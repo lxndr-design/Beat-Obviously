@@ -1,0 +1,26 @@
+.hint {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-1);
+  opacity: 0.6;
+  margin-bottom: var(--space-2);
+}
+
+.empty {
+  padding: var(--space-3);
+  text-align: center;
+  border: var(--border-fg);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.point {
+  display: grid;
+  grid-template-columns: auto repeat(7, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-bottom: var(--border-fg);
+}

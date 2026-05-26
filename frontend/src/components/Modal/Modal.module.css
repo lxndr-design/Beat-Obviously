@@ -1,0 +1,90 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--color-scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: beat-scrim-fade var(--duration-hover) var(--ease-out) forwards;
+}
+
+.modal {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: var(--border-fg);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.width-sm   { width: var(--width-modal-sm); }
+.width-md   { width: var(--width-modal-md); }
+.width-lg   { width: var(--width-modal-lg); }
+.width-full { width: calc(100vw - var(--space-8)); height: calc(100vh - var(--space-8)); }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 0 var(--space-1);
+  min-height: var(--modal-header-height);
+  border-bottom: var(--border-fg);
+  flex-shrink: 0;
+}
+
+.titleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.title {
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-uppercase);
+  line-height: 1;
+}
+
+.subtitle {
+  font-size: 11px;
+  font-family: var(--font-family-mono);
+  opacity: 0.6; /* deliberate exception — meta text, never on actionable controls */
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  width: var(--modal-header-height);
+  height: auto;
+  background: transparent;
+  color: var(--color-fg);
+  transition: var(--transition-invert);
+}
+
+.closeBtn:hover {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--modal-padding);
+}
+
+.footer {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 0;
+  padding: 0;
+  min-height: var(--modal-footer-height);
+  border-top: var(--border-fg);
+  flex-shrink: 0;
+}

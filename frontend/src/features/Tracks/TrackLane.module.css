@@ -1,0 +1,23 @@
+.lane {
+  position: relative;
+  background: var(--color-bg);
+  flex-shrink: 0;
+  border-bottom: var(--border-fg);
+}
+
+.gridLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--grid-line-faint);
+  pointer-events: none;
+}
+.gridLineMajor {
+  background: var(--grid-line-mid);
+}
+
+.dragOver {
+  /* subtle drag-target indicator using the gridline opacity scale */
+  background: var(--grid-line-faint);
+}

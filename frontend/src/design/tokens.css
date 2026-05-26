@@ -1,0 +1,187 @@
+/*
+ * Beat design tokens.
+ * The full source of visual truth. Components consume these via var(--token).
+ * Never hardcode colors, sizes, or durations in component CSS.
+ */
+
+:root {
+  /* === Colors =========================================================
+   * Only black and white. The opacities below are reserved for gridlines
+   * *inside* objects (tracks, segments, timeline). They MUST NOT appear
+   * on buttons, borders, text, or any standalone surface.
+   */
+  --color-bg: #000000;
+  --color-fg: #ffffff;
+  --color-bg-inverse: #ffffff;
+  --color-fg-inverse: #000000;
+
+  /* Modal/overlay scrim — only legitimate semi-transparent value */
+  --color-scrim: rgba(0, 0, 0, 0.6);
+
+  /* Light green — the ONE chromatic exception. Used for text selection only. */
+  --color-highlight: #a8ff8c;
+  --color-highlight-fg: #000000;
+
+  /* Off-white — the only "hover" tint allowed, and only on surfaces that
+   * are ALREADY white/foreground (e.g. an active Solo button, MIDI segment,
+   * the Play button while playing, the scrollbar thumb, an active beat
+   * cell in the time-signature picker). For everything else, hover stays
+   * a pure color-invert. */
+  --color-fg-hover: rgba(230, 230, 230, 0.8);
+
+  /* Inside-object gridline opacities — never use outside their context */
+  --grid-line-faint: rgba(255, 255, 255, 0.08);
+  --grid-line-soft:  rgba(255, 255, 255, 0.12);
+  --grid-line-mid:   rgba(255, 255, 255, 0.16);
+  --grid-line-bold:  rgba(255, 255, 255, 0.45);  /* bold-beat tick */
+
+  /* === Spacing (8px grid) ============================================ */
+  --space-unit: 8px;
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 40px;
+  --space-6: 48px;
+  --space-7: 56px;
+  --space-8: 64px;
+  --space-10: 80px;
+  --space-12: 96px;
+  --space-16: 128px;
+
+  /* === Borders ========================================================
+   * 1px is the only stroke weight. Used to delineate structure.
+   */
+  --border-width: 1px;
+  --border-fg: 1px solid var(--color-fg);
+  --border-bg: 1px solid var(--color-bg);
+
+  /* === Typography ===================================================== */
+  --font-family-base:
+    "Helvetica Neue",
+    "HelveticaNeue",
+    "Helvetica",
+    "Arial",
+    system-ui,
+    sans-serif;
+  --font-family-mono:
+    "Berkeley Mono",
+    "JetBrains Mono",
+    "SF Mono",
+    "Menlo",
+    "Consolas",
+    monospace;
+
+  /* 8-step ramp — min 16, max 90 */
+  --font-size-1: 16px;  /* body, controls */
+  --font-size-2: 20px;  /* secondary headings */
+  --font-size-3: 24px;  /* labels, small headings */
+  --font-size-4: 32px;  /* section headings */
+  --font-size-5: 40px;
+  --font-size-6: 56px;
+  --font-size-7: 72px;
+  --font-size-8: 90px;  /* hero */
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.0;
+  --line-height-snug: 1.2;
+  --line-height-base: 1.4;
+
+  --letter-spacing-tight: -0.01em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.04em;
+  --letter-spacing-uppercase: 0;
+
+  /* === Transitions ====================================================
+   * The entire transition vocabulary. Do not invent more.
+   */
+  --duration-hover: 0.1s;       /* hover info reveal, color invert */
+  --duration-slide: 0.2s;       /* panels, modals enter/leave */
+  --duration-flash: 0.05s;      /* playback flash to white */
+  --duration-fade: 0.4s;        /* playback fade back to black */
+
+  --ease-out: cubic-bezier(0.0, 0.0, 0.2, 1);
+  --ease-in:  cubic-bezier(0.4, 0.0, 1.0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --ease-linear: linear;
+
+  /* Reusable transition shorthands */
+  --transition-invert:
+    background-color var(--duration-hover) var(--ease-linear),
+    color var(--duration-hover) var(--ease-linear);
+  --transition-slide-x: transform var(--duration-slide) var(--ease-in-out);
+  --transition-slide-y: transform var(--duration-slide) var(--ease-in-out);
+  --transition-opacity: opacity var(--duration-hover) var(--ease-out);
+
+  /* === Layout ========================================================= */
+  --layout-max-width: 100vw;
+  --layout-app-height: 100vh;
+
+  /* Sidebar / panel widths use 8-grid multiples */
+  --width-sidebar: 256px;        /* 32 * 8 */
+  --width-instrument-panel: 384px; /* 48 * 8 */
+  --width-modal-sm: 384px;
+  --width-modal-md: 640px;
+  --width-modal-lg: 960px;
+
+  --height-topbar: 48px;          /* 6 * 8 — fits 32px controls + 8px gutter */
+  --height-transport: 64px;       /* 8 * 8 (deprecated — transport now in topbar) */
+  --height-track-row: 56px;       /* 7 * 8 */
+  --height-track-row-compact: 40px;
+  --height-track-header: 28px;
+  --height-timeline: 32px;
+  --height-eq-panel: 160px;       /* 20 * 8 — bottom EQ ribbon + sliders */
+
+  /* === Z-index scale ================================================== */
+  --z-base: 0;
+  --z-sticky: 100;
+  --z-floating: 200;     /* hover popovers */
+  --z-modal: 300;
+  --z-modal-stack-step: 10; /* additive per stacked modal */
+  --z-scrim: 400;        /* unsaved-check shadow */
+  --z-toast: 500;
+
+  /* === Component-specific tokens ====================================== */
+
+  /* Buttons — no outline, color-invert on hover. Icon-only buttons are
+   * always 1:1 (square). Sizes are 8-grid aligned. */
+  --button-padding-y: var(--space-1);
+  --button-padding-x: var(--space-2);
+  --button-min-height: 32px;
+  --button-min-width: 64px;
+  --button-square-xs: 28px;
+  --button-square-sm: 24px;
+  --button-square-md: 32px;
+  --button-square-lg: 40px;
+
+  /* Knobs — synth controls */
+  --knob-size-sm: 32px;
+  --knob-size-md: 48px;
+  --knob-size-lg: 64px;
+
+  /* Modal */
+  --modal-padding: var(--space-1);
+  --modal-header-height: 32px;
+  --modal-footer-height: 32px;
+
+  /* Track / segment */
+  --segment-min-width: 32px;
+  --segment-radius: 0; /* hard edges everywhere */
+}
+
+/* Theme inversion utility — for the few surfaces that need a white base.
+ * Apply class="theme-inverse" to a subtree.
+ */
+.theme-inverse {
+  --color-bg: #ffffff;
+  --color-fg: #000000;
+  --color-bg-inverse: #000000;
+  --color-fg-inverse: #ffffff;
+  --color-scrim: rgba(255, 255, 255, 0.6);
+  --grid-line-faint: rgba(0, 0, 0, 0.08);
+  --grid-line-soft:  rgba(0, 0, 0, 0.12);
+  --grid-line-mid:   rgba(0, 0, 0, 0.16);
+}

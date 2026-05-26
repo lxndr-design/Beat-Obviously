@@ -1,0 +1,104 @@
+.wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  gap: 4px;
+  padding: 0 var(--space-1);
+  border: var(--border-fg);
+  background: var(--color-bg);
+}
+
+.fillHeight {
+  height: 100%;
+}
+
+.label {
+  font-size: 11px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-uppercase);
+  font-weight: var(--font-weight-medium);
+  opacity: 0.7;
+}
+
+.trigger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 12px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  min-width: 0;
+  padding: 0 8px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: var(--border-fg);
+  font-family: var(--font-family-base);
+  font-size: 12px;
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-invert);
+}
+
+.inline .trigger {
+  height: auto;
+  min-width: 128px;
+  padding: 0;
+  border: 0;
+}
+
+.fillHeight .trigger {
+  height: 100%;
+}
+
+.trigger:hover {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.menu {
+  border: var(--border-fg);
+  background: var(--color-bg);
+  padding: 0;
+}
+
+.option {
+  display: block;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-fg);
+  border: 0;
+  border-bottom: var(--border-fg);
+  font-family: var(--font-family-base);
+  font-size: 12px;
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-invert);
+}
+
+.option:last-child {
+  border-bottom: 0;
+}
+
+.option:hover,
+.optionSelected {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}

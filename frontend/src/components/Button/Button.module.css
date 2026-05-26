@@ -1,0 +1,115 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: var(--button-min-height);
+  min-width: var(--button-min-width);
+  padding: var(--button-padding-y) var(--button-padding-x);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-family-base);
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-uppercase);
+  text-transform: uppercase;
+  border: 0;
+  transition: var(--transition-invert);
+  white-space: nowrap;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.button:active:not(:disabled) {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+  transform: translateY(1px); /* subtle press feedback within design rules */
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+/* Variants ------------------------------------------------------------- */
+.variant-default { /* default state */ }
+
+.variant-primary {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+/* Already white — hover dims to the off-white token instead of inverting. */
+.variant-primary:hover:not(:disabled) {
+  background: var(--color-fg-hover);
+  color: var(--color-fg-inverse);
+}
+
+.variant-ghost {
+  background: transparent;
+}
+.variant-ghost:hover:not(:disabled) {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.variant-danger {
+  font-weight: var(--font-weight-bold);
+}
+
+/* Selected toggle state — same visual as primary, same off-white hover. */
+.selected {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+.selected:hover:not(:disabled) {
+  background: var(--color-fg-hover);
+  color: var(--color-fg-inverse);
+}
+
+/* Sizes ---------------------------------------------------------------- */
+.size-xs {
+  min-height: 28px;
+  min-width: 28px;
+  padding: 0 var(--space-1);
+  font-size: 11px;
+}
+
+.size-sm {
+  min-height: 24px;
+  min-width: 48px;
+  padding: 0 var(--space-1);
+  font-size: 11px;
+}
+
+.size-md {
+  /* default */
+}
+
+.size-lg {
+  min-height: 48px;
+  min-width: 96px;
+  padding: var(--space-1) var(--space-3);
+  font-size: 13px;
+}
+
+/* Icon-only: 1:1 ratio. Sizes pin to --button-square-* tokens. */
+.iconOnly {
+  padding: 0;
+  text-transform: none;
+  letter-spacing: normal;
+  aspect-ratio: 1;
+}
+
+.iconOnly.size-xs { width: var(--button-square-xs); height: var(--button-square-xs); min-width: 0; min-height: 0; }
+.iconOnly.size-sm { width: var(--button-square-sm); height: var(--button-square-sm); min-width: 0; min-height: 0; }
+.iconOnly.size-md { width: var(--button-square-md); height: var(--button-square-md); min-width: 0; min-height: 0; }
+.iconOnly.size-lg { width: var(--button-square-lg); height: var(--button-square-lg); min-width: 0; min-height: 0; }

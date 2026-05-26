@@ -1,0 +1,10 @@
+CR-78 one-shot samples
+
+Source: https://oramics.github.io/sampled/DM/CR-78/
+Collection: Oramics sampled / CR-78
+License: Public Domain
+
+Files used:
+- cymbal.wav
+- guiro-short.wav
+- tamb-short.wav

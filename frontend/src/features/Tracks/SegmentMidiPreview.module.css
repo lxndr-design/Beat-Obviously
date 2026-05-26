@@ -1,0 +1,9 @@
+.svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.note {
+  fill: var(--color-bg); /* black on white segment body */
+}

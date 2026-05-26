@@ -1,0 +1,25 @@
+.popover {
+  position: fixed;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: var(--border-fg);
+  padding: 4px var(--space-1);
+  font-size: 11px;
+  max-width: 240px;
+  z-index: 200; /* var(--z-floating) */
+  pointer-events: none;
+  white-space: normal;
+}
+
+.placement-top {
+  transform: translate(-50%, calc(-100% - var(--space-1)));
+}
+.placement-bottom {
+  transform: translate(-50%, var(--space-1));
+}
+.placement-left {
+  transform: translate(calc(-100% - var(--space-1)), -50%);
+}
+.placement-right {
+  transform: translate(var(--space-1), -50%);
+}

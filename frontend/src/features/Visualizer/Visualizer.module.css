@@ -1,0 +1,7 @@
+.host {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.15; /* deliberately low — background only */
+}

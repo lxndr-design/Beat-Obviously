@@ -1,0 +1,110 @@
+.header {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--height-track-row);
+  padding: 0 var(--space-1);
+  border-bottom: var(--border-fg);
+  background: var(--color-bg);
+}
+
+.dragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--color-fg);
+  opacity: 0;
+  cursor: grab;
+  transition: var(--transition-opacity);
+}
+
+.header:hover .dragHandle {
+  opacity: 0.6;
+}
+
+.name {
+  background: transparent;
+  color: var(--color-fg);
+  border: 0;
+  font-family: var(--font-family-base);
+  font-size: 12px;
+  text-align: left;
+  padding: 0;
+  cursor: text;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.nameInput {
+  background: transparent;
+  color: var(--color-fg);
+  border: 0;
+  outline: 0;
+  font-family: var(--font-family-base);
+  font-size: 12px;
+  width: 100%;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Small circular Solo/Mute buttons. Border-radius exception is OK for
+ * this specific control per user spec. */
+.dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: 1px solid var(--color-fg);
+  font-family: var(--font-family-base);
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  padding: 0;
+  transition: var(--transition-invert);
+}
+
+.dot:hover {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.dotOn {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+/* Active dot + hover → off-white tint. Specificity (0,3,0) > .dot:hover (0,2,0). */
+.dot.dotOn:hover {
+  background: var(--color-fg-hover);
+  color: var(--color-fg-inverse);
+}
+
+.dot:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.dot:disabled:hover {
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+/* Reorder-drag drop indicators (inset shadow lines top/bottom). */
+.dropAbove {
+  box-shadow: inset 0 2px 0 0 var(--color-fg);
+}
+.dropBelow {
+  box-shadow: inset 0 -2px 0 0 var(--color-fg);
+}

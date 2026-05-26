@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:5173/)",
+      "Bash(curl -s http://localhost:5194/)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} \\(%{size_download} bytes\\)\\\\n\" http://localhost:5194/src/main.tsx)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s http://localhost:5174/)",
+      "Bash(curl -s http://localhost:6174/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:6174/)"
+    ]
+  }
+}

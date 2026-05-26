@@ -1,0 +1,89 @@
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Inline label + control — single-row field per spec. */
+.field {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--space-1);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: var(--border-fg);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  gap: 4px;
+}
+
+.label {
+  font-family: var(--font-family-base);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-uppercase);
+  font-weight: var(--font-weight-medium);
+  opacity: 0.7;
+}
+
+.input {
+  width: 56px;
+  background: transparent;
+  color: var(--color-fg);
+  border: 0;
+  outline: 0;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  text-align: right;
+}
+
+.select {
+  min-width: 128px;
+  background: transparent;
+  color: var(--color-fg);
+  border: 0;
+  outline: 0;
+  font-family: var(--font-family-base);
+  font-size: 12px;
+}
+
+/* Beat the global input:focus-visible / select:focus-visible outline from
+ * reset.css — the outer .field frame already delineates each control. */
+.field .input:focus,
+.field .input:focus-visible,
+.field .select:focus,
+.field .select:focus-visible {
+  outline: 0;
+  box-shadow: none;
+}
+
+.transportSlot {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.audioPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: var(--border-fg);
+  margin-top: var(--space-1);
+}
+
+.audioLabel {
+  font-size: var(--font-size-1);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-uppercase);
+  font-weight: var(--font-weight-medium);
+}
+
+.audioHint {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  opacity: 0.7;
+}

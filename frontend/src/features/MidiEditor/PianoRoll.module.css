@@ -1,0 +1,144 @@
+.rollWrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.editorFrame {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  border: var(--border-fg);
+  min-width: 0;
+}
+
+.keysScroll {
+  overflow: hidden;
+  background: var(--color-bg);
+  border-right: var(--border-fg);
+  position: relative;
+  z-index: 4;
+}
+
+.timeScroll {
+  overflow: auto;
+  min-width: 0;
+  background: var(--color-bg);
+}
+
+.inner {
+  position: relative;
+}
+
+/* Key column — pitch labels with optional black-key shading */
+.keys {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  position: relative;
+  z-index: 5;
+}
+
+.key {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 var(--space-1);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  color: var(--color-fg);
+  opacity: 0.7;
+  border-bottom: 1px solid var(--grid-line-faint);
+}
+
+.keyBlack {
+  background: var(--grid-line-faint);
+  opacity: 0.9;
+}
+
+/* Grid */
+.grid {
+  position: relative;
+  background: var(--color-bg);
+  cursor: crosshair;
+}
+
+.row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-bottom: 1px solid var(--grid-line-faint);
+  pointer-events: none;
+}
+
+.rowBlack {
+  background: var(--grid-line-faint);
+}
+
+.beatLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--grid-line-faint);
+  pointer-events: none;
+}
+.beatLineMajor {
+  background: var(--grid-line-mid);
+}
+
+/* Note: white outline, black fill per design spec */
+.note {
+  position: absolute;
+  background: var(--color-bg);
+  border: 1px solid var(--color-fg);
+  cursor: grab;
+  z-index: 1;
+}
+.note:active {
+  cursor: grabbing;
+}
+
+.noteSelected {
+  background: var(--color-fg);
+}
+
+.noteResize {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: ew-resize;
+}
+
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-fg);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.help {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  opacity: 0.6;
+  min-width: 0;
+}
+
+.zoomControls {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0;
+  border: var(--border-fg);
+  background: var(--color-bg);
+}

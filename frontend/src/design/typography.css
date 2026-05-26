@@ -1,0 +1,54 @@
+/* Typography utility classes.
+ * Components compose these via className or by referencing tokens directly. */
+
+.text-1 { font-size: var(--font-size-1); line-height: var(--line-height-base); }
+.text-2 { font-size: var(--font-size-2); line-height: var(--line-height-snug); }
+.text-3 { font-size: var(--font-size-3); line-height: var(--line-height-snug); }
+.text-4 { font-size: var(--font-size-4); line-height: var(--line-height-snug); }
+.text-5 { font-size: var(--font-size-5); line-height: var(--line-height-tight); }
+.text-6 { font-size: var(--font-size-6); line-height: var(--line-height-tight); letter-spacing: var(--letter-spacing-tight); }
+.text-7 { font-size: var(--font-size-7); line-height: var(--line-height-tight); letter-spacing: var(--letter-spacing-tight); }
+.text-8 { font-size: var(--font-size-8); line-height: var(--line-height-tight); letter-spacing: var(--letter-spacing-tight); }
+
+.text-regular { font-weight: var(--font-weight-regular); }
+.text-medium  { font-weight: var(--font-weight-medium); }
+.text-bold    { font-weight: var(--font-weight-bold); }
+
+.text-mono { font-family: var(--font-family-mono); }
+
+.text-uppercase {
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-uppercase);
+}
+
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Semantic role classes — preferred over text-N where meaningful */
+.text-label {
+  font-size: var(--font-size-1);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-uppercase);
+  font-weight: var(--font-weight-medium);
+}
+
+.text-meta {
+  font-size: var(--font-size-1);
+  font-family: var(--font-family-mono);
+}
+
+.text-heading {
+  font-size: var(--font-size-3);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.text-hero {
+  font-size: var(--font-size-8);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--letter-spacing-tight);
+}

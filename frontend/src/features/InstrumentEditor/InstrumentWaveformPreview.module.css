@@ -1,0 +1,55 @@
+.spanFull {
+  grid-column: 1 / -1;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-1);
+  border: var(--border-fg);
+  background: var(--color-bg);
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.headerRight {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.previewControls {
+  display: inline-flex;
+  flex-direction: row;
+  gap: var(--space-1);
+}
+
+.label,
+.meta {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-uppercase);
+  font-weight: var(--font-weight-bold);
+}
+
+.label {
+  opacity: 0.8;
+}
+
+.meta {
+  opacity: 0.55;
+}
+
+.canvas {
+  width: 100%;
+  height: 72px;
+  display: block;
+  background: var(--color-bg);
+}

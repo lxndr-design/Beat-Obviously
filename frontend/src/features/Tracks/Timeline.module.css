@@ -1,0 +1,47 @@
+.timeline {
+  position: relative;
+  height: var(--height-timeline);
+  border-top: var(--border-fg);
+  background: var(--color-bg);
+  margin-top: auto;
+  flex-shrink: 0;
+  cursor: ew-resize;
+  user-select: none;
+}
+
+.tick {
+  position: absolute;
+  top: 14px;
+  bottom: 0;
+  width: 1px;
+  background: var(--grid-line-faint);
+}
+
+.tick.major {
+  top: 7px;
+  background: var(--grid-line-mid);
+}
+
+.tick.bold {
+  top: 0;
+  width: 2px;
+  background: var(--grid-line-bold);
+}
+
+.timeLabelTick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.label {
+  position: absolute;
+  left: 4px;
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  color: var(--color-fg);
+  opacity: 0.7;
+  white-space: nowrap;
+  bottom: 2px;
+}

@@ -1,0 +1,10 @@
+.fullOverlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 400; /* var(--z-scrim) */
+  animation: beat-scrim-fade var(--duration-hover) var(--ease-out) forwards;
+}

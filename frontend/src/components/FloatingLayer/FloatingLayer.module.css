@@ -1,0 +1,7 @@
+.layer {
+  position: fixed;
+  left: var(--floating-layer-x);
+  top: var(--floating-layer-y);
+  width: var(--floating-layer-width, auto);
+  z-index: var(--z-toast);
+}

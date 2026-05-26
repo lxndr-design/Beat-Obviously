@@ -1,0 +1,11 @@
+.svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.waveform {
+  stroke: var(--color-bg);
+  stroke-width: 0.6;
+  fill: none;
+}

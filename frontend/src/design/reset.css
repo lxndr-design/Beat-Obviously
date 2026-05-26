@@ -1,0 +1,90 @@
+/* Minimal element reset. Modern browsers, no IE accommodations. */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-1);
+  line-height: var(--line-height-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  user-select: none;
+}
+
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: var(--border-fg);
+  outline-offset: -1px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul, ol {
+  list-style: none;
+}
+
+img, svg, canvas {
+  display: block;
+  max-width: 100%;
+}
+
+/* Disable selection by default — DAW UI behavior.
+ * Inputs explicitly opt back in. */
+input, textarea, [contenteditable], .selectable {
+  user-select: text;
+}
+
+/* Scrollbars — black/white only */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-fg);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-fg);
+}
+
+/* Drag preview ghosts are problematic with this aesthetic; hide them */
+[draggable]:active {
+  cursor: grabbing;
+}

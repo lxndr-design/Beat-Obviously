@@ -1,0 +1,107 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 100%;
+  padding: 0 var(--space-1);
+  border-bottom: var(--border-fg);
+  background: var(--color-bg);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.playback {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Unified input frame shared by the time display, TS button, and inline
+ * number fields so the entire playback row reads as one cohesive control. */
+.field {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--space-1);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: var(--border-fg);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.timeField {
+  min-width: 80px;
+  justify-content: center;
+  /* The time display reads as plain text, not a control — drop the frame. */
+  border: 0;
+  padding: 0 var(--space-1);
+}
+
+.tsWrap {
+  position: relative;
+}
+
+.tsBtn {
+  gap: 4px;
+  cursor: pointer;
+  transition: var(--transition-invert);
+  min-width: 56px;
+  justify-content: space-between;
+}
+.tsBtn:hover {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  min-width: 96px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: var(--border-fg);
+  display: flex;
+  flex-direction: column;
+  z-index: 200;
+  animation: beat-hover-reveal var(--duration-hover) var(--ease-out) forwards;
+}
+
+.dropItem {
+  height: 24px;
+  padding: 0 var(--space-1);
+  background: transparent;
+  color: var(--color-fg);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  text-align: left;
+  transition: var(--transition-invert);
+  cursor: pointer;
+}
+.dropItem:hover {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.dropSep {
+  height: 1px;
+  background: var(--color-fg);
+  opacity: 0.4;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-right: var(--space-1);
+}

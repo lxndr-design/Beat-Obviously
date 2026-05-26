@@ -1,0 +1,13 @@
+.dithered {
+  display: block;
+  background: var(--color-bg);
+  /* Crisp pixels — never let the browser smooth the dither */
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  opacity: 0;
+  transition: var(--transition-opacity);
+}
+
+.ready {
+  opacity: 1;
+}

@@ -1,0 +1,65 @@
+.menu {
+  position: fixed;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: var(--border-fg);
+  min-width: 192px;
+  max-width: 320px;
+  padding: 0;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  /* Slide-in feel — quick scale from 8px y-offset */
+  animation: beat-hover-reveal var(--duration-hover) var(--ease-out) forwards;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: var(--space-3) 1fr auto;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: var(--button-square-md);
+  padding: 0 var(--space-1);
+  background: transparent;
+  color: var(--color-fg);
+  font-size: var(--font-size-1);
+  font-family: var(--font-family-base);
+  text-align: left;
+  transition: var(--transition-invert);
+  cursor: pointer;
+}
+
+.item:hover:not(:disabled) {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.itemIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-3);
+}
+
+.itemLabel {
+  white-space: nowrap;
+}
+
+.itemHint {
+  font-family: var(--font-family-mono);
+  opacity: 0.6;
+  padding-left: var(--space-2);
+}
+
+.separator {
+  height: 1px;
+  background: var(--color-fg);
+  opacity: 0.4; /* internal-divider exception, like gridlines */
+  margin: 0;
+}

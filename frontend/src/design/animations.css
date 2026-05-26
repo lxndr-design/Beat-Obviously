@@ -1,0 +1,78 @@
+/* The entire animation vocabulary for Beat.
+ * Every other component imports from here. Do not redefine keyframes
+ * in component files unless you're adding a fundamentally new motion. */
+
+/* ----- Playback flash (track / segment) -------------------------------
+ * Flash to white, fade back to black. Mirrors the "white outline black
+ * fill" MIDI aesthetic — the white pulse on a playback tick reads as
+ * "active" without needing color.
+ */
+@keyframes beat-playback-flash {
+  0%   { background: var(--color-fg); }
+  100% { background: var(--color-bg); }
+}
+
+.animate-playback-flash {
+  animation: beat-playback-flash var(--duration-fade) var(--ease-out) forwards;
+}
+
+/* ----- Slide-in panel/modal ------------------------------------------- */
+@keyframes beat-slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes beat-slide-in-left {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes beat-slide-in-bottom {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes beat-slide-in-top {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0); }
+}
+
+.animate-slide-in-right  { animation: beat-slide-in-right  var(--duration-slide) var(--ease-in-out) forwards; }
+.animate-slide-in-left   { animation: beat-slide-in-left   var(--duration-slide) var(--ease-in-out) forwards; }
+.animate-slide-in-bottom { animation: beat-slide-in-bottom var(--duration-slide) var(--ease-in-out) forwards; }
+.animate-slide-in-top    { animation: beat-slide-in-top    var(--duration-slide) var(--ease-in-out) forwards; }
+
+/* ----- Color invert (button hover, toggle) ---------------------------- */
+.hover-invert {
+  transition: var(--transition-invert);
+}
+.hover-invert:hover {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+/* ----- Hover info reveal --------------------------------------------- */
+@keyframes beat-hover-reveal {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-hover-reveal {
+  animation: beat-hover-reveal var(--duration-hover) var(--ease-out) forwards;
+}
+
+/* ----- Modal scrim fade --------------------------------------------- */
+@keyframes beat-scrim-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-scrim-fade {
+  animation: beat-scrim-fade var(--duration-hover) var(--ease-out) forwards;
+}
+
+/* Respect user motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

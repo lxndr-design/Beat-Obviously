@@ -1,0 +1,106 @@
+.area {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  overflow-y: auto;
+}
+
+.headerCol {
+  display: flex;
+  flex-direction: column;
+  border-right: var(--border-fg);
+  background: var(--color-bg);
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+
+/* "Add track" button at the bottom of the header column. */
+.addRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 32px;
+  padding: 0 var(--space-1);
+  background: transparent;
+  color: var(--color-fg);
+  border: 0;
+  border-bottom: var(--border-fg);
+  font-family: var(--font-family-base);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition-invert);
+}
+
+.addRow:hover {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.timelineSpacer {
+  height: var(--height-timeline);
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+/* Wrap around the lane scroll — establishes a positioning context for the
+ * floating zoom cluster (anchored to the visible lane viewport). */
+.laneWrap {
+  position: relative;
+  min-width: 0;
+}
+
+.laneScroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+  height: 100%;
+}
+
+/* Scoped horizontal-scrollbar framing — a 1px inset outline on the track
+ * so the scrollbar reads as a framed control. Inset (not border) keeps the
+ * full 8px track height intact. */
+.laneScroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.laneScroll::-webkit-scrollbar-track {
+  background: var(--color-bg);
+  box-shadow: inset 0 0 0 1px var(--color-fg);
+}
+.laneScroll::-webkit-scrollbar-thumb {
+  background: var(--color-fg);
+}
+.laneScroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-fg-hover);
+}
+
+.lanesInner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+/* Empty row in the lane column matching the +add-track row's 32px height
+ * so the column rows stay vertically aligned with the header column. */
+.addRowLaneSpacer {
+  height: 32px;
+  flex-shrink: 0;
+}
+
+/* Floating zoom cluster — absolutely positioned on the lane *viewport*
+ * (not the scroll content), 8px from the bottom-right edge. */
+.zoomFloat {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  display: flex;
+  gap: 0;
+  padding: 0;
+  background: var(--color-bg);
+  border: var(--border-fg);
+  z-index: 3;
+}

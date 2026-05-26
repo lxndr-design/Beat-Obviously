@@ -1,0 +1,64 @@
+/* Design system entry point — import order matters.
+ * tokens → reset → typography → animations. */
+
+@import "./tokens.css";
+@import "./reset.css";
+@import "./typography.css";
+@import "./animations.css";
+
+/* Light-green text-selection — the single chromatic exception. */
+::selection {
+  background: var(--color-highlight);
+  color: var(--color-highlight-fg);
+}
+::-moz-selection {
+  background: var(--color-highlight);
+  color: var(--color-highlight-fg);
+}
+
+/* App-wide layout primitives */
+
+.app-root {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: var(--height-topbar) 1fr;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  overflow: hidden;
+}
+
+.app-main {
+  display: flex;       /* sidebar owns its width via inline style */
+  min-height: 0;
+}
+
+/* Main column flexes to fill what the sidebar doesn't take. */
+.main-col {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-rows: 1fr var(--height-eq-panel);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Structural border helpers — these are the *only* legitimate uses of
+ * outlines/borders outside component-internal grid lines. */
+.divider-h { border-bottom: var(--border-fg); }
+.divider-v { border-right:  var(--border-fg); }
+.frame     { border:        var(--border-fg); }
+
+/* Generic flex / grid helpers — kept narrow on purpose */
+.row    { display: flex; flex-direction: row; }
+.col    { display: flex; flex-direction: column; }
+.center { display: flex; align-items: center; justify-content: center; }
+.fill   { width: 100%; height: 100%; }
+.grow   { flex-grow: 1; min-width: 0; min-height: 0; }
+.gap-1  { gap: var(--space-1); }
+.gap-2  { gap: var(--space-2); }
+.gap-3  { gap: var(--space-3); }
+.gap-4  { gap: var(--space-4); }
+.pad-1  { padding: var(--space-1); }
+.pad-2  { padding: var(--space-2); }
+.pad-3  { padding: var(--space-3); }
+.pad-4  { padding: var(--space-4); }

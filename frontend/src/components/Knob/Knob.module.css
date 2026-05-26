@@ -1,0 +1,55 @@
+.knob {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+}
+
+.dial {
+  cursor: ns-resize;
+  width: var(--knob-size-md);
+  height: var(--knob-size-md);
+}
+
+.size-sm .dial { width: var(--knob-size-sm); height: var(--knob-size-sm); }
+.size-md .dial { width: var(--knob-size-md); height: var(--knob-size-md); }
+.size-lg .dial { width: var(--knob-size-lg); height: var(--knob-size-lg); }
+
+.svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The value readout is a button-as-text — no styling, just editable. */
+.value,
+.editValue {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  color: var(--color-fg);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-align: center;
+  min-height: var(--space-2);
+  cursor: text;
+  width: 64px;
+}
+
+.value:hover {
+  /* No styling change on hover per "really basic" instruction */
+}
+
+.editValue {
+  outline: none;
+  caret-color: var(--color-fg);
+}
+
+.label {
+  font-size: 11px;
+  line-height: 1.1;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-uppercase);
+  font-weight: var(--font-weight-medium);
+}

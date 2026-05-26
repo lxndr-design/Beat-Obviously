@@ -1,0 +1,54 @@
+.svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: default;
+  background: var(--color-bg);
+}
+
+.zeroLine {
+  stroke: var(--color-fg);
+  stroke-width: 1;
+  opacity: 0.5;
+}
+
+.gridLine {
+  stroke: var(--color-fg);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  opacity: 0.15;
+}
+
+.response {
+  stroke: var(--color-fg);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+/* Outline-only by default — stroke white, fill black (bg). */
+.dot {
+  fill: var(--color-bg);
+  stroke: var(--color-fg);
+  stroke-width: 1.5;
+  cursor: ns-resize;
+  transition:
+    r var(--duration-hover) var(--ease-out),
+    fill var(--duration-hover) var(--ease-out);
+}
+
+.dotActive {
+  fill: var(--color-fg);
+}
+
+.freqLabel {
+  fill: var(--color-fg);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.dbReadout {
+  fill: var(--color-fg);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+}

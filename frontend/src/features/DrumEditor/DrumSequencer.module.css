@@ -1,0 +1,264 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  outline: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.transportBlock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  height: 32px;
+  border: var(--border-fg);
+  background: var(--color-bg);
+}
+
+.zoomControl {
+  display: inline-flex;
+  gap: 0;
+  margin-left: auto;
+}
+
+.sequenceShell {
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr);
+  gap: 6px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.instrumentColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: var(--color-bg);
+}
+
+.headerStub {
+  height: 20px;
+}
+
+.rowControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--cell-size);
+  gap: 4px;
+  height: var(--cell-size);
+  min-height: var(--cell-size);
+}
+
+.addRowControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--button-square-xs);
+  gap: 0;
+  min-height: var(--cell-size);
+}
+
+.addRowSpacer {
+  min-height: var(--cell-size);
+}
+
+.rowControls .rowRemoveButton {
+  width: var(--cell-size);
+  height: var(--cell-size);
+}
+
+.stepScroller {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.stepPlane {
+  --cell-gap: 4px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: max-content;
+  min-width: 100%;
+}
+
+.playColumn {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(
+    var(--play-step) * (var(--cell-size) + var(--cell-gap))
+  );
+  width: var(--cell-size);
+  background: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.stepHeader,
+.stepGrid {
+  display: grid;
+  grid-template-columns: repeat(var(--step-count), var(--cell-size));
+  gap: var(--cell-gap);
+}
+
+.stepHeader {
+  position: relative;
+  z-index: 3;
+}
+
+.stepRows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stepNumber {
+  height: 20px;
+  min-width: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: 0;
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.stepGrid {
+  padding: 0;
+  background: var(--grid-line-faint);
+}
+
+.stepCell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--cell-size);
+  height: var(--cell-size);
+  min-width: 0;
+  padding: 0;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  cursor: pointer;
+  transition: var(--transition-invert);
+}
+
+.stepCell:focus,
+.stepCell:focus-visible {
+  outline: 0;
+  box-shadow: none;
+}
+
+.stepCell:hover {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.stepCellOn {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.stepCellOn:hover {
+  background: var(--color-fg-hover);
+}
+
+.stepCellSelected {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.stepCellOn.stepCellSelected {
+  background: var(--color-fg-hover);
+}
+
+.cellNote {
+  font-family: var(--font-family-base);
+  font-size: 8px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.stepCellTuned .cellNote {
+  color: var(--color-fg);
+}
+
+.stepCellOn .cellNote,
+.stepCellOn:hover .cellNote {
+  color: var(--color-fg-inverse);
+}
+
+.cellMenu,
+.pitchPopover {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: var(--border-fg);
+}
+
+.cellMenu {
+  display: flex;
+  flex-direction: column;
+  min-width: 144px;
+}
+
+.cellMenuItem {
+  height: 28px;
+  padding: 0 8px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: 0;
+  border-bottom: var(--border-fg);
+  font-family: var(--font-family-base);
+  font-size: 12px;
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-invert);
+}
+
+.cellMenuItem:last-child {
+  border-bottom: 0;
+}
+
+.cellMenuItem:hover:not(:disabled) {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.cellMenuItem:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pitchPopover {
+  width: 184px;
+  padding: 8px;
+}
+
+.pitchField {
+  width: 100%;
+}
+
+.pitchError {
+  margin-top: 6px;
+  font-family: var(--font-family-base);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.pitchActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0;
+  margin-top: 8px;
+}

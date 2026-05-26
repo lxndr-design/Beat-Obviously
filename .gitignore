@@ -1,0 +1,39 @@
+# Build
+build/
+cmake-build-*/
+out/
+*.o
+*.obj
+*.exe
+*.app/
+DerivedData/
+
+# JUCE / Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+JuceLibraryCode/
+
+# Node / Vite
+node_modules/
+frontend/dist/
+frontend/.vite/
+.npm/
+.pnpm-store/
+
+# Generated
+*.log
+.DS_Store
+.env
+.env.local
+*.tsbuildinfo
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Beat-specific
+*.beat.tmp
+samples-cache/

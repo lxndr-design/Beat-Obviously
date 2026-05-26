@@ -1,0 +1,167 @@
+.segment {
+  position: absolute;
+  background: var(--color-fg);          /* white body — same for audio & midi */
+  color: var(--color-fg-inverse);
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  user-select: none;
+  border: 1px solid var(--color-fg);
+  transition: background var(--duration-hover) var(--ease-linear);
+}
+
+.segment::before,
+.segment::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-bg);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.segment::before {
+  left: 0;
+}
+
+.segment::after {
+  right: 0;
+}
+
+/* Hover dims the already-white body to the off-white token. */
+.segment:hover {
+  background: var(--color-fg-hover);
+}
+
+.selected {
+  outline: 2px solid var(--color-fg);
+  outline-offset: -2px;
+}
+
+.layered {
+}
+
+.layered .body {
+  opacity: 0.9;
+}
+
+.virtual {
+  border-left: 1px dashed var(--color-fg);
+  opacity: 0.55;
+}
+
+/* ----- Layout: handles | body | handle ----- */
+.body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  cursor: grab;
+}
+.body:active {
+  cursor: grabbing;
+}
+
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  cursor: ew-resize;
+  background: rgba(255, 255, 255, 0.9);
+  opacity: 0;
+  transition: var(--transition-opacity);
+  z-index: 6;
+}
+.segment:hover .handle {
+  opacity: 1;
+}
+
+.handleLeft  { left: 0; }
+.handleRight { right: 0; }
+
+/* ----- Top "clip header" strip — black bg, white text.
+ *
+ * Spacing rhythm per spec:
+ *   - 4px padding around the nameplate (strip padding)
+ *   - 1px padding around the text inside the nameplate
+ *   - 4px column gap between nameplate and kind icon
+ *
+ * Height auto-fits the 16px kind icon + 4×2 strip padding = 24px.
+ */
+.labelStrip {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-fg);
+  min-height: 18px;
+}
+
+.nameplate {
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 1px;
+  gap: 3px;
+  line-height: 1;
+}
+
+.nameText {
+  font-family: var(--font-family-base);
+  font-size: 10px;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repBadge {
+  opacity: 0.7;
+}
+
+.kindIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+}
+
+/* ----- Body content area — black drawings on white background ----- */
+.content {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  background: inherit;                  /* picks up the hover tint */
+  color: var(--color-fg-inverse);
+  overflow: hidden;
+}
+
+.innerGrid {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(var(--space-2) - 1px),
+    rgba(0, 0, 0, 0.08) calc(var(--space-2) - 1px),
+    rgba(0, 0, 0, 0.08) var(--space-2)
+  );
+  pointer-events: none;
+}
+
+/* Track playback flash — applied when sequencer reports trigger */
+.segment.playing {
+  animation: beat-playback-flash var(--duration-fade) var(--ease-out);
+}
