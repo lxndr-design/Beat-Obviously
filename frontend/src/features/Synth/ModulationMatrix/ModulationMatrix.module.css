@@ -1,0 +1,36 @@
+.body {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+}
+
+.headerRow,
+.routeRow {
+  display: grid;
+  grid-template-columns: 40px minmax(96px, 0.8fr) minmax(136px, 1fr) minmax(80px, 0.45fr) 40px auto;
+  gap: var(--space-1);
+  align-items: center;
+  min-width: 0;
+  padding: var(--space-1);
+  border-bottom: var(--border-fg);
+}
+
+.headerRow {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-1);
+  text-transform: uppercase;
+}
+
+.routeRow:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 720px) {
+  .headerRow {
+    display: none;
+  }
+
+  .routeRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

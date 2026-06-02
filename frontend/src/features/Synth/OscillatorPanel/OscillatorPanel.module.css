@@ -1,0 +1,31 @@
+.body {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+}
+
+.strip {
+  display: grid;
+  grid-template-columns: auto minmax(160px, 1fr);
+  gap: var(--space-1);
+  align-items: center;
+  min-width: 0;
+}
+
+.knobs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: var(--space-2);
+  align-items: end;
+  min-width: 0;
+}
+
+.unison {
+  border: var(--border-fg);
+}
+
+@media (max-width: 560px) {
+  .strip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
