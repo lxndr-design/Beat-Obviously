@@ -1,9 +1,12 @@
-/* Design system entry point — import order matters.
- * tokens → reset → typography → animations. */
+/* Design system entry point - import order matters.
+ * tokens -> reset -> typography -> layout -> surfaces -> forms -> animations. */
 
 @import "./tokens.css";
 @import "./reset.css";
 @import "./typography.css";
+@import "./layout.css";
+@import "./surfaces.css";
+@import "./forms.css";
 @import "./animations.css";
 
 /* Light-green text-selection — the single chromatic exception. */
