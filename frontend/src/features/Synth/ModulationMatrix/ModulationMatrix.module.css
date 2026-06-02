@@ -1,0 +1,301 @@
+.body {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+}
+
+.headerRow,
+.routeRow {
+  display: grid;
+  grid-template-columns: 30px 100px 28px 126px 28px 112px 32px 28px;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  padding: 6px;
+  border-bottom: var(--border-fg);
+}
+
+.headerRow {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.routeRow:last-child {
+  border-bottom: 0;
+}
+
+.headerRow span:nth-child(7),
+.headerRow span:nth-child(8) {
+  justify-self: end;
+}
+
+.onCell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.onCell :global(button[role="switch"]) {
+  width: 28px;
+  height: 14px;
+}
+
+.onCell :global(button[role="switch"])::after {
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+}
+
+.onCell :global(button[role="switch"][aria-checked="true"])::after {
+  transform: translateX(14px);
+}
+
+.routeSelect {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourceSelect {
+  width: 100px;
+}
+
+.sourceCell {
+  min-width: 0;
+}
+
+.targetSelect {
+  width: 126px;
+}
+
+.targetMenu {
+  position: relative;
+  min-width: 0;
+  width: 126px;
+}
+
+.pickButton {
+  width: 28px;
+  height: 28px;
+  justify-self: center;
+}
+
+.targetTrigger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 12px;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 28px;
+  min-width: 0;
+  padding: 0 6px;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-invert);
+}
+
+.targetTrigger:hover {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.targetOptions {
+  overflow-y: auto;
+  border: var(--border-fg);
+  background: var(--color-bg);
+}
+
+.targetOption {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-bottom: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-invert);
+}
+
+.targetOption:last-child {
+  border-bottom: 0;
+}
+
+.targetOption:hover,
+.targetOptionSelected {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.targetLabel {
+  display: inline-grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.targetPrefix,
+.targetDivider {
+  opacity: 0.62;
+}
+
+.targetName {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--font-weight-medium);
+  text-overflow: ellipsis;
+}
+
+.strengthSlider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.strengthSlider input {
+  width: 100%;
+  min-width: 0;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--color-fg);
+}
+
+.strengthSlider span {
+  overflow: hidden;
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  line-height: 1;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.modeCell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.removeButton {
+  justify-self: end;
+}
+
+.modeButton,
+.modeStatic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+}
+
+.modeButton {
+  cursor: pointer;
+  transition: var(--transition-invert);
+}
+
+.modeButton:hover,
+.modeButtonActive {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.modeStatic {
+  opacity: 0.62;
+}
+
+.pickOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-toast);
+  pointer-events: none;
+}
+
+.pickCable {
+  position: fixed;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.pickCable path {
+  fill: none;
+  stroke: var(--color-fg);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--color-fg) 45%, transparent));
+  vector-effect: non-scaling-stroke;
+}
+
+.pickPlug {
+  position: fixed;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  pointer-events: none;
+}
+
+:global(body[data-synth-pick-mode="target"] [data-synth-target-id]),
+:global(body[data-synth-pick-mode="source"] [data-synth-source-id]) {
+  position: relative;
+}
+
+:global(body[data-synth-pick-mode="target"] [data-synth-target-id])::before,
+:global(body[data-synth-pick-mode="source"] [data-synth-source-id])::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, var(--color-fg) 50%, transparent 0) 0 0 / 8px 1px repeat-x,
+    linear-gradient(90deg, var(--color-fg) 50%, transparent 0) 0 100% / 8px 1px repeat-x,
+    linear-gradient(0deg, var(--color-fg) 50%, transparent 0) 0 0 / 1px 8px repeat-y,
+    linear-gradient(0deg, var(--color-fg) 50%, transparent 0) 100% 0 / 1px 8px repeat-y;
+  animation: synth-pick-marching-ants 0.55s linear infinite;
+}
+
+@keyframes synth-pick-marching-ants {
+  to {
+    background-position:
+      8px 0,
+      -8px 100%,
+      0 -8px,
+      100% 8px;
+  }
+}
+
+@media (max-width: 720px) {
+  .headerRow {
+    display: none;
+  }
+
+  .routeRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

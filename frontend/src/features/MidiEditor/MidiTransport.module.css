@@ -1,0 +1,5 @@
+.controls {
+  display: inline-flex;
+  gap: 0;
+  border: var(--border-fg);
+}

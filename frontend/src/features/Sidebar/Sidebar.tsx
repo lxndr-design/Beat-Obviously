@@ -20,6 +20,7 @@ export function Sidebar() {
   const width = useViewStore((s) => s.sidebarWidth);
   const setWidth = useViewStore((s) => s.setSidebarWidth);
   const [dragging, setDragging] = useState(false);
+  const [openPanel, setOpenPanel] = useState<"instruments" | "audio" | "components" | null>("instruments");
   const startRef = useRef<{ x: number; w: number } | null>(null);
 
   function onHandleDown(e: React.PointerEvent) {
@@ -49,13 +50,22 @@ export function Sidebar() {
   return (
     <aside className={styles.sidebar} style={{ width }}>
       <div className={styles.section}>
-        <InstrumentLibraryPanel />
+        <InstrumentLibraryPanel
+          expanded={openPanel === "instruments"}
+          onToggle={() => setOpenPanel(openPanel === "instruments" ? null : "instruments")}
+        />
       </div>
       <div className={styles.section}>
-        <AudioFileLibraryPanel />
+        <AudioFileLibraryPanel
+          expanded={openPanel === "audio"}
+          onToggle={() => setOpenPanel(openPanel === "audio" ? null : "audio")}
+        />
       </div>
       <div className={styles.section}>
-        <ComponentLibraryPanel />
+        <ComponentLibraryPanel
+          expanded={openPanel === "components"}
+          onToggle={() => setOpenPanel(openPanel === "components" ? null : "components")}
+        />
       </div>
       <div
         className={`${styles.resizeHandle} ${dragging ? styles.dragging : ""}`}

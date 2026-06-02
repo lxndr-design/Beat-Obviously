@@ -10,6 +10,7 @@ export interface NumberInputProps {
   label?: string;
   layout?: "stacked" | "inline";
   commitOnChange?: boolean;
+  maxLength?: number;
   onChange: (v: number) => void;
 }
 
@@ -27,6 +28,7 @@ export function NumberInput({
   label,
   layout = "stacked",
   commitOnChange = false,
+  maxLength,
   onChange,
 }: NumberInputProps) {
   const [text, setText] = useState(String(value));
@@ -78,6 +80,7 @@ export function NumberInput({
           className={styles.input}
           type="text"
           inputMode="numeric"
+          maxLength={maxLength}
           value={text}
           onChange={(e: ChangeEvent<HTMLInputElement>) => updateText(e.target.value)}
           onFocus={() => setEditing(true)}

@@ -1,0 +1,213 @@
+#include "WavetableFactory.h"
+#include "../Parameters/ParameterIds.h"
+
+#include <cmath>
+#include <vector>
+
+namespace beat
+{
+    namespace
+    {
+        constexpr double twoPi = juce::MathConstants<double>::twoPi;
+        constexpr int generatedMaxHarmonics = 64;
+
+        juce::String shapeId(BasicWavetableShape shape)
+        {
+            switch (shape)
+            {
+                case BasicWavetableShape::Sine: return juce::String(params::wavetable::basicSine.data());
+                case BasicWavetableShape::Saw: return juce::String(params::wavetable::basicSaw.data());
+                case BasicWavetableShape::Square: return juce::String(params::wavetable::basicSquare.data());
+                case BasicWavetableShape::Triangle: return juce::String(params::wavetable::basicTriangle.data());
+                case BasicWavetableShape::Pulse: return juce::String(params::wavetable::basicPulse.data());
+            }
+
+            return "basic.unknown";
+        }
+
+        juce::String shapeName(BasicWavetableShape shape)
+        {
+            switch (shape)
+            {
+                case BasicWavetableShape::Sine: return "Sine";
+                case BasicWavetableShape::Saw: return "Saw";
+                case BasicWavetableShape::Square: return "Square";
+                case BasicWavetableShape::Triangle: return "Triangle";
+                case BasicWavetableShape::Pulse: return "Pulse";
+            }
+
+            return "Unknown";
+        }
+
+        float harmonicAmplitude(BasicWavetableShape shape, int harmonic)
+        {
+            switch (shape)
+            {
+                case BasicWavetableShape::Sine:
+                    return harmonic == 1 ? 1.0f : 0.0f;
+
+                case BasicWavetableShape::Saw:
+                    return 1.0f / (float) harmonic;
+
+                case BasicWavetableShape::Square:
+                    return (harmonic % 2) == 1 ? 1.0f / (float) harmonic : 0.0f;
+
+                case BasicWavetableShape::Pulse:
+                {
+                    constexpr float duty = 0.25f;
+                    return (2.0f / (float) harmonic)
+                        * std::sin(juce::MathConstants<float>::pi * (float) harmonic * duty);
+                }
+
+                case BasicWavetableShape::Triangle:
+                    if ((harmonic % 2) == 0)
+                        return 0.0f;
+
+                    return (((harmonic - 1) / 2) % 2 == 0 ? 1.0f : -1.0f)
+                        / ((float) harmonic * (float) harmonic);
+            }
+
+            return 0.0f;
+        }
+
+        void normalizeFrame(std::vector<float>& samples, int frameStart, int frameSize)
+        {
+            float peak = 0.0f;
+            for (int i = 0; i < frameSize; ++i)
+                peak = juce::jmax(peak, std::abs(samples[(size_t) frameStart + (size_t) i]));
+
+            if (peak <= 0.000001f)
+                return;
+
+            const float gain = 0.95f / peak;
+            for (int i = 0; i < frameSize; ++i)
+                samples[(size_t) frameStart + (size_t) i] *= gain;
+        }
+
+        float customAmplitude(const WavetableFactory::CustomFrame& frame, int harmonic)
+        {
+            const float brightness = juce::jlimit(0.0f, 1.0f, frame.brightness);
+            const float even = juce::jlimit(0.0f, 1.0f, frame.even);
+            const float fold = juce::jlimit(0.0f, 1.0f, frame.fold);
+            const float parity = (harmonic % 2) == 1 ? 1.0f : even;
+            const float rolloff = std::exp(-(float) harmonic * (0.016f + (1.0f - brightness) * 0.085f));
+            const float center = 3.0f + brightness * 20.0f;
+            const float width = 1.6f + fold * 8.0f;
+            const float foldPeak = std::exp(-std::pow(((float) harmonic - center) / width, 2.0f));
+            const float motion = 1.0f + std::sin((float) harmonic * 1.7f + frame.phase * juce::MathConstants<float>::pi) * fold * 0.28f;
+            return juce::jmax(0.0f, parity * rolloff * motion / std::sqrt((float) harmonic) + foldPeak * fold * 0.35f);
+        }
+
+        float customPhase(const WavetableFactory::CustomFrame& frame, int harmonic)
+        {
+            const float fold = juce::jlimit(0.0f, 1.0f, frame.fold);
+            const float phase = juce::jlimit(-1.0f, 1.0f, frame.phase);
+            return phase * (float) harmonic * 0.28f + std::sin((float) harmonic * 0.41f) * fold * 0.55f;
+        }
+
+        WavetableFactory::CustomFrame interpolateCustomFrame(
+            const std::array<WavetableFactory::CustomFrame, 4>& frames,
+            float normalizedFrame)
+        {
+            const float scaled = juce::jlimit(0.0f, 1.0f, normalizedFrame) * 3.0f;
+            const int base = juce::jlimit(0, 2, (int) std::floor(scaled));
+            const float mix = scaled - (float) base;
+            const auto& a = frames[(size_t) base];
+            const auto& b = frames[(size_t) base + 1];
+            return {
+                a.brightness + (b.brightness - a.brightness) * mix,
+                a.even + (b.even - a.even) * mix,
+                a.fold + (b.fold - a.fold) * mix,
+                a.phase + (b.phase - a.phase) * mix,
+            };
+        }
+    }
+
+    Wavetable WavetableFactory::createBasic(BasicWavetableShape shape, int frameCount, int frameSize)
+    {
+        frameCount = juce::jlimit(1, 64, frameCount);
+        frameSize = juce::jlimit(32, 32768, frameSize);
+
+        std::vector<float> samples((size_t) frameCount * (size_t) frameSize, 0.0f);
+        const int maxTableHarmonic = juce::jmax(1, juce::jmin(generatedMaxHarmonics, frameSize / 2 - 1));
+
+        for (int frame = 0; frame < frameCount; ++frame)
+        {
+            const float frameNorm = frameCount <= 1 ? 1.0f : (float) frame / (float) (frameCount - 1);
+            const int harmonicLimit = shape == BasicWavetableShape::Sine
+                ? 1
+                : juce::jlimit(1, maxTableHarmonic, 1 + (int) std::round(frameNorm * (float) (maxTableHarmonic - 1)));
+            const int frameStart = frame * frameSize;
+
+            for (int i = 0; i < frameSize; ++i)
+            {
+                const double phase = (double) i / (double) frameSize;
+                double value = 0.0;
+
+                for (int harmonic = 1; harmonic <= harmonicLimit; ++harmonic)
+                {
+                    const float amp = harmonicAmplitude(shape, harmonic);
+                    if (amp != 0.0f)
+                        value += std::sin(twoPi * phase * (double) harmonic) * (double) amp;
+                }
+
+                samples[(size_t) frameStart + (size_t) i] = (float) value;
+            }
+
+            normalizeFrame(samples, frameStart, frameSize);
+        }
+
+        return Wavetable(
+            Wavetable::Metadata {
+                shapeId(shape),
+                shapeName(shape),
+                "generated.basic"
+            },
+            frameCount,
+            frameSize,
+            std::move(samples));
+    }
+
+    Wavetable WavetableFactory::createCustom(const std::array<CustomFrame, 4>& frames, int frameCount, int frameSize)
+    {
+        frameCount = juce::jlimit(1, 64, frameCount);
+        frameSize = juce::jlimit(32, 32768, frameSize);
+
+        std::vector<float> samples((size_t) frameCount * (size_t) frameSize, 0.0f);
+        const int maxTableHarmonic = juce::jmax(1, juce::jmin(generatedMaxHarmonics, frameSize / 2 - 1));
+
+        for (int frame = 0; frame < frameCount; ++frame)
+        {
+            const float frameNorm = frameCount <= 1 ? 0.0f : (float) frame / (float) (frameCount - 1);
+            const auto customFrame = interpolateCustomFrame(frames, frameNorm);
+            const int frameStart = frame * frameSize;
+
+            for (int i = 0; i < frameSize; ++i)
+            {
+                const double phase = (double) i / (double) frameSize;
+                double value = 0.0;
+
+                for (int harmonic = 1; harmonic <= maxTableHarmonic; ++harmonic)
+                {
+                    const float amp = customAmplitude(customFrame, harmonic);
+                    if (amp <= 0.0001f) continue;
+                    value += std::sin(twoPi * phase * (double) harmonic + (double) customPhase(customFrame, harmonic)) * (double) amp;
+                }
+
+                samples[(size_t) frameStart + (size_t) i] = (float) value;
+            }
+
+            normalizeFrame(samples, frameStart, frameSize);
+        }
+
+        return Wavetable(
+            Wavetable::Metadata {
+                "user.custom",
+                "Custom",
+                "generated.custom"
+            },
+            frameCount,
+            frameSize,
+            std::move(samples));
+    }
+}

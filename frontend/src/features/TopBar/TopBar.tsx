@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { Button, Icon, HoverInfo } from "../../components";
 import { useProjectStore, useTransportStore, useUiStore } from "../../state/store";
 import { send } from "../../ipc/bridge";
 import { saveProject } from "../../persistence/dexie";
 import { primeTimelineAudio, stopTimelineAudio } from "../../audio/timelineAudio";
-import { TimeSignatureModal } from "../Transport/TimeSignatureModal";
+import { TimeSignatureControl } from "../Transport/TimeSignatureControl";
 import { BrandMark } from "./BrandMark";
 import { InlineNumber } from "./InlineNumber";
 import styles from "./TopBar.module.css";
@@ -30,9 +29,6 @@ export function TopBar() {
   const project = useProjectStore((s) => s.project);
   const openEditor = useUiStore((s) => s.openEditor);
 
-  const [tsMenuOpen, setTsMenuOpen] = useState(false);
-  const [tsModalOpen, setTsModalOpen] = useState(false);
-
   async function onSave() {
     await Promise.all([
       saveProject(project),
@@ -55,11 +51,10 @@ export function TopBar() {
     void send({ kind: "transport.stop" });
   }
   function onRestart() {
-    transport.setPosition(0);
     primeTimelineAudio();
+    transport.setPosition(0);
     transport.play();
-    void send({ kind: "transport.seek", positionBeat: 0 });
-    void send({ kind: "transport.play" });
+    void send({ kind: "transport.restart" });
   }
   return (
     <header className={styles.bar}>
@@ -74,6 +69,16 @@ export function TopBar() {
             aria-label="Preferences"
           >
             <Icon name="ph:gear" size={16} decorative />
+          </Button>
+        </HoverInfo>
+        <HoverInfo content="Synth editor">
+          <Button
+            iconOnly
+            size="md"
+            onClick={() => openEditor({ kind: "synth" })}
+            aria-label="Synth editor"
+          >
+            <Icon name="ph:wave-sine" size={16} decorative />
           </Button>
         </HoverInfo>
       </div>
@@ -103,7 +108,7 @@ export function TopBar() {
         </HoverInfo>
 
         <span className={`${styles.field} ${styles.timeField}`}>
-          {formatClock(positionBeat, bpm)}
+          {formatClock(positionBeat, bpm)} / {formatClock(lengthBeats, bpm)}
         </span>
 
         <InlineNumber
@@ -115,47 +120,7 @@ export function TopBar() {
           onChange={setLengthBeats}
         />
 
-        <div className={styles.tsWrap}>
-          <button
-            type="button"
-            className={`${styles.field} ${styles.tsBtn}`}
-            onClick={() => setTsMenuOpen((v) => !v)}
-            aria-label="Time signature"
-            aria-expanded={tsMenuOpen}
-          >
-            {ts.num}/{ts.denom}
-            <Icon name="ph:caret-down" size={16} decorative />
-          </button>
-          {tsMenuOpen && (
-            <div className={styles.dropdown} role="menu">
-              {TS_PRESETS.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  className={styles.dropItem}
-                  onClick={() => {
-                    const [n, d] = p.split("/").map(Number);
-                    setTs({ num: n, denom: d, boldBeats: [1] });
-                    setTsMenuOpen(false);
-                  }}
-                >
-                  {p}
-                </button>
-              ))}
-              <div className={styles.dropSep} />
-              <button
-                type="button"
-                className={styles.dropItem}
-                onClick={() => {
-                  setTsMenuOpen(false);
-                  setTsModalOpen(true);
-                }}
-              >
-                Custom…
-              </button>
-            </div>
-          )}
-        </div>
+        <TimeSignatureControl value={ts} onChange={setTs} />
 
         <InlineNumber label="BPM" value={bpm} min={20} max={999} step={1} onChange={setBpm} />
       </div>
@@ -180,13 +145,9 @@ export function TopBar() {
           </Button>
         </HoverInfo>
       </div>
-
-      {tsModalOpen && <TimeSignatureModal onClose={() => setTsModalOpen(false)} />}
     </header>
   );
 }
-
-const TS_PRESETS = ["4/4", "3/4", "6/8", "5/4", "7/8", "12/8"];
 
 function formatClock(beat: number, bpm: number): string {
   const seconds = (beat * 60) / bpm;

@@ -22,6 +22,8 @@ export interface WaveformPickerProps {
   value: Waveform;
   /** When true, "sample" appears as an extra option (hybrid only). */
   allowSample?: boolean;
+  /** When true, "wavetable" appears as an extra option (Aether WT only). */
+  allowWavetable?: boolean;
   onChange: (v: Waveform) => void;
 }
 
@@ -32,10 +34,12 @@ export interface WaveformPickerProps {
  * dims it to the off-white token, matching the rest of the active-surface
  * hover rule. Hovering an unselected option color-inverts as usual.
  */
-export function WaveformPicker({ value, allowSample, onChange }: WaveformPickerProps) {
-  const opts = allowSample
-    ? [...OPTIONS, { value: "sample" as Waveform, icon: "ph:music-notes-simple", label: "Sample" }]
-    : OPTIONS;
+export function WaveformPicker({ value, allowSample, allowWavetable, onChange }: WaveformPickerProps) {
+  const opts = [
+    ...OPTIONS,
+    ...(allowSample ? [{ value: "sample" as Waveform, icon: "ph:music-notes-simple", label: "Sample" }] : []),
+    ...(allowWavetable ? [{ value: "wavetable" as Waveform, icon: "ph:waveform", label: "Wavetable" }] : []),
+  ];
   const selected = opts.find((o) => o.value === value);
 
   return (

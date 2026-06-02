@@ -32,17 +32,27 @@ export function FloatingSelect({
   onOpenChange,
   onChange,
 }: FloatingSelectProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [menuRect, setMenuRect] = useState<{ left: number; top: number; width: number } | null>(null);
+  const [menuRect, setMenuRect] = useState<{ left: number; top: number; width: number; maxHeight: number } | null>(null);
   const selected = options.find((option) => option.value === value) ?? options[0];
 
   useEffect(() => {
     if (!open) return;
 
     function position() {
-      const rect = buttonRef.current?.getBoundingClientRect();
+      const rect = rootRef.current?.getBoundingClientRect();
       if (!rect) return;
-      setMenuRect({ left: rect.left, top: rect.bottom - 1, width: rect.width });
+      const margin = 8;
+      const estimatedHeight = Math.min(260, Math.max(24, options.length * 24));
+      const availableBelow = window.innerHeight - rect.bottom - margin;
+      const availableAbove = rect.top - margin;
+      const openBelow = availableBelow >= Math.min(estimatedHeight, 144) || availableBelow >= availableAbove;
+      const maxHeight = Math.max(96, Math.min(estimatedHeight, openBelow ? availableBelow : availableAbove));
+      const top = openBelow ? rect.bottom - 1 : Math.max(margin, rect.top - maxHeight + 1);
+      const width = Math.max(0, Math.min(rect.width, window.innerWidth - margin * 2));
+      const left = Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin));
+      setMenuRect({ left, top, width, maxHeight });
     }
 
     position();
@@ -56,6 +66,7 @@ export function FloatingSelect({
 
   return (
     <div
+      ref={rootRef}
       className={[
         styles.wrap,
         fillHeight && styles.fillHeight,
@@ -82,6 +93,7 @@ export function FloatingSelect({
           x={menuRect.left}
           y={menuRect.top}
           width={menuRect.width}
+          style={{ maxHeight: menuRect.maxHeight }}
           role="listbox"
         >
           {options.map((option) => (

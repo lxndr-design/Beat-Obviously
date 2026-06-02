@@ -4,6 +4,7 @@
 #include "TrackModel.h"
 #include <atomic>
 #include <functional>
+#include <memory>
 
 namespace beat
 {
@@ -20,16 +21,35 @@ namespace beat
         struct TriggerEvent {
             Id     trackId;
             Id     segmentId;
+            Id     instrumentId;
             int    pitch;
             int    velocity;
             Beats  lengthBeats;
+            int    lengthSamples;
             int    sampleOffset;      // offset within the current block
             int    repetition;        // 0 = original, >0 = repeated copy
+            Beats  segmentStartBeat;  // absolute beat of this occurrence
+            float  trackGainDb { 0.0f };
+            float  trackPan { 0.0f };
+            float  segmentGainDb { 0.0f };
+            const MidiNote* sourceNote { nullptr };
         };
         using TriggerHandler = std::function<void(const TriggerEvent&)>;
 
+        struct ParameterAutomationEvent {
+            Id     trackId;
+            Id     segmentId;
+            Id     instrumentId;
+            juce::String parameterId;
+            float  value { 0.0f };
+            int    sampleOffset { 0 };
+            int    rampSamples { 0 };
+            int    repetition { 0 };
+        };
+        using ParameterAutomationHandler = std::function<void(const ParameterAutomationEvent&)>;
+
         void setProject(Project p);
-        void setTempo(double bpm)        { bpm.store(bpm); }
+        void setTempo(double newBpm)     { bpm.store(newBpm); }
         void setSampleRate(double sr)    { sampleRate.store(sr); }
         void setSpeed(double speed)      { playbackSpeed.store(juce::jlimit(0.1, 4.0, speed)); }
         void play()                      { playing.store(true); }
@@ -46,15 +66,18 @@ namespace beat
 
         bool   isPlaying() const         { return playing.load(); }
         Beats  getPosition() const       { return positionBeat.load(); }
+        double getTempo() const          { return bpm.load(); }
+        double getSpeed() const          { return playbackSpeed.load(); }
 
         /** Advance position by `numSamples` frames at the current sample
          *  rate / tempo, emitting any segment triggers that fall within the
          *  block via `onTrigger`. */
-        void render(int numSamples, TriggerHandler onTrigger);
+        void render(int numSamples,
+                    TriggerHandler onTrigger,
+                    ParameterAutomationHandler onAutomation = {});
 
     private:
-        Project project;
-        juce::CriticalSection projectLock;
+        std::shared_ptr<const Project> projectSnapshot { std::make_shared<Project>() };
 
         std::atomic<double> bpm           { 120.0 };
         std::atomic<double> sampleRate    { 44100.0 };

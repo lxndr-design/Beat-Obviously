@@ -1,8 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Modal, Button, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, TextInput, useModalStack } from "../../components";
-import { useAudioFileStore, useInstrumentStore, useUiStore } from "../../state/store";
-import { send } from "../../ipc/bridge";
-import type { Instrument } from "../../state/types";
+import { ai, type GeneratedInstrument } from "../../ai/aiService";
+import { maybeRunDueTraining } from "../../ai/trainingRunner";
+import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
+import { browserBlobToAudioFile, importAudioFile } from "../../audio/audioImport";
+import {
+  listInstrumentGenerationFeedback,
+  saveInstrumentGenerationFeedback,
+  updateInstrumentGenerationFeedback,
+} from "../../persistence/dexie";
+import { characterizeInstrument, defaultAetherSynthConfig, defaultWavetableConfig, snapshotInstrument, useAudioFileStore, useInstrumentStore, useUiStore } from "../../state/store";
+import { INSTRUMENT_ICON_OPTIONS, instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
+import type { Instrument, InstrumentSnapshot } from "../../state/types";
 import { WaveformPicker } from "./WaveformPicker";
 import { InstrumentWaveformPreview } from "./InstrumentWaveformPreview";
 import styles from "./InstrumentEditorModal.module.css";
@@ -19,6 +28,8 @@ const LFO_WAVEFORMS: Array<{ value: LfoWaveform; icon: string; label: string }> 
   { value: "saw", icon: "ph:wave-sawtooth", label: "Saw" },
   { value: "square", icon: "ph:wave-square", label: "Square" },
 ];
+
+const DEFAULT_INSTRUMENT_KNOBS = { cutoff: 0.6, resonance: 0.2, drive: 0.1, color: 0.5 };
 
 /**
  * InstrumentEditorModal — edit a single instrument.
@@ -42,13 +53,26 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
     s.instruments.find((i) => i.id === instrumentId),
   );
   const update = useInstrumentStore((s) => s.updateInstrument);
+  const instruments = useInstrumentStore((s) => s.instruments);
   const closeEditor = useUiStore((s) => s.closeEditor);
   const requestDirtyClose = useModalStack((s) => s.requestDirtyClose);
   const addAudioFile = useAudioFileStore((s) => s.addFile);
+  const audioFiles = useAudioFileStore((s) => s.files);
   const id = `instrument-${instrumentId}`;
 
   const [draft, setDraft] = useState<Instrument | undefined>(source);
   const [typeOpen, setTypeOpen] = useState(false);
+  const [iconOpen, setIconOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [lastGenerated, setLastGenerated] = useState<GeneratedInstrument | null>(null);
+  const [generationFeedbackId, setGenerationFeedbackId] = useState<string | null>(null);
+  const [feedbackRating, setFeedbackRating] = useState<"up" | "down" | null>(null);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState<"up" | "down" | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordChunksRef = useRef<Blob[]>([]);
+  const recordStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     if (source && !draft) setDraft(structuredClone(source));
@@ -57,10 +81,57 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
   if (!draft || !source) return null;
   const dirty = JSON.stringify(draft) !== JSON.stringify(source);
   const showOscillator = draft.kind === "synth" || draft.kind === "hybrid";
+  const showWavetable = draft.kind === "wavetable";
+  const showModulation = showOscillator || showWavetable;
   const showSamples = draft.kind === "sampler" || draft.kind === "hybrid";
+  const aether = draft.aether ?? defaultAetherSynthConfig();
+  const sourceEdited = Boolean(
+    draft.source &&
+    draft.source.kind !== "created" &&
+    draft.original &&
+    !snapshotMatchesInstrument(draft.original, draft),
+  );
+  const canRevert = Boolean(draft.original && sourceEdited);
+
+  function setAether(next: NonNullable<Instrument["aether"]>) {
+    setDraft({ ...(draft as Instrument), aether: next });
+  }
+
+  function updateAetherOsc(key: "oscA" | "oscB", patch: Partial<NonNullable<Instrument["aether"]>["oscA"]>) {
+    setAether({
+      ...aether,
+      [key]: { ...aether[key], ...patch },
+    });
+  }
+
+  function updateAetherSub(patch: Partial<NonNullable<Instrument["aether"]>["sub"]>) {
+    setAether({ ...aether, sub: { ...aether.sub, ...patch } });
+  }
+
+  function updateAetherNoise(patch: Partial<NonNullable<Instrument["aether"]>["noise"]>) {
+    setAether({ ...aether, noise: { ...aether.noise, ...patch } });
+  }
+
+  function applyGlobalWavetablePatch(patch: Partial<NonNullable<Instrument["wavetable"]>>) {
+    const currentDraft = draft as Instrument;
+    const currentWavetable = { ...(currentDraft.wavetable ?? defaultWavetableConfig()), ...patch };
+    const nextAether = {
+      ...aether,
+      oscA: { ...aether.oscA, wavetable: { ...aether.oscA.wavetable, ...patch } },
+      oscB: { ...aether.oscB, wavetable: { ...aether.oscB.wavetable, ...patch } },
+    };
+    setDraft({ ...currentDraft, wavetable: currentWavetable, aether: nextAether });
+  }
 
   function save() {
-    update(instrumentId, draft!);
+    const saved = markEdited({ ...draft!, descriptors: characterizeInstrument(draft!) });
+    if (generationFeedbackId) {
+      void updateInstrumentGenerationFeedback(generationFeedbackId, {
+        finalInstrument: saved,
+        rating: feedbackRating ?? "up",
+      });
+    }
+    update(instrumentId, saved);
     closeEditor({ kind: "instrument", instrumentId });
   }
   function close() {
@@ -72,22 +143,136 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
   }
 
   async function uploadSample() {
-    const resp = await send({ kind: "audio.import" });
-    if (!resp.file) return;
-    addAudioFile(resp.file);
-    setDraft({
+    const file = await importAudioFile();
+    if (!file) return;
+    if (!isSupportedAudioFileName(file.name) && !isSupportedAudioFileName(file.path)) {
+      window.alert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
+      return;
+    }
+    attachSample(file);
+  }
+
+  async function generateInstrument() {
+    const prompt = aiPrompt.trim();
+    if (!prompt) return;
+    setGenerating(true);
+    try {
+      const feedback = await listInstrumentGenerationFeedback(24);
+      const generated = await ai.generateInstrument({
+        prompt,
+        current: draft!,
+        targetKind: draft!.kind,
+        variationSeed: Date.now() + Math.floor(Math.random() * 100000),
+        instruments,
+        audioFiles,
+        feedbackExamples: feedback
+          .filter((entry): entry is typeof entry & { rating: "up" | "down" } => Boolean(entry.rating))
+          .map((entry) => ({
+            prompt: entry.prompt,
+            rating: entry.rating,
+            generated: entry.generated,
+            finalInstrument: entry.finalInstrument,
+          })),
+      });
+      const next = applyInstrumentPatch(draft!, generated.patch);
+      const feedbackId = crypto.randomUUID();
+      await saveInstrumentGenerationFeedback({
+        id: feedbackId,
+        prompt,
+        generated,
+        context: {
+          prompt,
+          targetKind: draft!.kind,
+          currentInstrumentId: instrumentId,
+          instrumentIds: instruments.map((instrument) => instrument.id),
+          audioFileIds: audioFiles.map((file) => file.id),
+        },
+        createdAt: Date.now(),
+      });
+      setDraft(next);
+      setLastGenerated(generated);
+      setGenerationFeedbackId(feedbackId);
+      setFeedbackRating(null);
+      setFeedbackSubmitted(null);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function rateGeneration(rating: "up" | "down") {
+    if (!generationFeedbackId || !lastGenerated || feedbackSubmitted) return;
+    setFeedbackRating(rating);
+    setFeedbackSubmitted(rating);
+    await updateInstrumentGenerationFeedback(generationFeedbackId, {
+      rating,
+      generated: lastGenerated,
+      finalInstrument: draft,
+    });
+    void maybeRunDueTraining("instruments");
+    window.setTimeout(() => setLastGenerated(null), 700);
+  }
+
+  function attachSample(file: ReturnType<typeof useAudioFileStore.getState>["files"][number]) {
+    addAudioFile(file);
+    const uploadedDraft: Instrument = {
       ...draft!,
-      sampleIds: Array.from(new Set([...draft!.sampleIds, resp.file.id])),
+      sampleIds: Array.from(new Set([...draft!.sampleIds, file.id])),
+      sampleUrl: file.path,
+      sampleUrls: Array.from(new Set([...(draft!.sampleUrls ?? []), file.path])),
       kind: draft!.kind === "synth" ? "hybrid" : draft!.kind,
       waveform: draft!.waveform === "sample" ? "sample" : draft!.waveform,
+      source: {
+        kind: "uploaded",
+        label: file.name,
+        url: file.path,
+        importedAt: Date.now(),
+        edited: false,
+      },
+    };
+    setDraft({
+      ...uploadedDraft,
+      descriptors: characterizeInstrument(uploadedDraft),
+      original: snapshotInstrument(uploadedDraft),
     });
+  }
+
+  async function toggleRecording() {
+    if (recording) {
+      recorderRef.current?.stop();
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      window.alert("Audio recording is not available in this browser.");
+      return;
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const recorder = new MediaRecorder(stream);
+    recordChunksRef.current = [];
+    recordStreamRef.current = stream;
+    recorderRef.current = recorder;
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) recordChunksRef.current.push(event.data);
+    };
+    recorder.onstop = async () => {
+      const blob = new Blob(recordChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+      recordStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordStreamRef.current = null;
+      recorderRef.current = null;
+      setRecording(false);
+      if (blob.size === 0) return;
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const file = await browserBlobToAudioFile(blob, `Recording ${stamp}.webm`);
+      attachSample(file);
+    };
+    recorder.start();
+    setRecording(true);
   }
 
   return (
     <Modal
       open
       scopeId={id}
-      title={`Edit instrument · ${draft.name}`}
+      title={<><Icon name={instrumentIcon(draft)} size={14} decorative />{draft.name}</>}
       width="lg"
       dirty={dirty}
       onClose={onClose}
@@ -100,29 +285,123 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
       }
     >
       <div className={styles.grid}>
-        <InstrumentWaveformPreview instrument={draft} hotkeyScopeId={id} />
+        <div className={`${styles.stickyIdentityRow} ${styles.spanFull}`}>
+          <InstrumentWaveformPreview instrument={draft} hotkeyScopeId={id} spanFull={false} />
 
-        {/* Row 1 — inline Name + Type fields, each one column. */}
-        <TextInput
-          label="Name"
-          layout="inline"
-          value={draft.name}
-          onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-        />
-        <FloatingSelect
-          label="Type"
-          layout="inline"
-          value={draft.kind}
-          ariaLabel="Instrument type"
-          options={[
-            { value: "synth", label: "Synth" },
-            { value: "sampler", label: "Sampler" },
-            { value: "hybrid", label: "Hybrid" },
-          ]}
-          open={typeOpen}
-          onOpenChange={setTypeOpen}
-          onChange={(kind) => setDraft({ ...draft, kind: kind as Instrument["kind"] })}
-        />
+          <div className={styles.identityStack}>
+            <div className={styles.nameIconRow}>
+              <TextInput
+                className={styles.nameField}
+                label="Name"
+                layout="inline"
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              />
+              <div className={styles.iconPicker}>
+                <HoverInfo content={instrumentIconLabel(draft.icon ?? instrumentIcon(draft))}>
+                  <Button
+                    iconOnly
+                    size="md"
+                    className={styles.iconPickerButton}
+                    aria-label="Change instrument icon"
+                    onClick={() => setIconOpen((open) => !open)}
+                  >
+                    <Icon name={instrumentIcon(draft)} size={16} decorative />
+                  </Button>
+                </HoverInfo>
+                {iconOpen && (
+                  <div className={styles.iconMenu} role="menu" aria-label="Instrument icons">
+                    {INSTRUMENT_ICON_OPTIONS.map((option) => (
+                      <button
+                        key={option.icon}
+                        type="button"
+                        className={`${styles.iconOption} ${instrumentIcon(draft) === option.icon ? styles.iconOptionSelected : ""}`}
+                        title={`${option.label} - ${option.tags.join(", ")}`}
+                        onClick={() => {
+                          setDraft({ ...draft, icon: option.icon });
+                          setIconOpen(false);
+                        }}
+                        role="menuitem"
+                      >
+                        <Icon name={option.icon} size={16} decorative />
+                        <span>{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <FloatingSelect
+              label="Type"
+              layout="inline"
+              value={draft.kind}
+              ariaLabel="Instrument type"
+              options={[
+                { value: "synth", label: "Synth" },
+                { value: "wavetable", label: "Aether WT" },
+                { value: "sampler", label: "Sampler" },
+                { value: "hybrid", label: "Hybrid" },
+              ]}
+              open={typeOpen}
+              onOpenChange={setTypeOpen}
+              onChange={(kind) => setDraft(instrumentWithKind(draft, kind as Instrument["kind"]))}
+            />
+            <div className={styles.generateRow}>
+              <TextInput
+                className={styles.generatePrompt}
+                label="Generate"
+                layout="inline"
+                value={aiPrompt}
+                placeholder={`${draft.kind === "wavetable" ? "evolving glass pad" : draft.kind === "sampler" ? "tight kick sample" : "warm analog"}`}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void generateInstrument();
+                }}
+              />
+              <HoverInfo content={lastGenerated ? "Regenerate instrument" : `Generate ${instrumentKindLabel(draft.kind)}`}>
+                <Button
+                  iconOnly
+                  size="md"
+                  className={styles.squareIconButton}
+                  disabled={!aiPrompt.trim() || generating}
+                  onClick={() => void generateInstrument()}
+                  aria-label={lastGenerated ? "Regenerate instrument" : `Generate ${instrumentKindLabel(draft.kind)}`}
+                >
+                  <Icon name={generating ? "ph:spinner" : "ph:sparkle"} size={14} decorative />
+                </Button>
+              </HoverInfo>
+              {lastGenerated && !feedbackSubmitted && (
+                <div className={styles.aiFeedback}>
+                  <HoverInfo content="Good instrument">
+                    <Button
+                      iconOnly
+                      size="md"
+                      className={styles.squareIconButton}
+                      selected={feedbackRating === "up"}
+                      onClick={() => void rateGeneration("up")}
+                      aria-label="Rate generated instrument up"
+                    >
+                      <Icon name="ph:thumbs-up" size={14} decorative />
+                    </Button>
+                  </HoverInfo>
+                  <HoverInfo content="Bad instrument">
+                    <Button
+                      iconOnly
+                      size="md"
+                      className={styles.squareIconButton}
+                      selected={feedbackRating === "down"}
+                      onClick={() => void rateGeneration("down")}
+                      aria-label="Rate generated instrument down"
+                    >
+                      <Icon name="ph:thumbs-down" size={14} decorative />
+                    </Button>
+                  </HoverInfo>
+                </div>
+              )}
+              {feedbackSubmitted && <span className={styles.aiFeedbackDone}>Saved</span>}
+            </div>
+          </div>
+        </div>
 
         {/* Row 2 — Macros (col 1) + Envelope (col 2). */}
         <section className={styles.section}>
@@ -131,6 +410,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
             <Knob
               size="sm"
               value={draft.knobs.cutoff}
+              defaultValue={DEFAULT_INSTRUMENT_KNOBS.cutoff}
               min={0} max={1} step={0.01}
               unit="%"
               label="Cut"
@@ -141,6 +421,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
             <Knob
               size="sm"
               value={draft.knobs.resonance}
+              defaultValue={DEFAULT_INSTRUMENT_KNOBS.resonance}
               min={0} max={1} step={0.01}
               unit="%"
               label="Res"
@@ -151,6 +432,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
             <Knob
               size="sm"
               value={draft.knobs.drive}
+              defaultValue={DEFAULT_INSTRUMENT_KNOBS.drive}
               min={0} max={1} step={0.01}
               unit="%"
               label="Drv"
@@ -161,6 +443,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
             <Knob
               size="sm"
               value={draft.knobs.color}
+              defaultValue={DEFAULT_INSTRUMENT_KNOBS.color}
               min={0} max={1} step={0.01}
               unit="%"
               label="Shape"
@@ -209,6 +492,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
               <WaveformPicker
                 value={draft.waveform}
                 allowSample={draft.kind === "hybrid"}
+                allowWavetable={draft.kind === "wavetable"}
                 onChange={(w) => setDraft({ ...draft, waveform: w })}
               />
               <div className={styles.fourCol}>
@@ -216,6 +500,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
                   size="sm"
                   bipolar
                   value={draft.detuneCents ?? 0}
+                  defaultValue={0}
                   min={-100} max={100} step={1}
                   unit="ct"
                   label="Detune"
@@ -227,6 +512,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
                   bipolar
                   label="Oct"
                   value={draft.octave ?? 0}
+                  defaultValue={0}
                   min={-3} max={3} step={1}
                   formatValue={formatInteger}
                   onChange={(v) => setDraft({ ...draft, octave: v })}
@@ -234,6 +520,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
                 <Knob
                   size="sm"
                   value={draft.subOscLevel ?? 0}
+                  defaultValue={0}
                   min={0} max={1} step={0.01}
                   unit="%"
                   label="Sub"
@@ -250,8 +537,93 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
           </section>
         )}
 
+        {showWavetable && (
+          <section className={`${styles.section} ${styles.spanFull}`}>
+            <h3 className={styles.sectionHeading}>Aether Engines</h3>
+            <div className={styles.aetherGrid}>
+              <AetherOscModule
+                label="OSC A"
+                value={aether.oscA}
+                onChange={(patch) => updateAetherOsc("oscA", patch)}
+              />
+              <AetherOscModule
+                label="OSC B"
+                value={aether.oscB}
+                onChange={(patch) => updateAetherOsc("oscB", patch)}
+              />
+              <AetherSubModule
+                value={aether.sub}
+                onChange={updateAetherSub}
+              />
+              <AetherNoiseModule
+                value={aether.noise}
+                onChange={updateAetherNoise}
+              />
+            </div>
+            <h3 className={styles.sectionHeading}>Aether Global</h3>
+            <div className={styles.aetherGlobalGrid}>
+              <WavetableBankSelect
+                value={(draft.wavetable ?? defaultWavetableConfig()).bank}
+                onChange={(bank) => applyGlobalWavetablePatch({ bank })}
+              />
+              <Knob
+                size="sm"
+                value={(draft.wavetable ?? defaultWavetableConfig()).position}
+                defaultValue={defaultWavetableConfig().position}
+                min={0} max={1} step={0.01}
+                unit="%"
+                label="WT Pos"
+                formatValue={formatPercent}
+                parseValue={parsePercent}
+                onChange={(position) => applyGlobalWavetablePatch({ position })}
+              />
+              <Knob
+                size="sm"
+                value={(draft.wavetable ?? defaultWavetableConfig()).warp}
+                defaultValue={defaultWavetableConfig().warp}
+                min={0} max={1} step={0.01}
+                unit="%"
+                label="Warp"
+                formatValue={formatPercent}
+                parseValue={parsePercent}
+                onChange={(warp) => applyGlobalWavetablePatch({ warp })}
+              />
+              <Knob
+                size="sm"
+                value={(draft.wavetable ?? defaultWavetableConfig()).unison}
+                defaultValue={defaultWavetableConfig().unison}
+                min={1} max={8} step={1}
+                label="Voices"
+                formatValue={formatInteger}
+                onChange={(unison) => applyGlobalWavetablePatch({ unison: Math.round(unison) })}
+              />
+              <Knob
+                size="sm"
+                value={(draft.wavetable ?? defaultWavetableConfig()).detuneCents}
+                defaultValue={defaultWavetableConfig().detuneCents}
+                min={0} max={100} step={1}
+                unit="ct"
+                label="Spread"
+                formatValue={formatInteger}
+                onChange={(detuneCents) => applyGlobalWavetablePatch({ detuneCents })}
+              />
+              <Knob
+                size="sm"
+                value={(draft.wavetable ?? defaultWavetableConfig()).blend}
+                defaultValue={defaultWavetableConfig().blend}
+                min={0} max={1} step={0.01}
+                unit="%"
+                label="Blend"
+                formatValue={formatPercent}
+                parseValue={parsePercent}
+                onChange={(blend) => applyGlobalWavetablePatch({ blend })}
+              />
+            </div>
+          </section>
+        )}
+
         {/* Modulation — spans both columns. */}
-        {showOscillator && (
+        {showModulation && (
           <section className={`${styles.section} ${styles.spanFull}`}>
             <h3 className={styles.sectionHeading}>Modulation</h3>
             <div className={styles.modGrid}>
@@ -277,6 +649,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
                 className={styles.modKnob}
                 size="sm"
                 value={draft.lfoRateHz ?? 4}
+                defaultValue={4}
                 min={1} max={20} step={1}
                 unit="Hz"
                 label="LFO Rate"
@@ -287,6 +660,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
                 className={styles.modKnob}
                 size="sm"
                 value={draft.lfoDepth ?? 0}
+                defaultValue={0}
                 min={0} max={1} step={0.01}
                 unit="%"
                 label="LFO Depth"
@@ -298,6 +672,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
                 className={styles.modKnob}
                 size="sm"
                 value={draft.lfoToPitch ?? 0}
+                defaultValue={0}
                 min={0} max={12} step={1}
                 unit="st"
                 label="LFO Pitch"
@@ -308,6 +683,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
                 className={styles.modKnob}
                 size="sm"
                 value={draft.lfoToFilter ?? 0}
+                defaultValue={0}
                 min={-1} max={1} step={0.01}
                 unit="%"
                 bipolar
@@ -320,6 +696,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
                 className={styles.modKnob}
                 size="sm"
                 value={draft.envToFilter ?? 0}
+                defaultValue={0}
                 min={-1} max={1} step={0.01}
                 unit="%"
                 bipolar
@@ -334,13 +711,24 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
 
         {showSamples && (
           <section className={`${styles.section} ${styles.spanFull}`}>
-            <h3 className={styles.sectionHeading}>Samples</h3>
+            <h3 className={styles.sectionHeading}>Sample</h3>
             <div className={styles.samplesRow}>
-              <span className={styles.hint}>
-                {draft.sampleIds.length} sample{draft.sampleIds.length === 1 ? "" : "s"} attached.
-              </span>
+              {draft.sampleIds.length > 0 && (
+                <span className={styles.hint}>
+                  {draft.sampleIds.length} sample{draft.sampleIds.length === 1 ? "" : "s"} attached.
+                </span>
+              )}
               <Button size="sm" onClick={uploadSample}>
                 Upload sample…
+              </Button>
+              <Button
+                iconOnly
+                size="sm"
+                variant={recording ? "primary" : "default"}
+                onClick={toggleRecording}
+                aria-label={recording ? "Stop recording sample" : "Record sample"}
+              >
+                <Icon name={recording ? "ph:stop-fill" : "ph:microphone"} size={14} decorative />
               </Button>
             </div>
           </section>
@@ -355,13 +743,436 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
             </p>
           </section>
         )}
+
+        {draft.source && (
+          <section className={`${styles.section} ${styles.spanFull}`}>
+            <h3 className={styles.sectionHeading}>Source</h3>
+            <div className={styles.sourceRow}>
+              <div className={styles.sourceText}>
+                <span>{sourceLabel(draft, sourceEdited)}</span>
+                {draft.source.license && <span>{draft.source.license}</span>}
+                {draft.source.url && <span className={styles.sourceUrl}>{draft.source.url}</span>}
+                {draft.descriptors && draft.descriptors.length > 0 && (
+                  <span>{draft.descriptors.join(" · ")}</span>
+                )}
+              </div>
+              {canRevert && (
+                <button
+                  type="button"
+                  className={styles.revertLink}
+                  onClick={() => setDraft(revertInstrument(draft))}
+                >
+                  Revert to original
+                </button>
+              )}
+            </div>
+          </section>
+        )}
       </div>
     </Modal>
   );
 }
 
+function AetherOscModule({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: NonNullable<Instrument["aether"]>["oscA"];
+  onChange: (patch: Partial<NonNullable<Instrument["aether"]>["oscA"]>) => void;
+}) {
+  const waveform = value.waveform ?? "wavetable";
+  const usesWavetable = waveform === "wavetable";
+  const defaults = label === "OSC B"
+    ? defaultAetherSynthConfig().oscB
+    : defaultAetherSynthConfig().oscA;
+
+  return (
+    <div className={`${styles.aetherModule} ${value.enabled ? styles.aetherModuleOn : styles.aetherModuleOff}`}>
+      <div className={styles.aetherModuleHead}>
+        <span>{label}</span>
+        <Button
+          iconOnly
+          size="xs"
+          selected={value.enabled}
+          aria-label={`${value.enabled ? "Disable" : "Enable"} ${label}`}
+          onClick={() => onChange({ enabled: !value.enabled })}
+        >
+          <Icon name={value.enabled ? "ph:power-fill" : "ph:power"} size={12} decorative />
+        </Button>
+      </div>
+      <div className={styles.aetherSource}>
+        <WaveformPicker
+          value={waveform}
+          allowWavetable
+          onChange={(next) => {
+            if (next !== "sample") onChange({ waveform: next });
+          }}
+        />
+      </div>
+      {usesWavetable && (
+        <WavetableBankSelect
+          value={value.wavetable.bank}
+          onChange={(bank) => onChange({ wavetable: { ...value.wavetable, bank } })}
+        />
+      )}
+      <div className={styles.aetherKnobs}>
+        <Knob
+          size="sm"
+          value={value.level}
+          defaultValue={defaults.level}
+          min={0} max={1} step={0.01}
+          unit="%"
+          label="Level"
+          formatValue={formatPercent}
+          parseValue={parsePercent}
+          onChange={(level) => onChange({ level })}
+        />
+        {usesWavetable && (
+          <>
+            <Knob
+              size="sm"
+              value={value.wavetable.position}
+              defaultValue={defaults.wavetable.position}
+              min={0} max={1} step={0.01}
+              unit="%"
+              label="WT"
+              formatValue={formatPercent}
+              parseValue={parsePercent}
+              onChange={(position) => onChange({ wavetable: { ...value.wavetable, position } })}
+            />
+            <Knob
+              size="sm"
+              value={value.wavetable.warp}
+              defaultValue={defaults.wavetable.warp}
+              min={0} max={1} step={0.01}
+              unit="%"
+              label="Warp"
+              formatValue={formatPercent}
+              parseValue={parsePercent}
+              onChange={(warp) => onChange({ wavetable: { ...value.wavetable, warp } })}
+            />
+            <Knob
+              size="sm"
+              value={value.wavetable.unison}
+              defaultValue={defaults.wavetable.unison}
+              min={1} max={8} step={1}
+              label="Voices"
+              formatValue={formatInteger}
+              onChange={(unison) => onChange({ wavetable: { ...value.wavetable, unison: Math.round(unison) } })}
+            />
+            <Knob
+              size="sm"
+              value={value.wavetable.detuneCents}
+              defaultValue={defaults.wavetable.detuneCents}
+              min={0} max={100} step={1}
+              unit="ct"
+              label="Spread"
+              formatValue={formatInteger}
+              onChange={(detuneCents) => onChange({ wavetable: { ...value.wavetable, detuneCents } })}
+            />
+          </>
+        )}
+        <Knob
+          size="sm"
+          bipolar
+          value={value.octave}
+          defaultValue={defaults.octave}
+          min={-3} max={3} step={1}
+          label="Oct"
+          formatValue={formatInteger}
+          onChange={(octave) => onChange({ octave })}
+        />
+        <Knob
+          size="sm"
+          bipolar
+          value={value.semitone}
+          defaultValue={defaults.semitone}
+          min={-12} max={12} step={1}
+          unit="st"
+          label="Semi"
+          formatValue={formatInteger}
+          onChange={(semitone) => onChange({ semitone })}
+        />
+        <Knob
+          size="sm"
+          bipolar
+          value={value.fineCents}
+          defaultValue={defaults.fineCents}
+          min={-100} max={100} step={1}
+          unit="ct"
+          label="Fine"
+          formatValue={formatInteger}
+          onChange={(fineCents) => onChange({ fineCents })}
+        />
+      </div>
+    </div>
+  );
+}
+
+function AetherSubModule({
+  value,
+  onChange,
+}: {
+  value: NonNullable<Instrument["aether"]>["sub"];
+  onChange: (patch: Partial<NonNullable<Instrument["aether"]>["sub"]>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const defaults = defaultAetherSynthConfig().sub;
+  return (
+    <div className={`${styles.aetherModule} ${value.enabled ? styles.aetherModuleOn : ""}`}>
+      <div className={styles.aetherModuleHead}>
+        <span>SUB</span>
+        <Button
+          iconOnly
+          size="xs"
+          selected={value.enabled}
+          aria-label={`${value.enabled ? "Disable" : "Enable"} Sub`}
+          onClick={() => onChange({ enabled: !value.enabled })}
+        >
+          <Icon name={value.enabled ? "ph:power-fill" : "ph:power"} size={12} decorative />
+        </Button>
+      </div>
+      <FloatingSelect
+        label="Wave"
+        layout="inline"
+        value={value.waveform}
+        ariaLabel="Sub waveform"
+        options={[
+          { value: "sine", label: "Sine" },
+          { value: "square", label: "Square" },
+          { value: "triangle", label: "Triangle" },
+        ]}
+        open={open}
+        onOpenChange={setOpen}
+        onChange={(waveform) => onChange({ waveform: waveform as NonNullable<Instrument["aether"]>["sub"]["waveform"] })}
+      />
+      <div className={styles.aetherKnobsCompact}>
+        <Knob
+          size="sm"
+          value={value.level}
+          defaultValue={defaults.level}
+          min={0} max={1} step={0.01}
+          unit="%"
+          label="Level"
+          formatValue={formatPercent}
+          parseValue={parsePercent}
+          onChange={(level) => onChange({ level })}
+        />
+        <Knob
+          size="sm"
+          bipolar
+          value={value.octave}
+          defaultValue={defaults.octave}
+          min={-4} max={0} step={1}
+          label="Oct"
+          formatValue={formatInteger}
+          onChange={(octave) => onChange({ octave })}
+        />
+      </div>
+    </div>
+  );
+}
+
+function AetherNoiseModule({
+  value,
+  onChange,
+}: {
+  value: NonNullable<Instrument["aether"]>["noise"];
+  onChange: (patch: Partial<NonNullable<Instrument["aether"]>["noise"]>) => void;
+}) {
+  const defaults = defaultAetherSynthConfig().noise;
+  return (
+    <div className={`${styles.aetherModule} ${value.enabled ? styles.aetherModuleOn : ""}`}>
+      <div className={styles.aetherModuleHead}>
+        <span>NOISE</span>
+        <Button
+          iconOnly
+          size="xs"
+          selected={value.enabled}
+          aria-label={`${value.enabled ? "Disable" : "Enable"} Noise`}
+          onClick={() => onChange({ enabled: !value.enabled })}
+        >
+          <Icon name={value.enabled ? "ph:power-fill" : "ph:power"} size={12} decorative />
+        </Button>
+      </div>
+      <div className={styles.aetherKnobsCompact}>
+        <Knob
+          size="sm"
+          value={value.level}
+          defaultValue={defaults.level}
+          min={0} max={1} step={0.01}
+          unit="%"
+          label="Level"
+          formatValue={formatPercent}
+          parseValue={parsePercent}
+          onChange={(level) => onChange({ level })}
+        />
+        <Knob
+          size="sm"
+          value={value.color}
+          defaultValue={defaults.color}
+          min={0} max={1} step={0.01}
+          unit="%"
+          label="Color"
+          formatValue={formatPercent}
+          parseValue={parsePercent}
+          onChange={(color) => onChange({ color })}
+        />
+      </div>
+    </div>
+  );
+}
+
+function sourceLabel(instrument: Instrument, edited = false): string {
+  const label = instrument.source?.label ?? "Unknown";
+  return edited || instrument.source?.edited ? `${label} Edited` : label;
+}
+
+function instrumentWithKind(instrument: Instrument, kind: Instrument["kind"]): Instrument {
+  if (kind === "wavetable") {
+    const next = {
+      ...instrument,
+      kind,
+      waveform: "wavetable" as const,
+      wavetable: instrument.wavetable ?? defaultWavetableConfig(),
+      aether: instrument.aether ?? defaultAetherSynthConfig(),
+    };
+    return { ...next, descriptors: characterizeInstrument(next) };
+  }
+  if (kind === "sampler") {
+    const next = { ...instrument, kind, waveform: "sample" as const };
+    return { ...next, descriptors: characterizeInstrument(next) };
+  }
+  if (kind === "hybrid") {
+    const next = { ...instrument, kind, waveform: instrument.waveform === "wavetable" ? "saw" as const : instrument.waveform };
+    return { ...next, descriptors: characterizeInstrument(next) };
+  }
+  const next = { ...instrument, kind, waveform: instrument.waveform === "sample" || instrument.waveform === "wavetable" ? "saw" as const : instrument.waveform };
+  return { ...next, descriptors: characterizeInstrument(next) };
+}
+
+function instrumentKindLabel(kind: Instrument["kind"]): string {
+  switch (kind) {
+    case "wavetable":
+      return "Aether WT";
+    case "sampler":
+      return "sampler";
+    case "hybrid":
+      return "hybrid";
+    case "synth":
+    default:
+      return "synth";
+  }
+}
+
+function markEdited(instrument: Instrument): Instrument {
+  if (!instrument.source || !instrument.original || instrument.source.kind === "created") return instrument;
+  return {
+    ...instrument,
+    source: {
+      ...instrument.source,
+      edited: !snapshotMatchesInstrument(instrument.original, instrument),
+    },
+  };
+}
+
+function applyInstrumentPatch(instrument: Instrument, patch: Partial<Instrument>): Instrument {
+  return {
+    ...instrument,
+    ...patch,
+    envelope: patch.envelope ? { ...instrument.envelope, ...patch.envelope } : instrument.envelope,
+    knobs: patch.knobs ? { ...instrument.knobs, ...patch.knobs } : instrument.knobs,
+    sampleIds: patch.sampleIds ?? instrument.sampleIds,
+    sampleUrls: patch.sampleUrls ?? instrument.sampleUrls,
+    wavetable: patch.wavetable ? { ...(instrument.wavetable ?? defaultWavetableConfig()), ...patch.wavetable } : instrument.wavetable,
+    aether: patch.aether ?? instrument.aether,
+    source: patch.source ?? instrument.source,
+    descriptors: characterizeInstrument({ ...instrument, ...patch, knobs: patch.knobs ? { ...instrument.knobs, ...patch.knobs } : instrument.knobs }),
+  };
+}
+
+function revertInstrument(instrument: Instrument): Instrument {
+  if (!instrument.original) return instrument;
+  return {
+    ...instrument,
+    ...restoreSnapshot(instrument.original),
+    source: instrument.source ? { ...instrument.source, edited: false } : instrument.source,
+  };
+}
+
+function restoreSnapshot(snapshot: InstrumentSnapshot): Partial<Instrument> {
+  return {
+    name: snapshot.name,
+    icon: snapshot.icon,
+    kind: snapshot.kind,
+    envelope: structuredClone(snapshot.envelope),
+    knobs: structuredClone(snapshot.knobs),
+    filterType: snapshot.filterType,
+    waveform: snapshot.waveform,
+    detuneCents: snapshot.detuneCents,
+    octave: snapshot.octave,
+    subOscLevel: snapshot.subOscLevel,
+    glideMs: snapshot.glideMs,
+    ampLevel: snapshot.ampLevel,
+    ampPan: snapshot.ampPan,
+    wavetable: snapshot.wavetable ? structuredClone(snapshot.wavetable) : undefined,
+    aether: snapshot.aether ? structuredClone(snapshot.aether) : undefined,
+    synthPatch: snapshot.synthPatch ? structuredClone(snapshot.synthPatch) : undefined,
+    lfoWaveform: snapshot.lfoWaveform,
+    lfoRateHz: snapshot.lfoRateHz,
+    lfoDepth: snapshot.lfoDepth,
+    lfoSync: snapshot.lfoSync,
+    lfoRetrigger: snapshot.lfoRetrigger,
+    lfoPositionBipolar: snapshot.lfoPositionBipolar,
+    lfoPitchBipolar: snapshot.lfoPitchBipolar,
+    lfoFilterBipolar: snapshot.lfoFilterBipolar,
+    lfoToPitch: snapshot.lfoToPitch,
+    lfoToFilter: snapshot.lfoToFilter,
+    envToFilter: snapshot.envToFilter,
+    sampleIds: [...snapshot.sampleIds],
+    sampleUrl: snapshot.sampleUrl,
+    sampleUrls: snapshot.sampleUrls ? [...snapshot.sampleUrls] : undefined,
+    sampleMap: snapshot.sampleMap ? structuredClone(snapshot.sampleMap) : undefined,
+    parentIds: snapshot.parentIds ? [...snapshot.parentIds] : undefined,
+    descriptors: snapshot.descriptors ? [...snapshot.descriptors] : undefined,
+  };
+}
+
+function snapshotMatchesInstrument(snapshot: InstrumentSnapshot, instrument: Instrument): boolean {
+  return JSON.stringify(snapshot) === JSON.stringify(snapshotInstrument(instrument));
+}
+
 function formatInteger(value: number): string {
   return String(Math.round(value));
+}
+
+function WavetableBankSelect({
+  value,
+  onChange,
+}: {
+  value: NonNullable<Instrument["wavetable"]>["bank"];
+  onChange: (value: NonNullable<Instrument["wavetable"]>["bank"]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <FloatingSelect
+      label="Bank"
+      value={value}
+      ariaLabel="Wavetable bank"
+      options={[
+        { value: "aether", label: "Aether" },
+        { value: "glass", label: "Glass" },
+        { value: "vocal", label: "Vocal" },
+        { value: "organ", label: "Organ" },
+        { value: "fm", label: "FM" },
+      ]}
+      open={open}
+      onOpenChange={setOpen}
+      onChange={(next) => onChange(next as NonNullable<Instrument["wavetable"]>["bank"])}
+    />
+  );
 }
 
 function formatPercent(value: number): string {

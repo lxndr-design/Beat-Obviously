@@ -7,13 +7,17 @@ import { Visualizer } from "./features/Visualizer/Visualizer";
 import { EditorHost } from "./features/EditorHost/EditorHost";
 import { ModalStackOverlay } from "./components";
 import { TimelineMidiPlayback } from "./audio/TimelineMidiPlayback";
-import { getTimelineAudioContext } from "./audio/timelineAudio";
+import { startAnalyzerClient } from "./audio/analyzerClient";
+import { RenderTimingPanel } from "./features/Debug/RenderTimingPanel";
+import { TrainingAutoRunner } from "./features/Training/TrainingAutoRunner";
+import { getTimelineAudioContext, stopTimelineAudio } from "./audio/timelineAudio";
+import { importAudioFiles } from "./audio/audioImport";
 import { preloadInstrumentSample } from "./audio/synthPreview";
 import { useGlobalHotkeys } from "./hotkeys/hotkeys";
-import { onEvent, send } from "./ipc/bridge";
-import { useAudioFileStore, useInstrumentStore, useProjectStore, useTransportStore } from "./state/store";
+import { isNative, onEvent, send } from "./ipc/bridge";
+import { createEmptyProject, useAudioFileStore, useInstrumentStore, useProjectStore, useTransportStore, useUiStore } from "./state/store";
 import { useComponentStore } from "./state/components";
-import { saveProject } from "./persistence/dexie";
+import { listAudioFiles, listComponents, listInstruments, listProjects, loadProject, saveAudioFiles, saveComponents, saveInstruments, saveProject } from "./persistence/dexie";
 import { useEffect as useReactEffect } from "react";
 
 /**
@@ -33,30 +37,96 @@ import { useEffect as useReactEffect } from "react";
 export function App() {
   useGlobalHotkeys();
 
+  useEffect(() => startAnalyzerClient(), []);
+
   useEffect(() => {
-    useInstrumentStore.getState().seedSystemInstruments();
-    useComponentStore.getState().seedDefaultDrumLoops(useInstrumentStore.getState().instruments);
-    const ctx = getTimelineAudioContext();
-    for (const instrument of useInstrumentStore.getState().instruments) {
-      if (!instrument.sampleUrl) continue;
-      void preloadInstrumentSample(ctx, instrument).catch(() => {
-        // Synth fallback remains available if a bundled sample cannot decode.
-      });
-    }
+    let hydrated = false;
+    let timer: number | null = null;
+
+    void listInstruments().then(({ instruments, sets }) => {
+      if (instruments.length > 0 || sets.length > 0) {
+        useInstrumentStore.getState().hydrateInstruments(instruments, sets);
+      }
+      useInstrumentStore.getState().seedSystemInstruments();
+      useComponentStore.getState().seedDefaultDrumLoops(useInstrumentStore.getState().instruments);
+      const ctx = getTimelineAudioContext();
+      for (const instrument of useInstrumentStore.getState().instruments) {
+        if (!instrument.sampleUrl) continue;
+        void preloadInstrumentSample(ctx, instrument).catch(() => {
+          // Synth fallback remains available if a bundled sample cannot decode.
+        });
+      }
+      hydrated = true;
+    });
+
+    const unsub = useInstrumentStore.subscribe((state) => {
+      if (!hydrated) return;
+      if (timer) window.clearTimeout(timer);
+      const instruments = state.instruments.map((instrument) => structuredClone(instrument));
+      const sets = state.instrumentSets.map((set) => structuredClone(set));
+      timer = window.setTimeout(() => {
+        void saveInstruments(instruments, sets);
+      }, 800);
+    });
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      unsub();
+    };
+  }, []);
+
+  useEffect(() => {
+    let hydrated = false;
+    let timer: number | null = null;
+
+    void listComponents().then((components) => {
+      useComponentStore.getState().hydrate(components);
+      hydrated = true;
+    });
+
+    const unsub = useComponentStore.subscribe((state) => {
+      if (!hydrated) return;
+      if (timer) window.clearTimeout(timer);
+      const snapshot = state.components
+        .filter((component) => !component.factory)
+        .map((component) => structuredClone(component));
+      timer = window.setTimeout(() => {
+        void saveComponents(snapshot);
+      }, 800);
+    });
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      unsub();
+    };
   }, []);
 
   useEffect(() => {
     void (async () => {
+      for (const file of await listAudioFiles()) useAudioFileStore.getState().addFile(file);
       const resp = await send({ kind: "audio.list" });
       for (const file of resp.files) useAudioFileStore.getState().addFile(file);
     })();
   }, []);
 
-  // Smooth playhead: while playing, advance positionBeat each animation
-  // frame based on elapsed wall-clock and current BPM. The C++ engine
-  // (when running) will also emit `transport.positionChanged`; whichever
-  // is more recent wins.
+  useEffect(() => {
+    let timer: number | null = null;
+    const unsub = useAudioFileStore.subscribe((state) => {
+      if (timer) window.clearTimeout(timer);
+      const files = state.files.map((file) => structuredClone(file));
+      timer = window.setTimeout(() => {
+        void saveAudioFiles(files);
+      }, 800);
+    });
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      unsub();
+    };
+  }, []);
+
+  // Browser preview advances its own playhead. In the native app, C++ is the
+  // only source of timeline position updates.
   useReactEffect(() => {
+    if (isNative()) return;
+
     let raf: number | null = null;
     let lastTs: number | null = null;
     function tick(ts: number) {
@@ -104,6 +174,29 @@ export function App() {
     };
   }, []);
 
+  // Keep the native JUCE engine in step with the React project model. The
+  // browser preview mock ignores this, while the standalone app uses it for
+  // transport/export playback.
+  useEffect(() => {
+    let timer: number | null = null;
+    const apply = () => {
+      if (timer) window.clearTimeout(timer);
+      const project = structuredClone(useProjectStore.getState().project);
+      const instruments = useInstrumentStore.getState().instruments.map((instrument) => structuredClone(instrument));
+      timer = window.setTimeout(() => {
+        void send({ kind: "engine.applyProject", project, instruments });
+      }, 120);
+    };
+    apply();
+    const unsubProject = useProjectStore.subscribe(() => apply());
+    const unsubInstruments = useInstrumentStore.subscribe(() => apply());
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      unsubProject();
+      unsubInstruments();
+    };
+  }, []);
+
   useEffect(() => {
     const off = onEvent((event) => {
       switch (event.kind) {
@@ -112,6 +205,10 @@ export function App() {
           break;
         case "transport.playbackEnded":
           useTransportStore.getState().pause();
+          stopTimelineAudio();
+          break;
+        case "native.menuCommand":
+          void handleNativeMenuCommand(event.command);
           break;
         case "log":
           // eslint-disable-next-line no-console
@@ -129,6 +226,8 @@ export function App() {
     <>
       <Visualizer />
       <TimelineMidiPlayback />
+      <TrainingAutoRunner />
+      <RenderTimingPanel />
       <div className="app-root">
         <TopBar />
         <main className="app-main">
@@ -143,4 +242,55 @@ export function App() {
       <ModalStackOverlay />
     </>
   );
+}
+
+async function handleNativeMenuCommand(command: "newProject" | "openProject" | "saveProject" | "importAudio" | "exportWav" | "preferences") {
+  switch (command) {
+    case "newProject": {
+      const ok = window.confirm("Create a new project? Unsaved changes are auto-saved locally, but the current workspace view will reset.");
+      if (!ok) return;
+      useTransportStore.getState().stop();
+      useProjectStore.getState().loadProject(createEmptyProject());
+      return;
+    }
+    case "openProject": {
+      const localProjects = await listProjects();
+      if (localProjects.length === 0) {
+        window.alert("No saved projects yet.");
+        return;
+      }
+      const menu = localProjects
+        .map((project, index) => `${index + 1}. ${project.name}`)
+        .join("\n");
+      const choice = window.prompt(`Open project:\n${menu}`, "1");
+      const index = Number(choice) - 1;
+      if (!Number.isInteger(index) || !localProjects[index]) return;
+
+      const project = await loadProject(localProjects[index].id);
+      if (project) {
+        useTransportStore.getState().stop();
+        useProjectStore.getState().loadProject(project);
+      }
+      return;
+    }
+    case "saveProject": {
+      const project = useProjectStore.getState().project;
+      await Promise.all([
+        saveProject(project),
+        send({ kind: "project.save", project }),
+      ]);
+      return;
+    }
+    case "importAudio": {
+      const files = await importAudioFiles();
+      for (const file of files) useAudioFileStore.getState().addFile(file);
+      return;
+    }
+    case "exportWav":
+      await send({ kind: "project.exportWav" });
+      return;
+    case "preferences":
+      useUiStore.getState().openEditor({ kind: "preferences" });
+      return;
+  }
 }

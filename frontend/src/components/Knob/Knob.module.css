@@ -1,8 +1,9 @@
 .knob {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   user-select: none;
 }
 
@@ -22,11 +23,25 @@
   display: block;
 }
 
+.ring {
+  fill: var(--color-bg);
+  stroke: var(--color-fg);
+  stroke-width: 2;
+}
+
+.defaultArcSegment {
+  fill: none;
+  stroke: var(--color-fg);
+  stroke-width: 8;
+  stroke-linecap: butt;
+  pointer-events: none;
+}
+
 /* The value readout is a button-as-text — no styling, just editable. */
 .value,
 .editValue {
   font-family: var(--font-family-mono);
-  font-size: 11px;
+  font-size: 10px;
   color: var(--color-fg);
   background: transparent;
   border: 0;
@@ -47,9 +62,29 @@
 }
 
 .label {
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.1;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
   font-weight: var(--font-weight-medium);
+}
+
+.modulation {
+  display: inline-grid;
+  grid-template-columns: 10px minmax(0, 52px);
+  align-items: center;
+  gap: 3px;
+  width: 65px;
+  min-height: 11px;
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  line-height: 1;
+}
+
+.modulationLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
 }

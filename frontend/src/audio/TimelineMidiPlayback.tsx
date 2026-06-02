@@ -2,8 +2,8 @@ import { useEffect, useRef } from "react";
 import { useInstrumentStore, useProjectStore, useTransportStore } from "../state/store";
 import { expandTrackSegments, isTrackAudible } from "../state/selectors";
 import { getTimelineAudioContext, scheduleTimelineMidiNote, stopTimelineAudio } from "./timelineAudio";
-import type { Instrument } from "../state/types";
-import { DEFAULT_DRUM_MIDI_PITCH, DEFAULT_DRUM_VELOCITY, normalizeDrumCell } from "../state/drumSteps";
+import type { Instrument, MidiNote } from "../state/types";
+import { DEFAULT_DRUM_MIDI_PITCH, DEFAULT_DRUM_VELOCITY, drumTimingOffsetBeats, normalizeDrumCell } from "../state/drumSteps";
 
 const LOOKAHEAD_SECONDS = 0.12;
 
@@ -87,7 +87,9 @@ export function TimelineMidiPlayback() {
               for (let step = 0; step < seg.payload.stepCount; step++) {
                 const cell = normalizeDrumCell(row.steps[step]);
                 if (!cell.on) continue;
-                const noteStart = occ.startBeat + step * stepLengthBeats;
+                const noteStart = occ.startBeat
+                  + step * stepLengthBeats
+                  + drumTimingOffsetBeats(step, stepLengthBeats, seg.payload.swingPercent, cell.leanPercent);
                 if (noteStart < currentBeat - 0.05 || noteStart > currentBeat + lookaheadBeats) continue;
                 const key = `${seg.id}:${occ.repetition}:${row.id}:${step}`;
                 if (scheduledRef.current.has(key)) continue;
@@ -110,21 +112,31 @@ export function TimelineMidiPlayback() {
             continue;
           }
           if (seg.payload.kind !== "midi" && seg.payload.kind !== "mixed") continue;
+          const payload = seg.payload;
           const instrument =
             instruments.find((i) => i.id === seg.instrumentId) ??
             instruments.find((i) => i.name.toLowerCase() === "lead saw") ??
             fallbackInstrument;
 
-          for (const note of seg.payload.notes) {
+          payload.notes.forEach((note, noteIndex) => {
             const noteStart = occ.startBeat + note.startBeat;
-            if (noteStart < currentBeat - 0.05 || noteStart > currentBeat + lookaheadBeats) continue;
-            const key = `${seg.id}:${occ.repetition}:${note.pitch}:${note.startBeat}:${note.lengthBeats}`;
-            if (scheduledRef.current.has(key)) continue;
+            if (noteStart < currentBeat - 0.05 || noteStart > currentBeat + lookaheadBeats) return;
+            const key = `${seg.id}:${occ.repetition}:${noteIndex}:${note.pitch}:${note.startBeat}:${note.lengthBeats}`;
+            if (scheduledRef.current.has(key)) return;
+            const transpose = seg.transpose ?? 0;
+            const target = connectedLaterNote(payload.notes, noteIndex);
             const delayS = Math.max(0, (noteStart - currentBeat) / beatsPerSecond);
-            const durationS = Math.max(0.03, note.lengthBeats / beatsPerSecond);
-            scheduleTimelineMidiNote(note, instrument, audio.currentTime + delayS, durationS);
+            const durationBeats = target ? Math.max(0.03, target.startBeat - note.startBeat) : note.lengthBeats;
+            const durationS = Math.max(0.03, durationBeats / beatsPerSecond);
+            scheduleTimelineMidiNote(
+              transposeNote(note, transpose),
+              instrument,
+              audio.currentTime + delayS,
+              durationS,
+              target ? transposeNote(target, transpose) : undefined,
+            );
             scheduledRef.current.add(key);
-          }
+          });
         }
       }
 
@@ -138,4 +150,25 @@ export function TimelineMidiPlayback() {
   }, [playing, speed, project, instruments]);
 
   return null;
+}
+
+function transposeNote(note: MidiNote, transpose: number): MidiNote {
+  const shift = Number.isFinite(transpose) ? transpose : 0;
+  if (shift === 0) return note;
+  return {
+    ...note,
+    pitch: Math.max(0, Math.min(127, note.pitch + shift)),
+    curve: note.curve?.map((point) => ({ ...point, pitch: Math.max(0, Math.min(127, point.pitch + shift)) })),
+  };
+}
+
+function connectedLaterNote(notes: MidiNote[], index: number): MidiNote | undefined {
+  const note = notes[index];
+  const direct = note.connectToIndex == null ? undefined : notes[note.connectToIndex];
+  const incoming = notes.find((candidate) => candidate.connectToIndex === index);
+  const target = [direct, incoming]
+    .filter((candidate): candidate is MidiNote => Boolean(candidate))
+    .sort((a, b) => a.startBeat - b.startBeat)[0];
+  if (!target || target.startBeat <= note.startBeat) return undefined;
+  return target;
 }

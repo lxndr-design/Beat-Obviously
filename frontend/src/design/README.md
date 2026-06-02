@@ -34,6 +34,9 @@ Strict, deliberately narrow visual language. Read this before adding any UI.
 - [`tokens.css`](./tokens.css) — every CSS custom property
 - [`reset.css`](./reset.css) — element reset
 - [`typography.css`](./typography.css) — font face, sizes, line-heights
+- [`layout.css`](./layout.css) — shared app/editor layout primitives
+- [`surfaces.css`](./surfaces.css) — shared panel, section, row, and frame primitives
+- [`forms.css`](./forms.css) — shared field/control primitives
 - [`animations.css`](./animations.css) — keyframes + transition shorthand classes
 - [`global.css`](./global.css) — entry point; imports the others
 
@@ -41,6 +44,8 @@ Strict, deliberately narrow visual language. Read this before adding any UI.
 
 1. Open `tokens.css` and check if existing tokens cover what you need.
 2. If not, add the token first (and justify it here in this README).
-3. Build the component in `components/<Name>/` consuming tokens via `var(--token)`.
-4. Never hardcode `#000`, `#fff`, `16px`, etc. — always go through tokens.
-5. Add a story/demo entry in `components/<Name>/<Name>.demo.tsx` so the component is exercisable.
+3. Check `layout.css`, `surfaces.css`, and `forms.css` before creating repeated panel, grid, or field styles.
+4. Build reusable primitives in `components/<Name>/` consuming tokens via `var(--token)`.
+5. Keep feature-only layout in that feature's CSS module.
+6. Never hardcode `#000`, `#fff`, `16px`, etc. — always go through tokens.
+7. Add a story/demo entry in `components/<Name>/<Name>.demo.tsx` so the component is exercisable.

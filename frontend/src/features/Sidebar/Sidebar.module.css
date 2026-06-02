@@ -4,15 +4,26 @@
   height: 100%;
   border-right: var(--border-fg);
   text-align: left;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   position: relative;
   flex-shrink: 0;
 }
 
 .section {
-  flex: 1 1 0;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  max-height: 66vh;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+.section:last-of-type {
+  position: sticky;
+  bottom: 0;
+  background: var(--color-bg);
+  z-index: 8;
 }
 
 /* 4px-wide invisible hit target on the right edge — wider on hover for

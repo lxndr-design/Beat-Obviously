@@ -1,8 +1,7 @@
-import { useState } from "react";
 import { Button, Icon, NumberInput, HoverInfo } from "../../components";
 import { useProjectStore, useTransportStore } from "../../state/store";
 import { send } from "../../ipc/bridge";
-import { TimeSignatureModal } from "./TimeSignatureModal";
+import { TimeSignatureControl } from "./TimeSignatureControl";
 import styles from "./TransportBar.module.css";
 
 /**
@@ -23,8 +22,6 @@ export function TransportBar() {
   const setBpm = useProjectStore((s) => s.setBpm);
   const setTs = useProjectStore((s) => s.setTimeSignature);
   const transport = useTransportStore();
-  const [tsModalOpen, setTsModalOpen] = useState(false);
-  const [tsMenuOpen, setTsMenuOpen] = useState(false);
 
   async function onPlay() {
     transport.play();
@@ -38,11 +35,10 @@ export function TransportBar() {
     transport.stop();
     await send({ kind: "transport.stop" });
   }
-  async function onRestart() {
+  function onRestart() {
     transport.setPosition(0);
     transport.play();
-    await send({ kind: "transport.seek", positionBeat: 0 });
-    await send({ kind: "transport.play" });
+    void send({ kind: "transport.restart" });
   }
   async function onSpeedPercent(p: number) {
     const mult = p / 100;
@@ -91,49 +87,7 @@ export function TransportBar() {
 
       {/* Playback section */}
       <div className={styles.playback}>
-        <div className={styles.tsWrap}>
-          <HoverInfo content="Time signature">
-            <button
-              type="button"
-              className={styles.tsBtn}
-              onClick={() => setTsMenuOpen((v) => !v)}
-              aria-label="Time signature"
-              aria-expanded={tsMenuOpen}
-            >
-              {ts.num}/{ts.denom}
-              <Icon name="ph:caret-up" size={16} decorative />
-            </button>
-          </HoverInfo>
-          {tsMenuOpen && (
-            <div className={styles.dropUp} role="menu">
-              {TS_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  className={styles.dropItem}
-                  onClick={() => {
-                    const [n, d] = preset.split("/").map(Number);
-                    setTs({ num: n, denom: d, boldBeats: [1] });
-                    setTsMenuOpen(false);
-                  }}
-                >
-                  {preset}
-                </button>
-              ))}
-              <div className={styles.dropSep} />
-              <button
-                type="button"
-                className={styles.dropItem}
-                onClick={() => {
-                  setTsMenuOpen(false);
-                  setTsModalOpen(true);
-                }}
-              >
-                Custom…
-              </button>
-            </div>
-          )}
-        </div>
+        <TimeSignatureControl value={ts} onChange={setTs} direction="up" />
 
         <NumberInput
           label="BPM"
@@ -154,12 +108,9 @@ export function TransportBar() {
         />
       </div>
 
-      {tsModalOpen && <TimeSignatureModal onClose={() => setTsModalOpen(false)} />}
     </div>
   );
 }
-
-const TS_PRESETS = ["4/4", "3/4", "6/8", "5/4", "7/8", "12/8"];
 
 /** Format a beat-position as M:SS:cs clock time using the current BPM. */
 function formatClock(beat: number, bpm: number): string {

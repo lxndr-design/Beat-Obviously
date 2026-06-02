@@ -24,10 +24,17 @@ namespace beat
     private:
         struct BandGains { float lowDb{0}, midDb{0}, highDb{0}, airDb{0}; };
         BandGains gainsAtBeat(Beats b) const;
+        static bool differs(const BandGains& a, const BandGains& b, float epsilonDb);
+        static BandGains blend(const BandGains& from, const BandGains& to, float t);
+        void updateCoefficients(const BandGains& gainsDb);
 
         double sampleRate { 44100.0 };
         Beats  currentBeat { 0.0 };
         std::vector<EqAutomationPoint> automation;
+        BandGains smoothedGains;
+        BandGains appliedGains;
+        bool hasAppliedGains { false };
+        double smoothingTimeSeconds { 0.015 };
 
         using Filter = juce::dsp::ProcessorDuplicator<
             juce::dsp::IIR::Filter<float>,

@@ -9,6 +9,26 @@
   background: var(--color-bg);
 }
 
+.headerSelecting {
+  cursor: pointer;
+}
+
+.headerSelected {
+  background: color-mix(in srgb, var(--color-fg) 14%, var(--color-bg));
+}
+
+.headerSelected:hover {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.checkbox {
+  justify-self: center;
+  width: 12px;
+  height: 12px;
+  margin: 0;
+}
+
 .dragHandle {
   display: inline-flex;
   align-items: center;
@@ -99,6 +119,11 @@
 .dot:disabled:hover {
   background: var(--color-bg);
   color: var(--color-fg);
+}
+
+.headerSelected .dot:disabled:hover {
+  background: transparent;
+  color: inherit;
 }
 
 /* Reorder-drag drop indicators (inset shadow lines top/bottom). */

@@ -1,9 +1,12 @@
-/* Design system entry point — import order matters.
- * tokens → reset → typography → animations. */
+/* Design system entry point - import order matters.
+ * tokens -> reset -> typography -> layout -> surfaces -> forms -> animations. */
 
 @import "./tokens.css";
 @import "./reset.css";
 @import "./typography.css";
+@import "./layout.css";
+@import "./surfaces.css";
+@import "./forms.css";
 @import "./animations.css";
 
 /* Light-green text-selection — the single chromatic exception. */
@@ -16,16 +19,46 @@
   color: var(--color-highlight-fg);
 }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-fg) var(--color-bg);
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-fg);
+}
+
 /* App-wide layout primitives */
 
 .app-root {
+  position: relative;
   width: 100vw;
   height: 100vh;
   display: grid;
   grid-template-rows: var(--height-topbar) 1fr;
   background: var(--color-bg);
   color: var(--color-fg);
+  box-sizing: border-box;
   overflow: hidden;
+}
+
+.app-root::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  border: var(--border-fg);
+  pointer-events: none;
+  box-sizing: border-box;
 }
 
 .app-main {

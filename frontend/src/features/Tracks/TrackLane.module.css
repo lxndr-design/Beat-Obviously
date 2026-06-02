@@ -5,6 +5,25 @@
   border-bottom: var(--border-fg);
 }
 
+.selecting {
+  cursor: pointer;
+}
+
+.selected {
+  background: color-mix(in srgb, var(--color-fg) 10%, var(--color-bg));
+}
+
+.selectionOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2000;
+  display: block;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
 .gridLine {
   position: absolute;
   top: 0;

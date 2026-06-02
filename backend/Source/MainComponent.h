@@ -19,7 +19,12 @@ public:
     void resized() override;
     void paint(juce::Graphics&) override;
 
+    juce::var handleNativeRequest(const juce::String& kind, const juce::var& payload);
+    void emitMenuCommand(const juce::String& command);
+
 private:
+    juce::WebBrowserComponent::Options createBrowserOptions();
+
     std::unique_ptr<beat::Database>      database;
     std::unique_ptr<beat::AudioEngine>   engine;
     std::unique_ptr<beat::MessageBridge> bridge;

@@ -1,53 +1,30 @@
 .panel {
   display: flex;
   flex-direction: column;
+  min-height: var(--button-square-xs);
+  max-height: inherit;
+  overflow: hidden;
   border-top: var(--border-fg);
-}
-
-.header {
-  display: grid;
-  grid-template-columns: var(--button-square-xs) 1fr auto;
-  align-items: center;
-  height: var(--button-square-xs);
-  padding: 0 var(--space-1);
-  gap: var(--space-1);
-  border-bottom: var(--border-fg);
-}
-
-.chevronBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--button-square-xs);
-  height: var(--button-square-xs);
-  background: transparent;
-  color: var(--color-fg);
-  cursor: pointer;
-  transition: var(--transition-invert);
-}
-.chevronBtn:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
-}
-
-.headerLabel {
-  font-size: 12px;
-  font-weight: var(--font-weight-medium);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-uppercase);
-  text-align: left;
-}
-
-.headerCount {
-  font-family: var(--font-family-mono);
-  font-size: 11px;
-  opacity: 0.6;
-  padding-right: 0;
 }
 
 .list {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 0;
+  opacity: 0;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  transition:
+    max-height 180ms var(--ease-out),
+    opacity 120ms var(--ease-out);
+}
+
+.listOpen {
+  max-height: calc(66vh - var(--button-square-xs));
+  opacity: 1;
+  overflow-y: auto;
 }
 
 .empty {
@@ -60,10 +37,10 @@
 
 .item {
   display: grid;
-  grid-template-columns: 14px 1fr auto;
+  grid-template-columns: 14px minmax(0, 1fr) 14px 24px;
   align-items: center;
   gap: 4px;
-  padding: 0 4px;
+  padding: 0 0 0 4px;
   height: 24px;
   cursor: grab;
   transition: var(--transition-invert);
@@ -84,8 +61,9 @@
   justify-content: center;
   width: 14px;
   height: 14px;
-  opacity: 0.5;
+  opacity: 0;
   cursor: grab;
+  transition: opacity var(--duration-hover) var(--ease-out);
 }
 .item:hover .itemDot {
   opacity: 0.9;
@@ -101,5 +79,44 @@
 .itemMeta {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
   opacity: 0.7;
+}
+
+.itemPreviewButton {
+  width: 24px;
+  height: 24px;
+}
+
+.drumIcon {
+  position: relative;
+  display: inline-block;
+  width: 13px;
+  height: 11px;
+  border: 1px solid currentColor;
+  border-top-width: 2px;
+  border-radius: 2px 2px 4px 4px;
+}
+
+.drumIcon::before,
+.drumIcon::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  width: 1px;
+  height: 5px;
+  background: currentColor;
+  transform-origin: bottom center;
+}
+
+.drumIcon::before {
+  left: 2px;
+  transform: rotate(-34deg);
+}
+
+.drumIcon::after {
+  right: 2px;
+  transform: rotate(34deg);
 }

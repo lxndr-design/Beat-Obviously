@@ -1,19 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import { Modal, Button, FloatingSelect, NumberInput, useModalStack } from "../../components";
+import { Modal, Button, FloatingSelect, Icon, NumberInput, TextInput, useModalStack } from "../../components";
 import { createInstrumentBufferSource, noteFrequency } from "../../audio/synthPreview";
+import { DRUM_MAX_STEPS } from "../../ai/drumBeatGenerator";
+import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
+import { importAudioFile } from "../../audio/audioImport";
+import type { GeneratedDrumBeat } from "../../ai/drumBeatGenerator";
+import { maybeRunDueTraining } from "../../ai/trainingRunner";
+import { updateDrumBeatFeedback } from "../../persistence/dexie";
 import {
   useAudioFileStore,
   useProjectStore,
   useUiStore,
   useInstrumentStore,
   useTransportStore,
+  snapshotInstrument,
 } from "../../state/store";
-import { send } from "../../ipc/bridge";
 import { selectSegment } from "../../state/selectors";
 import { PianoRoll } from "../MidiEditor";
 import { MidiTransport } from "../MidiEditor/MidiTransport";
 import { DrumSequencer } from "../DrumEditor/DrumSequencer";
-import type { DrumRow, Instrument, MidiNote, Segment } from "../../state/types";
+import type { DrumRow, DrumSpeed, Instrument, MidiNote, Segment, TimeSignature } from "../../state/types";
 import styles from "./SegmentEditorModal.module.css";
 
 interface Props {
@@ -44,10 +50,14 @@ export function SegmentEditorModal({ segmentId }: Props) {
   const addAudioFile = useAudioFileStore((s) => s.addFile);
   const positionBeat = useTransportStore((s) => s.positionBeat);
   const playing = useTransportStore((s) => s.playing);
+  const timeSignature = useProjectStore((s) => s.project.timeSignature);
   const id = `segment-${segmentId}`;
 
   const [draft, setDraft] = useState<Segment | undefined>(source);
   const [instrumentSelectOpen, setInstrumentSelectOpen] = useState(false);
+  const [midiTimeSignatureOpen, setMidiTimeSignatureOpen] = useState(false);
+  const [midiPreviewBeat, setMidiPreviewBeat] = useState<number | null>(null);
+  const [drumTrainingSessionId, setDrumTrainingSessionId] = useState<string | null>(null);
   const previewCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
@@ -65,6 +75,12 @@ export function SegmentEditorModal({ segmentId }: Props) {
   const dirty = JSON.stringify(draft) !== JSON.stringify(source);
 
   function save() {
+    if (drumTrainingSessionId && draft!.payload.kind === "drum") {
+      void updateDrumBeatFeedback(drumTrainingSessionId, {
+        acceptedEdit: true,
+        finalBeat: drumPayloadFromSegment(draft!),
+      }).then(() => maybeRunDueTraining("drums"));
+    }
     updateSegment(segmentId, draft!);
     close();
   }
@@ -96,17 +112,23 @@ export function SegmentEditorModal({ segmentId }: Props) {
 
   function resizeDrum(lengthBeats: number, rows: DrumRow[]) {
     if (draft!.payload.kind !== "drum") return;
-    const stepCount = Math.max(1, Math.min(64, Math.round(lengthBeats)));
+    const stepCount = Math.max(1, Math.min(DRUM_MAX_STEPS, Math.round(lengthBeats)));
     setDraft({
       ...draft!,
-      lengthBeats: stepCount,
+      lengthBeats: Math.max(1, Math.min(DRUM_MAX_STEPS, Math.round(lengthBeats))),
       payload: { ...draft!.payload, stepCount, rows },
     });
   }
 
-  function updateDrumSpeed(speed: 1 | 2 | 4 | 8) {
+  function updateDrumSpeed(speed: DrumSpeed) {
     if (draft!.payload.kind !== "drum") return;
-    setDraft({ ...draft!, payload: { ...draft!.payload, speed } });
+    setDraft({
+      ...draft!,
+      payload: {
+        ...draft!.payload,
+        speed,
+      },
+    });
   }
 
   function updateDrumDefaultPitch(frequencyHz: number | undefined) {
@@ -114,18 +136,66 @@ export function SegmentEditorModal({ segmentId }: Props) {
     setDraft({ ...draft!, payload: { ...draft!.payload, defaultPitchHz: frequencyHz } });
   }
 
+  function updateDrumSwing(swingPercent: number) {
+    if (draft!.payload.kind !== "drum") return;
+    setDraft({ ...draft!, payload: { ...draft!.payload, swingPercent } });
+  }
+
+  function updateDrumTimeSignature(next: TimeSignature) {
+    if (draft!.payload.kind !== "drum") return;
+    setDraft({ ...draft!, payload: { ...draft!.payload, timeSignature: next } });
+  }
+
+  function applyGeneratedDrumBeat(beat: GeneratedDrumBeat) {
+    setDraft((current) => {
+      if (!current || current.payload.kind !== "drum") return current;
+      return {
+        ...current,
+        lengthBeats: beat.lengthBeats,
+        payload: {
+          ...current.payload,
+          rows: beat.rows,
+          stepCount: beat.stepCount,
+          speed: beat.speed,
+          swingPercent: beat.swingPercent,
+          defaultPitchHz: beat.defaultPitchHz ?? current.payload.defaultPitchHz,
+        },
+      };
+    });
+  }
+
   async function uploadDrumRow() {
     if (draft!.payload.kind !== "drum") return;
-    const resp = await send({ kind: "audio.import" });
-    if (!resp.file) return;
-    addAudioFile(resp.file);
-    const name = sampleName(resp.file.name);
-    const instrumentId = addInstrument({
+    const file = await importAudioFile();
+    if (!file) return;
+    if (!isSupportedAudioFileName(file.name) && !isSupportedAudioFileName(file.path)) {
+      window.alert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
+      return;
+    }
+    addAudioFile(file);
+    const name = sampleName(file.name);
+    const uploadedInstrument: Partial<Instrument> = {
       name,
       kind: "sampler",
       waveform: "sample",
-      sampleIds: [resp.file.id],
+      sampleIds: [file.id],
+      sampleUrl: file.path,
+      source: {
+        kind: "uploaded",
+        label: file.name,
+        url: file.path,
+        importedAt: Date.now(),
+        edited: false,
+      },
       userCreated: true,
+    };
+    const instrumentId = addInstrument({
+      ...uploadedInstrument,
+      original: snapshotInstrument({
+        ...fallbackInstrument,
+        ...uploadedInstrument,
+        id: "uploaded-preview",
+      } as Instrument),
     });
     const nextRow: DrumRow = {
       id: crypto.randomUUID(),
@@ -155,29 +225,35 @@ export function SegmentEditorModal({ segmentId }: Props) {
     gain.connect(ctx.destination);
 
     const synth = instrument ?? fallbackInstrument;
-    const source = createInstrumentBufferSource(ctx, synth, 0.24, noteFrequency(pitch, synth));
+    const source = createInstrumentBufferSource(ctx, synth, 0.24, noteFrequency(Math.max(0, Math.min(127, pitch + (draft?.transpose ?? 0))), synth));
     source.connect(gain);
     source.start(now);
     source.stop(now + 0.24);
   }
 
   const isMidi = draft.payload.kind === "midi" || draft.payload.kind === "mixed";
-  const isDrum = draft.payload.kind === "drum";
   const drumPayload = draft.payload.kind === "drum" ? draft.payload : null;
-  const titleKind = draft.payload.kind === "audio" ? "Audio" : isDrum ? "Drums" : "MIDI";
+  const transpose = draft.transpose ?? 0;
+  const midiTimeSignature = draft.timeSignature ?? timeSignature;
+  const previewMidiNotes = midiNotes.map((note) => ({
+    ...note,
+    pitch: Math.max(0, Math.min(127, note.pitch + transpose)),
+    curve: note.curve?.map((point) => ({ ...point, pitch: Math.max(0, Math.min(127, point.pitch + transpose)) })),
+  }));
   const displayName = draft.name?.trim() || `Segment ${segmentId.slice(0, 6)}`;
-  const playheadBeat =
+  const globalPlayheadBeat =
     playing &&
     positionBeat >= draft.startBeat &&
     positionBeat <= draft.startBeat + draft.lengthBeats
       ? positionBeat - draft.startBeat
       : null;
+  const playheadBeat = midiPreviewBeat ?? globalPlayheadBeat;
 
   return (
     <Modal
       open
       scopeId={id}
-      title={`${titleKind} — ${displayName}`}
+      title={<><Icon name={segmentIcon(draft.payload.kind)} size={14} decorative />{displayName}</>}
       width="lg"
       dirty={dirty}
       onClose={onClose}
@@ -218,13 +294,33 @@ export function SegmentEditorModal({ segmentId }: Props) {
                 })
               }
             />
+            <NumberInput
+              layout="inline"
+              label="Transpose"
+              value={transpose}
+              min={-48}
+              max={DRUM_MAX_STEPS}
+              step={1}
+              onChange={(v) => setDraft({ ...draft, transpose: Math.round(v) })}
+            />
+            <FloatingSelect
+              layout="inline"
+              label="Time"
+              value={formatTimeSignature(midiTimeSignature)}
+              ariaLabel="MIDI time signature"
+              options={TIME_SIGNATURE_OPTIONS.map((signature) => ({ value: signature, label: signature }))}
+              open={midiTimeSignatureOpen}
+              onOpenChange={setMidiTimeSignatureOpen}
+              onChange={(value) => setDraft({ ...draft, timeSignature: parseTimeSignature(value) })}
+            />
             <div className={styles.transportSlot}>
               <MidiTransport
-                notes={midiNotes}
+                notes={previewMidiNotes}
                 lengthBeats={draft.lengthBeats}
                 bpm={useProjectStore.getState().project.bpm}
                 instrument={instruments.find((i) => i.id === draft.instrumentId)}
                 hotkeyScopeId={id}
+                onPositionChange={setMidiPreviewBeat}
               />
             </div>
           </div>
@@ -246,14 +342,21 @@ export function SegmentEditorModal({ segmentId }: Props) {
             stepCount={drumPayload.stepCount}
             speed={drumPayload.speed ?? 1}
             defaultPitchHz={drumPayload.defaultPitchHz}
+            swingPercent={drumPayload.swingPercent ?? 50}
             lengthBeats={draft.lengthBeats}
             bpm={useProjectStore.getState().project.bpm}
+            timeSignature={timeSignature}
+            segmentTimeSignature={drumPayload.timeSignature ?? timeSignature}
             instruments={instruments}
             hotkeyScopeId={id}
             onChange={updateDrumRows}
             onResize={resizeDrum}
+            onGenerateBeat={applyGeneratedDrumBeat}
+            onTrainingSessionChange={setDrumTrainingSessionId}
             onDefaultPitchChange={updateDrumDefaultPitch}
+            onSwingChange={updateDrumSwing}
             onSpeedChange={updateDrumSpeed}
+            onTimeSignatureChange={updateDrumTimeSignature}
             onUploadRow={uploadDrumRow}
           />
         </>
@@ -261,6 +364,13 @@ export function SegmentEditorModal({ segmentId }: Props) {
 
       {draft.payload.kind === "audio" && (
         <div className={styles.audioPanel}>
+          <TextInput
+            label="Name"
+            layout="inline"
+            value={draft.name ?? ""}
+            placeholder="Audio segment"
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          />
           <div className={styles.audioLabel}>Audio source</div>
           <p className={styles.audioHint}>
             {draft.payload.audioFileId
@@ -291,3 +401,37 @@ const fallbackInstrument: Instrument = {
 function sampleName(filename: string): string {
   return filename.replace(/\.[a-z0-9]+$/i, "").trim() || "Sample";
 }
+
+function drumPayloadFromSegment(segment: Segment): GeneratedDrumBeat | undefined {
+  if (segment.payload.kind !== "drum") return undefined;
+  return {
+    rows: structuredClone(segment.payload.rows),
+    stepCount: segment.payload.stepCount,
+    lengthBeats: segment.lengthBeats,
+    speed: segment.payload.speed,
+    swingPercent: segment.payload.swingPercent ?? 50,
+    defaultPitchHz: segment.payload.defaultPitchHz,
+    source: "local",
+  };
+}
+
+function segmentIcon(kind: Segment["payload"]["kind"]): string {
+  if (kind === "audio") return "ph:waveform";
+  if (kind === "drum") return "ph:drum";
+  return "ph:piano-keys";
+}
+
+function formatTimeSignature(timeSignature: TimeSignature): string {
+  return `${timeSignature.num}/${timeSignature.denom}`;
+}
+
+function parseTimeSignature(value: string): TimeSignature {
+  const [numRaw, denomRaw] = value.split("/");
+  return {
+    num: Math.max(1, Math.min(16, Number(numRaw) || 4)),
+    denom: Number(denomRaw) === 8 ? 8 : 4,
+    boldBeats: [1],
+  };
+}
+
+const TIME_SIGNATURE_OPTIONS = ["4/4", "3/4", "6/8", "5/4", "7/8", "12/8"] as const;

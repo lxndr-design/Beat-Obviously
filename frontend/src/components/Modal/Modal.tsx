@@ -6,11 +6,19 @@ import { useModalStack } from "./modalStack";
 
 export interface ModalProps {
   open: boolean;
-  title: string;
+  title: ReactNode;
   /** Optional subtitle under the title in the header stripe. */
   subtitle?: string;
   /** Footer content. Typically a row of Buttons; see ConfirmDialog for presets. */
   footer?: ReactNode;
+  /** Removes default body padding for editors that provide their own internal spacing. */
+  flushBody?: boolean;
+  /** Optional compact controls rendered in the title ribbon. */
+  headerActions?: ReactNode;
+  /** When true, clicking the backdrop requests close. Defaults off to avoid losing editor work. */
+  closeOnScrimClick?: boolean;
+  /** When true, Escape requests close. Defaults off so Escape can cancel tools/modes inside editors. */
+  closeOnEscape?: boolean;
   /** Width preset. */
   width?: "sm" | "md" | "lg" | "full";
   /** Stable id for modal stack coordination and contextual hotkeys. */
@@ -38,6 +46,10 @@ export function Modal({
   title,
   subtitle,
   footer,
+  flushBody = false,
+  headerActions,
+  closeOnScrimClick = false,
+  closeOnEscape = false,
   width = "md",
   scopeId,
   dirty = false,
@@ -59,7 +71,7 @@ export function Modal({
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
+      if (closeOnEscape && e.key === "Escape") {
         e.stopPropagation();
         requestClose();
       }
@@ -67,7 +79,7 @@ export function Modal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, dirty]);
+  }, [open, dirty, closeOnEscape]);
 
   function requestClose() {
     if (dirty && onRequestCloseDirty) {
@@ -86,7 +98,7 @@ export function Modal({
       className={styles.scrim}
       style={{ zIndex: 300 + stackIndex * 10 }}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) requestClose();
+        if (closeOnScrimClick && e.target === e.currentTarget) requestClose();
       }}
     >
       <div
@@ -103,17 +115,20 @@ export function Modal({
             </h2>
             {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
           </div>
-          <button
-            className={styles.closeBtn}
-            onClick={requestClose}
-            aria-label="Close"
-            type="button"
-          >
-            <Icon name="ph:x" size={16} decorative />
-          </button>
+          <div className={styles.headerRight}>
+            {headerActions && <div className={styles.headerActions}>{headerActions}</div>}
+            <button
+              className={styles.closeBtn}
+              onClick={requestClose}
+              aria-label="Close"
+              type="button"
+            >
+              <Icon name="ph:x" size={16} decorative />
+            </button>
+          </div>
         </header>
 
-        <div className={styles.body}>{children}</div>
+        <div className={`${styles.body} ${flushBody ? styles.bodyFlush : ""}`}>{children}</div>
 
         {footer && <footer className={styles.footer}>{footer}</footer>}
       </div>

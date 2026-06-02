@@ -1,0 +1,90 @@
+.panel {
+  position: fixed;
+  right: 6px;
+  bottom: 6px;
+  z-index: 9000;
+  width: min(348px, calc(100vw - 12px));
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: var(--border-fg);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  pointer-events: auto;
+}
+
+.ribbon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 6px;
+  border-bottom: var(--border-fg);
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.metric {
+  white-space: nowrap;
+  color: var(--color-muted);
+}
+
+.body {
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 58px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.label,
+.value,
+.staticValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.value {
+  text-align: right;
+  color: var(--color-muted);
+}
+
+.staticValue {
+  color: var(--color-muted);
+}
+
+.track {
+  position: relative;
+  height: 8px;
+  border: var(--border-fg);
+  overflow: hidden;
+}
+
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--fill);
+  background: var(--color-fg);
+}
+
+.collapsed {
+  width: auto;
+}
+
+.collapsed .ribbon {
+  border-bottom: 0;
+}

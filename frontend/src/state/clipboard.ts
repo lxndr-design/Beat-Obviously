@@ -9,24 +9,36 @@ import type { Segment } from "./types";
  */
 interface ClipboardState {
   segment: Segment | null;
+  segments: Segment[];
   copy: (seg: Segment) => void;
+  copyMany: (segments: Segment[]) => void;
   paste: () => Segment | null;
+  pasteMany: () => Segment[];
 }
 
 const store = create<ClipboardState>()((set, get) => ({
   segment: null,
-  copy: (seg) => set({ segment: structuredClone(seg) }),
+  segments: [],
+  copy: (seg) => set({ segment: structuredClone(seg), segments: [structuredClone(seg)] }),
+  copyMany: (segments) =>
+    set({
+      segment: segments[0] ? structuredClone(segments[0]) : null,
+      segments: segments.map((seg) => structuredClone(seg)),
+    }),
   paste: () => {
-    const s = get().segment;
+    const s = get().segments[0] ?? get().segment;
     return s ? structuredClone(s) : null;
   },
+  pasteMany: () => get().segments.map((seg) => structuredClone(seg)),
 }));
 
 /** Hook returning a stable copy/paste API. */
 export function useClipboard() {
   return {
     copy: store.getState().copy,
+    copyMany: store.getState().copyMany,
     paste: store.getState().paste,
+    pasteMany: store.getState().pasteMany,
   };
 }
 

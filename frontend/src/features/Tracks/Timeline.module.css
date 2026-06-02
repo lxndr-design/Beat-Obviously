@@ -1,12 +1,16 @@
 .timeline {
   position: relative;
   height: var(--height-timeline);
-  border-top: var(--border-fg);
   background: var(--color-bg);
   margin-top: auto;
   flex-shrink: 0;
   cursor: ew-resize;
   user-select: none;
+  transition: background 120ms var(--ease-out);
+}
+
+.timeline:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .tick {

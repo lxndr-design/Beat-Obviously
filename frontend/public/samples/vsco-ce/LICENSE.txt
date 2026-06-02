@@ -1,0 +1,5 @@
+VSCO 2 Community Edition
+Source: https://github.com/sgossner/VSCO-2-CE
+License: CC0-1.0
+
+Downloaded from the VSCO 2 Community Edition repository for Beat's built-in factory library.

@@ -1,33 +1,51 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Button, FloatingLayer, FloatingSelect, HoverInfo, Icon, NumberInput, RadioGroup, TextInput } from "../../components";
+import { ai } from "../../ai/aiService";
+import { DRUM_COMPLEXITY_DEFAULT, DRUM_GENRES, DRUM_MAX_STEPS, type DrumGenre, type GeneratedDrumBeat } from "../../ai/drumBeatGenerator";
+import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import { createInstrumentBufferSource, noteFrequency, preloadInstrumentSample } from "../../audio/synthPreview";
 import { useContextualHotkey } from "../../hotkeys/contextualHotkeys";
+import { listDrumBeatFeedback, saveDrumBeatFeedback } from "../../persistence/dexie";
+import { TimeSignatureControl } from "../Transport/TimeSignatureControl";
 import {
   DEFAULT_DRUM_MIDI_PITCH,
   DEFAULT_DRUM_VELOCITY,
+  drumTimingOffsetBeats,
+  effectiveDrumVelocity,
   formatFrequency,
   frequencyToNoteName,
+  hasCustomDrumVelocity,
   normalizeDrumCell,
   normalizeDrumSteps,
   parsePitchInput,
+  sanitizeLeanPercent,
+  sanitizeSwingPercent,
+  sanitizeVelocity,
 } from "../../state/drumSteps";
-import type { DrumCell, DrumRow, Instrument } from "../../state/types";
+import type { DrumCell, DrumRow, DrumSpeed, Instrument, TimeSignature } from "../../state/types";
 import styles from "./DrumSequencer.module.css";
 
 interface Props {
   rows: DrumRow[];
   stepCount: number;
-  speed: 1 | 2 | 4 | 8;
+  speed: DrumSpeed;
   lengthBeats: number;
   defaultPitchHz?: number;
+  swingPercent?: number;
   bpm: number;
+  timeSignature: TimeSignature;
+  segmentTimeSignature?: TimeSignature;
   instruments: Instrument[];
   hotkeyScopeId?: string;
   onChange: (rows: DrumRow[]) => void;
   onResize: (lengthBeats: number, rows: DrumRow[]) => void;
+  onGenerateBeat?: (beat: GeneratedDrumBeat) => void;
+  onTrainingSessionChange?: (id: string | null) => void;
   onDefaultPitchChange?: (frequencyHz: number | undefined) => void;
-  onSpeedChange: (speed: 1 | 2 | 4 | 8) => void;
+  onSwingChange?: (swingPercent: number) => void;
+  onSpeedChange: (speed: DrumSpeed) => void;
+  onTimeSignatureChange?: (timeSignature: TimeSignature) => void;
   onUploadRow?: () => void;
 }
 
@@ -41,6 +59,22 @@ interface CellMenuState {
 interface PitchPopoverState extends CellMenuState {
   value: string;
   error: boolean;
+}
+
+interface VolumePopoverState extends CellMenuState {
+  value: string;
+  error: boolean;
+}
+
+interface LeanPopoverState extends CellMenuState {
+  value: string;
+  error: boolean;
+}
+
+interface FeedbackPopoverState {
+  x: number;
+  y: number;
+  value: string;
 }
 
 interface CopiedCell {
@@ -59,30 +93,53 @@ export function DrumSequencer({
   speed,
   lengthBeats,
   defaultPitchHz,
+  swingPercent = 50,
   bpm,
+  timeSignature,
+  segmentTimeSignature,
   instruments,
   hotkeyScopeId,
   onChange,
   onResize,
+  onGenerateBeat,
+  onTrainingSessionChange,
   onDefaultPitchChange,
+  onSwingChange,
   onSpeedChange,
+  onTimeSignatureChange,
   onUploadRow,
 }: Props) {
   const [playing, setPlaying] = useState(false);
   const [playStep, setPlayStep] = useState<number | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(() => new Set());
   const [openRowId, setOpenRowId] = useState<string | null>(null);
+  const [generateGenre, setGenerateGenre] = useState<DrumGenre>("rock");
+  const [generateGenreOpen, setGenerateGenreOpen] = useState(false);
+  const [generateComplexity, setGenerateComplexity] = useState(DRUM_COMPLEXITY_DEFAULT);
+  const [generating, setGenerating] = useState(false);
+  const [lastGeneratedBeat, setLastGeneratedBeat] = useState<GeneratedDrumBeat | null>(null);
+  const [feedbackRating, setFeedbackRating] = useState<"up" | "down" | null>(null);
+  const [feedbackId, setFeedbackId] = useState<string | null>(null);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState<"up" | "down" | null>(null);
+  const [feedbackPopover, setFeedbackPopover] = useState<FeedbackPopoverState | null>(null);
   const [cellMenu, setCellMenu] = useState<CellMenuState | null>(null);
   const [pitchPopover, setPitchPopover] = useState<PitchPopoverState | null>(null);
+  const [volumePopover, setVolumePopover] = useState<VolumePopoverState | null>(null);
+  const [leanPopover, setLeanPopover] = useState<LeanPopoverState | null>(null);
   const [cellSize, setCellSize] = useState(DEFAULT_CELL_SIZE);
   const wrapRef = useRef<HTMLDivElement>(null);
   const rowsRef = useRef(rows);
   const instrumentsRef = useRef(instruments);
   const defaultPitchRef = useRef(defaultPitchHz);
   const ctxRef = useRef<AudioContext | null>(null);
-  const timerRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const scheduledRef = useRef<Set<string>>(new Set());
+  const activeSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  const activeGainsRef = useRef<Set<GainNode>>(new Set());
+  const loopStartTimeRef = useRef(0);
   const stepRef = useRef(0);
-  const dragRef = useRef<{ moved: boolean; pointerId: number; startedOn: string } | null>(null);
+  const dragRef = useRef<{ pointerId: number; setOn: boolean; touched: Set<string> } | null>(null);
+  const volumeDragRef = useRef<{ rowId: string; step: number; pointerId: number; rect: DOMRect } | null>(null);
   const cellClipboardRef = useRef<CopiedCells | null>(null);
 
   rowsRef.current = rows;
@@ -101,18 +158,30 @@ export function DrumSequencer({
 
   useEffect(
     () => () => {
-      stop();
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      stopDrumPreviewAudio();
       if (ctxRef.current) void ctxRef.current.close();
     },
     [],
   );
 
   useEffect(() => {
+    function resetZoom(e: globalThis.KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.key !== "0") return;
+      const active = document.activeElement;
+      if (active && wrapRef.current && !wrapRef.current.contains(active)) return;
+      e.preventDefault();
+      setCellSize(DEFAULT_CELL_SIZE);
+    }
+    window.addEventListener("keydown", resetZoom);
+    return () => window.removeEventListener("keydown", resetZoom);
+  }, []);
+
+  useEffect(() => {
     if (!playing) return;
-    stop();
-    play();
+    restartPlaybackClock();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stepCount, lengthBeats, bpm, speed]);
+  }, [stepCount, lengthBeats, bpm, speed, swingPercent]);
 
   useEffect(() => {
     const ctx = getCtx();
@@ -129,14 +198,22 @@ export function DrumSequencer({
       const target = e.target as Element | null;
       if (target?.closest("[data-floating-layer]")) return;
       setOpenRowId(null);
+      setGenerateGenreOpen(false);
       setCellMenu(null);
       setPitchPopover(null);
+      setVolumePopover(null);
+      setLeanPopover(null);
+      setFeedbackPopover(null);
     }
     function closeOnEscape(e: globalThis.KeyboardEvent) {
       if (e.key !== "Escape") return;
       setOpenRowId(null);
+      setGenerateGenreOpen(false);
       setCellMenu(null);
       setPitchPopover(null);
+      setVolumePopover(null);
+      setLeanPopover(null);
+      setFeedbackPopover(null);
     }
     window.addEventListener("mousedown", closeFloating);
     window.addEventListener("keydown", closeOnEscape);
@@ -158,25 +235,50 @@ export function DrumSequencer({
   function play() {
     const ctx = getCtx();
     if (ctx.state === "suspended") void ctx.resume();
+    stopDrumPreviewAudio();
+    scheduledRef.current.clear();
+    loopStartTimeRef.current = ctx.currentTime;
     stepRef.current = 0;
+    setPlayStep(0);
     setPlaying(true);
-    triggerStep(0);
-    const stepMs = Math.max(20, ((lengthBeats / speed) / stepCount) * (60 / bpm) * 1000);
-    timerRef.current = window.setInterval(() => {
-      stepRef.current = (stepRef.current + 1) % stepCount;
-      triggerStep(stepRef.current);
-    }, stepMs);
   }
 
   function stop() {
-    if (timerRef.current) window.clearInterval(timerRef.current);
-    timerRef.current = null;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    scheduledRef.current.clear();
+    stopDrumPreviewAudio();
     setPlaying(false);
     setPlayStep(null);
   }
 
-  function triggerStep(step: number) {
-    setPlayStep(step);
+  function restartPlaybackClock() {
+    const ctx = getCtx();
+    stopDrumPreviewAudio();
+    scheduledRef.current.clear();
+    loopStartTimeRef.current = ctx.currentTime;
+    stepRef.current = 0;
+    setPlayStep(0);
+  }
+
+  function stopDrumPreviewAudio() {
+    for (const source of activeSourcesRef.current) {
+      try {
+        source.onended = null;
+        source.stop();
+      } catch {
+        // Already stopped.
+      }
+      source.disconnect();
+    }
+    for (const gain of activeGainsRef.current) gain.disconnect();
+    activeSourcesRef.current.clear();
+    activeGainsRef.current.clear();
+  }
+
+  function scheduleStep(step: number, atTimeS: number, stepSeconds: number) {
+    const stepLengthBeats = (lengthBeats / speed) / Math.max(1, stepCount);
+    const beatsPerSecond = bpm / 60;
     for (const row of rowsRef.current) {
       const cell = normalizeDrumCell(row.steps[step]);
       if (!cell.on) continue;
@@ -184,31 +286,97 @@ export function DrumSequencer({
         instrumentsRef.current.find((i) => i.id === row.instrumentId) ??
         instrumentsRef.current[0] ??
         fallbackInstrument;
+      const hitTimeS = atTimeS + drumTimingOffsetBeats(step, stepLengthBeats, swingPercent, cell.leanPercent) / beatsPerSecond;
+      if (hitTimeS < getCtx().currentTime - 0.002) continue;
       playInstrument(
         instrument,
         cell.pitchHz ?? defaultPitchRef.current ?? noteFrequency(DEFAULT_DRUM_MIDI_PITCH, instrument),
         cell.velocity,
+        hitTimeS,
+        Math.max(0.05, Math.min(0.22, stepSeconds * 0.95)),
       );
     }
   }
 
-  function playInstrument(instrument: Instrument, frequencyHz: number, velocity = DEFAULT_DRUM_VELOCITY) {
+  function playInstrument(instrument: Instrument, frequencyHz: number, velocity = DEFAULT_DRUM_VELOCITY, atTimeS: number, maxDuration = 0.22) {
     const ctx = getCtx();
-    const now = ctx.currentTime;
-    const source = createInstrumentBufferSource(ctx, instrument, 0.2, frequencyHz);
+    const source = createInstrumentBufferSource(ctx, instrument, 0.2, frequencyHz, undefined, velocity);
     const duration = source.buffer
-      ? Math.max(0.05, Math.min(1.5, source.buffer.duration / source.playbackRate.value))
-      : 0.22;
+      ? Math.max(0.05, Math.min(1.5, maxDuration, source.buffer.duration / source.playbackRate.value))
+      : maxDuration;
     const gain = ctx.createGain();
-    const peak = (Math.max(1, Math.min(127, velocity)) / 127) * 0.28;
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(peak, now + 0.004);
-    gain.gain.linearRampToValueAtTime(0, now + duration);
+    const peak = (Math.max(0, Math.min(127, velocity)) / 127) * 0.28;
+    gain.gain.setValueAtTime(0, atTimeS);
+    gain.gain.linearRampToValueAtTime(peak, atTimeS + 0.004);
+    gain.gain.linearRampToValueAtTime(0, atTimeS + duration);
     gain.connect(ctx.destination);
     source.connect(gain);
-    source.start(now);
-    source.stop(now + duration + 0.02);
+    source.onended = () => {
+      activeSourcesRef.current.delete(source);
+      activeGainsRef.current.delete(gain);
+      source.disconnect();
+      gain.disconnect();
+    };
+    activeSourcesRef.current.add(source);
+    activeGainsRef.current.add(gain);
+    source.start(atTimeS);
+    source.stop(atTimeS + duration + 0.02);
   }
+
+  useEffect(() => {
+    if (!playing) {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      scheduledRef.current.clear();
+      return;
+    }
+
+    const ctx = getCtx();
+    const tick = () => {
+      const phraseSeconds = Math.max(0.05, ((lengthBeats / speed) * 60) / Math.max(1, bpm));
+      const stepSeconds = Math.max(0.005, phraseSeconds / Math.max(1, stepCount));
+      const stepLengthBeats = (lengthBeats / speed) / Math.max(1, stepCount);
+      const beatsPerSecond = bpm / 60;
+      const now = ctx.currentTime;
+      const elapsed = Math.max(0, now - loopStartTimeRef.current);
+      const cycle = Math.floor(elapsed / phraseSeconds);
+      const loopTime = elapsed - cycle * phraseSeconds;
+      const visualStep = Math.min(stepCount - 1, Math.max(0, Math.floor(loopTime / stepSeconds)));
+
+      if (visualStep !== stepRef.current) {
+        stepRef.current = visualStep;
+        setPlayStep(visualStep);
+      }
+
+      const horizon = now + DRUM_LOOKAHEAD_SECONDS;
+      for (let scheduleCycle = cycle; scheduleCycle <= cycle + 1; scheduleCycle++) {
+        for (let step = 0; step < stepCount; step++) {
+          const atTimeS = loopStartTimeRef.current + scheduleCycle * phraseSeconds + step * stepSeconds;
+          const earliestSwingTimeS = atTimeS + Math.min(0, drumTimingOffsetBeats(step, stepLengthBeats, swingPercent, -50) / beatsPerSecond);
+          if (earliestSwingTimeS > horizon) break;
+          if (atTimeS < now - stepSeconds) continue;
+          const key = `${scheduleCycle}:${step}`;
+          if (scheduledRef.current.has(key)) continue;
+          scheduledRef.current.add(key);
+          scheduleStep(step, atTimeS, stepSeconds);
+        }
+      }
+
+      for (const key of scheduledRef.current) {
+        const scheduleCycle = Number(key.split(":")[0]);
+        if (Number.isFinite(scheduleCycle) && scheduleCycle < cycle - 1) scheduledRef.current.delete(key);
+      }
+
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, lengthBeats, speed, stepCount, bpm, swingPercent]);
 
   function updateRow(rowId: string, patch: Partial<DrumRow>) {
     onChange(rows.map((row) => (row.id === rowId ? { ...row, ...patch } : row)));
@@ -222,24 +390,6 @@ export function DrumSequencer({
       ));
       return { ...row, steps };
     }));
-  }
-
-  function toggleStep(rowId: string, step: number) {
-    const key = cellKey(rowId, step);
-    updateCells(new Set([key]), (cell) => {
-      const next = { ...cell, on: !cell.on };
-      const instrument = instruments.find((i) => i.id === rows.find((row) => row.id === rowId)?.instrumentId)
-        ?? instruments[0]
-        ?? fallbackInstrument;
-      if (next.on) {
-        playInstrument(
-          instrument,
-          next.pitchHz ?? defaultPitchRef.current ?? noteFrequency(DEFAULT_DRUM_MIDI_PITCH, instrument),
-          next.velocity,
-        );
-      }
-      return next;
-    });
   }
 
   function addRow() {
@@ -260,39 +410,144 @@ export function DrumSequencer({
     setSelectedCells((prev) => new Set(Array.from(prev).filter((key) => !key.startsWith(`${rowId}:`))));
   }
 
-  function resizeSteps(nextCount: number) {
-    const count = Math.max(1, Math.min(64, Math.round(nextCount)));
-    onResize(count, rows.map((row) => ({ ...row, steps: normalizeDrumSteps(row.steps, count) })));
+  function resizeLength(nextLength: number) {
+    const length = Math.max(1, Math.min(DRUM_MAX_STEPS, Math.round(nextLength)));
+    const count = Math.max(1, Math.min(DRUM_MAX_STEPS, length));
+    onResize(length, rows.map((row) => ({ ...row, steps: normalizeDrumSteps(row.steps, count) })));
     setSelectedCells((prev) => new Set(Array.from(prev).filter((key) => Number(key.split(":")[1]) < count)));
+  }
+
+  function changeSpeed(nextSpeed: DrumSpeed) {
+    onSpeedChange(nextSpeed);
+  }
+
+  async function generateBeat() {
+    setGenerating(true);
+    try {
+      const feedback = await listDrumBeatFeedback(24);
+      const generated = await ai.generateDrumBeat({
+        genre: generateGenre,
+        instruments,
+        stepCount,
+        lengthBeats,
+        speed,
+        timeSignature,
+        complexity: generateComplexity,
+        variationSeed: Date.now() + Math.floor(Math.random() * 100000),
+        feedbackExamples: feedback
+          .filter((entry): entry is typeof entry & { rating: "up" | "down" } => Boolean(entry.rating))
+          .map((entry) => ({
+            genre: entry.genre,
+            rating: entry.rating,
+            beat: entry.finalBeat ?? entry.modelBeat,
+            userFeedback: entry.userFeedback,
+          })),
+      });
+      const feedbackId = crypto.randomUUID();
+      await saveDrumBeatFeedback({
+        id: feedbackId,
+        genre: generateGenre,
+        modelBeat: generated,
+        prompt: generated.prompt,
+        model: generated.model,
+        source: generated.source,
+        context: {
+          genre: generateGenre,
+          stepCount,
+          lengthBeats,
+          speed,
+          timeSignature,
+          complexity: generateComplexity,
+          instrumentIds: instruments.map((instrument) => instrument.id),
+        },
+        createdAt: Date.now(),
+      });
+      setSelectedCells(new Set());
+      setLastGeneratedBeat(generated);
+      setFeedbackRating(null);
+      setFeedbackSubmitted(null);
+      setFeedbackPopover(null);
+      setFeedbackId(feedbackId);
+      onTrainingSessionChange?.(feedbackId);
+      stop();
+      if (onGenerateBeat) {
+        onGenerateBeat(generated);
+        return;
+      }
+      onResize(generated.lengthBeats, generated.rows);
+      onChange(generated.rows);
+      onSpeedChange(generated.speed);
+      onSwingChange?.(generated.swingPercent);
+      onDefaultPitchChange?.(generated.defaultPitchHz);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function rateGeneratedBeat(rating: "up" | "down", userFeedback?: string) {
+    if (!lastGeneratedBeat || feedbackSubmitted) return;
+    setFeedbackRating(rating);
+    setFeedbackSubmitted(rating);
+    const id = feedbackId ?? crypto.randomUUID();
+    const entry = {
+      genre: generateGenre,
+      rating,
+      userFeedback,
+      modelBeat: lastGeneratedBeat,
+      prompt: lastGeneratedBeat.prompt,
+      model: lastGeneratedBeat.model,
+      source: lastGeneratedBeat.source,
+      context: {
+        genre: generateGenre,
+        stepCount,
+        lengthBeats,
+        speed,
+        timeSignature,
+        complexity: generateComplexity,
+        instrumentIds: instruments.map((instrument) => instrument.id),
+      },
+      createdAt: Date.now(),
+    };
+    await saveDrumBeatFeedback({ id, ...entry });
+    void maybeRunDueTraining("drums");
+    onTrainingSessionChange?.(id);
+    window.setTimeout(() => setLastGeneratedBeat(null), 700);
   }
 
   function startCellPointer(e: React.PointerEvent<HTMLButtonElement>, rowId: string, step: number) {
     if (e.button !== 0) return;
+    if (e.ctrlKey || e.metaKey) return;
     wrapRef.current?.focus();
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     const key = cellKey(rowId, step);
-    dragRef.current = { moved: false, pointerId: e.pointerId, startedOn: key };
-    setSelectedCells((prev) => {
-      if (!e.shiftKey) return new Set([key]);
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    if (e.shiftKey) {
+      setSelectedCells((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+      return;
+    }
+    const row = rows.find((candidate) => candidate.id === rowId);
+    const setOn = !normalizeDrumCell(row?.steps[step]).on;
+    dragRef.current = { pointerId: e.pointerId, setOn, touched: new Set([key]) };
+    updateCells(new Set([key]), (cell) => ({ ...cell, on: setOn }));
+    setSelectedCells(new Set());
   }
 
   function enterCell(rowId: string, step: number) {
-    if (!dragRef.current) return;
-    dragRef.current.moved = true;
-    setSelectedCells((prev) => new Set(prev).add(cellKey(rowId, step)));
+    const drag = dragRef.current;
+    if (!drag) return;
+    const key = cellKey(rowId, step);
+    if (drag.touched.has(key)) return;
+    drag.touched.add(key);
+    updateCells(new Set([key]), (cell) => ({ ...cell, on: drag.setOn }));
   }
 
-  function endCellPointer(rowId: string, step: number) {
-    const drag = dragRef.current;
+  function endCellPointer() {
     dragRef.current = null;
-    if (!drag || drag.moved) return;
-    toggleStep(rowId, step);
   }
 
   function openCellMenu(e: React.MouseEvent<HTMLButtonElement>, rowId: string, step: number) {
@@ -303,6 +558,8 @@ export function DrumSequencer({
     setCellMenu({ x: e.clientX, y: e.clientY, rowId, step });
     setOpenRowId(null);
     setPitchPopover(null);
+    setVolumePopover(null);
+    setLeanPopover(null);
   }
 
   function targetKeys(rowId: string, step: number): Set<string> {
@@ -322,7 +579,7 @@ export function DrumSequencer({
         return {
           rowOffset: (rowIndexLookup.get(cell.rowId) ?? 0) - minRow,
           stepOffset: cell.step - minStep,
-          cell: normalizeDrumCell(row?.steps[cell.step]),
+          cell: cloneDrumCell(row?.steps[cell.step]),
         };
       }),
     };
@@ -347,7 +604,7 @@ export function DrumSequencer({
   }
 
   function resetCells(rowId: string, step: number) {
-    updateCells(targetKeys(rowId, step), () => ({ on: false, velocity: DEFAULT_DRUM_VELOCITY }));
+    updateCells(targetKeys(rowId, step), () => ({ on: false }));
   }
 
   function applyPitch() {
@@ -367,13 +624,88 @@ export function DrumSequencer({
     setPitchPopover(null);
   }
 
+  function applyVolume() {
+    if (!volumePopover) return;
+    const velocity = parseVolumeInput(volumePopover.value);
+    if (velocity == null) {
+      setVolumePopover({ ...volumePopover, error: true });
+      return;
+    }
+    updateCells(targetKeys(volumePopover.rowId, volumePopover.step), (cell) => ({ ...cell, velocity }));
+    setVolumePopover(null);
+  }
+
+  function clearVolume() {
+    if (!volumePopover) return;
+    updateCells(targetKeys(volumePopover.rowId, volumePopover.step), (cell) => ({ ...cell, velocity: undefined }));
+    setVolumePopover(null);
+  }
+
+  function applyLean() {
+    if (!leanPopover) return;
+    const leanPercent = parseLeanInput(leanPopover.value);
+    if (leanPercent == null) {
+      setLeanPopover({ ...leanPopover, error: true });
+      return;
+    }
+    updateCells(targetKeys(leanPopover.rowId, leanPopover.step), (cell) => ({ ...cell, leanPercent }));
+    setLeanPopover(null);
+  }
+
+  function clearLean() {
+    if (!leanPopover) return;
+    updateCells(targetKeys(leanPopover.rowId, leanPopover.step), (cell) => ({ ...cell, leanPercent: undefined }));
+    setLeanPopover(null);
+  }
+
+  function startVolumeDrag(e: React.PointerEvent<HTMLSpanElement>, rowId: string, step: number) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const cellButton = e.currentTarget.closest("button");
+    if (!(cellButton instanceof HTMLElement)) return;
+    const rect = cellButton.getBoundingClientRect();
+    volumeDragRef.current = { rowId, step, pointerId: e.pointerId, rect };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    applyVolumeFromPointer(e.clientY, rowId, step, rect);
+  }
+
+  function dragVolume(e: React.PointerEvent<HTMLSpanElement>) {
+    const drag = volumeDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    applyVolumeFromPointer(e.clientY, drag.rowId, drag.step, drag.rect);
+  }
+
+  function endVolumeDrag(e: React.PointerEvent<HTMLSpanElement>) {
+    const drag = volumeDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    volumeDragRef.current = null;
+  }
+
+  function applyVolumeFromPointer(clientY: number, rowId: string, step: number, rect: DOMRect) {
+    const ratio = Math.max(0, Math.min(1, 1 - ((clientY - rect.top) / Math.max(1, rect.height))));
+    const velocity = Math.round(ratio * 127);
+    updateCells(new Set([cellKey(rowId, step)]), (cell) => ({ ...cell, velocity }));
+  }
+
   function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if ((e.metaKey || e.ctrlKey) && e.key === "0") {
+      e.preventDefault();
+      setCellSize(DEFAULT_CELL_SIZE);
+      return;
+    }
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
     if (selectedCells.size === 0) return;
     const first = parseCellKey(Array.from(selectedCells)[0]);
     if (!first) return;
     if (e.key === "Backspace" || e.key === "Delete") {
       e.preventDefault();
-      updateCells(selectedCells, () => ({ on: false, velocity: DEFAULT_DRUM_VELOCITY }));
+      updateCells(selectedCells, () => ({ on: false }));
     } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c") {
       e.preventDefault();
       copyCells(first.rowId, first.step);
@@ -383,10 +715,12 @@ export function DrumSequencer({
     }
   }
 
+  const activeTimeSignature = segmentTimeSignature ?? timeSignature;
   const sequenceStyle = {
     "--step-count": stepCount,
     "--play-step": playStep ?? 0,
-    "--cell-size": `${cellSize}px`,
+    "--cell-width": `${cellSize}px`,
+    "--cell-height": `${DEFAULT_CELL_SIZE}px`,
   } as CSSProperties;
 
   return (
@@ -395,11 +729,12 @@ export function DrumSequencer({
         <NumberInput
           layout="inline"
           label="Length"
-          value={stepCount}
+          value={lengthBeats}
           min={1}
-          max={64}
+          max={DRUM_MAX_STEPS}
           step={1}
-          onChange={resizeSteps}
+          maxLength={3}
+          onChange={resizeLength}
         />
         {onDefaultPitchChange && (
           <NumberInput
@@ -413,76 +748,104 @@ export function DrumSequencer({
             onChange={onDefaultPitchChange}
           />
         )}
-        <RadioGroup
-          label="Speed"
-          ariaLabel="Drum speed"
-          value={speed}
-          options={DRUM_SPEEDS.map((option) => ({ value: option, label: `${option}x` }))}
-          onChange={onSpeedChange}
-        />
-        <div className={styles.transportBlock}>
-          <HoverInfo content="Restart">
-            <Button
-              iconOnly
-              size="xs"
-              onClick={() => {
-                stop();
-                play();
-              }}
-              aria-label="Restart drum sequence"
-            >
-              <Icon name="ph:skip-back-fill" size={16} decorative />
-            </Button>
-          </HoverInfo>
-          <HoverInfo content="Play">
-            <Button
-              iconOnly
-              size="xs"
-              variant={playing ? "primary" : "default"}
-              disabled={playing}
-              onClick={play}
-              aria-label="Play drum sequence"
-            >
-              <Icon name="ph:play-fill" size={16} decorative />
-            </Button>
-          </HoverInfo>
-          <HoverInfo content="Pause">
-            <Button
-              iconOnly
-              size="xs"
-              variant={playing ? "primary" : "default"}
-              disabled={!playing}
-              onClick={stop}
-              aria-label="Pause drum sequence"
-            >
-              <Icon name="ph:pause-fill" size={16} decorative />
-            </Button>
-          </HoverInfo>
+        {onSwingChange && (
+          <label className={styles.swingControl}>
+            <span className={styles.swingHeader}>
+              <span className={styles.swingLabel}>Swing</span>
+              <span className={styles.swingValue}>{sanitizeSwingPercent(swingPercent)}%</span>
+            </span>
+            <input
+              className={styles.swingRange}
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={sanitizeSwingPercent(swingPercent)}
+              onChange={(event) => onSwingChange(Number(event.currentTarget.value))}
+            />
+          </label>
+        )}
+        {onTimeSignatureChange && (
+          <TimeSignatureControl
+            value={activeTimeSignature}
+            ariaLabel="Drum time signature"
+            onChange={onTimeSignatureChange}
+          />
+        )}
+        <div className={styles.generateBlock}>
+          <FloatingSelect
+            fillHeight
+            label="Genre"
+            layout="inline"
+            value={generateGenre}
+            ariaLabel="Generated beat genre"
+            options={DRUM_GENRES.map((genre) => ({ value: genre, label: genreLabel(genre) }))}
+            open={generateGenreOpen}
+            onOpenChange={(open) => {
+              setGenerateGenreOpen(open);
+              if (open) setOpenRowId(null);
+            }}
+            onChange={(value) => setGenerateGenre(value as DrumGenre)}
+          />
+          <label className={styles.complexityControl}>
+            <span className={styles.complexityHeader}>
+              <span className={styles.complexityLabel}>Complexity</span>
+              <span className={styles.complexityValue}>{generateComplexity}</span>
+            </span>
+            <input
+              className={styles.complexityRange}
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={generateComplexity}
+              onInput={(event) => setGenerateComplexity(Number(event.currentTarget.value))}
+              onChange={(event) => setGenerateComplexity(Number(event.currentTarget.value))}
+              aria-label="Generated beat complexity"
+            />
+          </label>
+          <Button
+            className={styles.generateButton}
+            iconOnly
+            size="xs"
+            onClick={generateBeat}
+            aria-label="Generate beat"
+            disabled={generating}
+          >
+            <Icon name={generating ? "ph:spinner" : "ph:sparkle"} size={14} decorative />
+          </Button>
         </div>
-        <div className={styles.zoomControl}>
-          <HoverInfo content="Zoom out">
-            <Button
-              iconOnly
-              size="xs"
-              onClick={() => setCellSize((size) => Math.max(MIN_CELL_SIZE, size - CELL_ZOOM_STEP))}
-              aria-label="Zoom drum cells out"
-            >
-              <Icon name="ph:magnifying-glass-minus" size={16} decorative />
-            </Button>
-          </HoverInfo>
-          <HoverInfo content="Zoom in">
-            <Button
-              iconOnly
-              size="xs"
-              onClick={() => setCellSize((size) => Math.min(DEFAULT_CELL_SIZE, size + CELL_ZOOM_STEP))}
-              aria-label="Zoom drum cells in"
-            >
-              <Icon name="ph:magnifying-glass-plus" size={16} decorative />
-            </Button>
-          </HoverInfo>
-        </div>
+        {lastGeneratedBeat && !feedbackSubmitted && (
+          <div className={styles.feedbackBlock} aria-label="Generated beat feedback">
+            <HoverInfo content="Good generation">
+              <Button
+                iconOnly
+                size="xs"
+                selected={feedbackRating === "up"}
+                onClick={() => void rateGeneratedBeat("up")}
+                aria-label="Rate generated beat up"
+              >
+                <Icon name="ph:thumbs-up" size={14} decorative />
+              </Button>
+            </HoverInfo>
+            <HoverInfo content="Bad generation">
+              <Button
+                iconOnly
+                size="xs"
+                selected={feedbackRating === "down"}
+                onClick={(event) => {
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  setFeedbackPopover({ x: rect.left, y: rect.bottom + 2, value: "" });
+                }}
+                aria-label="Rate generated beat down"
+              >
+                <Icon name="ph:thumbs-down" size={14} decorative />
+              </Button>
+            </HoverInfo>
+          </div>
+        )}
+        {feedbackSubmitted && <span className={styles.feedbackDone}>Thumbs {feedbackSubmitted === "up" ? "up" : "down"} saved</span>}
       </div>
-
       <div className={styles.sequenceShell} style={sequenceStyle}>
         <div className={styles.instrumentColumn}>
           <div className={styles.headerStub} aria-hidden />
@@ -501,6 +864,7 @@ export function DrumSequencer({
                   setOpenRowId(open ? row.id : null);
                   setCellMenu(null);
                   setPitchPopover(null);
+                  setVolumePopover(null);
                 }}
                 onChange={(instrumentId) => {
                   const instrument = instruments.find((candidate) => candidate.id === instrumentId);
@@ -541,7 +905,11 @@ export function DrumSequencer({
             {playStep != null && <div className={styles.playColumn} aria-hidden />}
             <div className={styles.stepHeader}>
               {Array.from({ length: stepCount }, (_, step) => (
-                <div key={step} className={styles.stepNumber}>
+                <div
+                  key={step}
+                  className={`${styles.stepNumber} ${isStrongBeat(step, speed, activeTimeSignature) ? styles.stepStrong : ""}`}
+                  style={swingStepStyle(step, swingPercent, cellSize)}
+                >
                   {step + 1}
                 </div>
               ))}
@@ -552,25 +920,51 @@ export function DrumSequencer({
                 <div key={row.id} className={styles.stepGrid}>
                   {normalizeDrumSteps(row.steps, stepCount).map((cell, step) => {
                     const selected = selectedCells.has(cellKey(row.id, step));
+                    const customVolume = hasCustomDrumVelocity(row.steps[step]);
+                    const volumePercent = customVolume ? velocityToPercent(effectiveDrumVelocity(cell)) : 0;
                     return (
                       <button
                         key={step}
                         type="button"
                         className={[
                           styles.stepCell,
+                          isStrongBeat(step, speed, activeTimeSignature) && styles.stepStrong,
                           cell.on && styles.stepCellOn,
                           selected && styles.stepCellSelected,
                           cell.pitchHz && styles.stepCellTuned,
+                          customVolume && styles.stepCellCustomVolume,
                         ].filter(Boolean).join(" ")}
+                        style={{
+                          ...swingStepStyle(step, swingPercent, cellSize),
+                          ...(customVolume ? { "--cell-volume": `${volumePercent}%` } as CSSProperties : null),
+                        }}
                         onPointerDown={(e) => startCellPointer(e, row.id, step)}
                         onPointerEnter={() => enterCell(row.id, step)}
-                        onPointerUp={() => endCellPointer(row.id, step)}
+                        onPointerUp={endCellPointer}
+                        onPointerCancel={endCellPointer}
                         onContextMenu={(e) => openCellMenu(e, row.id, step)}
                         aria-pressed={cell.on}
                         aria-label={`${row.name} step ${step + 1}`}
                       >
                         {cell.pitchHz && (
                           <span className={styles.cellNote}>{frequencyToNoteName(cell.pitchHz)}</span>
+                        )}
+                        {cell.leanPercent != null && (
+                          <span
+                            className={styles.cellLean}
+                            style={{ "--cell-lean": `${Math.max(-20, Math.min(20, cell.leanPercent * 0.4))}deg` } as CSSProperties}
+                            title={`${leanToDisplay(cell.leanPercent)}% (${cell.leanPercent >= 0 ? "+" : ""}${cell.leanPercent}%)`}
+                          />
+                        )}
+                        {customVolume && (
+                          <span
+                            className={styles.cellVolume}
+                            onPointerDown={(e) => startVolumeDrag(e, row.id, step)}
+                            onPointerMove={dragVolume}
+                            onPointerUp={endVolumeDrag}
+                            onPointerCancel={endVolumeDrag}
+                            aria-hidden
+                          />
                         )}
                       </button>
                     );
@@ -580,6 +974,71 @@ export function DrumSequencer({
               <div className={styles.addRowSpacer} aria-hidden />
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className={styles.transportRow}>
+        <RadioGroup
+          label="Speed"
+          ariaLabel="Drum speed"
+          value={speed}
+          options={DRUM_SPEEDS.map((option) => ({ value: option, label: String(option) }))}
+          onChange={changeSpeed}
+        />
+        <div className={styles.transportBlock}>
+          <HoverInfo content="Restart">
+            <Button
+              iconOnly
+              size="xs"
+              onClick={play}
+              aria-label="Restart drum sequence"
+            >
+              <Icon name="ph:skip-back-fill" size={16} decorative />
+            </Button>
+          </HoverInfo>
+          <HoverInfo content={playing ? "Pause" : "Play"}>
+            <Button
+              iconOnly
+              size="xs"
+              variant={playing ? "primary" : "default"}
+              onClick={playing ? stop : play}
+              aria-label={playing ? "Pause drum sequence" : "Play drum sequence"}
+            >
+              <Icon name={playing ? "ph:pause-fill" : "ph:play-fill"} size={16} decorative />
+            </Button>
+          </HoverInfo>
+        </div>
+        <div className={styles.zoomControl}>
+          <HoverInfo content="Zoom out">
+            <Button
+              iconOnly
+              size="xs"
+              onClick={() => setCellSize((size) => Math.max(MIN_CELL_SIZE, size - CELL_ZOOM_STEP))}
+              aria-label="Zoom drum cells out"
+            >
+              <Icon name="ph:magnifying-glass-minus" size={16} decorative />
+            </Button>
+          </HoverInfo>
+          <HoverInfo content="Reset zoom">
+            <Button
+              iconOnly
+              size="xs"
+              onClick={() => setCellSize(DEFAULT_CELL_SIZE)}
+              aria-label="Reset drum cell zoom"
+            >
+              <Icon name="ph:arrow-counter-clockwise" size={16} decorative />
+            </Button>
+          </HoverInfo>
+          <HoverInfo content="Zoom in">
+            <Button
+              iconOnly
+              size="xs"
+              onClick={() => setCellSize((size) => Math.min(MAX_CELL_WIDTH, size + CELL_ZOOM_STEP))}
+              aria-label="Zoom drum cells in"
+            >
+              <Icon name="ph:magnifying-glass-plus" size={16} decorative />
+            </Button>
+          </HoverInfo>
         </div>
       </div>
 
@@ -596,6 +1055,31 @@ export function DrumSequencer({
               value: formatFrequency(cell.pitchHz),
               error: false,
             });
+            setVolumePopover(null);
+            setCellMenu(null);
+          }}
+          onVolume={() => {
+            const row = rows.find((candidate) => candidate.id === cellMenu.rowId);
+            const cell = normalizeDrumCell(row?.steps[cellMenu.step]);
+            setVolumePopover({
+              ...cellMenu,
+              value: String(velocityToPercent(effectiveDrumVelocity(cell))),
+              error: false,
+            });
+            setPitchPopover(null);
+            setLeanPopover(null);
+            setCellMenu(null);
+          }}
+          onLean={() => {
+            const row = rows.find((candidate) => candidate.id === cellMenu.rowId);
+            const cell = normalizeDrumCell(row?.steps[cellMenu.step]);
+            setLeanPopover({
+              ...cellMenu,
+              value: String(leanToDisplay(cell.leanPercent)),
+              error: false,
+            });
+            setPitchPopover(null);
+            setVolumePopover(null);
             setCellMenu(null);
           }}
           onCopy={() => {
@@ -621,6 +1105,35 @@ export function DrumSequencer({
           onClear={clearPitch}
         />
       )}
+
+      {volumePopover && (
+        <VolumePopover
+          state={volumePopover}
+          onChange={(value) => setVolumePopover({ ...volumePopover, value, error: false })}
+          onApply={applyVolume}
+          onClear={clearVolume}
+        />
+      )}
+
+      {leanPopover && (
+        <LeanPopover
+          state={leanPopover}
+          onChange={(value) => setLeanPopover({ ...leanPopover, value, error: false })}
+          onApply={applyLean}
+          onClear={clearLean}
+        />
+      )}
+      {feedbackPopover && (
+        <FeedbackPopover
+          state={feedbackPopover}
+          onChange={(value) => setFeedbackPopover({ ...feedbackPopover, value })}
+          onSubmit={() => {
+            const value = feedbackPopover.value.trim();
+            setFeedbackPopover(null);
+            void rateGeneratedBeat("down", value || undefined);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -630,6 +1143,8 @@ function CellMenu({
   hasClipboard,
   selectionSize,
   onShiftPitch,
+  onVolume,
+  onLean,
   onCopy,
   onPaste,
   onReset,
@@ -638,6 +1153,8 @@ function CellMenu({
   hasClipboard: boolean;
   selectionSize: number;
   onShiftPitch: () => void;
+  onVolume: () => void;
+  onLean: () => void;
   onCopy: () => void;
   onPaste: () => void;
   onReset: () => void;
@@ -648,6 +1165,12 @@ function CellMenu({
       <button type="button" className={styles.cellMenuItem} onClick={onShiftPitch} role="menuitem">
         Shift pitch
       </button>
+      <button type="button" className={styles.cellMenuItem} onClick={onVolume} role="menuitem">
+        Volume
+      </button>
+      <button type="button" className={styles.cellMenuItem} onClick={onLean} role="menuitem">
+        Lean beat…
+      </button>
       <button type="button" className={styles.cellMenuItem} onClick={onCopy} role="menuitem">
         Copy{labelSuffix}
       </button>
@@ -657,6 +1180,42 @@ function CellMenu({
       <button type="button" className={styles.cellMenuItem} onClick={onReset} role="menuitem">
         Reset{labelSuffix}
       </button>
+    </FloatingLayer>,
+    document.body,
+  );
+}
+
+function LeanPopover({
+  state,
+  onChange,
+  onApply,
+  onClear,
+}: {
+  state: LeanPopoverState;
+  onChange: (value: string) => void;
+  onApply: () => void;
+  onClear: () => void;
+}) {
+  return createPortal(
+    <FloatingLayer className={styles.valuePopover} x={state.x} y={state.y}>
+      <TextInput
+        autoFocus
+        className={styles.valueField}
+        label="Lean"
+        layout="inline"
+        value={state.value}
+        placeholder="0-100"
+        unit="%"
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onApply();
+        }}
+      />
+      {state.error && <div className={styles.valueError}>Use 0 to 100%</div>}
+      <div className={styles.valueActions}>
+        <Button size="xs" onClick={onClear}>Default</Button>
+        <Button size="xs" variant="primary" onClick={onApply}>Apply</Button>
+      </div>
     </FloatingLayer>,
     document.body,
   );
@@ -697,6 +1256,72 @@ function PitchPopover({
   );
 }
 
+function VolumePopover({
+  state,
+  onChange,
+  onApply,
+  onClear,
+}: {
+  state: VolumePopoverState;
+  onChange: (value: string) => void;
+  onApply: () => void;
+  onClear: () => void;
+}) {
+  return createPortal(
+    <FloatingLayer className={styles.valuePopover} x={state.x} y={state.y}>
+      <TextInput
+        autoFocus
+        className={styles.valueField}
+        label="Volume"
+        layout="inline"
+        value={state.value}
+        placeholder="0-100%"
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onApply();
+        }}
+      />
+      {state.error && <div className={styles.valueError}>Use 0-100%</div>}
+      <div className={styles.valueActions}>
+        <Button size="xs" onClick={onClear}>Default</Button>
+        <Button size="xs" variant="primary" onClick={onApply}>Apply</Button>
+      </div>
+    </FloatingLayer>,
+    document.body,
+  );
+}
+
+function FeedbackPopover({
+  state,
+  onChange,
+  onSubmit,
+}: {
+  state: FeedbackPopoverState;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  return createPortal(
+    <FloatingLayer className={styles.valuePopover} x={state.x} y={state.y}>
+      <TextInput
+        autoFocus
+        className={styles.valueField}
+        label="Issue"
+        layout="inline"
+        value={state.value}
+        placeholder="What felt wrong?"
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onSubmit();
+        }}
+      />
+      <div className={styles.valueActions}>
+        <Button size="xs" variant="primary" onClick={onSubmit}>Submit</Button>
+      </div>
+    </FloatingLayer>,
+    document.body,
+  );
+}
+
 function cellKey(rowId: string, step: number): string {
   return `${rowId}:${step}`;
 }
@@ -707,6 +1332,52 @@ function parseCellKey(key: string): { rowId: string; step: number } | null {
   const step = Number(key.slice(lastColon + 1));
   if (!Number.isInteger(step)) return null;
   return { rowId: key.slice(0, lastColon), step };
+}
+
+function cloneDrumCell(step: DrumCell | boolean | undefined): DrumCell {
+  if (typeof step === "object" && step) return normalizeDrumCell(step);
+  return { on: Boolean(step) };
+}
+
+function parseVolumeInput(value: string): number | null {
+  const normalized = value.trim().replace(/%$/, "");
+  if (!normalized) return null;
+  const percent = Number(normalized);
+  if (!Number.isFinite(percent)) return null;
+  return sanitizeVelocity(Math.round((Math.max(0, Math.min(100, percent)) / 100) * 127)) ?? null;
+}
+
+function parseLeanInput(value: string): number | null {
+  const normalized = value.trim().replace(/%$/, "");
+  if (!normalized) return null;
+  const display = Number(normalized);
+  if (!Number.isFinite(display)) return null;
+  return sanitizeLeanPercent(Math.max(0, Math.min(100, display)) - 50) ?? null;
+}
+
+function leanToDisplay(value: number | undefined): number {
+  return Math.max(0, Math.min(100, (sanitizeLeanPercent(value) ?? 0) + 50));
+}
+
+function swingStepStyle(step: number, swingPercent: number, cellSize: number): CSSProperties | undefined {
+  const swing = sanitizeSwingPercent(swingPercent);
+  if (swing === 50 || step % 2 !== 0) return undefined;
+  const marginRight = Math.max(-cellSize * 0.35, Math.min(cellSize * 0.5, ((swing - 50) / 50) * cellSize * 0.5));
+  return { marginRight };
+}
+
+function isStrongBeat(step: number, speed: DrumSpeed, timeSignature: TimeSignature): boolean {
+  const stepsPerBar = Math.max(1, timeSignature.num * speed);
+  return step % stepsPerBar === 0;
+}
+
+function velocityToPercent(velocity: number): number {
+  return Math.round((Math.max(0, Math.min(127, velocity)) / 127) * 100);
+}
+
+function genreLabel(genre: DrumGenre): string {
+  if (genre === "dnb") return "DnB";
+  return genre.replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
 const fallbackInstrument: Instrument = {
@@ -720,7 +1391,9 @@ const fallbackInstrument: Instrument = {
   userCreated: false,
 };
 
-const DRUM_SPEEDS = [1, 2, 4, 8] as const;
+const DRUM_SPEEDS = [1, 2, 3, 4, 5, 6] as const satisfies readonly DrumSpeed[];
+const DRUM_LOOKAHEAD_SECONDS = 0.08;
 const DEFAULT_CELL_SIZE = 28;
 const MIN_CELL_SIZE = 20;
+const MAX_CELL_WIDTH = 56;
 const CELL_ZOOM_STEP = 4;

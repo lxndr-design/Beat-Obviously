@@ -22,7 +22,7 @@ namespace beat
      * On audio events, the engine calls back into this bridge which marshals
      * to the message thread and pushes JSON over the JS bridge.
      */
-    class MessageBridge
+    class MessageBridge : private juce::Timer
     {
     public:
         MessageBridge(AudioEngine& engine, Database& db, juce::WebBrowserComponent& browser);
@@ -35,8 +35,12 @@ namespace beat
          *  any thread — marshals to the message thread. */
         void emit(const juce::String& kind, const juce::var& payload);
 
-    private:
+        /** Dispatch a JS/native request. Called by MainComponent's JUCE
+         *  WebBrowser native function bridge. */
         juce::var handleRequest(const juce::String& kind, const juce::var& payload);
+
+    private:
+        void timerCallback() override;
 
         AudioEngine&             engine;
         Database&                database;
@@ -48,5 +52,7 @@ namespace beat
         // which we keep here so we can invoke it from C++ on inbound events.
         juce::Array<juce::var> subscribers;
         juce::CriticalSection  subscribersLock;
+        uint64_t lastAnalyzerSequence { 0 };
+        uint64_t lastRenderTimingSequence { 0 };
     };
 }

@@ -1,0 +1,6 @@
+LinnDrum LM-2 samples
+Source: https://oramics.github.io/sampled/DM/LM-2/
+Original source listed by Oramics: http://machines.hyperreal.org/manufacturers/Linn/LinnDrum/
+License: Public Domain
+
+Downloaded from Oramics Sampled for Beat's built-in factory library.

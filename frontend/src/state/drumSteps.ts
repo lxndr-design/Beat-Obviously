@@ -9,9 +9,10 @@ export function normalizeDrumCell(step: DrumStep | undefined): DrumCell {
       on: Boolean(step.on),
       pitchHz: sanitizeFrequency(step.pitchHz),
       velocity: sanitizeVelocity(step.velocity),
+      leanPercent: sanitizeLeanPercent(step.leanPercent),
     };
   }
-  return { on: Boolean(step), velocity: DEFAULT_DRUM_VELOCITY };
+  return { on: Boolean(step) };
 }
 
 export function normalizeDrumSteps(steps: DrumStep[], count: number): DrumCell[] {
@@ -27,9 +28,36 @@ export function sanitizeFrequency(value: unknown): number | undefined {
   return Math.max(20, Math.min(20000, value));
 }
 
-export function sanitizeVelocity(value: unknown): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_DRUM_VELOCITY;
-  return Math.max(1, Math.min(127, Math.round(value)));
+export function sanitizeVelocity(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.max(0, Math.min(127, Math.round(value)));
+}
+
+export function sanitizeLeanPercent(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.max(-50, Math.min(50, Math.round(value)));
+}
+
+export function sanitizeSwingPercent(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 50;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+export function drumTimingOffsetBeats(step: number, stepLengthBeats: number, swingPercent = 50, leanPercent = 0): number {
+  const swing = sanitizeSwingPercent(swingPercent);
+  const lean = sanitizeLeanPercent(leanPercent) ?? 0;
+  const swingOffset = step % 2 === 1
+    ? ((swing - 50) / 50) * stepLengthBeats * 0.5
+    : 0;
+  return swingOffset + (lean / 100) * stepLengthBeats;
+}
+
+export function effectiveDrumVelocity(cell: DrumCell): number {
+  return cell.velocity ?? DEFAULT_DRUM_VELOCITY;
+}
+
+export function hasCustomDrumVelocity(step: DrumStep | undefined): boolean {
+  return typeof step === "object" && step !== null && sanitizeVelocity(step.velocity) !== undefined;
 }
 
 export function parsePitchInput(value: string): number | null {

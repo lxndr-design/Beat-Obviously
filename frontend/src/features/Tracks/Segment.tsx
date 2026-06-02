@@ -1,9 +1,11 @@
-import { useRef } from "react";
-import { useProjectStore, useUiStore, useViewStore } from "../../state/store";
+import { useRef, useState } from "react";
+import { useProjectStore, useSettingsStore, useUiStore, useViewStore } from "../../state/store";
 import { SEGMENT_LAYER_OFFSET_PX } from "./geometry";
 import { useContextMenu, Icon, type ContextMenuItem } from "../../components";
 import { useClipboard } from "../../state/clipboard";
 import { useComponentStore } from "../../state/components";
+import { listDrumBeatFeedback, updateDrumBeatFeedback } from "../../persistence/dexie";
+import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import { SegmentWaveform } from "./SegmentWaveform";
 import { SegmentMidiPreview } from "./SegmentMidiPreview";
 import { SegmentDrumPreview } from "./SegmentDrumPreview";
@@ -55,10 +57,16 @@ export function Segment({
   const setSegmentRepeats = useProjectStore((s) => s.setSegmentRepeats);
   const projectLengthBeats = useProjectStore((s) => s.project.lengthBeats);
   const tsNum = useProjectStore((s) => s.project.timeSignature.num);
+  const timelineSmartGrid = useSettingsStore((s) => s.timelineSmartGrid);
+  const timelineSubdivision = useSettingsStore((s) => s.timelineSubdivision);
   const selected = useUiStore((s) => s.selectedSegmentIds.includes(segmentId));
+  const editing = useUiStore((s) => s.openEditors.some((editor) => editor.kind === "segment" && editor.segmentId === segmentId));
   const selectSegment = useUiStore((s) => s.selectSegment);
   const { copy: copyToClipboard, paste } = useClipboard();
   const saveComponent = useComponentStore((s) => s.add);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [dragging, setDragging] = useState(false);
 
   const drag = useRef<
     | { mode: "move"; startX: number; startBeat: number }
@@ -68,7 +76,8 @@ export function Segment({
   >(null);
 
   function snapStepBeats(shift: boolean): number {
-    return shift ? Math.max(1, tsNum) : GRID_TICK_BEATS;
+    if (shift) return Math.max(1, tsNum);
+    return timelineSmartGrid ? 4 / timelineSubdivision : GRID_TICK_BEATS;
   }
   function snapBeat(beat: number, shift: boolean): number {
     const step = snapStepBeats(shift);
@@ -93,6 +102,7 @@ export function Segment({
     } else {
       drag.current = { mode, startX: e.clientX, startBeat, startLen: lengthBeats, shift: e.shiftKey };
     }
+    setDragging(true);
     selectSegment(segmentId, e.shiftKey);
   }
 
@@ -134,6 +144,7 @@ export function Segment({
 
   function onPointerUp() {
     drag.current = null;
+    setDragging(false);
   }
 
   // Right-click menu.
@@ -189,8 +200,11 @@ export function Segment({
                     stepCount: liveSeg.payload.stepCount,
                     speed: liveSeg.payload.speed,
                     defaultPitchHz: liveSeg.payload.defaultPitchHz,
+                    swingPercent: liveSeg.payload.swingPercent,
+                    timeSignature: liveSeg.payload.timeSignature,
                     lengthBeats: liveSeg.lengthBeats,
                   });
+                  void markSavedGeneratedDrum(liveSeg);
                 } else if (liveSeg.payload.kind === "midi" || liveSeg.payload.kind === "mixed") {
                   saveComponent({
                     kind: "midi",
@@ -265,12 +279,14 @@ export function Segment({
       className={[
         styles.segment,
         selected && styles.selected,
+        editing && styles.editing,
+        dragging && styles.dragging,
         layer > 0 && styles.layered,
         repetition > 0 && styles.virtual,
       ]
         .filter(Boolean)
         .join(" ")}
-      style={{ left, width, top, bottom: 0, zIndex: layer + 1 }}
+      style={{ left, width, top, bottom: 0, zIndex: dragging ? 1000 : Math.round(startBeat * 100) + layer + 1 }}
       onDoubleClick={(e) => {
         e.stopPropagation();
         onEdit();
@@ -294,7 +310,36 @@ export function Segment({
       >
         <div className={styles.labelStrip}>
           <span className={styles.nameplate}>
-            <span className={styles.nameText}>{label}</span>
+            {editingName ? (
+              <input
+                className={styles.nameInput}
+                autoFocus
+                value={nameDraft}
+                onPointerDown={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onBlur={() => {
+                  updateSegment(segmentId, { name: nameDraft });
+                  setEditingName(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") setEditingName(false);
+                }}
+              />
+            ) : (
+              <span
+                className={styles.nameText}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  if (repetition > 0 || !liveSeg) return;
+                  setNameDraft(liveSeg.name ?? label);
+                  setEditingName(true);
+                }}
+              >
+                {label}
+              </span>
+            )}
             {repetition > 0 && (
               <span className={styles.repBadge}>×{repetition + 1}</span>
             )}
@@ -363,3 +408,30 @@ function nextAutoSegmentName(kind: "midi" | "audio" | "drum"): string {
 }
 
 const GRID_TICK_BEATS = 1;
+
+async function markSavedGeneratedDrum(seg: SegmentType) {
+  if (seg.payload.kind !== "drum") return;
+  const payload = seg.payload;
+  const feedback = await listDrumBeatFeedback(20);
+  const match = feedback.find((entry) => {
+    const beat = entry.finalBeat ?? entry.modelBeat;
+    return beat.stepCount === payload.stepCount &&
+      beat.speed === payload.speed &&
+      JSON.stringify(beat.rows) === JSON.stringify(payload.rows);
+  });
+  if (!match) return;
+  await updateDrumBeatFeedback(match.id, {
+    savedAsComponent: true,
+    rating: match.rating ?? "up",
+    finalBeat: {
+      rows: structuredClone(payload.rows),
+      stepCount: payload.stepCount,
+      lengthBeats: seg.lengthBeats,
+      speed: payload.speed,
+      swingPercent: payload.swingPercent ?? 50,
+      defaultPitchHz: payload.defaultPitchHz,
+      source: "local",
+    },
+  });
+  void maybeRunDueTraining("drums");
+}

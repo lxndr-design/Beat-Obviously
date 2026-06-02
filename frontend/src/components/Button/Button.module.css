@@ -103,13 +103,49 @@
 
 /* Icon-only: 1:1 ratio. Sizes pin to --button-square-* tokens. */
 .iconOnly {
+  flex: 0 0 auto;
   padding: 0;
   text-transform: none;
   letter-spacing: normal;
   aspect-ratio: 1;
 }
 
-.iconOnly.size-xs { width: var(--button-square-xs); height: var(--button-square-xs); min-width: 0; min-height: 0; }
-.iconOnly.size-sm { width: var(--button-square-sm); height: var(--button-square-sm); min-width: 0; min-height: 0; }
-.iconOnly.size-md { width: var(--button-square-md); height: var(--button-square-md); min-width: 0; min-height: 0; }
-.iconOnly.size-lg { width: var(--button-square-lg); height: var(--button-square-lg); min-width: 0; min-height: 0; }
+.iconOnly.size-xs {
+  flex-basis: var(--button-square-xs);
+  width: var(--button-square-xs) !important;
+  min-width: var(--button-square-xs);
+  max-width: var(--button-square-xs);
+  height: var(--button-square-xs) !important;
+  min-height: var(--button-square-xs);
+  max-height: var(--button-square-xs);
+}
+
+.iconOnly.size-sm {
+  flex-basis: var(--button-square-sm);
+  width: var(--button-square-sm) !important;
+  min-width: var(--button-square-sm);
+  max-width: var(--button-square-sm);
+  height: var(--button-square-sm) !important;
+  min-height: var(--button-square-sm);
+  max-height: var(--button-square-sm);
+}
+
+.iconOnly.size-md {
+  flex-basis: var(--button-square-md);
+  width: var(--button-square-md) !important;
+  min-width: var(--button-square-md);
+  max-width: var(--button-square-md);
+  height: var(--button-square-md) !important;
+  min-height: var(--button-square-md);
+  max-height: var(--button-square-md);
+}
+
+.iconOnly.size-lg {
+  flex-basis: var(--button-square-lg);
+  width: var(--button-square-lg) !important;
+  min-width: var(--button-square-lg);
+  max-width: var(--button-square-lg);
+  height: var(--button-square-lg) !important;
+  min-height: var(--button-square-lg);
+  max-height: var(--button-square-lg);
+}

@@ -1,7 +1,8 @@
 import { useMemo, useRef } from "react";
 import { Icon, HoverInfo, Button, useContextMenu, type ContextMenuItem } from "../../components";
-import { useProjectStore, useUiStore } from "../../state/store";
+import { useProjectStore, useTransportStore, useUiStore } from "../../state/store";
 import { expandTrackSegments } from "../../state/selectors";
+import { send } from "../../ipc/bridge";
 import { Segment } from "./Segment";
 import { BEATS_TO_PX, TRACK_HEADER_WIDTH } from "./geometry";
 import styles from "./TrackRow.module.css";
@@ -30,6 +31,15 @@ export function TrackRow({ trackId }: Props) {
   const openEditor = useUiStore((s) => s.openEditor);
   const laneRef = useRef<HTMLDivElement>(null);
   const lastClickBeatRef = useRef<number | null>(null);
+
+  function openSegmentEditor(segmentId: Id) {
+    const transport = useTransportStore.getState();
+    if (transport.playing) {
+      transport.pause();
+      void send({ kind: "transport.pause" });
+    }
+    openEditor({ kind: "segment", segmentId });
+  }
 
   const expanded = useMemo(
     () => (track ? expandTrackSegments(track, lengthBeats) : []),
@@ -175,9 +185,7 @@ export function TrackRow({ trackId }: Props) {
               repetition={occ.repetition}
               layer={original.layer}
               payloadKind={original.payload.kind}
-              onEdit={() =>
-                openEditor({ kind: "segment", segmentId: occ.segmentId })
-              }
+              onEdit={() => openSegmentEditor(occ.segmentId)}
             />
           );
         })}

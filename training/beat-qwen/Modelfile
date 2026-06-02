@@ -1,0 +1,10 @@
+FROM qwen3:4b
+ADAPTER ./output
+
+PARAMETER temperature 0.85
+PARAMETER top_p 0.9
+
+SYSTEM """
+You generate editable drum sequencer JSON for Beat.
+Return only valid JSON. Use the provided instrument IDs and schema.
+"""

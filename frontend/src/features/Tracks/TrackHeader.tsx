@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { nanoid as newNanoid } from "nanoid";
 import { Icon, HoverInfo, useContextMenu, type ContextMenuItem } from "../../components";
-import { useProjectStore } from "../../state/store";
+import { useProjectStore, useUiStore } from "../../state/store";
 import styles from "./TrackHeader.module.css";
 import type { Id } from "../../state/types";
 
 interface Props {
   trackId: Id;
   index: number;
+  selectMode?: boolean;
+  selected?: boolean;
+  onSelect?: (event: React.MouseEvent) => void;
+  onEnterSelectMode?: () => void;
 }
 
 const DND_MIME = "application/x-beat-track";
@@ -23,7 +27,14 @@ const DND_MIME = "application/x-beat-track";
  * Right-click → Mute/Solo/Rename/Duplicate/Delete. The ContextMenu hook
  * stops propagation so the outer TrackList area doesn't intercept it.
  */
-export function TrackHeader({ trackId, index }: Props) {
+export function TrackHeader({
+  trackId,
+  index,
+  selectMode = false,
+  selected = false,
+  onSelect,
+  onEnterSelectMode,
+}: Props) {
   const track = useProjectStore((s) =>
     s.project.tracks.find((t) => t.id === trackId),
   );
@@ -32,6 +43,7 @@ export function TrackHeader({ trackId, index }: Props) {
   const setTrackMute = useProjectStore((s) => s.setTrackMute);
   const removeTrack = useProjectStore((s) => s.removeTrack);
   const reorderTracks = useProjectStore((s) => s.reorderTracks);
+  const openTrackEffects = useUiStore((s) => s.openTrackEffects);
   const duplicateTrack = useDuplicateTrack();
   const [editingName, setEditingName] = useState(false);
   const [dropPosition, setDropPosition] = useState<"above" | "below" | null>(null);
@@ -39,6 +51,11 @@ export function TrackHeader({ trackId, index }: Props) {
   const { onContextMenu, menu } = useContextMenu((): ContextMenuItem[] => {
     if (!track) return [];
     return [
+      {
+        label: "Select",
+        icon: "ph:checks",
+        onSelect: () => onEnterSelectMode?.(),
+      },
       {
         label: track.mute ? "Unmute" : "Mute",
         icon: track.mute ? "ph:speaker-high" : "ph:speaker-x",
@@ -55,6 +72,11 @@ export function TrackHeader({ trackId, index }: Props) {
         icon: "ph:pencil-simple",
         onSelect: () => setEditingName(true),
         separatorBefore: true,
+      },
+      {
+        label: "Effects / Filters",
+        icon: "ph:sliders-horizontal",
+        onSelect: () => openTrackEffects(trackId),
       },
       {
         label: "Duplicate track",
@@ -104,25 +126,45 @@ export function TrackHeader({ trackId, index }: Props) {
     <div
       className={[
         styles.header,
+        selectMode && styles.headerSelecting,
+        selected && styles.headerSelected,
         dropPosition === "above" && styles.dropAbove,
         dropPosition === "below" && styles.dropBelow,
       ]
         .filter(Boolean)
         .join(" ")}
       onContextMenu={onContextMenu}
+      onClick={(event) => {
+        if (!selectMode) return;
+        onSelect?.(event);
+      }}
       onDragOver={onRowDragOver}
       onDragLeave={onRowDragLeave}
       onDrop={onRowDrop}
       data-track-index={index}
     >
-      <span
-        className={styles.dragHandle}
-        draggable
-        onDragStart={onHandleDragStart}
-        aria-hidden
-      >
-        <Icon name="ph:dots-six-vertical" size={16} decorative />
-      </span>
+      {selectMode ? (
+        <input
+          className={styles.checkbox}
+          type="checkbox"
+          checked={selected}
+          readOnly
+          onClick={(event) => {
+            event.stopPropagation();
+            onSelect?.(event);
+          }}
+          aria-label={`Select ${track.name}`}
+        />
+      ) : (
+        <span
+          className={styles.dragHandle}
+          draggable
+          onDragStart={onHandleDragStart}
+          aria-hidden
+        >
+          <Icon name="ph:dots-six-vertical" size={16} decorative />
+        </span>
+      )}
 
       {editingName ? (
         <input
@@ -151,7 +193,13 @@ export function TrackHeader({ trackId, index }: Props) {
           <button
             type="button"
             className={`${styles.dot} ${track.solo ? styles.dotOn : ""}`}
-            onClick={() => setTrackSolo(trackId, !track.solo)}
+            onClick={(event) => {
+              if (selectMode) {
+                event.stopPropagation();
+                return;
+              }
+              setTrackSolo(trackId, !track.solo);
+            }}
             aria-label={track.solo ? "Unsolo" : "Solo"}
           >
             S
@@ -163,7 +211,13 @@ export function TrackHeader({ trackId, index }: Props) {
           <button
             type="button"
             className={`${styles.dot} ${track.mute ? styles.dotOn : ""}`}
-            onClick={() => setTrackMute(trackId, !track.mute)}
+            onClick={(event) => {
+              if (selectMode) {
+                event.stopPropagation();
+                return;
+              }
+              setTrackMute(trackId, !track.mute);
+            }}
             aria-label={track.mute ? "Unmute" : "Mute"}
             disabled={track.solo}
           >

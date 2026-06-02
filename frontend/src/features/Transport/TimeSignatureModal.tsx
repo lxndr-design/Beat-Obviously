@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { Modal, Button, FloatingSelect, NumberInput } from "../../components";
 import { useProjectStore } from "../../state/store";
+import type { TimeSignature } from "../../state/types";
 import styles from "./TimeSignatureModal.module.css";
 
 interface Props {
+  value?: TimeSignature;
+  onChange?: (value: TimeSignature) => void;
   onClose: () => void;
 }
 
@@ -16,9 +19,10 @@ const DENOMS = [2, 4, 8, 16];
  * Example: 5/4 with boldBeats=[1, 4] renders bold tick marks on beats 1
  * and 4 of every bar (matching the user's example from the spec).
  */
-export function TimeSignatureModal({ onClose }: Props) {
-  const ts = useProjectStore((s) => s.project.timeSignature);
-  const setTs = useProjectStore((s) => s.setTimeSignature);
+export function TimeSignatureModal({ value, onChange, onClose }: Props) {
+  const storeTs = useProjectStore((s) => s.project.timeSignature);
+  const setStoreTs = useProjectStore((s) => s.setTimeSignature);
+  const ts = value ?? storeTs;
 
   const [num, setNum] = useState(ts.num);
   const [denom, setDenom] = useState(ts.denom);
@@ -38,7 +42,9 @@ export function TimeSignatureModal({ onClose }: Props) {
   }
 
   function save() {
-    setTs({ num, denom, boldBeats: bold.filter((b) => b <= num) });
+    const next = { num, denom, boldBeats: bold.filter((b) => b <= num) };
+    if (onChange) onChange(next);
+    else setStoreTs(next);
     onClose();
   }
 

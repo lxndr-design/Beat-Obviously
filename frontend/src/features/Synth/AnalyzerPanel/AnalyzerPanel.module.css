@@ -1,0 +1,140 @@
+.body {
+  display: grid;
+  grid-template-rows: auto minmax(78px, 200px) minmax(70px, 96px);
+  gap: 6px;
+  min-width: 0;
+  padding: 6px;
+  overflow: hidden;
+}
+
+.bodyCompact {
+  grid-template-rows: auto minmax(58px, 1fr);
+}
+
+.actions {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+}
+
+.playbackControls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.meters {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.meter {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 48px;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.meterLabel {
+  font-family: var(--font-family-mono);
+  text-transform: uppercase;
+}
+
+.meterTrack {
+  height: 8px;
+  min-width: 0;
+  border: var(--border-fg);
+  overflow: hidden;
+}
+
+.meterFill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--color-fg);
+  transform-origin: left center;
+}
+
+.meterValue {
+  display: block;
+  width: 48px;
+  overflow: hidden;
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  line-height: 1;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.wavetable {
+  display: grid;
+  gap: 6px;
+  min-height: 78px;
+  max-height: 200px;
+  min-width: 0;
+  border: var(--border-fg);
+  padding: 6px;
+  overflow: hidden;
+}
+
+.scopeLabel {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.wavetableSvg {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: min(150px, 20vh);
+  min-height: 48px;
+  max-height: 176px;
+}
+
+.zeroLine {
+  stroke: color-mix(in srgb, var(--color-fg) 34%, transparent);
+  stroke-width: 0.45;
+  vector-effect: non-scaling-stroke;
+}
+
+.wavetablePath {
+  fill: none;
+  stroke: var(--color-fg);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--color-fg) 45%, transparent));
+  vector-effect: non-scaling-stroke;
+}
+
+.spectrum {
+  display: grid;
+  gap: 6px;
+  min-height: 70px;
+  min-width: 0;
+  border: var(--border-fg);
+  padding: 6px;
+  overflow: hidden;
+}
+
+.spectrumBands {
+  display: grid;
+  grid-template-columns: repeat(64, minmax(0, 1fr));
+  align-items: end;
+  gap: 2px;
+  min-height: 44px;
+  min-width: 0;
+}
+
+.band {
+  display: block;
+  min-width: 0;
+  min-height: 6px;
+  background: var(--color-fg);
+}

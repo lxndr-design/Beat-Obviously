@@ -1,1 +1,0 @@
-export { FloatingSelect } from "./FloatingSelect";

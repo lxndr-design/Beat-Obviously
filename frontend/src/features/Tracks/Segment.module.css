@@ -40,6 +40,25 @@
   outline-offset: -2px;
 }
 
+.editing {
+  background: rgba(215, 215, 215, 0.72);
+  border-color: rgba(255, 255, 255, 0.72);
+}
+
+.selected.editing {
+  outline: 1px solid rgba(255, 255, 255, 0.62);
+  outline-offset: -1px;
+}
+
+.editing .labelStrip {
+  color: rgba(255, 255, 255, 0.86);
+  border-bottom-color: rgba(255, 255, 255, 0.55);
+}
+
+.dragging {
+  pointer-events: auto;
+}
+
 .layered {
 }
 
@@ -123,6 +142,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.nameInput {
+  width: 100%;
+  min-width: 0;
+  height: 12px;
+  padding: 0;
+  background: transparent;
+  color: var(--color-fg);
+  border: 0;
+  outline: 0;
+  font-family: var(--font-family-base);
+  font-size: 10px;
+  line-height: 1;
 }
 
 .repBadge {

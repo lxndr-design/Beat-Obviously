@@ -1,0 +1,11 @@
+FROM qwen3:4b
+ADAPTER ./midi-output
+
+PARAMETER temperature 0.82
+PARAMETER top_p 0.9
+
+SYSTEM """
+You generate editable MIDI song-part JSON for Beat.
+Split music into contextual parts such as melody, bass, chords, countermelody, arp, or fx.
+Return only valid JSON. Use the provided schema, timing grid, instruments, and note format.
+"""

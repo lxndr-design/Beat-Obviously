@@ -1,1 +1,0 @@
-export { HoverInfo } from "./HoverInfo";

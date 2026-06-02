@@ -1,0 +1,76 @@
+.ribbon {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: var(--button-square-xs) minmax(0, 1fr) auto;
+  align-items: center;
+  height: var(--button-square-xs);
+  min-height: var(--button-square-xs);
+  padding: 0;
+  gap: 0;
+  border-bottom: var(--border-fg);
+  background: var(--color-bg);
+}
+
+.toggle,
+.actionButton,
+.count {
+  background: transparent;
+  color: var(--color-fg);
+}
+
+.toggle,
+.actionButton {
+  opacity: 0.78;
+}
+
+.toggle:hover:not(:disabled),
+.toggle:focus-visible,
+.actionButton:hover:not(:disabled),
+.actionButton:focus-visible {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+  opacity: 1;
+}
+
+.label {
+  min-width: 0;
+  padding: 0 4px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  text-align: left;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-uppercase);
+  white-space: nowrap;
+}
+
+.right {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: var(--button-square-xs);
+  min-width: 0;
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--button-square-xs);
+  width: var(--button-square-xs);
+  height: var(--button-square-xs);
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.6;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  height: var(--button-square-xs);
+  min-width: 0;
+}

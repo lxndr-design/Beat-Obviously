@@ -39,10 +39,28 @@ interface MenuState {
   items: ContextMenuItem[];
 }
 
+const CONTEXT_MENU_OPEN_EVENT = "beat:context-menu-open";
+let nextContextMenuOwnerId = 1;
+
 export function useContextMenu(itemsFactory: () => ContextMenuItem[]) {
   const [state, setState] = useState<MenuState | null>(null);
   const factoryRef = useRef(itemsFactory);
+  const ownerIdRef = useRef(0);
   factoryRef.current = itemsFactory;
+  if (ownerIdRef.current === 0) ownerIdRef.current = nextContextMenuOwnerId++;
+
+  useEffect(() => {
+    function onAnyMenuOpen(event: Event) {
+      const ownerId = event instanceof CustomEvent ? event.detail?.ownerId : undefined;
+      if (ownerId !== ownerIdRef.current) setState(null);
+    }
+    window.addEventListener(CONTEXT_MENU_OPEN_EVENT, onAnyMenuOpen);
+    return () => window.removeEventListener(CONTEXT_MENU_OPEN_EVENT, onAnyMenuOpen);
+  }, []);
+
+  const announceOpen = useCallback(() => {
+    window.dispatchEvent(new CustomEvent(CONTEXT_MENU_OPEN_EVENT, { detail: { ownerId: ownerIdRef.current } }));
+  }, []);
 
   const onContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -51,8 +69,16 @@ export function useContextMenu(itemsFactory: () => ContextMenuItem[]) {
     e.stopPropagation();
     const items = factoryRef.current();
     if (items.length === 0) return;
+    announceOpen();
     setState({ x: e.clientX, y: e.clientY, items });
-  }, []);
+  }, [announceOpen]);
+
+  const openAt = useCallback((x: number, y: number) => {
+    const items = factoryRef.current();
+    if (items.length === 0) return;
+    announceOpen();
+    setState({ x, y, items });
+  }, [announceOpen]);
 
   const close = useCallback(() => setState(null), []);
 
@@ -60,7 +86,7 @@ export function useContextMenu(itemsFactory: () => ContextMenuItem[]) {
     <ContextMenuPortal x={state.x} y={state.y} items={state.items} onClose={close} />
   ) : null;
 
-  return { onContextMenu, menu, close };
+  return { onContextMenu, openAt, menu, close };
 }
 
 /* -------------------------------------------------------------------------

@@ -1,0 +1,110 @@
+/* Shared form/control primitives for dense editor panels.
+ * Component-specific controls still live in components/<Name>.
+ */
+
+.ds-field {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.ds-field-inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.ds-field-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-1);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-uppercase);
+}
+
+.ds-field-hint {
+  min-width: 0;
+  font-size: var(--font-size-1);
+  font-family: var(--font-family-mono);
+  line-height: var(--line-height-snug);
+}
+
+.ds-control {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--button-min-height);
+  min-width: 0;
+  padding: 0 var(--space-1);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: var(--border-fg);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-1);
+}
+
+.ds-control-full {
+  width: 100%;
+}
+
+.ds-input,
+.ds-select,
+.ds-textarea {
+  width: 100%;
+  min-width: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: var(--border-fg);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-1);
+}
+
+.ds-input,
+.ds-select {
+  height: var(--button-min-height);
+  padding: 0 var(--space-1);
+}
+
+.ds-textarea {
+  min-height: var(--height-track-row);
+  padding: var(--space-1);
+  resize: vertical;
+}
+
+.ds-input::placeholder,
+.ds-textarea::placeholder {
+  color: var(--color-fg);
+}
+
+.ds-input:disabled,
+.ds-select:disabled,
+.ds-textarea:disabled,
+.ds-control-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ds-control-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.ds-control-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.ds-range {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--color-fg);
+}

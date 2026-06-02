@@ -1,13 +1,16 @@
 import { useMemo, useRef, useState } from "react";
 import { useContextMenu, type ContextMenuItem } from "../../components";
-import { send } from "../../ipc/bridge";
+import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
+import { importAudioFile } from "../../audio/audioImport";
 import {
   useAudioFileStore,
   useProjectStore,
+  useTransportStore,
   useUiStore,
   useViewStore,
   useInstrumentStore,
 } from "../../state/store";
+import { send } from "../../ipc/bridge";
 import { useComponentStore } from "../../state/components";
 import { expandTrackSegments } from "../../state/selectors";
 import { Segment } from "./Segment";
@@ -36,6 +39,10 @@ function nextSegmentName(tracks: Track[], kind: "midi" | "audio" | "drum"): stri
 
 interface Props {
   trackId: Id;
+  selectMode?: boolean;
+  selected?: boolean;
+  onSelect?: (event: React.MouseEvent) => void;
+  onEnterSelectMode?: () => void;
 }
 
 /**
@@ -47,7 +54,13 @@ interface Props {
  *   - Context menu (Add Audio / MIDI / Mute / Solo / Duplicate / Delete)
  *   - Drag-drop instrument from the Library list → creates a segment
  */
-export function TrackLane({ trackId }: Props) {
+export function TrackLane({
+  trackId,
+  selectMode = false,
+  selected = false,
+  onSelect,
+  onEnterSelectMode,
+}: Props) {
   const track = useProjectStore((s) => s.project.tracks.find((t) => t.id === trackId));
   const tracks = useProjectStore((s) => s.project.tracks);
   const lengthBeats = useProjectStore((s) => s.project.lengthBeats);
@@ -60,6 +73,7 @@ export function TrackLane({ trackId }: Props) {
   const setTrackSolo = useProjectStore((s) => s.setTrackSolo);
   const removeTrack = useProjectStore((s) => s.removeTrack);
   const openEditor = useUiStore((s) => s.openEditor);
+  const openTrackEffects = useUiStore((s) => s.openTrackEffects);
   const instruments = useInstrumentStore((s) => s.instruments);
   const audioFiles = useAudioFileStore((s) => s.files);
   const addAudioFile = useAudioFileStore((s) => s.addFile);
@@ -67,6 +81,15 @@ export function TrackLane({ trackId }: Props) {
   const laneRef = useRef<HTMLDivElement>(null);
   const lastClickBeatRef = useRef<number>(0);
   const [dragOver, setDragOver] = useState(false);
+
+  function openSegmentEditor(segmentId: Id) {
+    const transport = useTransportStore.getState();
+    if (transport.playing) {
+      transport.pause();
+      void send({ kind: "transport.pause" });
+    }
+    openEditor({ kind: "segment", segmentId });
+  }
 
   const expanded = useMemo(
     () => (track ? expandTrackSegments(track, lengthBeats) : []),
@@ -77,8 +100,14 @@ export function TrackLane({ trackId }: Props) {
     if (!track) return [];
     return [
       {
+        label: "Select",
+        icon: "ph:checks",
+        onSelect: () => onEnterSelectMode?.(),
+      },
+      {
         label: "Add MIDI",
         icon: "ph:piano-keys",
+        separatorBefore: true,
         onSelect: () => {
           addSegment(trackId, {
             name: nextSegmentName(tracks, "midi"),
@@ -100,8 +129,9 @@ export function TrackLane({ trackId }: Props) {
             payload: {
               kind: "drum",
               stepCount: 16,
-              speed: 1,
+              speed: 4,
               defaultPitchHz: 261.63,
+              swingPercent: 50,
               rows: makeDefaultDrumRows(instruments),
             },
           });
@@ -123,15 +153,21 @@ export function TrackLane({ trackId }: Props) {
         label: "Import Audio…",
         icon: "ph:upload",
         onSelect: async () => {
-          const resp = await send({ kind: "audio.import" });
-          if (resp.file) addAudioFile(resp.file);
+          const file = await importAudioFile();
+          if (file) {
+            if (!isSupportedAudioFileName(file.name) && !isSupportedAudioFileName(file.path)) {
+              window.alert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
+              return;
+            }
+            addAudioFile(file);
+          }
           addSegment(trackId, {
             name: nextSegmentName(tracks, "audio"),
             startBeat: lastClickBeatRef.current,
             lengthBeats: lastLen,
             payload: {
               kind: "audio",
-              audioFileId: resp.file?.id ?? "",
+              audioFileId: file?.id ?? "",
               gainDb: 0,
             },
           });
@@ -150,10 +186,15 @@ export function TrackLane({ trackId }: Props) {
         onSelect: () => setTrackSolo(trackId, !track.solo),
       },
       {
+        label: "Effects / Filters",
+        icon: "ph:sliders-horizontal",
+        onSelect: () => openTrackEffects(trackId),
+        separatorBefore: true,
+      },
+      {
         label: "Duplicate track",
         icon: "ph:copy",
         onSelect: () => duplicateTrackInline(trackId),
-        separatorBefore: true,
       },
       {
         label: "Delete track",
@@ -169,9 +210,14 @@ export function TrackLane({ trackId }: Props) {
     return Math.max(0, Math.round((clientX - r.left) / beatsToPx));
   }
 
-  function handleContextMenu(e: React.MouseEvent<HTMLDivElement>) {
+  function handleContextMenu(e: React.MouseEvent<HTMLElement>) {
     lastClickBeatRef.current = beatAtX(e.clientX);
     onContextMenu(e);
+  }
+
+  function handleClick(e: React.MouseEvent<HTMLElement>) {
+    if (!selectMode) return;
+    onSelect?.(e);
   }
 
   // ----- Drag-and-drop --------------------------------------------------
@@ -229,6 +275,8 @@ export function TrackLane({ trackId }: Props) {
             stepCount: comp.stepCount,
             speed: comp.speed,
             defaultPitchHz: comp.defaultPitchHz,
+            swingPercent: comp.swingPercent,
+            timeSignature: comp.timeSignature,
           },
         });
       } else {
@@ -266,8 +314,16 @@ export function TrackLane({ trackId }: Props) {
   return (
     <div
       ref={laneRef}
-      className={`${styles.lane} ${dragOver ? styles.dragOver : ""}`}
+      className={[
+        styles.lane,
+        dragOver && styles.dragOver,
+        selectMode && styles.selecting,
+        selected && styles.selected,
+      ]
+        .filter(Boolean)
+        .join(" ")}
       style={{ width: lengthBeats * beatsToPx, height: "var(--height-track-row)" }}
+      onClick={handleClick}
       onContextMenu={handleContextMenu}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -292,10 +348,19 @@ export function TrackLane({ trackId }: Props) {
               repetition={occ.repetition}
               layer={original.layer}
               payloadKind={original.payload.kind}
-            onEdit={() => openEditor({ kind: "segment", segmentId: occ.segmentId })}
+            onEdit={() => openSegmentEditor(occ.segmentId)}
           />
         );
       })}
+      {selectMode && (
+        <button
+          type="button"
+          className={styles.selectionOverlay}
+          onClick={handleClick}
+          onContextMenu={handleContextMenu}
+          aria-label={`Select ${track.name}`}
+        />
+      )}
       {menu}
     </div>
   );
@@ -338,19 +403,19 @@ function makeDefaultDrumRows(instruments: Instrument[]) {
       id: nano(),
       instrumentId: kick?.id,
       name: kick?.name ?? "Kick",
-      steps: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
+      steps: Array.from({ length: 16 }, () => false),
     },
     {
       id: nano(),
       instrumentId: snare?.id,
       name: snare?.name ?? "Snare",
-      steps: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
+      steps: Array.from({ length: 16 }, () => false),
     },
     {
       id: nano(),
       instrumentId: hat?.id,
       name: hat?.name ?? "Hat",
-      steps: [false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false],
+      steps: Array.from({ length: 16 }, () => false),
     },
   ];
 }

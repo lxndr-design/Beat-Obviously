@@ -23,6 +23,7 @@
   overflow: auto;
   min-width: 0;
   background: var(--color-bg);
+  position: relative;
 }
 
 .inner {
@@ -46,13 +47,14 @@
   font-family: var(--font-family-mono);
   font-size: 11px;
   color: var(--color-fg);
-  opacity: 0.7;
+  background: rgba(255, 255, 255, 0.08);
+  opacity: 0.78;
   border-bottom: 1px solid var(--grid-line-faint);
 }
 
 .keyBlack {
-  background: var(--grid-line-faint);
-  opacity: 0.9;
+  background: #000;
+  opacity: 0.95;
 }
 
 /* Grid */
@@ -66,12 +68,13 @@
   position: absolute;
   left: 0;
   right: 0;
+  background: rgba(255, 255, 255, 0.08);
   border-bottom: 1px solid var(--grid-line-faint);
   pointer-events: none;
 }
 
 .rowBlack {
-  background: var(--grid-line-faint);
+  background: #000;
 }
 
 .beatLine {
@@ -86,20 +89,72 @@
   background: var(--grid-line-mid);
 }
 
-/* Note: white outline, black fill per design spec */
+.connections {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.connectionPath,
+.connectionPathActive,
+.curvePath,
+.curvePathActive {
+  fill: none;
+  stroke: var(--color-fg);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.connectionPathActive,
+.curvePathActive {
+  stroke-dasharray: 4 3;
+  opacity: 0.75;
+}
+
+.curvePath {
+  opacity: 0.45;
+}
+
 .note {
   position: absolute;
-  background: var(--color-bg);
+  overflow: hidden;
+  background: transparent;
   border: 1px solid var(--color-fg);
   cursor: grab;
-  z-index: 1;
+  z-index: 3;
 }
+
+.note::before,
+.note::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.note::before {
+  inset: 0;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.note::after {
+  bottom: 0;
+  height: var(--note-volume, 79%);
+  background: var(--color-fg);
+}
+
 .note:active {
   cursor: grabbing;
 }
 
 .noteSelected {
-  background: var(--color-fg);
+  box-shadow: inset 0 0 0 1px var(--color-fg);
+}
+
+.noteSelected::before {
+  background: rgba(255, 255, 255, 0.24);
 }
 
 .noteResize {
@@ -109,6 +164,7 @@
   bottom: 0;
   width: 4px;
   cursor: ew-resize;
+  z-index: 1;
 }
 
 .playhead {
@@ -118,26 +174,114 @@
   width: 1px;
   background: var(--color-fg);
   pointer-events: none;
-  z-index: 3;
+  z-index: 4;
 }
 
-.footer {
+.selectBox {
+  position: absolute;
+  border: var(--border-fg);
+  background: rgba(255, 255, 255, 0.14);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.noteMenu {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-1);
+  flex-direction: column;
+  min-width: 120px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: var(--border-fg);
 }
 
-.help {
-  font-family: var(--font-family-mono);
+.noteMenuItem {
+  height: 28px;
+  padding: 0 8px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: 0;
+  border-bottom: var(--border-fg);
+  font-family: var(--font-family-base);
+  font-size: 12px;
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-invert);
+}
+
+.noteMenuItem:last-child {
+  border-bottom: 0;
+}
+
+.noteMenuItem:hover {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.noteMenuItem:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.noteMenuItem:disabled:hover {
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.volumePopover {
+  width: 184px;
+  padding: 8px;
+}
+
+.volumeField {
+  width: 100%;
+}
+
+.volumeSliderRow {
+  display: grid;
+  grid-template-columns: auto minmax(72px, 1fr) 36px 24px;
+  align-items: center;
+  gap: 6px;
+}
+
+.volumeLabel,
+.volumeValue {
   font-size: 11px;
-  opacity: 0.6;
-  min-width: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.volumeSlider {
+  width: 100%;
+}
+
+.volumeClear {
+  height: 24px;
+  width: 24px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: 0;
+  transition: var(--transition-invert);
+}
+
+.volumeClear:hover {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.volumeError {
+  margin-top: 6px;
+  font-family: var(--font-family-base);
+  font-size: 11px;
+  line-height: 1;
 }
 
 .zoomControls {
   display: flex;
-  flex: 0 0 auto;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 8;
   gap: 0;
   border: var(--border-fg);
   background: var(--color-bg);

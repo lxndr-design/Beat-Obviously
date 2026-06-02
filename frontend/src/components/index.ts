@@ -12,3 +12,4 @@ export * from "./Toggle";
 export * from "./ContextMenu";
 export * from "./FloatingSelect";
 export * from "./FloatingLayer";
+export * from "./SectionRibbon";

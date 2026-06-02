@@ -1,0 +1,137 @@
+/* Shared layout primitives.
+ * Use these for app shells, editor panes, split views, and dense tool rows.
+ * Feature-specific positioning belongs in feature CSS modules.
+ */
+
+.ds-fill {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.ds-scroll {
+  overflow: auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.ds-scroll-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-width: 0;
+}
+
+.ds-scroll-y {
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.ds-stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.ds-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.ds-cluster {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.ds-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.ds-sidebar-layout {
+  display: grid;
+  grid-template-columns: var(--width-sidebar) minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.ds-editor-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.ds-editor-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.ds-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--button-square-md);
+  min-width: 0;
+}
+
+.ds-toolbar-spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ds-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.ds-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.ds-grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--width-modal-sm), 1fr));
+  min-width: 0;
+}
+
+.ds-gap-1 { gap: var(--space-1); }
+.ds-gap-2 { gap: var(--space-2); }
+.ds-gap-3 { gap: var(--space-3); }
+.ds-gap-4 { gap: var(--space-4); }
+
+.ds-pad-1 { padding: var(--space-1); }
+.ds-pad-2 { padding: var(--space-2); }
+.ds-pad-3 { padding: var(--space-3); }
+.ds-pad-4 { padding: var(--space-4); }
+
+.ds-inset-x-1 {
+  padding-left: var(--space-1);
+  padding-right: var(--space-1);
+}
+
+.ds-inset-y-1 {
+  padding-top: var(--space-1);
+  padding-bottom: var(--space-1);
+}
+
+@media (max-width: 720px) {
+  .ds-split,
+  .ds-sidebar-layout,
+  .ds-grid-2,
+  .ds-grid-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

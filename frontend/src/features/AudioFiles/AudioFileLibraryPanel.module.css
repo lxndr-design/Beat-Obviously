@@ -1,47 +1,49 @@
 .panel {
   display: flex;
   flex-direction: column;
+  min-height: var(--button-square-xs);
+  max-height: inherit;
+  overflow: hidden;
   border-top: var(--border-fg);
 }
 
-.header {
+.selectionBar {
   display: grid;
-  grid-template-columns: var(--button-square-xs) 1fr auto;
-  align-items: center;
-  height: var(--button-square-xs);
-  padding: 0 var(--space-1);
-  gap: var(--space-1);
+  grid-template-columns: auto auto 1fr;
+  align-items: stretch;
+  min-height: 28px;
   border-bottom: var(--border-fg);
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  backdrop-filter: blur(8px);
 }
 
-.chevronBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--button-square-xs);
-  height: var(--button-square-xs);
-  background: transparent;
-  color: var(--color-fg);
-  cursor: pointer;
-  transition: var(--transition-invert);
-}
-
-.chevronBtn:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
-}
-
-.headerLabel {
-  font-size: 12px;
-  font-weight: var(--font-weight-medium);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-uppercase);
-  text-align: left;
+.selectionCount {
+  align-self: center;
+  justify-self: end;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.65;
 }
 
 .list {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 0;
+  opacity: 0;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  transition:
+    max-height 180ms var(--ease-out),
+    opacity 120ms var(--ease-out);
+}
+
+.listOpen {
+  max-height: calc(66vh - var(--button-square-xs));
+  opacity: 1;
+  overflow-y: auto;
 }
 
 .empty {
@@ -64,6 +66,26 @@
   text-align: left;
 }
 
+.itemSelecting {
+  cursor: pointer;
+}
+
+.itemSelected {
+  background: color-mix(in srgb, var(--color-fg) 14%, var(--color-bg));
+}
+
+.itemSelected:hover {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.itemCheckbox {
+  justify-self: center;
+  width: 12px;
+  height: 12px;
+  margin: 0;
+}
+
 .item:active {
   cursor: grabbing;
 }
@@ -79,8 +101,9 @@
   justify-content: center;
   width: 14px;
   height: 14px;
-  opacity: 0.5;
+  opacity: 0;
   cursor: grab;
+  transition: opacity var(--duration-hover) var(--ease-out);
 }
 
 .item:hover .itemDot {

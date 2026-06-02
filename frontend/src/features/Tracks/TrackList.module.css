@@ -1,3 +1,31 @@
+.panel {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.selectionBar {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: stretch;
+  min-height: 28px;
+  border-bottom: var(--border-fg);
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  backdrop-filter: blur(8px);
+  flex-shrink: 0;
+}
+
+.selectionCount {
+  align-self: center;
+  justify-self: end;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.65;
+}
+
 .area {
   flex: 1 1 auto;
   min-height: 0;
@@ -26,7 +54,6 @@
   background: transparent;
   color: var(--color-fg);
   border: 0;
-  border-bottom: var(--border-fg);
   font-family: var(--font-family-base);
   font-size: 12px;
   cursor: pointer;

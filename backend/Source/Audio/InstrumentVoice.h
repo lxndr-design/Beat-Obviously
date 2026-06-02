@@ -1,7 +1,14 @@
 #pragma once
 
+#include "Realtime/RealtimeParameterQueue.h"
+#include "Wavetable/WavetableFactory.h"
+#include "Wavetable/WavetableOscillator.h"
+
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_dsp/juce_dsp.h>
+
+#include <array>
+#include <string_view>
 
 namespace beat
 {
@@ -33,30 +40,271 @@ namespace beat
                              int startSample, int numSamples) override;
 
         struct Params {
+            struct WavetableConfig
+            {
+                struct CustomFrame
+                {
+                    float brightness { 0.5f };
+                    float even { 0.2f };
+                    float fold { 0.1f };
+                    float phase { 0.0f };
+                };
+
+                int bank { 0 };
+                bool custom { false };
+                float position { 0.35f };
+                float warp { 0.2f };
+                int unison { 1 };
+                float detuneCents { 12.0f };
+                float blend { 0.5f };
+                std::array<CustomFrame, 4> customFrames {{
+                    { 0.22f, 0.08f, 0.05f, 0.0f },
+                    { 0.46f, 0.28f, 0.16f, 0.12f },
+                    { 0.72f, 0.48f, 0.34f, -0.08f },
+                    { 0.94f, 0.72f, 0.56f, 0.2f },
+                }};
+            };
+
+            struct AetherOscillator
+            {
+                bool enabled { false };
+                float level { 0.0f };
+                float pan { 0.0f };
+                int waveform { 5 };
+                int octave { 0 };
+                int semitone { 0 };
+                float fineCents { 0.0f };
+                WavetableConfig wavetable;
+            };
+
+            struct AetherSub
+            {
+                bool enabled { false };
+                float level { 0.0f };
+                int octave { -1 };
+                int waveform { 0 };
+            };
+
+            struct AetherNoise
+            {
+                bool enabled { false };
+                float level { 0.0f };
+                float color { 0.5f };
+            };
+
+            struct DynamicModTarget
+            {
+                float lfo { 0.0f };
+                bool lfoBipolar { true };
+                float env { 0.0f };
+                bool envBipolar { false };
+            };
+
+            struct DynamicModulation
+            {
+                bool active { false };
+                DynamicModTarget oscAPosition;
+                DynamicModTarget oscAFine;
+                DynamicModTarget oscALevel;
+                DynamicModTarget oscAPan;
+                DynamicModTarget oscBPosition;
+                DynamicModTarget oscBFine;
+                DynamicModTarget oscBLevel;
+                DynamicModTarget oscBPan;
+                DynamicModTarget filterCutoff;
+                DynamicModTarget filterResonance;
+                DynamicModTarget filterDrive;
+                DynamicModTarget ampLevel;
+                DynamicModTarget ampPan;
+                DynamicModTarget unisonDetune;
+                DynamicModTarget unisonSpread;
+            };
+
             float cutoff01    { 0.6f };
             float resonance01 { 0.2f };
             float drive01     { 0.1f };
             float color01     { 0.5f };
+            int filterType    { 0 };
             // ADSR in ms / 0..1
             float attackMs  { 5.f };
             float decayMs   { 100.f };
             float sustain   { 0.7f };
             float releaseMs { 200.f };
-            // Waveform: 0=sine, 1=saw, 2=square, 3=triangle, 4=noise
+            float ampLevel  { 1.0f };
+            float ampPan    { 0.0f };
+            // Waveform: 0=sine, 1=saw, 2=square, 3=triangle, 4=noise, 5=wavetable
             int waveform { 1 };
+            int wavetableBank { 0 };
+            float wavetablePosition { 0.35f };
+            float wavetableWarp { 0.2f };
+            int wavetableUnison { 1 };
+            float wavetableDetuneCents { 12.0f };
+            float wavetableBlend { 0.5f };
+            int lfoWaveform { 0 };
+            float lfoRateHz { 4.0f };
+            float lfoDepth { 0.0f };
+            bool lfoRetrigger { true };
+            bool lfoPositionBipolar { true };
+            bool lfoPitchBipolar { true };
+            bool lfoFilterBipolar { true };
+            float lfoToPitch { 0.0f };
+            float lfoToFilter { 0.0f };
+            float envToFilter { 0.0f };
+            DynamicModulation dynamicModulation;
+            WavetableConfig wavetable;
+            bool hasAether { false };
+            AetherOscillator aetherOscA;
+            AetherOscillator aetherOscB;
+            AetherSub aetherSub;
+            AetherNoise aetherNoise;
         };
 
         void setParams(const Params& p);
+        bool applyRealtimeParameter(std::string_view parameterId, float value, int rampSamples = 0) noexcept;
         void prepare(double sampleRate, int blockSize);
 
+        static constexpr size_t maxNoteAutomationEvents = 128;
+        static constexpr size_t maxPendingNoteAutomationContexts = 64;
+
+        struct NoteAutomationContext
+        {
+            struct PitchEvent
+            {
+                int sampleOffset { 0 };
+                float frequencyHz { 440.0f };
+                int rampSamples { 0 };
+            };
+
+            int midiNoteNumber { -1 };
+            int eventCount { 0 };
+            std::array<RealtimeParameterChange, maxNoteAutomationEvents> events {};
+            int pitchEventCount { 0 };
+            std::array<PitchEvent, maxNoteAutomationEvents> pitchEvents {};
+        };
+
+        static void setPendingNoteAutomationContexts(NoteAutomationContext* contexts, int count) noexcept;
+        static void clearPendingNoteAutomationContexts() noexcept;
+
     private:
+        struct StereoSample
+        {
+            float left { 0.0f };
+            float right { 0.0f };
+        };
+
+        struct WavetableUnisonPlan
+        {
+            int unison { 0 };
+            float detuneCents { -1.0f };
+            float spread { -1.0f };
+            float weightSum { 1.0f };
+            std::array<double, 8> rates {};
+            std::array<float, 8> centered {};
+            std::array<float, 8> weights {};
+            std::array<float, 8> phaseSpread {};
+        };
+
+        enum class RealtimeParam : size_t
+        {
+            FilterCutoff,
+            FilterResonance,
+            FilterDrive,
+            AmpLevel,
+            AmpPan,
+            OscAPosition,
+            OscBPosition,
+            OscAFine,
+            OscBFine,
+            OscALevel,
+            OscBLevel,
+            OscAPan,
+            OscBPan,
+            UnisonDetune,
+            UnisonSpread,
+            LfoRate,
+            LfoDepth,
+            Count,
+        };
+
+        struct RealtimeRamp
+        {
+            float current { 0.0f };
+            float target { 0.0f };
+            float step { 0.0f };
+            int remaining { 0 };
+
+            void reset(float value) noexcept;
+            void setTarget(float value, int rampSamples) noexcept;
+            float next() noexcept;
+            bool active() const noexcept { return remaining > 0; }
+        };
+
+        void configureWavetableOscillators(double frequencyHz) noexcept;
+        void resetRealtimeRampsFromParams() noexcept;
+        void setRealtimeRamp(RealtimeParam param, float value, int rampSamples) noexcept;
+        void activateRealtimeRamp(RealtimeParam param) noexcept;
+        void deactivateRealtimeRamp(RealtimeParam param) noexcept;
+        bool setRealtimeParameterValue(std::string_view parameterId, float value, int rampSamples, bool updateBaseline) noexcept;
+        void applyParamToParams(Params& target, RealtimeParam param, float value) noexcept;
+        void applyRealtimeValue(RealtimeParam param, float value) noexcept;
+        void advanceRealtimeRamps() noexcept;
+        void loadPendingNoteAutomation(int midiNoteNumber) noexcept;
+        void advanceVoiceAutomation() noexcept;
+        float renderWavetableStack(double frequencyHz, float positionMod, float detuneCentsMod, float spreadMod) noexcept;
+        void configureWavetableOscillatorBank(
+            std::array<WavetableOscillator, 8>& oscillators,
+            Wavetable& table,
+            const Params::WavetableConfig& config,
+            double frequencyHz) noexcept;
+        float renderWavetableOscillatorBank(
+            std::array<WavetableOscillator, 8>& oscillators,
+            WavetableUnisonPlan& plan,
+            const Params::WavetableConfig& config,
+            double frequencyHz,
+            float positionMod,
+            float detuneCentsMod,
+            float spreadMod) noexcept;
+        const WavetableUnisonPlan& updateWavetableUnisonPlan(
+            WavetableUnisonPlan& plan,
+            const Params::WavetableConfig& config,
+            float detuneCentsMod,
+            float spreadMod) noexcept;
+        StereoSample renderAetherTableStack(double frequencyHz, float rawLfo, float env) noexcept;
+
+        Params  baseParams;
         Params  params;
         double  sampleRate { 44100.0 };
         double  phase { 0.0 };
         double  phaseDelta { 0.0 };
+        double  baseFrequencyHz { 440.0 };
+        double  lfoPhase { 0.0 };
         float   level { 0.0f };
+        float   cachedFilterHz { -1.0f };
+        Wavetable wavetableTable;
+        Wavetable aetherTableA;
+        Wavetable aetherTableB;
+        std::array<WavetableOscillator, 8> wavetableOscillators;
+        std::array<WavetableOscillator, 8> aetherOscillatorsA;
+        std::array<WavetableOscillator, 8> aetherOscillatorsB;
+        WavetableUnisonPlan wavetableUnisonPlan;
+        WavetableUnisonPlan aetherUnisonPlanA;
+        WavetableUnisonPlan aetherUnisonPlanB;
+        std::array<RealtimeRamp, (size_t) RealtimeParam::Count> realtimeRamps;
+        std::array<size_t, (size_t) RealtimeParam::Count> activeRealtimeRampIndices {};
+        int activeRealtimeRampCount { 0 };
+        std::array<RealtimeParameterChange, maxNoteAutomationEvents> voiceAutomationEvents;
+        std::array<NoteAutomationContext::PitchEvent, maxNoteAutomationEvents> voicePitchEvents;
+        int voiceAutomationEventCount { 0 };
+        int voicePitchEventCount { 0 };
+        int nextVoiceAutomationEvent { 0 };
+        int nextVoicePitchEvent { 0 };
+        int voiceSamplePosition { 0 };
+        RealtimeRamp pitchFrequencyRamp;
+        int activeWavetableUnison { 1 };
+        juce::uint32 noiseState { 1 };
         juce::ADSR adsr;
         juce::ADSR::Parameters adsrParams;
-        juce::dsp::StateVariableTPTFilter<float> filter;
+        juce::dsp::StateVariableTPTFilter<float> filterLeft;
+        juce::dsp::StateVariableTPTFilter<float> filterRight;
     };
 }

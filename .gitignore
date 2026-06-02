@@ -1,5 +1,6 @@
 # Build
 build/
+build-native/
 cmake-build-*/
 out/
 *.o
@@ -18,6 +19,7 @@ JuceLibraryCode/
 node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/src/**/*.js
 .npm/
 .pnpm-store/
 

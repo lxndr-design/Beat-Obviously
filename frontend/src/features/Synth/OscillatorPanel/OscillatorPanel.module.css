@@ -1,0 +1,304 @@
+.panel {
+  width: 100%;
+  height: auto;
+  min-height: max-content;
+  min-width: 0;
+}
+
+.body {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-width: 0;
+}
+
+.row {
+  width: 100%;
+  border: var(--border-fg);
+  box-sizing: border-box;
+  min-width: 0;
+  align-self: start;
+  overflow: visible;
+}
+
+.disabledRow .rowMain {
+  opacity: 0.42;
+  filter: grayscale(1);
+}
+
+.rowMain {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  align-items: stretch;
+  min-width: 0;
+}
+
+.rowMain::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 66.666%;
+  z-index: 1;
+  border-right: var(--border-fg);
+  pointer-events: none;
+}
+
+.settingsPane {
+  min-width: 0;
+}
+
+.unisonSettingsPane {
+  align-self: start;
+}
+
+.rowBody {
+  display: grid;
+  grid-template-columns: 156px minmax(0, 1fr);
+  gap: 6px;
+  align-items: end;
+  min-width: 0;
+  padding: 6px;
+}
+
+.unisonBody {
+  display: grid;
+  align-items: center;
+  min-width: 0;
+  padding: 6px;
+}
+
+.rowKnobs {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(64px, 1fr));
+  gap: 6px;
+  align-items: end;
+  min-width: 0;
+}
+
+.unisonKnobs {
+  grid-template-columns: repeat(4, minmax(52px, 1fr));
+}
+
+.wavetableControl {
+  display: grid;
+  justify-items: start;
+  align-content: end;
+  gap: 3px;
+  width: 156px;
+  min-width: 0;
+}
+
+.wavetableButtons {
+  display: inline-flex;
+  min-height: 26px;
+  border: var(--border-fg);
+}
+
+.wavetableButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-right: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  cursor: pointer;
+  transition: var(--transition-invert);
+}
+
+.wavetableButton:last-child {
+  border-right: 0;
+}
+
+.wavetableButton:hover:not(.wavetableButtonActive),
+.wavetableButton:focus-visible:not(.wavetableButtonActive),
+.wavetableButtonActive {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.wavetableButtonActive:hover,
+.wavetableButtonActive:focus-visible {
+  background: var(--color-fg-hover);
+}
+
+.wavetableSelectedLabel,
+.wavetableControlLabel {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.wavetableSelectedLabel,
+.wavetableControlLabel {
+  justify-self: start;
+}
+
+.wavetableSelectedLabel {
+  font-weight: var(--font-weight-medium);
+}
+
+.wavetableControlLabel {
+  font-family: var(--font-family-mono);
+  opacity: 0.72;
+}
+
+.customEditor {
+  min-width: 0;
+  border-top: var(--border-fg);
+}
+
+.customFrames {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 6px;
+}
+
+.customFrame {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(42px, 1fr));
+  column-gap: 4px;
+  row-gap: 3px;
+  align-items: end;
+  min-width: 0;
+  padding: 0 4px 6px;
+  border: var(--border-fg);
+}
+
+.frameLabel {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  margin: 0 -4px;
+  border-bottom: var(--border-fg);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+}
+
+.frameWaveform {
+  grid-column: 1 / -1;
+  display: block;
+  width: 100%;
+  height: 42px;
+  min-width: 0;
+  margin: 0 -4px;
+  width: calc(100% + 8px);
+  border-bottom: var(--border-fg);
+}
+
+.frameWaveformPath {
+  fill: none;
+  stroke: var(--color-fg);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.customFrame :global(.knob) {
+  gap: 1px;
+  padding: 0;
+}
+
+.customFrame :global(.knob .value),
+.customFrame :global(.knob .editValue) {
+  min-height: 12px;
+}
+
+.previewPane {
+  display: grid;
+  grid-template-rows: minmax(96px, 160px);
+  align-content: start;
+  align-self: start;
+  min-width: 0;
+  padding: 6px;
+  overflow: hidden;
+}
+
+.previewPaneDisabled {
+  opacity: 1;
+  filter: none;
+}
+
+.previewSvg {
+  display: block;
+  width: 100%;
+  height: 160px;
+  max-height: 160px;
+  min-height: 96px;
+  border: var(--border-fg);
+}
+
+.zeroLine {
+  stroke: color-mix(in srgb, var(--color-fg) 34%, transparent);
+  stroke-width: 0.45;
+  vector-effect: non-scaling-stroke;
+}
+
+.previewPath {
+  fill: none;
+  stroke: var(--color-fg);
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--color-fg) 45%, transparent));
+  vector-effect: non-scaling-stroke;
+}
+
+.previewGhostPath {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-fg) 48%, transparent);
+  stroke-width: 0.85;
+  stroke-dasharray: 3 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.sectionActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
+}
+
+@media (max-width: 560px) {
+  .rowMain {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rowMain::before {
+    display: none;
+  }
+
+  .settingsPane {
+    border-right: 0;
+    border-bottom: var(--border-fg);
+  }
+
+  .rowBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rowKnobs,
+  .customFrames,
+  .customFrame {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

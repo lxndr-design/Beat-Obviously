@@ -90,10 +90,19 @@ async function mockResponse<R extends OutboundRequest>(
       return { path: "/tmp/mock-export.wav" } as unknown as ResponseFor<R>;
     case "instrument.list":
       return { instruments: [] } as unknown as ResponseFor<R>;
+    case "instrument.importDecent":
+      return { preset: null } as unknown as ResponseFor<R>;
     case "audio.import":
       return { file: null } as unknown as ResponseFor<R>;
+    case "audio.importMany":
+      return { files: [] } as unknown as ResponseFor<R>;
     case "audio.list":
       return { files: [] } as unknown as ResponseFor<R>;
+    case "training.run":
+      return {
+        started: false,
+        reason: "Training runner is only available in the native app.",
+      } as unknown as ResponseFor<R>;
     default:
       return { ok: true } as unknown as ResponseFor<R>;
   }
