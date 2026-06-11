@@ -84,6 +84,48 @@ try {
   );
 
   assert.deepEqual(
+    runner.previewSegmentFade({
+      edge: "in",
+      originFadeInBeats: 0.25,
+      originFadeOutBeats: 0.5,
+      originLengthBeats: 4,
+      pointerDeltaPx: 42,
+      beatsToPx: 24,
+      gridBeats: 0.25,
+    }),
+    { fadeInBeats: 2, fadeOutBeats: 0.5 },
+    "fade-in handle should grow from the segment head using snapped pointer travel",
+  );
+
+  assert.deepEqual(
+    runner.previewSegmentFade({
+      edge: "out",
+      originFadeInBeats: 0.25,
+      originFadeOutBeats: 0.5,
+      originLengthBeats: 4,
+      pointerDeltaPx: -400,
+      beatsToPx: 24,
+      gridBeats: 0.25,
+    }),
+    { fadeInBeats: 0.25, fadeOutBeats: 4 },
+    "fade-out handle should grow leftward and clamp to segment length",
+  );
+
+  assert.deepEqual(
+    runner.previewSegmentFade({
+      edge: "out",
+      originFadeInBeats: 0.25,
+      originFadeOutBeats: 0.5,
+      originLengthBeats: 4,
+      pointerDeltaPx: 18,
+      beatsToPx: 24,
+      gridBeats: 1,
+    }),
+    { fadeInBeats: 0.25, fadeOutBeats: 0 },
+    "fade handles should snap down to zero when dragged before the grid midpoint",
+  );
+
+  assert.deepEqual(
     runner.previewLoopClampDrag({
       marker: "start",
       startBeat: 4,
@@ -126,6 +168,41 @@ try {
     },
     "marquee preview should clamp to the editable timeline body",
   );
+
+  let selection = runner.clearArrangementSelection();
+  selection = runner.selectArrangementItem({ selection, domain: "track", id: "track-a" });
+  assert.deepEqual(
+    selection,
+    {
+      selectedTrackIds: ["track-a"],
+      selectedSegmentIds: [],
+      selectedTrackEffectAutomationPointKeys: [],
+    },
+    "track click should select tracks and clear other arrangement domains",
+  );
+  selection = runner.selectArrangementItem({ selection, domain: "segment", id: "segment-a" });
+  selection = runner.selectArrangementItem({ selection, domain: "segment", id: "segment-b", additive: true });
+  assert.deepEqual(
+    selection,
+    {
+      selectedTrackIds: [],
+      selectedSegmentIds: ["segment-a", "segment-b"],
+      selectedTrackEffectAutomationPointKeys: [],
+    },
+    "additive segment click should keep same-domain selections and clear tracks",
+  );
+  selection = runner.selectArrangementItem({ selection, domain: "effect-point", id: "track-a:effect-a:mix:point-a" });
+  assert.deepEqual(
+    selection,
+    {
+      selectedTrackIds: [],
+      selectedSegmentIds: [],
+      selectedTrackEffectAutomationPointKeys: ["track-a:effect-a:mix:point-a"],
+    },
+    "effect point click should clear segment selection",
+  );
+  selection = runner.selectArrangementItem({ selection, domain: "effect-point", id: "track-a:effect-a:mix:point-a", additive: true });
+  assert.deepEqual(selection, runner.clearArrangementSelection(), "additive click on a selected item should toggle it off");
 
   assert.equal(runner.shouldCloseModal({ reason: "backdrop", dirty: true }), false);
   assert.equal(runner.shouldCloseModal({ reason: "backdrop", dirty: false }), false);

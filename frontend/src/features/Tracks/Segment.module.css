@@ -185,6 +185,11 @@
   overflow: hidden;
 }
 
+.content > svg {
+  position: relative;
+  z-index: 1;
+}
+
 .innerGrid {
   position: absolute;
   inset: 0;
@@ -196,6 +201,103 @@
     color-mix(in srgb, var(--color-bg) 8%, transparent) var(--space-2)
   );
   pointer-events: none;
+}
+
+.fadeLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.fadeRegion {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.fadeInRegion {
+  left: 0;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--color-bg) 22%, transparent),
+    transparent
+  );
+  border-right: 1px solid color-mix(in srgb, var(--color-bg) 34%, transparent);
+}
+
+.fadeOutRegion {
+  right: 0;
+  background: linear-gradient(
+    to left,
+    color-mix(in srgb, var(--color-bg) 22%, transparent),
+    transparent
+  );
+  border-left: 1px solid color-mix(in srgb, var(--color-bg) 34%, transparent);
+}
+
+.fadeHandle {
+  position: absolute;
+  top: 2px;
+  width: 14px;
+  height: 18px;
+  padding: 0;
+  transform: translateX(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--color-bg);
+  cursor: ew-resize;
+  opacity: 0.66;
+  pointer-events: auto;
+  z-index: 8;
+}
+
+.fadeHandle::before,
+.fadeHandle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.fadeHandle::before {
+  top: 0;
+  width: 1px;
+  height: 18px;
+  background: currentColor;
+}
+
+.fadeHandle::after {
+  top: 1px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+
+.fadeHandleIn::after {
+  border-left: 7px solid currentColor;
+}
+
+.fadeHandleOut {
+  transform: translateX(50%);
+}
+
+.fadeHandleOut::after {
+  border-right: 7px solid currentColor;
+}
+
+.fadeHandle:hover,
+.fadeHandle:focus-visible,
+.selected .fadeHandle,
+.dragging .fadeHandle {
+  opacity: 1;
+}
+
+.fadeHandle:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 2px;
 }
 
 /* Track playback flash — applied when sequencer reports trigger */

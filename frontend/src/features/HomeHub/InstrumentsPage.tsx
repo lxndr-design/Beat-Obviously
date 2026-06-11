@@ -20,7 +20,7 @@ import { isNative, send } from "../../ipc/bridge";
 import type { AudioRenderAnalysis, AudioWaveformSummary } from "../../ipc/schema";
 import { useInstrumentStore } from "../../state/store";
 import type { Instrument } from "../../state/types";
-import { AssetPageShell } from "./AssetPageShell";
+import { AssetPageShell, AssetStateMessage } from "./AssetPageShell";
 import styles from "./InstrumentsPage.module.css";
 
 const PREVIEW_SECONDS = 2.0;
@@ -37,6 +37,7 @@ const SAMPLE_VARIABLE_OPTIONS: Array<{ mode: SampleVariable; label: string }> = 
 export function InstrumentsPage() {
   const instruments = useInstrumentStore((state) => state.instruments);
   const sets = useInstrumentStore((state) => state.instrumentSets);
+  const loading = useInstrumentStore((state) => state.loading);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loopPreview, setLoopPreview] = useState(false);
@@ -72,6 +73,7 @@ export function InstrumentsPage() {
   }, [instruments, searchQuery]);
   const activeInstrument = visibleInstruments.find((instrument) => instrument.id === activeId) ?? visibleInstruments[0] ?? null;
   const activeSampleUrls = activeInstrument ? instrumentSampleUrls(activeInstrument) : [];
+  const activeReference = activeInstrument ? instrumentReferenceState(activeInstrument) : null;
   const activeSampleUrl = activeInstrument && !isSustainedPreview(activeInstrument) && activeSampleUrls.length > 0
     ? activeSampleUrls[(samplePreviewIndex[activeInstrument.id] ?? 0) % activeSampleUrls.length]
     : undefined;
@@ -316,45 +318,64 @@ export function InstrumentsPage() {
           <span className={styles.count}>{visibleInstruments.length}</span>
         </div>
         <div className={styles.rows}>
-          {grouped.length === 0 ? (
-            <div className={styles.emptyRow}>No instruments yet.</div>
+          {loading && instruments.length === 0 ? (
+            <div className={styles.emptyRow}>
+              <AssetStateMessage
+                icon="ph:circle-notch"
+                title="Loading Instruments"
+                body="Restoring the project instrument library."
+                tone="loading"
+              />
+            </div>
+          ) : grouped.length === 0 ? (
+            <div className={styles.emptyRow}>
+              <AssetStateMessage
+                icon="ph:piano-keys"
+                title={searchQuery ? "No Matching Instruments" : "No Instruments"}
+                body={searchQuery ? "Clear search to show the full library." : "Create or import instruments to fill the project library."}
+              />
+            </div>
           ) : grouped.map((group) => (
             <div key={group.set.id} className={styles.group}>
               <div className={styles.groupHeader}>
                 <span>{group.set.factory ? `Factory ${group.set.name}` : group.set.name}</span>
                 <strong>{group.instruments.length}</strong>
               </div>
-              {group.instruments.map((instrument) => (
-                <div
-                  key={instrument.id}
-                  className={`${styles.row} ${activeInstrument?.id === instrument.id ? styles.rowActive : ""}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setActiveId(instrument.id)}
-                  onKeyDown={(event) => {
-                    if (event.key !== "Enter" && event.key !== " ") return;
-                    event.preventDefault();
-                    setActiveId(instrument.id);
-                  }}
-                >
-                  <Icon name={instrument.icon || "ph:piano-keys"} size={14} decorative />
-                  <MarqueeText className={styles.rowName} text={instrument.name} />
-                  <span className={styles.rowMeta}>
-                    <span className={styles.rowType}>{instrument.kind}</span>
-                    <button
-                      type="button"
-                      className={`${styles.rowPlay} ${playingId === instrument.id ? styles.rowPlayActive : ""}`}
-                      aria-label={`Preview ${instrument.name}`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void playPreview(instrument);
-                      }}
-                    >
-                      <Icon name={playingId === instrument.id ? "ph:pause-fill" : "ph:play-fill"} size={12} decorative />
-                    </button>
-                  </span>
-                </div>
-              ))}
+              {group.instruments.map((instrument) => {
+                const reference = instrumentReferenceState(instrument);
+                return (
+                  <div
+                    key={instrument.id}
+                    className={`${styles.row} ${activeInstrument?.id === instrument.id ? styles.rowActive : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setActiveId(instrument.id)}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      setActiveId(instrument.id);
+                    }}
+                  >
+                    <Icon name={instrument.icon || "ph:piano-keys"} size={14} decorative />
+                    <MarqueeText className={styles.rowName} text={instrument.name} />
+                    <span className={styles.rowMeta}>
+                      <span className={`${styles.referenceChip} ${styles[reference.className]}`}>{reference.label}</span>
+                      <span className={styles.rowType}>{instrument.kind}</span>
+                      <button
+                        type="button"
+                        className={`${styles.rowPlay} ${playingId === instrument.id ? styles.rowPlayActive : ""}`}
+                        aria-label={`Preview ${instrument.name}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void playPreview(instrument);
+                        }}
+                      >
+                        <Icon name={playingId === instrument.id ? "ph:pause-fill" : "ph:play-fill"} size={12} decorative />
+                      </button>
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
@@ -364,12 +385,34 @@ export function InstrumentsPage() {
         <>
         {activeInstrument ? (
           <div className={styles.previewBody}>
+            {activeReference && activeReference.tone !== "neutral" ? (
+              <AssetStateMessage
+                icon={activeReference.icon}
+                title={activeReference.title}
+                body={activeReference.body}
+                tone={activeReference.tone}
+              />
+            ) : null}
             <div className={styles.waveformStage}>
               <div className={styles.waveformGrid} />
               <InstrumentWaveform waveform={renderState.waveform} />
               <div className={styles.playhead} style={{ left: `${previewProgress * 100}%` }} />
-              {renderState.loading && <div className={styles.loading}>Rendering Preview...</div>}
-              {renderState.error && <div className={styles.loading}>{renderState.error}</div>}
+              {renderState.loading && (
+                <AssetStateMessage
+                  icon="ph:circle-notch"
+                  title="Rendering Preview"
+                  body="Preparing waveform and analysis."
+                  tone="loading"
+                />
+              )}
+              {renderState.error && (
+                <AssetStateMessage
+                  icon="ph:warning"
+                  title="Preview Unavailable"
+                  body={renderState.error}
+                  tone="warning"
+                />
+              )}
             </div>
             <div className={styles.previewName}>
               <Icon name={activeInstrument.icon || "ph:piano-keys"} size={16} decorative />
@@ -411,6 +454,7 @@ export function InstrumentsPage() {
             <dl className={styles.details}>
               <Info label="Engine" value={formatEngine(activeInstrument)} />
               <Info label="Source" value={activeInstrument.source?.label ?? "Made in Beat"} />
+              <Info label="Reference" value={activeReference?.detail ?? "Unknown"} />
               <Info label="Preview Mode" value={isSustainedPreview(activeInstrument) ? "Sustain until pause" : loopPreview ? "Looping sample" : "One-shot sample"} />
               <Info label="Preview Source" value={activeSampleUrl ? sampleName(activeSampleUrl) : "Rendered instrument"} />
               <Info label="Waveform" value={activeInstrument.waveform} />
@@ -427,7 +471,13 @@ export function InstrumentsPage() {
             )}
           </div>
         ) : (
-          <div className={styles.emptyPreview}>Select an instrument.</div>
+          <div className={styles.emptyPreview}>
+            <AssetStateMessage
+              icon="ph:piano-keys"
+              title="Select an Instrument"
+              body="Choose an instrument to inspect sound source, preview, and samples."
+            />
+          </div>
         )}
         </>
       }
@@ -472,6 +522,99 @@ function Info({ label, value }: { label: string; value: string }) {
       <dd title={value}>{value}</dd>
     </div>
   );
+}
+
+type InstrumentReferenceTone = "neutral" | "warning" | "danger";
+
+function instrumentReferenceState(instrument: Instrument): {
+  label: string;
+  detail: string;
+  title: string;
+  body: string;
+  icon: string;
+  tone: InstrumentReferenceTone;
+  className: string;
+} {
+  if (instrument.source?.kind === "plugin" && instrument.source.fallbackEngine) {
+    return {
+      label: "Fallback",
+      detail: `${instrument.source.label} via ${instrument.source.fallbackEngine}`,
+      title: "Plugin Fallback Active",
+      body: "This plugin-sourced instrument is using Beat's fallback engine for preview.",
+      icon: "ph:warning",
+      tone: "warning",
+      className: "referenceWarning",
+    };
+  }
+
+  const sampleUrls = instrumentSampleUrls(instrument);
+  const expectsSamples = instrument.kind === "sampler" || instrument.waveform === "sample" || (instrument.sampleMap?.length ?? 0) > 0;
+  if (expectsSamples && sampleUrls.length === 0) {
+    return {
+      label: "Missing",
+      detail: "No sample reference",
+      title: "Missing Sample Reference",
+      body: "This sampler instrument has no sample path to preview.",
+      icon: "ph:warning-diamond",
+      tone: "danger",
+      className: "referenceDanger",
+    };
+  }
+
+  if (sampleUrls.some((path) => sampleReferenceState(path).tone === "warning")) {
+    return {
+      label: "External",
+      detail: "External sample reference",
+      title: "External Sample Reference",
+      body: "One or more samples live outside the Beat library. Keep those files in place.",
+      icon: "ph:warning",
+      tone: "warning",
+      className: "referenceWarning",
+    };
+  }
+
+  if (sampleUrls.some((path) => path.startsWith("data:"))) {
+    return {
+      label: "Embedded",
+      detail: "Embedded sample data",
+      title: "Embedded Sample",
+      body: "This instrument stores sample data inside the library entry.",
+      icon: "ph:database",
+      tone: "neutral",
+      className: "referenceManaged",
+    };
+  }
+
+  if (sampleUrls.length > 0) {
+    return {
+      label: "Managed",
+      detail: "Managed sample reference",
+      title: "Managed Samples",
+      body: "Samples are referenced from the Beat library.",
+      icon: "ph:folder-simple",
+      tone: "neutral",
+      className: "referenceManaged",
+    };
+  }
+
+  return {
+    label: instrument.source?.kind === "factory" ? "Factory" : "Internal",
+    detail: instrument.source?.label ?? "Generated in Beat",
+    title: "Internal Instrument",
+    body: "This instrument renders from stored synth settings.",
+    icon: "ph:piano-keys",
+    tone: "neutral",
+    className: "referenceManaged",
+  };
+}
+
+function sampleReferenceState(path: string): { label: string; tone: InstrumentReferenceTone; className: string } {
+  const trimmed = path.trim();
+  if (!trimmed) return { label: "Missing", tone: "danger", className: "referenceDanger" };
+  if (trimmed.startsWith("data:")) return { label: "Embedded", tone: "neutral", className: "referenceManaged" };
+  if (trimmed.includes("/Beat/Audio Files/")) return { label: "Managed", tone: "neutral", className: "referenceManaged" };
+  if (trimmed.startsWith("/") || /^https?:/i.test(trimmed)) return { label: "External", tone: "warning", className: "referenceWarning" };
+  return { label: "Asset", tone: "neutral", className: "referenceManaged" };
 }
 
 function SampleStructure({ instrument, activeSampleUrl }: { instrument: Instrument; activeSampleUrl?: string }) {
@@ -638,38 +781,42 @@ function SampleStructure({ instrument, activeSampleUrl }: { instrument: Instrume
             ) : null}
           </div>
           <div className={styles.sampleRows}>
-            {group.rows.map((row) => (
-              <div
-                key={`${group.title}:${row.path}:${row.meta}`}
-                className={`${styles.sampleRow} ${row.path === activeSampleUrl ? styles.sampleRowActive : ""}`}
-              >
-                <MarqueeText text={row.name} />
-                {row.editable ? (
-                  <span
-                    className={styles.sampleValue}
-                    onDoubleClick={(event) => {
-                      event.stopPropagation();
-                      beginValueEdit(row);
-                    }}
-                  >
-                    {editingValue?.path === row.path ? (
-                      <input
-                        className={styles.sampleValueInput}
-                        value={editingValue.value}
-                        autoFocus
-                        onClick={(event) => event.stopPropagation()}
-                        onChange={(event) => setEditingValue({ path: row.path, value: event.currentTarget.value })}
-                        onBlur={commitEditedValue}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") commitEditedValue();
-                          if (event.key === "Escape") setEditingValue(null);
-                        }}
-                      />
-                    ) : row.meta}
-                  </span>
-                ) : null}
-              </div>
-            ))}
+            {group.rows.map((row) => {
+              const reference = sampleReferenceState(row.path);
+              return (
+                <div
+                  key={`${group.title}:${row.path}:${row.meta}`}
+                  className={`${styles.sampleRow} ${row.path === activeSampleUrl ? styles.sampleRowActive : ""}`}
+                >
+                  <MarqueeText text={row.name} />
+                  <span className={`${styles.referenceChip} ${styles[reference.className]}`}>{reference.label}</span>
+                  {row.editable ? (
+                    <span
+                      className={styles.sampleValue}
+                      onDoubleClick={(event) => {
+                        event.stopPropagation();
+                        beginValueEdit(row);
+                      }}
+                    >
+                      {editingValue?.path === row.path ? (
+                        <input
+                          className={styles.sampleValueInput}
+                          value={editingValue.value}
+                          autoFocus
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) => setEditingValue({ path: row.path, value: event.currentTarget.value })}
+                          onBlur={commitEditedValue}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") commitEditedValue();
+                            if (event.key === "Escape") setEditingValue(null);
+                          }}
+                        />
+                      ) : row.meta}
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </div>
       ))}

@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { Icon } from "../../components";
 import styles from "./AssetPageShell.module.css";
 
 type AssetPageVariant = "balanced" | "wide-browser" | "instrument";
@@ -48,6 +49,42 @@ export function AssetBrowserRibbon({ label, count }: { label: string; count?: nu
     <div className={styles.browserRibbon}>
       <span>{label}</span>
       {typeof count === "number" ? <strong>{count}</strong> : null}
+    </div>
+  );
+}
+
+type AssetStateTone = "neutral" | "loading" | "warning" | "danger";
+
+export function AssetStateMessage({
+  icon,
+  title,
+  body,
+  tone = "neutral",
+  children,
+}: {
+  icon: string;
+  title: string;
+  body?: string;
+  tone?: AssetStateTone;
+  children?: ReactNode;
+}) {
+  const className = [
+    styles.stateMessage,
+    tone === "loading" && styles.stateLoading,
+    tone === "warning" && styles.stateWarning,
+    tone === "danger" && styles.stateDanger,
+  ].filter(Boolean).join(" ");
+
+  return (
+    <div className={className}>
+      <span className={styles.stateIcon} aria-hidden>
+        <Icon name={icon} size={16} decorative />
+      </span>
+      <div className={styles.stateCopy}>
+        <strong>{title}</strong>
+        {body ? <span>{body}</span> : null}
+      </div>
+      {children ? <div className={styles.stateActions}>{children}</div> : null}
     </div>
   );
 }

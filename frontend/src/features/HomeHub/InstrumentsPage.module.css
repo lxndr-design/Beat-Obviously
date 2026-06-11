@@ -114,11 +114,39 @@
 
 .rowMeta {
   display: inline-grid;
-  grid-template-columns: minmax(54px, max-content) 22px;
+  grid-template-columns: 68px minmax(54px, max-content) 22px;
   align-items: center;
   gap: 6px;
   justify-self: end;
   min-width: 0;
+}
+
+.referenceChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 66px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--color-fg) 44%, transparent);
+  color: var(--color-fg-hover);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.referenceManaged {
+  background: var(--surface-subtle);
+}
+
+.referenceWarning {
+  background: color-mix(in srgb, var(--color-fg) 10%, var(--color-bg));
+  color: var(--color-fg);
+}
+
+.referenceDanger {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
 }
 
 .rowPlay {
@@ -421,7 +449,7 @@
 
 .sampleRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
+  grid-template-columns: minmax(0, 1fr) 68px minmax(96px, auto);
   align-items: center;
   gap: 6px;
   min-height: 24px;
@@ -518,6 +546,6 @@
 .emptyPreview {
   display: flex;
   align-items: center;
-  min-height: 32px;
-  padding: 0 6px;
+  min-height: 72px;
+  padding: 8px;
 }

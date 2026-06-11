@@ -7,7 +7,7 @@
 .headerRow,
 .row {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) 72px 84px 84px;
+  grid-template-columns: minmax(160px, 1fr) 76px 72px 84px 84px;
   align-items: center;
 }
 
@@ -66,10 +66,34 @@
 .emptyPreview {
   display: flex;
   align-items: center;
-  min-height: 32px;
-  padding: 0 6px;
+  min-height: 72px;
+  padding: 8px;
   color: var(--color-fg-hover);
   font-size: var(--font-size-ui);
+}
+
+.referenceChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  width: 66px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--color-fg) 44%, transparent);
+  color: var(--color-fg-hover);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.referenceManaged {
+  background: var(--surface-subtle);
+}
+
+.referenceWarning {
+  background: color-mix(in srgb, var(--color-fg) 10%, var(--color-bg));
+  color: var(--color-fg);
 }
 
 .preview {

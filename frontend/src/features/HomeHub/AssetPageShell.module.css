@@ -45,6 +45,88 @@
   font-weight: var(--font-weight-medium);
 }
 
+.stateMessage {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px;
+  border: var(--border-fg);
+  background: var(--surface-subtle);
+  color: var(--color-fg);
+}
+
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--color-fg-hover);
+}
+
+.stateCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.stateCopy strong,
+.stateCopy span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stateCopy strong {
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.stateCopy span {
+  color: var(--color-fg-hover);
+  font-size: var(--font-size-ui);
+  line-height: 1.2;
+}
+
+.stateActions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.stateLoading .stateIcon {
+  animation: assetStateSpin 1s linear infinite;
+}
+
+.stateWarning {
+  background: color-mix(in srgb, var(--color-fg) 7%, var(--color-bg));
+}
+
+.stateDanger {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-fg) 10%, transparent) 0 6px,
+      transparent 6px 12px
+    ),
+    var(--color-bg);
+}
+
+@keyframes assetStateSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 980px) {
   .page,
   .pageWideBrowser,

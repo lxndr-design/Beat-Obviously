@@ -6,7 +6,7 @@ import { isNative, send } from "../../ipc/bridge";
 import type { AudioWaveformSummary } from "../../ipc/schema";
 import { useAudioFileStore, useInstrumentStore, useProjectStore } from "../../state/store";
 import type { AudioFile, Instrument } from "../../state/types";
-import { AssetPageShell } from "./AssetPageShell";
+import { AssetPageShell, AssetStateMessage } from "./AssetPageShell";
 import styles from "./AudioFilesPage.module.css";
 
 type SortKey = "name" | "size" | "length" | "imported";
@@ -59,6 +59,7 @@ export function AudioFilesPage() {
 
   const sortedFiles = useMemo(() => sortAudioFiles(files, sort.key, sort.direction), [files, sort]);
   const activeFile = files.find((file) => file.id === activeId) ?? files[0] ?? null;
+  const activeReference = activeFile ? audioReferenceState(activeFile) : null;
   const selectedCount = selectedIds.size;
   const multipleSelected = selectMode && selectedCount > 1;
   const previewFile = multipleSelected ? null : activeFile;
@@ -342,6 +343,16 @@ export function AudioFilesPage() {
     if (!response.ok) window.alert(response.error ?? "View in Folder is only available in the native app.");
   }
 
+  async function copyReference(file: AudioFile) {
+    const value = copyableAudioReference(file);
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      window.prompt("Copy audio reference", value);
+    }
+  }
+
   return (
     <AssetPageShell
       variant="wide-browser"
@@ -351,17 +362,18 @@ export function AudioFilesPage() {
       browser={
         <>
         <div className={styles.actions}>
-          {selectMode && <span className={styles.selectionCount}>{selectedCount}</span>}
+          {selectMode && <span className={styles.selectionCount}>{selectedCount} selected</span>}
           <Button variant={selectMode ? "primary" : "default"} onClick={toggleSelectMode}>
-            Select
+            {selectMode ? "Done" : "Select"}
           </Button>
           <Button onClick={() => void onImport()}>
             <Icon name="ph:plus" size={14} decorative />
-            Import
+            Import Audio
           </Button>
           <HoverInfo content="Delete selected audio files">
-            <Button iconOnly disabled={selectedCount === 0} onClick={deleteSelected} aria-label="Delete selected audio files">
+            <Button variant="danger" disabled={selectedCount === 0} onClick={deleteSelected} aria-label="Delete selected audio files">
               <Icon name="ph:trash" size={14} decorative />
+              Delete
             </Button>
           </HoverInfo>
         </div>
@@ -370,6 +382,7 @@ export function AudioFilesPage() {
           <div className={styles.headerRow} role="row">
             {selectMode && <span className={styles.checkHeader} />}
             <SortHeader label="Name" sortKey="name" current={sort} onSort={toggleSort} />
+            <span className={styles.staticHeader}>Status</span>
             <SortHeader label="Length" sortKey="length" current={sort} onSort={toggleSort} />
             <SortHeader label="Size" sortKey="size" current={sort} onSort={toggleSort} />
             <SortHeader label="Imported" sortKey="imported" current={sort} onSort={toggleSort} />
@@ -377,10 +390,22 @@ export function AudioFilesPage() {
 
           <div className={styles.rows}>
             {sortedFiles.length === 0 ? (
-              <div className={styles.emptyRow}>No audio files yet.</div>
+              <div className={styles.emptyRow}>
+                <AssetStateMessage
+                  icon="ph:waveform"
+                  title="No Audio Files"
+                  body="Import audio to build the project library."
+                >
+                  <Button size="sm" onClick={() => void onImport()}>
+                    <Icon name="ph:plus" size={14} decorative />
+                    Import Audio
+                  </Button>
+                </AssetStateMessage>
+              </div>
             ) : sortedFiles.map((file) => {
               const selected = selectedIds.has(file.id);
               const active = activeFile?.id === file.id;
+              const reference = audioReferenceState(file);
               return (
                 <div
                   key={file.id}
@@ -405,6 +430,7 @@ export function AudioFilesPage() {
                     </span>
                   )}
                   <MarqueeText className={styles.nameCell} text={file.name} />
+                  <span className={`${styles.referenceChip} ${styles[reference.className]}`}>{reference.label}</span>
                   <span>{formatDuration(file.durationSeconds)}</span>
                   <span>{formatFileSize(file.sizeBytes)}</span>
                   <span>{formatImported(file.importedAt)}</span>
@@ -419,6 +445,11 @@ export function AudioFilesPage() {
         <>
         {multipleSelected ? (
           <div className={styles.previewBody}>
+            <AssetStateMessage
+              icon="ph:checks"
+              title={`${selectedCount} Audio Files Selected`}
+              body="Preview is paused while a multi-file selection is active."
+            />
             <div className={styles.waveformStage}>
               <div className={styles.waveformLine} />
               <ScopeOverlay analysis={null} />
@@ -452,11 +483,20 @@ export function AudioFilesPage() {
           </div>
         ) : activeFile ? (
           <div className={styles.previewBody}>
+            {activeReference && activeReference.tone !== "neutral" ? (
+              <AssetStateMessage
+                icon={activeReference.icon}
+                title={activeReference.title}
+                body={activeReference.body}
+                tone={activeReference.tone}
+              />
+            ) : null}
             <div className={styles.waveformStage}>
               <div className={styles.waveformLine} />
               <ScopeOverlay analysis={waveformAnalysis} />
               <WaveformPreview analysis={waveformAnalysis} />
               <div className={styles.playhead} style={{ left: `${previewProgress * 100}%` }} />
+              {!waveformAnalysis && <div className={styles.waveformStatus}>Loading Waveform</div>}
             </div>
             <div className={styles.previewFileName} title={activeFile.name}>{activeFile.name}</div>
             <div
@@ -502,6 +542,7 @@ export function AudioFilesPage() {
             </div>
             <dl className={styles.details}>
               <Info label="Source" value={formatSource(activeFile.path)} />
+              <Info label="Reference" value={activeReference?.detail ?? "Unknown"} />
               <Info label="Import Date" value={formatImported(activeFile.importedAt)} />
               <Info label="Playback Resolution" value={formatPlaybackResolution(activeFile)} />
               <Info label="Total Length" value={formatDuration(activeFile.durationSeconds)} />
@@ -519,14 +560,28 @@ export function AudioFilesPage() {
               <Info label="Format" value={formatExtension(activeFile.name || activeFile.path)} />
             </dl>
             <ActionFooter className={styles.previewActions}>
-              <Button size="sm" onClick={() => void viewInFolder(activeFile)}>
-                <Icon name="ph:folder-open" size={14} decorative />
-                View in Folder
-              </Button>
+              <HoverInfo content={canRevealAudioReference(activeFile) ? "Reveal the referenced file in Finder" : "Reveal is available only for file references in the native app"}>
+                <Button size="sm" disabled={!canRevealAudioReference(activeFile)} onClick={() => void viewInFolder(activeFile)}>
+                  <Icon name="ph:folder-open" size={14} decorative />
+                  Reveal File
+                </Button>
+              </HoverInfo>
+              <HoverInfo content="Copy the library reference">
+                <Button size="sm" disabled={!copyableAudioReference(activeFile)} onClick={() => void copyReference(activeFile)}>
+                  <Icon name="ph:copy" size={14} decorative />
+                  Copy Reference
+                </Button>
+              </HoverInfo>
             </ActionFooter>
           </div>
         ) : (
-          <div className={styles.emptyPreview}>Select or import an audio file.</div>
+          <div className={styles.emptyPreview}>
+            <AssetStateMessage
+              icon="ph:waveform"
+              title="Select an Audio File"
+              body="Choose a file to inspect waveform, usage, and reference details."
+            />
+          </div>
         )}
         </>
       }
@@ -1071,6 +1126,95 @@ function formatClipCount(count?: number, ratio?: number) {
 function formatCorrelation(value?: number) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "Mono / unknown";
   return value.toFixed(2);
+}
+
+type AudioReferenceTone = "neutral" | "warning" | "danger";
+
+function audioReferenceState(file: AudioFile): {
+  label: string;
+  detail: string;
+  title: string;
+  body: string;
+  icon: string;
+  tone: AudioReferenceTone;
+  className: string;
+} {
+  const path = file.path?.trim() ?? "";
+  if (!path) {
+    return {
+      label: "Missing",
+      detail: "Missing reference path",
+      title: "Missing Audio Reference",
+      body: "This library entry does not have a file path to reveal or preview.",
+      icon: "ph:warning-diamond",
+      tone: "danger",
+      className: "referenceDanger",
+    };
+  }
+  if (path.startsWith("data:")) {
+    return {
+      label: "Embedded",
+      detail: "Embedded browser import",
+      title: "Embedded Audio",
+      body: "This file is stored inside the project library data instead of a revealable disk path.",
+      icon: "ph:database",
+      tone: "warning",
+      className: "referenceWarning",
+    };
+  }
+  if (/^https?:/i.test(path)) {
+    return {
+      label: "Remote",
+      detail: "Remote URL reference",
+      title: "Remote Audio Reference",
+      body: "Preview depends on the referenced URL remaining reachable.",
+      icon: "ph:link",
+      tone: "warning",
+      className: "referenceWarning",
+    };
+  }
+  if (path.includes("/Beat/Audio Files/")) {
+    return {
+      label: "Managed",
+      detail: "Beat audio library file",
+      title: "Managed Audio File",
+      body: "Beat owns this library copy.",
+      icon: "ph:folder-simple",
+      tone: "neutral",
+      className: "referenceManaged",
+    };
+  }
+  if (path.startsWith("/")) {
+    return {
+      label: "External",
+      detail: "External file reference",
+      title: "External Audio Reference",
+      body: "This entry points outside the Beat library. Keep the source file in place.",
+      icon: "ph:warning",
+      tone: "warning",
+      className: "referenceWarning",
+    };
+  }
+  return {
+    label: "Asset",
+    detail: "Library asset reference",
+    title: "Audio Asset",
+    body: "This entry uses a non-file library reference.",
+    icon: "ph:file-audio",
+    tone: "neutral",
+    className: "referenceManaged",
+  };
+}
+
+function canRevealAudioReference(file: AudioFile) {
+  const path = file.path?.trim() ?? "";
+  return isNative() && Boolean(path) && !/^(data:|blob:|https?:)/i.test(path);
+}
+
+function copyableAudioReference(file: AudioFile) {
+  const path = file.path?.trim() ?? "";
+  if (!path) return "";
+  return path.startsWith("data:") ? file.name : path;
 }
 
 function formatSource(path: string) {

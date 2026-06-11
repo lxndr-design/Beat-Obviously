@@ -5,7 +5,7 @@ import { normalizeDrumCell } from "../../state/drumSteps";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";
 import type { Instrument } from "../../state/types";
 import { playComponentPreview, stopComponentPlayback, type ComponentPlayback } from "../ComponentLibrary/ComponentLibraryPanel";
-import { AssetBrowserRibbon, AssetPageShell } from "./AssetPageShell";
+import { AssetBrowserRibbon, AssetPageShell, AssetStateMessage } from "./AssetPageShell";
 import styles from "./PatternsPage.module.css";
 
 type PatternKind = "midi" | "drum";
@@ -29,6 +29,7 @@ export function PatternsPage() {
     [components],
   );
   const active = sorted.find((component) => component.id === activeId) ?? sorted[0] ?? null;
+  const activeReferenceIssue = active ? patternReferenceIssue(active, instruments) : null;
 
   useEffect(() => {
     if (activeId && !components.some((component) => component.id === activeId)) setActiveId(null);
@@ -115,30 +116,43 @@ export function PatternsPage() {
         <div className={styles.table}>
           <div className={styles.headerRow}>
             <span>Name</span>
+            <span>Status</span>
             <span>Type</span>
             <span>Length</span>
             <span>Items</span>
           </div>
           <div className={styles.rows}>
             {sorted.length === 0 ? (
-              <div className={styles.emptyRow}>No patterns yet.</div>
-            ) : sorted.map((component) => (
-              <button
-                key={component.id}
-                type="button"
-                className={`${styles.row} ${active?.id === component.id ? styles.rowActive : ""}`}
-                onClick={() => setActiveId(component.id)}
-                onDoubleClick={() => openEditor({ kind: "component", componentId: component.id })}
-              >
-                <span className={styles.nameCell}>
-                  <Icon name={componentIcon(component)} size={14} decorative />
-                  <MarqueeText text={component.name} />
-                </span>
-                <span>{componentLabel(component)}</span>
-                <span>{componentLength(component)}</span>
-                <span>{componentItemCount(component)}</span>
-              </button>
-            ))}
+              <div className={styles.emptyRow}>
+                <AssetStateMessage
+                  icon="ph:grid-four"
+                  title="No Patterns"
+                  body="Save MIDI or beat clips to build the project pattern library."
+                />
+              </div>
+            ) : sorted.map((component) => {
+              const issue = patternReferenceIssue(component, instruments);
+              return (
+                <button
+                  key={component.id}
+                  type="button"
+                  className={`${styles.row} ${active?.id === component.id ? styles.rowActive : ""}`}
+                  onClick={() => setActiveId(component.id)}
+                  onDoubleClick={() => openEditor({ kind: "component", componentId: component.id })}
+                >
+                  <span className={styles.nameCell}>
+                    <Icon name={componentIcon(component)} size={14} decorative />
+                    <MarqueeText text={component.name} />
+                  </span>
+                  <span className={`${styles.referenceChip} ${issue ? styles.referenceWarning : styles.referenceManaged}`}>
+                    {issue ? "Missing" : "Ready"}
+                  </span>
+                  <span>{componentLabel(component)}</span>
+                  <span>{componentLength(component)}</span>
+                  <span>{componentItemCount(component)}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
         </>
@@ -146,9 +160,23 @@ export function PatternsPage() {
       preview={
         <>
         {!active ? (
-          <div className={styles.emptyPreview}>Select a pattern.</div>
+          <div className={styles.emptyPreview}>
+            <AssetStateMessage
+              icon="ph:grid-four"
+              title="Select a Pattern"
+              body="Choose a pattern to preview, inspect, or edit."
+            />
+          </div>
         ) : (
           <div className={styles.previewBody}>
+            {activeReferenceIssue ? (
+              <AssetStateMessage
+                icon="ph:warning"
+                title="Missing Instrument Reference"
+                body={activeReferenceIssue}
+                tone="warning"
+              />
+            ) : null}
             <PatternSegmentPreview component={active} instruments={instruments} progress={previewProgress} />
             <div className={styles.previewTitle}>
               <span className={styles.previewName}>
@@ -183,7 +211,10 @@ export function PatternsPage() {
               </HoverInfo>
             </div>
             <ActionFooter className={styles.previewActions}>
-              <Button className={styles.previewActionButton} variant="primary" onClick={editActive}>Edit Pattern</Button>
+              <Button className={styles.previewActionButton} variant="primary" onClick={editActive}>
+                <Icon name="ph:pencil-simple" size={14} decorative />
+                Edit Pattern
+              </Button>
             </ActionFooter>
             <dl className={styles.details}>
               <div>
@@ -201,6 +232,10 @@ export function PatternsPage() {
               <div>
                 <dt>Source</dt>
                 <dd>{active.factory ? "Factory" : "User"}</dd>
+              </div>
+              <div>
+                <dt>References</dt>
+                <dd>{activeReferenceIssue ?? "All instruments available"}</dd>
               </div>
               <div>
                 <dt>Created</dt>
@@ -386,6 +421,20 @@ function componentItemCount(component: BeatComponent): string {
 function patternDurationSeconds(component: BeatComponent, bpm: number): number {
   const secondsPerBeat = 60 / Math.max(1, bpm);
   return Math.max(0.1, (component.kind === "drum" ? component.lengthBeats / component.speed : component.lengthBeats) * secondsPerBeat);
+}
+
+function patternReferenceIssue(component: BeatComponent, instruments: Instrument[]): string | null {
+  const known = new Set(instruments.map((instrument) => instrument.id));
+  if (component.kind === "drum") {
+    const missingRows = component.rows.filter((row) => row.instrumentId && !known.has(row.instrumentId));
+    if (missingRows.length === 0) return null;
+    const names = missingRows.map((row) => row.name).slice(0, 2).join(", ");
+    return `${missingRows.length} drum row${missingRows.length === 1 ? "" : "s"} reference missing instrument${missingRows.length === 1 ? "" : "s"}${names ? `: ${names}` : ""}.`;
+  }
+  if (component.instrumentId && !known.has(component.instrumentId)) {
+    return "This MIDI pattern references an instrument that is no longer in the library.";
+  }
+  return null;
 }
 
 function formatDate(ms: number): string {

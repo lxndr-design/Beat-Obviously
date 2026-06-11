@@ -325,6 +325,21 @@ try {
   assert.ok(abuttedLeft && abuttedRight, "adjacent crossfade targets should exist");
   assert.equal(abuttedLeft.fadeOutBeats, 0.75, "adjacent crossfade should honor requested outgoing duration");
   assert.equal(abuttedRight.fadeInBeats, 0.75, "adjacent crossfade should honor requested incoming duration");
+  assert.equal(abuttedLeft.startBeat, 38, "adjacent crossfade should not move the outgoing segment");
+  assert.equal(abuttedRight.startBeat, 40, "adjacent crossfade should not move the incoming segment");
+  assert.equal(abuttedLeft.lengthBeats, 2, "adjacent crossfade should not resize the outgoing segment");
+  assert.equal(abuttedRight.lengthBeats, 2, "adjacent crossfade should not resize the incoming segment");
+  store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "fade",
+    segmentId: adjacentLeft,
+    fadeInBeats: -1,
+    fadeOutBeats: 0,
+  });
+  project = store.useProjectStore.getState().project;
+  const clearedAdjacentLeft = project.tracks[0].segments.find((segment) => segment.id === adjacentLeft);
+  assert.ok(clearedAdjacentLeft, "fade clear target should exist");
+  assert.equal(clearedAdjacentLeft.fadeInBeats, 0, "fade command should clamp negative fade-in to zero");
+  assert.equal(clearedAdjacentLeft.fadeOutBeats, 0, "fade command should clear fade-out to zero");
 
   const effectTrack = store.useProjectStore.getState().project.tracks[0].id;
   const effectId = store.useProjectStore.getState().addTrackEffect(effectTrack);

@@ -69,6 +69,7 @@ export function Segment({
   const [nameDraft, setNameDraft] = useState("");
   const [dragging, setDragging] = useState(false);
   const [dragPreview, setDragPreview] = useState<{ startBeat: number; lengthBeats: number } | null>(null);
+  const [fadePreview, setFadePreview] = useState<{ fadeInBeats: number; fadeOutBeats: number } | null>(null);
 
   const drag = useRef<
     | {
@@ -101,6 +102,14 @@ export function Segment({
         shift: boolean;
         pendingResize: { startBeat: number; lengthBeats: number } | null;
       }
+    | {
+        mode: "fade-in" | "fade-out";
+        startX: number;
+        startLen: number;
+        startFadeInBeats: number;
+        startFadeOutBeats: number;
+        pendingFade: { fadeInBeats: number; fadeOutBeats: number } | null;
+      }
     | null
   >(null);
   const previewRaf = useRef<number | null>(null);
@@ -127,9 +136,16 @@ export function Segment({
     const step = snapStepBeats(shift);
     return Math.max(GRID_TICK_BEATS, Math.round(len / step) * step);
   }
+  function snapFadeLen(len: number, maxLen: number, shift: boolean): number {
+    const step = snapStepBeats(shift);
+    return Math.max(0, Math.min(maxLen, Math.round(len / step) * step));
+  }
+  function clampFadeLen(len: number, maxLen: number): number {
+    return Math.max(0, Math.min(maxLen, len));
+  }
 
   function startDrag(
-    mode: "move" | "resize-right" | "resize-left",
+    mode: "move" | "resize-right" | "resize-left" | "fade-in" | "fade-out",
     e: React.PointerEvent,
   ) {
     if (e.button !== 0 || e.ctrlKey) return;
@@ -181,7 +197,7 @@ export function Segment({
         shift: e.shiftKey,
         pendingResize: null,
       };
-    } else {
+    } else if (mode === "resize-left") {
       setSelectedSegments([segmentId]);
       setSelectedTracks([]);
       drag.current = {
@@ -193,6 +209,17 @@ export function Segment({
         payload: liveSeg ? structuredClone(liveSeg.payload) : null,
         shift: e.shiftKey,
         pendingResize: null,
+      };
+    } else {
+      setSelectedSegments([segmentId]);
+      setSelectedTracks([]);
+      drag.current = {
+        mode,
+        startX: e.clientX,
+        startLen: lengthBeats,
+        startFadeInBeats: liveSeg?.fadeInBeats ?? 0,
+        startFadeOutBeats: liveSeg?.fadeOutBeats ?? 0,
+        pendingFade: null,
       };
     }
     setDragging(true);
@@ -246,6 +273,20 @@ export function Segment({
       if (clampedStart === startBeat && newLen === lengthBeats) return;
       d.pendingResize = { startBeat: clampedStart, lengthBeats: newLen };
       scheduleDragPreview(d.pendingResize);
+    } else if (d.mode === "fade-in") {
+      const next = {
+        fadeInBeats: snapFadeLen(d.startFadeInBeats + dxBeats, d.startLen, e.shiftKey),
+        fadeOutBeats: d.startFadeOutBeats,
+      };
+      d.pendingFade = next;
+      setFadePreview(next);
+    } else if (d.mode === "fade-out") {
+      const next = {
+        fadeInBeats: d.startFadeInBeats,
+        fadeOutBeats: snapFadeLen(d.startFadeOutBeats - dxBeats, d.startLen, e.shiftKey),
+      };
+      d.pendingFade = next;
+      setFadePreview(next);
     }
   }
 
@@ -267,10 +308,47 @@ export function Segment({
         originPayload: d.payload ?? undefined,
       });
       setLastLen(d.pendingResize.lengthBeats);
+    } else if (d?.mode === "fade-in" && d.pendingFade) {
+      applySegmentEditCommand({ kind: "fade", segmentId, fadeInBeats: d.pendingFade.fadeInBeats });
+    } else if (d?.mode === "fade-out" && d.pendingFade) {
+      applySegmentEditCommand({ kind: "fade", segmentId, fadeOutBeats: d.pendingFade.fadeOutBeats });
     }
     drag.current = null;
     scheduleDragPreview(null);
+    setFadePreview(null);
     setDragging(false);
+  }
+
+  function onFadeHandleKeyDown(mode: "fade-in" | "fade-out", e: React.KeyboardEvent<HTMLButtonElement>) {
+    if (!liveSeg) return;
+    const step = snapStepBeats(e.shiftKey);
+    const fadeIn = liveSeg.fadeInBeats ?? 0;
+    const fadeOut = liveSeg.fadeOutBeats ?? 0;
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      e.stopPropagation();
+      setSelectedSegments([segmentId]);
+      setSelectedTracks([]);
+    } else {
+      return;
+    }
+
+    if (mode === "fade-in") {
+      const next = e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? lengthBeats
+          : fadeIn + (e.key === "ArrowRight" ? step : -step);
+      applySegmentEditCommand({ kind: "fade", segmentId, fadeInBeats: clampFadeLen(next, lengthBeats) });
+      return;
+    }
+
+    const next = e.key === "Home"
+      ? 0
+      : e.key === "End"
+        ? lengthBeats
+        : fadeOut + (e.key === "ArrowLeft" ? step : -step);
+    applySegmentEditCommand({ kind: "fade", segmentId, fadeOutBeats: clampFadeLen(next, lengthBeats) });
   }
 
   // Right-click menu.
@@ -450,6 +528,12 @@ export function Segment({
   const width = Math.max(beatsToPx / 2, visualLengthBeats * beatsToPx);
   const visualLayer = layer > 0 ? 1 : 0;
   const top = visualLayer * SEGMENT_LAYER_OFFSET_PX;
+  const fadeInBeats = Math.max(0, Math.min(visualLengthBeats, fadePreview?.fadeInBeats ?? liveSeg?.fadeInBeats ?? 0));
+  const fadeOutBeats = Math.max(0, Math.min(visualLengthBeats, fadePreview?.fadeOutBeats ?? liveSeg?.fadeOutBeats ?? 0));
+  const fadeInPx = Math.min(width, fadeInBeats * beatsToPx);
+  const fadeOutPx = Math.min(width, fadeOutBeats * beatsToPx);
+  const fadeInHandleX = Math.min(Math.max(8, fadeInPx), Math.max(8, width - 8));
+  const fadeOutHandleInset = Math.min(Math.max(8, fadeOutPx), Math.max(8, width - 8));
 
   const label = liveSeg?.name?.trim() || defaultName(payloadKind);
   const kindIcon =
@@ -553,6 +637,44 @@ export function Segment({
           )}
           {payloadKind === "audio" && liveSeg && (
             <SegmentWaveform segment={liveSeg as SegmentType} />
+          )}
+          {repetition === 0 && liveSeg && (
+            <div className={styles.fadeLayer}>
+              {fadeInPx > 0 && (
+                <div
+                  className={`${styles.fadeRegion} ${styles.fadeInRegion}`}
+                  style={{ width: fadeInPx }}
+                />
+              )}
+              {fadeOutPx > 0 && (
+                <div
+                  className={`${styles.fadeRegion} ${styles.fadeOutRegion}`}
+                  style={{ width: fadeOutPx }}
+                />
+              )}
+              <button
+                type="button"
+                className={`${styles.fadeHandle} ${styles.fadeHandleIn}`}
+                style={{ left: fadeInHandleX }}
+                data-segment-fade-handle="in"
+                aria-label="Adjust fade in"
+                onPointerDown={(e) => startDrag("fade-in", e)}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onKeyDown={(e) => onFadeHandleKeyDown("fade-in", e)}
+              />
+              <button
+                type="button"
+                className={`${styles.fadeHandle} ${styles.fadeHandleOut}`}
+                style={{ right: fadeOutHandleInset }}
+                data-segment-fade-handle="out"
+                aria-label="Adjust fade out"
+                onPointerDown={(e) => startDrag("fade-out", e)}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onKeyDown={(e) => onFadeHandleKeyDown("fade-out", e)}
+              />
+            </div>
           )}
         </div>
       </div>

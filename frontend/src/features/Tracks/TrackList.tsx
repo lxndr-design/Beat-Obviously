@@ -96,7 +96,7 @@ export function TrackList() {
   function onLanePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.button !== 0 || e.ctrlKey) return;
     const target = e.target as Element;
-    if (target.closest("[data-timeline-ruler], [data-segment-body], [data-segment-handle], input, button, [data-floating-layer]")) return;
+    if (target.closest("[data-timeline-ruler], [data-segment-body], [data-segment-handle], [data-segment-fade-handle], input, button, [data-floating-layer]")) return;
     const inner = laneScrollRef.current?.querySelector<HTMLElement>(`.${styles.lanesInner}`);
     if (!inner?.contains(target)) return;
     const next = {
