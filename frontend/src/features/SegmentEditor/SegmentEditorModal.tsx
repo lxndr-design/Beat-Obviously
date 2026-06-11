@@ -81,7 +81,7 @@ export function SegmentEditorModal({ segmentId }: Props) {
         finalBeat: drumPayloadFromSegment(draft!),
       }).then(() => maybeRunDueTraining("drums"));
     }
-    updateSegment(segmentId, draft!);
+    updateSegment(segmentId, prepareSegmentForSave(draft!));
     close();
   }
   function close() {
@@ -99,9 +99,18 @@ export function SegmentEditorModal({ segmentId }: Props) {
 
   function updateMidi(notes: MidiNote[]) {
     if (draft!.payload.kind === "midi") {
-      setDraft({ ...draft!, payload: { kind: "midi", notes } });
+      setDraft({ ...draft!, payload: { ...draft!.payload, notes } });
     } else if (draft!.payload.kind === "mixed") {
       setDraft({ ...draft!, payload: { ...draft!.payload, notes } });
+    }
+  }
+
+  function updateMidiVolume(percent: number) {
+    const gainDb = volumePercentToGainDb(percent);
+    if (draft!.payload.kind === "midi") {
+      setDraft({ ...draft!, payload: { ...draft!.payload, gainDb } });
+    } else if (draft!.payload.kind === "mixed") {
+      setDraft({ ...draft!, payload: { ...draft!.payload, gainDb } });
     }
   }
 
@@ -218,7 +227,7 @@ export function SegmentEditorModal({ segmentId }: Props) {
     const gain = ctx.createGain();
     const instrument = instruments.find((i) => i.id === draft?.instrumentId);
     const now = ctx.currentTime;
-    const peak = (velocity / 127) * 0.25;
+    const peak = (applyGainToVelocity(velocity, midiSegmentGainDb(draft!.payload)) / 127) * 0.25;
     gain.gain.setValueAtTime(0, now);
     gain.gain.linearRampToValueAtTime(peak, now + 0.005);
     gain.gain.linearRampToValueAtTime(0, now + 0.2);
@@ -234,6 +243,8 @@ export function SegmentEditorModal({ segmentId }: Props) {
   const isMidi = draft.payload.kind === "midi" || draft.payload.kind === "mixed";
   const drumPayload = draft.payload.kind === "drum" ? draft.payload : null;
   const transpose = draft.transpose ?? 0;
+  const midiGainDb = midiSegmentGainDb(draft.payload);
+  const midiVolumePercent = gainDbToVolumePercent(midiGainDb);
   const midiTimeSignature = draft.timeSignature ?? timeSignature;
   const previewMidiNotes = midiNotes.map((note) => ({
     ...note,
@@ -241,6 +252,7 @@ export function SegmentEditorModal({ segmentId }: Props) {
     curve: note.curve?.map((point) => ({ ...point, pitch: Math.max(0, Math.min(127, point.pitch + transpose)) })),
   }));
   const displayName = draft.name?.trim() || `Segment ${segmentId.slice(0, 6)}`;
+  const ribbonName = dirty ? `${displayName} *` : displayName;
   const globalPlayheadBeat =
     playing &&
     positionBeat >= draft.startBeat &&
@@ -253,7 +265,7 @@ export function SegmentEditorModal({ segmentId }: Props) {
     <Modal
       open
       scopeId={id}
-      title={<><Icon name={segmentIcon(draft.payload.kind)} size={14} decorative />{displayName}</>}
+      title={<><Icon name={segmentIcon(draft.payload.kind)} size={14} decorative />{ribbonName}</>}
       width="lg"
       dirty={dirty}
       onClose={onClose}
@@ -272,9 +284,9 @@ export function SegmentEditorModal({ segmentId }: Props) {
               layout="inline"
               label="Length"
               value={draft.lengthBeats}
-              min={0.25}
-              step={0.25}
-              onChange={(v) => setDraft({ ...draft, lengthBeats: Math.max(0.25, v) })}
+              min={1}
+              step={1}
+              onChange={(v) => setDraft({ ...draft, lengthBeats: Math.max(1, Math.round(v)) })}
             />
             <FloatingSelect
               layout="inline"
@@ -303,6 +315,18 @@ export function SegmentEditorModal({ segmentId }: Props) {
               step={1}
               onChange={(v) => setDraft({ ...draft, transpose: Math.round(v) })}
             />
+            <NumberInput
+              layout="inline"
+              label="Vol"
+              value={midiVolumePercent}
+              min={0}
+              max={100}
+              step={1}
+              unit="%"
+              maxLength={3}
+              commitOnChange
+              onChange={(v) => updateMidiVolume(Math.round(v))}
+            />
             <FloatingSelect
               layout="inline"
               label="Time"
@@ -316,6 +340,7 @@ export function SegmentEditorModal({ segmentId }: Props) {
             <div className={styles.transportSlot}>
               <MidiTransport
                 notes={previewMidiNotes}
+                gainDb={midiGainDb}
                 lengthBeats={draft.lengthBeats}
                 bpm={useProjectStore.getState().project.bpm}
                 instrument={instruments.find((i) => i.id === draft.instrumentId)}
@@ -329,6 +354,8 @@ export function SegmentEditorModal({ segmentId }: Props) {
             notes={midiNotes}
             lengthBeats={draft.lengthBeats}
             playheadBeat={playheadBeat}
+            hotkeyScopeId={id}
+            onLengthChange={(lengthBeats) => setDraft({ ...draft, lengthBeats: Math.max(1, Math.round(lengthBeats)) })}
             onChange={updateMidi}
             onPreviewNote={previewNote}
           />
@@ -435,3 +462,67 @@ function parseTimeSignature(value: string): TimeSignature {
 }
 
 const TIME_SIGNATURE_OPTIONS = ["4/4", "3/4", "6/8", "5/4", "7/8", "12/8"] as const;
+
+function prepareSegmentForSave(segment: Segment): Segment {
+  if (segment.payload.kind !== "midi" && segment.payload.kind !== "mixed") return segment;
+  const lengthBeats = Math.max(1, Math.round(segment.lengthBeats));
+  const payload = {
+    ...segment.payload,
+    notes: clipMidiNotesToLength(segment.payload.notes, lengthBeats),
+  };
+  return { ...segment, lengthBeats, payload };
+}
+
+function clipMidiNotesToLength(notes: MidiNote[], lengthBeats: number): MidiNote[] {
+  return notes.flatMap((note) => {
+    const startBeat = Math.max(0, note.startBeat);
+    const endBeat = Math.min(lengthBeats, note.startBeat + note.lengthBeats);
+    if (startBeat >= lengthBeats || endBeat - startBeat <= 0.000001) return [];
+    const clipped: MidiNote = {
+      ...note,
+      startBeat,
+      lengthBeats: Math.max(0.03125, endBeat - startBeat),
+      curve: clipNoteCurve(note, startBeat, endBeat),
+      automation: note.automation?.map((lane) => ({
+        ...lane,
+        points: lane.points
+          .filter((point) => point.beat >= startBeat && point.beat <= endBeat)
+          .map((point) => ({ ...point })),
+      })),
+    };
+    return [clipped];
+  });
+}
+
+function clipNoteCurve(note: MidiNote, startBeat: number, endBeat: number): MidiNote["curve"] {
+  if (!note.curve || note.curve.length < 2) return note.curve;
+  const points = note.curve
+    .filter((point) => point.beat >= startBeat && point.beat <= endBeat)
+    .map((point) => ({ ...point }));
+  if (points.length >= 2) return points;
+  return [
+    { beat: startBeat, pitch: note.pitch },
+    { beat: endBeat, pitch: note.pitch },
+  ];
+}
+
+function midiSegmentGainDb(payload: Segment["payload"]): number {
+  if (payload.kind === "midi" || payload.kind === "mixed") return payload.gainDb ?? 0;
+  return 0;
+}
+
+function gainDbToVolumePercent(gainDb: number): number {
+  const gain = Math.pow(10, Math.max(-96, Math.min(24, gainDb)) / 20);
+  return Math.max(0, Math.min(100, Math.round(gain * 100)));
+}
+
+function volumePercentToGainDb(percent: number): number {
+  const gain = Math.max(0, Math.min(100, percent)) / 100;
+  if (gain <= 0) return -96;
+  return Math.max(-96, Math.min(0, 20 * Math.log10(gain)));
+}
+
+function applyGainToVelocity(velocity: number, gainDb: number): number {
+  const gain = Math.pow(10, Math.max(-96, Math.min(24, gainDb)) / 20);
+  return Math.max(0, Math.min(127, velocity * gain));
+}

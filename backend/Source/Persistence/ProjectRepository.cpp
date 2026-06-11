@@ -1,11 +1,296 @@
 #include "ProjectRepository.h"
+#include "../Audio/Effects/TrackEffectDefaults.h"
+
+#include <cmath>
 
 namespace beat
 {
     namespace
     {
+        TrackKind trackKindFromVar(const juce::var& value)
+        {
+            if (value.isString())
+            {
+                const auto kind = value.toString();
+                if (kind == "midi") return TrackKind::Midi;
+                if (kind == "mixed") return TrackKind::Mixed;
+                if (kind == "group") return TrackKind::Group;
+                return TrackKind::Audio;
+            }
+            return (TrackKind) (int) value;
+        }
+
         // Minimal JSON encoder for Project. juce::JSON handles var → string;
         // we build a juce::var tree and let it serialize.
+        juce::var pluginCapabilityToVar(const PluginCapability& capability)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("id", capability.id);
+            o->setProperty("kind", capability.kind);
+            o->setProperty("label", capability.label);
+            o->setProperty("realtime", capability.realtime);
+            o->setProperty("offline", capability.offline);
+            o->setProperty("latencySamples", capability.latencySamples);
+            o->setProperty("fallbackMode", capability.fallbackMode);
+            return juce::var(o.get());
+        }
+
+        juce::var pluginToVar(const PluginAdapterDefinition& plugin)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("id", plugin.id);
+            o->setProperty("name", plugin.name);
+            o->setProperty("vendor", plugin.vendor);
+            o->setProperty("version", plugin.version);
+            o->setProperty("kind", plugin.kind);
+            o->setProperty("format", plugin.format);
+            o->setProperty("status", plugin.status);
+            o->setProperty("instrumentMode", plugin.instrumentMode);
+            o->setProperty("description", plugin.description);
+            o->setProperty("sourceFileName", plugin.sourceFileName);
+            o->setProperty("sourcePath", plugin.sourcePath);
+            o->setProperty("uiImagePath", plugin.uiImagePath);
+            o->setProperty("uiImageDataUrl", plugin.uiImageDataUrl);
+            o->setProperty("associatedInstrumentId", plugin.associatedInstrumentId);
+            o->setProperty("uiWidth", plugin.uiWidth);
+            o->setProperty("uiHeight", plugin.uiHeight);
+            o->setProperty("sampleCount", plugin.sampleCount);
+            o->setProperty("uiControlCount", plugin.uiControlCount);
+            o->setProperty("factory", plugin.factory);
+            o->setProperty("installedAt", plugin.installedAt);
+
+            juce::Array<juce::var> capabilityArr;
+            for (const auto& capability : plugin.capabilities)
+                capabilityArr.add(pluginCapabilityToVar(capability));
+            o->setProperty("capabilities", capabilityArr);
+            return juce::var(o.get());
+        }
+
+        juce::var recordingInputToVar(const RecordingInputProfile& profile)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("inputDeviceId", profile.inputDeviceId);
+            o->setProperty("inputDeviceName", profile.inputDeviceName);
+            o->setProperty("inputChannelStart", profile.inputChannelStart);
+            o->setProperty("inputChannelCount", profile.inputChannelCount);
+            o->setProperty("calibrationSampleRate", profile.calibrationSampleRate);
+            o->setProperty("measuredRoundTripSamples", profile.measuredRoundTripSamples);
+            o->setProperty("reportedInputLatencySamples", profile.reportedInputLatencySamples);
+            o->setProperty("reportedOutputLatencySamples", profile.reportedOutputLatencySamples);
+            o->setProperty("userLatencyAdjustmentSamples", profile.userLatencyAdjustmentSamples);
+            return juce::var(o.get());
+        }
+
+        RecordingInputProfile recordingInputFromVar(const juce::var& inputVar)
+        {
+            RecordingInputProfile profile;
+            if (!inputVar.isObject())
+                return profile;
+
+            profile.inputDeviceId = inputVar.getProperty("inputDeviceId", "").toString();
+            profile.inputDeviceName = inputVar.getProperty("inputDeviceName", "").toString();
+            profile.inputChannelStart = juce::jlimit(0, 1024, (int) inputVar.getProperty("inputChannelStart", 0));
+            profile.inputChannelCount = juce::jlimit(1, 1024, (int) inputVar.getProperty("inputChannelCount", 2));
+            profile.calibrationSampleRate = juce::jlimit(0.0, 768000.0, (double) inputVar.getProperty("calibrationSampleRate", 0.0));
+            profile.measuredRoundTripSamples = juce::jlimit(0, 1920000, (int) inputVar.getProperty("measuredRoundTripSamples", 0));
+            profile.reportedInputLatencySamples = juce::jlimit(0, 1920000, (int) inputVar.getProperty("reportedInputLatencySamples", 0));
+            profile.reportedOutputLatencySamples = juce::jlimit(0, 1920000, (int) inputVar.getProperty("reportedOutputLatencySamples", 0));
+            profile.userLatencyAdjustmentSamples = juce::jlimit(-1920000, 1920000, (int) inputVar.getProperty("userLatencyAdjustmentSamples", 0));
+            return profile;
+        }
+
+        juce::var masterChainToVar(const MasterChainSettings& settings)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("inputGainDb", settings.inputGainDb);
+            o->setProperty("compressorEnabled", settings.compressorEnabled);
+            o->setProperty("compressorThresholdDb", settings.compressorThresholdDb);
+            o->setProperty("compressorRatio", settings.compressorRatio);
+            o->setProperty("compressorAttackMs", settings.compressorAttackMs);
+            o->setProperty("compressorReleaseMs", settings.compressorReleaseMs);
+            o->setProperty("compressorMakeupDb", settings.compressorMakeupDb);
+            o->setProperty("compressorMix", settings.compressorMix);
+            o->setProperty("outputGainDb", settings.outputGainDb);
+            return juce::var(o.get());
+        }
+
+        MasterChainSettings masterChainFromVar(const juce::var& masterVar)
+        {
+            MasterChainSettings settings;
+            if (!masterVar.isObject())
+                return settings;
+
+            settings.inputGainDb = juce::jlimit(-48.0f, 24.0f, (float) (double) masterVar.getProperty("inputGainDb", 0.0));
+            settings.compressorEnabled = (bool) masterVar.getProperty("compressorEnabled", false);
+            settings.compressorThresholdDb = juce::jlimit(-60.0f, 0.0f, (float) (double) masterVar.getProperty("compressorThresholdDb", -18.0));
+            settings.compressorRatio = juce::jlimit(1.0f, 40.0f, (float) (double) masterVar.getProperty("compressorRatio", 2.0));
+            settings.compressorAttackMs = juce::jlimit(0.1f, 200.0f, (float) (double) masterVar.getProperty("compressorAttackMs", 20.0));
+            settings.compressorReleaseMs = juce::jlimit(1.0f, 3000.0f, (float) (double) masterVar.getProperty("compressorReleaseMs", 160.0));
+            settings.compressorMakeupDb = juce::jlimit(-24.0f, 24.0f, (float) (double) masterVar.getProperty("compressorMakeupDb", 0.0));
+            settings.compressorMix = juce::jlimit(0.0f, 100.0f, (float) (double) masterVar.getProperty("compressorMix", 100.0));
+            settings.outputGainDb = juce::jlimit(-48.0f, 24.0f, (float) (double) masterVar.getProperty("outputGainDb", 0.0));
+            return settings;
+        }
+
+        juce::var trackSendToVar(const TrackSend& send)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("busId", send.busId);
+            o->setProperty("gainDb", send.gainDb);
+            o->setProperty("pan", send.pan);
+            o->setProperty("enabled", send.enabled);
+            return juce::var(o.get());
+        }
+
+        juce::var trackEffectToVar(const TrackEffect& effect)
+        {
+            juce::DynamicObject::Ptr eo = new juce::DynamicObject();
+            eo->setProperty("id",       effect.id);
+            eo->setProperty("kind",     (int) effect.kind);
+            eo->setProperty("schemaVersion", effect.schemaVersion);
+            eo->setProperty("bypassed", effect.bypassed);
+            eo->setProperty("pluginId", effect.pluginId);
+            eo->setProperty("pluginName", effect.pluginName);
+            eo->setProperty("pluginFormat", effect.pluginFormat);
+            eo->setProperty("latencySamples", effect.latencySamples);
+
+            juce::DynamicObject::Ptr params = new juce::DynamicObject();
+            for (const auto& param : effect.params)
+                params->setProperty(param.key, param.value);
+            eo->setProperty("params", juce::var(params.get()));
+
+            juce::Array<juce::var> automationArr;
+            for (const auto& lane : effect.automation)
+            {
+                juce::DynamicObject::Ptr laneObject = new juce::DynamicObject();
+                laneObject->setProperty("param", lane.target);
+                juce::Array<juce::var> pointsArr;
+                for (const auto& point : lane.points)
+                {
+                    juce::DynamicObject::Ptr pointObject = new juce::DynamicObject();
+                    pointObject->setProperty("beat", point.beat);
+                    pointObject->setProperty("value", point.value);
+                    pointObject->setProperty("curve", (int) point.curve);
+                    pointsArr.add(juce::var(pointObject.get()));
+                }
+                laneObject->setProperty("points", pointsArr);
+                automationArr.add(juce::var(laneObject.get()));
+            }
+            eo->setProperty("automation", automationArr);
+            return juce::var(eo.get());
+        }
+
+        juce::var returnBusToVar(const ReturnBus& bus)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("id", bus.id);
+            o->setProperty("name", bus.name);
+            o->setProperty("gainDb", bus.gainDb);
+            o->setProperty("pan", bus.pan);
+            o->setProperty("mute", bus.mute);
+
+            juce::Array<juce::var> effectArr;
+            for (const auto& effect : bus.effects)
+                effectArr.add(trackEffectToVar(effect));
+            juce::DynamicObject::Ptr effects = new juce::DynamicObject();
+            effects->setProperty("filters", effectArr);
+            o->setProperty("effects", juce::var(effects.get()));
+            return juce::var(o.get());
+        }
+
+        TrackSend trackSendFromVar(const juce::var& sendVar)
+        {
+            TrackSend send;
+            if (!sendVar.isObject())
+                return send;
+
+            send.busId = sendVar.getProperty("busId", sendVar.getProperty("returnBusId", "")).toString();
+            send.gainDb = juce::jlimit(-96.0f, 24.0f, (float) (double) sendVar.getProperty("gainDb", -96.0));
+            send.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) sendVar.getProperty("pan", 0.0));
+            send.enabled = (bool) sendVar.getProperty("enabled", true);
+            return send;
+        }
+
+        TrackEffect trackEffectFromVar(const juce::var& ev)
+        {
+            TrackEffect effect;
+            if (!ev.isObject())
+                return effect;
+
+            effect.id = ev.getProperty("id", "").toString();
+            effect.kind = (TrackEffectKind) (int) ev.getProperty("kind", (int) TrackEffectKind::Unknown);
+            effect.schemaVersion = juce::jlimit(0, kCurrentTrackEffectSchemaVersion, (int) ev.getProperty("schemaVersion", 0));
+            effect.bypassed = (bool) ev.getProperty("bypassed", false);
+            effect.pluginId = ev.getProperty("pluginId", "").toString();
+            effect.pluginName = ev.getProperty("pluginName", ev.getProperty("name", "")).toString();
+            effect.pluginFormat = ev.getProperty("pluginFormat", ev.getProperty("format", "")).toString();
+            effect.latencySamples = juce::jlimit(0, 192000, (int) ev.getProperty("latencySamples", 0));
+
+            if (auto* params = ev.getProperty("params", {}).getDynamicObject())
+            {
+                for (const auto& property : params->getProperties())
+                {
+                    if (!property.value.isDouble() && !property.value.isInt() && !property.value.isBool())
+                        continue;
+                    effect.params.push_back({ property.name.toString(), (float) (double) property.value });
+                }
+            }
+
+            if (auto* lanes = ev.getProperty("automation", {}).getArray())
+            {
+                for (const auto& lv : *lanes)
+                {
+                    if (!lv.isObject()) continue;
+                    MidiAutomationLane lane;
+                    lane.target = lv.getProperty("param", lv.getProperty("target", "")).toString();
+                    if (auto* points = lv.getProperty("points", {}).getArray())
+                    {
+                        for (const auto& pv : *points)
+                        {
+                            if (!pv.isObject()) continue;
+                            MidiAutomationPoint point;
+                            point.beat = (double) pv.getProperty("beat", 0.0);
+                            point.value = (float) (double) pv.getProperty("value", 0.0);
+                            point.curve = (AutomationCurve) (int) pv.getProperty("curve", (int) AutomationCurve::Linear);
+                            if (std::isfinite(point.beat) && std::isfinite(point.value))
+                                lane.points.push_back(point);
+                        }
+                    }
+                    if (!lane.target.isEmpty() && !lane.points.empty())
+                        effect.automation.push_back(std::move(lane));
+                }
+            }
+
+            if (effect.kind != TrackEffectKind::Unknown)
+                normalizeTrackEffect(effect);
+
+            return effect;
+        }
+
+        ReturnBus returnBusFromVar(const juce::var& busVar)
+        {
+            ReturnBus bus;
+            if (!busVar.isObject())
+                return bus;
+
+            bus.id = busVar.getProperty("id", "").toString();
+            bus.name = busVar.getProperty("name", "").toString();
+            bus.gainDb = juce::jlimit(-96.0f, 24.0f, (float) (double) busVar.getProperty("gainDb", 0.0));
+            bus.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) busVar.getProperty("pan", 0.0));
+            bus.mute = (bool) busVar.getProperty("mute", false);
+
+            if (auto* filters = busVar.getProperty("effects", {}).getProperty("filters", {}).getArray())
+            {
+                for (const auto& ev : *filters)
+                {
+                    auto effect = trackEffectFromVar(ev);
+                    if (effect.kind != TrackEffectKind::Unknown)
+                        bus.effects.push_back(std::move(effect));
+                }
+            }
+            return bus;
+        }
+
         juce::var trackToVar(const Track& t)
         {
             juce::DynamicObject::Ptr o = new juce::DynamicObject();
@@ -14,10 +299,29 @@ namespace beat
             o->setProperty("kind",      (int) t.kind);
             o->setProperty("instrumentId", t.instrumentId);
             o->setProperty("audioFileId",  t.audioFileId);
+            o->setProperty("parentTrackId", t.parentTrackId);
             o->setProperty("gainDb",    t.gainDb);
             o->setProperty("pan",       t.pan);
             o->setProperty("mute",      t.mute);
             o->setProperty("solo",      t.solo);
+            o->setProperty("recordArmed", t.recordArmed);
+            o->setProperty("inputMonitoring", t.inputMonitoring);
+            o->setProperty("inputDeviceId", t.inputDeviceId);
+            o->setProperty("inputChannelStart", t.inputChannelStart);
+            o->setProperty("inputChannelCount", t.inputChannelCount);
+            o->setProperty("recordGainDb", t.recordGainDb);
+
+            juce::Array<juce::var> sendArr;
+            for (const auto& send : t.sends)
+                sendArr.add(trackSendToVar(send));
+            o->setProperty("sends", sendArr);
+
+            juce::Array<juce::var> effectArr;
+            for (const auto& effect : t.effects)
+                effectArr.add(trackEffectToVar(effect));
+            juce::DynamicObject::Ptr effects = new juce::DynamicObject();
+            effects->setProperty("filters", effectArr);
+            o->setProperty("effects", juce::var(effects.get()));
 
             juce::Array<juce::var> segArr;
             for (const auto& s : t.segments)
@@ -26,6 +330,9 @@ namespace beat
                 so->setProperty("id",          s.id);
                 so->setProperty("startBeat",   s.startBeat);
                 so->setProperty("lengthBeats", s.lengthBeats);
+                so->setProperty("sourceStartBeat", s.sourceStartBeat);
+                so->setProperty("fadeInBeats", s.fadeInBeats);
+                so->setProperty("fadeOutBeats", s.fadeOutBeats);
                 so->setProperty("repeats",     s.repeats);
                 so->setProperty("layer",       s.layer);
                 so->setProperty("muted",       s.muted);
@@ -41,12 +348,136 @@ namespace beat
                     no->setProperty("velocity",   n.velocity);
                     no->setProperty("startBeat",  n.startBeat);
                     no->setProperty("lengthBeats",n.lengthBeats);
+                    if (!n.curve.empty())
+                    {
+                        juce::Array<juce::var> curveArr;
+                        for (const auto& point : n.curve)
+                        {
+                            juce::DynamicObject::Ptr pointObject = new juce::DynamicObject();
+                            pointObject->setProperty("beat", point.beat);
+                            pointObject->setProperty("pitch", point.pitch);
+                            curveArr.add(juce::var(pointObject.get()));
+                        }
+                        no->setProperty("curve", curveArr);
+                    }
+                    if (!n.automation.empty())
+                    {
+                        juce::Array<juce::var> automationArr;
+                        for (const auto& lane : n.automation)
+                        {
+                            juce::DynamicObject::Ptr laneObject = new juce::DynamicObject();
+                            laneObject->setProperty("target", lane.target);
+                            juce::Array<juce::var> pointsArr;
+                            for (const auto& point : lane.points)
+                            {
+                                juce::DynamicObject::Ptr pointObject = new juce::DynamicObject();
+                                pointObject->setProperty("beat", point.beat);
+                                pointObject->setProperty("value", point.value);
+                                pointObject->setProperty("curve", (int) point.curve);
+                                pointsArr.add(juce::var(pointObject.get()));
+                            }
+                            laneObject->setProperty("points", pointsArr);
+                            automationArr.add(juce::var(laneObject.get()));
+                        }
+                        no->setProperty("automation", automationArr);
+                    }
                     notesArr.add(juce::var(no.get()));
                 }
                 so->setProperty("notes", notesArr);
                 segArr.add(juce::var(so.get()));
             }
             o->setProperty("segments", segArr);
+            return juce::var(o.get());
+        }
+
+        juce::var audioFileToVar(const AudioFileAsset& audioFile)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("id", audioFile.id);
+            o->setProperty("name", audioFile.name);
+            o->setProperty("path", audioFile.path);
+            o->setProperty("durationSeconds", audioFile.durationSeconds);
+            o->setProperty("sampleRate", audioFile.sampleRate);
+            return juce::var(o.get());
+        }
+
+        juce::var sampleZoneToVar(const InstrumentDefinition::SampleZone& zone)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("path", zone.path);
+            o->setProperty("rootNote", zone.rootNote);
+            o->setProperty("loNote", zone.loNote);
+            o->setProperty("hiNote", zone.hiNote);
+            o->setProperty("loVel", zone.loVel);
+            o->setProperty("hiVel", zone.hiVel);
+            o->setProperty("volumeDb", zone.volumeDb);
+            o->setProperty("pan", zone.pan);
+            o->setProperty("tuningCents", zone.tuningCents);
+            o->setProperty("seqPosition", zone.seqPosition);
+            o->setProperty("loopEnabled", zone.loopEnabled);
+            o->setProperty("loopStart", zone.loopStart);
+            o->setProperty("loopEnd", zone.loopEnd);
+            o->setProperty("oneShot", zone.oneShot);
+            o->setProperty("durationSeconds", zone.durationSeconds);
+            o->setProperty("loLengthSeconds", zone.loLengthSeconds);
+            o->setProperty("hiLengthSeconds", zone.hiLengthSeconds);
+            o->setProperty("chokeGroup", zone.chokeGroup);
+            o->setProperty("startSample", zone.startSample);
+            o->setProperty("endSample", zone.endSample);
+            return juce::var(o.get());
+        }
+
+        juce::var instrumentToVar(const InstrumentDefinition& instrument)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("id", instrument.id);
+            o->setProperty("kind", instrument.kind);
+            o->setProperty("waveform", instrument.waveform);
+            o->setProperty("cutoff01", instrument.cutoff01);
+            o->setProperty("resonance01", instrument.resonance01);
+            o->setProperty("drive01", instrument.drive01);
+            o->setProperty("color01", instrument.color01);
+            o->setProperty("filterType", instrument.filterType);
+            o->setProperty("attackMs", instrument.attackMs);
+            o->setProperty("decayMs", instrument.decayMs);
+            o->setProperty("sustain", instrument.sustain);
+            o->setProperty("releaseMs", instrument.releaseMs);
+            o->setProperty("ampLevel", instrument.ampLevel);
+            o->setProperty("ampPan", instrument.ampPan);
+            o->setProperty("wavetableBank", instrument.wavetableBank);
+            o->setProperty("wavetablePosition", instrument.wavetablePosition);
+            o->setProperty("wavetableWarp", instrument.wavetableWarp);
+            o->setProperty("wavetableUnison", instrument.wavetableUnison);
+            o->setProperty("wavetableDetuneCents", instrument.wavetableDetuneCents);
+            o->setProperty("wavetableBlend", instrument.wavetableBlend);
+            o->setProperty("lfoWaveform", instrument.lfoWaveform);
+            o->setProperty("lfoRateHz", instrument.lfoRateHz);
+            o->setProperty("lfoDepth", instrument.lfoDepth);
+            o->setProperty("lfoRetrigger", instrument.lfoRetrigger);
+            o->setProperty("lfoPositionBipolar", instrument.lfoPositionBipolar);
+            o->setProperty("lfoPitchBipolar", instrument.lfoPitchBipolar);
+            o->setProperty("lfoFilterBipolar", instrument.lfoFilterBipolar);
+            o->setProperty("lfoToPitch", instrument.lfoToPitch);
+            o->setProperty("lfoToFilter", instrument.lfoToFilter);
+            o->setProperty("envToFilter", instrument.envToFilter);
+            o->setProperty("hasAether", instrument.hasAether);
+
+            juce::Array<juce::var> effectArr;
+            for (const auto& effect : instrument.effects)
+                effectArr.add(trackEffectToVar(effect));
+            juce::DynamicObject::Ptr effects = new juce::DynamicObject();
+            effects->setProperty("filters", effectArr);
+            o->setProperty("effects", juce::var(effects.get()));
+
+            juce::Array<juce::var> sampleUrls;
+            for (const auto& sampleUrl : instrument.sampleUrls)
+                sampleUrls.add(sampleUrl);
+            o->setProperty("sampleUrls", sampleUrls);
+
+            juce::Array<juce::var> sampleZones;
+            for (const auto& zone : instrument.sampleZones)
+                sampleZones.add(sampleZoneToVar(zone));
+            o->setProperty("sampleZones", sampleZones);
             return juce::var(o.get());
         }
 
@@ -59,10 +490,32 @@ namespace beat
             o->setProperty("lengthBeats",p.lengthBeats);
             o->setProperty("tsNum",      p.timeSignatureNum);
             o->setProperty("tsDenom",    p.timeSignatureDenom);
+            o->setProperty("recordingInput", recordingInputToVar(p.recordingInput));
+            o->setProperty("masterChain", masterChainToVar(p.masterChain));
 
             juce::Array<juce::var> trackArr;
             for (const auto& t : p.tracks) trackArr.add(trackToVar(t));
             o->setProperty("tracks", trackArr);
+
+            juce::Array<juce::var> returnBusArr;
+            for (const auto& bus : p.returnBuses)
+                returnBusArr.add(returnBusToVar(bus));
+            o->setProperty("returnBuses", returnBusArr);
+
+            juce::Array<juce::var> audioFileArr;
+            for (const auto& audioFile : p.audioFiles)
+                audioFileArr.add(audioFileToVar(audioFile));
+            o->setProperty("audioFiles", audioFileArr);
+
+            juce::Array<juce::var> instrumentArr;
+            for (const auto& instrument : p.instruments)
+                instrumentArr.add(instrumentToVar(instrument));
+            o->setProperty("instruments", instrumentArr);
+
+            juce::Array<juce::var> pluginArr;
+            for (const auto& plugin : p.plugins)
+                pluginArr.add(pluginToVar(plugin));
+            o->setProperty("plugins", pluginArr);
 
             juce::Array<juce::var> eqArr;
             for (const auto& e : p.eqAutomation)
@@ -92,6 +545,184 @@ namespace beat
             p.lengthBeats        = (double) parsed.getProperty("lengthBeats", 64.0);
             p.timeSignatureNum   = (int)    parsed.getProperty("tsNum", 4);
             p.timeSignatureDenom = (int)    parsed.getProperty("tsDenom", 4);
+            p.recordingInput = recordingInputFromVar(parsed.getProperty("recordingInput", {}));
+            p.masterChain = masterChainFromVar(parsed.getProperty("masterChain", {}));
+
+            if (auto* audioFiles = parsed.getProperty("audioFiles", {}).getArray())
+            {
+                for (const auto& av : *audioFiles)
+                {
+                    if (!av.isObject()) continue;
+                    AudioFileAsset audioFile;
+                    audioFile.id = av.getProperty("id", "").toString();
+                    audioFile.name = av.getProperty("name", "").toString();
+                    audioFile.path = av.getProperty("path", "").toString();
+                    audioFile.durationSeconds = juce::jmax(0.0, (double) av.getProperty("durationSeconds", 0.0));
+                    audioFile.sampleRate = juce::jmax(0.0, (double) av.getProperty("sampleRate", 0.0));
+                    if (audioFile.id.isNotEmpty() && audioFile.path.isNotEmpty())
+                        p.audioFiles.push_back(std::move(audioFile));
+                }
+            }
+
+            if (auto* instruments = parsed.getProperty("instruments", {}).getArray())
+            {
+                for (const auto& iv : *instruments)
+                {
+                    if (!iv.isObject()) continue;
+                    InstrumentDefinition instrument;
+                    instrument.id = iv.getProperty("id", "").toString();
+                    instrument.kind = iv.getProperty("kind", "").toString();
+                    if (instrument.id.isEmpty())
+                        continue;
+
+                    instrument.waveform = juce::jlimit(0, 8, (int) iv.getProperty("waveform", instrument.waveform));
+                    instrument.cutoff01 = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("cutoff01", instrument.cutoff01));
+                    instrument.resonance01 = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("resonance01", instrument.resonance01));
+                    instrument.drive01 = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("drive01", instrument.drive01));
+                    instrument.color01 = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("color01", instrument.color01));
+                    instrument.filterType = juce::jlimit(0, 8, (int) iv.getProperty("filterType", instrument.filterType));
+                    instrument.attackMs = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty("attackMs", instrument.attackMs));
+                    instrument.decayMs = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty("decayMs", instrument.decayMs));
+                    instrument.sustain = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("sustain", instrument.sustain));
+                    instrument.releaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty("releaseMs", instrument.releaseMs));
+                    instrument.ampLevel = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("ampLevel", instrument.ampLevel));
+                    instrument.ampPan = juce::jlimit(-1.0f, 1.0f, (float) (double) iv.getProperty("ampPan", instrument.ampPan));
+                    instrument.wavetableBank = juce::jlimit(0, 8, (int) iv.getProperty("wavetableBank", instrument.wavetableBank));
+                    instrument.wavetablePosition = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("wavetablePosition", instrument.wavetablePosition));
+                    instrument.wavetableWarp = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("wavetableWarp", instrument.wavetableWarp));
+                    instrument.wavetableUnison = juce::jlimit(1, 8, (int) iv.getProperty("wavetableUnison", instrument.wavetableUnison));
+                    instrument.wavetableDetuneCents = juce::jlimit(0.0f, 100.0f, (float) (double) iv.getProperty("wavetableDetuneCents", instrument.wavetableDetuneCents));
+                    instrument.wavetableBlend = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("wavetableBlend", instrument.wavetableBlend));
+                    instrument.lfoWaveform = juce::jlimit(0, 8, (int) iv.getProperty("lfoWaveform", instrument.lfoWaveform));
+                    instrument.lfoRateHz = juce::jlimit(0.01f, 40.0f, (float) (double) iv.getProperty("lfoRateHz", instrument.lfoRateHz));
+                    instrument.lfoDepth = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("lfoDepth", instrument.lfoDepth));
+                    instrument.lfoRetrigger = (bool) iv.getProperty("lfoRetrigger", instrument.lfoRetrigger);
+                    instrument.lfoPositionBipolar = (bool) iv.getProperty("lfoPositionBipolar", instrument.lfoPositionBipolar);
+                    instrument.lfoPitchBipolar = (bool) iv.getProperty("lfoPitchBipolar", instrument.lfoPitchBipolar);
+                    instrument.lfoFilterBipolar = (bool) iv.getProperty("lfoFilterBipolar", instrument.lfoFilterBipolar);
+                    instrument.lfoToPitch = juce::jlimit(0.0f, 24.0f, (float) (double) iv.getProperty("lfoToPitch", instrument.lfoToPitch));
+                    instrument.lfoToFilter = juce::jlimit(-1.0f, 1.0f, (float) (double) iv.getProperty("lfoToFilter", instrument.lfoToFilter));
+                    instrument.envToFilter = juce::jlimit(-1.0f, 1.0f, (float) (double) iv.getProperty("envToFilter", instrument.envToFilter));
+                    instrument.hasAether = (bool) iv.getProperty("hasAether", instrument.hasAether);
+
+                    if (auto* filters = iv.getProperty("effects", {}).getProperty("filters", {}).getArray())
+                    {
+                        instrument.effects.reserve((size_t) filters->size());
+                        for (const auto& ev : *filters)
+                        {
+                            auto effect = trackEffectFromVar(ev);
+                            if (effect.kind != TrackEffectKind::Unknown)
+                                instrument.effects.push_back(std::move(effect));
+                        }
+                    }
+
+                    if (auto* sampleUrls = iv.getProperty("sampleUrls", {}).getArray())
+                    {
+                        for (const auto& sampleUrl : *sampleUrls)
+                        {
+                            const auto path = sampleUrl.toString();
+                            if (path.isNotEmpty() && !instrument.sampleUrls.contains(path))
+                                instrument.sampleUrls.add(path);
+                        }
+                    }
+
+                    if (auto* sampleZones = iv.getProperty("sampleZones", {}).getArray())
+                    {
+                        for (const auto& zv : *sampleZones)
+                        {
+                            if (!zv.isObject()) continue;
+                            InstrumentDefinition::SampleZone zone;
+                            zone.path = zv.getProperty("path", "").toString();
+                            if (zone.path.isEmpty()) continue;
+                            zone.rootNote = juce::jlimit(0, 127, (int) zv.getProperty("rootNote", zone.rootNote));
+                            zone.loNote = juce::jlimit(0, 127, (int) zv.getProperty("loNote", zone.loNote));
+                            zone.hiNote = juce::jlimit(0, 127, (int) zv.getProperty("hiNote", zone.hiNote));
+                            zone.loVel = juce::jlimit(0, 127, (int) zv.getProperty("loVel", zone.loVel));
+                            zone.hiVel = juce::jlimit(0, 127, (int) zv.getProperty("hiVel", zone.hiVel));
+                            zone.volumeDb = juce::jlimit(-48.0f, 24.0f, (float) (double) zv.getProperty("volumeDb", zone.volumeDb));
+                            zone.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) zv.getProperty("pan", zone.pan));
+                            zone.tuningCents = juce::jlimit(-1200.0f, 1200.0f, (float) (double) zv.getProperty("tuningCents", zone.tuningCents));
+                            zone.seqPosition = juce::jmax(0, (int) zv.getProperty("seqPosition", zone.seqPosition));
+                            zone.loopEnabled = (bool) zv.getProperty("loopEnabled", zone.loopEnabled);
+                            zone.loopStart = juce::jmax(0, (int) zv.getProperty("loopStart", zone.loopStart));
+                            zone.loopEnd = juce::jmax(0, (int) zv.getProperty("loopEnd", zone.loopEnd));
+                            zone.oneShot = (bool) zv.getProperty("oneShot", zone.oneShot);
+                            zone.durationSeconds = juce::jmax(0.0, (double) zv.getProperty("durationSeconds", zone.durationSeconds));
+                            zone.loLengthSeconds = juce::jmax(0.0, (double) zv.getProperty("loLengthSeconds", zone.loLengthSeconds));
+                            zone.hiLengthSeconds = juce::jmax(0.0, (double) zv.getProperty("hiLengthSeconds", zone.hiLengthSeconds));
+                            zone.chokeGroup = juce::jmax(0, (int) zv.getProperty("chokeGroup", zone.chokeGroup));
+                            zone.startSample = juce::jmax(0, (int) zv.getProperty("startSample", zone.startSample));
+                            zone.endSample = juce::jmax(0, (int) zv.getProperty("endSample", zone.endSample));
+                            if (zone.loNote > zone.hiNote) std::swap(zone.loNote, zone.hiNote);
+                            if (zone.loVel > zone.hiVel) std::swap(zone.loVel, zone.hiVel);
+                            if (zone.hiLengthSeconds > 0.0 && zone.loLengthSeconds > zone.hiLengthSeconds)
+                                std::swap(zone.loLengthSeconds, zone.hiLengthSeconds);
+                            if (zone.endSample > 0 && zone.startSample >= zone.endSample)
+                            {
+                                zone.startSample = 0;
+                                zone.endSample = 0;
+                            }
+                            if (zone.loopEnd > 0 && zone.loopStart >= zone.loopEnd)
+                                zone.loopEnabled = false;
+                            instrument.sampleZones.push_back(zone);
+                            if (!instrument.sampleUrls.contains(zone.path))
+                                instrument.sampleUrls.add(zone.path);
+                        }
+                    }
+
+                    p.instruments.push_back(std::move(instrument));
+                }
+            }
+
+            if (auto* plugins = parsed.getProperty("plugins", {}).getArray())
+            {
+                for (const auto& pv : *plugins)
+                {
+                    if (!pv.isObject()) continue;
+                    PluginAdapterDefinition plugin;
+                    plugin.id = pv.getProperty("id", "").toString();
+                    plugin.name = pv.getProperty("name", "").toString();
+                    plugin.vendor = pv.getProperty("vendor", "").toString();
+                    plugin.version = pv.getProperty("version", "").toString();
+                    plugin.kind = pv.getProperty("kind", "").toString();
+                    plugin.format = pv.getProperty("format", "").toString();
+                    plugin.status = pv.getProperty("status", "").toString();
+                    plugin.instrumentMode = pv.getProperty("instrumentMode", "").toString();
+                    plugin.description = pv.getProperty("description", "").toString();
+                    plugin.sourceFileName = pv.getProperty("sourceFileName", "").toString();
+                    plugin.sourcePath = pv.getProperty("sourcePath", "").toString();
+                    plugin.uiImagePath = pv.getProperty("uiImagePath", "").toString();
+                    plugin.uiImageDataUrl = pv.getProperty("uiImageDataUrl", "").toString();
+                    plugin.associatedInstrumentId = pv.getProperty("associatedInstrumentId", "").toString();
+                    plugin.uiWidth = (int) pv.getProperty("uiWidth", 0);
+                    plugin.uiHeight = (int) pv.getProperty("uiHeight", 0);
+                    plugin.sampleCount = (int) pv.getProperty("sampleCount", 0);
+                    plugin.uiControlCount = (int) pv.getProperty("uiControlCount", 0);
+                    plugin.factory = (bool) pv.getProperty("factory", false);
+                    plugin.installedAt = (double) pv.getProperty("installedAt", 0.0);
+
+                    if (auto* capabilities = pv.getProperty("capabilities", {}).getArray())
+                    {
+                        for (const auto& cv : *capabilities)
+                        {
+                            if (!cv.isObject()) continue;
+                            PluginCapability capability;
+                            capability.id = cv.getProperty("id", "").toString();
+                            capability.kind = cv.getProperty("kind", "").toString();
+                            capability.label = cv.getProperty("label", cv.getProperty("name", "")).toString();
+                            capability.realtime = (bool) cv.getProperty("realtime", false);
+                            capability.offline = (bool) cv.getProperty("offline", false);
+                            capability.latencySamples = juce::jlimit(0, 192000, (int) cv.getProperty("latencySamples", 0));
+                            capability.fallbackMode = cv.getProperty("fallbackMode", cv.getProperty("fallback", "")).toString();
+                            if (capability.kind.isNotEmpty())
+                                plugin.capabilities.push_back(std::move(capability));
+                        }
+                    }
+
+                    if (plugin.id.isNotEmpty())
+                        p.plugins.push_back(std::move(plugin));
+                }
+            }
 
             if (auto* tracks = parsed.getProperty("tracks", {}).getArray())
             {
@@ -100,13 +731,40 @@ namespace beat
                     Track t;
                     t.id    = tv.getProperty("id", "").toString();
                     t.name  = tv.getProperty("name", "").toString();
-                    t.kind  = (TrackKind) (int) tv.getProperty("kind", 0);
+                    t.kind  = trackKindFromVar(tv.getProperty("kind", 0));
                     t.instrumentId = tv.getProperty("instrumentId", "").toString();
                     t.audioFileId  = tv.getProperty("audioFileId", "").toString();
+                    t.parentTrackId = tv.getProperty("parentTrackId", "").toString();
                     t.gainDb = (float) (double) tv.getProperty("gainDb", 0.0);
                     t.pan    = (float) (double) tv.getProperty("pan", 0.0);
                     t.mute   = (bool) tv.getProperty("mute", false);
                     t.solo   = (bool) tv.getProperty("solo", false);
+                    t.recordArmed = (bool) tv.getProperty("recordArmed", false);
+                    t.inputMonitoring = (bool) tv.getProperty("inputMonitoring", false);
+                    t.inputDeviceId = tv.getProperty("inputDeviceId", "").toString();
+                    t.inputChannelStart = juce::jlimit(0, 1024, (int) tv.getProperty("inputChannelStart", 0));
+                    t.inputChannelCount = juce::jlimit(1, 1024, (int) tv.getProperty("inputChannelCount", 1));
+                    t.recordGainDb = (float) (double) tv.getProperty("recordGainDb", 0.0);
+
+                    if (auto* sends = tv.getProperty("sends", {}).getArray())
+                    {
+                        for (const auto& sv : *sends)
+                        {
+                            auto send = trackSendFromVar(sv);
+                            if (send.busId.isNotEmpty())
+                                t.sends.push_back(send);
+                        }
+                    }
+
+                    if (auto* filters = tv.getProperty("effects", {}).getProperty("filters", {}).getArray())
+                    {
+                        for (const auto& ev : *filters)
+                        {
+                            auto effect = trackEffectFromVar(ev);
+                            if (effect.kind != TrackEffectKind::Unknown)
+                                t.effects.push_back(std::move(effect));
+                        }
+                    }
 
                     if (auto* segs = tv.getProperty("segments", {}).getArray())
                     {
@@ -117,6 +775,9 @@ namespace beat
                             s.trackId     = t.id;
                             s.startBeat   = (double) sv.getProperty("startBeat", 0.0);
                             s.lengthBeats = (double) sv.getProperty("lengthBeats", 4.0);
+                            s.sourceStartBeat = (double) sv.getProperty("sourceStartBeat", 0.0);
+                            s.fadeInBeats = (double) sv.getProperty("fadeInBeats", 0.0);
+                            s.fadeOutBeats = (double) sv.getProperty("fadeOutBeats", 0.0);
                             s.repeats     = (int) sv.getProperty("repeats", 0);
                             s.layer       = (int) sv.getProperty("layer", 0);
                             s.muted       = (bool) sv.getProperty("muted", false);
@@ -133,6 +794,58 @@ namespace beat
                                     n.velocity    = (int) nv.getProperty("velocity", 100);
                                     n.startBeat   = (double) nv.getProperty("startBeat", 0.0);
                                     n.lengthBeats = (double) nv.getProperty("lengthBeats", 0.25);
+                                    if (auto* curve = nv.getProperty("curve", {}).getArray())
+                                    {
+                                        n.curve.reserve((size_t) curve->size());
+                                        for (const auto& pointVar : *curve)
+                                        {
+                                            if (!pointVar.isObject()) continue;
+                                            MidiPitchCurvePoint point;
+                                            point.beat = (double) pointVar.getProperty("beat", n.startBeat);
+                                            point.pitch = juce::jlimit(0.0, 127.0, (double) pointVar.getProperty("pitch", (double) n.pitch));
+                                            if (std::isfinite(point.beat) && std::isfinite(point.pitch))
+                                                n.curve.push_back(point);
+                                        }
+                                        std::sort(n.curve.begin(), n.curve.end(),
+                                                  [](const MidiPitchCurvePoint& a, const MidiPitchCurvePoint& b) {
+                                                      return a.beat < b.beat;
+                                                  });
+                                    }
+                                    if (auto* automation = nv.getProperty("automation", {}).getArray())
+                                    {
+                                        for (const auto& laneVar : *automation)
+                                        {
+                                            if (!laneVar.isObject()) continue;
+                                            MidiAutomationLane lane;
+                                            lane.target = laneVar.getProperty("target", "").toString();
+                                            if (lane.target.isEmpty() || lane.target == "pitch")
+                                                continue;
+
+                                            if (auto* points = laneVar.getProperty("points", {}).getArray())
+                                            {
+                                                lane.points.reserve((size_t) points->size());
+                                                for (const auto& pointVar : *points)
+                                                {
+                                                    if (!pointVar.isObject()) continue;
+                                                    MidiAutomationPoint point;
+                                                    point.beat = (double) pointVar.getProperty("beat", n.startBeat);
+                                                    point.value = (float) (double) pointVar.getProperty("value", 0.0);
+                                                    point.curve = (AutomationCurve) (int) pointVar.getProperty("curve", (int) AutomationCurve::Linear);
+                                                    if (std::isfinite(point.beat) && std::isfinite(point.value))
+                                                        lane.points.push_back(point);
+                                                }
+                                            }
+
+                                            if (!lane.points.empty())
+                                            {
+                                                std::sort(lane.points.begin(), lane.points.end(),
+                                                          [](const MidiAutomationPoint& a, const MidiAutomationPoint& b) {
+                                                              return a.beat < b.beat;
+                                                          });
+                                                n.automation.push_back(std::move(lane));
+                                            }
+                                        }
+                                    }
                                     s.notes.push_back(n);
                                 }
                             }
@@ -140,6 +853,16 @@ namespace beat
                         }
                     }
                     p.tracks.push_back(std::move(t));
+                }
+            }
+
+            if (auto* buses = parsed.getProperty("returnBuses", {}).getArray())
+            {
+                for (const auto& bv : *buses)
+                {
+                    auto bus = returnBusFromVar(bv);
+                    if (bus.id.isNotEmpty())
+                        p.returnBuses.push_back(std::move(bus));
                 }
             }
 
@@ -157,6 +880,21 @@ namespace beat
                 }
             }
             return p;
+        }
+
+        juce::String recentProjectNameFor(const juce::File& file, const juce::var& document = {})
+        {
+            if (document.isObject())
+            {
+                const auto project = document.getProperty("project", {});
+                const auto name = project.getProperty("name", {}).toString().trim();
+                if (name.isNotEmpty())
+                    return name;
+            }
+
+            return file.getFileNameWithoutExtension().isNotEmpty()
+                ? file.getFileNameWithoutExtension()
+                : juce::String("Untitled");
         }
     }
 
@@ -204,6 +942,69 @@ namespace beat
     {
         Statement stmt(db, "DELETE FROM projects WHERE id = ?");
         stmt.bind(1, id);
+        stmt.step();
+    }
+
+    void ProjectRepository::recordRecentProject(const juce::File& file, const juce::var& document)
+    {
+        if (file.getFullPathName().isEmpty())
+            return;
+
+        Statement stmt(db, R"sql(
+            INSERT INTO recent_projects(path, name, opened_at, size_bytes)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(path) DO UPDATE SET
+                name = excluded.name,
+                opened_at = excluded.opened_at,
+                size_bytes = excluded.size_bytes
+        )sql");
+        stmt.bind(1, file.getFullPathName());
+        stmt.bind(2, recentProjectNameFor(file, document));
+        stmt.bind(3, (int) (juce::Time::currentTimeMillis() / 1000));
+        stmt.bind(4, static_cast<double>(file.existsAsFile() ? file.getSize() : 0));
+        stmt.step();
+
+        db.exec(R"sql(
+            DELETE FROM recent_projects
+            WHERE path NOT IN (
+                SELECT path FROM recent_projects
+                ORDER BY opened_at DESC
+                LIMIT 16
+            )
+        )sql");
+    }
+
+    std::vector<ProjectRepository::RecentProject> ProjectRepository::listRecentProjects(int limit)
+    {
+        std::vector<RecentProject> out;
+        Statement stmt(db, R"sql(
+            SELECT path, name, opened_at, size_bytes
+            FROM recent_projects
+            ORDER BY opened_at DESC
+            LIMIT ?
+        )sql");
+        stmt.bind(1, juce::jlimit(1, 128, limit));
+        while (stmt.step())
+        {
+            const auto path = stmt.columnText(0);
+            out.push_back({
+                path,
+                stmt.columnText(1),
+                (juce::int64) stmt.columnInt(2),
+                stmt.columnDouble(3),
+                juce::File(path).existsAsFile(),
+            });
+        }
+        return out;
+    }
+
+    void ProjectRepository::removeRecentProject(const juce::String& path)
+    {
+        if (path.isEmpty())
+            return;
+
+        Statement stmt(db, "DELETE FROM recent_projects WHERE path = ?");
+        stmt.bind(1, path);
         stmt.step();
     }
 }

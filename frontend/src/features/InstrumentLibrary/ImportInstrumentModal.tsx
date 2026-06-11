@@ -6,6 +6,7 @@ import { isNative, send } from "../../ipc/bridge";
 import type { DecentSamplerImport } from "../../ipc/schema";
 import { characterizeInstrument, snapshotInstrument, useAudioFileStore, useInstrumentStore, USER_INSTRUMENT_SET_ID } from "../../state/store";
 import type { AudioFile, Instrument } from "../../state/types";
+import { createDecentSamplerInstrument } from "./decentSamplerInstrument";
 import styles from "./ImportInstrumentModal.module.css";
 
 interface Props {
@@ -19,12 +20,6 @@ interface ImportGroup {
   name: string;
   type: string;
   normalize: boolean;
-  volumes: ImportVolume[];
-}
-
-interface ImportVolume {
-  id: string;
-  name: string;
 }
 
 const INSTRUMENT_TYPES = [
@@ -64,7 +59,6 @@ export function ImportInstrumentModal({ onClose, initialFiles = [], onImportedFi
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(initialFiles.map((file) => file.id)));
   const [groups, setGroups] = useState<ImportGroup[]>([]);
   const [fileGroups, setFileGroups] = useState<Record<string, string | undefined>>({});
-  const [fileVolumes, setFileVolumes] = useState<Record<string, string | undefined>>({});
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const [dragIds, setDragIds] = useState<string[]>([]);
   const [decentStatus, setDecentStatus] = useState("");
@@ -139,7 +133,7 @@ export function ImportInstrumentModal({ onClose, initialFiles = [], onImportedFi
         : await importDecentPresetInBrowser();
       if (!preset) return;
       preset.audioFiles.forEach(addAudioFile);
-      createDecentInstrument(preset, addInstrument, updateInstrument);
+      createDecentSamplerInstrument(preset, addInstrument, updateInstrument);
       closeModal();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Decent Sampler import is unavailable here.";
@@ -190,13 +184,12 @@ export function ImportInstrumentModal({ onClose, initialFiles = [], onImportedFi
       name: commonInstrumentName(targets),
       type: inferInstrumentType(targets),
       normalize: false,
-      volumes: [{ id: crypto.randomUUID(), name: "Volume 1" }],
     };
     setGroups((current) => [...current, nextGroup]);
-    moveFilesToGroup(uniqueIds, id, false, nextGroup.volumes[0].id);
+    moveFilesToGroup(uniqueIds, id, false);
   }
 
-  function moveFilesToGroup(ids: string[], groupId: string | undefined, prune = true, volumeId?: string) {
+  function moveFilesToGroup(ids: string[], groupId: string | undefined, prune = true) {
     setFileGroups((current) => {
       const next = { ...current };
       ids.forEach((id) => {
@@ -204,14 +197,6 @@ export function ImportInstrumentModal({ onClose, initialFiles = [], onImportedFi
         else delete next[id];
       });
       if (prune) pruneEmptyGroups(next);
-      return next;
-    });
-    setFileVolumes((current) => {
-      const next = { ...current };
-      ids.forEach((id) => {
-        if (groupId) next[id] = volumeId;
-        else delete next[id];
-      });
       return next;
     });
   }
@@ -222,35 +207,6 @@ export function ImportInstrumentModal({ onClose, initialFiles = [], onImportedFi
 
   function updateGroup(id: string, patch: Partial<ImportGroup>) {
     setGroups((current) => current.map((group) => group.id === id ? { ...group, ...patch } : group));
-  }
-
-  function addVolume(groupId: string) {
-    setGroups((current) => current.map((group) => group.id === groupId
-      ? {
-        ...group,
-        volumes: [
-          ...group.volumes,
-          { id: crypto.randomUUID(), name: `Volume ${group.volumes.length + 1}` },
-        ],
-      }
-      : group));
-  }
-
-  function deleteVolume(groupId: string, volumeId: string) {
-    const group = groups.find((item) => item.id === groupId);
-    if (!group || group.volumes.length <= 1) return;
-    const index = group.volumes.findIndex((volume) => volume.id === volumeId);
-    const fallback = group.volumes[index + 1] ?? group.volumes[index - 1] ?? group.volumes[0];
-    setGroups((current) => current.map((item) => item.id === groupId
-      ? { ...item, volumes: item.volumes.filter((volume) => volume.id !== volumeId) }
-      : item));
-    setFileVolumes((current) => {
-      const next = { ...current };
-      files.forEach((file) => {
-        if (fileGroups[file.id] === groupId && next[file.id] === volumeId) next[file.id] = fallback.id;
-      });
-      return next;
-    });
   }
 
   function dragStart(fileId: string, event: DragEvent) {
@@ -267,15 +223,7 @@ export function ImportInstrumentModal({ onClose, initialFiles = [], onImportedFi
   function dropOnGroup(groupId: string, event: DragEvent) {
     event.preventDefault();
     const ids = draggedIds(event);
-    const group = groups.find((item) => item.id === groupId);
-    moveFilesToGroup(ids, groupId, true, group?.volumes[0]?.id);
-    setDragIds([]);
-  }
-
-  function dropOnVolume(groupId: string, volumeId: string, event: DragEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    moveFilesToGroup(draggedIds(event), groupId, true, volumeId);
+    moveFilesToGroup(ids, groupId, true);
     setDragIds([]);
   }
 
@@ -292,7 +240,7 @@ export function ImportInstrumentModal({ onClose, initialFiles = [], onImportedFi
     if (ids.length === 0) return;
     const targetGroup = fileGroups[targetId];
     if (targetGroup) {
-      moveFilesToGroup(ids, targetGroup, true, fileVolumes[targetId]);
+      moveFilesToGroup(ids, targetGroup, true);
       return;
     }
     groupFiles([...ids, targetId]);
@@ -312,11 +260,9 @@ export function ImportInstrumentModal({ onClose, initialFiles = [], onImportedFi
       createSamplerInstrument(
         group.name.trim() || commonInstrumentName(groupFiles),
         groupFiles,
-        groupFiles.length > 1 ? `Round robin upload (${groupFiles.length} files)` : groupFiles[0].name,
+        groupFiles.length > 1 ? `Hit variants upload (${groupFiles.length} files)` : groupFiles[0].name,
         group.type,
         group.normalize,
-        group.volumes,
-        fileVolumes,
         samplePeaks,
         addInstrument,
         updateInstrument,
@@ -367,7 +313,7 @@ export function ImportInstrumentModal({ onClose, initialFiles = [], onImportedFi
           </Button>
           <Button onClick={() => void importDecentPreset()}>
             <Icon name="ph:waveform" size={14} decorative />
-            Import DS
+            Import DS Pack
           </Button>
           <Button disabled={selectedIds.size === 0} onClick={() => groupFiles(Array.from(selectedIds))}>
             <Icon name="ph:stack-simple" size={14} decorative />
@@ -439,51 +385,23 @@ export function ImportInstrumentModal({ onClose, initialFiles = [], onImportedFi
                     />
                     <span>Normalize</span>
                   </label>
-                  <Button size="xs" onClick={() => addVolume(group.id)}>
-                    <Icon name="ph:plus" size={12} decorative />
-                    Add Volume
-                  </Button>
                 </div>
                 <div className={styles.groupRows}>
-                  {group.volumes.map((volume) => {
-                    const volumeFiles = groupFiles.filter((file) => (fileVolumes[file.id] ?? group.volumes[0]?.id) === volume.id);
-                    return (
-                      <div
-                        key={volume.id}
-                        className={styles.volumeBlock}
-                        onDragOver={(event) => event.preventDefault()}
-                        onDrop={(event) => dropOnVolume(group.id, volume.id, event)}
-                      >
-                        <div className={styles.volumeHeader}>
-                          <span>{volume.name}</span>
-                          <button
-                            type="button"
-                            className={styles.volumeDelete}
-                            disabled={group.volumes.length <= 1}
-                            onClick={() => deleteVolume(group.id, volume.id)}
-                            aria-label={`Delete ${volume.name}`}
-                          >
-                            <Icon name="ph:trash" size={12} decorative />
-                          </button>
-                        </div>
-                        {volumeFiles.map((file) => (
-                          <FileRow
-                            key={file.id}
-                            file={file}
-                            selected={selectedIds.has(file.id)}
-                            grouped
-                            onClick={(event) => selectFile(file.id, event)}
-                            onMouseDown={(event) => focusFileForDrag(file.id, event)}
-                            onContextMenu={(event) => openFileContext(file.id, event)}
-                            onDragStart={(event) => dragStart(file.id, event)}
-                            onDrop={(event) => dropOnFile(file.id, event)}
-                            onPreview={() => void previewFile(file)}
-                            playing={playingPreviewId === file.id}
-                          />
-                        ))}
-                      </div>
-                    );
-                  })}
+                  {groupFiles.map((file) => (
+                    <FileRow
+                      key={file.id}
+                      file={file}
+                      selected={selectedIds.has(file.id)}
+                      grouped
+                      onClick={(event) => selectFile(file.id, event)}
+                      onMouseDown={(event) => focusFileForDrag(file.id, event)}
+                      onContextMenu={(event) => openFileContext(file.id, event)}
+                      onDragStart={(event) => dragStart(file.id, event)}
+                      onDrop={(event) => dropOnFile(file.id, event)}
+                      onPreview={() => void previewFile(file)}
+                      playing={playingPreviewId === file.id}
+                    />
+                  ))}
                 </div>
               </div>
             ))}
@@ -492,7 +410,7 @@ export function ImportInstrumentModal({ onClose, initialFiles = [], onImportedFi
         <div className={styles.discardNote}>{ungroupedFiles.length} ungrouped files will be discarded</div>
         {groupedFiles.some((entry) => entry.files.length > 1) && (
           <p className={styles.hint}>
-            Groups with multiple files become one sampler instrument and cycle those files round-robin on playback.
+            Groups with multiple files become one sampler instrument with length-aware hit variants.
           </p>
         )}
         {fileMenu.menu}
@@ -556,64 +474,19 @@ function FileRow({ file, selected, grouped, onClick, onMouseDown, onContextMenu,
   );
 }
 
-function createDecentInstrument(
-  preset: DecentSamplerImport,
-  addInstrument: ReturnType<typeof useInstrumentStore.getState>["addInstrument"],
-  updateInstrument: ReturnType<typeof useInstrumentStore.getState>["updateInstrument"],
-) {
-  const sampleUrls = Array.from(new Set(preset.sampleUrls));
-  const audioIds = new Map(preset.audioFiles.map((file) => [file.path, file.id]));
-  const patch: Partial<Instrument> = {
-    name: preset.name || "Decent Sampler instrument",
-    kind: "sampler",
-    waveform: "sample",
-    sampleIds: sampleUrls.map((url) => audioIds.get(url)).filter(Boolean) as string[],
-    sampleUrl: sampleUrls[0],
-    sampleUrls,
-    sampleMap: preset.samples.map((sample) => ({
-      path: sample.path,
-      name: sample.name,
-      rootNote: sample.rootNote,
-      loNote: sample.loNote,
-      hiNote: sample.hiNote,
-      loVel: sample.loVel,
-      hiVel: sample.hiVel,
-      volumeDb: sample.volumeDb,
-      pan: sample.pan,
-      tuning: sample.tuning,
-      seqPosition: sample.seqPosition,
-    })),
-    setId: USER_INSTRUMENT_SET_ID,
-    source: {
-      kind: "uploaded",
-      label: `Decent Sampler: ${preset.name}`,
-      url: preset.path,
-      importedAt: Date.now(),
-      edited: false,
-    },
-    descriptors: describeDecentPreset(preset),
-    userCreated: true,
-  };
-  const id = addInstrument(patch);
-  const instrument = useInstrumentStore.getState().instruments.find((item) => item.id === id);
-  if (instrument) updateInstrument(id, { original: snapshotInstrument(instrument) });
-}
-
 function createSamplerInstrument(
   name: string,
   files: AudioFile[],
   sourceLabel: string,
   instrumentType: string,
   normalize: boolean,
-  volumes: ImportVolume[],
-  fileVolumes: Record<string, string | undefined>,
   samplePeaks: Record<string, number>,
   addInstrument: ReturnType<typeof useInstrumentStore.getState>["addInstrument"],
   updateInstrument: ReturnType<typeof useInstrumentStore.getState>["updateInstrument"],
 ) {
   const sampleIds = files.map((file) => file.id);
   const sampleUrls = files.map((file) => file.path);
-  const sampleMap = (normalize || volumes.length > 1) ? mappedSampleZones(files, samplePeaks, normalize, volumes, fileVolumes) : undefined;
+  const sampleMap = mappedSampleZones(files, samplePeaks, normalize);
   const patch: Partial<Instrument> = {
     name,
     kind: "sampler",
@@ -642,32 +515,48 @@ function mappedSampleZones(
   files: AudioFile[],
   samplePeaks: Record<string, number>,
   normalize: boolean,
-  volumes: ImportVolume[],
-  fileVolumes: Record<string, string | undefined>,
 ): Instrument["sampleMap"] {
-  const lanes = volumes.length > 0 ? volumes : [{ id: "default", name: "Volume 1" }];
-  return files.map((file, index) => {
+  const durationSorted = [...files].sort((a, b) => {
+    const delta = safeDurationSeconds(a) - safeDurationSeconds(b);
+    return Math.abs(delta) > 0.001 ? delta : a.name.localeCompare(b.name);
+  });
+  const maxDuration = durationSorted.reduce((max, file) => Math.max(max, safeDurationSeconds(file)), 0);
+  const hasUsefulDurationSpread = durationSorted.length > 1
+    && maxDuration > 0
+    && safeDurationSeconds(durationSorted[durationSorted.length - 1]) - safeDurationSeconds(durationSorted[0]) > 0.025;
+
+  return durationSorted.map((file, index) => {
     const peak = samplePeaks[file.id] ?? 0;
     const volumeDb = normalize && peak > 0
       ? Math.max(-24, Math.min(24, 20 * Math.log10(0.9 / peak)))
       : 0;
-    const laneIndex = Math.max(0, lanes.findIndex((lane) => lane.id === (fileVolumes[file.id] ?? lanes[0].id)));
-    const loVel = Math.round((laneIndex / lanes.length) * 128);
-    const hiVel = Math.min(127, Math.round(((laneIndex + 1) / lanes.length) * 128) - 1);
+    const durationSeconds = safeDurationSeconds(file);
+    const loLengthSeconds = hasUsefulDurationSpread ? (index / durationSorted.length) * maxDuration : undefined;
+    const hiLengthSeconds = hasUsefulDurationSpread
+      ? ((index + 1) / durationSorted.length) * maxDuration + 0.001
+      : undefined;
     return {
       path: file.path,
       name: file.name,
       rootNote: 60,
       loNote: 0,
       hiNote: 127,
-      loVel,
-      hiVel,
+      loVel: 0,
+      hiVel: 127,
       volumeDb,
       pan: 0,
       tuning: 0,
       seqPosition: index,
+      chokeGroup: 0,
+      ...(durationSeconds > 0 ? { durationSeconds } : {}),
+      ...(loLengthSeconds != null && hiLengthSeconds != null ? { loLengthSeconds, hiLengthSeconds } : {}),
+      oneShot: true,
     };
   });
+}
+
+function safeDurationSeconds(file: AudioFile): number {
+  return Number.isFinite(file.durationSeconds) ? Math.max(0, file.durationSeconds) : 0;
 }
 
 async function measureSamplePeaks(files: AudioFile[]): Promise<Record<string, number>> {
@@ -757,7 +646,7 @@ function describeUploadedInstrument(name: string, instrumentType: string, files:
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter((token) => token.length > 1);
-  return Array.from(new Set(["sampler", "uploaded", "round-robin", ...custom, ...base])).slice(0, 18);
+  return Array.from(new Set(["sampler", "uploaded", "hit-variants", ...custom, ...base])).slice(0, 18);
 }
 
 function commonInstrumentName(files: AudioFile[]): string {
@@ -770,7 +659,7 @@ function commonInstrumentName(files: AudioFile[]): string {
       prefix = prefix.slice(0, -1);
     }
   }
-  return prefix.replace(/[-_\s]+$/g, "").trim() || "Round robin instrument";
+  return prefix.replace(/[-_\s]+$/g, "").trim() || "Hit variant instrument";
 }
 
 function stripAudioExtension(filename: string): string {
@@ -798,6 +687,10 @@ function formatDuration(seconds: number): string {
 async function importDecentPresetInBrowser(): Promise<DecentSamplerImport | null> {
   const files = await chooseDecentFiles();
   if (files.length === 0) return null;
+
+  if (files.some((file) => file.name.toLowerCase().endsWith(".zip"))) {
+    throw new Error("Decent Sampler ZIP pack import is available in the native app. In browser preview, select the .dspreset and its sample files together.");
+  }
 
   const presetFile = files.find((file) => file.name.toLowerCase().endsWith(".dspreset"));
   if (!presetFile) {
@@ -848,7 +741,7 @@ function chooseDecentFiles(): Promise<File[]> {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.accept = [".dspreset", ...SUPPORTED_AUDIO_IMPORT_EXTENSIONS].join(",");
+    input.accept = [".dspreset", ".zip", ...SUPPORTED_AUDIO_IMPORT_EXTENSIONS].join(",");
     input.style.display = "none";
     document.body.append(input);
     input.addEventListener("change", () => {
@@ -880,6 +773,13 @@ function sampleFromElement(
     pan: floatAttribute(element, ["pan"], 0),
     tuning: floatAttribute(element, ["tuning", "pitch"], 0),
     seqPosition: intAttribute(element, ["seqPosition", "seq_position"], 0),
+    chokeGroup: Math.max(0, intAttribute(element, ["chokeGroup", "choke_group", "exclusiveGroup", "exclusive_group"], 0)),
+    loopEnabled: boolAttribute(element, ["loopEnabled", "loop", "loop_enabled"], false)
+      || stringAttributeMatches(element, ["loopMode", "loop_mode", "playbackMode", "trigger"], ["loop", "loop_continuous", "loop_sustain", "sustain"]),
+    loopStart: Math.max(0, intAttribute(element, ["loopStart", "loop_start", "loopStartSample", "loop_start_sample"], 0)),
+    loopEnd: Math.max(0, intAttribute(element, ["loopEnd", "loop_end", "loopEndSample", "loop_end_sample"], 0)),
+    oneShot: boolAttribute(element, ["oneShot", "one_shot"], false)
+      || stringAttributeMatches(element, ["trigger", "playbackMode", "loopMode", "loop_mode"], ["one_shot", "oneshot", "one shot"]),
   };
 }
 
@@ -923,14 +823,13 @@ function floatAttribute(element: Element, names: string[], fallback: number): nu
   return Number.isFinite(value) ? value : fallback;
 }
 
-function describeDecentPreset(preset: DecentSamplerImport): string[] {
-  const words = new Set(["sampler", "decent-sampler", "multisample"]);
-  for (const sample of preset.samples.slice(0, 24)) {
-    for (const token of sample.name.toLowerCase().split(/[^a-z0-9]+/)) {
-      if (token.length > 2) words.add(token);
-    }
-  }
-  if (preset.samples.some((sample) => sample.loNote !== 0 || sample.hiNote !== 127)) words.add("key-zoned");
-  if (preset.samples.some((sample) => sample.loVel !== 0 || sample.hiVel !== 127)) words.add("velocity-zoned");
-  return Array.from(words).slice(0, 18);
+function boolAttribute(element: Element, names: string[], fallback: boolean): boolean {
+  const value = firstAttribute(element, names).trim().toLowerCase();
+  if (!value) return fallback;
+  return value === "true" || value === "1" || value === "yes" || value === "on";
+}
+
+function stringAttributeMatches(element: Element, names: string[], values: string[]): boolean {
+  const value = firstAttribute(element, names).trim().toLowerCase();
+  return value ? values.some((expected) => value === expected.toLowerCase()) : false;
 }

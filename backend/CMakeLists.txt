@@ -27,12 +27,26 @@ target_sources(Beat PRIVATE
     Source/Audio/InstrumentVoice.h
     Source/Audio/Analysis/FftAnalyzer.cpp
     Source/Audio/Analysis/FftAnalyzer.h
+    Source/Audio/Analysis/AudioFileAnalyzer.cpp
+    Source/Audio/Analysis/AudioFileAnalyzer.h
     Source/Audio/Parameters/ParameterIds.h
     Source/Audio/Parameters/SynthPatchContract.cpp
     Source/Audio/Parameters/SynthPatchContract.h
     Source/Audio/Realtime/FixedObjectPool.h
     Source/Audio/Realtime/RealtimeParameterQueue.h
     Source/Audio/Realtime/SpscRingBuffer.h
+    Source/Audio/Recording/RecordingCalibration.cpp
+    Source/Audio/Recording/RecordingCalibration.h
+    Source/Audio/Recording/RecordingCapture.cpp
+    Source/Audio/Recording/RecordingCapture.h
+    Source/Audio/Recording/RecordingPlanner.cpp
+    Source/Audio/Recording/RecordingPlanner.h
+    Source/Audio/Recording/RecordingSessionPlanner.cpp
+    Source/Audio/Recording/RecordingSessionPlanner.h
+    Source/Audio/Rendering/TrackBouncePlanner.cpp
+    Source/Audio/Rendering/TrackBouncePlanner.h
+    Source/Audio/Sampler/DecentSamplerImporter.cpp
+    Source/Audio/Sampler/DecentSamplerImporter.h
     Source/Audio/Wavetable/Wavetable.cpp
     Source/Audio/Wavetable/Wavetable.h
     Source/Audio/Wavetable/WavetableFactory.cpp
@@ -43,6 +57,10 @@ target_sources(Beat PRIVATE
     Source/Audio/Effects/Bitcrush.h
     Source/Audio/Effects/MasterEq.cpp
     Source/Audio/Effects/MasterEq.h
+    Source/Audio/Effects/MasterLimiter.cpp
+    Source/Audio/Effects/MasterLimiter.h
+    Source/Audio/Effects/TrackEffectDefaults.cpp
+    Source/Audio/Effects/TrackEffectDefaults.h
 
     Source/Persistence/Database.cpp
     Source/Persistence/Database.h
@@ -50,6 +68,12 @@ target_sources(Beat PRIVATE
     Source/Persistence/ProjectRepository.h
     Source/Persistence/InstrumentRepository.cpp
     Source/Persistence/InstrumentRepository.h
+    Source/Persistence/ProjectAssetPackage.cpp
+    Source/Persistence/ProjectAssetPackage.h
+    Source/Persistence/ProjectDocumentBackup.cpp
+    Source/Persistence/ProjectDocumentBackup.h
+    Source/Persistence/ProjectIntegrityVerifier.cpp
+    Source/Persistence/ProjectIntegrityVerifier.h
 
     Source/Ipc/MessageBridge.cpp
     Source/Ipc/MessageBridge.h
@@ -63,6 +87,15 @@ target_compile_definitions(Beat PRIVATE
     JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:Beat,JUCE_PRODUCT_NAME>"
     JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:Beat,JUCE_VERSION>"
 )
+
+if(APPLE)
+    add_custom_command(TARGET Beat POST_BUILD
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/../scripts/register-beat-document-type.sh"
+                "$<TARGET_BUNDLE_DIR:Beat>/Contents/Info.plist"
+        COMMENT "Registering Beat .beat document type in app bundle"
+        VERBATIM
+    )
+endif()
 
 target_link_libraries(Beat PRIVATE
     juce::juce_audio_basics
@@ -85,6 +118,16 @@ target_compile_features(Beat PRIVATE cxx_std_20)
 
 add_executable(BeatBackendStress
     Tests/BackendStress.cpp
+    Source/Audio/AudioEngine.cpp
+    Source/Audio/AudioEngine.h
+    Source/Audio/Effects/Bitcrush.cpp
+    Source/Audio/Effects/Bitcrush.h
+    Source/Audio/Effects/MasterEq.cpp
+    Source/Audio/Effects/MasterEq.h
+    Source/Audio/Effects/MasterLimiter.cpp
+    Source/Audio/Effects/MasterLimiter.h
+    Source/Audio/Effects/TrackEffectDefaults.cpp
+    Source/Audio/Effects/TrackEffectDefaults.h
     Source/Audio/InstrumentVoice.cpp
     Source/Audio/InstrumentVoice.h
     Source/Audio/Sequencer.cpp
@@ -93,24 +136,54 @@ add_executable(BeatBackendStress
     Source/Audio/TrackModel.h
     Source/Audio/Analysis/FftAnalyzer.cpp
     Source/Audio/Analysis/FftAnalyzer.h
+    Source/Audio/Analysis/AudioFileAnalyzer.cpp
+    Source/Audio/Analysis/AudioFileAnalyzer.h
     Source/Audio/Parameters/ParameterIds.h
     Source/Audio/Parameters/SynthPatchContract.cpp
     Source/Audio/Parameters/SynthPatchContract.h
     Source/Audio/Realtime/FixedObjectPool.h
     Source/Audio/Realtime/RealtimeParameterQueue.h
     Source/Audio/Realtime/SpscRingBuffer.h
+    Source/Audio/Recording/RecordingCalibration.cpp
+    Source/Audio/Recording/RecordingCalibration.h
+    Source/Audio/Recording/RecordingCapture.cpp
+    Source/Audio/Recording/RecordingCapture.h
+    Source/Audio/Recording/RecordingPlanner.cpp
+    Source/Audio/Recording/RecordingPlanner.h
+    Source/Audio/Recording/RecordingSessionPlanner.cpp
+    Source/Audio/Recording/RecordingSessionPlanner.h
+    Source/Audio/Rendering/TrackBouncePlanner.cpp
+    Source/Audio/Rendering/TrackBouncePlanner.h
+    Source/Audio/Sampler/DecentSamplerImporter.cpp
+    Source/Audio/Sampler/DecentSamplerImporter.h
     Source/Audio/Wavetable/Wavetable.cpp
     Source/Audio/Wavetable/Wavetable.h
     Source/Audio/Wavetable/WavetableFactory.cpp
     Source/Audio/Wavetable/WavetableFactory.h
     Source/Audio/Wavetable/WavetableOscillator.cpp
     Source/Audio/Wavetable/WavetableOscillator.h
+    Source/Persistence/ProjectAssetPackage.cpp
+    Source/Persistence/ProjectAssetPackage.h
+    Source/Persistence/ProjectDocumentBackup.cpp
+    Source/Persistence/ProjectDocumentBackup.h
+    Source/Persistence/ProjectIntegrityVerifier.cpp
+    Source/Persistence/ProjectIntegrityVerifier.h
+    Source/Persistence/Database.cpp
+    Source/Persistence/Database.h
+    Source/Persistence/ProjectRepository.cpp
+    Source/Persistence/ProjectRepository.h
 )
 
 target_link_libraries(BeatBackendStress PRIVATE
     juce::juce_audio_basics
+    juce::juce_audio_devices
+    juce::juce_audio_formats
+    juce::juce_audio_processors
+    juce::juce_audio_utils
     juce::juce_core
     juce::juce_dsp
+    juce::juce_events
+    SQLite3::SQLite3
 )
 
 target_compile_features(BeatBackendStress PRIVATE cxx_std_20)
@@ -131,6 +204,21 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND BEAT_BUILD_FRONTEND)
             "${CMAKE_SOURCE_DIR}/frontend/dist"
             "${BEAT_FRONTEND_RESOURCE_DIR}"
         COMMENT "Copying React frontend into app bundle"
+        VERBATIM
+    )
+endif()
+
+if(APPLE)
+    add_custom_command(TARGET Beat POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/Assets/BeatIcon.icns"
+            "$<TARGET_BUNDLE_CONTENT_DIR:Beat>/Resources/Icon.icns"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/Assets/BeatIcon.png"
+            "$<TARGET_BUNDLE_CONTENT_DIR:Beat>/Resources/BeatIcon.png"
+        COMMAND "${CMAKE_SOURCE_DIR}/scripts/register-beat-document-type.sh"
+            "$<TARGET_BUNDLE_CONTENT_DIR:Beat>/Info.plist"
+        COMMENT "Copying Beat app icon and registering Beat document type"
         VERBATIM
     )
 endif()

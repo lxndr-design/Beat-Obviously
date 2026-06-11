@@ -57,6 +57,7 @@ namespace beat
         juce::String columnText(int col) const;
         double       columnDouble(int col) const;
         int          columnInt(int col) const;
+        bool         columnIsNull(int col) const;
 
     private:
         sqlite3_stmt* stmt { nullptr };

@@ -1,17 +1,288 @@
 #include "MessageBridge.h"
 #include "Schema.h"
+#include "../Audio/Analysis/AudioFileAnalyzer.h"
+#include "../Audio/Effects/TrackEffectDefaults.h"
 #include "../Audio/Parameters/SynthPatchContract.h"
+#include "../Audio/Rendering/TrackBouncePlanner.h"
+#include "../Audio/Sampler/DecentSamplerImporter.h"
+#include "../Persistence/ProjectAssetPackage.h"
+#include "../Persistence/ProjectDocumentBackup.h"
+#include "../Persistence/ProjectIntegrityVerifier.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <algorithm>
 #include <cmath>
 #include <thread>
+#include <vector>
 
 namespace beat
 {
     namespace
     {
         constexpr const char* audioImportWildcard = "*.wav;*.aif;*.aiff;*.mp3;*.flac;*.ogg;*.m4a";
+        constexpr const char* decentImportWildcard = "*.dspreset;*.zip";
+
+        void setFiniteProperty(juce::DynamicObject& object, const juce::Identifier& name, double value)
+        {
+            if (std::isfinite(value))
+                object.setProperty(name, value);
+        }
+
+        void setAudioAnalysisProperties(juce::DynamicObject& object, const AudioFileAnalysis& analysis)
+        {
+            setFiniteProperty(object, "leftPeakDbFS", analysis.leftPeakDbFS);
+            setFiniteProperty(object, "rightPeakDbFS", analysis.rightPeakDbFS);
+            setFiniteProperty(object, "truePeakDbTP", analysis.truePeakDbTP);
+            setFiniteProperty(object, "rmsDbFS", analysis.rmsDbFS);
+            setFiniteProperty(object, "crestFactorDb", analysis.crestFactorDb);
+            setFiniteProperty(object, "dcOffset", analysis.dcOffset);
+            object.setProperty("clippingCount", static_cast<double>(analysis.clippingCount));
+            setFiniteProperty(object, "clippingRatio", analysis.clippingRatio);
+            setFiniteProperty(object, "stereoCorrelation", analysis.stereoCorrelation);
+            setFiniteProperty(object, "integratedLufs", analysis.integratedLufs);
+        }
+
+        juce::var makeAudioAnalysis(const AudioFileAnalysis& analysis)
+        {
+            juce::DynamicObject::Ptr object = new juce::DynamicObject();
+            object->setProperty("sampleRate", analysis.sampleRate);
+            object->setProperty("durationSeconds", analysis.durationSeconds);
+            object->setProperty("lengthInSamples", static_cast<double>(analysis.lengthInSamples));
+            object->setProperty("channelCount", analysis.channelCount);
+            object->setProperty("bitDepth", analysis.bitDepth);
+            setAudioAnalysisProperties(*object, analysis);
+            return juce::var(object.get());
+        }
+
+        juce::var stringArrayToVar(const juce::StringArray& values)
+        {
+            juce::Array<juce::var> out;
+            out.ensureStorageAllocated(values.size());
+            for (const auto& value : values)
+                out.add(value);
+            return juce::var(out);
+        }
+
+        juce::var makeAudioDeviceSnapshotVar(const AudioEngine::AudioDeviceSnapshot& snapshot)
+        {
+            juce::Array<juce::var> devices;
+            devices.ensureStorageAllocated((int) snapshot.devices.size());
+            for (const auto& device : snapshot.devices)
+            {
+                juce::DynamicObject::Ptr object = new juce::DynamicObject();
+                object->setProperty("typeName", device.typeName);
+                object->setProperty("name", device.name);
+                object->setProperty("input", device.input);
+                object->setProperty("output", device.output);
+                object->setProperty("currentInput", device.currentInput);
+                object->setProperty("currentOutput", device.currentOutput);
+                devices.add(juce::var(object.get()));
+            }
+
+            juce::DynamicObject::Ptr object = new juce::DynamicObject();
+            object->setProperty("currentTypeName", snapshot.currentTypeName);
+            object->setProperty("currentInputName", snapshot.currentInputName);
+            object->setProperty("currentOutputName", snapshot.currentOutputName);
+            object->setProperty("sampleRate", snapshot.sampleRate);
+            object->setProperty("bufferSize", snapshot.bufferSize);
+            object->setProperty("inputLatencySamples", snapshot.inputLatencySamples);
+            object->setProperty("outputLatencySamples", snapshot.outputLatencySamples);
+            object->setProperty("inputChannelNames", stringArrayToVar(snapshot.inputChannelNames));
+            object->setProperty("outputChannelNames", stringArrayToVar(snapshot.outputChannelNames));
+            object->setProperty("devices", devices);
+            return juce::var(object.get());
+        }
+
+        juce::String trackKindToString(TrackKind kind)
+        {
+            switch (kind)
+            {
+                case TrackKind::Midi: return "midi";
+                case TrackKind::Mixed: return "mixed";
+                case TrackKind::Group: return "group";
+                case TrackKind::Audio:
+                default: return "audio";
+            }
+        }
+
+        juce::var makeAudioFileAssetVar(const AudioFileAsset& audioFile,
+                                        const std::optional<AudioFileAnalysis>& analysis = std::nullopt)
+        {
+            juce::DynamicObject::Ptr object = new juce::DynamicObject();
+            object->setProperty("id", audioFile.id);
+            object->setProperty("name", audioFile.name);
+            object->setProperty("path", audioFile.path);
+            object->setProperty("durationSeconds", audioFile.durationSeconds);
+            object->setProperty("sampleRate", audioFile.sampleRate);
+            if (analysis.has_value())
+            {
+                object->setProperty("bitDepth", analysis->bitDepth);
+                setAudioAnalysisProperties(*object, *analysis);
+            }
+            return juce::var(object.get());
+        }
+
+        juce::var makeAudioSegmentVar(const Segment& segment)
+        {
+            juce::DynamicObject::Ptr payload = new juce::DynamicObject();
+            payload->setProperty("kind", "audio");
+            payload->setProperty("audioFileId", segment.audioFileId);
+            payload->setProperty("gainDb", segment.audioGainDb);
+
+            juce::DynamicObject::Ptr object = new juce::DynamicObject();
+            object->setProperty("id", segment.id);
+            object->setProperty("trackId", segment.trackId);
+            object->setProperty("startBeat", segment.startBeat);
+            object->setProperty("lengthBeats", segment.lengthBeats);
+            object->setProperty("sourceStartBeat", segment.sourceStartBeat);
+            object->setProperty("fadeInBeats", segment.fadeInBeats);
+            object->setProperty("fadeOutBeats", segment.fadeOutBeats);
+            object->setProperty("repeats", segment.repeats);
+            object->setProperty("layer", segment.layer);
+            object->setProperty("muted", segment.muted);
+            object->setProperty("payload", juce::var(payload.get()));
+            return juce::var(object.get());
+        }
+
+        juce::var makeBouncedTrackVar(const Track& track)
+        {
+            juce::DynamicObject::Ptr effects = new juce::DynamicObject();
+            effects->setProperty("filters", juce::Array<juce::var> {});
+
+            juce::Array<juce::var> segments;
+            for (const auto& segment : track.segments)
+                segments.add(makeAudioSegmentVar(segment));
+
+            juce::DynamicObject::Ptr object = new juce::DynamicObject();
+            object->setProperty("id", track.id);
+            object->setProperty("name", track.name);
+            object->setProperty("kind", trackKindToString(track.kind));
+            object->setProperty("instrumentId", track.instrumentId);
+            object->setProperty("audioFileId", track.audioFileId);
+            object->setProperty("parentTrackId", track.parentTrackId);
+            object->setProperty("gainDb", track.gainDb);
+            object->setProperty("pan", track.pan);
+            object->setProperty("mute", track.mute);
+            object->setProperty("solo", track.solo);
+            object->setProperty("effects", juce::var(effects.get()));
+            object->setProperty("segments", segments);
+            object->setProperty("rowHeight", "normal");
+            return juce::var(object.get());
+        }
+
+        juce::Array<juce::var> makeFloatArrayVar(const std::vector<float>& values)
+        {
+            juce::Array<juce::var> out;
+            out.ensureStorageAllocated((int) values.size());
+            for (const auto value : values)
+                out.add(value);
+            return out;
+        }
+
+        juce::var makeWaveformChannel(const AudioWaveformChannel& channel)
+        {
+            juce::DynamicObject::Ptr object = new juce::DynamicObject();
+            object->setProperty("upper", makeFloatArrayVar(channel.upper));
+            object->setProperty("lower", makeFloatArrayVar(channel.lower));
+            return juce::var(object.get());
+        }
+
+        juce::var makeWaveformSummary(const AudioWaveformSummary& waveform)
+        {
+            juce::DynamicObject::Ptr object = new juce::DynamicObject();
+            object->setProperty("left", makeWaveformChannel(waveform.left));
+            object->setProperty("right", makeWaveformChannel(waveform.right));
+            object->setProperty("sampleRate", waveform.sampleRate);
+            object->setProperty("durationSeconds", waveform.durationSeconds);
+            object->setProperty("lengthInSamples", static_cast<double>(waveform.lengthInSamples));
+            object->setProperty("channelCount", waveform.channelCount);
+            object->setProperty("bucketCount", waveform.bucketCount);
+            return juce::var(object.get());
+        }
+
+        juce::String makeWavDataUrl(const juce::File& file)
+        {
+            juce::MemoryBlock data;
+            if (! file.loadFileAsData(data) || data.getSize() == 0)
+                return {};
+
+            return "data:audio/wav;base64," + juce::Base64::toBase64(data.getData(), data.getSize());
+        }
+
+        juce::String makeImageDataUrl(const juce::File& file)
+        {
+            if (! file.existsAsFile())
+                return {};
+
+            const auto size = file.getSize();
+            constexpr juce::int64 maxInlineImageBytes = 2 * 1024 * 1024;
+            if (size <= 0 || size > maxInlineImageBytes)
+                return {};
+
+            const auto extension = file.getFileExtension().toLowerCase();
+            juce::String mime;
+            if (extension == ".png")
+                mime = "image/png";
+            else if (extension == ".jpg" || extension == ".jpeg")
+                mime = "image/jpeg";
+            else if (extension == ".webp")
+                mime = "image/webp";
+            else
+                return {};
+
+            juce::MemoryBlock data;
+            if (! file.loadFileAsData(data) || data.getSize() == 0)
+                return {};
+
+            return "data:" + mime + ";base64," + juce::Base64::toBase64(data.getData(), data.getSize());
+        }
+
+        juce::Array<juce::var> makeStringArrayVar(const juce::StringArray& values)
+        {
+            juce::Array<juce::var> out;
+            for (const auto& value : values)
+                out.add(value);
+            return out;
+        }
+
+        juce::var makeSidecarCleanupReport(const ProjectSidecarCleanupReport& report)
+        {
+            juce::DynamicObject::Ptr object = new juce::DynamicObject();
+            object->setProperty("deletedFiles", report.deletedFiles);
+            object->setProperty("failedFiles", report.failedFiles);
+            object->setProperty("deletedPaths", makeStringArrayVar(report.deletedPaths));
+            object->setProperty("failedPaths", makeStringArrayVar(report.failedPaths));
+            return juce::var(object.get());
+        }
+
+        struct ExportRenderOptions
+        {
+            double sampleRate { 44100.0 };
+            int blockSize { 512 };
+            int channels { 2 };
+            int bitDepth { 16 };
+        };
+
+        int normalizeExportBitDepth(int value) noexcept
+        {
+            if (value <= 16) return 16;
+            if (value <= 24) return 24;
+            return 32;
+        }
+
+        ExportRenderOptions parseExportRenderOptions(const juce::var& payload)
+        {
+            ExportRenderOptions out;
+            const auto options = payload.getProperty("options", {});
+            if (options.isObject())
+            {
+                out.sampleRate = juce::jlimit(8000.0, 192000.0, (double) options.getProperty("sampleRate", out.sampleRate));
+                out.blockSize = juce::jlimit(64, 8192, (int) options.getProperty("blockSize", out.blockSize));
+                out.channels = juce::jlimit(1, 2, (int) options.getProperty("channels", out.channels));
+                out.bitDepth = normalizeExportBitDepth((int) options.getProperty("bitDepth", out.bitDepth));
+            }
+            return out;
+        }
 
         juce::var makeAudioFile(const juce::File& file)
         {
@@ -30,7 +301,112 @@ namespace beat
                 ? static_cast<double>(reader->lengthInSamples) / reader->sampleRate
                 : 0.0);
             audioFile->setProperty("sampleRate", reader->sampleRate);
+            audioFile->setProperty("bitDepth", static_cast<int>(reader->bitsPerSample));
+            audioFile->setProperty("sizeBytes", static_cast<double>(file.getSize()));
+            audioFile->setProperty("importedAt", static_cast<double>(juce::Time::getCurrentTime().toMilliseconds()));
+            if (auto analysis = AudioFileAnalyzer::analyzeFile(file))
+                setAudioAnalysisProperties(*audioFile, *analysis);
             return juce::var(audioFile.get());
+        }
+
+        double fallbackImportedAtForFile(const juce::File& file)
+        {
+            auto created = file.getCreationTime().toMilliseconds();
+            if (created > 0)
+                return static_cast<double>(created);
+
+            auto modified = file.getLastModificationTime().toMilliseconds();
+            if (modified > 0)
+                return static_cast<double>(modified);
+
+            return static_cast<double>(juce::Time::getCurrentTime().toMilliseconds());
+        }
+
+        bool audioFileNeedsMetadataRefresh(const juce::var& audioFile, bool hasAnalysis)
+        {
+            if (!audioFile.isObject())
+                return false;
+
+            const auto path = audioFile.getProperty("path", {}).toString();
+            if (path.isEmpty() || !juce::File(path).existsAsFile())
+                return false;
+
+            return (double) audioFile.getProperty("durationSeconds", 0.0) <= 0.0
+                || (int) audioFile.getProperty("sampleRate", 0) <= 0
+                || (double) audioFile.getProperty("sizeBytes", 0.0) <= 0.0
+                || (double) audioFile.getProperty("importedAt", 0.0) <= 0.0
+                || !hasAnalysis;
+        }
+
+        juce::var refreshAudioFileMetadata(const juce::var& existing)
+        {
+            const auto path = existing.getProperty("path", {}).toString();
+            auto refreshed = makeAudioFile(juce::File(path));
+            if (!refreshed.isObject())
+                return existing;
+
+            if (auto* object = refreshed.getDynamicObject())
+            {
+                object->setProperty("id", existing.getProperty("id", {}));
+
+                const auto storedName = existing.getProperty("name", {}).toString();
+                if (storedName.isNotEmpty())
+                    object->setProperty("name", storedName);
+
+                const auto storedImportedAt = (double) existing.getProperty("importedAt", 0.0);
+                object->setProperty("importedAt", storedImportedAt > 0.0
+                    ? storedImportedAt
+                    : fallbackImportedAtForFile(juce::File(path)));
+            }
+
+            return refreshed;
+        }
+
+        juce::File audioLibraryDirectory()
+        {
+            return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                .getChildFile("Beat")
+                .getChildFile("Audio Files");
+        }
+
+        bool fileLivesInsideDirectory(const juce::File& file, const juce::File& directory)
+        {
+            auto filePath = file.getFullPathName().replaceCharacter('\\', '/');
+            auto directoryPath = directory.getFullPathName().replaceCharacter('\\', '/');
+            if (!directoryPath.endsWithChar('/'))
+                directoryPath += "/";
+            return filePath.startsWithIgnoreCase(directoryPath);
+        }
+
+        juce::File uniqueAudioLibraryFile(const juce::File& source)
+        {
+            auto folder = audioLibraryDirectory();
+            folder.createDirectory();
+            auto candidate = folder.getChildFile(source.getFileName());
+            if (! candidate.exists())
+                return candidate;
+
+            const auto base = source.getFileNameWithoutExtension();
+            const auto ext = source.getFileExtension();
+            for (int i = 2; i < 10000; ++i)
+            {
+                candidate = folder.getChildFile(base + " " + juce::String(i) + ext);
+                if (! candidate.exists())
+                    return candidate;
+            }
+            return folder.getChildFile(base + " " + juce::Uuid().toString().substring(0, 8) + ext);
+        }
+
+        juce::File importAudioFileIntoLibrary(const juce::File& source)
+        {
+            const auto folder = audioLibraryDirectory();
+            if (source.getParentDirectory() == folder)
+                return source;
+
+            auto destination = uniqueAudioLibraryFile(source);
+            if (destination.existsAsFile())
+                destination.deleteFile();
+            return source.copyFileTo(destination) ? destination : source;
         }
 
         juce::var makeAudioFileResponse(const juce::File& file)
@@ -40,93 +416,275 @@ namespace beat
             return juce::var(response.get());
         }
 
-        void saveAudioFile(Database& database, const juce::var& audioFile);
-
-        juce::File resolveRelativeSamplePath(const juce::File& presetFile, juce::String path)
+        juce::File resolveFrontendAssetPath(const juce::String& path)
         {
-            path = path.replaceCharacter('\\', '/').trim();
-            if (path.isEmpty()) return {};
-
-            juce::File file(path);
-            if (path.startsWithChar('/') || path.contains(":")) return file;
-            return presetFile.getParentDirectory().getChildFile(path);
-        }
-
-        juce::String firstStringAttribute(const juce::XmlElement& element, std::initializer_list<const char*> names)
-        {
-            for (const auto* name : names)
+            if (path.startsWith("/samples/"))
             {
-                const auto value = element.getStringAttribute(name).trim();
-                if (value.isNotEmpty()) return value;
+                const auto executable = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
+                const auto resources = executable.getParentDirectory().getSiblingFile("Resources").getChildFile("frontend");
+                return resources.getChildFile(path.substring(1));
             }
-            return {};
+            return juce::File(path);
         }
 
-        int intAttribute(const juce::XmlElement& element, std::initializer_list<const char*> names, int fallback)
+        bool assetPathExists(const juce::String& path)
         {
-            for (const auto* name : names)
-            {
-                if (element.hasAttribute(name))
-                    return element.getIntAttribute(name, fallback);
-            }
-            return fallback;
+            if (path.isEmpty() || path.startsWith("blob:") || path.startsWith("data:"))
+                return true;
+            return resolveFrontendAssetPath(path).existsAsFile();
         }
 
-        double doubleAttribute(const juce::XmlElement& element, std::initializer_list<const char*> names, double fallback)
+        void addMissingAssetPath(juce::StringArray& missing, const juce::String& path)
         {
-            for (const auto* name : names)
-            {
-                if (element.hasAttribute(name))
-                    return element.getDoubleAttribute(name, fallback);
-            }
-            return fallback;
+            if (path.isNotEmpty() && !assetPathExists(path))
+                missing.addIfNotAlreadyThere(path);
         }
 
-        void collectDecentSamples(const juce::XmlElement& element, const juce::File& presetFile, juce::Array<juce::var>& samples, juce::StringArray& sampleUrls)
+        juce::StringArray collectMissingExportAssets(const juce::var& instrumentsVar, const juce::var& audioFilesVar)
         {
-            if (element.hasTagName("sample"))
+            juce::StringArray missing;
+            if (auto* audioFiles = audioFilesVar.getArray())
             {
-                const auto samplePath = firstStringAttribute(element, { "path", "file", "filename", "fileName", "sample" });
-                const auto file = resolveRelativeSamplePath(presetFile, samplePath);
-                if (file.existsAsFile())
+                for (const auto& audioFile : *audioFiles)
                 {
-                    const auto path = file.getFullPathName();
-                    if (!sampleUrls.contains(path))
-                        sampleUrls.add(path);
-
-                    juce::DynamicObject::Ptr sample = new juce::DynamicObject();
-                    sample->setProperty("path", path);
-                    sample->setProperty("name", file.getFileName());
-                    sample->setProperty("rootNote", intAttribute(element, { "rootNote", "root", "pitch_keycenter" }, 60));
-                    sample->setProperty("loNote", intAttribute(element, { "loNote", "loKey", "lokey" }, 0));
-                    sample->setProperty("hiNote", intAttribute(element, { "hiNote", "hiKey", "hikey" }, 127));
-                    sample->setProperty("loVel", intAttribute(element, { "loVel", "lovel" }, 0));
-                    sample->setProperty("hiVel", intAttribute(element, { "hiVel", "hivel" }, 127));
-                    sample->setProperty("volumeDb", doubleAttribute(element, { "volume", "gain" }, 0.0));
-                    sample->setProperty("pan", doubleAttribute(element, { "pan" }, 0.0));
-                    sample->setProperty("tuning", doubleAttribute(element, { "tuning", "pitch" }, 0.0));
-                    sample->setProperty("seqPosition", intAttribute(element, { "seqPosition", "seq_position" }, 0));
-                    samples.add(juce::var(sample.get()));
+                    if (!audioFile.isObject()) continue;
+                    addMissingAssetPath(missing, audioFile.getProperty("path", {}).toString());
                 }
             }
 
-            for (auto* child = element.getFirstChildElement(); child != nullptr; child = child->getNextElement())
-                collectDecentSamples(*child, presetFile, samples, sampleUrls);
+            if (auto* instruments = instrumentsVar.getArray())
+            {
+                for (const auto& instrument : *instruments)
+                {
+                    if (!instrument.isObject()) continue;
+                    addMissingAssetPath(missing, instrument.getProperty("sampleUrl", {}).toString());
+                    if (auto* sampleUrls = instrument.getProperty("sampleUrls", {}).getArray())
+                    {
+                        for (const auto& sampleUrl : *sampleUrls)
+                            addMissingAssetPath(missing, sampleUrl.toString());
+                    }
+                    if (auto* sampleMap = instrument.getProperty("sampleMap", {}).getArray())
+                    {
+                        for (const auto& zone : *sampleMap)
+                        {
+                            if (!zone.isObject()) continue;
+                            addMissingAssetPath(missing, zone.getProperty("path", zone.getProperty("sampleUrl", {})).toString());
+                        }
+                    }
+                }
+            }
+            return missing;
         }
 
-        juce::var makeDecentSamplerImport(Database& database, const juce::File& presetFile)
+        juce::String missingAssetExportError(const juce::StringArray& missing)
         {
-            auto xml = juce::XmlDocument::parse(presetFile);
-            if (xml == nullptr) return {};
+            if (missing.isEmpty()) return {};
+            juce::StringArray shown;
+            const int limit = juce::jmin(6, missing.size());
+            for (int i = 0; i < limit; ++i)
+                shown.add(missing[i]);
+            auto message = "Cannot export WAV because referenced audio/sample files are missing:\n"
+                + shown.joinIntoString("\n");
+            if (missing.size() > limit)
+                message += "\n...and " + juce::String(missing.size() - limit) + " more.";
+            return message;
+        }
 
+        juce::String projectIntegrityErrorDetails(const ProjectIntegrityReport& report)
+        {
+            if (report.ok())
+                return {};
+
+            juce::StringArray shown;
+            for (const auto& issue : report.issues)
+            {
+                if (issue.severity != ProjectIntegritySeverity::Error)
+                    continue;
+
+                shown.add(issue.path.isNotEmpty()
+                    ? issue.code + " at " + issue.path + ": " + issue.message
+                    : issue.code + ": " + issue.message);
+
+                if (shown.size() >= 6)
+                    break;
+            }
+
+            const auto remaining = report.errorCount() - shown.size();
+            if (remaining > 0)
+                shown.add("...and " + juce::String(remaining) + " more.");
+            return shown.joinIntoString("\n");
+        }
+
+        juce::String projectIntegritySaveError(const ProjectIntegrityReport& report)
+        {
+            const auto details = projectIntegrityErrorDetails(report);
+            if (details.isEmpty())
+                return {};
+            return "Cannot save Beat project because the document has invalid references:\n" + details;
+        }
+
+        juce::String projectIntegrityOpenError(const ProjectIntegrityReport& report)
+        {
+            const auto details = projectIntegrityErrorDetails(report);
+            if (details.isEmpty())
+                return {};
+            return "Cannot open Beat project because the document has invalid references:\n" + details;
+        }
+
+        juce::String assetPolicyForPath(const juce::String& path, const juce::String& kind)
+        {
+            if (kind == "plugin") return "plugin";
+            return path.startsWith("/samples/") ? "bundled" : "external";
+        }
+
+        juce::var makeMissingAssetObject(const juce::String& kind,
+                                         const juce::String& path,
+                                         const juce::String& name,
+                                         const juce::String& policy)
+        {
+            juce::DynamicObject::Ptr asset = new juce::DynamicObject();
+            asset->setProperty("id", "missing-" + juce::Uuid().toString());
+            asset->setProperty("kind", kind);
+            asset->setProperty("path", path);
+            if (name.isNotEmpty())
+                asset->setProperty("name", name);
+            asset->setProperty("policy", policy.isNotEmpty() ? policy : assetPolicyForPath(path, kind));
+            asset->setProperty("references", juce::Array<juce::var> {});
+            return juce::var(asset.get());
+        }
+
+        juce::Array<juce::var> collectMissingDocumentAssets(const juce::var& document)
+        {
+            juce::Array<juce::var> missing;
+            juce::StringArray seen;
+            const auto addMissing = [&](const juce::String& kind,
+                                        const juce::String& path,
+                                        const juce::String& name = {},
+                                        const juce::String& policy = {})
+            {
+                if (path.isEmpty() || assetPathExists(path) || seen.contains(path))
+                    return;
+                seen.add(path);
+                missing.add(makeMissingAssetObject(kind, path, name, policy));
+            };
+
+            if (auto* assets = document.getProperty("assets", {}).getArray())
+            {
+                for (const auto& asset : *assets)
+                {
+                    if (!asset.isObject()) continue;
+                    addMissing(
+                        asset.getProperty("kind", "sample").toString(),
+                        asset.getProperty("path", {}).toString(),
+                        asset.getProperty("name", {}).toString(),
+                        asset.getProperty("policy", {}).toString());
+                }
+                return missing;
+            }
+
+            if (auto* audioFiles = document.getProperty("audioFiles", {}).getArray())
+            {
+                for (const auto& audioFile : *audioFiles)
+                {
+                    if (!audioFile.isObject()) continue;
+                    addMissing("audio",
+                               audioFile.getProperty("path", {}).toString(),
+                               audioFile.getProperty("name", {}).toString());
+                }
+            }
+            if (auto* instruments = document.getProperty("instruments", {}).getArray())
+            {
+                for (const auto& instrument : *instruments)
+                {
+                    if (!instrument.isObject()) continue;
+                    const auto instrumentName = instrument.getProperty("name", {}).toString();
+                    addMissing("sample", instrument.getProperty("sampleUrl", {}).toString(), instrumentName);
+                    if (auto* sampleUrls = instrument.getProperty("sampleUrls", {}).getArray())
+                        for (const auto& sampleUrl : *sampleUrls)
+                            addMissing("sample", sampleUrl.toString(), instrumentName);
+                    if (auto* sampleMap = instrument.getProperty("sampleMap", {}).getArray())
+                    {
+                        for (const auto& zone : *sampleMap)
+                        {
+                            if (!zone.isObject()) continue;
+                            addMissing("sample",
+                                       zone.getProperty("path", zone.getProperty("sampleUrl", {})).toString(),
+                                       zone.getProperty("name", instrumentName).toString());
+                        }
+                    }
+                }
+            }
+            return missing;
+        }
+
+        float boundedEqDb(double value) noexcept
+        {
+            return juce::jlimit(-24.0f, 24.0f, (float) value);
+        }
+
+        float eqBandValue(const juce::Array<juce::var>* bands, int index) noexcept
+        {
+            if (bands == nullptr || index < 0 || index >= bands->size())
+                return 0.0f;
+            return boundedEqDb((double) bands->getReference(index));
+        }
+
+        EqAutomationPoint parseEqAutomationPoint(const juce::var& pointVar)
+        {
+            EqAutomationPoint point;
+            point.atBeat = (double) pointVar.getProperty("atBeat", 0.0);
+
+            if (auto* bands = pointVar.getProperty("bandsDb", {}).getArray())
+            {
+                point.lowDb = 0.5f * (eqBandValue(bands, 0) + eqBandValue(bands, 1));
+                point.midDb = 0.5f * (eqBandValue(bands, 2) + eqBandValue(bands, 3));
+                point.highDb = 0.5f * (eqBandValue(bands, 4) + eqBandValue(bands, 5));
+                point.airDb = eqBandValue(bands, 6);
+                return point;
+            }
+
+            point.lowDb = boundedEqDb((double) pointVar.getProperty("lowDb", 0.0));
+            point.midDb = boundedEqDb((double) pointVar.getProperty("midDb", 0.0));
+            point.highDb = boundedEqDb((double) pointVar.getProperty("highDb", 0.0));
+            point.airDb = boundedEqDb((double) pointVar.getProperty("airDb", 0.0));
+            return point;
+        }
+
+        void saveAudioFile(Database& database, const juce::var& audioFile);
+
+        juce::var makeDecentSamplerImport(Database& database, const DecentSamplerImport& source)
+        {
             juce::Array<juce::var> samples;
-            juce::StringArray sampleUrls;
-            collectDecentSamples(*xml, presetFile, samples, sampleUrls);
-            if (sampleUrls.isEmpty()) return {};
+            for (const auto& sourceSample : source.samples)
+            {
+                juce::DynamicObject::Ptr sample = new juce::DynamicObject();
+                sample->setProperty("path", sourceSample.path);
+                sample->setProperty("name", sourceSample.name);
+                sample->setProperty("rootNote", sourceSample.rootNote);
+                sample->setProperty("loNote", sourceSample.loNote);
+                sample->setProperty("hiNote", sourceSample.hiNote);
+                sample->setProperty("loVel", sourceSample.loVel);
+                sample->setProperty("hiVel", sourceSample.hiVel);
+                sample->setProperty("volumeDb", sourceSample.volumeDb);
+                sample->setProperty("pan", sourceSample.pan);
+                sample->setProperty("tuning", sourceSample.tuning);
+                sample->setProperty("seqPosition", sourceSample.seqPosition);
+                sample->setProperty("chokeGroup", sourceSample.chokeGroup);
+                sample->setProperty("loopEnabled", sourceSample.loopEnabled);
+                sample->setProperty("loopStart", sourceSample.loopStart);
+                sample->setProperty("loopEnd", sourceSample.loopEnd);
+                sample->setProperty("oneShot", sourceSample.oneShot);
+                sample->setProperty("durationSeconds", sourceSample.durationSeconds);
+                sample->setProperty("loLengthSeconds", sourceSample.loLengthSeconds);
+                sample->setProperty("hiLengthSeconds", sourceSample.hiLengthSeconds);
+                sample->setProperty("startSample", sourceSample.startSample);
+                sample->setProperty("endSample", sourceSample.endSample);
+                samples.add(juce::var(sample.get()));
+            }
 
             juce::Array<juce::var> audioFiles;
             juce::Array<juce::var> sampleUrlVars;
-            for (const auto& url : sampleUrls)
+            for (const auto& url : source.sampleUrls)
             {
                 sampleUrlVars.add(url);
                 const auto audioFile = makeAudioFile(juce::File(url));
@@ -137,9 +695,64 @@ namespace beat
                 }
             }
 
+            juce::Array<juce::var> uiControlDetails;
+            for (const auto& sourceControl : source.uiControlDetails)
+            {
+                juce::DynamicObject::Ptr control = new juce::DynamicObject();
+                control->setProperty("kind", sourceControl.kind);
+                control->setProperty("label", sourceControl.label);
+                control->setProperty("x", sourceControl.x);
+                control->setProperty("y", sourceControl.y);
+                control->setProperty("width", sourceControl.width);
+                control->setProperty("height", sourceControl.height);
+                control->setProperty("minValue", sourceControl.minValue);
+                control->setProperty("maxValue", sourceControl.maxValue);
+                control->setProperty("value", sourceControl.value);
+
+                juce::Array<juce::var> bindings;
+                for (const auto& sourceBinding : sourceControl.bindings)
+                {
+                    juce::DynamicObject::Ptr binding = new juce::DynamicObject();
+                    binding->setProperty("type", sourceBinding.type);
+                    binding->setProperty("level", sourceBinding.level);
+                    binding->setProperty("parameter", sourceBinding.parameter);
+                    binding->setProperty("position", sourceBinding.position);
+                    bindings.add(juce::var(binding.get()));
+                }
+                control->setProperty("bindings", bindings);
+                uiControlDetails.add(juce::var(control.get()));
+            }
+
+            juce::Array<juce::var> dsEffects;
+            for (const auto& sourceEffect : source.effects)
+            {
+                juce::DynamicObject::Ptr effect = new juce::DynamicObject();
+                effect->setProperty("type", sourceEffect.type);
+                effect->setProperty("position", sourceEffect.position);
+                effect->setProperty("frequency", sourceEffect.frequency);
+                effect->setProperty("resonance", sourceEffect.resonance);
+                effect->setProperty("wetLevel", sourceEffect.wetLevel);
+                effect->setProperty("roomSize", sourceEffect.roomSize);
+                effect->setProperty("damping", sourceEffect.damping);
+                dsEffects.add(juce::var(effect.get()));
+            }
+
             juce::DynamicObject::Ptr preset = new juce::DynamicObject();
-            preset->setProperty("name", xml->getStringAttribute("name", presetFile.getFileNameWithoutExtension()));
-            preset->setProperty("path", presetFile.getFullPathName());
+            preset->setProperty("name", source.name);
+            preset->setProperty("path", source.path);
+            preset->setProperty("pluginId", source.pluginId);
+            preset->setProperty("uiImagePath", source.uiImagePath);
+            if (source.uiImagePath.isNotEmpty())
+            {
+                const auto uiImageDataUrl = makeImageDataUrl(juce::File(source.uiImagePath));
+                if (uiImageDataUrl.isNotEmpty())
+                    preset->setProperty("uiImageDataUrl", uiImageDataUrl);
+            }
+            preset->setProperty("uiWidth", source.uiWidth);
+            preset->setProperty("uiHeight", source.uiHeight);
+            preset->setProperty("uiControls", source.uiControls);
+            preset->setProperty("uiControlDetails", uiControlDetails);
+            preset->setProperty("effects", dsEffects);
             preset->setProperty("sampleUrls", sampleUrlVars);
             preset->setProperty("samples", samples);
             preset->setProperty("audioFiles", audioFiles);
@@ -150,20 +763,64 @@ namespace beat
         {
             if (!audioFile.isObject()) return;
 
+            const auto bindOptionalDouble = [](Statement& stmt, int idx, const juce::var& value)
+            {
+                if (value.isVoid())
+                {
+                    stmt.bindNull(idx);
+                    return;
+                }
+
+                const auto numericValue = static_cast<double>(value);
+                if (std::isfinite(numericValue))
+                    stmt.bind(idx, numericValue);
+                else
+                    stmt.bindNull(idx);
+            };
+
             Statement stmt(database, R"sql(
-                INSERT INTO audio_files(id, name, path, duration_s, sample_rate)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO audio_files(
+                    id, name, path, duration_s, sample_rate, bit_depth, size_bytes, imported_at,
+                    left_peak_dbfs, right_peak_dbfs, true_peak_dbtp, rms_dbfs, crest_factor_db,
+                    dc_offset, clipping_count, clipping_ratio, stereo_correlation, integrated_lufs)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                   name = excluded.name,
                   path = excluded.path,
                   duration_s = excluded.duration_s,
-                  sample_rate = excluded.sample_rate
+                  sample_rate = excluded.sample_rate,
+                  bit_depth = excluded.bit_depth,
+                  size_bytes = excluded.size_bytes,
+                  imported_at = excluded.imported_at,
+                  left_peak_dbfs = excluded.left_peak_dbfs,
+                  right_peak_dbfs = excluded.right_peak_dbfs,
+                  true_peak_dbtp = excluded.true_peak_dbtp,
+                  rms_dbfs = excluded.rms_dbfs,
+                  crest_factor_db = excluded.crest_factor_db,
+                  dc_offset = excluded.dc_offset,
+                  clipping_count = excluded.clipping_count,
+                  clipping_ratio = excluded.clipping_ratio,
+                  stereo_correlation = excluded.stereo_correlation,
+                  integrated_lufs = excluded.integrated_lufs
             )sql");
             stmt.bind(1, audioFile.getProperty("id", {}).toString());
             stmt.bind(2, audioFile.getProperty("name", {}).toString());
             stmt.bind(3, audioFile.getProperty("path", {}).toString());
             stmt.bind(4, (double) audioFile.getProperty("durationSeconds", 0.0));
             stmt.bind(5, (int) audioFile.getProperty("sampleRate", 0));
+            stmt.bind(6, (int) audioFile.getProperty("bitDepth", 0));
+            stmt.bind(7, (double) audioFile.getProperty("sizeBytes", 0.0));
+            stmt.bind(8, (double) audioFile.getProperty("importedAt", 0.0));
+            bindOptionalDouble(stmt, 9, audioFile.getProperty("leftPeakDbFS", {}));
+            bindOptionalDouble(stmt, 10, audioFile.getProperty("rightPeakDbFS", {}));
+            bindOptionalDouble(stmt, 11, audioFile.getProperty("truePeakDbTP", {}));
+            bindOptionalDouble(stmt, 12, audioFile.getProperty("rmsDbFS", {}));
+            bindOptionalDouble(stmt, 13, audioFile.getProperty("crestFactorDb", {}));
+            bindOptionalDouble(stmt, 14, audioFile.getProperty("dcOffset", {}));
+            stmt.bind(15, (int) audioFile.getProperty("clippingCount", 0));
+            bindOptionalDouble(stmt, 16, audioFile.getProperty("clippingRatio", {}));
+            bindOptionalDouble(stmt, 17, audioFile.getProperty("stereoCorrelation", {}));
+            bindOptionalDouble(stmt, 18, audioFile.getProperty("integratedLufs", {}));
             stmt.step();
         }
 
@@ -249,6 +906,7 @@ namespace beat
                 const auto kind = value.toString();
                 if (kind == "midi") return TrackKind::Midi;
                 if (kind == "mixed") return TrackKind::Mixed;
+                if (kind == "group") return TrackKind::Group;
                 return TrackKind::Audio;
             }
             return static_cast<TrackKind>((int) value);
@@ -265,6 +923,71 @@ namespace beat
                 return SegmentPayloadKind::Audio;
             }
             return static_cast<SegmentPayloadKind>((int) value);
+        }
+
+        TrackEffectKind parseTrackEffectKind(const juce::var& value)
+        {
+            if (value.isInt() || value.isInt64())
+            {
+                const auto kind = (TrackEffectKind) (int) value;
+                switch (kind)
+                {
+                    case TrackEffectKind::Bitcrush:
+                    case TrackEffectKind::Lowpass:
+                    case TrackEffectKind::Highpass:
+                    case TrackEffectKind::Saturator:
+                    case TrackEffectKind::Reverb:
+                    case TrackEffectKind::Delay:
+                    case TrackEffectKind::Compressor:
+                    case TrackEffectKind::Plugin:
+                    case TrackEffectKind::Chorus:
+                    case TrackEffectKind::Phaser:
+                    case TrackEffectKind::Flanger:
+                    case TrackEffectKind::Distortion:
+                        return kind;
+                    case TrackEffectKind::Unknown:
+                    default:
+                        return TrackEffectKind::Unknown;
+                }
+            }
+
+            const auto kind = value.toString();
+            if (kind == "bitcrush") return TrackEffectKind::Bitcrush;
+            if (kind == "lowpass") return TrackEffectKind::Lowpass;
+            if (kind == "highpass") return TrackEffectKind::Highpass;
+            if (kind == "saturator") return TrackEffectKind::Saturator;
+            if (kind == "distortion") return TrackEffectKind::Distortion;
+            if (kind == "reverb") return TrackEffectKind::Reverb;
+            if (kind == "delay") return TrackEffectKind::Delay;
+            if (kind == "compressor") return TrackEffectKind::Compressor;
+            if (kind == "chorus") return TrackEffectKind::Chorus;
+            if (kind == "phaser") return TrackEffectKind::Phaser;
+            if (kind == "flanger") return TrackEffectKind::Flanger;
+            if (kind == "plugin") return TrackEffectKind::Plugin;
+            return TrackEffectKind::Unknown;
+        }
+
+        AutomationCurve parseAutomationCurve(const juce::var& value)
+        {
+            if (value.isString())
+            {
+                const auto curve = value.toString().toLowerCase();
+                if (curve == "hold") return AutomationCurve::Hold;
+                if (curve == "quadratic") return AutomationCurve::Quadratic;
+                if (curve == "cubic") return AutomationCurve::Cubic;
+                if (curve == "easein" || curve == "ease-in") return AutomationCurve::EaseIn;
+                if (curve == "easeout" || curve == "ease-out") return AutomationCurve::EaseOut;
+                if (curve == "smoothstep" || curve == "smooth-step") return AutomationCurve::Smoothstep;
+                return AutomationCurve::Linear;
+            }
+            const int curve = (int) value;
+            if (curve == 0) return AutomationCurve::Hold;
+            if (curve == 2) return AutomationCurve::Quadratic;
+            if (curve == 3) return AutomationCurve::Cubic;
+            if (curve == 4) return AutomationCurve::EaseIn;
+            if (curve == 5) return AutomationCurve::EaseOut;
+            if (curve == 6) return AutomationCurve::Smoothstep;
+            return AutomationCurve::Linear;
         }
 
         int parseWaveform(const juce::var& value, const juce::String& kind)
@@ -371,7 +1094,178 @@ namespace beat
             return swingOffset + (lean / 100.0) * stepLengthBeats;
         }
 
-        Project parseProjectFromFrontend(const juce::var& projectVar, const juce::var& instrumentsVar)
+        PluginCapability parsePluginCapability(const juce::var& capabilityVar)
+        {
+            PluginCapability capability;
+            if (!capabilityVar.isObject()) return capability;
+
+            capability.id = capabilityVar.getProperty("id", "").toString();
+            capability.kind = capabilityVar.getProperty("kind", "").toString();
+            capability.label = capabilityVar.getProperty("label", capabilityVar.getProperty("name", "")).toString();
+            capability.realtime = (bool) capabilityVar.getProperty("realtime", false);
+            capability.offline = (bool) capabilityVar.getProperty("offline", false);
+            capability.latencySamples = juce::jlimit(0, 192000, (int) capabilityVar.getProperty("latencySamples", 0));
+            capability.fallbackMode = capabilityVar.getProperty("fallbackMode", capabilityVar.getProperty("fallback", "")).toString();
+            return capability;
+        }
+
+        PluginAdapterDefinition parsePluginAdapter(const juce::var& pluginVar)
+        {
+            PluginAdapterDefinition plugin;
+            if (!pluginVar.isObject()) return plugin;
+
+            plugin.id = pluginVar.getProperty("id", "").toString();
+            plugin.name = pluginVar.getProperty("name", "").toString();
+            plugin.vendor = pluginVar.getProperty("vendor", "").toString();
+            plugin.version = pluginVar.getProperty("version", "").toString();
+            plugin.kind = pluginVar.getProperty("kind", "").toString();
+            plugin.format = pluginVar.getProperty("format", "").toString();
+            plugin.status = pluginVar.getProperty("status", "").toString();
+            plugin.instrumentMode = pluginVar.getProperty("instrumentMode", "").toString();
+            plugin.description = pluginVar.getProperty("description", "").toString();
+            plugin.sourceFileName = pluginVar.getProperty("sourceFileName", "").toString();
+            plugin.sourcePath = pluginVar.getProperty("sourcePath", "").toString();
+            plugin.uiImagePath = pluginVar.getProperty("uiImagePath", "").toString();
+            plugin.uiImageDataUrl = pluginVar.getProperty("uiImageDataUrl", "").toString();
+            plugin.uiWidth = (int) pluginVar.getProperty("uiWidth", 0);
+            plugin.uiHeight = (int) pluginVar.getProperty("uiHeight", 0);
+            plugin.sampleCount = (int) pluginVar.getProperty("sampleCount", 0);
+            plugin.uiControlCount = (int) pluginVar.getProperty("uiControlCount", 0);
+            plugin.factory = (bool) pluginVar.getProperty("factory", false);
+            plugin.installedAt = (double) pluginVar.getProperty("installedAt", 0.0);
+
+            if (auto* capabilities = pluginVar.getProperty("capabilities", {}).getArray())
+            {
+                plugin.capabilities.reserve((size_t) capabilities->size());
+                for (const auto& capabilityVar : *capabilities)
+                {
+                    auto capability = parsePluginCapability(capabilityVar);
+                    if (capability.kind.isNotEmpty())
+                        plugin.capabilities.push_back(std::move(capability));
+                }
+            }
+
+            return plugin;
+        }
+
+        RecordingInputProfile parseRecordingInputProfile(const juce::var& inputVar)
+        {
+            RecordingInputProfile profile;
+            if (!inputVar.isObject())
+                return profile;
+
+            profile.inputDeviceId = inputVar.getProperty("inputDeviceId", "").toString();
+            profile.inputDeviceName = inputVar.getProperty("inputDeviceName", "").toString();
+            profile.inputChannelStart = juce::jlimit(0, 1024, (int) inputVar.getProperty("inputChannelStart", 0));
+            profile.inputChannelCount = juce::jlimit(1, 1024, (int) inputVar.getProperty("inputChannelCount", 2));
+            profile.calibrationSampleRate = juce::jlimit(0.0, 768000.0, (double) inputVar.getProperty("calibrationSampleRate", 0.0));
+            profile.measuredRoundTripSamples = juce::jlimit(0, 1920000, (int) inputVar.getProperty("measuredRoundTripSamples", 0));
+            profile.reportedInputLatencySamples = juce::jlimit(0, 1920000, (int) inputVar.getProperty("reportedInputLatencySamples", 0));
+            profile.reportedOutputLatencySamples = juce::jlimit(0, 1920000, (int) inputVar.getProperty("reportedOutputLatencySamples", 0));
+            profile.userLatencyAdjustmentSamples = juce::jlimit(-1920000, 1920000, (int) inputVar.getProperty("userLatencyAdjustmentSamples", 0));
+            return profile;
+        }
+
+        MasterChainSettings parseMasterChainSettings(const juce::var& masterVar)
+        {
+            MasterChainSettings settings;
+            if (!masterVar.isObject())
+                return settings;
+
+            settings.inputGainDb = juce::jlimit(-48.0f, 24.0f, (float) (double) masterVar.getProperty("inputGainDb", 0.0));
+            settings.compressorEnabled = (bool) masterVar.getProperty("compressorEnabled", false);
+            settings.compressorThresholdDb = juce::jlimit(-60.0f, 0.0f, (float) (double) masterVar.getProperty("compressorThresholdDb", -18.0));
+            settings.compressorRatio = juce::jlimit(1.0f, 40.0f, (float) (double) masterVar.getProperty("compressorRatio", 2.0));
+            settings.compressorAttackMs = juce::jlimit(0.1f, 200.0f, (float) (double) masterVar.getProperty("compressorAttackMs", 20.0));
+            settings.compressorReleaseMs = juce::jlimit(1.0f, 3000.0f, (float) (double) masterVar.getProperty("compressorReleaseMs", 160.0));
+            settings.compressorMakeupDb = juce::jlimit(-24.0f, 24.0f, (float) (double) masterVar.getProperty("compressorMakeupDb", 0.0));
+            settings.compressorMix = juce::jlimit(0.0f, 100.0f, (float) (double) masterVar.getProperty("compressorMix", 100.0));
+            settings.outputGainDb = juce::jlimit(-48.0f, 24.0f, (float) (double) masterVar.getProperty("outputGainDb", 0.0));
+            return settings;
+        }
+
+        TrackSend parseTrackSend(const juce::var& sendVar)
+        {
+            TrackSend send;
+            if (!sendVar.isObject())
+                return send;
+
+            send.busId = sendVar.getProperty("busId", sendVar.getProperty("returnBusId", "")).toString();
+            send.gainDb = juce::jlimit(-96.0f, 24.0f, (float) (double) sendVar.getProperty("gainDb", -96.0));
+            send.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) sendVar.getProperty("pan", 0.0));
+            send.enabled = (bool) sendVar.getProperty("enabled", true);
+            return send;
+        }
+
+        TrackEffect parseTrackEffect(const juce::var& effectVar)
+        {
+            TrackEffect effect;
+            if (!effectVar.isObject())
+                return effect;
+
+            effect.id = effectVar.getProperty("id", "").toString();
+            effect.kind = parseTrackEffectKind(effectVar.getProperty("kind", ""));
+            effect.schemaVersion = juce::jlimit(0, kCurrentTrackEffectSchemaVersion, (int) effectVar.getProperty("schemaVersion", 0));
+            effect.bypassed = (bool) effectVar.getProperty("bypassed", false);
+            effect.pluginId = effectVar.getProperty("pluginId", "").toString();
+            effect.pluginName = effectVar.getProperty("pluginName", effectVar.getProperty("name", "")).toString();
+            effect.pluginFormat = effectVar.getProperty("pluginFormat", effectVar.getProperty("format", "")).toString();
+            effect.latencySamples = juce::jlimit(0, 192000, (int) effectVar.getProperty("latencySamples", 0));
+
+            if (auto* object = effectVar.getProperty("params", {}).getDynamicObject())
+            {
+                for (const auto& property : object->getProperties())
+                {
+                    if (!property.value.isDouble() && !property.value.isInt() && !property.value.isBool())
+                        continue;
+                    effect.params.push_back({
+                        property.name.toString(),
+                        juce::jlimit(-100000.0f, 100000.0f, (float) (double) property.value),
+                    });
+                }
+            }
+
+            if (auto* automation = effectVar.getProperty("automation", {}).getArray())
+            {
+                for (const auto& laneVar : *automation)
+                {
+                    if (!laneVar.isObject()) continue;
+                    MidiAutomationLane lane;
+                    lane.target = laneVar.getProperty("param", laneVar.getProperty("target", "")).toString();
+                    if (lane.target.isEmpty()) continue;
+                    if (auto* points = laneVar.getProperty("points", {}).getArray())
+                    {
+                        for (const auto& pointVar : *points)
+                        {
+                            if (!pointVar.isObject()) continue;
+                            MidiAutomationPoint point;
+                            point.beat = (double) pointVar.getProperty("beat", 0.0);
+                            point.value = (float) (double) pointVar.getProperty("value", 0.0);
+                            point.curve = parseAutomationCurve(pointVar.getProperty("curve", "linear"));
+                            if (std::isfinite(point.beat) && std::isfinite(point.value))
+                                lane.points.push_back(point);
+                        }
+                    }
+                    if (!lane.points.empty())
+                    {
+                        std::sort(lane.points.begin(), lane.points.end(),
+                                  [](const MidiAutomationPoint& a, const MidiAutomationPoint& b) {
+                                      return a.beat < b.beat;
+                                  });
+                        effect.automation.push_back(std::move(lane));
+                    }
+                }
+            }
+
+            if (effect.kind != TrackEffectKind::Unknown)
+                normalizeTrackEffect(effect);
+
+            return effect;
+        }
+
+        Project parseProjectFromFrontend(const juce::var& projectVar,
+                                         const juce::var& instrumentsVar,
+                                         const juce::var& audioFilesVar)
         {
             Project p;
             if (!projectVar.isObject()) return p;
@@ -387,6 +1281,36 @@ namespace beat
                 p.timeSignatureNum = (int) timeSignature.getProperty("num", 4);
                 p.timeSignatureDenom = (int) timeSignature.getProperty("denom", 4);
             }
+            p.recordingInput = parseRecordingInputProfile(projectVar.getProperty("recordingInput", {}));
+            p.masterChain = parseMasterChainSettings(projectVar.getProperty("masterChain", {}));
+
+            if (auto* audioFiles = audioFilesVar.getArray())
+            {
+                p.audioFiles.reserve((size_t) audioFiles->size());
+                for (const auto& audioFileVar : *audioFiles)
+                {
+                    if (!audioFileVar.isObject()) continue;
+                    AudioFileAsset audioFile;
+                    audioFile.id = audioFileVar.getProperty("id", "").toString();
+                    audioFile.name = audioFileVar.getProperty("name", "").toString();
+                    audioFile.path = audioFileVar.getProperty("path", "").toString();
+                    audioFile.durationSeconds = (double) audioFileVar.getProperty("durationSeconds", 0.0);
+                    audioFile.sampleRate = (double) audioFileVar.getProperty("sampleRate", 0.0);
+                    if (audioFile.id.isNotEmpty() && audioFile.path.isNotEmpty())
+                        p.audioFiles.push_back(std::move(audioFile));
+                }
+            }
+
+            if (auto* plugins = projectVar.getProperty("plugins", {}).getArray())
+            {
+                p.plugins.reserve((size_t) plugins->size());
+                for (const auto& pluginVar : *plugins)
+                {
+                    auto plugin = parsePluginAdapter(pluginVar);
+                    if (plugin.id.isNotEmpty())
+                        p.plugins.push_back(std::move(plugin));
+                }
+            }
 
             if (auto* tracks = projectVar.getProperty("tracks", {}).getArray())
             {
@@ -399,10 +1323,40 @@ namespace beat
                     t.kind = parseTrackKind(trackVar.getProperty("kind", "audio"));
                     t.instrumentId = trackVar.getProperty("instrumentId", "").toString();
                     t.audioFileId = trackVar.getProperty("audioFileId", "").toString();
+                    t.parentTrackId = trackVar.getProperty("parentTrackId", "").toString();
                     t.gainDb = (float) (double) trackVar.getProperty("gainDb", 0.0);
                     t.pan = (float) (double) trackVar.getProperty("pan", 0.0);
                     t.mute = (bool) trackVar.getProperty("mute", false);
                     t.solo = (bool) trackVar.getProperty("solo", false);
+                    t.recordArmed = (bool) trackVar.getProperty("recordArmed", false);
+                    t.inputMonitoring = (bool) trackVar.getProperty("inputMonitoring", false);
+                    t.inputDeviceId = trackVar.getProperty("inputDeviceId", "").toString();
+                    t.inputChannelStart = juce::jlimit(0, 1024, (int) trackVar.getProperty("inputChannelStart", 0));
+                    t.inputChannelCount = juce::jlimit(1, 1024, (int) trackVar.getProperty("inputChannelCount", 1));
+                    t.recordGainDb = (float) (double) trackVar.getProperty("recordGainDb", 0.0);
+
+                    if (auto* sends = trackVar.getProperty("sends", {}).getArray())
+                    {
+                        for (const auto& sendVar : *sends)
+                        {
+                            auto send = parseTrackSend(sendVar);
+                            if (send.busId.isNotEmpty())
+                                t.sends.push_back(send);
+                        }
+                    }
+
+                    const auto effects = trackVar.getProperty("effects", {});
+                    if (auto* filters = effects.getProperty("filters", {}).getArray())
+                    {
+                        t.effects.reserve((size_t) filters->size());
+                        for (const auto& effectVar : *filters)
+                        {
+                            auto effect = parseTrackEffect(effectVar);
+
+                            if (effect.kind != TrackEffectKind::Unknown)
+                                t.effects.push_back(std::move(effect));
+                        }
+                    }
 
                     if (auto* segments = trackVar.getProperty("segments", {}).getArray())
                     {
@@ -414,6 +1368,9 @@ namespace beat
                             s.trackId = t.id;
                             s.startBeat = (double) segmentVar.getProperty("startBeat", 0.0);
                             s.lengthBeats = (double) segmentVar.getProperty("lengthBeats", 4.0);
+                            s.sourceStartBeat = (double) segmentVar.getProperty("sourceStartBeat", 0.0);
+                            s.fadeInBeats = (double) segmentVar.getProperty("fadeInBeats", 0.0);
+                            s.fadeOutBeats = (double) segmentVar.getProperty("fadeOutBeats", 0.0);
                             s.repeats = (int) segmentVar.getProperty("repeats", 0);
                             s.layer = (int) segmentVar.getProperty("layer", 0);
                             s.muted = (bool) segmentVar.getProperty("muted", false);
@@ -496,8 +1453,8 @@ namespace beat
                                                 if (!pointVar.isObject()) continue;
                                                 MidiPitchCurvePoint point;
                                                 point.beat = (double) pointVar.getProperty("beat", n.startBeat);
-                                                point.pitch = juce::jlimit(0, 127, (int) pointVar.getProperty("pitch", n.pitch) + transpose);
-                                                if (std::isfinite(point.beat))
+                                                point.pitch = juce::jlimit(0.0, 127.0, (double) pointVar.getProperty("pitch", (double) n.pitch) + (double) transpose);
+                                                if (std::isfinite(point.beat) && std::isfinite(point.pitch))
                                                     n.curve.push_back(point);
                                             }
                                             std::sort(n.curve.begin(), n.curve.end(),
@@ -520,11 +1477,12 @@ namespace beat
                                                     for (const auto& pointVar : *points)
                                                     {
                                                         if (!pointVar.isObject()) continue;
-                                                        MidiAutomationPoint point;
-                                                        point.beat = (double) pointVar.getProperty("beat", n.startBeat);
-                                                        point.value = (float) (double) pointVar.getProperty("value", 0.0);
-                                                        if (std::isfinite(point.beat) && std::isfinite(point.value))
-                                                            lane.points.push_back(point);
+                                                MidiAutomationPoint point;
+                                                point.beat = (double) pointVar.getProperty("beat", n.startBeat);
+                                                point.value = (float) (double) pointVar.getProperty("value", 0.0);
+                                                point.curve = parseAutomationCurve(pointVar.getProperty("curve", "linear"));
+                                                if (std::isfinite(point.beat) && std::isfinite(point.value))
+                                                    lane.points.push_back(point);
                                                     }
                                                 }
 
@@ -561,6 +1519,7 @@ namespace beat
                                                 MidiAutomationPoint point;
                                                 point.beat = (double) pointVar.getProperty("beat", 0.0);
                                                 point.value = (float) (double) pointVar.getProperty("value", 0.0);
+                                                point.curve = parseAutomationCurve(pointVar.getProperty("curve", "linear"));
                                                 if (std::isfinite(point.beat) && std::isfinite(point.value))
                                                     lane.points.push_back(point);
                                             }
@@ -586,6 +1545,31 @@ namespace beat
                         }
                     }
                     p.tracks.push_back(std::move(t));
+                }
+            }
+
+            if (auto* buses = projectVar.getProperty("returnBuses", {}).getArray())
+            {
+                for (const auto& busVar : *buses)
+                {
+                    if (!busVar.isObject()) continue;
+                    ReturnBus bus;
+                    bus.id = busVar.getProperty("id", "").toString();
+                    bus.name = busVar.getProperty("name", "").toString();
+                    bus.gainDb = juce::jlimit(-96.0f, 24.0f, (float) (double) busVar.getProperty("gainDb", 0.0));
+                    bus.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) busVar.getProperty("pan", 0.0));
+                    bus.mute = (bool) busVar.getProperty("mute", false);
+                    if (auto* filters = busVar.getProperty("effects", {}).getProperty("filters", {}).getArray())
+                    {
+                        for (const auto& effectVar : *filters)
+                        {
+                            auto effect = parseTrackEffect(effectVar);
+                            if (effect.kind != TrackEffectKind::Unknown)
+                                bus.effects.push_back(std::move(effect));
+                        }
+                    }
+                    if (bus.id.isNotEmpty())
+                        p.returnBuses.push_back(std::move(bus));
                 }
             }
 
@@ -636,6 +1620,17 @@ namespace beat
                     instrument.envToFilter = floatParam(instrumentVar, "envToFilter", instrument.envToFilter, -1.0f, 1.0f);
                     instrument.ampLevel = floatParam(instrumentVar, "ampLevel", instrument.ampLevel, 0.0f, 1.0f);
                     instrument.ampPan = floatParam(instrumentVar, "ampPan", instrument.ampPan, -1.0f, 1.0f);
+
+                    if (auto* filters = instrumentVar.getProperty("effects", {}).getProperty("filters", {}).getArray())
+                    {
+                        instrument.effects.reserve((size_t) filters->size());
+                        for (const auto& effectVar : *filters)
+                        {
+                            auto effect = parseTrackEffect(effectVar);
+                            if (effect.kind != TrackEffectKind::Unknown)
+                                instrument.effects.push_back(std::move(effect));
+                        }
+                    }
 
                     InstrumentDefinition::WavetableConfig globalWavetable;
                     globalWavetable.bank = instrument.wavetableBank;
@@ -710,8 +1705,26 @@ namespace beat
                             zone.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) zoneVar.getProperty("pan", 0.0));
                             zone.tuningCents = juce::jlimit(-1200.0f, 1200.0f, (float) (double) zoneVar.getProperty("tuning", zoneVar.getProperty("tuningCents", 0.0)));
                             zone.seqPosition = juce::jmax(0, (int) zoneVar.getProperty("seqPosition", 0));
+                            zone.chokeGroup = juce::jmax(0, (int) zoneVar.getProperty("chokeGroup", zoneVar.getProperty("exclusiveGroup", 0)));
+                            zone.loopEnabled = (bool) zoneVar.getProperty("loopEnabled", false);
+                            zone.loopStart = juce::jmax(0, (int) zoneVar.getProperty("loopStart", 0));
+                            zone.loopEnd = juce::jmax(0, (int) zoneVar.getProperty("loopEnd", 0));
+                            zone.oneShot = (bool) zoneVar.getProperty("oneShot", false);
+                            zone.durationSeconds = juce::jmax(0.0, (double) zoneVar.getProperty("durationSeconds", 0.0));
+                            zone.loLengthSeconds = juce::jmax(0.0, (double) zoneVar.getProperty("loLengthSeconds", 0.0));
+                            zone.hiLengthSeconds = juce::jmax(0.0, (double) zoneVar.getProperty("hiLengthSeconds", 0.0));
+                            zone.startSample = juce::jmax(0, (int) zoneVar.getProperty("startSample", 0));
+                            zone.endSample = juce::jmax(0, (int) zoneVar.getProperty("endSample", 0));
                             if (zone.loNote > zone.hiNote) std::swap(zone.loNote, zone.hiNote);
                             if (zone.loVel > zone.hiVel) std::swap(zone.loVel, zone.hiVel);
+                            if (zone.hiLengthSeconds > 0.0 && zone.loLengthSeconds > zone.hiLengthSeconds)
+                                std::swap(zone.loLengthSeconds, zone.hiLengthSeconds);
+                            if (zone.endSample > 0 && zone.startSample >= zone.endSample)
+                            {
+                                zone.startSample = 0;
+                                zone.endSample = 0;
+                            }
+                            if (zone.loopEnd > 0 && zone.loopStart >= zone.loopEnd) zone.loopEnabled = false;
                             instrument.sampleZones.push_back(zone);
                             if (!instrument.sampleUrls.contains(zone.path))
                                 instrument.sampleUrls.add(zone.path);
@@ -730,13 +1743,7 @@ namespace beat
                 for (const auto& pointVar : *eq)
                 {
                     if (!pointVar.isObject()) continue;
-                    EqAutomationPoint point;
-                    point.atBeat = (double) pointVar.getProperty("atBeat", 0.0);
-                    point.lowDb = (float) (double) pointVar.getProperty("lowDb", 0.0);
-                    point.midDb = (float) (double) pointVar.getProperty("midDb", 0.0);
-                    point.highDb = (float) (double) pointVar.getProperty("highDb", 0.0);
-                    point.airDb = (float) (double) pointVar.getProperty("airDb", 0.0);
-                    p.eqAutomation.push_back(point);
+                    p.eqAutomation.push_back(parseEqAutomationPoint(pointVar));
                 }
             }
 
@@ -747,6 +1754,7 @@ namespace beat
                 {
                     if (!laneVar.isObject()) continue;
                     ProjectAutomationLane lane;
+                    lane.trackId = laneVar.getProperty("trackId", "").toString();
                     lane.instrumentId = laneVar.getProperty("instrumentId", "").toString();
                     lane.target = laneVar.getProperty("target", "").toString();
                     if (lane.target.isEmpty() || lane.target == "pitch") continue;
@@ -760,6 +1768,7 @@ namespace beat
                             MidiAutomationPoint point;
                             point.beat = (double) pointVar.getProperty("beat", 0.0);
                             point.value = (float) (double) pointVar.getProperty("value", 0.0);
+                            point.curve = parseAutomationCurve(pointVar.getProperty("curve", "linear"));
                             if (std::isfinite(point.beat) && std::isfinite(point.value))
                                 lane.points.push_back(point);
                         }
@@ -800,9 +1809,60 @@ namespace beat
 
     MessageBridge::~MessageBridge()
     {
+        {
+            const std::lock_guard<std::mutex> lock(exportJobLock);
+            if (activeExportJob)
+                activeExportJob->cancel.store(true, std::memory_order_release);
+        }
+        if (exportThread.joinable())
+            exportThread.join();
         stopTimer();
         engine.onPositionChanged = nullptr;
         engine.onSegmentTriggered = nullptr;
+    }
+
+    void MessageBridge::joinFinishedExportThreadIfNeeded()
+    {
+        std::shared_ptr<ExportJob> job;
+        {
+            const std::lock_guard<std::mutex> lock(exportJobLock);
+            job = activeExportJob;
+        }
+
+        if (job != nullptr && job->finished.load(std::memory_order_acquire) && exportThread.joinable())
+            exportThread.join();
+    }
+
+    juce::var MessageBridge::exportJobStatusVar(const std::shared_ptr<ExportJob>& job) const
+    {
+        juce::DynamicObject::Ptr object = new juce::DynamicObject();
+        if (job == nullptr)
+        {
+            object->setProperty("active", false);
+            object->setProperty("finished", true);
+            object->setProperty("ok", false);
+            object->setProperty("progress", 0.0);
+            object->setProperty("path", juce::String());
+            object->setProperty("error", juce::String());
+            return juce::var(object.get());
+        }
+
+        object->setProperty("active", !job->finished.load(std::memory_order_acquire));
+        object->setProperty("finished", job->finished.load(std::memory_order_acquire));
+        object->setProperty("ok", job->ok.load(std::memory_order_acquire));
+        object->setProperty("jobId", job->id);
+        object->setProperty("type", job->type);
+        object->setProperty("progress", job->progress.load(std::memory_order_acquire));
+        object->setProperty("samplesWritten", static_cast<double>(job->samplesWritten.load(std::memory_order_acquire)));
+        object->setProperty("totalSamples", static_cast<double>(job->totalSamples.load(std::memory_order_acquire)));
+        {
+            const std::lock_guard<std::mutex> lock(job->statusLock);
+            object->setProperty("path", job->path);
+            object->setProperty("error", job->error);
+            if (!job->analysis.isVoid())
+                object->setProperty("analysis", job->analysis);
+        }
+        return juce::var(object.get());
     }
 
     void MessageBridge::timerCallback()
@@ -818,13 +1878,79 @@ namespace beat
             timingObject->setProperty("sampleRate", timing.sampleRate);
             timingObject->setProperty("scheduleMs", timing.scheduleMs);
             timingObject->setProperty("synthMs", timing.synthMs);
+            timingObject->setProperty("voiceMs", timing.voiceMs);
+            timingObject->setProperty("modulationMs", timing.modulationMs);
             timingObject->setProperty("samplesMs", timing.samplesMs);
             timingObject->setProperty("fxMs", timing.fxMs);
+            timingObject->setProperty("filterFxMs", timing.filterFxMs);
             timingObject->setProperty("analyzerMs", timing.analyzerMs);
             timingObject->setProperty("copyMs", timing.copyMs);
             timingObject->setProperty("totalMs", timing.totalMs);
             timingObject->setProperty("loadPercent", timing.loadPercent);
+            timingObject->setProperty("activeSynthVoices", timing.activeSynthVoices);
+            timingObject->setProperty("activeSampleVoices", timing.activeSampleVoices);
+            timingObject->setProperty("activeAudioClipVoices", timing.activeAudioClipVoices);
+            timingObject->setProperty("routeCount", timing.routeCount);
+            timingObject->setProperty("automationEventCount", timing.automationEventCount);
+            timingObject->setProperty("wavetableCacheHits", (double) timing.wavetableCacheHits);
+            timingObject->setProperty("wavetableCacheMisses", (double) timing.wavetableCacheMisses);
+            timingObject->setProperty("wavetableCacheSize", timing.wavetableCacheSize);
+            timingObject->setProperty("voiceRenderBlocks", (double) timing.voiceRenderBlocks);
+            timingObject->setProperty("voiceRenderSamples", (double) timing.voiceRenderSamples);
+            timingObject->setProperty("oscillatorSamples", (double) timing.oscillatorSamples);
+            timingObject->setProperty("wavetableVoiceSamples", (double) timing.wavetableVoiceSamples);
+            timingObject->setProperty("aetherOscASamples", (double) timing.aetherOscASamples);
+            timingObject->setProperty("aetherOscBSamples", (double) timing.aetherOscBSamples);
+            timingObject->setProperty("aetherSubSamples", (double) timing.aetherSubSamples);
+            timingObject->setProperty("aetherNoiseSamples", (double) timing.aetherNoiseSamples);
+            timingObject->setProperty("filterSamples", (double) timing.filterSamples);
+            timingObject->setProperty("filterDriveSamples", (double) timing.filterDriveSamples);
+            timingObject->setProperty("filterCoefficientUpdates", (double) timing.filterCoefficientUpdates);
+            timingObject->setProperty("modulationSamples", (double) timing.modulationSamples);
+            timingObject->setProperty("realtimeRampSamples", (double) timing.realtimeRampSamples);
+            timingObject->setProperty("oscillatorRateCalculations", (double) timing.oscillatorRateCalculations);
+            timingObject->setProperty("wavetableFrequencyUpdates", (double) timing.wavetableFrequencyUpdates);
+            timingObject->setProperty("wavetablePositionUpdates", (double) timing.wavetablePositionUpdates);
+            timingObject->setProperty("routeEffectSamples", (double) timing.routeEffectSamples);
+            timingObject->setProperty("routeFilterEffectSamples", (double) timing.routeFilterEffectSamples);
+            timingObject->setProperty("routeNonlinearEffectSamples", (double) timing.routeNonlinearEffectSamples);
+            timingObject->setProperty("routeDelayEffectSamples", (double) timing.routeDelayEffectSamples);
             emit(ipc::kind::EV_RENDER_TIMING, juce::var(timingObject.get()));
+        }
+
+        std::vector<AudioEngine::TrackMeterSnapshot> meterSnapshots;
+        if (engine.pullTrackMeterSnapshots(meterSnapshots))
+        {
+            uint64_t newestMeterSequence = 0;
+            for (const auto& meter : meterSnapshots)
+                newestMeterSequence = std::max(newestMeterSequence, meter.sequence);
+
+            if (newestMeterSequence != 0 && newestMeterSequence != lastTrackMeterSequence)
+            {
+                lastTrackMeterSequence = newestMeterSequence;
+                juce::Array<juce::var> tracks;
+                tracks.ensureStorageAllocated((int) meterSnapshots.size());
+                for (const auto& meter : meterSnapshots)
+                {
+                    juce::DynamicObject::Ptr track = new juce::DynamicObject();
+                    track->setProperty("id", meter.trackId);
+                    track->setProperty("rms", juce::jlimit(0.0f, 1.0f, meter.rms));
+                    track->setProperty("peak", juce::jlimit(0.0f, 1.0f, meter.peak));
+                    if (std::isfinite(meter.rmsDbFS))
+                        track->setProperty("rmsDbFS", meter.rmsDbFS);
+                    if (std::isfinite(meter.peakDbFS))
+                        track->setProperty("peakDbFS", meter.peakDbFS);
+                    if (std::isfinite(meter.truePeakDbTP))
+                        track->setProperty("truePeakDbTP", meter.truePeakDbTP);
+                    if (std::isfinite(meter.momentaryLufs))
+                        track->setProperty("momentaryLufs", meter.momentaryLufs);
+                    tracks.add(juce::var(track.get()));
+                }
+
+                juce::DynamicObject::Ptr event = new juce::DynamicObject();
+                event->setProperty("tracks", tracks);
+                emit(ipc::kind::EV_LEVEL_METERS, juce::var(event.get()));
+            }
         }
 
         FftAnalyzer::Snapshot snapshot;
@@ -860,6 +1986,13 @@ namespace beat
     {
         using namespace ipc::kind;
 
+        if (kind == APP_READY)
+        {
+            if (onAppReady)
+                onAppReady();
+            return juce::var(true);
+        }
+
         if (kind == TRANSPORT_PLAY)       { engine.requestPlay();  return juce::var(true); }
         if (kind == TRANSPORT_PAUSE)      { engine.requestPause(); return juce::var(true); }
         if (kind == TRANSPORT_STOP)       { engine.requestStop();  return juce::var(true); }
@@ -894,7 +2027,8 @@ namespace beat
         {
             engine.applyProject(parseProjectFromFrontend(
                 payload.getProperty("project", {}),
-                payload.getProperty("instruments", {})));
+                payload.getProperty("instruments", {}),
+                payload.getProperty("audioFiles", {})));
             return juce::var(true);
         }
 
@@ -967,21 +2101,910 @@ namespace beat
             return juce::var(r.get());
         }
 
-        if (kind == PROJECT_EXPORT_WAV)
+        if (kind == PROJECT_SAVE_FILE)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto document = payload.getProperty("document", {});
+            if (!document.isObject())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", "No project document was provided.");
+                return juce::var(response.get());
+            }
+
+            auto pathHint = payload.getProperty("pathHint", {}).toString();
+            const bool forcePicker = (bool) payload.getProperty("forcePicker", false);
+            juce::File file;
+            if (pathHint.isNotEmpty() && !forcePicker)
+            {
+                file = juce::File(pathHint);
+            }
+            else
+            {
+                const auto project = document.getProperty("project", {});
+                const auto rawName = project.getProperty("name", "Untitled").toString();
+                const auto safeName = rawName.retainCharacters("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -_").trim();
+                const auto fallbackName = safeName.isNotEmpty() && safeName != "Untitled" ? safeName : juce::String("NewSong");
+                auto start = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                    .getChildFile(fallbackName)
+                    .withFileExtension(".beat");
+                juce::FileChooser chooser("Save Beat Project", start, "*.beat", true);
+                if (!chooser.browseForFileToSave(true))
+                {
+                    response->setProperty("path", juce::String());
+                    return juce::var(response.get());
+                }
+                file = chooser.getResult();
+            }
+
+            if (!file.hasFileExtension(".beat"))
+                file = file.withFileExtension(".beat");
+
+            const auto parent = file.getParentDirectory();
+            if (!parent.exists() && !parent.createDirectory())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", "Could not create project directory.");
+                return juce::var(response.get());
+            }
+
+            auto tempFile = parent.getChildFile(file.getFileName() + ".tmp");
+            if (tempFile.existsAsFile() && !tempFile.deleteFile())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", "Could not clear previous temporary project file.");
+                return juce::var(response.get());
+            }
+
+            auto documentToWrite = juce::JSON::parse(juce::JSON::toString(document));
+            juce::String packagingError;
+            if (!packageExternalDocumentAssets(documentToWrite, file, packagingError))
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", packagingError.isNotEmpty() ? packagingError : "Could not package project assets.");
+                return juce::var(response.get());
+            }
+
+            const auto integrityReport = verifyProjectDocumentIntegrity(documentToWrite, file);
+            if (!integrityReport.ok())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", projectIntegritySaveError(integrityReport));
+                return juce::var(response.get());
+            }
+
+            const auto serializedDocument = juce::JSON::toString(documentToWrite, true);
+            if (!tempFile.replaceWithText(serializedDocument))
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", "Could not write Beat project file.");
+                return juce::var(response.get());
+            }
+
+            const auto validation = juce::JSON::parse(tempFile);
+            if (!validation.isObject())
+            {
+                tempFile.deleteFile();
+                response->setProperty("path", juce::String());
+                response->setProperty("error", "Beat project file failed validation before save.");
+                return juce::var(response.get());
+            }
+
+            juce::String backupError;
+            juce::File backupFile;
+            if (!createProjectBackupBeforeReplace(file, backupError, &backupFile))
+            {
+                tempFile.deleteFile();
+                response->setProperty("path", juce::String());
+                response->setProperty("error", backupError.isNotEmpty() ? backupError : "Could not create project backup.");
+                return juce::var(response.get());
+            }
+
+            if (!tempFile.replaceFileIn(file))
+            {
+                tempFile.deleteFile();
+                response->setProperty("path", juce::String());
+                response->setProperty("error", "Could not finalize Beat project file.");
+                return juce::var(response.get());
+            }
+
+            const auto cleanupReport = cleanupUnusedProjectSidecarAssets(documentToWrite, file);
+            response->setProperty("cleanupReport", makeSidecarCleanupReport(cleanupReport));
+            response->setProperty("integrityReport", integrityReport.toVar());
+            projectRepo.recordRecentProject(file, documentToWrite);
+            response->setProperty("path", file.getFullPathName());
+            if (backupFile.existsAsFile())
+                response->setProperty("backupPath", backupFile.getFullPathName());
+            return juce::var(response.get());
+        }
+
+        if (kind == PROJECT_OPEN_FILE)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto directPath = payload.getProperty("directPath", {}).toString();
+            const auto pathHint = payload.getProperty("pathHint", {}).toString();
+            juce::File file;
+            if (directPath.isNotEmpty())
+            {
+                file = juce::File(directPath);
+                if (!file.existsAsFile())
+                {
+                    response->setProperty("path", juce::String());
+                    response->setProperty("error", "Recent project file no longer exists.");
+                    return juce::var(response.get());
+                }
+            }
+            else
+            {
+                const auto start = pathHint.isNotEmpty()
+                    ? juce::File(pathHint)
+                    : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+                juce::FileChooser chooser("Open Beat Project", start, "*.beat", true);
+                if (!chooser.browseForFileToOpen())
+                {
+                    response->setProperty("path", juce::String());
+                    return juce::var(response.get());
+                }
+                file = chooser.getResult();
+            }
+
+            auto parsed = juce::JSON::parse(file);
+            if (!parsed.isObject())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", "Could not read Beat project file.");
+                return juce::var(response.get());
+            }
+
+            resolveDocumentAssetPaths(parsed, file);
+            const auto integrityReport = verifyProjectDocumentIntegrity(parsed, file);
+            if (hasFatalProjectDocumentIntegrityErrors(integrityReport))
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", projectIntegrityOpenError(integrityReport));
+                response->setProperty("integrityReport", integrityReport.toVar());
+                return juce::var(response.get());
+            }
+
+            response->setProperty("path", file.getFullPathName());
+            response->setProperty("document", parsed);
+            response->setProperty("missingAssets", collectMissingDocumentAssets(parsed));
+            response->setProperty("integrityReport", integrityReport.toVar());
+            projectRepo.recordRecentProject(file, parsed);
+            return juce::var(response.get());
+        }
+
+        if (kind == PROJECT_RECENT_LIST)
+        {
+            juce::Array<juce::var> items;
+            for (const auto& recent : projectRepo.listRecentProjects(16))
+            {
+                juce::DynamicObject::Ptr item = new juce::DynamicObject();
+                item->setProperty("path", recent.path);
+                item->setProperty("name", recent.name);
+                item->setProperty("openedAt", static_cast<double>(recent.openedAt));
+                item->setProperty("sizeBytes", recent.sizeBytes);
+                item->setProperty("exists", recent.exists);
+                items.add(juce::var(item.get()));
+            }
+
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            response->setProperty("projects", items);
+            return juce::var(response.get());
+        }
+
+        if (kind == PROJECT_RECENT_REMOVE)
+        {
+            const auto path = payload.getProperty("path", {}).toString();
+            projectRepo.removeRecentProject(path);
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            response->setProperty("ok", true);
+            return juce::var(response.get());
+        }
+
+        if (kind == PROJECT_REVEAL_FILE)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto path = payload.getProperty("path", {}).toString();
+            if (path.isEmpty())
+            {
+                response->setProperty("ok", false);
+                response->setProperty("missing", true);
+                response->setProperty("error", "No project file path was provided.");
+                return juce::var(response.get());
+            }
+
+            const juce::File file(path);
+            if (! file.existsAsFile())
+            {
+                response->setProperty("ok", false);
+                response->setProperty("missing", true);
+                response->setProperty("error", "This project file is no longer available on disk.");
+                return juce::var(response.get());
+            }
+
+            file.revealToUser();
+            response->setProperty("ok", true);
+            response->setProperty("missing", false);
+            return juce::var(response.get());
+        }
+
+        if (kind == PROJECT_INSPECT_DOCUMENT)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            auto document = payload.getProperty("document", {});
+            if (!document.isObject())
+            {
+                response->setProperty("missingAssets", juce::Array<juce::var> {});
+                response->setProperty("error", "No Beat project document was provided.");
+                return juce::var(response.get());
+            }
+
+            auto inspected = juce::JSON::parse(juce::JSON::toString(document));
+            if (!inspected.isObject())
+            {
+                response->setProperty("missingAssets", juce::Array<juce::var> {});
+                response->setProperty("error", "Beat project document failed inspection serialization.");
+                return juce::var(response.get());
+            }
+
+            const auto projectPath = payload.getProperty("projectPath", payload.getProperty("path", {})).toString();
+            const juce::File projectFile(projectPath);
+            if (projectPath.isNotEmpty())
+                resolveDocumentAssetPaths(inspected, projectFile);
+
+            const auto integrityReport = verifyProjectDocumentIntegrity(inspected, projectFile);
+            response->setProperty("path", projectFile.existsAsFile() ? projectFile.getFullPathName() : juce::String());
+            response->setProperty("missingAssets", collectMissingDocumentAssets(inspected));
+            response->setProperty("integrityReport", integrityReport.toVar());
+            return juce::var(response.get());
+        }
+
+        if (kind == PROJECT_REPAIR_DOCUMENT)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            auto document = payload.getProperty("document", {});
+            if (!document.isObject())
+            {
+                response->setProperty("changed", false);
+                response->setProperty("missingAssets", juce::Array<juce::var> {});
+                response->setProperty("error", "No Beat project document was provided.");
+                return juce::var(response.get());
+            }
+
+            auto repaired = juce::JSON::parse(juce::JSON::toString(document));
+            if (!repaired.isObject())
+            {
+                response->setProperty("changed", false);
+                response->setProperty("missingAssets", juce::Array<juce::var> {});
+                response->setProperty("error", "Beat project document failed repair serialization.");
+                return juce::var(response.get());
+            }
+
+            const auto action = payload.getProperty("action", "rebuildAssetManifest").toString();
+            bool changed = false;
+            if (action == "rebuildAssetManifest")
+            {
+                changed = rebuildDocumentAssetManifest(repaired);
+            }
+            else if (action == "repairSegmentTrackIds")
+            {
+                changed = repairProjectDocumentSegmentTrackIds(repaired);
+            }
+            else
+            {
+                response->setProperty("changed", false);
+                response->setProperty("document", repaired);
+                response->setProperty("missingAssets", juce::Array<juce::var> {});
+                response->setProperty("error", "Unsupported project repair action: " + action);
+                return juce::var(response.get());
+            }
+
+            const auto projectPath = payload.getProperty("projectPath", payload.getProperty("path", {})).toString();
+            const juce::File projectFile(projectPath);
+            auto inspected = juce::JSON::parse(juce::JSON::toString(repaired));
+            if (projectPath.isNotEmpty())
+                resolveDocumentAssetPaths(inspected, projectFile);
+
+            const auto integrityReport = verifyProjectDocumentIntegrity(inspected, projectFile);
+            response->setProperty("changed", changed);
+            response->setProperty("document", repaired);
+            response->setProperty("path", projectFile.existsAsFile() ? projectFile.getFullPathName() : juce::String());
+            response->setProperty("missingAssets", collectMissingDocumentAssets(inspected));
+            response->setProperty("integrityReport", integrityReport.toVar());
+            return juce::var(response.get());
+        }
+
+        if (kind == PROJECT_LIST_BACKUPS)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto projectPath = payload.getProperty("projectPath", payload.getProperty("path", {})).toString();
+            if (projectPath.isEmpty())
+            {
+                response->setProperty("backups", juce::Array<juce::var> {});
+                response->setProperty("error", "No project path was provided.");
+                return juce::var(response.get());
+            }
+
+            juce::Array<juce::var> backups;
+            for (const auto& backup : listProjectBackups(juce::File(projectPath)))
+            {
+                juce::DynamicObject::Ptr item = new juce::DynamicObject();
+                const auto parsed = juce::JSON::parse(backup.file);
+                item->setProperty("path", backup.file.getFullPathName());
+                item->setProperty("name", backup.file.getFileName());
+                item->setProperty("modifiedAt", backup.modifiedAt.toISO8601(true));
+                item->setProperty("sizeBytes", static_cast<double>(backup.sizeBytes));
+                item->setProperty("latest", backup.latest);
+
+                if (parsed.isObject())
+                {
+                    const auto project = parsed.getProperty("project", {});
+                    const auto integrityReport = verifyProjectDocumentIntegrity(parsed, juce::File(projectPath));
+                    item->setProperty("projectName", project.getProperty("name", {}).toString());
+                    item->setProperty("projectId", project.getProperty("id", {}).toString());
+                    item->setProperty("savedAt", parsed.getProperty("savedAt", {}));
+                    item->setProperty("schemaVersion", parsed.getProperty("schemaVersion", {}));
+                    item->setProperty("valid", !hasFatalProjectDocumentIntegrityErrors(integrityReport));
+                    item->setProperty("integrityReport", integrityReport.toVar());
+                }
+                else
+                {
+                    item->setProperty("valid", false);
+                    item->setProperty("error", "Project backup is not valid JSON.");
+                }
+                backups.add(juce::var(item.get()));
+            }
+
+            response->setProperty("backups", backups);
+            return juce::var(response.get());
+        }
+
+        if (kind == PROJECT_RESTORE_BACKUP)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto projectPath = payload.getProperty("projectPath", payload.getProperty("path", {})).toString();
+            const auto backupPath = payload.getProperty("backupPath", {}).toString();
+            if (projectPath.isEmpty() || backupPath.isEmpty())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", "Project restore requires a project path and backup path.");
+                return juce::var(response.get());
+            }
+
+            juce::String error;
+            juce::File overwrittenBackup;
+            const juce::File projectFile(projectPath);
+            if (!restoreProjectBackup(projectFile, juce::File(backupPath), error, &overwrittenBackup))
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", error.isNotEmpty() ? error : "Could not restore project backup.");
+                return juce::var(response.get());
+            }
+
+            response->setProperty("path", projectFile.getFullPathName());
+            if (overwrittenBackup.existsAsFile())
+                response->setProperty("backupPath", overwrittenBackup.getFullPathName());
+
+            auto parsed = juce::JSON::parse(projectFile);
+            if (!parsed.isObject())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", "Restored project failed validation.");
+                return juce::var(response.get());
+            }
+
+            resolveDocumentAssetPaths(parsed, projectFile);
+            const auto integrityReport = verifyProjectDocumentIntegrity(parsed, projectFile);
+            if (hasFatalProjectDocumentIntegrityErrors(integrityReport))
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", projectIntegrityOpenError(integrityReport));
+                response->setProperty("integrityReport", integrityReport.toVar());
+                return juce::var(response.get());
+            }
+
+            response->setProperty("document", parsed);
+            response->setProperty("missingAssets", collectMissingDocumentAssets(parsed));
+            response->setProperty("integrityReport", integrityReport.toVar());
+            projectRepo.recordRecentProject(projectFile, parsed);
+            return juce::var(response.get());
+        }
+
+        if (kind == PROJECT_RELINK_ASSET)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto asset = payload.getProperty("asset", {});
+            const auto assetKind = asset.getProperty("kind", "sample").toString();
+            const auto assetName = asset.getProperty("name", asset.getProperty("path", "asset")).toString();
+            const auto pathHint = payload.getProperty("pathHint", asset.getProperty("path", {})).toString();
+            const auto start = pathHint.isNotEmpty()
+                ? juce::File(pathHint)
+                : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+            const auto wildcard = assetKind == "plugin" ? decentImportWildcard : audioImportWildcard;
+            juce::FileChooser chooser("Relink " + assetName, start, wildcard, true);
+            if (!chooser.browseForFileToOpen())
+            {
+                response->setProperty("path", juce::String());
+                return juce::var(response.get());
+            }
+            const auto file = chooser.getResult();
+            if (!file.existsAsFile())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", "Selected replacement file does not exist.");
+                return juce::var(response.get());
+            }
+            response->setProperty("path", file.getFullPathName());
+            return juce::var(response.get());
+        }
+
+        if (kind == PROJECT_CLEANUP_ASSETS)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto projectPath = payload.getProperty("projectPath", payload.getProperty("path", {})).toString();
+            const auto document = payload.getProperty("document", {});
+            if (projectPath.isEmpty() || !document.isObject())
+            {
+                response->setProperty("report", makeSidecarCleanupReport({}));
+                response->setProperty("error", "Asset cleanup requires a project path and document payload.");
+                return juce::var(response.get());
+            }
+
+            const auto report = cleanupUnusedProjectSidecarAssets(document, juce::File(projectPath));
+            response->setProperty("report", makeSidecarCleanupReport(report));
+            if (!report.ok())
+                response->setProperty("error", "Some project sidecar assets could not be deleted.");
+            return juce::var(response.get());
+        }
+
+        if (kind == PROJECT_EXPORT_STATUS)
+        {
+            joinFinishedExportThreadIfNeeded();
+            std::shared_ptr<ExportJob> job;
+            {
+                const std::lock_guard<std::mutex> lock(exportJobLock);
+                job = activeExportJob;
+            }
+            return exportJobStatusVar(job);
+        }
+
+        if (kind == PROJECT_EXPORT_CANCEL)
+        {
+            std::shared_ptr<ExportJob> job;
+            {
+                const std::lock_guard<std::mutex> lock(exportJobLock);
+                job = activeExportJob;
+                if (job)
+                    job->cancel.store(true, std::memory_order_release);
+            }
+            return exportJobStatusVar(job);
+        }
+
+        if (kind == PROJECT_EXPORT_WAV_ASYNC
+            || kind == PROJECT_EXPORT_TRACK_WAV_ASYNC
+            || kind == PROJECT_EXPORT_RANGE_WAV_ASYNC)
+        {
+            const bool exportTrack = kind == PROJECT_EXPORT_TRACK_WAV_ASYNC;
+            const bool exportRange = kind == PROJECT_EXPORT_RANGE_WAV_ASYNC;
+            const juce::String exportType = exportTrack ? "track" : (exportRange ? "range" : "project");
+
+            joinFinishedExportThreadIfNeeded();
+            {
+                const std::lock_guard<std::mutex> lock(exportJobLock);
+                if (activeExportJob && !activeExportJob->finished.load(std::memory_order_acquire))
+                {
+                    juce::DynamicObject::Ptr response = new juce::DynamicObject();
+                    response->setProperty("job", exportJobStatusVar(activeExportJob));
+                    response->setProperty("error", "An export is already running.");
+                    return juce::var(response.get());
+                }
+            }
+
+            auto pathHint = payload.getProperty("pathHint", {}).toString();
+            auto start = pathHint.isNotEmpty()
+                ? juce::File(pathHint)
+                : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                    .getChildFile(exportTrack ? "Beat Track Export.wav"
+                                              : (exportRange ? "Beat Range Export.wav" : "Beat Export.wav"));
+
+            juce::FileChooser chooser(exportTrack ? "Export Track WAV"
+                                                  : (exportRange ? "Export Range WAV" : "Export WAV"),
+                                      start,
+                                      "*.wav",
+                                      true);
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            if (!chooser.browseForFileToSave(true))
+            {
+                response->setProperty("started", false);
+                response->setProperty("job", exportJobStatusVar(nullptr));
+                return juce::var(response.get());
+            }
+
+            auto file = chooser.getResult();
+            if (!file.hasFileExtension(".wav"))
+                file = file.withFileExtension(".wav");
+
+            const auto projectPayload = payload.getProperty("project", {});
+            if (!projectPayload.isObject())
+            {
+                response->setProperty("started", false);
+                response->setProperty("error", "No project payload was provided for export.");
+                response->setProperty("job", exportJobStatusVar(nullptr));
+                return juce::var(response.get());
+            }
+
+            const auto instrumentsPayload = payload.getProperty("instruments", {});
+            const auto audioFilesPayload = payload.getProperty("audioFiles", {});
+            const auto missingAssets = collectMissingExportAssets(instrumentsPayload, audioFilesPayload);
+            if (!missingAssets.isEmpty())
+            {
+                response->setProperty("started", false);
+                response->setProperty("error", missingAssetExportError(missingAssets));
+                response->setProperty("job", exportJobStatusVar(nullptr));
+                return juce::var(response.get());
+            }
+
+            auto project = parseProjectFromFrontend(projectPayload,
+                                                    instrumentsPayload,
+                                                    audioFilesPayload);
+            const auto trackId = payload.getProperty("trackId", {}).toString();
+            if (exportTrack && trackId.isEmpty())
+            {
+                response->setProperty("started", false);
+                response->setProperty("error", "No track was selected for export.");
+                response->setProperty("job", exportJobStatusVar(nullptr));
+                return juce::var(response.get());
+            }
+
+            const auto startBeat = static_cast<Beats>(payload.getProperty("startBeat", 0.0));
+            const auto endBeat = static_cast<Beats>(payload.getProperty("endBeat", 0.0));
+            const bool includeTail = static_cast<bool>(payload.getProperty("includeTail", false));
+            const auto renderOptions = parseExportRenderOptions(payload);
+            if (exportRange && endBeat <= startBeat)
+            {
+                response->setProperty("started", false);
+                response->setProperty("error", "Export range must have an end beat after its start beat.");
+                response->setProperty("job", exportJobStatusVar(nullptr));
+                return juce::var(response.get());
+            }
+
+            auto job = std::make_shared<ExportJob>();
+            job->id = juce::Uuid().toString();
+            job->type = exportType;
+            job->path = file.getFullPathName();
+
+            {
+                const std::lock_guard<std::mutex> lock(exportJobLock);
+                activeExportJob = job;
+            }
+
+            if (exportThread.joinable())
+                exportThread.join();
+
+            exportThread = std::thread([this,
+                                        job,
+                                        exportTrack,
+                                        exportRange,
+                                        trackId,
+                                        startBeat,
+                                        endBeat,
+                                        includeTail,
+                                        renderOptions,
+                                        project = std::move(project),
+                                        file]() mutable
+            {
+                juce::int64 lastEmitMs = 0;
+                emit(ipc::kind::EV_EXPORT_PROGRESS, exportJobStatusVar(job));
+
+                juce::String error;
+                const auto progress = [this, job, &lastEmitMs](double progressValue,
+                                                               juce::int64 samplesWritten,
+                                                               juce::int64 totalSamples)
+                {
+                    job->progress.store(juce::jlimit(0.0, 1.0, progressValue), std::memory_order_release);
+                    job->samplesWritten.store(samplesWritten, std::memory_order_release);
+                    job->totalSamples.store(totalSamples, std::memory_order_release);
+
+                    const auto now = juce::Time::currentTimeMillis();
+                    if (now - lastEmitMs >= 100 || progressValue >= 1.0 || progressValue <= 0.0)
+                    {
+                        lastEmitMs = now;
+                        emit(ipc::kind::EV_EXPORT_PROGRESS, exportJobStatusVar(job));
+                    }
+
+                    return !job->cancel.load(std::memory_order_acquire);
+                };
+
+                bool exported = false;
+                if (exportTrack)
+                {
+                    exported = AudioEngine::renderTrackToWav(std::move(project),
+                                                             trackId,
+                                                             file,
+                                                             renderOptions.sampleRate,
+                                                             renderOptions.blockSize,
+                                                             renderOptions.channels,
+                                                             &error,
+                                                             progress,
+                                                             renderOptions.bitDepth);
+                }
+                else if (exportRange)
+                {
+                    exported = AudioEngine::renderProjectRangeToWav(std::move(project),
+                                                                    startBeat,
+                                                                    endBeat,
+                                                                    file,
+                                                                    includeTail,
+                                                                    renderOptions.sampleRate,
+                                                                    renderOptions.blockSize,
+                                                                    renderOptions.channels,
+                                                                    &error,
+                                                                    progress,
+                                                                    renderOptions.bitDepth);
+                }
+                else
+                {
+                    exported = AudioEngine::renderProjectToWav(std::move(project),
+                                                               file,
+                                                               renderOptions.sampleRate,
+                                                               renderOptions.blockSize,
+                                                               renderOptions.channels,
+                                                               &error,
+                                                               progress,
+                                                               renderOptions.bitDepth);
+                }
+                {
+                    const std::lock_guard<std::mutex> statusLock(job->statusLock);
+                    job->error = exported ? juce::String() : error;
+                    if (exported)
+                    {
+                        if (auto analysis = AudioFileAnalyzer::analyzeFile(file))
+                            job->analysis = makeAudioAnalysis(*analysis);
+                    }
+                }
+                job->ok.store(exported, std::memory_order_release);
+                job->progress.store(exported ? 1.0 : job->progress.load(std::memory_order_acquire), std::memory_order_release);
+                job->finished.store(true, std::memory_order_release);
+                emit(ipc::kind::EV_EXPORT_PROGRESS, exportJobStatusVar(job));
+            });
+
+            response->setProperty("started", true);
+            response->setProperty("job", exportJobStatusVar(job));
+            return juce::var(response.get());
+        }
+
+        if (kind == PROJECT_BOUNCE_TRACK_WAV)
         {
             auto pathHint = payload.getProperty("pathHint", {}).toString();
             auto start = pathHint.isNotEmpty()
                 ? juce::File(pathHint)
-                : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Beat Export.wav");
+                : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                    .getChildFile("Beat Track Bounce.wav");
 
-            juce::FileChooser chooser("Export WAV", start, "*.wav", true);
+            juce::FileChooser chooser("Bounce Track To WAV", start, "*.wav", true);
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            if (!chooser.browseForFileToSave(true))
+            {
+                response->setProperty("path", juce::String());
+                return juce::var(response.get());
+            }
+
+            auto file = chooser.getResult();
+            if (!file.hasFileExtension(".wav"))
+                file = file.withFileExtension(".wav");
+
+            const auto projectPayload = payload.getProperty("project", {});
+            if (!projectPayload.isObject())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", "No project payload was provided for track bounce.");
+                return juce::var(response.get());
+            }
+
+            const auto instrumentsPayload = payload.getProperty("instruments", {});
+            auto audioFilesPayload = payload.getProperty("audioFiles", {});
+            if (!audioFilesPayload.isArray())
+                audioFilesPayload = projectPayload.getProperty("audioFiles", {});
+            const auto missingAssets = collectMissingExportAssets(instrumentsPayload, audioFilesPayload);
+            if (!missingAssets.isEmpty())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", missingAssetExportError(missingAssets));
+                return juce::var(response.get());
+            }
+
+            auto project = parseProjectFromFrontend(projectPayload,
+                                                    instrumentsPayload,
+                                                    audioFilesPayload);
+            const auto trackId = payload.getProperty("trackId", {}).toString();
+            if (trackId.isEmpty())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", "No track was selected for bounce.");
+                return juce::var(response.get());
+            }
+
+            const auto renderOptions = parseExportRenderOptions(payload);
+            juce::String error;
+            const bool rendered = AudioEngine::renderTrackToWav(project,
+                                                                trackId,
+                                                                file,
+                                                                renderOptions.sampleRate,
+                                                                renderOptions.blockSize,
+                                                                renderOptions.channels,
+                                                                &error,
+                                                                {},
+                                                                renderOptions.bitDepth);
+            if (!rendered)
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", error);
+                return juce::var(response.get());
+            }
+
+            const auto analysis = AudioFileAnalyzer::analyzeFile(file);
+            if (!analysis.has_value() || analysis->durationSeconds <= 0.0 || analysis->sampleRate <= 0.0)
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", "Bounced WAV could not be analyzed.");
+                return juce::var(response.get());
+            }
+
+            TrackBounceSpec bounceSpec;
+            bounceSpec.sourceTrackId = trackId;
+            bounceSpec.audioFilePath = file.getFullPathName();
+            bounceSpec.audioFileName = file.getFileNameWithoutExtension();
+            bounceSpec.durationSeconds = analysis->durationSeconds;
+            bounceSpec.sampleRate = analysis->sampleRate;
+            const auto bounceResult = applyTrackBounce(project, bounceSpec, &error);
+            if (!bounceResult.has_value())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", error);
+                return juce::var(response.get());
+            }
+
+            const auto audioFileIt = std::find_if(project.audioFiles.begin(),
+                                                  project.audioFiles.end(),
+                                                  [&bounceResult](const AudioFileAsset& audioFile)
+                                                  {
+                                                      return audioFile.id == bounceResult->audioFileId;
+                                                  });
+            const auto trackIt = std::find_if(project.tracks.begin(),
+                                              project.tracks.end(),
+                                              [&bounceResult](const Track& track)
+                                              {
+                                                  return track.id == bounceResult->bouncedTrackId;
+                                              });
+            if (audioFileIt == project.audioFiles.end() || trackIt == project.tracks.end())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("error", "Bounced project update could not be serialized.");
+                return juce::var(response.get());
+            }
+
+            response->setProperty("path", file.getFullPathName());
+            response->setProperty("sourceTrackId", bounceResult->sourceTrackId);
+            response->setProperty("audioFile", makeAudioFileAssetVar(*audioFileIt, analysis));
+            response->setProperty("track", makeBouncedTrackVar(*trackIt));
+            response->setProperty("analysis", makeAudioAnalysis(*analysis));
+            return juce::var(response.get());
+        }
+
+        if (kind == PROJECT_EXPORT_WAV || kind == PROJECT_EXPORT_TRACK_WAV || kind == PROJECT_EXPORT_RANGE_WAV)
+        {
+            auto pathHint = payload.getProperty("pathHint", {}).toString();
+            const bool exportTrack = kind == PROJECT_EXPORT_TRACK_WAV;
+            const bool exportRange = kind == PROJECT_EXPORT_RANGE_WAV;
+            auto start = pathHint.isNotEmpty()
+                ? juce::File(pathHint)
+                : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                    .getChildFile(exportTrack ? "Beat Track Export.wav"
+                                              : (exportRange ? "Beat Range Export.wav" : "Beat Export.wav"));
+
+            juce::FileChooser chooser(exportTrack ? "Export Track WAV"
+                                                  : (exportRange ? "Export Range WAV" : "Export WAV"),
+                                      start,
+                                      "*.wav",
+                                      true);
             juce::DynamicObject::Ptr response = new juce::DynamicObject();
             if (chooser.browseForFileToSave(true))
             {
                 auto file = chooser.getResult();
                 if (!file.hasFileExtension(".wav"))
                     file = file.withFileExtension(".wav");
-                response->setProperty("path", file.getFullPathName());
+
+                const auto projectPayload = payload.getProperty("project", {});
+                if (!projectPayload.isObject())
+                {
+                    response->setProperty("path", juce::String());
+                    response->setProperty("error", "No project payload was provided for export.");
+                    return juce::var(response.get());
+                }
+
+                const auto instrumentsPayload = payload.getProperty("instruments", {});
+                const auto audioFilesPayload = payload.getProperty("audioFiles", {});
+                const auto missingAssets = collectMissingExportAssets(instrumentsPayload, audioFilesPayload);
+                if (!missingAssets.isEmpty())
+                {
+                    response->setProperty("path", juce::String());
+                    response->setProperty("error", missingAssetExportError(missingAssets));
+                    return juce::var(response.get());
+                }
+
+                auto project = parseProjectFromFrontend(projectPayload,
+                                                        instrumentsPayload,
+                                                        audioFilesPayload);
+                juce::String error;
+                const auto trackId = payload.getProperty("trackId", {}).toString();
+                if (exportTrack && trackId.isEmpty())
+                {
+                    response->setProperty("path", juce::String());
+                    response->setProperty("error", "No track was selected for export.");
+                    return juce::var(response.get());
+                }
+
+                const auto startBeat = static_cast<Beats>(payload.getProperty("startBeat", 0.0));
+                const auto endBeat = static_cast<Beats>(payload.getProperty("endBeat", 0.0));
+                const bool includeTail = static_cast<bool>(payload.getProperty("includeTail", false));
+                const auto renderOptions = parseExportRenderOptions(payload);
+                bool exported = false;
+                if (exportTrack)
+                {
+                    exported = AudioEngine::renderTrackToWav(std::move(project),
+                                                             trackId,
+                                                             file,
+                                                             renderOptions.sampleRate,
+                                                             renderOptions.blockSize,
+                                                             renderOptions.channels,
+                                                             &error,
+                                                             {},
+                                                             renderOptions.bitDepth);
+                }
+                else if (exportRange)
+                {
+                    if (endBeat <= startBeat)
+                    {
+                        response->setProperty("path", juce::String());
+                        response->setProperty("error", "Export range must have an end beat after its start beat.");
+                        return juce::var(response.get());
+                    }
+                    exported = AudioEngine::renderProjectRangeToWav(std::move(project),
+                                                                    startBeat,
+                                                                    endBeat,
+                                                                    file,
+                                                                    includeTail,
+                                                                    renderOptions.sampleRate,
+                                                                    renderOptions.blockSize,
+                                                                    renderOptions.channels,
+                                                                    &error,
+                                                                    {},
+                                                                    renderOptions.bitDepth);
+                }
+                else
+                {
+                    exported = AudioEngine::renderProjectToWav(std::move(project),
+                                                               file,
+                                                               renderOptions.sampleRate,
+                                                               renderOptions.blockSize,
+                                                               renderOptions.channels,
+                                                               &error,
+                                                               {},
+                                                               renderOptions.bitDepth);
+                }
+
+                if (exported)
+                {
+                    response->setProperty("path", file.getFullPathName());
+                    if (auto analysis = AudioFileAnalyzer::analyzeFile(file))
+                        response->setProperty("analysis", makeAudioAnalysis(*analysis));
+                }
+                else
+                {
+                    response->setProperty("path", juce::String());
+                    response->setProperty("error", error);
+                }
             }
             else
             {
@@ -990,22 +3013,136 @@ namespace beat
             return juce::var(response.get());
         }
 
+        if (kind == INSTRUMENT_RENDER_PREVIEW)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto instrumentPayload = payload.getProperty("instrument", {});
+            if (!instrumentPayload.isObject())
+            {
+                response->setProperty("error", "Instrument preview requires an instrument payload.");
+                return juce::var(response.get());
+            }
+
+            juce::Array<juce::var> instruments;
+            instruments.add(instrumentPayload);
+            const auto missingAssets = collectMissingExportAssets(juce::var(instruments), {});
+            if (!missingAssets.isEmpty())
+            {
+                response->setProperty("error", missingAssetExportError(missingAssets));
+                return juce::var(response.get());
+            }
+
+            const auto instrumentId = instrumentPayload.getProperty("id", "preview-instrument").toString();
+            const auto note = juce::jlimit(0, 127, (int) payload.getProperty("note", 60));
+            const auto velocity = juce::jlimit(1, 127, (int) payload.getProperty("velocity", 100));
+            const auto bpm = juce::jlimit(30.0, 300.0, (double) payload.getProperty("bpm", 120.0));
+            const auto durationBeats = juce::jlimit(0.25, 16.0, (double) payload.getProperty("durationBeats", 2.0));
+            const auto bucketCount = juce::jlimit(1, 4096, (int) payload.getProperty("bucketCount", 256));
+            const bool includeAudio = static_cast<bool>(payload.getProperty("includeAudio", false));
+
+            juce::DynamicObject::Ptr noteObject = new juce::DynamicObject();
+            noteObject->setProperty("pitch", note);
+            noteObject->setProperty("velocity", velocity);
+            noteObject->setProperty("startBeat", 0.0);
+            noteObject->setProperty("lengthBeats", durationBeats);
+            juce::Array<juce::var> notes;
+            notes.add(juce::var(noteObject.get()));
+
+            juce::DynamicObject::Ptr payloadObject = new juce::DynamicObject();
+            payloadObject->setProperty("kind", "midi");
+            payloadObject->setProperty("notes", notes);
+
+            juce::DynamicObject::Ptr segmentObject = new juce::DynamicObject();
+            segmentObject->setProperty("id", "preview-segment");
+            segmentObject->setProperty("startBeat", 0.0);
+            segmentObject->setProperty("lengthBeats", durationBeats);
+            segmentObject->setProperty("instrumentId", instrumentId);
+            segmentObject->setProperty("payload", juce::var(payloadObject.get()));
+            juce::Array<juce::var> segments;
+            segments.add(juce::var(segmentObject.get()));
+
+            juce::DynamicObject::Ptr trackObject = new juce::DynamicObject();
+            trackObject->setProperty("id", "preview-track");
+            trackObject->setProperty("name", "Preview");
+            trackObject->setProperty("kind", "midi");
+            trackObject->setProperty("instrumentId", instrumentId);
+            trackObject->setProperty("segments", segments);
+            juce::Array<juce::var> tracks;
+            tracks.add(juce::var(trackObject.get()));
+
+            juce::DynamicObject::Ptr projectObject = new juce::DynamicObject();
+            projectObject->setProperty("id", "preview-project");
+            projectObject->setProperty("name", "Instrument Preview");
+            projectObject->setProperty("bpm", bpm);
+            projectObject->setProperty("lengthBeats", durationBeats);
+            projectObject->setProperty("tracks", tracks);
+
+            auto project = parseProjectFromFrontend(juce::var(projectObject.get()), juce::var(instruments), {});
+            const auto previewFile = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                .getChildFile("BeatInstrumentPreview-" + juce::Uuid().toString() + ".wav");
+            if (previewFile.existsAsFile())
+                previewFile.deleteFile();
+
+            juce::String error;
+            const bool rendered = AudioEngine::renderProjectToWav(std::move(project),
+                                                                  previewFile,
+                                                                  44100.0,
+                                                                  512,
+                                                                  2,
+                                                                  &error);
+            if (!rendered)
+            {
+                previewFile.deleteFile();
+                response->setProperty("error", error.isNotEmpty() ? error : "Instrument preview render failed.");
+                return juce::var(response.get());
+            }
+
+            if (auto analysis = AudioFileAnalyzer::analyzeFile(previewFile))
+                response->setProperty("analysis", makeAudioAnalysis(*analysis));
+
+            if (auto waveform = AudioFileAnalyzer::analyzeWaveformFile(previewFile, bucketCount))
+                response->setProperty("waveform", makeWaveformSummary(*waveform));
+            else
+                response->setProperty("waveform", juce::var());
+
+            if (includeAudio)
+            {
+                auto audioDataUrl = makeWavDataUrl(previewFile);
+                if (audioDataUrl.isNotEmpty())
+                    response->setProperty("audioDataUrl", audioDataUrl);
+            }
+
+            response->setProperty("durationBeats", durationBeats);
+            response->setProperty("note", note);
+            response->setProperty("velocity", velocity);
+            previewFile.deleteFile();
+            return juce::var(response.get());
+        }
+
         if (kind == INSTRUMENT_IMPORT_DECENT)
         {
             auto pathHint = payload.getProperty("pathHint", {}).toString();
             auto start = pathHint.isNotEmpty() ? juce::File(pathHint) : juce::File();
-            if (start.existsAsFile())
-                start = start.getParentDirectory();
-
-            juce::FileChooser chooser("Import Decent Sampler preset", start, "*.dspreset", true);
+            auto importRoot = defaultDecentSamplerImportRoot();
             juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            if (start.existsAsFile() || start.isDirectory())
+            {
+                auto presetFile = resolveDecentSamplerPreset(start, importRoot);
+                auto preset = presetFile.existsAsFile() ? parseDecentSamplerPreset(presetFile) : std::nullopt;
+                response->setProperty("preset", preset ? makeDecentSamplerImport(database, *preset) : juce::var());
+                return juce::var(response.get());
+            }
+
+            juce::FileChooser chooser("Import Decent Sampler preset or pack", start, decentImportWildcard, true);
             if (! chooser.browseForFileToOpen())
             {
                 response->setProperty("preset", juce::var());
                 return juce::var(response.get());
             }
 
-            response->setProperty("preset", makeDecentSamplerImport(database, chooser.getResult()));
+            auto presetFile = resolveDecentSamplerPreset(chooser.getResult(), importRoot);
+            auto preset = presetFile.existsAsFile() ? parseDecentSamplerPreset(presetFile) : std::nullopt;
+            response->setProperty("preset", preset ? makeDecentSamplerImport(database, *preset) : juce::var());
             return juce::var(response.get());
         }
 
@@ -1024,7 +3161,7 @@ namespace beat
                 return juce::var(response.get());
             }
 
-            auto response = makeAudioFileResponse(chooser.getResult());
+            auto response = makeAudioFileResponse(importAudioFileIntoLibrary(chooser.getResult()));
             saveAudioFile(database, response.getProperty("file", {}));
             return response;
         }
@@ -1044,7 +3181,7 @@ namespace beat
             juce::Array<juce::var> files;
             for (const auto& file : results)
             {
-                auto audioFile = makeAudioFile(file);
+                auto audioFile = makeAudioFile(importAudioFileIntoLibrary(file));
                 if (! audioFile.isVoid())
                 {
                     saveAudioFile(database, audioFile);
@@ -1060,19 +3197,228 @@ namespace beat
         if (kind == AUDIO_LIST)
         {
             juce::Array<juce::var> files;
-            Statement stmt(database, "SELECT id, name, path, duration_s, sample_rate FROM audio_files ORDER BY name ASC");
-            while (stmt.step())
             {
-                juce::DynamicObject::Ptr audioFile = new juce::DynamicObject();
-                audioFile->setProperty("id", stmt.columnText(0));
-                audioFile->setProperty("name", stmt.columnText(1));
-                audioFile->setProperty("path", stmt.columnText(2));
-                audioFile->setProperty("durationSeconds", stmt.columnDouble(3));
-                audioFile->setProperty("sampleRate", stmt.columnInt(4));
-                files.add(juce::var(audioFile.get()));
+                Statement stmt(database, R"sql(
+                    SELECT id, name, path, duration_s, sample_rate, bit_depth, size_bytes, imported_at,
+                           left_peak_dbfs, right_peak_dbfs, true_peak_dbtp, rms_dbfs, crest_factor_db,
+                           dc_offset, clipping_count, clipping_ratio, stereo_correlation, integrated_lufs
+                    FROM audio_files
+                    ORDER BY name ASC
+                )sql");
+                while (stmt.step())
+                {
+                    juce::DynamicObject::Ptr audioFile = new juce::DynamicObject();
+                    const auto setNullableDoubleColumn = [&](const char* name, int col)
+                    {
+                        if (! stmt.columnIsNull(col))
+                            audioFile->setProperty(name, stmt.columnDouble(col));
+                    };
+
+                    audioFile->setProperty("id", stmt.columnText(0));
+                    audioFile->setProperty("name", stmt.columnText(1));
+                    audioFile->setProperty("path", stmt.columnText(2));
+                    audioFile->setProperty("durationSeconds", stmt.columnDouble(3));
+                    audioFile->setProperty("sampleRate", stmt.columnInt(4));
+                    audioFile->setProperty("bitDepth", stmt.columnInt(5));
+                    audioFile->setProperty("sizeBytes", stmt.columnDouble(6));
+                    audioFile->setProperty("importedAt", stmt.columnDouble(7));
+                    setNullableDoubleColumn("leftPeakDbFS", 8);
+                    setNullableDoubleColumn("rightPeakDbFS", 9);
+                    setNullableDoubleColumn("truePeakDbTP", 10);
+                    setNullableDoubleColumn("rmsDbFS", 11);
+                    setNullableDoubleColumn("crestFactorDb", 12);
+                    setNullableDoubleColumn("dcOffset", 13);
+                    audioFile->setProperty("clippingCount", stmt.columnInt(14));
+                    setNullableDoubleColumn("clippingRatio", 15);
+                    setNullableDoubleColumn("stereoCorrelation", 16);
+                    setNullableDoubleColumn("integratedLufs", 17);
+
+                    const bool hasAnalysis = !stmt.columnIsNull(8)
+                        || !stmt.columnIsNull(9)
+                        || !stmt.columnIsNull(10)
+                        || !stmt.columnIsNull(11)
+                        || !stmt.columnIsNull(12)
+                        || !stmt.columnIsNull(16)
+                        || !stmt.columnIsNull(17);
+                    auto audioFileVar = juce::var(audioFile.get());
+                    if (audioFileNeedsMetadataRefresh(audioFileVar, hasAnalysis))
+                        audioFileVar = refreshAudioFileMetadata(audioFileVar);
+                    files.add(audioFileVar);
+                }
             }
+
+            for (const auto& file : files)
+                saveAudioFile(database, file);
+
             juce::DynamicObject::Ptr response = new juce::DynamicObject();
             response->setProperty("files", files);
+            return juce::var(response.get());
+        }
+
+        if (kind == AUDIO_WAVEFORM)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto path = payload.getProperty("path", {}).toString();
+            const auto bucketCount = juce::jlimit(1, 4096, (int) payload.getProperty("bucketCount", 256));
+            const auto file = juce::File(path);
+            if (path.isEmpty() || !file.existsAsFile())
+            {
+                response->setProperty("waveform", juce::var());
+                response->setProperty("error", "Audio waveform requires an existing file path.");
+                return juce::var(response.get());
+            }
+
+            const auto modifiedMs = file.getLastModificationTime().toMilliseconds();
+            const auto sizeBytes = file.getSize();
+            for (const auto& cached : waveformCache)
+            {
+                if (cached.path == path
+                    && cached.bucketCount == bucketCount
+                    && cached.modifiedMs == modifiedMs
+                    && cached.sizeBytes == sizeBytes)
+                {
+                    response->setProperty("waveform", cached.waveform);
+                    response->setProperty("cached", true);
+                    return juce::var(response.get());
+                }
+            }
+
+            if (auto waveform = AudioFileAnalyzer::analyzeWaveformFile(file, bucketCount))
+            {
+                auto waveformVar = makeWaveformSummary(*waveform);
+                response->setProperty("waveform", waveformVar);
+                response->setProperty("cached", false);
+
+                waveformCache.push_back({ path, modifiedMs, sizeBytes, bucketCount, waveformVar });
+                constexpr size_t maxWaveformCacheEntries = 64;
+                if (waveformCache.size() > maxWaveformCacheEntries)
+                    waveformCache.erase(waveformCache.begin(), waveformCache.begin() + (waveformCache.size() - maxWaveformCacheEntries));
+            }
+            else
+            {
+                response->setProperty("waveform", juce::var());
+                response->setProperty("error", "Audio waveform could not be decoded.");
+            }
+            return juce::var(response.get());
+        }
+
+        if (kind == AUDIO_LIST_DEVICES)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            response->setProperty("snapshot", makeAudioDeviceSnapshotVar(engine.listAudioDevices()));
+            return juce::var(response.get());
+        }
+
+        if (kind == AUDIO_SELECT_INPUT_DEVICE)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto typeName = payload.getProperty("typeName", {}).toString();
+            const auto deviceName = payload.getProperty("deviceName", {}).toString();
+            const auto inputChannels = juce::jlimit(1, 32, (int) payload.getProperty("inputChannelCount", 2));
+
+            if (deviceName.isEmpty())
+            {
+                response->setProperty("ok", false);
+                response->setProperty("error", "No input device was selected.");
+                response->setProperty("snapshot", makeAudioDeviceSnapshotVar(engine.listAudioDevices()));
+                return juce::var(response.get());
+            }
+
+            juce::String error;
+            const bool ok = engine.selectInputDevice(typeName, deviceName, inputChannels, &error);
+            response->setProperty("ok", ok);
+            if (!ok)
+                response->setProperty("error", error.isNotEmpty() ? error : "Could not select input device.");
+            response->setProperty("snapshot", makeAudioDeviceSnapshotVar(engine.listAudioDevices()));
+            return juce::var(response.get());
+        }
+
+        if (kind == AUDIO_DELETE)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            juce::StringArray deletedIds;
+            juce::StringArray failedIds;
+            juce::StringArray failedPaths;
+            const bool deleteFiles = (bool) payload.getProperty("deleteFiles", true);
+            const auto audioLibrary = audioLibraryDirectory();
+
+            if (auto* ids = payload.getProperty("ids", {}).getArray())
+            {
+                for (const auto& idVar : *ids)
+                {
+                    const auto id = idVar.toString();
+                    if (id.isEmpty())
+                        continue;
+
+                    juce::String path;
+                    {
+                        Statement lookup(database, "SELECT path FROM audio_files WHERE id = ?");
+                        lookup.bind(1, id);
+                        if (lookup.step())
+                            path = lookup.columnText(0);
+                    }
+
+                    if (path.isEmpty())
+                    {
+                        failedIds.addIfNotAlreadyThere(id);
+                        continue;
+                    }
+
+                    const juce::File file(path);
+                    if (deleteFiles
+                        && file.existsAsFile()
+                        && fileLivesInsideDirectory(file, audioLibrary)
+                        && !file.deleteFile())
+                    {
+                        failedIds.addIfNotAlreadyThere(id);
+                        failedPaths.addIfNotAlreadyThere(path);
+                        continue;
+                    }
+
+                    Statement remove(database, "DELETE FROM audio_files WHERE id = ?");
+                    remove.bind(1, id);
+                    remove.step();
+                    deletedIds.addIfNotAlreadyThere(id);
+                }
+            }
+
+            response->setProperty("deletedIds", makeStringArrayVar(deletedIds));
+            response->setProperty("failedIds", makeStringArrayVar(failedIds));
+            response->setProperty("failedPaths", makeStringArrayVar(failedPaths));
+            if (!failedIds.isEmpty())
+                response->setProperty("error", "Some audio files could not be deleted.");
+            return juce::var(response.get());
+        }
+
+        if (kind == AUDIO_REVEAL)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto path = payload.getProperty("path", {}).toString();
+            if (path.isEmpty())
+            {
+                response->setProperty("ok", false);
+                response->setProperty("error", "No audio file path was provided.");
+                return juce::var(response.get());
+            }
+
+            const juce::File file(path);
+            if (file.exists())
+            {
+                file.revealToUser();
+                response->setProperty("ok", true);
+                return juce::var(response.get());
+            }
+
+            const auto parent = file.getParentDirectory();
+            if (parent.exists())
+            {
+                parent.revealToUser();
+                response->setProperty("ok", true);
+                return juce::var(response.get());
+            }
+
+            response->setProperty("ok", false);
+            response->setProperty("error", "This audio file is no longer available on disk.");
             return juce::var(response.get());
         }
 
@@ -1083,13 +3429,8 @@ namespace beat
             {
                 for (const auto& v : *a)
                 {
-                    EqAutomationPoint p;
-                    p.atBeat = (double) v.getProperty("atBeat", 0.0);
-                    p.lowDb  = (float) (double) v.getProperty("lowDb", 0.0);
-                    p.midDb  = (float) (double) v.getProperty("midDb", 0.0);
-                    p.highDb = (float) (double) v.getProperty("highDb", 0.0);
-                    p.airDb  = (float) (double) v.getProperty("airDb", 0.0);
-                    pts.push_back(p);
+                    if (v.isObject())
+                        pts.push_back(parseEqAutomationPoint(v));
                 }
             }
             engine.setEqAutomation(std::move(pts));

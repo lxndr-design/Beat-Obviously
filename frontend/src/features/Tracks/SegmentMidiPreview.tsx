@@ -3,6 +3,7 @@ import styles from "./SegmentMidiPreview.module.css";
 
 interface Props {
   segment: Segment;
+  displayLengthBeats?: number;
 }
 
 /**
@@ -10,7 +11,7 @@ interface Props {
  * Shows note positions/lengths at a glance. Pitch is mapped to vertical
  * position within the segment height (clamped 0..1).
  */
-export function SegmentMidiPreview({ segment }: Props) {
+export function SegmentMidiPreview({ segment, displayLengthBeats }: Props) {
   if (segment.payload.kind !== "midi" && segment.payload.kind !== "mixed") return null;
   const notes = segment.payload.notes;
   if (notes.length === 0) return null;
@@ -28,25 +29,26 @@ export function SegmentMidiPreview({ segment }: Props) {
     maxP += 6;
   }
   const pitchRange = Math.max(1, maxP - minP);
-  const segLen = Math.max(0.001, segment.lengthBeats);
+  const sourceLen = Math.max(0.001, segment.lengthBeats);
+  const viewLen = Math.max(0.001, displayLengthBeats ?? sourceLen);
 
   return (
     <svg
       className={styles.svg}
-      viewBox="0 0 100 100"
+      viewBox={`0 0 ${viewLen} 100`}
       preserveAspectRatio="none"
       aria-hidden
     >
       {notes.map((n, i) => {
-        const x = (n.startBeat / segLen) * 100;
-        const w = Math.max(0.5, (n.lengthBeats / segLen) * 100);
+        const x = n.startBeat;
+        const w = Math.max(0.04, n.lengthBeats);
         const y = (1 - (n.pitch - minP) / pitchRange) * 100;
         return (
           <rect
             key={i}
             x={x}
             y={Math.max(0, Math.min(98, y - 2))}
-            width={Math.min(100 - x, w)}
+            width={Math.max(0, Math.min(viewLen - x, w))}
             height={3}
             className={styles.note}
           />

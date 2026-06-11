@@ -10,12 +10,15 @@ namespace beat
     using Beats = double;
 
     enum class SegmentPayloadKind { Audio, Midi, Drum, Mixed };
-    enum class TrackKind          { Audio, Midi, Mixed };
+    enum class TrackKind          { Audio, Midi, Mixed, Group };
+    enum class TrackEffectKind    { Bitcrush, Lowpass, Highpass, Saturator, Reverb, Delay, Compressor, Plugin, Unknown, Chorus, Phaser, Flanger, Distortion };
+    enum class AutomationCurve    { Hold, Linear, Quadratic, Cubic, EaseIn, EaseOut, Smoothstep };
 
     struct MidiAutomationPoint
     {
         Beats beat { 0.0 };
         float value { 0.0f };
+        AutomationCurve curve { AutomationCurve::Linear };
     };
 
     struct MidiAutomationLane
@@ -27,11 +30,12 @@ namespace beat
     struct MidiPitchCurvePoint
     {
         Beats beat { 0.0 };
-        int pitch { 60 };
+        double pitch { 60.0 };
     };
 
     struct ProjectAutomationLane
     {
+        Id trackId;
         Id instrumentId;
         juce::String target;
         std::vector<MidiAutomationPoint> points;
@@ -48,12 +52,53 @@ namespace beat
         std::vector<MidiAutomationLane> automation;
     };
 
+    struct TrackEffectParam
+    {
+        juce::String key;
+        float value { 0.0f };
+    };
+
+    struct TrackEffect
+    {
+        Id id;
+        TrackEffectKind kind { TrackEffectKind::Unknown };
+        int schemaVersion { 1 };
+        bool bypassed { false };
+        Id pluginId;
+        juce::String pluginName;
+        juce::String pluginFormat;
+        int latencySamples { 0 };
+        std::vector<TrackEffectParam> params;
+        std::vector<MidiAutomationLane> automation;
+    };
+
+    struct TrackSend
+    {
+        Id busId;
+        float gainDb { -96.0f };
+        float pan { 0.0f };
+        bool enabled { true };
+    };
+
+    struct ReturnBus
+    {
+        Id id;
+        juce::String name;
+        float gainDb { 0.0f };
+        float pan { 0.0f };
+        bool mute { false };
+        std::vector<TrackEffect> effects;
+    };
+
     struct Segment
     {
         Id     id;
         Id     trackId;
         Beats  startBeat   { 0.0 };
         Beats  lengthBeats { 4.0 };
+        Beats  sourceStartBeat { 0.0 };
+        Beats  fadeInBeats { 0.0 };
+        Beats  fadeOutBeats { 0.0 };
         int    repeats     { 0 };
         int    layer       { 0 };
         bool   muted       { false };
@@ -169,6 +214,16 @@ namespace beat
             float pan { 0.0f };
             float tuningCents { 0.0f };
             int seqPosition { 0 };
+            bool loopEnabled { false };
+            int loopStart { 0 };
+            int loopEnd { 0 };
+            bool oneShot { false };
+            double durationSeconds { 0.0 };
+            double loLengthSeconds { 0.0 };
+            double hiLengthSeconds { 0.0 };
+            int chokeGroup { 0 };
+            int startSample { 0 };
+            int endSample { 0 };
         };
 
         Id id;
@@ -204,6 +259,7 @@ namespace beat
         DynamicModulation dynamicModulation;
         bool hasAether { false };
         AetherConfig aether;
+        std::vector<TrackEffect> effects;
         juce::StringArray sampleUrls;
         std::vector<SampleZone> sampleZones;
     };
@@ -215,11 +271,65 @@ namespace beat
         TrackKind kind { TrackKind::Audio };
         Id     instrumentId;
         Id     audioFileId;
+        Id     parentTrackId;
         float  gainDb { 0.0f };
         float  pan    { 0.0f };
         bool   mute   { false };
         bool   solo   { false };
+        bool   recordArmed { false };
+        bool   inputMonitoring { false };
+        juce::String inputDeviceId;
+        int    inputChannelStart { 0 };
+        int    inputChannelCount { 1 };
+        float  recordGainDb { 0.0f };
+        std::vector<TrackSend> sends;
+        std::vector<TrackEffect> effects;
         std::vector<Segment> segments;
+    };
+
+    struct PluginCapability
+    {
+        Id id;
+        juce::String kind;
+        juce::String label;
+        bool realtime { false };
+        bool offline { false };
+        int latencySamples { 0 };
+        juce::String fallbackMode;
+    };
+
+    struct PluginAdapterDefinition
+    {
+        Id id;
+        juce::String name;
+        juce::String vendor;
+        juce::String version;
+        juce::String kind;
+        juce::String format;
+        juce::String status;
+        juce::String instrumentMode;
+        juce::String description;
+        juce::String sourceFileName;
+        juce::String sourcePath;
+        juce::String uiImagePath;
+        juce::String uiImageDataUrl;
+        Id associatedInstrumentId;
+        int uiWidth { 0 };
+        int uiHeight { 0 };
+        int sampleCount { 0 };
+        int uiControlCount { 0 };
+        bool factory { false };
+        double installedAt { 0.0 };
+        std::vector<PluginCapability> capabilities;
+    };
+
+    struct AudioFileAsset
+    {
+        Id id;
+        juce::String name;
+        juce::String path;
+        double durationSeconds { 0.0 };
+        double sampleRate { 0.0 };
     };
 
     struct EqAutomationPoint
@@ -231,6 +341,32 @@ namespace beat
         float airDb  { 0.0f };
     };
 
+    struct RecordingInputProfile
+    {
+        juce::String inputDeviceId;
+        juce::String inputDeviceName;
+        int inputChannelStart { 0 };
+        int inputChannelCount { 2 };
+        double calibrationSampleRate { 0.0 };
+        int measuredRoundTripSamples { 0 };
+        int reportedInputLatencySamples { 0 };
+        int reportedOutputLatencySamples { 0 };
+        int userLatencyAdjustmentSamples { 0 };
+    };
+
+    struct MasterChainSettings
+    {
+        float inputGainDb { 0.0f };
+        bool compressorEnabled { false };
+        float compressorThresholdDb { -18.0f };
+        float compressorRatio { 2.0f };
+        float compressorAttackMs { 20.0f };
+        float compressorReleaseMs { 160.0f };
+        float compressorMakeupDb { 0.0f };
+        float compressorMix { 100.0f };
+        float outputGainDb { 0.0f };
+    };
+
     struct Project
     {
         Id     id;
@@ -239,9 +375,14 @@ namespace beat
         int    timeSignatureNum   { 4 };
         int    timeSignatureDenom { 4 };
         Beats  lengthBeats { 64.0 };
+        std::vector<AudioFileAsset> audioFiles;
         std::vector<InstrumentDefinition> instruments;
+        std::vector<PluginAdapterDefinition> plugins;
         std::vector<Track> tracks;
+        std::vector<ReturnBus> returnBuses;
         std::vector<EqAutomationPoint> eqAutomation;
         std::vector<ProjectAutomationLane> automation;
+        RecordingInputProfile recordingInput;
+        MasterChainSettings masterChain;
     };
 }

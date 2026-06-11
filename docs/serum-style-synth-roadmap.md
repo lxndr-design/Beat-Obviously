@@ -1,479 +1,368 @@
-# Serum-Style Synth Roadmap
+# Beat DAW + Aether Roadmap
 
 ## Goal
 
-Build a serious in-app synth instrument, inspired by Serum-style sound design, without trying to clone Serum feature-for-feature immediately.
+Build Beat into a coherent DAW with a serious native synth/sampler stack. The target is not a quick Serum clone. The target is a trustworthy music system: stable timeline, reliable documents, mathematically sound audio rendering, real-time-safe engine behavior, and an Aether synth that grows from a strong internal architecture instead of a pile of UI controls.
 
-Target outcome:
+This roadmap replaces the older Serum-style checklist. Current low-level audio-engine decisions and verification details live in `docs/audio-engine.md`; folder-structure migration guidance lives in `docs/project-structure.md`; stable synth IDs live in `docs/synth-parameter-contract.md`.
 
-- Stable DAW backend.
-- High-quality wavetable synth voice.
-- Visible and editable modulation.
-- Spectrum/analyzer feedback.
-- Preset-ready architecture.
-- Real-time safe audio behavior.
+Status legend:
 
-Non-goals for the first execution pass:
+- `[x]` implemented and covered by at least one build or stress path.
+- `[~]` partially implemented; usable, but not complete enough to call foundational.
+- `[ ]` not implemented or only placeholder-level.
 
-- Full Serum 2 parity.
-- Plugin export as VST/AU.
-- Full spectral resynthesis editor.
-- MPE/modular routing.
-- Commercial-grade preset browser polish.
+## Current Product Read
 
-Implementation notes:
+- DAW Core: `[~]` roughly early serious-prototype stage. Native transport, segment scheduling, loop clamps, selection, track routing, meters, effects, project IO, and WAV export exist, but recording, deep automation UI, mixer/bus architecture, document UX, and edit invariants still need serious work.
+- Audio Engine: `[~]` stronger than the UI. It has immutable project snapshots, SPSC transport commands, route buffers, native synth/sampler/audio-clip rendering, live/export parity stress tests, timing counters, live master dB/true-peak/momentary-LUFS metering, and safer export writes.
+- Aether Synth: `[~]` real but not mature. It has multi-osc wavetable controls, unison, modulation routing, cached wavetable lookup, analyzer/preview surfaces, and preset beginnings. It lacks deep wavetable editing/import, richer modulators, a proper FX rack, and full modulation UX.
+- Sampler/Plugin Imports: `[~]` DecentSampler import, package inspection, protected wrapper UI, and sample-zone playback exist. Plugin hosting is still a protected-adapter/renderer flow, not a true third-party host.
+- UI/UX Coherence: `[~]` the visual language is now recognizable, but many surfaces were built opportunistically and still need a system-wide pass for shared component usage, spacing, modal footers, hover/selection states, focus behavior, and asset-page consistency.
+- AI Generation: `[~]` beat/instrument generation exists, but must stay subordinate to genre rules, editable musical structure, and deterministic DAW state.
+- Codebase Structure: `[~]` forward structure is documented, but several large modules still need careful extraction.
 
-- Current audio-engine decisions and verification commands live in `docs/audio-engine.md`.
+## Buildout Progress Tracker
 
-## Milestone 0: Stabilize The Host
+These percentages are engineering-readiness estimates, not feature-count estimates. They should be updated after each meaningful buildout alongside the next concrete backend/UI steps.
 
-Purpose: make sure the DAW/synth container is trustworthy before adding more complexity.
+Last updated: 2026-06-11
 
-Checklist:
+- DAW core competency: `69%`
+  - Recent movement: transport panic/reset path, transport command coalescing for rapid play/pause/seek/restart bursts, non-blocking urgent transport fast path for pause/stop/restart/seek that clears stale queued play commands when the audio lock is available, immediate atomic transport state updates for play/pause/stop/restart/seek/speed/loop requests before the queued audio-thread reset path catches up, backend recording append-take planner, count-in/session planner for record-armed tracks, preallocated native input-recording capture buffer with WAV finalization stress, staged captured-take commit/rollback helper, recording latency-compensated placement, recording latency calibration math, persisted input/calibration profile metadata, default-off native input monitoring path, track-arm-driven monitoring enable/disable, explicit input-capable live-device preparation, track-arm/input metadata roundtrip, native input-device enumeration/selection IPC, local project repository audio-file/clip and sample-instrument roundtrip, shared frontend transport actions for play/pause/stop/restart cleanup, review-loop backend, selection/edit verifier, React-independent selection-domain invariants, grouped project-history transactions, pure timeline coordinate/marquee geometry tests, pure frontend interaction runner coverage for segment drag/resize, loop clamps, modal close policy, and marquee clamps, effect rows, MIDI editor interaction pass, first Home hub workflow, local-preview segment drag/resize commit path, backend group/folder routing foundation with integrity checks for bad parent graphs, backend freeze/bounce planner plus `project.bounceTrackWav` IPC that commits a rendered track stem as a playable replacement audio track while preserving the muted source track, explicit freeze/export parent-routing policy for bounced stems, clearer native render timing for route effects, live master dB/true-peak/momentary-LUFS meter publication with backend stress coverage, locked project-apply runtime-boundary stress coverage that prevents stale voices/tails after project swaps, and render-boundary normalization for overlong audio-clip fade pairs.
+  - Next steps: richer undo/redo destructive-operation policy, track/body interaction coverage, broader browser interaction coverage for marquee/drag edge cases, group routing UI, freeze/bounce UI and reversible unfreeze metadata, and latency-reporting polish.
+- Document/export safety: `99%`
+  - Recent movement: `.beat` Save/Save As/Open, LaunchServices document-type registration/package helper hardening for the root `Beat.app`, build-time `.beat` document-type registration in generated macOS app bundles, native document-registration verifier for built `Beat.app` bundle metadata/resources/executable wiring, dirty fingerprints, native WAV export, temp-file writes, temp WAV reader validation before final replacement, cancelled export preservation of previous destination files, document roundtrip verifier, asset manifest, missing-asset warnings/preflight, sidecar asset copy, relative path writing, relative path resolving on open, backend sidecar stress coverage, direct recent-open, native recent-project registry/list/remove/reveal IPC, Home recent-project list/remove/view-in-folder wiring, missing-asset relink before hydration, relink verifier coverage for audio/sample/sample-map references, backend project-integrity verification for missing references/orphaned sidecar files/duplicate IDs/invalid segment graphs/audio-segment trim and fade validity/recording metadata sanity, native Save integrity preflight before overwrite, successful-save integrity report return, frontend document-state retention for integrity reports/cleanup reports/backup paths, Project Health menu/modal surface for retained integrity/missing-asset/cleanup/backup state, on-demand Project Health backend rescan IPC, Project Health relink actions that update the live document and preserve dirty state, native Project Health repair IPC for deterministic asset-manifest rebuilds with backend stress coverage, Project Health copied-sidecar cleanup management UI for detected/deleted/failed orphan files, open integrity reports, fatal structural-integrity rejection before native Open hydration while keeping missing media relinkable, native WAV export analysis diagnostics including bit depth, previous-good project backups before overwrite, backend backup list/restore with stress coverage, backup restore path confinement, fatal-integrity rejection during restore, backup metadata surfacing, menu-driven backup recovery UI, offline export progress/cancel callback foundation, IPC-callable track stem export, IPC-callable beat-range export with stress coverage, app-menu Full Mix/Review Range/Selected Track WAV export wiring, IPC-callable sidecar cleanup helper with orphan cleanup stress coverage, automatic post-save sidecar cleanup reporting, native audio-library metadata repair for older imported files, background full/range/stem export jobs with progress/status/cancel IPC, native export progress/cancel UI wiring, deterministic recent-project repository stress coverage, local project repository audio-file/clip/sample-instrument plus MIDI fractional pitch-curve and per-note automation roundtrip stress coverage, bounded native export format options for sample rate, mono/stereo channels, block size, and 16/24/32-bit WAV depth, and a deterministic repair helper for stale segment container `trackId` metadata.
+  - Next steps: small user-facing export preset UI, repair UI for the safe segment-container fix, and strict LaunchServices app-registration verification for Finder double-click `.beat` association.
+- Live/export render parity: `72%`
+  - Recent movement: native synth/sampler/audio-clip export parity stress, faded audio-clip live/export parity, overlong audio-clip fade normalization stress, dense Aether live/export parity stress, route effects in live/offline path, instrument-owned FX live/export parity and export-tail stress, master limiter, sample-rate matrix, effect-owned automation lane parity, route-gain automation block-size stability stress, fractional native MIDI pitch-curve scheduling, plugin/effect latency metadata with a backend estimator, adapter-capability-derived plugin effect latency, preallocated plugin-latency/route-compensation delay lines with stress coverage, offline range rendering through the same engine path, nonzero-beat range export parity against live playback after seek, review-loop clamp range export parity against live loop playback, and native effect default normalization at engine ingress so live IPC and export prepare the same route state.
+  - Next steps: review-loop export IPC/UI cases, crossfade parity, true hosted-plugin latency reports once plugin processing exists.
+- Aether synth engine: `62%`
+  - Recent movement: cached wavetable/unison math, dense Aether route stress, max-unison polyphony route stress, modulation routing, shared immutable wavetable tables across identical voice configs, analyzer/preview plumbing, native offline instrument-preview render analysis for future Home/instrument-management surfaces, render-timing-visible wavetable cache hit/miss/size counters, low-overhead voice work counters for oscillator/wavetable/filter/modulation/ramp scaling with backend stress assertions, Aether-specific render-slice counters for oscillator A/B/sub/noise work, cached static Aether oscillator/sub pitch-rate math with a timing-visible dynamic-rate recalculation counter, cached dynamic-modulation route-active flags outside the per-sample Aether render loop, cached per-target dynamic modulation activity flags so inactive modulation rows do not execute per-sample offset/filter work, shared per-sample unison detune/spread modulation evaluation across Aether oscillators, reduced static pitch-rate recalculation inside the Aether render loop, base-2 pitch-ratio math switched from generic `pow(2, x)` to direct `exp2(x)`, quantized wavetable frequency/position control updates with stress-visible churn counters, disabled/non-wavetable Aether oscillator setup gating to avoid unnecessary table/bank configuration, legacy wavetable-bank setup skip while Aether mode owns synthesis, zero-drive nonlinear bypass so clean Aether/basic oscillator paths avoid per-sample `tanh()` work, bounded 2x midpoint oversampling for active voice-drive nonlinear stages with warmed bypass state and stress-visible drive work counters, bounded polyBLEP edge correction for built-in saw/square oscillators with voice stress coverage, deeper timing counters for filter drive plus coefficient-update churn, and first-class instrument-owned FX chains that render through the same route FX processor before track FX.
+  - Next steps: wavetable import/resynthesis lane, richer mod sources, additional bounded warp modes, Aether FX preset/version migration, and UI for instrument-owned FX.
+- Sampler/import layer: `77%`
+  - Recent movement: DecentSampler import, native-file-path handoff for DS installs when the host exposes a local file path, direct zone path loading, DS package UI metadata parsing, structured DS control geometry/default/range/binding metadata, DS declared lowpass/reverb effect parsing and bridging into Beat sampler instrument-owned FX defaults, package-skin wrapper hotspots plus fallback image-resource detection for packages without explicit `bgImage`, Lorenzo drum-kit package metadata fixture coverage, Lorenzo drum-kit native sampler playback/export stress coverage, DS group-level volume/round-robin/choke metadata inheritance into sample zones, DS instrument-level release control defaults carried into the generated Beat sampler instrument, installed DecentSampler package/renderer adapter registration, DecentSampler rail install/open flow into the protected package wrapper instead of the generic Aether editor, install/import-time creation of Beat-compatible native sampler instruments for MIDI segments without Aether fallback or synth-editor handoff, native persistence of the DS package adapter's hidden sampler `associatedInstrumentId`, project-integrity warnings for DS adapters whose sampler bridge is missing, stale generic synth/bridge DecentSampler adapter migration back into DS package adapters, parsed DS adapters now advertise live sampler-compatible capability metadata instead of rendered-audio fallback, local persistence and de-duping for installed plugin adapters across project transitions, length-aware hit variants, combined velocity + note-length sample-zone stress, DS duration/length/choke metadata preservation in runtime fixture projects, DS sample start/end offset preservation through import, package sidecars, repository roundtrip, native playback/export, and browser preview, choke/exclusive groups with backend stress coverage, explicit plugin adapter capability metadata across frontend/native project models with repository stress coverage, portable sidecar packaging for external sample/audio assets with sample-zone metadata preservation stress, audio-library list-time metadata repair for legacy rows, bounded native audio-library deletion, and Instruments-page sample-structure editing with independent length/volume/hit/pitch variables.
+  - Next steps: missing-file relink UI, trim/loop/root-note helpers, explicit velocity-layer editor, round-robin/group editor UX.
+- Effects/automation: `63%`
+  - Recent movement: track effect rows, effect timepoints, native route automation foundation, native post-fader send/return bus foundation with preallocated return buffers, reverb/delay/saturator/distortion/compressor/chorus/phaser/flanger path, bounded 2x midpoint oversampling for saturator/distortion with block-continuous per-effect state, stateful block-continuous bitcrush, route-effect work counters for total/filter/nonlinear/delay-style FX where nonlinear counts oversampled work, project-owned master-chain input/output gain plus optional compressor before the final limiter, shared effect automation metadata/value helpers, right-click effect timepoint curve editing, frontend curve utilities, bounded native curve checkpoints for hold/linear/quadratic/cubic/ease-in/ease-out/smoothstep automation spans with backend stress coverage, fractional note pitch-curve scheduling, per-note automation persistence, plugin effect latency fallback from adapter capabilities, instrument-owned FX persistence/rendering/tail estimation/project-health validation using the same effect model as track routes, DecentSampler-declared lowpass/reverb metadata mapped into generated sampler instrument FX chains, shared native effect schema/default migration for track, return-bus, and instrument-owned FX, and engine-ingress default normalization for live IPC/export projects.
+  - Next steps: bus routing UI, named effect preset library, automation selection browser tests, unified note/segment/track/project/instrument automation UX.
+- UI/UX coherence: `54%`
+  - Recent movement: shared rail/navigation direction, Home hub, two-column audio/instrument/pattern asset pages, unified tooltip behavior, compact typography tokens, modal footer/button-row cleanup via `ActionFooter`, Recent Projects card grid, shared asset-page shell/ribbon framing, sidebar row hover/scroll treatment, segment/MIDI/effect interaction polish, and repeated use of the black/white ribbon system.
+  - Next steps: audit remaining modal footer/action rows, extract shared asset browser table/list primitives, remove one-off dropdown sizing, add interaction snapshots for hover/selected/disabled states, and finish consistency passes for editor, plugin/import, and project-health surfaces.
+- AI generation: `30%`
+  - Recent movement: genre-guided beat generation, complexity redefinition, uploaded sample preference, local training hooks.
+  - Next steps: deterministic generation fixtures per genre, phrase-level musical structure, instrument-role mapping, trainer status/data lifecycle.
+- Codebase structure/testing: `81%`
+  - Recent movement: docs split, frontend verifier scripts, backend stress expansion, plugin/library folders, shared DecentSampler-to-sampler conversion helper, DecentSampler compatibility modal isolated through the global editor host, DS metadata wrapper parsing plus fallback package-skin detection covered by backend stress, plugin-adapter hydration merge/helper and stale DS adapter migration covered by the frontend interaction verifier, native plugin-adapter sampler-association roundtrip coverage, project-integrity verifier coverage for stale plugin-associated sampler bridges, project asset packaging extracted from IPC into persistence helpers, recent-project persistence extracted from IPC into `ProjectRepository`, frontend recent-project metadata/card handling, backend project-integrity verifier coverage, deterministic recent-project and plugin-capability repository stress coverage, shared native effect parser/default migration coverage, native effect defaults extracted into `Audio/Effects/TrackEffectDefaults` for repository, IPC, live engine, and offline export paths, explicit instrument-library loading state, Home asset pages for audio files/instruments/patterns, shared Home asset-page shell/ribbon framing, route-effect timing/work-counter coverage, master-chain compressor/block-continuity stress coverage, native send/return bus routing stress coverage, native group/folder routing and parent-graph integrity stress coverage, native track-bounce planner extracted into `Audio/Rendering` with deterministic stress coverage, native audio-waveform bucket analysis with stress coverage, native document-registration verifier for built `Beat.app` package invariants, shared wavetable table ownership through the backend stress path, backend stress assertions for Aether render-work counters, per-component Aether render-slice counters, and setup-path cache accesses, route nonlinear oversampling counter/continuity stress, frontend use of native waveform/export endpoints, shared effect-automation metadata/curve helpers, frontend interaction runner foundation for editor/modal math, sequencer automation-curve checkpoint stress, route automation block-size stability stress, React-independent selection-domain tests, pure timeline geometry extraction for verifier coverage, repository/render stress coverage for instrument-owned FX, and removal of the inactive duplicate sample-render path from `AudioEngine`.
+  - Next steps: extract oversized timeline/synth modules, add shared asset browser table/list primitives, and layer browser-level Playwright-style flow coverage on top of the pure interaction runner.
 
-- Verify play/pause/restart/seek behavior under rapid user input.
-- Confirm no backend/UI transport split-brain.
-- Confirm audio thread does not block on UI/project locks.
-- Confirm no callback-time allocations in common render path.
-- Add stress tests for sequencer events, transport, analyzer, and note on/off bursts.
-- Add panic path: all notes off, clear stuck voices, reset sustained notes.
-- Add CPU timing markers around synth render, sample render, master FX, and analyzer.
+## Priority 1: DAW Core Competency
 
-Done when:
-
-- Rapid transport spam does not freeze controls.
-- No stuck playhead after pause.
-- No sustained notes after stop/restart.
-- Backend stress test passes repeatedly.
-- Callback hot path has documented no-lock/no-allocation expectations.
-
-## Milestone 1: Real Wavetable Oscillator Core
-
-Purpose: create the first serious synth subsystem.
-
-Checklist:
-
-- Define `Wavetable` data model:
-  - frames
-  - frame size
-  - sample rate assumptions
-  - normalized table data
-  - metadata/name/source
-- Add wavetable oscillator per voice.
-- Implement frame interpolation.
-- Implement phase accumulator.
-- Implement pitch-to-frequency conversion.
-- Add selectable basic tables:
-  - sine
-  - saw
-  - square
-  - triangle
-  - PWM-like shape
-- Add wavetable position parameter.
-- Add basic oscillator controls:
-  - octave
-  - semitone
-  - fine tune
-  - level
-  - pan
-  - phase
-  - random phase
-- Add anti-aliasing strategy:
-  - first acceptable version: mipmapped tables or bandlimited generated tables
-  - avoid naive high-frequency saw/square playback
-- Add unit/stress tests:
-  - no NaN/Inf
-  - stable phase wrap
-  - frequency accuracy
-  - interpolation bounds
-  - high-note alias sanity check
-
-Done when:
-
-- One synth voice can play a wavetable cleanly across the keyboard.
-- Wavetable position moves smoothly.
-- Oscillator does not explode at extreme pitch/modulation values.
-- CPU cost is predictable.
-
-## Milestone 2: Voice Architecture Upgrade
-
-Purpose: make each note musically controllable.
+Purpose: make Beat reliable as a timeline-based audio editor before adding more high-level features.
 
 Checklist:
 
-- Define `SynthVoiceState`.
-- Add voice allocation policy.
-- Add voice stealing policy.
-- Add per-voice ADSR envelope.
-- Add per-voice filter state.
-- Add glide/portamento.
-- Add mono/poly/legato modes.
-- Add velocity mapping.
-- Add pitch bend support.
-- Add unison:
-  - voice count
-  - detune
-  - blend
-  - stereo spread
-  - phase randomization
-- Add oversampling option for nonlinear voice processing.
+- `[x]` Native transport requests are queued and drained on the audio thread in order.
+- `[x]` Pause/stop/restart/seek use a panic/reset path for voices, sample voices, clip voices, route MIDI, automation, and FX tails.
+- `[x]` Review-loop UI exists with draggable start/end clamps.
+- `[x]` Review-loop backend does not wrap after a manual seek beyond the endpoint until playback crosses from before the endpoint.
+- `[x]` Review-loop scheduling is piecewise inside a block, so MIDI, automation, and audio clips wrap together at the endpoint.
+- `[x]` Backend stress covers transport burst, loop crossing, and loop-boundary event scheduling.
+- `[~]` Timeline selection, marquee selection, segment drag, resize handles, and context menus exist. A first DAW edit-command verifier covers multi-move, resize clamp, duplicate, delete, split, trim, fade, origin-aware resize invariants, selection-domain exclusivity, grouped history transactions, and pure marquee/timeline coordinate helpers.
+- `[~]` Track selection exists, but track/body/segment interactions need continued UI consistency.
+- `[~]` Undo/redo exists for project state with explicit grouped-history transactions, but destructive-operation safety is still conservative and incomplete.
+- `[~]` Add explicit edit-command model for move, resize, duplicate, delete, paste, nudge, quantize, split, trim, and fade. Next pass should add richer destructive-operation policy and React-independent selection tests.
+- `[~]` Add deterministic tests for segment selection/edit semantics independent of React rendering. Store-level same-type/additive and cross-type exclusivity coverage exists; browser-level marquee/drag interaction coverage remains.
+- `[~]` Add timeline ruler/clip coordinate tests for zoom, scroll, resize, and loop marker drag. Pure beat/x conversion, content width, marquee overlap, scroll-offset styling, timeline-zone clamp coverage, segment drag/resize preview coverage, and loop-clamp preview coverage exist; browser-level drag coverage remains.
+- `[~]` Add proper recording workflow: backend take-to-audio-segment planning, count-in/session planning, preallocated input capture/write path, staged commit/rollback helper, latency-compensated placement, persisted input/calibration profile metadata, default-off and track-driven input monitoring, explicit input-capable live-device preparation, track-arm metadata, and native input-device enumeration/selection IPC exist; take naming UI and device-selection surface remain.
+- `[~]` Add clip split/trim/fade/crossfade model. Split/trim/fade metadata now exists across frontend state, IPC, sequencer events, and audio-clip playback; crossfades and visible fade handles are still pending.
+- `[~]` Add latency and compensation model for recording, plugin/render delay, and export alignment. Recording take placement, recording calibration math, persisted calibration profiles, and plugin route compensation exist; device timestamp handling and full export alignment reporting remain.
 
 Done when:
 
-- Polyphony feels stable.
-- Unison sounds wide without phase chaos.
-- Fast note bursts do not produce stuck or corrupted voices.
-- Voice stealing sounds intentional.
+- Rapid transport and edit bursts do not leave the app stuck, split-brained, or visually misleading.
+- Timeline edits are deterministic enough to test without the browser.
+- Playhead, loop markers, clip events, automation, and export all agree on the same musical time model.
 
-## Milestone 3: Modulation System V1
+## Priority 2: Documents, Persistence, And Export Safety
 
-Purpose: make the synth feel like a sound-design instrument.
+Purpose: make user work durable.
 
 Checklist:
 
-- Define modulation sources:
-  - Env 1
-  - Env 2
-  - LFO 1
-  - LFO 2
-  - velocity
-  - note/keytrack
-  - mod wheel
-  - macro 1-4
-- Define modulation targets:
-  - wavetable position
-  - oscillator pitch
-  - oscillator level
-  - filter cutoff
-  - filter resonance
-  - amp level
-  - pan
-  - unison detune
-  - FX mix params later
-- Add modulation routing structure:
-  - source
-  - target
-  - amount
-  - bipolar/unipolar
-  - per-voice/global
-- Add modulation summing rules.
-- Add clamping/smoothing per target.
-- Add sample-accurate or block-smoothed modulation where appropriate.
-- Add tests for:
-  - target bounds
-  - negative modulation
-  - multiple sources on one target
-  - disabled routing cost
-  - no NaN/Inf under extreme routes
+- `[x]` `.beat` document schema exists with frontend validation/migration gate.
+- `[x]` Native Save/Save As/Open paths exist.
+- `[x]` `.beat` saves write temp JSON, validate parseability, then replace the target file.
+- `[x]` WAV export renders through an isolated offline engine.
+- `[x]` WAV export writes to a sibling temp file, validates output, then replaces the target.
+- `[x]` WAV export accepts bounded format options for sample rate, channels, block size, and 16/24/32-bit depth while preserving safe defaults.
+- `[x]` Track stem export backend exists through `renderTrackToWav` and is callable through `project.exportTrackWav`.
+- `[x]` Beat-range export exists through `renderProjectRangeToWav` and `project.exportRangeWav`, has stress coverage, and is exposed as Review Range WAV in the app menu.
+- `[x]` Dirty-state UI is backed by a saved-document fingerprint instead of purely event-based dirty marking.
+- `[~]` Local DB autosave exists, but document lifecycle and explicit file lifecycle need clearer user semantics.
+- `[~]` Add Open Recent and current-path display. Native recent-project persistence/list/remove/reveal IPC, deterministic backend coverage, and Home recent-project open/remove/view-in-folder wiring exist; current-path display polish is still pending.
+- `[~]` Add project package strategy for imported samples: asset manifest, policy tracking, external asset sidecar copy, relative path writing, relative path resolving on open, and missing-file relink UI exist. Copied-asset cleanup/versioning still need work.
+- `[x]` Add backend project-integrity verifier for schema support, duplicate/missing IDs, invalid segment references, missing assets, and orphaned sidecar files.
+- `[x]` Add backend helper, IPC hook, post-save cleanup reporting, and stress coverage for cleaning unused project sidecar assets after integrity reports identify orphans.
+- `[x]` Add Project Health menu/modal surface for retained integrity reports, missing assets, cleanup reports, and last backup path.
+- `[x]` Add on-demand Project Health rescan IPC that inspects the current document without saving or mutating files.
+- `[x]` Add Project Health missing-asset relink action that updates the live document graph, marks it dirty, and rescans health.
+- `[x]` Add native Project Health repair action for rebuilding stale asset manifests without touching musical data.
+- `[x]` Add native safe repair command for stale segment container `trackId` metadata without changing timing or payload data.
+- `[x]` Add Project Health copied-sidecar cleanup management UI for detected orphan files plus deleted/failed cleanup results.
+- `[x]` Run backend project-integrity verification in native Save before temp-file write/replace.
+- `[x]` Return backend project-integrity report from native Open before hydration.
+- `[x]` Reject fatal structural project-integrity errors during native Open before replacing editor state, while allowing missing media to hydrate for relink/recovery flows.
+- `[x]` Return native render analysis from successful WAV export: duration, channels, bit depth, peaks, true peak, RMS, crest factor, DC offset, clipping, stereo correlation, and integrated LUFS.
+- `[x]` Add project backup/recovery files. Previous-good overwrite backups, backend backup listing, validated restore, backup metadata surfacing, native recovery browsing/restoration UI, and frontend retention of the last backup path now exist.
+- `[x]` Add document roundtrip tests for instruments, components, audio files, plugin adapters, effect automation, and editor-safe migrations.
+- `[x]` Add export cancellation and progress reporting. Full-project, beat-range, and track-stem async export jobs now share progress/status/cancel IPC and are reachable from the app menu.
+- `[ ]` Add export formats beyond PCM16 WAV when the render path is stable.
 
 Done when:
 
-- LFO can move wavetable position.
-- Envelope can move filter cutoff.
-- Macro can control multiple targets.
-- Modulation is visible in state and serializable.
+- A failed save/export does not destroy the last good file.
+- A saved project can move machines and reopen with clear missing-asset behavior.
+- Save/Open/New/Export cannot silently desync frontend, backend, local DB, and disk.
 
-## Milestone 4: Analyzer And Visual Feedback
+## Priority 3: Home Asset Management
 
-Purpose: connect FFT/analyzer work to actual sound-design UX.
+Purpose: make global assets manageable outside the editor without opening heavy project state.
 
 Checklist:
 
-- Expose analyzer snapshots from backend IPC.
-- Add spectrum event throttling.
-- Add frontend spectrum display.
-- Add level meters:
-  - master RMS
-  - master peak
-  - maybe per-track later
-- Add oscillator/wavetable display.
-- Add modulation amount visual indicators.
-- Add envelope/LFO visual editors.
+- `[~]` Home hub exists with Projects, Assets, and a separate AI section.
+- `[~]` Audio Files page has navigation, metadata, waveform preview, transport controls, and producer-facing stats. Native builds use cached backend waveform buckets first, with browser decode as a dev fallback.
+- `[~]` Instruments page uses the same two-column pattern: left-side instrument navigation, right-side sound preview and instrument detail surface. Native builds use `instrument.renderPreview` for analysis/waveform data and can request compact rendered WAV preview audio for synth/Aether audition.
+- `[~]` Patterns page uses the same two-column pattern: left-side pattern navigation, right-side passive segment-style preview, component playback, and an edit handoff into the MIDI or beat editor.
+- `[x]` Instrument preview behavior follows engine type at the UI layer: synth/Aether instruments sustain continuously until pause; sample-backed/non-synth instruments play once unless loop is enabled.
+- `[~]` Instrument details describe playable behavior rather than source-file stats: engine type, waveform, envelope, filter, sample count, descriptors, loudness, true peak, RMS, preview source, and sampler-associated audio structure are visible. Sampler-associated sample order/grouping can be edited and saved back to instrument metadata; modulation count, plugin fallback status, missing-asset warnings, and deeper velocity/loop editors are still pending.
+- `[ ]` Add global asset delete/relink/export flows with predictable project-reference warnings.
 
 Done when:
 
-- User can see spectrum while audio plays.
-- Analyzer does not cause audio thread blocking.
-- UI updates are smooth but not spammy.
-- Spectrum data survives rapid play/pause/restart.
+- Audio files, instruments, patterns, and AI training are manageable as global assets without opening an editor project.
+- Preview behavior matches the actual instrument engine instead of pretending every asset is an audio file.
 
-## Milestone 5: Effects Rack V1
+## Priority 4: Live/Export Render Parity
 
-Purpose: make patches sound finished.
+Purpose: make “what I hear” match “what I export.”
 
 Checklist:
 
-- Add per-instrument FX chain.
-- Add effect modules:
-  - filter
-  - distortion
-  - chorus
-  - delay
-  - reverb
-  - compressor
-  - EQ
-- Add wet/dry controls.
-- Add bypass per effect.
-- Add parameter smoothing.
-- Add oversampling for distortion where needed.
-- Add modulation targets for key FX params.
+- `[x]` Native synth live/export parity stress exists.
+- `[x]` Sample-backed instrument live/export parity stress exists.
+- `[x]` Mixed synth + sampler + audio-clip live/export parity stress exists.
+- `[x]` Effect-owned automation lane live/export parity stress exists.
+- `[x]` Route-gain automation has block-size stability stress for 128-sample vs 4096-sample audio-clip-route renders.
+- `[x]` Plugin/effect latency model exists as metadata plus a backend estimator, adapter-capability fallback, and route delay compensation stress coverage for plugin-latency placeholders.
+- `[x]` Track effects, global mastering EQ, meters, and effect tails are in the native path.
+- `[~]` Route automation supports gain, pan, and effect parameters.
+- `[~]` Project/segment/note automation are native, but frontend editing surfaces are early.
+- `[x]` Add parity tests for looped playback export regions. Native range export length/empty-range coverage, nonzero-start live parity, and review-loop clamp range parity now exist.
+- `[ ]` Add parity tests for dense overlapping automation, rapid tempo/speed changes, and high-polyphony Aether patches.
+- `[x]` Add sample-rate matrix tests: 44.1k, 48k, 96k.
+- `[x]` Add denormal protection and stress tests for long tails near silence.
+- `[ ]` Add null-test style comparisons for live/offline paths where deterministic output is expected.
+- `[x]` Add master-limiter/headroom policy before playback/export.
 
 Done when:
 
-- Synth patch can be shaped without external processing.
-- Effects are stateful, serializable, and automatable/modulatable.
-- Bypass does not click/pop badly.
+- Export is not a second engine. It is the same engine driven offline.
+- Render differences are either mathematically explained or treated as bugs.
 
-## Milestone 6: Presets And State
+## Priority 5: Mixer, Routing, And Mastering
 
-Purpose: make work saveable and reusable.
+Purpose: make the DAW feel like a controlled signal-flow environment.
 
 Checklist:
 
-- Define synth patch schema.
-- Include:
-  - oscillator settings
-  - wavetable reference/data
-  - envelopes
-  - LFOs
-  - modulation routes
-  - FX chain
-  - macros
-- Add factory presets folder.
-- Add user presets folder.
-- Add preset load/save.
-- Add version migration.
-- Add tests for patch roundtrip.
+- `[x]` Per-track route buffers exist.
+- `[x]` Track gain/pan are applied natively with equal-power pan.
+- `[x]` Track meters and master meters exist.
+- `[x]` Track effect chains have first native modules: filter, saturation, bitcrush, delay, reverb.
+- `[x]` Global Mastering controls the final layer before playback/export through master EQ.
+- `[~]` Render timing panel exposes schedule/synth/sample/fx/analyzer/copy cost plus wavetable cache hit/miss/size counters.
+- `[x]` Native render timing now separates route effect/plugin-placeholder processing from master FX and sample playback.
+- `[~]` Add explicit master chain model: global EQ, neutral input/output gain, optional compressor, final safety limiter, and live master RMS/peak/true-peak/momentary-LUFS diagnostics exist; deeper metering UX, offline integrated-loudness review, and preset migration remain.
+- `[~]` Add send/return bus model. Native post-fader sends, project return buses, preallocated return buffers, return effect chains, project persistence, IPC parsing, and backend stress coverage exist; bus UI, latency-reporting polish, and routing UX remain.
+- `[~]` Add group tracks and folder routing. Backend `TrackKind::Group`, `parentTrackId`, preallocated group buffers, group effects/sends, stereo-balance group pan, project persistence, IPC parsing, frontend schema support, parent-graph integrity checks, and backend stress coverage exist; group UI, nested-group ordering polish, and full latency reporting remain.
+- `[~]` Add per-track freeze/bounce-in-place using `renderTrackToWav`. Backend planner and `project.bounceTrackWav` IPC now validate source/asset IDs, render the selected track to WAV, analyze the rendered stem, preserve the source track muted, create a playable bounced audio track/segment from the stem, and have stress/build coverage. Freeze-style bounces detach the replacement from the source parent group by default to avoid double-processing rendered group FX, while export-style callers can preserve parent routing explicitly. UI wiring, reversible unfreeze metadata, and actual group-track bounce remain pending.
+- `[x]` Add plugin-latency compensation slots even before true plugin hosting.
+- `[~]` Add peak/RMS/LUFS metering strategy. Offline file/export analysis has integrated LUFS and true peak; live playback now publishes master RMS dBFS, peak dBFS, bounded true-peak dBTP, and preallocated momentary LUFS. Track-level loudness UX and integrated export review remain.
 
 Done when:
 
-- A patch can be saved, reloaded, and sound the same.
-- Old patches can survive schema changes.
-- Presets are portable inside the project.
+- Every audible source passes through one clear route path.
+- Track, bus, and master processing are serializable, automatable, and export-identical.
 
-## Milestone 7: Sound Design UI
+## Priority 6: Aether Synth Core
 
-Purpose: make the synth feel like an instrument, not a config panel.
+Purpose: build a serious native synth that belongs inside Beat.
 
 Checklist:
 
-- Build synth editor main view.
-- Add oscillator section.
-- Add wavetable display/position control.
-- Add filter section.
-- Add envelopes/LFO tabs.
-- Add modulation matrix.
-- Add macro controls.
-- Add FX rack.
-- Add preset browser.
-- Add analyzer view.
-- Make drag or click modulation assignment possible eventually.
+- `[x]` Stable synth parameter contract exists.
+- `[x]` Native wavetable data model and oscillator exist.
+- `[x]` Wavetable oscillator uses cached frame selection and interpolation.
+- `[x]` Basic wavetable factory tables exist.
+- `[x]` Aether oscillator A/B, sub, noise, unison, detune, spread, pan, and levels exist.
+- `[x]` Cached pan gains reduce avoidable per-sample trig for static pan.
+- `[~]` Dynamic modulation routes exist for LFO/env to oscillator, filter, amp, and unison targets.
+- `[~]` Modulation matrix UI exists with target/source selection, but needs deeper semantic cleanup.
+- `[~]` Custom frame editor exists, but needs a less tedious workflow and clearer meaning.
+- `[ ]` Extract oscillator, envelope, LFO, modulation, filter, and voice-allocation logic out of `InstrumentVoice`.
+- `[ ]` Add richer envelopes: Env 2+, curve shapes, looping envelopes.
+- `[ ]` Add LFO 2+, tempo sync, one-shot mode, smoothing, phase/random controls.
+- `[ ]` Add macro semantics: named macros, ranges, curves, and visible assignments.
+- `[ ]` Add wavetable import, morphing, drawing, FFT/resynthesis research lane, and frame normalization rules.
+- `[ ]` Add advanced warp modes with bounded CPU cost.
+- `[~]` Add oversampling strategy for nonlinear stages. Route saturator/distortion now use bounded 2x midpoint oversampling with block-continuous state and timing counters; Aether nonlinear/warp stages still need their own bounded strategy before exposing heavier modes.
+- `[ ]` Add proper voice stealing, mono/legato, glide, pitch bend, mod wheel, velocity, keytracking.
+- `[x]` Add Aether-specific stress: high polyphony, high unison, dense modulation, rapid parameter edits.
 
 Done when:
 
-- A user can create a patch without touching raw project data.
-- Modulation relationships are visible.
-- Common controls are one or two interactions away.
-- UI does not hide the sound-design state.
+- Aether can be edited quickly, sounds consistent between preview/live/export, and has a stable patch schema.
+- DSP cost scales predictably with voices, unison, FX, and modulation.
 
-## Recommended Execution Order
+## Priority 7: Sampler And Plugin Import Layer
 
-1. Finish host/audio safety baseline.
-2. Build real wavetable oscillator core.
-3. Upgrade voice architecture.
-4. Add modulation matrix V1.
-5. Wire analyzer to UI.
-6. Add FX rack.
-7. Add preset system.
-8. Deepen wavetable editing/import later.
+Purpose: make imported instruments usable without compromising Beat’s native model.
 
-## Parallel Execution Model
+Checklist:
 
-The work can run in parallel if each lane owns a narrow boundary and merges through agreed contracts. Avoid multiple agents editing the same files unless one agent is explicitly integrating.
+- `[x]` DecentSampler `.dspreset` / `.zip` import baseline exists.
+- `[x]` Imported sample zones include key/velocity ranges, root note, gain, pan, tuning, seq position, one-shot, loop metadata, and start/end sample offsets.
+- `[x]` Uploaded multi-file instruments default to length-aware hit variants instead of misleading volume lanes.
+- `[x]` Sample buffers are deduped during project apply.
+- `[x]` Sample-backed instruments render through the same route path as synths and audio clips.
+- `[x]` Sample-zone instruments can render from direct zone paths even when top-level sample URL lists are absent.
+- `[x]` Sample-zone start/end offsets are honored in native render and browser preview paths.
+- `[~]` Plugin library/sidebar and protected plugin modal exist. DecentSampler packages now open in a package-aware wrapper that can show parsed UI skin metadata, structured control hotspots/bindings, sample-zone maps, and create native sampler instruments for MIDI segments; true native DS runtime hosting remains future work.
+- `[~]` Aether fallback methodology exists for generic synth-plugin placeholders, but DecentSampler-derived instruments now stay sampler-backed and do not use Aether fallback.
+- `[x]` Add explicit plugin adapter capability metadata for instrument/effect/renderer/utility support, realtime/offline availability, fallback mode, and latency, with native repository stress coverage.
+- `[ ]` Add multisample/keymap editor UI.
+- `[ ]` Add explicit velocity-layer editor UI when we want real volume/dynamic layers instead of hit variants.
+- `[ ]` Add sample trimming, loop markers, crossfade loops, root-note detection helpers.
+- `[ ]` Add round-robin/choke/exclusive groups.
+- `[~]` Add package/copy imported samples into project documents or project asset folders. `.beat` documents now carry a generated asset manifest with bundled/external/plugin policies, external sample/audio assets are copied into a sibling project asset folder on save, and saved paths are rewritten relative to the project file. Missing-file relink UI and copied-asset cleanup/versioning remain.
+- `[x]` Define plugin adapter manifest and capability model: synth, effect, renderer, utility.
+- `[ ]` Add real plugin-host feasibility pass separately for AU/VST3, including sandboxing and crash isolation.
 
-### Lane A: Backend Audio Safety
+Done when:
 
-Owner focus:
+- Imported instruments behave like native Beat instruments in tracks, save/open, live playback, and export.
+- Missing plugins or samples degrade predictably instead of breaking the project.
 
-- `backend/Source/Audio/AudioEngine.*`
-- `backend/Source/Audio/Sequencer.*`
-- backend stress tests
-- callback safety documentation
+## Priority 8: Automation And Musical Editing
 
-Primary tasks:
+Purpose: let users shape sound over time with DAW-grade precision.
 
-- Keep transport stable.
-- Expand stress tests.
-- Audit audio callback locks/allocations.
-- Add CPU timing markers.
-- Maintain panic/all-notes-off behavior.
+Checklist:
 
-Dependencies:
+- `[x]` Native note automation can drive per-note pitch and parameter events.
+- `[x]` Segment automation and project automation are parsed and emitted.
+- `[x]` Route-level automation supports track gain/pan/effect targets.
+- `[~]` MIDI “curve to” concept exists, but should generalize beyond pitch.
+- `[ ]` Add visible automation lanes in track view.
+- `[ ]` Add per-segment automation editor with percent/time anchors.
+- `[ ]` Add note-specific modulation timelines for pitch, level, phase, filter, wavetable position, and macros.
+- `[~]` Add curve interpolation modes: hold, linear, quadratic, cubic, ease-in, ease-out, and smoothstep are native and control-checkpoint stress-covered; richer exponential/tension editing and stepped-pattern variants remain.
+- `[ ]` Add automation capture/write/read modes later.
+- `[ ]` Add automation conflict rules: project vs segment vs note vs live knob.
 
-- Should not wait on UI work.
-- Must review any synth voice changes for real-time safety.
+Done when:
 
-### Lane B: Wavetable Oscillator DSP
+- Automation is first-class project data, not hidden modal state.
+- Users can see and edit what is changing over time.
 
-Owner focus:
+## Priority 9: Beat And Instrument Generation
 
-- wavetable data structures
-- oscillator render code
-- oscillator tests
-- anti-aliasing/mipmapping strategy
+Purpose: keep generation musical, editable, and grounded in DAW state.
 
-Primary tasks:
+Checklist:
 
-- Implement `Wavetable`.
-- Implement oscillator playback.
-- Add interpolation and phase handling.
-- Add basic factory tables.
-- Add frequency/aliasing tests.
+- `[x]` Genre-informed drum generation exists.
+- `[x]` Complexity has been corrected away from “fill every cell and add instruments.”
+- `[~]` Genre rules include rock/pop/rap/trap/drill/breakcore/DnB/house/reggae/funk guidance.
+- `[~]` Aether-aware instrument generation exists, but should be measured against the current Aether schema.
+- `[ ]` Add generated pattern structure: sections, fills, rests, density maps, ghost notes, accents.
+- `[ ]` Add complexity as musical density/variation, not instrument count.
+- `[ ]` Add drummer-like constraints: limb independence, backbeat anchors, phrase length, fills into transitions.
+- `[ ]` Add generation provenance and editable “why this pattern” metadata.
+- `[ ]` Add training/export loops that preserve accepted user edits.
+- `[ ]` Add generation tests per genre using explicit expected invariants.
 
-Dependencies:
+Done when:
 
-- Needs a stable interface into the existing synth voice.
-- Should avoid changing transport, IPC, or UI unless integration requires it.
+- Generated material sounds like a musician’s starting point, not random grid fill.
+- Generated data remains ordinary editable DAW data after creation.
 
-### Lane C: Voice And Modulation Architecture
+## Priority 10: Codebase Organization
 
-Owner focus:
+Purpose: keep a large app editable as it grows.
 
-- voice state
-- envelopes/LFOs
-- modulation routing model
-- parameter smoothing/clamping
-- patch serializable state
+Checklist:
 
-Primary tasks:
+- `[x]` Target structure is documented in `docs/project-structure.md`.
+- `[~]` New backend domains exist: wavetable, realtime, sampler, effects, analysis, parameters.
+- `[~]` Frontend has feature folders, but DAW, Synth, Mixer, Library boundaries are not fully migrated.
+- `[ ]` Move sequencer/transport into `Audio/Sequencing` when the next sequencing-heavy change lands.
+- `[ ]` Split `AudioEngine` orchestration from render route/effects/sample voice helpers.
+- `[ ]` Split `InstrumentVoice` into smaller DSP modules.
+- `[ ]` Split giant stores into project, transport, document, library, plugin, analyzer stores.
+- `[ ]` Keep IPC schema additive/versioned and remove business logic from bridge code over time.
+- `[ ]` Add focused tests near subsystem ownership as modules split.
 
-- Define modulation source/target IDs.
-- Build route evaluation.
-- Add per-voice/global modulation distinction.
-- Connect Env/LFO to oscillator/filter targets.
-- Keep modulation state serializable from the start.
+Done when:
 
-Dependencies:
+- Agents can work in parallel without constantly touching the same central files.
+- The boundaries match how the product is actually reasoned about.
 
-- Needs oscillator parameters from Lane B.
-- Should coordinate with Lane F before freezing patch schema.
+## Research And Math Lane
 
-### Lane D: Analyzer And Metering UI
+Purpose: use top-tier DSP/math where it matters, without prematurely academicizing the app.
 
-Owner focus:
+Topics to evaluate before large rewrites:
 
-- analyzer IPC event
-- frontend spectrum/meter components
-- event throttling
-- UI rendering performance
+- Bandlimited oscillator/wavetable methods: mipmapped tables, minBLEP/polyBLEP, BLIT, oversampling tradeoffs.
+- FFT/resynthesis: windowing, phase handling, spectral interpolation, harmonic tracking, frame normalization.
+- Time-stretch/pitch-shift: phase vocoder, WSOLA/PSOLA-style approaches, Rubber Band-style integration feasibility.
+- Dynamics/mastering: true-peak limiting, oversampled clipping, LUFS/RMS/peak metering.
+- Automation smoothing: sample-accurate ramps vs block-rate smoothing, denormal protection, zipper-noise thresholds.
+- Scheduling: sample-accurate event queues, tempo maps, loop boundary splitting, latency compensation.
 
-Primary tasks:
+Rule:
 
-- Expose `FftAnalyzer` snapshots.
-- Add frontend store for spectrum data.
-- Render spectrum and levels.
-- Validate no UI event spam under playback.
+- Research becomes code only when tied to a measurable product path: sound quality, CPU budget, latency, determinism, or user workflow.
 
-Dependencies:
+## Current Execution Queue
 
-- Can proceed from the existing analyzer backend.
-- Should not touch oscillator internals.
+1. DAW Core invariants:
+   - Add visible fade handles and crossfade commands on top of the split/trim/fade model.
+   - Expand selection/drag/resize tests.
+   - Clip split/trim/fade model.
+2. Document safety:
+   - Project asset packaging strategy.
+   - Document roundtrip stress.
+3. Render parity:
+   - Automation-heavy parity stress.
+   - Region export once loop/range export UI exists.
+4. Aether structure:
+   - Split `InstrumentVoice`.
+   - Add deeper filter-stage render-slice counters.
+   - Design better wavetable/custom-frame workflow.
+5. Sampler/plugin:
+   - Keymap editor and project asset copying.
+   - Round-robin and choke-group editing UX.
+   - Plugin adapter manifest.
 
-### Lane E: Synth Editor UI
+## Parallel-Agent Guidance
 
-Owner focus:
-
-- synth editor layout
-- oscillator panel
-- envelope/LFO editors
-- modulation matrix UI
-- macros and FX rack surface
-
-Primary tasks:
-
-- Build the first usable synth editor screen.
-- Add controls for oscillator and wavetable position.
-- Add visual modulation indicators.
-- Add editor states for envelopes/LFOs/macros.
-
-Dependencies:
-
-- Needs stable parameter IDs from Lanes B/C.
-- Can mock unavailable backend values behind feature flags or placeholder state.
-
-### Lane F: Presets And Project State
-
-Owner focus:
-
-- patch schema
-- project serialization
-- preset folders
-- migration
-- roundtrip tests
-
-Primary tasks:
-
-- Define versioned patch format.
-- Add load/save/roundtrip tests.
-- Coordinate IDs with modulation and oscillator work.
-- Keep backward compatibility with existing projects.
-
-Dependencies:
-
-- Needs early schema agreement with Lanes B/C/E.
-- Should avoid UI polish until schema is stable.
-
-### Lane G: Effects Rack
-
-Owner focus:
-
-- per-instrument FX chain
-- effect modules
-- smoothing/bypass behavior
-- modulation target exposure
-
-Primary tasks:
-
-- Define effect chain model.
-- Add first modules.
-- Add wet/dry and bypass.
-- Make parameters serializable and modulatable.
-
-Dependencies:
-
-- Can start after basic patch schema exists.
-- Should use modulation target conventions from Lane C.
-
-## Coordination Rules
-
-- One integrator owns `AudioEngine.*` at a time.
-- One integrator owns patch/project schema at a time.
-- Every new DSP subsystem needs:
-  - no NaN/Inf test
-  - bounds test
-  - fast repeated render/stress test
-  - documented real-time behavior
-- UI work may mock backend state, but must use planned parameter IDs.
-- Backend work may expose placeholder IPC fields, but must version them or keep them additive.
-- Merge order should prefer contracts first, implementations second, UI last.
-
-## Suggested Two-Agent Split
-
-If two agents are active, split the work like this:
-
-- Agent 1: Lanes A, B, and C.
-- Agent 2: Lanes D, E, and F.
-
-This keeps core DSP/audio-thread work together and frontend/state work together. The main shared contract should be a small parameter/schema document before heavy implementation starts.
-
-## Immediate Next Step
-
-Create the first contract document for synth parameters and patch state:
-
-- oscillator parameter IDs
-- modulation source IDs
-- modulation target IDs
-- patch schema version
-- IPC/store boundaries
-
-After that, Lane B can build the wavetable core while Lane E/D can build UI/analyzer surfaces against stable names.
+- One agent owns `AudioEngine.*` and `Sequencer.*` at a time.
+- One agent owns schema/persistence at a time.
+- One agent can work on frontend DAW selection/edit UI if backend sequencing is active.
+- One agent can work on Aether UI if synth parameter contracts are not being changed.
+- Every backend change needs either an existing stress pass or a new stress case.
+- Every file/document change that affects user work must preserve rollback behavior.

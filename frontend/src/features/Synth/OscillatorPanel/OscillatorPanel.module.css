@@ -131,7 +131,7 @@
 .wavetableControlLabel {
   max-width: 100%;
   overflow: hidden;
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-align: center;
   text-overflow: ellipsis;
@@ -185,7 +185,7 @@
   margin: 0 -4px;
   border-bottom: var(--border-fg);
   font-family: var(--font-family-mono);
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-align: center;
 }

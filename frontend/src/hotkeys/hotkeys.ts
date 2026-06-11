@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { useContextualHotkeyStore } from "./contextualHotkeys";
 import { redo, undo, useProjectStore, useTransportStore, useUiStore } from "../state/store";
 import { clipboardStore } from "../state/clipboard";
-import { primeTimelineAudio, stopTimelineAudio } from "../audio/timelineAudio";
-import { send } from "../ipc/bridge";
+import { pauseTransport, playTransport, stopTransport } from "../audio/transportActions";
+import { saveCurrentDocument } from "../persistence/documentActions";
 
 /**
  * Hotkey registry.
@@ -39,13 +39,9 @@ const BINDINGS: HotkeyBinding[] = [
     action: () => {
       const t = useTransportStore.getState();
       if (t.playing) {
-        t.pause();
-        stopTimelineAudio();
-        void send({ kind: "transport.pause" });
+        pauseTransport();
       } else {
-        primeTimelineAudio();
-        t.play();
-        void send({ kind: "transport.play" });
+        playTransport();
       }
     },
   },
@@ -66,7 +62,15 @@ const BINDINGS: HotkeyBinding[] = [
     description: "Save project",
     preventDefault: true,
     action: () => {
-      // wired in App.tsx via a save-orchestrator hook; left as no-op here.
+      void saveCurrentDocument();
+    },
+  },
+  {
+    combo: "meta+shift+s",
+    description: "Save project as",
+    preventDefault: true,
+    action: () => {
+      void saveCurrentDocument({ saveAs: true });
     },
   },
   {
@@ -86,12 +90,49 @@ const BINDINGS: HotkeyBinding[] = [
     },
   },
   {
+    combo: "alt+arrowleft",
+    description: "Nudge selection left",
+    preventDefault: true,
+    action: () => {
+      nudgeSelectedTimelineSegments(-0.25);
+    },
+  },
+  {
+    combo: "alt+arrowright",
+    description: "Nudge selection right",
+    preventDefault: true,
+    action: () => {
+      nudgeSelectedTimelineSegments(0.25);
+    },
+  },
+  {
+    combo: "shift+alt+arrowleft",
+    description: "Nudge selection left by beat",
+    preventDefault: true,
+    action: () => {
+      nudgeSelectedTimelineSegments(-1);
+    },
+  },
+  {
+    combo: "shift+alt+arrowright",
+    description: "Nudge selection right by beat",
+    preventDefault: true,
+    action: () => {
+      nudgeSelectedTimelineSegments(1);
+    },
+  },
+  {
+    combo: "q",
+    description: "Quantize selection",
+    action: () => {
+      quantizeSelectedTimelineSegments(0.25);
+    },
+  },
+  {
     combo: ".",
     description: "Stop playback",
     action: () => {
-      useTransportStore.getState().stop();
-      stopTimelineAudio();
-      void send({ kind: "transport.stop" });
+      stopTransport();
     },
   },
 ];
@@ -168,19 +209,15 @@ function pasteTimelineSegments(): boolean {
   const minStart = Math.min(...segments.map((segment) => segment.startBeat));
   const maxEnd = Math.max(...segments.map((segment) => segment.startBeat + segment.lengthBeats));
   const offset = Math.max(0.25, maxEnd - minStart);
-  const addSegment = useProjectStore.getState().addSegment;
-  const project = useProjectStore.getState().project;
+  const { applySegmentEditCommand, project } = useProjectStore.getState();
   const trackIds = new Set(project.tracks.map((track) => track.id));
-  const pastedIds = segments
+  const commandSegments = segments
     .filter((segment) => trackIds.has(segment.trackId))
-    .map((segment) =>
-      addSegment(segment.trackId, {
-        ...structuredClone(segment),
-        id: undefined,
-        startBeat: segment.startBeat + offset,
-        name: segment.name ? `${segment.name} copy` : undefined,
-      }),
-    );
+    .map((segment) => ({
+      ...structuredClone(segment),
+      name: segment.name ? `${segment.name} copy` : undefined,
+    }));
+  const pastedIds = applySegmentEditCommand({ kind: "duplicate", segments: commandSegments, offsetBeats: offset });
 
   if (pastedIds.length === 0) return false;
   useUiStore.getState().setSelectedSegments(pastedIds);
@@ -190,8 +227,32 @@ function pasteTimelineSegments(): boolean {
 function deleteSelectedTimelineSegments(): boolean {
   const segments = selectedTimelineSegments();
   if (segments.length === 0) return false;
-  const removeSegment = useProjectStore.getState().removeSegment;
-  segments.forEach((segment) => removeSegment(segment.id));
+  useProjectStore.getState().applySegmentEditCommand({
+    kind: "delete",
+    segmentIds: segments.map((segment) => segment.id),
+  });
   useUiStore.getState().setSelectedSegments([]);
+  return true;
+}
+
+function nudgeSelectedTimelineSegments(deltaBeats: number): boolean {
+  const segments = selectedTimelineSegments();
+  if (segments.length === 0) return false;
+  useProjectStore.getState().applySegmentEditCommand({
+    kind: "nudge",
+    segmentIds: segments.map((segment) => segment.id),
+    deltaBeats,
+  });
+  return true;
+}
+
+function quantizeSelectedTimelineSegments(gridBeats: number): boolean {
+  const segments = selectedTimelineSegments();
+  if (segments.length === 0) return false;
+  useProjectStore.getState().applySegmentEditCommand({
+    kind: "quantize",
+    segmentIds: segments.map((segment) => segment.id),
+    gridBeats,
+  });
   return true;
 }

@@ -10,7 +10,7 @@ export type Id = string;
 export type Beats = number; // floating-point position/length in beats
 export type DrumSpeed = 1 | 2 | 3 | 4 | 5 | 6;
 
-export type TrackKind = "audio" | "midi" | "mixed";
+export type TrackKind = "audio" | "midi" | "mixed" | "group";
 
 export type MidiAutomationTarget =
   | "pitch"
@@ -44,7 +44,7 @@ export interface MidiNote {
   lengthBeats: Beats;
   /** Optional note this note should slide/legato-connect into. */
   connectToIndex?: number;
-  /** Optional unselectable pitch curve trail inside this note. Points are relative to the segment. */
+  /** Optional unselectable pitch curve trail inside this note. Fractional pitch values are allowed. */
   curve?: Array<{ beat: Beats; pitch: number }>;
   /** Optional per-note parameter automation. Existing curve remains the legacy pitch lane. */
   automation?: MidiAutomationLane[];
@@ -71,7 +71,7 @@ export interface DrumRow {
 
 export type SegmentPayload =
   | { kind: "audio"; audioFileId: Id; gainDb: number }
-  | { kind: "midi"; notes: MidiNote[] }
+  | { kind: "midi"; notes: MidiNote[]; gainDb?: number }
   | { kind: "drum"; rows: DrumRow[]; stepCount: number; speed: DrumSpeed; defaultPitchHz?: number; swingPercent?: number; timeSignature?: TimeSignature }
   | { kind: "mixed"; audioFileId: Id; notes: MidiNote[]; gainDb: number };
 
@@ -90,6 +90,12 @@ export interface Segment {
   startBeat: Beats;
   /** Length in beats. */
   lengthBeats: Beats;
+  /** Offset into the source content for non-destructive trim/split, in beats. */
+  sourceStartBeat?: Beats;
+  /** Linear fade-in duration at the segment head, in beats. */
+  fadeInBeats?: Beats;
+  /** Linear fade-out duration at the segment tail, in beats. */
+  fadeOutBeats?: Beats;
   /** When > 0, repeat this segment until the next segment / end of track. */
   repeats: number;
   payload: SegmentPayload;
@@ -100,12 +106,54 @@ export interface Segment {
 
 export interface TrackEffectChain {
   /** Each filter is an opaque effect node with parameters. */
-  filters: Array<{
-    id: Id;
-    kind: "bitcrush" | "lowpass" | "highpass" | "saturator" | "reverb" | "delay";
-    bypassed: boolean;
-    params: Record<string, number>;
-  }>;
+  filters: TrackEffect[];
+}
+
+export type AutomationCurve = "hold" | "linear" | "quadratic" | "cubic" | "easeIn" | "easeOut" | "smoothstep";
+
+export interface TrackEffectAutomationPoint {
+  id: Id;
+  /** Absolute beat on the project timeline. */
+  beat: Beats;
+  value: number;
+  /** Curve from this point toward the next point. */
+  curve?: AutomationCurve;
+}
+
+export interface TrackEffectAutomationLane {
+  /** Effect parameter key, e.g. cutoffHz, resonance, drive, mix. */
+  param: string;
+  points: TrackEffectAutomationPoint[];
+}
+
+export interface TrackEffect {
+  id: Id;
+  kind: "bitcrush" | "lowpass" | "highpass" | "saturator" | "distortion" | "reverb" | "delay" | "compressor" | "chorus" | "phaser" | "flanger" | "plugin";
+  bypassed: boolean;
+  /** Optional future effect-plugin host metadata. Native playback bypasses unavailable plugin processors safely. */
+  pluginId?: Id;
+  pluginName?: string;
+  pluginFormat?: PluginFormat;
+  latencySamples?: number;
+  params: Record<string, number>;
+  /** Track-owned timeline lanes for this effect. Empty lanes use params defaults. */
+  automation?: TrackEffectAutomationLane[];
+}
+
+export interface TrackSend {
+  busId: Id;
+  gainDb: number;
+  pan: number;
+  enabled: boolean;
+}
+
+export interface ReturnBus {
+  id: Id;
+  name: string;
+  gainDb: number;
+  pan: number;
+  mute: boolean;
+  effects: TrackEffectChain;
 }
 
 export interface Track {
@@ -116,11 +164,14 @@ export interface Track {
   instrumentId?: Id;
   /** Loaded audio file if this is an audio-input track. */
   audioFileId?: Id;
+  /** Optional parent group/folder route. Missing parent falls back to master. */
+  parentTrackId?: Id;
   gainDb: number;
   pan: number; // -1..1
   mute: boolean;
   solo: boolean;
   /** Color is not exposed in this design system — kept here for future themes. */
+  sends?: TrackSend[];
   effects: TrackEffectChain;
   segments: Segment[];
   /** UI-only: row height variant. */
@@ -186,13 +237,16 @@ export interface Instrument {
   lfoToFilter?: number;     // -1..1 — rhythmic filter sweep amount
   envToFilter?: number;     // -1..1 — ADSR-to-filter cutoff depth
 
+  /** Instrument-owned FX inserted before track FX. Used by plugin/sample imports. */
+  effects?: TrackEffectChain;
+
   /** Sample IDs the instrument can play. */
   sampleIds: Id[];
   /** Built-in or imported one-shot sample URL for sampler-style instruments. */
   sampleUrl?: string;
-  /** Multiple sample URLs played round-robin for one logical instrument. */
+  /** Multiple sample URLs for one logical sampler instrument. */
   sampleUrls?: string[];
-  /** Optional multisample/round-robin zones, e.g. parsed from Decent Sampler presets. */
+  /** Optional multisample, hit-variant, or round-robin zones, e.g. parsed from imports. */
   sampleMap?: InstrumentSampleZone[];
   /** Sidebar grouping bucket for instrument library organization. */
   setId?: Id;
@@ -220,6 +274,16 @@ export interface InstrumentSampleZone {
   pan: number;
   tuning: number;
   seqPosition: number;
+  chokeGroup?: number;
+  loopEnabled?: boolean;
+  loopStart?: number;
+  loopEnd?: number;
+  oneShot?: boolean;
+  durationSeconds?: number;
+  loLengthSeconds?: number;
+  hiLengthSeconds?: number;
+  startSample?: number;
+  endSample?: number;
 }
 
 export interface WavetableConfig {
@@ -310,12 +374,55 @@ export interface SynthPatchSnapshot {
 }
 
 export interface InstrumentSource {
-  kind: "factory" | "uploaded" | "created" | "derived";
+  kind: "factory" | "uploaded" | "created" | "derived" | "plugin";
   label: string;
   url?: string;
   license?: string;
   importedAt?: number;
   edited?: boolean;
+  pluginId?: Id;
+  fallbackEngine?: "aether";
+}
+
+export type PluginKind = "synth" | "effect" | "renderer" | "utility";
+export type PluginFormat = "native" | "vst3" | "audio-unit" | "bridge" | "decent-sampler";
+export type PluginInstallState = "available" | "installed" | "missing" | "blocked";
+export type PluginCapabilityKind = "instrument" | "effect" | "renderer" | "utility";
+export type PluginFallbackMode = "aether" | "rendered-audio" | "pass-through";
+
+export interface PluginCapability {
+  id: Id;
+  kind: PluginCapabilityKind;
+  label: string;
+  realtime: boolean;
+  offline: boolean;
+  latencySamples?: number;
+  fallbackMode?: PluginFallbackMode;
+}
+
+export interface PluginAdapter {
+  id: Id;
+  name: string;
+  vendor: string;
+  version?: string;
+  kind: PluginKind;
+  format: PluginFormat;
+  status: PluginInstallState;
+  /** Synth plugins can either create live instruments or render audio when hosting is unavailable. */
+  instrumentMode: "live-instrument" | "rendered-audio" | "fallback-aether";
+  description: string;
+  factory?: boolean;
+  sourceFileName?: string;
+  sourcePath?: string;
+  uiImagePath?: string;
+  uiImageDataUrl?: string;
+  uiWidth?: number;
+  uiHeight?: number;
+  associatedInstrumentId?: Id;
+  sampleCount?: number;
+  uiControlCount?: number;
+  installedAt?: number;
+  capabilities?: PluginCapability[];
 }
 
 export interface InstrumentSnapshot {
@@ -346,6 +453,7 @@ export interface InstrumentSnapshot {
   lfoToPitch?: number;
   lfoToFilter?: number;
   envToFilter?: number;
+  effects?: TrackEffectChain;
   sampleIds: Id[];
   sampleUrl?: string;
   sampleUrls?: string[];
@@ -368,6 +476,23 @@ export interface AudioFile {
   path: string;
   durationSeconds: number;
   sampleRate: number;
+  /** Source bit depth when the file format exposes it. */
+  bitDepth?: number;
+  /** Optional original/imported file size in bytes. Older libraries may omit this. */
+  sizeBytes?: number;
+  /** Unix ms timestamp when the asset entered the Beat audio library. */
+  importedAt?: number;
+  /** Native producer-facing analysis metadata. Omitted when unavailable. */
+  leftPeakDbFS?: number;
+  rightPeakDbFS?: number;
+  truePeakDbTP?: number;
+  rmsDbFS?: number;
+  crestFactorDb?: number;
+  dcOffset?: number;
+  clippingCount?: number;
+  clippingRatio?: number;
+  stereoCorrelation?: number;
+  integratedLufs?: number;
 }
 
 /**
@@ -389,6 +514,18 @@ export interface EqAutomationPoint {
   bandsDb: number[];
 }
 
+export interface MasterChainSettings {
+  inputGainDb: number;
+  compressorEnabled: boolean;
+  compressorThresholdDb: number;
+  compressorRatio: number;
+  compressorAttackMs: number;
+  compressorReleaseMs: number;
+  compressorMakeupDb: number;
+  compressorMix: number;
+  outputGainDb: number;
+}
+
 export interface TimeSignature {
   num: number;
   denom: number;
@@ -407,7 +544,9 @@ export interface Project {
   /** Beats counted from 0 — where to stop sequencer playback. */
   lengthBeats: Beats;
   tracks: Track[];
+  returnBuses: ReturnBus[];
   masterEqAutomation: EqAutomationPoint[];
+  masterChain: MasterChainSettings;
   /** Last saved timestamp ms. */
   savedAt?: number;
 }
@@ -422,21 +561,30 @@ export interface TransportState {
   positionBeat: Beats;
   /** Playback speed multiplier. 1.0 = normal. */
   speed: number;
-  /** Active selection loop range for preview, or null. */
-  loopRange: { startBeat: Beats; endBeat: Beats } | null;
+  /** Review loop toggle. When enabled, playback wraps at loopRange.endBeat. */
+  loopEnabled: boolean;
+  /** Review loop clamp positions. Stored even when loopEnabled is false. */
+  loopRange: { startBeat: Beats; endBeat: Beats };
+  /** Whole-project repeat toggle. When enabled, playback restarts at project end. */
+  repeatTrackEnabled: boolean;
 }
 
 /** UI-only ephemeral state — selection, focus, drag — not persisted, not undone. */
 export interface UiState {
   selectedTrackIds: Id[];
   selectedSegmentIds: Id[];
+  selectedTrackEffectAutomationPointKeys: string[];
   /** Open editors. Multiple modals can be open at once. */
   openEditors: Array<
     | { kind: "instrument"; instrumentId: Id }
     | { kind: "synth" }
+    | { kind: "track"; trackId: Id }
     | { kind: "segment"; segmentId: Id }
     | { kind: "component"; componentId: Id }
+    | { kind: "plugin"; pluginId: Id }
+    | { kind: "decentSamplerLibrary" }
     | { kind: "eq" }
+    | { kind: "projectHealth" }
     | { kind: "preferences" }
   >;
   /** Modeless, singleton editor for per-track effects. */

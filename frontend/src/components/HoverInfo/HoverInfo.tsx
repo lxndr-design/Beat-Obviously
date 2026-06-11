@@ -1,6 +1,6 @@
 import {
-  cloneElement,
   isValidElement,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -11,6 +11,8 @@ import {
 import { createPortal } from "react-dom";
 import styles from "./HoverInfo.module.css";
 
+type HoverInfoPlacement = "top" | "bottom" | "left" | "right";
+
 export interface HoverInfoProps {
   /** Element to attach hover-info to. Must accept onMouseEnter/onMouseLeave. */
   children: ReactElement;
@@ -19,7 +21,7 @@ export interface HoverInfoProps {
   /** Delay before reveal in ms. Default 2000ms — slow reveal. */
   delay?: number;
   /** Placement relative to the trigger. */
-  placement?: "top" | "bottom" | "left" | "right";
+  placement?: HoverInfoPlacement;
 }
 
 /**
@@ -33,36 +35,93 @@ export function HoverInfo({
   children,
   content,
   delay = 2000,
-  placement = "top",
+  placement = "bottom",
 }: HoverInfoProps) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
-  const triggerRef = useRef<HTMLElement>(null);
+  const [activePlacement, setActivePlacement] = useState(placement);
+  const triggerRef = useRef<HTMLSpanElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const timer = useRef<number | null>(null);
 
-  function placeFromTrigger() {
-    const el = triggerRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    let x = r.left + r.width / 2;
-    let y = r.top;
-    if (placement === "bottom") y = r.bottom;
-    if (placement === "left") {
-      x = r.left;
-      y = r.top + r.height / 2;
+  const updatePosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const pop = popoverRef.current;
+    if (!trigger || !pop) return;
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const popRect = pop.getBoundingClientRect();
+    const boundary = trigger.closest('[role="dialog"]')?.getBoundingClientRect() ?? {
+      left: 0,
+      top: 0,
+      right: window.innerWidth,
+      bottom: window.innerHeight,
+    };
+    const offset = 3;
+    const margin = 3;
+    const fallbackOrder: HoverInfoPlacement[] = ["bottom", "right", "left", "top"];
+    const placements = [
+      placement,
+      ...fallbackOrder.filter((nextPlacement) => nextPlacement !== placement),
+    ];
+
+    function pointFor(nextPlacement: HoverInfoPlacement) {
+      if (nextPlacement === "bottom") {
+        return {
+          x: triggerRect.left + triggerRect.width / 2 - popRect.width / 2,
+          y: triggerRect.bottom + offset,
+        };
+      }
+      if (nextPlacement === "right") {
+        return {
+          x: triggerRect.right + offset,
+          y: triggerRect.top + triggerRect.height / 2 - popRect.height / 2,
+        };
+      }
+      if (nextPlacement === "left") {
+        return {
+          x: triggerRect.left - popRect.width - offset,
+          y: triggerRect.top + triggerRect.height / 2 - popRect.height / 2,
+        };
+      }
+      return {
+        x: triggerRect.left + triggerRect.width / 2 - popRect.width / 2,
+        y: triggerRect.top - popRect.height - offset,
+      };
     }
-    if (placement === "right") {
-      x = r.right;
-      y = r.top + r.height / 2;
+
+    function fits(point: { x: number; y: number }) {
+      return (
+        point.x >= boundary.left + margin &&
+        point.y >= boundary.top + margin &&
+        point.x + popRect.width <= boundary.right - margin &&
+        point.y + popRect.height <= boundary.bottom - margin
+      );
     }
-    setCoords({ x, y });
-  }
+
+    const selectedPlacement =
+      placements.find((nextPlacement) => fits(pointFor(nextPlacement))) ?? "bottom";
+    const selectedPoint = pointFor(selectedPlacement);
+    const nextCoords = {
+      x: Math.min(
+        Math.max(selectedPoint.x, boundary.left + margin),
+        boundary.right - popRect.width - margin,
+      ),
+      y: Math.min(
+        Math.max(selectedPoint.y, boundary.top + margin),
+        boundary.bottom - popRect.height - margin,
+      ),
+    };
+
+    setActivePlacement(selectedPlacement);
+    setCoords(nextCoords);
+  }, [placement]);
 
   function show() {
     if (timer.current) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
-      placeFromTrigger();
+      setCoords(null);
+      setActivePlacement(placement);
       setOpen(true);
     }, delay);
   }
@@ -71,25 +130,21 @@ export function HoverInfo({
     setOpen(false);
   }
 
-  // Viewport clamp — after the popover renders, measure and nudge if needed.
+  // Position after render so we can measure the real tooltip size.
   useLayoutEffect(() => {
-    if (!open || !coords) return;
-    const pop = popoverRef.current;
-    if (!pop) return;
-    const rect = pop.getBoundingClientRect();
-    const margin = 8;
-    let nx = coords.x;
-    let ny = coords.y;
-    if (rect.left < margin) nx += margin - rect.left;
-    if (rect.right > window.innerWidth - margin)
-      nx -= rect.right - (window.innerWidth - margin);
-    if (rect.top < margin) ny += margin - rect.top;
-    if (rect.bottom > window.innerHeight - margin)
-      ny -= rect.bottom - (window.innerHeight - margin);
-    if (nx !== coords.x || ny !== coords.y) {
-      setCoords({ x: nx, y: ny });
-    }
-  }, [open, coords]);
+    if (!open) return;
+    updatePosition();
+  }, [open, content, updatePosition]);
+
+  useEffect(() => {
+    if (!open) return;
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, updatePosition]);
 
   useEffect(
     () => () => {
@@ -100,40 +155,28 @@ export function HoverInfo({
 
   if (!isValidElement(children)) return children;
 
-  const child = cloneElement(children, {
-    ref: triggerRef,
-    onMouseEnter: (e: MouseEvent) => {
-      // @ts-expect-error pass-through
-      children.props.onMouseEnter?.(e);
-      show();
-    },
-    onMouseLeave: (e: MouseEvent) => {
-      // @ts-expect-error pass-through
-      children.props.onMouseLeave?.(e);
-      hide();
-    },
-    onFocus: (e: FocusEvent) => {
-      // @ts-expect-error pass-through
-      children.props.onFocus?.(e);
-      show();
-    },
-    onBlur: (e: FocusEvent) => {
-      // @ts-expect-error pass-through
-      children.props.onBlur?.(e);
-      hide();
-    },
-  } as Partial<typeof children.props> & { ref: typeof triggerRef });
-
   return (
     <>
-      {child}
+      <span
+        ref={triggerRef}
+        className={styles.trigger}
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onFocus={show}
+        onBlur={hide}
+      >
+        {children}
+      </span>
       {open &&
-        coords &&
         createPortal(
           <div
             ref={popoverRef}
-            className={`${styles.popover} ${styles[`placement-${placement}`]} animate-hover-reveal`}
-            style={{ top: coords.y, left: coords.x }}
+            className={`${styles.popover} ${styles[`placement-${activePlacement}`]} animate-hover-reveal`}
+            style={{
+              top: coords?.y ?? 0,
+              left: coords?.x ?? 0,
+              visibility: coords ? "visible" : "hidden",
+            }}
             role="tooltip"
           >
             {content}

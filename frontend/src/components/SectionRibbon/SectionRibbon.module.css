@@ -3,14 +3,23 @@
   top: 0;
   z-index: 10;
   display: grid;
-  grid-template-columns: var(--button-square-xs) minmax(0, 1fr) auto;
+  grid-template-columns: var(--sidebar-rail-size) minmax(0, 1fr) auto;
   align-items: center;
-  height: var(--button-square-xs);
-  min-height: var(--button-square-xs);
+  height: var(--sidebar-rail-size);
+  min-height: var(--sidebar-rail-size);
   padding: 0;
   gap: 0;
+  border-top: 0;
   border-bottom: var(--border-fg);
   background: var(--color-bg);
+}
+
+.ribbonExpanded {
+  background: var(--color-bg);
+}
+
+.ribbonNoToggle {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .toggle,
@@ -25,10 +34,18 @@
   opacity: 0.78;
 }
 
+.toggle.toggle,
+.actionButton.actionButton {
+  width: var(--button-square-md) !important;
+  min-width: var(--button-square-md);
+  max-width: var(--button-square-md);
+  height: var(--button-square-md) !important;
+  min-height: var(--button-square-md);
+  max-height: var(--button-square-md);
+}
+
 .toggle:hover:not(:disabled),
-.toggle:focus-visible,
-.actionButton:hover:not(:disabled),
-.actionButton:focus-visible {
+.actionButton:hover:not(:disabled) {
   background: var(--color-fg);
   color: var(--color-fg-inverse);
   opacity: 1;
@@ -38,7 +55,7 @@
   min-width: 0;
   padding: 0 4px;
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   font-weight: var(--font-weight-medium);
   line-height: 1;
   text-align: left;
@@ -48,11 +65,15 @@
   white-space: nowrap;
 }
 
+.ribbonNoToggle .label {
+  padding-left: 8px;
+}
+
 .right {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  height: var(--button-square-xs);
+  height: var(--sidebar-rail-size);
   min-width: 0;
 }
 
@@ -60,10 +81,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 var(--button-square-xs);
-  width: var(--button-square-xs);
-  height: var(--button-square-xs);
-  font-size: 11px;
+  flex: 0 0 var(--sidebar-rail-size);
+  width: var(--sidebar-rail-size);
+  height: var(--sidebar-rail-size);
+  font-size: var(--font-size-ui);
   line-height: 1;
   opacity: 0.6;
 }
@@ -71,6 +92,6 @@
 .actions {
   display: inline-flex;
   align-items: center;
-  height: var(--button-square-xs);
+  height: var(--sidebar-rail-size);
   min-width: 0;
 }

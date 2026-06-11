@@ -1,10 +1,10 @@
-import { Button, Icon, HoverInfo } from "../../components";
-import { useProjectStore, useTransportStore, useUiStore } from "../../state/store";
+import { useEffect, useRef, useState } from "react";
+import { Button, Icon, HoverInfo, MarqueeText } from "../../components";
+import { useProjectStore, useTransportStore } from "../../state/store";
 import { send } from "../../ipc/bridge";
-import { saveProject } from "../../persistence/dexie";
-import { primeTimelineAudio, stopTimelineAudio } from "../../audio/timelineAudio";
+import { pauseTransport, playTransport, restartTransport, stopTransport } from "../../audio/transportActions";
 import { TimeSignatureControl } from "../Transport/TimeSignatureControl";
-import { BrandMark } from "./BrandMark";
+import { AppMenuButton } from "./AppMenuButton";
 import { InlineNumber } from "./InlineNumber";
 import styles from "./TopBar.module.css";
 
@@ -17,74 +17,124 @@ import styles from "./TopBar.module.css";
  * - Time display, time-sig, and BPM inputs share one unified
  *   input-frame style so they read as a single horizontal "playback" row.
  */
-export function TopBar() {
-  const { playing, positionBeat } = useTransportStore();
+interface TopBarProps {
+  onHome: () => void;
+  onNew: () => void;
+  onOpen: () => void;
+  onSave: () => void;
+  onSaveAs: () => void;
+  onExport: () => void;
+  onExportRange: () => void;
+  onExportTrack: () => void;
+  onRecover: () => void;
+  onHealth: () => void;
+  onSettings: () => void;
+}
+
+export function TopBar({ onHome, onNew, onOpen, onSave, onSaveAs, onExport, onExportRange, onExportTrack, onRecover, onHealth, onSettings }: TopBarProps) {
+  const { playing, positionBeat, loopEnabled, loopRange, repeatTrackEnabled } = useTransportStore();
   const transport = useTransportStore();
   const bpm = useProjectStore((s) => s.project.bpm);
   const ts = useProjectStore((s) => s.project.timeSignature);
   const lengthBeats = useProjectStore((s) => s.project.lengthBeats);
+  const projectName = useProjectStore((s) => s.project.name);
   const setBpm = useProjectStore((s) => s.setBpm);
   const setTs = useProjectStore((s) => s.setTimeSignature);
   const setLengthBeats = useProjectStore((s) => s.setLengthBeats);
-  const project = useProjectStore((s) => s.project);
-  const openEditor = useUiStore((s) => s.openEditor);
+  const renameProject = useProjectStore((s) => s.rename);
+  const [editingProjectName, setEditingProjectName] = useState(false);
+  const [projectNameDraft, setProjectNameDraft] = useState(projectName || "Untitled");
+  const projectNameInputRef = useRef<HTMLInputElement>(null);
 
-  async function onSave() {
-    await Promise.all([
-      saveProject(project),
-      send({ kind: "project.save", project }),
-    ]);
-  }
+  useEffect(() => {
+    if (!editingProjectName) setProjectNameDraft(projectName || "Untitled");
+  }, [editingProjectName, projectName]);
+
+  useEffect(() => {
+    if (!editingProjectName) return;
+    projectNameInputRef.current?.focus();
+    projectNameInputRef.current?.select();
+  }, [editingProjectName]);
+
   function onPlay() {
-    primeTimelineAudio();
-    transport.play();
-    void send({ kind: "transport.play" });
+    playTransport();
   }
   function onPause() {
-    transport.pause();
-    stopTimelineAudio();
-    void send({ kind: "transport.pause" });
+    pauseTransport();
   }
   function onStop() {
-    transport.stop();
-    stopTimelineAudio();
-    void send({ kind: "transport.stop" });
+    stopTransport();
   }
   function onRestart() {
-    primeTimelineAudio();
-    transport.setPosition(0);
-    transport.play();
-    void send({ kind: "transport.restart" });
+    restartTransport();
+  }
+  function onToggleLoop() {
+    const nextEnabled = !loopEnabled;
+    transport.setLoopEnabled(nextEnabled);
+    const activeRange = nextEnabled && loopRange.endBeat > loopRange.startBeat ? loopRange : null;
+    void send({ kind: "transport.setLoop", range: activeRange });
+  }
+  function onToggleRepeatTrack() {
+    transport.setRepeatTrackEnabled(!repeatTrackEnabled);
+  }
+  function commitProjectName() {
+    const nextName = projectNameDraft.trim() || "Untitled";
+    if (nextName !== projectName) renameProject(nextName);
+    setEditingProjectName(false);
   }
   return (
     <header className={styles.bar}>
-      {/* Left: brand + preferences */}
+      {/* Left: brand */}
       <div className={styles.brand}>
-        <BrandMark />
-        <HoverInfo content="Preferences">
-          <Button
-            iconOnly
-            size="md"
-            onClick={() => openEditor({ kind: "preferences" })}
-            aria-label="Preferences"
-          >
-            <Icon name="ph:gear" size={16} decorative />
-          </Button>
-        </HoverInfo>
-        <HoverInfo content="Synth editor">
-          <Button
-            iconOnly
-            size="md"
-            onClick={() => openEditor({ kind: "synth" })}
-            aria-label="Synth editor"
-          >
-            <Icon name="ph:wave-sine" size={16} decorative />
-          </Button>
-        </HoverInfo>
+        <AppMenuButton
+          onHome={onHome}
+          onNew={onNew}
+          onOpen={onOpen}
+          onSave={onSave}
+          onSaveAs={onSaveAs}
+          onExport={onExport}
+          onExportRange={onExportRange}
+          onExportTrack={onExportTrack}
+          onRecover={onRecover}
+          onHealth={onHealth}
+          onSettings={onSettings}
+        />
+        <h1 className={styles.breadcrumb}>
+          <button type="button" className={styles.breadcrumbHome} onClick={onHome}>Beat</button>
+          <span className={styles.breadcrumbSlash}>/</span>
+          <span>Editor</span>
+          <span className={styles.breadcrumbSlash}>/</span>
+          {editingProjectName ? (
+            <input
+              ref={projectNameInputRef}
+              className={styles.projectNameInput}
+              value={projectNameDraft}
+              onChange={(event) => setProjectNameDraft(event.currentTarget.value)}
+              onBlur={commitProjectName}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") commitProjectName();
+                if (event.key === "Escape") {
+                  setProjectNameDraft(projectName || "Untitled");
+                  setEditingProjectName(false);
+                }
+              }}
+              aria-label="Project name"
+            />
+          ) : (
+            <button
+              type="button"
+              className={styles.projectName}
+              onDoubleClick={() => setEditingProjectName(true)}
+              title="Double-click to rename project"
+            >
+              <MarqueeText text={projectName || "Untitled"} className={styles.projectNameText} />
+            </button>
+          )}
+        </h1>
       </div>
 
-      {/* Center: transport + playback section */}
-      <div className={styles.playback}>
+      {/* Center: transport + clock */}
+      <div className={styles.transport}>
         <HoverInfo content="Restart">
           <Button iconOnly size="md" onClick={onRestart} aria-label="Restart">
             <Icon name="ph:skip-back-fill" size={16} decorative />
@@ -101,6 +151,28 @@ export function TopBar() {
             <Icon name={playing ? "ph:pause-fill" : "ph:play-fill"} size={16} decorative />
           </Button>
         </HoverInfo>
+        <HoverInfo content={loopEnabled ? "Disable review loop" : "Enable review loop"}>
+          <Button
+            iconOnly
+            size="md"
+            variant={loopEnabled ? "primary" : "default"}
+            onClick={onToggleLoop}
+            aria-label={loopEnabled ? "Disable review loop" : "Enable review loop"}
+          >
+            <Icon name="ph:arrows-in-line-horizontal" size={16} decorative />
+          </Button>
+        </HoverInfo>
+        <HoverInfo content={repeatTrackEnabled ? "Disable track repeat" : "Repeat track at end"}>
+          <Button
+            iconOnly
+            size="md"
+            variant={repeatTrackEnabled ? "primary" : "default"}
+            onClick={onToggleRepeatTrack}
+            aria-label={repeatTrackEnabled ? "Disable track repeat" : "Enable track repeat"}
+          >
+            <Icon name="ph:repeat" size={16} decorative />
+          </Button>
+        </HoverInfo>
         <HoverInfo content="Stop (.)">
           <Button iconOnly size="md" onClick={onStop} aria-label="Stop">
             <Icon name="ph:stop-fill" size={16} decorative />
@@ -110,7 +182,10 @@ export function TopBar() {
         <span className={`${styles.field} ${styles.timeField}`}>
           {formatClock(positionBeat, bpm)} / {formatClock(lengthBeats, bpm)}
         </span>
+      </div>
 
+      {/* Right: project timing controls */}
+      <div className={styles.projectControls}>
         <InlineNumber
           label="Length"
           value={lengthBeats}
@@ -123,27 +198,6 @@ export function TopBar() {
         <TimeSignatureControl value={ts} onChange={setTs} />
 
         <InlineNumber label="BPM" value={bpm} min={20} max={999} step={1} onChange={setBpm} />
-      </div>
-
-      <div className={styles.spacer} />
-
-      {/* Right: save / export */}
-      <div className={styles.actions}>
-        <HoverInfo content="Save project (⌘S)">
-          <Button iconOnly size="md" onClick={onSave} aria-label="Save">
-            <Icon name="ph:floppy-disk" size={16} decorative />
-          </Button>
-        </HoverInfo>
-        <HoverInfo content="Export to WAV">
-          <Button
-            iconOnly
-            size="md"
-            onClick={() => send({ kind: "project.exportWav" })}
-            aria-label="Export"
-          >
-            <Icon name="ph:export" size={16} decorative />
-          </Button>
-        </HoverInfo>
       </div>
     </header>
   );

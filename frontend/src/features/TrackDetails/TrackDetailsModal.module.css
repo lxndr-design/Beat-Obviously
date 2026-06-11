@@ -1,0 +1,59 @@
+.panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.spanFull {
+  grid-column: 1 / -1;
+}
+
+.section {
+  border: var(--border-fg);
+  background: var(--color-bg);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 26px;
+  padding: 0 var(--space-1);
+  border-bottom: var(--border-fg);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+}
+
+.sectionBody {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-1);
+}
+
+.sliderRow {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 26px;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-ui);
+}
+
+.sliderLabel {
+  color: var(--color-fg-hover);
+  text-transform: uppercase;
+}
+
+.sliderValue {
+  justify-self: end;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+}
+
+.range {
+  width: 100%;
+  accent-color: var(--color-fg);
+}

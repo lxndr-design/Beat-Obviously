@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Button, Icon, useContextMenu, HoverInfo, SectionRibbon, SectionRibbonActionButton, type ContextMenuItem } from "../../components";
+import { Button, Icon, MarqueeText, useContextMenu, HoverInfo, SectionRibbon, SectionRibbonActionButton, type ContextMenuItem } from "../../components";
 import { createInstrumentBufferSource, preloadInstrumentSample, previewFrequency } from "../../audio/synthPreview";
 import { useInstrumentStore, useUiStore } from "../../state/store";
 import { instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
@@ -31,9 +31,6 @@ interface WavetableStarter {
 
 const WAVETABLE_STARTERS: WavetableStarter[] = [
   { label: "Create Aether", icon: "ph:cube", presetId: "factory.init", fallbackName: "Aether" },
-  { label: "Create wavetable", icon: "ph:wave-sine", presetId: "factory.custom-table", fallbackName: "New Wavetable" },
-  { label: "Create WT lead", icon: "ph:wave-sawtooth", presetId: "factory.wt-lead", fallbackName: "WT Lead" },
-  { label: "Create WT pad", icon: "ph:circles-three-plus", presetId: "factory.glass-pad", fallbackName: "WT Pad" },
 ];
 
 /**
@@ -58,6 +55,7 @@ interface InstrumentLibraryPanelProps {
 export function InstrumentLibraryPanel({ expanded, onToggle }: InstrumentLibraryPanelProps) {
   const instruments = useInstrumentStore((s) => s.instruments);
   const instrumentSets = useInstrumentStore((s) => s.instrumentSets);
+  const loading = useInstrumentStore((s) => s.loading);
   const addInstrument = useInstrumentStore((s) => s.addInstrument);
   const addInstrumentSet = useInstrumentStore((s) => s.addInstrumentSet);
   const renameInstrumentSet = useInstrumentStore((s) => s.renameInstrumentSet);
@@ -82,6 +80,10 @@ export function InstrumentLibraryPanel({ expanded, onToggle }: InstrumentLibrary
     () => instruments.filter((instrument) => selectedIds.has(instrument.id)),
     [instruments, selectedIds],
   );
+  const sortedInstrumentSets = useMemo(
+    () => [...instrumentSets].sort((a, b) => instrumentSetDisplayName(a).localeCompare(instrumentSetDisplayName(b), undefined, { sensitivity: "base" })),
+    [instrumentSets],
+  );
   const { onContextMenu: onPanelContextMenu, menu: panelMenu } = useContextMenu((): ContextMenuItem[] => [
     {
       label: "Select",
@@ -91,7 +93,7 @@ export function InstrumentLibraryPanel({ expanded, onToggle }: InstrumentLibrary
   ]);
   const { menu: addMenu, openAt: openAddMenu } = useContextMenu((): ContextMenuItem[] => [
     {
-      label: "Create group",
+      label: "+ New Group",
       icon: "ph:folder-plus",
       onSelect: () => addInstrumentSet(),
     },
@@ -100,11 +102,15 @@ export function InstrumentLibraryPanel({ expanded, onToggle }: InstrumentLibrary
       icon: "ph:piano-keys",
       onSelect: createNew,
     },
+    {
+      label: "Import Instrument",
+      icon: "ph:upload-simple",
+      onSelect: () => setImportOpen(true),
+    },
     ...WAVETABLE_STARTERS.map((starter, index) => ({
       label: starter.label,
       icon: starter.icon,
       hint: index === 0 ? "Init" : undefined,
-      separatorBefore: index === 0,
       onSelect: () => createWavetable(starter),
     })),
   ]);
@@ -227,15 +233,10 @@ export function InstrumentLibraryPanel({ expanded, onToggle }: InstrumentLibrary
         title="Instruments"
         expanded={expanded}
         onToggle={onToggle}
+        showToggle={false}
         onContextMenu={onPanelContextMenu}
         actions={(
           <>
-            <SectionRibbonActionButton
-              onClick={() => setImportOpen(true)}
-              aria-label="Import instruments"
-            >
-              <Icon name="ph:upload-simple" size={14} decorative />
-            </SectionRibbonActionButton>
             <SectionRibbonActionButton
               onClick={(e) => openAddMenu(e.clientX, e.clientY)}
               aria-label="Add instrument item"
@@ -258,11 +259,17 @@ export function InstrumentLibraryPanel({ expanded, onToggle }: InstrumentLibrary
       )}
 
       <div className={`${styles.list} ${expanded ? styles.listOpen : ""}`} aria-hidden={!expanded}>
-        {instruments.length === 0 && (
+        {loading && (
+          <div className={styles.loadingState} role="status" aria-live="polite">
+            <span className={styles.loadingRing} />
+            <span>Loading Instruments...</span>
+          </div>
+        )}
+        {!loading && instruments.length === 0 && (
           <div className={styles.empty}>No instruments yet.</div>
         )}
-        {instrumentSets.map((set) => {
-          const setOpen = openSets[set.id] ?? true;
+        {!loading && sortedInstrumentSets.map((set) => {
+          const setOpen = openSets[set.id] ?? false;
           const items = instruments.filter((instrument) => instrumentSetId(instrument) === set.id);
           return (
             <InstrumentSetSection
@@ -424,7 +431,7 @@ function InstrumentItem({
           <Icon name="ph:dots-six-vertical" size={14} decorative />
         </span>
       )}
-      <span className={styles.itemName}>{name}</span>
+      <MarqueeText className={styles.itemName} text={name} />
       <HoverInfo content={hint}>
         <span className={styles.itemKindIcon} aria-label={hint}>
           <Icon name={icon} size={14} decorative />
@@ -476,6 +483,7 @@ function InstrumentSetSection({
   onUngroup: () => void;
 }) {
   const [draftName, setDraftName] = useState(set.name);
+  const displayName = instrumentSetDisplayName(set);
   const { onContextMenu, menu } = useContextMenu((): ContextMenuItem[] => [
     {
       label: "Rename",
@@ -513,15 +521,23 @@ function InstrumentSetSection({
 
   return (
     <section className={styles.setSection} onDragOver={onDragOver} onDrop={onDrop}>
-      <div className={styles.setHeader} onContextMenu={onContextMenu}>
-        <button
-          type="button"
-          className={styles.setToggle}
-          onClick={onToggle}
-          aria-label={`${open ? "Collapse" : "Expand"} ${set.name}`}
-        >
+      <div
+        className={`${styles.setHeader} ${open ? styles.setHeaderOpen : ""}`}
+        role={renaming ? undefined : "button"}
+        tabIndex={renaming ? undefined : 0}
+        aria-expanded={renaming ? undefined : open}
+        aria-label={renaming ? undefined : `${open ? "Collapse" : "Expand"} ${displayName}`}
+        onClick={renaming ? undefined : onToggle}
+        onContextMenu={onContextMenu}
+        onKeyDown={renaming ? undefined : (e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          onToggle();
+        }}
+      >
+        <span className={styles.setToggle} aria-hidden>
           <Icon name={open ? "ph:caret-down" : "ph:caret-right"} size={12} decorative />
-        </button>
+        </span>
         {renaming ? (
           <input
             className={styles.setNameInput}
@@ -533,16 +549,12 @@ function InstrumentSetSection({
               if (e.key === "Enter") onRename(draftName);
               if (e.key === "Escape") onCancelRename();
             }}
-            aria-label={`Rename ${set.name}`}
+            aria-label={`Rename ${displayName}`}
           />
         ) : (
-          <button
-            type="button"
-            className={styles.setNameButton}
-            onClick={onToggle}
-          >
-            <span className={styles.setName}>{set.name}</span>
-          </button>
+          <span className={styles.setNameButton}>
+            <MarqueeText className={styles.setName} text={displayName} />
+          </span>
         )}
         <span className={styles.setCount}>{items.length}</span>
       </div>
@@ -556,6 +568,11 @@ function InstrumentSetSection({
 
 function instrumentSetId(instrument: Instrument): string {
   return instrument.setId ?? "user-instruments";
+}
+
+function instrumentSetDisplayName(set: InstrumentSet): string {
+  if (!set.factory || set.id === "user-instruments") return set.name;
+  return set.name.toLowerCase().startsWith("factory ") ? set.name : `Factory ${set.name}`;
 }
 
 let previewCtx: AudioContext | null = null;

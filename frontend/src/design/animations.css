@@ -43,9 +43,37 @@
 .hover-invert {
   transition: var(--transition-invert);
 }
+.hover-invert:not(:hover) {
+  transition: var(--transition-invert-out);
+}
 .hover-invert:hover {
   background: var(--color-fg);
   color: var(--color-fg-inverse);
+}
+
+/* Interactive hover color changes should feel instant on release. Components
+ * still opt into hover-in with --transition-invert; this rule makes hover-out
+ * snap back for the dense DAW surface without touching panel slide/fade timing.
+ */
+:where(
+  button,
+  [role="button"],
+  [role="menuitem"],
+  [class*="_button_"],
+  [class*="_Button_"],
+  [class*="_cell_"],
+  [class*="_Cell_"],
+  [class*="_dropItem_"],
+  [class*="_header_"],
+  [class*="_Header_"],
+  [class*="_item_"],
+  [class*="_Item_"],
+  [class*="_option_"],
+  [class*="_Option_"],
+  [class*="_trigger_"],
+  [class*="_Trigger_"]
+):not(:hover) {
+  transition-duration: 0s;
 }
 
 /* ----- Hover info reveal --------------------------------------------- */

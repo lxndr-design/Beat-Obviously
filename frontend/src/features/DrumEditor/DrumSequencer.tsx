@@ -774,6 +774,7 @@ export function DrumSequencer({
         )}
         <div className={styles.generateBlock}>
           <FloatingSelect
+            className={styles.genreSelect}
             fillHeight
             label="Genre"
             layout="inline"

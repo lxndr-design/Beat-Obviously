@@ -7,7 +7,7 @@ import styles from "./BrandMark.module.css";
  */
 export function BrandMark() {
   return (
-    <div className={styles.mark} aria-label="Beat">
+    <div className={`${styles.mark} brandMark`} aria-label="Beat">
       <Icon name="ph:music-note" size={16} decorative />
     </div>
   );

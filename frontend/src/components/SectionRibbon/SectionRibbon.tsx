@@ -9,6 +9,7 @@ interface SectionRibbonProps {
   onToggle: () => void;
   actions?: ReactNode;
   count?: number;
+  showToggle?: boolean;
   onContextMenu?: React.MouseEventHandler<HTMLDivElement>;
 }
 
@@ -18,19 +19,25 @@ export function SectionRibbon({
   onToggle,
   actions,
   count,
+  showToggle = true,
   onContextMenu,
 }: SectionRibbonProps) {
   return (
-    <div className={styles.ribbon} onContextMenu={onContextMenu}>
-      <Button
-        iconOnly
-        size="xs"
-        className={styles.toggle}
-        onClick={onToggle}
-        aria-label={expanded ? `Collapse ${title}` : `Expand ${title}`}
-      >
-        <Icon name={expanded ? "ph:caret-down" : "ph:caret-right"} size={16} decorative />
-      </Button>
+    <div
+      className={`${styles.ribbon} ${expanded ? styles.ribbonExpanded : ""} ${!showToggle ? styles.ribbonNoToggle : ""}`}
+      onContextMenu={onContextMenu}
+    >
+      {showToggle && (
+        <Button
+          iconOnly
+          size="md"
+          className={styles.toggle}
+          onClick={onToggle}
+          aria-label={expanded ? `Collapse ${title}` : `Expand ${title}`}
+        >
+          <Icon name={expanded ? "ph:caret-down" : "ph:caret-right"} size={16} decorative />
+        </Button>
+      )}
       <span className={styles.label}>{title}</span>
       <span className={styles.right}>
         {typeof count === "number" && <span className={styles.count}>{count}</span>}
@@ -48,7 +55,7 @@ export const SectionRibbonActionButton = forwardRef<
     <Button
       ref={ref}
       iconOnly
-      size="xs"
+      size="md"
       className={[styles.actionButton, className].filter(Boolean).join(" ")}
       {...props}
     >

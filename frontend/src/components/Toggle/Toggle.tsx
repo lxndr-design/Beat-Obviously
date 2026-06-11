@@ -6,6 +6,8 @@ export interface ToggleProps {
   onChange: (v: boolean) => void;
   label?: string;
   disabled?: boolean;
+  className?: string;
+  labelClassName?: string;
 }
 
 /**
@@ -16,11 +18,11 @@ export interface ToggleProps {
  * attach refs.
  */
 export const Toggle = forwardRef<HTMLLabelElement, ToggleProps>(function Toggle(
-  { checked, onChange, label, disabled },
+  { checked, onChange, label, disabled, className, labelClassName },
   ref,
 ) {
   return (
-    <label ref={ref} className={styles.wrap}>
+    <label ref={ref} className={[styles.wrap, className].filter(Boolean).join(" ")}>
       <button
         type="button"
         role="switch"
@@ -29,7 +31,7 @@ export const Toggle = forwardRef<HTMLLabelElement, ToggleProps>(function Toggle(
         onClick={() => onChange(!checked)}
         className={`${styles.box} ${checked ? styles.on : ""}`}
       />
-      {label && <span className={styles.label}>{label}</span>}
+      {label && <span className={[styles.label, labelClassName].filter(Boolean).join(" ")}>{label}</span>}
     </label>
   );
 });

@@ -47,15 +47,18 @@ Prerequisites: CMake ≥ 3.22, Xcode 15+, Node ≥ 20, JUCE 8 (fetched automatic
 cd frontend && npm install && npm run dev
 
 # Full app build
-cmake -B build -G Xcode
-cmake --build build --config Release
-open build/backend/Beat_artefacts/Release/Beat.app
+cmake -B build-native -G Xcode
+cmake --build build-native --config Release
+open build-native/backend/Beat_artefacts/Release/Beat.app
 
 # Or use the packaging helper
 ./scripts/package-macos.sh
+
+# Register the current root app for .beat files after copying a build to ./Beat.app
+./scripts/register-current-beat-app.sh ./Beat.app
 ```
 
-In dev mode, set `BEAT_DEV_FRONTEND_URL=http://localhost:5173` before launching the app to point the embedded webview at the Vite dev server.
+In dev mode, set `BEAT_DEV_FRONTEND_URL=http://localhost:6174` before launching the app to point the embedded webview at the Vite dev server. On startup, the native app checks that the configured port is actually serving the Beat frontend before loading it, adds a launch cache-buster, and refreshes the dev webview once to avoid stale startup documents. If the dev URL is unavailable or occupied by the wrong server, a bundled frontend build is used when present.
 
 In production builds, `frontend/dist/` is copied into `Beat.app/Contents/Resources/frontend` and served by JUCE's `WebBrowserComponent::Options::withResourceProvider()`. The native menu sends commands into the React app through the JUCE native bridge exposed as `window.__BEAT_NATIVE__`.
 

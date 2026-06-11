@@ -138,10 +138,11 @@ export function PreferencesModal() {
           <h3 className={styles.sectionTitle}>Local AI</h3>
           <div className={styles.row}>
             <FloatingSelect
-              label="Ollama model"
+              className={styles.modelSelect}
+              label="AI model"
               layout="inline"
               value={model}
-              ariaLabel="Ollama model"
+              ariaLabel="AI model"
               options={MODEL_OPTIONS.map((option) => ({ value: option, label: option }))}
               open={modelOpen}
               onOpenChange={setModelOpen}
@@ -149,7 +150,7 @@ export function PreferencesModal() {
             />
           </div>
           <p className={styles.hint}>
-            Use a base model like qwen3:4b now, then switch this to your tuned model name after training, such as beat-qwen:latest.
+            Used for local beat generation, instrument generation, MIDI/song ideas, and training-assisted suggestions. Use a base model now, then switch to a tuned Beat model after training.
           </p>
         </section>
 
@@ -158,39 +159,43 @@ export function PreferencesModal() {
           <div className={styles.gridRows}>
             <div className={styles.gridRow}>
               <Toggle
+                className={styles.gridToggle}
+                labelClassName={styles.gridToggleLabel}
                 label="Timeline"
                 checked={settings.timelineSmartGrid}
                 onChange={settings.setTimelineSmartGrid}
               />
-              {settings.timelineSmartGrid && (
-                <RadioGroup
-                  ariaLabel="Timeline smart grid subdivision"
-                  value={settings.timelineSubdivision}
-                  options={SUBDIVISION_OPTIONS}
-                  onChange={settings.setTimelineSubdivision}
-                />
-              )}
+              <RadioGroup
+                className={styles.gridRadio}
+                ariaLabel="Timeline smart grid subdivision"
+                value={settings.timelineSubdivision}
+                options={SUBDIVISION_OPTIONS}
+                disabled={!settings.timelineSmartGrid}
+                onChange={settings.setTimelineSubdivision}
+              />
             </div>
             <div className={styles.gridRow}>
               <Toggle
+                className={styles.gridToggle}
+                labelClassName={styles.gridToggleLabel}
                 label="MIDI"
                 checked={settings.midiSmartGrid}
                 onChange={settings.setMidiSmartGrid}
               />
-              {settings.midiSmartGrid && (
-                <RadioGroup
-                  ariaLabel="MIDI smart grid subdivision"
-                  value={settings.midiSubdivision}
-                  options={SUBDIVISION_OPTIONS}
-                  onChange={settings.setMidiSubdivision}
-                />
-              )}
+              <RadioGroup
+                className={styles.gridRadio}
+                ariaLabel="MIDI smart grid subdivision"
+                value={settings.midiSubdivision}
+                options={SUBDIVISION_OPTIONS}
+                disabled={!settings.midiSmartGrid}
+                onChange={settings.setMidiSubdivision}
+              />
             </div>
           </div>
         </section>
 
         <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Training Checkpoints</h3>
+          <h3 className={styles.sectionTitle}>Local AI Training Status</h3>
           <div className={styles.checkpointList}>
             {checkpoints.map((checkpoint) => (
               <div key={checkpoint.kind} className={styles.checkpointRow}>
@@ -208,7 +213,7 @@ export function PreferencesModal() {
                   disabled={checkpoint.sinceLast === 0}
                   onClick={() => void runTraining(checkpoint.kind)}
                 >
-                  Run now
+                  Send
                 </Button>
               </div>
             ))}
@@ -216,19 +221,19 @@ export function PreferencesModal() {
           <div className={styles.exportActions}>
             <Button size="sm" onClick={() => void exportDataset()}>
               <Icon name="ph:download-simple" size={14} decorative />
-              Export drums
+              Drum training data
             </Button>
             <Button size="sm" onClick={() => void exportInstrumentDataset()}>
               <Icon name="ph:download-simple" size={14} decorative />
-              Export instruments
+              Instrument training data
             </Button>
             <Button size="sm" onClick={() => void exportMidiDataset()}>
               <Icon name="ph:download-simple" size={14} decorative />
-              Export MIDI
+              MIDI training data
             </Button>
           </div>
           <p className={styles.hint}>
-            Beat starts a local training checkpoint every {TRAINING_BREAKPOINT} new rated/accepted signals in the standalone app. Export keeps the dataset handoff inspectable.
+            Send queues the current JSONL dataset into the local native trainer. The buttons below only download inspectable dataset backups; they do not export project audio or MIDI files.
           </p>
           {exportStatus && <p className={styles.hint}>{exportStatus}</p>}
         </section>

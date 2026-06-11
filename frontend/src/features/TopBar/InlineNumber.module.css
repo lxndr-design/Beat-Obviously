@@ -7,13 +7,13 @@
   color: var(--color-fg);
   border: var(--border-fg);
   font-family: var(--font-family-mono);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   gap: 4px;
 }
 
 .label {
   font-family: var(--font-family-base);
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
   font-weight: var(--font-weight-medium);
@@ -28,7 +28,7 @@
   border: 0;
   outline: 0;
   font-family: var(--font-family-mono);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   line-height: 16px;
   text-align: right;
   caret-color: var(--color-fg);

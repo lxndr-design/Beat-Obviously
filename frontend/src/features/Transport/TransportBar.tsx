@@ -1,6 +1,7 @@
 import { Button, Icon, NumberInput, HoverInfo } from "../../components";
 import { useProjectStore, useTransportStore } from "../../state/store";
 import { send } from "../../ipc/bridge";
+import { pauseTransport, playTransport, restartTransport, stopTransport } from "../../audio/transportActions";
 import { TimeSignatureControl } from "./TimeSignatureControl";
 import styles from "./TransportBar.module.css";
 
@@ -16,29 +17,24 @@ import styles from "./TransportBar.module.css";
  * percentage (internally still a multiplier).
  */
 export function TransportBar() {
-  const { playing, positionBeat, speed, loopRange } = useTransportStore();
+  const { playing, positionBeat, speed, loopEnabled, loopRange } = useTransportStore();
   const bpm = useProjectStore((s) => s.project.bpm);
   const ts = useProjectStore((s) => s.project.timeSignature);
   const setBpm = useProjectStore((s) => s.setBpm);
   const setTs = useProjectStore((s) => s.setTimeSignature);
   const transport = useTransportStore();
 
-  async function onPlay() {
-    transport.play();
-    await send({ kind: "transport.play" });
+  function onPlay() {
+    playTransport();
   }
-  async function onPause() {
-    transport.pause();
-    await send({ kind: "transport.pause" });
+  function onPause() {
+    pauseTransport();
   }
-  async function onStop() {
-    transport.stop();
-    await send({ kind: "transport.stop" });
+  function onStop() {
+    stopTransport();
   }
   function onRestart() {
-    transport.setPosition(0);
-    transport.play();
-    void send({ kind: "transport.restart" });
+    restartTransport();
   }
   async function onSpeedPercent(p: number) {
     const mult = p / 100;
@@ -76,7 +72,7 @@ export function TransportBar() {
         </HoverInfo>
 
         <span className={styles.timeDisplay}>{formatClock(positionBeat, bpm)}</span>
-        {loopRange && (
+        {loopEnabled && loopRange.endBeat > loopRange.startBeat && (
           <span className={styles.loop}>
             ⟲ {formatClock(loopRange.startBeat, bpm)} – {formatClock(loopRange.endBeat, bpm)}
           </span>

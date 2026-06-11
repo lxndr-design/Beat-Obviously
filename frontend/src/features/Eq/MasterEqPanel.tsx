@@ -7,10 +7,10 @@ import { EqGraph } from "./EqGraph";
 import styles from "./MasterEqPanel.module.css";
 
 /**
- * MasterEqPanel — bottom-of-app 7-band EQ as a graph.
+ * MasterEqPanel — bottom-of-app final mastering EQ as a graph.
  *
  *   ┌────────────────────────────────────────────────────────────────┐
- *   │ MASTER EQ                                              [edit]  │
+ *   │ GLOBAL MASTERING                                      [edit]  │
  *   ├────────────────────────────────────────────────────────────────┤
  *   │  ●─●─●─●─●─●─●                       (drag dots vertically)    │
  *   │  ───── 0 dB reference ─────                                    │
@@ -72,12 +72,12 @@ export function MasterEqPanel() {
   }
 
   return (
-    <section className={styles.panel} aria-label="Mastering">
+    <section className={styles.panel} aria-label="Global Mastering">
       <header className={styles.ribbon}>
-        <span className={styles.title}>Mastering</span>
+        <span className={styles.title}>Global Mastering</span>
         <div className={styles.ribbonActions}>
           <div className={styles.presetWrap}>
-            <Button size="xs" onClick={() => setPresetOpen((open) => !open)}>
+            <Button className={styles.presetButton} size="xs" onClick={() => setPresetOpen((open) => !open)}>
               Presets
               <Icon name="ph:caret-down" size={12} decorative />
             </Button>
@@ -143,10 +143,10 @@ const USER_PRESET_KEY = "beat.masterEq.presets.v1";
 
 const FACTORY_PRESETS: EqPreset[] = [
   { id: "flat", name: "Flat", bandsDb: [0, 0, 0, 0, 0, 0, 0] },
-  { id: "warm", name: "Warm", bandsDb: [3, 2, 0.5, 0, -0.5, -1, -1.5] },
-  { id: "bright", name: "Bright", bandsDb: [-1, -0.5, 0, 0.5, 1.5, 2, 3] },
-  { id: "club", name: "Club", bandsDb: [3, 1.5, -1, -1.5, 0.5, 2, 1] },
-  { id: "vocal", name: "Vocal", bandsDb: [-2, -1, 0, 2, 3, 1, 0] },
+  { id: "warm", name: "Warm", bandsDb: [7, 5, 2, 0, -1.5, -3, -4] },
+  { id: "bright", name: "Bright", bandsDb: [-4, -2.5, -1, 1, 3.5, 5.5, 7] },
+  { id: "club", name: "Club", bandsDb: [8, 4, -3, -5, 2, 5, 3] },
+  { id: "vocal", name: "Vocal", bandsDb: [-5, -3, -1, 4, 7, 3, -1] },
 ];
 
 function normalizeBands(bandsDb: number[]): number[] {

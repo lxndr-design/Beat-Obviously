@@ -2,7 +2,7 @@ import { useMemo, useRef } from "react";
 import { Icon, HoverInfo, Button, useContextMenu, type ContextMenuItem } from "../../components";
 import { useProjectStore, useTransportStore, useUiStore } from "../../state/store";
 import { expandTrackSegments } from "../../state/selectors";
-import { send } from "../../ipc/bridge";
+import { pauseTransport } from "../../audio/transportActions";
 import { Segment } from "./Segment";
 import { BEATS_TO_PX, TRACK_HEADER_WIDTH } from "./geometry";
 import styles from "./TrackRow.module.css";
@@ -35,8 +35,7 @@ export function TrackRow({ trackId }: Props) {
   function openSegmentEditor(segmentId: Id) {
     const transport = useTransportStore.getState();
     if (transport.playing) {
-      transport.pause();
-      void send({ kind: "transport.pause" });
+      pauseTransport();
     }
     openEditor({ kind: "segment", segmentId });
   }

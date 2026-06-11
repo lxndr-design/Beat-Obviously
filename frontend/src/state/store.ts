@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { temporal } from "zundo";
 import { immer } from "zustand/middleware/immer";
 import { nanoid } from "nanoid";
+import type { BeatProjectAsset, BeatProjectIntegrityReport, ProjectSidecarCleanupReport, RecentProjectEntry } from "../ipc/schema";
 import type {
   Beats,
   AudioFile,
@@ -9,9 +10,13 @@ import type {
   Instrument,
   InstrumentSet,
   InstrumentSnapshot,
+  MidiNote,
+  PluginAdapter,
   Project,
   Segment,
   Track,
+  TrackEffect,
+  TrackEffectAutomationPoint,
   TransportState,
   UiState,
 } from "./types";
@@ -34,6 +39,15 @@ interface ProjectSlice {
   removeTrack: (id: Id) => void;
   reorderTracks: (orderedIds: Id[]) => void;
   updateTrack: (id: Id, patch: Partial<Track>) => void;
+  addTrackEffect: (trackId: Id, kind?: TrackEffect["kind"]) => Id;
+  setTrackEffectKind: (trackId: Id, effectId: Id, kind: TrackEffect["kind"]) => void;
+  upsertTrackEffectAutomationPoint: (
+    trackId: Id,
+    effectId: Id,
+    param: string,
+    point: Partial<TrackEffectAutomationPoint> & { beat: Beats; value: number },
+  ) => Id;
+  removeTrackEffectAutomationPoint: (trackId: Id, effectId: Id, param: string, pointId: Id) => void;
   /** Exclusive solo: soloing a track auto-mutes currently unmuted tracks.
    *  Unsoloing restores only those auto-mutes. */
   setTrackSolo: (id: Id, solo: boolean) => void;
@@ -48,6 +62,7 @@ interface ProjectSlice {
   removeSegment: (segmentId: Id) => void;
   moveSegment: (segmentId: Id, toTrackId: Id, toStartBeat: Beats) => void;
   updateSegment: (segmentId: Id, patch: Partial<Segment>) => void;
+  applySegmentEditCommand: (command: SegmentEditCommand) => Id[];
   /** Set repeat count; rest of track is filled until next segment. */
   setSegmentRepeats: (segmentId: Id, repeats: number) => void;
 
@@ -60,6 +75,67 @@ interface ProjectSlice {
   // Loading
   loadProject: (project: Project) => void;
 }
+
+export type SegmentEditCommand =
+  | {
+      kind: "move";
+      moves: Array<{ segmentId: Id; toTrackId: Id; toStartBeat: Beats }>;
+    }
+  | {
+      kind: "resize";
+      segmentId: Id;
+      startBeat: Beats;
+      lengthBeats: Beats;
+      originStartBeat?: Beats;
+      originLengthBeats?: Beats;
+      originSourceStartBeat?: Beats;
+      originPayload?: Segment["payload"];
+    }
+  | {
+      kind: "duplicate";
+      segments: Array<Segment & { name?: string }>;
+      offsetBeats?: Beats;
+      targetTrackId?: Id;
+    }
+  | {
+      kind: "delete";
+      segmentIds: Id[];
+    }
+  | {
+      kind: "nudge";
+      segmentIds: Id[];
+      deltaBeats: Beats;
+    }
+  | {
+      kind: "quantize";
+      segmentIds: Id[];
+      gridBeats: Beats;
+    }
+  | {
+      kind: "split";
+      segmentId: Id;
+      splitBeat: Beats;
+    }
+  | {
+      kind: "trim";
+      segmentId: Id;
+      edge: "start" | "end";
+      beat: Beats;
+    }
+  | {
+      kind: "fade";
+      segmentId: Id;
+      fadeInBeats?: Beats;
+      fadeOutBeats?: Beats;
+    }
+  | {
+      kind: "crossfade";
+      firstSegmentId: Id;
+      secondSegmentId: Id;
+      lengthBeats?: Beats;
+    };
+
+const MIN_SEGMENT_LENGTH_BEATS = 0.25;
 
 function defaultTrack(): Track {
   return {
@@ -87,7 +163,19 @@ export function createEmptyProject(): Project {
     lengthBeats: 64,
     // New projects always start with one blank track.
     tracks: [defaultTrack()],
+    returnBuses: [],
     masterEqAutomation: [],
+    masterChain: {
+      inputGainDb: 0,
+      compressorEnabled: false,
+      compressorThresholdDb: -18,
+      compressorRatio: 2,
+      compressorAttackMs: 20,
+      compressorReleaseMs: 160,
+      compressorMakeupDb: 0,
+      compressorMix: 100,
+      outputGainDb: 0,
+    },
   };
 }
 
@@ -129,6 +217,71 @@ export const useProjectStore = create<ProjectSlice>()(
         set((s) => {
           const t = s.project.tracks.find((x) => x.id === id);
           if (t) Object.assign(t, patch);
+        }),
+
+      addTrackEffect: (trackId, kind = "reverb") => {
+        const effectId = nanoid();
+        set((s) => {
+          const track = s.project.tracks.find((candidate) => candidate.id === trackId);
+          if (!track) return;
+          track.effects.filters.push({
+            id: effectId,
+            kind,
+            bypassed: false,
+            params: defaultTrackEffectParams(kind),
+            automation: [],
+          });
+        });
+        return effectId;
+      },
+
+      setTrackEffectKind: (trackId, effectId, kind) =>
+        set((s) => {
+          const track = s.project.tracks.find((candidate) => candidate.id === trackId);
+          const effect = track?.effects.filters.find((candidate) => candidate.id === effectId);
+          if (!effect) return;
+          effect.kind = kind;
+          effect.bypassed = false;
+          effect.params = defaultTrackEffectParams(kind);
+          effect.automation = [];
+        }),
+
+      upsertTrackEffectAutomationPoint: (trackId, effectId, param, point) => {
+        const pointId = point.id ?? nanoid();
+        set((s) => {
+          const track = s.project.tracks.find((candidate) => candidate.id === trackId);
+          const effect = track?.effects.filters.find((candidate) => candidate.id === effectId);
+          if (!effect || !param.trim()) return;
+          effect.automation ??= [];
+          let lane = effect.automation.find((candidate) => candidate.param === param);
+          if (!lane) {
+            lane = { param, points: [] };
+            effect.automation.push(lane);
+          }
+          const nextPoint = {
+            id: pointId,
+            beat: clampProjectBeat(point.beat, s.project.lengthBeats),
+            value: clampAutomationValue(point.value),
+            curve: point.curve ?? "linear",
+          };
+          const existing = lane.points.findIndex((candidate) => candidate.id === pointId);
+          if (existing >= 0) lane.points[existing] = nextPoint;
+          else lane.points.push(nextPoint);
+          lane.points.sort((a, b) => a.beat - b.beat);
+        });
+        return pointId;
+      },
+
+      removeTrackEffectAutomationPoint: (trackId, effectId, param, pointId) =>
+        set((s) => {
+          const track = s.project.tracks.find((candidate) => candidate.id === trackId);
+          const effect = track?.effects.filters.find((candidate) => candidate.id === effectId);
+          if (!effect?.automation) return;
+          effect.automation = effect.automation
+            .map((lane) => lane.param === param
+              ? { ...lane, points: lane.points.filter((point) => point.id !== pointId) }
+              : lane)
+            .filter((lane) => lane.points.length > 0);
         }),
 
       setTrackSolo: (id, solo) =>
@@ -229,11 +382,197 @@ export const useProjectStore = create<ProjectSlice>()(
             const seg = t.segments.find((x) => x.id === segmentId);
             if (seg) {
               Object.assign(seg, patch);
+              enforceSegmentBounds(seg, s.project.lengthBeats);
               normalizeSegmentLayers(t);
               return;
             }
           }
         }),
+
+      applySegmentEditCommand: (command) => {
+        const createdIds: Id[] = [];
+        if (command.kind === "duplicate") {
+          for (let index = 0; index < command.segments.length; index++) {
+            createdIds.push(nanoid());
+          }
+        } else if (command.kind === "split") {
+          createdIds.push(nanoid());
+        }
+
+        set((s) => {
+          if (command.kind === "move") {
+            const touched = new Set<Track>();
+            for (const move of command.moves) {
+              const source = s.project.tracks.find((track) =>
+                track.segments.some((segment) => segment.id === move.segmentId),
+              );
+              const dest = s.project.tracks.find((track) => track.id === move.toTrackId);
+              if (!source || !dest) continue;
+              const index = source.segments.findIndex((segment) => segment.id === move.segmentId);
+              if (index < 0) continue;
+              const [segment] = source.segments.splice(index, 1);
+              segment.trackId = dest.id;
+              segment.startBeat = Math.max(0, move.toStartBeat);
+              enforceSegmentBounds(segment, s.project.lengthBeats);
+              dest.segments.push(segment);
+              touched.add(source);
+              touched.add(dest);
+            }
+            touched.forEach(normalizeSegmentLayers);
+            return;
+          }
+
+          if (command.kind === "resize") {
+            for (const track of s.project.tracks) {
+              const segment = track.segments.find((candidate) => candidate.id === command.segmentId);
+              if (!segment) continue;
+              applySegmentWindow(segment, command.startBeat, command.lengthBeats, s.project.lengthBeats, {
+                startBeat: command.originStartBeat,
+                lengthBeats: command.originLengthBeats,
+                sourceStartBeat: command.originSourceStartBeat,
+                payload: command.originPayload,
+              });
+              normalizeSegmentLayers(track);
+              return;
+            }
+            return;
+          }
+
+          if (command.kind === "duplicate") {
+            const tracksById = new Map(s.project.tracks.map((track) => [track.id, track]));
+            for (const [index, source] of command.segments.entries()) {
+              const targetTrack = tracksById.get(command.targetTrackId ?? source.trackId);
+              if (!targetTrack) continue;
+              const clone: Segment = {
+                ...cloneProjectData(source),
+                id: createdIds[index],
+                trackId: targetTrack.id,
+                startBeat: Math.max(0, source.startBeat + (command.offsetBeats ?? source.lengthBeats)),
+              };
+              enforceSegmentBounds(clone, s.project.lengthBeats);
+              targetTrack.segments.push(clone);
+              normalizeSegmentLayers(targetTrack);
+            }
+            return;
+          }
+
+          if (command.kind === "delete") {
+            const ids = new Set(command.segmentIds);
+            for (const track of s.project.tracks) {
+              const next = track.segments.filter((segment) => !ids.has(segment.id));
+              if (next.length === track.segments.length) continue;
+              track.segments = next;
+              normalizeSegmentLayers(track);
+            }
+            return;
+          }
+
+          if (command.kind === "nudge" || command.kind === "quantize") {
+            const ids = new Set(command.segmentIds);
+            const touched = new Set<Track>();
+            const gridBeats = command.kind === "quantize" ? Math.max(MIN_SEGMENT_LENGTH_BEATS, command.gridBeats) : 0;
+            for (const track of s.project.tracks) {
+              for (const segment of track.segments) {
+                if (!ids.has(segment.id)) continue;
+                segment.startBeat = command.kind === "nudge"
+                  ? segment.startBeat + command.deltaBeats
+                  : Math.round(segment.startBeat / gridBeats) * gridBeats;
+                enforceSegmentBounds(segment, s.project.lengthBeats);
+                touched.add(track);
+              }
+            }
+            touched.forEach(normalizeSegmentLayers);
+            return;
+          }
+
+          if (command.kind === "split") {
+            for (const track of s.project.tracks) {
+              const segmentIndex = track.segments.findIndex((candidate) => candidate.id === command.segmentId);
+              if (segmentIndex < 0) continue;
+              const segment = track.segments[segmentIndex];
+              const splitBeat = juceLikeClamp(segment.startBeat + MIN_SEGMENT_LENGTH_BEATS,
+                                              segment.startBeat + segment.lengthBeats - MIN_SEGMENT_LENGTH_BEATS,
+                                              command.splitBeat);
+              if (splitBeat <= segment.startBeat || splitBeat >= segment.startBeat + segment.lengthBeats)
+                return;
+
+              const leftLength = splitBeat - segment.startBeat;
+              const rightLength = segment.startBeat + segment.lengthBeats - splitBeat;
+              const right = cloneProjectData(segment);
+              right.id = createdIds[0];
+              right.startBeat = splitBeat;
+              right.lengthBeats = rightLength;
+              right.repeats = 0;
+              right.sourceStartBeat = (segment.sourceStartBeat ?? 0) + leftLength;
+              right.fadeInBeats = clampFade(right.fadeInBeats ?? 0, rightLength);
+              right.fadeOutBeats = clampFade(right.fadeOutBeats ?? 0, rightLength);
+              trimSegmentPayloadToRange(right, leftLength, segment.lengthBeats);
+
+              segment.lengthBeats = leftLength;
+              segment.repeats = 0;
+              segment.fadeInBeats = clampFade(segment.fadeInBeats ?? 0, leftLength);
+              segment.fadeOutBeats = clampFade(segment.fadeOutBeats ?? 0, leftLength);
+              trimSegmentPayloadToRange(segment, 0, leftLength);
+              enforceSegmentBounds(segment, s.project.lengthBeats);
+              enforceSegmentBounds(right, s.project.lengthBeats);
+              track.segments.splice(segmentIndex + 1, 0, right);
+              normalizeSegmentLayers(track);
+              return;
+            }
+            return;
+          }
+
+          if (command.kind === "trim") {
+            for (const track of s.project.tracks) {
+              const segment = track.segments.find((candidate) => candidate.id === command.segmentId);
+              if (!segment) continue;
+              const oldStart = segment.startBeat;
+              const oldEnd = segment.startBeat + segment.lengthBeats;
+              if (command.edge === "start") {
+                const nextStart = juceLikeClamp(0, oldEnd - MIN_SEGMENT_LENGTH_BEATS, command.beat);
+                applySegmentWindow(segment, nextStart, oldEnd - nextStart, s.project.lengthBeats);
+              } else {
+                const nextEnd = juceLikeClamp(oldStart + MIN_SEGMENT_LENGTH_BEATS, s.project.lengthBeats, command.beat);
+                applySegmentWindow(segment, oldStart, nextEnd - oldStart, s.project.lengthBeats);
+              }
+              normalizeSegmentLayers(track);
+              return;
+            }
+            return;
+          }
+
+          if (command.kind === "fade") {
+            for (const track of s.project.tracks) {
+              const segment = track.segments.find((candidate) => candidate.id === command.segmentId);
+              if (!segment) continue;
+              if (command.fadeInBeats != null)
+                segment.fadeInBeats = clampFade(command.fadeInBeats, segment.lengthBeats);
+              if (command.fadeOutBeats != null)
+                segment.fadeOutBeats = clampFade(command.fadeOutBeats, segment.lengthBeats);
+              return;
+            }
+          }
+
+          if (command.kind === "crossfade") {
+            for (const track of s.project.tracks) {
+              const first = track.segments.find((candidate) => candidate.id === command.firstSegmentId);
+              const second = track.segments.find((candidate) => candidate.id === command.secondSegmentId);
+              if (!first || !second || first.id === second.id) continue;
+              const [left, right] = first.startBeat <= second.startBeat ? [first, second] : [second, first];
+              const leftEnd = left.startBeat + left.lengthBeats;
+              const rightEnd = right.startBeat + right.lengthBeats;
+              const overlap = Math.max(0, Math.min(leftEnd, rightEnd) - Math.max(left.startBeat, right.startBeat));
+              const requested = command.lengthBeats ?? overlap;
+              const duration = Math.max(0, Math.min(requested, left.lengthBeats, right.lengthBeats));
+              left.fadeOutBeats = clampFade(duration, left.lengthBeats);
+              right.fadeInBeats = clampFade(duration, right.lengthBeats);
+              return;
+            }
+          }
+        });
+
+        return createdIds;
+      },
 
       setSegmentRepeats: (segmentId, repeats) =>
         set((s) => {
@@ -297,6 +636,44 @@ export const canUndo = () =>
 export const canRedo = () =>
   useProjectStore.temporal.getState().futureStates.length > 0;
 
+type TemporalInternals = ReturnType<typeof useProjectStore.temporal.getState> & {
+  _handleSet?: (
+    pastState: ProjectSlice,
+    replace: undefined,
+    currentState: ProjectSlice,
+    deltaState?: Partial<ProjectSlice> | null,
+  ) => void;
+};
+
+/**
+ * Run multiple project mutations as a single undo step. This is for compound
+ * DAW edits such as "drag selected clips" or "create effect with default
+ * lanes", where the user perceives several store writes as one edit.
+ */
+export function runProjectHistoryGroup<T>(mutation: () => T): T {
+  const temporalState = useProjectStore.temporal.getState();
+  const wasTracking = temporalState.isTracking;
+  const before = useProjectStore.getState();
+  let completed = false;
+  let result: T;
+
+  if (wasTracking) temporalState.pause();
+  try {
+    result = mutation();
+    completed = true;
+  } finally {
+    if (wasTracking) temporalState.resume();
+    if (wasTracking && completed) {
+      const after = useProjectStore.getState();
+      if (before.project !== after.project) {
+        (useProjectStore.temporal.getState() as TemporalInternals)._handleSet?.(before, undefined, after);
+      }
+    }
+  }
+
+  return result!;
+}
+
 function wouldUndoDestructively(current: Project, previous: Project): boolean {
   if (previous.tracks.length < current.tracks.length) return true;
   const previousTrackIds = new Set(previous.tracks.map((track) => track.id));
@@ -320,6 +697,130 @@ function segmentHasContent(segment: Segment): boolean {
   return Boolean(segment.payload.audioFileId);
 }
 
+function enforceSegmentBounds(segment: Segment, projectLengthBeats: Beats): void {
+  segment.startBeat = Math.max(0, segment.startBeat);
+  segment.lengthBeats = Math.max(MIN_SEGMENT_LENGTH_BEATS, segment.lengthBeats);
+  const maxEnd = Math.max(MIN_SEGMENT_LENGTH_BEATS, projectLengthBeats);
+  if (segment.startBeat + segment.lengthBeats > maxEnd) {
+    segment.lengthBeats = Math.max(MIN_SEGMENT_LENGTH_BEATS, maxEnd - segment.startBeat);
+  }
+  segment.fadeInBeats = clampFade(segment.fadeInBeats ?? 0, segment.lengthBeats);
+  segment.fadeOutBeats = clampFade(segment.fadeOutBeats ?? 0, segment.lengthBeats);
+  segment.sourceStartBeat = Math.max(0, segment.sourceStartBeat ?? 0);
+}
+
+function applySegmentWindow(
+  segment: Segment,
+  nextStartBeat: Beats,
+  nextLengthBeats: Beats,
+  projectLengthBeats: Beats,
+  origin?: { startBeat?: Beats; lengthBeats?: Beats; sourceStartBeat?: Beats; payload?: Segment["payload"] },
+): void {
+  const oldStartBeat = origin?.startBeat ?? segment.startBeat;
+  const oldLengthBeats = origin?.lengthBeats ?? segment.lengthBeats;
+  const oldSourceStartBeat = origin?.sourceStartBeat ?? segment.sourceStartBeat ?? 0;
+  const newStartBeat = Math.max(0, nextStartBeat);
+  const newLengthBeats = Math.max(MIN_SEGMENT_LENGTH_BEATS, nextLengthBeats);
+  const localStart = Math.max(0, newStartBeat - oldStartBeat);
+  const localEnd = Math.min(oldLengthBeats, localStart + newLengthBeats);
+  if (origin?.payload) segment.payload = cloneProjectData(origin.payload);
+  segment.startBeat = newStartBeat;
+  segment.lengthBeats = newLengthBeats;
+  segment.sourceStartBeat = Math.max(0, oldSourceStartBeat + localStart);
+  trimSegmentPayloadToRange(segment, localStart, localEnd);
+  enforceSegmentBounds(segment, projectLengthBeats);
+}
+
+function trimSegmentPayloadToRange(segment: Segment, rangeStartBeat: Beats, rangeEndBeat: Beats): void {
+  if (segment.payload.kind === "midi" || segment.payload.kind === "mixed") {
+    segment.payload.notes = trimNotesToRange(segment.payload.notes, rangeStartBeat, rangeEndBeat);
+  }
+}
+
+function trimNotesToRange(notes: MidiNote[], rangeStartBeat: Beats, rangeEndBeat: Beats): MidiNote[] {
+  return notes.flatMap((note) => {
+    const noteStart = note.startBeat;
+    const noteEnd = note.startBeat + note.lengthBeats;
+    const overlapStart = Math.max(noteStart, rangeStartBeat);
+    const overlapEnd = Math.min(noteEnd, rangeEndBeat);
+    if (overlapEnd - overlapStart < 0.000001) return [];
+    const shifted: MidiNote = {
+      ...note,
+      curve: note.curve?.map((point) => ({ ...point })),
+      automation: note.automation?.map((lane) => ({
+        ...lane,
+        points: lane.points.map((point) => ({ ...point })),
+      })),
+      startBeat: overlapStart - rangeStartBeat,
+      lengthBeats: Math.max(0.03125, overlapEnd - overlapStart),
+    };
+    if (shifted.curve) {
+      shifted.curve = shifted.curve
+        .filter((point) => point.beat >= overlapStart && point.beat <= overlapEnd)
+        .map((point) => ({ ...point, beat: point.beat - rangeStartBeat }));
+    }
+    if (shifted.automation) {
+      shifted.automation = shifted.automation.map((lane) => ({
+        ...lane,
+        points: lane.points
+          .filter((point) => point.beat >= overlapStart && point.beat <= overlapEnd)
+          .map((point) => ({ ...point, beat: point.beat - rangeStartBeat })),
+      }));
+    }
+    return [shifted];
+  });
+}
+
+function clampFade(value: Beats, lengthBeats: Beats): Beats {
+  return Math.max(0, Math.min(Math.max(0, lengthBeats), value));
+}
+
+function juceLikeClamp(min: number, max: number, value: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function cloneProjectData<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function clampProjectBeat(beat: Beats, projectLengthBeats: Beats): Beats {
+  return Math.max(0, Math.min(Math.max(0, projectLengthBeats), Number.isFinite(beat) ? beat : 0));
+}
+
+function clampAutomationValue(value: number): number {
+  return Math.max(-100000, Math.min(100000, Number.isFinite(value) ? value : 0));
+}
+
+function defaultTrackEffectParams(kind: TrackEffect["kind"]): Record<string, number> {
+  switch (kind) {
+    case "delay":
+      return { timeMs: 250, feedback: 25, mix: 18 };
+    case "lowpass":
+      return { cutoffHz: 8000, resonance: 8 };
+    case "highpass":
+      return { cutoffHz: 80, resonance: 0 };
+    case "saturator":
+      return { drive: 20, mix: 100 };
+    case "distortion":
+      return { drive: 55, shape: 35, trimDb: 6, mix: 45 };
+    case "bitcrush":
+      return { bits: 8, rate: 50, mix: 35 };
+    case "compressor":
+      return { thresholdDb: -18, ratio: 4, attackMs: 10, releaseMs: 120, makeupDb: 0, mix: 100 };
+    case "chorus":
+      return { rateHz: 0.8, depthMs: 8, delayMs: 12, feedback: 8, mix: 35 };
+    case "phaser":
+      return { rateHz: 0.45, centerHz: 900, depthOct: 1.8, feedback: 35, mix: 45 };
+    case "flanger":
+      return { rateHz: 0.28, depthMs: 2, delayMs: 2.5, feedback: 45, mix: 50 };
+    case "plugin":
+      return { mix: 100 };
+    case "reverb":
+    default:
+      return { roomSize: 40, damping: 35, mix: 20 };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Transport: live state, NOT undoable.
 // ---------------------------------------------------------------------------
@@ -329,20 +830,26 @@ interface TransportSlice extends TransportState {
   stop: () => void;
   setPosition: (beat: Beats) => void;
   setSpeed: (speed: number) => void;
+  setLoopEnabled: (enabled: boolean) => void;
   setLoopRange: (range: TransportState["loopRange"]) => void;
+  setRepeatTrackEnabled: (enabled: boolean) => void;
 }
 
 export const useTransportStore = create<TransportSlice>()((set) => ({
   playing: false,
   positionBeat: 0,
   speed: 1,
-  loopRange: null,
+  loopEnabled: false,
+  loopRange: { startBeat: 0, endBeat: 0 },
+  repeatTrackEnabled: false,
   play: () => set({ playing: true }),
   pause: () => set({ playing: false }),
   stop: () => set({ playing: false, positionBeat: 0 }),
   setPosition: (beat) => set({ positionBeat: Math.max(0, beat) }),
   setSpeed: (speed) => set({ speed: Math.max(0.1, Math.min(4, speed)) }),
+  setLoopEnabled: (enabled) => set({ loopEnabled: enabled }),
   setLoopRange: (range) => set({ loopRange: range }),
+  setRepeatTrackEnabled: (enabled) => set({ repeatTrackEnabled: enabled }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -363,7 +870,7 @@ interface ViewSlice {
 export const useViewStore = create<ViewSlice>()((set) => ({
   beatsToPx: 64,
   lastSegmentLength: 4,
-  sidebarWidth: 200,
+  sidebarWidth: 230,
   setZoom: (px) => set({ beatsToPx: Math.max(8, Math.min(256, px)) }),
   setLastSegmentLength: (n) => set({ lastSegmentLength: Math.max(0.25, n) }),
   setSidebarWidth: (px) => set({ sidebarWidth: Math.max(160, Math.min(480, px)) }),
@@ -406,6 +913,356 @@ export const useSettingsStore = create<SettingsSlice>()((set) => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Document: current .beat file metadata and dirty state.
+// ---------------------------------------------------------------------------
+interface DocumentSlice {
+  currentFilePath: string | null;
+  documentOpen: boolean;
+  dirty: boolean;
+  savedFingerprint: string | null;
+  recentFilePaths: string[];
+  recentProjects: RecentProjectEntry[];
+  missingAssets: BeatProjectAsset[];
+  integrityReport: BeatProjectIntegrityReport | null;
+  cleanupReport: ProjectSidecarCleanupReport | null;
+  lastBackupPath: string | null;
+  markDirty: (currentFingerprint?: string) => void;
+  markSaved: (path?: string | null, savedFingerprint?: string) => void;
+  closeDocument: () => void;
+  setCurrentFilePath: (path: string | null) => void;
+  addRecentFilePath: (path: string) => void;
+  addRecentProject: (project: Partial<RecentProjectEntry> & { path: string }) => void;
+  removeRecentFilePath: (path: string) => void;
+  setMissingAssets: (assets: BeatProjectAsset[]) => void;
+  setIntegrityReport: (report: BeatProjectIntegrityReport | null) => void;
+  setCleanupReport: (report: ProjectSidecarCleanupReport | null) => void;
+  setLastBackupPath: (path: string | null) => void;
+}
+
+const initialRecentProjects = loadRecentProjects();
+
+export const useDocumentStore = create<DocumentSlice>()((set) => ({
+  currentFilePath: null,
+  documentOpen: false,
+  dirty: false,
+  savedFingerprint: null,
+  recentProjects: initialRecentProjects,
+  recentFilePaths: initialRecentProjects.map((project) => project.path),
+  missingAssets: [],
+  integrityReport: null,
+  cleanupReport: null,
+  lastBackupPath: null,
+  markDirty: (currentFingerprint) =>
+    set((state) => ({
+      dirty: !state.documentOpen
+        ? false
+        : currentFingerprint && state.savedFingerprint
+        ? currentFingerprint !== state.savedFingerprint
+        : true,
+    })),
+  markSaved: (path, savedFingerprint) =>
+    set((state) => ({
+      documentOpen: true,
+      dirty: false,
+      savedFingerprint: savedFingerprint ?? state.savedFingerprint,
+      currentFilePath: path === undefined ? state.currentFilePath : path,
+      ...(path ? storeRecentProjectState(upsertRecentProject(state.recentProjects, { path, openedAt: Date.now() })) : {}),
+    })),
+  closeDocument: () => set({
+    currentFilePath: null,
+    documentOpen: false,
+    dirty: false,
+    savedFingerprint: null,
+    missingAssets: [],
+    integrityReport: null,
+    cleanupReport: null,
+    lastBackupPath: null,
+  }),
+  setCurrentFilePath: (path) => set((state) => ({ currentFilePath: path, documentOpen: path ? true : state.documentOpen })),
+  addRecentFilePath: (path) => set((state) => storeRecentProjectState(upsertRecentProject(state.recentProjects, { path, openedAt: Date.now() }))),
+  addRecentProject: (project) => set((state) => storeRecentProjectState(upsertRecentProject(state.recentProjects, project))),
+  removeRecentFilePath: (path) => set((state) => storeRecentProjectState(state.recentProjects.filter((project) => project.path !== path))),
+  setMissingAssets: (assets) => set({ missingAssets: assets }),
+  setIntegrityReport: (report) => set({ integrityReport: report }),
+  setCleanupReport: (report) => set({ cleanupReport: report }),
+  setLastBackupPath: (path) => set({ lastBackupPath: path }),
+}));
+
+const RECENT_FILE_PATHS_KEY = "beat.recentFilePaths";
+const RECENT_PROJECTS_KEY = "beat.recentProjects";
+
+function loadRecentProjects(): RecentProjectEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(RECENT_PROJECTS_KEY) ?? "[]");
+    if (Array.isArray(parsed) && parsed.length > 0) return normalizeRecentProjects(parsed);
+  } catch {
+    // Fall through to the legacy path-only list.
+  }
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(RECENT_FILE_PATHS_KEY) ?? "[]");
+    return Array.isArray(parsed)
+      ? normalizeRecentFilePaths(parsed).map((path) => createRecentProject({ path }))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function storeRecentProjectState(projects: RecentProjectEntry[]) {
+  const normalized = normalizeRecentProjects(projects);
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(normalized));
+    window.localStorage.setItem(RECENT_FILE_PATHS_KEY, JSON.stringify(normalized.map((project) => project.path)));
+  }
+  return {
+    recentProjects: normalized,
+    recentFilePaths: normalized.map((project) => project.path),
+  };
+}
+
+function upsertRecentProject(
+  projects: RecentProjectEntry[],
+  project: Partial<RecentProjectEntry> & { path: string },
+): RecentProjectEntry[] {
+  return [
+    createRecentProject(project),
+    ...projects.filter((candidate) => candidate.path !== project.path),
+  ];
+}
+
+function createRecentProject(project: Partial<RecentProjectEntry> & { path: string }): RecentProjectEntry {
+  return {
+    path: project.path.trim(),
+    name: project.name?.trim() || projectFileName(project.path),
+    openedAt: Number.isFinite(project.openedAt) ? Number(project.openedAt) : Date.now(),
+    sizeBytes: Number.isFinite(project.sizeBytes) ? Number(project.sizeBytes) : 0,
+    exists: project.exists ?? true,
+  };
+}
+
+function normalizeRecentProjects(projects: unknown[]): RecentProjectEntry[] {
+  const unique: RecentProjectEntry[] = [];
+  for (const project of projects) {
+    if (!project || typeof project !== "object") continue;
+    const candidate = project as Partial<RecentProjectEntry>;
+    if (typeof candidate.path !== "string" || !candidate.path.trim()) continue;
+    const normalized = createRecentProject(candidate as Partial<RecentProjectEntry> & { path: string });
+    if (!unique.some((existing) => existing.path === normalized.path)) unique.push(normalized);
+    if (unique.length >= 8) break;
+  }
+  return unique;
+}
+
+function normalizeRecentFilePaths(paths: unknown[]): string[] {
+  const unique: string[] = [];
+  for (const path of paths) {
+    if (typeof path !== "string" || !path.trim()) continue;
+    const trimmed = path.trim();
+    if (!unique.includes(trimmed)) unique.push(trimmed);
+    if (unique.length >= 8) break;
+  }
+  return unique;
+}
+
+function projectFileName(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
+}
+
+// ---------------------------------------------------------------------------
+// Plugins: lightweight adapter registry for future native/third-party hosts.
+// ---------------------------------------------------------------------------
+interface PluginLibrarySlice {
+  plugins: PluginAdapter[];
+  addPlugin: (plugin?: Partial<PluginAdapter>) => Id;
+  hydratePlugins: (plugins: PluginAdapter[]) => void;
+  updatePlugin: (id: Id, patch: Partial<PluginAdapter>) => void;
+  removePlugin: (id: Id) => void;
+}
+
+const PLUGIN_BRIDGE_ID = "plugin-aether-bridge-host";
+const PLUGIN_LIBRARY_KEY = "beat.pluginAdapters";
+
+export function normalizePluginAdapter(patch: Partial<PluginAdapter> = {}): PluginAdapter {
+  if (isDecentSamplerAdapterPatch(patch)) {
+    const normalizedPatch = {
+      ...patch,
+      kind: "renderer" as const,
+      format: "decent-sampler" as const,
+      instrumentMode: "live-instrument" as const,
+    };
+    return {
+      id: normalizedPatch.id ?? nanoid(),
+      name: normalizedPatch.name ?? "DecentSampler Package",
+      vendor: normalizedPatch.vendor ?? "DecentSampler",
+      version: normalizedPatch.version ?? "1.0.0",
+      status: normalizedPatch.status ?? "installed",
+      description: normalizedPatch.description ?? "DecentSampler sample package. Opens in Beat's DS compatibility wrapper and plays through Beat's sampler engine.",
+      ...normalizedPatch,
+      capabilities: [
+        {
+          id: "decent-sampler-package",
+          kind: "instrument",
+          label: "Play DecentSampler package through Beat sampler",
+          realtime: true,
+          offline: true,
+          latencySamples: 0,
+          fallbackMode: "pass-through",
+        },
+      ],
+    };
+  }
+
+  const kind = patch.kind ?? "synth";
+  const capabilities = patch.capabilities ?? [
+    {
+      id: `${kind}-fallback`,
+      kind: kind === "synth" ? "instrument" : kind,
+      label: kind === "synth" ? "Create Aether-backed instrument" : "Preserve plugin metadata",
+      realtime: kind === "synth" && patch.instrumentMode === "live-instrument",
+      offline: true,
+      latencySamples: 0,
+      fallbackMode: kind === "synth" ? "aether" : "pass-through",
+    },
+  ];
+
+  return {
+    id: nanoid(),
+    name: "Plugin Adapter",
+    vendor: "Beat",
+    version: "1.0.0",
+    kind,
+    format: "bridge",
+    status: "available",
+    instrumentMode: "fallback-aether",
+    description: "Protected host shell for imported synths, effects, renderers, and utility backends.",
+    capabilities,
+    ...patch,
+  };
+}
+
+function isDecentSamplerAdapterPatch(patch: Partial<PluginAdapter>) {
+  if (patch.format === "decent-sampler") return true;
+  const haystack = [
+    patch.vendor,
+    patch.name,
+    patch.sourceFileName,
+    patch.sourcePath,
+    patch.description,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes("decentsampler") || haystack.includes("decent sampler") || haystack.includes("decent-sampler");
+}
+
+function loadPersistedPluginAdapters(): Partial<PluginAdapter>[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(PLUGIN_LIBRARY_KEY) ?? "[]");
+    return Array.isArray(parsed)
+      ? parsed.filter((plugin): plugin is Partial<PluginAdapter> => !!plugin && typeof plugin === "object" && !(plugin as PluginAdapter).factory)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function storePersistedPluginAdapters(plugins: PluginAdapter[]) {
+  if (typeof window === "undefined") return;
+  const userPlugins = plugins.filter((plugin) => !plugin.factory);
+  window.localStorage.setItem(PLUGIN_LIBRARY_KEY, JSON.stringify(userPlugins));
+}
+
+export function mergePluginAdaptersById(...groups: PluginAdapter[][]): PluginAdapter[] {
+  const seen = new Set<string>();
+  const merged: PluginAdapter[] = [];
+  for (const group of groups) {
+    for (const plugin of group) {
+      if (seen.has(plugin.id)) continue;
+      seen.add(plugin.id);
+      merged.push(plugin);
+    }
+  }
+  return merged;
+}
+
+export const usePluginStore = create<PluginLibrarySlice>()(
+  immer((set) => ({
+    plugins: [
+      normalizePluginAdapter({
+        id: PLUGIN_BRIDGE_ID,
+        name: "Aether Bridge Host",
+        vendor: "Beat",
+        version: "0.1.0",
+        kind: "synth",
+        format: "bridge",
+        status: "available",
+        instrumentMode: "fallback-aether",
+        factory: true,
+        description: "Creates Aether fallback instruments until native plugin hosting is wired.",
+        capabilities: [
+          {
+            id: "aether-fallback-instrument",
+            kind: "instrument",
+            label: "Create Aether-backed instrument",
+            realtime: true,
+            offline: true,
+            latencySamples: 0,
+            fallbackMode: "aether",
+          },
+        ],
+      }),
+      ...loadPersistedPluginAdapters().map((plugin) => normalizePluginAdapter(plugin)),
+    ],
+    addPlugin: (plugin) => {
+      let id = nanoid();
+      set((s) => {
+        const sourcePath = plugin?.sourcePath?.trim();
+        const sourceFileName = plugin?.sourceFileName?.trim();
+        const existing = s.plugins.find((candidate) => !candidate.factory
+          && candidate.format === plugin?.format
+          && ((sourcePath && candidate.sourcePath === sourcePath)
+            || (!sourcePath && sourceFileName && candidate.sourceFileName === sourceFileName)));
+        if (existing) {
+          id = existing.id;
+          Object.assign(existing, normalizePluginAdapter({ ...plugin, id: existing.id }));
+          storePersistedPluginAdapters(s.plugins);
+          return;
+        }
+        s.plugins.push(normalizePluginAdapter({ ...plugin, id }));
+        storePersistedPluginAdapters(s.plugins);
+      });
+      return id;
+    },
+    hydratePlugins: (plugins) =>
+      set((s) => {
+        const factory = s.plugins.filter((plugin) => plugin.factory);
+        const persistedPlugins = loadPersistedPluginAdapters().map((plugin) => normalizePluginAdapter(plugin));
+        const currentUserPlugins = s.plugins.filter((plugin) => !plugin.factory);
+        const projectPlugins = plugins
+          .filter((plugin) => !plugin.factory)
+          .map((plugin) => normalizePluginAdapter(plugin));
+        s.plugins = mergePluginAdaptersById(factory, persistedPlugins, currentUserPlugins, projectPlugins);
+        storePersistedPluginAdapters(s.plugins);
+      }),
+    updatePlugin: (id, patch) =>
+      set((s) => {
+        const plugin = s.plugins.find((candidate) => candidate.id === id);
+        if (plugin) Object.assign(plugin, normalizePluginAdapter({ ...plugin, ...patch, id: plugin.id }));
+        storePersistedPluginAdapters(s.plugins);
+      }),
+    removePlugin: (id) =>
+      set((s) => {
+        const plugin = s.plugins.find((candidate) => candidate.id === id);
+        if (plugin?.factory) return;
+        s.plugins = s.plugins.filter((candidate) => candidate.id !== id);
+        storePersistedPluginAdapters(s.plugins);
+      }),
+  })),
+);
+
+// ---------------------------------------------------------------------------
 // UI: ephemeral selection / modal state.
 // ---------------------------------------------------------------------------
 interface UiSlice extends UiState {
@@ -413,6 +1270,7 @@ interface UiSlice extends UiState {
   setSelectedTracks: (ids: Id[]) => void;
   selectSegment: (id: Id, additive?: boolean) => void;
   setSelectedSegments: (ids: Id[]) => void;
+  selectTrackEffectAutomationPoint: (key: string, additive?: boolean) => void;
   clearSelection: () => void;
   openEditor: (e: UiState["openEditors"][number]) => void;
   closeEditor: (e: UiState["openEditors"][number]) => void;
@@ -423,6 +1281,7 @@ interface UiSlice extends UiState {
 export const useUiStore = create<UiSlice>()((set) => ({
   selectedTrackIds: [],
   selectedSegmentIds: [],
+  selectedTrackEffectAutomationPointKeys: [],
   openEditors: [],
   trackEffectsEditorTrackId: null,
   selectTrack: (id, additive) =>
@@ -432,8 +1291,13 @@ export const useUiStore = create<UiSlice>()((set) => ({
           ? s.selectedTrackIds.filter((x) => x !== id)
           : [...s.selectedTrackIds, id]
         : [id],
+      selectedSegmentIds: [],
+      selectedTrackEffectAutomationPointKeys: [],
     })),
-  setSelectedTracks: (ids) => set({ selectedTrackIds: ids }),
+  setSelectedTracks: (ids) => set({
+    selectedTrackIds: ids,
+    ...(ids.length > 0 ? { selectedSegmentIds: [], selectedTrackEffectAutomationPointKeys: [] } : {}),
+  }),
   selectSegment: (id, additive) =>
     set((s) => ({
       selectedSegmentIds: additive
@@ -441,10 +1305,25 @@ export const useUiStore = create<UiSlice>()((set) => ({
           ? s.selectedSegmentIds.filter((x) => x !== id)
           : [...s.selectedSegmentIds, id]
         : [id],
+      selectedTrackIds: [],
+      selectedTrackEffectAutomationPointKeys: [],
     })),
-  setSelectedSegments: (ids) => set({ selectedSegmentIds: ids }),
+  setSelectedSegments: (ids) => set({
+    selectedSegmentIds: ids,
+    ...(ids.length > 0 ? { selectedTrackIds: [], selectedTrackEffectAutomationPointKeys: [] } : {}),
+  }),
+  selectTrackEffectAutomationPoint: (key, additive) =>
+    set((s) => ({
+      selectedTrackEffectAutomationPointKeys: additive
+        ? s.selectedTrackEffectAutomationPointKeys.includes(key)
+          ? s.selectedTrackEffectAutomationPointKeys.filter((x) => x !== key)
+          : [...s.selectedTrackEffectAutomationPointKeys, key]
+        : [key],
+      selectedTrackIds: [],
+      selectedSegmentIds: [],
+    })),
   clearSelection: () =>
-    set({ selectedTrackIds: [], selectedSegmentIds: [] }),
+    set({ selectedTrackIds: [], selectedSegmentIds: [], selectedTrackEffectAutomationPointKeys: [] }),
   openEditor: (e) =>
     set((s) => ({
       openEditors: dedupeEditor(s.openEditors, e),
@@ -461,6 +1340,7 @@ export const useUiStore = create<UiSlice>()((set) => ({
 // Instruments are a separate store: they're project-independent (library).
 // ---------------------------------------------------------------------------
 interface InstrumentLibrarySlice {
+  loading: boolean;
   instruments: Instrument[];
   instrumentSets: InstrumentSet[];
   addInstrument: (i?: Partial<Instrument>) => Id;
@@ -478,6 +1358,7 @@ interface InstrumentLibrarySlice {
   mergeInstruments: (a: Id, b: Id) => Id | null;
   /** Seed the library with system (non-deletable) instruments. Idempotent. */
   seedSystemInstruments: () => void;
+  setLoading: (loading: boolean) => void;
 }
 
 export const FACTORY_DRUM_SET_ID = "factory-drums";
@@ -607,6 +1488,7 @@ export function snapshotInstrument(instrument: Instrument): InstrumentSnapshot {
     lfoToPitch: instrument.lfoToPitch,
     lfoToFilter: instrument.lfoToFilter,
     envToFilter: instrument.envToFilter,
+    effects: instrument.effects ? structuredClone(instrument.effects) : undefined,
     sampleIds: [...instrument.sampleIds],
     sampleUrl: instrument.sampleUrl,
     sampleUrls: instrument.sampleUrls ? [...instrument.sampleUrls] : undefined,
@@ -729,6 +1611,7 @@ function normalizeInstrumentSets(sets?: InstrumentSet[]): InstrumentSet[] {
 
 export const useInstrumentStore = create<InstrumentLibrarySlice>()(
   immer((set, get) => ({
+    loading: true,
     instruments: [],
     instrumentSets: defaultInstrumentSets(),
     addInstrument: (patch) => {
@@ -776,6 +1659,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
       set((s) => {
         s.instrumentSets = normalizeInstrumentSets(sets);
         s.instruments = instruments.map((instrument) => normalizeInstrument(instrument));
+        s.loading = false;
       }),
     addInstrumentSet: (name) => {
       const id = nanoid();
@@ -1039,8 +1923,12 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
           }
         }
         s.instruments.unshift(...missingSeeds);
+        s.loading = false;
       });
     },
+    setLoading: (loading) => set((s) => {
+      s.loading = loading;
+    }),
 
     mergeInstruments: (aId, bId) => {
       const all = get().instruments;
@@ -1097,6 +1985,8 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
 interface AudioFileLibrarySlice {
   files: AudioFile[];
   addFile: (file: AudioFile) => void;
+  hydrateFiles: (files: AudioFile[]) => void;
+  updateFile: (id: Id, patch: Partial<AudioFile>) => void;
   removeFile: (id: Id) => void;
 }
 
@@ -1107,6 +1997,15 @@ export const useAudioFileStore = create<AudioFileLibrarySlice>()(
       set((s) => {
         if (s.files.some((f) => f.id === file.id)) return;
         s.files.push(file);
+      }),
+    hydrateFiles: (files) =>
+      set((s) => {
+        s.files = files.map((file) => structuredClone(file));
+      }),
+    updateFile: (id, patch) =>
+      set((s) => {
+        const file = s.files.find((candidate) => candidate.id === id);
+        if (file) Object.assign(file, patch);
       }),
     removeFile: (id) =>
       set((s) => {
@@ -1130,10 +2029,14 @@ function sameEditor(
   if (a.kind !== b.kind) return false;
   if (a.kind === "instrument" && b.kind === "instrument")
     return a.instrumentId === b.instrumentId;
+  if (a.kind === "track" && b.kind === "track")
+    return a.trackId === b.trackId;
   if (a.kind === "segment" && b.kind === "segment")
     return a.segmentId === b.segmentId;
   if (a.kind === "component" && b.kind === "component")
     return a.componentId === b.componentId;
+  if (a.kind === "plugin" && b.kind === "plugin")
+    return a.pluginId === b.pluginId;
   return true;
 }
 

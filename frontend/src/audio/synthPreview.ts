@@ -56,6 +56,7 @@ export const SYNTH_PREVIEW_MIDI_PITCH = 60;
 export const SYNTH_PREVIEW_BASE_HZ = 440 * Math.pow(2, (SYNTH_PREVIEW_MIDI_PITCH - 69) / 12);
 
 const sampleBufferCache = new Map<string, AudioBuffer>();
+const sampleLoadPromises = new Map<string, Promise<void>>();
 const sampleRoundRobinIndex = new Map<string, number>();
 const renderedInstrumentBufferCache = new Map<string, AudioBuffer>();
 const unisonVoicePlanCache = new Map<string, UnisonVoicePlan>();
@@ -70,6 +71,11 @@ interface SamplePlaybackTarget {
   rootNote: number;
   tuning: number;
   gain: number;
+  durationSeconds?: number;
+  loLengthSeconds?: number;
+  hiLengthSeconds?: number;
+  startSample?: number;
+  endSample?: number;
 }
 
 interface UnisonVoicePlan {
@@ -192,10 +198,16 @@ export function createInstrumentBufferSource(
   velocity = 127,
 ): AudioBufferSourceNode {
   const shouldGlide = targetFrequency != null && Number.isFinite(targetFrequency) && Math.abs(targetFrequency - frequency) > 0.01;
-  const sampleTarget = nextSampleTarget(instrument, frequency, velocity);
+  const sampleTarget = nextSampleTarget(instrument, frequency, velocity, durationS);
   if (sampleTarget && sampleBufferCache.has(sampleTarget.url)) {
     const source = ctx.createBufferSource();
-    source.buffer = sampleBufferWithGain(ctx, sampleTarget.url, sampleTarget.gain);
+    source.buffer = sampleBufferWithGain(
+      ctx,
+      sampleTarget.url,
+      sampleTarget.gain,
+      sampleTarget.startSample,
+      sampleTarget.endSample,
+    );
     const baseFrequency = midiFrequency(sampleTarget.rootNote);
     const tuningRate = Math.pow(2, sampleTarget.tuning / 1200);
     const rate = Math.max(0.25, Math.min(4, (frequency / baseFrequency) * tuningRate));
@@ -211,6 +223,28 @@ export function createInstrumentBufferSource(
   const buffer = renderedInstrumentBuffer(ctx, instrument, durationS, frequency, targetFrequency);
   const source = ctx.createBufferSource();
   source.buffer = buffer;
+  return source;
+}
+
+export function createInstrumentSampleBufferSource(
+  ctx: AudioContext,
+  instrument: Instrument,
+  sampleUrl: string,
+  frequency: number,
+  velocity = 127,
+): AudioBufferSourceNode | null {
+  if (!sampleBufferCache.has(sampleUrl)) return null;
+  const source = ctx.createBufferSource();
+  const zone = (instrument.sampleMap ?? [])
+    .filter((candidate) => candidate.path === sampleUrl)
+    .find((candidate) => velocity >= candidate.loVel && velocity <= candidate.hiVel)
+    ?? (instrument.sampleMap ?? []).find((candidate) => candidate.path === sampleUrl);
+  const gain = zone ? decibelsToGain(zone.volumeDb) : 1;
+  source.buffer = sampleBufferWithGain(ctx, sampleUrl, gain, zone?.startSample, zone?.endSample);
+  const rootNote = zone?.rootNote ?? 60;
+  const tuningRate = Math.pow(2, (zone?.tuning ?? 0) / 1200);
+  const baseFrequency = midiFrequency(rootNote);
+  source.playbackRate.value = Math.max(0.25, Math.min(4, (frequency / baseFrequency) * tuningRate));
   return source;
 }
 
@@ -309,10 +343,16 @@ export function createInstrumentCurveBufferSource(
   automation?: SynthAutomationLane[],
 ): AudioBufferSourceNode {
   const sorted = normalizeFrequencyCurve(curve, durationS, frequency);
-  const sampleTarget = nextSampleTarget(instrument, frequency);
+  const sampleTarget = nextSampleTarget(instrument, frequency, 127, durationS);
   if (!automation?.length && sampleTarget && sampleBufferCache.has(sampleTarget.url)) {
     const source = ctx.createBufferSource();
-    source.buffer = sampleBufferWithGain(ctx, sampleTarget.url, sampleTarget.gain);
+    source.buffer = sampleBufferWithGain(
+      ctx,
+      sampleTarget.url,
+      sampleTarget.gain,
+      sampleTarget.startSample,
+      sampleTarget.endSample,
+    );
     const baseFrequency = midiFrequency(sampleTarget.rootNote);
     const tuningRate = Math.pow(2, sampleTarget.tuning / 1200);
     const rates = Float32Array.from(sorted.map((point) => Math.max(0.25, Math.min(4, (point.frequency / baseFrequency) * tuningRate))));
@@ -346,11 +386,24 @@ export async function preloadInstrumentSample(ctx: AudioContext, instrument: Ins
   const urls = instrumentSampleUrls(instrument);
   await Promise.all(urls.map(async (url) => {
     if (sampleBufferCache.has(url)) return;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Failed to load sample: ${url}`);
-    const data = await response.arrayBuffer();
-    const buffer = await ctx.decodeAudioData(data.slice(0));
-    sampleBufferCache.set(url, buffer);
+    const pending = sampleLoadPromises.get(url);
+    if (pending) {
+      await pending;
+      return;
+    }
+    const loadPromise = (async () => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to load sample: ${url}`);
+      const data = await response.arrayBuffer();
+      const buffer = await ctx.decodeAudioData(data.slice(0));
+      sampleBufferCache.set(url, buffer);
+    })();
+    sampleLoadPromises.set(url, loadPromise);
+    try {
+      await loadPromise;
+    } finally {
+      sampleLoadPromises.delete(url);
+    }
   }));
 }
 
@@ -364,44 +417,84 @@ export function cachedInstrumentSampleBuffer(url: string): AudioBuffer | undefin
   return sampleBufferCache.get(url);
 }
 
-function instrumentSampleUrls(instrument: Instrument): string[] {
+export function hasCachedInstrumentSample(instrument: Instrument): boolean {
+  const urls = instrumentSampleUrls(instrument);
+  return urls.length > 0 && urls.every((url) => sampleBufferCache.has(url));
+}
+
+export function instrumentSampleUrls(instrument: Instrument): string[] {
   return Array.from(new Set([
+    ...(instrument.sampleMap ?? []).map((zone) => zone.path),
     ...(instrument.sampleUrls ?? []),
     ...(instrument.sampleUrl ? [instrument.sampleUrl] : []),
   ].filter(Boolean)));
 }
 
-function nextSampleTarget(instrument: Instrument, frequency: number, velocity = 127): SamplePlaybackTarget | undefined {
+function nextSampleTarget(instrument: Instrument, frequency: number, velocity = 127, durationS = 0): SamplePlaybackTarget | undefined {
   const midiPitch = frequencyToMidi(frequency);
   const zones = (instrument.sampleMap ?? [])
     .filter((zone) => sampleBufferCache.has(zone.path))
     .filter((zone) => midiPitch >= zone.loNote && midiPitch <= zone.hiNote && velocity >= zone.loVel && velocity <= zone.hiVel);
   const targets = zones.length > 0
-    ? zones.map((zone) => ({ url: zone.path, rootNote: zone.rootNote, tuning: zone.tuning, gain: decibelsToGain(zone.volumeDb) }))
+    ? zones.map((zone) => ({
+      url: zone.path,
+      rootNote: zone.rootNote,
+      tuning: zone.tuning,
+      gain: decibelsToGain(zone.volumeDb),
+      durationSeconds: zone.durationSeconds,
+      loLengthSeconds: zone.loLengthSeconds,
+      hiLengthSeconds: zone.hiLengthSeconds,
+      startSample: zone.startSample,
+      endSample: zone.endSample,
+    }))
     : instrumentSampleUrls(instrument)
       .filter((url) => sampleBufferCache.has(url))
-      .map((url) => ({ url, rootNote: 60, tuning: 0, gain: 1 }));
-  if (targets.length === 0) return undefined;
-  if (targets.length === 1) return targets[0];
+      .map((url) => ({ url, rootNote: 60, tuning: 0, gain: 1, durationSeconds: sampleBufferCache.get(url)?.duration }));
+  const selectedTargets = lengthMatchedTargets(targets, durationS);
+  if (selectedTargets.length === 0) return undefined;
+  if (selectedTargets.length === 1) return selectedTargets[0];
   const key = instrument.id;
-  const index = sampleRoundRobinIndex.get(key) ?? Math.floor(Math.random() * targets.length);
-  sampleRoundRobinIndex.set(key, (index + 1) % targets.length);
-  return targets[index % targets.length];
+  const index = sampleRoundRobinIndex.get(key) ?? Math.floor(Math.random() * selectedTargets.length);
+  sampleRoundRobinIndex.set(key, (index + 1) % selectedTargets.length);
+  return selectedTargets[index % selectedTargets.length];
+}
+
+function lengthMatchedTargets(targets: SamplePlaybackTarget[], durationS: number): SamplePlaybackTarget[] {
+  if (targets.length <= 1 || !Number.isFinite(durationS) || durationS <= 0.001) return targets;
+  const bandMatches = targets.filter((target) => (
+    target.loLengthSeconds != null
+    && target.hiLengthSeconds != null
+    && durationS >= target.loLengthSeconds
+    && durationS <= target.hiLengthSeconds
+  ));
+  if (bandMatches.length > 0) return bandMatches;
+
+  const durationTargets = targets.filter((target) => target.durationSeconds != null && target.durationSeconds > 0);
+  if (durationTargets.length === 0) return targets;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const target of durationTargets) {
+    bestDistance = Math.min(bestDistance, Math.abs((target.durationSeconds ?? 0) - durationS));
+  }
+  return durationTargets.filter((target) => Math.abs(Math.abs((target.durationSeconds ?? 0) - durationS) - bestDistance) <= 0.003);
 }
 
 const gainedSampleBufferCache = new Map<string, AudioBuffer>();
 
-function sampleBufferWithGain(ctx: AudioContext, url: string, gain: number): AudioBuffer {
+function sampleBufferWithGain(ctx: AudioContext, url: string, gain: number, startSample = 0, endSample = 0): AudioBuffer {
   const source = sampleBufferCache.get(url)!;
-  if (Math.abs(gain - 1) < 0.001) return source;
-  const key = `${url}::${gain.toFixed(4)}`;
+  const start = Math.max(0, Math.min(source.length - 1, Math.floor(startSample || 0)));
+  const end = endSample > start + 1
+    ? Math.max(start + 2, Math.min(source.length, Math.floor(endSample)))
+    : source.length;
+  if (Math.abs(gain - 1) < 0.001 && start === 0 && end === source.length) return source;
+  const key = `${url}::${gain.toFixed(4)}::${start}:${end}`;
   const cached = gainedSampleBufferCache.get(key);
   if (cached) return cached;
-  const buffer = ctx.createBuffer(source.numberOfChannels, source.length, source.sampleRate);
+  const buffer = ctx.createBuffer(source.numberOfChannels, Math.max(1, end - start), source.sampleRate);
   for (let channel = 0; channel < source.numberOfChannels; channel++) {
     const input = source.getChannelData(channel);
     const output = buffer.getChannelData(channel);
-    for (let i = 0; i < input.length; i++) output[i] = clamp(input[i] * gain, -1, 1);
+    for (let i = 0; i < output.length; i++) output[i] = clamp(input[start + i] * gain, -1, 1);
   }
   gainedSampleBufferCache.set(key, buffer);
   return buffer;

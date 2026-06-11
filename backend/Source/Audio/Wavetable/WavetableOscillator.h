@@ -21,7 +21,9 @@ namespace beat
         float renderSample() noexcept;
 
     private:
-        float readCurrentSample() const noexcept;
+        void markFrameCacheDirty() noexcept { frameCacheDirty = true; }
+        void updateFrameCache() noexcept;
+        float readCurrentSample() noexcept;
 
         const Wavetable* table { nullptr };
         double sampleRate { 44100.0 };
@@ -29,5 +31,10 @@ namespace beat
         double phase { 0.0 };
         double phaseDelta { 440.0 / 44100.0 };
         float position { 0.0f };
+        bool frameCacheDirty { true };
+        int cachedFrameSize { 0 };
+        const float* cachedFrame0Data { nullptr };
+        const float* cachedFrame1Data { nullptr };
+        float cachedFrameFrac { 0.0f };
     };
 }

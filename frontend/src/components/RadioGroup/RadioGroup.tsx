@@ -10,6 +10,8 @@ interface RadioGroupProps<T extends string | number> {
   ariaLabel: string;
   value: T;
   options: Array<RadioGroupOption<T>>;
+  className?: string;
+  disabled?: boolean;
   onChange: (value: T) => void;
 }
 
@@ -18,10 +20,12 @@ export function RadioGroup<T extends string | number>({
   ariaLabel,
   value,
   options,
+  className,
+  disabled = false,
   onChange,
 }: RadioGroupProps<T>) {
   return (
-    <div className={styles.wrap}>
+    <div className={[styles.wrap, disabled && styles.disabled, className].filter(Boolean).join(" ")}>
       {label && <span className={styles.label}>{label}</span>}
       <div className={styles.control} role="radiogroup" aria-label={ariaLabel}>
         {options.map((option) => {
@@ -32,6 +36,7 @@ export function RadioGroup<T extends string | number>({
               type="button"
               role="radio"
               aria-checked={selected}
+              disabled={disabled}
               className={`${styles.button} ${selected ? styles.active : ""}`}
               onClick={() => onChange(option.value)}
             >

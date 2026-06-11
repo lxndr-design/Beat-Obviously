@@ -64,6 +64,9 @@ export async function browserFileToAudioFile(file: File): Promise<AudioFile> {
     path: await fileToDataUrl(file),
     durationSeconds: metadata.durationSeconds,
     sampleRate: metadata.sampleRate,
+    bitDepth: metadata.bitDepth,
+    sizeBytes: file.size,
+    importedAt: Date.now(),
   };
 }
 
@@ -81,16 +84,44 @@ async function readBrowserAudioMetadata(file: File) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const Ctor = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
     const ctx = new Ctor();
-    const buffer = await ctx.decodeAudioData(await file.arrayBuffer());
+    const arrayBuffer = await file.arrayBuffer();
+    const bitDepth = parseWavBitDepth(arrayBuffer);
+    const buffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
     await ctx.close();
     return {
       durationSeconds: buffer.duration,
       sampleRate: buffer.sampleRate,
+      bitDepth,
     };
   } catch {
     return {
       durationSeconds: 0,
       sampleRate: 0,
+      bitDepth: undefined,
     };
   }
+}
+
+function parseWavBitDepth(buffer: ArrayBuffer) {
+  if (buffer.byteLength < 44) return undefined;
+  const view = new DataView(buffer);
+  if (ascii(view, 0, 4) !== "RIFF" || ascii(view, 8, 4) !== "WAVE") return undefined;
+
+  let offset = 12;
+  while (offset + 8 <= view.byteLength) {
+    const chunkId = ascii(view, offset, 4);
+    const chunkSize = view.getUint32(offset + 4, true);
+    if (chunkId === "fmt " && offset + 16 <= view.byteLength) {
+      const bits = view.getUint16(offset + 8 + 14, true);
+      return bits > 0 ? bits : undefined;
+    }
+    offset += 8 + chunkSize + (chunkSize % 2);
+  }
+  return undefined;
+}
+
+function ascii(view: DataView, offset: number, length: number) {
+  let value = "";
+  for (let i = 0; i < length; i += 1) value += String.fromCharCode(view.getUint8(offset + i));
+  return value;
 }

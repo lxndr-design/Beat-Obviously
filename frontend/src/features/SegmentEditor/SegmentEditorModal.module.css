@@ -1,8 +1,8 @@
 .controls {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
+  gap: 6px;
+  margin-bottom: 6px;
   flex-wrap: wrap;
 }
 
@@ -16,13 +16,13 @@
   color: var(--color-fg);
   border: var(--border-fg);
   font-family: var(--font-family-mono);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   gap: 4px;
 }
 
 .label {
   font-family: var(--font-family-base);
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
   font-weight: var(--font-weight-medium);
@@ -36,7 +36,7 @@
   border: 0;
   outline: 0;
   font-family: var(--font-family-mono);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   text-align: right;
 }
 
@@ -47,7 +47,7 @@
   border: 0;
   outline: 0;
   font-family: var(--font-family-base);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
 }
 
 /* Beat the global input:focus-visible / select:focus-visible outline from
@@ -84,6 +84,6 @@
 
 .audioHint {
   font-family: var(--font-family-mono);
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   opacity: 0.7;
 }

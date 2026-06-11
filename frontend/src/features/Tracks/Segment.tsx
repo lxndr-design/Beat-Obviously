@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useProjectStore, useSettingsStore, useUiStore, useViewStore } from "../../state/store";
+import { useProjectStore, useSettingsStore, useTransportStore, useUiStore, useViewStore } from "../../state/store";
 import { SEGMENT_LAYER_OFFSET_PX } from "./geometry";
 import { useContextMenu, Icon, type ContextMenuItem } from "../../components";
 import { useClipboard } from "../../state/clipboard";
@@ -50,30 +50,70 @@ export function Segment({
 }: Props) {
   const beatsToPx = useViewStore((s) => s.beatsToPx);
   const setLastLen = useViewStore((s) => s.setLastSegmentLength);
-  const moveSegment = useProjectStore((s) => s.moveSegment);
   const updateSegment = useProjectStore((s) => s.updateSegment);
-  const removeSegment = useProjectStore((s) => s.removeSegment);
   const addSegment = useProjectStore((s) => s.addSegment);
+  const applySegmentEditCommand = useProjectStore((s) => s.applySegmentEditCommand);
   const setSegmentRepeats = useProjectStore((s) => s.setSegmentRepeats);
   const projectLengthBeats = useProjectStore((s) => s.project.lengthBeats);
   const tsNum = useProjectStore((s) => s.project.timeSignature.num);
   const timelineSmartGrid = useSettingsStore((s) => s.timelineSmartGrid);
   const timelineSubdivision = useSettingsStore((s) => s.timelineSubdivision);
-  const selected = useUiStore((s) => s.selectedSegmentIds.includes(segmentId));
+  const selectedSegmentIds = useUiStore((s) => s.selectedSegmentIds);
+  const selected = selectedSegmentIds.includes(segmentId);
   const editing = useUiStore((s) => s.openEditors.some((editor) => editor.kind === "segment" && editor.segmentId === segmentId));
-  const selectSegment = useUiStore((s) => s.selectSegment);
-  const { copy: copyToClipboard, paste } = useClipboard();
+  const setSelectedSegments = useUiStore((s) => s.setSelectedSegments);
+  const setSelectedTracks = useUiStore((s) => s.setSelectedTracks);
+  const { copy: copyToClipboard, copyMany, paste } = useClipboard();
   const saveComponent = useComponentStore((s) => s.add);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [dragPreview, setDragPreview] = useState<{ startBeat: number; lengthBeats: number } | null>(null);
 
   const drag = useRef<
-    | { mode: "move"; startX: number; startBeat: number }
-    | { mode: "resize-right"; startX: number; startLen: number; shift: boolean }
-    | { mode: "resize-left"; startX: number; startBeat: number; startLen: number; shift: boolean }
+    | {
+        mode: "move";
+        startX: number;
+        startY: number;
+        anchorSegmentId: Id;
+        originTrackIndex: number;
+        segments: Array<{ id: Id; startBeat: number; trackId: Id; trackIndex: number }>;
+        moved: boolean;
+        pendingMoves: Array<{ segmentId: Id; toTrackId: Id; toStartBeat: number }>;
+      }
+    | {
+        mode: "resize-right";
+        startX: number;
+        startBeat: number;
+        startLen: number;
+        sourceStartBeat: number;
+        payload: SegmentType["payload"] | null;
+        shift: boolean;
+        pendingResize: { startBeat: number; lengthBeats: number } | null;
+      }
+    | {
+        mode: "resize-left";
+        startX: number;
+        startBeat: number;
+        startLen: number;
+        sourceStartBeat: number;
+        payload: SegmentType["payload"] | null;
+        shift: boolean;
+        pendingResize: { startBeat: number; lengthBeats: number } | null;
+      }
     | null
   >(null);
+  const previewRaf = useRef<number | null>(null);
+  const pendingPreview = useRef<{ startBeat: number; lengthBeats: number } | null>(null);
+
+  function scheduleDragPreview(next: { startBeat: number; lengthBeats: number } | null) {
+    pendingPreview.current = next;
+    if (previewRaf.current != null) return;
+    previewRaf.current = window.requestAnimationFrame(() => {
+      previewRaf.current = null;
+      setDragPreview(pendingPreview.current);
+    });
+  }
 
   function snapStepBeats(shift: boolean): number {
     if (shift) return Math.max(1, tsNum);
@@ -92,39 +132,106 @@ export function Segment({
     mode: "move" | "resize-right" | "resize-left",
     e: React.PointerEvent,
   ) {
+    if (e.button !== 0 || e.ctrlKey) return;
     if (repetition > 0) return;
     e.stopPropagation();
     (e.target as Element).setPointerCapture(e.pointerId);
     if (mode === "move") {
-      drag.current = { mode, startX: e.clientX, startBeat };
+      const project = useProjectStore.getState().project;
+      const ids = useUiStore.getState().selectedSegmentIds;
+      const nextSelected = ids.includes(segmentId)
+        ? ids
+        : e.shiftKey
+          ? [...ids, segmentId]
+          : [segmentId];
+      setSelectedSegments(nextSelected);
+      setSelectedTracks([]);
+      const selectedIdSet = new Set(nextSelected);
+      const segments = project.tracks.flatMap((track, trackIndex) =>
+        track.segments
+          .filter((seg) => selectedIdSet.has(seg.id))
+          .map((seg) => ({
+            id: seg.id,
+            startBeat: seg.startBeat,
+            trackId: seg.trackId,
+            trackIndex,
+          })),
+      );
+      const originTrackIndex = Math.max(0, project.tracks.findIndex((track) => track.id === liveSeg?.trackId));
+      drag.current = {
+        mode,
+        startX: e.clientX,
+        startY: e.clientY,
+        anchorSegmentId: segmentId,
+        originTrackIndex,
+        segments: segments.length > 0 ? segments : [{ id: segmentId, startBeat, trackId: liveSeg?.trackId ?? "", trackIndex: originTrackIndex }],
+        moved: false,
+        pendingMoves: [],
+      };
     } else if (mode === "resize-right") {
-      drag.current = { mode, startX: e.clientX, startLen: lengthBeats, shift: e.shiftKey };
+      setSelectedSegments([segmentId]);
+      setSelectedTracks([]);
+      drag.current = {
+        mode,
+        startX: e.clientX,
+        startBeat,
+        startLen: lengthBeats,
+        sourceStartBeat: liveSeg?.sourceStartBeat ?? 0,
+        payload: liveSeg ? structuredClone(liveSeg.payload) : null,
+        shift: e.shiftKey,
+        pendingResize: null,
+      };
     } else {
-      drag.current = { mode, startX: e.clientX, startBeat, startLen: lengthBeats, shift: e.shiftKey };
+      setSelectedSegments([segmentId]);
+      setSelectedTracks([]);
+      drag.current = {
+        mode,
+        startX: e.clientX,
+        startBeat,
+        startLen: lengthBeats,
+        sourceStartBeat: liveSeg?.sourceStartBeat ?? 0,
+        payload: liveSeg ? structuredClone(liveSeg.payload) : null,
+        shift: e.shiftKey,
+        pendingResize: null,
+      };
     }
     setDragging(true);
-    selectSegment(segmentId, e.shiftKey);
   }
 
   function onPointerMove(e: React.PointerEvent) {
     const d = drag.current;
     if (!d) return;
     const dxPx = e.clientX - d.startX;
+    const dyPx = "startY" in d ? e.clientY - d.startY : 0;
+    if (Math.hypot(dxPx, dyPx) < 3) return;
+    if ("moved" in d) d.moved = true;
     const dxBeats = dxPx / beatsToPx;
 
     if (d.mode === "move") {
-      const newStart = snapBeat(d.startBeat + dxBeats, e.shiftKey);
-      if (newStart === startBeat) return;
-      const seg = useProjectStore.getState().project.tracks
-        .flatMap((t) => t.segments)
-        .find((s) => s.id === segmentId);
-      if (seg) moveSegment(segmentId, seg.trackId, newStart);
+      const project = useProjectStore.getState().project;
+      const anchor = d.segments.find((seg) => seg.id === d.anchorSegmentId) ?? d.segments[0];
+      const snappedAnchor = snapBeat(anchor.startBeat + dxBeats, e.shiftKey);
+      let deltaBeats = snappedAnchor - anchor.startBeat;
+      const minStart = Math.min(...d.segments.map((seg) => seg.startBeat + deltaBeats));
+      if (minStart < 0) deltaBeats -= minStart;
+      const targetTrackIndex = trackIndexAtClientY(e.clientY, project.tracks.map((track) => track.id));
+      const trackDelta = targetTrackIndex == null ? 0 : targetTrackIndex - d.originTrackIndex;
+      const moves = d.segments.flatMap((seg) => {
+        const targetIndex = Math.max(0, Math.min(project.tracks.length - 1, seg.trackIndex + trackDelta));
+        const targetTrackId = project.tracks[targetIndex]?.id ?? seg.trackId;
+        const newStart = Math.max(0, seg.startBeat + deltaBeats);
+        if (seg.trackId === targetTrackId && seg.startBeat === newStart) return [];
+        return [{ segmentId: seg.id, toTrackId: targetTrackId, toStartBeat: newStart }];
+      });
+      d.pendingMoves = moves;
+      const ownMove = moves.find((move) => move.segmentId === segmentId);
+      scheduleDragPreview(ownMove ? { startBeat: ownMove.toStartBeat, lengthBeats } : { startBeat, lengthBeats });
     } else if (d.mode === "resize-right") {
       const raw = d.startLen + dxBeats;
       const newLen = snapLen(raw, e.shiftKey);
       if (newLen === lengthBeats) return;
-      updateSegment(segmentId, { lengthBeats: newLen });
-      setLastLen(newLen);
+      d.pendingResize = { startBeat: d.startBeat, lengthBeats: newLen };
+      scheduleDragPreview(d.pendingResize);
     } else if (d.mode === "resize-left") {
       // Lock the right edge — it's the anchor while we drag the left handle.
       // Snap the new start to the same step the right handle uses, then
@@ -137,13 +244,32 @@ export function Segment({
       const clampedStart = Math.min(rightBeat - GRID_TICK_BEATS, snappedStart);
       const newLen = rightBeat - clampedStart;
       if (clampedStart === startBeat && newLen === lengthBeats) return;
-      updateSegment(segmentId, { startBeat: clampedStart, lengthBeats: newLen });
-      setLastLen(newLen);
+      d.pendingResize = { startBeat: clampedStart, lengthBeats: newLen };
+      scheduleDragPreview(d.pendingResize);
     }
   }
 
   function onPointerUp() {
+    const d = drag.current;
+    if (d?.mode === "move" && !d.moved) {
+      setSelectedSegments([segmentId]);
+    } else if (d?.mode === "move" && d.pendingMoves.length > 0) {
+      applySegmentEditCommand({ kind: "move", moves: d.pendingMoves });
+    } else if ((d?.mode === "resize-right" || d?.mode === "resize-left") && d.pendingResize) {
+      applySegmentEditCommand({
+        kind: "resize",
+        segmentId,
+        startBeat: d.pendingResize.startBeat,
+        lengthBeats: d.pendingResize.lengthBeats,
+        originStartBeat: d.startBeat,
+        originLengthBeats: d.startLen,
+        originSourceStartBeat: d.sourceStartBeat,
+        originPayload: d.payload ?? undefined,
+      });
+      setLastLen(d.pendingResize.lengthBeats);
+    }
     drag.current = null;
+    scheduleDragPreview(null);
     setDragging(false);
   }
 
@@ -152,12 +278,38 @@ export function Segment({
   const liveSeg = segState.project.tracks
     .flatMap((t) => t.segments)
     .find((s) => s.id === segmentId);
+  const selectedSegments = segState.project.tracks
+    .flatMap((t) => t.segments)
+    .filter((s) => selectedSegmentIds.includes(s.id));
 
   const { onContextMenu, menu } = useContextMenu((): ContextMenuItem[] => {
     if (!liveSeg) return [];
+    if (selected && selectedSegmentIds.length > 1) {
+      return [
+        {
+          label: "Copy",
+          icon: "ph:clipboard",
+          onSelect: () => copyMany(selectedSegments),
+        },
+        {
+          label: "Delete",
+          icon: "ph:trash",
+          separatorBefore: true,
+          onSelect: () => {
+            const ids = selectedSegments.map((seg) => seg.id);
+            applySegmentEditCommand({ kind: "delete", segmentIds: ids });
+            setSelectedSegments([]);
+          },
+        },
+      ];
+    }
     const isMidi =
       liveSeg.payload.kind === "midi" || liveSeg.payload.kind === "mixed";
     const canLoop = isMidi || liveSeg.payload.kind === "drum";
+    const playheadBeat = useTransportStore.getState().positionBeat;
+    const canSplitAtPlayhead =
+      playheadBeat > liveSeg.startBeat + GRID_TICK_BEATS / 4 &&
+      playheadBeat < liveSeg.startBeat + liveSeg.lengthBeats - GRID_TICK_BEATS / 4;
     return [
       { label: "Edit", icon: "ph:pencil-simple", onSelect: onEdit },
       {
@@ -183,6 +335,39 @@ export function Segment({
             } as ContextMenuItem,
           ]
         : []),
+      ...(canSplitAtPlayhead
+        ? [
+            {
+              label: "Split at Playhead",
+              icon: "ph:scissors",
+              separatorBefore: true,
+              onSelect: () => {
+                const [createdId] = applySegmentEditCommand({
+                  kind: "split",
+                  segmentId,
+                  splitBeat: playheadBeat,
+                });
+                if (createdId) setSelectedSegments([createdId]);
+              },
+            } as ContextMenuItem,
+          ]
+        : []),
+      {
+        label: "Fade In 1/4",
+        icon: "ph:triangle",
+        onSelect: () => applySegmentEditCommand({ kind: "fade", segmentId, fadeInBeats: 0.25 }),
+        separatorBefore: !canSplitAtPlayhead,
+      },
+      {
+        label: "Fade Out 1/4",
+        icon: "ph:triangle",
+        onSelect: () => applySegmentEditCommand({ kind: "fade", segmentId, fadeOutBeats: 0.25 }),
+      },
+      {
+        label: "Clear Fades",
+        icon: "ph:x-circle",
+        onSelect: () => applySegmentEditCommand({ kind: "fade", segmentId, fadeInBeats: 0, fadeOutBeats: 0 }),
+      },
       ...(isMidi || liveSeg.payload.kind === "drum"
         ? [
             {
@@ -222,12 +407,12 @@ export function Segment({
         label: "Duplicate",
         icon: "ph:copy",
         onSelect: () => {
-          addSegment(liveSeg.trackId, {
-            ...structuredClone(liveSeg),
-            startBeat: liveSeg.startBeat + liveSeg.lengthBeats,
-            name: duplicateSegmentName(liveSeg),
-            id: undefined as unknown as Id,
+          const [createdId] = applySegmentEditCommand({
+            kind: "duplicate",
+            segments: [{ ...liveSeg, name: duplicateSegmentName(liveSeg) }],
+            offsetBeats: liveSeg.lengthBeats,
           });
+          if (createdId) setSelectedSegments([createdId]);
         },
         separatorBefore: true,
       },
@@ -253,14 +438,16 @@ export function Segment({
       {
         label: "Delete",
         icon: "ph:trash",
-        onSelect: () => removeSegment(segmentId),
+        onSelect: () => applySegmentEditCommand({ kind: "delete", segmentIds: [segmentId] }),
         separatorBefore: true,
       },
     ];
   });
 
-  const left = startBeat * beatsToPx;
-  const width = Math.max(beatsToPx / 2, lengthBeats * beatsToPx);
+  const visualStartBeat = dragPreview?.startBeat ?? startBeat;
+  const visualLengthBeats = dragPreview?.lengthBeats ?? lengthBeats;
+  const left = visualStartBeat * beatsToPx;
+  const width = Math.max(beatsToPx / 2, visualLengthBeats * beatsToPx);
   const visualLayer = layer > 0 ? 1 : 0;
   const top = visualLayer * SEGMENT_LAYER_OFFSET_PX;
 
@@ -286,16 +473,22 @@ export function Segment({
       ]
         .filter(Boolean)
         .join(" ")}
-      style={{ left, width, top, bottom: 0, zIndex: dragging ? 1000 : Math.round(startBeat * 100) + layer + 1 }}
+      style={{ left, width, top, bottom: 0, zIndex: dragging ? 90 : 10 + visualLayer }}
       onDoubleClick={(e) => {
         e.stopPropagation();
+        setSelectedSegments([segmentId]);
+        setSelectedTracks([]);
         onEdit();
       }}
       onContextMenu={onContextMenu}
+      data-segment-id={segmentId}
+      data-track-id={liveSeg?.trackId}
+      data-segment-repetition={repetition}
     >
       {repetition === 0 && (
         <div
           className={`${styles.handle} ${styles.handleLeft}`}
+          data-segment-handle
           onPointerDown={(e) => startDrag("resize-left", e)}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -304,6 +497,7 @@ export function Segment({
 
       <div
         className={styles.body}
+        data-segment-body
         onPointerDown={(e) => startDrag("move", e)}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -341,7 +535,9 @@ export function Segment({
               </span>
             )}
             {repetition > 0 && (
-              <span className={styles.repBadge}>×{repetition + 1}</span>
+              <span className={styles.repBadge} aria-label="Loop repeat">
+                <Icon name="ph:repeat" size={12} decorative />
+              </span>
             )}
           </span>
           <span className={styles.kindIcon} aria-hidden>
@@ -350,10 +546,10 @@ export function Segment({
         </div>
         <div className={styles.content}>
           {payloadKind === "midi" && liveSeg && (
-            <SegmentMidiPreview segment={liveSeg as SegmentType} />
+            <SegmentMidiPreview segment={liveSeg as SegmentType} displayLengthBeats={visualLengthBeats} />
           )}
           {payloadKind === "drum" && liveSeg && (
-            <SegmentDrumPreview segment={liveSeg as SegmentType} />
+            <SegmentDrumPreview segment={liveSeg as SegmentType} displayLengthBeats={visualLengthBeats} />
           )}
           {payloadKind === "audio" && liveSeg && (
             <SegmentWaveform segment={liveSeg as SegmentType} />
@@ -364,6 +560,7 @@ export function Segment({
       {repetition === 0 && (
         <div
           className={`${styles.handle} ${styles.handleRight}`}
+          data-segment-handle
           onPointerDown={(e) => startDrag("resize-right", e)}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -408,6 +605,26 @@ function nextAutoSegmentName(kind: "midi" | "audio" | "drum"): string {
 }
 
 const GRID_TICK_BEATS = 1;
+
+function trackIndexAtClientY(clientY: number, trackIds: Id[]): number | null {
+  const lanes = Array.from(document.querySelectorAll<HTMLElement>("[data-track-lane-id]"));
+  if (lanes.length === 0) return null;
+  let closestIndex: number | null = null;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  for (const lane of lanes) {
+    const trackId = lane.dataset.trackLaneId;
+    const index = trackIds.indexOf(trackId ?? "");
+    if (index < 0) continue;
+    const rect = lane.getBoundingClientRect();
+    if (clientY >= rect.top && clientY <= rect.bottom) return index;
+    const distance = clientY < rect.top ? rect.top - clientY : clientY - rect.bottom;
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestIndex = index;
+    }
+  }
+  return closestIndex;
+}
 
 async function markSavedGeneratedDrum(seg: SegmentType) {
   if (seg.payload.kind !== "drum") return;

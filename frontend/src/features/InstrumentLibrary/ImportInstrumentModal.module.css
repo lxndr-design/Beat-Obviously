@@ -14,7 +14,7 @@
 }
 
 .discardNote {
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   opacity: 0.62;
   text-align: right;
@@ -23,8 +23,8 @@
 .status {
   padding: 6px 8px;
   border: var(--border-fg);
-  background: color-mix(in srgb, var(--color-fg) 8%, var(--color-bg));
-  font-size: 11px;
+  background: var(--surface-subtle);
+  font-size: var(--font-size-ui);
   line-height: 1.25;
 }
 
@@ -56,7 +56,7 @@
   border-bottom: var(--border-fg);
   background: color-mix(in srgb, var(--color-bg) 92%, transparent);
   backdrop-filter: blur(8px);
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   font-weight: var(--font-weight-medium);
   text-transform: uppercase;
@@ -65,7 +65,7 @@
 
 .empty {
   padding: 8px;
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1.35;
   opacity: 0.65;
 }
@@ -96,16 +96,16 @@
 }
 
 .fileRowSelected {
-  background: color-mix(in srgb, var(--color-fg) 14%, var(--color-bg));
+  background: var(--surface-selected);
 }
 
 .fileRowGrouped {
-  background: color-mix(in srgb, var(--color-fg) 6%, var(--color-bg));
+  background: var(--surface-subtle);
 }
 
 .dragHandle {
   justify-self: center;
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   opacity: 0;
 }
@@ -117,14 +117,14 @@
 
 .fileName {
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .fileMeta {
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   opacity: 0.65;
   text-align: right;
@@ -162,7 +162,7 @@
   flex-direction: column;
   margin: 0 8px;
   border: var(--border-fg);
-  background: color-mix(in srgb, var(--color-fg) 4%, var(--color-bg));
+  background: var(--color-bg);
 }
 
 .groupCard:first-of-type {
@@ -171,7 +171,7 @@
 
 .groupHeader {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.55fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.55fr) auto;
   gap: 6px;
   padding: 6px;
   border-bottom: var(--border-fg);
@@ -200,12 +200,12 @@
   min-height: 24px;
   padding-left: 6px;
   border-bottom: var(--border-fg);
-  background: color-mix(in srgb, var(--color-fg) 7%, var(--color-bg));
+  background: var(--surface-subtle);
 }
 
 .volumeHeader span {
   overflow: hidden;
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   font-weight: var(--font-weight-bold);
   line-height: 1;
   letter-spacing: var(--letter-spacing-uppercase);
@@ -251,7 +251,7 @@
 
 .typeField span {
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
@@ -267,7 +267,7 @@
   background: transparent;
   color: var(--color-fg);
   font-family: var(--font-family-base);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   line-height: 16px;
 }
 
@@ -289,7 +289,7 @@
 }
 
 .normalizeField span {
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
@@ -297,7 +297,7 @@
 
 .hint {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1.35;
   opacity: 0.7;
 }

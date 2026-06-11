@@ -27,8 +27,19 @@ namespace beat
         std::optional<Project> load(const Id& id);
         /** Lightweight listing — id/name/saved_at only. */
         struct Summary { Id id; juce::String name; juce::int64 savedAt; };
+        struct RecentProject
+        {
+            juce::String path;
+            juce::String name;
+            juce::int64 openedAt { 0 };
+            double sizeBytes { 0.0 };
+            bool exists { false };
+        };
         std::vector<Summary> list();
         void remove(const Id& id);
+        void recordRecentProject(const juce::File& file, const juce::var& document = {});
+        std::vector<RecentProject> listRecentProjects(int limit = 16);
+        void removeRecentProject(const juce::String& path);
 
     private:
         Database& db;

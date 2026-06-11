@@ -11,10 +11,16 @@ type EffectKind = TrackEffect["kind"];
 const EFFECT_OPTIONS: Array<{ value: EffectKind; label: string }> = [
   { value: "reverb", label: "Reverb / Room" },
   { value: "delay", label: "Delay" },
+  { value: "chorus", label: "Chorus" },
+  { value: "phaser", label: "Phaser" },
+  { value: "flanger", label: "Flanger" },
+  { value: "compressor", label: "Compressor" },
   { value: "lowpass", label: "Low-pass" },
   { value: "highpass", label: "High-pass" },
   { value: "saturator", label: "Saturator" },
+  { value: "distortion", label: "Distortion" },
   { value: "bitcrush", label: "Bitcrush" },
+  { value: "plugin", label: "Plugin" },
 ];
 
 const EFFECT_LABELS: Record<EffectKind, string> = {
@@ -22,8 +28,14 @@ const EFFECT_LABELS: Record<EffectKind, string> = {
   lowpass: "Low-pass",
   highpass: "High-pass",
   saturator: "Saturator",
+  distortion: "Distortion",
   reverb: "Reverb / Room",
   delay: "Delay",
+  chorus: "Chorus",
+  phaser: "Phaser",
+  flanger: "Flanger",
+  compressor: "Compressor",
+  plugin: "Plugin",
 };
 
 interface ParamSpec {
@@ -46,6 +58,35 @@ const PARAMS: Record<EffectKind, ParamSpec[]> = {
     { key: "feedback", label: "Feed", min: 0, max: 95, step: 1, unit: "%" },
     { key: "mix", label: "Mix", min: 0, max: 100, step: 1, unit: "%" },
   ],
+  chorus: [
+    { key: "rateHz", label: "Rate", min: 0.02, max: 12, step: 0.01, unit: "Hz" },
+    { key: "depthMs", label: "Depth", min: 0, max: 25, step: 0.1, unit: "ms" },
+    { key: "delayMs", label: "Delay", min: 1, max: 35, step: 0.1, unit: "ms" },
+    { key: "feedback", label: "Feed", min: -85, max: 85, step: 1, unit: "%" },
+    { key: "mix", label: "Mix", min: 0, max: 100, step: 1, unit: "%" },
+  ],
+  phaser: [
+    { key: "rateHz", label: "Rate", min: 0.02, max: 12, step: 0.01, unit: "Hz" },
+    { key: "centerHz", label: "Center", min: 80, max: 8000, step: 1, unit: "Hz" },
+    { key: "depthOct", label: "Depth", min: 0, max: 4, step: 0.1, unit: "oct" },
+    { key: "feedback", label: "Feed", min: -85, max: 85, step: 1, unit: "%" },
+    { key: "mix", label: "Mix", min: 0, max: 100, step: 1, unit: "%" },
+  ],
+  flanger: [
+    { key: "rateHz", label: "Rate", min: 0.02, max: 12, step: 0.01, unit: "Hz" },
+    { key: "depthMs", label: "Depth", min: 0, max: 8, step: 0.1, unit: "ms" },
+    { key: "delayMs", label: "Delay", min: 0.1, max: 15, step: 0.1, unit: "ms" },
+    { key: "feedback", label: "Feed", min: -85, max: 85, step: 1, unit: "%" },
+    { key: "mix", label: "Mix", min: 0, max: 100, step: 1, unit: "%" },
+  ],
+  compressor: [
+    { key: "thresholdDb", label: "Thresh", min: -60, max: 0, step: 1, unit: "dB" },
+    { key: "ratio", label: "Ratio", min: 1, max: 40, step: 0.1, unit: ":1" },
+    { key: "attackMs", label: "Attack", min: 0.1, max: 200, step: 0.1, unit: "ms" },
+    { key: "releaseMs", label: "Release", min: 1, max: 2000, step: 1, unit: "ms" },
+    { key: "makeupDb", label: "Makeup", min: -24, max: 24, step: 1, unit: "dB" },
+    { key: "mix", label: "Mix", min: 0, max: 100, step: 1, unit: "%" },
+  ],
   lowpass: [
     { key: "cutoffHz", label: "Cut", min: 20, max: 20000, step: 1, unit: "Hz" },
     { key: "resonance", label: "Res", min: 0, max: 100, step: 1, unit: "%" },
@@ -58,9 +99,18 @@ const PARAMS: Record<EffectKind, ParamSpec[]> = {
     { key: "drive", label: "Drive", min: 0, max: 100, step: 1, unit: "%" },
     { key: "mix", label: "Mix", min: 0, max: 100, step: 1, unit: "%" },
   ],
+  distortion: [
+    { key: "drive", label: "Drive", min: 0, max: 100, step: 1, unit: "%" },
+    { key: "shape", label: "Shape", min: 0, max: 100, step: 1, unit: "%" },
+    { key: "trimDb", label: "Trim", min: 0, max: 18, step: 0.5, unit: "dB" },
+    { key: "mix", label: "Mix", min: 0, max: 100, step: 1, unit: "%" },
+  ],
   bitcrush: [
     { key: "bits", label: "Bits", min: 1, max: 16, step: 1 },
     { key: "rate", label: "Rate", min: 1, max: 100, step: 1, unit: "%" },
+    { key: "mix", label: "Mix", min: 0, max: 100, step: 1, unit: "%" },
+  ],
+  plugin: [
     { key: "mix", label: "Mix", min: 0, max: 100, step: 1, unit: "%" },
   ],
 };
@@ -68,10 +118,16 @@ const PARAMS: Record<EffectKind, ParamSpec[]> = {
 const DEFAULT_PARAMS: Record<EffectKind, Record<string, number>> = {
   reverb: { roomSize: 40, damping: 35, mix: 20 },
   delay: { timeMs: 250, feedback: 25, mix: 18 },
+  chorus: { rateHz: 0.8, depthMs: 8, delayMs: 12, feedback: 8, mix: 35 },
+  phaser: { rateHz: 0.45, centerHz: 900, depthOct: 1.8, feedback: 35, mix: 45 },
+  flanger: { rateHz: 0.28, depthMs: 2, delayMs: 2.5, feedback: 45, mix: 50 },
+  compressor: { thresholdDb: -18, ratio: 4, attackMs: 10, releaseMs: 120, makeupDb: 0, mix: 100 },
   lowpass: { cutoffHz: 8000, resonance: 8 },
   highpass: { cutoffHz: 80, resonance: 0 },
   saturator: { drive: 20, mix: 100 },
+  distortion: { drive: 55, shape: 35, trimDb: 6, mix: 45 },
   bitcrush: { bits: 8, rate: 50, mix: 35 },
+  plugin: { mix: 100 },
 };
 
 export function TrackEffectsPanel() {

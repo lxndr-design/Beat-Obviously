@@ -28,7 +28,7 @@
 }
 
 .title {
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   font-weight: var(--font-weight-medium);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);

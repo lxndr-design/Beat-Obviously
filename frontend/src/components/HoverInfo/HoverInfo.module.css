@@ -1,25 +1,35 @@
+.trigger {
+  display: inline-flex;
+  align-items: stretch;
+  justify-content: center;
+  min-width: 0;
+  width: fit-content;
+  height: fit-content;
+}
+
 .popover {
   position: fixed;
   background: var(--color-bg);
   color: var(--color-fg);
   border: var(--border-fg);
-  padding: 4px var(--space-1);
-  font-size: 11px;
+  padding: 3px 6px;
+  font-size: var(--font-size-ui);
+  line-height: 1.15;
   max-width: 240px;
-  z-index: 200; /* var(--z-floating) */
+  z-index: 1000;
   pointer-events: none;
   white-space: normal;
 }
 
 .placement-top {
-  transform: translate(-50%, calc(-100% - var(--space-1)));
+  transform: none;
 }
 .placement-bottom {
-  transform: translate(-50%, var(--space-1));
+  transform: none;
 }
 .placement-left {
-  transform: translate(calc(-100% - var(--space-1)), -50%);
+  transform: none;
 }
 .placement-right {
-  transform: translate(var(--space-1), -50%);
+  transform: none;
 }

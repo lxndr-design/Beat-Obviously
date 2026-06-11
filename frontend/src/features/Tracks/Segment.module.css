@@ -30,29 +30,31 @@
   right: 0;
 }
 
-/* Hover dims the already-white body to the off-white token. */
 .segment:hover {
-  background: var(--color-fg-hover);
+  background: color-mix(in srgb, var(--color-fg) 88%, var(--color-bg));
 }
 
 .selected {
-  outline: 2px solid var(--color-fg);
-  outline-offset: -2px;
+  background: color-mix(in srgb, var(--color-fg) 72%, var(--color-bg));
+  outline: 0;
+}
+
+.selected:hover {
+  background: color-mix(in srgb, var(--color-fg) 72%, var(--color-bg));
 }
 
 .editing {
-  background: rgba(215, 215, 215, 0.72);
-  border-color: rgba(255, 255, 255, 0.72);
+  background: color-mix(in srgb, var(--color-fg) 72%, var(--color-bg));
+  border-color: color-mix(in srgb, var(--color-fg) 72%, transparent);
 }
 
 .selected.editing {
-  outline: 1px solid rgba(255, 255, 255, 0.62);
-  outline-offset: -1px;
+  outline: 0;
 }
 
 .editing .labelStrip {
-  color: rgba(255, 255, 255, 0.86);
-  border-bottom-color: rgba(255, 255, 255, 0.55);
+  color: color-mix(in srgb, var(--color-fg) 86%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--color-fg) 55%, transparent);
 }
 
 .dragging {
@@ -89,12 +91,14 @@
   bottom: 0;
   width: 3px;
   cursor: ew-resize;
-  background: rgba(255, 255, 255, 0.9);
+  background: color-mix(in srgb, var(--color-fg) 90%, transparent);
   opacity: 0;
   transition: var(--transition-opacity);
   z-index: 6;
 }
-.segment:hover .handle {
+.segment:has(.body:hover) .handle,
+.handle:hover,
+.dragging .handle {
   opacity: 1;
 }
 
@@ -137,7 +141,7 @@
 
 .nameText {
   font-family: var(--font-family-base);
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -154,7 +158,7 @@
   border: 0;
   outline: 0;
   font-family: var(--font-family-base);
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   line-height: 1;
 }
 
@@ -188,8 +192,8 @@
     to right,
     transparent 0,
     transparent calc(var(--space-2) - 1px),
-    rgba(0, 0, 0, 0.08) calc(var(--space-2) - 1px),
-    rgba(0, 0, 0, 0.08) var(--space-2)
+    color-mix(in srgb, var(--color-bg) 8%, transparent) calc(var(--space-2) - 1px),
+    color-mix(in srgb, var(--color-bg) 8%, transparent) var(--space-2)
   );
   pointer-events: none;
 }

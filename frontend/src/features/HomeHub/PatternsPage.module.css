@@ -1,0 +1,373 @@
+.table {
+  display: grid;
+  grid-template-rows: 28px 1fr;
+  min-height: 0;
+}
+
+.headerRow,
+.row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 72px 84px 84px;
+  align-items: center;
+}
+
+.headerRow {
+  border-bottom: var(--border-fg);
+  color: var(--color-fg-hover);
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+}
+
+.headerRow span,
+.row > span {
+  min-width: 0;
+  padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rows {
+  min-height: 0;
+  overflow: auto;
+}
+
+.row {
+  width: 100%;
+  min-height: 28px;
+  border: 0;
+  border-bottom: var(--border-soft);
+  background: transparent;
+  color: var(--color-fg);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-ui);
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-invert);
+}
+
+.row:hover {
+  background: var(--surface-hover);
+}
+
+.rowActive {
+  background: var(--surface-selected);
+}
+
+.nameCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: var(--font-weight-medium);
+}
+
+.emptyRow,
+.emptyPreview {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 6px;
+  color: var(--color-fg-hover);
+  font-size: var(--font-size-ui);
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  overflow: auto;
+}
+
+.previewBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.segmentStage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: var(--pattern-stage-min, 260px);
+  min-height: var(--pattern-stage-min, 260px);
+  border: var(--border-fg);
+  padding: 0;
+  overflow: hidden;
+}
+
+.segmentStage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--color-fg) 24%, transparent) 1px, transparent 1px),
+    linear-gradient(0deg, color-mix(in srgb, var(--color-fg) 18%, transparent) 1px, transparent 1px);
+  background-size: 64px 100%, 100% 36px;
+}
+
+.segmentBlock {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: 28px 1fr;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: var(--border-fg);
+  background: var(--surface-subtle);
+  overflow: hidden;
+}
+
+.segmentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 8px;
+  border-bottom: var(--border-fg);
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+}
+
+.previewGrid {
+  position: relative;
+  min-height: 0;
+  overflow: auto;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--color-fg) 18%, transparent) 1px, transparent 1px),
+    linear-gradient(0deg, color-mix(in srgb, var(--color-fg) 14%, transparent) 1px, transparent 1px);
+  background-size: 42px 100%, 100% 28px;
+}
+
+.midiPreviewContent {
+  position: relative;
+  width: max(100%, var(--pattern-content-width, 100%));
+  height: 100%;
+  min-height: 100%;
+}
+
+.segmentPlayhead {
+  position: absolute;
+  z-index: 4;
+  top: 28px;
+  bottom: 0;
+  left: calc(var(--pattern-label-width, 0px) + ((100% - var(--pattern-label-width, 0px)) * var(--pattern-progress, 0)));
+  width: 1px;
+  background: var(--color-fg);
+  opacity: 0.86;
+  pointer-events: none;
+}
+
+.noteBlock {
+  position: absolute;
+  height: 12px;
+  min-width: 4px;
+  border: var(--border-fg);
+  background: var(--color-fg);
+  opacity: 0.76;
+}
+
+.drumMatrix {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--pattern-label-width) minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-bg);
+  pointer-events: auto;
+}
+
+.drumLabels {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: var(--border-fg);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.drumStepsViewport {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.drumStepsContent {
+  position: relative;
+  min-height: 100%;
+  padding-bottom: 12px;
+}
+
+.drumMatrixRow {
+  display: grid;
+  min-height: 24px;
+  border-bottom: var(--border-soft);
+}
+
+.drumMatrixRow:last-child {
+  border-bottom: 0;
+}
+
+.drumMatrixLabel {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  min-width: 0;
+  padding: 0 6px;
+  border-bottom: var(--border-soft);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drumMatrixLabel:last-child {
+  border-bottom: 0;
+}
+
+.drumMatrixCell {
+  position: relative;
+  min-width: 0;
+  width: var(--pattern-step-width);
+  border-left: 1px solid color-mix(in srgb, var(--color-fg) 24%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--color-fg) 22%, transparent);
+}
+
+.drumMatrixCell:last-child {
+  border-right: 0;
+}
+
+.drumMatrixCellOn::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 50%;
+  width: 5px;
+  background: var(--color-fg);
+  transform: translateX(-50%);
+}
+
+.drumStepPlayhead {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  bottom: 12px;
+  width: 1px;
+  background: var(--color-fg);
+  opacity: 0.86;
+  transform: translateX(-0.5px);
+  pointer-events: none;
+}
+
+.previewTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 28px;
+  color: var(--color-fg);
+  font-size: var(--font-size-ui);
+  line-height: 1.2;
+}
+
+.previewName {
+  min-width: 0;
+  color: var(--color-fg);
+  font-size: var(--font-size-ui-lg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playbackBar {
+  position: relative;
+  width: 100%;
+  height: 10px;
+  border: var(--border-fg);
+  overflow: hidden;
+  touch-action: none;
+}
+
+.playbackBarFill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  background: color-mix(in srgb, var(--color-fg) 28%, transparent);
+  pointer-events: none;
+}
+
+.playbackKnob {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 16px;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.previewControls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.timeButtonText {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.previewActions {
+  flex-shrink: 0;
+}
+
+.previewActionButton {
+  min-width: 128px;
+  padding: 0 12px;
+  border-top: 0;
+  border-bottom: 0;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+  margin: 0;
+  padding: 6px 0 0;
+  font-size: var(--font-size-ui);
+}
+
+.details div {
+  min-width: 0;
+}
+
+.details dt {
+  color: var(--color-fg-hover);
+  font-size: var(--font-size-ui);
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.details dd {
+  margin: 4px 0 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-fg);
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

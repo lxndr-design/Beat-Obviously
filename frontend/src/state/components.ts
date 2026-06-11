@@ -153,7 +153,7 @@ function makeFactoryDrumLoops(instruments: Instrument[]): DrumComponent[] {
   const loop = ({
     name,
     rows,
-    speed = 1,
+    speed = 4,
     lengthBeats = 16,
     stepCount = 16,
     swingPercent = 50,
@@ -243,7 +243,7 @@ function makeFactoryDrumLoops(instruments: Instrument[]): DrumComponent[] {
     }),
     loop({
       name: "Breakcore Cut",
-      speed: 2,
+      speed: 4,
       stepCount: 32,
       lengthBeats: 16,
       swingPercent: 53,
@@ -256,7 +256,7 @@ function makeFactoryDrumLoops(instruments: Instrument[]): DrumComponent[] {
     }),
     loop({
       name: "Trap Half-Time",
-      speed: 2,
+      speed: 4,
       stepCount: 32,
       lengthBeats: 16,
       swingPercent: 57,

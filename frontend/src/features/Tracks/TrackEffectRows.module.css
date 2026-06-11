@@ -1,0 +1,205 @@
+.effectHeader {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--height-track-effect-row, 22px);
+  padding: 0 var(--space-1);
+  border-bottom: var(--border-fg);
+  background: var(--surface-subtle);
+  color: var(--color-fg);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-ui);
+  cursor: pointer;
+}
+
+.effectHeader:hover {
+  background: var(--surface-hover);
+}
+
+.effectHeaderExpanded {
+  background: var(--surface-hover);
+}
+
+.effectHeaderIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+}
+
+.effectHeaderTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.effectHeaderPrimary {
+  opacity: 0.64;
+}
+
+.valueHeader {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--height-track-effect-row, 22px);
+  padding: 0 var(--space-1);
+  border-bottom: var(--border-fg);
+  background: color-mix(in srgb, var(--color-fg) 4%, var(--color-bg));
+  color: var(--color-fg);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-ui);
+}
+
+.valueHeaderIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.72;
+}
+
+.valueHeaderTitle,
+.valueHeaderValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.valueHeaderValue {
+  opacity: 0.62;
+  font-family: var(--font-family-mono);
+}
+
+.effectLane {
+  position: relative;
+  height: var(--height-track-effect-row, 22px);
+  flex-shrink: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-fg) 18%, transparent);
+  background: color-mix(in srgb, var(--color-fg) 3%, var(--color-bg));
+}
+
+.effectLane:hover {
+  background: var(--surface-subtle);
+}
+
+.effectSummaryLane {
+  cursor: pointer;
+}
+
+.effectLaneExpanded {
+  background: var(--surface-subtle);
+}
+
+.valueLane {
+  background: color-mix(in srgb, var(--color-fg) 2%, var(--color-bg));
+  cursor: crosshair;
+}
+
+.gridLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--color-fg) 5%, transparent);
+  pointer-events: none;
+}
+
+.gridLineMajor {
+  background: color-mix(in srgb, var(--color-fg) 10%, transparent);
+}
+
+.valueLine {
+  position: absolute;
+  height: 1px;
+  background: color-mix(in srgb, var(--color-fg) 30%, transparent);
+  pointer-events: none;
+}
+
+.valueGuide {
+  position: absolute;
+  height: 1px;
+  border-top: 1px dotted color-mix(in srgb, var(--color-fg) 26%, transparent);
+  pointer-events: none;
+}
+
+.valueDiamond {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--color-fg);
+  background: var(--color-bg);
+  transform: translate(-50%, -50%) rotate(45deg);
+  opacity: 0.72;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.valueDiamondSelected {
+  background: var(--color-fg);
+  opacity: 1;
+}
+
+.valueTooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 5px);
+  min-width: 32px;
+  padding: 1px 4px;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  line-height: 12px;
+  text-align: center;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) rotate(-45deg);
+  transition: opacity var(--transition-fast);
+}
+
+.valueDiamond:hover .valueTooltip {
+  opacity: 1;
+}
+
+.ghostDiamond {
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+.pointPopover {
+  position: absolute;
+  z-index: 30;
+  display: inline-grid;
+  grid-template-columns: 44px auto;
+  align-items: center;
+  height: 22px;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  transform: translate(-50%, 6px);
+}
+
+.pointInput {
+  width: 44px;
+  height: 20px;
+  min-width: 0;
+  padding: 0 var(--space-1);
+  border: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  text-align: center;
+  outline: none;
+}
+
+.pointUnit {
+  padding: 0 var(--space-1);
+  color: color-mix(in srgb, var(--color-fg) 68%, var(--color-bg));
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  white-space: nowrap;
+}

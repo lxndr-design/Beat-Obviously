@@ -181,12 +181,36 @@ export async function saveProject(project: Project) {
   await db.projects.put({ ...project, savedAt: Date.now() });
 }
 
+export async function pruneBlankUntitledProjects(): Promise<number> {
+  return db.projects
+    .filter((project) => isBlankUntitledProject(project))
+    .delete();
+}
+
 export async function loadProject(id: string): Promise<Project | undefined> {
   return db.projects.get(id);
 }
 
+export async function deleteProject(id: string): Promise<void> {
+  await db.projects.delete(id);
+}
+
 export async function listProjects(): Promise<Project[]> {
   return db.projects.orderBy("savedAt").reverse().toArray();
+}
+
+function isBlankUntitledProject(project: Project): boolean {
+  if ((project.name || "Untitled").trim() !== "Untitled") return false;
+  if (project.masterEqAutomation?.length) return false;
+  if (!Array.isArray(project.tracks) || project.tracks.length !== 1) return false;
+  const track = project.tracks[0];
+  if ((track.name || "Track").trim() !== "Track") return false;
+  if (track.segments.length > 0) return false;
+  if (track.effects.filters.length > 0) return false;
+  return track.gainDb === 0
+    && track.pan === 0
+    && !track.mute
+    && !track.solo;
 }
 
 export async function saveInstruments(instruments: Instrument[], sets: InstrumentSet[]) {
@@ -441,7 +465,7 @@ function normalizeMidiNotes(notes: MidiNote[]): MidiNote[] {
       lengthBeats: roundBeat(Math.max(0.03125, note.lengthBeats)),
       ...(note.frequencyHz ? { frequencyHz: note.frequencyHz } : {}),
       ...(note.connectToIndex != null ? { connectToIndex: note.connectToIndex } : {}),
-      ...(note.curve ? { curve: note.curve.map((point) => ({ beat: roundBeat(point.beat), pitch: Math.max(0, Math.min(127, Math.round(point.pitch))) })) } : {}),
+      ...(note.curve ? { curve: note.curve.map((point) => ({ beat: roundBeat(point.beat), pitch: roundPitch(point.pitch) })) } : {}),
     }))
     .sort((a, b) => a.startBeat - b.startBeat || a.pitch - b.pitch);
 }
@@ -488,4 +512,8 @@ function summarizeInstrumentForMidi(instrument: Instrument | undefined, fallback
 
 function roundBeat(value: number): number {
   return Math.round(value * 1000) / 1000;
+}
+
+function roundPitch(value: number): number {
+  return Math.round(Math.max(0, Math.min(127, value)) * 100) / 100;
 }

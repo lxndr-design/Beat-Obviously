@@ -9,15 +9,17 @@
 html, body, #root {
   height: 100%;
   width: 100%;
+  background: var(--color-bg, #000000);
 }
 
 html {
+  background: #000000;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  background: var(--color-bg);
+  background: var(--color-bg, #000000);
   color: var(--color-fg);
   font-family: var(--font-family-base);
   font-size: var(--font-size-1);
@@ -41,12 +43,16 @@ button {
   cursor: pointer;
 }
 
-button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: var(--border-fg);
   outline-offset: -1px;
+}
+
+button:focus,
+button:focus-visible {
+  outline: 0;
 }
 
 a {
@@ -69,19 +75,25 @@ input, textarea, [contenteditable], .selectable {
   user-select: text;
 }
 
-/* Scrollbars — black/white only */
+/* Scrollbars — outline-first. Filled states are handled in global.css. */
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
+  background: transparent;
 }
 *::-webkit-scrollbar-track {
-  background: var(--color-bg);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--color-fg);
 }
 *::-webkit-scrollbar-thumb {
-  background: var(--color-fg);
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 1px solid var(--color-fg);
+  box-shadow: none;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--color-fg);
+  background: color-mix(in srgb, var(--color-fg) 14%, transparent) !important;
+  background-color: color-mix(in srgb, var(--color-fg) 14%, transparent) !important;
 }
 
 /* Drag preview ghosts are problematic with this aesthetic; hide them */

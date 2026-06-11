@@ -8,6 +8,7 @@ import styles from "./MidiTransport.module.css";
 
 export interface MidiTransportProps {
   notes: MidiNote[];
+  gainDb?: number;
   lengthBeats: number;
   bpm: number;
   /** Optional bound instrument — its waveform is used by the in-modal synth. */
@@ -25,7 +26,7 @@ export interface MidiTransportProps {
  *     replaces this when wired through IPC.
  *   - Play / Pause / Restart buttons.
  */
-export function MidiTransport({ notes, lengthBeats, bpm, instrument, hotkeyScopeId, onPositionChange }: MidiTransportProps) {
+export function MidiTransport({ notes, gainDb = 0, lengthBeats, bpm, instrument, hotkeyScopeId, onPositionChange }: MidiTransportProps) {
   const [playing, setPlaying] = useState(false);
   const ctxRef = useRef<AudioContext | null>(null);
   const startMsRef = useRef<number | null>(null);
@@ -252,7 +253,7 @@ export function MidiTransport({ notes, lengthBeats, bpm, instrument, hotkeyScope
           const noteDelaySec = (n.startBeat - pos) / beatsPerSec;
           const durBeats = target ? Math.max(0.03, target.startBeat - n.startBeat) : n.lengthBeats;
           const durSec = durBeats / beatsPerSec;
-          scheduleNote(n, ctx.currentTime + noteDelaySec, durSec, n.velocity, target);
+          scheduleNote(n, ctx.currentTime + noteDelaySec, durSec, applyGainToVelocity(n.velocity, gainDb), target);
           scheduledRef.current.add(key);
         }
       });
@@ -264,7 +265,7 @@ export function MidiTransport({ notes, lengthBeats, bpm, instrument, hotkeyScope
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, notes, lengthBeats, bpm, instrument, onPositionChange]);
+  }, [playing, notes, gainDb, lengthBeats, bpm, instrument, onPositionChange]);
 
   // Stop the audio context when the modal closes.
   useEffect(
@@ -277,8 +278,8 @@ export function MidiTransport({ notes, lengthBeats, bpm, instrument, hotkeyScope
 
   return (
     <div className={styles.controls}>
-      <HoverInfo content="Restart">
-        <Button iconOnly size="xs" onClick={restart} aria-label="Restart">
+      <HoverInfo content="Play from start">
+        <Button iconOnly size="xs" onClick={restart} aria-label="Play from start">
           <Icon name="ph:skip-back-fill" size={16} decorative />
         </Button>
       </HoverInfo>
@@ -295,6 +296,11 @@ export function MidiTransport({ notes, lengthBeats, bpm, instrument, hotkeyScope
       </HoverInfo>
     </div>
   );
+}
+
+function applyGainToVelocity(velocity: number, gainDb: number): number {
+  const gain = Math.pow(10, Math.max(-96, Math.min(24, gainDb)) / 20);
+  return Math.max(0, Math.min(127, velocity * gain));
 }
 
 interface PreviewAudioHandle {

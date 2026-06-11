@@ -13,6 +13,7 @@ interface FloatingSelectProps {
   value: string;
   options: FloatingSelectOption[];
   open: boolean;
+  className?: string;
   fillHeight?: boolean;
   label?: string;
   layout?: "default" | "inline";
@@ -25,6 +26,7 @@ export function FloatingSelect({
   value,
   options,
   open,
+  className,
   fillHeight = false,
   label,
   layout = "default",
@@ -69,6 +71,7 @@ export function FloatingSelect({
       ref={rootRef}
       className={[
         styles.wrap,
+        className,
         fillHeight && styles.fillHeight,
         layout === "inline" && styles.inline,
       ].filter(Boolean).join(" ")}

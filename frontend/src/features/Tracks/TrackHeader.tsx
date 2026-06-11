@@ -2,19 +2,33 @@ import { useState } from "react";
 import { nanoid as newNanoid } from "nanoid";
 import { Icon, HoverInfo, useContextMenu, type ContextMenuItem } from "../../components";
 import { useProjectStore, useUiStore } from "../../state/store";
+import { useAnalyzerStore } from "../../state/analyzerStore";
 import styles from "./TrackHeader.module.css";
 import type { Id } from "../../state/types";
 
 interface Props {
   trackId: Id;
   index: number;
-  selectMode?: boolean;
   selected?: boolean;
   onSelect?: (event: React.MouseEvent) => void;
-  onEnterSelectMode?: () => void;
 }
 
 const DND_MIME = "application/x-beat-track";
+
+function isPlainSelectionClick(event: React.MouseEvent): boolean {
+  return event.button === 0 && !event.ctrlKey;
+}
+
+function formatGainBadge(gainDb: number): string | null {
+  if (Math.abs(gainDb) < 0.05) return null;
+  const rounded = Math.round(gainDb);
+  return `${rounded > 0 ? "+" : ""}${rounded}`;
+}
+
+function formatPanBadge(pan: number): "L" | "R" | null {
+  if (Math.abs(pan) < 0.01) return null;
+  return pan < 0 ? "L" : "R";
+}
 
 /**
  * TrackHeader — sticky left column for a single track.
@@ -30,10 +44,8 @@ const DND_MIME = "application/x-beat-track";
 export function TrackHeader({
   trackId,
   index,
-  selectMode = false,
   selected = false,
   onSelect,
-  onEnterSelectMode,
 }: Props) {
   const track = useProjectStore((s) =>
     s.project.tracks.find((t) => t.id === trackId),
@@ -43,19 +55,18 @@ export function TrackHeader({
   const setTrackMute = useProjectStore((s) => s.setTrackMute);
   const removeTrack = useProjectStore((s) => s.removeTrack);
   const reorderTracks = useProjectStore((s) => s.reorderTracks);
-  const openTrackEffects = useUiStore((s) => s.openTrackEffects);
+  const addTrackEffect = useProjectStore((s) => s.addTrackEffect);
+  const openEditor = useUiStore((s) => s.openEditor);
+  const meter = useAnalyzerStore((s) => s.trackMeters[trackId]);
   const duplicateTrack = useDuplicateTrack();
   const [editingName, setEditingName] = useState(false);
   const [dropPosition, setDropPosition] = useState<"above" | "below" | null>(null);
+  const gainBadge = formatGainBadge(track?.gainDb ?? 0);
+  const panBadge = formatPanBadge(track?.pan ?? 0);
 
   const { onContextMenu, menu } = useContextMenu((): ContextMenuItem[] => {
     if (!track) return [];
     return [
-      {
-        label: "Select",
-        icon: "ph:checks",
-        onSelect: () => onEnterSelectMode?.(),
-      },
       {
         label: track.mute ? "Unmute" : "Mute",
         icon: track.mute ? "ph:speaker-high" : "ph:speaker-x",
@@ -74,9 +85,9 @@ export function TrackHeader({
         separatorBefore: true,
       },
       {
-        label: "Effects / Filters",
+        label: "+ Effect",
         icon: "ph:sliders-horizontal",
-        onSelect: () => openTrackEffects(trackId),
+        onSelect: () => addTrackEffect(trackId),
       },
       {
         label: "Duplicate track",
@@ -126,7 +137,6 @@ export function TrackHeader({
     <div
       className={[
         styles.header,
-        selectMode && styles.headerSelecting,
         selected && styles.headerSelected,
         dropPosition === "above" && styles.dropAbove,
         dropPosition === "below" && styles.dropBelow,
@@ -135,58 +145,72 @@ export function TrackHeader({
         .join(" ")}
       onContextMenu={onContextMenu}
       onClick={(event) => {
-        if (!selectMode) return;
+        if (!isPlainSelectionClick(event)) return;
         onSelect?.(event);
+      }}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        if (!isPlainSelectionClick(event)) return;
+        onSelect?.(event);
+        openEditor({ kind: "track", trackId });
       }}
       onDragOver={onRowDragOver}
       onDragLeave={onRowDragLeave}
       onDrop={onRowDrop}
+      data-track-header
       data-track-index={index}
     >
-      {selectMode ? (
-        <input
-          className={styles.checkbox}
-          type="checkbox"
-          checked={selected}
-          readOnly
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelect?.(event);
-          }}
-          aria-label={`Select ${track.name}`}
-        />
-      ) : (
-        <span
-          className={styles.dragHandle}
-          draggable
-          onDragStart={onHandleDragStart}
-          aria-hidden
-        >
-          <Icon name="ph:dots-six-vertical" size={16} decorative />
-        </span>
-      )}
+      <span
+        className={styles.dragHandle}
+        draggable
+        onClick={(event) => event.stopPropagation()}
+        onDragStart={onHandleDragStart}
+        aria-hidden
+      >
+        <Icon name="ph:dots-six-vertical" size={16} decorative />
+      </span>
 
-      {editingName ? (
-        <input
-          className={styles.nameInput}
-          autoFocus
-          value={track.name}
-          onChange={(e) => updateTrack(trackId, { name: e.target.value })}
-          onBlur={() => setEditingName(false)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === "Escape") setEditingName(false);
-          }}
-        />
-      ) : (
-        <button
-          type="button"
-          className={styles.name}
-          onDoubleClick={() => setEditingName(true)}
-          title="Double-click to rename"
-        >
-          {track.name}
-        </button>
-      )}
+      <div className={styles.nameStack}>
+        {editingName ? (
+          <input
+            className={styles.nameInput}
+            autoFocus
+            value={track.name}
+            onChange={(e) => updateTrack(trackId, { name: e.target.value })}
+            onBlur={() => setEditingName(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape") setEditingName(false);
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            className={styles.name}
+            onDoubleClick={(event) => {
+              event.stopPropagation();
+              if (!isPlainSelectionClick(event)) return;
+              onSelect?.(event);
+              openEditor({ kind: "track", trackId });
+            }}
+            title="Double-click to rename"
+          >
+            {track.name}
+          </button>
+        )}
+
+        <div className={styles.meter} aria-hidden>
+          <span
+            className={styles.meterFill}
+            style={{ transform: `scaleX(${Math.max(0, Math.min(1, meter?.peak ?? 0))})` }}
+          />
+        </div>
+        {(gainBadge || panBadge) && (
+          <div className={styles.statusRow} aria-hidden>
+            {gainBadge && <span className={styles.statusBadge}>{gainBadge}</span>}
+            {panBadge && <span className={styles.statusBadge}>{panBadge}</span>}
+          </div>
+        )}
+      </div>
 
       <div className={styles.controls}>
         <HoverInfo content={track.solo ? "Unsolo" : "Solo (mute others)"}>
@@ -194,10 +218,8 @@ export function TrackHeader({
             type="button"
             className={`${styles.dot} ${track.solo ? styles.dotOn : ""}`}
             onClick={(event) => {
-              if (selectMode) {
-                event.stopPropagation();
-                return;
-              }
+              event.stopPropagation();
+              if (event.ctrlKey) return;
               setTrackSolo(trackId, !track.solo);
             }}
             aria-label={track.solo ? "Unsolo" : "Solo"}
@@ -212,10 +234,8 @@ export function TrackHeader({
             type="button"
             className={`${styles.dot} ${track.mute ? styles.dotOn : ""}`}
             onClick={(event) => {
-              if (selectMode) {
-                event.stopPropagation();
-                return;
-              }
+              event.stopPropagation();
+              if (event.ctrlKey) return;
               setTrackMute(trackId, !track.mute);
             }}
             aria-label={track.mute ? "Unmute" : "Mute"}

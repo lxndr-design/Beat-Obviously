@@ -1,0 +1,18 @@
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  color: var(--color-fg);
+  border: 0;
+  cursor: pointer;
+}
+
+.menuButton:hover :global(.brandMark),
+.menuButton:focus-visible :global(.brandMark) {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}

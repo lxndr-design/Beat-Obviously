@@ -4,8 +4,12 @@ import { InstrumentEditorModal } from "../InstrumentEditor/InstrumentEditorModal
 import { SegmentEditorModal } from "../SegmentEditor/SegmentEditorModal";
 import { EqAutomationModal } from "../EqAutomation/EqAutomationModal";
 import { TrackEffectsPanel } from "../TrackEffects/TrackEffectsPanel";
+import { TrackDetailsModal } from "../TrackDetails/TrackDetailsModal";
 import { PreferencesModal } from "../Preferences/PreferencesModal";
+import { ProjectHealthModal } from "../ProjectHealth/ProjectHealthModal";
 import { ComponentEditorModal } from "../ComponentLibrary/ComponentEditorModal";
+import { DecentSamplerLibraryModal } from "../PluginLibrary/DecentSamplerLibraryModal";
+import { PluginHostModal } from "../PluginLibrary/PluginHostModal";
 import { SynthEditor } from "../Synth";
 
 /**
@@ -45,6 +49,13 @@ export function EditorHost() {
                 <SynthEditor />
               </Modal>
             );
+          case "track":
+            return (
+              <TrackDetailsModal
+                key={`track-${e.trackId}`}
+                trackId={e.trackId}
+              />
+            );
           case "segment":
             return (
               <SegmentEditorModal
@@ -59,8 +70,23 @@ export function EditorHost() {
                 componentId={e.componentId}
               />
             );
+          case "plugin":
+            return (
+              <PluginHostModal
+                key={`plugin-${e.pluginId}`}
+                pluginId={e.pluginId}
+              />
+            );
+          case "decentSamplerLibrary":
+            return (
+              <DecentSamplerLibraryModal
+                key="decent-sampler-library"
+              />
+            );
           case "eq":
             return <EqAutomationModal key="eq" />;
+          case "projectHealth":
+            return <ProjectHealthModal key="project-health" />;
           case "preferences":
             return <PreferencesModal key="preferences" />;
           default:

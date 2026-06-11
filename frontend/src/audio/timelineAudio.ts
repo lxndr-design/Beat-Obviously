@@ -1,4 +1,13 @@
-import { createInstrumentBufferSource, createInstrumentCurveBufferSource, noteFrequency, type SynthAutomationTarget, type SynthAutomationLane } from "./synthPreview";
+import {
+  createInstrumentBufferSource,
+  createInstrumentCurveBufferSource,
+  hasCachedInstrumentSample,
+  noteFrequency,
+  preloadInstrumentSample,
+  primaryInstrumentSampleUrl,
+  type SynthAutomationTarget,
+  type SynthAutomationLane,
+} from "./synthPreview";
 import { createSynthWorkletPreviewNode } from "./synthWorkletPreview";
 import type { Instrument, MidiAutomationLane, MidiAutomationTarget, MidiNote } from "../state/types";
 
@@ -57,6 +66,25 @@ export function scheduleTimelineMidiNote(
   const targetFrequency = targetNote ? targetNote.frequencyHz ?? noteFrequency(targetNote.pitch, instrument) : undefined;
   const playbackDuration = Math.max(0.03, durationS);
   const scheduleToken = stopToken;
+  if (!instrument.aether && primaryInstrumentSampleUrl(instrument) && !hasCachedInstrumentSample(instrument)) {
+    void preloadInstrumentSample(audio, instrument)
+      .then(() => {
+        if (scheduleToken !== stopToken) return;
+        scheduleBufferSource(
+          audio,
+          instrument,
+          baseFrequency,
+          targetFrequency,
+          curve,
+          automation,
+          Math.max(atTimeS, audio.currentTime + 0.001),
+          durationS,
+          note.velocity,
+        );
+      })
+      .catch(() => undefined);
+    return;
+  }
 
   if (instrument.aether) {
     void createSynthWorkletPreviewNode(

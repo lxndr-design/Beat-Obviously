@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Icon, SectionRibbon, useContextMenu, HoverInfo, type ContextMenuItem } from "../../components";
+import { Button, Icon, MarqueeText, SectionRibbon, useContextMenu, HoverInfo, type ContextMenuItem } from "../../components";
 import { createInstrumentBufferSource, noteFrequency, preloadInstrumentSample } from "../../audio/synthPreview";
 import { DEFAULT_DRUM_MIDI_PITCH, DEFAULT_DRUM_VELOCITY, drumTimingOffsetBeats, normalizeDrumCell } from "../../state/drumSteps";
 import { useComponentStore, type BeatComponent } from "../../state/components";
@@ -52,6 +52,7 @@ export function ComponentLibraryPanel({ expanded, onToggle }: ComponentLibraryPa
         title="Components"
         expanded={expanded}
         onToggle={onToggle}
+        showToggle={false}
         count={components.length}
       />
 
@@ -132,8 +133,8 @@ function ComponentItem({
       <span className={styles.itemDot} aria-hidden>
         <Icon name="ph:dots-six-vertical" size={14} decorative />
       </span>
-      <span className={styles.itemName}>{component.name}</span>
-      <HoverInfo content={`${itemCount} ${kind === "drum" ? "hit" : "note"}${itemCount === 1 ? "" : "s"} · ${component.lengthBeats} beats`}>
+      <MarqueeText className={styles.itemName} text={component.name} />
+      <HoverInfo content={`${itemCount} ${kind === "drum" ? "hit" : "note"}${itemCount === 1 ? "" : "s"} · ${componentPlaybackLength(component)} beats`}>
         <span className={styles.itemMeta}>
           {kind === "drum" ? <span className={styles.drumIcon} aria-hidden /> : <Icon name="ph:piano-keys" size={14} decorative />}
         </span>
@@ -158,7 +159,7 @@ function ComponentItem({
   );
 }
 
-interface ComponentPlayback {
+export interface ComponentPlayback {
   ctx: AudioContext;
   sources: Set<AudioBufferSourceNode>;
   gains: Set<GainNode>;
@@ -167,11 +168,13 @@ interface ComponentPlayback {
   doneTimer: number;
 }
 
-function playComponentPreview(
+export function playComponentPreview(
   component: BeatComponent,
   instruments: Instrument[],
   bpm: number,
   onDone: () => void,
+  speedMultiplier = 1,
+  donePaddingMs = 80,
 ): ComponentPlayback {
   const ctx = getComponentPreviewCtx();
   if (ctx.state === "suspended") void ctx.resume();
@@ -185,7 +188,8 @@ function playComponentPreview(
     doneTimer: 0,
   };
 
-  const secondsPerBeat = 60 / Math.max(1, bpm);
+  const previewSpeed = Math.max(0.25, Math.min(4, speedMultiplier));
+  const secondsPerBeat = (60 / Math.max(1, bpm)) / previewSpeed;
   const durationBeats = component.kind === "drum" ? component.lengthBeats / component.speed : component.lengthBeats;
   const durationSeconds = Math.max(0.1, durationBeats * secondsPerBeat);
   const now = ctx.currentTime;
@@ -227,7 +231,7 @@ function playComponentPreview(
   playback.doneTimer = window.setTimeout(() => {
     stopComponentPlayback(playback);
     onDone();
-  }, Math.ceil(durationSeconds * 1000) + 80);
+  }, Math.ceil(durationSeconds * 1000) + Math.max(0, donePaddingMs));
 
   return playback;
 }
@@ -282,7 +286,7 @@ function schedulePreviewNote(
   source.stop(atTimeS + playbackDuration + 0.03);
 }
 
-function stopComponentPlayback(playback: ComponentPlayback | null) {
+export function stopComponentPlayback(playback: ComponentPlayback | null) {
   if (!playback) return;
   window.clearTimeout(playback.doneTimer);
   for (const timer of playback.timers) window.clearTimeout(timer);
@@ -309,6 +313,13 @@ function getComponentPreviewCtx(): AudioContext {
     componentPreviewCtx = new Ctor();
   }
   return componentPreviewCtx;
+}
+
+function componentPlaybackLength(component: BeatComponent): string {
+  const beats = component.kind === "drum"
+    ? component.lengthBeats / Math.max(1, component.speed)
+    : component.lengthBeats;
+  return Number.isInteger(beats) ? `${beats}` : beats.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 const fallbackInstrument: Instrument = {

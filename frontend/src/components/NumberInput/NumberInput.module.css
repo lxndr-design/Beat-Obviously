@@ -15,7 +15,7 @@
 }
 
 .label {
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
@@ -49,7 +49,7 @@
   width: 0;
   min-width: 56px;
   font-family: var(--font-family-mono);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   line-height: 16px;
   min-height: 20px;
   color: var(--color-fg);
@@ -69,7 +69,7 @@
 .unit {
   flex: 0 0 auto;
   font-family: var(--font-family-mono);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   line-height: 16px;
   opacity: 0.7;
   text-align: right;

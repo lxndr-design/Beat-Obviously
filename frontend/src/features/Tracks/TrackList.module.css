@@ -6,24 +6,13 @@
   flex-direction: column;
 }
 
-.selectionBar {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  align-items: stretch;
-  min-height: 28px;
-  border-bottom: var(--border-fg);
-  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
-  backdrop-filter: blur(8px);
-  flex-shrink: 0;
+.tracksBlock :global([class*="Block-module_header"]) {
+  height: var(--sidebar-rail-size);
 }
 
-.selectionCount {
-  align-self: center;
-  justify-self: end;
-  padding: 0 6px;
-  font-size: 11px;
-  line-height: 1;
-  opacity: 0.65;
+.tracksBlock.tracksBlock {
+  border-top: 0;
+  border-left: 0;
 }
 
 .area {
@@ -55,7 +44,7 @@
   color: var(--color-fg);
   border: 0;
   font-family: var(--font-family-base);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   cursor: pointer;
   text-align: left;
   transition: var(--transition-invert);
@@ -94,14 +83,22 @@
   height: 8px;
 }
 .laneScroll::-webkit-scrollbar-track {
-  background: var(--color-bg);
+  background: transparent;
   box-shadow: inset 0 0 0 1px var(--color-fg);
 }
 .laneScroll::-webkit-scrollbar-thumb {
-  background: var(--color-fg);
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 1px solid var(--color-fg);
+  box-shadow: none;
 }
 .laneScroll::-webkit-scrollbar-thumb:hover {
-  background: var(--color-fg-hover);
+  background: color-mix(in srgb, var(--color-fg) 14%, transparent) !important;
+  background-color: color-mix(in srgb, var(--color-fg) 14%, transparent) !important;
+}
+.laneScroll::-webkit-scrollbar-thumb:active {
+  background: color-mix(in srgb, var(--color-fg) 28%, transparent) !important;
+  background-color: color-mix(in srgb, var(--color-fg) 28%, transparent) !important;
 }
 
 .lanesInner {
@@ -109,6 +106,41 @@
   display: flex;
   flex-direction: column;
   min-height: 100%;
+}
+
+.marquee {
+  position: absolute;
+  z-index: 3000;
+  pointer-events: none;
+  border: var(--border-fg);
+  background: color-mix(in srgb, var(--color-fg) 10%, transparent);
+}
+
+.loopLaneRegion {
+  position: absolute;
+  top: 0;
+  bottom: var(--height-timeline);
+  z-index: 2;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-fg) 24%, transparent) 0,
+      color-mix(in srgb, var(--color-fg) 7%, transparent) 1px,
+      color-mix(in srgb, var(--color-fg) 7%, transparent) calc(100% - 1px),
+      color-mix(in srgb, var(--color-fg) 24%, transparent) 100%
+    );
+}
+
+.loopLaneRegionEnabled {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-fg) 34%, transparent) 0,
+      color-mix(in srgb, var(--color-fg) 12%, transparent) 1px,
+      color-mix(in srgb, var(--color-fg) 12%, transparent) calc(100% - 1px),
+      color-mix(in srgb, var(--color-fg) 34%, transparent) 100%
+    );
 }
 
 /* Empty row in the lane column matching the +add-track row's 32px height

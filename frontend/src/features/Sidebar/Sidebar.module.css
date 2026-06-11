@@ -1,29 +1,123 @@
 .sidebar {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   height: 100%;
   border-right: var(--border-fg);
   text-align: left;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   position: relative;
   flex-shrink: 0;
 }
 
-.section {
-  flex: 0 0 auto;
+.rail {
+  flex: 0 0 var(--sidebar-rail-size);
+  width: var(--sidebar-rail-size);
   display: flex;
   flex-direction: column;
-  max-height: 66vh;
+  justify-content: space-between;
   min-height: 0;
+  border-right: var(--border-fg);
+  background: var(--color-bg);
+}
+
+.railGroup {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.railButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sidebar-rail-size);
+  height: var(--sidebar-rail-size);
+  padding: 0;
+  background: transparent;
+  color: var(--color-fg);
+  border: 0;
+  border-bottom: var(--border-fg);
+  transition: var(--transition-invert);
+}
+
+.railButtonActive {
+  background: color-mix(in srgb, var(--color-fg) 14%, var(--color-bg));
+  color: var(--color-fg);
+}
+
+.railButton:hover,
+.railButtonActive:hover {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.decentSamplerIcon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  object-fit: cover;
+}
+
+.railBottom {
+  display: flex;
+  flex-direction: column;
+  border-top: var(--border-fg);
+}
+
+.railBottom .railButton {
+  border-bottom: var(--border-fg);
+}
+
+.railBottom > :last-child .railButton {
+  border-bottom: 0;
+}
+
+.railSaveSlot {
+  position: relative;
+  display: inline-flex;
+}
+
+.dirtyDot {
+  position: absolute;
+  top: 5px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  background: var(--color-fg);
+  border: 3px solid var(--color-bg);
+  border-radius: 50%;
+  box-sizing: content-box;
+  pointer-events: none;
+  transform-origin: center;
+  animation: beat-dirty-pulse 1.6s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes beat-dirty-pulse {
+  0%,
+  100% {
+    opacity: 0.74;
+    transform: scale(0.84);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.content {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden;
 }
 
-.section:last-of-type {
-  position: sticky;
-  bottom: 0;
-  background: var(--color-bg);
-  z-index: 8;
+.content > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
 }
 
 /* 4px-wide invisible hit target on the right edge — wider on hover for

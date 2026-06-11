@@ -21,11 +21,15 @@
 .ribbonActions {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: 0;
 }
 
 .presetWrap {
   position: relative;
+}
+
+.presetButton {
+  width: 15ch;
 }
 
 .presetMenu {
@@ -33,14 +37,15 @@
   right: 0;
   bottom: calc(100% + 1px);
   z-index: 30;
-  min-width: 168px;
+  box-sizing: border-box;
+  width: 15ch;
   border: var(--border-fg);
   background: var(--color-bg);
 }
 
 .presetItem {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 24px;
+  display: flex;
+  align-items: stretch;
   min-height: 26px;
   border-bottom: var(--border-fg);
 }
@@ -52,24 +57,29 @@
   color: var(--color-fg);
   border: 0;
   font-family: var(--font-family-base);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   cursor: pointer;
   transition: var(--transition-invert);
 }
 
 .presetName {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   padding: 0 8px;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+  width: 100%;
 }
 
 .presetDelete {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 24px;
+  width: 24px;
   border-left: var(--border-fg);
 }
 
@@ -88,7 +98,7 @@
 }
 
 .title {
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   font-weight: var(--font-weight-medium);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);

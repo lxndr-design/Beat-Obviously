@@ -12,7 +12,7 @@
 
 .sectionTitle {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
@@ -28,6 +28,11 @@
   flex: 1 1 auto;
 }
 
+.modelSelect {
+  width: min(100%, 390px);
+  min-width: 320px;
+}
+
 .gridRows {
   display: flex;
   flex-direction: column;
@@ -35,15 +40,52 @@
 }
 
 .gridRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: 82px minmax(0, max-content);
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+
+.gridToggle {
+  width: 82px;
+  gap: 6px;
+}
+
+.gridToggle button {
+  width: 24px;
+  height: 14px;
+}
+
+.gridToggle button::after {
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+}
+
+.gridToggle button[aria-checked="true"]::after {
+  transform: translateX(10px);
+}
+
+.gridToggleLabel {
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.gridRadio {
+  height: 26px;
+  justify-self: start;
+}
+
+.gridRadio button {
+  width: 30px;
+  font-size: var(--font-size-ui);
 }
 
 .hint {
   margin: 0;
   color: var(--color-fg);
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1.35;
   opacity: 0.65;
 }
@@ -81,14 +123,14 @@
 }
 
 .checkpointName {
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
 }
 
 .checkpointCount {
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   opacity: 0.65;
 }
@@ -101,7 +143,7 @@
   height: 100%;
   border-left: var(--border-fg);
   border-right: var(--border-fg);
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);

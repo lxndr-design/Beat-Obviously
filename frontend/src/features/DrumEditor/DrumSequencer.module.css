@@ -36,10 +36,20 @@
   gap: 0;
   height: 32px;
   border: var(--border-fg);
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.generateBlock [class*="FloatingSelect-module_wrap"] {
-  width: 124px;
+.generateBlock .genreSelect {
+  flex: 0 1 126px;
+  width: 126px;
+  max-width: 126px;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 0;
 }
 
 .complexityControl {
@@ -52,6 +62,8 @@
   padding: 0 6px;
   border-left: var(--border-fg);
   background: var(--color-bg);
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .complexityHeader {
@@ -59,7 +71,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
@@ -119,6 +131,7 @@
 .generateButton {
   background: transparent;
   border-left: var(--border-fg);
+  flex: 0 0 var(--button-square-xs);
 }
 
 .generateButton:hover:not(:disabled) {
@@ -141,7 +154,7 @@
   height: 100%;
   padding: 0 6px;
   border-right: var(--border-fg);
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
@@ -153,7 +166,7 @@
   align-items: center;
   height: 32px;
   padding: 0 6px;
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   opacity: 0.7;
 }
@@ -175,7 +188,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
@@ -301,7 +314,7 @@
     var(--play-step) * (var(--cell-width) + var(--cell-gap))
   );
   width: var(--cell-width);
-  background: rgba(255, 255, 255, 0.18);
+  background: color-mix(in srgb, var(--color-fg) 18%, transparent);
   pointer-events: none;
   z-index: 2;
 }
@@ -332,7 +345,7 @@
   color: var(--color-fg);
   border: 0;
   font-family: var(--font-family-mono);
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   line-height: 20px;
   text-align: center;
 }
@@ -396,7 +409,7 @@
 
 .cellNote {
   font-family: var(--font-family-base);
-  font-size: 8px;
+  font-size: var(--font-size-hint);
   line-height: 1;
   pointer-events: none;
 }
@@ -458,7 +471,7 @@
   border: 0;
   border-bottom: var(--border-fg);
   font-family: var(--font-family-base);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-align: left;
   cursor: pointer;
@@ -494,7 +507,7 @@
 .valueError {
   margin-top: 6px;
   font-family: var(--font-family-base);
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
 }
 

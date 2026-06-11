@@ -33,7 +33,7 @@
 
 .label,
 .meta {
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
   font-weight: var(--font-weight-bold);

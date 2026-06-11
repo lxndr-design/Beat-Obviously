@@ -20,7 +20,7 @@
 }
 
 .label {
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
@@ -62,7 +62,7 @@
   outline: 0;
   caret-color: var(--color-fg);
   font-family: var(--font-family-base);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   line-height: 16px;
   min-height: 20px;
 }
@@ -76,7 +76,7 @@
 .unit {
   flex: 0 0 auto;
   font-family: var(--font-family-base);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   line-height: 16px;
   opacity: 0.7;
 }

@@ -8,7 +8,9 @@
 #include <juce_dsp/juce_dsp.h>
 
 #include <array>
+#include <memory>
 #include <string_view>
+#include <utility>
 
 namespace beat
 {
@@ -22,8 +24,8 @@ namespace beat
      *   drive     → pre-filter saturation amount
      *   color     → oscillator detune / sub-osc blend (wildcard parameter)
      *
-     * Real sample playback (sampler / hybrid kinds) is a TODO that drops in
-     * by replacing the oscillator section.
+     * Sample playback is handled by AudioEngine's sample-zone renderer. This
+     * voice remains the built-in oscillator/wavetable synth path.
      */
     class InstrumentVoice : public juce::SynthesiserVoice
     {
@@ -185,6 +187,36 @@ namespace beat
         static void setPendingNoteAutomationContexts(NoteAutomationContext* contexts, int count) noexcept;
         static void clearPendingNoteAutomationContexts() noexcept;
 
+        struct WavetableCacheStats
+        {
+            int64_t hits { 0 };
+            int64_t misses { 0 };
+            int size { 0 };
+        };
+
+        struct RenderWorkStats
+        {
+            int64_t voiceBlocks { 0 };
+            int64_t voiceSamples { 0 };
+            int64_t oscillatorSamples { 0 };
+            int64_t wavetableVoiceSamples { 0 };
+            int64_t aetherOscASamples { 0 };
+            int64_t aetherOscBSamples { 0 };
+            int64_t aetherSubSamples { 0 };
+            int64_t aetherNoiseSamples { 0 };
+            int64_t filterSamples { 0 };
+            int64_t filterDriveSamples { 0 };
+            int64_t filterCoefficientUpdates { 0 };
+            int64_t modulationSamples { 0 };
+            int64_t realtimeRampSamples { 0 };
+            int64_t oscillatorRateCalculations { 0 };
+            int64_t wavetableFrequencyUpdates { 0 };
+            int64_t wavetablePositionUpdates { 0 };
+        };
+
+        static WavetableCacheStats getWavetableCacheStats() noexcept;
+        static RenderWorkStats consumeRenderWorkStats() noexcept;
+
     private:
         struct StereoSample
         {
@@ -199,9 +231,11 @@ namespace beat
             float spread { -1.0f };
             float weightSum { 1.0f };
             std::array<double, 8> rates {};
+            std::array<double, 8> appliedFrequencyHz {};
             std::array<float, 8> centered {};
             std::array<float, 8> weights {};
             std::array<float, 8> phaseSpread {};
+            std::array<float, 8> appliedPosition {};
         };
 
         enum class RealtimeParam : size_t
@@ -240,6 +274,11 @@ namespace beat
         };
 
         void configureWavetableOscillators(double frequencyHz) noexcept;
+        void clearWavetableOscillatorBank(
+            std::array<WavetableOscillator, 8>& oscillators,
+            WavetableUnisonPlan& plan) noexcept;
+        bool legacyWavetableNeedsSetup() const noexcept;
+        bool aetherOscillatorNeedsWavetable(const Params::AetherOscillator& osc) const noexcept;
         void resetRealtimeRampsFromParams() noexcept;
         void setRealtimeRamp(RealtimeParam param, float value, int rampSamples) noexcept;
         void activateRealtimeRamp(RealtimeParam param) noexcept;
@@ -253,7 +292,7 @@ namespace beat
         float renderWavetableStack(double frequencyHz, float positionMod, float detuneCentsMod, float spreadMod) noexcept;
         void configureWavetableOscillatorBank(
             std::array<WavetableOscillator, 8>& oscillators,
-            Wavetable& table,
+            const Wavetable* table,
             const Params::WavetableConfig& config,
             double frequencyHz) noexcept;
         float renderWavetableOscillatorBank(
@@ -264,12 +303,17 @@ namespace beat
             float positionMod,
             float detuneCentsMod,
             float spreadMod) noexcept;
-        const WavetableUnisonPlan& updateWavetableUnisonPlan(
+        WavetableUnisonPlan& updateWavetableUnisonPlan(
             WavetableUnisonPlan& plan,
             const Params::WavetableConfig& config,
             float detuneCentsMod,
             float spreadMod) noexcept;
+        void invalidateWavetableBankCache(WavetableUnisonPlan& plan) noexcept;
+        void refreshCachedPanGains() noexcept;
+        void refreshCachedPitchRates() noexcept;
+        void refreshCachedDynamicModulationFlags() noexcept;
         StereoSample renderAetherTableStack(double frequencyHz, float rawLfo, float env) noexcept;
+        StereoSample processDriveOversampled(StereoSample sample, float driveGain) noexcept;
 
         Params  baseParams;
         Params  params;
@@ -280,15 +324,38 @@ namespace beat
         double  lfoPhase { 0.0 };
         float   level { 0.0f };
         float   cachedFilterHz { -1.0f };
-        Wavetable wavetableTable;
-        Wavetable aetherTableA;
-        Wavetable aetherTableB;
+        float   cachedFilterResonance { -1.0f };
+        std::shared_ptr<const Wavetable> wavetableTable;
+        std::shared_ptr<const Wavetable> aetherTableA;
+        std::shared_ptr<const Wavetable> aetherTableB;
         std::array<WavetableOscillator, 8> wavetableOscillators;
         std::array<WavetableOscillator, 8> aetherOscillatorsA;
         std::array<WavetableOscillator, 8> aetherOscillatorsB;
         WavetableUnisonPlan wavetableUnisonPlan;
         WavetableUnisonPlan aetherUnisonPlanA;
         WavetableUnisonPlan aetherUnisonPlanB;
+        std::pair<float, float> cachedAmpPanGains { 1.0f, 1.0f };
+        std::pair<float, float> cachedAetherOscAPanGains { 1.0f, 1.0f };
+        std::pair<float, float> cachedAetherOscBPanGains { 1.0f, 1.0f };
+        double cachedAetherOscARate { 1.0 };
+        double cachedAetherOscBRate { 1.0 };
+        double cachedAetherSubRate { 0.5 };
+        bool cachedAmpPanDynamic { false };
+        bool cachedAetherOscAPanDynamic { false };
+        bool cachedAetherOscBPanDynamic { false };
+        bool cachedAetherOscAFineDynamic { false };
+        bool cachedAetherOscBFineDynamic { false };
+        bool cachedAetherOscAPositionDynamic { false };
+        bool cachedAetherOscBPositionDynamic { false };
+        bool cachedAetherOscALevelDynamic { false };
+        bool cachedAetherOscBLevelDynamic { false };
+        bool cachedFilterCutoffDynamic { false };
+        bool cachedFilterResonanceDynamic { false };
+        bool cachedFilterDriveDynamic { false };
+        bool cachedAmpLevelDynamic { false };
+        bool cachedUnisonDetuneDynamic { false };
+        bool cachedUnisonSpreadDynamic { false };
+        bool cachedAnyDynamicModulationTarget { false };
         std::array<RealtimeRamp, (size_t) RealtimeParam::Count> realtimeRamps;
         std::array<size_t, (size_t) RealtimeParam::Count> activeRealtimeRampIndices {};
         int activeRealtimeRampCount { 0 };
@@ -301,6 +368,19 @@ namespace beat
         int voiceSamplePosition { 0 };
         RealtimeRamp pitchFrequencyRamp;
         int activeWavetableUnison { 1 };
+        int64_t currentBlockOscillatorSamples { 0 };
+        int64_t currentBlockWavetableVoiceSamples { 0 };
+        int64_t currentBlockAetherOscASamples { 0 };
+        int64_t currentBlockAetherOscBSamples { 0 };
+        int64_t currentBlockAetherSubSamples { 0 };
+        int64_t currentBlockAetherNoiseSamples { 0 };
+        int64_t currentBlockOscillatorRateCalculations { 0 };
+        int64_t currentBlockFilterDriveSamples { 0 };
+        int64_t currentBlockFilterCoefficientUpdates { 0 };
+        int64_t currentBlockWavetableFrequencyUpdates { 0 };
+        int64_t currentBlockWavetablePositionUpdates { 0 };
+        StereoSample previousDriveInput;
+        StereoSample driveDownsampleState;
         juce::uint32 noiseState { 1 };
         juce::ADSR adsr;
         juce::ADSR::Parameters adsrParams;

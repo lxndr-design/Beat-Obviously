@@ -97,6 +97,7 @@ export function Modal({
     <div
       className={styles.scrim}
       style={{ zIndex: 300 + stackIndex * 10 }}
+      data-floating-layer
       onMouseDown={(e) => {
         if (closeOnScrimClick && e.target === e.currentTarget) requestClose();
       }}
@@ -107,6 +108,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-title`}
+        data-floating-layer
       >
         <header className={styles.header}>
           <div className={styles.titleGroup}>

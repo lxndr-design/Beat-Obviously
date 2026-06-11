@@ -9,6 +9,7 @@
   grid-template-columns: 48px minmax(0, 1fr);
   border: var(--border-fg);
   min-width: 0;
+  position: relative;
 }
 
 .keysScroll {
@@ -45,9 +46,9 @@
   justify-content: flex-end;
   padding: 0 var(--space-1);
   font-family: var(--font-family-mono);
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   color: var(--color-fg);
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--color-fg) 8%, var(--color-bg));
   opacity: 0.78;
   border-bottom: 1px solid var(--grid-line-faint);
 }
@@ -61,14 +62,48 @@
 .grid {
   position: relative;
   background: var(--color-bg);
+}
+
+.lengthHandle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  transform: translateX(-4px);
+  z-index: 7;
+  cursor: ew-resize;
+}
+
+.lengthHandle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: var(--color-fg);
+  opacity: 0.76;
+}
+
+.lengthHandle:hover::before,
+.lengthHandleActive::before {
+  width: 2px;
+  opacity: 1;
+}
+
+.gridDrawMode {
   cursor: crosshair;
+}
+
+.gridSelectMode {
+  cursor: default;
 }
 
 .row {
   position: absolute;
   left: 0;
   right: 0;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--color-fg) 8%, var(--color-bg));
   border-bottom: 1px solid var(--grid-line-faint);
   pointer-events: none;
 }
@@ -89,6 +124,10 @@
   background: var(--grid-line-mid);
 }
 
+.beatLineSub {
+  background: color-mix(in srgb, var(--color-fg) 14%, transparent);
+}
+
 .connections {
   position: absolute;
   inset: 0;
@@ -106,6 +145,11 @@
   vector-effect: non-scaling-stroke;
 }
 
+.curvePathFill {
+  fill: color-mix(in srgb, var(--color-fg) 18%, transparent);
+  stroke: none;
+}
+
 .connectionPathActive,
 .curvePathActive {
   stroke-dasharray: 4 3;
@@ -118,7 +162,7 @@
 
 .note {
   position: absolute;
-  overflow: hidden;
+  overflow: visible;
   background: transparent;
   border: 1px solid var(--color-fg);
   cursor: grab;
@@ -136,12 +180,12 @@
 
 .note::before {
   inset: 0;
-  background: rgba(255, 255, 255, 0.16);
+  background: color-mix(in srgb, var(--color-fg) 16%, transparent);
 }
 
 .note::after {
   bottom: 0;
-  height: var(--note-volume, 79%);
+  height: var(--note-volume, 100%);
   background: var(--color-fg);
 }
 
@@ -149,22 +193,128 @@
   cursor: grabbing;
 }
 
+.note:not(.noteSelected):hover::before,
+.note:not(.noteSelected):hover::after {
+  opacity: 0.82;
+}
+
 .noteSelected {
+  background: transparent;
   box-shadow: inset 0 0 0 1px var(--color-fg);
 }
 
 .noteSelected::before {
-  background: rgba(255, 255, 255, 0.24);
+  background: color-mix(in srgb, var(--color-fg) 16%, transparent);
+  opacity: 0.45;
+}
+
+.noteSelected::after {
+  opacity: 0.45;
+}
+
+.noteVolumeOverlay {
+  position: absolute;
+  left: 3px;
+  bottom: 1px;
+  z-index: 2;
+  color: var(--color-bg);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-hint);
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.noteSelected .noteVolumeOverlay {
+  opacity: 0.76;
 }
 
 .noteResize {
   position: absolute;
-  right: 0;
   top: 0;
   bottom: 0;
   width: 4px;
+  background: var(--color-fg);
   cursor: ew-resize;
-  z-index: 1;
+  opacity: 0.72;
+  z-index: 6;
+}
+
+.noteResize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-bg);
+  pointer-events: none;
+}
+
+.noteResizeLeft {
+  left: -2px;
+}
+
+.noteResizeLeft::after {
+  right: 0;
+}
+
+.noteResizeRight {
+  right: -2px;
+}
+
+.noteResizeRight::after {
+  left: 0;
+}
+
+.noteHoverLeft .noteResizeLeft,
+.noteHoverRight .noteResizeRight {
+  width: 5px;
+  opacity: 1;
+}
+
+.noteHoverLeft .noteResizeLeft {
+  left: -3px;
+}
+
+.noteHoverRight .noteResizeRight {
+  right: -3px;
+}
+
+.noteCurveOverlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.noteCurveFill {
+  fill: color-mix(in srgb, var(--color-fg) 22%, transparent);
+  stroke: none;
+}
+
+.noteCurveLine {
+  fill: none;
+  stroke: var(--color-fg);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.curveHandle {
+  position: absolute;
+  z-index: 5;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--color-fg);
+  background: var(--color-bg);
+  transform: translate(-50%, -50%) rotate(45deg);
+  cursor: ns-resize;
+}
+
+.curveHandle:hover {
+  background: var(--color-fg);
 }
 
 .playhead {
@@ -180,7 +330,7 @@
 .selectBox {
   position: absolute;
   border: var(--border-fg);
-  background: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--color-fg) 14%, transparent);
   pointer-events: none;
   z-index: 5;
 }
@@ -202,7 +352,7 @@
   border: 0;
   border-bottom: var(--border-fg);
   font-family: var(--font-family-base);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-align: left;
   cursor: pointer;
@@ -244,15 +394,55 @@
   gap: 6px;
 }
 
+.volumeSliderRowNoClear {
+  grid-template-columns: 22px minmax(72px, 1fr) 36px;
+}
+
 .volumeLabel,
 .volumeValue {
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-transform: uppercase;
 }
 
 .volumeSlider {
   width: 100%;
+  min-width: 0;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--color-fg);
+  appearance: none;
+  background: transparent;
+}
+
+.volumeSlider::-webkit-slider-runnable-track {
+  height: 4px;
+  border: 1px solid var(--color-fg);
+  background: color-mix(in srgb, var(--color-fg) 20%, var(--color-bg));
+}
+
+.volumeSlider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 12px;
+  margin-top: -5px;
+  border: 1px solid var(--color-fg);
+  background: var(--color-fg);
+  border-radius: 0;
+}
+
+.volumeSlider::-moz-range-track {
+  height: 4px;
+  border: 1px solid var(--color-fg);
+  background: color-mix(in srgb, var(--color-fg) 20%, var(--color-bg));
+}
+
+.volumeSlider::-moz-range-thumb {
+  width: 14px;
+  height: 12px;
+  border: 1px solid var(--color-fg);
+  background: var(--color-fg);
+  border-radius: 0;
 }
 
 .volumeClear {
@@ -272,7 +462,7 @@
 .volumeError {
   margin-top: 6px;
   font-family: var(--font-family-base);
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
 }
 
@@ -285,4 +475,11 @@
   gap: 0;
   border: var(--border-fg);
   background: var(--color-bg);
+}
+
+.toolDivider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--color-fg);
+  opacity: 0.72;
 }

@@ -64,7 +64,7 @@
   width: 48px;
   overflow: hidden;
   font-family: var(--font-family-mono);
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-align: right;
   white-space: nowrap;
@@ -83,7 +83,7 @@
 
 .scopeLabel {
   font-family: var(--font-family-mono);
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-transform: uppercase;
 }

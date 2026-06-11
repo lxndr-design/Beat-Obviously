@@ -17,6 +17,7 @@ try {
     [
       join(repoRoot, "frontend/src/state/synthStore.ts"),
       join(repoRoot, "frontend/src/audio/synthPreview.ts"),
+      join(repoRoot, "frontend/src/ai/aiService.ts"),
       "--bundle",
       "--format=esm",
       "--platform=node",
@@ -27,6 +28,7 @@ try {
 
   const synthStore = await import(pathToFileURL(join(outDir, "state/synthStore.js")));
   const synthPreview = await import(pathToFileURL(join(outDir, "audio/synthPreview.js")));
+  const aiService = await import(pathToFileURL(join(outDir, "ai/aiService.js")));
 
   const draft = synthStore.normalizeSynthDraftPatch({
     name: "Roundtrip Probe",
@@ -362,6 +364,72 @@ try {
   }
   const dynamicDiffRms = Math.sqrt(dynamicDiff / dynamicSamples.length);
   assert.ok(dynamicDiffRms > 0.001, `expected expanded modulation routes to alter render, got diff ${dynamicDiffRms}`);
+
+  globalThis.fetch = async () => {
+    throw new Error("force local instrument generation fallback");
+  };
+  globalThis.localStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
+  };
+  const generated = await aiService.LocalAiService.generateInstrument({
+    prompt: "wide evolving glass bass pad with gentle motion",
+    targetKind: "wavetable",
+    variationSeed: 4242,
+    instruments: [],
+    audioFiles: [],
+    current: {
+      id: "generated-current",
+      name: "Generated Current",
+      kind: "wavetable",
+      envelope: { attackMs: 5, decayMs: 100, sustain: 0.7, releaseMs: 200 },
+      knobs: { cutoff: 0.6, resonance: 0.2, drive: 0.1, color: 0.5 },
+      filterType: "lowpass",
+      waveform: "wavetable",
+      detuneCents: 0,
+      octave: 0,
+      subOscLevel: 0,
+      glideMs: 0,
+      ampLevel: 1,
+      ampPan: 0,
+      lfoWaveform: "sine",
+      lfoRateHz: 4,
+      lfoDepth: 0,
+      lfoSync: false,
+      lfoRetrigger: true,
+      lfoPositionBipolar: true,
+      lfoPitchBipolar: true,
+      lfoFilterBipolar: true,
+      lfoToPitch: 0,
+      lfoToFilter: 0,
+      envToFilter: 0,
+      sampleIds: [],
+      userCreated: true,
+    },
+  });
+  assert.equal(generated.source, "local");
+  assert.equal(generated.patch.kind, "wavetable");
+  assert.equal(generated.patch.waveform, "wavetable");
+  assert.ok(generated.patch.aether?.oscA.enabled, "generated Aether patch should enable oscillator A");
+  assert.ok(generated.patch.synthPatch, "generated Aether patch should include canonical synthPatch");
+  assert.deepEqual(
+    synthStore.normalizeSynthDraftPatch(JSON.parse(JSON.stringify(generated.patch.synthPatch))),
+    generated.patch.synthPatch,
+  );
+  const generatedPreview = synthStore.synthDraftToPreviewInstrument(generated.patch.synthPatch);
+  const generatedSamples = new Float32Array(16000);
+  synthPreview.renderInstrumentSamples(generatedPreview, generatedSamples, 48000, synthPreview.previewFrequency(generatedPreview), "audio", true);
+  let generatedEnergy = 0;
+  let generatedPeak = 0;
+  for (const sample of generatedSamples) {
+    assert.equal(Number.isFinite(sample), true);
+    generatedEnergy += sample * sample;
+    generatedPeak = Math.max(generatedPeak, Math.abs(sample));
+  }
+  assert.ok(Math.sqrt(generatedEnergy / generatedSamples.length) > 0.005, "expected generated Aether patch to be audible");
+  assert.ok(generatedPeak > 0.02, "expected generated Aether patch to have a visible peak");
 
   const preview = synthStore.synthDraftToPreviewInstrument(loadedDraft);
   const samples = new Float32Array(48000);

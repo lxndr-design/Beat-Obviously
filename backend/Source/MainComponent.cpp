@@ -57,6 +57,12 @@ namespace
 })();
 )JS";
 
+    struct FrontendLaunchTarget
+    {
+        juce::URL url;
+        bool isDevServer { false };
+    };
+
     /** Where the embedded frontend lives. In dev, override via env var. */
     juce::File getBundledFrontendRoot()
     {
@@ -71,19 +77,58 @@ namespace
        #endif
     }
 
-    juce::URL resolveFrontendUrl(const juce::File& bundledRoot)
+    juce::String appendLaunchToken(juce::String url)
+    {
+        const auto separator = url.containsChar('?') ? "&" : "?";
+        return url + separator + "beatLaunch=" + juce::String(juce::Time::currentTimeMillis());
+    }
+
+    bool devServerLooksLikeBeat(const juce::String& baseUrl)
+    {
+        auto trimmed = baseUrl.trim().trimCharactersAtEnd("/");
+        if (trimmed.isEmpty())
+            return false;
+
+        const auto healthUrl = appendLaunchToken(trimmed + "/index.html");
+        auto stream = juce::URL(healthUrl).createInputStream(
+            juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
+                .withConnectionTimeoutMs(450)
+                .withNumRedirectsToFollow(1));
+
+        if (stream == nullptr)
+        {
+            DBG("Beat frontend dev server not reachable: " << healthUrl);
+            return false;
+        }
+
+        const auto html = stream->readEntireStreamAsString();
+        const bool looksLikeBeat = html.contains("<title>Beat</title>") && html.contains("id=\"root\"");
+        if (!looksLikeBeat)
+            DBG("Port is occupied, but it is not serving the Beat frontend: " << healthUrl);
+        return looksLikeBeat;
+    }
+
+    FrontendLaunchTarget resolveFrontendLaunchTarget(const juce::File& bundledRoot)
     {
         if (auto devUrl = juce::SystemStats::getEnvironmentVariable(
                 "BEAT_DEV_FRONTEND_URL", {});
             devUrl.isNotEmpty())
         {
-            return juce::URL(devUrl);
+            if (devServerLooksLikeBeat(devUrl))
+                return { juce::URL(appendLaunchToken(devUrl)), true };
+
+            DBG("Ignoring BEAT_DEV_FRONTEND_URL because the dev server failed the Beat health check.");
         }
 
         if (bundledRoot.getChildFile("index.html").existsAsFile())
-            return juce::URL(juce::WebBrowserComponent::getResourceProviderRoot());
+            return { juce::URL(juce::WebBrowserComponent::getResourceProviderRoot()), false };
 
-        return juce::URL("http://localhost:5173");
+        const juce::String defaultDevUrl("http://localhost:6174");
+        if (devServerLooksLikeBeat(defaultDevUrl))
+            return { juce::URL(appendLaunchToken(defaultDevUrl)), true };
+
+        DBG("Beat frontend dev server is unavailable on http://localhost:6174 and no bundled frontend was found.");
+        return { juce::URL(defaultDevUrl), true };
     }
 
     juce::String mimeForFile(const juce::File& file)
@@ -146,9 +191,24 @@ MainComponent::MainComponent()
     // The bridge wires native JS handlers to engine/database operations and
     // pumps inbound events back to JS.
     bridge = std::make_unique<beat::MessageBridge>(*engine, *database, *browser);
+    bridge->onAppReady = [this]
+    {
+        if (onFrontendReady)
+            onFrontendReady();
+    };
     bridge->install();
 
-    browser->goToURL(resolveFrontendUrl(getBundledFrontendRoot()).toString(true));
+    const auto launchTarget = resolveFrontendLaunchTarget(getBundledFrontendRoot());
+    browser->goToURL(launchTarget.url.toString(true));
+    if (launchTarget.isDevServer)
+    {
+        juce::Component::SafePointer<MainComponent> safeThis(this);
+        juce::Timer::callAfterDelay(350, [safeThis, url = launchTarget.url]
+        {
+            if (safeThis != nullptr && safeThis->browser != nullptr)
+                safeThis->browser->goToURL(url.toString(true));
+        });
+    }
 
     setSize(1440, 900);
 }
@@ -218,4 +278,13 @@ void MainComponent::emitMenuCommand(const juce::String& command)
     juce::DynamicObject::Ptr payload = new juce::DynamicObject();
     payload->setProperty("command", command);
     bridge->emit("native.menuCommand", juce::var(payload.get()));
+}
+
+void MainComponent::emitOpenProjectFile(const juce::String& path)
+{
+    if (!bridge || path.isEmpty()) return;
+
+    juce::DynamicObject::Ptr payload = new juce::DynamicObject();
+    payload->setProperty("path", path);
+    bridge->emit("native.openProjectFile", juce::var(payload.get()));
 }

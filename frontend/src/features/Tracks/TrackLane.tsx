@@ -10,12 +10,13 @@ import {
   useViewStore,
   useInstrumentStore,
 } from "../../state/store";
-import { send } from "../../ipc/bridge";
+import { pauseTransport } from "../../audio/transportActions";
 import { useComponentStore } from "../../state/components";
+import { clipboardStore, useClipboard } from "../../state/clipboard";
 import { expandTrackSegments } from "../../state/selectors";
 import { Segment } from "./Segment";
 import styles from "./TrackLane.module.css";
-import type { Id, Instrument, Track } from "../../state/types";
+import type { Id, Instrument, Segment as SegmentModel, Track } from "../../state/types";
 
 /**
  * nextSegmentName — auto-numbers default segment names like "Midi 1",
@@ -39,10 +40,7 @@ function nextSegmentName(tracks: Track[], kind: "midi" | "audio" | "drum"): stri
 
 interface Props {
   trackId: Id;
-  selectMode?: boolean;
   selected?: boolean;
-  onSelect?: (event: React.MouseEvent) => void;
-  onEnterSelectMode?: () => void;
 }
 
 /**
@@ -56,10 +54,7 @@ interface Props {
  */
 export function TrackLane({
   trackId,
-  selectMode = false,
   selected = false,
-  onSelect,
-  onEnterSelectMode,
 }: Props) {
   const track = useProjectStore((s) => s.project.tracks.find((t) => t.id === trackId));
   const tracks = useProjectStore((s) => s.project.tracks);
@@ -69,14 +64,11 @@ export function TrackLane({
   const lastLen = useViewStore((s) => s.lastSegmentLength);
   const setLastLen = useViewStore((s) => s.setLastSegmentLength);
   const addSegment = useProjectStore((s) => s.addSegment);
-  const setTrackMute = useProjectStore((s) => s.setTrackMute);
-  const setTrackSolo = useProjectStore((s) => s.setTrackSolo);
-  const removeTrack = useProjectStore((s) => s.removeTrack);
   const openEditor = useUiStore((s) => s.openEditor);
-  const openTrackEffects = useUiStore((s) => s.openTrackEffects);
   const instruments = useInstrumentStore((s) => s.instruments);
   const audioFiles = useAudioFileStore((s) => s.files);
   const addAudioFile = useAudioFileStore((s) => s.addFile);
+  const { pasteMany } = useClipboard();
 
   const laneRef = useRef<HTMLDivElement>(null);
   const lastClickBeatRef = useRef<number>(0);
@@ -85,8 +77,7 @@ export function TrackLane({
   function openSegmentEditor(segmentId: Id) {
     const transport = useTransportStore.getState();
     if (transport.playing) {
-      transport.pause();
-      void send({ kind: "transport.pause" });
+      pauseTransport();
     }
     openEditor({ kind: "segment", segmentId });
   }
@@ -98,16 +89,21 @@ export function TrackLane({
 
   const { onContextMenu, menu } = useContextMenu((): ContextMenuItem[] => {
     if (!track) return [];
+    const canPaste = clipboardStore.getState().segments.length > 0;
     return [
+      ...(canPaste
+        ? [
+            {
+              label: "Paste",
+              icon: "ph:clipboard-text",
+              onSelect: () => pasteSegmentsIntoTrack(trackId, lastClickBeatRef.current, pasteMany()),
+            } as ContextMenuItem,
+          ]
+        : []),
       {
-        label: "Select",
-        icon: "ph:checks",
-        onSelect: () => onEnterSelectMode?.(),
-      },
-      {
-        label: "Add MIDI",
+        label: "+ MIDI",
         icon: "ph:piano-keys",
-        separatorBefore: true,
+        separatorBefore: canPaste,
         onSelect: () => {
           addSegment(trackId, {
             name: nextSegmentName(tracks, "midi"),
@@ -119,7 +115,7 @@ export function TrackLane({
         },
       },
       {
-        label: "Add Drums",
+        label: "+ Drum",
         icon: "ph:squares-four",
         onSelect: () => {
           addSegment(trackId, {
@@ -138,19 +134,7 @@ export function TrackLane({
         },
       },
       {
-        label: "Record sound",
-        icon: "ph:record-fill",
-        onSelect: () => {
-          addSegment(trackId, {
-            name: nextSegmentName(tracks, "audio"),
-            startBeat: lastClickBeatRef.current,
-            lengthBeats: lastLen,
-            payload: { kind: "audio", audioFileId: "", gainDb: 0 },
-          });
-        },
-      },
-      {
-        label: "Import Audio…",
+        label: "+ WAV",
         icon: "ph:upload",
         onSelect: async () => {
           const file = await importAudioFile();
@@ -174,32 +158,16 @@ export function TrackLane({
         },
       },
       {
-        label: track.mute ? "Unmute" : "Mute",
-        icon: track.mute ? "ph:speaker-high" : "ph:speaker-x",
-        onSelect: () => setTrackMute(trackId, !track.mute),
-        disabled: track.solo,
-        separatorBefore: true,
-      },
-      {
-        label: track.solo ? "Unsolo" : "Solo",
-        icon: "ph:headphones",
-        onSelect: () => setTrackSolo(trackId, !track.solo),
-      },
-      {
-        label: "Effects / Filters",
-        icon: "ph:sliders-horizontal",
-        onSelect: () => openTrackEffects(trackId),
-        separatorBefore: true,
-      },
-      {
-        label: "Duplicate track",
-        icon: "ph:copy",
-        onSelect: () => duplicateTrackInline(trackId),
-      },
-      {
-        label: "Delete track",
-        icon: "ph:trash",
-        onSelect: () => removeTrack(trackId),
+        label: "Record Audio",
+        icon: "ph:record-fill",
+        onSelect: () => {
+          addSegment(trackId, {
+            name: nextSegmentName(tracks, "audio"),
+            startBeat: lastClickBeatRef.current,
+            lengthBeats: lastLen,
+            payload: { kind: "audio", audioFileId: "", gainDb: 0 },
+          });
+        },
       },
     ];
   });
@@ -213,11 +181,6 @@ export function TrackLane({
   function handleContextMenu(e: React.MouseEvent<HTMLElement>) {
     lastClickBeatRef.current = beatAtX(e.clientX);
     onContextMenu(e);
-  }
-
-  function handleClick(e: React.MouseEvent<HTMLElement>) {
-    if (!selectMode) return;
-    onSelect?.(e);
   }
 
   // ----- Drag-and-drop --------------------------------------------------
@@ -314,16 +277,15 @@ export function TrackLane({
   return (
     <div
       ref={laneRef}
+      data-track-lane-id={trackId}
       className={[
         styles.lane,
         dragOver && styles.dragOver,
-        selectMode && styles.selecting,
         selected && styles.selected,
       ]
         .filter(Boolean)
         .join(" ")}
       style={{ width: lengthBeats * beatsToPx, height: "var(--height-track-row)" }}
-      onClick={handleClick}
       onContextMenu={handleContextMenu}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -352,15 +314,6 @@ export function TrackLane({
           />
         );
       })}
-      {selectMode && (
-        <button
-          type="button"
-          className={styles.selectionOverlay}
-          onClick={handleClick}
-          onContextMenu={handleContextMenu}
-          aria-label={`Select ${track.name}`}
-        />
-      )}
       {menu}
     </div>
   );
@@ -370,25 +323,30 @@ export function TrackLane({
  * Duplicate-track helper. Inlined here so TrackLane doesn't need to import
  * the same hook from TrackHeader (would cause circular imports).
  */
-function duplicateTrackInline(trackId: Id) {
-  const { project, loadProject } = useProjectStore.getState();
-  const idx = project.tracks.findIndex((t) => t.id === trackId);
-  if (idx < 0) return;
-  const src = project.tracks[idx];
-  const newId = nano();
-  const copy = {
-    ...structuredClone(src),
-    id: newId,
-    name: `${src.name} copy`,
-    segments: src.segments.map((s) => ({
-      ...structuredClone(s),
-      id: nano(),
-      trackId: newId,
-    })),
-  };
-  const tracks = [...project.tracks];
-  tracks.splice(idx + 1, 0, copy);
-  loadProject({ ...project, tracks });
+function pasteSegmentsIntoTrack(trackId: Id, startBeat: number, segments: SegmentModel[]) {
+  if (segments.length === 0) return;
+  const { project, applySegmentEditCommand } = useProjectStore.getState();
+  const targetTrackIndex = Math.max(0, project.tracks.findIndex((track) => track.id === trackId));
+  const trackIndexById = new Map(project.tracks.map((track, index) => [track.id, index]));
+  const sourceIndexes = segments.map((segment) => trackIndexById.get(segment.trackId) ?? targetTrackIndex);
+  const sourceAnchorIndex = Math.min(...sourceIndexes);
+  const startAnchor = Math.min(...segments.map((segment) => segment.startBeat));
+
+  const commandSegments = segments.flatMap((segment, index) => {
+    const destIndex = Math.max(
+      0,
+      Math.min(project.tracks.length - 1, targetTrackIndex + sourceIndexes[index] - sourceAnchorIndex),
+    );
+    const destinationTrack = project.tracks[destIndex];
+    if (!destinationTrack) return [];
+    return [{
+      ...structuredClone(segment),
+      trackId: destinationTrack.id,
+      startBeat: Math.max(0, startBeat + segment.startBeat - startAnchor),
+      name: segment.name?.trim() ? `${segment.name} copy` : segment.name,
+    }];
+  });
+  applySegmentEditCommand({ kind: "duplicate", segments: commandSegments, offsetBeats: 0 });
 }
 
 import { nanoid as nano } from "nanoid";

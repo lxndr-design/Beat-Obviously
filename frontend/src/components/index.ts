@@ -13,3 +13,5 @@ export * from "./ContextMenu";
 export * from "./FloatingSelect";
 export * from "./FloatingLayer";
 export * from "./SectionRibbon";
+export * from "./MarqueeText";
+export * from "./ActionFooter";

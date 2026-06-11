@@ -6,6 +6,12 @@
 #include "../Persistence/ProjectRepository.h"
 #include "../Persistence/InstrumentRepository.h"
 
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <thread>
+#include <vector>
+
 namespace beat
 {
     /**
@@ -39,8 +45,38 @@ namespace beat
          *  WebBrowser native function bridge. */
         juce::var handleRequest(const juce::String& kind, const juce::var& payload);
 
+        std::function<void()> onAppReady;
+
     private:
         void timerCallback() override;
+
+        struct ExportJob
+        {
+            juce::String id;
+            juce::String type;
+            juce::String path;
+            mutable std::mutex statusLock;
+            std::atomic<bool> cancel { false };
+            std::atomic<bool> finished { false };
+            std::atomic<bool> ok { false };
+            std::atomic<double> progress { 0.0 };
+            std::atomic<juce::int64> samplesWritten { 0 };
+            std::atomic<juce::int64> totalSamples { 0 };
+            juce::String error;
+            juce::var analysis;
+        };
+
+        void joinFinishedExportThreadIfNeeded();
+        juce::var exportJobStatusVar(const std::shared_ptr<ExportJob>& job) const;
+
+        struct WaveformCacheEntry
+        {
+            juce::String path;
+            juce::int64 modifiedMs { 0 };
+            juce::int64 sizeBytes { 0 };
+            int bucketCount { 0 };
+            juce::var waveform;
+        };
 
         AudioEngine&             engine;
         Database&                database;
@@ -52,7 +88,12 @@ namespace beat
         // which we keep here so we can invoke it from C++ on inbound events.
         juce::Array<juce::var> subscribers;
         juce::CriticalSection  subscribersLock;
+        mutable std::mutex exportJobLock;
+        std::shared_ptr<ExportJob> activeExportJob;
+        std::thread exportThread;
+        std::vector<WaveformCacheEntry> waveformCache;
         uint64_t lastAnalyzerSequence { 0 };
         uint64_t lastRenderTimingSequence { 0 };
+        uint64_t lastTrackMeterSequence { 0 };
     };
 }

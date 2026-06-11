@@ -6,10 +6,10 @@
   min-height: var(--button-min-height);
   min-width: var(--button-min-width);
   padding: var(--button-padding-y) var(--button-padding-x);
-  background: var(--color-bg);
+  background: transparent;
   color: var(--color-fg);
   font-family: var(--font-family-base);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-uppercase);
   text-transform: uppercase;
@@ -80,14 +80,14 @@
   min-height: 28px;
   min-width: 28px;
   padding: 0 var(--space-1);
-  font-size: 11px;
+  font-size: var(--font-size-ui);
 }
 
 .size-sm {
   min-height: 24px;
   min-width: 48px;
   padding: 0 var(--space-1);
-  font-size: 11px;
+  font-size: var(--font-size-ui);
 }
 
 .size-md {
@@ -98,7 +98,7 @@
   min-height: 48px;
   min-width: 96px;
   padding: var(--space-1) var(--space-3);
-  font-size: 13px;
+  font-size: var(--font-size-ui-lg);
 }
 
 /* Icon-only: 1:1 ratio. Sizes pin to --button-square-* tokens. */

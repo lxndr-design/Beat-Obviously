@@ -1131,6 +1131,7 @@ function restoreSnapshot(snapshot: InstrumentSnapshot): Partial<Instrument> {
     lfoToPitch: snapshot.lfoToPitch,
     lfoToFilter: snapshot.lfoToFilter,
     envToFilter: snapshot.envToFilter,
+    effects: snapshot.effects ? structuredClone(snapshot.effects) : undefined,
     sampleIds: [...snapshot.sampleIds],
     sampleUrl: snapshot.sampleUrl,
     sampleUrls: snapshot.sampleUrls ? [...snapshot.sampleUrls] : undefined,

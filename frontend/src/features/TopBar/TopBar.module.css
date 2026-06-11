@@ -1,6 +1,7 @@
 .bar {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) auto minmax(320px, 1fr);
   align-items: center;
   gap: var(--space-1);
   height: 100%;
@@ -13,12 +14,96 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  justify-self: start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
-.playback {
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: min(46vw, 100%);
+  overflow: hidden;
+  margin: 0;
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.breadcrumbHome {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--duration-hover) var(--ease-out);
+}
+
+.breadcrumbHome:hover {
+  color: var(--color-fg);
+}
+
+.breadcrumbSlash {
+  color: var(--color-fg-hover);
+  font-weight: var(--font-weight-medium);
+}
+
+.projectName,
+.projectNameInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: min(15ch, 100%);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-fg);
+  font: inherit;
+  line-height: 1;
+}
+
+.projectName {
+  display: block;
+  overflow: hidden;
+  cursor: text;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectNameText {
+  max-width: 100%;
+}
+
+.projectName:hover {
+  color: var(--color-fg);
+}
+
+.projectNameInput {
+  width: min(15ch, 100%);
+  height: 24px;
+  border-bottom: var(--border-fg);
+  outline: 0;
+}
+
+.transport {
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  justify-self: center;
+}
+
+.projectControls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  justify-self: end;
+  min-width: 0;
 }
 
 /* Unified input frame shared by the time display, TS button, and inline
@@ -32,7 +117,7 @@
   color: var(--color-fg);
   border: var(--border-fg);
   font-family: var(--font-family-mono);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   white-space: nowrap;
 }
 
@@ -80,7 +165,7 @@
   background: transparent;
   color: var(--color-fg);
   font-family: var(--font-family-mono);
-  font-size: 12px;
+  font-size: var(--font-size-ui);
   text-align: left;
   transition: var(--transition-invert);
   cursor: pointer;
@@ -96,13 +181,56 @@
   opacity: 0.4;
 }
 
-.spacer {
-  flex: 1 1 auto;
-}
-
 .actions {
   display: flex;
   align-items: center;
   gap: var(--space-1);
   padding-right: var(--space-1);
+}
+
+.actionStatus {
+  min-width: 72px;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  opacity: 0.65;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.saveSlot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.dirtyDot {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  background: var(--color-fg);
+  border: 3px solid var(--color-bg);
+  border-radius: 50%;
+  box-sizing: content-box;
+  pointer-events: none;
+  transform-origin: center;
+  animation: beat-dirty-pulse 1.6s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes beat-dirty-pulse {
+  0%,
+  100% {
+    opacity: 0.74;
+    transform: scale(0.84);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

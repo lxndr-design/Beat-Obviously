@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { Button, FloatingLayer, HoverInfo, Icon } from "../../components";
+import { useContextualHotkey } from "../../hotkeys/contextualHotkeys";
 import { useSettingsStore } from "../../state/store";
 import type { MidiNote } from "../../state/types";
 import styles from "./PianoRoll.module.css";
@@ -11,6 +12,8 @@ export interface PianoRollProps {
   lengthBeats: number;
   /** Current playhead position relative to this segment, in beats. */
   playheadBeat?: number | null;
+  hotkeyScopeId?: string;
+  onLengthChange?: (lengthBeats: number) => void;
   onChange: (notes: MidiNote[]) => void;
   onPreviewNote?: (pitch: number, velocity?: number) => void;
 }
@@ -31,7 +34,7 @@ export interface PianoRollProps {
  */
 const DEFAULT_PX_PER_BEAT = 48;
 const MIN_PX_PER_BEAT = 24;
-const MAX_PX_PER_BEAT = 160;
+const MAX_PX_PER_BEAT = 384;
 const ZOOM_STEP = 8;
 const PX_PER_PITCH = 16;
 const VIEW_HEIGHT = 520;
@@ -40,15 +43,19 @@ const BOTTOM_PITCH = 36;  // C2
 const PITCH_RANGE = TOP_PITCH - BOTTOM_PITCH + 1;
 const KEY_LABEL_WIDTH = 48;
 const DEFAULT_NOTE_LENGTH_BEATS = 0.25;
+const MIN_NOTE_LENGTH_BEATS = 1 / 64;
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 let midiNoteClipboard: MidiNoteClipboard | null = null;
+type MidiToolMode = "draw" | "select";
 
 export function PianoRoll({
   notes,
   lengthBeats,
   playheadBeat = null,
+  hotkeyScopeId,
+  onLengthChange,
   onChange,
   onPreviewNote,
 }: PianoRollProps) {
@@ -61,6 +68,11 @@ export function PianoRoll({
   const [noteMenu, setNoteMenu] = useState<{ x: number; y: number; idx: number; target: PasteTarget } | null>(null);
   const [gridMenu, setGridMenu] = useState<{ x: number; y: number; target: PasteTarget } | null>(null);
   const [volumePopover, setVolumePopover] = useState<VolumePopoverState | null>(null);
+  const [noteEditor, setNoteEditor] = useState<NoteEditorState | null>(null);
+  const [hoveredNoteSide, setHoveredNoteSide] = useState<{ idx: number; side: "left" | "right" } | null>(null);
+  const [toolMode, setToolMode] = useState<MidiToolMode>("draw");
+  const [dragActive, setDragActive] = useState(false);
+  const [lengthHandleActive, setLengthHandleActive] = useState(false);
   const [connectFrom, setConnectFrom] = useState<number | null>(null);
   const [connectPointer, setConnectPointer] = useState<{ x: number; y: number } | null>(null);
   const [curveFrom, setCurveFrom] = useState<number | null>(null);
@@ -83,24 +95,93 @@ export function PianoRoll({
         indices: number[];
         startX: number;
         startY: number;
-        startNotes: Pick<MidiNote, "startBeat" | "pitch" | "lengthBeats">[];
+        startNotes: Array<Pick<MidiNote, "startBeat" | "pitch" | "lengthBeats"> & { curve?: MidiNote["curve"] }>;
+        historyPushed?: boolean;
       }
-    | { mode: "resize"; idx: number; startX: number; startLen: number }
+    | {
+        mode: "resize";
+        indices: number[];
+        edge: "left" | "right";
+        startX: number;
+        startNotes: Array<Pick<MidiNote, "startBeat" | "lengthBeats"> & { curve?: MidiNote["curve"] }>;
+        historyPushed?: boolean;
+      }
+    | { mode: "curve-handle"; idx: number; edge: "start" | "end"; historyPushed?: boolean }
+    | { mode: "length-resize"; startX: number; startLengthBeats: number }
     | { mode: "select"; anchorX: number; anchorY: number; pointerId: number }
     | null
   >(null);
 
   const width = lengthBeats * pxPerBeat;
   const height = PITCH_RANGE * PX_PER_PITCH;
+  const gridLines = useMemo(() => makeGridLines(lengthBeats, pxPerBeat), [lengthBeats, pxPerBeat]);
+
+  useContextualHotkey(
+    hotkeyScopeId ?? "",
+    "d",
+    () => {
+      setToolMode("draw");
+      return true;
+    },
+    Boolean(hotkeyScopeId),
+  );
+
+  useContextualHotkey(
+    hotkeyScopeId ?? "",
+    "s",
+    () => {
+      setToolMode("select");
+      return true;
+    },
+    Boolean(hotkeyScopeId),
+  );
 
   // Keep selected indices valid if notes shrink.
   useEffect(() => {
     setSelected((prev) => prev.filter((i) => i >= 0 && i < notes.length));
   }, [notes.length]);
 
+  useEffect(() => {
+    if (!noteEditor && !volumePopover) return;
+    function closeNoteDetails(event: PointerEvent) {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest("[data-midi-note-detail]")) return;
+      setNoteEditor(null);
+      setVolumePopover(null);
+    }
+    window.addEventListener("pointerdown", closeNoteDetails, true);
+    return () => window.removeEventListener("pointerdown", closeNoteDetails, true);
+  }, [noteEditor, volumePopover]);
+
+  useEffect(() => {
+    const scroll = timeScrollRef.current;
+    if (!scroll) return;
+    const c4Center = (TOP_PITCH - 60) * PX_PER_PITCH + PX_PER_PITCH / 2;
+    scroll.scrollTop = Math.max(0, c4Center - VIEW_HEIGHT / 2);
+    syncKeyScroll();
+  }, []);
+
+  useEffect(() => {
+    if (!dragActive) return;
+    function finishDrag() {
+      onNotePointerUp();
+    }
+    window.addEventListener("pointerup", finishDrag);
+    window.addEventListener("pointercancel", finishDrag);
+    return () => {
+      window.removeEventListener("pointerup", finishDrag);
+      window.removeEventListener("pointercancel", finishDrag);
+    };
+  }, [dragActive, notes, selectBox]);
+
   function pitchFromY(y: number): number {
     const row = Math.floor(y / PX_PER_PITCH);
     return TOP_PITCH - row;
+  }
+  function curvePitchFromY(y: number, snapToNote: boolean): number {
+    const pitch = TOP_PITCH - y / PX_PER_PITCH;
+    const next = snapToNote ? Math.round(pitch) : Math.round(pitch * 100) / 100;
+    return clamp(next, BOTTOM_PITCH, TOP_PITCH);
   }
   function beatFromX(x: number): number {
     return Math.max(0, Math.min(lengthBeats, x / pxPerBeat));
@@ -108,7 +189,7 @@ export function PianoRoll({
   function targetFromClient(clientX: number, clientY: number): PasteTarget {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return { beat: 0, pitch: BOTTOM_PITCH };
-    const beat = snap(beatFromX(clientX - rect.left));
+    const beat = beatFromX(clientX - rect.left);
     const pitch = clamp(pitchFromY(clientY - rect.top), BOTTOM_PITCH, TOP_PITCH);
     return { beat, pitch };
   }
@@ -117,11 +198,30 @@ export function PianoRoll({
     const factor = midiSubdivision / 4;
     return Math.round(beat * factor) / factor;
   }
+  function snapShiftDrag(beat: number): number {
+    return Math.round(beat * 4) / 4;
+  }
 
-  function commitChange(next: MidiNote[]) {
+  function pushHistorySnapshot() {
     historyRef.current.push(structuredClone(notes));
     if (historyRef.current.length > 100) historyRef.current.shift();
+  }
+
+  function commitChange(next: MidiNote[]) {
+    pushHistorySnapshot();
     onChange(next);
+  }
+
+  function applyTransientChange(next: MidiNote[]) {
+    onChange(next);
+  }
+
+  function ensureDragHistory(
+    d: Extract<NonNullable<typeof drag.current>, { historyPushed?: boolean }>,
+  ) {
+    if (d.historyPushed) return;
+    pushHistorySnapshot();
+    d.historyPushed = true;
   }
 
   function undoLocal() {
@@ -133,14 +233,16 @@ export function PianoRoll({
 
   function onGridPointerDown(e: React.PointerEvent) {
     if (e.target !== e.currentTarget) return;
+    if (e.button !== 0) return;
     setNoteMenu(null);
     setGridMenu(null);
     setVolumePopover(null);
+    setNoteEditor(null);
     (e.target as Element).setPointerCapture(e.pointerId);
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    lastPointerTargetRef.current = { beat: snap(beatFromX(x)), pitch: clamp(pitchFromY(y), BOTTOM_PITCH, TOP_PITCH) };
+    lastPointerTargetRef.current = { beat: beatFromX(x), pitch: clamp(pitchFromY(y), BOTTOM_PITCH, TOP_PITCH) };
     if (connectFrom != null) {
       setConnectFrom(null);
       setConnectPointer(null);
@@ -148,22 +250,21 @@ export function PianoRoll({
     }
     if (curveFrom != null) {
       completeCurve(curveFrom, {
-        beat: snap(beatFromX(x)),
+        beat: e.shiftKey ? snapShiftDrag(beatFromX(x)) : beatFromX(x),
         pitch: clamp(pitchFromY(y), BOTTOM_PITCH, TOP_PITCH),
       });
       return;
     }
-    if (e.altKey) {
-      drag.current = { mode: "select", anchorX: x, anchorY: y, pointerId: e.pointerId };
-      setSelectBox({ left: x, top: y, width: 0, height: 0 });
+    if (toolMode === "select" || e.altKey) {
+      startMarquee(x, y, e.pointerId);
       return;
     }
-    const beat = snap(beatFromX(x));
+    const beat = e.shiftKey ? snapShiftDrag(beatFromX(x)) : beatFromX(x);
     const pitch = pitchFromY(y);
-    const initialLength = clamp(lastDrawnLengthRef.current, DEFAULT_NOTE_LENGTH_BEATS, Math.max(DEFAULT_NOTE_LENGTH_BEATS, lengthBeats - beat));
+    const initialLength = clamp(lastDrawnLengthRef.current, MIN_NOTE_LENGTH_BEATS, Math.max(MIN_NOTE_LENGTH_BEATS, lengthBeats - beat));
     const newNote: MidiNote = {
       pitch,
-      velocity: 100,
+      velocity: 127,
       startBeat: beat,
       lengthBeats: initialLength,
     };
@@ -172,11 +273,48 @@ export function PianoRoll({
     const idx = next.length - 1;
     setSelected([idx]);
     drag.current = { mode: "draw", idx, anchorBeat: beat, initialLength, currentLength: initialLength };
+    setDragActive(true);
     onPreviewNote?.(pitch, newNote.velocity);
+  }
+
+  function onTimeScrollPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.target !== e.currentTarget || toolMode !== "select" || e.button !== 0) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const y = e.clientY - rect.top;
+    if (y < 0 || y > height) return;
+    e.preventDefault();
+    setNoteMenu(null);
+    setGridMenu(null);
+    setVolumePopover(null);
+    setNoteEditor(null);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    startMarquee(e.clientX - rect.left, y, e.pointerId);
+  }
+
+  function startMarquee(anchorX: number, anchorY: number, pointerId: number) {
+    const y = clamp(anchorY, 0, height);
+    drag.current = { mode: "select", anchorX, anchorY: y, pointerId };
+    setSelectBox({ left: anchorX, top: y, width: 0, height: 0 });
+    setDragActive(true);
+  }
+
+  function startLengthResize(e: React.PointerEvent) {
+    if (!onLengthChange || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setNoteMenu(null);
+    setGridMenu(null);
+    setVolumePopover(null);
+    setNoteEditor(null);
+    drag.current = { mode: "length-resize", startX: e.clientX, startLengthBeats: lengthBeats };
+    setLengthHandleActive(true);
+    setDragActive(true);
   }
 
   function startMove(idx: number, e: React.PointerEvent) {
     e.stopPropagation();
+    if (e.button !== 0) return;
     setNoteMenu(null);
     setGridMenu(null);
     setVolumePopover(null);
@@ -193,6 +331,28 @@ export function PianoRoll({
       return;
     }
     (e.target as Element).setPointerCapture(e.pointerId);
+    if (e.altKey) {
+      const sourceIndices = selected.includes(idx) ? selected : [idx];
+      const duplicated = duplicateNotes(notes, sourceIndices);
+      if (duplicated.indices.length === 0) return;
+      commitChange(duplicated.notes);
+      setSelected(duplicated.indices);
+      drag.current = {
+        mode: "move",
+        indices: duplicated.indices,
+        startX: e.clientX,
+        startY: e.clientY,
+        startNotes: duplicated.indices.map((i) => ({
+          startBeat: duplicated.notes[i].startBeat,
+          pitch: duplicated.notes[i].pitch,
+          lengthBeats: duplicated.notes[i].lengthBeats,
+          curve: structuredClone(duplicated.notes[i].curve),
+        })),
+        historyPushed: true,
+      };
+      setDragActive(true);
+      return;
+    }
     const indices = selected.includes(idx) ? selected : [idx];
     drag.current = {
       mode: "move",
@@ -203,23 +363,33 @@ export function PianoRoll({
         startBeat: notes[i].startBeat,
         pitch: notes[i].pitch,
         lengthBeats: notes[i].lengthBeats,
+        curve: structuredClone(notes[i].curve),
       })),
     };
+    setDragActive(true);
     setSelected(e.shiftKey
-      ? selected.includes(idx) ? selected.filter((i) => i !== idx) : [...selected, idx]
+      ? selected.includes(idx) ? selected : [...selected, idx]
       : [idx]);
   }
 
-  function startResize(idx: number, e: React.PointerEvent) {
+  function startResize(idx: number, edge: "left" | "right", e: React.PointerEvent) {
     e.stopPropagation();
+    if (e.button !== 0) return;
     (e.target as Element).setPointerCapture(e.pointerId);
+    const indices = selected.includes(idx) ? selected : [idx];
     drag.current = {
       mode: "resize",
-      idx,
+      indices,
+      edge,
       startX: e.clientX,
-      startLen: notes[idx].lengthBeats,
+      startNotes: indices.map((i) => ({
+        startBeat: notes[i].startBeat,
+        lengthBeats: notes[i].lengthBeats,
+        curve: structuredClone(notes[i].curve),
+      })),
     };
-    setSelected([idx]);
+    setDragActive(true);
+    setSelected(indices);
   }
 
   function onNotePointerMove(e: React.PointerEvent) {
@@ -236,7 +406,7 @@ export function PianoRoll({
     if (d.mode === "draw") {
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const currentBeat = snap(beatFromX(e.clientX - rect.left));
+      const currentBeat = e.shiftKey ? snapShiftDrag(beatFromX(e.clientX - rect.left)) : beatFromX(e.clientX - rect.left);
       const startBeat = Math.min(d.anchorBeat, currentBeat);
       const drawnLength = Math.abs(currentBeat - d.anchorBeat);
       const length = drawnLength > 0 ? Math.max(DEFAULT_NOTE_LENGTH_BEATS, drawnLength) : d.initialLength;
@@ -248,54 +418,95 @@ export function PianoRoll({
         startBeat,
         lengthBeats: d.currentLength,
       };
-      commitChange(next);
+      applyTransientChange(next);
     } else if (d.mode === "move") {
+      ensureDragHistory(d);
       const dx = e.clientX - d.startX;
       const dy = e.clientY - d.startY;
-      const dBeat = snap(dx / pxPerBeat);
+      const rawBeatDelta = dx / pxPerBeat;
       const dPitch = -Math.round(dy / PX_PER_PITCH);
       const next = notes.slice();
       d.indices.forEach((idx, groupIdx) => {
         if (!next[idx]) return;
         const start = d.startNotes[groupIdx];
+        const rawStartBeat = start.startBeat + rawBeatDelta;
+        const startBeat = clamp(e.shiftKey ? snap(rawStartBeat) : rawStartBeat, 0, lengthBeats - start.lengthBeats);
+        const pitch = clamp(start.pitch + dPitch, BOTTOM_PITCH, TOP_PITCH);
         next[idx] = {
           ...next[idx],
-          startBeat: clamp(start.startBeat + dBeat, 0, lengthBeats - start.lengthBeats),
-          pitch: clamp(start.pitch + dPitch, BOTTOM_PITCH, TOP_PITCH),
+          startBeat,
+          pitch,
+          curve: shiftCurveWithNote(start.curve, start.pitch, startBeat, pitch, start.lengthBeats),
         };
       });
-      commitChange(next);
+      applyTransientChange(next);
     } else if (d.mode === "resize") {
+      ensureDragHistory(d);
       const dx = e.clientX - d.startX;
-      const dLen = snap(dx / pxPerBeat);
+      const dLen = e.shiftKey ? snapShiftDrag(dx / pxPerBeat) : dx / pxPerBeat;
       const next = notes.slice();
-      next[d.idx] = {
-        ...next[d.idx],
-        lengthBeats: clamp(d.startLen + dLen, 0.25, lengthBeats - next[d.idx].startBeat),
-      };
-      commitChange(next);
+      d.indices.forEach((idx, groupIdx) => {
+        if (!next[idx]) return;
+        const start = d.startNotes[groupIdx];
+        if (d.edge === "right") {
+          next[idx] = {
+            ...next[idx],
+            lengthBeats: clamp(start.lengthBeats + dLen, MIN_NOTE_LENGTH_BEATS, lengthBeats - start.startBeat),
+          };
+        } else {
+          const originalEnd = start.startBeat + start.lengthBeats;
+          const nextStart = clamp(start.startBeat + dLen, 0, originalEnd - MIN_NOTE_LENGTH_BEATS);
+          next[idx] = {
+            ...next[idx],
+            startBeat: nextStart,
+            lengthBeats: clamp(originalEnd - nextStart, MIN_NOTE_LENGTH_BEATS, lengthBeats - nextStart),
+          };
+        }
+        next[idx] = normalizeNoteCurveToBounds(next[idx]);
+      });
+      applyTransientChange(next);
+    } else if (d.mode === "curve-handle") {
+      ensureDragHistory(d);
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const next = notes.slice();
+      const note = next[d.idx];
+      if (!note) return;
+      const pitch = curvePitchFromY(e.clientY - rect.top, e.shiftKey);
+      next[d.idx] = updateNoteCurveHandle(note, d.edge, pitch);
+      applyTransientChange(next);
+    } else if (d.mode === "length-resize") {
+      const deltaBeats = (e.clientX - d.startX) / pxPerBeat;
+      onLengthChange?.(Math.max(1, Math.round(d.startLengthBeats + deltaBeats)));
     } else {
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
       const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const y = clamp(e.clientY - rect.top, 0, height);
       setSelectBox(normalizeRect(d.anchorX, d.anchorY, x, y));
     }
   }
 
   function onNotePointerUp() {
     if (drag.current?.mode === "draw") {
-      lastDrawnLengthRef.current = Math.max(DEFAULT_NOTE_LENGTH_BEATS, drag.current.currentLength);
+      lastDrawnLengthRef.current = Math.max(MIN_NOTE_LENGTH_BEATS, drag.current.currentLength);
     }
     if (drag.current?.mode === "select" && selectBox) {
       const selectedIndices = notes
-        .map((note, index) => ({ note, index, rect: noteRect(note) }))
-        .filter(({ rect }) => rectsIntersect(selectBox, rect))
+        .map((note, index) => ({ note, index, rect: visibleNoteRect(note) }))
+        .filter(({ rect }) => rect ? rectsIntersect(selectBox, rect) : false)
         .map(({ index }) => index);
       setSelected(selectedIndices);
       setSelectBox(null);
     }
+    setLengthHandleActive(false);
     drag.current = null;
+    setDragActive(false);
+  }
+
+  function stopLengthResizeOnLeave() {
+    if (drag.current?.mode !== "length-resize") return;
+    onNotePointerUp();
   }
 
   function openNoteMenu(idx: number, e: React.MouseEvent) {
@@ -318,6 +529,7 @@ export function PianoRoll({
     lastPointerTargetRef.current = target;
     setNoteMenu(null);
     setVolumePopover(null);
+    setNoteEditor(null);
     setGridMenu({ x: e.clientX, y: e.clientY, target });
   }
 
@@ -329,6 +541,28 @@ export function PianoRoll({
       value: String(velocityToPercent(notes[idx]?.velocity ?? 100)),
       error: false,
     });
+  }
+
+  function openNoteEditor(idx: number) {
+    const note = notes[idx];
+    const rect = noteViewportRect(note);
+    if (!note || !rect) return;
+    setSelected([idx]);
+    setNoteMenu(null);
+    setGridMenu(null);
+    setVolumePopover(null);
+    setNoteEditor({
+      idx,
+      x: rect.left,
+      y: rect.bottom + 4,
+      value: String(velocityToPercent(note.velocity)),
+      error: false,
+    });
+    if (!note.curve || note.curve.length < 2) {
+      const next = notes.slice();
+      next[idx] = defaultNoteCurve(note);
+      commitChange(next);
+    }
   }
 
   function applyNoteVolume() {
@@ -344,10 +578,31 @@ export function PianoRoll({
     setVolumePopover(null);
   }
 
+  function applyNoteEditorVolume() {
+    if (!noteEditor) return;
+    const velocity = parseVolumeInput(noteEditor.value);
+    if (velocity == null) {
+      setNoteEditor({ ...noteEditor, error: true });
+      return;
+    }
+    const next = notes.slice();
+    next[noteEditor.idx] = { ...next[noteEditor.idx], velocity };
+    commitChange(next);
+  }
+
+  function startCurveHandleDrag(idx: number, edge: "start" | "end", e: React.PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    (e.target as Element).setPointerCapture(e.pointerId);
+    setSelected([idx]);
+    drag.current = { mode: "curve-handle", idx, edge };
+    setDragActive(true);
+  }
+
   function clearNoteVolume() {
     if (!volumePopover) return;
     const next = notes.slice();
-    next[volumePopover.idx] = { ...next[volumePopover.idx], velocity: 100 };
+    next[volumePopover.idx] = { ...next[volumePopover.idx], velocity: 127 };
     commitChange(next);
     setVolumePopover(null);
   }
@@ -444,6 +699,7 @@ export function PianoRoll({
       minPitch,
       pitchSpan: maxPitch - minPitch,
       spanBeats: Math.max(...unique.map((idx) => notes[idx].startBeat + notes[idx].lengthBeats)) - minStart,
+      nextStartBeat: minStart + 1,
     };
     return true;
   }
@@ -453,13 +709,12 @@ export function PianoRoll({
     return copyNotes(indices);
   }
 
-  function pasteCopiedNotes(target?: PasteTarget): boolean {
+  function pasteCopiedNotes(_target?: PasteTarget): boolean {
     if (!midiNoteClipboard || midiNoteClipboard.notes.length === 0) return false;
-    const pasteTarget = target ?? lastPointerTargetRef.current ?? fallbackPasteTarget();
     const maxStart = Math.max(0, lengthBeats - midiNoteClipboard.spanBeats);
-    const startBeat = clamp(snap(pasteTarget.beat), 0, maxStart);
+    const startBeat = clamp(snap(midiNoteClipboard.nextStartBeat), 0, maxStart);
     const basePitch = clamp(
-      pasteTarget.pitch ?? midiNoteClipboard.minPitch,
+      midiNoteClipboard.minPitch,
       BOTTOM_PITCH,
       TOP_PITCH - midiNoteClipboard.pitchSpan,
     );
@@ -472,17 +727,12 @@ export function PianoRoll({
     }));
     commitChange([...notes, ...pasted]);
     setSelected(pasted.map((_, i) => baseIndex + i));
+    midiNoteClipboard = {
+      ...midiNoteClipboard,
+      nextStartBeat: startBeat + 1,
+    };
     lastPointerTargetRef.current = { beat: startBeat, pitch: basePitch };
     return true;
-  }
-
-  function fallbackPasteTarget(): PasteTarget {
-    if (playheadBeat != null) return { beat: snap(playheadBeat), pitch: midiNoteClipboard?.minPitch ?? 60 };
-    if (selected.length > 0 && notes[selected[0]]) {
-      const first = notes[selected[0]];
-      return { beat: snap(first.startBeat + first.lengthBeats), pitch: first.pitch };
-    }
-    return { beat: 0, pitch: midiNoteClipboard?.minPitch ?? 60 };
   }
 
   // Keyboard: Backspace/Delete removes selected.
@@ -496,8 +746,10 @@ export function PianoRoll({
         setNoteMenu(null);
         setGridMenu(null);
         setVolumePopover(null);
+        setNoteEditor(null);
         setSelectBox(null);
         drag.current = null;
+        setDragActive(false);
         return;
       }
       const t = e.target as HTMLElement;
@@ -508,6 +760,13 @@ export function PianoRoll({
         e.stopPropagation();
         e.stopImmediatePropagation();
         undoLocal();
+        return;
+      }
+      if (isCopyPasteModifier && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        setSelected(notes.map((_, index) => index));
         return;
       }
       if (isCopyPasteModifier && e.key.toLowerCase() === "c") {
@@ -543,7 +802,7 @@ export function PianoRoll({
   }, [selected, notes, onChange, volumePopover, playheadBeat]);
 
   useEffect(() => {
-    if (connectFrom == null && curveFrom == null && !noteMenu && !gridMenu && !volumePopover) return;
+    if (connectFrom == null && curveFrom == null && !noteMenu && !gridMenu && !volumePopover && !noteEditor) return;
     function cancel(e: MouseEvent) {
       const target = e.target as Node;
       if (containerRef.current?.contains(target)) return;
@@ -551,6 +810,7 @@ export function PianoRoll({
       setNoteMenu(null);
       setGridMenu(null);
       setVolumePopover(null);
+      setNoteEditor(null);
       if (connectFrom != null) {
         setConnectFrom(null);
         setConnectPointer(null);
@@ -562,7 +822,7 @@ export function PianoRoll({
     }
     window.addEventListener("mousedown", cancel);
     return () => window.removeEventListener("mousedown", cancel);
-  }, [connectFrom, curveFrom, noteMenu, gridMenu, volumePopover]);
+  }, [connectFrom, curveFrom, noteMenu, gridMenu, volumePopover, noteEditor]);
 
   function syncKeyScroll() {
     if (!keysScrollRef.current || !timeScrollRef.current) return;
@@ -600,6 +860,25 @@ export function PianoRoll({
       width: note.lengthBeats * pxPerBeat,
       height: PX_PER_PITCH,
     };
+  }
+
+  function visibleNoteRect(note: MidiNote): Rect | null {
+    const start = note.startBeat;
+    const end = Math.min(lengthBeats, note.startBeat + note.lengthBeats);
+    if (start >= lengthBeats || end <= 0 || end <= start) return null;
+    return {
+      left: start * pxPerBeat,
+      top: (TOP_PITCH - note.pitch) * PX_PER_PITCH,
+      width: Math.max(1, (end - start) * pxPerBeat),
+      height: PX_PER_PITCH,
+    };
+  }
+
+  function noteViewportRect(note: MidiNote): DOMRect | null {
+    const gridRect = containerRef.current?.getBoundingClientRect();
+    if (!gridRect) return null;
+    const rect = noteRect(note);
+    return new DOMRect(gridRect.left + rect.left, gridRect.top + rect.top, rect.width, rect.height);
   }
 
   function scrollKeysWithGrid(e: React.WheelEvent<HTMLDivElement>) {
@@ -652,40 +931,34 @@ export function PianoRoll({
           style={{ height: VIEW_HEIGHT }}
           onScroll={syncKeyScroll}
           onWheel={handleWheelZoom}
+          onPointerDown={onTimeScrollPointerDown}
+          onPointerMove={onNotePointerMove}
+          onPointerUp={onNotePointerUp}
+          onPointerLeave={stopLengthResizeOnLeave}
         >
-          <div className={styles.zoomControls}>
-            <HoverInfo content="Zoom out">
-              <Button
-                iconOnly
-                size="xs"
-                onClick={() => zoom(-ZOOM_STEP)}
-                aria-label="Zoom MIDI editor out"
-              >
-                <Icon name="ph:magnifying-glass-minus" size={16} decorative />
-              </Button>
-            </HoverInfo>
-            <HoverInfo content="Zoom in">
-              <Button
-                iconOnly
-                size="xs"
-                onClick={() => zoom(ZOOM_STEP)}
-                aria-label="Zoom MIDI editor in"
-              >
-                <Icon name="ph:magnifying-glass-plus" size={16} decorative />
-              </Button>
-            </HoverInfo>
-          </div>
           <div className={styles.inner} style={{ width, height }}>
             {/* Grid + notes */}
             <div
               ref={containerRef}
-              className={styles.grid}
+              className={`${styles.grid} ${toolMode === "select" ? styles.gridSelectMode : styles.gridDrawMode}`}
               style={{ width, height }}
               onPointerDown={onGridPointerDown}
               onPointerMove={onNotePointerMove}
               onPointerUp={onNotePointerUp}
               onContextMenu={openGridMenu}
             >
+              <div
+                className={`${styles.lengthHandle} ${lengthHandleActive ? styles.lengthHandleActive : ""}`}
+                style={{ left: width }}
+                onPointerDown={startLengthResize}
+                onPointerMove={onNotePointerMove}
+                onPointerUp={onNotePointerUp}
+                onPointerEnter={() => setLengthHandleActive(true)}
+                onPointerLeave={() => {
+                  if (drag.current?.mode !== "length-resize") setLengthHandleActive(false);
+                }}
+                aria-hidden
+              />
               {/* Horizontal rows (per pitch) */}
               {keyLabels.map((k, i) => (
                 <div
@@ -694,30 +967,37 @@ export function PianoRoll({
                   style={{ top: i * PX_PER_PITCH, height: PX_PER_PITCH }}
                 />
               ))}
-              {/* Vertical lines (per beat) */}
-              {Array.from({ length: Math.floor(lengthBeats) + 1 }, (_, b) => (
+              {/* Vertical lines adapt with zoom: bars, beats, and close-view subdivisions. */}
+              {gridLines.map((line) => (
                 <div
-                  key={b}
-                  className={`${styles.beatLine} ${b % 4 === 0 ? styles.beatLineMajor : ""}`}
-                  style={{ left: b * pxPerBeat }}
+                  key={`${line.beat}:${line.kind}`}
+                  className={`${styles.beatLine} ${line.kind === "bar" ? styles.beatLineMajor : line.kind === "sub" ? styles.beatLineSub : ""}`}
+                  style={{ left: line.beat * pxPerBeat }}
                 />
               ))}
 
               <svg className={styles.connections} width={width} height={height} aria-hidden>
                 {notes.map((note, i) => {
                   if (!note.curve || note.curve.length < 2) return null;
+                  if (noteEditor?.idx === i) return null;
                   const [from, to] = note.curve;
+                  const noteCenterY = (TOP_PITCH - note.pitch) * PX_PER_PITCH + PX_PER_PITCH / 2;
                   const x1 = from.beat * pxPerBeat;
                   const y1 = (TOP_PITCH - from.pitch) * PX_PER_PITCH + PX_PER_PITCH / 2;
                   const x2 = to.beat * pxPerBeat;
                   const y2 = (TOP_PITCH - to.pitch) * PX_PER_PITCH + PX_PER_PITCH / 2;
                   const c = Math.max(24, Math.abs(x2 - x1) * 0.45);
                   return (
-                    <path
-                      key={`curve:${i}`}
-                      className={styles.curvePath}
-                      d={`M ${x1} ${y1} C ${x1 + c} ${y1}, ${x2 - c} ${y2}, ${x2} ${y2}`}
-                    />
+                    <g key={`curve:${i}`}>
+                      <path
+                        className={styles.curvePathFill}
+                        d={`M ${x1} ${noteCenterY} L ${x1} ${y1} C ${x1 + c} ${y1}, ${x2 - c} ${y2}, ${x2} ${y2} L ${x2} ${noteCenterY} Z`}
+                      />
+                      <path
+                        className={styles.curvePath}
+                        d={`M ${x1} ${y1} C ${x1 + c} ${y1}, ${x2 - c} ${y2}, ${x2} ${y2}`}
+                      />
+                    </g>
                   );
                 })}
                 {notes.map((note, i) => {
@@ -770,34 +1050,63 @@ export function PianoRoll({
 
             {/* Notes */}
             {notes.map((n, i) => {
-              const row = TOP_PITCH - n.pitch;
-              const top = row * PX_PER_PITCH;
-              const left = n.startBeat * pxPerBeat;
-              const noteWidth = n.lengthBeats * pxPerBeat;
+              const rect = visibleNoteRect(n);
+              if (!rect) return null;
               const isSelected = selected.includes(i);
+              const hoveredSide = hoveredNoteSide?.idx === i ? hoveredNoteSide.side : null;
               const volumePercent = Math.round((clamp(n.velocity, 0, 127) / 127) * 100);
               return (
                 <div
                   key={i}
-                  className={`${styles.note} ${isSelected ? styles.noteSelected : ""}`}
+                  className={`${styles.note} ${isSelected ? styles.noteSelected : ""} ${hoveredSide === "left" ? styles.noteHoverLeft : ""} ${hoveredSide === "right" ? styles.noteHoverRight : ""}`}
                   style={{
-                    left,
-                    top,
-                    width: noteWidth,
-                    height: PX_PER_PITCH,
+                    left: rect.left,
+                    top: rect.top,
+                    width: rect.width,
+                    height: rect.height,
                     "--note-volume": `${volumePercent}%`,
                   } as CSSProperties}
                   onPointerDown={(e) => startMove(i, e)}
                   onPointerMove={onNotePointerMove}
                   onPointerUp={onNotePointerUp}
+                  onMouseMove={(event) => {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    setHoveredNoteSide({ idx: i, side: event.clientX - rect.left < rect.width / 2 ? "left" : "right" });
+                  }}
+                  onMouseLeave={() => {
+                    setHoveredNoteSide((current) => current?.idx === i ? null : current);
+                  }}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    openNoteEditor(i);
+                  }}
                   onContextMenu={(e) => openNoteMenu(i, e)}
                 >
+                  {volumePercent < 100 && (
+                    <div className={styles.noteVolumeOverlay} aria-hidden>
+                      {volumePercent}%
+                    </div>
+                  )}
                   <div
-                    className={styles.noteResize}
-                    onPointerDown={(e) => startResize(i, e)}
+                    className={`${styles.noteResize} ${styles.noteResizeLeft}`}
+                    onPointerDown={(e) => startResize(i, "left", e)}
                     onPointerMove={onNotePointerMove}
                     onPointerUp={onNotePointerUp}
                   />
+                  <div
+                    className={`${styles.noteResize} ${styles.noteResizeRight}`}
+                    onPointerDown={(e) => startResize(i, "right", e)}
+                    onPointerMove={onNotePointerMove}
+                    onPointerUp={onNotePointerUp}
+                  />
+                  {noteEditor?.idx === i && (
+                    <CurveHandles
+                      note={n}
+                      pxPerBeat={pxPerBeat}
+                      onPointerDown={startCurveHandleDrag}
+                      noteIndex={i}
+                    />
+                  )}
                 </div>
               );
             })}
@@ -821,6 +1130,51 @@ export function PianoRoll({
             )}
             </div>
           </div>
+        </div>
+        <div className={styles.zoomControls}>
+          <HoverInfo content="Draw notes (D)">
+            <Button
+              iconOnly
+              size="xs"
+              selected={toolMode === "draw"}
+              onClick={() => setToolMode("draw")}
+              aria-label="Draw notes tool, D"
+            >
+              <Icon name="ph:pen" size={16} decorative />
+            </Button>
+          </HoverInfo>
+          <HoverInfo content="Select notes (S)">
+            <Button
+              iconOnly
+              size="xs"
+              selected={toolMode === "select"}
+              onClick={() => setToolMode("select")}
+              aria-label="Select notes tool, S"
+            >
+              <Icon name="ph:cursor" size={16} decorative />
+            </Button>
+          </HoverInfo>
+          <span className={styles.toolDivider} aria-hidden />
+          <HoverInfo content="Zoom out">
+            <Button
+              iconOnly
+              size="xs"
+              onClick={() => zoom(-ZOOM_STEP)}
+              aria-label="Zoom MIDI editor out"
+            >
+              <Icon name="ph:magnifying-glass-minus" size={16} decorative />
+            </Button>
+          </HoverInfo>
+          <HoverInfo content="Zoom in">
+            <Button
+              iconOnly
+              size="xs"
+              onClick={() => zoom(ZOOM_STEP)}
+              aria-label="Zoom MIDI editor in"
+            >
+              <Icon name="ph:magnifying-glass-plus" size={16} decorative />
+            </Button>
+          </HoverInfo>
         </div>
       </div>
       {noteMenu && (
@@ -877,6 +1231,21 @@ export function PianoRoll({
           onChange={(value) => setVolumePopover({ ...volumePopover, value, error: false })}
           onApply={applyNoteVolume}
           onClear={clearNoteVolume}
+        />
+      )}
+      {noteEditor && (
+        <VolumePopover
+          state={noteEditor}
+          label="Vol"
+          showClear={false}
+          onChange={(value) => setNoteEditor({ ...noteEditor, value, error: false })}
+          onApply={applyNoteEditorVolume}
+          onClear={() => {
+            setNoteEditor({ ...noteEditor, value: "100", error: false });
+            const next = notes.slice();
+            next[noteEditor.idx] = { ...next[noteEditor.idx], velocity: 127 };
+            commitChange(next);
+          }}
         />
       )}
     </div>
@@ -969,6 +1338,7 @@ interface MidiNoteClipboard {
   minPitch: number;
   pitchSpan: number;
   spanBeats: number;
+  nextStartBeat: number;
 }
 
 interface VolumePopoverState {
@@ -979,13 +1349,73 @@ interface VolumePopoverState {
   error: boolean;
 }
 
+type NoteEditorState = VolumePopoverState;
+
+function CurveHandles({
+  note,
+  noteIndex,
+  pxPerBeat,
+  onPointerDown,
+}: {
+  note: MidiNote;
+  noteIndex: number;
+  pxPerBeat: number;
+  onPointerDown: (idx: number, edge: "start" | "end", event: React.PointerEvent) => void;
+}) {
+  const startPitch = curveEdgePitch(note, "start");
+  const endPitch = curveEdgePitch(note, "end");
+  const startY = curvePitchToNoteY(note, startPitch);
+  const endY = curvePitchToNoteY(note, endPitch);
+  const endX = note.lengthBeats * pxPerBeat;
+  const centerY = PX_PER_PITCH / 2;
+  const curveC = Math.max(12, Math.abs(endX) * 0.45);
+
+  return (
+    <>
+      <svg
+        className={styles.noteCurveOverlay}
+        width={Math.max(1, endX)}
+        height={PX_PER_PITCH}
+        aria-hidden
+      >
+        <path
+          className={styles.noteCurveFill}
+          d={`M 0 ${centerY} L 0 ${startY} C ${curveC} ${startY}, ${Math.max(0, endX - curveC)} ${endY}, ${endX} ${endY} L ${endX} ${centerY} Z`}
+        />
+        <path
+          className={styles.noteCurveLine}
+          d={`M 0 ${startY} C ${curveC} ${startY}, ${Math.max(0, endX - curveC)} ${endY}, ${endX} ${endY}`}
+        />
+      </svg>
+      <span
+        className={`${styles.curveHandle} ${styles.curveHandleStart}`}
+        style={{ left: 0, top: startY }}
+        title={`Start ${formatPitchValue(startPitch)}`}
+        data-midi-note-detail
+        onPointerDown={(event) => onPointerDown(noteIndex, "start", event)}
+      />
+      <span
+        className={`${styles.curveHandle} ${styles.curveHandleEnd}`}
+        style={{ left: endX, top: endY }}
+        title={`End ${formatPitchValue(endPitch)}`}
+        data-midi-note-detail
+        onPointerDown={(event) => onPointerDown(noteIndex, "end", event)}
+      />
+    </>
+  );
+}
+
 function VolumePopover({
   state,
+  label = "Volume",
+  showClear = true,
   onChange,
   onApply,
   onClear,
 }: {
   state: VolumePopoverState;
+  label?: string;
+  showClear?: boolean;
   onChange: (value: string) => void;
   onApply: () => void;
   onClear: () => void;
@@ -993,10 +1423,9 @@ function VolumePopover({
   const numericValue = Math.max(0, Math.min(100, Number(state.value.replace(/%$/, "")) || 0));
   return createPortal(
     <FloatingLayer className={styles.volumePopover} x={state.x} y={state.y}>
-      <div className={styles.volumeSliderRow}>
-        <span className={styles.volumeLabel}>Volume</span>
+      <div className={`${styles.volumeSliderRow} ${!showClear ? styles.volumeSliderRowNoClear : ""}`} data-midi-note-detail>
+        <span className={styles.volumeLabel}>{label}</span>
         <input
-          autoFocus
           className={styles.volumeSlider}
           type="range"
           min={0}
@@ -1010,9 +1439,11 @@ function VolumePopover({
           }}
         />
         <span className={styles.volumeValue}>{numericValue}%</span>
-        <button type="button" className={styles.volumeClear} onClick={onClear} aria-label="Clear note volume">
-          x
-        </button>
+        {showClear && (
+          <button type="button" className={styles.volumeClear} onClick={onClear} aria-label="Clear note volume">
+            x
+          </button>
+        )}
       </div>
       {state.error && <div className={styles.volumeError}>Use 0-100%</div>}
     </FloatingLayer>,
@@ -1055,6 +1486,26 @@ function parseVolumeInput(value: string): number | null {
   return Math.round((Math.max(0, Math.min(100, percent)) / 100) * 127);
 }
 
+function duplicateNotes(notes: MidiNote[], indices: number[]): { notes: MidiNote[]; indices: number[] } {
+  const unique = Array.from(new Set(indices))
+    .filter((idx) => notes[idx])
+    .sort((a, b) => a - b);
+  if (unique.length === 0) return { notes, indices: [] };
+  const baseIndex = notes.length;
+  const indexMap = new Map(unique.map((idx, copyIdx) => [idx, baseIndex + copyIdx]));
+  const duplicated = unique.map((idx) => {
+    const note = structuredClone(notes[idx]);
+    return {
+      ...note,
+      connectToIndex: note.connectToIndex == null ? undefined : indexMap.get(note.connectToIndex),
+    };
+  });
+  return {
+    notes: [...notes, ...duplicated],
+    indices: duplicated.map((_, copyIdx) => baseIndex + copyIdx),
+  };
+}
+
 function connectNotes(notes: MidiNote[], fromIndex: number, toIndex: number): MidiNote[] {
   return notes.map((note, index) => {
     const touchesConnection =
@@ -1072,4 +1523,89 @@ function connectNotes(notes: MidiNote[], fromIndex: number, toIndex: number): Mi
 
 function velocityToPercent(velocity: number): number {
   return Math.round((Math.max(0, Math.min(127, velocity)) / 127) * 100);
+}
+
+function defaultNoteCurve(note: MidiNote): MidiNote {
+  return {
+    ...note,
+    curve: [
+      { beat: note.startBeat, pitch: note.pitch },
+      { beat: note.startBeat + note.lengthBeats, pitch: note.pitch },
+    ],
+  };
+}
+
+function normalizeNoteCurveToBounds(note: MidiNote): MidiNote {
+  if (!note.curve || note.curve.length < 2) return note;
+  return {
+    ...note,
+    curve: [
+      { beat: note.startBeat, pitch: curveEdgePitch(note, "start") },
+      { beat: note.startBeat + note.lengthBeats, pitch: curveEdgePitch(note, "end") },
+    ],
+  };
+}
+
+function shiftCurveWithNote(
+  curve: MidiNote["curve"],
+  oldPitch: number,
+  nextStartBeat: number,
+  nextPitch: number,
+  lengthBeats: number,
+): MidiNote["curve"] {
+  if (!curve || curve.length < 2) return undefined;
+  const deltaPitch = nextPitch - oldPitch;
+  const startPitch = clamp(curve[0]?.pitch + deltaPitch, BOTTOM_PITCH, TOP_PITCH);
+  const endPitch = clamp(curve[curve.length - 1]?.pitch + deltaPitch, BOTTOM_PITCH, TOP_PITCH);
+  return [
+    { beat: nextStartBeat, pitch: startPitch },
+    { beat: nextStartBeat + lengthBeats, pitch: endPitch },
+  ];
+}
+
+function updateNoteCurveHandle(note: MidiNote, edge: "start" | "end", pitch: number): MidiNote {
+  const curved = note.curve && note.curve.length >= 2 ? normalizeNoteCurveToBounds(note) : defaultNoteCurve(note);
+  const startPitch = edge === "start" ? pitch : curveEdgePitch(curved, "start");
+  const endPitch = edge === "end" ? pitch : curveEdgePitch(curved, "end");
+  return {
+    ...curved,
+    curve: [
+      { beat: note.startBeat, pitch: startPitch },
+      { beat: note.startBeat + note.lengthBeats, pitch: endPitch },
+    ],
+  };
+}
+
+function curveEdgePitch(note: MidiNote, edge: "start" | "end"): number {
+  if (!note.curve || note.curve.length < 2) return note.pitch;
+  const point = edge === "start" ? note.curve[0] : note.curve[note.curve.length - 1];
+  return clamp(point?.pitch ?? note.pitch, BOTTOM_PITCH, TOP_PITCH);
+}
+
+function curvePitchToNoteY(note: MidiNote, pitch: number): number {
+  return (note.pitch - pitch) * PX_PER_PITCH + PX_PER_PITCH / 2;
+}
+
+function formatPitchValue(pitch: number): string {
+  return Number.isInteger(pitch) ? String(pitch) : pitch.toFixed(2);
+}
+
+function makeGridLines(lengthBeats: number, pxPerBeat: number): Array<{ beat: number; kind: "bar" | "beat" | "sub" }> {
+  const subdivision = pxPerBeat >= 240 ? 16 : pxPerBeat >= 120 ? 4 : 1;
+  const step = 1 / subdivision;
+  const count = Math.floor(lengthBeats / step);
+  const lines: Array<{ beat: number; kind: "bar" | "beat" | "sub" }> = [];
+  for (let i = 0; i <= count; i++) {
+    const beat = Math.round(i * step * 10000) / 10000;
+    const nearestBeat = Math.round(beat);
+    const isWholeBeat = Math.abs(beat - nearestBeat) < 0.0001;
+    lines.push({
+      beat,
+      kind: isWholeBeat ? nearestBeat % 4 === 0 ? "bar" : "beat" : "sub",
+    });
+  }
+  if (Math.abs(lengthBeats - count * step) > 0.0001) {
+    lines.push({ beat: lengthBeats, kind: "bar" });
+  }
+  return lines;
 }

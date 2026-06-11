@@ -9,7 +9,7 @@
 .label {
   padding: 0 var(--space-1);
   font-family: var(--font-family-base);
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
@@ -31,7 +31,7 @@
   border: 0;
   border-right: var(--border-fg);
   font-family: var(--font-family-base);
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   cursor: pointer;
   transition: var(--transition-invert);
@@ -46,6 +46,10 @@
   color: var(--color-fg-inverse);
 }
 
+.button:disabled {
+  cursor: default;
+}
+
 .active {
   background: var(--color-fg);
   color: var(--color-fg-inverse);
@@ -53,4 +57,18 @@
 
 .active:hover {
   background: var(--color-fg-hover);
+}
+
+.disabled {
+  opacity: 0.38;
+}
+
+.disabled .button {
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.disabled .active {
+  background: color-mix(in srgb, var(--color-fg) 38%, var(--color-bg));
+  color: var(--color-fg);
 }

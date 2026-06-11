@@ -1,0 +1,36 @@
+.root {
+  --marquee-offset: 0px;
+  --marquee-duration: 1.4s;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inner {
+  display: inline-block;
+  min-width: max-content;
+  max-width: none;
+  will-change: transform;
+}
+
+.root[data-overflow="true"]:hover .inner {
+  animation: beat-marquee-text var(--marquee-duration) linear 0.5s infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root[data-overflow="true"]:hover .inner {
+    animation: none;
+  }
+}
+
+@keyframes beat-marquee-text {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(var(--marquee-offset));
+  }
+}

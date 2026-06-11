@@ -3,10 +3,10 @@
   background: var(--color-bg);
   color: var(--color-fg);
   border: var(--border-fg);
-  min-width: 192px;
-  max-width: 320px;
+  min-width: 150px;
+  max-width: 260px;
   padding: 0;
-  z-index: 500;
+  z-index: 5000;
   display: flex;
   flex-direction: column;
   /* Slide-in feel — quick scale from 8px y-offset */
@@ -15,19 +15,24 @@
 
 .item {
   display: grid;
-  grid-template-columns: var(--space-3) 1fr auto;
+  grid-template-columns: 16px 1fr auto;
   align-items: center;
-  gap: var(--space-1);
+  gap: 4px;
   width: 100%;
-  min-height: var(--button-square-md);
-  padding: 0 var(--space-1);
+  min-height: 24px;
+  padding: 0 6px;
   background: transparent;
   color: var(--color-fg);
-  font-size: var(--font-size-1);
+  font-size: var(--font-size-ui);
   font-family: var(--font-family-base);
+  line-height: 1;
   text-align: left;
   transition: var(--transition-invert);
   cursor: pointer;
+}
+
+.itemWrap {
+  position: relative;
 }
 
 .item:hover:not(:disabled) {
@@ -44,7 +49,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--space-3);
+  width: 16px;
 }
 
 .itemLabel {
@@ -62,4 +67,16 @@
   background: var(--color-fg);
   opacity: 0.4; /* internal-divider exception, like gridlines */
   margin: 0;
+}
+
+.submenu {
+  position: absolute;
+  left: calc(100% - 1px);
+  top: 0;
+  min-width: 150px;
+  max-width: 260px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: var(--border-fg);
+  z-index: 5001;
 }

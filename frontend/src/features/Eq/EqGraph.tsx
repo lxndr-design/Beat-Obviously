@@ -163,6 +163,7 @@ export function EqGraph({ bandsDb, onChange }: EqGraphProps) {
 
       {points.map((p, i) => {
         const active = dragIdx === i || hoverIdx === i;
+        const showReadout = active || Math.abs(p.db) >= 0.05;
         return (
           <g key={i}>
             <circle
@@ -182,7 +183,7 @@ export function EqGraph({ bandsDb, onChange }: EqGraphProps) {
             >
               {formatFreq(p.hz)}
             </text>
-            {dragIdx === i && (
+            {showReadout && (
               <text
                 x={p.x}
                 y={Math.max(p.y - 8, TOP_PAD + 8)}
@@ -190,7 +191,7 @@ export function EqGraph({ bandsDb, onChange }: EqGraphProps) {
                 className={styles.dbReadout}
               >
                 {p.db > 0 ? "+" : ""}
-                {p.db.toFixed(1)}
+                {formatDb(p.db)}
               </text>
             )}
           </g>
@@ -248,4 +249,9 @@ function formatFreq(hz: number): string {
     return k % 1 === 0 ? `${k}k` : `${k.toFixed(1)}k`;
   }
   return `${hz}`;
+}
+
+function formatDb(db: number): string {
+  const rounded = Math.abs(db) >= 10 ? db.toFixed(0) : db.toFixed(1);
+  return `${rounded}dB`;
 }

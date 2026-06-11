@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, HoverInfo, Icon, SectionRibbon, SectionRibbonActionButton, useContextMenu, type ContextMenuItem } from "../../components";
+import { Button, HoverInfo, Icon, MarqueeText, SectionRibbon, SectionRibbonActionButton, useContextMenu, type ContextMenuItem } from "../../components";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
 import { useAudioFileStore } from "../../state/store";
@@ -106,9 +106,10 @@ export function AudioFileLibraryPanel({ expanded, onToggle }: AudioFileLibraryPa
   return (
     <div ref={panelRef} className={styles.panel} onContextMenu={onContextMenu}>
       <SectionRibbon
-        title="Audio files"
+        title="Audio Files"
         expanded={expanded}
         onToggle={onToggle}
+        showToggle={false}
         onContextMenu={onContextMenu}
         actions={(
           <HoverInfo content={`Upload ${SUPPORTED_AUDIO_IMPORT_LABEL}`}>
@@ -218,7 +219,7 @@ function AudioFileItem({ file, selectMode, selected, onSelect, onEnterSelectMode
           <Icon name="ph:dots-six-vertical" size={14} decorative />
         </span>
       )}
-      <span className={styles.itemName}>{name}</span>
+      <MarqueeText className={styles.itemName} text={name} />
       <HoverInfo content={formatDuration(durationSeconds)}>
         <span className={styles.itemMeta}>
           <Icon name="ph:waveform" size={14} decorative />

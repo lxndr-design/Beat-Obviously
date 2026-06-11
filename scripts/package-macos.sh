@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BUILD_DIR="${ROOT_DIR}/build"
+BUILD_DIR="${ROOT_DIR}/build-native"
 
 cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}" -G Xcode -DCMAKE_BUILD_TYPE=Release -DBEAT_BUILD_FRONTEND=ON
 cmake --build "${BUILD_DIR}" --config Release
@@ -17,4 +17,7 @@ if [[ -z "${APP_PATH}" || ! -d "${APP_PATH}" ]]; then
   exit 1
 fi
 
-echo "${APP_PATH}"
+ROOT_APP_PATH="${ROOT_DIR}/Beat.app"
+ditto "${APP_PATH}" "${ROOT_APP_PATH}"
+"${ROOT_DIR}/scripts/register-current-beat-app.sh" "${ROOT_APP_PATH}"
+echo "${ROOT_APP_PATH}"

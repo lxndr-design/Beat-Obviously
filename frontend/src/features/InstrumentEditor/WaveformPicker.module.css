@@ -46,7 +46,7 @@
 }
 
 .selectedLabel {
-  font-size: 11px;
+  font-size: var(--font-size-ui);
   line-height: 1.1;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);

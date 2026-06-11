@@ -48,6 +48,25 @@ namespace beat
         };
         using ParameterAutomationHandler = std::function<void(const ParameterAutomationEvent&)>;
 
+        struct AudioClipEvent {
+            Id     trackId;
+            Id     segmentId;
+            Id     audioFileId;
+            int    sampleOffset { 0 };
+            int    lengthSamples { 0 };
+            Beats  sourceOffsetBeats { 0.0 };
+            Beats  clipOffsetBeats { 0.0 };
+            Beats  clipLengthBeats { 0.0 };
+            Beats  fadeInBeats { 0.0 };
+            Beats  fadeOutBeats { 0.0 };
+            int    repetition { 0 };
+            Beats  segmentStartBeat { 0.0 };
+            float  trackGainDb { 0.0f };
+            float  trackPan { 0.0f };
+            float  segmentGainDb { 0.0f };
+        };
+        using AudioClipHandler = std::function<void(const AudioClipEvent&)>;
+
         void setProject(Project p);
         void setTempo(double newBpm)     { bpm.store(newBpm); }
         void setSampleRate(double sr)    { sampleRate.store(sr); }
@@ -74,7 +93,8 @@ namespace beat
          *  block via `onTrigger`. */
         void render(int numSamples,
                     TriggerHandler onTrigger,
-                    ParameterAutomationHandler onAutomation = {});
+                    ParameterAutomationHandler onAutomation = {},
+                    AudioClipHandler onAudioClip = {});
 
     private:
         std::shared_ptr<const Project> projectSnapshot { std::make_shared<Project>() };

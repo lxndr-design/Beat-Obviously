@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { previewFrequency, renderedInstrumentBuffer } from "../../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../../audio/synthWorkletPreview";
-import { Button, HoverInfo, Icon, Knob, TextInput } from "../../../components";
+import { ActionFooter, Button, HoverInfo, Icon, Knob, TextInput } from "../../../components";
 import {
   FACTORY_SYNTH_PRESETS,
   getNumberParam,
@@ -495,20 +495,18 @@ export function SynthEditor() {
         </div>
       </div>
 
-      <footer className={styles.footer}>
-        <div className={styles.footerActions}>
-          <Button className={styles.footerButton} variant="ghost" selected={auditioning} onClick={() => void onAudition()}>
-            <Icon name={auditioning ? "ph:stop-fill" : "ph:play-fill"} size={12} decorative />
-            {auditioning ? "Stop" : "Play"}
-          </Button>
-          <Button className={styles.footerButton} onClick={() => void onApply()}>
-            Apply
-          </Button>
-          <Button className={styles.footerButton} variant="primary" onClick={() => void onSaveInstrument()}>
-            Save
-          </Button>
-        </div>
-      </footer>
+      <ActionFooter className={styles.footer}>
+        <Button className={styles.footerButton} variant="ghost" selected={auditioning} onClick={() => void onAudition()}>
+          <Icon name={auditioning ? "ph:stop-fill" : "ph:play-fill"} size={12} decorative />
+          {auditioning ? "Stop" : "Play"}
+        </Button>
+        <Button className={styles.footerButton} onClick={() => void onApply()}>
+          Apply
+        </Button>
+        <Button className={styles.footerButton} variant="primary" onClick={() => void onSaveInstrument()}>
+          Save
+        </Button>
+      </ActionFooter>
     </section>
   );
 }

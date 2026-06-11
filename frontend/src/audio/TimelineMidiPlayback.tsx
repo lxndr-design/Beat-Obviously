@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useInstrumentStore, useProjectStore, useTransportStore } from "../state/store";
 import { expandTrackSegments, isTrackAudible } from "../state/selectors";
 import { getTimelineAudioContext, scheduleTimelineMidiNote, stopTimelineAudio } from "./timelineAudio";
+import { useAnalyzerStore } from "../state/analyzerStore";
 import type { Instrument, MidiNote } from "../state/types";
 import { DEFAULT_DRUM_MIDI_PITCH, DEFAULT_DRUM_VELOCITY, drumTimingOffsetBeats, normalizeDrumCell } from "../state/drumSteps";
 
@@ -63,6 +64,7 @@ export function TimelineMidiPlayback() {
       const beatsPerSecond = (bpm / 60) * transport.speed;
       const lookaheadBeats = LOOKAHEAD_SECONDS * beatsPerSecond;
       const currentBeat = transport.positionBeat;
+      const trackMeters: Array<{ id: string; rms: number; peak: number }> = [];
 
       if (currentBeat < lastPositionRef.current || currentBeat > lengthBeats - 0.01) {
         scheduledRef.current.clear();
@@ -70,7 +72,11 @@ export function TimelineMidiPlayback() {
       lastPositionRef.current = currentBeat;
 
       for (const track of tracks) {
-        if (!isTrackAudible(track)) continue;
+        if (!isTrackAudible(track)) {
+          trackMeters.push({ id: track.id, peak: 0, rms: 0 });
+          continue;
+        }
+        let trackPeak = 0;
         const occurrences = expandTrackSegments(track, lengthBeats);
         for (const occ of occurrences) {
           const seg = track.segments.find((s) => s.id === occ.segmentId);
@@ -94,11 +100,12 @@ export function TimelineMidiPlayback() {
                 const key = `${seg.id}:${occ.repetition}:${row.id}:${step}`;
                 if (scheduledRef.current.has(key)) continue;
                 const delayS = Math.max(0, (noteStart - currentBeat) / beatsPerSecond);
+                const velocity = applyGainToVelocity(cell.velocity ?? DEFAULT_DRUM_VELOCITY, track.gainDb);
                 scheduleTimelineMidiNote(
                   {
                     pitch: DEFAULT_DRUM_MIDI_PITCH,
                     frequencyHz: cell.pitchHz ?? seg.payload.defaultPitchHz,
-                    velocity: cell.velocity ?? DEFAULT_DRUM_VELOCITY,
+                    velocity,
                     startBeat: 0,
                     lengthBeats: Math.min(0.25, stepLengthBeats),
                   },
@@ -107,6 +114,7 @@ export function TimelineMidiPlayback() {
                   Math.max(0.05, Math.min(0.18, stepLengthBeats / beatsPerSecond)),
                 );
                 scheduledRef.current.add(key);
+                trackPeak = Math.max(trackPeak, velocity / 127);
               }
             }
             continue;
@@ -128,17 +136,21 @@ export function TimelineMidiPlayback() {
             const delayS = Math.max(0, (noteStart - currentBeat) / beatsPerSecond);
             const durationBeats = target ? Math.max(0.03, target.startBeat - note.startBeat) : note.lengthBeats;
             const durationS = Math.max(0.03, durationBeats / beatsPerSecond);
+            const noteWithGain = applySegmentGainToNote(transposeNote(note, transpose), (payload.gainDb ?? 0) + track.gainDb);
             scheduleTimelineMidiNote(
-              transposeNote(note, transpose),
+              noteWithGain,
               instrument,
               audio.currentTime + delayS,
               durationS,
               target ? transposeNote(target, transpose) : undefined,
             );
             scheduledRef.current.add(key);
+            trackPeak = Math.max(trackPeak, noteWithGain.velocity / 127);
           });
         }
+        trackMeters.push({ id: track.id, peak: trackPeak, rms: trackPeak * 0.707 });
       }
+      if (trackMeters.length) useAnalyzerStore.getState().setTrackMeters(trackMeters);
 
       rafRef.current = requestAnimationFrame(tick);
     }
@@ -160,6 +172,20 @@ function transposeNote(note: MidiNote, transpose: number): MidiNote {
     pitch: Math.max(0, Math.min(127, note.pitch + shift)),
     curve: note.curve?.map((point) => ({ ...point, pitch: Math.max(0, Math.min(127, point.pitch + shift)) })),
   };
+}
+
+function applySegmentGainToNote(note: MidiNote, gainDb: number): MidiNote {
+  if (Math.abs(gainDb) < 0.001) return note;
+  return {
+    ...note,
+    velocity: applyGainToVelocity(note.velocity, gainDb),
+  };
+}
+
+function applyGainToVelocity(velocity: number, gainDb: number): number {
+  if (Math.abs(gainDb) < 0.001) return velocity;
+  const gain = Math.pow(10, Math.max(-96, Math.min(24, gainDb)) / 20);
+  return Math.max(0, Math.min(127, velocity * gain));
 }
 
 function connectedLaterNote(notes: MidiNote[], index: number): MidiNote | undefined {

@@ -35,6 +35,13 @@
   --grid-line-mid:   rgba(255, 255, 255, 0.16);
   --grid-line-bold:  rgba(255, 255, 255, 0.45);  /* bold-beat tick */
 
+  /* Standard UI surfaces for browser rows, list rows, and preview internals. */
+  --surface-subtle: color-mix(in srgb, var(--color-fg) 8%, var(--color-bg));
+  --surface-hover: color-mix(in srgb, var(--color-fg) 14%, var(--color-bg));
+  --surface-selected: color-mix(in srgb, var(--color-fg) 34%, var(--color-bg));
+  --surface-selected-strong: color-mix(in srgb, var(--color-fg) 48%, var(--color-bg));
+  --border-soft: 1px solid color-mix(in srgb, var(--color-fg) 35%, transparent);
+
   /* === Spacing (8px grid) ============================================ */
   --space-unit: 8px;
   --space-1: 8px;
@@ -72,8 +79,17 @@
     "Consolas",
     monospace;
 
-  /* 8-step ramp — min 16, max 90 */
-  --font-size-1: 16px;  /* body, controls */
+  /* Compact DAW UI sizes. Use these for dense controls, rows, hints, and
+   * editor surfaces. 12px is the minimum readable interactive size; 10px is
+   * reserved for faint non-interactive tick/hint annotations only. */
+  --font-size-hint: 10px;
+  --font-size-ui: 12px;
+  --font-size-ui-lg: 14px;
+  --font-size-section: 16px;
+  --font-size-title: 18px;
+
+  /* 8-step editorial ramp — min 16, max 90 */
+  --font-size-1: 16px;  /* body/editorial text */
   --font-size-2: 20px;  /* secondary headings */
   --font-size-3: 24px;  /* labels, small headings */
   --font-size-4: 32px;  /* section headings */
@@ -98,7 +114,8 @@
   /* === Transitions ====================================================
    * The entire transition vocabulary. Do not invent more.
    */
-  --duration-hover: 0.1s;       /* hover info reveal, color invert */
+  --duration-hover: 0.1s;       /* hover info reveal, color invert hover-in */
+  --duration-hover-out: 0s;     /* color invert hover-out */
   --duration-slide: 0.2s;       /* panels, modals enter/leave */
   --duration-flash: 0.05s;      /* playback flash to white */
   --duration-fade: 0.4s;        /* playback fade back to black */
@@ -112,6 +129,9 @@
   --transition-invert:
     background-color var(--duration-hover) var(--ease-linear),
     color var(--duration-hover) var(--ease-linear);
+  --transition-invert-out:
+    background-color var(--duration-hover-out) var(--ease-linear),
+    color var(--duration-hover-out) var(--ease-linear);
   --transition-slide-x: transform var(--duration-slide) var(--ease-in-out);
   --transition-slide-y: transform var(--duration-slide) var(--ease-in-out);
   --transition-opacity: opacity var(--duration-hover) var(--ease-out);
@@ -156,6 +176,8 @@
   --button-square-sm: 24px;
   --button-square-md: 32px;
   --button-square-lg: 40px;
+  --sidebar-rail-size: 36px;
+  --sidebar-subrow-height: 24px;
 
   /* Knobs — synth controls */
   --knob-size-sm: 32px;

@@ -15,8 +15,9 @@ export interface ContextMenuItem {
   label: string;
   /** Optional Iconify name (ph:* only). */
   icon?: string;
-  onSelect: () => void;
+  onSelect?: () => void;
   disabled?: boolean;
+  submenu?: ContextMenuItem[];
   /** Show a thin divider above this item. */
   separatorBefore?: boolean;
   /** Items rendered to the right (e.g. shortcut hint). */
@@ -103,6 +104,7 @@ interface PortalProps {
 function ContextMenuPortal({ x, y, items, onClose }: PortalProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x, y });
+  const [submenuIndex, setSubmenuIndex] = useState<number | null>(null);
 
   // Clamp to viewport after first paint so we don't overflow the right/bottom edges.
   useEffect(() => {
@@ -143,27 +145,62 @@ function ContextMenuPortal({ x, y, items, onClose }: PortalProps) {
       className={styles.menu}
       style={{ left: pos.x, top: pos.y }}
       role="menu"
+      data-floating-layer
     >
       {items.map((item, i) => (
         <Fragment key={i}>
           {item.separatorBefore && <div className={styles.separator} />}
-          <button
-            type="button"
-            role="menuitem"
-            disabled={item.disabled}
-            className={styles.item}
-            onClick={() => {
-              if (item.disabled) return;
-              item.onSelect();
-              onClose();
-            }}
+          <div
+            className={styles.itemWrap}
+            onMouseEnter={() => setSubmenuIndex(!item.disabled && item.submenu ? i : null)}
+            onFocus={() => setSubmenuIndex(!item.disabled && item.submenu ? i : null)}
           >
-            <span className={styles.itemIcon}>
-              {item.icon && <Icon name={item.icon} size={16} decorative />}
-            </span>
-            <span className={styles.itemLabel}>{item.label}</span>
-            {item.hint && <span className={styles.itemHint}>{item.hint}</span>}
-          </button>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={item.disabled}
+              className={styles.item}
+              onClick={() => {
+                if (item.disabled || item.submenu) return;
+                item.onSelect?.();
+                onClose();
+              }}
+            >
+              <span className={styles.itemIcon}>
+                {item.icon && <Icon name={item.icon} size={12} decorative />}
+              </span>
+              <span className={styles.itemLabel}>{item.label}</span>
+              {item.submenu ? (
+                <span className={styles.itemHint}>›</span>
+              ) : item.hint ? (
+                <span className={styles.itemHint}>{item.hint}</span>
+              ) : null}
+            </button>
+            {item.submenu && submenuIndex === i && (
+              <div className={styles.submenu} role="menu" data-floating-layer>
+                {item.submenu.map((child, childIndex) => (
+                  <button
+                    key={`${child.label}:${childIndex}`}
+                    type="button"
+                    role="menuitem"
+                    disabled={child.disabled}
+                    className={styles.item}
+                    onClick={() => {
+                      if (child.disabled) return;
+                      child.onSelect?.();
+                      onClose();
+                    }}
+                  >
+                    <span className={styles.itemIcon}>
+                      {child.icon && <Icon name={child.icon} size={12} decorative />}
+                    </span>
+                    <span className={styles.itemLabel}>{child.label}</span>
+                    {child.hint && <span className={styles.itemHint}>{child.hint}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </Fragment>
       ))}
     </div>,

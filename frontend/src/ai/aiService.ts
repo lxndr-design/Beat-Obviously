@@ -1,4 +1,5 @@
 import type { AudioFile, Instrument, MidiNote } from "../state/types";
+import { synthDraftFromInstrument } from "../state/synthStore";
 import {
   DRUM_GENRE_GUIDELINES,
   generateLocalDrumBeat,
@@ -153,6 +154,8 @@ async function generateInstrumentWithOllama(opts: GenerateInstrumentOptions): Pr
               "Return ONLY valid JSON, no markdown.",
               "Stay within provided numeric ranges.",
               "Respect targetInstrumentType unless the user explicitly asks for a different type.",
+              "For wavetable instruments, use Aether multi-oscillator settings instead of legacy single-oscillator synth settings.",
+              "Do not hand-author synthPatch; Beat derives the canonical synthPatch from normalized Aether settings.",
               "Use variationSeed to produce a meaningfully different patch for repeated prompts.",
               "Only use sampleUrl values from availableSamples.",
             ].join(" "),
@@ -260,7 +263,22 @@ function buildInstrumentPrompt(opts: GenerateInstrumentOptions): string {
         detuneCents: "0..100",
         blend: "0..1",
       },
-      aether: "For kind wavetable, return kind wavetable, waveform wavetable, wavetable settings, and optional aether.oscA/oscB/sub/noise settings.",
+      aether: {
+        rule: "For kind wavetable, always return aether.oscA and use oscB/sub/noise when musically useful.",
+        oscA: {
+          enabled: "true",
+          waveform: ["wavetable", "sine", "saw", "square", "triangle", "noise"],
+          level: "0..1",
+          pan: "-1..1",
+          octave: "-4..4 integer",
+          semitone: "-24..24 integer",
+          fineCents: "-100..100",
+          wavetable: "same object shape as wavetable",
+        },
+        oscB: "same shape as oscA; set enabled false when not needed",
+        sub: { enabled: "boolean", level: "0..1", octave: "-4..0 integer", waveform: ["sine", "square", "triangle"] },
+        noise: { enabled: "boolean", level: "0..1", color: "0..1" },
+      },
     },
     outputSchema: {
       name: "string",
@@ -282,7 +300,7 @@ function buildInstrumentPrompt(opts: GenerateInstrumentOptions): string {
       envToFilter: "number",
       sampleUrl: "optional exact sampleUrl from availableSamples",
       wavetable: "optional object for kind wavetable",
-      aether: "optional Aether oscillator stack for kind wavetable",
+      aether: "Aether oscillator stack for kind wavetable; Beat derives synthPatch from this",
     },
   });
 }
@@ -303,7 +321,7 @@ function sanitizeInstrumentPatch(value: unknown, opts: GenerateInstrumentOptions
     ? record.waveform
     : kind === "sampler" ? "sample" : kind === "wavetable" ? "wavetable" : opts.current.waveform;
 
-  return {
+  const patch: Partial<Instrument> = {
     name: typeof record.name === "string" && record.name.trim()
       ? record.name.trim().slice(0, 48)
       : opts.current.name,
@@ -337,6 +355,7 @@ function sanitizeInstrumentPatch(value: unknown, opts: GenerateInstrumentOptions
     aether: kind === "wavetable" ? sanitizeAether(record.aether, opts.current.aether) : record.aether,
     ...(sampleUrl ? { sampleUrl, sampleIds: [], source: { kind: "derived", label: "AI sample selection", url: sampleUrl, edited: false } } : {}),
   };
+  return withAetherSynthPatch(patch, opts);
 }
 
 function sanitizeWavetable(value: unknown, fallback?: Instrument["wavetable"]): NonNullable<Instrument["wavetable"]> {
@@ -433,7 +452,7 @@ function generateLocalInstrumentPatch(opts: GenerateInstrumentOptions): Partial<
     : sample
     ? "sampler"
     : "synth";
-  return {
+  const patch: Partial<Instrument> = {
     name: opts.prompt.trim().slice(0, 32) || "AI Instrument",
     kind,
     waveform: kind === "sampler" ? "sample" : kind === "wavetable" ? "wavetable" : sample ? "sample" : bowed || soft ? "sine" : bright ? "saw" : "square",
@@ -479,6 +498,8 @@ function generateLocalInstrumentPatch(opts: GenerateInstrumentOptions): Partial<
     } : {}),
     ...(sample?.sampleUrl ? { sampleUrl: sample.sampleUrl, sampleIds: [], source: { kind: "derived", label: sample.name, url: sample.sampleUrl, edited: false } } : {}),
   };
+
+  return withAetherSynthPatch(patch, opts);
 }
 
 function summarizeInstrument(instrument: Instrument) {
@@ -502,6 +523,47 @@ function summarizeInstrument(instrument: Instrument) {
     lfoToPitch: instrument.lfoToPitch,
     lfoToFilter: instrument.lfoToFilter,
     envToFilter: instrument.envToFilter,
+    wavetable: instrument.wavetable,
+    aether: instrument.aether,
+    synthPatch: instrument.synthPatch
+      ? {
+          name: instrument.synthPatch.name,
+          tags: instrument.synthPatch.metadata.tags,
+          parameters: instrument.synthPatch.parameters,
+          modulation: instrument.synthPatch.modulation,
+        }
+      : undefined,
+  };
+}
+
+function withAetherSynthPatch(patch: Partial<Instrument>, opts: GenerateInstrumentOptions): Partial<Instrument> {
+  if (patch.kind !== "wavetable") return patch;
+
+  const merged: Instrument = {
+    ...opts.current,
+    ...patch,
+    kind: "wavetable",
+    waveform: "wavetable",
+    envelope: patch.envelope ? { ...opts.current.envelope, ...patch.envelope } : opts.current.envelope,
+    knobs: patch.knobs ? { ...opts.current.knobs, ...patch.knobs } : opts.current.knobs,
+    wavetable: patch.wavetable ? sanitizeWavetable(patch.wavetable, opts.current.wavetable) : sanitizeWavetable(undefined, opts.current.wavetable),
+    aether: sanitizeAether(patch.aether, opts.current.aether),
+    sampleIds: patch.sampleIds ?? opts.current.sampleIds ?? [],
+    userCreated: opts.current.userCreated,
+  };
+
+  const synthPatch = synthDraftFromInstrument(merged);
+  synthPatch.name = merged.name;
+  synthPatch.metadata.tags = Array.from(new Set([...(merged.descriptors ?? []), "generated", "aether"])).slice(0, 16);
+  synthPatch.metadata.icon = merged.icon ?? synthPatch.metadata.icon;
+
+  return {
+    ...patch,
+    kind: "wavetable",
+    waveform: "wavetable",
+    wavetable: merged.wavetable,
+    aether: merged.aether,
+    synthPatch,
   };
 }
 

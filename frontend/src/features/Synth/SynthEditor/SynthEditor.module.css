@@ -1,7 +1,7 @@
 section.shell {
   --synth-gap: 6px;
-  --synth-font: 12px;
-  --synth-mono-font: 11px;
+  --synth-font: var(--font-size-ui);
+  --synth-mono-font: var(--font-size-ui);
   --synth-control-height: 28px;
   display: flex;
   flex-direction: column;
@@ -34,33 +34,11 @@ section.shell {
 }
 
 .footer {
-  display: flex;
-  justify-content: flex-end;
-  align-items: stretch;
-  gap: 0;
-  padding: 0;
-  height: var(--modal-footer-height);
-  min-height: var(--modal-footer-height);
-  max-height: var(--modal-footer-height);
-  border-top: var(--border-fg);
-  flex: 0 0 var(--modal-footer-height);
-  overflow: hidden;
-}
-
-.footerActions {
-  display: inline-flex;
-  align-items: stretch;
-  justify-content: flex-end;
-  gap: 0;
-  margin-left: auto;
-  height: 100%;
+  flex-shrink: 0;
 }
 
 .footerButton {
-  height: 100%;
-  min-height: var(--modal-footer-height);
-  max-height: var(--modal-footer-height);
-  align-self: stretch;
+  min-width: 96px;
 }
 
 .utilityGrid {
@@ -129,7 +107,7 @@ section.shell {
 }
 
 .presetSelect :global(.ds-field-label) {
-  font-size: 11px;
+  font-size: var(--font-size-ui);
 }
 
 .iconPicker {
@@ -189,7 +167,7 @@ section.shell {
 .iconOption span {
   max-width: 100%;
   overflow: hidden;
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -265,7 +243,7 @@ section.shell {
 .shapeControlLabel {
   max-width: 100%;
   overflow: hidden;
-  font-size: 10px;
+  font-size: var(--font-size-ui);
   line-height: 1;
   text-align: center;
   text-overflow: ellipsis;

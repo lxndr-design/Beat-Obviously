@@ -10,6 +10,10 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    // The Three.js visualizer is isolated in an async vendor chunk. Keep the
+    // warning focused on first-load app chunks instead of that lazy WebGL
+    // dependency.
+    chunkSizeWarningLimit: 900,
     // Produce assets that JUCE can pack into BinaryData with predictable
     // names. Hashes are kept short to avoid SQLite blob bloat.
     rollupOptions: {
@@ -17,6 +21,17 @@ export default defineConfig({
         entryFileNames: "assets/[name]-[hash:8].js",
         chunkFileNames: "assets/[name]-[hash:8].js",
         assetFileNames: "assets/[name]-[hash:8][extname]",
+        manualChunks(id) {
+          if (id.includes("@react-three") || id.includes("/three/") || id.includes("\\three\\") || id.includes("react-reconciler")) {
+            return "vendor-visualizer";
+          }
+          if (id.includes("node_modules")) {
+            if (id.includes("dexie")) return "vendor-db";
+            if (id.includes("@iconify")) return "vendor-icons";
+            return "vendor";
+          }
+          return undefined;
+        },
       },
     },
   },
