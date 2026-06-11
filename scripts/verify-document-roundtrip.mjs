@@ -42,6 +42,27 @@ try {
   assert.equal(migrated.project.tracks.length, 1, "document migration should keep valid tracks");
   assert.equal(migrated.project.tracks[0].gainDb, 24, "track gain should clamp to the supported range");
   assert.equal(migrated.project.tracks[0].pan, -1, "track pan should clamp to the supported range");
+  assert.equal(migrated.project.tracks[0].recordArmed, true, "track record-arm state should survive document migration");
+  assert.equal(migrated.project.tracks[0].inputMonitoring, true, "track input monitoring should survive document migration");
+  assert.equal(migrated.project.tracks[0].inputDeviceId, "builtin-input", "track input device id should survive document migration");
+  assert.equal(migrated.project.tracks[0].inputChannelStart, 1024, "track input channel start should clamp to the supported range");
+  assert.equal(migrated.project.tracks[0].inputChannelCount, 1, "track input channel count should clamp to at least one channel");
+  assert.equal(migrated.project.tracks[0].recordGainDb, 24, "track record gain should clamp to the supported range");
+  assert.deepEqual(
+    migrated.project.recordingInput,
+    {
+      inputDeviceId: "builtin-input",
+      inputDeviceName: "Built-in Microphone",
+      inputChannelStart: 1024,
+      inputChannelCount: 1,
+      calibrationSampleRate: 768000,
+      measuredRoundTripSamples: 1920000,
+      reportedInputLatencySamples: 0,
+      reportedOutputLatencySamples: 512,
+      userLatencyAdjustmentSamples: -1920000,
+    },
+    "project recording input profile should roundtrip with backend-compatible clamps",
+  );
   assert.equal(migrated.project.tracks[0].effects.filters[0].kind, "plugin");
   assert.equal(migrated.project.tracks[0].effects.filters[0].pluginId, "plug-decent-kit");
   assert.deepEqual(
@@ -92,6 +113,14 @@ try {
     beatDocumentFingerprint(migrated),
     beatDocumentFingerprint(changedPlugin),
     "document dirty fingerprint should include plugin adapter state",
+  );
+
+  const changedRecordingInput = structuredClone(migrated);
+  changedRecordingInput.project.recordingInput.userLatencyAdjustmentSamples += 32;
+  assert.notEqual(
+    beatDocumentFingerprint(migrated),
+    beatDocumentFingerprint(changedRecordingInput),
+    "document dirty fingerprint should include recording latency calibration",
   );
 
   const relinked = replaceBeatDocumentAssetPath(migrated, "/Samples/Kick.wav", "/Relinked/Kick.wav");
@@ -148,6 +177,17 @@ function makeRepresentativeDocument() {
         { atBeat: 0, bandsDb: [0, 1, -1, 2, -2, 3, -3] },
         { atBeat: 64, bandsDb: [1, 1, 0, 0, -1, -1, 2] },
       ],
+      recordingInput: {
+        inputDeviceId: "builtin-input",
+        inputDeviceName: "Built-in Microphone",
+        inputChannelStart: 9999,
+        inputChannelCount: -2,
+        calibrationSampleRate: 999999,
+        measuredRoundTripSamples: 9999999,
+        reportedInputLatencySamples: -4,
+        reportedOutputLatencySamples: 512,
+        userLatencyAdjustmentSamples: -9999999,
+      },
       tracks: [
         {
           id: "track-a",
@@ -158,6 +198,12 @@ function makeRepresentativeDocument() {
           pan: -4,
           mute: false,
           solo: false,
+          recordArmed: true,
+          inputMonitoring: true,
+          inputDeviceId: "builtin-input",
+          inputChannelStart: 9999,
+          inputChannelCount: -2,
+          recordGainDb: 99,
           rowHeight: "normal",
           effects: {
             filters: [

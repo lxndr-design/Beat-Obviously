@@ -187,6 +187,7 @@ function sanitizeProject(value: unknown): Project {
     returnBuses: Array.isArray(value.returnBuses) ? structuredClone(value.returnBuses) : [],
     masterEqAutomation: Array.isArray(value.masterEqAutomation) ? structuredClone(value.masterEqAutomation) : [],
     masterChain: sanitizeMasterChain(value.masterChain),
+    recordingInput: sanitizeRecordingInputProfile(value.recordingInput),
   };
 }
 
@@ -219,12 +220,33 @@ function sanitizeTrack(value: unknown): Track | null {
     pan: clamp(finiteNumber(value.pan, 0), -1, 1),
     mute: Boolean(value.mute),
     solo: Boolean(value.solo),
+    recordArmed: Boolean(value.recordArmed),
+    inputMonitoring: Boolean(value.inputMonitoring),
+    inputDeviceId: nonEmptyString(value.inputDeviceId, ""),
+    inputChannelStart: Math.round(clamp(finiteNumber(value.inputChannelStart, 0), 0, 1024)),
+    inputChannelCount: Math.round(clamp(finiteNumber(value.inputChannelCount, 1), 1, 1024)),
+    recordGainDb: clamp(finiteNumber(value.recordGainDb, 0), -48, 24),
     sends: Array.isArray(value.sends) ? structuredClone(value.sends) : [],
     effects: isObject(value.effects) && Array.isArray(value.effects.filters)
       ? { filters: structuredClone(value.effects.filters) as Track["effects"]["filters"] }
       : { filters: [] },
     segments: Array.isArray(value.segments) ? structuredClone(value.segments) : [],
     rowHeight: value.rowHeight === "compact" ? "compact" : "normal",
+  };
+}
+
+function sanitizeRecordingInputProfile(value: unknown): Project["recordingInput"] {
+  const source = isObject(value) ? value : {};
+  return {
+    inputDeviceId: nonEmptyString(source.inputDeviceId, ""),
+    inputDeviceName: nonEmptyString(source.inputDeviceName, ""),
+    inputChannelStart: Math.round(clamp(finiteNumber(source.inputChannelStart, 0), 0, 1024)),
+    inputChannelCount: Math.round(clamp(finiteNumber(source.inputChannelCount, 2), 1, 1024)),
+    calibrationSampleRate: clamp(finiteNumber(source.calibrationSampleRate, 0), 0, 768000),
+    measuredRoundTripSamples: Math.round(clamp(finiteNumber(source.measuredRoundTripSamples, 0), 0, 1920000)),
+    reportedInputLatencySamples: Math.round(clamp(finiteNumber(source.reportedInputLatencySamples, 0), 0, 1920000)),
+    reportedOutputLatencySamples: Math.round(clamp(finiteNumber(source.reportedOutputLatencySamples, 0), 0, 1920000)),
+    userLatencyAdjustmentSamples: Math.round(clamp(finiteNumber(source.userLatencyAdjustmentSamples, 0), -1920000, 1920000)),
   };
 }
 

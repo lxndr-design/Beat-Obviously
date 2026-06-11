@@ -170,6 +170,13 @@ export interface Track {
   pan: number; // -1..1
   mute: boolean;
   solo: boolean;
+  /** Native recording state. Persisted so armed/input mappings survive document roundtrip. */
+  recordArmed: boolean;
+  inputMonitoring: boolean;
+  inputDeviceId?: string;
+  inputChannelStart: number;
+  inputChannelCount: number;
+  recordGainDb: number;
   /** Color is not exposed in this design system — kept here for future themes. */
   sends?: TrackSend[];
   effects: TrackEffectChain;
@@ -526,6 +533,18 @@ export interface MasterChainSettings {
   outputGainDb: number;
 }
 
+export interface RecordingInputProfile {
+  inputDeviceId?: string;
+  inputDeviceName?: string;
+  inputChannelStart: number;
+  inputChannelCount: number;
+  calibrationSampleRate: number;
+  measuredRoundTripSamples: number;
+  reportedInputLatencySamples: number;
+  reportedOutputLatencySamples: number;
+  userLatencyAdjustmentSamples: number;
+}
+
 export interface TimeSignature {
   num: number;
   denom: number;
@@ -547,6 +566,7 @@ export interface Project {
   returnBuses: ReturnBus[];
   masterEqAutomation: EqAutomationPoint[];
   masterChain: MasterChainSettings;
+  recordingInput: RecordingInputProfile;
   /** Last saved timestamp ms. */
   savedAt?: number;
 }

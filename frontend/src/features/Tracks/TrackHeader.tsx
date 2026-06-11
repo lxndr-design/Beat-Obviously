@@ -79,6 +79,17 @@ export function TrackHeader({
         onSelect: () => setTrackSolo(trackId, !track.solo),
       },
       {
+        label: track.recordArmed ? "Disarm recording" : "Arm recording",
+        icon: track.recordArmed ? "ph:record-fill" : "ph:record",
+        onSelect: () => updateTrack(trackId, { recordArmed: !track.recordArmed }),
+        separatorBefore: true,
+      },
+      {
+        label: track.inputMonitoring ? "Disable input monitoring" : "Enable input monitoring",
+        icon: "ph:speaker-high",
+        onSelect: () => updateTrack(trackId, { inputMonitoring: !track.inputMonitoring }),
+      },
+      {
         label: "Rename",
         icon: "ph:pencil-simple",
         onSelect: () => setEditingName(true),
@@ -204,15 +215,45 @@ export function TrackHeader({
             style={{ transform: `scaleX(${Math.max(0, Math.min(1, meter?.peak ?? 0))})` }}
           />
         </div>
-        {(gainBadge || panBadge) && (
+        {(gainBadge || panBadge || track.recordArmed || track.inputMonitoring) && (
           <div className={styles.statusRow} aria-hidden>
             {gainBadge && <span className={styles.statusBadge}>{gainBadge}</span>}
             {panBadge && <span className={styles.statusBadge}>{panBadge}</span>}
+            {track.recordArmed && <span className={styles.statusBadge}>REC</span>}
+            {track.inputMonitoring && <span className={styles.statusBadge}>IN</span>}
           </div>
         )}
       </div>
 
       <div className={styles.controls}>
+        <HoverInfo content={track.recordArmed ? "Disarm recording" : "Arm recording"}>
+          <button
+            type="button"
+            className={`${styles.dot} ${styles.recordDot} ${track.recordArmed ? styles.dotOn : ""}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (event.ctrlKey) return;
+              updateTrack(trackId, { recordArmed: !track.recordArmed });
+            }}
+            aria-label={track.recordArmed ? "Disarm recording" : "Arm recording"}
+          >
+            R
+          </button>
+        </HoverInfo>
+        <HoverInfo content={track.inputMonitoring ? "Disable input monitoring" : "Enable input monitoring"}>
+          <button
+            type="button"
+            className={`${styles.dot} ${track.inputMonitoring ? styles.dotOn : ""}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (event.ctrlKey) return;
+              updateTrack(trackId, { inputMonitoring: !track.inputMonitoring });
+            }}
+            aria-label={track.inputMonitoring ? "Disable input monitoring" : "Enable input monitoring"}
+          >
+            I
+          </button>
+        </HoverInfo>
         <HoverInfo content={track.solo ? "Unsolo" : "Solo (mute others)"}>
           <button
             type="button"

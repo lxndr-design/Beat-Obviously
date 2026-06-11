@@ -109,6 +109,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 /* Small circular Solo/Mute buttons. Border-radius exception is OK for
@@ -139,6 +141,10 @@
 .dotOn {
   background: var(--color-fg);
   color: var(--color-fg-inverse);
+}
+
+.recordDot {
+  border-style: double;
 }
 
 /* Active dot + hover → off-white tint. Specificity (0,3,0) > .dot:hover (0,2,0). */

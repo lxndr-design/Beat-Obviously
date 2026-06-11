@@ -1,4 +1,4 @@
-import { Button, Modal, TextInput } from "../../components";
+import { Button, Modal, NumberInput, TextInput, Toggle } from "../../components";
 import { useProjectStore, useUiStore } from "../../state/store";
 import styles from "./TrackDetailsModal.module.css";
 import type { Id } from "../../state/types";
@@ -63,6 +63,58 @@ export function TrackDetailsModal({ trackId }: TrackDetailsModalProps) {
               step={1}
               display={formatPan(track.pan)}
               onChange={(panPercent) => updateTrack(trackId, { pan: panPercent / 100 })}
+            />
+          </div>
+        </section>
+
+        <section className={`${styles.section} ${styles.spanFull}`}>
+          <header className={styles.sectionHeader}>Recording</header>
+          <div className={styles.sectionBody}>
+            <div className={styles.toggleGrid}>
+              <Toggle
+                label="Arm"
+                checked={track.recordArmed}
+                onChange={(recordArmed) => updateTrack(trackId, { recordArmed })}
+              />
+              <Toggle
+                label="Monitor"
+                checked={track.inputMonitoring}
+                onChange={(inputMonitoring) => updateTrack(trackId, { inputMonitoring })}
+              />
+            </div>
+            <TextInput
+              label="Input Device ID"
+              value={track.inputDeviceId ?? ""}
+              onChange={(event) => updateTrack(trackId, { inputDeviceId: event.target.value })}
+            />
+            <div className={styles.numberGrid}>
+              <NumberInput
+                label="Channel Start"
+                layout="inline"
+                value={track.inputChannelStart}
+                min={0}
+                max={1024}
+                step={1}
+                onChange={(inputChannelStart) => updateTrack(trackId, { inputChannelStart: Math.round(inputChannelStart) })}
+              />
+              <NumberInput
+                label="Channels"
+                layout="inline"
+                value={track.inputChannelCount}
+                min={1}
+                max={1024}
+                step={1}
+                onChange={(inputChannelCount) => updateTrack(trackId, { inputChannelCount: Math.round(inputChannelCount) })}
+              />
+            </div>
+            <SliderRow
+              label="Rec Gain"
+              value={track.recordGainDb}
+              min={-48}
+              max={24}
+              step={1}
+              display={formatGain(track.recordGainDb)}
+              onChange={(recordGainDb) => updateTrack(trackId, { recordGainDb })}
             />
           </div>
         </section>
