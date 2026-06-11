@@ -464,10 +464,15 @@ namespace beat
 
     AudioEngine::AudioDeviceSnapshot AudioEngine::listAudioDevices(bool scanAvailableDevices)
     {
-        if (device == nullptr)
-            device = std::make_unique<juce::AudioDeviceManager>();
-
         AudioDeviceSnapshot snapshot;
+        if (device == nullptr)
+        {
+            if (!scanAvailableDevices)
+                return snapshot;
+
+            device = std::make_unique<juce::AudioDeviceManager>();
+        }
+
         snapshot.currentTypeName = device->getCurrentAudioDeviceType();
 
         if (auto* current = device->getCurrentAudioDevice())

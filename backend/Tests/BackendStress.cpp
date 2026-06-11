@@ -9370,6 +9370,7 @@ int main()
     }
     std::cerr << "analysis: done\n";
 
+    std::cerr << "sequencer: start\n";
     if (!stressSequencerTransport())
     {
         std::cerr << "Sequencer transport stress failed\n";
@@ -9425,6 +9426,9 @@ int main()
         std::cerr << "Sequencer audio clip event stress failed\n";
         return 1;
     }
+    std::cerr << "sequencer: done\n";
+
+    std::cerr << "persistence: start\n";
     if (!stressProjectAssetSidecarPackaging())
     {
         std::cerr << "Project asset sidecar packaging stress failed\n";
@@ -9490,166 +9494,204 @@ int main()
         std::cerr << "Project document backup stress failed\n";
         return 1;
     }
+    std::cerr << "persistence: done\n";
+
+    std::cerr << "engine: start\n";
+    std::cerr << "  track meters\n";
     if (!stressAudioEngineTrackMeters())
     {
         std::cerr << "Audio engine track meter stress failed\n";
         return 1;
     }
+    std::cerr << "  track gain/pan render\n";
     if (!stressAudioEngineTrackGainPanRender())
     {
         std::cerr << "Audio engine track gain/pan render stress failed\n";
         return 1;
     }
+    std::cerr << "  track effects\n";
     if (!stressAudioEngineTrackEffects())
     {
         std::cerr << "Audio engine track effects stress failed\n";
         return 1;
     }
+    std::cerr << "  instrument effects\n";
     if (!stressAudioEngineInstrumentEffects())
     {
         std::cerr << "Audio engine instrument effects stress failed\n";
         return 1;
     }
+    std::cerr << "  plugin effect placeholder\n";
     if (!stressAudioEnginePluginEffectPlaceholder())
     {
         std::cerr << "Audio engine plugin effect placeholder stress failed\n";
         return 1;
     }
+    std::cerr << "  effect latency estimate\n";
     if (!stressAudioEngineEffectLatencyEstimate())
     {
         std::cerr << "Audio engine effect latency estimate stress failed\n";
         return 1;
     }
+    std::cerr << "  transport command coalescing\n";
     if (!stressAudioEngineTransportCommandCoalescing())
     {
         std::cerr << "Audio engine transport command coalescing stress failed\n";
         return 1;
     }
+    std::cerr << "  device snapshot\n";
     if (!stressAudioEngineDeviceSnapshot())
     {
         std::cerr << "Audio engine device snapshot stress failed\n";
         return 1;
     }
+    std::cerr << "  input recording capture\n";
     if (!stressAudioEngineInputRecordingCapture())
     {
         std::cerr << "Audio engine input recording capture stress failed\n";
         return 1;
     }
+    std::cerr << "  input monitoring\n";
     if (!stressAudioEngineInputMonitoring())
     {
         std::cerr << "Audio engine input monitoring stress failed\n";
         return 1;
     }
+    std::cerr << "  plugin latency compensation\n";
     if (!stressAudioEnginePluginLatencyCompensation())
     {
         std::cerr << "Audio engine plugin latency compensation stress failed\n";
         return 1;
     }
+    std::cerr << "  compressor effect\n";
     if (!stressAudioEngineCompressorEffect())
     {
         std::cerr << "Audio engine compressor effect stress failed\n";
         return 1;
     }
+    std::cerr << "  distortion effect\n";
     if (!stressAudioEngineDistortionEffect())
     {
         std::cerr << "Audio engine distortion effect stress failed\n";
         return 1;
     }
+    std::cerr << "  chorus effect\n";
     if (!stressAudioEngineChorusEffect())
     {
         std::cerr << "Audio engine chorus effect stress failed\n";
         return 1;
     }
+    std::cerr << "  phaser effect\n";
     if (!stressAudioEnginePhaserEffect())
     {
         std::cerr << "Audio engine phaser effect stress failed\n";
         return 1;
     }
+    std::cerr << "  flanger effect\n";
     if (!stressAudioEngineFlangerEffect())
     {
         std::cerr << "Audio engine flanger effect stress failed\n";
         return 1;
     }
+    std::cerr << "  bitcrush chunk continuity\n";
     if (!stressAudioEngineBitcrushChunkContinuity())
     {
         std::cerr << "Audio engine bitcrush chunk continuity stress failed\n";
         return 1;
     }
+    std::cerr << "  transport panic reset\n";
     if (!stressAudioEngineTransportPanicReset())
     {
         std::cerr << "Audio engine transport panic reset stress failed\n";
         return 1;
     }
+    std::cerr << "  apply project runtime boundary\n";
     if (!stressAudioEngineApplyProjectRuntimeBoundary())
     {
         std::cerr << "Audio engine apply-project runtime boundary stress failed\n";
         return 1;
     }
+    std::cerr << "  transport command burst\n";
     if (!stressAudioEngineTransportCommandBurst())
     {
         std::cerr << "Audio engine transport command burst stress failed\n";
         return 1;
     }
+    std::cerr << "  queued loop clamp transport\n";
     if (!stressAudioEngineQueuedLoopClampTransport())
     {
         std::cerr << "Audio engine queued loop clamp transport stress failed\n";
         return 1;
     }
+    std::cerr << "  audio clip playback\n";
     if (!stressAudioEngineAudioClipPlayback())
     {
         std::cerr << "Audio engine audio clip playback stress failed\n";
         return 1;
     }
+    std::cerr << "  tail effects\n";
     if (!stressAudioEngineTailEffects())
     {
         std::cerr << "Audio engine delay/reverb stress failed\n";
         return 1;
     }
+    std::cerr << "  denormal tail protection\n";
     if (!stressAudioEngineDenormalTailProtection())
     {
         std::cerr << "Audio engine denormal tail protection stress failed\n";
         return 1;
     }
+    std::cerr << "  route automation\n";
     if (!stressAudioEngineRouteAutomation())
     {
         std::cerr << "Audio engine route automation stress failed\n";
         return 1;
     }
+    std::cerr << "  automation block-size stability\n";
     if (!stressAudioEngineAutomationBlockSizeStability())
     {
         std::cerr << "Audio engine automation block-size stability stress failed\n";
         return 1;
     }
+    std::cerr << "  sample instrument routing\n";
     if (!stressAudioEngineSampleInstrumentRouting())
     {
         std::cerr << "Audio engine sample instrument routing stress failed\n";
         return 1;
     }
+    std::cerr << "  sample zones and release\n";
     if (!stressAudioEngineSampleZonesAndRelease())
     {
         std::cerr << "Audio engine sample zone/release stress failed\n";
         return 1;
     }
+    std::cerr << "  sample zone direct path loading\n";
     if (!stressAudioEngineSampleZoneDirectPathLoading())
     {
         std::cerr << "Audio engine sample zone direct-path loading stress failed\n";
         return 1;
     }
+    std::cerr << "  sample zone start/end slicing\n";
     if (!stressAudioEngineSampleZoneStartEndSlicing())
     {
         std::cerr << "Audio engine sample zone start/end slicing stress failed\n";
         return 1;
     }
+    std::cerr << "  sample zone length selection\n";
     if (!stressAudioEngineSampleZoneLengthSelection())
     {
         std::cerr << "Audio engine sample zone length selection stress failed\n";
         return 1;
     }
+    std::cerr << "  sample zone multi-variable selection\n";
     if (!stressAudioEngineSampleZoneMultiVariableSelection())
     {
         std::cerr << "Audio engine sample zone multi-variable selection stress failed\n";
         return 1;
     }
+    std::cerr << "engine: done\n";
+
+    std::cerr << "sample/export: start\n";
     if (!stressAudioEngineSampleLoopAndOneShot())
     {
         std::cerr << "Audio engine sample loop/one-shot stress failed\n";
@@ -9715,6 +9757,9 @@ int main()
         std::cerr << "Audio engine mixed live/export parity stress failed\n";
         return 1;
     }
+    std::cerr << "sample/export: done\n";
+
+    std::cerr << "decent sampler: start\n";
     if (!stressDecentSamplerFixtureImportAndPlayback())
     {
         std::cerr << "Decent Sampler fixture import/playback stress failed\n";
@@ -9735,6 +9780,9 @@ int main()
         std::cerr << "Decent Sampler Lorenzo import/playback stress failed\n";
         return 1;
     }
+    std::cerr << "decent sampler: done\n";
+
+    std::cerr << "audio clips/master/routing: start\n";
     if (!stressAudioEngineAudioClipOfflineExport())
     {
         std::cerr << "Audio engine audio clip offline export stress failed\n";
@@ -9790,6 +9838,9 @@ int main()
         std::cerr << "Track bounce planner stress failed\n";
         return 1;
     }
+    std::cerr << "audio clips/master/routing: done\n";
+
+    std::cerr << "churn/dense: start\n";
     if (!stressAudioEngineProjectApplyChurn())
     {
         std::cerr << "Audio engine project apply churn stress failed\n";
@@ -9815,6 +9866,7 @@ int main()
         std::cerr << "Audio engine variable block size stress failed\n";
         return 1;
     }
+    std::cerr << "churn/dense: done\n";
 
     std::cout << "Backend stress passed\n";
     return 0;
