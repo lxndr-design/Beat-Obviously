@@ -12,6 +12,7 @@
     "verify:daw": "node ../scripts/verify-daw-core.mjs",
     "verify:documents": "node ../scripts/verify-document-roundtrip.mjs",
     "verify:native-doc": "node ../scripts/verify-native-document-registration.mjs",
+    "verify:design-system": "node ../scripts/verify-design-system.mjs",
     "verify:synth": "node ../scripts/verify-synth-roundtrip.mjs",
     "verify:drums": "node ../scripts/verify-drum-generation.mjs",
     "verify:interactions": "node ../scripts/verify-frontend-interactions.mjs"

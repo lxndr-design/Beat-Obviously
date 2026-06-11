@@ -1,0 +1,119 @@
+.page {
+  width: 100%;
+  min-height: 100%;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.header {
+  display: grid;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-fg);
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--font-size-4);
+  line-height: var(--line-height-tight);
+  text-transform: uppercase;
+}
+
+.intro {
+  max-width: 960px;
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-snug);
+}
+
+.section {
+  display: grid;
+  gap: var(--space-1);
+  border: var(--border-fg);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  min-height: var(--button-square-lg);
+  padding: 0 var(--space-1);
+  border-bottom: var(--border-fg);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--font-size-section);
+  text-transform: uppercase;
+}
+
+.sectionNote {
+  margin: 0;
+  max-width: 640px;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  line-height: var(--line-height-snug);
+}
+
+.body {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-1);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(192px, 1fr));
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.sample {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-1);
+  border: var(--border-fg);
+}
+
+.sampleLabel {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  line-height: var(--line-height-snug);
+}
+
+.swatch {
+  display: grid;
+  grid-template-rows: 64px auto;
+  min-width: 0;
+  border: var(--border-fg);
+}
+
+.swatchChip {
+  min-height: 64px;
+  border-bottom: var(--border-fg);
+}
+
+.swatchLabel {
+  padding: var(--space-1);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+}
+
+.constrained {
+  width: 192px;
+  min-width: 0;
+}

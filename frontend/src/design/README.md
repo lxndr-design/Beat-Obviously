@@ -1,51 +1,188 @@
-# Beat design system
+# Beat UI kit
 
-Strict, deliberately narrow visual language. Read this before adding any UI.
+Beat uses a narrow, monochrome DAW interface system. This document is the source
+of truth for visual rules, component usage, accessibility expectations, and how
+to extend the kit without drifting.
 
-## Hard rules
+## Status
 
-1. **Colors**: only `#000` and `#fff`. Three narrow exceptions:
-   - **Text selection** (`::selection`) uses `--color-highlight` (light green `#a8ff8c`).
-   - **Inside-object gridlines**: very-low-opacity white (`rgba(255,255,255,0.08–0.45)`) for subdivision lines.
-   - **Hover on already-white surfaces** uses `--color-fg-hover` (off-white `rgba(255,255,255,0.78)`). Only valid when the surface is already in its "active/white" state (e.g. selected Solo button, MIDI segment body). Hover on black-bodied things still uses pure color-invert.
+The kit is implemented in three layers:
 
-   None of these appear on standalone or default-state surfaces.
-2. **Font**: Helvetica Neue (system fallback chain in `tokens.css`). Sizes are an 8-step ramp: `16, 20, 24, 32, 40, 56, 72, 90`. No 14, no 18, no 100.
-3. **Spacing**: 8px base unit. Every gap, padding, margin, width, height is a multiple of 8. Half-units (4px) are banned except for 1px borders.
-4. **Outlines**: buttons get **none**. Outlines/borders exist only to delineate grid structure — page sections, window borders, column dividers, modal frames. Always 1px solid `#fff` or `#000`.
-5. **Transitions**:
-   - Hover-info reveal: `0.1s` ease-out.
-   - Color invert: `0.1s` linear (button hover, toggle states).
-   - Sliding: `0.2s cubic-bezier(0.4, 0, 0.2, 1)` (modal enter, panel slide).
-   - Track/segment playback flash: `0.05s` flash to white, `0.4s` fade to black.
-   - That's the entire transition vocabulary. Do not invent more.
-6. **Columns fill width**: grid selectors, list items, etc. always stretch to the column's full width. Never fit-to-content.
-7. **Icons**: Iconify only. Single set: **`ph`** (Phosphor) by default. Do not mix in `mdi`, `lucide`, etc. on the same screen.
-8. **Images**: all raster images render as B&W bitmaps with a pre-applied dither (see `<DitheredImage>`). Display only the dithered result.
-9. **MIDI elements**: white outline on black fill (e.g., the white-outlined boxes in piano roll views).
-10. **Modal behavior**:
-    - Save confirmation: `[Save] [Don't Save] [Cancel]`.
-    - Warning / notification: `[OK] [Cancel]`.
-    - Editing anything opens a new modal; modal tracks its own dirty state.
-    - Multiple modals may be open. The unsaved-check overlay shadows the *whole window* (`rgba(0,0,0,0.6)` over everything including other modals).
+1. **Foundations** in `frontend/src/design/*.css`.
+2. **Shared primitives** in `frontend/src/components`.
+3. **Feature composition** in `frontend/src/features`.
 
-## Files
+Every shared component must have a colocated `*.demo.tsx` file, and every demo
+must be included by `frontend/src/design/UiKitCatalog.tsx`.
 
-- [`tokens.css`](./tokens.css) — every CSS custom property
-- [`reset.css`](./reset.css) — element reset
-- [`typography.css`](./typography.css) — font face, sizes, line-heights
-- [`layout.css`](./layout.css) — shared app/editor layout primitives
-- [`surfaces.css`](./surfaces.css) — shared panel, section, row, and frame primitives
-- [`forms.css`](./forms.css) — shared field/control primitives
-- [`animations.css`](./animations.css) — keyframes + transition shorthand classes
-- [`global.css`](./global.css) — entry point; imports the others
+## Foundations
 
-## How to add a new component
+### Color
 
-1. Open `tokens.css` and check if existing tokens cover what you need.
-2. If not, add the token first (and justify it here in this README).
-3. Check `layout.css`, `surfaces.css`, and `forms.css` before creating repeated panel, grid, or field styles.
-4. Build reusable primitives in `components/<Name>/` consuming tokens via `var(--token)`.
-5. Keep feature-only layout in that feature's CSS module.
-6. Never hardcode `#000`, `#fff`, `16px`, etc. — always go through tokens.
-7. Add a story/demo entry in `components/<Name>/<Name>.demo.tsx` so the component is exercisable.
+Default UI is black and white:
+
+- `--color-bg`: black
+- `--color-fg`: white
+- `--color-bg-inverse`: white
+- `--color-fg-inverse`: black
+
+Allowed exceptions:
+
+- `--color-highlight` for text selection only.
+- `--color-scrim` for modal and unsaved-state overlays.
+- `--color-fg-hover` for hover on surfaces that are already foreground-filled.
+- `--grid-line-*` and `--surface-*` for dense editor internals, browser rows,
+  waveform grids, timeline subdivisions, and secondary data marks.
+
+Do not introduce hue. If a feature needs status, use copy, iconography, position,
+or monochrome emphasis before adding a token.
+
+### Typography
+
+Use `--font-family-base` for UI and `--font-family-mono` for technical readouts.
+
+Compact DAW UI tokens:
+
+- `--font-size-hint`: 10px, non-interactive hints and ticks only.
+- `--font-size-ui`: 12px, dense controls and compact rows.
+- `--font-size-ui-lg`: 14px, larger dense controls.
+- `--font-size-section`: 16px, section labels and standard readable text.
+- `--font-size-title`: 18px, compact modal and panel titles.
+
+Editorial/display ramp:
+
+- `--font-size-1` through `--font-size-8`: 16, 20, 24, 32, 40, 56, 72, 90px.
+
+Do not scale type with viewport width. Use `letter-spacing: var(--letter-spacing-*)`.
+
+### Spacing
+
+The base unit is 8px. Use `--space-*` tokens for gaps, padding, margins, fixed
+control dimensions, and layout rhythm.
+
+Allowed non-8px values:
+
+- `1px` borders and gridlines.
+- Tokenized compact control sizes that already exist in `tokens.css`.
+- Geometry that is derived from audio/time data, SVG paths, or rendered waveforms.
+
+### Borders
+
+Borders delineate structure. Use `--border-fg` and `--border-bg`.
+
+Buttons do not get resting outlines. Inputs, panels, modal frames, timeline grids,
+and section dividers may use 1px structural borders.
+
+### Motion
+
+Use only the transition vocabulary in `tokens.css`:
+
+- `--transition-invert` for color inversion.
+- `--transition-slide-x` and `--transition-slide-y` for panels and modals.
+- `--transition-opacity` for hover info.
+- Playback flash uses `--duration-flash` then `--duration-fade`.
+
+Do not add decorative fades, bounces, spring motion, or arbitrary easing.
+
+### Icons
+
+Use `<Icon>` from `components/Icon`. Icon names must use the `ph:` Iconify set.
+Do not mix icon sets in product UI.
+
+Decorative icons must pass `decorative`. Informational icons need a `title` or
+an accessible label from the surrounding control.
+
+### Images
+
+Raster imagery must render as dithered black-and-white output through
+`<DitheredImage>`. Do not display the original color image in product UI.
+
+## CSS Files
+
+- `tokens.css`: tokens and theme inversion.
+- `reset.css`: element reset and baseline focus behavior.
+- `typography.css`: font sizing utilities.
+- `layout.css`: app shells, rows, stacks, grids, scrolling, and toolbars.
+- `surfaces.css`: frames, panels, sections, row items, and empty states.
+- `forms.css`: field, label, input, textarea, select, and range primitives.
+- `animations.css`: approved keyframes and transition utility classes.
+- `global.css`: import entry point; import order matters.
+
+## Shared Components
+
+Use shared components before styling feature-local controls.
+
+| Component | Use For | Required States |
+| --- | --- | --- |
+| `ActionFooter` | Modal/action button rows | start/end alignment |
+| `Block` | Section frames and structured panels | framed/unframed, title, actions, padding |
+| `Button` | Commands, icon buttons, selected toggles | default, primary, ghost, danger, disabled, icon-only |
+| `ContextMenu` | Pointer and keyboard-invoked menus | disabled item, submenu, separators |
+| `DitheredImage` | Raster preview imagery | loading, success, failure fallback |
+| `FloatingLayer` | Portaled popovers | positioned layer with role |
+| `FloatingSelect` | Compact selects in constrained panels | open, selected, long labels |
+| `HoverInfo` | Tooltips and compact hover detail | hover/focus, viewport clamping |
+| `Icon` | All product icons | decorative and labelled |
+| `Knob` | Continuous synth/audio parameters | small/medium/large, bipolar, edited, modulation |
+| `MarqueeText` | Single-line overflowing labels | short and overflow text |
+| `Modal` | Editors and confirmations | stacked, dirty, footer, close controls |
+| `NumberInput` | Numeric fields | clamping, unit, arrow-key stepping |
+| `RadioGroup` | Mutually exclusive modes | selected, disabled |
+| `SectionRibbon` | Sidebar/panel headers | expanded/collapsed, count, actions |
+| `TextInput` | Text fields | stacked, inline, bare, unit |
+| `Toggle` | Binary settings | on, off, disabled |
+
+## Accessibility
+
+Baseline expectations:
+
+- Native controls stay native where possible.
+- Icon-only controls require `aria-label`.
+- Modal roots use `role="dialog"` and `aria-modal="true"`.
+- Sliders expose `aria-valuemin`, `aria-valuemax`, `aria-valuenow`, and label.
+- Menus use `role="menu"` / `role="menuitem"`; listbox selects use
+  `role="listbox"` / `role="option"`.
+- Disabled controls use native `disabled` where possible.
+- Keyboard behavior must be documented in the component comment or demo when it
+  differs from browser defaults.
+- Focus should remain visible for inputs and complex controls. Buttons may avoid
+  resting outlines, but keyboard-only operation must still be possible.
+
+## Component Demo Requirements
+
+Each shared component folder must include `<Component>.demo.tsx`.
+
+A demo should show:
+
+- Default state.
+- Primary variants or sizes.
+- Disabled/empty/error states when applicable.
+- Keyboard or accessibility-specific behavior when non-obvious.
+- Realistic copy from the DAW domain, not lorem ipsum.
+
+The demo is not a marketing page. It is a compact inspection surface for
+engineers and designers.
+
+## Adding Or Changing UI
+
+1. Check `tokens.css` first.
+2. Check `layout.css`, `surfaces.css`, and `forms.css` before adding CSS.
+3. Prefer an existing shared component.
+4. If a new shared primitive is needed, add it under `components/<Name>/`.
+5. Add `<Name>.demo.tsx`.
+6. Add the demo to `design/UiKitCatalog.tsx`.
+7. Run `npm run verify:design-system`.
+8. Run `npm run typecheck` and `npm run build`.
+
+## Enforcement
+
+`npm run verify:design-system` checks that:
+
+- Every shared component has a demo.
+- Every demo is included in `UiKitCatalog.tsx`.
+- Component files do not import raw Iconify directly.
+- Non-Phosphor icon names are not used in source.
+- Shared component CSS does not introduce new hex colors outside design files.
+
+The verifier is intentionally conservative. If it flags a legitimate new pattern,
+add a token and update this document in the same change.
