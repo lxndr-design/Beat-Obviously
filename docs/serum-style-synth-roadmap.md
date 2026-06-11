@@ -4,7 +4,7 @@
 
 Build Beat into a coherent DAW with a serious native synth/sampler stack. The target is not a quick Serum clone. The target is a trustworthy music system: stable timeline, reliable documents, mathematically sound audio rendering, real-time-safe engine behavior, and an Aether synth that grows from a strong internal architecture instead of a pile of UI controls.
 
-This roadmap replaces the older Serum-style checklist. Current low-level audio-engine decisions and verification details live in `docs/audio-engine.md`; folder-structure migration guidance lives in `docs/project-structure.md`; stable synth IDs live in `docs/synth-parameter-contract.md`.
+This roadmap replaces the older Serum-style checklist. The focused v1 DAW completion plan lives in `docs/daw-comprehensiveness-roadmap.md`; current low-level audio-engine decisions and verification details live in `docs/audio-engine.md`; folder-structure migration guidance lives in `docs/project-structure.md`; stable synth IDs live in `docs/synth-parameter-contract.md`.
 
 Status legend:
 
