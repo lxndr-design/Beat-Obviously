@@ -36,6 +36,17 @@
   box-shadow: inset 0 0 0 1px var(--color-fg);
 }
 
+.empty {
+  display: flex;
+  align-items: center;
+  min-height: var(--sidebar-subrow-height);
+  padding: 0 6px;
+  color: var(--color-fg-hover);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .item {
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr) var(--sidebar-subrow-height);

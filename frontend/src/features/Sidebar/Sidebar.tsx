@@ -3,13 +3,14 @@ import { InstrumentLibraryPanel } from "../InstrumentLibrary/InstrumentLibraryPa
 import { AudioFileLibraryPanel } from "../AudioFiles/AudioFileLibraryPanel";
 import { ComponentLibraryPanel } from "../ComponentLibrary/ComponentLibraryPanel";
 import { PluginLibraryPanel } from "../PluginLibrary/PluginLibraryPanel";
+import { DecentSamplerLibraryPanel } from "../PluginLibrary/DecentSamplerLibraryPanel";
 import { HoverInfo, Icon } from "../../components";
 import { isNative, send } from "../../ipc/bridge";
 import { saveCurrentDocument } from "../../persistence/documentActions";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore, useUiStore, useViewStore } from "../../state/store";
 import styles from "./Sidebar.module.css";
 
-type SidebarPanel = "instruments" | "audio" | "components" | "plugins";
+type SidebarPanel = "instruments" | "audio" | "components" | "plugins" | "decentSampler";
 
 const PANELS: Array<{ id: SidebarPanel; label: string; icon: string }> = [
   { id: "instruments", label: "Instruments", icon: "ph:piano-keys" },
@@ -113,9 +114,10 @@ export function Sidebar() {
           <HoverInfo content="DecentSampler" placement="right">
             <button
               type="button"
-              className={styles.railButton}
-              onClick={() => openEditor({ kind: "decentSamplerLibrary" })}
+              className={`${styles.railButton} ${activePanel === "decentSampler" ? styles.railButtonActive : ""}`}
+              onClick={() => setActivePanel("decentSampler")}
               aria-label="DecentSampler compatibility"
+              aria-pressed={activePanel === "decentSampler"}
             >
               <img className={styles.decentSamplerIcon} src="/assets/decent-sampler.png" alt="" aria-hidden="true" />
             </button>
@@ -180,6 +182,12 @@ export function Sidebar() {
           <PluginLibraryPanel
             expanded
             onToggle={() => setActivePanel("plugins")}
+          />
+        )}
+        {activePanel === "decentSampler" && (
+          <DecentSamplerLibraryPanel
+            expanded
+            onToggle={() => setActivePanel("decentSampler")}
           />
         )}
       </div>

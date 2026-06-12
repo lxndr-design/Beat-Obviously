@@ -57,7 +57,7 @@ export function PluginLibraryPanel({ expanded, onToggle }: PluginLibraryPanelPro
   );
 }
 
-function PluginImportModal({ onClose, onInstalled }: { onClose: () => void; onInstalled: (pluginId: string) => void }) {
+export function PluginImportModal({ onClose, onInstalled }: { onClose: () => void; onInstalled: (pluginId: string) => void }) {
   const addPlugin = usePluginStore((s) => s.addPlugin);
   const updatePlugin = usePluginStore((s) => s.updatePlugin);
   const addAudioFile = useAudioFileStore((s) => s.addFile);
@@ -160,7 +160,7 @@ interface PluginItemProps {
   onOpen: () => void;
 }
 
-function PluginItem({ plugin, onOpen }: PluginItemProps) {
+export function PluginItem({ plugin, onOpen }: PluginItemProps) {
   const removePlugin = usePluginStore((s) => s.removePlugin);
   const closeEditor = useUiStore((s) => s.closeEditor);
   const { onContextMenu, menu } = useContextMenu((): ContextMenuItem[] => [
@@ -173,7 +173,7 @@ function PluginItem({ plugin, onOpen }: PluginItemProps) {
       onSelect: onOpen,
     },
     {
-      label: plugin.format === "decent-sampler" ? "Open DS Skin" : plugin.kind === "synth" ? "Create Instrument" : "Render WAV",
+      label: plugin.format === "decent-sampler" ? "Open Package UI" : plugin.kind === "synth" ? "Create Instrument" : "Render WAV",
       icon: plugin.format === "decent-sampler" ? "ph:package" : plugin.kind === "synth" ? "ph:wave-sine" : "ph:file-audio",
       onSelect: onOpen,
       separatorBefore: true,
@@ -274,7 +274,7 @@ function detectPluginFile(file: File | null): {
       kind: "renderer",
       format: "decent-sampler",
       version: "1.0.0",
-      description: "Imported DecentSampler package. Opens in Beat's protected DS skin host.",
+      description: "Imported DecentSampler package. Opens to the package UI.",
     };
   }
   if (lower.endsWith(".zip")) {
