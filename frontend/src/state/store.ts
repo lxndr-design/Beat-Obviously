@@ -1391,7 +1391,7 @@ function defaultInstrumentSets(): InstrumentSet[] {
     { id: FACTORY_DRUM_SET_ID, name: "Classic Machines", factory: true },
     { id: ORCHESTRA_SET_ID, name: "Orchestra Pit", factory: true },
     { id: FACTORY_SYNTH_SET_ID, name: "Synths", factory: true },
-    { id: TEMPORARY_DS_INSTRUMENT_SET_ID, name: "Temporary Instruments", factory: true },
+    { id: TEMPORARY_DS_INSTRUMENT_SET_ID, name: "Instanced Instruments", factory: true },
     { id: USER_INSTRUMENT_SET_ID, name: "User", factory: true },
   ];
 }
