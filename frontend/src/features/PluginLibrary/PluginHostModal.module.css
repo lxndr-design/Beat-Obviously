@@ -113,53 +113,28 @@
 }
 
 .decentSkinHost {
+  position: relative;
   display: grid;
-  grid-template-rows: var(--modal-header-height) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   min-height: 0;
-  height: 100%;
+  height: min(620px, calc(100vh - 96px));
 }
 
-.decentSkinToolbar {
-  display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 6px;
-  min-width: 0;
-  min-height: var(--modal-header-height);
-  border-bottom: var(--border-fg);
-  background: var(--surface-subtle);
-}
-
-.decentSkinStatus {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding: 0 8px;
-}
-
-.decentSkinStatus span,
-.decentSkinStatus strong,
-.decentSkinStatus em {
+.decentSkinNotice {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 3;
+  max-width: min(420px, calc(100% - 16px));
   overflow: hidden;
-  min-width: 0;
+  padding: 6px;
+  border: var(--border-fg);
+  background: color-mix(in srgb, var(--color-bg) 86%, transparent);
   font-size: var(--font-size-ui);
-  font-style: normal;
   line-height: 1;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
-}
-
-.decentSkinStatus span,
-.decentSkinStatus em {
-  color: var(--color-fg-hover);
-}
-
-.decentSkinActions {
-  display: inline-flex;
-  align-items: stretch;
-  flex-shrink: 0;
 }
 
 .decentSkinWorkspace {
@@ -181,19 +156,14 @@
   min-height: 0;
   padding: 12px;
   overflow: hidden;
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--color-fg) 10%, transparent) 1px, transparent 1px),
-    linear-gradient(0deg, color-mix(in srgb, var(--color-fg) 10%, transparent) 1px, transparent 1px);
-  background-size: 48px 48px;
+  background: var(--color-bg);
 }
 
 .decentSkinFrame {
   position: relative;
   width: min(100%, 1680px);
-  max-height: calc(100vh - 128px);
-  border: var(--border-fg);
+  max-height: calc(100vh - 120px);
   background-color: var(--color-bg);
-  box-shadow: 0 0 0 1px var(--color-bg);
 }
 
 .decentSkinHotspot {
@@ -203,8 +173,8 @@
   min-width: 6px;
   min-height: 6px;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--color-fg) 52%, transparent);
-  background: color-mix(in srgb, var(--color-bg) 24%, transparent);
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--color-fg);
   cursor: pointer;
 }
@@ -223,7 +193,7 @@
 .decentSkinHotspot:hover,
 .decentSkinHotspot:focus-visible,
 .decentSkinHotspotActive {
-  background: color-mix(in srgb, var(--color-fg) 18%, transparent);
+  background: color-mix(in srgb, var(--color-fg) 12%, transparent);
   outline: 1px solid var(--color-fg);
   outline-offset: 1px;
 }
@@ -244,8 +214,6 @@
 
 .decentSkinEmpty strong,
 .decentSkinEmpty span,
-.decentSkinOverlay strong,
-.decentSkinOverlay span,
 .decentControlInspector strong,
 .decentControlInspector span,
 .decentControlInspector em {
@@ -260,13 +228,11 @@
 }
 
 .decentSkinEmpty span,
-.decentSkinOverlay span,
 .decentControlInspector span,
 .decentControlInspector em {
   color: var(--color-fg-hover);
 }
 
-.decentSkinOverlay,
 .decentControlInspector {
   position: absolute;
   z-index: 2;
@@ -276,11 +242,6 @@
   padding: 6px;
   border: var(--border-fg);
   background: color-mix(in srgb, var(--color-bg) 78%, transparent);
-}
-
-.decentSkinOverlay {
-  left: 12px;
-  top: 12px;
 }
 
 .decentControlInspector {
@@ -565,12 +526,7 @@
     border-top: var(--border-fg);
   }
 
-  .decentSkinToolbar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .decentSkinActions {
-    justify-content: stretch;
+  .decentSkinHost {
+    height: min(560px, calc(100vh - 96px));
   }
 }

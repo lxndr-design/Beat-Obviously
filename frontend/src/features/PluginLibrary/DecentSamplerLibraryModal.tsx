@@ -132,7 +132,7 @@ export function DecentSamplerLibraryModal({ onClose }: DecentSamplerLibraryModal
             <div className={styles.fileDrop} aria-label="Native DecentSampler installer">
               <img className={styles.decentLogo} src="/assets/decent-sampler.png" alt="" aria-hidden="true" />
               <span>Press Install</span>
-              <small>Choose a .zip or .dspreset. Beat extracts the package, parses the DS preset, registers sample assets, creates the MIDI-compatible sampler instrument, and opens the DS skin host.</small>
+              <small>Choose a .zip or .dspreset. Beat extracts the package, parses the DS preset, registers sample assets, creates the MIDI-compatible sampler instrument, and opens the package UI.</small>
             </div>
           ) : (
             <label className={styles.fileDrop}>
@@ -148,7 +148,7 @@ export function DecentSamplerLibraryModal({ onClose }: DecentSamplerLibraryModal
           )}
           <div className={styles.compatGrid}>
             <InfoCell label="Format" value="DecentSampler" />
-            <InfoCell label="Host" value="DS skin" />
+            <InfoCell label="Host" value="Package UI" />
             <InfoCell label="Install" value={native ? "Native parser" : "Browser shell"} />
           </div>
           {status && <div className={styles.statusText}>{status}</div>}
@@ -185,7 +185,7 @@ export function pluginFromDecentSamplerPreset(preset: DecentSamplerImport): Part
     sampleCount: preset.samples.length,
     uiControlCount: preset.uiControls?.length ?? 0,
     installedAt: Date.now(),
-    description: `DecentSampler sample package with ${preset.samples.length} mapped sample zone${preset.samples.length === 1 ? "" : "s"}. Opens in Beat's DS skin host and plays through Beat's sampler engine.`,
+    description: `DecentSampler sample package with ${preset.samples.length} mapped sample zone${preset.samples.length === 1 ? "" : "s"}. Opens to the package UI and plays through Beat's sampler engine.`,
     capabilities: [
       {
         id: "decent-sampler-package",
