@@ -63,24 +63,25 @@ export function PluginHostModal({ pluginId }: PluginHostModalProps) {
       open
       scopeId={`plugin-${pluginId}`}
       title={<ModalTitle plugin={plugin} />}
-      width="lg"
+      width={isDecentSampler ? "full" : "lg"}
+      flushBody={isDecentSampler}
       onClose={close}
-      footer={
+      footer={!isDecentSampler ? (
         <>
-          <Button variant="ghost" onClick={close}>{isDecentSampler ? "Close" : "Cancel"}</Button>
-          {!isDecentSampler && plugin.kind === "synth" ? (
+          <Button variant="ghost" onClick={close}>Cancel</Button>
+          {plugin.kind === "synth" ? (
             <Button variant="primary" onClick={createInstrument}>
               <Icon name="ph:plus" size={14} decorative />
               Create Instrument
             </Button>
-          ) : !isDecentSampler ? (
+          ) : (
             <Button variant="primary" disabled>
               <Icon name="ph:file-audio" size={14} decorative />
               Render WAV
             </Button>
-          ) : null}
+          )}
         </>
-      }
+      ) : undefined}
     >
       <div className={styles.host}>
         {isDecentSampler ? (
@@ -175,6 +176,8 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [packageStatus, setPackageStatus] = useState("");
+  const [showDetails, setShowDetails] = useState(false);
+  const [activeControlIndex, setActiveControlIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isNative() || !plugin.sourcePath) return;
@@ -219,10 +222,11 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
     ? uiControlDetails
     : uiControls.map((label) => ({ kind: "control", label }));
   const nativeAvailable = isNative();
+  const activeControl = activeControlIndex == null ? null : hotspotControls[activeControlIndex] ?? null;
 
   async function refreshPackage(pathHint?: string) {
     if (!nativeAvailable) {
-      setLoadError("DecentSampler ZIP and preset parsing runs in the native Beat app. Browser preview can only show package shells.");
+      setLoadError("DecentSampler ZIP and preset parsing runs in the native Beat app. Browser mode can only show package shells.");
       return null;
     }
 
@@ -257,97 +261,118 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
   }
 
   return (
-    <section className={`${styles.shell} ${styles.decentHost}`} aria-label="DecentSampler host">
-      <div className={styles.shellHeader}>
-        <span>DECENT SAMPLER</span>
-        <span>{plugin.status === "installed" ? "PACKAGE READY" : "PACKAGE SHELL"}</span>
+    <section className={styles.decentSkinHost} aria-label="DecentSampler skin host">
+      <div className={styles.decentSkinToolbar}>
+        <div className={styles.decentSkinStatus}>
+          <span>{plugin.status === "installed" ? "Package Ready" : "Package Shell"}</span>
+          <strong>{uiImageDataUrl ? "Skin" : "Awaiting Skin"}</strong>
+          {loading && <em>Refreshing</em>}
+          {loadError && <em>{loadError}</em>}
+          {packageStatus && <em>{packageStatus}</em>}
+        </div>
+        <div className={styles.decentSkinActions}>
+          <Button size="sm" variant={showDetails ? "default" : "primary"} onClick={() => setShowDetails(false)}>
+            <Icon name="ph:sliders" size={14} decorative />
+            Skin
+          </Button>
+          <Button size="sm" variant={showDetails ? "primary" : "default"} onClick={() => setShowDetails(true)}>
+            <Icon name="ph:list-magnifying-glass" size={14} decorative />
+            Details
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => void refreshPackage(plugin.sourcePath)} disabled={loading || !nativeAvailable}>
+            <Icon name={packageHasMetadata ? "ph:arrows-clockwise" : "ph:download-simple"} size={14} decorative />
+            {packageHasMetadata ? "Refresh" : "Install"}
+          </Button>
+        </div>
       </div>
-      <div className={styles.decentBody}>
-        <div className={`${styles.decentCanvas} ${uiImageDataUrl ? styles.decentCanvasImage : ""}`}>
+
+      <div className={`${styles.decentSkinWorkspace} ${showDetails ? styles.decentSkinWorkspaceWithDetails : ""}`}>
+        <div className={styles.decentSkinCanvas} aria-label={`${plugin.name} DecentSampler skin`}>
           {uiImageDataUrl ? (
-            <div className={styles.decentCanvasFrame} style={canvasFrameStyle}>
+            <div className={styles.decentSkinFrame} style={canvasFrameStyle}>
               {hotspotControls.map((control, index) => (
-                <span
+                <button
                   key={`${control.label}-${control.x}-${control.y}-${index}`}
-                  className={styles.decentHotspot}
+                  type="button"
+                  className={`${styles.decentSkinHotspot} ${activeControlIndex === index ? styles.decentSkinHotspotActive : ""}`}
                   style={controlHotspotStyle(control, uiWidth, uiHeight)}
                   title={`${control.label} ${describeControlBinding(control)}`.trim()}
-                />
+                  aria-label={`${control.label} ${describeControlBinding(control)}`.trim()}
+                  onClick={() => setActiveControlIndex(activeControlIndex === index ? null : index)}
+                >
+                  <span>{control.label}</span>
+                </button>
               ))}
             </div>
           ) : (
-            <img className={styles.decentCanvasLogo} src="/assets/decent-sampler.png" alt="" aria-hidden="true" />
+            <div className={styles.decentSkinEmpty}>
+              <img className={styles.decentCanvasLogo} src="/assets/decent-sampler.png" alt="" aria-hidden="true" />
+              <strong>{plugin.name}</strong>
+              <span>{nativeAvailable ? "Install or refresh the package to load the DS skin." : "Open Beat.app to parse package skin metadata."}</span>
+            </div>
           )}
-          <div className={styles.decentCanvasText}>
+          <div className={styles.decentSkinOverlay}>
             <strong>{plugin.name}</strong>
-            <span>{uiWidth && uiHeight ? `${uiWidth} x ${uiHeight} DS UI` : "DecentSampler package UI"}</span>
+            <span>{uiWidth && uiHeight ? `${uiWidth} x ${uiHeight}` : "DS UI"}</span>
           </div>
-          {(preset?.uiImagePath || plugin.uiImagePath) && <span className={styles.decentBgNote}>{uiImageDataUrl ? "Package skin" : "Background detected"}</span>}
-        </div>
-        <div className={styles.decentSummary}>
-          <h3>{plugin.name}</h3>
-          <p>{plugin.description}</p>
-          {loading && <p>Refreshing DecentSampler preset metadata...</p>}
-          {loadError && <p>{loadError}</p>}
-          {plugin.associatedInstrumentId ? (
-            <p>Beat sampler bridge is ready for MIDI tracks.</p>
-          ) : packageHasMetadata ? (
-            <p>Beat will repair the sampler bridge automatically from this package metadata.</p>
-          ) : null}
-          {packageStatus && <p>{packageStatus}</p>}
-          <div className={styles.decentActions}>
-            {!packageHasMetadata && (
-              <Button variant="primary" onClick={() => void refreshPackage(plugin.sourcePath)} disabled={loading || !nativeAvailable}>
-                <Icon name="ph:download-simple" size={14} decorative />
-                {nativeAvailable ? "Install package" : "Native parse required"}
-              </Button>
-            )}
-            {packageHasMetadata && (
-              <Button variant="ghost" onClick={() => void refreshPackage(plugin.sourcePath)} disabled={loading || !nativeAvailable}>
-                <Icon name="ph:arrows-clockwise" size={14} decorative />
-                Refresh Metadata
-              </Button>
-            )}
-          </div>
-        </div>
-        <div className={styles.decentCells}>
-          <InfoCell label="Package" value={plugin.sourceFileName ?? plugin.name} />
-          <InfoCell label="Zones" value={sampleCount ? `${sampleCount}` : "Pending parse"} />
-          <InfoCell label="Controls" value={uiControlCount ? `${uiControlCount}` : "–"} />
-          <InfoCell label="Mode" value="Sample package" />
-        </div>
-        {listedControls.length > 0 && (
-          <div className={styles.decentControls} aria-label="DecentSampler UI controls">
-            {listedControls.slice(0, 12).map((control, index) => (
-              <span key={`${control.label}-${index}`}>
-                <strong>{control.label}</strong>
-                <em>{describeControlBinding(control) || formatControlRange(control)}</em>
-              </span>
-            ))}
-          </div>
-        )}
-        <div className={styles.decentMap} aria-label="DecentSampler sample map">
-          {samplePreview.length > 0 ? (
-            samplePreview.map((sample) => (
-              <div key={`${sample.path}-${sample.loNote}-${sample.hiNote}-${sample.loVel}-${sample.hiVel}`} className={styles.decentZone}>
-                <span>{sample.name}</span>
-                <strong>
-                  {noteRange(sample.loNote, sample.hiNote)} / vel {sample.loVel}-{sample.hiVel}
-                </strong>
-              </div>
-            ))
-          ) : (
-            <div className={styles.decentZone}>
-              <span>{nativeAvailable ? "Install or parse this package to load zones" : "Open Beat.app to parse zones"}</span>
-              <strong>{nativeAvailable ? "Parse" : "Native"}</strong>
+          {activeControl && (
+            <div className={styles.decentControlInspector}>
+              <strong>{activeControl.label}</strong>
+              <span>{describeControlBinding(activeControl) || formatControlRange(activeControl)}</span>
             </div>
           )}
         </div>
+
+        {showDetails && (
+          <aside className={styles.decentDetails} aria-label="DecentSampler package details">
+            <div className={styles.decentSummary}>
+              <h3>{plugin.name}</h3>
+              <p>{plugin.description}</p>
+              {plugin.associatedInstrumentId ? (
+                <p>Beat sampler bridge is ready for MIDI tracks.</p>
+              ) : packageHasMetadata ? (
+                <p>Beat will repair the sampler bridge automatically from this package metadata.</p>
+              ) : null}
+            </div>
+            <div className={styles.decentCells}>
+              <InfoCell label="Package" value={plugin.sourceFileName ?? plugin.name} />
+              <InfoCell label="Zones" value={sampleCount ? `${sampleCount}` : "Pending parse"} />
+              <InfoCell label="Controls" value={uiControlCount ? `${uiControlCount}` : "-"} />
+              <InfoCell label="Mode" value="Sample package" />
+            </div>
+            {listedControls.length > 0 && (
+              <div className={styles.decentControls} aria-label="DecentSampler UI controls">
+                {listedControls.slice(0, 12).map((control, index) => (
+                  <span key={`${control.label}-${index}`}>
+                    <strong>{control.label}</strong>
+                    <em>{describeControlBinding(control) || formatControlRange(control)}</em>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className={styles.decentMap} aria-label="DecentSampler sample map">
+              {samplePreview.length > 0 ? (
+                samplePreview.map((sample) => (
+                  <div key={`${sample.path}-${sample.loNote}-${sample.hiNote}-${sample.loVel}-${sample.hiVel}`} className={styles.decentZone}>
+                    <span>{sample.name}</span>
+                    <strong>
+                      {noteRange(sample.loNote, sample.hiNote)} / vel {sample.loVel}-{sample.hiVel}
+                    </strong>
+                  </div>
+                ))
+              ) : (
+                <div className={styles.decentZone}>
+                  <span>{nativeAvailable ? "Install or parse this package to load zones" : "Open Beat.app to parse zones"}</span>
+                  <strong>{nativeAvailable ? "Parse" : "Native"}</strong>
+                </div>
+              )}
+            </div>
+          </aside>
+        )}
       </div>
     </section>
   );
 }
-
 function decentSamplerVisualSrc(plugin: PluginAdapter) {
   return plugin.uiImageDataUrl || "/assets/decent-sampler.png";
 }

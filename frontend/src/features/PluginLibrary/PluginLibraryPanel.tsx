@@ -173,7 +173,7 @@ function PluginItem({ plugin, onOpen }: PluginItemProps) {
       onSelect: onOpen,
     },
     {
-      label: plugin.format === "decent-sampler" ? "Open DS Wrapper" : plugin.kind === "synth" ? "Create Instrument" : "Render WAV",
+      label: plugin.format === "decent-sampler" ? "Open DS Skin" : plugin.kind === "synth" ? "Create Instrument" : "Render WAV",
       icon: plugin.format === "decent-sampler" ? "ph:package" : plugin.kind === "synth" ? "ph:wave-sine" : "ph:file-audio",
       onSelect: onOpen,
       separatorBefore: true,
@@ -274,7 +274,7 @@ function detectPluginFile(file: File | null): {
       kind: "renderer",
       format: "decent-sampler",
       version: "1.0.0",
-      description: "Imported DecentSampler package. Opens in Beat's protected DS compatibility wrapper.",
+      description: "Imported DecentSampler package. Opens in Beat's protected DS skin host.",
     };
   }
   if (lower.endsWith(".zip")) {
