@@ -237,7 +237,7 @@ export function TrackHeader({
             }}
             aria-label={track.recordArmed ? "Disarm recording" : "Arm recording"}
           >
-            R
+            <Icon name="ph:microphone" size={12} decorative />
           </button>
         </HoverInfo>
         <HoverInfo content={track.inputMonitoring ? "Disable input monitoring" : "Enable input monitoring"}>
@@ -251,7 +251,7 @@ export function TrackHeader({
             }}
             aria-label={track.inputMonitoring ? "Disable input monitoring" : "Enable input monitoring"}
           >
-            I
+            <Icon name="ph:speaker-high" size={12} decorative />
           </button>
         </HoverInfo>
         <HoverInfo content={track.solo ? "Unsolo" : "Solo (mute others)"}>

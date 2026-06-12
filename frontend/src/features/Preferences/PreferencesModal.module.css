@@ -10,6 +10,13 @@
   gap: 8px;
 }
 
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .sectionTitle {
   margin: 0;
   font-size: var(--font-size-ui);
@@ -31,6 +38,86 @@
 .modelSelect {
   width: min(100%, 390px);
   min-width: 320px;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.channelGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.fieldSelect {
+  min-width: 0;
+}
+
+.fieldSelect > button {
+  min-width: 0;
+}
+
+.inlineToggle {
+  width: 100%;
+  min-height: 26px;
+  border: var(--border-fg);
+  padding: 0 6px;
+  justify-content: space-between;
+}
+
+.inlineToggle button {
+  width: 24px;
+  height: 14px;
+}
+
+.inlineToggle button::after {
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+}
+
+.inlineToggle button[aria-checked="true"]::after {
+  transform: translateX(10px);
+}
+
+.readout {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  min-height: 26px;
+  border: var(--border-fg);
+  min-width: 0;
+}
+
+.readoutLabel {
+  min-width: 0;
+  padding: 0 6px;
+  color: var(--color-fg);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  opacity: 0.65;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-uppercase);
+  white-space: nowrap;
+}
+
+.readoutValue {
+  min-width: 0;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  border-left: var(--border-fg);
+  padding: 0 6px;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gridRows {
@@ -80,6 +167,10 @@
 .gridRadio button {
   width: 30px;
   font-size: var(--font-size-ui);
+}
+
+.channelRadio button {
+  width: 58px;
 }
 
 .hint {
@@ -156,4 +247,15 @@
 
 .waitingBadge {
   opacity: 0.65;
+}
+
+@media (max-width: 760px) {
+  .settingsGrid,
+  .channelGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .modelSelect {
+    min-width: 0;
+  }
 }

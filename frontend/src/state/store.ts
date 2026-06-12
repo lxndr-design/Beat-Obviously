@@ -136,8 +136,119 @@ export type SegmentEditCommand =
     };
 
 const MIN_SEGMENT_LENGTH_BEATS = 0.25;
+const SETTINGS_STORAGE_KEY = "beat.settings.v1";
+
+export type FileAssetPolicy = "reference" | "copy" | "ask";
+export type MemoryCachePreset = "conservative" | "balanced" | "performance";
+export type StartupProjectBehavior = "home" | "restore-last" | "new-project";
+
+interface SettingsSnapshot {
+  resizeSnapSeconds: number;
+  resizeSnapMeasures: number;
+  timelineSmartGrid: boolean;
+  midiSmartGrid: boolean;
+  timelineSubdivision: 2 | 4 | 8 | 16;
+  midiSubdivision: 2 | 4 | 8 | 16;
+  preferredAudioTypeName: string;
+  preferredInputDeviceName: string;
+  preferredOutputDeviceName: string;
+  defaultInputMonitoring: boolean;
+  defaultRecordArm: boolean;
+  defaultInputChannelCount: 1 | 2;
+  fileAssetPolicy: FileAssetPolicy;
+  autosaveBackups: boolean;
+  maxRecentProjects: number;
+  memoryCachePreset: MemoryCachePreset;
+  restoreLastProject: boolean;
+  startupProjectBehavior: StartupProjectBehavior;
+}
+
+const DEFAULT_SETTINGS: SettingsSnapshot = {
+  resizeSnapSeconds: 1,
+  resizeSnapMeasures: 1,
+  timelineSmartGrid: true,
+  midiSmartGrid: true,
+  timelineSubdivision: 4,
+  midiSubdivision: 4,
+  preferredAudioTypeName: "",
+  preferredInputDeviceName: "",
+  preferredOutputDeviceName: "",
+  defaultInputMonitoring: false,
+  defaultRecordArm: false,
+  defaultInputChannelCount: 2,
+  fileAssetPolicy: "copy",
+  autosaveBackups: true,
+  maxRecentProjects: 8,
+  memoryCachePreset: "balanced",
+  restoreLastProject: false,
+  startupProjectBehavior: "home",
+};
+
+function readSettingsSnapshot(): SettingsSnapshot {
+  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  try {
+    return normalizeSettingsSnapshot(JSON.parse(window.localStorage.getItem(SETTINGS_STORAGE_KEY) ?? "{}"));
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+function writeSettingsPatch(patch: Partial<SettingsSnapshot>) {
+  if (typeof window === "undefined") return;
+  const next = normalizeSettingsSnapshot({ ...readSettingsSnapshot(), ...patch });
+  window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(next));
+}
+
+function normalizeSettingsSnapshot(value: unknown): SettingsSnapshot {
+  const source = value && typeof value === "object" ? value as Partial<SettingsSnapshot> : {};
+  return {
+    resizeSnapSeconds: clampNumber(source.resizeSnapSeconds, 0.0625, 16, DEFAULT_SETTINGS.resizeSnapSeconds),
+    resizeSnapMeasures: Math.max(1, Math.min(16, Math.round(source.resizeSnapMeasures ?? DEFAULT_SETTINGS.resizeSnapMeasures))),
+    timelineSmartGrid: source.timelineSmartGrid ?? DEFAULT_SETTINGS.timelineSmartGrid,
+    midiSmartGrid: source.midiSmartGrid ?? DEFAULT_SETTINGS.midiSmartGrid,
+    timelineSubdivision: normalizeSubdivision(source.timelineSubdivision, DEFAULT_SETTINGS.timelineSubdivision),
+    midiSubdivision: normalizeSubdivision(source.midiSubdivision, DEFAULT_SETTINGS.midiSubdivision),
+    preferredAudioTypeName: normalizeString(source.preferredAudioTypeName),
+    preferredInputDeviceName: normalizeString(source.preferredInputDeviceName),
+    preferredOutputDeviceName: normalizeString(source.preferredOutputDeviceName),
+    defaultInputMonitoring: source.defaultInputMonitoring ?? DEFAULT_SETTINGS.defaultInputMonitoring,
+    defaultRecordArm: source.defaultRecordArm ?? DEFAULT_SETTINGS.defaultRecordArm,
+    defaultInputChannelCount: source.defaultInputChannelCount === 1 ? 1 : 2,
+    fileAssetPolicy: normalizeFileAssetPolicy(source.fileAssetPolicy),
+    autosaveBackups: source.autosaveBackups ?? DEFAULT_SETTINGS.autosaveBackups,
+    maxRecentProjects: Math.max(4, Math.min(24, Math.round(source.maxRecentProjects ?? DEFAULT_SETTINGS.maxRecentProjects))),
+    memoryCachePreset: normalizeMemoryCachePreset(source.memoryCachePreset),
+    restoreLastProject: source.restoreLastProject ?? DEFAULT_SETTINGS.restoreLastProject,
+    startupProjectBehavior: normalizeStartupProjectBehavior(source.startupProjectBehavior),
+  };
+}
+
+function clampNumber(value: number | undefined, min: number, max: number, fallback: number) {
+  return Number.isFinite(value) ? Math.max(min, Math.min(max, value as number)) : fallback;
+}
+
+function normalizeString(value: string | undefined) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeSubdivision(value: number | undefined, fallback: 2 | 4 | 8 | 16): 2 | 4 | 8 | 16 {
+  return value === 2 || value === 4 || value === 8 || value === 16 ? value : fallback;
+}
+
+function normalizeFileAssetPolicy(value: FileAssetPolicy | undefined): FileAssetPolicy {
+  return value === "reference" || value === "copy" || value === "ask" ? value : DEFAULT_SETTINGS.fileAssetPolicy;
+}
+
+function normalizeMemoryCachePreset(value: MemoryCachePreset | undefined): MemoryCachePreset {
+  return value === "conservative" || value === "balanced" || value === "performance" ? value : DEFAULT_SETTINGS.memoryCachePreset;
+}
+
+function normalizeStartupProjectBehavior(value: StartupProjectBehavior | undefined): StartupProjectBehavior {
+  return value === "home" || value === "restore-last" || value === "new-project" ? value : DEFAULT_SETTINGS.startupProjectBehavior;
+}
 
 function defaultTrack(): Track {
+  const settings = readSettingsSnapshot();
   return {
     id: nanoid(),
     name: "Track",
@@ -148,11 +259,11 @@ function defaultTrack(): Track {
     pan: 0,
     mute: false,
     solo: false,
-    recordArmed: false,
-    inputMonitoring: false,
+    recordArmed: settings.defaultRecordArm,
+    inputMonitoring: settings.defaultInputMonitoring,
     inputDeviceId: "",
     inputChannelStart: 0,
-    inputChannelCount: 1,
+    inputChannelCount: settings.defaultInputChannelCount,
     recordGainDb: 0,
     effects: { filters: [] },
     segments: [],
@@ -906,27 +1017,112 @@ interface SettingsSlice {
   midiSmartGrid: boolean;
   timelineSubdivision: 2 | 4 | 8 | 16;
   midiSubdivision: 2 | 4 | 8 | 16;
+  preferredAudioTypeName: string;
+  preferredInputDeviceName: string;
+  preferredOutputDeviceName: string;
+  defaultInputMonitoring: boolean;
+  defaultRecordArm: boolean;
+  defaultInputChannelCount: 1 | 2;
+  fileAssetPolicy: FileAssetPolicy;
+  autosaveBackups: boolean;
+  maxRecentProjects: number;
+  memoryCachePreset: MemoryCachePreset;
+  restoreLastProject: boolean;
+  startupProjectBehavior: StartupProjectBehavior;
   setResizeSnapSeconds: (s: number) => void;
   setResizeSnapMeasures: (m: number) => void;
   setTimelineSmartGrid: (enabled: boolean) => void;
   setMidiSmartGrid: (enabled: boolean) => void;
   setTimelineSubdivision: (subdivision: 2 | 4 | 8 | 16) => void;
   setMidiSubdivision: (subdivision: 2 | 4 | 8 | 16) => void;
+  setPreferredInputDevice: (typeName: string, deviceName: string) => void;
+  setPreferredOutputDevice: (typeName: string, deviceName: string) => void;
+  setDefaultInputMonitoring: (enabled: boolean) => void;
+  setDefaultRecordArm: (enabled: boolean) => void;
+  setDefaultInputChannelCount: (count: 1 | 2) => void;
+  setFileAssetPolicy: (policy: FileAssetPolicy) => void;
+  setAutosaveBackups: (enabled: boolean) => void;
+  setMaxRecentProjects: (count: number) => void;
+  setMemoryCachePreset: (preset: MemoryCachePreset) => void;
+  setRestoreLastProject: (enabled: boolean) => void;
+  setStartupProjectBehavior: (behavior: StartupProjectBehavior) => void;
 }
 
+const initialSettings = readSettingsSnapshot();
+
 export const useSettingsStore = create<SettingsSlice>()((set) => ({
-  resizeSnapSeconds: 1,
-  resizeSnapMeasures: 1,
-  timelineSmartGrid: true,
-  midiSmartGrid: true,
-  timelineSubdivision: 4,
-  midiSubdivision: 4,
-  setResizeSnapSeconds: (s) => set({ resizeSnapSeconds: Math.max(0.0625, s) }),
-  setResizeSnapMeasures: (m) => set({ resizeSnapMeasures: Math.max(1, Math.round(m)) }),
-  setTimelineSmartGrid: (enabled) => set({ timelineSmartGrid: enabled }),
-  setMidiSmartGrid: (enabled) => set({ midiSmartGrid: enabled }),
-  setTimelineSubdivision: (subdivision) => set({ timelineSubdivision: subdivision }),
-  setMidiSubdivision: (subdivision) => set({ midiSubdivision: subdivision }),
+  ...initialSettings,
+  setResizeSnapSeconds: (s) => {
+    const resizeSnapSeconds = Math.max(0.0625, s);
+    writeSettingsPatch({ resizeSnapSeconds });
+    set({ resizeSnapSeconds });
+  },
+  setResizeSnapMeasures: (m) => {
+    const resizeSnapMeasures = Math.max(1, Math.round(m));
+    writeSettingsPatch({ resizeSnapMeasures });
+    set({ resizeSnapMeasures });
+  },
+  setTimelineSmartGrid: (timelineSmartGrid) => {
+    writeSettingsPatch({ timelineSmartGrid });
+    set({ timelineSmartGrid });
+  },
+  setMidiSmartGrid: (midiSmartGrid) => {
+    writeSettingsPatch({ midiSmartGrid });
+    set({ midiSmartGrid });
+  },
+  setTimelineSubdivision: (timelineSubdivision) => {
+    writeSettingsPatch({ timelineSubdivision });
+    set({ timelineSubdivision });
+  },
+  setMidiSubdivision: (midiSubdivision) => {
+    writeSettingsPatch({ midiSubdivision });
+    set({ midiSubdivision });
+  },
+  setPreferredInputDevice: (preferredAudioTypeName, preferredInputDeviceName) => {
+    writeSettingsPatch({ preferredAudioTypeName, preferredInputDeviceName });
+    set({ preferredAudioTypeName, preferredInputDeviceName });
+  },
+  setPreferredOutputDevice: (_typeName, preferredOutputDeviceName) => {
+    writeSettingsPatch({ preferredOutputDeviceName });
+    set({ preferredOutputDeviceName });
+  },
+  setDefaultInputMonitoring: (defaultInputMonitoring) => {
+    writeSettingsPatch({ defaultInputMonitoring });
+    set({ defaultInputMonitoring });
+  },
+  setDefaultRecordArm: (defaultRecordArm) => {
+    writeSettingsPatch({ defaultRecordArm });
+    set({ defaultRecordArm });
+  },
+  setDefaultInputChannelCount: (defaultInputChannelCount) => {
+    writeSettingsPatch({ defaultInputChannelCount });
+    set({ defaultInputChannelCount });
+  },
+  setFileAssetPolicy: (fileAssetPolicy) => {
+    writeSettingsPatch({ fileAssetPolicy });
+    set({ fileAssetPolicy });
+  },
+  setAutosaveBackups: (autosaveBackups) => {
+    writeSettingsPatch({ autosaveBackups });
+    set({ autosaveBackups });
+  },
+  setMaxRecentProjects: (maxRecentProjects) => {
+    const normalized = Math.max(4, Math.min(24, Math.round(maxRecentProjects)));
+    writeSettingsPatch({ maxRecentProjects: normalized });
+    set({ maxRecentProjects: normalized });
+  },
+  setMemoryCachePreset: (memoryCachePreset) => {
+    writeSettingsPatch({ memoryCachePreset });
+    set({ memoryCachePreset });
+  },
+  setRestoreLastProject: (restoreLastProject) => {
+    writeSettingsPatch({ restoreLastProject });
+    set({ restoreLastProject });
+  },
+  setStartupProjectBehavior: (startupProjectBehavior) => {
+    writeSettingsPatch({ startupProjectBehavior });
+    set({ startupProjectBehavior });
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -1060,24 +1256,26 @@ function createRecentProject(project: Partial<RecentProjectEntry> & { path: stri
 
 function normalizeRecentProjects(projects: unknown[]): RecentProjectEntry[] {
   const unique: RecentProjectEntry[] = [];
+  const maxRecentProjects = readSettingsSnapshot().maxRecentProjects;
   for (const project of projects) {
     if (!project || typeof project !== "object") continue;
     const candidate = project as Partial<RecentProjectEntry>;
     if (typeof candidate.path !== "string" || !candidate.path.trim()) continue;
     const normalized = createRecentProject(candidate as Partial<RecentProjectEntry> & { path: string });
     if (!unique.some((existing) => existing.path === normalized.path)) unique.push(normalized);
-    if (unique.length >= 8) break;
+    if (unique.length >= maxRecentProjects) break;
   }
   return unique;
 }
 
 function normalizeRecentFilePaths(paths: unknown[]): string[] {
   const unique: string[] = [];
+  const maxRecentProjects = readSettingsSnapshot().maxRecentProjects;
   for (const path of paths) {
     if (typeof path !== "string" || !path.trim()) continue;
     const trimmed = path.trim();
     if (!unique.includes(trimmed)) unique.push(trimmed);
-    if (unique.length >= 8) break;
+    if (unique.length >= maxRecentProjects) break;
   }
   return unique;
 }
