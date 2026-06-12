@@ -9,11 +9,13 @@ import {
   useUiStore,
   useViewStore,
   useInstrumentStore,
+  usePluginStore,
 } from "../../state/store";
 import { pauseTransport } from "../../audio/transportActions";
 import { useComponentStore } from "../../state/components";
 import { clipboardStore, useClipboard } from "../../state/clipboard";
 import { expandTrackSegments } from "../../state/selectors";
+import { decentSamplerPluginForInstrument } from "../PluginLibrary/decentSamplerPluginAdapter";
 import { Segment } from "./Segment";
 import styles from "./TrackLane.module.css";
 import type { Id, Instrument, Segment as SegmentModel, Track } from "../../state/types";
@@ -66,6 +68,7 @@ export function TrackLane({
   const addSegment = useProjectStore((s) => s.addSegment);
   const openEditor = useUiStore((s) => s.openEditor);
   const instruments = useInstrumentStore((s) => s.instruments);
+  const plugins = usePluginStore((s) => s.plugins);
   const audioFiles = useAudioFileStore((s) => s.files);
   const addAudioFile = useAudioFileStore((s) => s.addFile);
   const { pasteMany } = useClipboard();
@@ -259,8 +262,9 @@ export function TrackLane({
     if (instrumentId) {
       const inst = instruments.find((i) => i.id === instrumentId);
       if (!inst || !track) return;
+      const dsPlugin = decentSamplerPluginForInstrument(inst, plugins);
       addSegment(trackId, {
-        name: nextSegmentName(tracks, "midi"),
+        name: dsPlugin ? inst.name : nextSegmentName(tracks, "midi"),
         startBeat,
         lengthBeats: lastLen,
         instrumentId: inst.id,

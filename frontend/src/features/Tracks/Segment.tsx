@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useProjectStore, useSettingsStore, useTransportStore, useUiStore, useViewStore } from "../../state/store";
+import { useInstrumentStore, usePluginStore, useProjectStore, useSettingsStore, useTransportStore, useUiStore, useViewStore } from "../../state/store";
 import { SEGMENT_LAYER_OFFSET_PX } from "./geometry";
 import { useContextMenu, Icon, type ContextMenuItem } from "../../components";
 import { useClipboard } from "../../state/clipboard";
@@ -10,6 +10,7 @@ import { selectedCrossfadeCandidate } from "./arrangementActions";
 import { SegmentWaveform } from "./SegmentWaveform";
 import { SegmentMidiPreview } from "./SegmentMidiPreview";
 import { SegmentDrumPreview } from "./SegmentDrumPreview";
+import { decentSamplerPluginForInstrument } from "../PluginLibrary/decentSamplerPluginAdapter";
 import styles from "./Segment.module.css";
 import type { Id, Segment as SegmentType } from "../../state/types";
 
@@ -62,8 +63,11 @@ export function Segment({
   const selectedSegmentIds = useUiStore((s) => s.selectedSegmentIds);
   const selected = selectedSegmentIds.includes(segmentId);
   const editing = useUiStore((s) => s.openEditors.some((editor) => editor.kind === "segment" && editor.segmentId === segmentId));
+  const openEditor = useUiStore((s) => s.openEditor);
   const setSelectedSegments = useUiStore((s) => s.setSelectedSegments);
   const setSelectedTracks = useUiStore((s) => s.setSelectedTracks);
+  const instruments = useInstrumentStore((s) => s.instruments);
+  const plugins = usePluginStore((s) => s.plugins);
   const { copy: copyToClipboard, copyMany, paste } = useClipboard();
   const saveComponent = useComponentStore((s) => s.add);
   const [editingName, setEditingName] = useState(false);
@@ -357,6 +361,10 @@ export function Segment({
   const liveSeg = segState.project.tracks
     .flatMap((t) => t.segments)
     .find((s) => s.id === segmentId);
+  const liveInstrument = liveSeg?.instrumentId
+    ? instruments.find((instrument) => instrument.id === liveSeg.instrumentId)
+    : undefined;
+  const decentSamplerPlugin = decentSamplerPluginForInstrument(liveInstrument, plugins);
   const selectedSegments = segState.project.tracks
     .flatMap((t) => t.segments)
     .filter((s) => selectedSegmentIds.includes(s.id));
@@ -409,6 +417,15 @@ export function Segment({
       playheadBeat < liveSeg.startBeat + liveSeg.lengthBeats - GRID_TICK_BEATS / 4;
     return [
       { label: "Edit", icon: "ph:pencil-simple", onSelect: onEdit },
+      ...(decentSamplerPlugin
+        ? [
+            {
+              label: "Edit DS Instrument",
+              icon: "ph:package",
+              onSelect: () => openEditor({ kind: "plugin", pluginId: decentSamplerPlugin.id }),
+            } as ContextMenuItem,
+          ]
+        : []),
       {
         label: "Rename",
         icon: "ph:text-aa",
@@ -640,6 +657,11 @@ export function Segment({
             {repetition > 0 && (
               <span className={styles.repBadge} aria-label="Loop repeat">
                 <Icon name="ph:repeat" size={12} decorative />
+              </span>
+            )}
+            {decentSamplerPlugin && (
+              <span className={styles.decentSamplerBadge} aria-label="DecentSampler instrument">
+                <img src="/assets/decent-sampler.png" alt="" aria-hidden="true" />
               </span>
             )}
           </span>

@@ -1,5 +1,5 @@
 import type { DecentSamplerImport } from "../../ipc/schema";
-import type { PluginAdapter } from "../../state/types";
+import type { Instrument, PluginAdapter } from "../../state/types";
 
 export function pluginFromDecentSamplerPreset(preset: DecentSamplerImport): Partial<PluginAdapter> {
   return {
@@ -32,6 +32,23 @@ export function pluginFromDecentSamplerPreset(preset: DecentSamplerImport): Part
       },
     ],
   };
+}
+
+export function decentSamplerPluginForInstrument(
+  instrument: Instrument | undefined,
+  plugins: PluginAdapter[],
+): PluginAdapter | undefined {
+  if (!instrument) return undefined;
+  return plugins.find((plugin) => (
+    plugin.format === "decent-sampler"
+    && (plugin.associatedInstrumentId === instrument.id || plugin.id === instrument.source?.pluginId)
+  ));
+}
+
+export function decentSamplerDragInstrumentId(plugin: PluginAdapter): string | null {
+  return plugin.format === "decent-sampler" && plugin.associatedInstrumentId
+    ? plugin.associatedInstrumentId
+    : null;
 }
 
 function fileNameFromPath(path: string) {

@@ -3,7 +3,7 @@ import { Button, HoverInfo, Icon, MarqueeText, Modal, SectionRibbon, SectionRibb
 import { isNative, send } from "../../ipc/bridge";
 import { useAudioFileStore, usePluginStore, useUiStore } from "../../state/store";
 import type { PluginAdapter, PluginFormat, PluginKind } from "../../state/types";
-import { pluginFromDecentSamplerPreset } from "./decentSamplerPluginAdapter";
+import { decentSamplerDragInstrumentId, pluginFromDecentSamplerPreset } from "./decentSamplerPluginAdapter";
 import { upsertDecentSamplerInstrument } from "../InstrumentLibrary/decentSamplerInstrument";
 import styles from "./PluginLibraryPanel.module.css";
 
@@ -189,13 +189,25 @@ export function PluginItem({ plugin, onOpen }: PluginItemProps) {
       },
     },
   ]);
+  const draggableInstrumentId = decentSamplerDragInstrumentId(plugin);
+
+  function onDragStart(e: React.DragEvent<HTMLLIElement>) {
+    if (!draggableInstrumentId) return;
+    e.dataTransfer.setData("application/x-beat-instrument", draggableInstrumentId);
+    e.dataTransfer.setData("application/x-beat-decent-sampler-plugin", plugin.id);
+    e.dataTransfer.setData("text/plain", plugin.name);
+    e.dataTransfer.effectAllowed = "copy";
+  }
 
   return (
     <li
       className={styles.item}
+      draggable={Boolean(draggableInstrumentId)}
       onClick={onOpen}
       onDoubleClick={onOpen}
       onContextMenu={onContextMenu}
+      onDragStart={onDragStart}
+      title={draggableInstrumentId ? "Drag to a track to create a DS instrument segment" : undefined}
     >
       <span className={styles.itemIcon} aria-hidden>
         {plugin.format === "decent-sampler" && plugin.uiImageDataUrl ? (

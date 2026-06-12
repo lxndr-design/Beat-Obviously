@@ -367,7 +367,21 @@ try {
     sampleMap: [],
     userCreated: true,
     effects: { filters: dsEffects },
+    source: { kind: "plugin", label: "Synthetic DS", pluginId: "ds-plugin" },
   };
+  assert.deepEqual(
+    runner.previewDecentSamplerInstrumentAffordance(dsInstrument, [
+      plugin("plain-plugin", { format: "vst3", associatedInstrumentId: "ds-inst" }),
+      plugin("ds-plugin", { associatedInstrumentId: "ds-inst" }),
+      plugin("other-ds", { associatedInstrumentId: "other-inst" }),
+    ]),
+    {
+      pluginId: "ds-plugin",
+      dragInstrumentIds: [null, "ds-inst", "other-inst"],
+      canEditDsInstrument: true,
+    },
+    "DS package rows should drag their associated instrument and DS-backed segments should expose plugin editing",
+  );
   const releaseControl = {
     kind: "labeled-knob",
     label: "Release",
