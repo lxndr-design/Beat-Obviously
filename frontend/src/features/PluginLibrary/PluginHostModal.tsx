@@ -207,18 +207,20 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
     };
   }, [plugin.sourcePath]);
 
-  const uiControlDetails = preset?.uiControlDetails ?? [];
+  const pluginUiControlDetails = (plugin as PluginAdapter & { uiControlDetails?: DecentSamplerUiControl[] }).uiControlDetails ?? [];
+  const uiControlDetails = preset?.uiControlDetails ?? pluginUiControlDetails;
   const uiWidth = preset?.uiWidth ?? plugin.uiWidth ?? 0;
   const uiHeight = preset?.uiHeight ?? plugin.uiHeight ?? 0;
   const uiImageDataUrl = preset?.uiImageDataUrl ?? plugin.uiImageDataUrl ?? "";
   const canvasFrameStyle: CSSProperties | undefined = uiImageDataUrl
     ? {
+        "--decent-ui-aspect": uiWidth && uiHeight ? uiWidth / uiHeight : 1,
         aspectRatio: uiWidth && uiHeight ? `${uiWidth} / ${uiHeight}` : undefined,
         backgroundImage: `url("${uiImageDataUrl}")`,
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
         backgroundSize: "100% 100%",
-      }
+      } as CSSProperties
     : undefined;
   const hotspotControls = uiControlDetails.filter((control) => hasControlHotspot(control, uiWidth, uiHeight)).slice(0, 64);
   const nativeAvailable = isNative();
@@ -314,28 +316,28 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
               <span>{nativeAvailable ? "Install or refresh the package to load the DS skin." : "Open Beat.app to parse package skin metadata."}</span>
             </div>
           )}
-          {activeControl && (
-            <div className={styles.decentControlInspector}>
-              <strong>{controlDisplayLabel(activeControl)}</strong>
-              <span>{activeControlBinding?.targetLabel ?? (describeControlBinding(activeControl) || formatControlRange(activeControl))}</span>
-              {activeControlBinding ? (
-                <label className={styles.decentControlSlider}>
-                  <input
-                    type="range"
-                    min={activeControlBinding.min}
-                    max={activeControlBinding.max}
-                    step={activeControlBinding.step}
-                    value={activeControlBinding.value}
-                    onChange={(event) => updateActiveControl(event.currentTarget.valueAsNumber)}
-                  />
-                  <em>{activeControlBinding.valueLabel}</em>
-                </label>
-              ) : (
-                <em>{associatedInstrument ? "Inspect only" : "Install package to enable control"}</em>
-              )}
-            </div>
-          )}
         </div>
+        {activeControl && (
+          <div className={styles.decentControlInspector}>
+            <strong>{controlDisplayLabel(activeControl)}</strong>
+            <span>{activeControlBinding?.targetLabel ?? (describeControlBinding(activeControl) || formatControlRange(activeControl))}</span>
+            {activeControlBinding ? (
+              <label className={styles.decentControlSlider}>
+                <input
+                  type="range"
+                  min={activeControlBinding.min}
+                  max={activeControlBinding.max}
+                  step={activeControlBinding.step}
+                  value={activeControlBinding.value}
+                  onChange={(event) => updateActiveControl(event.currentTarget.valueAsNumber)}
+                />
+                <em>{activeControlBinding.valueLabel}</em>
+              </label>
+            ) : (
+              <em>{associatedInstrument ? "Inspect only" : "Install package to enable control"}</em>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

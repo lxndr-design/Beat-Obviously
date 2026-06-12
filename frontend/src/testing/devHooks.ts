@@ -1,0 +1,196 @@
+import type { DecentSamplerUiControl } from "../ipc/schema";
+import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useUiStore } from "../state/store";
+import type { PluginAdapter } from "../state/types";
+
+type DevDecentSamplerFixture = "lorenzo" | "wide";
+
+declare global {
+  interface Window {
+    __beatTestHooks?: {
+      installDecentSamplerFixture: (fixture?: DevDecentSamplerFixture) => {
+        pluginId: string;
+        instrumentId: string;
+      };
+    };
+  }
+}
+
+let installed = false;
+
+export function installBeatDevHooks() {
+  if (installed) return;
+  installed = true;
+
+  const installDecentSamplerFixture = (fixture: DevDecentSamplerFixture = "lorenzo") => {
+    const pluginId = `dev-ds-${fixture}`;
+    const instrumentId = `dev-ds-${fixture}-template`;
+    const pluginStore = usePluginStore.getState();
+    const instrumentStore = useInstrumentStore.getState();
+
+    for (const plugin of pluginStore.plugins) {
+      if (plugin.sourcePath === "/dev-fixtures/lorenzos-drums.dspreset" || plugin.id === pluginId) {
+        pluginStore.removePlugin(plugin.id);
+      }
+    }
+    for (const instrument of instrumentStore.instruments) {
+      if (instrument.source?.url === "/dev-fixtures/lorenzos-drums.dspreset" || instrument.id === instrumentId) {
+        instrumentStore.removeInstrument(instrument.id);
+      }
+    }
+
+    const imageDataUrl = decentSamplerFixtureImage();
+    const controls = decentSamplerFixtureControls();
+    const nextInstrumentId = instrumentStore.addInstrument({
+      id: instrumentId,
+      name: "Lorenzos Drums V1 Template",
+      icon: "ph:piano-keys",
+      kind: "sampler",
+      waveform: "sample",
+      setId: TEMPORARY_DS_INSTRUMENT_SET_ID,
+      sampleUrls: [
+        "/samples/dev-ds/kick.wav",
+        "/samples/dev-ds/snare.wav",
+        "/samples/dev-ds/hat.wav",
+      ],
+      sampleMap: [
+        sampleZone("Kick", 36),
+        sampleZone("Snare", 38),
+        sampleZone("Hat", 42),
+      ],
+      descriptors: ["decentsampler", "decent-sampler", "drum", "kick", "snare"],
+      source: {
+        kind: "plugin",
+        label: "DecentSampler compatibility: Lorenzos Drums V1",
+        url: "/dev-fixtures/lorenzos-drums.dspreset",
+        importedAt: Date.now(),
+        pluginId,
+      },
+      userCreated: true,
+    });
+
+    const nextPluginId = pluginStore.addPlugin({
+      id: pluginId,
+      name: "Lorenzos Drums V1",
+      vendor: "DecentSampler",
+      version: "1.0.0",
+      kind: "renderer",
+      format: "decent-sampler",
+      status: "installed",
+      instrumentMode: "live-instrument",
+      sourceFileName: "lorenzos-drums-dev-fixture.dspreset",
+      sourcePath: "/dev-fixtures/lorenzos-drums.dspreset",
+      uiImageDataUrl: imageDataUrl,
+      uiWidth: 812,
+      uiHeight: 375,
+      sampleCount: 335,
+      uiControlCount: controls.length,
+      associatedInstrumentId: nextInstrumentId,
+      defaultEditorKind: "midi",
+      installedAt: Date.now(),
+      description: "Development DecentSampler fixture for exercising package UI and instanced instrument flows.",
+      uiControlDetails: controls,
+    } as Partial<PluginAdapter> & { uiControlDetails: DecentSamplerUiControl[] });
+
+    pluginStore.updatePlugin(nextPluginId, { associatedInstrumentId: nextInstrumentId });
+    useUiStore.getState().openEditor({ kind: "plugin", pluginId: nextPluginId });
+    return { pluginId: nextPluginId, instrumentId: nextInstrumentId };
+  };
+
+  window.__beatTestHooks = {
+    ...(window.__beatTestHooks ?? {}),
+    installDecentSamplerFixture,
+  };
+
+  document.addEventListener("beat:install-decent-sampler-fixture", (event) => {
+    const fixture = event instanceof CustomEvent ? event.detail?.fixture : undefined;
+    installDecentSamplerFixture(fixture === "wide" ? "wide" : "lorenzo");
+  });
+
+  const fixture = new URLSearchParams(window.location.search).get("beatDevFixture");
+  if (fixture === "ds-lorenzo" || fixture === "ds-wide") {
+    window.setTimeout(() => {
+      installDecentSamplerFixture(fixture === "ds-wide" ? "wide" : "lorenzo");
+    }, 0);
+  }
+}
+
+function sampleZone(name: string, note: number) {
+  return {
+    path: `/samples/dev-ds/${name.toLowerCase()}.wav`,
+    name,
+    rootNote: note,
+    loNote: note,
+    hiNote: note,
+    loVel: 1,
+    hiVel: 127,
+    volumeDb: 0,
+    pan: 0,
+    tuning: 0,
+    seqPosition: 1,
+  };
+}
+
+function decentSamplerFixtureControls(): DecentSamplerUiControl[] {
+  return [
+    control("labeled-knob", "Tone", 18, 252, 56, 56, "effect", "instrument", "FX_FILTER_FREQUENCY", 0, 20, 22000, 18000),
+    control("labeled-knob", "Kick", 468, 82, 64, 64, "amp", "group", "AMP_VOLUME", 0, 0, 1, 1),
+    control("labeled-knob", "Snare", 604, 178, 58, 58, "amp", "group", "AMP_VOLUME", 1, 0, 1, 0.82),
+    control("labeled-knob", "Hats", 730, 178, 58, 58, "amp", "group", "AMP_VOLUME", 2, 0, 1, 0.72),
+    control("labeled-knob", "Room", 682, 272, 58, 58, "effect", "instrument", "FX_REVERB_WET_LEVEL", 1, 0, 1, 0.42),
+  ];
+}
+
+function control(
+  kind: string,
+  label: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  type: string,
+  level: string,
+  parameter: string,
+  position: number,
+  minValue: number,
+  maxValue: number,
+  value: number,
+): DecentSamplerUiControl {
+  return {
+    kind,
+    label,
+    x,
+    y,
+    width,
+    height,
+    minValue,
+    maxValue,
+    value,
+    bindings: [{ type, level, parameter, position }],
+  };
+}
+
+function decentSamplerFixtureImage() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 812 375">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#061424"/>
+        <stop offset="0.52" stop-color="#294054"/>
+        <stop offset="1" stop-color="#050b13"/>
+      </linearGradient>
+    </defs>
+    <rect width="812" height="375" fill="url(#bg)"/>
+    <circle cx="144" cy="206" r="132" fill="#d2c9b6" opacity=".45"/>
+    <circle cx="520" cy="126" r="116" fill="#e2dfd4" opacity=".48"/>
+    <circle cx="602" cy="340" r="148" fill="#d6d7d1" opacity=".4"/>
+    <rect x="452" y="78" width="320" height="230" fill="#071828" opacity=".72"/>
+    <g fill="#fff" font-family="Helvetica,Arial,sans-serif" font-weight="700">
+      <text x="74" y="172" font-size="28">LORENZO'S DRUMS V1</text>
+      <text x="472" y="148" font-size="16">KICK</text>
+      <text x="604" y="148" font-size="16">SNARE</text>
+      <text x="708" y="148" font-size="16">HATS</text>
+      <text x="472" y="250" font-size="14">KICK MIC</text>
+      <text x="584" y="250" font-size="14">SNARE MIC</text>
+    </g>
+  </svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}

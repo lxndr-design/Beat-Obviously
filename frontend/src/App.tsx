@@ -61,6 +61,11 @@ export function App() {
   const shouldMountEditorHost = useUiStore((s) => s.openEditors.length > 0 || Boolean(s.trackEffectsEditorTrackId));
   const [showHome, setShowHome] = useState(true);
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    void import("./testing/devHooks").then(({ installBeatDevHooks }) => installBeatDevHooks());
+  }, []);
+
   function closeHome() {
     setShowHome(false);
   }
