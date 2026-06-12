@@ -114,6 +114,26 @@ export interface AudioDeviceSnapshot {
   devices: AudioDeviceInfo[];
 }
 
+export interface RecordingCaptureStats {
+  active: boolean;
+  channels: number;
+  recordedSamples: number;
+  capacitySamples: number;
+  sampleRate: number;
+  overflowed: boolean;
+  durationSeconds: number;
+}
+
+export interface RecordingSessionPlan {
+  trackId: Id;
+  transportStartBeat: Beats;
+  captureStartBeat: Beats;
+  countInBeats: Beats;
+  captureDelaySeconds: number;
+  maxDurationSeconds: number;
+  inputChannels: number;
+}
+
 export interface ProjectExportJobStatus {
   active: boolean;
   finished: boolean;
@@ -290,6 +310,15 @@ export type OutboundRequest =
   | { kind: "audio.waveform"; path: string; bucketCount?: number }
   | { kind: "audio.listDevices" }
   | { kind: "audio.selectInputDevice"; typeName?: string; deviceName: string; inputChannelCount?: number }
+  // Recording -------------------------------------------------------------
+  | { kind: "recording.plan"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[]; trackId?: Id; startBeat: Beats; countInBeats?: Beats; maxDurationSeconds: number; inputChannels?: number; sampleRate?: number; bpm?: number; requireRecordArm?: boolean }
+  | { kind: "recording.prepare"; maxDurationSeconds: number; inputChannels?: number }
+  | { kind: "recording.start" }
+  | { kind: "recording.stop" }
+  | { kind: "recording.cancel" }
+  | { kind: "recording.status" }
+  | { kind: "recording.writeWav"; pathHint: string; bitDepth?: 16 | 24 | 32 }
+  | { kind: "recording.commitTake"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[]; trackId?: Id; pathHint: string; startBeat?: Beats; name?: string; trackName?: string; audioFileId?: Id; segmentId?: Id; bpm?: number; gainDb?: number; compensateLatency?: boolean; inputLatencySamples?: number; outputLatencySamples?: number; manualLatencySamples?: number; bitDepth?: 16 | 24 | 32 }
   // EQ -------------------------------------------------------------------
   | { kind: "eq.setAutomation"; points: EqAutomationPoint[] }
   // Local AI training ------------------------------------------------------
@@ -331,6 +360,14 @@ export type ResponseFor<R extends OutboundRequest> =
   R extends { kind: "audio.waveform" } ? { waveform: AudioWaveformSummary | null; cached?: boolean; error?: string } :
   R extends { kind: "audio.listDevices" } ? { snapshot: AudioDeviceSnapshot } :
   R extends { kind: "audio.selectInputDevice" } ? { ok: boolean; snapshot: AudioDeviceSnapshot; error?: string } :
+  R extends { kind: "recording.plan" } ? { plan: RecordingSessionPlan | null; error?: string } :
+  R extends { kind: "recording.prepare" } ? { ok: boolean; stats: RecordingCaptureStats; error?: string } :
+  R extends { kind: "recording.start" } ? { stats: RecordingCaptureStats } :
+  R extends { kind: "recording.stop" } ? { stats: RecordingCaptureStats } :
+  R extends { kind: "recording.cancel" } ? { stats: RecordingCaptureStats } :
+  R extends { kind: "recording.status" } ? { stats: RecordingCaptureStats } :
+  R extends { kind: "recording.writeWav" } ? { path: string; stats: RecordingCaptureStats; analysis?: AudioRenderAnalysis; error?: string } :
+  R extends { kind: "recording.commitTake" } ? { path?: string; trackId?: Id; audioFileId?: Id; segmentId?: Id; lengthBeats?: Beats; stats: RecordingCaptureStats; audioFile?: AudioFile; track?: Track; analysis?: AudioRenderAnalysis; error?: string } :
   R extends { kind: "training.run" }    ? { started: boolean; reason?: string } :
   R extends { kind: "app.ready" }       ? { ok: true } :
   R extends { kind: "ping" }           ? { pong: true; backendVersion: string } :

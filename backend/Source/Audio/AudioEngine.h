@@ -215,6 +215,7 @@ namespace beat
         RecordingCaptureStats stopInputRecording() noexcept;
         void cancelInputRecording() noexcept;
         RecordingCaptureStats inputRecordingStats() const noexcept;
+        const RecordingCapture& inputRecordingCapture() const noexcept { return inputRecording; }
         bool writeInputRecordingToWav(const juce::File& outputFile,
                                       juce::String* error = nullptr,
                                       int bitDepth = 24) const;

@@ -66,6 +66,16 @@ namespace beat::ipc
         constexpr const char* AUDIO_LIST_DEVICES  = "audio.listDevices";
         constexpr const char* AUDIO_SELECT_INPUT_DEVICE = "audio.selectInputDevice";
 
+        // Recording
+        constexpr const char* RECORDING_PLAN      = "recording.plan";
+        constexpr const char* RECORDING_PREPARE   = "recording.prepare";
+        constexpr const char* RECORDING_START     = "recording.start";
+        constexpr const char* RECORDING_STOP      = "recording.stop";
+        constexpr const char* RECORDING_CANCEL    = "recording.cancel";
+        constexpr const char* RECORDING_STATUS    = "recording.status";
+        constexpr const char* RECORDING_WRITE_WAV = "recording.writeWav";
+        constexpr const char* RECORDING_COMMIT_TAKE = "recording.commitTake";
+
         // EQ
         constexpr const char* EQ_SET_AUTOMATION   = "eq.setAutomation";
 

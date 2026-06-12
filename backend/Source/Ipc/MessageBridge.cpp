@@ -3,6 +3,8 @@
 #include "../Audio/Analysis/AudioFileAnalyzer.h"
 #include "../Audio/Effects/TrackEffectDefaults.h"
 #include "../Audio/Parameters/SynthPatchContract.h"
+#include "../Audio/Recording/RecordingPlanner.h"
+#include "../Audio/Recording/RecordingSessionPlanner.h"
 #include "../Audio/Rendering/TrackBouncePlanner.h"
 #include "../Audio/Sampler/DecentSamplerImporter.h"
 #include "../Persistence/ProjectAssetPackage.h"
@@ -164,9 +166,43 @@ namespace beat
             object->setProperty("pan", track.pan);
             object->setProperty("mute", track.mute);
             object->setProperty("solo", track.solo);
+            object->setProperty("recordArmed", track.recordArmed);
+            object->setProperty("inputMonitoring", track.inputMonitoring);
+            object->setProperty("inputDeviceId", track.inputDeviceId);
+            object->setProperty("inputChannelStart", track.inputChannelStart);
+            object->setProperty("inputChannelCount", track.inputChannelCount);
+            object->setProperty("recordGainDb", track.recordGainDb);
             object->setProperty("effects", juce::var(effects.get()));
             object->setProperty("segments", segments);
             object->setProperty("rowHeight", "normal");
+            return juce::var(object.get());
+        }
+
+        juce::var makeRecordingCaptureStatsVar(const RecordingCaptureStats& stats)
+        {
+            juce::DynamicObject::Ptr object = new juce::DynamicObject();
+            object->setProperty("active", stats.active);
+            object->setProperty("channels", stats.channels);
+            object->setProperty("recordedSamples", stats.recordedSamples);
+            object->setProperty("capacitySamples", stats.capacitySamples);
+            object->setProperty("sampleRate", stats.sampleRate);
+            object->setProperty("overflowed", stats.overflowed);
+            object->setProperty("durationSeconds", stats.sampleRate > 0.0
+                ? static_cast<double>(stats.recordedSamples) / stats.sampleRate
+                : 0.0);
+            return juce::var(object.get());
+        }
+
+        juce::var makeRecordingSessionPlanVar(const RecordingSessionPlan& plan)
+        {
+            juce::DynamicObject::Ptr object = new juce::DynamicObject();
+            object->setProperty("trackId", plan.trackId);
+            object->setProperty("transportStartBeat", plan.transportStartBeat);
+            object->setProperty("captureStartBeat", plan.captureStartBeat);
+            object->setProperty("countInBeats", plan.countInBeats);
+            object->setProperty("captureDelaySeconds", plan.captureDelaySeconds);
+            object->setProperty("maxDurationSeconds", plan.maxDurationSeconds);
+            object->setProperty("inputChannels", plan.inputChannels);
             return juce::var(object.get());
         }
 
@@ -3330,6 +3366,186 @@ namespace beat
             if (!ok)
                 response->setProperty("error", error.isNotEmpty() ? error : "Could not select input device.");
             response->setProperty("snapshot", makeAudioDeviceSnapshotVar(engine.listAudioDevices()));
+            return juce::var(response.get());
+        }
+
+        if (kind == RECORDING_PLAN)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto projectPayload = payload.getProperty("project", {});
+            if (!projectPayload.isObject())
+            {
+                response->setProperty("plan", juce::var());
+                response->setProperty("error", "Recording plan requires a project payload.");
+                return juce::var(response.get());
+            }
+
+            const auto project = parseProjectFromFrontend(projectPayload,
+                                                          payload.getProperty("instruments", {}),
+                                                          payload.getProperty("audioFiles", {}));
+            RecordingSessionSpec spec;
+            spec.trackId = payload.getProperty("trackId", {}).toString();
+            spec.requestedStartBeat = (double) payload.getProperty("startBeat", 0.0);
+            spec.countInBeats = (double) payload.getProperty("countInBeats", 0.0);
+            spec.bpm = (double) payload.getProperty("bpm", project.bpm);
+            const auto deviceSnapshot = engine.listAudioDevices(false);
+            const auto fallbackSampleRate = deviceSnapshot.sampleRate > 0.0 ? deviceSnapshot.sampleRate : 44100.0;
+            spec.sampleRate = (double) payload.getProperty("sampleRate", fallbackSampleRate);
+            spec.maxDurationSeconds = (double) payload.getProperty("maxDurationSeconds", 60.0);
+            spec.inputChannels = juce::jlimit(1, 32, (int) payload.getProperty("inputChannels", 2));
+            spec.requireRecordArm = (bool) payload.getProperty("requireRecordArm", true);
+
+            juce::String error;
+            const auto plan = planRecordingSession(project, spec, &error);
+            response->setProperty("plan", plan ? makeRecordingSessionPlanVar(*plan) : juce::var());
+            if (!plan)
+                response->setProperty("error", error.isNotEmpty() ? error : "Recording session could not be planned.");
+            return juce::var(response.get());
+        }
+
+        if (kind == RECORDING_PREPARE)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            juce::String error;
+            const auto maxDurationSeconds = juce::jlimit(0.01, 60.0 * 60.0, (double) payload.getProperty("maxDurationSeconds", 60.0));
+            const auto inputChannels = juce::jlimit(1, 32, (int) payload.getProperty("inputChannels", 2));
+            const bool ok = engine.prepareInputRecording(maxDurationSeconds, inputChannels, &error);
+            response->setProperty("ok", ok);
+            response->setProperty("stats", makeRecordingCaptureStatsVar(engine.inputRecordingStats()));
+            if (!ok)
+                response->setProperty("error", error.isNotEmpty() ? error : "Could not prepare input recording.");
+            return juce::var(response.get());
+        }
+
+        if (kind == RECORDING_START)
+        {
+            engine.startInputRecording();
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            response->setProperty("stats", makeRecordingCaptureStatsVar(engine.inputRecordingStats()));
+            return juce::var(response.get());
+        }
+
+        if (kind == RECORDING_STOP)
+        {
+            const auto stats = engine.stopInputRecording();
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            response->setProperty("stats", makeRecordingCaptureStatsVar(stats));
+            return juce::var(response.get());
+        }
+
+        if (kind == RECORDING_CANCEL)
+        {
+            engine.cancelInputRecording();
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            response->setProperty("stats", makeRecordingCaptureStatsVar(engine.inputRecordingStats()));
+            return juce::var(response.get());
+        }
+
+        if (kind == RECORDING_STATUS)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            response->setProperty("stats", makeRecordingCaptureStatsVar(engine.inputRecordingStats()));
+            return juce::var(response.get());
+        }
+
+        if (kind == RECORDING_WRITE_WAV)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto pathHint = payload.getProperty("pathHint", {}).toString();
+            if (pathHint.trim().isEmpty())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("stats", makeRecordingCaptureStatsVar(engine.inputRecordingStats()));
+                response->setProperty("error", "Recording write requires an output path.");
+                return juce::var(response.get());
+            }
+
+            juce::String error;
+            const auto bitDepth = normalizeExportBitDepth((int) payload.getProperty("bitDepth", 24));
+            const juce::File outputFile(pathHint);
+            const bool ok = engine.writeInputRecordingToWav(outputFile, &error, bitDepth);
+            response->setProperty("path", ok ? outputFile.getFullPathName() : juce::String());
+            response->setProperty("stats", makeRecordingCaptureStatsVar(engine.inputRecordingStats()));
+            if (ok)
+            {
+                if (auto analysis = AudioFileAnalyzer::analyzeFile(outputFile))
+                    response->setProperty("analysis", makeAudioAnalysis(*analysis));
+            }
+            else
+            {
+                response->setProperty("error", error.isNotEmpty() ? error : "Could not write recorded WAV.");
+            }
+            return juce::var(response.get());
+        }
+
+        if (kind == RECORDING_COMMIT_TAKE)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto projectPayload = payload.getProperty("project", {});
+            const auto pathHint = payload.getProperty("pathHint", {}).toString();
+            if (!projectPayload.isObject())
+            {
+                response->setProperty("error", "Recording commit requires a project payload.");
+                response->setProperty("stats", makeRecordingCaptureStatsVar(engine.inputRecordingStats()));
+                return juce::var(response.get());
+            }
+            if (pathHint.trim().isEmpty())
+            {
+                response->setProperty("error", "Recording commit requires an output path.");
+                response->setProperty("stats", makeRecordingCaptureStatsVar(engine.inputRecordingStats()));
+                return juce::var(response.get());
+            }
+
+            auto project = parseProjectFromFrontend(projectPayload,
+                                                    payload.getProperty("instruments", {}),
+                                                    payload.getProperty("audioFiles", {}));
+            RecordedTakeSpec spec;
+            spec.trackId = payload.getProperty("trackId", {}).toString();
+            spec.trackName = payload.getProperty("trackName", "Recorded Audio").toString();
+            spec.audioFileId = payload.getProperty("audioFileId", {}).toString();
+            spec.segmentId = payload.getProperty("segmentId", {}).toString();
+            spec.name = payload.getProperty("name", juce::File(pathHint).getFileNameWithoutExtension()).toString();
+            spec.startBeat = (double) payload.getProperty("startBeat", 0.0);
+            spec.bpm = (double) payload.getProperty("bpm", project.bpm);
+            spec.gainDb = (float) (double) payload.getProperty("gainDb", 0.0);
+            spec.compensateLatency = (bool) payload.getProperty("compensateLatency", true);
+            spec.inputLatencySamples = (int) payload.getProperty("inputLatencySamples", 0);
+            spec.outputLatencySamples = (int) payload.getProperty("outputLatencySamples", 0);
+            spec.manualLatencySamples = (int) payload.getProperty("manualLatencySamples", 0);
+
+            juce::String error;
+            const auto bitDepth = normalizeExportBitDepth((int) payload.getProperty("bitDepth", 24));
+            const auto result = commitRecordedCapture(project, engine.inputRecordingCapture(), juce::File(pathHint), spec, &error, bitDepth);
+            response->setProperty("stats", makeRecordingCaptureStatsVar(engine.inputRecordingStats()));
+            if (!result)
+            {
+                response->setProperty("error", error.isNotEmpty() ? error : "Could not commit recorded take.");
+                return juce::var(response.get());
+            }
+
+            const auto audioIt = std::find_if(project.audioFiles.begin(),
+                                              project.audioFiles.end(),
+                                              [&result](const AudioFileAsset& audioFile) { return audioFile.id == result->audioFileId; });
+            const auto trackIt = std::find_if(project.tracks.begin(),
+                                              project.tracks.end(),
+                                              [&result](const Track& track) { return track.id == result->trackId; });
+
+            response->setProperty("path", juce::File(pathHint).getFullPathName());
+            response->setProperty("trackId", result->trackId);
+            response->setProperty("audioFileId", result->audioFileId);
+            response->setProperty("segmentId", result->segmentId);
+            response->setProperty("lengthBeats", result->lengthBeats);
+            const auto analysis = AudioFileAnalyzer::analyzeFile(juce::File(pathHint));
+            if (audioIt != project.audioFiles.end())
+            {
+                auto audioFileVar = makeAudioFileAssetVar(*audioIt, analysis);
+                response->setProperty("audioFile", audioFileVar);
+                saveAudioFile(database, audioFileVar);
+            }
+            if (trackIt != project.tracks.end())
+                response->setProperty("track", makeBouncedTrackVar(*trackIt));
+            if (analysis)
+                response->setProperty("analysis", makeAudioAnalysis(*analysis));
             return juce::var(response.get());
         }
 
