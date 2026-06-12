@@ -12,11 +12,12 @@ import styles from "./Sidebar.module.css";
 
 type SidebarPanel = "instruments" | "audio" | "components" | "plugins" | "decentSampler";
 
-const PANELS: Array<{ id: SidebarPanel; label: string; icon: string }> = [
+const PANELS: Array<{ id: SidebarPanel; label: string; icon?: string; imageSrc?: string }> = [
   { id: "instruments", label: "Instruments", icon: "ph:piano-keys" },
   { id: "audio", label: "Audio files", icon: "ph:music-note" },
   { id: "components", label: "Components", icon: "ph:stack" },
   { id: "plugins", label: "Plugins", icon: "ph:share-network" },
+  { id: "decentSampler", label: "DecentSampler", imageSrc: "/assets/decent-sampler.png" },
 ];
 
 /**
@@ -107,21 +108,14 @@ export function Sidebar() {
                 aria-label={panel.label}
                 aria-pressed={activePanel === panel.id}
               >
-                <Icon name={panel.icon} size={16} decorative />
+                {panel.imageSrc ? (
+                  <img className={styles.decentSamplerIcon} src={panel.imageSrc} alt="" aria-hidden="true" />
+                ) : (
+                  <Icon name={panel.icon ?? "ph:square"} size={16} decorative />
+                )}
               </button>
             </HoverInfo>
           ))}
-          <HoverInfo content="DecentSampler" placement="right">
-            <button
-              type="button"
-              className={`${styles.railButton} ${activePanel === "decentSampler" ? styles.railButtonActive : ""}`}
-              onClick={() => setActivePanel("decentSampler")}
-              aria-label="DecentSampler compatibility"
-              aria-pressed={activePanel === "decentSampler"}
-            >
-              <img className={styles.decentSamplerIcon} src="/assets/decent-sampler.png" alt="" aria-hidden="true" />
-            </button>
-          </HoverInfo>
         </div>
         <div className={styles.railBottom}>
           <span className={styles.railSaveSlot}>

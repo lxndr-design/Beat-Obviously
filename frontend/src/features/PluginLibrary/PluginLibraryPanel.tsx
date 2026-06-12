@@ -3,7 +3,7 @@ import { Button, HoverInfo, Icon, MarqueeText, Modal, SectionRibbon, SectionRibb
 import { isNative, send } from "../../ipc/bridge";
 import { useAudioFileStore, usePluginStore, useUiStore } from "../../state/store";
 import type { PluginAdapter, PluginFormat, PluginKind } from "../../state/types";
-import { pluginFromDecentSamplerPreset } from "./DecentSamplerLibraryModal";
+import { pluginFromDecentSamplerPreset } from "./decentSamplerPluginAdapter";
 import { upsertDecentSamplerInstrument } from "../InstrumentLibrary/decentSamplerInstrument";
 import styles from "./PluginLibraryPanel.module.css";
 

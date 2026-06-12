@@ -10,7 +10,7 @@ import type { DecentSamplerImport, DecentSamplerUiControl } from "../../ipc/sche
 import { createDefaultSynthDraft, synthDraftToInstrumentPatch, type SynthDraftPatch, useSynthStore } from "../../state/synthStore";
 import { useAudioFileStore, useInstrumentStore, usePluginStore, useUiStore } from "../../state/store";
 import type { PluginAdapter } from "../../state/types";
-import { pluginFromDecentSamplerPreset } from "./DecentSamplerLibraryModal";
+import { pluginFromDecentSamplerPreset } from "./decentSamplerPluginAdapter";
 import styles from "./PluginHostModal.module.css";
 
 interface PluginHostModalProps {

@@ -602,7 +602,6 @@ export interface UiState {
     | { kind: "segment"; segmentId: Id }
     | { kind: "component"; componentId: Id }
     | { kind: "plugin"; pluginId: Id }
-    | { kind: "decentSamplerLibrary" }
     | { kind: "eq" }
     | { kind: "projectHealth" }
     | { kind: "preferences" }

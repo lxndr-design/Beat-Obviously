@@ -1114,7 +1114,7 @@ export function normalizePluginAdapter(patch: Partial<PluginAdapter> = {}): Plug
       vendor: normalizedPatch.vendor ?? "DecentSampler",
       version: normalizedPatch.version ?? "1.0.0",
       status: normalizedPatch.status ?? "installed",
-      description: normalizedPatch.description ?? "DecentSampler sample package. Opens in Beat's DS compatibility wrapper and plays through Beat's sampler engine.",
+      description: normalizedPatch.description ?? "DecentSampler sample package. Opens to the package UI and plays through Beat's sampler engine.",
       ...normalizedPatch,
       capabilities: [
         {
