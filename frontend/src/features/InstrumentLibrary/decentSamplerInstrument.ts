@@ -1,5 +1,5 @@
 import type { DecentSamplerImport, DecentSamplerUiBinding, DecentSamplerUiControl } from "../../ipc/schema";
-import { snapshotInstrument, useInstrumentStore, USER_INSTRUMENT_SET_ID } from "../../state/store";
+import { snapshotInstrument, TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore } from "../../state/store";
 import type { Instrument, TrackEffect } from "../../state/types";
 
 type InstrumentStore = ReturnType<typeof useInstrumentStore.getState>;
@@ -58,7 +58,7 @@ function decentSamplerInstrumentPatch(
       startSample: sample.startSample,
       endSample: sample.endSample,
     })),
-    setId: USER_INSTRUMENT_SET_ID,
+    setId: TEMPORARY_DS_INSTRUMENT_SET_ID,
     source: {
       kind: "plugin",
       label: options.sourceLabel ?? `DecentSampler compatibility: ${preset.name}`,

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, Icon, MarqueeText, useContextMenu, HoverInfo, SectionRibbon, SectionRibbonActionButton, type ContextMenuItem } from "../../components";
 import { createInstrumentBufferSource, preloadInstrumentSample, previewFrequency } from "../../audio/synthPreview";
-import { useInstrumentStore, useUiStore } from "../../state/store";
+import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, useUiStore } from "../../state/store";
 import { instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
 import {
   FACTORY_SYNTH_PRESETS,
@@ -571,7 +571,7 @@ function instrumentSetId(instrument: Instrument): string {
 }
 
 function instrumentSetDisplayName(set: InstrumentSet): string {
-  if (!set.factory || set.id === "user-instruments") return set.name;
+  if (!set.factory || set.id === "user-instruments" || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID) return set.name;
   return set.name.toLowerCase().startsWith("factory ") ? set.name : `Factory ${set.name}`;
 }
 

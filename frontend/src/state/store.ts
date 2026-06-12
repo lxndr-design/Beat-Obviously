@@ -1382,6 +1382,7 @@ export const FACTORY_DRUM_SET_ID = "factory-drums";
 export const FACTORY_SYNTH_SET_ID = "factory-synths";
 export const ROCK_DRUM_SET_ID = "rock-drums";
 export const ORCHESTRA_SET_ID = "orchestra-pit";
+export const TEMPORARY_DS_INSTRUMENT_SET_ID = "temporary-ds-instruments";
 export const USER_INSTRUMENT_SET_ID = "user-instruments";
 
 function defaultInstrumentSets(): InstrumentSet[] {
@@ -1390,6 +1391,7 @@ function defaultInstrumentSets(): InstrumentSet[] {
     { id: FACTORY_DRUM_SET_ID, name: "Classic Machines", factory: true },
     { id: ORCHESTRA_SET_ID, name: "Orchestra Pit", factory: true },
     { id: FACTORY_SYNTH_SET_ID, name: "Synths", factory: true },
+    { id: TEMPORARY_DS_INSTRUMENT_SET_ID, name: "Temporary Instruments", factory: true },
     { id: USER_INSTRUMENT_SET_ID, name: "User", factory: true },
   ];
 }
@@ -1521,13 +1523,32 @@ function withOriginal(instrument: Instrument): Instrument {
 
 function normalizeInstrument(instrument: Instrument): Instrument {
   const source = instrument.source ?? inferInstrumentSource(instrument);
+  const setId = isDecentSamplerInstancedInstrument(instrument, source)
+    && (!instrument.setId || instrument.setId === USER_INSTRUMENT_SET_ID)
+    ? TEMPORARY_DS_INSTRUMENT_SET_ID
+    : instrument.setId ?? (instrument.userCreated ? USER_INSTRUMENT_SET_ID : FACTORY_SYNTH_SET_ID);
   return {
     ...instrument,
-    setId: instrument.setId ?? (instrument.userCreated ? USER_INSTRUMENT_SET_ID : FACTORY_SYNTH_SET_ID),
+    setId,
     source,
     descriptors: instrument.descriptors ?? characterizeInstrument(instrument),
     original: instrument.original ?? (source.kind === "created" ? undefined : snapshotInstrument(instrument)),
   };
+}
+
+function isDecentSamplerInstancedInstrument(
+  instrument: Pick<Instrument, "descriptors" | "source">,
+  source: NonNullable<Instrument["source"]>,
+): boolean {
+  const tokens = [
+    source.kind,
+    source.label,
+    source.pluginId,
+    ...(instrument.descriptors ?? []),
+  ].join(" ").toLowerCase();
+  return tokens.includes("decentsampler")
+    || tokens.includes("decent sampler")
+    || tokens.includes("decent-sampler");
 }
 
 export function characterizeInstrument(instrument: Pick<Instrument, "name" | "kind" | "waveform" | "sampleUrl" | "knobs" | "octave" | "subOscLevel" | "glideMs">): string[] {

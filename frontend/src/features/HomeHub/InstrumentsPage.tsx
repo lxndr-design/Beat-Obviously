@@ -18,8 +18,8 @@ import {
 } from "../../audio/synthPreview";
 import { isNative, send } from "../../ipc/bridge";
 import type { AudioRenderAnalysis, AudioWaveformSummary } from "../../ipc/schema";
-import { useInstrumentStore } from "../../state/store";
-import type { Instrument } from "../../state/types";
+import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore } from "../../state/store";
+import type { Instrument, InstrumentSet } from "../../state/types";
 import { AssetPageShell, AssetStateMessage } from "./AssetPageShell";
 import styles from "./InstrumentsPage.module.css";
 
@@ -338,7 +338,7 @@ export function InstrumentsPage() {
           ) : grouped.map((group) => (
             <div key={group.set.id} className={styles.group}>
               <div className={styles.groupHeader}>
-                <span>{group.set.factory ? `Factory ${group.set.name}` : group.set.name}</span>
+                <span>{instrumentSetDisplayName(group.set)}</span>
                 <strong>{group.instruments.length}</strong>
               </div>
               {group.instruments.map((instrument) => {
@@ -483,6 +483,11 @@ export function InstrumentsPage() {
       }
     />
   );
+}
+
+function instrumentSetDisplayName(set: InstrumentSet): string {
+  if (!set.factory || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID) return set.name;
+  return `Factory ${set.name}`;
 }
 
 function InstrumentWaveform({ waveform }: { waveform: AudioWaveformSummary | null }) {
