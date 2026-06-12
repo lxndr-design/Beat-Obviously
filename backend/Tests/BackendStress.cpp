@@ -7156,6 +7156,103 @@ namespace
         return ok;
     }
 
+    bool stressDecentSamplerHovefluteImportAndPlayback()
+    {
+        const auto archiveFile = juce::File("/Users/alexcheng/Downloads/samples/1043_Hoveflute_StefingoUnosson_DS.zip");
+        if (!archiveFile.existsAsFile())
+        {
+            std::cerr << "Decent Hoveflute fixture pack not present; skipping import/playback stress\n";
+            return true;
+        }
+
+        auto extractedRoot = juce::File("/private/tmp").getChildFile("BeatBackendStress-decent-hoveflute-playback");
+        if (extractedRoot.exists())
+            extractedRoot.deleteRecursively();
+        if (!extractedRoot.createDirectory())
+        {
+            std::cerr << "Decent Hoveflute playback temp root creation failed\n";
+            return false;
+        }
+
+        const auto presetFile = beat::resolveDecentSamplerPreset(archiveFile, extractedRoot);
+        const auto preset = presetFile.existsAsFile() ? beat::parseDecentSamplerPreset(presetFile) : std::nullopt;
+        if (!preset)
+        {
+            extractedRoot.deleteRecursively();
+            std::cerr << "Decent Hoveflute playback parse failed preset=" << presetFile.getFullPathName() << "\n";
+            return false;
+        }
+
+        bool samplePathsExist = true;
+        bool sampleRangesValid = true;
+        for (const auto& sample : preset->samples)
+        {
+            samplePathsExist = samplePathsExist && juce::File(sample.path).existsAsFile();
+            sampleRangesValid = sampleRangesValid
+                && sample.rootNote >= 0
+                && sample.rootNote <= 127
+                && sample.loNote >= 0
+                && sample.hiNote <= 127
+                && sample.loVel >= 0
+                && sample.hiVel <= 127
+                && sample.loNote <= sample.hiNote
+                && sample.loVel <= sample.hiVel;
+        }
+
+        const bool uiImageExists = juce::File(preset->uiImagePath).existsAsFile();
+
+        auto project = makeDecentFixtureProject(*preset);
+        project.name = "Hoveflute DecentSampler Playback";
+
+        const auto live = renderOfflineChunks(project, 44100, 256);
+        const double liveEnergy = bufferEnergy(live);
+        const float livePeak = bufferPeak(live);
+
+        auto exportFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-hoveflute-ds-fixture.wav");
+        if (exportFile.existsAsFile())
+            exportFile.deleteFile();
+
+        juce::String error;
+        const bool exportedOk = beat::AudioEngine::renderProjectToWav(project, exportFile, 44100.0, 256, 2, &error);
+        const double exportEnergy = exportedOk ? wavEnergy(exportFile) : std::numeric_limits<double>::quiet_NaN();
+
+        if (exportFile.existsAsFile())
+            exportFile.deleteFile();
+        extractedRoot.deleteRecursively();
+
+        const bool ok = preset->samples.size() >= 8
+            && preset->sampleUrls.size() >= 8
+            && preset->uiImagePath.isNotEmpty()
+            && uiImageExists
+            && preset->uiWidth > 0
+            && preset->uiHeight > 0
+            && !presetFile.getFullPathName().containsIgnoreCase(juce::File::getSeparatorString() + "__MACOSX" + juce::File::getSeparatorString())
+            && samplePathsExist
+            && sampleRangesValid
+            && std::isfinite(liveEnergy)
+            && std::isfinite(exportEnergy)
+            && liveEnergy > 0.0001
+            && exportEnergy > 0.0001
+            && livePeak > 0.0005f
+            && livePeak <= 1.0f;
+        if (!ok)
+        {
+            std::cerr << "Decent Hoveflute playback failed preset=" << presetFile.getFullPathName()
+                      << " samples=" << (int) preset->samples.size()
+                      << " urls=" << preset->sampleUrls.size()
+                      << " uiImage=" << preset->uiImagePath
+                      << " ui=" << juce::String(preset->uiWidth) + "x" + juce::String(preset->uiHeight)
+                      << " uiImageExists=" << uiImageExists
+                      << " samplePathsExist=" << samplePathsExist
+                      << " sampleRangesValid=" << sampleRangesValid
+                      << " liveEnergy=" << liveEnergy
+                      << " livePeak=" << livePeak
+                      << " exportEnergy=" << exportEnergy
+                      << " exportError=" << error << "\n";
+        }
+        return ok;
+    }
+
     bool stressAudioEngineAudioClipOfflineExport()
     {
         auto clipFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-clip-export-source.wav");
@@ -9778,6 +9875,11 @@ int main()
     if (!stressDecentSamplerLorenzoImportAndPlayback())
     {
         std::cerr << "Decent Sampler Lorenzo import/playback stress failed\n";
+        return 1;
+    }
+    if (!stressDecentSamplerHovefluteImportAndPlayback())
+    {
+        std::cerr << "Decent Sampler Hoveflute import/playback stress failed\n";
         return 1;
     }
     std::cerr << "decent sampler: done\n";
