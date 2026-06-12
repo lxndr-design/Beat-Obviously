@@ -355,6 +355,82 @@ try {
   assert.equal(dsEffects[1].params.mix, 42, "bound DS reverb wet control should map to Beat mix percent");
   assert.equal(dsEffects[1].params.roomSize, 85, "DS room size should map to Beat room percent");
 
+  const dsInstrument = {
+    id: "ds-inst",
+    name: "Synthetic DS",
+    kind: "sampler",
+    envelope: { attackMs: 1, decayMs: 80, sustain: 0, releaseMs: 180 },
+    knobs: { cutoff: 1, resonance: 0.2, drive: 0, color: 0.5 },
+    waveform: "sample",
+    sampleIds: [],
+    sampleUrls: [],
+    sampleMap: [],
+    userCreated: true,
+    effects: { filters: dsEffects },
+  };
+  const releaseControl = {
+    kind: "labeled-knob",
+    label: "Release",
+    minValue: 0,
+    maxValue: 2,
+    value: 0.18,
+    bindings: [{ type: "amp", level: "instrument", parameter: "ENV_RELEASE" }],
+  };
+  assert.deepEqual(
+    runner.previewDecentSamplerControlBinding(releaseControl, dsInstrument),
+    { value: 0.18, min: 0, max: 2, step: 0.01, targetLabel: "Envelope Release", valueLabel: "180ms" },
+    "DS release controls should read from the Beat sampler envelope",
+  );
+  assert.equal(
+    runner.previewDecentSamplerControlPatch(releaseControl, dsInstrument, 0.9).envelope.releaseMs,
+    900,
+    "DS release controls should patch Beat sampler release milliseconds",
+  );
+  const filterControl = {
+    kind: "labeled-knob",
+    label: "Tone",
+    minValue: 20,
+    maxValue: 22000,
+    value: 18000,
+    bindings: [{ type: "effect", level: "instrument", parameter: "FX_FILTER_FREQUENCY", position: 0 }],
+  };
+  assert.equal(
+    runner.previewDecentSamplerControlPatch(filterControl, dsInstrument, 1200).effects.filters[0].params.cutoffHz,
+    1200,
+    "DS filter frequency controls should patch the imported lowpass effect",
+  );
+  const wetControl = {
+    kind: "labeled-knob",
+    label: "Space",
+    minValue: 0,
+    maxValue: 1,
+    value: 0.42,
+    bindings: [{ type: "effect", level: "instrument", parameter: "FX_REVERB_WET_LEVEL", position: 1 }],
+  };
+  assert.deepEqual(
+    runner.previewDecentSamplerControlBinding(wetControl, dsInstrument),
+    { value: 0.42, min: 0, max: 1, step: 0.01, targetLabel: "Reverb Mix", valueLabel: "42%" },
+    "DS reverb controls should read from Beat percent params in DS unit range",
+  );
+  assert.equal(
+    runner.previewDecentSamplerControlPatch(wetControl, dsInstrument, 0.64).effects.filters[1].params.mix,
+    64,
+    "DS reverb wet controls should patch Beat reverb mix percent",
+  );
+  const ampControl = {
+    kind: "labeled-knob",
+    label: "Volume",
+    minValue: 0,
+    maxValue: 1,
+    value: 1,
+    bindings: [{ type: "amp", level: "group", parameter: "AMP_VOLUME" }],
+  };
+  assert.equal(
+    runner.previewDecentSamplerControlPatch(ampControl, dsInstrument, 0.72).ampLevel,
+    0.72,
+    "DS amp volume controls should patch Beat sampler amp level",
+  );
+
   console.log("Frontend interaction runner verifier passed.");
 } finally {
   rmSync(outDir, { recursive: true, force: true });

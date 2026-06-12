@@ -247,10 +247,12 @@
 .decentSkinOverlay strong,
 .decentSkinOverlay span,
 .decentControlInspector strong,
-.decentControlInspector span {
+.decentControlInspector span,
+.decentControlInspector em {
   overflow: hidden;
   max-width: 100%;
   font-size: var(--font-size-ui);
+  font-style: normal;
   line-height: 1;
   text-overflow: ellipsis;
   text-transform: uppercase;
@@ -259,7 +261,8 @@
 
 .decentSkinEmpty span,
 .decentSkinOverlay span,
-.decentControlInspector span {
+.decentControlInspector span,
+.decentControlInspector em {
   color: var(--color-fg-hover);
 }
 
@@ -283,6 +286,24 @@
 .decentControlInspector {
   left: 12px;
   bottom: 12px;
+}
+
+.decentControlSlider {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-width: min(280px, calc(100vw - 48px));
+}
+
+.decentControlSlider input {
+  min-width: 0;
+  accent-color: var(--color-fg);
+}
+
+.decentControlSlider em {
+  min-width: 42px;
+  text-align: right;
 }
 
 .decentDetails {

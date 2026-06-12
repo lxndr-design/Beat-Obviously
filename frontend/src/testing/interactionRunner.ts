@@ -5,10 +5,14 @@ import {
   type TimelineRect,
 } from "../features/Tracks/geometry";
 import { selectedCrossfadeCandidate } from "../features/Tracks/arrangementActions";
-import { decentSamplerEffects } from "../features/InstrumentLibrary/decentSamplerInstrument";
-import type { DecentSamplerImport } from "../ipc/schema";
+import {
+  decentSamplerControlBindingState,
+  decentSamplerControlInstrumentPatch,
+  decentSamplerEffects,
+} from "../features/InstrumentLibrary/decentSamplerInstrument";
+import type { DecentSamplerImport, DecentSamplerUiControl } from "../ipc/schema";
 import { mergePluginAdaptersById, normalizePluginAdapter } from "../state/store";
-import type { PluginAdapter, Segment, TrackEffect } from "../state/types";
+import type { Instrument, PluginAdapter, Segment, TrackEffect } from "../state/types";
 
 export type SegmentResizeEdge = "start" | "end";
 export type SegmentFadeEdge = "in" | "out";
@@ -320,4 +324,12 @@ export function previewDecentSamplerEffects(preset: DecentSamplerImport): TrackE
 
 export function previewSelectedCrossfadeCandidate(segments: Segment[]) {
   return selectedCrossfadeCandidate(segments);
+}
+
+export function previewDecentSamplerControlBinding(control: DecentSamplerUiControl, instrument: Instrument) {
+  return decentSamplerControlBindingState(control, instrument);
+}
+
+export function previewDecentSamplerControlPatch(control: DecentSamplerUiControl, instrument: Instrument, value: number) {
+  return decentSamplerControlInstrumentPatch(control, instrument, value);
 }

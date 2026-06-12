@@ -1,6 +1,10 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { Button, Icon, Modal } from "../../components";
-import { upsertDecentSamplerInstrument } from "../InstrumentLibrary/decentSamplerInstrument";
+import {
+  decentSamplerControlBindingState,
+  decentSamplerControlInstrumentPatch,
+  upsertDecentSamplerInstrument,
+} from "../InstrumentLibrary/decentSamplerInstrument";
 import { isNative, send } from "../../ipc/bridge";
 import type { DecentSamplerImport, DecentSamplerUiControl } from "../../ipc/schema";
 import { createDefaultSynthDraft, synthDraftToInstrumentPatch, type SynthDraftPatch, useSynthStore } from "../../state/synthStore";
@@ -171,6 +175,12 @@ function RouteCard({ icon, title, value }: { icon: string; title: string; value:
 
 function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
   const addAudioFile = useAudioFileStore((s) => s.addFile);
+  const associatedInstrument = useInstrumentStore((s) =>
+    plugin.associatedInstrumentId
+      ? s.instruments.find((instrument) => instrument.id === plugin.associatedInstrumentId)
+      : undefined,
+  );
+  const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
   const updatePlugin = usePluginStore((s) => s.updatePlugin);
   const [preset, setPreset] = useState<DecentSamplerImport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -223,6 +233,9 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
     : uiControls.map((label) => ({ kind: "control", label }));
   const nativeAvailable = isNative();
   const activeControl = activeControlIndex == null ? null : hotspotControls[activeControlIndex] ?? null;
+  const activeControlBinding = activeControl && associatedInstrument
+    ? decentSamplerControlBindingState(activeControl, associatedInstrument)
+    : null;
 
   async function refreshPackage(pathHint?: string) {
     if (!nativeAvailable) {
@@ -258,6 +271,13 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  function updateActiveControl(value: number) {
+    if (!activeControl || !associatedInstrument) return;
+    const patch = decentSamplerControlInstrumentPatch(activeControl, associatedInstrument, value);
+    if (!patch) return;
+    updateInstrument(associatedInstrument.id, patch);
   }
 
   return (
@@ -318,7 +338,22 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
           {activeControl && (
             <div className={styles.decentControlInspector}>
               <strong>{activeControl.label}</strong>
-              <span>{describeControlBinding(activeControl) || formatControlRange(activeControl)}</span>
+              <span>{activeControlBinding?.targetLabel ?? (describeControlBinding(activeControl) || formatControlRange(activeControl))}</span>
+              {activeControlBinding ? (
+                <label className={styles.decentControlSlider}>
+                  <input
+                    type="range"
+                    min={activeControlBinding.min}
+                    max={activeControlBinding.max}
+                    step={activeControlBinding.step}
+                    value={activeControlBinding.value}
+                    onChange={(event) => updateActiveControl(event.currentTarget.valueAsNumber)}
+                  />
+                  <em>{activeControlBinding.valueLabel}</em>
+                </label>
+              ) : (
+                <em>{associatedInstrument ? "Inspect only" : "Install package to enable control"}</em>
+              )}
             </div>
           )}
         </div>
