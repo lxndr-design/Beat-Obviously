@@ -377,10 +377,22 @@ try {
     ]),
     {
       pluginId: "ds-plugin",
-      dragInstrumentIds: [null, "ds-inst", "other-inst"],
+      dragPluginIds: [null, "ds-plugin", "other-ds"],
       canEditDsInstrument: true,
     },
-    "DS package rows should drag their associated instrument and DS-backed segments should expose plugin editing",
+    "DS package rows should drag plugin instantiation requests and DS-backed segments should expose plugin editing",
+  );
+  const dsInstancePatch = runner.previewDecentSamplerInstancePatch(
+    dsInstrument,
+    plugin("ds-plugin", { associatedInstrumentId: "ds-inst", sourcePath: "/packs/synthetic.dspreset" }),
+    "Synthetic DS 2",
+  );
+  assert.equal(dsInstancePatch.name, "Synthetic DS 2", "DS instance creation should use the requested instance name");
+  assert.equal(dsInstancePatch.source.pluginId, "ds-plugin", "DS instances should stay linked to their source plugin");
+  assert.equal(
+    dsInstancePatch.setId,
+    "temporary-ds-instruments",
+    "DS instances should appear in the Instanced Instruments section",
   );
   const releaseControl = {
     kind: "labeled-knob",

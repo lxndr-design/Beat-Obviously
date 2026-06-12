@@ -15,7 +15,10 @@ import { pauseTransport } from "../../audio/transportActions";
 import { useComponentStore } from "../../state/components";
 import { clipboardStore, useClipboard } from "../../state/clipboard";
 import { expandTrackSegments } from "../../state/selectors";
-import { decentSamplerPluginForInstrument } from "../PluginLibrary/decentSamplerPluginAdapter";
+import {
+  decentSamplerInstrumentInstancePatch,
+  decentSamplerPluginForInstrument,
+} from "../PluginLibrary/decentSamplerPluginAdapter";
 import { Segment } from "./Segment";
 import styles from "./TrackLane.module.css";
 import type { Id, Instrument, Segment as SegmentModel, Track } from "../../state/types";
@@ -68,6 +71,7 @@ export function TrackLane({
   const addSegment = useProjectStore((s) => s.addSegment);
   const openEditor = useUiStore((s) => s.openEditor);
   const instruments = useInstrumentStore((s) => s.instruments);
+  const addInstrument = useInstrumentStore((s) => s.addInstrument);
   const plugins = usePluginStore((s) => s.plugins);
   const audioFiles = useAudioFileStore((s) => s.files);
   const addAudioFile = useAudioFileStore((s) => s.addFile);
@@ -194,6 +198,7 @@ export function TrackLane({
   function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
     const types = e.dataTransfer.types;
     if (
+      types.includes("application/x-beat-decent-sampler-plugin") ||
       types.includes("application/x-beat-instrument") ||
       types.includes("application/x-beat-component") ||
       types.includes("application/x-beat-audio-file")
@@ -255,6 +260,26 @@ export function TrackLane({
         });
       }
       setLastLen(comp.lengthBeats);
+      return;
+    }
+
+    const decentSamplerPluginId = e.dataTransfer.getData("application/x-beat-decent-sampler-plugin");
+    if (decentSamplerPluginId) {
+      const plugin = plugins.find((candidate) => candidate.id === decentSamplerPluginId && candidate.format === "decent-sampler");
+      const template = plugin?.associatedInstrumentId
+        ? instruments.find((instrument) => instrument.id === plugin.associatedInstrumentId)
+        : undefined;
+      if (!plugin || !template || !track) return;
+      const instanceName = nextDecentSamplerInstanceName(plugin.name || template.name, plugin.id, template.id, instruments);
+      const instanceId = addInstrument(decentSamplerInstrumentInstancePatch(template, plugin, instanceName));
+      addSegment(trackId, {
+        name: instanceName,
+        startBeat,
+        lengthBeats: lastLen,
+        instrumentId: instanceId,
+        payload: { kind: "midi", notes: [] },
+      });
+      setLastLen(lastLen);
       return;
     }
 
@@ -351,6 +376,16 @@ function pasteSegmentsIntoTrack(trackId: Id, startBeat: number, segments: Segmen
     }];
   });
   applySegmentEditCommand({ kind: "duplicate", segments: commandSegments, offsetBeats: 0 });
+}
+
+function nextDecentSamplerInstanceName(baseName: string, pluginId: Id, templateInstrumentId: Id, instruments: Instrument[]): string {
+  const base = baseName.trim() || "DecentSampler Instrument";
+  const existing = instruments.filter((instrument) => (
+    instrument.id !== templateInstrumentId
+    && instrument.source?.pluginId === pluginId
+  ));
+  const index = existing.length + 1;
+  return index === 1 ? base : `${base} ${index}`;
 }
 
 import { nanoid as nano } from "nanoid";

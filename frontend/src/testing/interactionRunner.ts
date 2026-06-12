@@ -11,7 +11,8 @@ import {
   decentSamplerEffects,
 } from "../features/InstrumentLibrary/decentSamplerInstrument";
 import {
-  decentSamplerDragInstrumentId,
+  decentSamplerDragPluginId,
+  decentSamplerInstrumentInstancePatch,
   decentSamplerPluginForInstrument,
 } from "../features/PluginLibrary/decentSamplerPluginAdapter";
 import type { DecentSamplerImport, DecentSamplerUiControl } from "../ipc/schema";
@@ -342,7 +343,11 @@ export function previewDecentSamplerInstrumentAffordance(instrument: Instrument 
   const plugin = decentSamplerPluginForInstrument(instrument, plugins);
   return {
     pluginId: plugin?.id ?? null,
-    dragInstrumentIds: plugins.map((candidate) => decentSamplerDragInstrumentId(candidate)),
+    dragPluginIds: plugins.map((candidate) => decentSamplerDragPluginId(candidate)),
     canEditDsInstrument: Boolean(plugin),
   };
+}
+
+export function previewDecentSamplerInstancePatch(template: Instrument, plugin: PluginAdapter, name: string) {
+  return decentSamplerInstrumentInstancePatch(template, plugin, name);
 }

@@ -1,4 +1,5 @@
 import type { DecentSamplerImport } from "../../ipc/schema";
+import { snapshotInstrument, TEMPORARY_DS_INSTRUMENT_SET_ID } from "../../state/store";
 import type { Instrument, PluginAdapter } from "../../state/types";
 
 export function pluginFromDecentSamplerPreset(preset: DecentSamplerImport): Partial<PluginAdapter> {
@@ -45,10 +46,47 @@ export function decentSamplerPluginForInstrument(
   ));
 }
 
-export function decentSamplerDragInstrumentId(plugin: PluginAdapter): string | null {
+export function decentSamplerDragPluginId(plugin: PluginAdapter): string | null {
   return plugin.format === "decent-sampler" && plugin.associatedInstrumentId
-    ? plugin.associatedInstrumentId
+    ? plugin.id
     : null;
+}
+
+export function decentSamplerInstrumentInstancePatch(
+  template: Instrument,
+  plugin: PluginAdapter,
+  name: string,
+): Partial<Instrument> {
+  const {
+    id,
+    original,
+    parentIds,
+    setId,
+    source,
+    ...rest
+  } = structuredClone(template);
+  void id;
+  void original;
+  void parentIds;
+  void setId;
+  void source;
+
+  return {
+    ...rest,
+    name,
+    setId: TEMPORARY_DS_INSTRUMENT_SET_ID,
+    source: {
+      kind: "plugin",
+      label: `Instanced from ${plugin.name}`,
+      url: plugin.sourcePath,
+      importedAt: Date.now(),
+      edited: false,
+      pluginId: plugin.id,
+    },
+    original: snapshotInstrument(template),
+    parentIds: [template.id],
+    userCreated: true,
+  };
 }
 
 function fileNameFromPath(path: string) {
