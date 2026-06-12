@@ -27,8 +27,8 @@ export function DecentSamplerLibraryPanel({ expanded, onToggle }: DecentSamplerL
         showToggle={false}
         count={plugins.length}
         actions={
-          <HoverInfo content="Import plugin">
-            <SectionRibbonActionButton onClick={() => setImportOpen(true)} aria-label="Import DecentSampler package">
+          <HoverInfo content="Import DS file">
+            <SectionRibbonActionButton onClick={() => setImportOpen(true)} aria-label="Import DS file">
               <Icon name="ph:plus" size={16} decorative />
             </SectionRibbonActionButton>
           </HoverInfo>

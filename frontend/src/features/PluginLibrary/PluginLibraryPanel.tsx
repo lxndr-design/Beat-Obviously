@@ -26,8 +26,8 @@ export function PluginLibraryPanel({ expanded, onToggle }: PluginLibraryPanelPro
         showToggle={false}
         count={plugins.length}
         actions={
-          <HoverInfo content="Import plugin">
-            <SectionRibbonActionButton onClick={() => setImportOpen(true)} aria-label="Import plugin">
+          <HoverInfo content="Import DS file">
+            <SectionRibbonActionButton onClick={() => setImportOpen(true)} aria-label="Import DS file">
               <Icon name="ph:plus" size={16} decorative />
             </SectionRibbonActionButton>
           </HoverInfo>
@@ -122,10 +122,10 @@ export function PluginImportModal({ onClose, onInstalled }: { onClose: () => voi
       title={(
         <>
           <Icon name="ph:plug" size={14} decorative />
-          Import Plugin
+          Import DS File
         </>
       )}
-      width="lg"
+      width="sm"
       onClose={onClose}
       footer={
         <>
@@ -141,33 +141,24 @@ export function PluginImportModal({ onClose, onInstalled }: { onClose: () => voi
         <label className={styles.fileDrop}>
           <input
             type="file"
-            accept=".zip,.dspreset,.dslibrary,.dsconfig,.xml,.vst3,.component,.plugin"
+            accept=".zip,.dspreset,.dslibrary,.dsconfig,.xml"
             onChange={(event) => setFile(event.currentTarget.files?.[0] ?? null)}
           />
           <Icon name="ph:archive" size={32} decorative />
-          <span>{file ? file.name : "Choose plugin file or zip"}</span>
-          <small>DecentSampler zip/preset packages are supported first. VST3/AU/native files are registered as protected placeholders until native adapters are available.</small>
+          <span>{file ? file.name : "Choose DS file"}</span>
         </label>
 
-        <div className={styles.importGrid}>
-          <ImportCell label="Kind" value={detected.kind} />
-          <ImportCell label="Format" value={detected.format} />
-          <ImportCell label="Mode" value={detected.format === "decent-sampler" ? "DS Sampler" : detected.kind === "synth" ? "Fallback Aether" : "Rendered Audio"} />
-          <ImportCell label="Status" value={file ? "Ready" : "Waiting for file"} />
-          {detected.format === "decent-sampler" && (
-            <FloatingSelect
-              className={styles.importSelect}
-              label="Editor"
-              layout="inline"
-              value={editorKindMode}
-              ariaLabel="DecentSampler editor kind"
-              options={DECENT_SAMPLER_EDITOR_OPTIONS}
-              open={editorKindOpen}
-              onOpenChange={setEditorKindOpen}
-              onChange={(value) => setEditorKindMode(value as "auto" | PluginEditorKind)}
-            />
-          )}
-        </div>
+        <FloatingSelect
+          className={styles.importSelect}
+          label="Editor"
+          layout="inline"
+          value={editorKindMode}
+          ariaLabel="DecentSampler editor kind"
+          options={DECENT_SAMPLER_EDITOR_OPTIONS}
+          open={editorKindOpen}
+          onOpenChange={setEditorKindOpen}
+          onChange={(value) => setEditorKindMode(value as "auto" | PluginEditorKind)}
+        />
       </div>
     </Modal>
   );
@@ -263,15 +254,6 @@ export function PluginItem({ plugin, onOpen }: PluginItemProps) {
       </HoverInfo>
       {menu}
     </li>
-  );
-}
-
-function ImportCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div className={styles.importCell}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
   );
 }
 

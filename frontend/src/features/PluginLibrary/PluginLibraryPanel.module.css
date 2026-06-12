@@ -153,7 +153,7 @@
   grid-template-columns: 32px minmax(0, 1fr);
   align-items: center;
   gap: 4px 8px;
-  min-height: 96px;
+  min-height: 72px;
   padding: 12px;
   border: var(--border-fg);
   cursor: pointer;
@@ -182,55 +182,7 @@
   white-space: nowrap;
 }
 
-.fileDrop small {
-  grid-column: 2;
-  color: currentColor;
-  font-size: var(--font-size-ui);
-  line-height: 1.25;
-  opacity: 0.68;
-}
-
-.importGrid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  border-top: var(--border-fg);
-  border-left: var(--border-fg);
-}
-
 .importSelect {
   min-width: 0;
-  border-right: var(--border-fg);
-  border-bottom: var(--border-fg);
-}
-
-.importCell {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  padding: 6px;
-  border-right: var(--border-fg);
-  border-bottom: var(--border-fg);
-}
-
-.importCell span {
-  font-size: var(--font-size-ui);
-  line-height: 1;
-  text-transform: uppercase;
-  opacity: 0.6;
-}
-
-.importCell strong {
-  overflow: hidden;
-  font-size: var(--font-size-ui);
-  font-weight: var(--font-weight-medium);
-  line-height: 1;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-@media (max-width: 900px) {
-  .importGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  border: var(--border-fg);
 }
