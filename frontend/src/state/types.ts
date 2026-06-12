@@ -396,6 +396,7 @@ export type PluginFormat = "native" | "vst3" | "audio-unit" | "bridge" | "decent
 export type PluginInstallState = "available" | "installed" | "missing" | "blocked";
 export type PluginCapabilityKind = "instrument" | "effect" | "renderer" | "utility";
 export type PluginFallbackMode = "aether" | "rendered-audio" | "pass-through";
+export type PluginEditorKind = "midi" | "drum";
 
 export interface PluginCapability {
   id: Id;
@@ -426,6 +427,7 @@ export interface PluginAdapter {
   uiWidth?: number;
   uiHeight?: number;
   associatedInstrumentId?: Id;
+  defaultEditorKind?: PluginEditorKind;
   sampleCount?: number;
   uiControlCount?: number;
   installedAt?: number;

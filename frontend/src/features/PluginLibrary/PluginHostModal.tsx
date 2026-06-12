@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { Button, Icon, Modal } from "../../components";
+import { Button, FloatingSelect, Icon, Modal } from "../../components";
 import {
   decentSamplerControlBindingState,
   decentSamplerControlInstrumentPatch,
@@ -9,8 +9,8 @@ import { isNative, send } from "../../ipc/bridge";
 import type { DecentSamplerImport, DecentSamplerUiControl } from "../../ipc/schema";
 import { createDefaultSynthDraft, synthDraftToInstrumentPatch, type SynthDraftPatch, useSynthStore } from "../../state/synthStore";
 import { useAudioFileStore, useInstrumentStore, usePluginStore, useUiStore } from "../../state/store";
-import type { PluginAdapter } from "../../state/types";
-import { pluginFromDecentSamplerPreset } from "./decentSamplerPluginAdapter";
+import type { PluginAdapter, PluginEditorKind } from "../../state/types";
+import { decentSamplerEditorKind, pluginFromDecentSamplerPreset } from "./decentSamplerPluginAdapter";
 import styles from "./PluginHostModal.module.css";
 
 interface PluginHostModalProps {
@@ -188,6 +188,7 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [activeControlIndex, setActiveControlIndex] = useState<number | null>(null);
+  const [editorKindOpen, setEditorKindOpen] = useState(false);
 
   useEffect(() => {
     if (!isNative() || !plugin.sourcePath) return;
@@ -248,7 +249,7 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
         sourceLabel: `DecentSampler compatibility: ${nextPreset.name}`,
       });
       updatePlugin(plugin.id, {
-        ...pluginFromDecentSamplerPreset(nextPreset),
+        ...pluginFromDecentSamplerPreset(nextPreset, decentSamplerEditorKind(plugin)),
         associatedInstrumentId: instrumentId,
       });
       setPreset(nextPreset);
@@ -270,6 +271,20 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
 
   return (
     <section className={styles.decentSkinHost} aria-label="DecentSampler package UI">
+      <div className={styles.decentSkinToolbar}>
+        <FloatingSelect
+          className={styles.decentEditorSelect}
+          label="Editor"
+          layout="inline"
+          value={decentSamplerEditorKind(plugin)}
+          ariaLabel="Default DecentSampler segment editor"
+          options={DECENT_SAMPLER_EDITOR_OPTIONS}
+          open={editorKindOpen}
+          onOpenChange={setEditorKindOpen}
+          onChange={(value) => updatePlugin(plugin.id, { defaultEditorKind: value as PluginEditorKind })}
+        />
+        <span>{decentSamplerEditorKind(plugin) === "drum" ? "New drops open in Drum editor." : "New drops open in MIDI editor."}</span>
+      </div>
       {(loading || loadError) && (
         <div className={styles.decentSkinNotice} role={loadError ? "alert" : "status"}>
           {loading ? "Refreshing package UI" : loadError}
@@ -281,17 +296,15 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
           {uiImageDataUrl ? (
             <div className={styles.decentSkinFrame} style={canvasFrameStyle}>
               {hotspotControls.map((control, index) => (
-                <button
-                  key={`${control.label}-${control.x}-${control.y}-${index}`}
-                  type="button"
-                  className={`${styles.decentSkinHotspot} ${activeControlIndex === index ? styles.decentSkinHotspotActive : ""}`}
-                  style={controlHotspotStyle(control, uiWidth, uiHeight)}
-                  title={`${control.label} ${describeControlBinding(control)}`.trim()}
-                  aria-label={`${control.label} ${describeControlBinding(control)}`.trim()}
+                <DecentSamplerHotspot
+                  key={`${control.kind}-${control.x}-${control.y}-${index}`}
+                  control={control}
+                  uiWidth={uiWidth}
+                  uiHeight={uiHeight}
+                  active={activeControlIndex === index}
+                  binding={associatedInstrument ? decentSamplerControlBindingState(control, associatedInstrument) : null}
                   onClick={() => setActiveControlIndex(activeControlIndex === index ? null : index)}
-                >
-                  <span>{control.label}</span>
-                </button>
+                />
               ))}
             </div>
           ) : (
@@ -303,7 +316,7 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
           )}
           {activeControl && (
             <div className={styles.decentControlInspector}>
-              <strong>{activeControl.label}</strong>
+              <strong>{controlDisplayLabel(activeControl)}</strong>
               <span>{activeControlBinding?.targetLabel ?? (describeControlBinding(activeControl) || formatControlRange(activeControl))}</span>
               {activeControlBinding ? (
                 <label className={styles.decentControlSlider}>
@@ -327,6 +340,69 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
     </section>
   );
 }
+
+const DECENT_SAMPLER_EDITOR_OPTIONS: Array<{ value: PluginEditorKind; label: string }> = [
+  { value: "drum", label: "Drum" },
+  { value: "midi", label: "MIDI" },
+];
+
+function DecentSamplerHotspot({
+  control,
+  uiWidth,
+  uiHeight,
+  active,
+  binding,
+  onClick,
+}: {
+  control: DecentSamplerUiControl;
+  uiWidth: number;
+  uiHeight: number;
+  active: boolean;
+  binding: ReturnType<typeof decentSamplerControlBindingState>;
+  onClick: () => void;
+}) {
+  const label = controlDisplayLabel(control);
+  const description = describeControlBinding(control);
+  return (
+    <button
+      type="button"
+      className={`${styles.decentSkinHotspot} ${active ? styles.decentSkinHotspotActive : ""}`}
+      style={controlHotspotStyle(control, uiWidth, uiHeight)}
+      title={`${label} ${description}`.trim()}
+      aria-label={`${label} ${description}`.trim()}
+      onClick={onClick}
+    >
+      <DecentSamplerControlGlyph control={control} binding={binding} />
+    </button>
+  );
+}
+
+function DecentSamplerControlGlyph({
+  control,
+  binding,
+}: {
+  control: DecentSamplerUiControl;
+  binding: ReturnType<typeof decentSamplerControlBindingState>;
+}) {
+  const displayKind = controlDisplayKind(control);
+  const percent = controlValuePercent(control, binding);
+  if (displayKind === "slider") {
+    return (
+      <span className={styles.decentSkinSlider} aria-hidden="true">
+        <span style={{ width: `${percent * 100}%` }} />
+      </span>
+    );
+  }
+  if (displayKind === "button" || displayKind === "menu") {
+    return <span className={styles.decentSkinButton} aria-hidden="true" />;
+  }
+  return (
+    <span className={styles.decentSkinKnob} aria-hidden="true">
+      <span style={{ transform: `rotate(${-135 + percent * 270}deg)` }} />
+    </span>
+  );
+}
+
 function decentSamplerVisualSrc(plugin: PluginAdapter) {
   return plugin.uiImageDataUrl || "/assets/decent-sampler.png";
 }
@@ -360,6 +436,41 @@ function describeControlBinding(control: DecentSamplerUiControl) {
     .filter(Boolean)
     .map((part) => String(part).replace(/^FX_/, "").replaceAll("_", " ").toLowerCase());
   return parts.join(" / ");
+}
+
+function controlDisplayLabel(control: DecentSamplerUiControl) {
+  const rawLabel = String(control.label || "").trim();
+  const rawKind = String(control.kind || "").trim();
+  if (rawLabel && rawLabel.toLowerCase() !== rawKind.toLowerCase()) return humanizeDecentControlText(rawLabel);
+  const binding = control.bindings?.find((candidate) => candidate.parameter || candidate.type || candidate.level);
+  const fallback = binding?.parameter || binding?.type || binding?.level || rawKind || "control";
+  return humanizeDecentControlText(fallback);
+}
+
+function controlDisplayKind(control: DecentSamplerUiControl) {
+  const kind = String(control.kind || "").toLowerCase();
+  if (kind.includes("slider")) return "slider";
+  if (kind.includes("button")) return "button";
+  if (kind.includes("menu")) return "menu";
+  return "knob";
+}
+
+function controlValuePercent(control: DecentSamplerUiControl, binding: ReturnType<typeof decentSamplerControlBindingState>) {
+  const min = binding?.min ?? control.minValue ?? 0;
+  const max = binding?.max ?? control.maxValue ?? 1;
+  const value = binding?.value ?? control.value ?? min;
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return 0.5;
+  return Math.max(0, Math.min(1, (value - min) / (max - min)));
+}
+
+function humanizeDecentControlText(value: string) {
+  const text = value
+    .replace(/^FX_/, "")
+    .replace(/[-_]+/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    .trim();
+  return text || "Control";
 }
 
 function formatControlRange(control: DecentSamplerUiControl) {

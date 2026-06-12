@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, Icon, MarqueeText, useContextMenu, HoverInfo, SectionRibbon, SectionRibbonActionButton, type ContextMenuItem } from "../../components";
 import { createInstrumentBufferSource, preloadInstrumentSample, previewFrequency } from "../../audio/synthPreview";
-import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, useUiStore } from "../../state/store";
+import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useUiStore } from "../../state/store";
 import { instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
 import {
   FACTORY_SYNTH_PRESETS,
@@ -13,6 +13,7 @@ import {
 import type { Instrument, InstrumentSet } from "../../state/types";
 import { ImportInstrumentModal } from "./ImportInstrumentModal";
 import { MergeInstrumentModal } from "./MergeInstrumentModal";
+import { decentSamplerPluginForInstrument } from "../PluginLibrary/decentSamplerPluginAdapter";
 import styles from "./InstrumentLibraryPanel.module.css";
 
 const KIND_HINT: Record<string, string> = {
@@ -63,6 +64,7 @@ export function InstrumentLibraryPanel({ expanded, onToggle }: InstrumentLibrary
   const moveInstrument = useInstrumentStore((s) => s.moveInstrument);
   const duplicate = useInstrumentStore((s) => s.duplicateInstrument);
   const remove = useInstrumentStore((s) => s.removeInstrument);
+  const plugins = usePluginStore((s) => s.plugins);
   const openEditor = useUiStore((s) => s.openEditor);
   const bindSynthInstrument = useSynthStore((s) => s.bindInstrument);
   const setSynthDraft = useSynthStore((s) => s.setDraft);
@@ -299,7 +301,14 @@ export function InstrumentLibraryPanel({ expanded, onToggle }: InstrumentLibrary
                 <InstrumentItem
                   key={i.id}
                   instrument={i}
-                  onEdit={() => openEditor({ kind: "instrument", instrumentId: i.id })}
+                  onEdit={() => {
+                    const dsPlugin = decentSamplerPluginForInstrument(i, plugins);
+                    if (dsPlugin) {
+                      openEditor({ kind: "plugin", pluginId: dsPlugin.id });
+                      return;
+                    }
+                    openEditor({ kind: "instrument", instrumentId: i.id });
+                  }}
                   onDuplicate={() => duplicate(i.id)}
                   onMerge={() => setMergeFromId(i.id)}
                   onDelete={() => remove(i.id)}

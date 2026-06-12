@@ -197,6 +197,12 @@
   border-left: var(--border-fg);
 }
 
+.importSelect {
+  min-width: 0;
+  border-right: var(--border-fg);
+  border-bottom: var(--border-fg);
+}
+
 .importCell {
   display: grid;
   gap: 4px;

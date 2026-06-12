@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Button, HoverInfo, Icon, MarqueeText, Modal, SectionRibbon, SectionRibbonActionButton, useContextMenu, type ContextMenuItem } from "../../components";
+import { Button, FloatingSelect, HoverInfo, Icon, MarqueeText, Modal, SectionRibbon, SectionRibbonActionButton, useContextMenu, type ContextMenuItem } from "../../components";
 import { isNative, send } from "../../ipc/bridge";
 import { useAudioFileStore, usePluginStore, useUiStore } from "../../state/store";
-import type { PluginAdapter, PluginFormat, PluginKind } from "../../state/types";
-import { decentSamplerDragPluginId, pluginFromDecentSamplerPreset } from "./decentSamplerPluginAdapter";
+import type { PluginAdapter, PluginEditorKind, PluginFormat, PluginKind } from "../../state/types";
+import { decentSamplerDragPluginId, detectDecentSamplerEditorKind, pluginFromDecentSamplerPreset } from "./decentSamplerPluginAdapter";
 import { upsertDecentSamplerInstrument } from "../InstrumentLibrary/decentSamplerInstrument";
 import styles from "./PluginLibraryPanel.module.css";
 
@@ -63,6 +63,8 @@ export function PluginImportModal({ onClose, onInstalled }: { onClose: () => voi
   const addAudioFile = useAudioFileStore((s) => s.addFile);
   const [file, setFile] = useState<File | null>(null);
   const [installing, setInstalling] = useState(false);
+  const [editorKindOpen, setEditorKindOpen] = useState(false);
+  const [editorKindMode, setEditorKindMode] = useState<"auto" | PluginEditorKind>("auto");
   const detected = detectPluginFile(file);
 
   async function install() {
@@ -74,8 +76,11 @@ export function PluginImportModal({ onClose, onInstalled }: { onClose: () => voi
       if (detected.format === "decent-sampler" && isNative()) {
         const preset = (await send({ kind: "instrument.importDecent", pathHint: nativeFilePath(file) })).preset;
         if (!preset) return;
+        const editorKind = editorKindMode === "auto"
+          ? detectDecentSamplerEditorKind(preset)
+          : editorKindMode;
         preset.audioFiles.forEach(addAudioFile);
-        const id = addPlugin(pluginFromDecentSamplerPreset(preset));
+        const id = addPlugin(pluginFromDecentSamplerPreset(preset, editorKind));
         const instrumentId = upsertDecentSamplerInstrument(preset, {
           pluginId: id,
           sourceLabel: `DecentSampler compatibility: ${preset.name}`,
@@ -149,11 +154,30 @@ export function PluginImportModal({ onClose, onInstalled }: { onClose: () => voi
           <ImportCell label="Format" value={detected.format} />
           <ImportCell label="Mode" value={detected.format === "decent-sampler" ? "DS Sampler" : detected.kind === "synth" ? "Fallback Aether" : "Rendered Audio"} />
           <ImportCell label="Status" value={file ? "Ready" : "Waiting for file"} />
+          {detected.format === "decent-sampler" && (
+            <FloatingSelect
+              className={styles.importSelect}
+              label="Editor"
+              layout="inline"
+              value={editorKindMode}
+              ariaLabel="DecentSampler editor kind"
+              options={DECENT_SAMPLER_EDITOR_OPTIONS}
+              open={editorKindOpen}
+              onOpenChange={setEditorKindOpen}
+              onChange={(value) => setEditorKindMode(value as "auto" | PluginEditorKind)}
+            />
+          )}
         </div>
       </div>
     </Modal>
   );
 }
+
+const DECENT_SAMPLER_EDITOR_OPTIONS = [
+  { value: "auto", label: "Auto" },
+  { value: "drum", label: "Drum" },
+  { value: "midi", label: "MIDI" },
+];
 
 interface PluginItemProps {
   plugin: PluginAdapter;

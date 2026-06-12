@@ -16,12 +16,13 @@ import { useComponentStore } from "../../state/components";
 import { clipboardStore, useClipboard } from "../../state/clipboard";
 import { expandTrackSegments } from "../../state/selectors";
 import {
+  decentSamplerEditorKind,
   decentSamplerInstrumentInstancePatch,
   decentSamplerPluginForInstrument,
 } from "../PluginLibrary/decentSamplerPluginAdapter";
 import { Segment } from "./Segment";
 import styles from "./TrackLane.module.css";
-import type { Id, Instrument, Segment as SegmentModel, Track } from "../../state/types";
+import type { DrumRow, Id, Instrument, Segment as SegmentModel, Track } from "../../state/types";
 
 /**
  * nextSegmentName — auto-numbers default segment names like "Midi 1",
@@ -272,12 +273,21 @@ export function TrackLane({
       if (!plugin || !template || !track) return;
       const instanceName = nextDecentSamplerInstanceName(plugin.name || template.name, plugin.id, template.id, instruments);
       const instanceId = addInstrument(decentSamplerInstrumentInstancePatch(template, plugin, instanceName));
+      const editorKind = decentSamplerEditorKind(plugin);
       addSegment(trackId, {
         name: instanceName,
         startBeat,
         lengthBeats: lastLen,
         instrumentId: instanceId,
-        payload: { kind: "midi", notes: [] },
+        payload: editorKind === "drum"
+          ? {
+              kind: "drum",
+              rows: makeDecentSamplerDrumRows(instanceId, template),
+              stepCount: 16,
+              speed: 4,
+              defaultPitchHz: midiToFrequency(defaultDecentSamplerRootNote(template)),
+            }
+          : { kind: "midi", notes: [] },
       });
       setLastLen(lastLen);
       return;
@@ -288,12 +298,21 @@ export function TrackLane({
       const inst = instruments.find((i) => i.id === instrumentId);
       if (!inst || !track) return;
       const dsPlugin = decentSamplerPluginForInstrument(inst, plugins);
+      const editorKind = dsPlugin ? decentSamplerEditorKind(dsPlugin) : "midi";
       addSegment(trackId, {
         name: dsPlugin ? inst.name : nextSegmentName(tracks, "midi"),
         startBeat,
         lengthBeats: lastLen,
         instrumentId: inst.id,
-        payload: { kind: "midi", notes: [] },
+        payload: editorKind === "drum"
+          ? {
+              kind: "drum",
+              rows: makeDecentSamplerDrumRows(inst.id, inst),
+              stepCount: 16,
+              speed: 4,
+              defaultPitchHz: midiToFrequency(defaultDecentSamplerRootNote(inst)),
+            }
+          : { kind: "midi", notes: [] },
       });
       setLastLen(lastLen);
     }
@@ -346,6 +365,56 @@ export function TrackLane({
       {menu}
     </div>
   );
+}
+
+function makeDecentSamplerDrumRows(instrumentId: Id, instrument: Instrument): DrumRow[] {
+  const zones = instrument.sampleMap ?? [];
+  const rowCandidates = zones
+    .filter((zone) => isLikelyDrumZoneName(zone.name ?? zone.path))
+    .slice(0, 16);
+  const uniqueRows = new Map<string, DrumRow>();
+  for (const zone of (rowCandidates.length ? rowCandidates : zones).slice(0, 16)) {
+    const rootNote = Math.max(0, Math.min(127, Math.round(zone.rootNote)));
+    const name = conciseZoneName(zone.name ?? zone.path, rootNote);
+    const key = `${name.toLowerCase()}:${rootNote}`;
+    if (uniqueRows.has(key)) continue;
+    uniqueRows.set(key, {
+      id: nano(),
+      instrumentId,
+      name,
+      steps: Array.from({ length: 16 }, () => ({
+        on: false,
+        pitchHz: midiToFrequency(rootNote),
+        velocity: Math.max(1, Math.min(127, Math.round((zone.loVel + zone.hiVel) / 2) || 110)),
+      })),
+    });
+  }
+
+  if (uniqueRows.size > 0) return Array.from(uniqueRows.values());
+  return [{
+    id: nano(),
+    instrumentId,
+    name: instrument.name,
+    steps: Array.from({ length: 16 }, () => ({ on: false, pitchHz: midiToFrequency(60), velocity: 110 })),
+  }];
+}
+
+function defaultDecentSamplerRootNote(instrument: Instrument): number {
+  const firstZone = instrument.sampleMap?.find((zone) => Number.isFinite(zone.rootNote));
+  return firstZone ? Math.max(0, Math.min(127, Math.round(firstZone.rootNote))) : 60;
+}
+
+function midiToFrequency(note: number) {
+  return 440 * Math.pow(2, (note - 69) / 12);
+}
+
+function conciseZoneName(name: string, rootNote: number) {
+  const fileName = name.split(/[\\/]/).pop()?.replace(/\.[a-z0-9]+$/i, "") ?? name;
+  return (fileName.trim() || `DS ${rootNote}`).slice(0, 42);
+}
+
+function isLikelyDrumZoneName(name: string) {
+  return /\b(kick|bd|bass drum|808|snare|sd|hat|hihat|hi[- ]?hat|hh|tom|cymbal|crash|ride|splash|clap|rim|perc|conga|bongo|cowbell|timbal|tamb|shaker|triangle|guiro)\b/i.test(name);
 }
 
 /**

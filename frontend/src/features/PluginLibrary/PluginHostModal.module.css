@@ -115,9 +115,34 @@
 .decentSkinHost {
   position: relative;
   display: grid;
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   height: min(620px, calc(100vh - 96px));
+}
+
+.decentSkinToolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+  min-height: 34px;
+  border-bottom: var(--border-fg);
+}
+
+.decentEditorSelect {
+  min-width: 0;
+  border-right: var(--border-fg);
+}
+
+.decentSkinToolbar span {
+  overflow: hidden;
+  padding: 0 8px;
+  color: var(--color-fg-hover);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .decentSkinNotice {
@@ -177,31 +202,66 @@
   background: transparent;
   color: var(--color-fg);
   cursor: pointer;
-}
-
-.decentSkinHotspot span {
-  overflow: hidden;
-  max-width: calc(100% - 4px);
-  font-size: var(--font-size-hint);
-  line-height: 1;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-  opacity: 0;
+  opacity: 0.82;
 }
 
 .decentSkinHotspot:hover,
 .decentSkinHotspot:focus-visible,
 .decentSkinHotspotActive {
-  background: color-mix(in srgb, var(--color-fg) 12%, transparent);
-  outline: 1px solid var(--color-fg);
-  outline-offset: 1px;
+  background: color-mix(in srgb, var(--color-bg) 10%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--color-fg) 70%, transparent);
+  outline-offset: 2px;
+  opacity: 1;
 }
 
-.decentSkinHotspot:hover span,
-.decentSkinHotspot:focus-visible span,
-.decentSkinHotspotActive span {
-  opacity: 1;
+.decentSkinKnob {
+  position: relative;
+  display: block;
+  width: clamp(16px, 32%, 34px);
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in srgb, var(--color-fg) 72%, transparent);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-fg) 18%, transparent) 0 34%, transparent 36%),
+    color-mix(in srgb, var(--color-bg) 52%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-bg) 48%, transparent);
+}
+
+.decentSkinKnob span {
+  position: absolute;
+  left: calc(50% - 1px);
+  top: 12%;
+  width: 2px;
+  height: 38%;
+  border-radius: 999px;
+  background: var(--color-fg);
+  transform-origin: 50% 100%;
+}
+
+.decentSkinSlider {
+  display: block;
+  width: max(34px, min(72%, 92px));
+  height: 6px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-fg) 66%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg) 58%, transparent);
+}
+
+.decentSkinSlider span {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  background: var(--color-fg);
+}
+
+.decentSkinButton {
+  display: block;
+  width: clamp(14px, 28%, 30px);
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in srgb, var(--color-fg) 70%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-fg) 18%, transparent);
 }
 
 .decentSkinEmpty {
