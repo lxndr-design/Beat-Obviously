@@ -18,6 +18,7 @@ if [[ -z "${APP_PATH}" || ! -d "${APP_PATH}" ]]; then
 fi
 
 ROOT_APP_PATH="${ROOT_DIR}/Beat.app"
+rm -rf "${ROOT_APP_PATH}"
 ditto "${APP_PATH}" "${ROOT_APP_PATH}"
 "${ROOT_DIR}/scripts/register-current-beat-app.sh" "${ROOT_APP_PATH}"
 echo "${ROOT_APP_PATH}"

@@ -200,10 +200,14 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND BEAT_BUILD_FRONTEND)
     endif()
 
     add_custom_command(TARGET Beat POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E remove_directory
+            "${BEAT_FRONTEND_RESOURCE_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "${BEAT_FRONTEND_RESOURCE_DIR}"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_SOURCE_DIR}/frontend/dist"
             "${BEAT_FRONTEND_RESOURCE_DIR}"
-        COMMENT "Copying React frontend into app bundle"
+        COMMENT "Refreshing React frontend in app bundle"
         VERBATIM
     )
 endif()
