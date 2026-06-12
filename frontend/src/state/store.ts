@@ -141,6 +141,7 @@ const SETTINGS_STORAGE_KEY = "beat.settings.v1";
 export type FileAssetPolicy = "reference" | "copy" | "ask";
 export type MemoryCachePreset = "conservative" | "balanced" | "performance";
 export type StartupProjectBehavior = "home" | "restore-last" | "new-project";
+export type AudioLatencyMode = "reported" | "low" | "balanced" | "safe";
 
 interface SettingsSnapshot {
   resizeSnapSeconds: number;
@@ -152,6 +153,9 @@ interface SettingsSnapshot {
   preferredAudioTypeName: string;
   preferredInputDeviceName: string;
   preferredOutputDeviceName: string;
+  preferredSampleRate: number;
+  preferredBufferSize: number;
+  audioLatencyMode: AudioLatencyMode;
   defaultInputMonitoring: boolean;
   defaultRecordArm: boolean;
   defaultInputChannelCount: 1 | 2;
@@ -173,6 +177,9 @@ const DEFAULT_SETTINGS: SettingsSnapshot = {
   preferredAudioTypeName: "",
   preferredInputDeviceName: "",
   preferredOutputDeviceName: "",
+  preferredSampleRate: 48000,
+  preferredBufferSize: 512,
+  audioLatencyMode: "reported",
   defaultInputMonitoring: false,
   defaultRecordArm: false,
   defaultInputChannelCount: 2,
@@ -211,6 +218,9 @@ function normalizeSettingsSnapshot(value: unknown): SettingsSnapshot {
     preferredAudioTypeName: normalizeString(source.preferredAudioTypeName),
     preferredInputDeviceName: normalizeString(source.preferredInputDeviceName),
     preferredOutputDeviceName: normalizeString(source.preferredOutputDeviceName),
+    preferredSampleRate: normalizeSampleRate(source.preferredSampleRate),
+    preferredBufferSize: normalizeBufferSize(source.preferredBufferSize),
+    audioLatencyMode: normalizeAudioLatencyMode(source.audioLatencyMode),
     defaultInputMonitoring: source.defaultInputMonitoring ?? DEFAULT_SETTINGS.defaultInputMonitoring,
     defaultRecordArm: source.defaultRecordArm ?? DEFAULT_SETTINGS.defaultRecordArm,
     defaultInputChannelCount: source.defaultInputChannelCount === 1 ? 1 : 2,
@@ -245,6 +255,24 @@ function normalizeMemoryCachePreset(value: MemoryCachePreset | undefined): Memor
 
 function normalizeStartupProjectBehavior(value: StartupProjectBehavior | undefined): StartupProjectBehavior {
   return value === "home" || value === "restore-last" || value === "new-project" ? value : DEFAULT_SETTINGS.startupProjectBehavior;
+}
+
+function normalizeSampleRate(value: number | undefined): number {
+  return value === 44100 || value === 48000 || value === 88200 || value === 96000 || value === 192000
+    ? value
+    : DEFAULT_SETTINGS.preferredSampleRate;
+}
+
+function normalizeBufferSize(value: number | undefined): number {
+  return value === 64 || value === 128 || value === 256 || value === 512 || value === 1024 || value === 2048
+    ? value
+    : DEFAULT_SETTINGS.preferredBufferSize;
+}
+
+function normalizeAudioLatencyMode(value: AudioLatencyMode | undefined): AudioLatencyMode {
+  return value === "reported" || value === "low" || value === "balanced" || value === "safe"
+    ? value
+    : DEFAULT_SETTINGS.audioLatencyMode;
 }
 
 function defaultTrack(): Track {
@@ -1020,6 +1048,9 @@ interface SettingsSlice {
   preferredAudioTypeName: string;
   preferredInputDeviceName: string;
   preferredOutputDeviceName: string;
+  preferredSampleRate: number;
+  preferredBufferSize: number;
+  audioLatencyMode: AudioLatencyMode;
   defaultInputMonitoring: boolean;
   defaultRecordArm: boolean;
   defaultInputChannelCount: 1 | 2;
@@ -1037,6 +1068,9 @@ interface SettingsSlice {
   setMidiSubdivision: (subdivision: 2 | 4 | 8 | 16) => void;
   setPreferredInputDevice: (typeName: string, deviceName: string) => void;
   setPreferredOutputDevice: (typeName: string, deviceName: string) => void;
+  setPreferredSampleRate: (sampleRate: number) => void;
+  setPreferredBufferSize: (bufferSize: number) => void;
+  setAudioLatencyMode: (mode: AudioLatencyMode) => void;
   setDefaultInputMonitoring: (enabled: boolean) => void;
   setDefaultRecordArm: (enabled: boolean) => void;
   setDefaultInputChannelCount: (count: 1 | 2) => void;
@@ -1085,6 +1119,21 @@ export const useSettingsStore = create<SettingsSlice>()((set) => ({
   setPreferredOutputDevice: (_typeName, preferredOutputDeviceName) => {
     writeSettingsPatch({ preferredOutputDeviceName });
     set({ preferredOutputDeviceName });
+  },
+  setPreferredSampleRate: (sampleRate) => {
+    const preferredSampleRate = normalizeSampleRate(sampleRate);
+    writeSettingsPatch({ preferredSampleRate });
+    set({ preferredSampleRate });
+  },
+  setPreferredBufferSize: (bufferSize) => {
+    const preferredBufferSize = normalizeBufferSize(bufferSize);
+    writeSettingsPatch({ preferredBufferSize });
+    set({ preferredBufferSize });
+  },
+  setAudioLatencyMode: (audioLatencyMode) => {
+    const normalized = normalizeAudioLatencyMode(audioLatencyMode);
+    writeSettingsPatch({ audioLatencyMode: normalized });
+    set({ audioLatencyMode: normalized });
   },
   setDefaultInputMonitoring: (defaultInputMonitoring) => {
     writeSettingsPatch({ defaultInputMonitoring });

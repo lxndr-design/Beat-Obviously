@@ -159,10 +159,10 @@
   --z-base: 0;
   --z-sticky: 100;
   --z-floating: 200;     /* hover popovers */
-  --z-modal: 300;
+  --z-modal: 3000;
   --z-modal-stack-step: 10; /* additive per stacked modal */
-  --z-scrim: 400;        /* unsaved-check shadow */
-  --z-toast: 500;
+  --z-scrim: 4000;        /* unsaved-check shadow */
+  --z-toast: 5000;
 
   /* === Component-specific tokens ====================================== */
 

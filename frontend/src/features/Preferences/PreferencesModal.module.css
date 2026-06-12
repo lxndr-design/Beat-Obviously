@@ -1,7 +1,55 @@
 .panel {
   display: flex;
   flex-direction: column;
+  height: min(620px, calc(100vh - 148px));
+  min-height: 420px;
+  overflow: hidden;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex-shrink: 0;
+  border-bottom: var(--border-fg);
+}
+
+.tabButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 32px;
+  border-right: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-uppercase);
+  transition: var(--transition-invert);
+}
+
+.tabButton:last-child {
+  border-right: 0;
+}
+
+.tabButton:hover,
+.tabButtonActive {
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.tabContent {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
   gap: 12px;
+  overflow-y: auto;
+  padding: 12px;
 }
 
 .section {
@@ -86,7 +134,7 @@
 
 .readout {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: minmax(92px, max-content) minmax(0, 1fr);
   align-items: center;
   min-height: 26px;
   border: var(--border-fg);
@@ -102,6 +150,8 @@
   opacity: 0.65;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -128,13 +178,13 @@
 
 .gridRow {
   display: grid;
-  grid-template-columns: 82px minmax(0, max-content);
+  grid-template-columns: 128px minmax(0, 1fr);
   align-items: center;
   gap: 6px;
 }
 
 .gridToggle {
-  width: 82px;
+  width: 128px;
   gap: 6px;
 }
 
@@ -162,6 +212,7 @@
 .gridRadio {
   height: 26px;
   justify-self: start;
+  min-width: 0;
 }
 
 .gridRadio button {
@@ -170,7 +221,7 @@
 }
 
 .channelRadio button {
-  width: 58px;
+  width: 64px;
 }
 
 .hint {
@@ -250,6 +301,14 @@
 }
 
 @media (max-width: 760px) {
+  .panel {
+    height: min(620px, calc(100vh - 120px));
+  }
+
+  .tabButton {
+    gap: 4px;
+  }
+
   .settingsGrid,
   .channelGrid {
     grid-template-columns: 1fr;

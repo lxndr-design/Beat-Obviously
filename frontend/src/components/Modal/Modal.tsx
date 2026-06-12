@@ -96,7 +96,7 @@ export function Modal({
   return createPortal(
     <div
       className={styles.scrim}
-      style={{ zIndex: 300 + stackIndex * 10 }}
+      style={{ zIndex: 3000 + stackIndex * 10 }}
       data-floating-layer
       onMouseDown={(e) => {
         if (closeOnScrimClick && e.target === e.currentTarget) requestClose();

@@ -395,6 +395,11 @@ export function App() {
           onHealth={() => useUiStore.getState().openEditor({ kind: "projectHealth" })}
           onSettings={() => useUiStore.getState().openEditor({ kind: "preferences" })}
         />
+        {shouldMountEditorHost && (
+          <Suspense fallback={null}>
+            <EditorHost />
+          </Suspense>
+        )}
         <ModalStackOverlay />
       </>
     );
