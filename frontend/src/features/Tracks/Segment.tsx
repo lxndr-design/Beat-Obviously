@@ -6,6 +6,7 @@ import { useClipboard } from "../../state/clipboard";
 import { useComponentStore } from "../../state/components";
 import { listDrumBeatFeedback, updateDrumBeatFeedback } from "../../persistence/dexie";
 import { maybeRunDueTraining } from "../../ai/trainingRunner";
+import { selectedCrossfadeCandidate } from "./arrangementActions";
 import { SegmentWaveform } from "./SegmentWaveform";
 import { SegmentMidiPreview } from "./SegmentMidiPreview";
 import { SegmentDrumPreview } from "./SegmentDrumPreview";
@@ -363,10 +364,28 @@ export function Segment({
   const { onContextMenu, menu } = useContextMenu((): ContextMenuItem[] => {
     if (!liveSeg) return [];
     if (selected && selectedSegmentIds.length > 1) {
+      const crossfadeCandidate = selectedCrossfadeCandidate(selectedSegments);
       return [
+        ...(crossfadeCandidate
+          ? [
+              {
+                label: crossfadeCandidate.kind === "overlap" ? "Crossfade Overlap" : "Crossfade Adjacent",
+                icon: "ph:wave-triangle",
+                onSelect: () => {
+                  applySegmentEditCommand({
+                    kind: "crossfade",
+                    firstSegmentId: crossfadeCandidate.firstSegmentId,
+                    secondSegmentId: crossfadeCandidate.secondSegmentId,
+                    lengthBeats: crossfadeCandidate.lengthBeats,
+                  });
+                },
+              } as ContextMenuItem,
+            ]
+          : []),
         {
           label: "Copy",
           icon: "ph:clipboard",
+          separatorBefore: Boolean(crossfadeCandidate),
           onSelect: () => copyMany(selectedSegments),
         },
         {

@@ -204,6 +204,57 @@ try {
   selection = runner.selectArrangementItem({ selection, domain: "effect-point", id: "track-a:effect-a:mix:point-a", additive: true });
   assert.deepEqual(selection, runner.clearArrangementSelection(), "additive click on a selected item should toggle it off");
 
+  const audioSegment = (patch) => ({
+    id: patch.id,
+    trackId: patch.trackId ?? "track-a",
+    name: patch.id,
+    startBeat: patch.startBeat,
+    lengthBeats: patch.lengthBeats,
+    repeats: 0,
+    layer: 0,
+    payload: patch.payload ?? { kind: "audio", audioFileId: `${patch.id}-file`, gainDb: 0 },
+  });
+  assert.deepEqual(
+    runner.previewSelectedCrossfadeCandidate([
+      audioSegment({ id: "right", startBeat: 3, lengthBeats: 2 }),
+      audioSegment({ id: "left", startBeat: 0, lengthBeats: 4 }),
+    ]),
+    { firstSegmentId: "left", secondSegmentId: "right", lengthBeats: 1, kind: "overlap" },
+    "selected overlapping audio pair should expose an overlap crossfade action",
+  );
+  assert.deepEqual(
+    runner.previewSelectedCrossfadeCandidate([
+      audioSegment({ id: "adjacent-left", startBeat: 8, lengthBeats: 2 }),
+      audioSegment({ id: "adjacent-right", startBeat: 10, lengthBeats: 2 }),
+    ]),
+    { firstSegmentId: "adjacent-left", secondSegmentId: "adjacent-right", lengthBeats: 0.25, kind: "adjacent" },
+    "selected adjacent audio pair should expose a default paired-fade crossfade action",
+  );
+  assert.equal(
+    runner.previewSelectedCrossfadeCandidate([
+      audioSegment({ id: "gap-left", startBeat: 12, lengthBeats: 2 }),
+      audioSegment({ id: "gap-right", startBeat: 14.5, lengthBeats: 2 }),
+    ]),
+    null,
+    "gapped audio selections should not expose crossfade",
+  );
+  assert.equal(
+    runner.previewSelectedCrossfadeCandidate([
+      audioSegment({ id: "audio", startBeat: 16, lengthBeats: 2 }),
+      audioSegment({ id: "midi", startBeat: 17, lengthBeats: 2, payload: { kind: "midi", notes: [] } }),
+    ]),
+    null,
+    "non-audio segment selections should not expose crossfade",
+  );
+  assert.equal(
+    runner.previewSelectedCrossfadeCandidate([
+      audioSegment({ id: "track-a-audio", trackId: "track-a", startBeat: 20, lengthBeats: 2 }),
+      audioSegment({ id: "track-b-audio", trackId: "track-b", startBeat: 21, lengthBeats: 2 }),
+    ]),
+    null,
+    "cross-track selections should not expose same-lane crossfade",
+  );
+
   assert.equal(runner.shouldCloseModal({ reason: "backdrop", dirty: true }), false);
   assert.equal(runner.shouldCloseModal({ reason: "backdrop", dirty: false }), false);
   assert.equal(runner.shouldCloseModal({ reason: "escape", dirty: true }), false);

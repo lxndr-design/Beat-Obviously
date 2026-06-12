@@ -4,10 +4,11 @@ import {
   timelineXToBeat,
   type TimelineRect,
 } from "../features/Tracks/geometry";
+import { selectedCrossfadeCandidate } from "../features/Tracks/arrangementActions";
 import { decentSamplerEffects } from "../features/InstrumentLibrary/decentSamplerInstrument";
 import type { DecentSamplerImport } from "../ipc/schema";
 import { mergePluginAdaptersById, normalizePluginAdapter } from "../state/store";
-import type { PluginAdapter, TrackEffect } from "../state/types";
+import type { PluginAdapter, Segment, TrackEffect } from "../state/types";
 
 export type SegmentResizeEdge = "start" | "end";
 export type SegmentFadeEdge = "in" | "out";
@@ -315,4 +316,8 @@ export function previewPluginHydrationAdapters({
 
 export function previewDecentSamplerEffects(preset: DecentSamplerImport): TrackEffect[] {
   return decentSamplerEffects(preset);
+}
+
+export function previewSelectedCrossfadeCandidate(segments: Segment[]) {
+  return selectedCrossfadeCandidate(segments);
 }
