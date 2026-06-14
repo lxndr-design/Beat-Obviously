@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, HoverInfo, Icon } from "../../components";
+import { Button, HoverInfo, Icon, appConfirm } from "../../components";
 import { AppMenuButton } from "../TopBar/AppMenuButton";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore } from "../../state/store";
 import { useComponentStore } from "../../state/components";
@@ -43,9 +43,9 @@ export function HomeHub({
   const instrumentCount = useInstrumentStore((s) => s.instruments.length);
   const patternCount = useComponentStore((s) => s.components.length);
 
-  function quitBeat() {
+  async function quitBeat() {
     const { documentOpen, dirty } = useDocumentStore.getState();
-    if (documentOpen && dirty && !window.confirm("Quit Beat? Unsaved changes may be lost.")) return;
+    if (documentOpen && dirty && !await appConfirm("Quit Beat? Unsaved changes may be lost.")) return;
     window.close();
   }
 
@@ -63,7 +63,7 @@ export function HomeHub({
           onRecover={onRecover}
           onHealth={onHealth}
           onSettings={onSettings}
-          onQuit={quitBeat}
+          onQuit={() => void quitBeat()}
           disableHome={false}
         />
         {page === "audio"
@@ -90,7 +90,7 @@ export function HomeHub({
         onRecover={onRecover}
         onHealth={onHealth}
         onSettings={onSettings}
-        onQuit={quitBeat}
+        onQuit={() => void quitBeat()}
         disableHome
       />
 

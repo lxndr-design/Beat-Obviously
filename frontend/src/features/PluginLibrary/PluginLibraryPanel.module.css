@@ -33,7 +33,7 @@
 
 .listOpen::-webkit-scrollbar-track {
   background: transparent;
-  box-shadow: inset 0 0 0 1px var(--color-fg);
+  box-shadow: inset 0 0 0 1px var(--border-fg-color);
 }
 
 .empty {
@@ -44,100 +44,65 @@
   color: var(--color-fg-hover);
   font-size: var(--font-size-ui);
   line-height: 1;
-  text-transform: uppercase;
-}
-
-.item {
-  display: grid;
-  grid-template-columns: 14px minmax(0, 1fr) var(--sidebar-subrow-height);
-  align-items: center;
-  gap: 4px;
-  width: calc(100% + 8px);
-  min-height: calc(var(--sidebar-subrow-height) * 2);
-  padding: 4px 8px 4px 4px;
-  box-sizing: border-box;
-  cursor: pointer;
-  text-align: left;
-  transition: var(--transition-invert);
-}
-
-.item:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
-}
-
-.itemIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  align-self: start;
-  width: 14px;
-  height: 14px;
-  margin-top: 1px;
-  opacity: 0.8;
+  text-transform: none;
 }
 
 .itemThumb {
   display: block;
-  width: 14px;
-  height: 14px;
-  object-fit: cover;
+  width: auto;
+  height: 100%;
+  max-width: 86px;
+  object-fit: contain;
 }
 
-.itemText {
-  display: flex;
-  flex-direction: column;
+.itemLogo {
+  display: block;
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.aetherBridgeIcon {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  min-width: 0;
-  gap: 2px;
-}
-
-.itemName,
-.itemMeta,
-.itemVersion {
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--color-fg) 82%, transparent);
+  background:
+    radial-gradient(circle at 18% 22%, var(--aether-bridge-red) 0 18%, transparent 42%),
+    radial-gradient(circle at 82% 18%, var(--aether-bridge-orange) 0 20%, transparent 48%),
+    radial-gradient(circle at 82% 78%, var(--aether-bridge-cyan) 0 22%, transparent 48%),
+    radial-gradient(circle at 28% 86%, var(--aether-bridge-warm) 0 18%, transparent 44%),
+    linear-gradient(135deg, var(--aether-bridge-deep-red) 0%, var(--aether-bridge-deep-orange) 34%, var(--aether-bridge-deep-cyan) 100%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--color-bg) 18%, transparent),
+    inset 0 0 10px color-mix(in srgb, var(--color-fg) 24%, transparent);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.itemName {
-  font-size: var(--font-size-ui);
-  line-height: 1;
+.aetherBridgeIcon svg {
+  display: block;
+  width: 25px;
+  height: 25px;
+  overflow: visible;
 }
 
-.itemMeta {
-  font-size: var(--font-size-ui);
-  line-height: 1;
-  text-transform: uppercase;
-  opacity: 0.55;
+.aetherBridgeWave,
+.aetherBridgeWaveShadow {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.itemVersion {
-  font-size: var(--font-size-ui);
-  line-height: 1;
-  opacity: 0.42;
+.aetherBridgeWaveShadow {
+  stroke: color-mix(in srgb, var(--color-bg) 56%, transparent);
+  stroke-width: 5.4px;
 }
 
-.item:hover .itemMeta,
-.item:hover .itemVersion {
-  opacity: 0.8;
-}
-
-.itemOpenButton.itemOpenButton {
-  align-self: center;
-  width: var(--sidebar-subrow-height) !important;
-  min-width: var(--sidebar-subrow-height);
-  max-width: var(--sidebar-subrow-height);
-  height: var(--sidebar-subrow-height) !important;
-  min-height: var(--sidebar-subrow-height);
-  max-height: var(--sidebar-subrow-height);
-  background: transparent;
-  color: currentColor;
-}
-
-.item:hover .itemOpenButton:hover {
-  background: transparent;
-  color: currentColor;
+.aetherBridgeWave {
+  stroke: var(--color-fg);
+  stroke-width: 3.4px;
 }
 
 .importBody {
@@ -160,8 +125,8 @@
 }
 
 .fileDrop:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--surface-hover);
+  color: var(--color-fg);
 }
 
 .fileDrop input {
@@ -178,7 +143,7 @@
   font-weight: var(--font-weight-medium);
   line-height: 1;
   text-overflow: ellipsis;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
 }
 

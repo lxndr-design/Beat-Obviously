@@ -15,7 +15,8 @@
     "verify:design-system": "node ../scripts/verify-design-system.mjs",
     "verify:synth": "node ../scripts/verify-synth-roundtrip.mjs",
     "verify:drums": "node ../scripts/verify-drum-generation.mjs",
-    "verify:interactions": "node ../scripts/verify-frontend-interactions.mjs"
+    "verify:interactions": "node ../scripts/verify-frontend-interactions.mjs",
+    "benchmark:midi-stress": "node ../scripts/benchmark-dense-midi.mjs"
   },
   "dependencies": {
     "@iconify/react": "^5.0.2",

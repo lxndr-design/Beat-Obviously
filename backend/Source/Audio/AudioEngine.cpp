@@ -1025,6 +1025,10 @@ namespace beat
                 state.trackId,
                 state.publishedRms.load(std::memory_order_relaxed),
                 state.publishedPeak.load(std::memory_order_relaxed),
+                state.publishedChannelRms[0].load(std::memory_order_relaxed),
+                state.publishedChannelRms[1].load(std::memory_order_relaxed),
+                state.publishedChannelPeak[0].load(std::memory_order_relaxed),
+                state.publishedChannelPeak[1].load(std::memory_order_relaxed),
                 isMaster ? masterLoudnessMeterState.publishedRmsDbFS.load(std::memory_order_relaxed) : -std::numeric_limits<float>::infinity(),
                 isMaster ? masterLoudnessMeterState.publishedPeakDbFS.load(std::memory_order_relaxed) : -std::numeric_limits<float>::infinity(),
                 isMaster ? masterLoudnessMeterState.publishedTruePeakDbTP.load(std::memory_order_relaxed) : -std::numeric_limits<float>::infinity(),
@@ -1899,13 +1903,19 @@ namespace beat
     void AudioEngine::resetTrackMetersLocked() noexcept
     {
         masterMeterState.sumSquares = 0.0;
+        masterMeterState.channelSumSquares.fill(0.0);
         masterMeterState.sampleCount = 0;
+        masterMeterState.channelSampleCounts.fill(0);
         masterMeterState.blockPeak = 0.0f;
+        masterMeterState.channelBlockPeaks.fill(0.0f);
         for (auto& state : trackMeterStates)
         {
             state.sumSquares = 0.0;
+            state.channelSumSquares.fill(0.0);
             state.sampleCount = 0;
+            state.channelSampleCounts.fill(0);
             state.blockPeak = 0.0f;
+            state.channelBlockPeaks.fill(0.0f);
         }
     }
 
@@ -1963,6 +1973,9 @@ namespace beat
 
         const auto absSample = std::abs(sample);
         state->blockPeak = juce::jmax(state->blockPeak, absSample);
+        state->channelBlockPeaks[0] = juce::jmax(state->channelBlockPeaks[0], absSample);
+        state->channelSumSquares[0] += (double) sample * (double) sample;
+        ++state->channelSampleCounts[0];
         state->sumSquares += (double) sample * (double) sample;
         ++state->sampleCount;
     }
@@ -1988,7 +2001,14 @@ namespace beat
             for (int i = 0; i < numSamples; ++i)
             {
                 const float sample = samples[i] * scale;
-                state->blockPeak = juce::jmax(state->blockPeak, std::abs(sample));
+                const float absSample = std::abs(sample);
+                state->blockPeak = juce::jmax(state->blockPeak, absSample);
+                if (ch < 2)
+                {
+                    state->channelBlockPeaks[(size_t) ch] = juce::jmax(state->channelBlockPeaks[(size_t) ch], absSample);
+                    state->channelSumSquares[(size_t) ch] += (double) sample * (double) sample;
+                    ++state->channelSampleCounts[(size_t) ch];
+                }
                 state->sumSquares += (double) sample * (double) sample;
             }
             state->sampleCount += numSamples;
@@ -2004,6 +2024,14 @@ namespace beat
                 : 0.0f;
             state.publishedRms.store(juce::jlimit(0.0f, 1.0f, rms), std::memory_order_relaxed);
             state.publishedPeak.store(juce::jlimit(0.0f, 1.0f, state.blockPeak), std::memory_order_relaxed);
+            for (size_t channel = 0; channel < state.publishedChannelRms.size(); ++channel)
+            {
+                const float channelRms = state.channelSampleCounts[channel] > 0
+                    ? std::sqrt((float) (state.channelSumSquares[channel] / (double) state.channelSampleCounts[channel]))
+                    : 0.0f;
+                state.publishedChannelRms[channel].store(juce::jlimit(0.0f, 1.0f, channelRms), std::memory_order_relaxed);
+                state.publishedChannelPeak[channel].store(juce::jlimit(0.0f, 1.0f, state.channelBlockPeaks[channel]), std::memory_order_relaxed);
+            }
             state.sequence.fetch_add(1, std::memory_order_release);
         }
     }
@@ -2025,6 +2053,13 @@ namespace beat
                 const float sample = samples[i];
                 peak = juce::jmax(peak, std::abs(sample));
                 sumSquares += (double) sample * (double) sample;
+                if (ch < 2)
+                {
+                    const float absSample = std::abs(sample);
+                    masterMeterState.channelBlockPeaks[(size_t) ch] = juce::jmax(masterMeterState.channelBlockPeaks[(size_t) ch], absSample);
+                    masterMeterState.channelSumSquares[(size_t) ch] += (double) sample * (double) sample;
+                    ++masterMeterState.channelSampleCounts[(size_t) ch];
+                }
             }
             sampleCount += numSamples;
         }
@@ -2060,6 +2095,14 @@ namespace beat
             : 0.0f;
         masterMeterState.publishedRms.store(juce::jlimit(0.0f, 1.0f, rms), std::memory_order_relaxed);
         masterMeterState.publishedPeak.store(juce::jlimit(0.0f, 1.0f, peak), std::memory_order_relaxed);
+        for (size_t channel = 0; channel < masterMeterState.publishedChannelRms.size(); ++channel)
+        {
+            const float channelRms = masterMeterState.channelSampleCounts[channel] > 0
+                ? std::sqrt((float) (masterMeterState.channelSumSquares[channel] / (double) masterMeterState.channelSampleCounts[channel]))
+                : 0.0f;
+            masterMeterState.publishedChannelRms[channel].store(juce::jlimit(0.0f, 1.0f, channelRms), std::memory_order_relaxed);
+            masterMeterState.publishedChannelPeak[channel].store(juce::jlimit(0.0f, 1.0f, masterMeterState.channelBlockPeaks[channel]), std::memory_order_relaxed);
+        }
         loudness.publishedRmsDbFS.store(amplitudeToDb(rms), std::memory_order_relaxed);
         loudness.publishedPeakDbFS.store(amplitudeToDb(peak), std::memory_order_relaxed);
         loudness.publishedTruePeakDbTP.store(amplitudeToDb(juce::jmax(peak, truePeak)), std::memory_order_relaxed);

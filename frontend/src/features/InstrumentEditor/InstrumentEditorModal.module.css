@@ -436,7 +436,7 @@
 }
 
 .glideRange:focus-visible {
-  box-shadow: 0 0 0 1px var(--color-fg);
+  box-shadow: 0 0 0 1px var(--border-fg-color);
 }
 
 .glideRange::-webkit-slider-runnable-track {

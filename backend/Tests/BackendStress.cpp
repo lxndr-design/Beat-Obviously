@@ -2177,13 +2177,23 @@ namespace
         bool foundTrack = false;
         for (const auto& meter : meters)
         {
-            if (!std::isfinite(meter.rms) || !std::isfinite(meter.peak))
+            if (!std::isfinite(meter.rms)
+                || !std::isfinite(meter.peak)
+                || !std::isfinite(meter.leftRms)
+                || !std::isfinite(meter.rightRms)
+                || !std::isfinite(meter.leftPeak)
+                || !std::isfinite(meter.rightPeak))
                 return false;
+            const bool hasChannelSignal = meter.leftRms > 0.0f
+                || meter.rightRms > 0.0f
+                || meter.leftPeak > 0.0f
+                || meter.rightPeak > 0.0f;
             if (meter.trackId == "master")
             {
                 foundMaster = meter.sequence > 0
                     && meter.rms > 0.0f
                     && meter.peak > 0.0f
+                    && hasChannelSignal
                     && std::isfinite(meter.rmsDbFS)
                     && std::isfinite(meter.peakDbFS)
                     && std::isfinite(meter.truePeakDbTP)
@@ -2191,7 +2201,12 @@ namespace
                     && meter.truePeakDbTP >= meter.peakDbFS - 0.25f;
             }
             if (meter.trackId == "offline-track")
-                foundTrack = meter.sequence > 0 && meter.rms > 0.0f && meter.peak > 0.0f;
+            {
+                foundTrack = meter.sequence > 0
+                    && meter.rms > 0.0f
+                    && meter.peak > 0.0f
+                    && hasChannelSignal;
+            }
         }
 
         return foundMaster && foundTrack;
@@ -2867,7 +2882,18 @@ namespace
         std::vector<beat::AudioEngine::TrackMeterSnapshot> meters;
         const bool metersOk = engine.pullTrackMeterSnapshots(meters)
             && std::any_of(meters.begin(), meters.end(), [](const auto& meter) {
-                return meter.trackId == "master" && meter.sequence > 0 && meter.rms > 0.0f && meter.peak > 0.0f;
+                return meter.trackId == "master"
+                    && meter.sequence > 0
+                    && meter.rms > 0.0f
+                    && meter.peak > 0.0f
+                    && std::isfinite(meter.leftRms)
+                    && std::isfinite(meter.rightRms)
+                    && std::isfinite(meter.leftPeak)
+                    && std::isfinite(meter.rightPeak)
+                    && (meter.leftRms > 0.0f
+                        || meter.rightRms > 0.0f
+                        || meter.leftPeak > 0.0f
+                        || meter.rightPeak > 0.0f);
             });
 
         engine.setInputMonitoringEnabled(false);
@@ -3562,7 +3588,19 @@ namespace
         for (const auto& meter : meters)
         {
             if (meter.trackId == "audio-clip-track")
-                foundTrack = meter.sequence > 0 && meter.rms > 0.0f && meter.peak > 0.0f;
+            {
+                foundTrack = meter.sequence > 0
+                    && meter.rms > 0.0f
+                    && meter.peak > 0.0f
+                    && std::isfinite(meter.leftRms)
+                    && std::isfinite(meter.rightRms)
+                    && std::isfinite(meter.leftPeak)
+                    && std::isfinite(meter.rightPeak)
+                    && (meter.leftRms > 0.0f
+                        || meter.rightRms > 0.0f
+                        || meter.leftPeak > 0.0f
+                        || meter.rightPeak > 0.0f);
+            }
         }
 
         file.deleteFile();

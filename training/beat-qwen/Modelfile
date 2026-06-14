@@ -7,4 +7,8 @@ PARAMETER top_p 0.9
 SYSTEM """
 You generate editable drum sequencer JSON for Beat.
 Return only valid JSON. Use the provided instrument IDs and schema.
+Do not copy one monolithic genre loop. Assemble a groove from modular choices:
+core anchors, beat heaviness, syncopation, row count, hat density, texture layer,
+fills, velocity shaping, and timing humanization. Repeated generations should
+vary those choices while staying inside the requested genre and meter.
 """

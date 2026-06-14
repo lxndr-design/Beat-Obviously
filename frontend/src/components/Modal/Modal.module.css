@@ -47,8 +47,8 @@
   gap: 6px;
   font-size: var(--font-size-ui);
   font-weight: var(--font-weight-bold);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-uppercase);
+  text-transform: none;
+  letter-spacing: 0;
   line-height: 1;
 }
 
@@ -86,8 +86,8 @@
 }
 
 .closeBtn:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--surface-hover);
+  color: var(--color-fg);
 }
 
 .body {

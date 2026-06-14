@@ -13,6 +13,6 @@
 
 .menuButton:hover :global(.brandMark),
 .menuButton:focus-visible :global(.brandMark) {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: color-mix(in srgb, var(--color-fg) 18%, var(--color-bg));
+  color: var(--color-fg);
 }

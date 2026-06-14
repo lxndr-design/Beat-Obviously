@@ -1972,6 +1972,10 @@ namespace beat
                     track->setProperty("id", meter.trackId);
                     track->setProperty("rms", juce::jlimit(0.0f, 1.0f, meter.rms));
                     track->setProperty("peak", juce::jlimit(0.0f, 1.0f, meter.peak));
+                    track->setProperty("leftRms", juce::jlimit(0.0f, 1.0f, meter.leftRms));
+                    track->setProperty("rightRms", juce::jlimit(0.0f, 1.0f, meter.rightRms));
+                    track->setProperty("leftPeak", juce::jlimit(0.0f, 1.0f, meter.leftPeak));
+                    track->setProperty("rightPeak", juce::jlimit(0.0f, 1.0f, meter.rightPeak));
                     if (std::isfinite(meter.rmsDbFS))
                         track->setProperty("rmsDbFS", meter.rmsDbFS);
                     if (std::isfinite(meter.peakDbFS))

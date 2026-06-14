@@ -36,8 +36,8 @@
 }
 
 .item:hover:not(:disabled) {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--surface-hover);
+  color: var(--color-fg);
 }
 
 .item:disabled {

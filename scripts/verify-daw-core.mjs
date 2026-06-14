@@ -532,6 +532,76 @@ try {
     "clear selection should empty every selection domain",
   );
 
+  store.useProjectStore.getState().loadProject(store.createEmptyProject());
+  store.useProjectStore.getState().setLengthBeats(256);
+  store.useProjectStore.temporal.getState().clear();
+  const stressTrackIds = [store.useProjectStore.getState().project.tracks[0].id];
+  for (let trackIndex = 1; trackIndex < 10; trackIndex++) {
+    stressTrackIds.push(store.useProjectStore.getState().addTrack({
+      name: `Dense MIDI ${trackIndex + 1}`,
+      kind: "midi",
+    }));
+  }
+  const stressSegmentIds = [];
+  const notesPerSegment = 100;
+  const segmentsPerTrack = 50;
+  for (const [trackIndex, trackId] of stressTrackIds.entries()) {
+    for (let segmentIndex = 0; segmentIndex < segmentsPerTrack; segmentIndex++) {
+      const notes = Array.from({ length: notesPerSegment }, (_, noteIndex) => ({
+        pitch: 48 + ((trackIndex * 7 + noteIndex) % 36),
+        velocity: 64 + ((segmentIndex + noteIndex) % 48),
+        startBeat: (noteIndex % 25) * 0.16,
+        lengthBeats: 0.08 + ((noteIndex % 4) * 0.04),
+      }));
+      stressSegmentIds.push(store.useProjectStore.getState().addSegment(trackId, {
+        name: `Dense ${trackIndex + 1}-${segmentIndex + 1}`,
+        startBeat: segmentIndex * 4,
+        lengthBeats: 4,
+        payload: { kind: "midi", notes },
+      }));
+    }
+  }
+  project = store.useProjectStore.getState().project;
+  assert.equal(project.tracks.length, 10, "dense MIDI stress should create ten tracks");
+  assert.equal(
+    project.tracks.flatMap((track) => track.segments).length,
+    500,
+    "dense MIDI stress should create 500 segments",
+  );
+  assert.equal(
+    project.tracks.flatMap((track) =>
+      track.segments.flatMap((segment) => segment.payload.kind === "midi" ? segment.payload.notes : []),
+    ).length,
+    50000,
+    "dense MIDI stress should create 50,000 notes",
+  );
+  store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "nudge",
+    segmentIds: stressSegmentIds,
+    deltaBeats: 0.25,
+  });
+  store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "quantize",
+    segmentIds: stressSegmentIds,
+    gridBeats: 0.25,
+  });
+  project = store.useProjectStore.getState().project;
+  assert.equal(
+    project.tracks.flatMap((track) => track.segments).every((segment) =>
+      Number.isFinite(segment.startBeat) && segment.startBeat >= 0 && segment.startBeat + segment.lengthBeats <= project.lengthBeats,
+    ),
+    true,
+    "dense MIDI stress edits should keep every segment in finite project bounds",
+  );
+  assert.equal(
+    project.tracks.flatMap((track) =>
+      track.segments.flatMap((segment) => segment.payload.kind === "midi" ? segment.payload.notes : []),
+    ).length,
+    50000,
+    "dense MIDI stress edits should preserve note count",
+  );
+  store.useProjectStore.getState().loadProject(store.createEmptyProject());
+
   console.log("DAW core edit-command verifier passed.");
 } finally {
   rmSync(outDir, { recursive: true, force: true });

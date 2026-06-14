@@ -1,15 +1,16 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useRef, useEffect, useState } from "react";
 import { TopBar } from "./features/TopBar/TopBar";
 import { Sidebar } from "./features/Sidebar/Sidebar";
 import { TrackList } from "./features/Tracks/TrackList";
 import { MasterEqPanel } from "./features/Eq/MasterEqPanel";
 import { HomeHub } from "./features/HomeHub/HomeHub";
-import { ModalStackOverlay } from "./components";
+import { AppDialogHost, ModalStackOverlay, appAlert, appConfirm } from "./components";
 import { TimelineMidiPlayback } from "./audio/TimelineMidiPlayback";
 import { startAnalyzerClient } from "./audio/analyzerClient";
 import { RenderTimingPanel } from "./features/Debug/RenderTimingPanel";
 import { ExportJobPanel } from "./features/Debug/ExportJobPanel";
 import { TrainingAutoRunner } from "./features/Training/TrainingAutoRunner";
+import { StartupSplash, type StartupStage } from "./features/Startup";
 import { getTimelineAudioContext, stopTimelineAudio } from "./audio/timelineAudio";
 import { importAudioFiles } from "./audio/audioImport";
 import { preloadInstrumentSample } from "./audio/synthPreview";
@@ -27,20 +28,29 @@ const EditorHost = lazy(() => import("./features/EditorHost/EditorHost").then((m
 
 type StartupReadinessKey = "instruments" | "components" | "audio";
 
-const startupReadiness: Record<StartupReadinessKey, boolean> = {
-  instruments: false,
-  components: false,
-  audio: false,
+function initialStartupReadiness(): Record<StartupReadinessKey, boolean> {
+  return {
+    instruments: false,
+    components: false,
+    audio: false,
+  };
+}
+
+const STARTUP_STAGE_LABELS: Record<StartupReadinessKey, string> = {
+  instruments: "Loading instruments",
+  components: "Loading components",
+  audio: "Loading audio files",
 };
 
-let startupReadySent = false;
-
-function markStartupReady(key: StartupReadinessKey) {
-  startupReadiness[key] = true;
-  if (startupReadySent || !startupReadiness.instruments || !startupReadiness.components || !startupReadiness.audio) return;
-  startupReadySent = true;
-  void send({ kind: "app.ready" });
+function allStartupReady(readiness: Record<StartupReadinessKey, boolean>) {
+  return readiness.instruments && readiness.components && readiness.audio;
 }
+
+const startupStageOrder: StartupReadinessKey[] = [
+  "instruments",
+  "components",
+  "audio",
+];
 
 /**
  * App — root layout.
@@ -60,6 +70,26 @@ export function App() {
   useGlobalHotkeys();
   const shouldMountEditorHost = useUiStore((s) => s.openEditors.length > 0 || Boolean(s.trackEffectsEditorTrackId));
   const [showHome, setShowHome] = useState(true);
+  const startupReadySentRef = useRef(false);
+  const [startupReadiness, setStartupReadiness] = useState<Record<StartupReadinessKey, boolean>>(initialStartupReadiness);
+  const startupStages = useMemo<StartupStage[]>(
+    () => startupStageOrder.map((id) => ({
+      id,
+      label: STARTUP_STAGE_LABELS[id],
+      ready: startupReadiness[id],
+    })),
+    [startupReadiness],
+  );
+  const markStartupReady = useCallback((key: StartupReadinessKey) => {
+    setStartupReadiness((current) => {
+      const next = { ...current, [key]: true };
+      if (!startupReadySentRef.current && allStartupReady(next)) {
+        startupReadySentRef.current = true;
+        void send({ kind: "app.ready" });
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -70,12 +100,12 @@ export function App() {
     setShowHome(false);
   }
 
-  function openHome() {
-    if (closeCurrentDocumentForHome()) setShowHome(true);
+  async function openHome() {
+    if (await closeCurrentDocumentForHome()) setShowHome(true);
   }
 
   async function createFromHome() {
-    if (createNewDocument()) closeHome();
+    if (await createNewDocument()) closeHome();
   }
 
   async function openFromHome() {
@@ -99,13 +129,13 @@ export function App() {
 
   async function revealRecentFromHome(path: string) {
     if (!isNative()) {
-      window.alert("View in Folder is only available in the native app.");
+      await appAlert("View in Folder is only available in the native app.");
       return;
     }
     const result = await send({ kind: "project.revealFile", path });
     if (result.ok) return;
     if (result.missing) {
-      const shouldRemove = window.confirm("This project file could not be found. Remove it from Recent?");
+      const shouldRemove = await appConfirm("This project file could not be found. Remove it from Recent?");
       if (shouldRemove) await removeRecentFromHome(path);
       return;
     }
@@ -185,7 +215,7 @@ export function App() {
       if (timer) window.clearTimeout(timer);
       unsub();
     };
-  }, []);
+  }, [markStartupReady]);
 
   useEffect(() => {
     let hydrated = false;
@@ -217,7 +247,7 @@ export function App() {
       if (timer) window.clearTimeout(timer);
       unsub();
     };
-  }, []);
+  }, [markStartupReady]);
 
   useEffect(() => {
     let hydrated = false;
@@ -248,7 +278,7 @@ export function App() {
       if (timer) window.clearTimeout(timer);
       unsub();
     };
-  }, []);
+  }, [markStartupReady]);
 
   // Browser preview advances its own playhead. In the native app, C++ is the
   // only source of timeline position updates.
@@ -360,12 +390,12 @@ export function App() {
           break;
         case "native.menuCommand":
           void handleNativeMenuCommand(event.command).catch((error) => {
-            window.alert(error instanceof Error ? error.message : "Project command failed.");
+            void appAlert(error instanceof Error ? error.message : "Project command failed.");
           });
           break;
         case "native.openProjectFile":
           void openRecentDocument(event.path).catch((error) => {
-            window.alert(error instanceof Error ? error.message : "Open project failed.");
+            void appAlert(error instanceof Error ? error.message : "Open project failed.");
           });
           break;
         case "project.exportProgress":
@@ -389,13 +419,13 @@ export function App() {
         <HomeHub
           onHome={() => undefined}
           onNew={() => void createFromHome()}
-          onOpen={() => void openFromHome().catch((error) => window.alert(error instanceof Error ? error.message : "Open failed."))}
-          onRecent={(path) => void openRecentFromHome(path).catch((error) => window.alert(error instanceof Error ? error.message : "Open recent failed."))}
-          onRevealRecent={(path) => void revealRecentFromHome(path).catch((error) => window.alert(error instanceof Error ? error.message : "View in Folder failed."))}
-          onRemoveRecent={(path) => void removeRecentFromHome(path).catch((error) => window.alert(error instanceof Error ? error.message : "Remove recent failed."))}
+          onOpen={() => void openFromHome().catch((error) => appAlert(error instanceof Error ? error.message : "Open failed."))}
+          onRecent={(path) => void openRecentFromHome(path).catch((error) => appAlert(error instanceof Error ? error.message : "Open recent failed."))}
+          onRevealRecent={(path) => void revealRecentFromHome(path).catch((error) => appAlert(error instanceof Error ? error.message : "View in Folder failed."))}
+          onRemoveRecent={(path) => void removeRecentFromHome(path).catch((error) => appAlert(error instanceof Error ? error.message : "Remove recent failed."))}
           onSave={() => void saveFromMenu(false)}
           onSaveAs={() => void saveFromMenu(true)}
-          onExport={() => void exportCurrentWav().catch((error) => window.alert(error instanceof Error ? error.message : "Export failed."))}
+          onExport={() => void exportCurrentWav().catch((error) => appAlert(error instanceof Error ? error.message : "Export failed."))}
           onRecover={() => undefined}
           onHealth={() => useUiStore.getState().openEditor({ kind: "projectHealth" })}
           onSettings={() => useUiStore.getState().openEditor({ kind: "preferences" })}
@@ -406,6 +436,8 @@ export function App() {
           </Suspense>
         )}
         <ModalStackOverlay />
+        <AppDialogHost />
+        <StartupSplash stages={startupStages} />
       </>
     );
   }
@@ -421,14 +453,14 @@ export function App() {
       <ExportJobPanel />
       <div className="app-root">
         <TopBar
-          onHome={openHome}
+          onHome={() => void openHome()}
           onNew={() => void createFromHome()}
-          onOpen={() => void openFromHome().catch((error) => window.alert(error instanceof Error ? error.message : "Open failed."))}
+          onOpen={() => void openFromHome().catch((error) => appAlert(error instanceof Error ? error.message : "Open failed."))}
           onSave={() => void saveFromMenu(false)}
           onSaveAs={() => void saveFromMenu(true)}
-          onExport={() => void exportCurrentWav().catch((error) => window.alert(error instanceof Error ? error.message : "Export failed."))}
-          onExportRange={() => void exportCurrentWav("range").catch((error) => window.alert(error instanceof Error ? error.message : "Range export failed."))}
-          onExportTrack={() => void exportCurrentWav("track").catch((error) => window.alert(error instanceof Error ? error.message : "Track export failed."))}
+          onExport={() => void exportCurrentWav().catch((error) => appAlert(error instanceof Error ? error.message : "Export failed."))}
+          onExportRange={() => void exportCurrentWav("range").catch((error) => appAlert(error instanceof Error ? error.message : "Range export failed."))}
+          onExportTrack={() => void exportCurrentWav("track").catch((error) => appAlert(error instanceof Error ? error.message : "Track export failed."))}
           onRecover={() => void recoverFromMenu()}
           onHealth={() => useUiStore.getState().openEditor({ kind: "projectHealth" })}
           onSettings={() => useUiStore.getState().openEditor({ kind: "preferences" })}
@@ -447,6 +479,8 @@ export function App() {
         </Suspense>
       )}
       <ModalStackOverlay />
+      <AppDialogHost />
+      <StartupSplash stages={startupStages} />
     </>
   );
 }
@@ -464,7 +498,7 @@ function scheduleCurrentDocumentDirtyState() {
 async function handleNativeMenuCommand(command: "newProject" | "openProject" | "saveProject" | "importAudio" | "exportWav" | "preferences") {
   switch (command) {
     case "newProject": {
-      createNewDocument();
+      await createNewDocument();
       return;
     }
     case "openProject": {
@@ -495,7 +529,7 @@ async function saveFromMenu(saveAs: boolean) {
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("[Beat] Save failed", error);
-    window.alert("Save failed.");
+    await appAlert("Save failed.");
   }
 }
 
@@ -505,7 +539,7 @@ async function recoverFromMenu() {
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("[Beat] Backup recovery failed", error);
-    window.alert(error instanceof Error ? error.message : "Backup recovery failed.");
+    await appAlert(error instanceof Error ? error.message : "Backup recovery failed.");
   }
 }
 

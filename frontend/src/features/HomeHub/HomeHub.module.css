@@ -135,8 +135,8 @@
 .actionRow:hover,
 .assetRow:hover,
 .trainingRow:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--surface-hover);
+  color: var(--color-fg);
 }
 
 .recentGrid {
@@ -270,7 +270,7 @@
 }
 
 .assetRow:hover strong {
-  color: var(--color-fg-inverse);
+  color: var(--color-fg);
 }
 
 .blankContent {

@@ -1,4 +1,5 @@
 import { ActionFooterDemo } from "../components/ActionFooter/ActionFooter.demo";
+import { AppDialogDemo } from "../components/AppDialog/AppDialog.demo";
 import { BlockDemo } from "../components/Block/Block.demo";
 import { ButtonDemo } from "../components/Button/Button.demo";
 import { ContextMenuDemo } from "../components/ContextMenu/ContextMenu.demo";
@@ -12,7 +13,9 @@ import { MarqueeTextDemo } from "../components/MarqueeText/MarqueeText.demo";
 import { ModalDemo } from "../components/Modal/Modal.demo";
 import { NumberInputDemo } from "../components/NumberInput/NumberInput.demo";
 import { RadioGroupDemo } from "../components/RadioGroup/RadioGroup.demo";
+import { RowItemDemo } from "../components/RowItem/RowItem.demo";
 import { SectionRibbonDemo } from "../components/SectionRibbon/SectionRibbon.demo";
+import { TagDemo } from "../components/Tag/Tag.demo";
 import { TextInputDemo } from "../components/TextInput/TextInput.demo";
 import { ToggleDemo } from "../components/Toggle/Toggle.demo";
 import { DemoGrid, DemoSection, DemoSwatch, UiKitDemoPage } from "./UiKitDemo";
@@ -25,7 +28,10 @@ export function UiKitCatalog() {
       <IconDemo />
       <BlockDemo />
       <SectionRibbonDemo />
+      <RowItemDemo />
+      <TagDemo />
       <ActionFooterDemo />
+      <AppDialogDemo />
       <TextInputDemo />
       <NumberInputDemo />
       <RadioGroupDemo />

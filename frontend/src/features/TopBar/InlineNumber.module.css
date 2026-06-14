@@ -14,8 +14,8 @@
 .label {
   font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-uppercase);
+  text-transform: none;
+  letter-spacing: 0;
   font-weight: var(--font-weight-medium);
   opacity: 0.7;
 }

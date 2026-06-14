@@ -23,8 +23,7 @@
 }
 
 .toggle,
-.actionButton,
-.count {
+.actionButton {
   background: transparent;
   color: var(--color-fg);
 }
@@ -46,8 +45,8 @@
 
 .toggle:hover:not(:disabled),
 .actionButton:hover:not(:disabled) {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--surface-hover);
+  color: var(--color-fg);
   opacity: 1;
 }
 
@@ -55,13 +54,13 @@
   min-width: 0;
   padding: 0 4px;
   overflow: hidden;
-  font-size: var(--font-size-ui);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--section-ribbon-label-size, var(--font-size-ui));
+  font-weight: var(--font-weight-bold);
   line-height: 1;
   text-align: left;
   text-overflow: ellipsis;
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-uppercase);
+  text-transform: none;
+  letter-spacing: 0;
   white-space: nowrap;
 }
 
@@ -84,9 +83,8 @@
   flex: 0 0 var(--sidebar-rail-size);
   width: var(--sidebar-rail-size);
   height: var(--sidebar-rail-size);
-  font-size: var(--font-size-ui);
-  line-height: 1;
-  opacity: 0.6;
+  padding-right: 3px;
+  box-sizing: border-box;
 }
 
 .actions {

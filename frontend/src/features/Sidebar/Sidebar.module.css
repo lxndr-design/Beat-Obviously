@@ -37,25 +37,75 @@
   color: var(--color-fg);
   border: 0;
   border-bottom: var(--border-fg);
-  transition: var(--transition-invert);
+  transition:
+    background var(--duration-hover) var(--ease-out),
+    color var(--duration-hover) var(--ease-out);
 }
 
 .railButtonActive {
-  background: color-mix(in srgb, var(--color-fg) 14%, var(--color-bg));
+  background:
+    radial-gradient(circle at 25% 18%, color-mix(in srgb, var(--color-bg) 24%, transparent) 0 18%, transparent 44%),
+    radial-gradient(circle at 82% 72%, color-mix(in srgb, var(--color-bg) 18%, transparent) 0 16%, transparent 42%),
+    radial-gradient(circle at 55% 48%, color-mix(in srgb, var(--color-bg) 12%, transparent) 0 22%, transparent 54%),
+    linear-gradient(145deg, color-mix(in srgb, var(--color-bg) 10%, transparent), transparent 70%),
+    var(--color-fg);
+  color: var(--color-fg-inverse);
+}
+
+.railButton:hover {
+  background: var(--surface-hover);
   color: var(--color-fg);
 }
 
-.railButton:hover,
 .railButtonActive:hover {
-  background: var(--color-fg);
+  background:
+    radial-gradient(circle at 25% 18%, color-mix(in srgb, var(--color-bg) 24%, transparent) 0 18%, transparent 44%),
+    radial-gradient(circle at 82% 72%, color-mix(in srgb, var(--color-bg) 18%, transparent) 0 16%, transparent 42%),
+    radial-gradient(circle at 55% 48%, color-mix(in srgb, var(--color-bg) 12%, transparent) 0 22%, transparent 54%),
+    linear-gradient(145deg, color-mix(in srgb, var(--color-bg) 10%, transparent), transparent 70%),
+    var(--color-fg);
   color: var(--color-fg-inverse);
 }
 
 .decentSamplerIcon {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 22px;
   height: 22px;
-  object-fit: cover;
+}
+
+.decentSamplerIcon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.decentSamplerIconFrame {
+  fill: transparent;
+  stroke: currentColor;
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+}
+
+.decentSamplerIconGlyph {
+  fill: currentColor;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-hint);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0;
+}
+
+.railButtonActive .decentSamplerIconFrame,
+.railButtonActive:hover .decentSamplerIconFrame {
+  fill: var(--color-fg);
+  stroke: currentColor;
+}
+
+.railButtonActive .decentSamplerIconGlyph,
+.railButtonActive:hover .decentSamplerIconGlyph {
+  fill: var(--color-fg-inverse);
 }
 
 .railBottom {

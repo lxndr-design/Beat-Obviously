@@ -64,7 +64,15 @@ export function TimelineMidiPlayback() {
       const beatsPerSecond = (bpm / 60) * transport.speed;
       const lookaheadBeats = LOOKAHEAD_SECONDS * beatsPerSecond;
       const currentBeat = transport.positionBeat;
-      const trackMeters: Array<{ id: string; rms: number; peak: number }> = [];
+      const trackMeters: Array<{
+        id: string;
+        rms: number;
+        peak: number;
+        leftRms: number;
+        rightRms: number;
+        leftPeak: number;
+        rightPeak: number;
+      }> = [];
 
       if (currentBeat < lastPositionRef.current || currentBeat > lengthBeats - 0.01) {
         scheduledRef.current.clear();
@@ -73,7 +81,7 @@ export function TimelineMidiPlayback() {
 
       for (const track of tracks) {
         if (!isTrackAudible(track)) {
-          trackMeters.push({ id: track.id, peak: 0, rms: 0 });
+          trackMeters.push({ id: track.id, peak: 0, rms: 0, leftPeak: 0, rightPeak: 0, leftRms: 0, rightRms: 0 });
           continue;
         }
         let trackPeak = 0;
@@ -148,7 +156,16 @@ export function TimelineMidiPlayback() {
             trackPeak = Math.max(trackPeak, noteWithGain.velocity / 127);
           });
         }
-        trackMeters.push({ id: track.id, peak: trackPeak, rms: trackPeak * 0.707 });
+        const trackRms = trackPeak * 0.707;
+        trackMeters.push({
+          id: track.id,
+          peak: trackPeak,
+          rms: trackRms,
+          leftPeak: trackPeak,
+          rightPeak: trackPeak,
+          leftRms: trackRms,
+          rightRms: trackRms,
+        });
       }
       if (trackMeters.length) useAnalyzerStore.getState().setTrackMeters(trackMeters);
 

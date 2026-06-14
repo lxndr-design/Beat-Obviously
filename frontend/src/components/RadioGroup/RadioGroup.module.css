@@ -11,8 +11,8 @@
   font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-uppercase);
+  text-transform: none;
+  letter-spacing: 0;
   font-weight: var(--font-weight-medium);
   opacity: 0.7;
 }
@@ -42,8 +42,8 @@
 }
 
 .button:hover:not(.active) {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--surface-hover);
+  color: var(--color-fg);
 }
 
 .button:disabled {

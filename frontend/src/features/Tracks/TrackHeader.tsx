@@ -61,6 +61,8 @@ export function TrackHeader({
   const duplicateTrack = useDuplicateTrack();
   const [editingName, setEditingName] = useState(false);
   const [dropPosition, setDropPosition] = useState<"above" | "below" | null>(null);
+  const meterPeak = clamp01(meter?.peak ?? 0);
+  const meterRms = clamp01(meter?.rms ?? 0);
   const gainBadge = formatGainBadge(track?.gainDb ?? 0);
   const panBadge = formatPanBadge(track?.pan ?? 0);
 
@@ -209,11 +211,52 @@ export function TrackHeader({
           </button>
         )}
 
+        <div className={styles.channelControls}>
+          <HoverInfo content={track.solo ? "Unsolo" : "Solo (mute others)"}>
+            <button
+              type="button"
+              className={`${styles.dot} ${styles.textDot} ${track.solo ? styles.dotOn : ""}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (event.ctrlKey) return;
+                setTrackSolo(trackId, !track.solo);
+              }}
+              aria-label={track.solo ? "Unsolo" : "Solo"}
+            >
+              S
+            </button>
+          </HoverInfo>
+          <HoverInfo
+            content={track.solo ? "Soloed — can't mute" : track.mute ? "Unmute" : "Mute"}
+          >
+            <button
+              type="button"
+              className={`${styles.dot} ${styles.textDot} ${track.mute ? styles.dotOn : ""}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (event.ctrlKey) return;
+                setTrackMute(trackId, !track.mute);
+              }}
+              aria-label={track.mute ? "Unmute" : "Mute"}
+              disabled={track.solo}
+            >
+              M
+            </button>
+          </HoverInfo>
+        </div>
         <div className={styles.meter} aria-hidden>
-          <span
-            className={styles.meterFill}
-            style={{ transform: `scaleX(${Math.max(0, Math.min(1, meter?.peak ?? 0))})` }}
-          />
+          <span className={styles.meterLane}>
+            <span
+              className={styles.meterFill}
+              style={{ transform: `scaleX(${meterPeak})` }}
+            />
+          </span>
+          <span className={styles.meterLane}>
+            <span
+              className={styles.meterFill}
+              style={{ transform: `scaleX(${meterRms})` }}
+            />
+          </span>
         </div>
         {(gainBadge || panBadge || track.recordArmed || track.inputMonitoring) && (
           <div className={styles.statusRow} aria-hidden>
@@ -229,7 +272,7 @@ export function TrackHeader({
         <HoverInfo content={track.recordArmed ? "Disarm recording" : "Arm recording"}>
           <button
             type="button"
-            className={`${styles.dot} ${styles.recordDot} ${track.recordArmed ? styles.dotOn : ""}`}
+            className={`${styles.dot} ${track.recordArmed ? styles.dotOn : ""}`}
             onClick={(event) => {
               event.stopPropagation();
               if (event.ctrlKey) return;
@@ -237,7 +280,7 @@ export function TrackHeader({
             }}
             aria-label={track.recordArmed ? "Disarm recording" : "Arm recording"}
           >
-            <Icon name="ph:microphone" size={12} decorative />
+            <Icon name={track.recordArmed ? "ph:microphone-fill" : "ph:microphone"} size={12} decorative />
           </button>
         </HoverInfo>
         <HoverInfo content={track.inputMonitoring ? "Disable input monitoring" : "Enable input monitoring"}>
@@ -251,44 +294,18 @@ export function TrackHeader({
             }}
             aria-label={track.inputMonitoring ? "Disable input monitoring" : "Enable input monitoring"}
           >
-            <Icon name="ph:speaker-high" size={12} decorative />
-          </button>
-        </HoverInfo>
-        <HoverInfo content={track.solo ? "Unsolo" : "Solo (mute others)"}>
-          <button
-            type="button"
-            className={`${styles.dot} ${track.solo ? styles.dotOn : ""}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (event.ctrlKey) return;
-              setTrackSolo(trackId, !track.solo);
-            }}
-            aria-label={track.solo ? "Unsolo" : "Solo"}
-          >
-            S
-          </button>
-        </HoverInfo>
-        <HoverInfo
-          content={track.solo ? "Soloed — can't mute" : track.mute ? "Unmute" : "Mute"}
-        >
-          <button
-            type="button"
-            className={`${styles.dot} ${track.mute ? styles.dotOn : ""}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (event.ctrlKey) return;
-              setTrackMute(trackId, !track.mute);
-            }}
-            aria-label={track.mute ? "Unmute" : "Mute"}
-            disabled={track.solo}
-          >
-            M
+            <Icon name={track.inputMonitoring ? "ph:speaker-high-fill" : "ph:speaker-high"} size={12} decorative />
           </button>
         </HoverInfo>
       </div>
       {menu}
     </div>
   );
+}
+
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
 }
 
 function useDuplicateTrack() {

@@ -9,7 +9,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   /** When true, fills the parent column completely (per design spec). */
   fullWidth?: boolean;
-  /** When true, renders as a "selected" toggle (inverted colors). */
+  /** When true, renders as a selected toggle with filled foreground treatment. */
   selected?: boolean;
   /** Icon-only button — renders as a 1:1 square at the size's square dim. */
   iconOnly?: boolean;
@@ -17,13 +17,13 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 /**
  * Base button.
- * No outline by default. Hover = color invert in 0.1s.
- * Variants are all monochrome — they differ in starting state, not color.
+ * No outline by default. Hover uses a light surface tint; selected/primary
+ * states use filled foreground treatment.
  *
- * - default: black bg, white fg → invert on hover
- * - primary: white bg, black fg (already inverted)
- * - ghost:   transparent bg, no hover background, just text invert
- * - danger:  same shape as default; uses a stronger label treatment
+ * - default: transparent bg, white fg, tint on hover
+ * - primary: white bg, black fg
+ * - ghost:   transparent bg, softer tint on hover
+ * - danger:  same shape as default; uses stronger label weight
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {

@@ -63,6 +63,10 @@ export interface RenderTimingSnapshot {
 export interface TrackMeterSnapshot {
   rms: number;
   peak: number;
+  leftRms?: number;
+  rightRms?: number;
+  leftPeak?: number;
+  rightPeak?: number;
   rmsDbFS?: number;
   peakDbFS?: number;
   truePeakDbTP?: number;
@@ -78,7 +82,7 @@ interface AnalyzerState {
   setMasterSnapshot: (snapshot: Partial<AnalyzerSnapshot>) => void;
   setSynthSnapshot: (snapshot: Partial<AnalyzerSnapshot>) => void;
   setRenderTiming: (snapshot: Partial<RenderTimingSnapshot>) => void;
-  setTrackMeters: (meters: Array<{ id: string; rms: number; peak: number; rmsDbFS?: number; peakDbFS?: number; truePeakDbTP?: number; momentaryLufs?: number }>) => void;
+  setTrackMeters: (meters: Array<{ id: string; rms: number; peak: number; leftRms?: number; rightRms?: number; leftPeak?: number; rightPeak?: number; rmsDbFS?: number; peakDbFS?: number; truePeakDbTP?: number; momentaryLufs?: number }>) => void;
   clear: () => void;
   clearSynth: () => void;
 }
@@ -181,6 +185,10 @@ export const useAnalyzerStore = create<AnalyzerState>((set) => ({
         next[meter.id] = {
           rms: clamp01(meter.rms),
           peak: clamp01(meter.peak),
+          leftRms: clampOptional01(meter.leftRms),
+          rightRms: clampOptional01(meter.rightRms),
+          leftPeak: clampOptional01(meter.leftPeak),
+          rightPeak: clampOptional01(meter.rightPeak),
           rmsDbFS: finiteOrUndefined(meter.rmsDbFS),
           peakDbFS: finiteOrUndefined(meter.peakDbFS),
           truePeakDbTP: finiteOrUndefined(meter.truePeakDbTP),
@@ -202,6 +210,10 @@ export const useAnalyzerStore = create<AnalyzerState>((set) => ({
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(1, value));
+}
+
+function clampOptional01(value: number | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? clamp01(value) : undefined;
 }
 
 function finiteOrUndefined(value: number | undefined): number | undefined {

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Modal, Button } from "../../components";
 import { useInstrumentStore, useUiStore } from "../../state/store";
 import type { Id } from "../../state/types";
+import { editorRequestForInstrument } from "../InstrumentEditor/instrumentEditorRouting";
 import styles from "./MergeInstrumentModal.module.css";
 
 interface Props {
@@ -28,7 +29,10 @@ export function MergeInstrumentModal({ sourceId, onClose }: Props) {
   function confirm() {
     if (!pickedId) return;
     const id = merge(sourceId, pickedId);
-    if (id) openEditor({ kind: "instrument", instrumentId: id });
+    if (id) {
+      const instrument = useInstrumentStore.getState().instruments.find((candidate) => candidate.id === id);
+      if (instrument) openEditor(editorRequestForInstrument(instrument));
+    }
     onClose();
   }
 

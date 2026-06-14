@@ -4,6 +4,46 @@
  * Never hardcode colors, sizes, or durations in component CSS.
  */
 
+@font-face {
+  font-family: "Akzidenz Grotesk Next";
+  src: url("/assets/fonts/akzidenz-grotesk-next-light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Akzidenz Grotesk Next";
+  src: url("/assets/fonts/akzidenz-grotesk-next-regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Akzidenz Grotesk Next";
+  src: url("/assets/fonts/akzidenz-grotesk-next-italic.otf") format("opentype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Akzidenz Grotesk Next";
+  src: url("/assets/fonts/akzidenz-grotesk-next-medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Akzidenz Grotesk Next";
+  src: url("/assets/fonts/akzidenz-grotesk-next-bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* === Colors =========================================================
    * Only black and white. The opacities below are reserved for gridlines
@@ -22,11 +62,17 @@
   --color-highlight: #a8ff8c;
   --color-highlight-fg: #000000;
 
-  /* Off-white — the only "hover" tint allowed, and only on surfaces that
-   * are ALREADY white/foreground (e.g. an active Solo button, MIDI segment,
-   * the Play button while playing, the scrollbar thumb, an active beat
-   * cell in the time-signature picker). For everything else, hover stays
-   * a pure color-invert. */
+  /* Aether bridge icon mesh — chromatic product mark, not general UI chrome. */
+  --aether-bridge-red: #ff2d2d;
+  --aether-bridge-orange: #ff8a18;
+  --aether-bridge-cyan: #00d5ff;
+  --aether-bridge-warm: #ff5a1f;
+  --aether-bridge-deep-red: #1b0603;
+  --aether-bridge-deep-orange: #381006;
+  --aether-bridge-deep-cyan: #05313d;
+
+  /* Off-white for foreground-active surfaces and high-contrast controls.
+   * List rows use --surface-hover so scanning does not flash full white. */
   --color-fg-hover: rgba(230, 230, 230, 0.8);
 
   /* Inside-object gridline opacities — never use outside their context */
@@ -40,6 +86,7 @@
   --surface-hover: color-mix(in srgb, var(--color-fg) 14%, var(--color-bg));
   --surface-selected: color-mix(in srgb, var(--color-fg) 34%, var(--color-bg));
   --surface-selected-strong: color-mix(in srgb, var(--color-fg) 48%, var(--color-bg));
+  --border-fg-color: color-mix(in srgb, var(--color-fg) 72%, transparent);
   --border-soft: 1px solid color-mix(in srgb, var(--color-fg) 35%, transparent);
 
   /* === Spacing (8px grid) ============================================ */
@@ -60,11 +107,12 @@
    * 1px is the only stroke weight. Used to delineate structure.
    */
   --border-width: 1px;
-  --border-fg: 1px solid var(--color-fg);
+  --border-fg: 1px solid var(--border-fg-color);
   --border-bg: 1px solid var(--color-bg);
 
   /* === Typography ===================================================== */
   --font-family-base:
+    "Akzidenz Grotesk Next",
     "Helvetica Neue",
     "HelveticaNeue",
     "Helvetica",
@@ -80,10 +128,10 @@
     monospace;
 
   /* Compact DAW UI sizes. Use these for dense controls, rows, hints, and
-   * editor surfaces. 12px is the minimum readable interactive size; 10px is
+   * editor surfaces. 11px is the default dense interactive size; 10px is
    * reserved for faint non-interactive tick/hint annotations only. */
   --font-size-hint: 10px;
-  --font-size-ui: 12px;
+  --font-size-ui: 11px;
   --font-size-ui-lg: 14px;
   --font-size-section: 16px;
   --font-size-title: 18px;
@@ -141,8 +189,10 @@
   --layout-app-height: 100vh;
 
   /* Sidebar / panel widths use 8-grid multiples */
-  --width-sidebar: 256px;        /* 32 * 8 */
-  --width-instrument-panel: 384px; /* 48 * 8 */
+  --width-library-column: 288px;       /* 36 * 8 */
+  --width-track-head: 240px;           /* compact track controls */
+  --width-instrument-panel: var(--width-library-column);
+  --width-sidebar: 324px;              /* 36px rail + 288px content */
   --width-modal-sm: 384px;
   --width-modal-md: 640px;
   --width-modal-lg: 960px;
@@ -163,6 +213,7 @@
   --z-modal-stack-step: 10; /* additive per stacked modal */
   --z-scrim: 4000;        /* unsaved-check shadow */
   --z-toast: 5000;
+  --z-startup-splash: 12000;
 
   /* === Component-specific tokens ====================================== */
 

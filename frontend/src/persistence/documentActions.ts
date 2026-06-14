@@ -1,4 +1,5 @@
 import { stopTimelineAudio } from "../audio/timelineAudio";
+import { appAlert, appConfirm } from "../components";
 import type { BeatProjectAsset, BeatProjectDocument, ProjectBackupEntry } from "../ipc/schema";
 import { isNative, send } from "../ipc/bridge";
 import { createEmptyProject, useDocumentStore, useProjectStore, useTransportStore } from "../state/store";
@@ -45,7 +46,7 @@ export async function saveCurrentDocument(options: { saveAs?: boolean } = {}): P
 
 export async function openDocumentFromUserChoice(): Promise<"opened" | "cancelled"> {
   if (hasUnsavedOpenDocument()) {
-    const shouldOpen = window.confirm("Open another project? Unsaved changes will remain in local autosave, but this view will switch.");
+    const shouldOpen = await appConfirm("Open another project? Unsaved changes will remain in local autosave, but this view will switch.");
     if (!shouldOpen) return "cancelled";
   }
 
@@ -65,7 +66,7 @@ export async function openDocumentFromUserChoice(): Promise<"opened" | "cancelle
     documentStore.setCleanupReport(null);
     documentStore.setLastBackupPath(null);
     if (missingAssets.length) {
-      window.alert(formatMissingAssetWarning(missingAssets.map((asset) => asset.path)));
+      await appAlert(formatMissingAssetWarning(missingAssets.map((asset) => asset.path)));
     }
     return "opened";
   }
@@ -76,7 +77,7 @@ export async function openDocumentFromUserChoice(): Promise<"opened" | "cancelle
   try {
     document = JSON.parse(await file.text()) as BeatProjectDocument;
   } catch {
-    window.alert("That file is not a readable .beat project.");
+    await appAlert("That file is not a readable .beat project.");
     return "cancelled";
   }
   stopPlaybackForDocumentSwitch();
@@ -87,7 +88,7 @@ export async function openDocumentFromUserChoice(): Promise<"opened" | "cancelle
 export async function openRecentDocument(path: string): Promise<"opened" | "cancelled"> {
   if (!isNative()) return "cancelled";
   if (hasUnsavedOpenDocument()) {
-    const shouldOpen = window.confirm("Open another project? Unsaved changes will remain in local autosave, but this view will switch.");
+    const shouldOpen = await appConfirm("Open another project? Unsaved changes will remain in local autosave, but this view will switch.");
     if (!shouldOpen) return "cancelled";
   }
 
@@ -106,39 +107,39 @@ export async function openRecentDocument(path: string): Promise<"opened" | "canc
   documentStore.setCleanupReport(null);
   documentStore.setLastBackupPath(null);
   if (missingAssets.length) {
-    window.alert(formatMissingAssetWarning(missingAssets.map((asset) => asset.path)));
+    await appAlert(formatMissingAssetWarning(missingAssets.map((asset) => asset.path)));
   }
   return "opened";
 }
 
 export async function recoverCurrentDocumentFromBackup(): Promise<"restored" | "cancelled"> {
   if (!isNative()) {
-    window.alert("Project backup recovery is only available in the native app.");
+    await appAlert("Project backup recovery is only available in the native app.");
     return "cancelled";
   }
 
   const currentFilePath = useDocumentStore.getState().currentFilePath;
   if (!currentFilePath) {
-    window.alert("Save this project to a .beat file before using backup recovery.");
+    await appAlert("Save this project to a .beat file before using backup recovery.");
     return "cancelled";
   }
 
   const listResult = await send({ kind: "project.listBackups", projectPath: currentFilePath });
   if (listResult.error) throw new Error(listResult.error);
   if (listResult.backups.length === 0) {
-    window.alert("No backups exist for this project yet.");
+    await appAlert("No backups exist for this project yet.");
     return "cancelled";
   }
 
   const backup = await chooseProjectBackup(listResult.backups);
   if (!backup) return "cancelled";
   if (backup.valid === false) {
-    window.alert(backup.error || "This backup is not safe to restore.");
+    await appAlert(backup.error || "This backup is not safe to restore.");
     return "cancelled";
   }
 
   const label = backup.projectName || backup.name;
-  if (!window.confirm(`Restore backup "${label}"? The current project file will be backed up first.`)) {
+  if (!await appConfirm(`Restore backup "${label}"? The current project file will be backed up first.`)) {
     return "cancelled";
   }
 
@@ -162,14 +163,14 @@ export async function recoverCurrentDocumentFromBackup(): Promise<"restored" | "
   documentStore.setCleanupReport(null);
   documentStore.setLastBackupPath(restoreResult.backupPath ?? null);
   if (missingAssets.length) {
-    window.alert(formatMissingAssetWarning(missingAssets.map((asset) => asset.path)));
+    await appAlert(formatMissingAssetWarning(missingAssets.map((asset) => asset.path)));
   }
   return "restored";
 }
 
-export function createNewDocument(): boolean {
+export async function createNewDocument(): Promise<boolean> {
   if (hasUnsavedOpenDocument()) {
-    const shouldCreate = window.confirm("Create a new project? Unsaved changes will remain in local autosave, but this view will reset.");
+    const shouldCreate = await appConfirm("Create a new project? Unsaved changes will remain in local autosave, but this view will reset.");
     if (!shouldCreate) return false;
   }
   stopPlaybackForDocumentSwitch();
@@ -182,9 +183,9 @@ export function createNewDocument(): boolean {
   return true;
 }
 
-export function closeCurrentDocumentForHome(): boolean {
+export async function closeCurrentDocumentForHome(): Promise<boolean> {
   if (hasUnsavedOpenDocument()) {
-    const shouldClose = window.confirm("Close the current project and go Home? Unsaved changes may be lost.");
+    const shouldClose = await appConfirm("Close the current project and go Home? Unsaved changes may be lost.");
     if (!shouldClose) return false;
   }
   stopPlaybackForDocumentSwitch();
@@ -210,7 +211,7 @@ async function relinkMissingAssetsBeforeOpen(
   missingAssets: BeatProjectAsset[],
 ): Promise<{ document: BeatProjectDocument; missingAssets: BeatProjectAsset[] }> {
   if (!isNative() || missingAssets.length === 0) return { document, missingAssets };
-  const shouldRelink = window.confirm(formatMissingAssetRelinkPrompt(missingAssets));
+  const shouldRelink = await appConfirm(formatMissingAssetRelinkPrompt(missingAssets));
   if (!shouldRelink) return { document, missingAssets };
 
   let nextDocument = document;
@@ -314,7 +315,7 @@ function chooseProjectBackup(backups: ProjectBackupEntry[]): Promise<ProjectBack
     panel.style.color = "var(--color-fg)";
     panel.style.border = "var(--border-fg)";
     panel.style.fontFamily = "var(--font-family-base)";
-    panel.style.fontSize = "12px";
+    panel.style.fontSize = "var(--font-size-ui)";
 
     const title = document.createElement("div");
     title.textContent = "Recover Backup";
@@ -326,7 +327,7 @@ function chooseProjectBackup(backups: ProjectBackupEntry[]): Promise<ProjectBack
     title.style.borderBottom = "var(--border-fg)";
     title.style.fontWeight = "var(--font-weight-bold)";
     title.style.textTransform = "uppercase";
-    title.style.fontSize = "12px";
+    title.style.fontSize = "var(--font-size-ui)";
     title.style.lineHeight = "1";
     panel.append(title);
 
@@ -349,7 +350,7 @@ function chooseProjectBackup(backups: ProjectBackupEntry[]): Promise<ProjectBack
       row.style.background = "transparent";
       row.style.color = backup.valid === false ? "var(--color-fg-hover)" : "var(--color-fg)";
       row.style.font = "inherit";
-      row.style.fontSize = "12px";
+      row.style.fontSize = "var(--font-size-ui)";
       row.style.textAlign = "left";
       row.style.cursor = backup.valid === false ? "not-allowed" : "pointer";
       row.style.boxSizing = "border-box";
@@ -369,7 +370,7 @@ function chooseProjectBackup(backups: ProjectBackupEntry[]): Promise<ProjectBack
       details.style.textOverflow = "ellipsis";
       details.style.whiteSpace = "nowrap";
       details.style.color = "var(--color-fg-hover)";
-      details.style.fontSize = "12px";
+      details.style.fontSize = "var(--font-size-ui)";
       main.append(name, details);
 
       const status = document.createElement("span");
@@ -414,7 +415,7 @@ function chooseProjectBackup(backups: ProjectBackupEntry[]): Promise<ProjectBack
     cancel.style.background = "transparent";
     cancel.style.color = "var(--color-fg)";
     cancel.style.font = "inherit";
-    cancel.style.fontSize = "12px";
+    cancel.style.fontSize = "var(--font-size-ui)";
     cancel.style.textTransform = "uppercase";
     cancel.style.cursor = "pointer";
     cancel.style.padding = "0 12px";

@@ -4,7 +4,9 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  box-sizing: border-box;
+  border: var(--border-fg);
+  background: color-mix(in srgb, var(--color-fg) 10%, var(--color-bg));
+  color: var(--color-fg);
   flex-shrink: 0;
 }

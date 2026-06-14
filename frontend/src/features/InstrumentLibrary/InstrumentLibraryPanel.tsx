@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Button, Icon, MarqueeText, useContextMenu, HoverInfo, SectionRibbon, SectionRibbonActionButton, type ContextMenuItem } from "../../components";
+import { Button, Icon, MarqueeText, RowItem, Tag, useContextMenu, HoverInfo, SectionRibbon, SectionRibbonActionButton, type ContextMenuItem } from "../../components";
 import { createInstrumentBufferSource, preloadInstrumentSample, previewFrequency } from "../../audio/synthPreview";
 import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useUiStore } from "../../state/store";
 import { instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
@@ -14,6 +14,7 @@ import type { Instrument, InstrumentSet } from "../../state/types";
 import { ImportInstrumentModal } from "./ImportInstrumentModal";
 import { MergeInstrumentModal } from "./MergeInstrumentModal";
 import { decentSamplerPluginForInstrument } from "../PluginLibrary/decentSamplerPluginAdapter";
+import { editorRequestForInstrument } from "../InstrumentEditor/instrumentEditorRouting";
 import styles from "./InstrumentLibraryPanel.module.css";
 
 const KIND_HINT: Record<string, string> = {
@@ -141,7 +142,8 @@ export function InstrumentLibraryPanel({ expanded, onToggle }: InstrumentLibrary
 
   function createNew() {
     const id = addInstrument({ name: "New Instrument", userCreated: true });
-    openEditor({ kind: "instrument", instrumentId: id });
+    const instrument = useInstrumentStore.getState().instruments.find((candidate) => candidate.id === id);
+    if (instrument) openEditor(editorRequestForInstrument(instrument));
   }
 
   function createWavetable(starter: WavetableStarter) {
@@ -158,7 +160,7 @@ export function InstrumentLibraryPanel({ expanded, onToggle }: InstrumentLibrary
     });
     bindSynthInstrument(id);
     setSynthDraft(namedDraft);
-    openEditor({ kind: "synth" });
+    openEditor({ kind: "synthInstrument", instrumentId: id });
   }
 
   function togglePreview(instrument: Instrument) {
@@ -232,6 +234,7 @@ export function InstrumentLibraryPanel({ expanded, onToggle }: InstrumentLibrary
   return (
     <div ref={panelRef} className={styles.panel} onContextMenu={onPanelContextMenu}>
       <SectionRibbon
+        className={styles.instrumentsRibbon}
         title="Instruments"
         expanded={expanded}
         onToggle={onToggle}
@@ -307,7 +310,7 @@ export function InstrumentLibraryPanel({ expanded, onToggle }: InstrumentLibrary
                       openEditor({ kind: "plugin", pluginId: dsPlugin.id });
                       return;
                     }
-                    openEditor({ kind: "instrument", instrumentId: i.id });
+                    openEditor(editorRequestForInstrument(i));
                   }}
                   onDuplicate={() => duplicate(i.id)}
                   onMerge={() => setMergeFromId(i.id)}
@@ -410,8 +413,10 @@ function InstrumentItem({
   const hint = instrument.icon ? instrumentIconLabel(instrument.icon) : KIND_HINT[kind] ?? kind;
 
   return (
-    <li
+    <RowItem
       className={`${styles.item} ${selected ? styles.itemSelected : ""} ${selectMode ? styles.itemSelecting : ""}`}
+      reserveDragSlot={false}
+      cursor="pointer"
       draggable={!selectMode}
       onClick={(event) => {
         if (!selectMode) return;
@@ -422,8 +427,8 @@ function InstrumentItem({
       onDrop={onDrop}
       onDoubleClick={onEdit}
       onContextMenu={onContextMenu}
-    >
-      {selectMode ? (
+      iconAriaHidden={!selectMode}
+      icon={selectMode ? (
         <input
           className={styles.itemCheckbox}
           type="checkbox"
@@ -436,33 +441,32 @@ function InstrumentItem({
           aria-label={`Select ${name}`}
         />
       ) : (
-        <span className={styles.itemDot} aria-hidden>
-          <Icon name="ph:dots-six-vertical" size={14} decorative />
-        </span>
+        <HoverInfo content={hint}>
+          <Icon name={icon} size={14} title={hint} />
+        </HoverInfo>
       )}
-      <MarqueeText className={styles.itemName} text={name} />
-      <HoverInfo content={hint}>
-        <span className={styles.itemKindIcon} aria-label={hint}>
-          <Icon name={icon} size={14} decorative />
-        </span>
-      </HoverInfo>
-      <HoverInfo content={previewing ? "Pause sound" : "Play sound"}>
-        <Button
-          className={styles.itemPreviewButton}
-          iconOnly
-          size="sm"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onTogglePreview();
-          }}
-          aria-label={`${previewing ? "Pause" : "Play"} ${name}`}
-        >
-          <Icon name={previewing ? "ph:pause-fill" : "ph:play-fill"} size={12} decorative />
-        </Button>
-      </HoverInfo>
+      hoverIcon={!selectMode && <Icon name="ph:dots-six-vertical" size={14} decorative />}
+      name={name}
+      action={(
+        <HoverInfo content={previewing ? "Pause sound" : "Play sound"}>
+          <Button
+            className={styles.itemPreviewButton}
+            iconOnly
+            size="sm"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePreview();
+            }}
+            aria-label={`${previewing ? "Pause" : "Play"} ${name}`}
+          >
+            <Icon name={previewing ? "ph:pause-fill" : "ph:play-fill"} size={12} decorative />
+          </Button>
+        </HoverInfo>
+      )}
+    >
       {menu}
-    </li>
+    </RowItem>
   );
 }
 
@@ -565,7 +569,7 @@ function InstrumentSetSection({
             <MarqueeText className={styles.setName} text={displayName} />
           </span>
         )}
-        <span className={styles.setCount}>{items.length}</span>
+        <Tag className={styles.setCount}>{items.length}</Tag>
       </div>
       <ul className={`${styles.setList} ${open ? styles.setListOpen : ""}`} aria-hidden={!open}>
         {children}

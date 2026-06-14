@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Modal, Button, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, TextInput, useModalStack } from "../../components";
+import { Modal, Button, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, TextInput, appAlert, useModalStack } from "../../components";
 import { ai, type GeneratedInstrument } from "../../ai/aiService";
 import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
@@ -18,6 +18,7 @@ import styles from "./InstrumentEditorModal.module.css";
 
 interface Props {
   instrumentId: string;
+  editorKind?: "instrument" | "samplerInstrument";
 }
 
 type LfoWaveform = NonNullable<Instrument["lfoWaveform"]>;
@@ -48,7 +49,7 @@ const DEFAULT_INSTRUMENT_KNOBS = { cutoff: 0.6, resonance: 0.2, drive: 0.1, colo
  *   ├──── Lineage (if merged) ────┤
  *   └─────────────────────────────┘
  */
-export function InstrumentEditorModal({ instrumentId }: Props) {
+export function InstrumentEditorModal({ instrumentId, editorKind = "instrument" }: Props) {
   const source = useInstrumentStore((s) =>
     s.instruments.find((i) => i.id === instrumentId),
   );
@@ -80,10 +81,11 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
 
   if (!draft || !source) return null;
   const dirty = JSON.stringify(draft) !== JSON.stringify(source);
-  const showOscillator = draft.kind === "synth" || draft.kind === "hybrid";
-  const showWavetable = draft.kind === "wavetable";
+  const samplerEditorMode = editorKind === "samplerInstrument";
+  const showOscillator = !samplerEditorMode && (draft.kind === "synth" || draft.kind === "hybrid");
+  const showWavetable = !samplerEditorMode && draft.kind === "wavetable";
   const showModulation = showOscillator || showWavetable;
-  const showSamples = draft.kind === "sampler" || draft.kind === "hybrid";
+  const showSamples = samplerEditorMode || draft.kind === "sampler" || draft.kind === "hybrid";
   const aether = draft.aether ?? defaultAetherSynthConfig();
   const sourceEdited = Boolean(
     draft.source &&
@@ -92,6 +94,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
     !snapshotMatchesInstrument(draft.original, draft),
   );
   const canRevert = Boolean(draft.original && sourceEdited);
+  const closeRequest = { kind: editorKind, instrumentId } as const;
 
   function setAether(next: NonNullable<Instrument["aether"]>) {
     setDraft({ ...(draft as Instrument), aether: next });
@@ -132,10 +135,10 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
       });
     }
     update(instrumentId, saved);
-    closeEditor({ kind: "instrument", instrumentId });
+    closeEditor(closeRequest);
   }
   function close() {
-    closeEditor({ kind: "instrument", instrumentId });
+    closeEditor(closeRequest);
   }
   function onClose() {
     if (dirty) requestDirtyClose(id, save, close);
@@ -146,7 +149,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
     const file = await importAudioFile();
     if (!file) return;
     if (!isSupportedAudioFileName(file.name) && !isSupportedAudioFileName(file.path)) {
-      window.alert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
+      await appAlert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
       return;
     }
     attachSample(file);
@@ -242,7 +245,7 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      window.alert("Audio recording is not available in this browser.");
+      await appAlert("Audio recording is not available in this browser.");
       return;
     }
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -336,12 +339,15 @@ export function InstrumentEditorModal({ instrumentId }: Props) {
               layout="inline"
               value={draft.kind}
               ariaLabel="Instrument type"
-              options={[
-                { value: "synth", label: "Synth" },
-                { value: "wavetable", label: "Aether WT" },
-                { value: "sampler", label: "Sampler" },
-                { value: "hybrid", label: "Hybrid" },
-              ]}
+              options={samplerEditorMode
+                ? [
+                    { value: "sampler", label: "Sampler" },
+                    { value: "hybrid", label: "Layered Sample" },
+                  ]
+                : [
+                    { value: "synth", label: "Synth" },
+                    { value: "wavetable", label: "Aether WT" },
+                  ]}
               open={typeOpen}
               onOpenChange={setTypeOpen}
               onChange={(kind) => setDraft(instrumentWithKind(draft, kind as Instrument["kind"]))}

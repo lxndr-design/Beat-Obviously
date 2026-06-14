@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Icon, HoverInfo } from "../../components";
+import { Button, Icon, HoverInfo, appPrompt } from "../../components";
 import { useProjectStore, useTransportStore, useUiStore } from "../../state/store";
 import { send } from "../../ipc/bridge";
 import { EQ_BAND_COUNT, type EqAutomationPoint } from "../../state/types";
@@ -52,8 +52,8 @@ export function MasterEqPanel() {
     void send({ kind: "eq.setAutomation", points: next });
   }
 
-  function savePreset() {
-    const name = window.prompt("Preset name");
+  async function savePreset() {
+    const name = await appPrompt("Preset name");
     if (!name?.trim()) return;
     const next = [...userPresets.filter((preset) => preset.name !== name.trim()), {
       id: crypto.randomUUID(),
@@ -107,7 +107,7 @@ export function MasterEqPanel() {
                     )}
                   </div>
                 ))}
-                <button type="button" className={styles.savePreset} onClick={savePreset}>
+                <button type="button" className={styles.savePreset} onClick={() => void savePreset()}>
                   Save as preset
                 </button>
               </div>
@@ -115,6 +115,7 @@ export function MasterEqPanel() {
           </div>
           <HoverInfo content="Open EQ automation editor">
             <Button
+              className={styles.editButton}
               iconOnly
               size="xs"
               onClick={() => openEditor({ kind: "eq" })}

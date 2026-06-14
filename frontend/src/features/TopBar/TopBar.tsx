@@ -100,8 +100,6 @@ export function TopBar({ onHome, onNew, onOpen, onSave, onSaveAs, onExport, onEx
           onSettings={onSettings}
         />
         <h1 className={styles.breadcrumb}>
-          <button type="button" className={styles.breadcrumbHome} onClick={onHome}>Beat</button>
-          <span className={styles.breadcrumbSlash}>/</span>
           <span>Editor</span>
           <span className={styles.breadcrumbSlash}>/</span>
           {editingProjectName ? (

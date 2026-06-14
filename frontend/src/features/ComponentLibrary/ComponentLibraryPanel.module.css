@@ -33,7 +33,7 @@
 
 .listOpen::-webkit-scrollbar-track {
   background: transparent;
-  box-shadow: inset 0 0 0 1px var(--color-fg);
+  box-shadow: inset 0 0 0 1px var(--border-fg-color);
 }
 
 .empty {
@@ -46,67 +46,6 @@
   line-height: 1;
   opacity: 0.6;
   pointer-events: none;
-}
-
-.item {
-  display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) 12px var(--sidebar-subrow-height);
-  align-items: center;
-  gap: 4px;
-  width: calc(100% + 8px);
-  padding: 0 8px 0 4px;
-  box-sizing: border-box;
-  height: var(--sidebar-subrow-height);
-  cursor: grab;
-  transition: var(--transition-invert);
-  text-align: left;
-}
-.item:active {
-  cursor: grabbing;
-}
-
-.item:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
-}
-
-.itemDot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 12px;
-  height: 12px;
-  opacity: 0;
-  cursor: grab;
-  transition: opacity var(--duration-hover) var(--ease-out);
-}
-.item:hover .itemDot {
-  opacity: 0.9;
-}
-
-.itemName {
-  font-size: var(--font-size-ui);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.itemMeta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 12px;
-  height: 12px;
-  opacity: 0.7;
-}
-
-.itemPreviewButton.itemPreviewButton {
-  width: var(--sidebar-subrow-height) !important;
-  min-width: var(--sidebar-subrow-height);
-  max-width: var(--sidebar-subrow-height);
-  height: var(--sidebar-subrow-height) !important;
-  min-height: var(--sidebar-subrow-height);
-  max-height: var(--sidebar-subrow-height);
 }
 
 .drumIcon {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Modal, Button, FloatingSelect, Icon, NumberInput, TextInput, useModalStack } from "../../components";
+import { Modal, Button, FloatingSelect, Icon, NumberInput, TextInput, appAlert, useModalStack } from "../../components";
 import { createInstrumentBufferSource, noteFrequency } from "../../audio/synthPreview";
 import { DRUM_MAX_STEPS } from "../../ai/drumBeatGenerator";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
@@ -178,7 +178,7 @@ export function SegmentEditorModal({ segmentId }: Props) {
     const file = await importAudioFile();
     if (!file) return;
     if (!isSupportedAudioFileName(file.name) && !isSupportedAudioFileName(file.path)) {
-      window.alert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
+      await appAlert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
       return;
     }
     addAudioFile(file);

@@ -23,6 +23,9 @@ export interface AiService {
   generatePattern: (opts: {
     lengthBeats: number;
     style?: string;
+    role?: MidiPatternRole;
+    key?: string;
+    variationSeed?: number;
     seedNotes?: MidiNote[];
   }) => Promise<MidiNote[]>;
 
@@ -56,6 +59,8 @@ export interface GeneratedInstrument {
   model?: string;
 }
 
+export type MidiPatternRole = "melody" | "bass" | "chords" | "arp" | "countermelody";
+
 export interface InstrumentFeedbackExample {
   prompt: string;
   rating: "up" | "down";
@@ -86,13 +91,8 @@ export const LocalAiService: AiService = {
     };
   },
 
-  async generatePattern({ lengthBeats }) {
-    const notes: MidiNote[] = [];
-    // Simple 4-on-the-floor kick pattern as placeholder.
-    for (let beat = 0; beat < lengthBeats; beat++) {
-      notes.push({ pitch: 36, velocity: 100, startBeat: beat, lengthBeats: 0.25 });
-    }
-    return notes;
+  async generatePattern(opts) {
+    return generateLocalMidiPattern(opts);
   },
 
   async generateDrumBeat(opts) {
@@ -124,7 +124,13 @@ function simpleHash(s: string): number {
 }
 
 function seededRandom(seed: number): () => number {
-  let state = Math.max(1, Math.floor(seed) % 2147483647);
+  let mixed = Math.floor(seed) >>> 0;
+  mixed ^= mixed >>> 16;
+  mixed = Math.imul(mixed, 0x7feb352d);
+  mixed ^= mixed >>> 15;
+  mixed = Math.imul(mixed, 0x846ca68b);
+  mixed ^= mixed >>> 16;
+  let state = ((mixed >>> 0) % 2147483646) + 1;
   return () => {
     state = (state * 48271) % 2147483647;
     return state / 2147483647;
@@ -143,8 +149,8 @@ async function generateInstrumentWithOllama(opts: GenerateInstrumentOptions): Pr
         stream: false,
         format: "json",
         options: {
-          temperature: 0.85,
-          top_p: 0.9,
+          temperature: 0.95,
+          top_p: 0.94,
         },
         messages: [
           {
@@ -157,6 +163,8 @@ async function generateInstrumentWithOllama(opts: GenerateInstrumentOptions): Pr
               "For wavetable instruments, use Aether multi-oscillator settings instead of legacy single-oscillator synth settings.",
               "Do not hand-author synthPatch; Beat derives the canonical synthPatch from normalized Aether settings.",
               "Use variationSeed to produce a meaningfully different patch for repeated prompts.",
+              "Repeated generations for the same text must diverge in oscillator topology, envelope contour, modulation routing, wavetable bank/position, and sample choice where available.",
+              "Do not merely rename the current patch or nudge macro values. Make the sound-design architecture noticeably different.",
               "Only use sampleUrl values from availableSamples.",
             ].join(" "),
           },
@@ -184,6 +192,8 @@ async function generateInstrumentWithOllama(opts: GenerateInstrumentOptions): Pr
 }
 
 function buildInstrumentPrompt(opts: GenerateInstrumentOptions): string {
+  const seed = opts.variationSeed ?? Date.now();
+  const lane = instrumentDivergenceLane(seed, opts.prompt);
   const availableSamples = [
     ...opts.instruments
       .filter((instrument) => instrument.sampleUrl)
@@ -220,6 +230,8 @@ function buildInstrumentPrompt(opts: GenerateInstrumentOptions): string {
     userPrompt: opts.prompt,
     targetInstrumentType: opts.targetKind ?? opts.current.kind,
     variationSeed: opts.variationSeed,
+    divergenceLane: lane,
+    diversityInstruction: "This is a single new instrument, not an edit pass. For every generation, choose a different macro identity, oscillator stack, modulation behavior, envelope contour, and spectral balance than previous or current examples unless the prompt forbids it.",
     currentInstrument: summarizeInstrument(opts.current),
     availableSamples,
     likedExamples: positive ?? [],
@@ -431,11 +443,22 @@ function sanitizeAetherOsc(value: unknown, fallback: NonNullable<Instrument["aet
 function generateLocalInstrumentPatch(opts: GenerateInstrumentOptions): Partial<Instrument> {
   const lower = opts.prompt.toLowerCase();
   const targetKind = opts.targetKind ?? opts.current.kind;
-  const rnd = seededRandom((opts.variationSeed ?? Date.now()) + simpleHash(opts.prompt));
+  const seed = (opts.variationSeed ?? Date.now()) + simpleHash(opts.prompt);
+  const rnd = seededRandom(seed);
+  const lane = instrumentDivergenceLane(seed, opts.prompt);
   const wantsSample = /\b(vocal|voice|drum|perc|kick|snare|hat|cymbal|sample|guitar|violin|flute|piano)\b/.test(lower);
-  const sample = wantsSample
-    ? opts.instruments.find((instrument) => instrument.sampleUrl && lower.split(/\W+/).some((word) => word.length > 2 && instrument.name.toLowerCase().includes(word)))
-      ?? opts.instruments.find((instrument) => instrument.sampleUrl)
+  const samplePool = [
+    ...opts.instruments
+      .filter((instrument) => instrument.sampleUrl)
+      .map((instrument) => ({ name: instrument.name, sampleUrl: instrument.sampleUrl, sourceLabel: instrument.source?.label ?? instrument.name })),
+    ...opts.audioFiles.map((file) => ({ name: file.name, sampleUrl: file.path, sourceLabel: file.name })),
+  ];
+  const promptWords = lower.split(/\W+/).filter((word) => word.length > 2);
+  const matchingSamples = samplePool.filter((sampleCandidate) =>
+    promptWords.some((word) => sampleCandidate.name.toLowerCase().includes(word)),
+  );
+  const sample = wantsSample || lane.sampleBias > 0.72
+    ? (matchingSamples.length > 0 ? matchingSamples : samplePool)[Math.floor(rnd() * Math.max(1, (matchingSamples.length > 0 ? matchingSamples : samplePool).length))]
     : undefined;
   const bright = /\b(bright|sharp|acid|pluck|lead)\b/.test(lower);
   const soft = /\b(soft|pad|warm|mellow|ambient)\b/.test(lower);
@@ -443,63 +466,349 @@ function generateLocalInstrumentPatch(opts: GenerateInstrumentOptions): Partial<
   const brass = /\b(brass|horn|trumpet|trombone)\b/.test(lower);
   const bell = /\b(bell|glass|mallet|chime)\b/.test(lower);
   const pluck = /\b(pluck|pizzicato|harp|short)\b/.test(lower);
-  const kind: Instrument["kind"] = targetKind === "wavetable"
+  const kind: Instrument["kind"] = sample && lane.sampleBias > 0.45
+    ? "sampler"
+    : targetKind === "wavetable"
     ? "wavetable"
     : targetKind === "sampler"
     ? "sampler"
     : targetKind === "hybrid"
     ? "hybrid"
+    : lane.kind === "wavetable"
+    ? "wavetable"
+    : lane.kind === "hybrid"
+    ? "hybrid"
     : sample
     ? "sampler"
     : "synth";
+  const longMotion = lane.motion === "evolving" || lane.motion === "swarm";
+  const percussive = lane.motion === "pluck" || lane.motion === "strike";
+  const noisy = lane.color === "noise" || lane.color === "metal";
+  const envelopeStretch = 0.38 + rnd() * 2.28;
+  const macroTilt = (rnd() - 0.5) * 0.58;
+  const modulationLift = rnd() * 0.44;
+  const sampleWarp = kind === "sampler" || kind === "hybrid" ? rnd() : 0;
+  const sampleMotion = kind === "sampler" ? 0.72 + rnd() * 0.88 : 1;
   const patch: Partial<Instrument> = {
-    name: opts.prompt.trim().slice(0, 32) || "AI Instrument",
+    name: `${lane.namePrefix} ${opts.prompt.trim() || "Instrument"}`.slice(0, 48),
     kind,
-    waveform: kind === "sampler" ? "sample" : kind === "wavetable" ? "wavetable" : sample ? "sample" : bowed || soft ? "sine" : bright ? "saw" : "square",
+    waveform: kind === "sampler" ? "sample" : kind === "wavetable" ? "wavetable" : sample ? "sample" : lane.waveform ?? (bowed || soft ? "sine" : bright ? "saw" : "square"),
     envelope: {
-      attackMs: Math.round(bowed ? 80 + rnd() * 220 : soft ? 180 + rnd() * 180 : pluck ? 2 + rnd() * 10 : 4 + rnd() * 18),
-      decayMs: Math.round(bowed ? 450 + rnd() * 700 : soft ? 520 + rnd() * 420 : pluck ? 70 + rnd() * 130 : 120 + rnd() * 180),
-      sustain: bowed ? 0.68 + rnd() * 0.24 : soft ? 0.64 + rnd() * 0.24 : pluck ? 0.18 + rnd() * 0.22 : 0.28 + rnd() * 0.24,
-      releaseMs: Math.round(bowed ? 420 + rnd() * 900 : soft ? 700 + rnd() * 800 : pluck ? 90 + rnd() * 180 : 140 + rnd() * 240),
+      attackMs: Math.round((sampleWarp > 0.72 ? 1 + rnd() * 18 : longMotion ? 220 + rnd() * 2200 : bowed ? 60 + rnd() * 420 : soft ? 120 + rnd() * 420 : percussive || pluck ? 1 + rnd() * 32 : 2 + rnd() * 120) * envelopeStretch * sampleMotion),
+      decayMs: Math.round((sampleWarp > 0.66 ? 42 + rnd() * 520 : longMotion ? 520 + rnd() * 2400 : bowed ? 300 + rnd() * 1200 : soft ? 360 + rnd() * 900 : percussive || pluck ? 32 + rnd() * 320 : 80 + rnd() * 620) * envelopeStretch * sampleMotion),
+      sustain: clamp(longMotion ? 0.32 + rnd() * 0.62 : bowed ? 0.54 + rnd() * 0.38 : soft ? 0.46 + rnd() * 0.42 : percussive || pluck ? 0.02 + rnd() * 0.42 : 0.12 + rnd() * 0.68, 0, 1, 0.5),
+      releaseMs: Math.round((sampleWarp > 0.58 ? 36 + rnd() * 2200 : longMotion ? 650 + rnd() * 5200 : bowed ? 260 + rnd() * 1500 : soft ? 420 + rnd() * 1700 : percussive || pluck ? 32 + rnd() * 420 : 80 + rnd() * 1050) * envelopeStretch * sampleMotion),
     },
     knobs: {
-      cutoff: clamp((bright ? 0.82 : bowed ? 0.54 : soft ? 0.46 : 0.65) + (rnd() - 0.5) * 0.18, 0, 1, 0.6),
-      resonance: clamp((bright || brass ? 0.25 : bowed ? 0.16 : 0.12) + rnd() * 0.12, 0, 1, 0.18),
-      drive: clamp((/\b(distort|dirty|808|hard)\b/.test(lower) ? 0.38 : brass ? 0.16 : 0.06) + rnd() * 0.12, 0, 1, 0.08),
-      color: clamp((bright ? 0.72 : bowed ? 0.38 : soft ? 0.44 : 0.52) + (rnd() - 0.5) * 0.2, 0, 1, 0.5),
+      cutoff: clamp((bright ? 0.82 : noisy ? 0.7 : bowed ? 0.54 : soft ? 0.46 : 0.65) + lane.cutoffOffset + macroTilt + (rnd() - 0.5) * 0.46, 0, 1, 0.6),
+      resonance: clamp((bright || brass || lane.motion === "acid" || sampleWarp > 0.52 ? 0.3 : bowed ? 0.16 : 0.12) + rnd() * 0.52, 0, 1, 0.18),
+      drive: clamp((/\b(distort|dirty|808|hard)\b/.test(lower) || noisy ? 0.32 : brass ? 0.16 : 0.04) + lane.driveOffset - macroTilt * 0.35 + rnd() * 0.38, 0, 1, 0.08),
+      color: clamp((bright ? 0.72 : noisy ? 0.84 : bowed ? 0.38 : soft ? 0.44 : 0.52) - macroTilt * 0.45 + (rnd() - 0.5) * 0.58, 0, 1, 0.5),
     },
-    detuneCents: Math.round((soft || bowed ? 6 : 0) + rnd() * 16),
-    octave: /\bbass|sub|808\b/.test(lower) ? -1 : 0,
-    subOscLevel: clamp((/\bbass|sub|808\b/.test(lower) ? 0.38 : 0.04) + rnd() * 0.12, 0, 1, 0.08),
-    glideMs: Math.round(/\bslide|glide|legato\b/.test(lower) || bowed ? 60 + rnd() * 180 : rnd() > 0.82 ? rnd() * 80 : 0),
-    lfoWaveform: "sine",
-    lfoRateHz: Math.round((bowed ? 4 + rnd() * 3 : 3 + rnd() * 5) * 10) / 10,
-    lfoDepth: clamp((bowed ? 0.12 : 0.04) + rnd() * 0.08, 0, 1, 0.08),
-    lfoSync: false,
+    detuneCents: Math.round((soft || bowed || longMotion ? 7 : 0) + rnd() * (kind === "sampler" ? 96 : lane.motion === "swarm" || sampleWarp > 0.6 ? 72 : 28)),
+    octave: /\bbass|sub|808\b/.test(lower) ? -1 - Math.floor(rnd() * 2) : kind === "sampler" && sampleWarp > 0.62 ? [-2, -1, 0, 1][Math.floor(rnd() * 4)] ?? 0 : lane.octave,
+    subOscLevel: clamp((/\bbass|sub|808\b/.test(lower) ? 0.34 : kind === "hybrid" ? 0.24 : lane.kind === "hybrid" ? 0.18 : kind === "sampler" ? 0.01 + sampleWarp * 0.12 : 0.03) + rnd() * (kind === "hybrid" ? 0.42 : kind === "sampler" ? 0.42 : 0.28), 0, 1, 0.08),
+    glideMs: Math.round(/\bslide|glide|legato\b/.test(lower) || bowed || lane.motion === "glide" || sampleWarp > 0.7 ? 32 + rnd() * 360 : rnd() > 0.64 ? rnd() * 180 : 0),
+    lfoWaveform: lane.lfoWaveform,
+    lfoRateHz: Math.round((lane.motion === "swarm" ? 7 + rnd() * 10 : bowed ? 4 + rnd() * 3 : 1.2 + rnd() * 7) * 10) / 10,
+    lfoDepth: clamp((longMotion ? 0.18 : bowed ? 0.12 : lane.motion === "acid" ? 0.24 : 0.04) + modulationLift + rnd() * 0.34, 0, 1, 0.08),
+    lfoSync: rnd() > 0.45,
     lfoRetrigger: true,
-    lfoToPitch: /\bvibrato|siren\b/.test(lower) || bowed ? Math.round(1 + rnd() * 3) : 0,
-    lfoToFilter: /\bwah|pulse|wobble\b/.test(lower) ? 0.35 : 0,
-    envToFilter: pluck || brass || /\bsnap\b/.test(lower) ? 0.35 + rnd() * 0.3 : bowed ? 0.08 + rnd() * 0.12 : 0,
+    lfoToPitch: /\bvibrato|siren\b/.test(lower) || bowed || lane.motion === "swarm" || sampleWarp > 0.64 ? Math.round(1 + rnd() * (kind === "sampler" ? 11 : 7)) : rnd() > 0.82 ? Math.round(rnd() * 4) : 0,
+    lfoToFilter: /\bwah|pulse|wobble\b/.test(lower) || longMotion || lane.motion === "acid" || sampleWarp > 0.46 || rnd() > 0.62 ? clamp(-0.38 + rnd() * 1.48, -1, 1, 0.35) : 0,
+    envToFilter: percussive || pluck || brass || /\bsnap\b/.test(lower) || sampleWarp > 0.36 || rnd() > 0.56 ? clamp(-0.22 + rnd() * 1.22, -1, 1, 0.25) : bowed || longMotion ? 0.08 + rnd() * 0.36 : 0,
     ...(kind === "wavetable" ? {
       wavetable: {
-        bank: bell ? "glass" : /\bvocal|choir|voice\b/.test(lower) || bowed ? "vocal" : /\borgan\b/.test(lower) ? "organ" : /\bfm|digital\b/.test(lower) ? "fm" : "aether",
-        position: clamp((bright ? 0.62 : bowed ? 0.48 : soft ? 0.28 : 0.42) + (rnd() - 0.5) * 0.28, 0, 1, 0.42),
-        warp: clamp((/\bdirty|fold|metal|hard\b/.test(lower) ? 0.5 : bowed ? 0.18 : 0.22) + rnd() * 0.18, 0, 1, 0.22),
-        unison: Math.round(soft || bowed || /\bwide|lush|supersaw\b/.test(lower) ? 3 + rnd() * 4 : 1 + rnd() * 2),
-        detuneCents: Math.round((soft || bowed || /\bwide|lush|supersaw\b/.test(lower) ? 16 : 6) + rnd() * 22),
-        blend: clamp((soft || bowed || /\bwide|lush|supersaw\b/.test(lower) ? 0.68 : 0.44) + rnd() * 0.22, 0, 1, 0.5),
+        bank: lane.bank ?? (bell ? "glass" : /\bvocal|choir|voice\b/.test(lower) || bowed ? "vocal" : /\borgan\b/.test(lower) ? "organ" : /\bfm|digital\b/.test(lower) ? "fm" : "aether"),
+        position: clamp((bright ? 0.62 : bowed ? 0.48 : soft ? 0.28 : 0.42) + lane.positionOffset + (rnd() - 0.5) * 0.38, 0, 1, 0.42),
+        warp: clamp((/\bdirty|fold|metal|hard\b/.test(lower) || noisy ? 0.52 : bowed ? 0.18 : 0.22) + rnd() * 0.32, 0, 1, 0.22),
+        unison: Math.round(soft || bowed || longMotion || /\bwide|lush|supersaw\b/.test(lower) ? 3 + rnd() * 5 : 1 + rnd() * 4),
+        detuneCents: Math.round((soft || bowed || longMotion || /\bwide|lush|supersaw\b/.test(lower) ? 16 : 6) + rnd() * 38),
+        blend: clamp((soft || bowed || longMotion || /\bwide|lush|supersaw\b/.test(lower) ? 0.68 : 0.44) + rnd() * 0.28, 0, 1, 0.5),
       },
       aether: sanitizeAether({
-        oscA: { enabled: true, level: 0.72 + rnd() * 0.18, waveform: "wavetable" },
-        oscB: { enabled: rnd() > 0.35, level: 0.22 + rnd() * 0.35, waveform: rnd() > 0.4 ? "wavetable" : bowed ? "sine" : "saw", semitone: bowed ? 7 : rnd() > 0.5 ? 12 : 7, fineCents: Math.round((rnd() - 0.5) * 16) },
-        sub: { enabled: /\bbass|sub|808\b/.test(lower), level: 0.12 + rnd() * 0.18, octave: -1, waveform: "sine" },
-        noise: { enabled: bright && rnd() > 0.55, level: 0.04 + rnd() * 0.08, color: 0.35 + rnd() * 0.5 },
+        oscA: { enabled: true, level: 0.58 + rnd() * 0.36, waveform: lane.oscAWaveform },
+        oscB: { enabled: lane.oscBEnabled, level: 0.16 + rnd() * 0.5, waveform: lane.oscBWaveform, octave: lane.oscBOctave, semitone: lane.oscBSemitone, fineCents: Math.round((rnd() - 0.5) * 42), pan: (rnd() - 0.5) * 0.7 },
+        sub: { enabled: /\bbass|sub|808\b/.test(lower) || lane.subEnabled, level: 0.1 + rnd() * 0.32, octave: lane.subOctave, waveform: lane.subWaveform },
+        noise: { enabled: noisy || bright && rnd() > 0.42, level: 0.035 + rnd() * 0.18, color: 0.2 + rnd() * 0.75 },
       }, opts.current.aether),
     } : {}),
-    ...(sample?.sampleUrl ? { sampleUrl: sample.sampleUrl, sampleIds: [], source: { kind: "derived", label: sample.name, url: sample.sampleUrl, edited: false } } : {}),
+    ...(sample?.sampleUrl ? { sampleUrl: sample.sampleUrl, sampleIds: [], source: { kind: "derived", label: sample.sourceLabel, url: sample.sampleUrl, edited: false } } : {}),
   };
 
   return withAetherSynthPatch(patch, opts);
+}
+
+interface InstrumentDivergenceLane {
+  namePrefix: string;
+  kind: "synth" | "wavetable" | "hybrid";
+  motion: "evolving" | "pluck" | "strike" | "acid" | "glide" | "swarm";
+  color: "warm" | "glass" | "metal" | "noise" | "vocal" | "analog";
+  waveform?: Instrument["waveform"];
+  bank?: NonNullable<Instrument["wavetable"]>["bank"];
+  lfoWaveform: NonNullable<Instrument["lfoWaveform"]>;
+  octave: number;
+  sampleBias: number;
+  cutoffOffset: number;
+  driveOffset: number;
+  positionOffset: number;
+  oscAWaveform: NonNullable<Instrument["aether"]>["oscA"]["waveform"];
+  oscBEnabled: boolean;
+  oscBWaveform: NonNullable<Instrument["aether"]>["oscA"]["waveform"];
+  oscBOctave: number;
+  oscBSemitone: number;
+  subEnabled: boolean;
+  subOctave: number;
+  subWaveform: NonNullable<Instrument["aether"]>["sub"]["waveform"];
+}
+
+function instrumentDivergenceLane(seed: number, prompt: string): InstrumentDivergenceLane {
+  const rnd = seededRandom(seed + simpleHash(prompt) * 3 + 911);
+  const pick = <T,>(items: T[]): T => items[Math.floor(rnd() * items.length)] ?? items[0];
+  const motion = pick(["evolving", "pluck", "strike", "acid", "glide", "swarm"] as const);
+  const color = pick(["warm", "glass", "metal", "noise", "vocal", "analog"] as const);
+  const bankByColor: Record<InstrumentDivergenceLane["color"], NonNullable<Instrument["wavetable"]>["bank"]> = {
+    warm: "aether",
+    glass: "glass",
+    metal: "fm",
+    noise: "fm",
+    vocal: "vocal",
+    analog: "organ",
+  };
+  const kind = pick(["synth", "wavetable", "wavetable", "hybrid"] as const);
+  const waveform = pick(["sine", "saw", "square", "triangle", "noise"] as const);
+  return {
+    namePrefix: pick(["Prism", "Bent", "Wide", "Dust", "Glass", "Phase", "Volt", "Bloom", "Rift", "Flux"]),
+    kind,
+    motion,
+    color,
+    waveform,
+    bank: bankByColor[color],
+    lfoWaveform: pick(["sine", "triangle", "saw", "square"] as const),
+    octave: pick([-2, -1, 0, 0, 1]),
+    sampleBias: rnd(),
+    cutoffOffset: (rnd() - 0.5) * 0.28,
+    driveOffset: (rnd() - 0.35) * 0.24,
+    positionOffset: (rnd() - 0.5) * 0.42,
+    oscAWaveform: pick(["wavetable", "saw", "square", "triangle", "sine", "noise"] as const),
+    oscBEnabled: rnd() > 0.22,
+    oscBWaveform: pick(["wavetable", "saw", "square", "triangle", "sine", "noise"] as const),
+    oscBOctave: pick([-1, 0, 0, 1]),
+    oscBSemitone: pick([-12, -7, -5, 3, 5, 7, 12]),
+    subEnabled: rnd() > 0.48,
+    subOctave: pick([-2, -1, -1, 0]),
+    subWaveform: pick(["sine", "square", "triangle"] as const),
+  };
+}
+
+interface MidiPhraseProfile {
+  rhythmStep: number;
+  restChance: number;
+  leapChance: number;
+  octaveBias: number;
+  density: number;
+  gate: number;
+  inversion: number;
+  direction: -1 | 1;
+  contour: "rise" | "fall" | "arch" | "dip" | "wander";
+}
+
+function generateLocalMidiPattern({
+  lengthBeats,
+  style = "",
+  role,
+  key = "C minor",
+  variationSeed,
+  seedNotes = [],
+}: {
+  lengthBeats: number;
+  style?: string;
+  role?: MidiPatternRole;
+  key?: string;
+  variationSeed?: number;
+  seedNotes?: MidiNote[];
+}): MidiNote[] {
+  const safeLength = Math.max(1, Math.min(32, Math.round(lengthBeats || 8)));
+  const seed = (variationSeed ?? Date.now()) + simpleHash(style) + simpleHash(key) + seedNotes.length * 97;
+  const rnd = seededRandom(seed);
+  const chosenRole = role ?? inferMidiRole(style, rnd);
+  const scale = scaleForKey(key);
+  const profile = midiPhraseProfile(chosenRole, style, rnd);
+  const progression = chordProgression(style, rnd);
+  if (chosenRole === "chords") return generateChordLoop(safeLength, scale, progression, profile, rnd);
+  if (chosenRole === "bass") return generateBassLoop(safeLength, scale, progression, profile, rnd);
+  if (chosenRole === "arp") return generateArpLoop(safeLength, scale, progression, profile, rnd);
+  return generateMelodyLoop(safeLength, scale, progression, chosenRole, profile, rnd);
+}
+
+function inferMidiRole(style: string, rnd: () => number): MidiPatternRole {
+  const lower = style.toLowerCase();
+  if (/\bbass|808|sub\b/.test(lower)) return "bass";
+  if (/\bchord|pad|harmony|progression\b/.test(lower)) return "chords";
+  if (/\barp|pluck|sequence\b/.test(lower)) return "arp";
+  if (/\bcounter|response\b/.test(lower)) return "countermelody";
+  return rnd() > 0.58 ? "melody" : rnd() > 0.5 ? "bass" : "chords";
+}
+
+function scaleForKey(key: string): number[] {
+  const match = key.match(/\b([A-G](?:#|b)?)(?:\s+(minor|major|dorian|phrygian))?/i);
+  const rootName = match?.[1] ?? "C";
+  const mode = (match?.[2] ?? "minor").toLowerCase();
+  const root = noteNameToMidi(rootName);
+  const intervals = mode === "major"
+    ? [0, 2, 4, 5, 7, 9, 11]
+    : mode === "dorian"
+    ? [0, 2, 3, 5, 7, 9, 10]
+    : mode === "phrygian"
+    ? [0, 1, 3, 5, 7, 8, 10]
+    : [0, 2, 3, 5, 7, 8, 10];
+  return intervals.map((interval) => root + interval);
+}
+
+function noteNameToMidi(name: string): number {
+  const raw = name.trim();
+  const normalized = raw.length > 1
+    ? `${raw[0]?.toUpperCase() ?? "C"}${raw.slice(1).replace("♭", "b")}`
+    : raw.toUpperCase();
+  const roots: Record<string, number> = { C: 60, "C#": 61, Db: 61, D: 62, "D#": 63, Eb: 63, E: 64, F: 65, "F#": 66, Gb: 66, G: 67, "G#": 68, Ab: 68, A: 69, "A#": 70, Bb: 70, B: 71 };
+  return roots[normalized] ?? 60;
+}
+
+function chordProgression(style: string, rnd: () => number): number[] {
+  const lower = style.toLowerCase();
+  const progressions = /\bjazz|neo|soul\b/.test(lower)
+    ? [[0, 5, 3, 4], [0, 3, 6, 2], [0, 4, 5, 3], [1, 5, 0, 4], [0, 2, 5, 3]]
+    : /\bpop|anthem|chorus\b/.test(lower)
+    ? [[0, 5, 3, 4], [0, 3, 5, 4], [5, 3, 0, 4], [0, 4, 5, 3], [3, 5, 0, 4]]
+    : [[0, 6, 5, 4], [0, 3, 4, 0], [0, 5, 6, 4], [0, 4, 3, 5], [0, 2, 6, 5], [5, 4, 0, 3]];
+  return progressions[Math.floor(rnd() * progressions.length)] ?? progressions[0];
+}
+
+function midiPhraseProfile(role: MidiPatternRole, style: string, rnd: () => number): MidiPhraseProfile {
+  const lower = style.toLowerCase();
+  const dense = /\bfast|busy|run|arp|dance|drill|dnb\b/.test(lower);
+  const sparse = /\bsparse|simple|minimal|space\b/.test(lower);
+  const rhythmStep = role === "arp"
+    ? (rnd() > 0.52 ? 0.25 : 0.5)
+    : role === "bass"
+    ? [0.5, 0.75, 1][Math.floor(rnd() * 3)] ?? 0.5
+    : [0.25, 0.5, 0.75, 1][Math.floor(rnd() * 4)] ?? 0.5;
+  return {
+    rhythmStep,
+    restChance: sparse ? 0.34 : dense ? 0.08 : 0.16 + rnd() * 0.18,
+    leapChance: role === "bass" ? 0.18 + rnd() * 0.28 : role === "chords" ? 0.08 : 0.2 + rnd() * 0.38,
+    octaveBias: role === "bass" ? -24 : role === "countermelody" ? 12 : rnd() > 0.74 ? 12 : 0,
+    density: sparse ? 0.55 : dense ? 1.28 : 0.78 + rnd() * 0.62,
+    gate: 0.48 + rnd() * 0.46,
+    inversion: Math.floor(rnd() * 3),
+    direction: rnd() > 0.5 ? 1 : -1,
+    contour: (["rise", "fall", "arch", "dip", "wander"] as const)[Math.floor(rnd() * 5)] ?? "wander",
+  };
+}
+
+function generateBassLoop(lengthBeats: number, scale: number[], progression: number[], profile: MidiPhraseProfile, rnd: () => number): MidiNote[] {
+  const notes: MidiNote[] = [];
+  const chordBeats = Math.max(1, lengthBeats / progression.length);
+  progression.forEach((degree, chordIndex) => {
+    const root = scale[degree % scale.length] - 24;
+    const start = chordIndex * chordBeats;
+    const mainLength = chordBeats * (0.34 + profile.gate * 0.48);
+    notes.push(note(root + (rnd() < profile.leapChance ? 12 : 0), 90 + Math.round(rnd() * 28), start, mainLength));
+    const subdivisions = Math.max(1, Math.floor(chordBeats / profile.rhythmStep));
+    for (let i = 1; i < subdivisions; i += 1) {
+      if (rnd() < profile.restChance) continue;
+      const stepStart = start + i * profile.rhythmStep;
+      if (stepStart >= start + chordBeats) continue;
+      const degreeOffset = rnd() < profile.leapChance ? [2, 4, 5][Math.floor(rnd() * 3)] ?? 4 : [0, 1, 2][Math.floor(rnd() * 3)] ?? 0;
+      const octave = rnd() > 0.72 ? 12 : 0;
+      notes.push(note(scale[(degree + degreeOffset) % scale.length] - 24 + octave, 62 + Math.round(rnd() * 36), stepStart, profile.rhythmStep * profile.gate));
+    }
+  });
+  return clipMidi(notes, lengthBeats);
+}
+
+function generateChordLoop(lengthBeats: number, scale: number[], progression: number[], profile: MidiPhraseProfile, rnd: () => number): MidiNote[] {
+  const notes: MidiNote[] = [];
+  const chordBeats = Math.max(1, lengthBeats / progression.length);
+  progression.forEach((degree, index) => {
+    const start = index * chordBeats;
+    const split = profile.density > 1.06 && rnd() > 0.45;
+    const chordStarts = split ? [start, start + chordBeats * (rnd() > 0.5 ? 0.5 : 0.625)] : [start];
+    for (const chordStart of chordStarts) {
+      const length = Math.min(chordBeats * profile.gate, start + chordBeats - chordStart);
+      const voicing = [0, 2, 4, rnd() > 0.58 ? 6 : 7].slice(0, rnd() > 0.62 ? 4 : 3);
+      for (const offset of voicing) {
+        const inversionShift = offset < profile.inversion * 2 ? 12 : 0;
+        notes.push(note(scale[(degree + offset) % scale.length] + inversionShift + (rnd() > 0.84 ? 12 : 0), 58 + Math.round(rnd() * 28), chordStart, length));
+      }
+    }
+  });
+  return clipMidi(notes, lengthBeats);
+}
+
+function generateArpLoop(lengthBeats: number, scale: number[], progression: number[], profile: MidiPhraseProfile, rnd: () => number): MidiNote[] {
+  const notes: MidiNote[] = [];
+  const step = profile.rhythmStep;
+  const patterns = profile.direction > 0
+    ? [[0, 2, 4, 7], [0, 4, 7, 2], [0, 2, 5, 4], [0, 1, 4, 6], [2, 4, 6, 9]]
+    : [[7, 4, 2, 0], [4, 2, 7, 0], [5, 4, 2, 0], [6, 4, 1, 0], [9, 6, 4, 2]];
+  const pattern = patterns[Math.floor(rnd() * patterns.length)] ?? patterns[0];
+  const transposeDegree = rnd() > 0.58 ? [-2, -1, 1, 2][Math.floor(rnd() * 4)] ?? 0 : 0;
+  for (let beat = 0; beat < lengthBeats; beat += step) {
+    const chord = progression[Math.floor((beat / lengthBeats) * progression.length)] ?? 0;
+    if (rnd() < profile.restChance * 0.45) continue;
+    const patternIndex = Math.floor((beat / step + (rnd() > 0.66 ? 1 : 0)) % pattern.length);
+    const degree = (pattern[patternIndex] ?? 0) + transposeDegree + (rnd() < profile.leapChance * 0.24 ? 7 : 0);
+    const octave = 12 + (rnd() > 0.68 ? 12 : 0) + (rnd() > 0.9 ? -12 : 0);
+    const scaleIndex = ((chord + degree) % scale.length + scale.length) % scale.length;
+    notes.push(note(scale[scaleIndex] + octave, 52 + Math.round(rnd() * 42), beat, step * profile.gate));
+  }
+  return clipMidi(notes, lengthBeats);
+}
+
+function generateMelodyLoop(lengthBeats: number, scale: number[], progression: number[], role: MidiPatternRole, profile: MidiPhraseProfile, rnd: () => number): MidiNote[] {
+  const notes: MidiNote[] = [];
+  let beat = 0;
+  let lastDegree = role === "countermelody" ? 4 : 2;
+  while (beat < lengthBeats - 0.01) {
+    const dur = profile.rhythmStep * ([1, 1, 1.5, 2, 3][Math.floor(rnd() * 5)] ?? 1);
+    if (rnd() > profile.restChance) {
+      const chord = progression[Math.floor((beat / lengthBeats) * progression.length)] ?? 0;
+      const contourPush = profile.contour === "rise"
+        ? 1
+        : profile.contour === "fall"
+        ? -1
+        : profile.contour === "arch"
+        ? beat < lengthBeats / 2 ? 1 : -1
+        : profile.contour === "dip"
+        ? beat < lengthBeats / 2 ? -1 : 1
+        : 0;
+      const leap = rnd() < profile.leapChance ? [-3, -2, 2, 3, 4][Math.floor(rnd() * 5)] ?? 2 : [-1, 0, 1][Math.floor(rnd() * 3)] ?? 0;
+      lastDegree = Math.max(0, Math.min(scale.length - 1, lastDegree + leap + contourPush));
+      const pitch = scale[(chord + lastDegree) % scale.length] + profile.octaveBias + (rnd() > 0.82 ? 12 : 0);
+      notes.push(note(pitch, 66 + Math.round(rnd() * 46), beat, Math.min(dur * profile.gate, lengthBeats - beat)));
+    }
+    beat += dur;
+  }
+  return clipMidi(notes, lengthBeats);
+}
+
+function note(pitch: number, velocity: number, startBeat: number, lengthBeats: number): MidiNote {
+  return {
+    pitch: Math.max(0, Math.min(127, Math.round(pitch))),
+    velocity: Math.max(1, Math.min(127, Math.round(velocity))),
+    startBeat: Math.round(startBeat * 1000) / 1000,
+    lengthBeats: Math.max(0.0625, Math.round(lengthBeats * 1000) / 1000),
+  };
+}
+
+function clipMidi(notes: MidiNote[], lengthBeats: number): MidiNote[] {
+  return notes
+    .filter((candidate) => candidate.startBeat < lengthBeats)
+    .map((candidate) => ({
+      ...candidate,
+      lengthBeats: Math.min(candidate.lengthBeats, Math.max(0.0625, lengthBeats - candidate.startBeat)),
+    }));
 }
 
 function summarizeInstrument(instrument: Instrument) {
@@ -618,7 +927,9 @@ async function generateDrumBeatWithOllama(opts: GenerateDrumBeatOptions): Promis
               "Cells may include on, velocity 0-127, leanPercent -50..50, pitchHz 20..20000.",
               "Think like a drummer: central meter beats should be louder, supporting filler and texture hits should be lighter.",
               "Respect timeSignature and boldBeats; odd meters such as 5/4 or 7/8 must feel grouped differently from 4/4.",
-              "Treat genre as a ruleset, not a fixed loop. Vary within that ruleset using variationSeed.",
+              "Treat genre as a ruleset, not a fixed loop.",
+              "Assemble the beat from modular choices: heaviness, row count, core anchors, syncopation, hat density, texture layer, fills, and velocity/humanization.",
+              "Use variationSeed to change those choices materially while preserving the genre identity.",
             ].join(" "),
           },
           { role: "user", content: prompt },
@@ -695,6 +1006,11 @@ function buildDrumPrompt(opts: GenerateDrumBeatOptions): string {
       timeSignature: opts.timeSignature,
       complexity: opts.complexity ?? 50,
     },
+    nonAiFallbackContract: {
+      description: "Beat's local generator is a modular groove rules engine, not one monolithic example loop.",
+      knobs: ["heaviness", "syncopation", "fillRate", "texture", "targetRows", "density"],
+      expectation: "Model output should look like an assembled groove with choices, not a copied genre template.",
+    },
     availableInstruments: instruments,
     likedExamples: positive ?? [],
     dislikedExamples: negative ?? [],
@@ -710,7 +1026,7 @@ function buildDrumPrompt(opts: GenerateDrumBeatOptions): string {
         steps: ["false or { on:true, velocity?:0..127, leanPercent?:-50..50, pitchHz?:20..20000 }"],
       }],
     },
-    instruction: "Treat genreGuideline as the rulebook. Preserve its coreBeat anchors first, then vary around them according to genreGuideline.hatDensity/hatsPerc, swing, kickComplexity, fillRate, humanization, and special. Complexity 50 is the ideal canonical groove for the genre, not a request for lots of instruments. Complexity must not add more instrument rows by itself; it changes density, fills, chops, velocity detail, ghost notes, and rhythmic variation inside the genre's normal instrumentation. Below 50 should simplify/strip down. Above 50 should add tasteful detail within existing roles. Prefer sampled drum instruments, especially uploaded/userCreated instruments whose name, source, sampleMap, or descriptors match the guideline instruments. Make rhythm genre-appropriate, musical, and editable. Speed is grid compression/resolution, not a command to make the beat frantic. Higher speed only makes sense when lengthBeats also increases enough to preserve musical duration. For longer phrases, prefer more lengthBeats and cap speed lower instead of returning a long 16x pattern. Use velocity variation and small leanPercent values like a real drummer. Accentuate the meter: strong beats should anchor kick or main snare/clap, secondary bold beats should support, and filler/texture notes between them should be lower velocity. For 5/4 prefer a 3+2 or 2+3 grouping; for 7/8 prefer 2+2+3 or 3+2+2 grouping.",
+    instruction: "Treat genreGuideline as the rulebook. Preserve its coreBeat anchors first, then vary around them according to genreGuideline.hatDensity/hatsPerc, swing, kickComplexity, fillRate, humanization, and special. Complexity 50 is the ideal canonical groove for the genre, not a request for maximum density. Below 50 should simplify/strip down. Above 50 should add tasteful detail through fills, chops, velocity detail, ghost notes, rhythmic variation, and sometimes one extra texture/instrument row. Pick a beat heaviness profile: light, balanced, heavy, or broken. Pick an instrumentation profile: minimal core kit, core plus hats, core plus texture, or core plus phrase fill. Prefer sampled drum instruments, especially uploaded/userCreated instruments whose name, source, sampleMap, or descriptors match the guideline instruments. Make rhythm genre-appropriate, musical, and editable. Speed is grid compression/resolution, not a command to make the beat frantic. Higher speed only makes sense when lengthBeats also increases enough to preserve musical duration. For longer phrases, prefer more lengthBeats and cap speed lower instead of returning a long 16x pattern. Use velocity variation and small leanPercent values like a real drummer. Accentuate the meter: strong beats should anchor kick or main snare/clap, secondary bold beats should support, and filler/texture notes between them should be lower velocity. For 5/4 prefer a 3+2 or 2+3 grouping; for 7/8 prefer 2+2+3 or 3+2+2 grouping.",
   });
 }
 

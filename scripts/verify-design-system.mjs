@@ -80,8 +80,26 @@ const sourceFiles = walk(frontendSrc, (path) => /\.(ts|tsx)$/.test(path));
 for (const file of sourceFiles) {
   const source = readFileSync(file, "utf8");
   const isIconWrapper = file.endsWith(join("components", "Icon", "Icon.tsx"));
+  const relativeFile = rel(file);
   if (!isIconWrapper && source.includes("@iconify/react")) {
     fail(`Raw Iconify import outside Icon wrapper: ${rel(file)}`);
+  }
+
+  if (!relativeFile.endsWith("scripts/verify-design-system.mjs")) {
+    for (const { line, lineNumber } of lineEntries(source)) {
+      if (/\bwindow\.(?:alert|confirm|prompt)\s*\(/.test(line)) {
+        fail(`Native browser dialog bypasses UI kit ${location(file, lineNumber)}: ${line.trim()}`);
+      }
+      if (
+        /<Button\b/.test(line) &&
+        /\biconOnly\b/.test(line) &&
+        !/\baria-label=/.test(line) &&
+        !/\baria-labelledby=/.test(line) &&
+        !/\baria-hidden=/.test(line)
+      ) {
+        fail(`Icon-only Button needs an accessible label ${location(file, lineNumber)}: ${line.trim()}`);
+      }
+    }
   }
 
   const iconLiteralPattern = /\b(?:name|icon)\s*(?:=|:)\s*["']([^"']+:[^"']+)["']/g;

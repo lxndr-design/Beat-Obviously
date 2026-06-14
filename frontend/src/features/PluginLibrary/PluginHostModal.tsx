@@ -311,7 +311,7 @@ function DecentSamplerHost({ plugin }: { plugin: PluginAdapter }) {
             </div>
           ) : (
             <div className={styles.decentSkinEmpty}>
-              <img className={styles.decentCanvasLogo} src="/assets/decent-sampler.png" alt="" aria-hidden="true" />
+              <img className={styles.decentCanvasLogo} src="/assets/decent-sampler.svg" alt="" aria-hidden="true" />
               <strong>{plugin.name}</strong>
               <span>{nativeAvailable ? "Install or refresh the package to load the DS skin." : "Open Beat.app to parse package skin metadata."}</span>
             </div>
@@ -406,7 +406,7 @@ function DecentSamplerControlGlyph({
 }
 
 function decentSamplerVisualSrc(plugin: PluginAdapter) {
-  return plugin.uiImageDataUrl || "/assets/decent-sampler.png";
+  return plugin.uiImageDataUrl || "/assets/decent-sampler.svg";
 }
 
 function hasControlHotspot(control: DecentSamplerUiControl, uiWidth: number, uiHeight: number) {

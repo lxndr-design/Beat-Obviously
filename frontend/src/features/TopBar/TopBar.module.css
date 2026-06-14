@@ -15,7 +15,6 @@
   align-items: center;
   gap: var(--space-1);
   justify-self: start;
-  width: 100%;
   max-width: 100%;
   min-width: 0;
 }
@@ -24,7 +23,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   max-width: min(46vw, 100%);
   overflow: hidden;
@@ -34,22 +33,6 @@
   line-height: 1;
 }
 
-.breadcrumbHome {
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
-  font: inherit;
-  line-height: 1;
-  cursor: pointer;
-  transition: color var(--duration-hover) var(--ease-out);
-}
-
-.breadcrumbHome:hover {
-  color: var(--color-fg);
-}
-
 .breadcrumbSlash {
   color: var(--color-fg-hover);
   font-weight: var(--font-weight-medium);
@@ -57,7 +40,7 @@
 
 .projectName,
 .projectNameInput {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   max-width: min(15ch, 100%);
   padding: 0;
@@ -72,12 +55,15 @@
   display: block;
   overflow: hidden;
   cursor: text;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .projectNameText {
+  display: block;
   max-width: 100%;
+  text-align: left;
 }
 
 .projectName:hover {
@@ -197,7 +183,7 @@
   overflow: hidden;
   text-align: right;
   text-overflow: ellipsis;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
 }
 

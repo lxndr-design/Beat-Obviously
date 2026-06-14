@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Icon, MarqueeText, SectionRibbon, useContextMenu, HoverInfo, type ContextMenuItem } from "../../components";
+import { Button, Icon, RowItem, SectionRibbon, appPrompt, useContextMenu, type ContextMenuItem } from "../../components";
 import { createInstrumentBufferSource, noteFrequency, preloadInstrumentSample } from "../../audio/synthPreview";
 import { DEFAULT_DRUM_MIDI_PITCH, DEFAULT_DRUM_VELOCITY, drumTimingOffsetBeats, normalizeDrumCell } from "../../state/drumSteps";
 import { useComponentStore, type BeatComponent } from "../../state/components";
@@ -73,10 +73,10 @@ export function ComponentLibraryPanel({ expanded, onToggle }: ComponentLibraryPa
             onTogglePreview={() => togglePreview(c)}
             onEdit={() => openEditor({ kind: "component", componentId: c.id })}
             onRemove={() => remove(c.id)}
-            onRename={() => {
-              const next = window.prompt("Component name", c.name);
+            onRename={() => void (async () => {
+              const next = await appPrompt("Component name", c.name);
               if (next != null) rename(c.id, next);
-            }}
+            })()}
           />
         ))}
       </ul>
@@ -124,22 +124,18 @@ function ComponentItem({
   }
 
   return (
-    <li
-      className={styles.item}
+    <RowItem
+      className={styles.componentRow}
+      density="compact"
+      cursor="grab"
       draggable
       onDragStart={onDragStart}
       onContextMenu={onContextMenu}
-    >
-      <span className={styles.itemDot} aria-hidden>
-        <Icon name="ph:dots-six-vertical" size={14} decorative />
-      </span>
-      <MarqueeText className={styles.itemName} text={component.name} />
-      <HoverInfo content={`${itemCount} ${kind === "drum" ? "hit" : "note"}${itemCount === 1 ? "" : "s"} · ${componentPlaybackLength(component)} beats`}>
-        <span className={styles.itemMeta}>
-          {kind === "drum" ? <span className={styles.drumIcon} aria-hidden /> : <Icon name="ph:piano-keys" size={14} decorative />}
-        </span>
-      </HoverInfo>
-      <HoverInfo content={playing ? "Pause component" : "Play component"}>
+      title={`${itemCount} ${kind === "drum" ? "hit" : "note"}${itemCount === 1 ? "" : "s"} · ${componentPlaybackLength(component)} beats`}
+      icon={kind === "drum" ? <span className={styles.drumIcon} aria-hidden /> : <Icon name="ph:piano-keys" size={14} decorative />}
+      hoverIcon={<Icon name="ph:dots-six-vertical" size={14} decorative />}
+      name={component.name}
+      action={(
         <Button
           className={styles.itemPreviewButton}
           iconOnly
@@ -153,9 +149,10 @@ function ComponentItem({
         >
           <Icon name={playing ? "ph:pause-fill" : "ph:play-fill"} size={12} decorative />
         </Button>
-      </HoverInfo>
+      )}
+    >
       {menu}
-    </li>
+    </RowItem>
   );
 }
 

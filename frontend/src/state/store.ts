@@ -1026,10 +1026,10 @@ interface ViewSlice {
 export const useViewStore = create<ViewSlice>()((set) => ({
   beatsToPx: 64,
   lastSegmentLength: 4,
-  sidebarWidth: 230,
+  sidebarWidth: 324,
   setZoom: (px) => set({ beatsToPx: Math.max(8, Math.min(256, px)) }),
   setLastSegmentLength: (n) => set({ lastSegmentLength: Math.max(0.25, n) }),
-  setSidebarWidth: (px) => set({ sidebarWidth: Math.max(160, Math.min(480, px)) }),
+  setSidebarWidth: (px) => set({ sidebarWidth: Math.max(220, Math.min(560, px)) }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -2313,6 +2313,10 @@ function sameEditor(
 ) {
   if (a.kind !== b.kind) return false;
   if (a.kind === "instrument" && b.kind === "instrument")
+    return a.instrumentId === b.instrumentId;
+  if (a.kind === "samplerInstrument" && b.kind === "samplerInstrument")
+    return a.instrumentId === b.instrumentId;
+  if (a.kind === "synthInstrument" && b.kind === "synthInstrument")
     return a.instrumentId === b.instrumentId;
   if (a.kind === "track" && b.kind === "track")
     return a.trackId === b.trackId;

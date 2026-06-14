@@ -97,7 +97,7 @@ try {
   assertBatchDuration(breakcoreExtended, 32);
   assert.equal(minRows(breakcoreLow) <= minRows(breakcoreMid), true, "mid complexity should not use fewer rows than low");
   assert.equal(minRows(breakcoreMid) <= minRows(breakcoreHigh), true, "high complexity should not use fewer rows than mid");
-  assert.equal(maxRows(breakcoreHigh) <= maxRows(breakcoreMid), true, "complexity should not add Breakcore instrument rows");
+  assert.equal(maxRows(breakcoreHigh) <= 7, true, "high complexity may add texture rows but should remain editable");
   assert.equal(avgHits(breakcoreLow) < avgHits(breakcoreHigh), true, "high complexity should add hit density");
   assert.equal(breakcoreContainsTom(drums, opts, 50), false, "ideal Breakcore should not add tom rows");
   assert.equal(maxHits(breakcoreHigh) <= 120, true, "high complexity should stay spaced, not saturate every cell");
@@ -105,6 +105,7 @@ try {
   assert.equal(maxSpeed(breakcoreLong) <= 4, true, "long high-complexity Breakcore should not force max speed");
   assert.equal(maxSpeed(breakcoreExtended) <= 4, true, "128-cell Breakcore should use length for detail, not max speed");
   assert.equal(maxLength(breakcoreExtended), 128, "drum generator should support 128-cell loops");
+  assert.equal(uniqueRows(breakcoreHigh) > 1 || uniqueHits(breakcoreHigh) > 1, true, "different seeds should vary the assembled groove profile");
   assertGenreAnchors(drums, opts);
 
   console.log(JSON.stringify({
@@ -213,6 +214,14 @@ function maxLength(batch) {
 
 function avgHits(batch) {
   return batch.reduce((total, beat) => total + beat.hits, 0) / batch.length;
+}
+
+function uniqueRows(batch) {
+  return new Set(batch.map((beat) => beat.rows)).size;
+}
+
+function uniqueHits(batch) {
+  return new Set(batch.map((beat) => beat.hits)).size;
 }
 
 function batchSummary(batch) {

@@ -1,5 +1,5 @@
 import { useRef, type MouseEvent } from "react";
-import { useContextMenu, type ContextMenuItem } from "../../components";
+import { appAlert, appConfirm, useContextMenu, type ContextMenuItem } from "../../components";
 import { useDocumentStore, useTransportStore, useUiStore } from "../../state/store";
 import { BrandMark } from "./BrandMark";
 import styles from "./AppMenuButton.module.css";
@@ -45,7 +45,7 @@ export function AppMenuButton({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menu = useContextMenu((): ContextMenuItem[] => [
     { label: "Home", icon: "ph:house", disabled: disableHome, onSelect: onHome },
-    { label: "What's New", icon: "ph:sparkle", onSelect: () => window.alert("What's New is coming soon.") },
+    { label: "What's New", icon: "ph:sparkle", onSelect: () => void appAlert("What's New is coming soon.") },
     { label: "New Project", icon: "ph:plus", separatorBefore: true, onSelect: onNew },
     { label: "Open...", icon: "ph:folder-open", onSelect: onOpen },
     { label: "Import...", icon: "ph:download-simple", disabled: true, hint: "Later" },
@@ -97,8 +97,10 @@ export function AppMenuButton({
       icon: "ph:sign-out",
       onSelect: () => {
         const { documentOpen: isOpen, dirty: isDirty } = useDocumentStore.getState();
-        if (isOpen && isDirty && !window.confirm("Quit Beat? Unsaved changes may be lost.")) return;
-        window.close();
+        void (async () => {
+          if (isOpen && isDirty && !await appConfirm("Quit Beat? Unsaved changes may be lost.")) return;
+          window.close();
+        })();
       },
     },
   ]);

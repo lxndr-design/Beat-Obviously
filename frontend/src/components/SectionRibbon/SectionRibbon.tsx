@@ -1,12 +1,14 @@
 import { forwardRef, type ComponentProps, type ReactNode } from "react";
 import { Button } from "../Button";
 import { Icon } from "../Icon";
+import { Tag } from "../Tag";
 import styles from "./SectionRibbon.module.css";
 
 interface SectionRibbonProps {
   title: string;
   expanded: boolean;
   onToggle: () => void;
+  className?: string;
   actions?: ReactNode;
   count?: number;
   showToggle?: boolean;
@@ -17,6 +19,7 @@ export function SectionRibbon({
   title,
   expanded,
   onToggle,
+  className,
   actions,
   count,
   showToggle = true,
@@ -24,7 +27,7 @@ export function SectionRibbon({
 }: SectionRibbonProps) {
   return (
     <div
-      className={`${styles.ribbon} ${expanded ? styles.ribbonExpanded : ""} ${!showToggle ? styles.ribbonNoToggle : ""}`}
+      className={`${styles.ribbon} ${expanded ? styles.ribbonExpanded : ""} ${!showToggle ? styles.ribbonNoToggle : ""} ${className ?? ""}`}
       onContextMenu={onContextMenu}
     >
       {showToggle && (
@@ -40,7 +43,11 @@ export function SectionRibbon({
       )}
       <span className={styles.label}>{title}</span>
       <span className={styles.right}>
-        {typeof count === "number" && <span className={styles.count}>{count}</span>}
+        {typeof count === "number" && (
+          <span className={styles.count}>
+            <Tag>{count}</Tag>
+          </span>
+        )}
         {actions && <span className={styles.actions}>{actions}</span>}
       </span>
     </div>

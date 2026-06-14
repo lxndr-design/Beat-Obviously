@@ -1,5 +1,6 @@
 import { Modal } from "../../components";
 import { useUiStore } from "../../state/store";
+import { useInstrumentStore } from "../../state/store";
 import { InstrumentEditorModal } from "../InstrumentEditor/InstrumentEditorModal";
 import { SegmentEditorModal } from "../SegmentEditor/SegmentEditorModal";
 import { EqAutomationModal } from "../EqAutomation/EqAutomationModal";
@@ -21,6 +22,7 @@ import { SynthEditor } from "../Synth";
 export function EditorHost() {
   const openEditors = useUiStore((s) => s.openEditors);
   const closeEditor = useUiStore((s) => s.closeEditor);
+  const instruments = useInstrumentStore((s) => s.instruments);
 
   return (
     <>
@@ -28,12 +30,30 @@ export function EditorHost() {
       {openEditors.map((e) => {
         switch (e.kind) {
           case "instrument":
+          case "samplerInstrument":
             return (
               <InstrumentEditorModal
-                key={`instr-${e.instrumentId}`}
+                key={`sampler-instr-${e.instrumentId}`}
                 instrumentId={e.instrumentId}
+                editorKind={e.kind === "instrument" ? "instrument" : "samplerInstrument"}
               />
             );
+          case "synthInstrument": {
+            const instrument = instruments.find((candidate) => candidate.id === e.instrumentId);
+            return (
+              <Modal
+                key={`synth-instr-${e.instrumentId}`}
+                open
+                title={instrument?.name ?? "Synth"}
+                width="full"
+                scopeId={`synth-editor-${e.instrumentId}`}
+                flushBody
+                onClose={() => closeEditor({ kind: "synthInstrument", instrumentId: e.instrumentId })}
+              >
+                <SynthEditor instrumentId={e.instrumentId} />
+              </Modal>
+            );
+          }
           case "synth":
             return (
               <Modal

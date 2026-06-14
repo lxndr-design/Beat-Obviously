@@ -181,14 +181,14 @@ export function Timeline() {
       )}
       <button
         type="button"
-        className={`${styles.loopClamp} ${styles.loopClampStart} ${loopEnabled ? styles.loopClampEnabled : ""}`}
+        className={`${styles.loopClamp} ${styles.loopClampStart} ${loopEnabled || loopDragging === "start" ? styles.loopClampActive : ""}`}
         style={{ left: loopStartPx }}
         onPointerDown={(e) => onLoopHandlePointerDown("start", e)}
         aria-label="Drag loop start"
       />
       <button
         type="button"
-        className={`${styles.loopClamp} ${styles.loopClampEnd} ${loopEnabled ? styles.loopClampEnabled : ""}`}
+        className={`${styles.loopClamp} ${styles.loopClampEnd} ${loopEnabled || loopDragging === "end" ? styles.loopClampActive : ""}`}
         style={{ left: loopEndPx }}
         onPointerDown={(e) => onLoopHandlePointerDown("end", e)}
         aria-label="Drag loop end"

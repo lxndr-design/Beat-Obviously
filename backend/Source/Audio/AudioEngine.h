@@ -152,6 +152,10 @@ namespace beat
             Id trackId;
             float rms { 0.0f };
             float peak { 0.0f };
+            float leftRms { 0.0f };
+            float rightRms { 0.0f };
+            float leftPeak { 0.0f };
+            float rightPeak { 0.0f };
             float rmsDbFS { -std::numeric_limits<float>::infinity() };
             float peakDbFS { -std::numeric_limits<float>::infinity() };
             float truePeakDbTP { -std::numeric_limits<float>::infinity() };
@@ -435,10 +439,15 @@ namespace beat
         {
             Id trackId;
             double sumSquares { 0.0 };
+            std::array<double, 2> channelSumSquares { 0.0, 0.0 };
             int sampleCount { 0 };
+            std::array<int, 2> channelSampleCounts { 0, 0 };
             float blockPeak { 0.0f };
+            std::array<float, 2> channelBlockPeaks { 0.0f, 0.0f };
             std::atomic<float> publishedRms { 0.0f };
             std::atomic<float> publishedPeak { 0.0f };
+            std::array<std::atomic<float>, 2> publishedChannelRms { 0.0f, 0.0f };
+            std::array<std::atomic<float>, 2> publishedChannelPeak { 0.0f, 0.0f };
             std::atomic<uint64_t> sequence { 0 };
 
             TrackMeterState() = default;
@@ -446,22 +455,38 @@ namespace beat
             TrackMeterState(TrackMeterState&& other) noexcept
                 : trackId(std::move(other.trackId)),
                   sumSquares(other.sumSquares),
+                  channelSumSquares(other.channelSumSquares),
                   sampleCount(other.sampleCount),
+                  channelSampleCounts(other.channelSampleCounts),
                   blockPeak(other.blockPeak),
+                  channelBlockPeaks(other.channelBlockPeaks),
                   publishedRms(other.publishedRms.load(std::memory_order_relaxed)),
                   publishedPeak(other.publishedPeak.load(std::memory_order_relaxed)),
                   sequence(other.sequence.load(std::memory_order_relaxed))
             {
+                for (size_t channel = 0; channel < publishedChannelRms.size(); ++channel)
+                {
+                    publishedChannelRms[channel].store(other.publishedChannelRms[channel].load(std::memory_order_relaxed), std::memory_order_relaxed);
+                    publishedChannelPeak[channel].store(other.publishedChannelPeak[channel].load(std::memory_order_relaxed), std::memory_order_relaxed);
+                }
             }
             TrackMeterState& operator=(TrackMeterState&& other) noexcept
             {
                 if (this == &other) return *this;
                 trackId = std::move(other.trackId);
                 sumSquares = other.sumSquares;
+                channelSumSquares = other.channelSumSquares;
                 sampleCount = other.sampleCount;
+                channelSampleCounts = other.channelSampleCounts;
                 blockPeak = other.blockPeak;
+                channelBlockPeaks = other.channelBlockPeaks;
                 publishedRms.store(other.publishedRms.load(std::memory_order_relaxed), std::memory_order_relaxed);
                 publishedPeak.store(other.publishedPeak.load(std::memory_order_relaxed), std::memory_order_relaxed);
+                for (size_t channel = 0; channel < publishedChannelRms.size(); ++channel)
+                {
+                    publishedChannelRms[channel].store(other.publishedChannelRms[channel].load(std::memory_order_relaxed), std::memory_order_relaxed);
+                    publishedChannelPeak[channel].store(other.publishedChannelPeak[channel].load(std::memory_order_relaxed), std::memory_order_relaxed);
+                }
                 sequence.store(other.sequence.load(std::memory_order_relaxed), std::memory_order_relaxed);
                 return *this;
             }

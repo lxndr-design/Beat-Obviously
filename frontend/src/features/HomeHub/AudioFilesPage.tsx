@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { ActionFooter, Button, HoverInfo, Icon, MarqueeText } from "../../components";
+import { ActionFooter, Button, HoverInfo, Icon, MarqueeText, appAlert, appConfirm, appPrompt } from "../../components";
 import { importAudioFiles } from "../../audio/audioImport";
 import { isNative, send } from "../../ipc/bridge";
 import type { AudioWaveformSummary } from "../../ipc/schema";
@@ -175,12 +175,12 @@ export function AudioFilesPage() {
 
   async function deleteSelected() {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Delete ${selectedIds.size} audio file${selectedIds.size === 1 ? "" : "s"} from the Beat library?`)) return;
+    if (!await appConfirm(`Delete ${selectedIds.size} audio file${selectedIds.size === 1 ? "" : "s"} from the Beat library?`)) return;
     stopPreview();
     const response = await send({ kind: "audio.delete", ids: [...selectedIds], deleteFiles: true });
     response.deletedIds.forEach((id) => removeFile(id));
     if (response.failedIds.length > 0) {
-      window.alert(response.error ?? "Some audio files could not be deleted.");
+      await appAlert(response.error ?? "Some audio files could not be deleted.");
     }
     setSelectedIds(new Set());
     setSelectMode(false);
@@ -277,7 +277,7 @@ export function AudioFilesPage() {
       console.error("[Beat audio preview] Failed to preview audio file", { file, direction, error });
       setPlayingId(null);
       stopProgress();
-      window.alert("This audio file could not be previewed from the current page.");
+      await appAlert("This audio file could not be previewed from the current page.");
     }
   }
 
@@ -340,7 +340,7 @@ export function AudioFilesPage() {
 
   async function viewInFolder(file: AudioFile) {
     const response = await send({ kind: "audio.reveal", path: file.path });
-    if (!response.ok) window.alert(response.error ?? "View in Folder is only available in the native app.");
+    if (!response.ok) await appAlert(response.error ?? "View in Folder is only available in the native app.");
   }
 
   async function copyReference(file: AudioFile) {
@@ -349,7 +349,7 @@ export function AudioFilesPage() {
     try {
       await navigator.clipboard.writeText(value);
     } catch {
-      window.prompt("Copy audio reference", value);
+      await appPrompt("Copy audio reference", value);
     }
   }
 
@@ -459,7 +459,7 @@ export function AudioFilesPage() {
             <div className={styles.previewControls} aria-hidden="true">
               <Button iconOnly disabled aria-label="Play from start"><Icon name="ph:skip-back" size={14} decorative /></Button>
               <Button iconOnly disabled aria-label="Play or pause"><Icon name="ph:play-fill" size={14} decorative /></Button>
-              <Button iconOnly disabled>–</Button>
+              <Button iconOnly disabled aria-hidden="true">-</Button>
               <Button iconOnly disabled aria-label="Play backwards"><Icon name="ph:rewind-fill" size={14} decorative /></Button>
               <Button iconOnly disabled aria-label="Loop preview"><Icon name="ph:repeat" size={14} decorative /></Button>
             </div>

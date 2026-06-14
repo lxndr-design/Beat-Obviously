@@ -4,7 +4,7 @@ import { AudioFileLibraryPanel } from "../AudioFiles/AudioFileLibraryPanel";
 import { ComponentLibraryPanel } from "../ComponentLibrary/ComponentLibraryPanel";
 import { PluginLibraryPanel } from "../PluginLibrary/PluginLibraryPanel";
 import { DecentSamplerLibraryPanel } from "../PluginLibrary/DecentSamplerLibraryPanel";
-import { HoverInfo, Icon } from "../../components";
+import { HoverInfo, Icon, appAlert, useContextMenu, type ContextMenuItem } from "../../components";
 import { isNative, send } from "../../ipc/bridge";
 import { saveCurrentDocument } from "../../persistence/documentActions";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore, useUiStore, useViewStore } from "../../state/store";
@@ -12,12 +12,12 @@ import styles from "./Sidebar.module.css";
 
 type SidebarPanel = "instruments" | "audio" | "components" | "plugins" | "decentSampler";
 
-const PANELS: Array<{ id: SidebarPanel; label: string; icon?: string; imageSrc?: string }> = [
-  { id: "instruments", label: "Instruments", icon: "ph:piano-keys" },
-  { id: "audio", label: "Audio files", icon: "ph:music-note" },
-  { id: "components", label: "Components", icon: "ph:stack" },
-  { id: "plugins", label: "Plugins", icon: "ph:share-network" },
-  { id: "decentSampler", label: "DecentSampler", imageSrc: "/assets/decent-sampler.png" },
+const PANELS: Array<{ id: SidebarPanel; label: string; icon?: string; activeIcon?: string; kind?: "decentSampler" }> = [
+  { id: "instruments", label: "Instruments", icon: "ph:piano-keys", activeIcon: "ph:piano-keys-fill" },
+  { id: "audio", label: "Audio files", icon: "ph:music-note", activeIcon: "ph:music-note-fill" },
+  { id: "components", label: "Components", icon: "ph:stack", activeIcon: "ph:stack-fill" },
+  { id: "plugins", label: "Plugins", icon: "ph:share-network", activeIcon: "ph:share-network-fill" },
+  { id: "decentSampler", label: "DecentSampler", kind: "decentSampler" },
 ];
 
 /**
@@ -43,6 +43,10 @@ export function Sidebar() {
   const [dragging, setDragging] = useState(false);
   const [activePanel, setActivePanel] = useState<SidebarPanel>("instruments");
   const startRef = useRef<{ x: number; w: number } | null>(null);
+  const { onContextMenu: onSaveContextMenu, menu: saveMenu } = useContextMenu((): ContextMenuItem[] => [
+    { label: "Save", icon: "ph:floppy-disk", onSelect: () => void onSave() },
+    { label: "Save as...", icon: "ph:floppy-disk-back", onSelect: () => void onSave({ saveAs: true }) },
+  ]);
 
   function onHandleDown(e: React.PointerEvent) {
     (e.target as Element).setPointerCapture(e.pointerId);
@@ -68,13 +72,13 @@ export function Sidebar() {
     };
   }, [dragging, setWidth]);
 
-  async function onSave() {
+  async function onSave(options: { saveAs?: boolean } = {}) {
     try {
-      await saveCurrentDocument();
+      await saveCurrentDocument(options);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("[Beat] Save failed", error);
-      window.alert("Save failed.");
+      await appAlert("Save failed.");
     }
   }
 
@@ -82,16 +86,16 @@ export function Sidebar() {
     try {
       const result = await send({ kind: "project.exportWav", project, instruments, audioFiles });
       if (result.error) {
-        window.alert(result.error);
+        await appAlert(result.error);
       } else if (!result.path) {
         return;
       } else if (!isNative()) {
-        window.alert("WAV export ready.");
+        await appAlert("WAV export ready.");
       }
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("[Beat] Export failed", error);
-      window.alert("Export failed.");
+      await appAlert("Export failed.");
     }
   }
 
@@ -108,10 +112,14 @@ export function Sidebar() {
                 aria-label={panel.label}
                 aria-pressed={activePanel === panel.id}
               >
-                {panel.imageSrc ? (
-                  <img className={styles.decentSamplerIcon} src={panel.imageSrc} alt="" aria-hidden="true" />
+                {panel.kind === "decentSampler" ? (
+                  <DecentSamplerRailIcon />
                 ) : (
-                  <Icon name={panel.icon ?? "ph:square"} size={16} decorative />
+                  <Icon
+                    name={(activePanel === panel.id ? panel.activeIcon : panel.icon) ?? "ph:square"}
+                    size={16}
+                    decorative
+                  />
                 )}
               </button>
             </HoverInfo>
@@ -124,12 +132,14 @@ export function Sidebar() {
                 type="button"
                 className={styles.railButton}
                 onClick={() => void onSave()}
+                onContextMenu={onSaveContextMenu}
                 aria-label="Save"
               >
                 <Icon name="ph:floppy-disk" size={16} decorative />
               </button>
             </HoverInfo>
             {documentOpen && dirty && <span className={styles.dirtyDot} aria-label="Unsaved changes" />}
+            {saveMenu}
           </span>
           <HoverInfo content="Export WAV" placement="right">
             <button
@@ -176,6 +186,7 @@ export function Sidebar() {
           <PluginLibraryPanel
             expanded
             onToggle={() => setActivePanel("plugins")}
+            onOpenDecentSampler={() => setActivePanel("decentSampler")}
           />
         )}
         {activePanel === "decentSampler" && (
@@ -193,5 +204,18 @@ export function Sidebar() {
         aria-label="Resize sidebar"
       />
     </aside>
+  );
+}
+
+function DecentSamplerRailIcon() {
+  return (
+    <span className={styles.decentSamplerIcon} aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false">
+        <rect className={styles.decentSamplerIconFrame} x="3.5" y="3.5" width="17" height="17" />
+        <text className={styles.decentSamplerIconGlyph} x="5.1" y="16.4">
+          ds
+        </text>
+      </svg>
+    </span>
   );
 }

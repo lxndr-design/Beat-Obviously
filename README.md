@@ -49,14 +49,17 @@ cd frontend && npm install && npm run dev
 # Full app build
 cmake -B build-native -G Xcode
 cmake --build build-native --config Release
-open build-native/backend/Beat_artefacts/Release/Beat.app
 
-# Or use the packaging helper
+# Package/register the canonical repo-root launcher
 ./scripts/package-macos.sh
+open ./Beat.app
 
-# Register the current root app for .beat files after copying a build to ./Beat.app
+# Or register an already-packaged root app for .beat files
 ./scripts/register-current-beat-app.sh ./Beat.app
 ```
+
+`build-native/backend/Beat_artefacts/Release/Beat.app` is the CMake/JUCE build artifact.
+Use the repo-root `Beat.app` as the manual launcher and LaunchServices-registered app.
 
 In dev mode, set `BEAT_DEV_FRONTEND_URL=http://localhost:6174` before launching the app to point the embedded webview at the Vite dev server. On startup, the native app checks that the configured port is actually serving the Beat frontend before loading it, adds a launch cache-buster, and refreshes the dev webview once to avoid stale startup documents. If the dev URL is unavailable or occupied by the wrong server, a bundled frontend build is used when present.
 

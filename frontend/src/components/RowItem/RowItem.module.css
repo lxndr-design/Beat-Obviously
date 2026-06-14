@@ -1,0 +1,191 @@
+.row {
+  --row-height: var(--sidebar-subrow-height);
+  --row-icon-track: 14px;
+  --row-icon-size: 14px;
+  --row-action-width: var(--row-height);
+  --row-divider: 1px solid color-mix(in srgb, var(--color-fg) 18%, transparent);
+
+  display: grid;
+  grid-template-columns: 14px var(--row-icon-track) minmax(0, 1fr) var(--row-action-width);
+  align-items: center;
+  gap: var(--row-gap, 3px);
+  width: 100%;
+  min-height: var(--row-height);
+  padding: 0 var(--row-padding-inline-end, 6px) 0 var(--row-padding-inline-start, 4px);
+  box-sizing: border-box;
+  border-bottom: var(--row-divider);
+  color: var(--color-fg);
+  text-align: left;
+  transition: var(--transition-invert);
+}
+
+.row:hover {
+  background: var(--surface-hover);
+  color: var(--color-fg);
+}
+
+.noDragSlot {
+  grid-template-columns: var(--row-icon-track) minmax(0, 1fr) var(--row-action-width);
+}
+
+.density-compact {
+  --row-height: 22px;
+}
+
+.density-standard {
+  --row-height: var(--sidebar-subrow-height);
+}
+
+.density-media {
+  --row-height: calc(var(--sidebar-subrow-height) * 2);
+  --row-icon-track: minmax(42px, auto);
+  --row-icon-size: auto;
+  --row-action-width: var(--sidebar-subrow-height);
+
+  gap: 4px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.cursor-grab {
+  cursor: grab;
+}
+
+.cursor-grab:active {
+  cursor: grabbing;
+}
+
+.cursor-default {
+  cursor: default;
+}
+
+.dragSlot,
+.iconSlot,
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.dragSlot {
+  width: 14px;
+  height: 14px;
+  opacity: 0.72;
+}
+
+.iconSlot {
+  position: relative;
+  justify-self: center;
+  width: var(--row-icon-size);
+  min-width: var(--row-icon-size);
+  height: calc(var(--row-height) - 8px);
+  overflow: hidden;
+  opacity: 0.82;
+}
+
+.iconSwapSlot {
+  overflow: visible;
+}
+
+.iconDefault,
+.iconHover {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity var(--duration-hover) var(--ease-out);
+}
+
+.iconDefault {
+  opacity: 0.72;
+}
+
+.iconHover {
+  opacity: 0;
+  cursor: grab;
+}
+
+.row:hover .iconDefault {
+  opacity: 0;
+}
+
+.row:hover .iconHover {
+  opacity: 0.9;
+}
+
+.density-compact .iconSlot {
+  height: 14px;
+}
+
+.density-media .iconSlot {
+  min-width: 42px;
+}
+
+.action {
+  width: var(--row-action-width);
+  min-width: var(--row-action-width);
+  height: var(--row-height);
+}
+
+.action > :global(button) {
+  width: var(--row-action-width) !important;
+  min-width: var(--row-action-width);
+  max-width: var(--row-action-width);
+  height: var(--row-height) !important;
+  min-height: var(--row-height);
+  max-height: var(--row-height);
+  background: transparent;
+  color: inherit;
+}
+
+.row:hover .action > :global(button),
+.action > :global(button:hover:not(:disabled)),
+.action > :global(button:active:not(:disabled)) {
+  background: transparent;
+  color: inherit;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  gap: 2px;
+}
+
+.name,
+.meta,
+.detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.meta {
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  opacity: 0.55;
+  text-transform: none;
+}
+
+.detail {
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  opacity: 0.42;
+}
+
+.row:hover .meta,
+.row:hover .detail {
+  opacity: 0.8;
+}

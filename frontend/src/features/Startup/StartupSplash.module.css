@@ -1,0 +1,122 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-startup-splash);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.panel {
+  --startup-progress: 0%;
+
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-areas:
+    "mark copy"
+    "progress progress"
+    "stages stages";
+  align-items: center;
+  gap: 10px 12px;
+  width: min(320px, calc(100vw - var(--space-4)));
+  padding: var(--space-2);
+  box-sizing: border-box;
+  border: var(--border-fg);
+  background: var(--color-bg);
+}
+
+.mark {
+  grid-area: mark;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  border: var(--border-fg);
+  background: color-mix(in srgb, var(--color-fg) 10%, var(--color-bg));
+  color: var(--color-fg);
+}
+
+.copy {
+  grid-area: copy;
+  min-width: 0;
+}
+
+.copy h1,
+.copy p {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copy h1 {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.copy p {
+  margin-top: 4px;
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  opacity: 0.68;
+}
+
+.progress {
+  grid-area: progress;
+  height: 2px;
+  overflow: hidden;
+  background: var(--surface-subtle);
+}
+
+.progress span {
+  display: block;
+  width: var(--startup-progress);
+  height: 100%;
+  background: var(--color-fg);
+  transition: width var(--duration-slide) var(--ease-out);
+}
+
+.stageList {
+  grid-area: stages;
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stageList li {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-fg-hover);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.stageList li span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stageDot {
+  width: 4px;
+  height: 4px;
+  background: color-mix(in srgb, var(--color-fg) 32%, transparent);
+}
+
+.stageReady {
+  color: var(--color-fg);
+}
+
+.stageReady .stageDot {
+  background: var(--color-fg);
+}

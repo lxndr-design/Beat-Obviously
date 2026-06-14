@@ -1,0 +1,16 @@
+.tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  min-height: 14px;
+  padding: 0 1px;
+  box-sizing: border-box;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-fg) 24%, transparent);
+  color: var(--color-fg-inverse);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  white-space: nowrap;
+}

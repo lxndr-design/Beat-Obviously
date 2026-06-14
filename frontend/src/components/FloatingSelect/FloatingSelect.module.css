@@ -23,8 +23,8 @@
 .label {
   font-size: var(--font-size-ui);
   line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-uppercase);
+  text-transform: none;
+  letter-spacing: 0;
   font-weight: var(--font-weight-medium);
   opacity: 0.7;
   white-space: nowrap;
@@ -66,8 +66,8 @@
 
 .trigger:hover,
 .inline:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--surface-hover);
+  color: var(--color-fg);
 }
 
 .inline:hover .trigger {
@@ -120,8 +120,12 @@
   color: var(--color-fg);
 }
 
-.option:hover,
+.option:hover {
+  background: var(--surface-hover);
+  color: var(--color-fg);
+}
+
 .optionSelected:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--surface-selected-strong);
+  color: var(--color-fg);
 }

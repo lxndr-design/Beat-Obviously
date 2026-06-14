@@ -6,7 +6,7 @@
   align-items: stretch;
   overflow: hidden;
   user-select: none;
-  border: 1px solid var(--color-fg);
+  border: var(--border-fg);
   transition: background var(--duration-hover) var(--ease-linear);
 }
 
@@ -69,7 +69,7 @@
 }
 
 .virtual {
-  border-left: 1px dashed var(--color-fg);
+  border-left: 1px dashed var(--border-fg-color);
   opacity: 0.55;
 }
 
@@ -125,7 +125,7 @@
   align-items: center;
   gap: 3px;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--color-fg);
+  border-bottom: var(--border-fg);
   min-height: 18px;
 }
 

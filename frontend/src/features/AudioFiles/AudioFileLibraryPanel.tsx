@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, HoverInfo, Icon, MarqueeText, SectionRibbon, SectionRibbonActionButton, useContextMenu, type ContextMenuItem } from "../../components";
+import { Button, HoverInfo, Icon, RowItem, SectionRibbon, SectionRibbonActionButton, appAlert, useContextMenu, type ContextMenuItem } from "../../components";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
 import { useAudioFileStore } from "../../state/store";
@@ -54,7 +54,7 @@ export function AudioFileLibraryPanel({ expanded, onToggle }: AudioFileLibraryPa
     const file = await importAudioFile();
     if (!file) return;
     if (!isSupportedAudioFileName(file.name) && !isSupportedAudioFileName(file.path)) {
-      window.alert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
+      await appAlert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
       return;
     }
     addFile(file);
@@ -192,8 +192,10 @@ function AudioFileItem({ file, selectMode, selected, onSelect, onEnterSelectMode
   }
 
   return (
-    <li
+    <RowItem
       className={`${styles.item} ${selected ? styles.itemSelected : ""} ${selectMode ? styles.itemSelecting : ""}`}
+      reserveDragSlot={false}
+      cursor={selectMode ? "pointer" : "grab"}
       draggable={!selectMode}
       onClick={(event) => {
         if (!selectMode) return;
@@ -201,8 +203,8 @@ function AudioFileItem({ file, selectMode, selected, onSelect, onEnterSelectMode
       }}
       onDragStart={onDragStart}
       onContextMenu={onContextMenu}
-    >
-      {selectMode ? (
+      iconAriaHidden={!selectMode}
+      icon={selectMode ? (
         <input
           className={styles.itemCheckbox}
           type="checkbox"
@@ -219,14 +221,17 @@ function AudioFileItem({ file, selectMode, selected, onSelect, onEnterSelectMode
           <Icon name="ph:dots-six-vertical" size={14} decorative />
         </span>
       )}
-      <MarqueeText className={styles.itemName} text={name} />
-      <HoverInfo content={formatDuration(durationSeconds)}>
-        <span className={styles.itemMeta}>
-          <Icon name="ph:waveform" size={14} decorative />
-        </span>
-      </HoverInfo>
+      name={name}
+      action={(
+        <HoverInfo content={formatDuration(durationSeconds)}>
+          <span className={styles.itemMeta}>
+            <Icon name="ph:waveform" size={14} decorative />
+          </span>
+        </HoverInfo>
+      )}
+    >
       {menu}
-    </li>
+    </RowItem>
   );
 }
 

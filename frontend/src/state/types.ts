@@ -599,6 +599,8 @@ export interface UiState {
   /** Open editors. Multiple modals can be open at once. */
   openEditors: Array<
     | { kind: "instrument"; instrumentId: Id }
+    | { kind: "samplerInstrument"; instrumentId: Id }
+    | { kind: "synthInstrument"; instrumentId: Id }
     | { kind: "synth" }
     | { kind: "track"; trackId: Id }
     | { kind: "segment"; segmentId: Id }

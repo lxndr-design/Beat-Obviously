@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useInstrumentStore, usePluginStore, useProjectStore, useSettingsStore, useTransportStore, useUiStore, useViewStore } from "../../state/store";
 import { SEGMENT_LAYER_OFFSET_PX } from "./geometry";
-import { useContextMenu, Icon, type ContextMenuItem } from "../../components";
+import { useContextMenu, Icon, appPrompt, type ContextMenuItem } from "../../components";
 import { useClipboard } from "../../state/clipboard";
 import { useComponentStore } from "../../state/components";
 import { listDrumBeatFeedback, updateDrumBeatFeedback } from "../../persistence/dexie";
@@ -36,7 +36,10 @@ interface Props {
  * Resize handles on left/right edges (8px). Body drags to move. Right-click
  * exposes Edit / Duplicate / Copy / Paste / Rename.
  *
- * Drag/resize snap follows the musical ruler:
+ * Body drag is free by default. Holding Shift during body drag enables the
+ * musical ruler snap that used to be the default.
+ *
+ * Resize/fade snap still follows the musical ruler:
  *   - default: one time-signature subtick (one beat)
  *   - Shift held: one full measure (timeSig.num beats)
  * Time labels are derived from BPM after the musical grid is established.
@@ -135,6 +138,11 @@ export function Segment({
   }
   function snapBeat(beat: number, shift: boolean): number {
     const step = snapStepBeats(shift);
+    return Math.max(0, Math.round(beat / step) * step);
+  }
+  function snapDragBeat(beat: number, shift: boolean): number {
+    if (!shift) return Math.max(0, beat);
+    const step = timelineSmartGrid ? 4 / timelineSubdivision : GRID_TICK_BEATS;
     return Math.max(0, Math.round(beat / step) * step);
   }
   function snapLen(len: number, shift: boolean): number {
@@ -242,7 +250,7 @@ export function Segment({
     if (d.mode === "move") {
       const project = useProjectStore.getState().project;
       const anchor = d.segments.find((seg) => seg.id === d.anchorSegmentId) ?? d.segments[0];
-      const snappedAnchor = snapBeat(anchor.startBeat + dxBeats, e.shiftKey);
+      const snappedAnchor = snapDragBeat(anchor.startBeat + dxBeats, e.shiftKey);
       let deltaBeats = snappedAnchor - anchor.startBeat;
       const minStart = Math.min(...d.segments.map((seg) => seg.startBeat + deltaBeats));
       if (minStart < 0) deltaBeats -= minStart;
@@ -430,8 +438,10 @@ export function Segment({
         label: "Rename",
         icon: "ph:text-aa",
         onSelect: () => {
-          const next = window.prompt("Segment name", liveSeg.name ?? "");
-          if (next != null) updateSegment(segmentId, { name: next });
+          void (async () => {
+            const next = await appPrompt("Segment name", liveSeg.name ?? "");
+            if (next != null) updateSegment(segmentId, { name: next });
+          })();
         },
       },
       ...(canLoop
@@ -489,30 +499,32 @@ export function Segment({
               icon: "ph:package",
               onSelect: () => {
                 const fallback = liveSeg.name?.trim() || "Untitled Component";
-                const name = window.prompt("Component name", fallback) ?? fallback;
-                if (!name) return;
-                if (liveSeg.payload.kind === "drum") {
-                  saveComponent({
-                    kind: "drum",
-                    name,
-                    rows: liveSeg.payload.rows,
-                    stepCount: liveSeg.payload.stepCount,
-                    speed: liveSeg.payload.speed,
-                    defaultPitchHz: liveSeg.payload.defaultPitchHz,
-                    swingPercent: liveSeg.payload.swingPercent,
-                    timeSignature: liveSeg.payload.timeSignature,
-                    lengthBeats: liveSeg.lengthBeats,
-                  });
-                  void markSavedGeneratedDrum(liveSeg);
-                } else if (liveSeg.payload.kind === "midi" || liveSeg.payload.kind === "mixed") {
-                  saveComponent({
-                    kind: "midi",
-                    name,
-                    notes: liveSeg.payload.notes,
-                    lengthBeats: liveSeg.lengthBeats,
-                    instrumentId: liveSeg.instrumentId,
-                  });
-                }
+                void (async () => {
+                  const name = await appPrompt("Component name", fallback) ?? fallback;
+                  if (!name) return;
+                  if (liveSeg.payload.kind === "drum") {
+                    saveComponent({
+                      kind: "drum",
+                      name,
+                      rows: liveSeg.payload.rows,
+                      stepCount: liveSeg.payload.stepCount,
+                      speed: liveSeg.payload.speed,
+                      defaultPitchHz: liveSeg.payload.defaultPitchHz,
+                      swingPercent: liveSeg.payload.swingPercent,
+                      timeSignature: liveSeg.payload.timeSignature,
+                      lengthBeats: liveSeg.lengthBeats,
+                    });
+                    void markSavedGeneratedDrum(liveSeg);
+                  } else if (liveSeg.payload.kind === "midi" || liveSeg.payload.kind === "mixed") {
+                    saveComponent({
+                      kind: "midi",
+                      name,
+                      notes: liveSeg.payload.notes,
+                      lengthBeats: liveSeg.lengthBeats,
+                      instrumentId: liveSeg.instrumentId,
+                    });
+                  }
+                })();
               },
             } as ContextMenuItem,
           ]
@@ -661,7 +673,7 @@ export function Segment({
             )}
             {decentSamplerPlugin && (
               <span className={styles.decentSamplerBadge} aria-label="DecentSampler instrument">
-                <img src="/assets/decent-sampler.png" alt="" aria-hidden="true" />
+                <img src="/assets/decent-sampler.svg" alt="" aria-hidden="true" />
               </span>
             )}
           </span>

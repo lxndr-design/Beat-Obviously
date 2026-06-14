@@ -48,7 +48,11 @@ interface AuditionHandle {
   stop: (when?: number) => void;
 }
 
-export function SynthEditor() {
+interface SynthEditorProps {
+  instrumentId?: string;
+}
+
+export function SynthEditor({ instrumentId }: SynthEditorProps) {
   const draft = useSynthStore((state) => state.draft);
   const boundInstrumentId = useSynthStore((state) => state.boundInstrumentId);
   const bindInstrument = useSynthStore((state) => state.bindInstrument);
@@ -74,7 +78,17 @@ export function SynthEditor() {
   const [auditionSnapshot, setAuditionSnapshot] = useState<AnalyzerSnapshot>(() => createEmptyAnalyzerSnapshot());
 
   useEffect(() => {
-    if (didAutoBind.current || boundInstrumentId || synthInstruments.length === 0) return;
+    if (!instrumentId) return;
+    const instrument = instruments.find((candidate) => candidate.id === instrumentId);
+    if (!instrument) return;
+    if (boundInstrumentId === instrumentId) return;
+    didAutoBind.current = true;
+    bindInstrument(instrument.id);
+    setDraft(synthDraftFromInstrument(instrument));
+  }, [bindInstrument, boundInstrumentId, instrumentId, instruments, setDraft]);
+
+  useEffect(() => {
+    if (instrumentId || didAutoBind.current || boundInstrumentId || synthInstruments.length === 0) return;
     const first = synthInstruments[0];
     didAutoBind.current = true;
     bindInstrument(first.id);
@@ -319,7 +333,8 @@ export function SynthEditor() {
 
   async function onSaveInstrument() {
     await saveDraftToInstrument();
-    closeEditor({ kind: "synth" });
+    if (instrumentId) closeEditor({ kind: "synthInstrument", instrumentId });
+    else closeEditor({ kind: "synth" });
   }
 
   function onLoadPreset(value: string) {

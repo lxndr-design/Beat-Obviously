@@ -40,11 +40,13 @@ or monochrome emphasis before adding a token.
 ### Typography
 
 Use `--font-family-base` for UI and `--font-family-mono` for technical readouts.
+The base UI face is Akzidenz Grotesk Next, bundled from `public/assets/fonts/`
+with light, regular, italic, medium, and bold faces.
 
 Compact DAW UI tokens:
 
 - `--font-size-hint`: 10px, non-interactive hints and ticks only.
-- `--font-size-ui`: 12px, dense controls and compact rows.
+- `--font-size-ui`: 11px, dense controls and compact rows.
 - `--font-size-ui-lg`: 14px, larger dense controls.
 - `--font-size-section`: 16px, section labels and standard readable text.
 - `--font-size-title`: 18px, compact modal and panel titles.
@@ -115,6 +117,7 @@ Use shared components before styling feature-local controls.
 | Component | Use For | Required States |
 | --- | --- | --- |
 | `ActionFooter` | Modal/action button rows | start/end alignment |
+| `AppDialog` | App-wide alert, confirm, and prompt flows | alert, confirm, prompt |
 | `Block` | Section frames and structured panels | framed/unframed, title, actions, padding |
 | `Button` | Commands, icon buttons, selected toggles | default, primary, ghost, danger, disabled, icon-only |
 | `ContextMenu` | Pointer and keyboard-invoked menus | disabled item, submenu, separators |
@@ -128,7 +131,9 @@ Use shared components before styling feature-local controls.
 | `Modal` | Editors and confirmations | stacked, dirty, footer, close controls |
 | `NumberInput` | Numeric fields | clamping, unit, arrow-key stepping |
 | `RadioGroup` | Mutually exclusive modes | selected, disabled |
+| `RowItem` | Library/browser list rows | compact/media density, drag/icon/meta/action slots |
 | `SectionRibbon` | Sidebar/panel headers | expanded/collapsed, count, actions |
+| `Tag` | Compact tinted metadata labels and counters | numeric/text content, inherited context |
 | `TextInput` | Text fields | stacked, inline, bare, unit |
 | `Toggle` | Binary settings | on, off, disabled |
 

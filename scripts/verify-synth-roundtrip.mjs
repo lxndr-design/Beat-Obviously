@@ -431,6 +431,54 @@ try {
   assert.ok(Math.sqrt(generatedEnergy / generatedSamples.length) > 0.005, "expected generated Aether patch to be audible");
   assert.ok(generatedPeak > 0.02, "expected generated Aether patch to have a visible peak");
 
+  const generatedVariant = await aiService.LocalAiService.generateInstrument({
+    prompt: "wide evolving glass bass pad with gentle motion",
+    targetKind: "wavetable",
+    variationSeed: 9876,
+    instruments: [],
+    audioFiles: [],
+    current: {
+      id: "generated-current",
+      name: "Generated Current",
+      kind: "wavetable",
+      envelope: { attackMs: 5, decayMs: 100, sustain: 0.7, releaseMs: 200 },
+      knobs: { cutoff: 0.6, resonance: 0.2, drive: 0.1, color: 0.5 },
+      filterType: "lowpass",
+      waveform: "wavetable",
+      detuneCents: 0,
+      octave: 0,
+      subOscLevel: 0,
+      glideMs: 0,
+      ampLevel: 1,
+      ampPan: 0,
+      lfoWaveform: "sine",
+      lfoRateHz: 4,
+      lfoDepth: 0,
+      lfoSync: false,
+      lfoRetrigger: true,
+      lfoPositionBipolar: true,
+      lfoPitchBipolar: true,
+      lfoFilterBipolar: true,
+      lfoToPitch: 0,
+      lfoToFilter: 0,
+      envToFilter: 0,
+      sampleIds: [],
+      userCreated: true,
+    },
+  });
+  assert.equal(generatedVariant.source, "local");
+  assert.notDeepEqual(generatedVariant.patch.aether, generated.patch.aether, "same prompt with different seeds should change oscillator architecture");
+  assert.notDeepEqual(generatedVariant.patch.envelope, generated.patch.envelope, "same prompt with different seeds should change envelope contour");
+
+  const melody = await aiService.LocalAiService.generatePattern({ lengthBeats: 8, role: "melody", key: "C minor", style: "main melody", variationSeed: 101 });
+  const bass = await aiService.LocalAiService.generatePattern({ lengthBeats: 8, role: "bass", key: "C minor", style: "bassline", variationSeed: 102 });
+  const chords = await aiService.LocalAiService.generatePattern({ lengthBeats: 8, role: "chords", key: "C minor", style: "chorus progression", variationSeed: 103 });
+  assertMidiPart(melody, 8, "melody");
+  assertMidiPart(bass, 8, "bass");
+  assertMidiPart(chords, 8, "chords");
+  assert.equal(new Set(bass.map((note) => note.pitch)).size >= 2, true, "bassline should follow a progression, not one repeated note");
+  assert.equal(chords.length >= 6, true, "chord generation should create a compact chord progression");
+
   const preview = synthStore.synthDraftToPreviewInstrument(loadedDraft);
   const samples = new Float32Array(48000);
   synthPreview.renderInstrumentSamples(preview, samples, 48000, synthPreview.previewFrequency(preview), "audio", true);
@@ -448,4 +496,15 @@ try {
   console.log(JSON.stringify({ ok: true, routes: draft.modulation.length, rms, peak }, null, 2));
 } finally {
   rmSync(outDir, { recursive: true, force: true });
+}
+
+function assertMidiPart(notes, lengthBeats, label) {
+  assert.equal(notes.length > 0, true, `${label} should generate notes`);
+  for (const note of notes) {
+    assert.equal(Number.isFinite(note.pitch), true, `${label} pitch should be finite`);
+    assert.equal(note.pitch >= 0 && note.pitch <= 127, true, `${label} pitch should stay in MIDI range`);
+    assert.equal(note.velocity >= 1 && note.velocity <= 127, true, `${label} velocity should stay in MIDI range`);
+    assert.equal(note.startBeat >= 0 && note.startBeat < lengthBeats, true, `${label} note should start inside loop`);
+    assert.equal(note.startBeat + note.lengthBeats <= lengthBeats + 0.0001, true, `${label} note should end inside loop`);
+  }
 }

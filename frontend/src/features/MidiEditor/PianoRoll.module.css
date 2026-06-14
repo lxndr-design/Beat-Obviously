@@ -164,7 +164,7 @@
   position: absolute;
   overflow: visible;
   background: transparent;
-  border: 1px solid var(--color-fg);
+  border: var(--border-fg);
   cursor: grab;
   z-index: 3;
 }
@@ -200,7 +200,7 @@
 
 .noteSelected {
   background: transparent;
-  box-shadow: inset 0 0 0 1px var(--color-fg);
+  box-shadow: inset 0 0 0 1px var(--border-fg-color);
 }
 
 .noteSelected::before {
@@ -307,7 +307,7 @@
   z-index: 5;
   width: 8px;
   height: 8px;
-  border: 1px solid var(--color-fg);
+  border: var(--border-fg);
   background: var(--color-bg);
   transform: translate(-50%, -50%) rotate(45deg);
   cursor: ns-resize;
@@ -417,7 +417,7 @@
 
 .volumeSlider::-webkit-slider-runnable-track {
   height: 4px;
-  border: 1px solid var(--color-fg);
+  border: var(--border-fg);
   background: color-mix(in srgb, var(--color-fg) 20%, var(--color-bg));
 }
 
@@ -426,21 +426,21 @@
   width: 14px;
   height: 12px;
   margin-top: -5px;
-  border: 1px solid var(--color-fg);
+  border: var(--border-fg);
   background: var(--color-fg);
   border-radius: 0;
 }
 
 .volumeSlider::-moz-range-track {
   height: 4px;
-  border: 1px solid var(--color-fg);
+  border: var(--border-fg);
   background: color-mix(in srgb, var(--color-fg) 20%, var(--color-bg));
 }
 
 .volumeSlider::-moz-range-thumb {
   width: 14px;
   height: 12px;
-  border: 1px solid var(--color-fg);
+  border: var(--border-fg);
   background: var(--color-fg);
   border-radius: 0;
 }

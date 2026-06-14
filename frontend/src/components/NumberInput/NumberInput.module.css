@@ -17,8 +17,8 @@
 .label {
   font-size: var(--font-size-ui);
   line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-uppercase);
+  text-transform: none;
+  letter-spacing: 0;
   font-weight: var(--font-weight-medium);
 }
 

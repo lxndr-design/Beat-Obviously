@@ -30,7 +30,13 @@ For MIDI/song generation, export **Export MIDI** and save it as:
 training/beat-qwen/beat-midi-song-finetune.jsonl
 ```
 
-The MIDI dataset is useful before a full song-generator UI exists: it is built from saved MIDI components, saved projects, and future MIDI feedback records. Parts are labeled as melody, bass, chords, countermelody, arp, or fx from track/instrument context and pitch structure.
+The MIDI dataset is useful before a full song-generator UI exists: it is built from saved MIDI components, saved projects, and future MIDI feedback records. Train it as a phrase generator, not a whole-song generator. Parts are labeled as melody, bass, chords, countermelody, arp, or fx from track/instrument context and pitch structure, and a normal generation should create one loop, hook, chorus motif, main melody, chord progression, or bassline phrase.
+
+Generation should stay hybrid:
+
+- Deterministic local logic supplies strong non-AI defaults: scale/key handling, role-specific MIDI phrase shapes, drum genre anchors, beat heaviness, row-count, texture/fill choices, and instrument patch divergence lanes.
+- The model adapter should add taste, surprise, and learned preference, not replace those app-level rules with one canned example.
+- Repeated generations for the same prompt should materially diverge in structure: instrument oscillator topology/envelope/modulation, drum instrumentation/density/fills, or MIDI contour/progression.
 
 ## Recommended Path
 

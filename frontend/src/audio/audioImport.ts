@@ -1,4 +1,5 @@
 import { isNative, send } from "../ipc/bridge";
+import { appAlert } from "../components/AppDialog";
 import type { AudioFile } from "../state/types";
 import {
   isSupportedAudioFileName,
@@ -40,7 +41,7 @@ function importAudioFilesInBrowser(multiple: boolean): Promise<AudioFile[]> {
       }
       const unsupported = files.find((file) => !isSupportedAudioFileName(file.name));
       if (unsupported) {
-        window.alert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
+        void appAlert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
         resolve([]);
         return;
       }

@@ -28,8 +28,8 @@
 }
 
 .option:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--surface-hover);
+  color: var(--color-fg);
 }
 
 .option.selected {
@@ -44,7 +44,7 @@
 .optionKind {
   font-family: var(--font-family-mono);
   font-size: var(--font-size-ui);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-uppercase);
+  text-transform: none;
+  letter-spacing: 0;
   opacity: 0.7;
 }

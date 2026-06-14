@@ -30,8 +30,8 @@
 .title {
   font-size: var(--font-size-ui);
   font-weight: var(--font-weight-medium);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-uppercase);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .actions {

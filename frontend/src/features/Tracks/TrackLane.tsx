@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { useContextMenu, type ContextMenuItem } from "../../components";
+import { appAlert, useContextMenu, type ContextMenuItem } from "../../components";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
 import {
@@ -148,7 +148,7 @@ export function TrackLane({
           const file = await importAudioFile();
           if (file) {
             if (!isSupportedAudioFileName(file.name) && !isSupportedAudioFileName(file.path)) {
-              window.alert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
+              await appAlert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
               return;
             }
             addAudioFile(file);

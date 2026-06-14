@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
-import { Button, Icon, Modal, TextInput, useContextMenu } from "../../components";
+import { Button, Icon, Modal, TextInput, appAlert, useContextMenu } from "../../components";
 import { browserFileToAudioFile, importAudioFiles } from "../../audio/audioImport";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_EXTENSIONS, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { isNative, send } from "../../ipc/bridge";
@@ -138,7 +138,7 @@ export function ImportInstrumentModal({ onClose, initialFiles = [], onImportedFi
     } catch (error) {
       const message = error instanceof Error ? error.message : "Decent Sampler import is unavailable here.";
       setDecentStatus(message);
-      window.alert(message);
+      await appAlert(message);
     }
   }
 

@@ -73,18 +73,30 @@
   cursor: ew-resize;
 }
 
-.loopClamp::before {
+.loopClamp::before,
+.loopClamp::after {
   content: "";
   position: absolute;
-  top: 3px;
   width: 0;
   height: 0;
+}
+
+.loopClamp::before {
+  top: 3px;
   opacity: 0.72;
 }
 
+.loopClamp::after {
+  top: 5px;
+}
+
 .loopClamp:hover::before,
-.loopClampEnabled::before {
+.loopClampActive::before {
   opacity: 1;
+}
+
+.loopClampActive::after {
+  display: none;
 }
 
 .loopClampStart {
@@ -98,6 +110,13 @@
   border-left: 8px solid currentColor;
 }
 
+.loopClampStart::after {
+  left: 4px;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-left: 5px solid var(--color-bg);
+}
+
 .loopClampEnd {
   bottom: 0;
 }
@@ -107,4 +126,11 @@
   border-top: 5px solid transparent;
   border-bottom: 5px solid transparent;
   border-right: 8px solid currentColor;
+}
+
+.loopClampEnd::after {
+  right: 4px;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-right: 5px solid var(--color-bg);
 }

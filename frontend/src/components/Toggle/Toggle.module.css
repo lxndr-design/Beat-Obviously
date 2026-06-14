@@ -37,6 +37,6 @@
 
 .label {
   font-size: var(--font-size-1);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-uppercase);
+  text-transform: none;
+  letter-spacing: 0;
 }
