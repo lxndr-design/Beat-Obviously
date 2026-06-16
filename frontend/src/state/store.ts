@@ -840,13 +840,24 @@ export const useProjectStore = create<ProjectSlice>()(
   ),
 ) as TemporalStoreApi<ProjectSlice>;
 
-/** Bound helpers for invoking undo/redo from anywhere. */
-export const undo = () => {
+export interface UndoOptions {
+  allowDestructive?: boolean;
+}
+
+export const nextUndoRequiresConfirmation = () => {
   const temporalState = useProjectStore.temporal.getState();
   const previous = temporalState.pastStates[temporalState.pastStates.length - 1];
   const current = useProjectStore.getState();
-  if (previous?.project && wouldUndoDestructively(current.project, previous.project)) return;
+  return Boolean(previous?.project && wouldUndoDestructively(current.project, previous.project));
+};
+
+/** Bound helpers for invoking undo/redo from anywhere. */
+export const undo = (options: UndoOptions = {}) => {
+  if (nextUndoRequiresConfirmation() && !options.allowDestructive) return false;
+  const temporalState = useProjectStore.temporal.getState();
+  if (temporalState.pastStates.length === 0) return false;
   temporalState.undo();
+  return true;
 };
 export const redo = () => useProjectStore.temporal.getState().redo();
 export const canUndo = () =>

@@ -551,6 +551,30 @@ try {
   assert.equal(groupedSecond.startBeat, 10, "grouped redo should restore second segment move");
   assert.equal(groupedFirst.fadeInBeats, 1, "grouped redo should restore grouped fade edit");
 
+  store.useProjectStore.getState().loadProject(store.createEmptyProject());
+  store.useProjectStore.temporal.getState().clear();
+  const destructiveTrack = store.useProjectStore.getState().project.tracks[0].id;
+  const destructiveSegment = store.useProjectStore.getState().addSegment(destructiveTrack, {
+    name: "Destructive Undo Guard",
+    startBeat: 2,
+    lengthBeats: 2,
+    payload: { kind: "midi", notes: [{ pitch: 72, velocity: 100, startBeat: 0, lengthBeats: 1 }] },
+  });
+  assert.equal(store.nextUndoRequiresConfirmation(), true, "undo that removes newly created content should require confirmation");
+  assert.equal(store.undo(), false, "plain undo should refuse destructive removal");
+  project = store.useProjectStore.getState().project;
+  assert.ok(
+    project.tracks[0].segments.some((segment) => segment.id === destructiveSegment),
+    "refused destructive undo should keep new content",
+  );
+  assert.equal(store.undo({ allowDestructive: true }), true, "confirmed undo should allow destructive removal");
+  project = store.useProjectStore.getState().project;
+  assert.equal(
+    project.tracks[0].segments.some((segment) => segment.id === destructiveSegment),
+    false,
+    "confirmed destructive undo should remove newly created content",
+  );
+
   assert.equal(geometry.beatToTimelineX(12.5, 48), 600, "beat-to-pixel timeline conversion should honor zoom");
   assert.equal(geometry.timelineXToBeat(600, 48), 12.5, "pixel-to-beat timeline conversion should round-trip");
   assert.equal(geometry.timelineContentWidth(64, 32), 2048, "timeline content width should derive from project length");
