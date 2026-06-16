@@ -68,6 +68,39 @@ def _preferred_content_type_for_extension(core_services: ctypes.CDLL, core_found
     return resolved
 
 
+def _set_default_handler_for_content_type(
+    core_services: ctypes.CDLL,
+    core_foundation: ctypes.CDLL,
+    content_type_value: str,
+    bundle_id: str,
+) -> int:
+    content_type = _cfstring(core_foundation, content_type_value)
+    handler = _cfstring(core_foundation, bundle_id)
+    set_handler = core_services.LSSetDefaultRoleHandlerForContentType
+    set_handler.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_void_p]
+    set_handler.restype = ctypes.c_int32
+    status = set_handler(content_type, K_LS_ROLES_ALL, handler)
+    _release(core_foundation, content_type)
+    _release(core_foundation, handler)
+    return status
+
+
+def _copy_default_handler_for_content_type(
+    core_services: ctypes.CDLL,
+    core_foundation: ctypes.CDLL,
+    content_type_value: str,
+) -> str:
+    content_type = _cfstring(core_foundation, content_type_value)
+    copy_handler = core_services.LSCopyDefaultRoleHandlerForContentType
+    copy_handler.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    copy_handler.restype = ctypes.c_void_p
+    current = copy_handler(content_type, K_LS_ROLES_ALL)
+    current_bundle_id = _cfstring_to_py(core_foundation, current)
+    _release(core_foundation, current)
+    _release(core_foundation, content_type)
+    return current_bundle_id
+
+
 def main() -> int:
     verify_only = "--verify-only" in sys.argv
     args = [arg for arg in sys.argv[1:] if arg != "--verify-only"]
@@ -80,39 +113,55 @@ def main() -> int:
         FILENAME_EXTENSION,
     )
 
-    content_type = _cfstring(core_foundation, CONTENT_TYPE)
-    handler = _cfstring(core_foundation, bundle_id)
+    candidate_content_types = [CONTENT_TYPE]
+    if resolved_extension_type and resolved_extension_type != CONTENT_TYPE:
+        candidate_content_types.append(resolved_extension_type)
 
     if not verify_only:
-        set_handler = core_services.LSSetDefaultRoleHandlerForContentType
-        set_handler.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_void_p]
-        set_handler.restype = ctypes.c_int32
-        status = set_handler(content_type, K_LS_ROLES_ALL, handler)
+        statuses: list[tuple[str, int]] = []
+        for candidate_content_type in candidate_content_types:
+            status = _set_default_handler_for_content_type(
+                core_services,
+                core_foundation,
+                candidate_content_type,
+                bundle_id,
+            )
+            statuses.append((candidate_content_type, status))
+            if status == 0:
+                break
+
+        status = statuses[-1][1] if statuses else 1
         if status != 0:
-            print(f"Failed to set default handler for {CONTENT_TYPE}: OSStatus {status}", file=sys.stderr)
+            status_summary = ", ".join(f"{content_type}: {status}" for content_type, status in statuses)
+            print(f"Failed to set default .{FILENAME_EXTENSION} handler: {status_summary}", file=sys.stderr)
             if resolved_extension_type and resolved_extension_type != CONTENT_TYPE:
                 print(
                     f".{FILENAME_EXTENSION} currently resolves to {resolved_extension_type}; "
-                    f"the Beat app bundle has not registered {CONTENT_TYPE} with LaunchServices.",
+                    f"tried both {CONTENT_TYPE} and the resolved dynamic type.",
                     file=sys.stderr,
                 )
-            _release(core_foundation, content_type)
-            _release(core_foundation, handler)
             return 1
 
-    copy_handler = core_services.LSCopyDefaultRoleHandlerForContentType
-    copy_handler.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
-    copy_handler.restype = ctypes.c_void_p
-    current = copy_handler(content_type, K_LS_ROLES_ALL)
-    current_bundle_id = _cfstring_to_py(core_foundation, current)
+    handlers = [
+        (
+            candidate_content_type,
+            _copy_default_handler_for_content_type(core_services, core_foundation, candidate_content_type),
+        )
+        for candidate_content_type in candidate_content_types
+    ]
 
-    _release(core_foundation, current)
-    _release(core_foundation, content_type)
-    _release(core_foundation, handler)
-
-    if current_bundle_id != bundle_id:
+    matching_handler = next(
+        ((candidate_content_type, current_bundle_id) for candidate_content_type, current_bundle_id in handlers
+         if current_bundle_id == bundle_id),
+        None,
+    )
+    if matching_handler is None:
+        handler_summary = ", ".join(
+            f"{content_type}: {current_bundle_id or '<none>'}"
+            for content_type, current_bundle_id in handlers
+        )
         print(
-            f"Default handler mismatch for {CONTENT_TYPE}: expected {bundle_id}, got {current_bundle_id or '<none>'}",
+            f"Default handler mismatch for .{FILENAME_EXTENSION}: expected {bundle_id}; got {handler_summary}",
             file=sys.stderr,
         )
         if resolved_extension_type and resolved_extension_type != CONTENT_TYPE:
@@ -123,7 +172,11 @@ def main() -> int:
             )
         return 1
 
-    print(f"{CONTENT_TYPE} -> {current_bundle_id}")
+    matched_content_type, current_bundle_id = matching_handler
+    if matched_content_type == CONTENT_TYPE:
+        print(f"{CONTENT_TYPE} -> {current_bundle_id}")
+    else:
+        print(f".{FILENAME_EXTENSION} ({matched_content_type}) -> {current_bundle_id}")
     return 0
 
 

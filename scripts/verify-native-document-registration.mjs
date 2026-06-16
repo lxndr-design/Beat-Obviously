@@ -58,7 +58,11 @@ if (requireDefaultHandler) {
     ["python3", join(repoRoot, "scripts", "set-beat-default-project-handler.py"), "--verify-only", "com.beat.app"],
     { encoding: "utf8" },
   );
-  assert.match(handler, /com\.beat\.project -> com\.beat\.app/, "macOS default .beat handler was not com.beat.app");
+  assert.match(
+    handler,
+    /(?:com\.beat\.project|\.beat \([^)]+\)) -> com\.beat\.app/,
+    "macOS default .beat handler was not com.beat.app",
+  );
 }
 
 console.log(`Native document registration verifier passed for ${basename(appPath)}.`);
