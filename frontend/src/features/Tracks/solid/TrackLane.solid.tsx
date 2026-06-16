@@ -397,7 +397,6 @@ function pasteSegmentsIntoTrack(trackId: Id, startBeat: number, segments: Segmen
   const trackIndexById = new Map(project.tracks.map((track, index) => [track.id, index]));
   const sourceIndexes = segments.map((segment) => trackIndexById.get(segment.trackId) ?? targetTrackIndex);
   const sourceAnchorIndex = Math.min(...sourceIndexes);
-  const startAnchor = Math.min(...segments.map((segment) => segment.startBeat));
   const commandSegments = segments.flatMap((segment, index) => {
     const destinationIndex = Math.max(0, Math.min(project.tracks.length - 1, targetTrackIndex + sourceIndexes[index] - sourceAnchorIndex));
     const destinationTrack = project.tracks[destinationIndex];
@@ -405,11 +404,10 @@ function pasteSegmentsIntoTrack(trackId: Id, startBeat: number, segments: Segmen
     return [{
       ...structuredClone(segment),
       trackId: destinationTrack.id,
-      startBeat: Math.max(0, startBeat + segment.startBeat - startAnchor),
       name: segment.name?.trim() ? `${segment.name} copy` : segment.name,
     }];
   });
-  applySegmentEditCommand({ kind: "duplicate", segments: commandSegments, offsetBeats: 0 });
+  applySegmentEditCommand({ kind: "paste", segments: commandSegments, startBeat });
 }
 
 function nextDecentSamplerInstanceName(baseName: string, pluginId: Id, templateInstrumentId: Id, instruments: Instrument[]): string {

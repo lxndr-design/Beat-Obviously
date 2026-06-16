@@ -62,22 +62,21 @@ Purpose: make timeline editing feel like a DAW instead of a demo surface.
 
 Current assets:
 
-- Timeline, tracks, segments, marquee, drag/resize, split/trim/fade metadata, review loop, transport actions, grouped history, and pure geometry/interaction verifiers exist.
+- Timeline, tracks, segments, marquee, drag/resize, visible fade handles, split/trim/fade metadata, paste/duplicate, rename/color/icon metadata, crossfade commands, review loop, transport actions, grouped history, and pure geometry/interaction verifiers exist.
+- `npm run verify:daw` covers edit-command behavior for move, resize, duplicate, paste, delete, rename/color/icon metadata, nudge, quantize, split, trim, fade, crossfade, grouped undo/redo, and timeline geometry.
+- `npm run verify:track-interactions` covers free segment drag/resize/fade by default with Shift-based snapping.
 
 Build:
 
-- Visible fade handles on audio/MIDI/drum segments.
-- Crossfade model for overlapping audio clips, with clear default behavior.
-- Edit command policy for move, resize, duplicate, delete, paste, nudge, quantize, split, trim, fade, crossfade, rename, color/icon metadata, group/ungroup.
+- Edit command policy for group/ungroup.
 - Explicit destructive-operation confirmation rules.
 - Multi-select command bar or context actions for selected segments.
 - Track/body/segment click behavior audit: selection, additive selection, context menu, empty-area click, drag handles, lane drop targets.
 - Snap/grid policy surfaced consistently: bar, beat, subdivision, sample/time for audio where relevant.
-- Browser-level smoke for marquee, drag, resize, split, fade, and loop marker interaction.
+- Browser-level smoke for marquee, drag, resize, split, fade, crossfade, and loop marker interaction.
 
 Backend/model:
 
-- Persist fade/crossfade semantics.
 - Ensure crossfades and trims affect live and export paths identically.
 - Add stress for fade/crossfade render parity and invalid trim/crossfade repair warnings.
 

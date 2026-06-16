@@ -375,7 +375,9 @@ export function SegmentSolid(props: Props) {
         onSelect: () => {
           void (async () => {
             const next = await appPrompt("Segment name", segment.name ?? "");
-            if (next != null) projectStore.updateSegment(props.segmentId, { name: next });
+            if (next != null) {
+              projectStore.applySegmentEditCommand({ kind: "metadata", segmentIds: [props.segmentId], name: next });
+            }
           })();
         },
       },
@@ -476,12 +478,16 @@ export function SegmentSolid(props: Props) {
         onSelect: () => {
           const pasted = clipboardStore.getState().paste();
           if (!pasted) return;
-          projectStore.addSegment(segment.trackId, {
-            ...pasted,
-            id: undefined as unknown as Id,
+          const [createdId] = projectStore.applySegmentEditCommand({
+            kind: "paste",
+            targetTrackId: segment.trackId,
             startBeat: segment.startBeat + segment.lengthBeats,
-            name: duplicateSegmentName(pasted),
+            segments: [{
+              ...pasted,
+              name: duplicateSegmentName(pasted),
+            }],
           });
+          if (createdId) uiStore.setSelectedSegments([createdId]);
         },
       },
       {
@@ -581,7 +587,11 @@ export function SegmentSolid(props: Props) {
                 onDblClick={(event) => event.stopPropagation()}
                 onInput={(event) => setNameDraft(event.currentTarget.value)}
                 onBlur={() => {
-                  useProjectStore.getState().updateSegment(props.segmentId, { name: nameDraft() });
+                  useProjectStore.getState().applySegmentEditCommand({
+                    kind: "metadata",
+                    segmentIds: [props.segmentId],
+                    name: nameDraft(),
+                  });
                   setEditingName(false);
                 }}
                 onKeyDown={(event) => {

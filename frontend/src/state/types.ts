@@ -80,6 +80,10 @@ export interface Segment {
   trackId: Id;
   /** Optional display name shown in the segment's label strip. */
   name?: string;
+  /** Optional visual tag color for future segment metadata/organization UI. */
+  color?: string;
+  /** Optional Iconify icon name for future segment metadata/organization UI. */
+  icon?: string;
   /** Bound instrument from the library (renders this segment). */
   instrumentId?: Id;
   /** MIDI playback transpose in semitones. */

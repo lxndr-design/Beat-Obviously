@@ -98,8 +98,21 @@ export type SegmentEditCommand =
       targetTrackId?: Id;
     }
   | {
+      kind: "paste";
+      segments: Array<Segment & { name?: string }>;
+      startBeat?: Beats;
+      targetTrackId?: Id;
+    }
+  | {
       kind: "delete";
       segmentIds: Id[];
+    }
+  | {
+      kind: "metadata";
+      segmentIds: Id[];
+      name?: string;
+      color?: string | null;
+      icon?: string | null;
     }
   | {
       kind: "nudge";
@@ -547,7 +560,7 @@ export const useProjectStore = create<ProjectSlice>()(
 
       applySegmentEditCommand: (command) => {
         const createdIds: Id[] = [];
-        if (command.kind === "duplicate") {
+        if (command.kind === "duplicate" || command.kind === "paste") {
           for (let index = 0; index < command.segments.length; index++) {
             createdIds.push(nanoid());
           }
@@ -612,6 +625,30 @@ export const useProjectStore = create<ProjectSlice>()(
             return;
           }
 
+          if (command.kind === "paste") {
+            const tracksById = new Map(s.project.tracks.map((track) => [track.id, track]));
+            const sourceAnchor = command.startBeat === undefined
+              ? 0
+              : Math.min(...command.segments.map((segment) => segment.startBeat));
+            for (const [index, source] of command.segments.entries()) {
+              const targetTrack = tracksById.get(command.targetTrackId ?? source.trackId);
+              if (!targetTrack) continue;
+              const pastedStart = command.startBeat === undefined
+                ? source.startBeat
+                : command.startBeat + source.startBeat - sourceAnchor;
+              const clone: Segment = {
+                ...cloneProjectData(source),
+                id: createdIds[index],
+                trackId: targetTrack.id,
+                startBeat: Math.max(0, pastedStart),
+              };
+              enforceSegmentBounds(clone, s.project.lengthBeats);
+              targetTrack.segments.push(clone);
+              normalizeSegmentLayers(targetTrack);
+            }
+            return;
+          }
+
           if (command.kind === "delete") {
             const ids = new Set(command.segmentIds);
             for (const track of s.project.tracks) {
@@ -619,6 +656,31 @@ export const useProjectStore = create<ProjectSlice>()(
               if (next.length === track.segments.length) continue;
               track.segments = next;
               normalizeSegmentLayers(track);
+            }
+            return;
+          }
+
+          if (command.kind === "metadata") {
+            const ids = new Set(command.segmentIds);
+            for (const track of s.project.tracks) {
+              for (const segment of track.segments) {
+                if (!ids.has(segment.id)) continue;
+                if (command.name !== undefined) {
+                  const nextName = command.name.trim();
+                  if (nextName) segment.name = nextName;
+                  else delete segment.name;
+                }
+                if (command.color !== undefined) {
+                  const nextColor = command.color?.trim() ?? "";
+                  if (nextColor) segment.color = nextColor;
+                  else delete segment.color;
+                }
+                if (command.icon !== undefined) {
+                  const nextIcon = command.icon?.trim() ?? "";
+                  if (nextIcon) segment.icon = nextIcon;
+                  else delete segment.icon;
+                }
+              }
             }
             return;
           }

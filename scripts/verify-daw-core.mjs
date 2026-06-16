@@ -158,6 +158,116 @@ try {
     "delete command should remove every requested segment",
   );
 
+  const pasteSourceAId = projectStore.addSegment(trackA, {
+    name: "Paste Source A",
+    startBeat: 2,
+    lengthBeats: 1,
+    payload: { kind: "midi", notes: [{ pitch: 65, velocity: 96, startBeat: 0, lengthBeats: 0.5 }] },
+  });
+  const pasteSourceBId = projectStore.addSegment(trackA, {
+    name: "Paste Source B",
+    startBeat: 4.5,
+    lengthBeats: 1.5,
+    payload: { kind: "midi", notes: [{ pitch: 69, velocity: 88, startBeat: 0.25, lengthBeats: 0.75 }] },
+  });
+  project = store.useProjectStore.getState().project;
+  const pasteSourceA = project.tracks[0].segments.find((segment) => segment.id === pasteSourceAId);
+  const pasteSourceB = project.tracks[0].segments.find((segment) => segment.id === pasteSourceBId);
+  assert.ok(pasteSourceA && pasteSourceB, "paste sources should exist");
+  const pastedToTargetIds = store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "paste",
+    segments: [pasteSourceA, pasteSourceB],
+    targetTrackId: trackB,
+    startBeat: 12,
+  });
+  assert.equal(pastedToTargetIds.length, 2, "paste command should return created ids");
+  project = store.useProjectStore.getState().project;
+  const pastedToTarget = pastedToTargetIds.map((id) => project.tracks[1].segments.find((segment) => segment.id === id));
+  assert.ok(pastedToTarget.every(Boolean), "target-track paste should insert every clone into the requested track");
+  assert.deepEqual(
+    pastedToTarget.map((segment) => [segment.id, segment.trackId, segment.startBeat, segment.lengthBeats]),
+    [
+      [pastedToTargetIds[0], trackB, 12, 1],
+      [pastedToTargetIds[1], trackB, 14.5, 1.5],
+    ],
+    "paste should anchor the earliest copied segment and preserve relative offsets",
+  );
+  assert.notEqual(pastedToTargetIds[0], pasteSourceAId, "paste clones should have fresh ids");
+  assert.deepEqual(
+    pastedToTarget[0].payload.notes,
+    pasteSourceA.payload.notes,
+    "paste should clone source payload content",
+  );
+
+  const pastedPreservedTrackIds = store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "paste",
+    segments: [
+      pasteSourceA,
+      { ...pasteSourceB, trackId: trackB },
+    ],
+    startBeat: 20,
+  });
+  project = store.useProjectStore.getState().project;
+  const preservedTrackA = project.tracks[0].segments.find((segment) => segment.id === pastedPreservedTrackIds[0]);
+  const preservedTrackB = project.tracks[1].segments.find((segment) => segment.id === pastedPreservedTrackIds[1]);
+  assert.ok(preservedTrackA && preservedTrackB, "paste without target override should preserve per-segment tracks");
+  assert.equal(preservedTrackA.startBeat, 20, "preserved-track paste should anchor first segment");
+  assert.equal(preservedTrackB.startBeat, 22.5, "preserved-track paste should preserve second segment offset");
+
+  store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "delete",
+    segmentIds: [pasteSourceAId, pasteSourceBId, ...pastedToTargetIds, ...pastedPreservedTrackIds],
+  });
+  project = store.useProjectStore.getState().project;
+  assert.equal(
+    project.tracks.flatMap((track) => track.segments).length,
+    0,
+    "paste verifier cleanup should remove sources and clones",
+  );
+
+  const metadataSegmentId = projectStore.addSegment(trackA, {
+    name: "Metadata Source",
+    startBeat: 1,
+    lengthBeats: 2,
+    payload: { kind: "midi", notes: [] },
+  });
+  store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "metadata",
+    segmentIds: [metadataSegmentId],
+    name: "  Renamed Segment  ",
+    color: "  #f5f5f5  ",
+    icon: "  ph:waveform  ",
+  });
+  project = store.useProjectStore.getState().project;
+  let metadataSegment = project.tracks[0].segments.find((segment) => segment.id === metadataSegmentId);
+  assert.ok(metadataSegment, "metadata target should exist");
+  assert.equal(metadataSegment.name, "Renamed Segment", "metadata command should trim segment names");
+  assert.equal(metadataSegment.color, "#f5f5f5", "metadata command should store trimmed color metadata");
+  assert.equal(metadataSegment.icon, "ph:waveform", "metadata command should store trimmed icon metadata");
+  store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "metadata",
+    segmentIds: [metadataSegmentId],
+    name: "",
+    color: null,
+    icon: "",
+  });
+  project = store.useProjectStore.getState().project;
+  metadataSegment = project.tracks[0].segments.find((segment) => segment.id === metadataSegmentId);
+  assert.ok(metadataSegment, "metadata clear target should exist");
+  assert.equal(metadataSegment.name, undefined, "empty metadata name should clear the optional name");
+  assert.equal(metadataSegment.color, undefined, "null metadata color should clear the optional color");
+  assert.equal(metadataSegment.icon, undefined, "empty metadata icon should clear the optional icon");
+  store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "delete",
+    segmentIds: [metadataSegmentId],
+  });
+  project = store.useProjectStore.getState().project;
+  assert.equal(
+    project.tracks.flatMap((track) => track.segments).length,
+    0,
+    "metadata verifier cleanup should remove its segment",
+  );
+
   const splitSource = projectStore.addSegment(trackA, {
     name: "Split MIDI",
     startBeat: 4,
