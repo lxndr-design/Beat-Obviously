@@ -7,7 +7,7 @@
 
 /**
  * MainComponent — owns the audio engine, database, and the WebBrowserComponent
- * that hosts the React UI. Wires everything to the MessageBridge so the
+ * that hosts the Solid UI. Wires everything to the MessageBridge so the
  * frontend can drive the engine and receive events.
  */
 class MainComponent : public juce::Component

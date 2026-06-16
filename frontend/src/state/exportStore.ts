@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { createStore as create } from "zustand/vanilla";
 import type { ProjectExportJobStatus } from "../ipc/schema";
 
 interface ExportState {

@@ -230,6 +230,8 @@ export interface Instrument {
   aether?: AetherSynthConfig;
   /** Exact synth-editor patch contract. Preserves modulation/macro state. */
   synthPatch?: SynthPatchSnapshot;
+  /** Visual node-editor graph for synth-style instruments. */
+  nodeGraph?: InstrumentNodeGraph;
 
   /** LFO that modulates the filter cutoff (and optionally pitch). */
   lfoWaveform?: "sine" | "triangle" | "saw" | "square"; // LFO movement shape
@@ -380,6 +382,52 @@ export interface SynthPatchSnapshot {
   };
 }
 
+export type InstrumentNodeKind =
+  | "oscillator"
+  | "noise"
+  | "mixer"
+  | "filter"
+  | "gain"
+  | "lfo"
+  | "envelope"
+  | "output";
+
+export type InstrumentNodePortKind = "input" | "output";
+export type InstrumentNodeSignalKind = "audio" | "control";
+export type InstrumentNodeParameterValue = boolean | number | string;
+
+export interface InstrumentNodePort {
+  id: string;
+  label: string;
+  kind: InstrumentNodePortKind;
+  signal: InstrumentNodeSignalKind;
+}
+
+export interface InstrumentNode {
+  id: Id;
+  kind: InstrumentNodeKind;
+  label: string;
+  x: number;
+  y: number;
+  inputs: InstrumentNodePort[];
+  outputs: InstrumentNodePort[];
+  parameters: Record<string, InstrumentNodeParameterValue>;
+}
+
+export interface InstrumentNodeCable {
+  id: Id;
+  fromNodeId: Id;
+  fromPortId: string;
+  toNodeId: Id;
+  toPortId: string;
+}
+
+export interface InstrumentNodeGraph {
+  schemaVersion: 1;
+  nodes: InstrumentNode[];
+  cables: InstrumentNodeCable[];
+}
+
 export interface InstrumentSource {
   kind: "factory" | "uploaded" | "created" | "derived" | "plugin";
   label: string;
@@ -451,6 +499,7 @@ export interface InstrumentSnapshot {
   wavetable?: WavetableConfig;
   aether?: AetherSynthConfig;
   synthPatch?: SynthPatchSnapshot;
+  nodeGraph?: InstrumentNodeGraph;
   lfoWaveform?: Instrument["lfoWaveform"];
   lfoRateHz?: number;
   lfoDepth?: number;

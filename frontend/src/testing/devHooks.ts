@@ -1,6 +1,7 @@
 import type { DecentSamplerUiControl } from "../ipc/schema";
 import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useUiStore } from "../state/store";
 import type { PluginAdapter } from "../state/types";
+import { compileNodeGraphToInstrumentPatch, createDefaultInstrumentNodeGraph } from "../features/NodeInstrumentEditor/nodeGraph";
 
 type DevDecentSamplerFixture = "lorenzo" | "wide";
 
@@ -9,6 +10,9 @@ declare global {
     __beatTestHooks?: {
       installDecentSamplerFixture: (fixture?: DevDecentSamplerFixture) => {
         pluginId: string;
+        instrumentId: string;
+      };
+      installNodeInstrumentFixture: () => {
         instrumentId: string;
       };
     };
@@ -96,9 +100,57 @@ export function installBeatDevHooks() {
     return { pluginId: nextPluginId, instrumentId: nextInstrumentId };
   };
 
+  const installNodeInstrumentFixture = () => {
+    const instrumentId = "dev-node-synth";
+    const instrumentStore = useInstrumentStore.getState();
+    const existing = instrumentStore.instruments.find((instrument) => instrument.id === instrumentId);
+    if (existing?.userCreated) instrumentStore.removeInstrument(existing.id);
+
+    const nextInstrumentId = instrumentStore.addInstrument({
+      id: instrumentId,
+      name: "Node Graph Synth",
+      icon: "ph:graph",
+      kind: "wavetable",
+      waveform: "wavetable",
+      filterType: "lowpass",
+      envelope: { attackMs: 8, decayMs: 180, sustain: 0.66, releaseMs: 360 },
+      knobs: { cutoff: 0.54, resonance: 0.26, drive: 0.12, color: 0.78 },
+      sampleIds: [],
+      userCreated: true,
+      source: { kind: "created", label: "Node editor dev fixture" },
+    });
+    const instrument = instrumentStore.instruments.find((candidate) => candidate.id === nextInstrumentId);
+    if (!instrument) return { instrumentId: nextInstrumentId };
+
+    const graph = createDefaultInstrumentNodeGraph(instrument);
+    const oscB = graph.nodes.find((node) => node.label === "Oscillator B");
+    if (oscB) {
+      oscB.parameters.waveform = "triangle";
+      oscB.parameters.level = 0.42;
+      oscB.parameters.octave = 1;
+      oscB.parameters.fine = -8;
+    }
+    const lfo = graph.nodes.find((node) => node.kind === "lfo");
+    if (lfo) {
+      lfo.parameters.shape = "triangle";
+      lfo.parameters.rate = 0.75;
+      lfo.parameters.amount = 0.34;
+    }
+    const filter = graph.nodes.find((node) => node.kind === "filter");
+    if (filter) {
+      filter.parameters.cutoff = 6200;
+      filter.parameters.resonance = 0.32;
+      filter.parameters.drive = 0.14;
+    }
+    instrumentStore.updateInstrument(nextInstrumentId, compileNodeGraphToInstrumentPatch(graph, instrument));
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
+    return { instrumentId: nextInstrumentId };
+  };
+
   window.__beatTestHooks = {
     ...(window.__beatTestHooks ?? {}),
     installDecentSamplerFixture,
+    installNodeInstrumentFixture,
   };
 
   document.addEventListener("beat:install-decent-sampler-fixture", (event) => {
@@ -110,6 +162,10 @@ export function installBeatDevHooks() {
   if (fixture === "ds-lorenzo" || fixture === "ds-wide") {
     window.setTimeout(() => {
       installDecentSamplerFixture(fixture === "ds-wide" ? "wide" : "lorenzo");
+    }, 0);
+  } else if (fixture === "node-instrument") {
+    window.setTimeout(() => {
+      installNodeInstrumentFixture();
     }, 0);
   }
 }

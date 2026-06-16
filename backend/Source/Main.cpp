@@ -225,7 +225,7 @@ namespace
 /**
  * Beat application entry point.
  *
- * Single window hosting the React UI in a WebBrowserComponent. The audio
+ * Single window hosting the Solid UI in a WebBrowserComponent. The audio
  * engine is owned by MainComponent and runs on its own JUCE audio thread.
  */
 class BeatApp : public juce::JUCEApplication,

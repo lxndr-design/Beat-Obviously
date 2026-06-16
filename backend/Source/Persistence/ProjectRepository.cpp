@@ -896,6 +896,19 @@ namespace beat
                 ? file.getFileNameWithoutExtension()
                 : juce::String("Untitled");
         }
+
+        juce::int64 normalizeTimestampMs(juce::int64 timestamp)
+        {
+            if (timestamp <= 0)
+                return 0;
+
+            constexpr juce::int64 minPlausibleRecentTimestampMs = 1704067200000LL; // 2024-01-01
+
+            // Older recent-project rows were stored as Unix seconds. The
+            // frontend contract is JavaScript timestamps in milliseconds.
+            const auto timestampMs = timestamp < 100000000000LL ? timestamp * 1000 : timestamp;
+            return timestampMs >= minPlausibleRecentTimestampMs ? timestampMs : 0;
+        }
     }
 
     void ProjectRepository::save(const Project& p)
@@ -960,7 +973,7 @@ namespace beat
         )sql");
         stmt.bind(1, file.getFullPathName());
         stmt.bind(2, recentProjectNameFor(file, document));
-        stmt.bind(3, (int) (juce::Time::currentTimeMillis() / 1000));
+        stmt.bind(3, (double) juce::Time::currentTimeMillis());
         stmt.bind(4, static_cast<double>(file.existsAsFile() ? file.getSize() : 0));
         stmt.step();
 
@@ -990,7 +1003,7 @@ namespace beat
             out.push_back({
                 path,
                 stmt.columnText(1),
-                (juce::int64) stmt.columnInt(2),
+                normalizeTimestampMs((juce::int64) stmt.columnDouble(2)),
                 stmt.columnDouble(3),
                 juce::File(path).existsAsFile(),
             });

@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useContextualHotkeyStore } from "./contextualHotkeys";
 import { redo, undo, useProjectStore, useTransportStore, useUiStore } from "../state/store";
 import { clipboardStore } from "../state/clipboard";
@@ -141,41 +140,39 @@ export function listHotkeys(): HotkeyBinding[] {
   return BINDINGS;
 }
 
-export function useGlobalHotkeys() {
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      // Ignore when typing in an input.
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-      const combo = comboFromEvent(e);
-      if ((combo === "meta+z" || combo === "shift+meta+z") && useUiStore.getState().openEditors.length > 0) {
-        e.preventDefault();
-        return;
-      }
-      if (combo === "backspace" || combo === "delete") {
-        e.preventDefault();
-        deleteSelectedTimelineSegments();
-        return;
-      }
-      if (useContextualHotkeyStore.getState().run(combo)) {
-        e.preventDefault();
-        return;
-      }
-      const binding = BINDINGS.find((b) => b.combo === combo);
-      if (!binding) return;
-      if (binding.preventDefault) e.preventDefault();
-      binding.action();
+export function installGlobalHotkeys() {
+  function onKey(e: KeyboardEvent) {
+    // Ignore when typing in an input.
+    const target = e.target as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable)
+    ) {
+      return;
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+    const combo = comboFromEvent(e);
+    if ((combo === "meta+z" || combo === "shift+meta+z") && useUiStore.getState().openEditors.length > 0) {
+      e.preventDefault();
+      return;
+    }
+    if (combo === "backspace" || combo === "delete") {
+      e.preventDefault();
+      deleteSelectedTimelineSegments();
+      return;
+    }
+    if (useContextualHotkeyStore.getState().run(combo)) {
+      e.preventDefault();
+      return;
+    }
+    const binding = BINDINGS.find((b) => b.combo === combo);
+    if (!binding) return;
+    if (binding.preventDefault) e.preventDefault();
+    binding.action();
+  }
+  window.addEventListener("keydown", onKey);
+  return () => window.removeEventListener("keydown", onKey);
 }
 
 function canUseTimelineSegmentHotkeys(): boolean {

@@ -8,7 +8,7 @@ import type {
 /**
  * IPC bridge to the JUCE C++ backend.
  *
- * In production, the React app runs inside a juce::WebBrowserComponent
+ * In production, the Solid app runs inside a juce::WebBrowserComponent
  * with native integration enabled. JUCE 8 exposes:
  *   - window.__BEAT_NATIVE__.request(kind, payload) → Promise<response>
  *   - window.__BEAT_NATIVE__.subscribe(listener)    → unsubscribe

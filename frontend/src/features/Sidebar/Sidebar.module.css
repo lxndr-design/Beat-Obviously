@@ -170,6 +170,19 @@
   min-width: 0;
 }
 
+.panelHost {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+}
+
+.panelHost > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
 /* 4px-wide invisible hit target on the right edge — wider on hover for
  * easier grabbing. Drag changes the cursor and the sidebar width. */
 .resizeHandle {

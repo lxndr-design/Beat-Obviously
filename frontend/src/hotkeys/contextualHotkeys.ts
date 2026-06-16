@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { create } from "zustand";
+import { createStore as create } from "zustand/vanilla";
 import { useModalStack } from "../components";
 
 type HotkeyHandler = () => boolean | void;
@@ -41,18 +40,3 @@ export const useContextualHotkeyStore = create<ContextualHotkeyState>((set, get)
     return false;
   },
 }));
-
-export function useContextualHotkey(
-  scopeId: string,
-  combo: string,
-  handler: HotkeyHandler,
-  enabled = true,
-) {
-  useEffect(() => {
-    if (!enabled) return;
-    useContextualHotkeyStore.getState().register(scopeId, combo, handler);
-    return () => {
-      useContextualHotkeyStore.getState().unregister(scopeId, combo);
-    };
-  }, [scopeId, combo, handler, enabled]);
-}

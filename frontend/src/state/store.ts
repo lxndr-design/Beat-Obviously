@@ -1,7 +1,7 @@
-import { create } from "zustand";
-import { temporal } from "zundo";
+import { createStore as create } from "zustand/vanilla";
 import { immer } from "zustand/middleware/immer";
 import { nanoid } from "nanoid";
+import { temporal, type TemporalStoreApi } from "./temporal";
 import type { BeatProjectAsset, BeatProjectIntegrityReport, ProjectSidecarCleanupReport, RecentProjectEntry } from "../ipc/schema";
 import type {
   Beats,
@@ -27,7 +27,7 @@ import type {
  *   - transport: live, NOT undoable (you don't undo "press play")
  *   - ui: ephemeral, NOT undoable
  *
- * Only the project slice is wrapped by zundo. Transport and UI live in
+ * Only the project slice is wrapped by local undo history. Transport and UI live in
  * separate stores below to keep undo history clean.
  */
 
@@ -776,7 +776,7 @@ export const useProjectStore = create<ProjectSlice>()(
       equality: (a, b) => a.project === b.project,
     },
   ),
-);
+) as TemporalStoreApi<ProjectSlice>;
 
 /** Bound helpers for invoking undo/redo from anywhere. */
 export const undo = () => {
@@ -1297,10 +1297,17 @@ function createRecentProject(project: Partial<RecentProjectEntry> & { path: stri
   return {
     path: project.path.trim(),
     name: project.name?.trim() || projectFileName(project.path),
-    openedAt: Number.isFinite(project.openedAt) ? Number(project.openedAt) : Date.now(),
+    openedAt: normalizeTimestampMs(project.openedAt),
     sizeBytes: Number.isFinite(project.sizeBytes) ? Number(project.sizeBytes) : 0,
     exists: project.exists ?? true,
   };
+}
+
+function normalizeTimestampMs(value: unknown): number {
+  const timestamp = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return Date.now();
+  const timestampMs = timestamp < 100_000_000_000 ? timestamp * 1000 : timestamp;
+  return timestampMs >= Date.UTC(2024, 0, 1) ? timestampMs : Date.now();
 }
 
 function normalizeRecentProjects(projects: unknown[]): RecentProjectEntry[] {
@@ -1743,6 +1750,7 @@ export function snapshotInstrument(instrument: Instrument): InstrumentSnapshot {
     wavetable: instrument.wavetable ? structuredClone(instrument.wavetable) : undefined,
     aether: instrument.aether ? structuredClone(instrument.aether) : undefined,
     synthPatch: instrument.synthPatch ? structuredClone(instrument.synthPatch) : undefined,
+    nodeGraph: instrument.nodeGraph ? structuredClone(instrument.nodeGraph) : undefined,
     lfoWaveform: instrument.lfoWaveform,
     lfoRateHz: instrument.lfoRateHz,
     lfoDepth: instrument.lfoDepth,

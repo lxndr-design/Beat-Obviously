@@ -3,13 +3,13 @@
  *
  * Future variants (other shaders, an openFrameworks-backed renderer,
  * particle systems) implement this and register themselves. The active
- * variant is set in user preferences and consumed by Visualizer.tsx.
+ * variant is set in user preferences and consumed by the Solid visualizer host.
  */
 export interface VisualizerVariant {
   id: string;
   label: string;
-  /** React component to render the variant. */
-  Component: React.ComponentType;
+  /** Mount the variant into a host element and return a cleanup callback. */
+  mount: (host: HTMLElement) => () => void;
 }
 
 const REGISTRY: VisualizerVariant[] = [];

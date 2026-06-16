@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { createStore as create } from "zustand/vanilla";
 import type { CustomWavetableDefinition, CustomWavetableFrame, Instrument, SynthPatchSnapshot, WavetableConfig } from "./types";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 1;

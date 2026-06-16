@@ -14,3 +14,8 @@
   line-height: 1;
   white-space: nowrap;
 }
+
+.zero {
+  background: transparent;
+  color: color-mix(in srgb, var(--color-fg) 55%, transparent);
+}

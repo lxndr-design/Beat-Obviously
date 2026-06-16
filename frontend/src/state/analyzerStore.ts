@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { createStore as create } from "zustand/vanilla";
 
 export const ANALYZER_BAND_COUNT = 64;
 

@@ -1,8 +1,10 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import solid from "vite-plugin-solid";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    solid({ include: "**/*.solid.tsx" }),
+  ],
   server: {
     port: 6174,
     strictPort: true,
@@ -22,7 +24,7 @@ export default defineConfig({
         chunkFileNames: "assets/[name]-[hash:8].js",
         assetFileNames: "assets/[name]-[hash:8][extname]",
         manualChunks(id) {
-          if (id.includes("@react-three") || id.includes("/three/") || id.includes("\\three\\") || id.includes("react-reconciler")) {
+          if (id.includes("/three/") || id.includes("\\three\\")) {
             return "vendor-visualizer";
           }
           if (id.includes("node_modules")) {

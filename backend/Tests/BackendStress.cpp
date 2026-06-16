@@ -4770,11 +4770,11 @@ namespace
             stmt.bind(4, (double) firstFile.getSize());
             stmt.bind(5, missingPath);
             stmt.bind(6, "Missing");
-            stmt.bind(7, 200);
+            stmt.bind(7, 1710000001);
             stmt.bind(8, 0.0);
             stmt.bind(9, secondFile.getFullPathName());
             stmt.bind(10, "Second");
-            stmt.bind(11, 300);
+            stmt.bind(11, (double) 1710000002000LL);
             stmt.bind(12, (double) secondFile.getSize());
             stmt.step();
         }
@@ -4788,6 +4788,10 @@ namespace
             && recents[0].exists
             && !recents[1].exists
             && recents[2].exists;
+        const bool legacyTimestampOk = orderOk
+            && recents[0].openedAt == 1710000002000LL
+            && recents[1].openedAt == 1710000001000LL
+            && recents[2].openedAt == 0;
 
         repo.removeRecentProject(missingPath);
         const auto afterRemove = repo.listRecentProjects();
@@ -4804,14 +4808,16 @@ namespace
         const bool recordOk = !afterRecord.empty()
             && afterRecord.front().path == firstFile.getFullPathName()
             && afterRecord.front().name == "Named From Document"
-            && afterRecord.front().sizeBytes == (double) firstFile.getSize();
+            && afterRecord.front().sizeBytes == (double) firstFile.getSize()
+            && afterRecord.front().openedAt > 1000000000000LL;
 
         root.deleteRecursively();
-        const bool ok = orderOk && existenceOk && removeOk && recordOk;
+        const bool ok = orderOk && existenceOk && legacyTimestampOk && removeOk && recordOk;
         if (!ok)
         {
             std::cerr << "Recent project repository stress failed order=" << orderOk
                       << " existence=" << existenceOk
+                      << " legacyTimestamp=" << legacyTimestampOk
                       << " remove=" << removeOk
                       << " record=" << recordOk << "\n";
         }

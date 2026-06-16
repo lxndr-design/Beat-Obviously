@@ -28,7 +28,7 @@ FetchContent_MakeAvailable(JUCE)
 # in the JUCE binary. In Debug builds, the webview points at the Vite dev
 # server (set BEAT_DEV_FRONTEND_URL when launching).
 
-option(BEAT_BUILD_FRONTEND "Build the React frontend and embed it" ON)
+option(BEAT_BUILD_FRONTEND "Build the Solid frontend and embed it" ON)
 
 if(BEAT_BUILD_FRONTEND AND CMAKE_BUILD_TYPE STREQUAL "Release")
     find_program(NPM_EXECUTABLE npm REQUIRED)
@@ -36,7 +36,7 @@ if(BEAT_BUILD_FRONTEND AND CMAKE_BUILD_TYPE STREQUAL "Release")
         COMMAND ${NPM_EXECUTABLE} install
         COMMAND ${NPM_EXECUTABLE} run build
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/frontend
-        COMMENT "Building React frontend"
+        COMMENT "Building Solid frontend"
         VERBATIM
     )
 endif()

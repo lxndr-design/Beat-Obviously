@@ -207,7 +207,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND BEAT_BUILD_FRONTEND)
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_SOURCE_DIR}/frontend/dist"
             "${BEAT_FRONTEND_RESOURCE_DIR}"
-        COMMENT "Refreshing React frontend in app bundle"
+        COMMENT "Refreshing Solid frontend in app bundle"
         VERBATIM
     )
 endif()

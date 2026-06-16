@@ -9,11 +9,11 @@ to extend the kit without drifting.
 The kit is implemented in three layers:
 
 1. **Foundations** in `frontend/src/design/*.css`.
-2. **Shared primitives** in `frontend/src/components`.
+2. **Shared Solid primitives** in `frontend/src/solid-ui`.
 3. **Feature composition** in `frontend/src/features`.
 
-Every shared component must have a colocated `*.demo.tsx` file, and every demo
-must be included by `frontend/src/design/UiKitCatalog.tsx`.
+Every shared Solid component must have a colocated `*.demo.solid.tsx` file, and
+every demo must be included by `frontend/src/design/SolidUiKitCatalog.solid.tsx`.
 
 ## Foundations
 
@@ -88,7 +88,7 @@ Do not add decorative fades, bounces, spring motion, or arbitrary easing.
 
 ### Icons
 
-Use `<Icon>` from `components/Icon`. Icon names must use the `ph:` Iconify set.
+Use `<Icon>` from `solid-ui/Icon`. Icon names must use the `ph:` Iconify set.
 Do not mix icon sets in product UI.
 
 Decorative icons must pass `decorative`. Informational icons need a `title` or
@@ -112,7 +112,7 @@ Raster imagery must render as dithered black-and-white output through
 
 ## Shared Components
 
-Use shared components before styling feature-local controls.
+Use shared Solid components before styling feature-local controls.
 
 | Component | Use For | Required States |
 | --- | --- | --- |
@@ -155,7 +155,7 @@ Baseline expectations:
 
 ## Component Demo Requirements
 
-Each shared component folder must include `<Component>.demo.tsx`.
+Each shared Solid component folder must include `<Component>.demo.solid.tsx`.
 
 A demo should show:
 
@@ -173,9 +173,9 @@ engineers and designers.
 1. Check `tokens.css` first.
 2. Check `layout.css`, `surfaces.css`, and `forms.css` before adding CSS.
 3. Prefer an existing shared component.
-4. If a new shared primitive is needed, add it under `components/<Name>/`.
-5. Add `<Name>.demo.tsx`.
-6. Add the demo to `design/UiKitCatalog.tsx`.
+4. If a new shared primitive is needed, add it under `solid-ui/<Name>/`.
+5. Add `<Name>.demo.solid.tsx`.
+6. Add the demo to `design/SolidUiKitCatalog.solid.tsx`.
 7. Run `npm run verify:design-system`.
 8. Run `npm run typecheck` and `npm run build`.
 
@@ -184,10 +184,11 @@ engineers and designers.
 `npm run verify:design-system` checks that:
 
 - Every shared component has a demo.
-- Every demo is included in `UiKitCatalog.tsx`.
-- Component files do not import raw Iconify directly.
+- Every demo is included in `SolidUiKitCatalog.solid.tsx`.
+- Source files do not import deprecated Iconify React bindings.
 - Non-Phosphor icon names are not used in source.
 - Shared component CSS does not introduce new hex colors outside design files.
+- Legacy JSX files under `frontend/src` are either Solid-suffixed or removed.
 
 The verifier is intentionally conservative. If it flags a legitimate new pattern,
 add a token and update this document in the same change.

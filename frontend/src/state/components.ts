@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { createStore as create } from "zustand/vanilla";
 import { immer } from "zustand/middleware/immer";
 import { nanoid } from "nanoid";
 import type { DrumRow, DrumSpeed, DrumStep, Id, Instrument, MidiNote, TimeSignature } from "./types";

@@ -15,7 +15,7 @@
 namespace beat
 {
     /**
-     * MessageBridge — wires the React frontend to the C++ engine + database.
+     * MessageBridge — wires the web frontend to the C++ engine + database.
      *
      * On install():
      *   - registers a JS-callable native function "request" on the

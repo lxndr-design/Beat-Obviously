@@ -1,0 +1,386 @@
+.shell {
+  --node-width: 206px;
+  --node-cable-audio-start: color-mix(in srgb, var(--color-fg) 34%, transparent);
+  --node-cable-audio-end: color-mix(in srgb, var(--color-fg) 82%, transparent);
+  --node-cable-control-start: color-mix(in srgb, var(--color-fg) 20%, transparent);
+  --node-cable-control-end: color-mix(in srgb, var(--color-fg) 54%, transparent);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-size: var(--font-size-ui);
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.7fr) minmax(0, 2fr) auto;
+  align-items: stretch;
+  min-height: 46px;
+  border-bottom: var(--border-soft);
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-right: var(--border-soft);
+}
+
+.identity svg {
+  flex: 0 0 auto;
+}
+
+.identityMark {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  background: var(--color-fg);
+  color: var(--color-bg);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.identity div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.identity strong,
+.nodeHeader strong {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity span,
+.inspectorHint {
+  color: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
+  font-size: var(--font-size-hint);
+}
+
+.nodePalette {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2);
+  overflow-x: auto;
+  border-right: var(--border-soft);
+}
+
+.nodePalette button {
+  flex: 0 0 auto;
+}
+
+.nodePaletteButton,
+.nodeActionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  color: var(--color-fg);
+  background: transparent;
+  border: var(--border-soft);
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+}
+
+.nodePaletteButton span {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  background: color-mix(in srgb, var(--color-fg) 12%, var(--color-bg));
+  color: var(--color-fg);
+  font-size: var(--font-size-hint);
+}
+
+.nodePaletteButton:hover,
+.nodeActionButton:hover {
+  background: var(--surface-hover);
+}
+
+.primaryActionButton {
+  background: var(--color-fg);
+  color: var(--color-bg);
+  border-color: var(--color-fg);
+}
+
+.primaryActionButton:hover {
+  background: color-mix(in srgb, var(--color-fg) 88%, var(--color-bg));
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+}
+
+.viewport {
+  min-height: 0;
+  overflow: auto;
+  background:
+    linear-gradient(var(--grid-line-faint) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line-faint) 1px, transparent 1px),
+    radial-gradient(circle at 18% 14%, color-mix(in srgb, var(--color-fg) 8%, transparent), transparent 24%),
+    var(--color-bg);
+  background-size: 28px 28px, 28px 28px, 100% 100%, auto;
+}
+
+.solidHost {
+  display: contents;
+}
+
+.canvas {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.cables {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.cable,
+.draftCable {
+  fill: none;
+  stroke: url("#node-cable-audio");
+  stroke-linecap: round;
+  stroke-width: 2;
+  pointer-events: stroke;
+}
+
+.cable[data-signal="control"],
+.draftCable[data-signal="control"] {
+  stroke: url("#node-cable-control");
+  stroke-dasharray: 6 5;
+}
+
+.draftCable {
+  opacity: 0.74;
+}
+
+.cableHitArea {
+  fill: none;
+  stroke: transparent;
+  stroke-linecap: round;
+  stroke-width: 12;
+  pointer-events: stroke;
+}
+
+.node {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  grid-template-rows: 38px auto;
+  width: var(--node-width);
+  min-height: 126px;
+  border: var(--border-soft);
+  background: color-mix(in srgb, var(--color-bg) 86%, var(--color-fg));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-bg) 70%, transparent);
+  user-select: none;
+}
+
+.selectedNode {
+  border-color: var(--color-fg);
+  background: color-mix(in srgb, var(--color-fg) 12%, var(--color-bg));
+}
+
+.nodeHeader {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  cursor: grab;
+  border-bottom: var(--border-soft);
+}
+
+.nodeHeader:active {
+  cursor: grabbing;
+}
+
+.nodeIcon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+
+.removeNode {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: color-mix(in srgb, var(--color-fg) 76%, var(--color-bg));
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.removeNode:hover {
+  color: var(--color-fg);
+  background: var(--surface-hover);
+}
+
+.portGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2);
+}
+
+.portColumn {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.portColumn[data-align="right"] {
+  justify-items: end;
+}
+
+.port {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 92px;
+  min-height: 22px;
+  padding: 0;
+  overflow: hidden;
+  color: var(--color-fg);
+  background: transparent;
+  border: 0;
+  cursor: crosshair;
+  font: inherit;
+  text-align: left;
+}
+
+.port[data-kind="output"] {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.port span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portDot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border: var(--border-fg);
+  border-radius: 999px;
+  background: var(--color-bg);
+}
+
+.portDot[data-signal="control"] {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--color-fg) 24%, var(--color-bg));
+}
+
+.port:hover .portDot {
+  background: var(--color-fg);
+}
+
+.inspector {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 2fr);
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 78px;
+  padding: var(--space-2) var(--space-3);
+  border-top: var(--border-soft);
+  background: color-mix(in srgb, var(--color-fg) 5%, var(--color-bg));
+}
+
+.inspectorTitle {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.parameterGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.selectField,
+.booleanField,
+.textField,
+.numberField {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.selectField span,
+.booleanField span,
+.textField span,
+.numberField span {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--color-fg) 70%, var(--color-bg));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectField select,
+.textField input,
+.numberField input {
+  min-width: 0;
+  height: 28px;
+  color: var(--color-fg);
+  background: var(--color-bg);
+  border: var(--border-fg);
+  font: inherit;
+}
+
+.numberField {
+  grid-template-columns: 74px minmax(0, 1fr) auto;
+}
+
+.fieldUnit {
+  font-size: var(--font-size-hint);
+}
+
+.booleanField input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-fg);
+}
+
+.empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: color-mix(in srgb, var(--color-fg) 62%, var(--color-bg));
+}

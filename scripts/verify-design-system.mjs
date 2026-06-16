@@ -5,8 +5,9 @@ import { join, relative } from "node:path";
 const repoRoot = new URL("..", import.meta.url).pathname;
 const frontendSrc = join(repoRoot, "frontend", "src");
 const componentsDir = join(frontendSrc, "components");
+const solidUiDir = join(frontendSrc, "solid-ui");
 const featuresDir = join(frontendSrc, "features");
-const catalogPath = join(frontendSrc, "design", "UiKitCatalog.tsx");
+const solidCatalogPath = join(frontendSrc, "design", "SolidUiKitCatalog.solid.tsx");
 const tokensPath = join(frontendSrc, "design", "tokens.css");
 
 const failures = [];
@@ -54,35 +55,35 @@ function isAllowed(allowlist, file, line, value) {
   });
 }
 
-const componentNames = readdirSync(componentsDir)
-  .filter((name) => statSync(join(componentsDir, name)).isDirectory())
-  .sort();
-
-const catalog = existsSync(catalogPath) ? readFileSync(catalogPath, "utf8") : "";
-if (!catalog) {
-  fail("Missing frontend/src/design/UiKitCatalog.tsx");
+const solidComponentNames = existsSync(solidUiDir)
+  ? readdirSync(solidUiDir)
+    .filter((name) => statSync(join(solidUiDir, name)).isDirectory())
+    .sort()
+  : [];
+const solidCatalog = existsSync(solidCatalogPath) ? readFileSync(solidCatalogPath, "utf8") : "";
+if (solidComponentNames.length > 0 && !solidCatalog) {
+  fail("Missing frontend/src/design/SolidUiKitCatalog.solid.tsx");
 }
 
-for (const name of componentNames) {
-  const demoPath = join(componentsDir, name, `${name}.demo.tsx`);
+for (const name of solidComponentNames) {
+  const demoPath = join(solidUiDir, name, `${name}.demo.solid.tsx`);
   if (!existsSync(demoPath)) {
-    fail(`Missing component demo: ${rel(demoPath)}`);
+    fail(`Missing Solid component demo: ${rel(demoPath)}`);
     continue;
   }
 
-  const expectedImport = `../components/${name}/${name}.demo`;
-  if (!catalog.includes(expectedImport)) {
-    fail(`UiKitCatalog does not import ${expectedImport}`);
+  const expectedImport = `../solid-ui/${name}/${name}.demo.solid`;
+  if (!solidCatalog.includes(expectedImport)) {
+    fail(`SolidUiKitCatalog does not import ${expectedImport}`);
   }
 }
 
 const sourceFiles = walk(frontendSrc, (path) => /\.(ts|tsx)$/.test(path));
 for (const file of sourceFiles) {
   const source = readFileSync(file, "utf8");
-  const isIconWrapper = file.endsWith(join("components", "Icon", "Icon.tsx"));
   const relativeFile = rel(file);
-  if (!isIconWrapper && source.includes("@iconify/react")) {
-    fail(`Raw Iconify import outside Icon wrapper: ${rel(file)}`);
+  if (source.includes("@iconify/react")) {
+    fail(`Deprecated Iconify React import in ${rel(file)}`);
   }
 
   if (!relativeFile.endsWith("scripts/verify-design-system.mjs")) {
@@ -131,19 +132,14 @@ if (!tokenSource) {
 // and piano-roll internals that are domain geometry rather than standalone UI.
 const featureRawColorAllowlist = [
   {
-    file: "frontend/src/features/InstrumentEditor/InstrumentWaveformPreview.tsx",
+    file: "frontend/src/features/InstrumentEditor/InstrumentWaveformPreview.solid.tsx",
     value: "#fff",
     line: /getPropertyValue\("--color-fg"\).*"#fff"/,
   },
   {
-    file: "frontend/src/features/InstrumentEditor/InstrumentWaveformPreview.tsx",
+    file: "frontend/src/features/InstrumentEditor/InstrumentWaveformPreview.solid.tsx",
     value: "rgba(255,255,255,0.12)",
     line: /getPropertyValue\("--grid-line-faint"\).*"rgba\(255,255,255,0\.12\)"/,
-  },
-  {
-    file: "frontend/src/features/Eq/EqGraph.tsx",
-    value: "#fff",
-    line: /stopColor="#fff"/,
   },
   {
     file: "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.module.css",
@@ -218,6 +214,12 @@ const featureUnknownTokenAllowlist = [
 const featureFiles = existsSync(featuresDir)
   ? walk(featuresDir, (path) => /\.(css|ts|tsx)$/.test(path))
   : [];
+
+for (const file of sourceFiles) {
+  if (file.endsWith(".tsx") && !file.endsWith(".solid.tsx")) {
+    fail(`Legacy JSX file must be Solid-suffixed or removed: ${rel(file)}`);
+  }
+}
 
 const rawColorPattern = /#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)/g;
 const namedHuePattern =
@@ -301,4 +303,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Design system verifier passed for ${componentNames.length} components and ${featureFiles.length} feature files.`);
+console.log(`Design system verifier passed for ${solidComponentNames.length} Solid components and ${featureFiles.length} feature files.`);
