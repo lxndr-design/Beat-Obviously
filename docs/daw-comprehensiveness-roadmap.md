@@ -62,7 +62,7 @@ Purpose: make timeline editing feel like a DAW instead of a demo surface.
 
 Current assets:
 
-- Timeline, tracks, segments, marquee, drag/resize, visible fade handles, split/trim/fade metadata, paste/duplicate, rename/color/icon metadata, segment group/ungroup metadata and multi-select menu actions, crossfade commands, review loop, transport actions, grouped history, grid-snap preferences, destructive undo guardrails with hotkey confirmation, and pure geometry/interaction verifiers exist.
+- Timeline, tracks, segments, marquee, drag/resize, visible fade handles, split/trim/fade metadata, paste/duplicate, rename/color/icon metadata, segment group/ungroup metadata and multi-select menu actions, crossfade commands, review loop, transport actions, grouped history, grid-snap preferences, destructive undo guardrails with hotkey confirmation, and pure geometry/interaction/backend parity verifiers exist.
 - `npm run verify:daw` covers edit-command behavior for move, resize, duplicate, paste, delete, rename/color/icon metadata, group/ungroup, nudge, quantize, split, trim, fade, crossfade, grouped undo/redo, destructive undo confirmation policy, and timeline geometry.
 - `npm run verify:track-interactions` covers free segment drag/resize/fade by default with Shift-based snapping.
 
@@ -76,8 +76,8 @@ Build:
 
 Backend/model:
 
-- Ensure crossfades and trims affect live and export paths identically.
-- Add stress for fade/crossfade render parity and invalid trim/crossfade repair warnings.
+- Ensure trims affect live and export paths identically.
+- Add stress for invalid trim/crossfade repair warnings.
 
 Acceptance:
 
