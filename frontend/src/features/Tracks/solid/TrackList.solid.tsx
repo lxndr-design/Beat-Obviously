@@ -1,8 +1,9 @@
 /** @jsxImportSource solid-js */
-import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { createStoreSelector } from "../../../solid-utils/store";
 import { Button, HoverInfo, Icon } from "../../../solid-ui";
 import { useProjectStore, useTransportStore, useUiStore, useViewStore } from "../../../state/store";
+import { clipboardStore } from "../../../state/clipboard";
 import { TrackLaneSolid } from "./TrackLane.solid";
 import { TrackEffectHeaderRowsSolid, TrackEffectLaneRowsSolid } from "./TrackEffectRows.solid";
 import { TimelineSolid } from "./Timeline.solid";
@@ -38,11 +39,19 @@ export function TrackListSolid() {
   const tracks = createStoreSelector(useProjectStore, (state) => state.project.tracks);
   const lengthBeats = createStoreSelector(useProjectStore, (state) => state.project.lengthBeats);
   const selectedTrackIds = createStoreSelector(useUiStore, (state) => state.selectedTrackIds);
+  const selectedSegmentIds = createStoreSelector(useUiStore, (state) => state.selectedSegmentIds);
   const loopEnabled = createStoreSelector(useTransportStore, (state) => state.loopEnabled);
   const loopRange = createStoreSelector(useTransportStore, (state) => state.loopRange);
   const beatsToPx = createStoreSelector(useViewStore, (state) => state.beatsToPx);
   const [marquee, setMarquee] = createSignal<MarqueeState | null>(null, { equals: false });
   const [expandedEffectIds, setExpandedEffectIds] = createSignal<Set<Id>>(new Set(), { equals: false });
+  const selectedSegments = createMemo(() => {
+    const ids = new Set(selectedSegmentIds());
+    return tracks().flatMap((track) => track.segments).filter((segment) => ids.has(segment.id));
+  });
+  const selectedGroupIds = createMemo(() => Array.from(new Set(selectedSegments()
+    .map((segment) => segment.groupId)
+    .filter((groupId): groupId is Id => Boolean(groupId)))));
 
   function clearSelection() {
     useUiStore.getState().setSelectedTracks([]);
@@ -191,6 +200,29 @@ export function TrackListSolid() {
     useViewStore.getState().setZoom(next);
   }
 
+  function groupSelectedSegments() {
+    const ids = selectedSegments().map((segment) => segment.id);
+    if (ids.length < 2) return;
+    useProjectStore.getState().applySegmentEditCommand({ kind: "group", segmentIds: ids });
+  }
+
+  function ungroupSelectedSegments() {
+    const groupIds = selectedGroupIds();
+    if (groupIds.length === 0) return;
+    useProjectStore.getState().applySegmentEditCommand({ kind: "ungroup", groupIds });
+  }
+
+  function copySelectedSegments() {
+    clipboardStore.getState().copyMany(selectedSegments());
+  }
+
+  function deleteSelectedSegments() {
+    const ids = selectedSegments().map((segment) => segment.id);
+    if (ids.length === 0) return;
+    useProjectStore.getState().applySegmentEditCommand({ kind: "delete", segmentIds: ids });
+    useUiStore.getState().setSelectedSegments([]);
+  }
+
   return (
     <div class={styles.panel}>
       <div class={styles.area}>
@@ -225,6 +257,37 @@ export function TrackListSolid() {
         </div>
 
         <div class={styles.laneWrap}>
+          <Show when={selectedSegments().length > 1}>
+            <div class={styles.selectionBar} data-floating-layer>
+              <span class={styles.selectionCount}>{selectedSegments().length}</span>
+              <HoverInfo content="Group selected segments">
+                <Button iconOnly size="xs" aria-label="Group selected segments" onClick={groupSelectedSegments}>
+                  <Icon name="ph:brackets-square" size={16} decorative />
+                </Button>
+              </HoverInfo>
+              <HoverInfo content="Ungroup selected segments">
+                <Button
+                  iconOnly
+                  size="xs"
+                  aria-label="Ungroup selected segments"
+                  disabled={selectedGroupIds().length === 0}
+                  onClick={ungroupSelectedSegments}
+                >
+                  <Icon name="ph:brackets-curly" size={16} decorative />
+                </Button>
+              </HoverInfo>
+              <HoverInfo content="Copy selected segments">
+                <Button iconOnly size="xs" aria-label="Copy selected segments" onClick={copySelectedSegments}>
+                  <Icon name="ph:clipboard" size={16} decorative />
+                </Button>
+              </HoverInfo>
+              <HoverInfo content="Delete selected segments">
+                <Button iconOnly size="xs" aria-label="Delete selected segments" onClick={deleteSelectedSegments}>
+                  <Icon name="ph:trash" size={16} decorative />
+                </Button>
+              </HoverInfo>
+            </div>
+          </Show>
           <div
             ref={laneScrollElement}
             class={styles.laneScroll}

@@ -72,6 +72,31 @@
   min-width: 0;
 }
 
+.selectionBar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+  border: var(--border-fg);
+}
+
+.selectionCount {
+  min-width: 20px;
+  height: var(--button-square-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-1);
+  color: var(--color-fg);
+  border-right: var(--border-fg);
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+}
+
 .laneScroll {
   overflow-x: auto;
   overflow-y: hidden;
