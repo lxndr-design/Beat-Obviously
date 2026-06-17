@@ -530,13 +530,13 @@ function FilesPreferences(props: FilesPreferencesProps) {
 function GridPreferences(props: { settings: SettingsState }) {
   return (
     <section class={styles.section}>
-      <h3 class={styles.sectionTitle}>Smart Grid</h3>
+      <h3 class={styles.sectionTitle}>Grid Snap</h3>
       <div class={styles.gridRows}>
         <div class={styles.gridRow}>
           <Toggle
             className={styles.gridToggle}
             labelClassName={styles.gridToggleLabel}
-            label="Timeline"
+            label="Timeline snap"
             checked={props.settings.timelineSmartGrid}
             onChange={props.settings.setTimelineSmartGrid}
           />
@@ -553,7 +553,7 @@ function GridPreferences(props: { settings: SettingsState }) {
           <Toggle
             className={styles.gridToggle}
             labelClassName={styles.gridToggleLabel}
-            label="MIDI"
+            label="MIDI snap"
             checked={props.settings.midiSmartGrid}
             onChange={props.settings.setMidiSmartGrid}
           />
