@@ -322,6 +322,10 @@ export function SegmentSolid(props: Props) {
     const uiStore = useUiStore.getState();
     if (selected() && selectedSegmentIds().length > 1) {
       const crossfadeCandidate = selectedCrossfadeCandidate(selectedSegments());
+      const selectedIds = selectedSegments().map((candidate) => candidate.id);
+      const groupedIds = Array.from(new Set(selectedSegments()
+        .map((candidate) => candidate.groupId)
+        .filter((groupId): groupId is Id => Boolean(groupId))));
       return [
         ...(crossfadeCandidate
           ? [{
@@ -338,9 +342,22 @@ export function SegmentSolid(props: Props) {
             } as ContextMenuItem]
           : []),
         {
+          label: "Group",
+          icon: "ph:brackets-square",
+          separatorBefore: Boolean(crossfadeCandidate),
+          onSelect: () => projectStore.applySegmentEditCommand({ kind: "group", segmentIds: selectedIds }),
+        },
+        ...(groupedIds.length > 0
+          ? [{
+              label: "Ungroup",
+              icon: "ph:brackets-curly",
+              onSelect: () => projectStore.applySegmentEditCommand({ kind: "ungroup", groupIds: groupedIds }),
+            } as ContextMenuItem]
+          : []),
+        {
           label: "Copy",
           icon: "ph:clipboard",
-          separatorBefore: Boolean(crossfadeCandidate),
+          separatorBefore: true,
           onSelect: () => clipboardStore.getState().copyMany(selectedSegments()),
         },
         {
@@ -348,7 +365,7 @@ export function SegmentSolid(props: Props) {
           icon: "ph:trash",
           separatorBefore: true,
           onSelect: () => {
-            projectStore.applySegmentEditCommand({ kind: "delete", segmentIds: selectedSegments().map((candidate) => candidate.id) });
+            projectStore.applySegmentEditCommand({ kind: "delete", segmentIds: selectedIds });
             uiStore.setSelectedSegments([]);
           },
         },
