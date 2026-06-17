@@ -1,8 +1,9 @@
 import { useContextualHotkeyStore } from "./contextualHotkeys";
-import { redo, undo, useProjectStore, useTransportStore, useUiStore } from "../state/store";
+import { nextUndoRequiresConfirmation, redo, undo, useProjectStore, useTransportStore, useUiStore } from "../state/store";
 import { clipboardStore } from "../state/clipboard";
 import { pauseTransport, playTransport, stopTransport } from "../audio/transportActions";
 import { saveCurrentDocument } from "../persistence/documentActions";
+import { appConfirm } from "../components";
 
 /**
  * Hotkey registry.
@@ -48,7 +49,9 @@ const BINDINGS: HotkeyBinding[] = [
     combo: "meta+z",
     description: "Undo",
     preventDefault: true,
-    action: () => undo(),
+    action: () => {
+      void undoWithDestructiveConfirmation();
+    },
   },
   {
     combo: "shift+meta+z",
@@ -173,6 +176,15 @@ export function installGlobalHotkeys() {
   }
   window.addEventListener("keydown", onKey);
   return () => window.removeEventListener("keydown", onKey);
+}
+
+async function undoWithDestructiveConfirmation() {
+  if (!nextUndoRequiresConfirmation()) {
+    undo();
+    return;
+  }
+  const confirmed = await appConfirm("Undo will remove newly created arrangement content. Continue?");
+  if (confirmed) undo({ allowDestructive: true });
 }
 
 function canUseTimelineSegmentHotkeys(): boolean {
