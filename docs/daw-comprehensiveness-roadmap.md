@@ -76,7 +76,6 @@ Build:
 
 Backend/model:
 
-- Ensure trims affect live and export paths identically.
 - Add stress for invalid trim/crossfade repair warnings.
 
 Acceptance:

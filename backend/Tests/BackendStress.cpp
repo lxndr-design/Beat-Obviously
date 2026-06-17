@@ -1498,6 +1498,41 @@ namespace
         return project;
     }
 
+    beat::Project makeAudioClipTrimProject(const juce::File& file)
+    {
+        beat::Project project;
+        project.id = "offline-audio-clip-trim-project";
+        project.name = "Offline Audio Clip Trim";
+        project.bpm = 120.0;
+        project.lengthBeats = 0.75;
+
+        beat::AudioFileAsset audioFile;
+        audioFile.id = "clip-file";
+        audioFile.name = "Clip Fixture";
+        audioFile.path = file.getFullPathName();
+        audioFile.durationSeconds = 0.5;
+        audioFile.sampleRate = 44100.0;
+        project.audioFiles.push_back(std::move(audioFile));
+
+        beat::Track track;
+        track.id = "audio-clip-trim-track";
+        track.name = "Audio Clip Trim Track";
+        track.kind = beat::TrackKind::Audio;
+
+        beat::Segment segment;
+        segment.id = "audio-clip-trim-segment";
+        segment.trackId = track.id;
+        segment.kind = beat::SegmentPayloadKind::Audio;
+        segment.audioFileId = "clip-file";
+        segment.startBeat = 0.0;
+        segment.lengthBeats = 0.75;
+        segment.sourceStartBeat = 0.25;
+        track.segments.push_back(std::move(segment));
+
+        project.tracks.push_back(std::move(track));
+        return project;
+    }
+
     beat::Project makeSampleInstrumentOfflineProject(const juce::File& file)
     {
         beat::Project project;
@@ -7618,6 +7653,72 @@ namespace
         return ok;
     }
 
+    bool stressAudioEngineAudioClipTrimLiveExportParity()
+    {
+        auto clipFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-clip-trim-parity-source.wav");
+        auto exportFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-clip-trim-parity.wav");
+        if (!writeAudioClipFixture(clipFile))
+            return false;
+        if (exportFile.existsAsFile())
+            exportFile.deleteFile();
+
+        constexpr int samples = 16538;
+        constexpr int blockSize = 257;
+        auto project = makeAudioClipTrimProject(clipFile);
+        const auto live = renderOfflineChunks(project, samples, blockSize);
+
+        juce::String error;
+        if (!beat::AudioEngine::renderProjectToWav(project, exportFile, 44100.0, blockSize, 2, &error))
+        {
+            std::cerr << "Audio clip trim parity export error: " << error << "\n";
+            clipFile.deleteFile();
+            return false;
+        }
+
+        const auto exported = readWavPrefix(exportFile, samples);
+        clipFile.deleteFile();
+        exportFile.deleteFile();
+
+        if (exported.getNumChannels() != live.getNumChannels() || exported.getNumSamples() < samples)
+        {
+            std::cerr << "Audio clip trim parity channel/sample mismatch liveChannels=" << live.getNumChannels()
+                      << " exportedChannels=" << exported.getNumChannels()
+                      << " exportedSamples=" << exported.getNumSamples() << "\n";
+            return false;
+        }
+
+        double sumAbsDiff = 0.0;
+        float maxAbsDiff = 0.0f;
+        double liveEnergy = 0.0;
+        for (int ch = 0; ch < live.getNumChannels(); ++ch)
+        {
+            for (int i = 0; i < samples; ++i)
+            {
+                const float liveSample = live.getSample(ch, i);
+                const float exportSample = exported.getSample(ch, i);
+                if (!std::isfinite(liveSample) || !std::isfinite(exportSample))
+                    return false;
+
+                const float diff = std::abs(liveSample - exportSample);
+                maxAbsDiff = std::max(maxAbsDiff, diff);
+                sumAbsDiff += diff;
+                liveEnergy += (double) liveSample * (double) liveSample;
+            }
+        }
+
+        const double meanAbsDiff = sumAbsDiff / (double) (live.getNumChannels() * samples);
+        const bool ok = liveEnergy > 0.0001
+            && maxAbsDiff <= 0.00008f
+            && meanAbsDiff <= 0.00002;
+        if (!ok)
+        {
+            std::cerr << "Audio clip trim live/export parity failed liveEnergy=" << liveEnergy
+                      << " maxAbsDiff=" << maxAbsDiff
+                      << " meanAbsDiff=" << meanAbsDiff << "\n";
+        }
+        return ok;
+    }
+
     bool stressAudioEngineMasterLimiter()
     {
         auto project = makeTinyOfflineProject();
@@ -10063,6 +10164,11 @@ int main()
     if (!stressAudioEngineAudioClipCrossfadeLiveExportParity())
     {
         std::cerr << "Audio engine audio clip crossfade live/export parity stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineAudioClipTrimLiveExportParity())
+    {
+        std::cerr << "Audio engine audio clip trim live/export parity stress failed\n";
         return 1;
     }
     if (!stressAudioEngineMasterLimiter())
