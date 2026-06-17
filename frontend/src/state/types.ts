@@ -84,6 +84,8 @@ export interface Segment {
   color?: string;
   /** Optional Iconify icon name for future segment metadata/organization UI. */
   icon?: string;
+  /** Optional edit group id for linked arrangement operations. */
+  groupId?: Id;
   /** Bound instrument from the library (renders this segment). */
   instrumentId?: Id;
   /** MIDI playback transpose in semitones. */

@@ -115,6 +115,16 @@ export type SegmentEditCommand =
       icon?: string | null;
     }
   | {
+      kind: "group";
+      segmentIds: Id[];
+      groupId?: Id;
+    }
+  | {
+      kind: "ungroup";
+      segmentIds?: Id[];
+      groupIds?: Id[];
+    }
+  | {
       kind: "nudge";
       segmentIds: Id[];
       deltaBeats: Beats;
@@ -564,6 +574,8 @@ export const useProjectStore = create<ProjectSlice>()(
           for (let index = 0; index < command.segments.length; index++) {
             createdIds.push(nanoid());
           }
+        } else if (command.kind === "group" && !command.groupId) {
+          createdIds.push(nanoid());
         } else if (command.kind === "split") {
           createdIds.push(nanoid());
         }
@@ -679,6 +691,32 @@ export const useProjectStore = create<ProjectSlice>()(
                   const nextIcon = command.icon?.trim() ?? "";
                   if (nextIcon) segment.icon = nextIcon;
                   else delete segment.icon;
+                }
+              }
+            }
+            return;
+          }
+
+          if (command.kind === "group") {
+            const groupId = command.groupId ?? createdIds[0];
+            if (!groupId) return;
+            const ids = new Set(command.segmentIds);
+            for (const track of s.project.tracks) {
+              for (const segment of track.segments) {
+                if (ids.has(segment.id)) segment.groupId = groupId;
+              }
+            }
+            return;
+          }
+
+          if (command.kind === "ungroup") {
+            const segmentIds = new Set(command.segmentIds ?? []);
+            const groupIds = new Set(command.groupIds ?? []);
+            if (segmentIds.size === 0 && groupIds.size === 0) return;
+            for (const track of s.project.tracks) {
+              for (const segment of track.segments) {
+                if (segmentIds.has(segment.id) || (segment.groupId && groupIds.has(segment.groupId))) {
+                  delete segment.groupId;
                 }
               }
             }

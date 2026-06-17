@@ -62,13 +62,13 @@ Purpose: make timeline editing feel like a DAW instead of a demo surface.
 
 Current assets:
 
-- Timeline, tracks, segments, marquee, drag/resize, visible fade handles, split/trim/fade metadata, paste/duplicate, rename/color/icon metadata, crossfade commands, review loop, transport actions, grouped history, destructive undo guardrails, and pure geometry/interaction verifiers exist.
-- `npm run verify:daw` covers edit-command behavior for move, resize, duplicate, paste, delete, rename/color/icon metadata, nudge, quantize, split, trim, fade, crossfade, grouped undo/redo, destructive undo confirmation policy, and timeline geometry.
+- Timeline, tracks, segments, marquee, drag/resize, visible fade handles, split/trim/fade metadata, paste/duplicate, rename/color/icon metadata, segment group/ungroup metadata, crossfade commands, review loop, transport actions, grouped history, destructive undo guardrails, and pure geometry/interaction verifiers exist.
+- `npm run verify:daw` covers edit-command behavior for move, resize, duplicate, paste, delete, rename/color/icon metadata, group/ungroup, nudge, quantize, split, trim, fade, crossfade, grouped undo/redo, destructive undo confirmation policy, and timeline geometry.
 - `npm run verify:track-interactions` covers free segment drag/resize/fade by default with Shift-based snapping.
 
 Build:
 
-- Edit command policy for group/ungroup.
+- Segment grouping UI actions backed by the verified group/ungroup edit commands.
 - UI confirmation surface for destructive undo and other destructive operations.
 - Multi-select command bar or context actions for selected segments.
 - Track/body/segment click behavior audit: selection, additive selection, context menu, empty-area click, drag handles, lane drop targets.

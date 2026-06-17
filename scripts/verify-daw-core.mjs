@@ -268,6 +268,68 @@ try {
     "metadata verifier cleanup should remove its segment",
   );
 
+  const groupSourceAId = projectStore.addSegment(trackA, {
+    name: "Group Source A",
+    startBeat: 1,
+    lengthBeats: 2,
+    payload: { kind: "midi", notes: [] },
+  });
+  const groupSourceBId = projectStore.addSegment(trackA, {
+    name: "Group Source B",
+    startBeat: 4,
+    lengthBeats: 2,
+    payload: { kind: "midi", notes: [] },
+  });
+  const [createdGroupId] = store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "group",
+    segmentIds: [groupSourceAId, groupSourceBId],
+  });
+  assert.ok(createdGroupId, "group command should return a created group id");
+  project = store.useProjectStore.getState().project;
+  let groupSourceA = project.tracks[0].segments.find((segment) => segment.id === groupSourceAId);
+  let groupSourceB = project.tracks[0].segments.find((segment) => segment.id === groupSourceBId);
+  assert.ok(groupSourceA && groupSourceB, "group targets should exist");
+  assert.equal(groupSourceA.groupId, createdGroupId, "group command should assign the created group id");
+  assert.equal(groupSourceB.groupId, createdGroupId, "group command should assign the same id to all selected segments");
+  store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "ungroup",
+    segmentIds: [groupSourceAId],
+  });
+  project = store.useProjectStore.getState().project;
+  groupSourceA = project.tracks[0].segments.find((segment) => segment.id === groupSourceAId);
+  groupSourceB = project.tracks[0].segments.find((segment) => segment.id === groupSourceBId);
+  assert.ok(groupSourceA && groupSourceB, "partial ungroup targets should exist");
+  assert.equal(groupSourceA.groupId, undefined, "ungroup by segment id should clear only the requested segment");
+  assert.equal(groupSourceB.groupId, createdGroupId, "ungroup by segment id should leave other group members intact");
+  store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "ungroup",
+    groupIds: [createdGroupId],
+  });
+  project = store.useProjectStore.getState().project;
+  groupSourceB = project.tracks[0].segments.find((segment) => segment.id === groupSourceBId);
+  assert.ok(groupSourceB, "group-id ungroup target should exist");
+  assert.equal(groupSourceB.groupId, undefined, "ungroup by group id should clear remaining members");
+  store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "group",
+    segmentIds: [groupSourceAId, groupSourceBId],
+    groupId: "manual-group",
+  });
+  project = store.useProjectStore.getState().project;
+  groupSourceA = project.tracks[0].segments.find((segment) => segment.id === groupSourceAId);
+  groupSourceB = project.tracks[0].segments.find((segment) => segment.id === groupSourceBId);
+  assert.equal(groupSourceA.groupId, "manual-group", "group command should accept a caller-provided group id");
+  assert.equal(groupSourceB.groupId, "manual-group", "provided group id should apply to all selected segments");
+  store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "delete",
+    segmentIds: [groupSourceAId, groupSourceBId],
+  });
+  project = store.useProjectStore.getState().project;
+  assert.equal(
+    project.tracks.flatMap((track) => track.segments).length,
+    0,
+    "group verifier cleanup should remove its segments",
+  );
+
   const splitSource = projectStore.addSegment(trackA, {
     name: "Split MIDI",
     startBeat: 4,
