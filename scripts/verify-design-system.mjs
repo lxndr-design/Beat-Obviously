@@ -5,6 +5,7 @@ import { join, relative } from "node:path";
 const repoRoot = new URL("..", import.meta.url).pathname;
 const frontendSrc = join(repoRoot, "frontend", "src");
 const componentsDir = join(frontendSrc, "components");
+const reactBridgeDir = join(frontendSrc, "react-bridge");
 const solidUiDir = join(frontendSrc, "solid-ui");
 const featuresDir = join(frontendSrc, "features");
 const solidCatalogPath = join(frontendSrc, "design", "SolidUiKitCatalog.solid.tsx");
@@ -64,6 +65,9 @@ const solidComponentNames = existsSync(solidUiDir)
 const solidCatalog = existsSync(solidCatalogPath) ? readFileSync(solidCatalogPath, "utf8") : "";
 if (existsSync(componentsDir)) {
   fail("Legacy frontend/src/components namespace should stay removed; shared UI belongs in frontend/src/solid-ui.");
+}
+if (existsSync(reactBridgeDir)) {
+  fail("Legacy frontend/src/react-bridge namespace should stay removed; Solid is mounted directly from frontend/src/main.solid.tsx.");
 }
 if (solidComponentNames.length > 0 && !solidCatalog) {
   fail("Missing frontend/src/design/SolidUiKitCatalog.solid.tsx");

@@ -187,6 +187,7 @@ engineers and designers.
 - Every demo is included in `SolidUiKitCatalog.solid.tsx`.
 - Source files do not import deprecated `@iconify/react` bindings.
 - The removed `frontend/src/components` compatibility namespace does not reappear.
+- The removed `frontend/src/react-bridge` compatibility namespace does not reappear.
 - Legacy `mount*Solid` / `Mounted*Solid` bridge APIs do not reappear.
 - Non-Phosphor icon names are not used in source.
 - Shared component CSS does not introduce new hex colors outside design files.
