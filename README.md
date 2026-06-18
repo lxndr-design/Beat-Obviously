@@ -1,11 +1,11 @@
 # Beat
 
-A beat sequencing DAW. Hybrid architecture: JUCE 8 (C++20) audio engine + React/TypeScript UI in an embedded WKWebView, packaged as a single macOS `.app`.
+A beat sequencing DAW. Hybrid architecture: JUCE 8 (C++20) audio engine + Solid/TypeScript UI in an embedded WKWebView, packaged as a single macOS `.app`.
 
 ## Why this architecture
 
 - **JUCE backend** for real-time audio: sample-accurate sequencing, low-latency CoreAudio output, MIDI I/O, DSP (EQ, bitcrush), sample loading, SQLite persistence.
-- **React/TS frontend** for everything visual: design system, component library, modals, drag-and-drop, visualizer. Lives in `frontend/`, served inside the JUCE app via `juce::WebBrowserComponent`.
+- **Solid/TS frontend** for everything visual: design system, component library, modals, drag-and-drop, visualizer. Lives in `frontend/`, served inside the JUCE app via `juce::WebBrowserComponent`.
 - **IPC** via JUCE 8's native JS↔C++ message passing — typed schema kept in sync between `backend/Source/Ipc/Schema.h` and `frontend/src/ipc/schema.ts`.
 
 This split lets us keep the strict CSS-driven design system (impossible to reproduce cleanly in C++ UI frameworks) while having a real audio engine underneath.
@@ -23,7 +23,7 @@ beat/
 │       ├── Audio/              # real-time DSP, sequencer, tracks, instruments
 │       ├── Persistence/        # SQLite repositories
 │       └── Ipc/                # message bridge to web UI
-├── frontend/                   # React + Vite + TypeScript
+├── frontend/                   # Solid + Vite + TypeScript
 │   ├── package.json
 │   ├── vite.config.ts
 │   ├── index.html
@@ -63,7 +63,7 @@ Use the repo-root `Beat.app` as the manual launcher and LaunchServices-registere
 
 In dev mode, set `BEAT_DEV_FRONTEND_URL=http://localhost:6174` before launching the app to point the embedded webview at the Vite dev server. On startup, the native app checks that the configured port is actually serving the Beat frontend before loading it, adds a launch cache-buster, and refreshes the dev webview once to avoid stale startup documents. If the dev URL is unavailable or occupied by the wrong server, a bundled frontend build is used when present.
 
-In production builds, `frontend/dist/` is copied into `Beat.app/Contents/Resources/frontend` and served by JUCE's `WebBrowserComponent::Options::withResourceProvider()`. The native menu sends commands into the React app through the JUCE native bridge exposed as `window.__BEAT_NATIVE__`.
+In production builds, `frontend/dist/` is copied into `Beat.app/Contents/Resources/frontend` and served by JUCE's `WebBrowserComponent::Options::withResourceProvider()`. The native menu sends commands into the Solid UI through the JUCE native bridge exposed as `window.__BEAT_NATIVE__`.
 
 ## Design system
 
