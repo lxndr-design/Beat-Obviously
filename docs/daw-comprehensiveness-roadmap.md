@@ -62,19 +62,25 @@ Purpose: make timeline editing feel like a DAW instead of a demo surface.
 
 Current assets:
 
-- Timeline, tracks, segments, marquee, audited click/context-menu selection behavior, drag/resize, visible fade handles, split/trim/fade metadata, paste/duplicate, rename/color/icon metadata, segment group/ungroup metadata, multi-select menu actions and command bar, crossfade commands, review loop, transport actions, grouped history, grid-snap preferences, destructive undo guardrails with hotkey confirmation, populated-track delete confirmation, invalid trim/fade warning stress, and pure geometry/interaction/backend parity verifiers exist.
+- Timeline, tracks, segments, marquee, audited click/context-menu selection behavior, drag/resize, visible fade handles, audio sample/time snap policy, split/trim/fade metadata, paste/duplicate, rename/color/icon metadata, segment group/ungroup metadata, multi-select menu actions and command bar, crossfade commands, review loop, transport actions, grouped history, grid-snap preferences, destructive undo guardrails with hotkey confirmation, populated-track delete confirmation, invalid trim/fade warning stress, and pure geometry/interaction/backend parity verifiers exist.
 - `npm run verify:daw` covers edit-command behavior for move, resize, duplicate, paste, delete, rename/color/icon metadata, group/ungroup, nudge, quantize, split, trim, fade, crossfade, grouped undo/redo, destructive undo confirmation policy, and timeline geometry.
 - `npm run verify:track-interactions` covers free segment drag/resize/fade by default with Shift-based snapping.
 
 Build:
 
 - UI confirmation surface for remaining non-undo destructive operations.
-- Sample/time snap policy for audio where relevant.
 - Browser-level smoke for marquee, drag, resize, split, fade, crossfade, and loop marker interaction.
 
 Backend/model:
 
 - No open backend/model items for Phase 1.
+
+Audio snap policy:
+
+- Audio-bearing segments use the same arrangement edit policy as MIDI/drum segments: body drag, resize, and fade handles are free by default and snap only while Shift is held.
+- Free edits preserve exact beat offsets for sample-aligned placement and fade shape. Shift-snap uses the current timeline subdivision for body drag and the current measure/grid step for resize and fades.
+- Left trim/resize updates `sourceStartBeat` from the original edit snapshot so repeated preview commits do not compound the sample offset.
+- `npm run verify:track-interactions` covers the free/Shift snap math. `npm run verify:daw` covers audio trim/fade metadata and source-offset stability.
 
 Acceptance:
 
