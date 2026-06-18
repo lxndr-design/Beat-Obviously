@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { nanoid as nano } from "nanoid";
 import { createStoreSelector } from "../../../solid-utils/store";
-import { appAlert } from "../../../components";
+import { appAlert } from "../../../solid-ui";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../../audio/audioFormats";
 import { importAudioFile } from "../../../audio/audioImport";
 import {

@@ -3,7 +3,7 @@ import { Portal, render } from "solid-js/web";
 import { Button, HoverInfo, Icon, NumberInput } from "../../solid-ui";
 import type { TimeSignature } from "../../state/types";
 import styles from "./TimeSignatureControl.module.css";
-import modalFrameStyles from "../../components/Modal/Modal.module.css";
+import modalFrameStyles from "../../solid-ui/Modal/Modal.module.css";
 import timeSignatureModalStyles from "./TimeSignatureModal.module.css";
 
 export interface TimeSignatureControlSolidProps {

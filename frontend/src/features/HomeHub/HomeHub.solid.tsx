@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { render } from "solid-js/web";
 import type { RecentProjectEntry } from "../../ipc/schema";
-import { appConfirm } from "../../components";
+import { appConfirm } from "../../solid-ui";
 import { Button, HoverInfo, Icon } from "../../solid-ui";
 import { useComponentStore } from "../../state/components";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore } from "../../state/store";

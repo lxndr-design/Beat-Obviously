@@ -1,5 +1,5 @@
 import { Show, splitProps, type JSX } from "solid-js";
-import styles from "../../components/RowItem/RowItem.module.css";
+import styles from "./RowItem.module.css";
 
 type RowItemDensity = "compact" | "standard" | "media";
 

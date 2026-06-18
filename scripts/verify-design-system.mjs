@@ -116,13 +116,16 @@ for (const file of sourceFiles) {
   }
 }
 
-const componentCssFiles = walk(componentsDir, (path) => /\.css$/.test(path));
+const sharedCssFiles = [
+  ...(existsSync(componentsDir) ? walk(componentsDir, (path) => /\.css$/.test(path)) : []),
+  ...walk(solidUiDir, (path) => /\.css$/.test(path)),
+];
 const hexPattern = /#[0-9a-fA-F]{3,8}\b/g;
-for (const file of componentCssFiles) {
+for (const file of sharedCssFiles) {
   const source = readFileSync(file, "utf8");
   const matches = source.match(hexPattern);
   if (matches) {
-    fail(`Raw hex color in shared component CSS ${rel(file)}: ${[...new Set(matches)].join(", ")}`);
+    fail(`Raw hex color in shared UI CSS ${rel(file)}: ${[...new Set(matches)].join(", ")}`);
   }
 }
 

@@ -1,5 +1,5 @@
 import { splitProps, type JSX } from "solid-js";
-import styles from "../../components/ActionFooter/ActionFooter.module.css";
+import styles from "./ActionFooter.module.css";
 
 export interface ActionFooterProps extends JSX.HTMLAttributes<HTMLElement> {
   align?: "start" | "end";

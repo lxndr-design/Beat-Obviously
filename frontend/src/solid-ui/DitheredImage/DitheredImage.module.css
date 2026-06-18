@@ -11,3 +11,13 @@
 .ready {
   opacity: 1;
 }
+
+.fallback {
+  display: grid;
+  place-items: center;
+  min-height: var(--height-row);
+  padding: var(--space-2);
+  border: var(--border-muted);
+  color: var(--color-muted);
+  background: var(--surface-subtle);
+}

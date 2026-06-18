@@ -1,5 +1,5 @@
 /* Shared form/control primitives for dense editor panels.
- * Component-specific controls still live in components/<Name>.
+ * Component-specific controls live in solid-ui/<Name>.
  */
 
 .ds-field {

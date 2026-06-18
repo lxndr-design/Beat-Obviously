@@ -1,5 +1,5 @@
 import { stopTimelineAudio } from "../audio/timelineAudio";
-import { appAlert, appConfirm } from "../components";
+import { appAlert, appConfirm } from "../solid-ui";
 import type { BeatProjectAsset, BeatProjectDocument, ProjectBackupEntry } from "../ipc/schema";
 import { isNative, send } from "../ipc/bridge";
 import { createEmptyProject, useDocumentStore, useProjectStore, useTransportStore } from "../state/store";

@@ -5,7 +5,7 @@ import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
 import { createInstrumentBufferSource, noteFrequency } from "../../audio/synthPreview";
-import { appAlert, useModalStack } from "../../components";
+import { appAlert, useModalStack } from "../../solid-ui";
 import { updateDrumBeatFeedback } from "../../persistence/dexie";
 import { Button, FloatingSelect, Icon, Modal, NumberInput, TextInput } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";

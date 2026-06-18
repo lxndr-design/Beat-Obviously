@@ -1,6 +1,6 @@
 import { Show } from "solid-js";
 import { Portal } from "solid-js/web";
-import { Button } from "../../solid-ui";
+import { Button } from "..";
 import { createStoreSelector } from "../../solid-utils/store";
 import { useModalStack } from "./modalStack";
 import styles from "./Modal.module.css";

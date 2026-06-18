@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
-import { Button, Modal, TextInput } from "../../solid-ui";
+import { Button, Modal, TextInput } from "..";
 import { completeDialog, getActiveAppDialog, subscribeAppDialog, type ActiveDialog } from "./state";
 import styles from "./AppDialog.module.css";
 

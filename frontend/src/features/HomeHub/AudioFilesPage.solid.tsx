@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { render } from "solid-js/web";
-import { appAlert, appConfirm, appPrompt } from "../../components";
+import { appAlert, appConfirm, appPrompt } from "../../solid-ui";
 import { ActionFooter, Button, HoverInfo, Icon, MarqueeText } from "../../solid-ui";
 import { importAudioFiles } from "../../audio/audioImport";
 import { isNative, send } from "../../ipc/bridge";

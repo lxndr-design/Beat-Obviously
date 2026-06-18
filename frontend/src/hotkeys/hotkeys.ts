@@ -3,7 +3,7 @@ import { nextUndoRequiresConfirmation, redo, undo, useProjectStore, useTransport
 import { clipboardStore } from "../state/clipboard";
 import { pauseTransport, playTransport, stopTransport } from "../audio/transportActions";
 import { saveCurrentDocument } from "../persistence/documentActions";
-import { appConfirm } from "../components";
+import { appConfirm } from "../solid-ui";
 
 /**
  * Hotkey registry.

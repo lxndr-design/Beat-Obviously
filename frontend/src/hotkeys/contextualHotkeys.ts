@@ -1,5 +1,5 @@
 import { createStore as create } from "zustand/vanilla";
-import { useModalStack } from "../components";
+import { useModalStack } from "../solid-ui";
 
 type HotkeyHandler = () => boolean | void;
 

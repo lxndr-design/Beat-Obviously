@@ -8,7 +8,7 @@ import { useProjectStore, useTransportStore } from "../../state/store";
 import { TimeSignatureControlSolid } from "../Transport/TimeSignatureControl.solid";
 import { AppMenuButtonSolid } from "./AppMenuButton.solid";
 import { InlineNumberSolid } from "./InlineNumber.solid";
-import marqueeStyles from "../../components/MarqueeText/MarqueeText.module.css";
+import marqueeStyles from "../../solid-ui/MarqueeText/MarqueeText.module.css";
 import styles from "./TopBar.module.css";
 
 export interface TopBarProps {

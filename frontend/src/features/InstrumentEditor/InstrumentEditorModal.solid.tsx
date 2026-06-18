@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { render } from "solid-js/web";
-import { appAlert, useModalStack } from "../../components";
+import { appAlert, useModalStack } from "../../solid-ui";
 import { Modal, Button, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, TextInput } from "../../solid-ui";
 import { ai, type GeneratedInstrument } from "../../ai/aiService";
 import { maybeRunDueTraining } from "../../ai/trainingRunner";

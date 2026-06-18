@@ -1,6 +1,6 @@
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import { render } from "solid-js/web";
-import { appAlert } from "../../components";
+import { appAlert } from "../../solid-ui";
 import { isNative, send } from "../../ipc/bridge";
 import { saveCurrentDocument } from "../../persistence/documentActions";
 import { createStoreSelector } from "../../solid-utils/store";

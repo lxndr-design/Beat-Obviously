@@ -112,15 +112,17 @@ backend/
 ```text
 frontend/src/
   app/
-    App.tsx
+    App.solid.tsx
     routes.ts
-    providers.tsx
+    providers.solid.tsx
   audio/
     nativeAudioBridge.ts
     timelineAudio.ts
     analyzerClient.ts
-  components/
+  solid-ui/
     Button/
+    Block/
+    DitheredImage/
     Knob/
     Modal/
     NumberInput/

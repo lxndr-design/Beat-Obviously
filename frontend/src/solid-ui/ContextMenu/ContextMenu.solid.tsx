@@ -1,7 +1,7 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Icon } from "../Icon";
-import styles from "../../components/ContextMenu/ContextMenu.module.css";
+import styles from "./ContextMenu.module.css";
 
 export interface ContextMenuItem {
   label: string;

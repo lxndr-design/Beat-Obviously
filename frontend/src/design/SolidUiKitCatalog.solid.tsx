@@ -1,10 +1,13 @@
 import { ButtonSolidDemo } from "../solid-ui/Button/Button.demo.solid";
+import { BlockSolidDemo } from "../solid-ui/Block/Block.demo.solid";
 import { ContextMenuSolidDemo } from "../solid-ui/ContextMenu/ContextMenu.demo.solid";
+import { DitheredImageSolidDemo } from "../solid-ui/DitheredImage/DitheredImage.demo.solid";
 import { FloatingSelectSolidDemo } from "../solid-ui/FloatingSelect/FloatingSelect.demo.solid";
 import { HoverInfoSolidDemo } from "../solid-ui/HoverInfo/HoverInfo.demo.solid";
 import { IconSolidDemo } from "../solid-ui/Icon/Icon.demo.solid";
 import { KnobSolidDemo } from "../solid-ui/Knob/Knob.demo.solid";
 import { ActionFooterSolidDemo } from "../solid-ui/ActionFooter/ActionFooter.demo.solid";
+import { AppDialogSolidDemo } from "../solid-ui/AppDialog/AppDialog.demo.solid";
 import { MarqueeTextSolidDemo } from "../solid-ui/MarqueeText/MarqueeText.demo.solid";
 import { ModalSolidDemo } from "../solid-ui/Modal/Modal.demo.solid";
 import { NumberInputSolidDemo } from "../solid-ui/NumberInput/NumberInput.demo.solid";
@@ -19,6 +22,7 @@ export function SolidUiKitCatalog() {
   return (
     <main>
       <ButtonSolidDemo />
+      <BlockSolidDemo />
       <IconSolidDemo />
       <TagSolidDemo />
       <RowItemSolidDemo />
@@ -32,8 +36,10 @@ export function SolidUiKitCatalog() {
       <HoverInfoSolidDemo />
       <FloatingSelectSolidDemo />
       <ModalSolidDemo />
+      <AppDialogSolidDemo />
       <ActionFooterSolidDemo />
       <MarqueeTextSolidDemo />
+      <DitheredImageSolidDemo />
     </main>
   );
 }

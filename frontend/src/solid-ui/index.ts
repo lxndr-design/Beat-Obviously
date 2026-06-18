@@ -1,4 +1,5 @@
 export * from "./Button";
+export * from "./Block";
 export * from "./Icon";
 export * from "./Tag";
 export * from "./RowItem";
@@ -11,7 +12,9 @@ export * from "./RadioGroup";
 export * from "./ContextMenu";
 export * from "./HoverInfo";
 export * from "./Modal";
+export * from "./AppDialog";
 export * from "./FloatingSelect";
 export * from "./FloatingLayer.solid";
 export * from "./ActionFooter";
 export * from "./MarqueeText";
+export * from "./DitheredImage";

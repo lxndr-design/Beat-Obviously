@@ -1,5 +1,5 @@
 import { Show } from "solid-js";
-import styles from "../../components/Toggle/Toggle.module.css";
+import styles from "./Toggle.module.css";
 
 export interface ToggleProps {
   checked: boolean;

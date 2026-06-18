@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
-import { appAlert, appConfirm } from "./components";
+import { appAlert, appConfirm, Block } from "./solid-ui";
 import { TimelineMidiPlaybackSolid } from "./audio/TimelineMidiPlayback.solid";
 import { startAnalyzerClient } from "./audio/analyzerClient";
 import { RenderTimingPanelSolid } from "./features/Debug/RenderTimingPanel.solid";
@@ -25,9 +25,8 @@ import { SidebarSolid } from "./features/Sidebar/Sidebar.solid";
 import { TrackListSolid } from "./features/Tracks/solid/TrackList.solid";
 import { MasterEqPanelSolid } from "./features/Eq/MasterEqPanel.solid";
 import { EditorHostSolid } from "./features/EditorHost/EditorHost.solid";
-import { AppDialogHostSolid } from "./components/AppDialog/AppDialog.solid";
-import { ModalStackOverlaySolid } from "./components/Modal/ModalStackOverlay.solid";
-import blockStyles from "./components/Block/Block.module.css";
+import { AppDialogHostSolid } from "./solid-ui/AppDialog";
+import { ModalStackOverlaySolid } from "./solid-ui/Modal";
 import trackStyles from "./features/Tracks/TrackList.module.css";
 
 type StartupReadinessKey = "instruments" | "components" | "audio";
@@ -472,22 +471,10 @@ export function AppSolid() {
 }
 
 function TrackBlock() {
-  const className = [
-    blockStyles.block,
-    blockStyles.framed,
-    blockStyles.fill,
-    blockStyles["pad-none"],
-    trackStyles.tracksBlock,
-  ].join(" ");
   return (
-    <section class={className}>
-      <header class={blockStyles.header}>
-        <h2 class={blockStyles.title}>Tracks</h2>
-      </header>
-      <div class={blockStyles.body}>
-        <TrackListSolid />
-      </div>
-    </section>
+    <Block title="Tracks" framed fill padding="none" className={trackStyles.tracksBlock}>
+      <TrackListSolid />
+    </Block>
   );
 }
 

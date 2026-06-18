@@ -1,6 +1,6 @@
 import { createSignal, For, Show } from "solid-js";
 import { Button, HoverInfo, Icon, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
-import { appConfirm } from "../../components";
+import { appConfirm } from "../../solid-ui";
 import { usePluginStore, useUiStore } from "../../state/store";
 import type { PluginAdapter } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";

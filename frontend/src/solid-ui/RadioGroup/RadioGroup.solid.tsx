@@ -1,5 +1,5 @@
 import { For, Show } from "solid-js";
-import styles from "../../components/RadioGroup/RadioGroup.module.css";
+import styles from "./RadioGroup.module.css";
 
 export interface RadioGroupOption<T extends string | number> {
   value: T;

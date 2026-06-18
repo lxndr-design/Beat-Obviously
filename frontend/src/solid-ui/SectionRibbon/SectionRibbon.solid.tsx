@@ -2,7 +2,7 @@ import { Show, splitProps, type JSX } from "solid-js";
 import { Button } from "../Button";
 import { Icon } from "../Icon";
 import { Tag } from "../Tag";
-import styles from "../../components/SectionRibbon/SectionRibbon.module.css";
+import styles from "./SectionRibbon.module.css";
 
 export interface SectionRibbonProps extends Omit<JSX.HTMLAttributes<HTMLDivElement>, "title"> {
   title: string;

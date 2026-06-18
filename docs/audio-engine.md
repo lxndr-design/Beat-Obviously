@@ -309,7 +309,7 @@ The first supported live parameter set is intentionally limited to continuous va
 
 Wavetable bank/frame changes still go through full project/patch apply because they can rebuild table data.
 
-The frontend exposes current render cost through `RenderTimingPanel`, mounted globally from `App.tsx`. It reads `useAnalyzerStore().renderTiming` and shows callback load plus per-phase timings. Voice work is split into oscillator samples, wavetable voice samples, Aether oscillator A/B/sub/noise samples, raw filter samples, filter-drive samples, filter coefficient updates, modulation samples, ramp samples, and oscillator-rate calculations so dense synth patches can be profiled without guessing where CPU is going.
+The frontend exposes current render cost through `RenderTimingPanel`, mounted globally from `App.solid.tsx`. It reads `useAnalyzerStore().renderTiming` and shows callback load plus per-phase timings. Voice work is split into oscillator samples, wavetable voice samples, Aether oscillator A/B/sub/noise samples, raw filter samples, filter-drive samples, filter coefficient updates, modulation samples, ramp samples, and oscillator-rate calculations so dense synth patches can be profiled without guessing where CPU is going.
 
 ## Drum Generator Playback
 

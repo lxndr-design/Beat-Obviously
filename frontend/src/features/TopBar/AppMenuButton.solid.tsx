@@ -1,6 +1,6 @@
 import { createSignal, type Accessor } from "solid-js";
 import { render } from "solid-js/web";
-import { appAlert, appConfirm } from "../../components";
+import { appAlert, appConfirm } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { useDocumentStore, useTransportStore, useUiStore } from "../../state/store";

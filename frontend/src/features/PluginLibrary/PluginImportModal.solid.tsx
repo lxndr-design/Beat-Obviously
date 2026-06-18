@@ -1,6 +1,6 @@
 import { createMemo, createSignal } from "solid-js";
 import { Button, FloatingSelect, Icon, Modal } from "../../solid-ui";
-import { appAlert } from "../../components";
+import { appAlert } from "../../solid-ui";
 import { isNative, send } from "../../ipc/bridge";
 import { useAudioFileStore, usePluginStore } from "../../state/store";
 import type { PluginEditorKind, PluginFormat, PluginKind } from "../../state/types";

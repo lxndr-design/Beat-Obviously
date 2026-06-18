@@ -1,6 +1,6 @@
 import { createEffect, createSignal, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
-import styles from "../../components/HoverInfo/HoverInfo.module.css";
+import styles from "./HoverInfo.module.css";
 
 type HoverInfoPlacement = "top" | "bottom" | "left" | "right";
 

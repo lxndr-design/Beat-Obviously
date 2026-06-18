@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { Icon } from "../Icon";
-import styles from "../../components/Knob/Knob.module.css";
+import styles from "./Knob.module.css";
 
 export interface KnobProps {
   value: number;

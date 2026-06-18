@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { render } from "solid-js/web";
-import { appPrompt } from "../../components";
+import { appPrompt } from "../../solid-ui";
 import { send } from "../../ipc/bridge";
 import { createStoreSelector } from "../../solid-utils/store";
 import { Button, HoverInfo, Icon } from "../../solid-ui";

@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onCleanup, type JSX } from "solid-js";
-import styles from "../../components/MarqueeText/MarqueeText.module.css";
+import styles from "./MarqueeText.module.css";
 
 export interface MarqueeTextProps {
   text: string;

@@ -1,5 +1,5 @@
 import type { JSX } from "solid-js";
-import styles from "../components/FloatingLayer/FloatingLayer.module.css";
+import styles from "./FloatingLayer.module.css";
 
 export interface FloatingLayerProps {
   x: number;

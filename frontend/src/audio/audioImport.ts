@@ -1,5 +1,5 @@
 import { isNative, send } from "../ipc/bridge";
-import { appAlert } from "../components/AppDialog/state";
+import { appAlert } from "../solid-ui";
 import type { AudioFile } from "../state/types";
 import {
   isSupportedAudioFileName,

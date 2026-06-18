@@ -15,7 +15,7 @@ import { listDrumBeatFeedback, updateDrumBeatFeedback } from "../../../persisten
 import { maybeRunDueTraining } from "../../../ai/trainingRunner";
 import { selectedCrossfadeCandidate } from "../arrangementActions";
 import { decentSamplerPluginForInstrument } from "../../PluginLibrary/decentSamplerPluginAdapter";
-import { appPrompt } from "../../../components";
+import { appPrompt } from "../../../solid-ui";
 import { createContextMenu, Icon, type ContextMenuItem } from "../../../solid-ui";
 import { SEGMENT_LAYER_OFFSET_PX } from "../geometry";
 import {

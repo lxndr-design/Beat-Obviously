@@ -1,6 +1,6 @@
 import { createSignal, For, onCleanup, Show } from "solid-js";
 import { Button, Icon, RowItem, SectionRibbon, createContextMenu, type ContextMenuItem } from "../../solid-ui";
-import { appPrompt } from "../../components";
+import { appPrompt } from "../../solid-ui";
 import { createInstrumentBufferSource, noteFrequency, preloadInstrumentSample } from "../../audio/synthPreview";
 import { DEFAULT_DRUM_MIDI_PITCH, DEFAULT_DRUM_VELOCITY, drumTimingOffsetBeats, normalizeDrumCell } from "../../state/drumSteps";
 import { useComponentStore, type BeatComponent } from "../../state/components";

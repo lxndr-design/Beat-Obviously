@@ -22,12 +22,12 @@ Only one worker should edit each group at a time.
 | --- | --- | --- |
 | Frontend project model | `frontend/src/state/types.ts`, `frontend/src/state/store.ts`, `frontend/src/state/selectors.ts` | Track, segment, recording, routing, automation, selection, and document actions converge here. |
 | Frontend IPC | `frontend/src/ipc/schema.ts`, `frontend/src/ipc/bridge.ts` | Must stay in sync with backend IPC names and response shapes. |
-| App shell | `frontend/src/App.tsx`, `frontend/src/features/EditorHost/EditorHost.tsx`, `frontend/src/features/TopBar/AppMenuButton.tsx` | Central hydration, dirty state, export calls, modal routing, and app commands. |
+| App shell | `frontend/src/App.solid.tsx`, `frontend/src/features/EditorHost/EditorHost.solid.tsx`, `frontend/src/features/TopBar/AppMenuButton.solid.tsx` | Central hydration, dirty state, export calls, modal routing, and app commands. |
 | Backend IPC | `backend/Source/Ipc/Schema.h`, `backend/Source/Ipc/MessageBridge.cpp` | One switch owns project, export, recording, asset, device, and repair requests. |
 | Backend project model | `backend/Source/Audio/TrackModel.h`, `backend/Source/Persistence/ProjectRepository.cpp`, `backend/Source/Persistence/ProjectIntegrityVerifier.cpp` | Persisted DAW data must roundtrip and validate deterministically. |
 | Backend audio engine | `backend/Source/Audio/AudioEngine.cpp`, `backend/Source/Audio/AudioEngine.h` | Recording, routing, automation, monitoring, render, bounce, and meters share realtime boundaries. |
 | Backend stress | `backend/Tests/BackendStress.cpp` | Every backend lane wants coverage here; append tests in one coordinated pass or split helpers first. |
-| UI kit registry | `frontend/src/components/index.ts`, `frontend/src/design/UiKitCatalog.tsx`, `frontend/src/design/tokens.css` | New primitives, demos, and tokens affect all feature lanes. |
+| UI kit registry | `frontend/src/solid-ui/index.ts`, `frontend/src/design/SolidUiKitCatalog.solid.tsx`, `frontend/src/design/tokens.css` | New primitives, demos, and tokens affect all feature lanes. |
 
 ## Parallel Wave 1
 
@@ -37,11 +37,11 @@ These tasks can run now in separate worktrees.
 
 Owned files:
 
-- `frontend/src/features/Tracks/Segment.tsx`
+- `frontend/src/features/Tracks/solid/Segment.solid.tsx`
 - `frontend/src/features/Tracks/Segment.module.css`
-- `frontend/src/features/Tracks/TrackLane.tsx`
-- `frontend/src/features/Tracks/TrackList.tsx`
-- `frontend/src/features/Tracks/Timeline.tsx`
+- `frontend/src/features/Tracks/solid/TrackLane.solid.tsx`
+- `frontend/src/features/Tracks/solid/TrackList.solid.tsx`
+- `frontend/src/features/Tracks/solid/Timeline.solid.tsx`
 - `frontend/src/features/Tracks/geometry.ts`
 - `frontend/src/testing/interactionRunner.ts`
 - `scripts/verify-frontend-interactions.mjs`
@@ -64,7 +64,7 @@ Avoid:
 Owned files:
 
 - `scripts/verify-design-system.mjs`
-- Existing `frontend/src/components/*/*.demo.tsx` files when a demo-only correction is needed.
+- Existing `frontend/src/solid-ui/*/*.demo.solid.tsx` files when a demo-only correction is needed.
 
 Scope:
 
@@ -117,7 +117,7 @@ Scope:
 Avoid:
 
 - New asset graph schema.
-- `App.tsx`, `store.ts`, IPC, backend, and document action changes.
+- `App.solid.tsx`, `store.ts`, IPC, backend, and document action changes.
 
 ## Serial Contract Lane
 

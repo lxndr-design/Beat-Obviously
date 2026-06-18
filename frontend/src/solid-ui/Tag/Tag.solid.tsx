@@ -1,5 +1,5 @@
 import { splitProps, type JSX } from "solid-js";
-import styles from "../../components/Tag/Tag.module.css";
+import styles from "./Tag.module.css";
 
 export type TagProps = JSX.HTMLAttributes<HTMLSpanElement> & { className?: string; tone?: "default" | "zero" };
 

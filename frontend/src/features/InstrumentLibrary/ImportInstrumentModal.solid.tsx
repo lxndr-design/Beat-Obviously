@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Button, Icon, Modal, TextInput, createContextMenu } from "../../solid-ui";
-import { appAlert } from "../../components";
+import { appAlert } from "../../solid-ui";
 import { browserFileToAudioFile, importAudioFiles } from "../../audio/audioImport";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_EXTENSIONS, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { isNative, send } from "../../ipc/bridge";

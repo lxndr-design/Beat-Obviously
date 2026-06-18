@@ -1,7 +1,7 @@
 import { createEffect, createUniqueId, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Icon } from "../Icon";
-import styles from "../../components/Modal/Modal.module.css";
+import styles from "./Modal.module.css";
 
 export interface ModalProps {
   open: boolean;

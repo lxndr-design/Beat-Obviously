@@ -1,6 +1,6 @@
 import { createMemo, createSignal, Show } from "solid-js";
 import { nanoid as newNanoid } from "nanoid";
-import { appConfirm } from "../../../components";
+import { appConfirm } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import { createContextMenu, HoverInfo, Icon, type ContextMenuItem } from "../../../solid-ui";
 import { useAnalyzerStore } from "../../../state/analyzerStore";

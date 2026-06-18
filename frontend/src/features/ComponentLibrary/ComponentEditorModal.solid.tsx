@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { render } from "solid-js/web";
 import { DRUM_MAX_STEPS } from "../../ai/drumBeatGenerator";
-import { useModalStack } from "../../components";
+import { useModalStack } from "../../solid-ui";
 import { Button, FloatingSelect, Icon, Modal, NumberInput, TextInput } from "../../solid-ui";
 import { useComponentStore, type BeatComponent, type DrumComponent, type MidiComponent } from "../../state/components";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";

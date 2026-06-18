@@ -1,5 +1,5 @@
 import { splitProps, type JSX } from "solid-js";
-import styles from "../../components/Button/Button.module.css";
+import styles from "./Button.module.css";
 
 export type ButtonVariant = "default" | "primary" | "ghost" | "danger";
 export type ButtonSize = "xs" | "sm" | "md" | "lg";

@@ -1,7 +1,7 @@
 import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Icon } from "../Icon";
-import styles from "../../components/FloatingSelect/FloatingSelect.module.css";
+import styles from "./FloatingSelect.module.css";
 
 export interface FloatingSelectOption {
   value: string;
