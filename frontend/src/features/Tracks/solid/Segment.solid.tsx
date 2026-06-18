@@ -516,6 +516,14 @@ export function SegmentSolid(props: Props) {
     ];
   });
 
+  function handleContextMenu(event: MouseEvent) {
+    if (!selected()) {
+      useUiStore.getState().setSelectedSegments([props.segmentId]);
+      useUiStore.getState().setSelectedTracks([]);
+    }
+    menu.onContextMenu(event);
+  }
+
   const visualStartBeat = createMemo(() => dragPreview()?.startBeat ?? props.startBeat);
   const visualLengthBeats = createMemo(() => dragPreview()?.lengthBeats ?? props.lengthBeats);
   const left = createMemo(() => visualStartBeat() * beatsToPx());
@@ -555,7 +563,7 @@ export function SegmentSolid(props: Props) {
         useUiStore.getState().setSelectedTracks([]);
         props.onEdit();
       }}
-      onContextMenu={menu.onContextMenu}
+      onContextMenu={handleContextMenu}
       data-segment-id={props.segmentId}
       data-track-id={liveSeg()?.trackId}
       data-segment-repetition={props.repetition}

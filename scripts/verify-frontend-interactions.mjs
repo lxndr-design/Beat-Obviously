@@ -191,6 +191,29 @@ try {
     },
     "additive segment click should keep same-domain selections and clear tracks",
   );
+  assert.deepEqual(
+    runner.contextMenuArrangementItem({ selection, domain: "segment", id: "segment-a" }),
+    selection,
+    "segment context menu on a selected item should preserve multi-selection",
+  );
+  assert.deepEqual(
+    runner.contextMenuArrangementItem({ selection, domain: "segment", id: "segment-c" }),
+    {
+      selectedTrackIds: [],
+      selectedSegmentIds: ["segment-c"],
+      selectedTrackEffectAutomationPointKeys: [],
+    },
+    "segment context menu on an unselected item should target that segment",
+  );
+  assert.deepEqual(
+    runner.clearArrangementSelection(),
+    {
+      selectedTrackIds: [],
+      selectedSegmentIds: [],
+      selectedTrackEffectAutomationPointKeys: [],
+    },
+    "empty arrangement click should clear every arrangement selection domain",
+  );
   selection = runner.selectArrangementItem({ selection, domain: "effect-point", id: "track-a:effect-a:mix:point-a" });
   assert.deepEqual(
     selection,
@@ -203,6 +226,26 @@ try {
   );
   selection = runner.selectArrangementItem({ selection, domain: "effect-point", id: "track-a:effect-a:mix:point-a", additive: true });
   assert.deepEqual(selection, runner.clearArrangementSelection(), "additive click on a selected item should toggle it off");
+  selection = runner.selectArrangementItem({ selection: runner.clearArrangementSelection(), domain: "track", id: "track-a" });
+  selection = runner.selectArrangementItem({ selection, domain: "track", id: "track-b", additive: true });
+  assert.deepEqual(
+    runner.contextMenuArrangementItem({ selection, domain: "track", id: "track-a" }),
+    {
+      selectedTrackIds: ["track-a", "track-b"],
+      selectedSegmentIds: [],
+      selectedTrackEffectAutomationPointKeys: [],
+    },
+    "track context menu on a selected row should preserve multi-track selection",
+  );
+  assert.deepEqual(
+    runner.contextMenuArrangementItem({ selection, domain: "track", id: "track-c" }),
+    {
+      selectedTrackIds: ["track-c"],
+      selectedSegmentIds: [],
+      selectedTrackEffectAutomationPointKeys: [],
+    },
+    "track context menu on an unselected row should target that track",
+  );
 
   const audioSegment = (patch) => ({
     id: patch.id,

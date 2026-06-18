@@ -262,6 +262,24 @@ export function selectArrangementItem({
   };
 }
 
+export function contextMenuArrangementItem({
+  selection,
+  domain,
+  id,
+}: {
+  selection: ArrangementSelection;
+  domain: ArrangementSelectionDomain;
+  id: string;
+}): ArrangementSelection {
+  const selectedIds = domain === "track"
+    ? selection.selectedTrackIds
+    : domain === "segment"
+      ? selection.selectedSegmentIds
+      : selection.selectedTrackEffectAutomationPointKeys;
+  if (selectedIds.includes(id)) return selection;
+  return selectArrangementItem({ selection, domain, id });
+}
+
 export function clearArrangementSelection(): ArrangementSelection {
   return {
     selectedTrackIds: [],

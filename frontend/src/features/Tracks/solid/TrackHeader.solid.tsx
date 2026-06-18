@@ -97,6 +97,11 @@ export function TrackHeaderSolid(props: Props) {
     useUiStore.getState().openEditor({ kind: "track", trackId: props.trackId });
   }
 
+  function handleContextMenu(event: MouseEvent) {
+    if (!props.selected) props.onSelect?.(event);
+    menu.onContextMenu(event);
+  }
+
   function onHandleDragStart(event: DragEvent) {
     event.dataTransfer?.setData(DND_MIME, props.trackId);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
@@ -133,7 +138,7 @@ export function TrackHeaderSolid(props: Props) {
             dropPosition() === "above" && styles.dropAbove,
             dropPosition() === "below" && styles.dropBelow,
           ].filter(Boolean).join(" ")}
-          onContextMenu={menu.onContextMenu}
+          onContextMenu={handleContextMenu}
           onClick={(event) => {
             if (!isPlainSelectionClick(event)) return;
             props.onSelect?.(event);
