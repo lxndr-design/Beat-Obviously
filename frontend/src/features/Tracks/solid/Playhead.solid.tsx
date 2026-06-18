@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createStoreSelector } from "../../../solid-utils/store";
 import { useTransportStore, useViewStore } from "../../../state/store";
 import styles from "../Playhead.module.css";

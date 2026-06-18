@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { nanoid as nano } from "nanoid";
 import { createStoreSelector } from "../../../solid-utils/store";

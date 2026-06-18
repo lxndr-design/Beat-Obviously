@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { Icon } from "./Icon.solid";
 
 export function IconSolidDemo() {

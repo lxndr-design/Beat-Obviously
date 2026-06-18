@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createEffect, createSignal, onCleanup, Show, type Accessor } from "solid-js";
 import { render } from "solid-js/web";
 import { pauseTransport, playTransport, restartTransport, stopTransport } from "../../audio/transportActions";

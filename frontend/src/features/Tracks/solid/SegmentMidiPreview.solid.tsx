@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { For, Show } from "solid-js";
 import type { Segment } from "../../../state/types";
 import styles from "../SegmentMidiPreview.module.css";

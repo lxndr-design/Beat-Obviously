@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { render } from "solid-js/web";
 import { AppSolid } from "./App.solid";
 import "./design/global.css";

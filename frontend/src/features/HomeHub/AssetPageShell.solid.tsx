@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { Show, type JSX } from "solid-js";
 import { Icon } from "../../solid-ui";
 import styles from "./AssetPageShell.module.css";

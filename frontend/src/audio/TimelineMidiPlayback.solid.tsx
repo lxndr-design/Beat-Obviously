@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createEffect, onCleanup, untrack } from "solid-js";
 import { createStoreSelector } from "../solid-utils/store";
 import { useInstrumentStore, useProjectStore, useTransportStore } from "../state/store";

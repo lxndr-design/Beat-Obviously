@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createEffect, createSignal, Show, splitProps, type JSX } from "solid-js";
 import { loadIcon } from "@iconify/core/lib/api/icons";
 import { setAPIModule } from "@iconify/core/lib/api/modules";

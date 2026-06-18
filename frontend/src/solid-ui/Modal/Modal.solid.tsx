@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createEffect, createUniqueId, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Icon } from "../Icon";

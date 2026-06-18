@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createContextMenu } from "./ContextMenu.solid";
 
 export function ContextMenuSolidDemo() {

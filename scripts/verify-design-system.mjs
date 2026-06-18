@@ -9,6 +9,7 @@ const solidUiDir = join(frontendSrc, "solid-ui");
 const featuresDir = join(frontendSrc, "features");
 const solidCatalogPath = join(frontendSrc, "design", "SolidUiKitCatalog.solid.tsx");
 const tokensPath = join(frontendSrc, "design", "tokens.css");
+const tsconfigPath = join(repoRoot, "frontend", "tsconfig.json");
 
 const failures = [];
 
@@ -82,6 +83,9 @@ const sourceFiles = walk(frontendSrc, (path) => /\.(ts|tsx)$/.test(path));
 for (const file of sourceFiles) {
   const source = readFileSync(file, "utf8");
   const relativeFile = rel(file);
+  if (source.includes("@jsxImportSource solid-js")) {
+    fail(`Per-file Solid JSX pragma should be replaced by frontend/tsconfig.json jsxImportSource: ${rel(file)}`);
+  }
   if (source.includes("@iconify/react")) {
     fail(`Deprecated Iconify React import in ${rel(file)}`);
   }
@@ -126,6 +130,17 @@ const tokenSource = existsSync(tokensPath) ? readFileSync(tokensPath, "utf8") : 
 const designTokens = new Set([...tokenSource.matchAll(/--[A-Za-z0-9_-]+(?=\s*:)/g)].map((match) => match[0]));
 if (!tokenSource) {
   fail("Missing frontend/src/design/tokens.css");
+}
+
+const tsconfigSource = existsSync(tsconfigPath) ? readFileSync(tsconfigPath, "utf8") : "";
+if (!tsconfigSource.includes('"jsx": "preserve"')) {
+  fail("frontend/tsconfig.json must keep JSX preserved for the Solid Vite transform.");
+}
+if (!tsconfigSource.includes('"jsxImportSource": "solid-js"')) {
+  fail("frontend/tsconfig.json must define Solid as the global JSX import source.");
+}
+if (tsconfigSource.includes('"jsx": "react-jsx"')) {
+  fail("frontend/tsconfig.json must not use React JSX mode.");
 }
 
 // Existing feature-local exceptions are narrow: canvas/SVG fallbacks, mask alpha,

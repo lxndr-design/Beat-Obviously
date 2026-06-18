@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { render } from "solid-js/web";
 import { DRUM_MAX_STEPS } from "../../ai/drumBeatGenerator";

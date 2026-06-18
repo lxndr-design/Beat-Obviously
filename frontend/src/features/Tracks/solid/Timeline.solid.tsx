@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { send } from "../../../ipc/bridge";
 import { createStoreSelector } from "../../../solid-utils/store";

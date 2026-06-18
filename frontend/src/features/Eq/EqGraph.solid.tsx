@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createEffect, createMemo, createSignal, For, onCleanup } from "solid-js";
 import { EQ_BAND_CENTERS_HZ } from "../../state/types";
 import styles from "./EqGraph.module.css";

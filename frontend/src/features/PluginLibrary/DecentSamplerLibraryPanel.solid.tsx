@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createSignal, For, Show } from "solid-js";
 import { HoverInfo, Icon, SectionRibbon, SectionRibbonActionButton } from "../../solid-ui";
 import { usePluginStore, useUiStore } from "../../state/store";

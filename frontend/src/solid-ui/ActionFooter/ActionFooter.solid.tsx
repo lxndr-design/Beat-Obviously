@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { splitProps, type JSX } from "solid-js";
 import styles from "../../components/ActionFooter/ActionFooter.module.css";
 

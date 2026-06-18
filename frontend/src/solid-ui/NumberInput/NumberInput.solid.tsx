@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createEffect, createSignal, Show } from "solid-js";
 import styles from "../../components/NumberInput/NumberInput.module.css";
 

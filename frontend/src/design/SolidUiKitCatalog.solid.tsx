@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { ButtonSolidDemo } from "../solid-ui/Button/Button.demo.solid";
 import { ContextMenuSolidDemo } from "../solid-ui/ContextMenu/ContextMenu.demo.solid";
 import { FloatingSelectSolidDemo } from "../solid-ui/FloatingSelect/FloatingSelect.demo.solid";

@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createSignal, type Accessor } from "solid-js";
 import { render } from "solid-js/web";
 import { appAlert, appConfirm } from "../../components";

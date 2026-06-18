@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createMemo, createSignal, Show } from "solid-js";
 import { createStoreSelector } from "../../../solid-utils/store";
 import {

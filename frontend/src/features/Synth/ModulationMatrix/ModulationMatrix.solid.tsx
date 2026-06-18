@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { Portal, render } from "solid-js/web";
 import { Button, HoverInfo, Icon, Toggle } from "../../../solid-ui";

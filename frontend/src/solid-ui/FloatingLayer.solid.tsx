@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import type { JSX } from "solid-js";
 import styles from "../components/FloatingLayer/FloatingLayer.module.css";
 

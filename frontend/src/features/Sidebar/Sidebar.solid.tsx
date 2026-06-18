@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import { render } from "solid-js/web";
 import { appAlert } from "../../components";

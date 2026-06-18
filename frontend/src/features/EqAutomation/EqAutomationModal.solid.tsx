@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { For, Show } from "solid-js";
 import { render } from "solid-js/web";
 import { Button, Knob, Modal, NumberInput } from "../../solid-ui";

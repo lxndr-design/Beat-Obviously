@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createEffect, createSignal, onCleanup, type JSX } from "solid-js";
 import styles from "../../components/MarqueeText/MarqueeText.module.css";
 

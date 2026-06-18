@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createSignal } from "solid-js";
 import { Button } from "../Button";
 import { Modal } from "./Modal.solid";

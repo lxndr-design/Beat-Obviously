@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createSignal } from "solid-js";
 import { Icon } from "../Icon";
 import { SectionRibbon, SectionRibbonActionButton } from "./SectionRibbon.solid";

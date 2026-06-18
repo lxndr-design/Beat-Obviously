@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createSignal, For, Show } from "solid-js";
 import { Button, HoverInfo, Icon, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { appConfirm } from "../../components";

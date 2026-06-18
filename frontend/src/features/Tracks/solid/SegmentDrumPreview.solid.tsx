@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { For, Show } from "solid-js";
 import { drumStepOn } from "../../../state/drumSteps";
 import type { Segment } from "../../../state/types";

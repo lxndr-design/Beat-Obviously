@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { MarqueeText } from "./MarqueeText.solid";
 
 export function MarqueeTextSolidDemo() {

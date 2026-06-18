@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { render } from "solid-js/web";
 import { previewFrequency, renderedInstrumentBuffer } from "../../../audio/synthPreview";

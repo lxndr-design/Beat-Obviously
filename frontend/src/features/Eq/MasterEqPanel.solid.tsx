@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { render } from "solid-js/web";
 import { appPrompt } from "../../components";

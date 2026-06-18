@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { Show } from "solid-js";
 import styles from "../../components/Toggle/Toggle.module.css";
 

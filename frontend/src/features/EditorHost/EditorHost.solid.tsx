@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { For } from "solid-js";
 import { render } from "solid-js/web";
 import { Modal } from "../../solid-ui";

@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Button } from "../../solid-ui";

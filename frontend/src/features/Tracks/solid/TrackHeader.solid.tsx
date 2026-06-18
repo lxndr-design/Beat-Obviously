@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createMemo, createSignal, Show } from "solid-js";
 import { nanoid as newNanoid } from "nanoid";
 import { appConfirm } from "../../../components";

@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { onCleanup, onMount } from "solid-js";
 import { render } from "solid-js/web";
 import * as THREE from "three";

@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createMemo, Show } from "solid-js";
 import { render } from "solid-js/web";
 import { Button, Modal, NumberInput, TextInput, Toggle } from "../../solid-ui";

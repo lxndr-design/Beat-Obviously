@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { Button } from "./Button.solid";
 import { Icon } from "../Icon";
 

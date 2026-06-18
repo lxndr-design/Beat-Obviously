@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { Icon } from "../../solid-ui";
 import styles from "./BrandMark.module.css";
 

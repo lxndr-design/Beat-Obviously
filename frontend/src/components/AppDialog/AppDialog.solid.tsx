@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { Button, Modal, TextInput } from "../../solid-ui";
 import { completeDialog, getActiveAppDialog, subscribeAppDialog, type ActiveDialog } from "./state";

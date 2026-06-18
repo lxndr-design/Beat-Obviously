@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { Show, splitProps, type JSX } from "solid-js";
 import styles from "../../components/TextInput/TextInput.module.css";
 

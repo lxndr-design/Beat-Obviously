@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { appAlert, appConfirm } from "./components";
 import { TimelineMidiPlaybackSolid } from "./audio/TimelineMidiPlayback.solid";

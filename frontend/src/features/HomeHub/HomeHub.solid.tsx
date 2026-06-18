@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createSignal, For, Show } from "solid-js";
 import { render } from "solid-js/web";
 import type { RecentProjectEntry } from "../../ipc/schema";

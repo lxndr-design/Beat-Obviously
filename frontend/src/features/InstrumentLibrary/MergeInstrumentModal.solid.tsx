@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createSignal, For, Show } from "solid-js";
 import { Button, Modal } from "../../solid-ui";
 import { useInstrumentStore, useUiStore } from "../../state/store";

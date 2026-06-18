@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createSignal, For, onCleanup, Show } from "solid-js";
 import { Button, Icon, RowItem, SectionRibbon, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { appPrompt } from "../../components";

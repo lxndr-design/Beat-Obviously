@@ -1,4 +1,3 @@
-/** @jsxImportSource solid-js */
 import { createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { createStoreSelector } from "../../../solid-utils/store";
 import { Button, HoverInfo, Icon } from "../../../solid-ui";
