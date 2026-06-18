@@ -22,7 +22,7 @@ import { VisualizerSolid } from "./features/Visualizer/Visualizer.solid";
 import { HomeHubSolid } from "./features/HomeHub/HomeHub.solid";
 import { TopBarSolid } from "./features/TopBar/TopBarSolid.solid";
 import { SidebarSolid } from "./features/Sidebar/Sidebar.solid";
-import { TrackListSolid } from "./features/Tracks/solid/TrackList.solid";
+import { TrackListSolid } from "./features/Tracks/TrackList.solid";
 import { MasterEqPanelSolid } from "./features/Eq/MasterEqPanel.solid";
 import { EditorHostSolid } from "./features/EditorHost/EditorHost.solid";
 import { AppDialogHostSolid } from "./solid-ui/AppDialog";

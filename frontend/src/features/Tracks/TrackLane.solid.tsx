@@ -1,9 +1,9 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { nanoid as nano } from "nanoid";
-import { createStoreSelector } from "../../../solid-utils/store";
-import { appAlert } from "../../../solid-ui";
-import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../../audio/audioFormats";
-import { importAudioFile } from "../../../audio/audioImport";
+import { createStoreSelector } from "../../solid-utils/store";
+import { appAlert } from "../../solid-ui";
+import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
+import { importAudioFile } from "../../audio/audioImport";
 import {
   useAudioFileStore,
   useInstrumentStore,
@@ -12,20 +12,20 @@ import {
   useTransportStore,
   useUiStore,
   useViewStore,
-} from "../../../state/store";
-import { pauseTransport } from "../../../audio/transportActions";
-import { useComponentStore } from "../../../state/components";
-import { clipboardStore } from "../../../state/clipboard";
-import { expandTrackSegments } from "../../../state/selectors";
+} from "../../state/store";
+import { pauseTransport } from "../../audio/transportActions";
+import { useComponentStore } from "../../state/components";
+import { clipboardStore } from "../../state/clipboard";
+import { expandTrackSegments } from "../../state/selectors";
 import {
   decentSamplerEditorKind,
   decentSamplerInstrumentInstancePatch,
   decentSamplerPluginForInstrument,
-} from "../../PluginLibrary/decentSamplerPluginAdapter";
-import { createContextMenu, type ContextMenuItem } from "../../../solid-ui";
+} from "../PluginLibrary/decentSamplerPluginAdapter";
+import { createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { SegmentSolid } from "./Segment.solid";
-import styles from "../TrackLane.module.css";
-import type { DrumRow, Id, Instrument, Segment as SegmentModel, Track } from "../../../state/types";
+import styles from "./TrackLane.module.css";
+import type { DrumRow, Id, Instrument, Segment as SegmentModel, Track } from "../../state/types";
 
 interface Props {
   trackId: Id;

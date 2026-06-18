@@ -1,12 +1,12 @@
 import { createMemo, createSignal, Show } from "solid-js";
 import { nanoid as newNanoid } from "nanoid";
-import { appConfirm } from "../../../solid-ui";
-import { createStoreSelector } from "../../../solid-utils/store";
-import { createContextMenu, HoverInfo, Icon, type ContextMenuItem } from "../../../solid-ui";
-import { useAnalyzerStore } from "../../../state/analyzerStore";
-import { useProjectStore, useUiStore } from "../../../state/store";
-import styles from "../TrackHeader.module.css";
-import type { Id, Track } from "../../../state/types";
+import { appConfirm } from "../../solid-ui";
+import { createStoreSelector } from "../../solid-utils/store";
+import { createContextMenu, HoverInfo, Icon, type ContextMenuItem } from "../../solid-ui";
+import { useAnalyzerStore } from "../../state/analyzerStore";
+import { useProjectStore, useUiStore } from "../../state/store";
+import styles from "./TrackHeader.module.css";
+import type { Id, Track } from "../../state/types";
 
 interface Props {
   trackId: Id;

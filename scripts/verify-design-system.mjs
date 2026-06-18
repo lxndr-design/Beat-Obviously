@@ -40,6 +40,17 @@ function walk(dir, predicate = () => true) {
   return out;
 }
 
+function walkDirs(dir) {
+  const out = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    const stat = statSync(full);
+    if (!stat.isDirectory()) continue;
+    out.push(full, ...walkDirs(full));
+  }
+  return out;
+}
+
 function lineEntries(source) {
   return source.split(/\r?\n/).map((line, index) => ({
     line,
@@ -68,6 +79,13 @@ if (existsSync(componentsDir)) {
 }
 if (existsSync(reactBridgeDir)) {
   fail("Legacy frontend/src/react-bridge namespace should stay removed; Solid is mounted directly from frontend/src/main.solid.tsx.");
+}
+if (existsSync(featuresDir)) {
+  for (const dir of walkDirs(featuresDir)) {
+    if (dir.endsWith("/solid")) {
+      fail(`Migration-only feature solid/ folder should be flattened now that the app is Solid-owned: ${rel(dir)}`);
+    }
+  }
 }
 if (solidComponentNames.length > 0 && !solidCatalog) {
   fail("Missing frontend/src/design/SolidUiKitCatalog.solid.tsx");

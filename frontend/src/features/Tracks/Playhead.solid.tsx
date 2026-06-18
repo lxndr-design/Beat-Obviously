@@ -1,6 +1,6 @@
-import { createStoreSelector } from "../../../solid-utils/store";
-import { useTransportStore, useViewStore } from "../../../state/store";
-import styles from "../Playhead.module.css";
+import { createStoreSelector } from "../../solid-utils/store";
+import { useTransportStore, useViewStore } from "../../state/store";
+import styles from "./Playhead.module.css";
 
 export function PlayheadSolid() {
   const position = createStoreSelector(useTransportStore, (state) => state.positionBeat);

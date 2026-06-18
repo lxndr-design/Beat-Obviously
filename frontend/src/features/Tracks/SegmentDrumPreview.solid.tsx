@@ -1,7 +1,7 @@
 import { For, Show } from "solid-js";
-import { drumStepOn } from "../../../state/drumSteps";
-import type { Segment } from "../../../state/types";
-import styles from "../SegmentDrumPreview.module.css";
+import { drumStepOn } from "../../state/drumSteps";
+import type { Segment } from "../../state/types";
+import styles from "./SegmentDrumPreview.module.css";
 
 interface Props {
   segment: Segment;

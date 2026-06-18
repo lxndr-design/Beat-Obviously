@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { createStoreSelector } from "../../../solid-utils/store";
-import { createContextMenu, Icon, type ContextMenuItem } from "../../../solid-ui";
+import { createStoreSelector } from "../../solid-utils/store";
+import { createContextMenu, Icon, type ContextMenuItem } from "../../solid-ui";
 import {
   EFFECT_KIND_ORDER,
   EFFECT_META,
@@ -10,11 +10,11 @@ import {
   formatEffectParamValue,
   visibleEffectAutomationPoints,
   type EffectParamMeta,
-} from "../../../automation/trackEffects";
-import { AUTOMATION_CURVES, automationCurveLabel, evaluateAutomationCurve } from "../../../automation/curves";
-import { useProjectStore, useUiStore, useViewStore } from "../../../state/store";
-import styles from "../TrackEffectRows.module.css";
-import type { Id, TrackEffect, TrackEffectAutomationPoint } from "../../../state/types";
+} from "../../automation/trackEffects";
+import { AUTOMATION_CURVES, automationCurveLabel, evaluateAutomationCurve } from "../../automation/curves";
+import { useProjectStore, useUiStore, useViewStore } from "../../state/store";
+import styles from "./TrackEffectRows.module.css";
+import type { Id, TrackEffect, TrackEffectAutomationPoint } from "../../state/types";
 
 const TIMEPOINT_HANDLE_Y = 11;
 

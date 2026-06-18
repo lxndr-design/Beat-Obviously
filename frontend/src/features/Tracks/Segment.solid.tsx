@@ -1,5 +1,5 @@
 import { createMemo, createSignal, Show } from "solid-js";
-import { createStoreSelector } from "../../../solid-utils/store";
+import { createStoreSelector } from "../../solid-utils/store";
 import {
   useInstrumentStore,
   usePluginStore,
@@ -8,16 +8,16 @@ import {
   useTransportStore,
   useUiStore,
   useViewStore,
-} from "../../../state/store";
-import { clipboardStore } from "../../../state/clipboard";
-import { useComponentStore } from "../../../state/components";
-import { listDrumBeatFeedback, updateDrumBeatFeedback } from "../../../persistence/dexie";
-import { maybeRunDueTraining } from "../../../ai/trainingRunner";
-import { selectedCrossfadeCandidate } from "../arrangementActions";
-import { decentSamplerPluginForInstrument } from "../../PluginLibrary/decentSamplerPluginAdapter";
-import { appPrompt } from "../../../solid-ui";
-import { createContextMenu, Icon, type ContextMenuItem } from "../../../solid-ui";
-import { SEGMENT_LAYER_OFFSET_PX } from "../geometry";
+} from "../../state/store";
+import { clipboardStore } from "../../state/clipboard";
+import { useComponentStore } from "../../state/components";
+import { listDrumBeatFeedback, updateDrumBeatFeedback } from "../../persistence/dexie";
+import { maybeRunDueTraining } from "../../ai/trainingRunner";
+import { selectedCrossfadeCandidate } from "./arrangementActions";
+import { decentSamplerPluginForInstrument } from "../PluginLibrary/decentSamplerPluginAdapter";
+import { appPrompt } from "../../solid-ui";
+import { createContextMenu, Icon, type ContextMenuItem } from "../../solid-ui";
+import { SEGMENT_LAYER_OFFSET_PX } from "./geometry";
 import {
   GRID_TICK_BEATS,
   clampFadeLen,
@@ -27,12 +27,12 @@ import {
   snapLen,
   snapStepBeats,
   type SegmentSnapSettings,
-} from "../segmentMath";
+} from "./segmentMath";
 import { SegmentMidiPreviewSolid } from "./SegmentMidiPreview.solid";
 import { SegmentDrumPreviewSolid } from "./SegmentDrumPreview.solid";
 import { SegmentWaveformSolid } from "./SegmentWaveform.solid";
-import styles from "../Segment.module.css";
-import type { Id, Segment as SegmentType } from "../../../state/types";
+import styles from "./Segment.module.css";
+import type { Id, Segment as SegmentType } from "../../state/types";
 
 interface Props {
   segmentId: Id;

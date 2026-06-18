@@ -1,8 +1,8 @@
 import { createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
-import { createStoreSelector } from "../../../solid-utils/store";
-import { Button, HoverInfo, Icon } from "../../../solid-ui";
-import { useProjectStore, useTransportStore, useUiStore, useViewStore } from "../../../state/store";
-import { clipboardStore } from "../../../state/clipboard";
+import { createStoreSelector } from "../../solid-utils/store";
+import { Button, HoverInfo, Icon } from "../../solid-ui";
+import { useProjectStore, useTransportStore, useUiStore, useViewStore } from "../../state/store";
+import { clipboardStore } from "../../state/clipboard";
 import { TrackLaneSolid } from "./TrackLane.solid";
 import { TrackEffectHeaderRowsSolid, TrackEffectLaneRowsSolid } from "./TrackEffectRows.solid";
 import { TimelineSolid } from "./Timeline.solid";
@@ -14,9 +14,9 @@ import {
   normalizedTimelineRect,
   rectsOverlap,
   type TimelineRect,
-} from "../geometry";
-import styles from "../TrackList.module.css";
-import type { Id } from "../../../state/types";
+} from "./geometry";
+import styles from "./TrackList.module.css";
+import type { Id } from "../../state/types";
 
 const ZOOM_STEP = 8;
 const MIN_ZOOM = 16;

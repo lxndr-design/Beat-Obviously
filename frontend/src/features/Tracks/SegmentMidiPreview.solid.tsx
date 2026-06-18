@@ -1,6 +1,6 @@
 import { For, Show } from "solid-js";
-import type { Segment } from "../../../state/types";
-import styles from "../SegmentMidiPreview.module.css";
+import type { Segment } from "../../state/types";
+import styles from "./SegmentMidiPreview.module.css";
 
 interface Props {
   segment: Segment;

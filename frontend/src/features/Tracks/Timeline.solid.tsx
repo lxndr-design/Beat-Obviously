@@ -1,8 +1,8 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
-import { send } from "../../../ipc/bridge";
-import { createStoreSelector } from "../../../solid-utils/store";
-import { useProjectStore, useTransportStore, useViewStore } from "../../../state/store";
-import styles from "../Timeline.module.css";
+import { send } from "../../ipc/bridge";
+import { createStoreSelector } from "../../solid-utils/store";
+import { useProjectStore, useTransportStore, useViewStore } from "../../state/store";
+import styles from "./Timeline.module.css";
 
 type LoopClamp = "start" | "end";
 

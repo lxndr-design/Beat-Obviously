@@ -1,6 +1,6 @@
 import { createMemo } from "solid-js";
-import type { Segment } from "../../../state/types";
-import styles from "../SegmentWaveform.module.css";
+import type { Segment } from "../../state/types";
+import styles from "./SegmentWaveform.module.css";
 
 interface Props {
   segment: Segment;

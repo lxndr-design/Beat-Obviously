@@ -37,11 +37,11 @@ These tasks can run now in separate worktrees.
 
 Owned files:
 
-- `frontend/src/features/Tracks/solid/Segment.solid.tsx`
+- `frontend/src/features/Tracks/Segment.solid.tsx`
 - `frontend/src/features/Tracks/Segment.module.css`
-- `frontend/src/features/Tracks/solid/TrackLane.solid.tsx`
-- `frontend/src/features/Tracks/solid/TrackList.solid.tsx`
-- `frontend/src/features/Tracks/solid/Timeline.solid.tsx`
+- `frontend/src/features/Tracks/TrackLane.solid.tsx`
+- `frontend/src/features/Tracks/TrackList.solid.tsx`
+- `frontend/src/features/Tracks/Timeline.solid.tsx`
 - `frontend/src/features/Tracks/geometry.ts`
 - `frontend/src/testing/interactionRunner.ts`
 - `scripts/verify-frontend-interactions.mjs`
