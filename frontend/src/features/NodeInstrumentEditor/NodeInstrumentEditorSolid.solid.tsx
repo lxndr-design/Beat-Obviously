@@ -1,5 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, type Accessor, type Setter } from "solid-js";
-import { render } from "solid-js/web";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, type Accessor } from "solid-js";
 import type {
   Instrument,
   InstrumentNode,
@@ -38,20 +37,6 @@ export interface NodeInstrumentEditorSolidProps {
 
 interface NodeInstrumentEditorSolidInternalProps {
   props: Accessor<NodeInstrumentEditorSolidProps>;
-}
-
-export interface MountedNodeInstrumentEditorSolid {
-  setProps: Setter<NodeInstrumentEditorSolidProps>;
-  dispose: () => void;
-}
-
-export function mountNodeInstrumentEditorSolid(
-  element: HTMLElement,
-  initialProps: NodeInstrumentEditorSolidProps,
-): MountedNodeInstrumentEditorSolid {
-  const [props, setProps] = createSignal(initialProps, { equals: false });
-  const dispose = render(() => <NodeInstrumentEditorSolidView props={props} />, element);
-  return { setProps, dispose };
 }
 
 export function NodeInstrumentEditorSolid(props: NodeInstrumentEditorSolidProps) {

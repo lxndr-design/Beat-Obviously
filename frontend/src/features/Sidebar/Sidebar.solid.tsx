@@ -1,5 +1,4 @@
 import { createEffect, createSignal, onCleanup } from "solid-js";
-import { render } from "solid-js/web";
 import { appAlert } from "../../solid-ui";
 import { isNative, send } from "../../ipc/bridge";
 import { saveCurrentDocument } from "../../persistence/documentActions";
@@ -22,15 +21,6 @@ const PANELS: Array<{ id: SidebarPanel; label: string; icon?: string; activeIcon
   { id: "plugins", label: "Plugins", icon: "ph:share-network", activeIcon: "ph:share-network-fill" },
   { id: "decentSampler", label: "DecentSampler", kind: "decentSampler" },
 ];
-
-export interface MountedSidebarSolid {
-  dispose: () => void;
-}
-
-export function mountSidebarSolid(host: HTMLElement): MountedSidebarSolid {
-  const dispose = render(() => <SidebarSolid />, host);
-  return { dispose };
-}
 
 export function SidebarSolid() {
   const width = createStoreSelector(useViewStore, (state) => state.sidebarWidth);

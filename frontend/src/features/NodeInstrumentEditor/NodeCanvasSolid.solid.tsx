@@ -1,5 +1,4 @@
-import { createMemo, createSignal, For, type Accessor, type Setter } from "solid-js";
-import { render } from "solid-js/web";
+import { createMemo, For, type Accessor } from "solid-js";
 import type {
   InstrumentNode,
   InstrumentNodeCable,
@@ -40,17 +39,6 @@ export interface NodeCanvasSolidState {
 
 interface NodeCanvasSolidProps {
   state: Accessor<NodeCanvasSolidState>;
-}
-
-export interface MountedNodeCanvasSolid {
-  setState: Setter<NodeCanvasSolidState>;
-  dispose: () => void;
-}
-
-export function mountNodeCanvasSolid(element: HTMLElement, initialState: NodeCanvasSolidState): MountedNodeCanvasSolid {
-  const [state, setState] = createSignal(initialState, { equals: false });
-  const dispose = render(() => <NodeCanvasSolid state={state} />, element);
-  return { setState, dispose };
 }
 
 export function NodeCanvasSolid(props: NodeCanvasSolidProps) {

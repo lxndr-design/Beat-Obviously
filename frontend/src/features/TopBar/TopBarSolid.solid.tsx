@@ -1,5 +1,4 @@
 import { createEffect, createSignal, onCleanup, Show, type Accessor } from "solid-js";
-import { render } from "solid-js/web";
 import { pauseTransport, playTransport, restartTransport, stopTransport } from "../../audio/transportActions";
 import { send } from "../../ipc/bridge";
 import { createStoreSelector } from "../../solid-utils/store";
@@ -23,17 +22,6 @@ export interface TopBarProps {
   onRecover: () => void;
   onHealth: () => void;
   onSettings: () => void;
-}
-
-export interface MountedTopBarSolid {
-  setProps: (props: TopBarProps) => void;
-  dispose: () => void;
-}
-
-export function mountTopBarSolid(host: HTMLElement, initialProps: TopBarProps): MountedTopBarSolid {
-  const [props, setProps] = createSignal(initialProps, { equals: false });
-  const dispose = render(() => <TopBarSolid props={props} />, host);
-  return { setProps, dispose };
 }
 
 export function TopBarSolid(props: { props: Accessor<TopBarProps> }) {

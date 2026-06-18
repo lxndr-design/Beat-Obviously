@@ -1,5 +1,4 @@
-import { createSignal, type Accessor } from "solid-js";
-import { render } from "solid-js/web";
+import { type Accessor } from "solid-js";
 import { appAlert, appConfirm } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { createContextMenu, type ContextMenuItem } from "../../solid-ui";
@@ -21,17 +20,6 @@ export interface AppMenuButtonProps {
   onSettings: () => void;
   disableHome?: boolean;
   disableFileStateActions?: boolean;
-}
-
-export interface MountedAppMenuButtonSolid {
-  setProps: (props: AppMenuButtonProps) => void;
-  dispose: () => void;
-}
-
-export function mountAppMenuButtonSolid(host: HTMLElement, initialProps: AppMenuButtonProps): MountedAppMenuButtonSolid {
-  const [props, setProps] = createSignal(initialProps, { equals: false });
-  const dispose = render(() => <AppMenuButtonSolid props={props} />, host);
-  return { setProps, dispose };
 }
 
 export function AppMenuButtonSolid(props: { props: Accessor<AppMenuButtonProps> }) {

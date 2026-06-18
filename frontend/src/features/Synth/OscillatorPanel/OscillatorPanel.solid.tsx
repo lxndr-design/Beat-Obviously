@@ -1,5 +1,4 @@
 import { createMemo, For, Show } from "solid-js";
-import { render } from "solid-js/web";
 import { renderAetherOutputPreviewSamples } from "../../../audio/synthPreview";
 import { Button, HoverInfo, Icon, Knob } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
@@ -429,13 +428,4 @@ function modulationPropsForTarget(draft: SynthDraftPatch, id: SynthParameterId) 
     modulationAmount: summary.amount,
     modulationLabel: summary.label,
   };
-}
-
-export interface MountedOscillatorPanelSolid {
-  dispose: () => void;
-}
-
-export function mountOscillatorPanelSolid(host: HTMLElement): MountedOscillatorPanelSolid {
-  const dispose = render(() => <OscillatorPanelSolid />, host);
-  return { dispose };
 }

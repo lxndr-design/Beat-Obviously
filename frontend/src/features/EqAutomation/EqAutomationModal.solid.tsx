@@ -1,5 +1,4 @@
 import { For, Show } from "solid-js";
-import { render } from "solid-js/web";
 import { Button, Knob, Modal, NumberInput } from "../../solid-ui";
 import { send } from "../../ipc/bridge";
 import { useProjectStore, useUiStore } from "../../state/store";
@@ -111,13 +110,4 @@ export function EqAutomationModalSolid() {
       </Show>
     </Modal>
   );
-}
-
-export interface MountedEqAutomationModalSolid {
-  dispose: () => void;
-}
-
-export function mountEqAutomationModalSolid(host: HTMLElement): MountedEqAutomationModalSolid {
-  const dispose = render(() => <EqAutomationModalSolid />, host);
-  return { dispose };
 }

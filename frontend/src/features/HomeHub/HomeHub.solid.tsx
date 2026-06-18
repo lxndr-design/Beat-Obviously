@@ -1,5 +1,4 @@
 import { createSignal, For, Show } from "solid-js";
-import { render } from "solid-js/web";
 import type { RecentProjectEntry } from "../../ipc/schema";
 import { appConfirm } from "../../solid-ui";
 import { Button, HoverInfo, Icon } from "../../solid-ui";
@@ -279,18 +278,4 @@ function formatRecentDate(openedAt: number): string {
     day: "numeric",
     year: "numeric",
   }).format(new Date(openedAt))}`;
-}
-
-export interface MountedHomeHubSolid {
-  update: (next: HomeHubProps) => void;
-  dispose: () => void;
-}
-
-export function mountHomeHubSolid(host: HTMLElement, initialProps: HomeHubProps): MountedHomeHubSolid {
-  const [state, setState] = createSignal(initialProps, { equals: false });
-  const dispose = render(() => <HomeHubSolid {...state()} />, host);
-  return {
-    update: setState,
-    dispose,
-  };
 }

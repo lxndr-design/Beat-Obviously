@@ -1,5 +1,4 @@
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
-import { render } from "solid-js/web";
 import { ActionFooter, Button, HoverInfo, Icon, MarqueeText } from "../../solid-ui";
 import {
   cachedInstrumentSampleBuffer,
@@ -1341,13 +1340,4 @@ function getPreviewContext(ref: RefValue<AudioContext | null>): AudioContext {
   const ctx = new Ctor();
   ref.current = ctx;
   return ctx;
-}
-
-export interface MountedInstrumentsPageSolid {
-  dispose: () => void;
-}
-
-export function mountInstrumentsPageSolid(host: HTMLElement): MountedInstrumentsPageSolid {
-  const dispose = render(() => <InstrumentsPageSolid />, host);
-  return { dispose };
 }

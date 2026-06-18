@@ -1,5 +1,4 @@
-import { createMemo, createSignal, For, Show, type Accessor } from "solid-js";
-import { render } from "solid-js/web";
+import { createMemo, For, Show, type Accessor } from "solid-js";
 import { Button, Icon } from "../../../solid-ui";
 import { useAnalyzerStore, type AnalyzerSnapshot } from "../../../state/analyzerStore";
 import { createStoreSelector } from "../../../solid-utils/store";
@@ -119,19 +118,4 @@ function toBandCount(source: number[], count: number): number[] {
     const mix = position - left;
     return clamp01(source[left] + (source[right] - source[left]) * mix);
   });
-}
-
-export interface MountedAnalyzerPanelSolid {
-  update: (next: AnalyzerPanelProps) => void;
-  dispose: () => void;
-}
-
-export function mountAnalyzerPanelSolid(host: HTMLElement, initialProps: AnalyzerPanelProps): MountedAnalyzerPanelSolid {
-  const [state, setState] = createSignalForMount(initialProps);
-  const dispose = render(() => <AnalyzerPanelSolid state={state} />, host);
-  return { update: setState, dispose };
-}
-
-function createSignalForMount<T>(initial: T): [Accessor<T>, (next: T) => void] {
-  return createSignal(initial, { equals: false });
 }

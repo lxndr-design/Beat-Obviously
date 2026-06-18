@@ -1,5 +1,4 @@
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
-import { render } from "solid-js/web";
 import { Button, FloatingSelect, Icon, Modal, RadioGroup, Toggle } from "../../solid-ui";
 import { getOllamaModel, setOllamaModel } from "../../ai/aiService";
 import {
@@ -30,15 +29,6 @@ import {
 } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
 import styles from "./PreferencesModal.module.css";
-
-export interface MountedPreferencesModalSolid {
-  dispose: () => void;
-}
-
-export function mountPreferencesModalSolid(host: HTMLElement): MountedPreferencesModalSolid {
-  const dispose = render(() => <PreferencesModalSolid />, host);
-  return { dispose };
-}
 
 export function PreferencesModalSolid() {
   const settings = createStoreSelector(useSettingsStore, (s) => s);

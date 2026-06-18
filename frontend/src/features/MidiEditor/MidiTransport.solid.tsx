@@ -1,5 +1,4 @@
 import { createEffect, createSignal, onCleanup, type Accessor } from "solid-js";
-import { render } from "solid-js/web";
 import { Button, HoverInfo, Icon } from "../../solid-ui";
 import {
   createInstrumentBufferSource,
@@ -364,18 +363,4 @@ function midiAutomationToSynthLanes(note: MidiNote, durationS: number): SynthAut
 
 function isSynthAutomationTarget(target: MidiAutomationTarget): target is SynthAutomationTarget {
   return target !== "pitch";
-}
-
-export interface MountedMidiTransportSolid {
-  update: (next: MidiTransportProps) => void;
-  dispose: () => void;
-}
-
-export function mountMidiTransportSolid(host: HTMLElement, initialProps: MidiTransportProps): MountedMidiTransportSolid {
-  const [state, setState] = createSignal(initialProps, { equals: false });
-  const dispose = render(() => <MidiTransportSolidRuntime state={state} />, host);
-  return {
-    update: (next) => setState(next),
-    dispose,
-  };
 }

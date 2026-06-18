@@ -1,5 +1,4 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
-import { render } from "solid-js/web";
 import { DRUM_MAX_STEPS, type GeneratedDrumBeat } from "../../ai/drumBeatGenerator";
 import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
@@ -516,21 +515,4 @@ function volumePercentToGainDb(percent: number): number {
 function applyGainToVelocity(velocity: number, gainDb: number): number {
   const gain = Math.pow(10, Math.max(-96, Math.min(24, gainDb)) / 20);
   return Math.max(0, Math.min(127, velocity * gain));
-}
-
-export interface MountedSegmentEditorModalSolid {
-  update: (next: SegmentEditorModalProps) => void;
-  dispose: () => void;
-}
-
-export function mountSegmentEditorModalSolid(
-  host: HTMLElement,
-  initialProps: SegmentEditorModalProps,
-): MountedSegmentEditorModalSolid {
-  const [state, setState] = createSignal(initialProps, { equals: false });
-  const dispose = render(() => <SegmentEditorModalSolid {...state()} />, host);
-  return {
-    update: setState,
-    dispose,
-  };
 }

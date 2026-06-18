@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
-import { Portal, render } from "solid-js/web";
+import { Portal } from "solid-js/web";
 import { nanoid } from "nanoid";
 import { Button, HoverInfo, Icon, NumberInput, Toggle } from "../../solid-ui";
 import { useProjectStore, useUiStore } from "../../state/store";
@@ -136,15 +136,6 @@ interface DragState {
   dx: number;
   dy: number;
   pointerId: number;
-}
-
-export interface MountedTrackEffectsPanelSolid {
-  dispose: () => void;
-}
-
-export function mountTrackEffectsPanelSolid(host: HTMLElement): MountedTrackEffectsPanelSolid {
-  const dispose = render(() => <TrackEffectsPanelSolid />, host);
-  return { dispose };
 }
 
 export function TrackEffectsPanelSolid() {

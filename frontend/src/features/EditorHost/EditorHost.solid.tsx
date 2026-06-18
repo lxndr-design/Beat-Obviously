@@ -1,5 +1,4 @@
 import { For } from "solid-js";
-import { render } from "solid-js/web";
 import { Modal } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { useInstrumentStore, useUiStore } from "../../state/store";
@@ -14,15 +13,6 @@ import { SegmentEditorModalSolid } from "../SegmentEditor/SegmentEditorModal.sol
 import { SynthEditorSolid } from "../Synth/SynthEditor/SynthEditor.solid";
 import { TrackDetailsModalSolid } from "../TrackDetails/TrackDetailsModal.solid";
 import { TrackEffectsPanelSolid } from "../TrackEffects/TrackEffectsPanel.solid";
-
-export interface MountedEditorHostSolid {
-  dispose: () => void;
-}
-
-export function mountEditorHostSolid(host: HTMLElement): MountedEditorHostSolid {
-  const dispose = render(() => <EditorHostSolid />, host);
-  return { dispose };
-}
 
 export function EditorHostSolid() {
   const openEditors = createStoreSelector(useUiStore, (state) => state.openEditors);

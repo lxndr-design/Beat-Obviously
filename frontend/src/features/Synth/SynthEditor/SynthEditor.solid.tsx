@@ -1,5 +1,4 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { render } from "solid-js/web";
 import { previewFrequency, renderedInstrumentBuffer } from "../../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../../audio/synthWorkletPreview";
 import { Button, HoverInfo, Icon, Knob, TextInput } from "../../../solid-ui";
@@ -866,19 +865,5 @@ function modulationPropsForSource(draft: SynthDraftPatch, id: SynthParameterId) 
   return {
     modulationAmount: summary.amount,
     modulationLabel: summary.label,
-  };
-}
-
-export interface MountedSynthEditorSolid {
-  update: (next: SynthEditorProps) => void;
-  dispose: () => void;
-}
-
-export function mountSynthEditorSolid(host: HTMLElement, initialProps: SynthEditorProps): MountedSynthEditorSolid {
-  const [state, setState] = createSignal(initialProps, { equals: false });
-  const dispose = render(() => <SynthEditorSolid {...state()} />, host);
-  return {
-    update: setState,
-    dispose,
   };
 }

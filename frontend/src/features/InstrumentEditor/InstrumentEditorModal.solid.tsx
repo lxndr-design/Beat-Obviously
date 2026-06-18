@@ -1,5 +1,4 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
-import { render } from "solid-js/web";
 import { appAlert, useModalStack } from "../../solid-ui";
 import { Modal, Button, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, TextInput } from "../../solid-ui";
 import { ai, type GeneratedInstrument } from "../../ai/aiService";
@@ -800,20 +799,6 @@ export function InstrumentEditorModalSolid(props: Props) {
     </Modal>
     </Show>
   );
-}
-
-export interface MountedInstrumentEditorModalSolid {
-  update: (next: Props) => void;
-  dispose: () => void;
-}
-
-export function mountInstrumentEditorModalSolid(
-  host: HTMLElement,
-  initialProps: Props,
-): MountedInstrumentEditorModalSolid {
-  const [state, setState] = createSignal(initialProps, { equals: false });
-  const dispose = render(() => <InstrumentEditorModalSolid {...state()} />, host);
-  return { update: setState, dispose };
 }
 
 function AetherOscModule({

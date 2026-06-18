@@ -1,5 +1,4 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, type Accessor } from "solid-js";
-import { render } from "solid-js/web";
 import { Button, HoverInfo, Icon } from "../../solid-ui";
 import {
   cachedInstrumentSampleBuffer,
@@ -480,21 +479,4 @@ function normalize(values: number[]): number[] {
   const center = (min + max) / 2;
   const peak = Math.max(0.001, max - center, center - min);
   return values.map((value) => (value - center) / peak);
-}
-
-export interface MountedInstrumentWaveformPreviewSolid {
-  update: (next: InstrumentWaveformPreviewProps) => void;
-  dispose: () => void;
-}
-
-export function mountInstrumentWaveformPreviewSolid(
-  host: HTMLElement,
-  initialProps: InstrumentWaveformPreviewProps,
-): MountedInstrumentWaveformPreviewSolid {
-  const [state, setState] = createSignal(initialProps, { equals: false });
-  const dispose = render(() => <InstrumentWaveformPreviewSolidRuntime state={state} />, host);
-  return {
-    update: setState,
-    dispose,
-  };
 }

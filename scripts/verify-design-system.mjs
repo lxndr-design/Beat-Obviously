@@ -92,6 +92,9 @@ for (const file of sourceFiles) {
   if (source.includes("@iconify/react")) {
     fail(`Deprecated @iconify/react import in ${rel(file)}`);
   }
+  if (/export\s+(?:function\s+mount[A-Za-z0-9]+Solid|interface\s+Mounted[A-Za-z0-9]+Solid)\b/.test(source)) {
+    fail(`Deprecated Solid bridge mount API in ${rel(file)}`);
+  }
 
   if (!relativeFile.endsWith("scripts/verify-design-system.mjs")) {
     for (const { line, lineNumber } of lineEntries(source)) {

@@ -1,17 +1,7 @@
 import { onCleanup, onMount } from "solid-js";
-import { render } from "solid-js/web";
 import * as THREE from "three";
 import { useTransportStore } from "../../state/store";
 import styles from "./Visualizer.module.css";
-
-export interface MountedVisualizerSolid {
-  dispose: () => void;
-}
-
-export function mountVisualizerSolid(host: HTMLElement): MountedVisualizerSolid {
-  const dispose = render(() => <VisualizerSolid />, host);
-  return { dispose };
-}
 
 /**
  * Visualizer — low-priority raw Three background.

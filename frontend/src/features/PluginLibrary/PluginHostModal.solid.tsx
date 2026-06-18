@@ -1,5 +1,4 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
-import { render } from "solid-js/web";
 import { Button, FloatingSelect, Icon, Modal } from "../../solid-ui";
 import {
   decentSamplerControlBindingState,
@@ -17,15 +16,6 @@ import styles from "./PluginHostModal.module.css";
 
 interface PluginHostModalSolidProps {
   pluginId: string;
-}
-
-export interface MountedPluginHostModalSolid {
-  dispose: () => void;
-}
-
-export function mountPluginHostModalSolid(host: HTMLElement, props: PluginHostModalSolidProps): MountedPluginHostModalSolid {
-  const dispose = render(() => <PluginHostModalSolid {...props} />, host);
-  return { dispose };
 }
 
 export function PluginHostModalSolid(props: PluginHostModalSolidProps) {

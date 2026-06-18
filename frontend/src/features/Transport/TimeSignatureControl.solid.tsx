@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { Portal, render } from "solid-js/web";
+import { Portal } from "solid-js/web";
 import { Button, HoverInfo, Icon, NumberInput } from "../../solid-ui";
 import type { TimeSignature } from "../../state/types";
 import styles from "./TimeSignatureControl.module.css";
@@ -11,17 +11,6 @@ export interface TimeSignatureControlSolidProps {
   onChange: (value: TimeSignature) => void;
   ariaLabel?: string;
   direction?: "down" | "up";
-}
-
-export interface MountedTimeSignatureControlSolid {
-  setProps: (props: TimeSignatureControlSolidProps) => void;
-  dispose: () => void;
-}
-
-export function mountTimeSignatureControlSolid(host: HTMLElement, initialProps: TimeSignatureControlSolidProps): MountedTimeSignatureControlSolid {
-  const [props, setProps] = createSignal(initialProps, { equals: false });
-  const dispose = render(() => <TimeSignatureControlSolid {...props()} />, host);
-  return { setProps, dispose };
 }
 
 const TS_PRESETS = ["4/4", "3/4", "6/8", "5/4", "7/8", "12/8"] as const;

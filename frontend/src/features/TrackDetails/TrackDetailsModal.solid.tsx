@@ -1,5 +1,4 @@
 import { createMemo, Show } from "solid-js";
-import { render } from "solid-js/web";
 import { Button, Modal, NumberInput, TextInput, Toggle } from "../../solid-ui";
 import { useProjectStore, useUiStore } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
@@ -8,15 +7,6 @@ import type { Id, Track } from "../../state/types";
 
 interface TrackDetailsModalSolidProps {
   trackId: Id;
-}
-
-export interface MountedTrackDetailsModalSolid {
-  dispose: () => void;
-}
-
-export function mountTrackDetailsModalSolid(host: HTMLElement, props: TrackDetailsModalSolidProps): MountedTrackDetailsModalSolid {
-  const dispose = render(() => <TrackDetailsModalSolid {...props} />, host);
-  return { dispose };
 }
 
 export function TrackDetailsModalSolid(props: TrackDetailsModalSolidProps) {

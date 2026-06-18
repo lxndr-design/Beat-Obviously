@@ -1,5 +1,4 @@
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
-import { render } from "solid-js/web";
 import { DRUM_MAX_STEPS } from "../../ai/drumBeatGenerator";
 import { useModalStack } from "../../solid-ui";
 import { Button, FloatingSelect, Icon, Modal, NumberInput, TextInput } from "../../solid-ui";
@@ -202,21 +201,4 @@ export function ComponentEditorModalSolid(props: ComponentEditorModalProps) {
       </Modal>
     </Show>
   );
-}
-
-export interface MountedComponentEditorModalSolid {
-  update: (next: ComponentEditorModalProps) => void;
-  dispose: () => void;
-}
-
-export function mountComponentEditorModalSolid(
-  host: HTMLElement,
-  initialProps: ComponentEditorModalProps,
-): MountedComponentEditorModalSolid {
-  const [state, setState] = createSignal(initialProps, { equals: false });
-  const dispose = render(() => <ComponentEditorModalSolid {...state()} />, host);
-  return {
-    update: setState,
-    dispose,
-  };
 }

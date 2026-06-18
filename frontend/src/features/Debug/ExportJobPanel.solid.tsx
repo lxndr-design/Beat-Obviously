@@ -1,19 +1,9 @@
 import { createEffect, onCleanup, Show } from "solid-js";
-import { render } from "solid-js/web";
 import { send } from "../../ipc/bridge";
 import { createStoreSelector } from "../../solid-utils/store";
 import { Button, HoverInfo, Icon } from "../../solid-ui";
 import { useExportStore } from "../../state/exportStore";
 import styles from "./ExportJobPanel.module.css";
-
-export interface MountedExportJobPanelSolid {
-  dispose: () => void;
-}
-
-export function mountExportJobPanelSolid(host: HTMLElement): MountedExportJobPanelSolid {
-  const dispose = render(() => <ExportJobPanelSolid />, host);
-  return { dispose };
-}
 
 export function ExportJobPanelSolid() {
   const job = createStoreSelector(useExportStore, (state) => state.job);

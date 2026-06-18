@@ -1,5 +1,4 @@
-import { createMemo, createSignal, For, type Accessor } from "solid-js";
-import { render } from "solid-js/web";
+import { createMemo, For, type Accessor } from "solid-js";
 import { HoverInfo, Icon } from "../../solid-ui";
 import type { Instrument } from "../../state/types";
 import styles from "./WaveformPicker.module.css";
@@ -62,19 +61,4 @@ function WaveformPickerSolidRuntime(props: { state: Accessor<WaveformPickerProps
       <div class={styles.selectedLabel}>{selected()?.label ?? props.state().value}</div>
     </div>
   );
-}
-
-export interface MountedWaveformPickerSolid {
-  update: (next: WaveformPickerProps) => void;
-  dispose: () => void;
-}
-
-export function mountWaveformPickerSolid(host: HTMLElement, initialProps: WaveformPickerProps): MountedWaveformPickerSolid {
-  const [state, setState] = createSignalForMount(initialProps);
-  const dispose = render(() => <WaveformPickerSolidRuntime state={state} />, host);
-  return { update: setState, dispose };
-}
-
-function createSignalForMount<T>(initial: T): [Accessor<T>, (next: T) => void] {
-  return createSignal(initial, { equals: false });
 }

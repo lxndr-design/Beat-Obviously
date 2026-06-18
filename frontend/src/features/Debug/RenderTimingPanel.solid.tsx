@@ -1,5 +1,4 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { render } from "solid-js/web";
 import { createStoreSelector } from "../../solid-utils/store";
 import { Button, HoverInfo, Icon } from "../../solid-ui";
 import { useAnalyzerStore } from "../../state/analyzerStore";
@@ -25,15 +24,6 @@ const countRows = [
   ["Events", "automationEventCount"],
   ["WT", "wavetableCacheSize"],
 ] as const;
-
-export interface MountedRenderTimingPanelSolid {
-  dispose: () => void;
-}
-
-export function mountRenderTimingPanelSolid(host: HTMLElement): MountedRenderTimingPanelSolid {
-  const dispose = render(() => <RenderTimingPanelSolid />, host);
-  return { dispose };
-}
 
 export function RenderTimingPanelSolid() {
   const [collapsed, setCollapsed] = createSignal(true);

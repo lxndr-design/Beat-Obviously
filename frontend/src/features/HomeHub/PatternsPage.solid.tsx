@@ -1,5 +1,4 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
-import { render } from "solid-js/web";
 import { ActionFooter, Button, HoverInfo, Icon, MarqueeText } from "../../solid-ui";
 import { useComponentStore, type BeatComponent, type DrumComponent, type MidiComponent } from "../../state/components";
 import { normalizeDrumCell } from "../../state/drumSteps";
@@ -458,13 +457,4 @@ function formatDate(ms: number): string {
 
 function formatNumber(value: number): string {
   return Number.isInteger(value) ? `${value}` : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
-}
-
-export interface MountedPatternsPageSolid {
-  dispose: () => void;
-}
-
-export function mountPatternsPageSolid(host: HTMLElement): MountedPatternsPageSolid {
-  const dispose = render(() => <PatternsPageSolid />, host);
-  return { dispose };
 }

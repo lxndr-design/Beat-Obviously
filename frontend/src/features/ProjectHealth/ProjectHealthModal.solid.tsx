@@ -1,5 +1,4 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { render } from "solid-js/web";
 import { Button, Icon, Modal } from "../../solid-ui";
 import { isNative, send } from "../../ipc/bridge";
 import type { BeatProjectAsset, BeatProjectIntegrityIssue, ProjectSidecarCleanupReport } from "../../ipc/schema";
@@ -99,15 +98,6 @@ const REPAIR_LABELS: Record<RepairAction, { idle: string; busy: string; complete
     complete: "Segment track ID repair finished.",
   },
 };
-
-export interface MountedProjectHealthModalSolid {
-  dispose: () => void;
-}
-
-export function mountProjectHealthModalSolid(host: HTMLElement): MountedProjectHealthModalSolid {
-  const dispose = render(() => <ProjectHealthModalSolid />, host);
-  return { dispose };
-}
 
 export function ProjectHealthModalSolid() {
   const currentFilePath = createStoreSelector(useDocumentStore, (s) => s.currentFilePath);

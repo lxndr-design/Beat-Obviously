@@ -1,5 +1,4 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { render } from "solid-js/web";
 import { appPrompt } from "../../solid-ui";
 import { send } from "../../ipc/bridge";
 import { createStoreSelector } from "../../solid-utils/store";
@@ -8,15 +7,6 @@ import { useProjectStore, useTransportStore, useUiStore } from "../../state/stor
 import { EQ_BAND_COUNT, type EqAutomationPoint } from "../../state/types";
 import { EqGraphSolid } from "./EqGraph.solid";
 import styles from "./MasterEqPanel.module.css";
-
-export interface MountedMasterEqPanelSolid {
-  dispose: () => void;
-}
-
-export function mountMasterEqPanelSolid(host: HTMLElement): MountedMasterEqPanelSolid {
-  const dispose = render(() => <MasterEqPanelSolid />, host);
-  return { dispose };
-}
 
 export function MasterEqPanelSolid() {
   const automation = createStoreSelector(useProjectStore, (state) => state.project.masterEqAutomation);

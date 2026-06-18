@@ -1,5 +1,4 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
-import { render } from "solid-js/web";
 import { appAlert, appConfirm, appPrompt } from "../../solid-ui";
 import { ActionFooter, Button, HoverInfo, Icon, MarqueeText } from "../../solid-ui";
 import { importAudioFiles } from "../../audio/audioImport";
@@ -1284,13 +1283,4 @@ function formatInstrumentUsage(file: AudioFile, instruments: Instrument[]) {
 function formatExtension(name: string) {
   const match = /\.([a-z0-9]+)$/i.exec(name);
   return match ? match[1].toUpperCase() : "Unknown";
-}
-
-export interface MountedAudioFilesPageSolid {
-  dispose: () => void;
-}
-
-export function mountAudioFilesPageSolid(host: HTMLElement): MountedAudioFilesPageSolid {
-  const dispose = render(() => <AudioFilesPageSolid />, host);
-  return { dispose };
 }

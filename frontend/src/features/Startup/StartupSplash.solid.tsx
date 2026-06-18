@@ -1,5 +1,4 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show, type Accessor } from "solid-js";
-import { render } from "solid-js/web";
 import { Icon } from "../../solid-ui";
 import styles from "./StartupSplash.module.css";
 
@@ -13,18 +12,7 @@ export interface StartupSplashProps {
   stages: StartupStage[];
 }
 
-export interface MountedStartupSplashSolid {
-  setProps: (props: StartupSplashProps) => void;
-  dispose: () => void;
-}
-
 export const STARTUP_MINIMUM_VISIBLE_MS = 900;
-
-export function mountStartupSplashSolid(host: HTMLElement, initialProps: StartupSplashProps): MountedStartupSplashSolid {
-  const [props, setProps] = createSignal(initialProps, { equals: false });
-  const dispose = render(() => <StartupSplashSolid props={props} />, host);
-  return { setProps, dispose };
-}
 
 export function StartupSplashSolid(props: { props: Accessor<StartupSplashProps> }) {
   const [minimumElapsed, setMinimumElapsed] = createSignal(false);
