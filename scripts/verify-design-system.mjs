@@ -62,6 +62,9 @@ const solidComponentNames = existsSync(solidUiDir)
     .sort()
   : [];
 const solidCatalog = existsSync(solidCatalogPath) ? readFileSync(solidCatalogPath, "utf8") : "";
+if (existsSync(componentsDir)) {
+  fail("Legacy frontend/src/components namespace should stay removed; shared UI belongs in frontend/src/solid-ui.");
+}
 if (solidComponentNames.length > 0 && !solidCatalog) {
   fail("Missing frontend/src/design/SolidUiKitCatalog.solid.tsx");
 }
@@ -87,7 +90,7 @@ for (const file of sourceFiles) {
     fail(`Per-file Solid JSX pragma should be replaced by frontend/tsconfig.json jsxImportSource: ${rel(file)}`);
   }
   if (source.includes("@iconify/react")) {
-    fail(`Deprecated Iconify React import in ${rel(file)}`);
+    fail(`Deprecated @iconify/react import in ${rel(file)}`);
   }
 
   if (!relativeFile.endsWith("scripts/verify-design-system.mjs")) {
@@ -143,7 +146,7 @@ if (!tsconfigSource.includes('"jsxImportSource": "solid-js"')) {
   fail("frontend/tsconfig.json must define Solid as the global JSX import source.");
 }
 if (tsconfigSource.includes('"jsx": "react-jsx"')) {
-  fail("frontend/tsconfig.json must not use React JSX mode.");
+  fail("frontend/tsconfig.json must not use the old JSX transform mode.");
 }
 
 // Existing feature-local exceptions are narrow: canvas/SVG fallbacks, mask alpha,

@@ -185,7 +185,8 @@ engineers and designers.
 
 - Every shared component has a demo.
 - Every demo is included in `SolidUiKitCatalog.solid.tsx`.
-- Source files do not import deprecated Iconify React bindings.
+- Source files do not import deprecated `@iconify/react` bindings.
+- The removed `frontend/src/components` compatibility namespace does not reappear.
 - Non-Phosphor icon names are not used in source.
 - Shared component CSS does not introduce new hex colors outside design files.
 - Legacy JSX files under `frontend/src` are either Solid-suffixed or removed.

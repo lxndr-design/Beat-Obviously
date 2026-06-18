@@ -8,7 +8,7 @@ The synth editor now auditions Aether patches with an AudioWorklet-first path:
 
 - `frontend/src/audio/synthWorkletPreview.ts` loads `/worklets/aether-preview-worklet.js` once per `AudioContext`.
 - `frontend/public/worklets/aether-preview-worklet.js` renders the preview inside an `AudioWorkletProcessor`.
-- `frontend/src/features/Synth/SynthEditor/SynthEditor.tsx` connects the worklet node through the same analyzer/gain path used by the previous preview.
+- `frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx` connects the worklet node through the same analyzer/gain path used by the previous preview.
 - If AudioWorklet setup fails, the editor falls back to the cached `AudioBuffer` renderer from `frontend/src/audio/synthPreview.ts`.
 
 This keeps the expensive click-to-play path out of the frontend event handler in supported browsers while preserving a safe fallback for development shells and older browser contexts.
@@ -16,7 +16,7 @@ This keeps the expensive click-to-play path out of the frontend event handler in
 The same worklet can also run scheduled one-shot notes for timeline Aether instruments:
 
 - `frontend/src/audio/timelineAudio.ts` tries the worklet path for instruments with `instrument.aether`.
-- `frontend/src/features/MidiEditor/MidiTransport.tsx` uses the same worklet-first behavior for in-modal MIDI preview.
+- `frontend/src/features/MidiEditor/MidiTransport.solid.tsx` uses the same worklet-first behavior for in-modal MIDI preview.
 - Sample-backed instruments, drum rows, and unsupported browsers continue to use `AudioBufferSourceNode`.
 - Worklet render options now include `startTimeS`, `targetFrequency`, pitch `curve`, per-note `automation`, and `velocity`.
 - The processor outputs silence until the requested audio start frame, then renders the note duration and exits.

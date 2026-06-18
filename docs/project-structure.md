@@ -134,7 +134,6 @@ frontend/src/
     surfaces.css
     forms.css
     typography.css
-    layout.css
   features/
     Daw/
       EditorHost/

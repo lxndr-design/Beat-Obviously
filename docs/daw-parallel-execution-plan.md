@@ -82,7 +82,7 @@ Avoid:
 
 Owned files:
 
-- `frontend/src/features/ProjectHealth/ProjectHealthModal.tsx`
+- `frontend/src/features/ProjectHealth/ProjectHealthModal.solid.tsx`
 - `frontend/src/features/ProjectHealth/ProjectHealthModal.module.css`
 
 Scope:
@@ -101,12 +101,12 @@ Avoid:
 
 Owned files:
 
-- `frontend/src/features/HomeHub/AudioFilesPage.tsx`
+- `frontend/src/features/HomeHub/AudioFilesPage.solid.tsx`
 - `frontend/src/features/HomeHub/AudioFilesPage.module.css`
-- `frontend/src/features/HomeHub/InstrumentsPage.tsx`
+- `frontend/src/features/HomeHub/InstrumentsPage.solid.tsx`
 - `frontend/src/features/HomeHub/InstrumentsPage.module.css`
-- `frontend/src/features/HomeHub/PatternsPage.tsx`
-- `frontend/src/features/HomeHub/AssetPageShell.tsx`
+- `frontend/src/features/HomeHub/PatternsPage.solid.tsx`
+- `frontend/src/features/HomeHub/AssetPageShell.solid.tsx`
 
 Scope:
 
