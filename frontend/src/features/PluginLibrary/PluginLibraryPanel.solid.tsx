@@ -1,6 +1,7 @@
 /** @jsxImportSource solid-js */
 import { createSignal, For, Show } from "solid-js";
 import { Button, HoverInfo, Icon, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
+import { appConfirm } from "../../components";
 import { usePluginStore, useUiStore } from "../../state/store";
 import type { PluginAdapter } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
@@ -131,13 +132,17 @@ export function PluginItemSolid(props: PluginItemProps) {
         icon: "ph:trash",
         disabled: Boolean(props.plugin.factory),
         separatorBefore: true,
-        onSelect: () => {
-          useUiStore.getState().closeEditor({ kind: "plugin", pluginId: props.plugin.id });
-          usePluginStore.getState().removePlugin(props.plugin.id);
-        },
+        onSelect: () => void deletePlugin(props.plugin),
       },
     ];
   });
+
+  async function deletePlugin(plugin: PluginAdapter) {
+    if (plugin.factory) return;
+    if (!await appConfirm(`Delete "${plugin.name}" from this project?`)) return;
+    useUiStore.getState().closeEditor({ kind: "plugin", pluginId: plugin.id });
+    usePluginStore.getState().removePlugin(plugin.id);
+  }
 
   function onDragStart(event: DragEvent) {
     const id = draggablePluginId();

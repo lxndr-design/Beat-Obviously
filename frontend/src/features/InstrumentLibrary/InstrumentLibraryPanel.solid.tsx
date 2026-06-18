@@ -1,6 +1,7 @@
 /** @jsxImportSource solid-js */
 import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { Button, HoverInfo, Icon, RowItem, SectionRibbon, SectionRibbonActionButton, Tag, createContextMenu, type ContextMenuItem } from "../../solid-ui";
+import { appConfirm } from "../../components";
 import { createInstrumentBufferSource, preloadInstrumentSample, previewFrequency } from "../../audio/synthPreview";
 import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useUiStore } from "../../state/store";
 import { instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
@@ -259,11 +260,20 @@ export function InstrumentLibraryPanelSolid(props: InstrumentLibraryPanelProps) 
     setLastSelectedId(instrumentId);
   }
 
-  function deleteSelected() {
-    for (const instrument of selectedInstruments().filter((candidate) => candidate.userCreated)) {
+  async function deleteSelected() {
+    const deletable = selectedInstruments().filter((candidate) => candidate.userCreated);
+    if (deletable.length === 0) return;
+    if (!await appConfirm(`Delete ${deletable.length} instrument${deletable.length === 1 ? "" : "s"} from this project?`)) return;
+    for (const instrument of deletable) {
       useInstrumentStore.getState().removeInstrument(instrument.id);
     }
     exitSelectMode();
+  }
+
+  async function deleteInstrument(instrument: Instrument) {
+    if (!instrument.userCreated) return;
+    if (!await appConfirm(`Delete "${instrument.name}" from this project?`)) return;
+    useInstrumentStore.getState().removeInstrument(instrument.id);
   }
 
   function groupSelected() {
@@ -294,7 +304,7 @@ export function InstrumentLibraryPanelSolid(props: InstrumentLibraryPanelProps) 
       />
       <Show when={selectMode() && props.expanded}>
         <div class={styles.selectionBar}>
-          <Button size="xs" disabled={selectedInstruments().every((instrument) => !instrument.userCreated)} onClick={deleteSelected}>
+          <Button size="xs" disabled={selectedInstruments().every((instrument) => !instrument.userCreated)} onClick={() => void deleteSelected()}>
             Delete
           </Button>
           <Button size="xs" disabled={selectedInstruments().length === 0} onClick={groupSelected}>
@@ -356,7 +366,7 @@ export function InstrumentLibraryPanelSolid(props: InstrumentLibraryPanelProps) 
                         }}
                         onDuplicate={() => useInstrumentStore.getState().duplicateInstrument(instrument.id)}
                         onMerge={() => setMergeFromId(instrument.id)}
-                        onDelete={() => useInstrumentStore.getState().removeInstrument(instrument.id)}
+                        onDelete={() => void deleteInstrument(instrument)}
                         onMoveBefore={(draggedId) => useInstrumentStore.getState().moveInstrument(draggedId, set.id, instrument.id)}
                         previewing={previewingId() === instrument.id}
                         onTogglePreview={() => togglePreview(instrument)}

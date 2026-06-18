@@ -1,7 +1,7 @@
 /** @jsxImportSource solid-js */
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { Button, HoverInfo, Icon, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
-import { appAlert } from "../../components";
+import { appAlert, appConfirm } from "../../components";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
 import { useAudioFileStore } from "../../state/store";
@@ -97,9 +97,15 @@ export function AudioFileLibraryPanelSolid(props: AudioFileLibraryPanelProps) {
     setLastSelectedId(fileId);
   }
 
-  function deleteSelected() {
+  async function deleteSelected() {
+    if (!await appConfirm(`Delete ${selectedFiles().length} audio file${selectedFiles().length === 1 ? "" : "s"} from this project?`)) return;
     for (const file of selectedFiles()) useAudioFileStore.getState().removeFile(file.id);
     exitSelectMode();
+  }
+
+  async function deleteFile(file: AudioFile) {
+    if (!await appConfirm(`Delete "${file.name}" from this project?`)) return;
+    useAudioFileStore.getState().removeFile(file.id);
   }
 
   function groupSelected() {
@@ -125,7 +131,7 @@ export function AudioFileLibraryPanelSolid(props: AudioFileLibraryPanelProps) {
       />
       <Show when={selectMode() && props.expanded}>
         <div class={styles.selectionBar}>
-          <Button size="xs" disabled={selectedFiles().length === 0} onClick={deleteSelected}>
+          <Button size="xs" disabled={selectedFiles().length === 0} onClick={() => void deleteSelected()}>
             Delete
           </Button>
           <Button size="xs" disabled={selectedFiles().length === 0} onClick={groupSelected}>
@@ -147,7 +153,7 @@ export function AudioFileLibraryPanelSolid(props: AudioFileLibraryPanelProps) {
               selected={selectedIds().has(file.id)}
               onSelect={(event) => selectFile(file.id, event.shiftKey)}
               onEnterSelectMode={() => enterSelectMode(file.id)}
-              onRemove={() => useAudioFileStore.getState().removeFile(file.id)}
+              onRemove={() => void deleteFile(file)}
             />
           )}
         </For>
