@@ -68,6 +68,17 @@ function isAllowed(allowlist, file, line, value) {
   });
 }
 
+function checkInteractionTokens(file, source) {
+  for (const { line, lineNumber } of lineEntries(source)) {
+    if (/transition:\s*var\(--transition-invert\)/.test(line)) {
+      fail(`Use --interaction-transition for UI hover/click feedback ${location(file, lineNumber)}: ${line.trim()}`);
+    }
+    if (/background:\s*var\(--surface-(?:hover|selected|selected-strong)\)/.test(line)) {
+      fail(`Use --interaction-* background tokens for UI state feedback ${location(file, lineNumber)}: ${line.trim()}`);
+    }
+  }
+}
+
 const solidComponentNames = existsSync(solidUiDir)
   ? readdirSync(solidUiDir)
     .filter((name) => statSync(join(solidUiDir, name)).isDirectory())
@@ -151,6 +162,7 @@ const sharedCssFiles = [
 const hexPattern = /#[0-9a-fA-F]{3,8}\b/g;
 for (const file of sharedCssFiles) {
   const source = readFileSync(file, "utf8");
+  checkInteractionTokens(file, source);
   const matches = source.match(hexPattern);
   if (matches) {
     fail(`Raw hex color in shared UI CSS ${rel(file)}: ${[...new Set(matches)].join(", ")}`);
@@ -283,6 +295,9 @@ const designTokenNamespacePattern =
 for (const file of featureFiles) {
   const source = readFileSync(file, "utf8");
   const isCss = file.endsWith(".css");
+  if (isCss) {
+    checkInteractionTokens(file, source);
+  }
 
   for (const { line, lineNumber } of lineEntries(source)) {
     for (const match of line.matchAll(rawColorPattern)) {

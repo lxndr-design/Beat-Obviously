@@ -10,11 +10,11 @@
 }
 
 .headerSelected {
-  background: var(--surface-selected);
+  background: var(--interaction-selected-bg);
 }
 
 .headerSelected:hover {
-  background: var(--surface-selected);
+  background: var(--interaction-selected-bg);
   color: var(--color-fg);
 }
 

@@ -50,7 +50,7 @@
   font-size: var(--font-size-ui);
   font-weight: var(--font-weight-bold);
   text-transform: uppercase;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
   cursor: pointer;
 }
 
@@ -67,7 +67,7 @@
 }
 
 .sortHeader:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
 }
 
@@ -77,7 +77,7 @@
 }
 
 .sortHeaderActive:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
 }
 
@@ -98,23 +98,23 @@
   font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .row:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
 }
 
 .rowActive {
-  background: var(--surface-selected);
+  background: var(--interaction-selected-bg);
 }
 
 .rowSelected {
-  background: var(--surface-selected);
+  background: var(--interaction-selected-bg);
 }
 
 .rowActive.rowSelected {
-  background: var(--surface-selected-strong);
+  background: var(--interaction-selected-hover-bg);
 }
 
 .row > span {

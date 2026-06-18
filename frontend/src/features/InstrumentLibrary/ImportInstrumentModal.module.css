@@ -87,16 +87,16 @@
   font: inherit;
   text-align: left;
   user-select: none;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .fileRow:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
 }
 
 .fileRowSelected {
-  background: var(--surface-selected);
+  background: var(--interaction-selected-bg);
 }
 
 .fileRowGrouped {
@@ -228,11 +228,11 @@
   background: transparent;
   color: var(--color-fg);
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .volumeDelete:hover:not(:disabled) {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
 }
 

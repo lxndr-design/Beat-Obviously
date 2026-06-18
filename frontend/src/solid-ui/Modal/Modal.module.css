@@ -82,11 +82,11 @@
   height: auto;
   background: transparent;
   color: var(--color-fg);
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .closeBtn:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
 }
 

@@ -83,7 +83,7 @@
   font-size: var(--font-size-ui);
   text-align: left;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .row:focus,
@@ -92,11 +92,11 @@
 }
 
 .row:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
 }
 
 .rowActive {
-  background: var(--surface-selected);
+  background: var(--interaction-selected-bg);
 }
 
 .rowName,
@@ -373,7 +373,7 @@
   font-size: var(--font-size-ui);
   text-transform: uppercase;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .sampleGrouping button:disabled {
@@ -474,15 +474,15 @@
   padding: 0 6px;
   background: var(--surface-subtle);
   font-size: var(--font-size-ui);
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .sampleRow:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
 }
 
 .sampleRowActive {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
 }
 
 .sampleValue {

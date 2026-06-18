@@ -480,7 +480,7 @@
   line-height: 1;
   text-align: left;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .cellMenuItem:last-child {

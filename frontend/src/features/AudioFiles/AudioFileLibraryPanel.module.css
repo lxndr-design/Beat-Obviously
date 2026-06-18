@@ -76,7 +76,7 @@
 }
 
 .itemSelected.itemSelected:hover {
-  background: var(--surface-selected-strong);
+  background: var(--interaction-selected-hover-bg);
   color: var(--color-fg);
 }
 

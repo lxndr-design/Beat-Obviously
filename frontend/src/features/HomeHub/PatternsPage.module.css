@@ -44,15 +44,15 @@
   font-size: var(--font-size-ui);
   text-align: left;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .row:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
 }
 
 .rowActive {
-  background: var(--surface-selected);
+  background: var(--interaction-selected-bg);
 }
 
 .nameCell {

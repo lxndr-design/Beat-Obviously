@@ -14,11 +14,11 @@
 }
 
 .effectHeader:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
 }
 
 .effectHeaderExpanded {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
 }
 
 .effectHeaderIcon {

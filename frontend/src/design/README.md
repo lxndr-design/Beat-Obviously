@@ -199,6 +199,8 @@ engineers and designers.
 - The removed `frontend/src/react-bridge` compatibility namespace does not reappear.
 - Migration-only feature `solid/` subfolders do not reappear.
 - Legacy `mount*Solid` / `Mounted*Solid` bridge APIs do not reappear.
+- Hover/click feedback uses `--interaction-*` tokens instead of direct surface
+  hover/selected backgrounds.
 - Non-Phosphor icon names are not used in source.
 - Shared component CSS does not introduce new hex colors outside design files.
 - Legacy JSX files under `frontend/src` are either Solid-suffixed or removed.

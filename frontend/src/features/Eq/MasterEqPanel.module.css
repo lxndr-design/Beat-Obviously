@@ -80,7 +80,7 @@
   font-size: var(--font-size-ui);
   line-height: 1;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .presetName {

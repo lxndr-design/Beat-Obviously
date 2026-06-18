@@ -135,7 +135,7 @@
 .actionRow:hover,
 .assetRow:hover,
 .trainingRow:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
 }
 
@@ -159,11 +159,11 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .recentCard:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
 }
 
 .recentArt {
@@ -191,7 +191,7 @@
   background: var(--color-bg);
   color: var(--color-fg);
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .recentCard:hover .recentRemove,

@@ -125,7 +125,7 @@
 }
 
 .fileDrop:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
 }
 

@@ -51,11 +51,11 @@
   font-size: var(--font-size-ui);
   cursor: pointer;
   text-align: left;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .addRow:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
 }
 

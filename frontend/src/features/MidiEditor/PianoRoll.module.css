@@ -356,7 +356,7 @@
   line-height: 1;
   text-align: left;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .noteMenuItem:last-child {
@@ -455,7 +455,7 @@
   background: var(--color-bg);
   color: var(--color-fg);
   border: 0;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .volumeClear:hover {

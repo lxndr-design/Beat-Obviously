@@ -108,7 +108,7 @@
 
 .nodePaletteButton:hover,
 .nodeActionButton:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
 }
 
 .primaryActionButton {
@@ -240,7 +240,7 @@
 
 .removeNode:hover {
   color: var(--color-fg);
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
 }
 
 .portGrid {

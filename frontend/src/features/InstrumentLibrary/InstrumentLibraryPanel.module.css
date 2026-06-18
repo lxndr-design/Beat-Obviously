@@ -88,11 +88,11 @@
   color: var(--color-fg);
   cursor: pointer;
   text-align: left;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .setHeader:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
 }
 
@@ -241,11 +241,11 @@
 }
 
 .itemSelected {
-  background: var(--surface-selected);
+  background: var(--interaction-selected-bg);
 }
 
 .itemSelected:hover {
-  background: var(--surface-selected-strong);
+  background: var(--interaction-selected-hover-bg);
   color: var(--color-fg);
 }
 
