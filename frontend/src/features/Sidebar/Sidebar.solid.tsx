@@ -5,11 +5,11 @@ import { saveCurrentDocument } from "../../persistence/documentActions";
 import { createStoreSelector } from "../../solid-utils/store";
 import { createContextMenu, HoverInfo, Icon, type ContextMenuItem } from "../../solid-ui";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore, useUiStore, useViewStore } from "../../state/store";
-import { InstrumentLibraryPanelSolid } from "../InstrumentLibrary/InstrumentLibraryPanel.solid";
-import { AudioFileLibraryPanelSolid } from "../AudioFiles/AudioFileLibraryPanel.solid";
-import { ComponentLibraryPanelSolid } from "../ComponentLibrary/ComponentLibraryPanel.solid";
-import { PluginLibraryPanelSolid } from "../PluginLibrary/PluginLibraryPanel.solid";
-import { DecentSamplerLibraryPanelSolid } from "../PluginLibrary/DecentSamplerLibraryPanel.solid";
+import { InstrumentLibraryPanel } from "../InstrumentLibrary/InstrumentLibraryPanel.solid";
+import { AudioFileLibraryPanel } from "../AudioFiles/AudioFileLibraryPanel.solid";
+import { ComponentLibraryPanel } from "../ComponentLibrary/ComponentLibraryPanel.solid";
+import { PluginLibraryPanel } from "../PluginLibrary/PluginLibraryPanel.solid";
+import { DecentSamplerLibraryPanel } from "../PluginLibrary/DecentSamplerLibraryPanel.solid";
 import styles from "./Sidebar.module.css";
 
 type SidebarPanel = "instruments" | "audio" | "components" | "plugins" | "decentSampler";
@@ -22,7 +22,7 @@ const PANELS: Array<{ id: SidebarPanel; label: string; icon?: string; activeIcon
   { id: "decentSampler", label: "DecentSampler", kind: "decentSampler" },
 ];
 
-export function SidebarSolid() {
+export function Sidebar() {
   const width = createStoreSelector(useViewStore, (state) => state.sidebarWidth);
   const project = createStoreSelector(useProjectStore, (state) => state.project);
   const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
@@ -149,33 +149,33 @@ export function SidebarSolid() {
       </nav>
       <div class={styles.content}>
         {activePanel() === "instruments" && (
-          <InstrumentLibraryPanelSolid
+          <InstrumentLibraryPanel
             expanded
             onToggle={() => setActivePanel("instruments")}
             onOpenDecentSampler={() => setActivePanel("decentSampler")}
           />
         )}
         {activePanel() === "audio" && (
-          <AudioFileLibraryPanelSolid
+          <AudioFileLibraryPanel
             expanded
             onToggle={() => setActivePanel("audio")}
           />
         )}
         {activePanel() === "components" && (
-          <ComponentLibraryPanelSolid
+          <ComponentLibraryPanel
             expanded
             onToggle={() => setActivePanel("components")}
           />
         )}
         {activePanel() === "plugins" && (
-          <PluginLibraryPanelSolid
+          <PluginLibraryPanel
             expanded
             onToggle={() => setActivePanel("plugins")}
             onOpenDecentSampler={() => setActivePanel("decentSampler")}
           />
         )}
         {activePanel() === "decentSampler" && (
-          <DecentSamplerLibraryPanelSolid
+          <DecentSamplerLibraryPanel
             expanded
             onToggle={() => setActivePanel("decentSampler")}
           />

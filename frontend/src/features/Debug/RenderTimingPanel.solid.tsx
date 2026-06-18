@@ -25,7 +25,7 @@ const countRows = [
   ["WT", "wavetableCacheSize"],
 ] as const;
 
-export function RenderTimingPanelSolid() {
+export function RenderTimingPanel() {
   const [collapsed, setCollapsed] = createSignal(true);
   const timing = createStoreSelector(useAnalyzerStore, (state) => state.renderTiming);
   const stale = createMemo(() => timing().sequence === 0);

@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 import { NumberInput } from "./NumberInput.solid";
 
-export function NumberInputSolidDemo() {
+export function NumberInputDemo() {
   const [value, setValue] = createSignal(60);
   return (
     <section>

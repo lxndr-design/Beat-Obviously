@@ -6,12 +6,12 @@ import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/sto
 import type { Instrument } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { playComponentPreview, stopComponentPlayback, type ComponentPlayback } from "../ComponentLibrary/ComponentLibraryPanel.solid";
-import { AssetBrowserRibbonSolid, AssetPageShellSolid, AssetStateMessageSolid } from "./AssetPageShell.solid";
+import { AssetBrowserRibbon, AssetPageShell, AssetStateMessage } from "./AssetPageShell.solid";
 import styles from "./PatternsPage.module.css";
 
 type PatternKind = "midi" | "drum";
 
-export function PatternsPageSolid() {
+export function PatternsPage() {
   const components = createStoreSelector(useComponentStore, (s) => s.components);
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
   const bpm = createStoreSelector(useProjectStore, (s) => s.project.bpm);
@@ -99,13 +99,13 @@ export function PatternsPageSolid() {
   }
 
   return (
-    <AssetPageShellSolid
+    <AssetPageShell
       browserLabel="Pattern browser"
       previewLabel="Pattern preview"
       previewClassName={styles.preview}
       browser={
         <>
-          <AssetBrowserRibbonSolid label="Patterns" count={components().length} />
+          <AssetBrowserRibbon label="Patterns" count={components().length} />
           <div class={styles.table}>
             <div class={styles.headerRow}>
               <span>Name</span>
@@ -119,7 +119,7 @@ export function PatternsPageSolid() {
                 when={sorted().length > 0}
                 fallback={
                   <div class={styles.emptyRow}>
-                    <AssetStateMessageSolid
+                    <AssetStateMessage
                       icon="ph:grid-four"
                       title="No Patterns"
                       body="Save MIDI or beat clips to build the project pattern library."
@@ -161,7 +161,7 @@ export function PatternsPageSolid() {
           when={active()}
           fallback={
             <div class={styles.emptyPreview}>
-              <AssetStateMessageSolid
+              <AssetStateMessage
                 icon="ph:grid-four"
                 title="Select a Pattern"
                 body="Choose a pattern to preview, inspect, or edit."
@@ -172,7 +172,7 @@ export function PatternsPageSolid() {
           {(currentActive) => (
             <div class={styles.previewBody}>
               <Show when={activeReferenceIssue()}>
-                <AssetStateMessageSolid
+                <AssetStateMessage
                   icon="ph:warning"
                   title="Missing Instrument Reference"
                   body={activeReferenceIssue() ?? undefined}

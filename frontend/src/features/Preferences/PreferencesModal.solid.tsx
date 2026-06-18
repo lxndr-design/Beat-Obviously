@@ -30,7 +30,7 @@ import {
 import { createStoreSelector } from "../../solid-utils/store";
 import styles from "./PreferencesModal.module.css";
 
-export function PreferencesModalSolid() {
+export function PreferencesModal() {
   const settings = createStoreSelector(useSettingsStore, (s) => s);
   const [activeTab, setActiveTab] = createSignal<PreferenceTab>("audio");
   const [model, setModel] = createSignal(getOllamaModel());

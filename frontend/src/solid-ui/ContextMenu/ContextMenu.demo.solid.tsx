@@ -1,6 +1,6 @@
 import { createContextMenu } from "./ContextMenu.solid";
 
-export function ContextMenuSolidDemo() {
+export function ContextMenuDemo() {
   const menu = createContextMenu(() => [
     { label: "Edit", icon: "ph:pencil-simple" },
     { label: "Delete", icon: "ph:trash", separatorBefore: true },

@@ -14,7 +14,7 @@ import type { AudioRenderAnalysis, AudioWaveformSummary } from "../../ipc/schema
 import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore } from "../../state/store";
 import type { Instrument, InstrumentSet } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
-import { AssetPageShellSolid, AssetStateMessageSolid } from "./AssetPageShell.solid";
+import { AssetPageShell, AssetStateMessage } from "./AssetPageShell.solid";
 import styles from "./InstrumentsPage.module.css";
 
 const PREVIEW_SECONDS = 2.0;
@@ -38,7 +38,7 @@ type InstrumentRenderState = {
     error?: string;
 };
 
-export function InstrumentsPageSolid() {
+export function InstrumentsPage() {
   const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
   const sets = createStoreSelector(useInstrumentStore, (state) => state.instrumentSets);
   const loading = createStoreSelector(useInstrumentStore, (state) => state.loading);
@@ -280,7 +280,7 @@ export function InstrumentsPageSolid() {
   }
 
   return (
-    <AssetPageShellSolid
+    <AssetPageShell
       variant="instrument"
       browserLabel="Instrument browser"
       previewLabel="Instrument preview"
@@ -317,7 +317,7 @@ export function InstrumentsPageSolid() {
         <div class={styles.rows}>
           {loading() && instruments().length === 0 ? (
             <div class={styles.emptyRow}>
-              <AssetStateMessageSolid
+              <AssetStateMessage
                 icon="ph:circle-notch"
                 title="Loading Instruments"
                 body="Restoring the project instrument library."
@@ -326,7 +326,7 @@ export function InstrumentsPageSolid() {
             </div>
           ) : grouped().length === 0 ? (
             <div class={styles.emptyRow}>
-              <AssetStateMessageSolid
+              <AssetStateMessage
                 icon="ph:piano-keys"
                 title={searchQuery() ? "No Matching Instruments" : "No Instruments"}
                 body={searchQuery() ? "Clear search to show the full library." : "Create or import instruments to fill the project library."}
@@ -382,7 +382,7 @@ export function InstrumentsPageSolid() {
         {activeInstrument() ? (
           <div class={styles.previewBody}>
             {activeReference() && activeReference()!.tone !== "neutral" ? (
-              <AssetStateMessageSolid
+              <AssetStateMessage
                 icon={activeReference()!.icon}
                 title={activeReference()!.title}
                 body={activeReference()!.body}
@@ -394,7 +394,7 @@ export function InstrumentsPageSolid() {
               <InstrumentWaveform waveform={renderState().waveform} />
               <div class={styles.playhead} style={{ left: `${previewProgress() * 100}%` }} />
               {renderState().loading && (
-                <AssetStateMessageSolid
+                <AssetStateMessage
                   icon="ph:circle-notch"
                   title="Rendering Preview"
                   body="Preparing waveform and analysis."
@@ -402,7 +402,7 @@ export function InstrumentsPageSolid() {
                 />
               )}
               {renderState().error && (
-                <AssetStateMessageSolid
+                <AssetStateMessage
                   icon="ph:warning"
                   title="Preview Unavailable"
                   body={renderState().error}
@@ -468,7 +468,7 @@ export function InstrumentsPageSolid() {
           </div>
         ) : (
           <div class={styles.emptyPreview}>
-            <AssetStateMessageSolid
+            <AssetStateMessage
               icon="ph:piano-keys"
               title="Select an Instrument"
               body="Choose an instrument to inspect sound source, preview, and samples."

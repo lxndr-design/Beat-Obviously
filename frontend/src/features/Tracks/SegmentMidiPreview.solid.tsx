@@ -7,7 +7,7 @@ interface Props {
   displayLengthBeats?: number;
 }
 
-export function SegmentMidiPreviewSolid(props: Props) {
+export function SegmentMidiPreview(props: Props) {
   const notes = () => (props.segment.payload.kind === "midi" || props.segment.payload.kind === "mixed")
     ? props.segment.payload.notes
     : [];

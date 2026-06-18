@@ -2,7 +2,7 @@ import { onCleanup, onMount } from "solid-js";
 import { maybeRunDueTraining, markTrainingComplete, markTrainingFailed } from "../../ai/trainingRunner";
 import { onEvent } from "../../ipc/bridge";
 
-export function TrainingAutoRunnerSolid() {
+export function TrainingAutoRunner() {
   onMount(() => {
     void maybeRunDueTraining();
     const unsubscribe = onEvent((event) => {

@@ -6,16 +6,16 @@ import { useComponentStore, type BeatComponent, type DrumComponent, type MidiCom
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";
 import type { DrumRow, DrumSpeed, MidiNote, TimeSignature } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
-import { DrumSequencerSolid } from "../DrumEditor/DrumSequencer.solid";
-import { PianoRollSolid } from "../MidiEditor/PianoRoll.solid";
-import { MidiTransportSolid } from "../MidiEditor/MidiTransport.solid";
+import { DrumSequencer } from "../DrumEditor/DrumSequencer.solid";
+import { PianoRoll } from "../MidiEditor/PianoRoll.solid";
+import { MidiTransport } from "../MidiEditor/MidiTransport.solid";
 import styles from "../SegmentEditor/SegmentEditorModal.module.css";
 
 export interface ComponentEditorModalProps {
   componentId: string;
 }
 
-export function ComponentEditorModalSolid(props: ComponentEditorModalProps) {
+export function ComponentEditorModal(props: ComponentEditorModalProps) {
   const source = createStoreSelector(useComponentStore, (s) => s.components.find((component) => component.id === props.componentId));
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
   const project = createStoreSelector(useProjectStore, (s) => s.project);
@@ -137,7 +137,7 @@ export function ComponentEditorModalSolid(props: ComponentEditorModalProps) {
                   onChange={(instrumentId) => setMidiPatch({ instrumentId: instrumentId || undefined })}
                 />
                 <div class={styles.transportSlot}>
-                  <MidiTransportSolid
+                  <MidiTransport
                     notes={midiDraft().notes}
                     lengthBeats={midiDraft().lengthBeats}
                     bpm={project().bpm}
@@ -152,7 +152,7 @@ export function ComponentEditorModalSolid(props: ComponentEditorModalProps) {
 
         <Show when={midi()}>
           {(midiDraft) => (
-            <PianoRollSolid
+            <PianoRoll
               notes={midiDraft().notes}
               lengthBeats={midiDraft().lengthBeats}
               playheadBeat={null}
@@ -163,7 +163,7 @@ export function ComponentEditorModalSolid(props: ComponentEditorModalProps) {
 
         <Show when={drum()}>
           {(drumDraft) => (
-            <DrumSequencerSolid
+            <DrumSequencer
               rows={drumDraft().rows}
               stepCount={drumDraft().stepCount}
               speed={drumDraft().speed}

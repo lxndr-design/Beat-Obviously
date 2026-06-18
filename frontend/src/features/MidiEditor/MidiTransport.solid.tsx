@@ -22,11 +22,11 @@ export interface MidiTransportProps {
   onPositionChange?: (beat: number | null) => void;
 }
 
-export function MidiTransportSolid(props: MidiTransportProps) {
-  return <MidiTransportSolidRuntime state={() => props} />;
+export function MidiTransport(props: MidiTransportProps) {
+  return <MidiTransportRuntime state={() => props} />;
 }
 
-function MidiTransportSolidRuntime(props: { state: Accessor<MidiTransportProps> }) {
+function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
   const [playing, setPlaying] = createSignal(false);
   let ctx: AudioContext | null = null;
   let startMs: number | null = null;

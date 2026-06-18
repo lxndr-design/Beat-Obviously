@@ -8,7 +8,7 @@ import { detectDecentSamplerEditorKind, pluginFromDecentSamplerPreset } from "./
 import { upsertDecentSamplerInstrument } from "../InstrumentLibrary/decentSamplerInstrument";
 import styles from "./PluginLibraryPanel.module.css";
 
-export function PluginImportModalSolid(props: {
+export function PluginImportModal(props: {
   onClose: () => void;
   onInstalled: (pluginId: string) => void;
 }) {

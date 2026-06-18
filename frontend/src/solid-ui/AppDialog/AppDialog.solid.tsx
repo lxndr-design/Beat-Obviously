@@ -3,7 +3,7 @@ import { Button, Modal, TextInput } from "..";
 import { completeDialog, getActiveAppDialog, subscribeAppDialog, type ActiveDialog } from "./state";
 import styles from "./AppDialog.module.css";
 
-export function AppDialogHostSolid() {
+export function AppDialogHost() {
   const [dialog, setDialog] = createSignal<ActiveDialog | null>(getActiveAppDialog());
   const [promptValue, setPromptValue] = createSignal("");
 

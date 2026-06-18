@@ -23,7 +23,7 @@ import {
   decentSamplerPluginForInstrument,
 } from "../PluginLibrary/decentSamplerPluginAdapter";
 import { createContextMenu, type ContextMenuItem } from "../../solid-ui";
-import { SegmentSolid } from "./Segment.solid";
+import { Segment } from "./Segment.solid";
 import styles from "./TrackLane.module.css";
 import type { DrumRow, Id, Instrument, Segment as SegmentModel, Track } from "../../state/types";
 
@@ -32,7 +32,7 @@ interface Props {
   selected?: boolean;
 }
 
-export function TrackLaneSolid(props: Props) {
+export function TrackLane(props: Props) {
   let laneElement: HTMLDivElement | undefined;
   let lastClickBeat = 0;
   const [dragOver, setDragOver] = createSignal(false);
@@ -307,7 +307,7 @@ export function TrackLaneSolid(props: Props) {
             return (
               <Show when={original()}>
                 {(segment) => (
-                  <SegmentSolid
+                  <Segment
                     segmentId={occurrence.segmentId}
                     startBeat={occurrence.startBeat}
                     lengthBeats={occurrence.lengthBeats}

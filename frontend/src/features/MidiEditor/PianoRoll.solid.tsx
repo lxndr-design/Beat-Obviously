@@ -70,7 +70,7 @@ function createCompatEffect(effect: () => void | (() => void), _deps?: unknown[]
   });
 }
 
-export function PianoRollSolid(props: PianoRollProps) {
+export function PianoRoll(props: PianoRollProps) {
   const notes = new Proxy([] as MidiNote[], {
     get: (_target, property) => Reflect.get(props.notes, property),
   });

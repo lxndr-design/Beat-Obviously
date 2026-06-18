@@ -5,10 +5,10 @@ import { createStoreSelector } from "../../solid-utils/store";
 import { Button, HoverInfo, Icon } from "../../solid-ui";
 import { useProjectStore, useTransportStore, useUiStore } from "../../state/store";
 import { EQ_BAND_COUNT, type EqAutomationPoint } from "../../state/types";
-import { EqGraphSolid } from "./EqGraph.solid";
+import { EqGraph } from "./EqGraph.solid";
 import styles from "./MasterEqPanel.module.css";
 
-export function MasterEqPanelSolid() {
+export function MasterEqPanel() {
   const automation = createStoreSelector(useProjectStore, (state) => state.project.masterEqAutomation);
   const project = createStoreSelector(useProjectStore, (state) => state.project);
   const position = createStoreSelector(useTransportStore, (state) => state.positionBeat);
@@ -117,7 +117,7 @@ export function MasterEqPanelSolid() {
         </div>
       </header>
       <div class={styles.graphHost}>
-        <EqGraphSolid bandsDb={current()} onChange={setBand} />
+        <EqGraph bandsDb={current()} onChange={setBand} />
       </div>
     </section>
   );

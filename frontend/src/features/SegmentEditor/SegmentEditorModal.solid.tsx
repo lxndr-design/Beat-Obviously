@@ -18,9 +18,9 @@ import {
   useUiStore,
 } from "../../state/store";
 import type { DrumRow, DrumSpeed, Instrument, MidiNote, Segment, TimeSignature } from "../../state/types";
-import { DrumSequencerSolid } from "../DrumEditor/DrumSequencer.solid";
-import { PianoRollSolid } from "../MidiEditor/PianoRoll.solid";
-import { MidiTransportSolid } from "../MidiEditor/MidiTransport.solid";
+import { DrumSequencer } from "../DrumEditor/DrumSequencer.solid";
+import { PianoRoll } from "../MidiEditor/PianoRoll.solid";
+import { MidiTransport } from "../MidiEditor/MidiTransport.solid";
 import styles from "./SegmentEditorModal.module.css";
 
 export interface SegmentEditorModalProps {
@@ -31,7 +31,7 @@ type MidiLikePayload = Extract<Segment["payload"], { kind: "midi" | "mixed" }>;
 type DrumPayload = Extract<Segment["payload"], { kind: "drum" }>;
 type AudioPayload = Extract<Segment["payload"], { kind: "audio" }>;
 
-export function SegmentEditorModalSolid(props: SegmentEditorModalProps) {
+export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const source = createStoreSelector(useProjectStore, () => selectSegment(props.segmentId));
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
   const positionBeat = createStoreSelector(useTransportStore, (s) => s.positionBeat);
@@ -325,7 +325,7 @@ export function SegmentEditorModalSolid(props: SegmentEditorModalProps) {
                 onChange={(value) => setDraft((current) => current ? { ...current, timeSignature: parseTimeSignature(value) } : current)}
               />
               <div class={styles.transportSlot}>
-                <MidiTransportSolid
+                <MidiTransport
                   notes={previewMidiNotes()}
                   gainDb={midiGainDb()}
                   lengthBeats={draft()!.lengthBeats}
@@ -337,7 +337,7 @@ export function SegmentEditorModalSolid(props: SegmentEditorModalProps) {
               </div>
             </div>
 
-            <PianoRollSolid
+            <PianoRoll
               notes={midiNotes()}
               lengthBeats={draft()!.lengthBeats}
               playheadBeat={playheadBeat()}
@@ -351,7 +351,7 @@ export function SegmentEditorModalSolid(props: SegmentEditorModalProps) {
 
         <Show when={drumPayload()}>
           {(payload) => (
-            <DrumSequencerSolid
+            <DrumSequencer
               rows={payload().rows}
               stepCount={payload().stepCount}
               speed={payload().speed ?? 1}

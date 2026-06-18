@@ -5,11 +5,11 @@ import { createStoreSelector } from "../../solid-utils/store";
 import styles from "./TrackDetailsModal.module.css";
 import type { Id, Track } from "../../state/types";
 
-interface TrackDetailsModalSolidProps {
+interface TrackDetailsModalProps {
   trackId: Id;
 }
 
-export function TrackDetailsModalSolid(props: TrackDetailsModalSolidProps) {
+export function TrackDetailsModal(props: TrackDetailsModalProps) {
   const tracks = createStoreSelector(useProjectStore, (s) => s.project.tracks);
   const track = createMemo(() => tracks().find((candidate) => candidate.id === props.trackId));
 

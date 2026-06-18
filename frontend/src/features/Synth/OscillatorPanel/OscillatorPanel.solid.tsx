@@ -48,7 +48,7 @@ const WAVETABLE_ICONS: Record<WavetableId, string> = {
   [DEFAULT_CUSTOM_WAVETABLE_ID]: "ph:sliders-horizontal",
 };
 
-export function OscillatorPanelSolid() {
+export function OscillatorPanel() {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
   const setNumericParameter = useSynthStore.getState().setNumericParameter;

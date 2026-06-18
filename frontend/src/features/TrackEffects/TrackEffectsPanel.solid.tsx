@@ -138,7 +138,7 @@ interface DragState {
   pointerId: number;
 }
 
-export function TrackEffectsPanelSolid() {
+export function TrackEffectsPanel() {
   let addButtonRef: HTMLButtonElement | undefined;
   let dragRef: DragState | null = null;
   const trackId = createStoreSelector(useUiStore, (s) => s.trackEffectsEditorTrackId);
@@ -303,7 +303,7 @@ export function TrackEffectsPanelSolid() {
             </div>
             <Show when={addOpen() && addRect()}>
               {(rect) => (
-                <FloatingLayerSolid
+                <FloatingLayer
                   className={styles.addMenu}
                   x={rect().left}
                   y={rect().top}
@@ -322,7 +322,7 @@ export function TrackEffectsPanelSolid() {
                       </button>
                     )}
                   </For>
-                </FloatingLayerSolid>
+                </FloatingLayer>
               )}
             </Show>
           </div>
@@ -372,7 +372,7 @@ function EffectBlock(props: {
   );
 }
 
-function FloatingLayerSolid(props: {
+function FloatingLayer(props: {
   className?: string;
   x: number;
   y: number;

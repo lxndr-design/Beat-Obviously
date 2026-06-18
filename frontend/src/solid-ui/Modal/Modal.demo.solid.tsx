@@ -2,7 +2,7 @@ import { createSignal } from "solid-js";
 import { Button } from "../Button";
 import { Modal } from "./Modal.solid";
 
-export function ModalSolidDemo() {
+export function ModalDemo() {
   const [open, setOpen] = createSignal(false);
   return (
     <section>

@@ -2,7 +2,7 @@ import { createSignal } from "solid-js";
 import { Icon } from "../Icon";
 import { SectionRibbon, SectionRibbonActionButton } from "./SectionRibbon.solid";
 
-export function SectionRibbonSolidDemo() {
+export function SectionRibbonDemo() {
   const [expanded, setExpanded] = createSignal(true);
   return (
     <section>

@@ -26,11 +26,11 @@ export interface WaveformPickerProps {
   onChange: (value: Waveform) => void;
 }
 
-export function WaveformPickerSolid(props: WaveformPickerProps) {
-  return <WaveformPickerSolidRuntime state={() => props} />;
+export function WaveformPicker(props: WaveformPickerProps) {
+  return <WaveformPickerRuntime state={() => props} />;
 }
 
-function WaveformPickerSolidRuntime(props: { state: Accessor<WaveformPickerProps> }) {
+function WaveformPickerRuntime(props: { state: Accessor<WaveformPickerProps> }) {
   const opts = createMemo(() => [
     ...OPTIONS,
     ...(props.state().allowSample ? [{ value: "sample" as Waveform, icon: "ph:music-notes-simple", label: "Sample" }] : []),

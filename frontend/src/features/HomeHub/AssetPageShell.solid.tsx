@@ -14,7 +14,7 @@ interface AssetPageShellProps {
   variant?: AssetPageVariant;
 }
 
-export function AssetPageShellSolid(props: AssetPageShellProps) {
+export function AssetPageShell(props: AssetPageShellProps) {
   const pageClass = () => [
     styles.page,
     props.variant === "wide-browser" && styles.pageWideBrowser,
@@ -35,7 +35,7 @@ export function AssetPageShellSolid(props: AssetPageShellProps) {
   );
 }
 
-export function AssetBrowserRibbonSolid(props: { label: string; count?: number }) {
+export function AssetBrowserRibbon(props: { label: string; count?: number }) {
   return (
     <div class={styles.browserRibbon}>
       <span>{props.label}</span>
@@ -48,7 +48,7 @@ export function AssetBrowserRibbonSolid(props: { label: string; count?: number }
 
 type AssetStateTone = "neutral" | "loading" | "warning" | "danger";
 
-export function AssetStateMessageSolid(props: {
+export function AssetStateMessage(props: {
   icon: string;
   title: string;
   body?: string;

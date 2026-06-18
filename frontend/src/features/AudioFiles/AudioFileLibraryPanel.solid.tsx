@@ -6,7 +6,7 @@ import { importAudioFile } from "../../audio/audioImport";
 import { useAudioFileStore } from "../../state/store";
 import type { AudioFile } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
-import { ImportInstrumentModalSolid } from "../InstrumentLibrary/ImportInstrumentModal.solid";
+import { ImportInstrumentModal } from "../InstrumentLibrary/ImportInstrumentModal.solid";
 import styles from "./AudioFileLibraryPanel.module.css";
 
 interface AudioFileLibraryPanelProps {
@@ -14,7 +14,7 @@ interface AudioFileLibraryPanelProps {
   onToggle: () => void;
 }
 
-export function AudioFileLibraryPanelSolid(props: AudioFileLibraryPanelProps) {
+export function AudioFileLibraryPanel(props: AudioFileLibraryPanelProps) {
   const files = createStoreSelector(useAudioFileStore, (s) => s.files);
   const [selectMode, setSelectMode] = createSignal(false);
   const [selectedIds, setSelectedIds] = createSignal<Set<string>>(new Set(), { equals: false });
@@ -160,7 +160,7 @@ export function AudioFileLibraryPanelSolid(props: AudioFileLibraryPanelProps) {
       {panelMenu.menu()}
       <Show when={groupingFiles()}>
         {(currentGroupingFiles) => (
-          <ImportInstrumentModalSolid
+          <ImportInstrumentModal
             initialFiles={currentGroupingFiles()}
             onImportedFiles={(imported) => {
               for (const file of imported) useAudioFileStore.getState().removeFile(file.id);

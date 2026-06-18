@@ -6,7 +6,7 @@ import styles from "./TimeSignatureControl.module.css";
 import modalFrameStyles from "../../solid-ui/Modal/Modal.module.css";
 import timeSignatureModalStyles from "./TimeSignatureModal.module.css";
 
-export interface TimeSignatureControlSolidProps {
+export interface TimeSignatureControlProps {
   value: TimeSignature;
   onChange: (value: TimeSignature) => void;
   ariaLabel?: string;
@@ -16,7 +16,7 @@ export interface TimeSignatureControlSolidProps {
 const TS_PRESETS = ["4/4", "3/4", "6/8", "5/4", "7/8", "12/8"] as const;
 const DENOMS = [2, 4, 8, 16];
 
-export function TimeSignatureControlSolid(props: TimeSignatureControlSolidProps) {
+export function TimeSignatureControl(props: TimeSignatureControlProps) {
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [modalOpen, setModalOpen] = createSignal(false);
   const ariaLabel = () => props.ariaLabel ?? "Time signature";
@@ -66,7 +66,7 @@ export function TimeSignatureControlSolid(props: TimeSignatureControlSolidProps)
         </div>
       </Show>
       <Show when={modalOpen()}>
-        <TimeSignatureModalSolid
+        <TimeSignatureModal
           value={props.value}
           onChange={props.onChange}
           onClose={() => setModalOpen(false)}
@@ -76,7 +76,7 @@ export function TimeSignatureControlSolid(props: TimeSignatureControlSolidProps)
   );
 }
 
-function TimeSignatureModalSolid(props: {
+function TimeSignatureModal(props: {
   value: TimeSignature;
   onChange: (value: TimeSignature) => void;
   onClose: () => void;

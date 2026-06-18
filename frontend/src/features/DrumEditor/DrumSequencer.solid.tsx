@@ -7,7 +7,7 @@ import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import { createInstrumentBufferSource, noteFrequency, preloadInstrumentSample } from "../../audio/synthPreview";
 import { useContextualHotkeySolid } from "../../solid-utils/contextualHotkeys.solid";
 import { listDrumBeatFeedback, saveDrumBeatFeedback } from "../../persistence/dexie";
-import { TimeSignatureControlSolid } from "../Transport/TimeSignatureControl.solid";
+import { TimeSignatureControl } from "../Transport/TimeSignatureControl.solid";
 import {
   DEFAULT_DRUM_MIDI_PITCH,
   DEFAULT_DRUM_VELOCITY,
@@ -106,7 +106,7 @@ function px(value: number): string {
   return `${value}px`;
 }
 
-export function DrumSequencerSolid(props: Props) {
+export function DrumSequencer(props: Props) {
   const [playing, setPlaying] = createSignal(false);
   const [playStep, setPlayStep] = createSignal<number | null>(null);
   const [selectedCells, setSelectedCells] = createSignal<Set<string>>(new Set(), { equals: false });
@@ -777,7 +777,7 @@ export function DrumSequencerSolid(props: Props) {
           </label>
         )}
         {props.onTimeSignatureChange && (
-          <TimeSignatureControlSolid
+          <TimeSignatureControl
             value={activeTimeSignature}
             ariaLabel="Drum time signature"
             onChange={props.onTimeSignatureChange}

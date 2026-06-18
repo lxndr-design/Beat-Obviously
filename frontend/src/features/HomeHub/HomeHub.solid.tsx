@@ -5,10 +5,10 @@ import { Button, HoverInfo, Icon } from "../../solid-ui";
 import { useComponentStore } from "../../state/components";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
-import { AppMenuButtonSolid } from "../TopBar/AppMenuButton.solid";
-import { AudioFilesPageSolid } from "./AudioFilesPage.solid";
-import { InstrumentsPageSolid } from "./InstrumentsPage.solid";
-import { PatternsPageSolid } from "./PatternsPage.solid";
+import { AppMenuButton } from "../TopBar/AppMenuButton.solid";
+import { AudioFilesPage } from "./AudioFilesPage.solid";
+import { InstrumentsPage } from "./InstrumentsPage.solid";
+import { PatternsPage } from "./PatternsPage.solid";
 import styles from "./HomeHub.module.css";
 
 type HomePage = "home" | "audio" | "instruments" | "patterns" | "training";
@@ -28,7 +28,7 @@ export interface HomeHubProps {
   onSettings: () => void;
 }
 
-export function HomeHubSolid(props: HomeHubProps) {
+export function HomeHub(props: HomeHubProps) {
   const [page, setPage] = createSignal<HomePage>("home");
   const recentProjects = createStoreSelector(useDocumentStore, (s) => s.recentProjects);
   const audioFileCount = createStoreSelector(useAudioFileStore, (s) => s.files.length);
@@ -61,13 +61,13 @@ export function HomeHubSolid(props: HomeHubProps) {
             disableHome={false}
           />
           <Show when={page() === "audio"}>
-            <AudioFilesPageSolid />
+            <AudioFilesPage />
           </Show>
           <Show when={page() === "instruments"}>
-            <InstrumentsPageSolid />
+            <InstrumentsPage />
           </Show>
           <Show when={page() === "patterns"}>
-            <PatternsPageSolid />
+            <PatternsPage />
           </Show>
           <Show when={page() === "training"}>
             <div class={styles.blankContent} />
@@ -185,7 +185,7 @@ function HomeHeader(props: HomeHeaderProps) {
   return (
     <div class={styles.header}>
       <div class={styles.brand}>
-        <AppMenuButtonSolid
+        <AppMenuButton
           props={() => ({
             onHome: props.onHome,
             onNew: props.onNew,

@@ -1,6 +1,6 @@
 import { MarqueeText } from "./MarqueeText.solid";
 
-export function MarqueeTextSolidDemo() {
+export function MarqueeTextDemo() {
   return (
     <section>
       <h2>Solid MarqueeText</h2>

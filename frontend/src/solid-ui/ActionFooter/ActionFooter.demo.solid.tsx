@@ -1,7 +1,7 @@
 import { Button } from "../Button";
 import { ActionFooter } from "./ActionFooter.solid";
 
-export function ActionFooterSolidDemo() {
+export function ActionFooterDemo() {
   return (
     <section>
       <h2>Solid ActionFooter</h2>

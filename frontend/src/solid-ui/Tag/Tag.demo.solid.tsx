@@ -1,6 +1,6 @@
 import { Tag } from "./Tag.solid";
 
-export function TagSolidDemo() {
+export function TagDemo() {
   return (
     <section>
       <h2>Solid Tag</h2>

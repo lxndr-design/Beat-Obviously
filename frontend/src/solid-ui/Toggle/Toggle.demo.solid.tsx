@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 import { Toggle } from "./Toggle.solid";
 
-export function ToggleSolidDemo() {
+export function ToggleDemo() {
   const [checked, setChecked] = createSignal(false);
   return (
     <section>

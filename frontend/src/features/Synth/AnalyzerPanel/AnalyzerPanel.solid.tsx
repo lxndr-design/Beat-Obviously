@@ -12,7 +12,7 @@ export interface AnalyzerPanelProps {
   onTogglePlayback?: () => void;
 }
 
-export function AnalyzerPanelSolid(props: { state: Accessor<AnalyzerPanelProps> }) {
+export function AnalyzerPanel(props: { state: Accessor<AnalyzerPanelProps> }) {
   const masterSnapshot = createStoreSelector(useAnalyzerStore, (state) => state.master);
   const synthSnapshot = createStoreSelector(useAnalyzerStore, (state) => state.synth);
   const snapshot = createMemo(() => props.state().snapshotOverride ?? (props.state().scope === "synth" ? synthSnapshot() : masterSnapshot()));

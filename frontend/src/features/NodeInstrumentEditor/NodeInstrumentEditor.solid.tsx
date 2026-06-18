@@ -16,7 +16,7 @@ import {
   normalizeInstrumentNodeGraph,
   type NodeParameterSpec,
 } from "./nodeGraph";
-import { NodeCanvasSolid, type NodeCanvasSolidDragCable } from "./NodeCanvasSolid.solid";
+import { NodeCanvas, type NodeCanvasDragCable } from "./NodeCanvas.solid";
 import { Button, Icon, NumberInput, TextInput, Toggle } from "../../solid-ui";
 import styles from "./NodeInstrumentEditor.module.css";
 
@@ -30,20 +30,20 @@ interface NodeDrag {
   offsetY: number;
 }
 
-export interface NodeInstrumentEditorSolidProps {
+export interface NodeInstrumentEditorProps {
   instrument: Instrument | null;
   updateInstrument: (id: string, patch: Partial<Instrument>) => void;
 }
 
-interface NodeInstrumentEditorSolidInternalProps {
-  props: Accessor<NodeInstrumentEditorSolidProps>;
+interface NodeInstrumentEditorInternalProps {
+  props: Accessor<NodeInstrumentEditorProps>;
 }
 
-export function NodeInstrumentEditorSolid(props: NodeInstrumentEditorSolidProps) {
-  return <NodeInstrumentEditorSolidView props={() => props} />;
+export function NodeInstrumentEditor(props: NodeInstrumentEditorProps) {
+  return <NodeInstrumentEditorView props={() => props} />;
 }
 
-function NodeInstrumentEditorSolidView({ props }: NodeInstrumentEditorSolidInternalProps) {
+function NodeInstrumentEditorView({ props }: NodeInstrumentEditorInternalProps) {
   let canvasElement: HTMLDivElement | null = null;
   let lastInstrumentId: string | null = null;
 
@@ -53,7 +53,7 @@ function NodeInstrumentEditorSolidView({ props }: NodeInstrumentEditorSolidInter
   );
   const [selectedNodeId, setSelectedNodeId] = createSignal<string | null>(null);
   const [dirty, setDirty] = createSignal(false);
-  const [dragCable, setDragCable] = createSignal<NodeCanvasSolidDragCable | null>(null, { equals: false });
+  const [dragCable, setDragCable] = createSignal<NodeCanvasDragCable | null>(null, { equals: false });
   const [nodeDrag, setNodeDrag] = createSignal<NodeDrag | null>(null, { equals: false });
 
   const selectedNode = createMemo(() => {
@@ -296,7 +296,7 @@ function NodeInstrumentEditorSolidView({ props }: NodeInstrumentEditorSolidInter
             </div>
           </header>
 
-          <NodeCanvasSolid state={canvasState} />
+          <NodeCanvas state={canvasState} />
 
           <NodeInspector
             node={selectedNode()}

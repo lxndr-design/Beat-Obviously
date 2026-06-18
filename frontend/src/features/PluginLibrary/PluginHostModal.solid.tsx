@@ -14,11 +14,11 @@ import { createStoreSelector } from "../../solid-utils/store";
 import { decentSamplerEditorKind, pluginFromDecentSamplerPreset } from "./decentSamplerPluginAdapter";
 import styles from "./PluginHostModal.module.css";
 
-interface PluginHostModalSolidProps {
+interface PluginHostModalProps {
   pluginId: string;
 }
 
-export function PluginHostModalSolid(props: PluginHostModalSolidProps) {
+export function PluginHostModal(props: PluginHostModalProps) {
   const plugins = createStoreSelector(usePluginStore, (s) => s.plugins);
   const plugin = createMemo(() => plugins().find((candidate) => candidate.id === props.pluginId));
   const isDecentSampler = createMemo(() => plugin()?.format === "decent-sampler");

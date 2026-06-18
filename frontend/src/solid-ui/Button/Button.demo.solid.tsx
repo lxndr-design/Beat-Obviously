@@ -1,7 +1,7 @@
 import { Button } from "./Button.solid";
 import { Icon } from "../Icon";
 
-export function ButtonSolidDemo() {
+export function ButtonDemo() {
   return (
     <section>
       <h2>Solid Button</h2>

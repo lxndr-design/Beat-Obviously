@@ -21,9 +21,9 @@ import { deleteSynthPreset, listSynthPresets, saveSynthPreset, type SynthPresetR
 import { ANALYZER_BAND_COUNT, useAnalyzerStore, type AnalyzerSnapshot } from "../../../state/analyzerStore";
 import { useInstrumentStore, useUiStore } from "../../../state/store";
 import { INSTRUMENT_ICON_OPTIONS, instrumentIconLabel } from "../../../state/instrumentIcons";
-import { AnalyzerPanelSolid } from "../AnalyzerPanel/AnalyzerPanel.solid";
-import { ModulationMatrixSolid } from "../ModulationMatrix/ModulationMatrix.solid";
-import { OscillatorPanelSolid } from "../OscillatorPanel/OscillatorPanel.solid";
+import { AnalyzerPanel } from "../AnalyzerPanel/AnalyzerPanel.solid";
+import { ModulationMatrix } from "../ModulationMatrix/ModulationMatrix.solid";
+import { OscillatorPanel } from "../OscillatorPanel/OscillatorPanel.solid";
 import styles from "./SynthEditor.module.css";
 
 const MACRO_IDS = ["macro.1", "macro.2", "macro.3", "macro.4"] as const;
@@ -53,7 +53,7 @@ export interface SynthEditorProps {
   instrumentId?: string;
 }
 
-export function SynthEditorSolid(props: SynthEditorProps) {
+export function SynthEditor(props: SynthEditorProps) {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const boundInstrumentId = createStoreSelector(useSynthStore, (state) => state.boundInstrumentId);
   const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
@@ -474,7 +474,7 @@ export function SynthEditorSolid(props: SynthEditorProps) {
               </div>
             </div>
           </section>
-          <AnalyzerPanelSolid
+          <AnalyzerPanel
             state={() => ({
               scope: "synth",
               snapshotOverride: auditionSnapshot(),
@@ -484,7 +484,7 @@ export function SynthEditorSolid(props: SynthEditorProps) {
           />
         </div>
 
-        <OscillatorPanelSolid />
+        <OscillatorPanel />
 
         <div class={styles.sourceGrid}>
           <LfoPanel />
@@ -516,7 +516,7 @@ export function SynthEditorSolid(props: SynthEditorProps) {
 
         <div class={styles.bottomGrid}>
           <AmpFilterPanel />
-          <ModulationMatrixSolid />
+          <ModulationMatrix />
         </div>
       </div>
 

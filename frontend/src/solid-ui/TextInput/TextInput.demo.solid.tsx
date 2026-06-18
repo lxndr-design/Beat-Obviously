@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 import { TextInput } from "./TextInput.solid";
 
-export function TextInputSolidDemo() {
+export function TextInputDemo() {
   const [name, setName] = createSignal("Nodemap");
   return (
     <section>

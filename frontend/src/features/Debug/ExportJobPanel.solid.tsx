@@ -5,7 +5,7 @@ import { Button, HoverInfo, Icon } from "../../solid-ui";
 import { useExportStore } from "../../state/exportStore";
 import styles from "./ExportJobPanel.module.css";
 
-export function ExportJobPanelSolid() {
+export function ExportJobPanel() {
   const job = createStoreSelector(useExportStore, (state) => state.job);
   const label = () => {
     const current = job();

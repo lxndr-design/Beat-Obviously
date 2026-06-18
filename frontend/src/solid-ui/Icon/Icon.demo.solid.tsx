@@ -1,6 +1,6 @@
 import { Icon } from "./Icon.solid";
 
-export function IconSolidDemo() {
+export function IconDemo() {
   return (
     <section>
       <h2>Solid Icon</h2>

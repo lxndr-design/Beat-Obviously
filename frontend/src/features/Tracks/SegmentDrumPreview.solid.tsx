@@ -8,7 +8,7 @@ interface Props {
   displayLengthBeats?: number;
 }
 
-export function SegmentDrumPreviewSolid(props: Props) {
+export function SegmentDrumPreview(props: Props) {
   const drumPayload = () => props.segment.payload.kind === "drum" ? props.segment.payload : null;
   const viewLength = () => Math.max(0.001, props.displayLengthBeats ?? props.segment.lengthBeats);
   const stepBeats = () => {

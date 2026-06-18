@@ -3,7 +3,7 @@ import { appAlert, appConfirm } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { useDocumentStore, useTransportStore, useUiStore } from "../../state/store";
-import { BrandMarkSolid } from "./BrandMark.solid";
+import { BrandMark } from "./BrandMark.solid";
 import styles from "./AppMenuButton.module.css";
 
 export interface AppMenuButtonProps {
@@ -22,7 +22,7 @@ export interface AppMenuButtonProps {
   disableFileStateActions?: boolean;
 }
 
-export function AppMenuButtonSolid(props: { props: Accessor<AppMenuButtonProps> }) {
+export function AppMenuButton(props: { props: Accessor<AppMenuButtonProps> }) {
   let buttonElement: HTMLButtonElement | undefined;
   const dirty = createStoreSelector(useDocumentStore, (state) => state.dirty);
   const documentOpen = createStoreSelector(useDocumentStore, (state) => state.documentOpen);
@@ -114,7 +114,7 @@ export function AppMenuButtonSolid(props: { props: Accessor<AppMenuButtonProps> 
         aria-label="Beat menu"
         aria-haspopup="menu"
       >
-        <BrandMarkSolid />
+        <BrandMark />
       </button>
       {menu.menu()}
     </>

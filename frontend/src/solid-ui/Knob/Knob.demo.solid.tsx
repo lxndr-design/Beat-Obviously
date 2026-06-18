@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 import { Knob } from "./Knob.solid";
 
-export function KnobSolidDemo() {
+export function KnobDemo() {
   const [value, setValue] = createSignal(0);
   return (
     <section>

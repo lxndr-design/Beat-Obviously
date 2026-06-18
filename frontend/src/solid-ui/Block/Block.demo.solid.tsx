@@ -1,7 +1,7 @@
 import { Button } from "../Button";
 import { Block } from "./Block.solid";
 
-export function BlockSolidDemo() {
+export function BlockDemo() {
   return (
     <Block
       title="Block"

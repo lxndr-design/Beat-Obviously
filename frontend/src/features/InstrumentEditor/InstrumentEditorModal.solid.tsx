@@ -14,8 +14,8 @@ import { characterizeInstrument, defaultAetherSynthConfig, defaultWavetableConfi
 import { INSTRUMENT_ICON_OPTIONS, instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
 import type { Instrument, InstrumentSnapshot } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
-import { WaveformPickerSolid } from "./WaveformPicker.solid";
-import { InstrumentWaveformPreviewSolid } from "./InstrumentWaveformPreview.solid";
+import { WaveformPicker } from "./WaveformPicker.solid";
+import { InstrumentWaveformPreview } from "./InstrumentWaveformPreview.solid";
 import styles from "./InstrumentEditorModal.module.css";
 
 export interface Props {
@@ -51,7 +51,7 @@ const DEFAULT_INSTRUMENT_KNOBS = { cutoff: 0.6, resonance: 0.2, drive: 0.1, colo
  *   ├──── Lineage (if merged) ────┤
  *   └─────────────────────────────┘
  */
-export function InstrumentEditorModalSolid(props: Props) {
+export function InstrumentEditorModal(props: Props) {
   const source = createStoreSelector(useInstrumentStore, (s) =>
     s.instruments.find((i) => i.id === props.instrumentId),
   );
@@ -309,7 +309,7 @@ export function InstrumentEditorModalSolid(props: Props) {
     >
       <div class={styles.grid}>
         <div class={`${styles.stickyIdentityRow} ${styles.spanFull}`}>
-          <InstrumentWaveformPreviewSolid instrument={currentDraft()} hotkeyScopeId={id()} spanFull={false} />
+          <InstrumentWaveformPreview instrument={currentDraft()} hotkeyScopeId={id()} spanFull={false} />
 
           <div class={styles.identityStack}>
             <div class={styles.nameIconRow}>
@@ -514,7 +514,7 @@ export function InstrumentEditorModalSolid(props: Props) {
           <section class={`${styles.section} ${styles.spanFull}`}>
             <h3 class={styles.sectionHeading}>Oscillator</h3>
             <div class={styles.oscRow}>
-              <WaveformPickerSolid
+              <WaveformPicker
                 value={currentDraft().waveform}
                 allowSample={currentDraft().kind === "hybrid"}
                 allowWavetable={currentDraft().kind === "wavetable"}
@@ -831,7 +831,7 @@ function AetherOscModule({
         </Button>
       </div>
       <div class={styles.aetherSource}>
-        <WaveformPickerSolid
+        <WaveformPicker
           value={waveform}
           allowWavetable
           onChange={(next) => {

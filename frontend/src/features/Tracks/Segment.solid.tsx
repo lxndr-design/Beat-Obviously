@@ -28,9 +28,9 @@ import {
   snapStepBeats,
   type SegmentSnapSettings,
 } from "./segmentMath";
-import { SegmentMidiPreviewSolid } from "./SegmentMidiPreview.solid";
-import { SegmentDrumPreviewSolid } from "./SegmentDrumPreview.solid";
-import { SegmentWaveformSolid } from "./SegmentWaveform.solid";
+import { SegmentMidiPreview } from "./SegmentMidiPreview.solid";
+import { SegmentDrumPreview } from "./SegmentDrumPreview.solid";
+import { SegmentWaveform } from "./SegmentWaveform.solid";
 import styles from "./Segment.module.css";
 import type { Id, Segment as SegmentType } from "../../state/types";
 
@@ -74,7 +74,7 @@ type DragState =
       pendingFade: { fadeInBeats: number; fadeOutBeats: number } | null;
     };
 
-export function SegmentSolid(props: Props) {
+export function Segment(props: Props) {
   let drag: DragState | null = null;
   let previewRaf: number | null = null;
   let pendingPreview: { startBeat: number; lengthBeats: number } | null = null;
@@ -641,13 +641,13 @@ export function SegmentSolid(props: Props) {
         </div>
         <div class={styles.content}>
           <Show when={props.payloadKind === "midi" && liveSeg()}>
-            {(segment) => <SegmentMidiPreviewSolid segment={segment()} displayLengthBeats={visualLengthBeats()} />}
+            {(segment) => <SegmentMidiPreview segment={segment()} displayLengthBeats={visualLengthBeats()} />}
           </Show>
           <Show when={props.payloadKind === "drum" && liveSeg()}>
-            {(segment) => <SegmentDrumPreviewSolid segment={segment()} displayLengthBeats={visualLengthBeats()} />}
+            {(segment) => <SegmentDrumPreview segment={segment()} displayLengthBeats={visualLengthBeats()} />}
           </Show>
           <Show when={props.payloadKind === "audio" && liveSeg()}>
-            {(segment) => <SegmentWaveformSolid segment={segment()} />}
+            {(segment) => <SegmentWaveform segment={segment()} />}
           </Show>
           <Show when={props.repetition === 0 && liveSeg()}>
             <div class={styles.fadeLayer}>

@@ -1,7 +1,7 @@
 import { Icon } from "../Icon";
 import { RowItem } from "./RowItem.solid";
 
-export function RowItemSolidDemo() {
+export function RowItemDemo() {
   return (
     <section>
       <h2>Solid RowItem</h2>

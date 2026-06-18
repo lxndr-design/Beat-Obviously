@@ -52,7 +52,7 @@ const INSTRUMENT_TYPES = [
   "Foley",
 ];
 
-export function ImportInstrumentModalSolid(props: Props) {
+export function ImportInstrumentModal(props: Props) {
   const [files, setFiles] = createSignal<AudioFile[]>(props.initialFiles ?? [], { equals: false });
   const [selectedIds, setSelectedIds] = createSignal<Set<string>>(new Set((props.initialFiles ?? []).map((file) => file.id)), { equals: false });
   const [groups, setGroups] = createSignal<ImportGroup[]>([], { equals: false });

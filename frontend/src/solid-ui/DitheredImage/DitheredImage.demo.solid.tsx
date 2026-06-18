@@ -2,7 +2,7 @@ import { DitheredImage } from "./DitheredImage.solid";
 
 const demoImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAGElEQVR4nGNkYGD4z8DAwMgABYwMjAACCgEABpMAf5S4JikAAAAASUVORK5CYII=";
 
-export function DitheredImageSolidDemo() {
+export function DitheredImageDemo() {
   return (
     <DitheredImage
       src={demoImage}

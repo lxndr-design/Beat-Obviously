@@ -4,9 +4,9 @@ import { send } from "../../ipc/bridge";
 import { createStoreSelector } from "../../solid-utils/store";
 import { Button, HoverInfo, Icon } from "../../solid-ui";
 import { useProjectStore, useTransportStore } from "../../state/store";
-import { TimeSignatureControlSolid } from "../Transport/TimeSignatureControl.solid";
-import { AppMenuButtonSolid } from "./AppMenuButton.solid";
-import { InlineNumberSolid } from "./InlineNumber.solid";
+import { TimeSignatureControl } from "../Transport/TimeSignatureControl.solid";
+import { AppMenuButton } from "./AppMenuButton.solid";
+import { InlineNumber } from "./InlineNumber.solid";
 import marqueeStyles from "../../solid-ui/MarqueeText/MarqueeText.module.css";
 import styles from "./TopBar.module.css";
 
@@ -24,7 +24,7 @@ export interface TopBarProps {
   onSettings: () => void;
 }
 
-export function TopBarSolid(props: { props: Accessor<TopBarProps> }) {
+export function TopBar(props: { props: Accessor<TopBarProps> }) {
   let projectNameInput: HTMLInputElement | undefined;
   const playing = createStoreSelector(useTransportStore, (state) => state.playing);
   const positionBeat = createStoreSelector(useTransportStore, (state) => state.positionBeat);
@@ -67,7 +67,7 @@ export function TopBarSolid(props: { props: Accessor<TopBarProps> }) {
   return (
     <header class={styles.bar}>
       <div class={styles.brand}>
-        <AppMenuButtonSolid props={props.props} />
+        <AppMenuButton props={props.props} />
         <h1 class={styles.breadcrumb}>
           <span>Editor</span>
           <span class={styles.breadcrumbSlash}>/</span>
@@ -80,7 +80,7 @@ export function TopBarSolid(props: { props: Accessor<TopBarProps> }) {
                 onDblClick={() => setEditingProjectName(true)}
                 title="Double-click to rename project"
               >
-                <MarqueeTextSolid text={projectName() || "Untitled"} className={styles.projectNameText} />
+                <MarqueeText text={projectName() || "Untitled"} className={styles.projectNameText} />
               </button>
             )}
           >
@@ -153,7 +153,7 @@ export function TopBarSolid(props: { props: Accessor<TopBarProps> }) {
       </div>
 
       <div class={styles.projectControls}>
-        <InlineNumberSolid
+        <InlineNumber
           label="Length"
           value={lengthBeats()}
           min={4}
@@ -161,11 +161,11 @@ export function TopBarSolid(props: { props: Accessor<TopBarProps> }) {
           step={4}
           onChange={(value) => useProjectStore.getState().setLengthBeats(value)}
         />
-        <TimeSignatureControlSolid
+        <TimeSignatureControl
           value={timeSignature()}
           onChange={(value) => useProjectStore.getState().setTimeSignature(value)}
         />
-        <InlineNumberSolid
+        <InlineNumber
           label="BPM"
           value={bpm()}
           min={20}
@@ -178,7 +178,7 @@ export function TopBarSolid(props: { props: Accessor<TopBarProps> }) {
   );
 }
 
-function MarqueeTextSolid(props: { text: string; className?: string; title?: string }) {
+function MarqueeText(props: { text: string; className?: string; title?: string }) {
   let rootElement: HTMLSpanElement | undefined;
   let innerElement: HTMLSpanElement | undefined;
   let frame = 0;

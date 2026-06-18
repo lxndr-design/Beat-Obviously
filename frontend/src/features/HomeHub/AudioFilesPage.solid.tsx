@@ -7,7 +7,7 @@ import type { AudioWaveformSummary } from "../../ipc/schema";
 import { useAudioFileStore, useInstrumentStore, useProjectStore } from "../../state/store";
 import type { AudioFile, Instrument } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
-import { AssetPageShellSolid, AssetStateMessageSolid } from "./AssetPageShell.solid";
+import { AssetPageShell, AssetStateMessage } from "./AssetPageShell.solid";
 import styles from "./AudioFilesPage.module.css";
 
 type SortKey = "name" | "size" | "length" | "imported";
@@ -29,7 +29,7 @@ type WaveformAnalysis = {
   stereoCorrelation: number;
 };
 
-export function AudioFilesPageSolid() {
+export function AudioFilesPage() {
   const files = createStoreSelector(useAudioFileStore, (s) => s.files);
   const addFile = useAudioFileStore.getState().addFile;
   const removeFile = useAudioFileStore.getState().removeFile;
@@ -359,7 +359,7 @@ export function AudioFilesPageSolid() {
   }
 
   return (
-    <AssetPageShellSolid
+    <AssetPageShell
       variant="wide-browser"
       browserLabel="Audio file browser"
       previewLabel="Audio playback"
@@ -402,7 +402,7 @@ export function AudioFilesPageSolid() {
               when={sortedFiles().length > 0}
               fallback={
                 <div class={styles.emptyRow}>
-                <AssetStateMessageSolid
+                <AssetStateMessage
                   icon="ph:waveform"
                   title="No Audio Files"
                   body="Import audio to build the project library."
@@ -411,7 +411,7 @@ export function AudioFilesPageSolid() {
                     <Icon name="ph:plus" size={14} decorative />
                     Import Audio
                   </Button>
-                </AssetStateMessageSolid>
+                </AssetStateMessage>
               </div>
               }
             >
@@ -464,7 +464,7 @@ export function AudioFilesPageSolid() {
           when={!multipleSelected()}
           fallback={
           <div class={styles.previewBody}>
-            <AssetStateMessageSolid
+            <AssetStateMessage
               icon="ph:checks"
               title={`${selectedCount()} Audio Files Selected`}
               body="Preview is paused while a multi-file selection is active."
@@ -506,7 +506,7 @@ export function AudioFilesPageSolid() {
           when={activeFile()}
           fallback={
             <div class={styles.emptyPreview}>
-              <AssetStateMessageSolid
+              <AssetStateMessage
                 icon="ph:waveform"
                 title="Select an Audio File"
                 body="Choose a file to inspect waveform, usage, and reference details."
@@ -517,7 +517,7 @@ export function AudioFilesPageSolid() {
           {(file) => (
           <div class={styles.previewBody}>
             <Show when={activeReference() && activeReference()!.tone !== "neutral"}>
-              <AssetStateMessageSolid
+              <AssetStateMessage
                 icon={activeReference()!.icon}
                 title={activeReference()!.title}
                 body={activeReference()!.body}

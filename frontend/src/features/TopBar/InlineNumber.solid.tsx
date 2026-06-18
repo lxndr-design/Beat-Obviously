@@ -1,7 +1,7 @@
 import { createEffect, createSignal, Show } from "solid-js";
 import styles from "./InlineNumber.module.css";
 
-export interface InlineNumberSolidProps {
+export interface InlineNumberProps {
   label: string;
   value: number;
   min?: number;
@@ -11,7 +11,7 @@ export interface InlineNumberSolidProps {
   onChange: (v: number) => void;
 }
 
-export function InlineNumberSolid(props: InlineNumberSolidProps) {
+export function InlineNumber(props: InlineNumberProps) {
   const [text, setText] = createSignal(String(props.value));
 
   createEffect(() => setText(String(props.value)));

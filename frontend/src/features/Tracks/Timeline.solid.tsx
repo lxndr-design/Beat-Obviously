@@ -6,7 +6,7 @@ import styles from "./Timeline.module.css";
 
 type LoopClamp = "start" | "end";
 
-export function TimelineSolid() {
+export function Timeline() {
   let stripElement: HTMLDivElement | undefined;
   const lengthBeats = createStoreSelector(useProjectStore, (state) => state.project.lengthBeats);
   const timeSignature = createStoreSelector(useProjectStore, (state) => state.project.timeSignature);

@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup } from "solid-js
 import { EQ_BAND_CENTERS_HZ } from "../../state/types";
 import styles from "./EqGraph.module.css";
 
-export interface EqGraphSolidProps {
+export interface EqGraphProps {
   bandsDb: number[];
   onChange: (idx: number, db: number) => void;
 }
@@ -18,7 +18,7 @@ const RIGHT_PAD = 8;
 
 let nextGradientId = 1;
 
-export function EqGraphSolid(props: EqGraphSolidProps) {
+export function EqGraph(props: EqGraphProps) {
   let svgElement: SVGSVGElement | undefined;
   const gradientId = `beat-eq-gradient-${nextGradientId++}`;
   const [size, setSize] = createSignal({ w: 600, h: 100 }, { equals: false });

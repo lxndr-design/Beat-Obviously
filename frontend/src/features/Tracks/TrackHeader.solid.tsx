@@ -17,7 +17,7 @@ interface Props {
 
 const DND_MIME = "application/x-beat-track";
 
-export function TrackHeaderSolid(props: Props) {
+export function TrackHeader(props: Props) {
   const track = createStoreSelector(useProjectStore, (state) => state.project.tracks.find((candidate) => candidate.id === props.trackId));
   const meter = createStoreSelector(useAnalyzerStore, (state) => state.trackMeters[props.trackId]);
   const [editingName, setEditingName] = createSignal(false);

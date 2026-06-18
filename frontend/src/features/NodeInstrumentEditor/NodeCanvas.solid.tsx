@@ -12,7 +12,7 @@ const NODE_WIDTH = 206;
 const PORT_TOP = 62;
 const PORT_GAP = 26;
 
-export interface NodeCanvasSolidDragCable {
+export interface NodeCanvasDragCable {
   nodeId: string;
   portId: string;
   portKind: "input" | "output";
@@ -21,10 +21,10 @@ export interface NodeCanvasSolidDragCable {
   y: number;
 }
 
-export interface NodeCanvasSolidState {
+export interface NodeCanvasState {
   graph: InstrumentNodeGraph;
   selectedNodeId: string | null;
-  dragCable: NodeCanvasSolidDragCable | null;
+  dragCable: NodeCanvasDragCable | null;
   canvasWidth: number;
   canvasHeight: number;
   onCanvasElement: (element: HTMLDivElement | null) => void;
@@ -37,11 +37,11 @@ export interface NodeCanvasSolidState {
   onRemoveCable: (cableId: string) => void;
 }
 
-interface NodeCanvasSolidProps {
-  state: Accessor<NodeCanvasSolidState>;
+interface NodeCanvasProps {
+  state: Accessor<NodeCanvasState>;
 }
 
-export function NodeCanvasSolid(props: NodeCanvasSolidProps) {
+export function NodeCanvas(props: NodeCanvasProps) {
   const cablePaths = createMemo(() =>
     props.state().graph.cables
       .map((cable) => {
@@ -101,7 +101,7 @@ export function NodeCanvasSolid(props: NodeCanvasSolidProps) {
 
         <For each={props.state().graph.nodes}>
           {(node) => (
-            <NodeBlockSolid
+            <NodeBlock
               node={node}
               selected={props.state().selectedNodeId === node.id}
               state={props.state}
@@ -113,14 +113,14 @@ export function NodeCanvasSolid(props: NodeCanvasSolidProps) {
   );
 }
 
-function NodeBlockSolid({
+function NodeBlock({
   node,
   selected,
   state,
 }: {
   node: InstrumentNode;
   selected: boolean;
-  state: Accessor<NodeCanvasSolidState>;
+  state: Accessor<NodeCanvasState>;
 }) {
   const definition = nodeDefinition(node.kind);
   return (
@@ -152,24 +152,24 @@ function NodeBlockSolid({
       </div>
       <div class={styles.portGrid}>
         <div class={styles.portColumn}>
-          <For each={node.inputs}>{(port) => <PortButtonSolid node={node} port={port} state={state} />}</For>
+          <For each={node.inputs}>{(port) => <PortButton node={node} port={port} state={state} />}</For>
         </div>
         <div class={styles.portColumn} data-align="right">
-          <For each={node.outputs}>{(port) => <PortButtonSolid node={node} port={port} state={state} />}</For>
+          <For each={node.outputs}>{(port) => <PortButton node={node} port={port} state={state} />}</For>
         </div>
       </div>
     </article>
   );
 }
 
-function PortButtonSolid({
+function PortButton({
   node,
   port,
   state,
 }: {
   node: InstrumentNode;
   port: InstrumentNodePort;
-  state: Accessor<NodeCanvasSolidState>;
+  state: Accessor<NodeCanvasState>;
 }) {
   return (
     <button
@@ -202,7 +202,7 @@ function portPosition(graph: InstrumentNodeGraph, nodeId: string, portId: string
   };
 }
 
-function draftCablePath(graph: InstrumentNodeGraph, drag: NodeCanvasSolidDragCable | null): string {
+function draftCablePath(graph: InstrumentNodeGraph, drag: NodeCanvasDragCable | null): string {
   if (!drag) return "";
   const from = portPosition(graph, drag.nodeId, drag.portId, drag.portKind);
   if (!from) return "";

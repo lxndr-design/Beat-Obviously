@@ -2,8 +2,8 @@ import { createSignal, For, Show } from "solid-js";
 import { HoverInfo, Icon, SectionRibbon, SectionRibbonActionButton } from "../../solid-ui";
 import { usePluginStore, useUiStore } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
-import { PluginImportModalSolid } from "./PluginImportModal.solid";
-import { PluginItemSolid } from "./PluginLibraryPanel.solid";
+import { PluginImportModal } from "./PluginImportModal.solid";
+import { PluginItem } from "./PluginLibraryPanel.solid";
 import styles from "./PluginLibraryPanel.module.css";
 
 interface DecentSamplerLibraryPanelProps {
@@ -11,7 +11,7 @@ interface DecentSamplerLibraryPanelProps {
   onToggle: () => void;
 }
 
-export function DecentSamplerLibraryPanelSolid(props: DecentSamplerLibraryPanelProps) {
+export function DecentSamplerLibraryPanel(props: DecentSamplerLibraryPanelProps) {
   const allPlugins = createStoreSelector(usePluginStore, (s) => s.plugins);
   const plugins = () => allPlugins().filter((plugin) => plugin.format === "decent-sampler");
   const [importOpen, setImportOpen] = createSignal(false);
@@ -37,7 +37,7 @@ export function DecentSamplerLibraryPanelSolid(props: DecentSamplerLibraryPanelP
         <Show when={plugins().length > 0} fallback={<li class={styles.empty}>No DecentSampler packages installed.</li>}>
           <For each={plugins()}>
             {(plugin) => (
-              <PluginItemSolid
+              <PluginItem
                 plugin={plugin}
                 onOpen={() => useUiStore.getState().openEditor({ kind: "plugin", pluginId: plugin.id })}
               />
@@ -47,7 +47,7 @@ export function DecentSamplerLibraryPanelSolid(props: DecentSamplerLibraryPanelP
       </ul>
 
       <Show when={importOpen()}>
-        <PluginImportModalSolid
+        <PluginImportModal
           onClose={() => setImportOpen(false)}
           onInstalled={(pluginId) => {
             setImportOpen(false);

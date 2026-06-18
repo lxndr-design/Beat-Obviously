@@ -14,7 +14,7 @@ interface ComponentLibraryPanelProps {
   onToggle: () => void;
 }
 
-export function ComponentLibraryPanelSolid(props: ComponentLibraryPanelProps) {
+export function ComponentLibraryPanel(props: ComponentLibraryPanelProps) {
   const components = createStoreSelector(useComponentStore, (s) => s.components);
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
   const bpm = createStoreSelector(useProjectStore, (s) => s.project.bpm);

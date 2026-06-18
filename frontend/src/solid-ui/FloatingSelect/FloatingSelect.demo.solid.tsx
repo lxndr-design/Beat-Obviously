@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 import { FloatingSelect } from "./FloatingSelect.solid";
 
-export function FloatingSelectSolidDemo() {
+export function FloatingSelectDemo() {
   const [open, setOpen] = createSignal(false);
   const [value, setValue] = createSignal("midi");
   return (

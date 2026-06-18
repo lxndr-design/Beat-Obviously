@@ -2,7 +2,7 @@ import { createStoreSelector } from "../../solid-utils/store";
 import { useTransportStore, useViewStore } from "../../state/store";
 import styles from "./Playhead.module.css";
 
-export function PlayheadSolid() {
+export function Playhead() {
   const position = createStoreSelector(useTransportStore, (state) => state.positionBeat);
   const beatsToPx = createStoreSelector(useViewStore, (state) => state.beatsToPx);
   return (

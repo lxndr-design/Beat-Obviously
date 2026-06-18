@@ -24,7 +24,7 @@ const fallbackInstrument: Instrument = {
   userCreated: false,
 };
 
-export function TimelineMidiPlaybackSolid() {
+export function TimelineMidiPlayback() {
   const playing = createStoreSelector(useTransportStore, (s) => s.playing);
   const positionBeat = createStoreSelector(useTransportStore, (s) => s.positionBeat);
   const speed = createStoreSelector(useTransportStore, (s) => s.speed);

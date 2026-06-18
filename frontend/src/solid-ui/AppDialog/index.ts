@@ -1,2 +1,2 @@
 export * from "./state";
-export { AppDialogHostSolid } from "./AppDialog.solid";
+export { AppDialogHost } from "./AppDialog.solid";

@@ -1,7 +1,7 @@
 import { Button } from "../Button";
 import { HoverInfo } from "./HoverInfo.solid";
 
-export function HoverInfoSolidDemo() {
+export function HoverInfoDemo() {
   return (
     <section>
       <h2>Solid HoverInfo</h2>

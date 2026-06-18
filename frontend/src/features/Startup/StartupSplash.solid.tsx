@@ -14,7 +14,7 @@ export interface StartupSplashProps {
 
 export const STARTUP_MINIMUM_VISIBLE_MS = 900;
 
-export function StartupSplashSolid(props: { props: Accessor<StartupSplashProps> }) {
+export function StartupSplash(props: { props: Accessor<StartupSplashProps> }) {
   const [minimumElapsed, setMinimumElapsed] = createSignal(false);
   const stages = () => props.props().stages;
   const readyCount = createMemo(() => stages().filter((stage) => stage.ready).length);

@@ -11,7 +11,7 @@ interface Props {
   onClose: () => void;
 }
 
-export function MergeInstrumentModalSolid(props: Props) {
+export function MergeInstrumentModal(props: Props) {
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
   const [pickedId, setPickedId] = createSignal<Id | null>(null);
   const source = () => instruments().find((instrument) => instrument.id === props.sourceId);

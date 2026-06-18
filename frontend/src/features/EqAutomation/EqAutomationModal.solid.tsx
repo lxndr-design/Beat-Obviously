@@ -6,7 +6,7 @@ import { EQ_BAND_COUNT, EQ_BAND_LABELS, type EqAutomationPoint } from "../../sta
 import { createStoreSelector } from "../../solid-utils/store";
 import styles from "./EqAutomationModal.module.css";
 
-export function EqAutomationModalSolid() {
+export function EqAutomationModal() {
   const points = createStoreSelector(useProjectStore, (s) => s.project.masterEqAutomation);
   const project = createStoreSelector(useProjectStore, (s) => s.project);
   const closeEditor = useUiStore.getState().closeEditor;

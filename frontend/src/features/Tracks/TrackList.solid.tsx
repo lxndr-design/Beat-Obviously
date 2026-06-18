@@ -3,11 +3,11 @@ import { createStoreSelector } from "../../solid-utils/store";
 import { Button, HoverInfo, Icon } from "../../solid-ui";
 import { useProjectStore, useTransportStore, useUiStore, useViewStore } from "../../state/store";
 import { clipboardStore } from "../../state/clipboard";
-import { TrackLaneSolid } from "./TrackLane.solid";
-import { TrackEffectHeaderRowsSolid, TrackEffectLaneRowsSolid } from "./TrackEffectRows.solid";
-import { TimelineSolid } from "./Timeline.solid";
-import { PlayheadSolid } from "./Playhead.solid";
-import { TrackHeaderSolid } from "./TrackHeader.solid";
+import { TrackLane } from "./TrackLane.solid";
+import { TrackEffectHeaderRows, TrackEffectLaneRows } from "./TrackEffectRows.solid";
+import { Timeline } from "./Timeline.solid";
+import { Playhead } from "./Playhead.solid";
+import { TrackHeader } from "./TrackHeader.solid";
 import {
   clampClientYToTimeline,
   marqueeStyleFromClientPoints,
@@ -30,7 +30,7 @@ interface MarqueeState {
   active: boolean;
 }
 
-export function TrackListSolid() {
+export function TrackList() {
   let laneScrollElement: HTMLDivElement | undefined;
   let marqueeRef: MarqueeState | null = null;
   let suppressLaneClick = false;
@@ -229,13 +229,13 @@ export function TrackListSolid() {
           <For each={tracks()}>
             {(track, index) => (
               <div>
-                <TrackHeaderSolid
+                <TrackHeader
                   trackId={track.id}
                   index={index()}
                   selected={selectedTrackIds().includes(track.id)}
                   onSelect={(event) => selectTrack(track.id, event.shiftKey)}
                 />
-                <TrackEffectHeaderRowsSolid
+                <TrackEffectHeaderRows
                   trackId={track.id}
                   expandedEffectIds={expandedEffectIds()}
                   onToggleEffect={toggleEffectRows}
@@ -305,11 +305,11 @@ export function TrackListSolid() {
               <For each={tracks()}>
                 {(track) => (
                   <div>
-                    <TrackLaneSolid
+                    <TrackLane
                       trackId={track.id}
                       selected={selectedTrackIds().includes(track.id)}
                     />
-                    <TrackEffectLaneRowsSolid
+                    <TrackEffectLaneRows
                       trackId={track.id}
                       expandedEffectIds={expandedEffectIds()}
                       onToggleEffect={toggleEffectRows}
@@ -328,8 +328,8 @@ export function TrackListSolid() {
                 />
               </Show>
               <div class={styles.addRowLaneSpacer} />
-              <PlayheadSolid />
-              <TimelineSolid />
+              <Playhead />
+              <Timeline />
               <Show when={marquee()}>
                 {(current) => <div class={styles.marquee} style={marqueeStyle(current(), laneScrollElement)} />}
               </Show>

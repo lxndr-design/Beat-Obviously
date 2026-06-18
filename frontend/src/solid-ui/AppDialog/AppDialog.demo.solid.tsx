@@ -1,7 +1,7 @@
 import { Button } from "../Button";
 import { appAlert, appConfirm, appPrompt } from "./state";
 
-export function AppDialogSolidDemo() {
+export function AppDialogDemo() {
   return (
     <div class="ui-toolbar">
       <Button size="sm" onClick={() => void appAlert("Alert dialog preview.")}>Alert</Button>

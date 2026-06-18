@@ -6,7 +6,7 @@ interface Props {
   segment: Segment;
 }
 
-export function SegmentWaveformSolid(props: Props) {
+export function SegmentWaveform(props: Props) {
   const samples = createMemo(() => synthPeaks(props.segment.id, 96));
   const path = createMemo(() => samples().map((sample, index) => {
     const x = (index / (samples().length - 1)) * 100;

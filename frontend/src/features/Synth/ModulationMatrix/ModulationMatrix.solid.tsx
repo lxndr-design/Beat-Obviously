@@ -29,7 +29,7 @@ type PickMode = {
   pointer: { x: number; y: number };
 };
 
-export function ModulationMatrixSolid() {
+export function ModulationMatrix() {
   const routes = createStoreSelector(useSynthStore, (state) => state.draft.modulation);
   const updateRoute = useSynthStore.getState().updateModulationRoute;
   const addRoute = useSynthStore.getState().addModulationRoute;
@@ -333,7 +333,7 @@ function TargetSelect(props: {
       </button>
       <Show when={open() && menuRect()}>
         {(rect) => (
-          <FloatingLayerSolid
+          <FloatingLayer
             ref={(element) => {
               menuRef = element;
             }}
@@ -363,14 +363,14 @@ function TargetSelect(props: {
                 );
               }}
             </For>
-          </FloatingLayerSolid>
+          </FloatingLayer>
         )}
       </Show>
     </div>
   );
 }
 
-function FloatingLayerSolid(props: {
+function FloatingLayer(props: {
   ref?: (element: HTMLDivElement) => void;
   className?: string;
   role?: "listbox";

@@ -5,7 +5,7 @@ import { usePluginStore, useUiStore } from "../../state/store";
 import type { PluginAdapter } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { decentSamplerDragPluginId } from "./decentSamplerPluginAdapter";
-import { PluginImportModalSolid } from "./PluginImportModal.solid";
+import { PluginImportModal } from "./PluginImportModal.solid";
 import styles from "./PluginLibraryPanel.module.css";
 
 interface PluginLibraryPanelProps {
@@ -40,7 +40,7 @@ const BUILTIN_DECENT_SAMPLER_PLUGIN: PluginAdapter = {
   ],
 };
 
-export function PluginLibraryPanelSolid(props: PluginLibraryPanelProps) {
+export function PluginLibraryPanel(props: PluginLibraryPanelProps) {
   const plugins = createStoreSelector(usePluginStore, (s) => s.plugins);
   const [importOpen, setImportOpen] = createSignal(false);
   const visiblePlugins = () => [
@@ -75,7 +75,7 @@ export function PluginLibraryPanelSolid(props: PluginLibraryPanelProps) {
       <ul class={`${styles.list} ${props.expanded ? styles.listOpen : ""}`} aria-hidden={!props.expanded}>
         <For each={visiblePlugins()}>
           {(plugin) => (
-            <PluginItemSolid
+            <PluginItem
               plugin={plugin}
               onOpen={() => openPlugin(plugin)}
             />
@@ -84,7 +84,7 @@ export function PluginLibraryPanelSolid(props: PluginLibraryPanelProps) {
       </ul>
 
       <Show when={importOpen()}>
-        <PluginImportModalSolid
+        <PluginImportModal
           onClose={() => setImportOpen(false)}
           onInstalled={(pluginId) => {
             setImportOpen(false);
@@ -101,7 +101,7 @@ interface PluginItemProps {
   onOpen: () => void;
 }
 
-export function PluginItemSolid(props: PluginItemProps) {
+export function PluginItem(props: PluginItemProps) {
   const isBuiltInDecentSampler = () => props.plugin.id === BUILTIN_DECENT_SAMPLER_PLUGIN_ID;
   const isAetherBridgeHost = () => props.plugin.id === AETHER_BRIDGE_HOST_PLUGIN_ID;
   const draggablePluginId = () => decentSamplerDragPluginId(props.plugin);

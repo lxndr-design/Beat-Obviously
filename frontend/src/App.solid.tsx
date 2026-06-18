@@ -1,11 +1,11 @@
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { appAlert, appConfirm, Block } from "./solid-ui";
-import { TimelineMidiPlaybackSolid } from "./audio/TimelineMidiPlayback.solid";
+import { TimelineMidiPlayback } from "./audio/TimelineMidiPlayback.solid";
 import { startAnalyzerClient } from "./audio/analyzerClient";
-import { RenderTimingPanelSolid } from "./features/Debug/RenderTimingPanel.solid";
-import { ExportJobPanelSolid } from "./features/Debug/ExportJobPanel.solid";
-import { TrainingAutoRunnerSolid } from "./features/Training/TrainingAutoRunner.solid";
-import { StartupSplashSolid, STARTUP_MINIMUM_VISIBLE_MS, type StartupStage } from "./features/Startup/StartupSplash.solid";
+import { RenderTimingPanel } from "./features/Debug/RenderTimingPanel.solid";
+import { ExportJobPanel } from "./features/Debug/ExportJobPanel.solid";
+import { TrainingAutoRunner } from "./features/Training/TrainingAutoRunner.solid";
+import { StartupSplash, STARTUP_MINIMUM_VISIBLE_MS, type StartupStage } from "./features/Startup/StartupSplash.solid";
 import { getTimelineAudioContext, stopTimelineAudio } from "./audio/timelineAudio";
 import { importAudioFiles } from "./audio/audioImport";
 import { preloadInstrumentSample } from "./audio/synthPreview";
@@ -18,15 +18,15 @@ import { listAudioFiles, listComponents, listInstruments, pruneBlankUntitledProj
 import { closeCurrentDocumentForHome, createNewDocument, openDocumentFromUserChoice, openRecentDocument, recoverCurrentDocumentFromBackup, saveCurrentDocument } from "./persistence/documentActions";
 import { buildCurrentBeatDocumentFingerprint } from "./persistence/beatDocument";
 import { createStoreSelector } from "./solid-utils/store";
-import { VisualizerSolid } from "./features/Visualizer/Visualizer.solid";
-import { HomeHubSolid } from "./features/HomeHub/HomeHub.solid";
-import { TopBarSolid } from "./features/TopBar/TopBarSolid.solid";
-import { SidebarSolid } from "./features/Sidebar/Sidebar.solid";
-import { TrackListSolid } from "./features/Tracks/TrackList.solid";
-import { MasterEqPanelSolid } from "./features/Eq/MasterEqPanel.solid";
-import { EditorHostSolid } from "./features/EditorHost/EditorHost.solid";
-import { AppDialogHostSolid } from "./solid-ui/AppDialog";
-import { ModalStackOverlaySolid } from "./solid-ui/Modal";
+import { Visualizer } from "./features/Visualizer/Visualizer.solid";
+import { HomeHub } from "./features/HomeHub/HomeHub.solid";
+import { TopBar } from "./features/TopBar/TopBar.solid";
+import { Sidebar } from "./features/Sidebar/Sidebar.solid";
+import { TrackList } from "./features/Tracks/TrackList.solid";
+import { MasterEqPanel } from "./features/Eq/MasterEqPanel.solid";
+import { EditorHost } from "./features/EditorHost/EditorHost.solid";
+import { AppDialogHost } from "./solid-ui/AppDialog";
+import { ModalStackOverlay } from "./solid-ui/Modal";
 import trackStyles from "./features/Tracks/TrackList.module.css";
 
 type StartupReadinessKey = "instruments" | "components" | "audio";
@@ -55,7 +55,7 @@ const startupStageOrder: StartupReadinessKey[] = [
   "audio",
 ];
 
-export function AppSolid() {
+export function App() {
   const shouldMountEditorHost = createStoreSelector(useUiStore, (s) => s.openEditors.length > 0 || Boolean(s.trackEffectsEditorTrackId));
   const [showHome, setShowHome] = createSignal(true);
   const [startupReadiness, setStartupReadiness] = createSignal<Record<StartupReadinessKey, boolean>>(initialStartupReadiness(), { equals: false });
@@ -434,37 +434,37 @@ export function AppSolid() {
         when={!showHome()}
         fallback={(
           <>
-            <HomeHubSolid {...homeProps()} />
+            <HomeHub {...homeProps()} />
             <Show when={shouldMountEditorHost()}>
-              <EditorHostSolid />
+              <EditorHost />
             </Show>
-            <ModalStackOverlaySolid />
-            <AppDialogHostSolid />
-            <StartupSplashSolid props={() => ({ stages: startupStages() })} />
+            <ModalStackOverlay />
+            <AppDialogHost />
+            <StartupSplash props={() => ({ stages: startupStages() })} />
           </>
         )}
       >
-        <VisualizerSolid />
-        <TimelineMidiPlaybackSolid />
-        <TrainingAutoRunnerSolid />
-        <RenderTimingPanelSolid />
-        <ExportJobPanelSolid />
+        <Visualizer />
+        <TimelineMidiPlayback />
+        <TrainingAutoRunner />
+        <RenderTimingPanel />
+        <ExportJobPanel />
         <div class="app-root">
-          <TopBarSolid props={topBarProps} />
+          <TopBar props={topBarProps} />
           <main class="app-main">
-            <SidebarSolid />
+            <Sidebar />
             <div class="main-col">
               <TrackBlock />
-              <MasterEqPanelSolid />
+              <MasterEqPanel />
             </div>
           </main>
         </div>
         <Show when={shouldMountEditorHost()}>
-          <EditorHostSolid />
+          <EditorHost />
         </Show>
-        <ModalStackOverlaySolid />
-        <AppDialogHostSolid />
-        <StartupSplashSolid props={() => ({ stages: startupStages() })} />
+        <ModalStackOverlay />
+        <AppDialogHost />
+        <StartupSplash props={() => ({ stages: startupStages() })} />
       </Show>
     </>
   );
@@ -473,7 +473,7 @@ export function AppSolid() {
 function TrackBlock() {
   return (
     <Block title="Tracks" framed fill padding="none" className={trackStyles.tracksBlock}>
-      <TrackListSolid />
+      <TrackList />
     </Block>
   );
 }

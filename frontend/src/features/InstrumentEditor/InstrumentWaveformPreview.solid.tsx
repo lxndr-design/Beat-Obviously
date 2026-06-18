@@ -28,11 +28,11 @@ const PREVIEW_SECONDS = 3;
 
 type SampleEnvelope = Array<{ min: number; max: number }>;
 
-export function InstrumentWaveformPreviewSolid(props: InstrumentWaveformPreviewProps) {
-  return <InstrumentWaveformPreviewSolidRuntime state={() => props} />;
+export function InstrumentWaveformPreview(props: InstrumentWaveformPreviewProps) {
+  return <InstrumentWaveformPreviewRuntime state={() => props} />;
 }
 
-function InstrumentWaveformPreviewSolidRuntime(props: { state: Accessor<InstrumentWaveformPreviewProps> }) {
+function InstrumentWaveformPreviewRuntime(props: { state: Accessor<InstrumentWaveformPreviewProps> }) {
   let canvasRef: HTMLCanvasElement | undefined;
   let audioCtx: AudioContext | null = null;
   let source: AudioBufferSourceNode | null = null;

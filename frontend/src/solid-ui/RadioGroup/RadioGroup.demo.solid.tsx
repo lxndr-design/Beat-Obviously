@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 import { RadioGroup } from "./RadioGroup.solid";
 
-export function RadioGroupSolidDemo() {
+export function RadioGroupDemo() {
   const [value, setValue] = createSignal<2 | 4 | 8 | 16>(8);
   return (
     <section>

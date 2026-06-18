@@ -13,7 +13,7 @@ import {
 } from "../../state/synthStore";
 import type { Instrument, InstrumentSet } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
-import { MergeInstrumentModalSolid } from "./MergeInstrumentModal.solid";
+import { MergeInstrumentModal } from "./MergeInstrumentModal.solid";
 import { decentSamplerPluginForInstrument } from "../PluginLibrary/decentSamplerPluginAdapter";
 import { editorRequestForInstrument } from "../InstrumentEditor/instrumentEditorRouting";
 import { compileNodeGraphToInstrumentPatch, createOutputOnlyInstrumentNodeGraph } from "../NodeInstrumentEditor/nodeGraph";
@@ -43,7 +43,7 @@ interface InstrumentLibraryPanelProps {
   onOpenDecentSampler: () => void;
 }
 
-export function InstrumentLibraryPanelSolid(props: InstrumentLibraryPanelProps) {
+export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
   const instrumentSets = createStoreSelector(useInstrumentStore, (s) => s.instrumentSets);
   const loading = createStoreSelector(useInstrumentStore, (s) => s.loading);
@@ -387,7 +387,7 @@ export function InstrumentLibraryPanelSolid(props: InstrumentLibraryPanelProps) 
 
       <Show when={mergeFromId()}>
         {(sourceId) => (
-          <MergeInstrumentModalSolid
+          <MergeInstrumentModal
             sourceId={sourceId()}
             onClose={() => setMergeFromId(null)}
           />

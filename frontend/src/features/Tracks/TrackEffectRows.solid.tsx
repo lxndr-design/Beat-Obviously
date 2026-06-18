@@ -24,7 +24,7 @@ interface EffectRowsProps {
   onToggleEffect: (effectId: Id) => void;
 }
 
-export function TrackEffectHeaderRowsSolid(props: EffectRowsProps) {
+export function TrackEffectHeaderRows(props: EffectRowsProps) {
   const track = createStoreSelector(useProjectStore, (state) => state.project.tracks.find((candidate) => candidate.id === props.trackId));
   return (
     <Show when={track()?.effects.filters.length}>
@@ -42,7 +42,7 @@ export function TrackEffectHeaderRowsSolid(props: EffectRowsProps) {
   );
 }
 
-export function TrackEffectLaneRowsSolid(props: EffectRowsProps) {
+export function TrackEffectLaneRows(props: EffectRowsProps) {
   const track = createStoreSelector(useProjectStore, (state) => state.project.tracks.find((candidate) => candidate.id === props.trackId));
   const lengthBeats = createStoreSelector(useProjectStore, (state) => state.project.lengthBeats);
   const bpm = createStoreSelector(useProjectStore, (state) => state.project.bpm);

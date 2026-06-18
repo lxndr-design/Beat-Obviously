@@ -6,7 +6,7 @@ import { useModalStack } from "./modalStack";
 import styles from "./Modal.module.css";
 import overlayStyles from "./ModalStackOverlay.module.css";
 
-export function ModalStackOverlaySolid() {
+export function ModalStackOverlay() {
   const pending = createStoreSelector(useModalStack, (state) => state.pendingDirtyClose);
   const clear = useModalStack.getState().clearDirtyClose;
 

@@ -9,7 +9,7 @@ import styles from "./Visualizer.module.css";
  * This owns a tiny Three lifecycle directly and keeps DPR at 1
  * so it remains a subtle background layer rather than a rendering hotspot.
  */
-export function VisualizerSolid() {
+export function Visualizer() {
   let hostElement: HTMLDivElement | undefined;
 
   onMount(() => {

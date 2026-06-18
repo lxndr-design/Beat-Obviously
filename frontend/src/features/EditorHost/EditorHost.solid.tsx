@@ -2,19 +2,19 @@ import { For } from "solid-js";
 import { Modal } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { useInstrumentStore, useUiStore } from "../../state/store";
-import { ComponentEditorModalSolid } from "../ComponentLibrary/ComponentEditorModal.solid";
-import { EqAutomationModalSolid } from "../EqAutomation/EqAutomationModal.solid";
-import { InstrumentEditorModalSolid } from "../InstrumentEditor/InstrumentEditorModal.solid";
-import { NodeInstrumentEditorSolid } from "../NodeInstrumentEditor/NodeInstrumentEditorSolid.solid";
-import { PluginHostModalSolid } from "../PluginLibrary/PluginHostModal.solid";
-import { PreferencesModalSolid } from "../Preferences/PreferencesModal.solid";
-import { ProjectHealthModalSolid } from "../ProjectHealth/ProjectHealthModal.solid";
-import { SegmentEditorModalSolid } from "../SegmentEditor/SegmentEditorModal.solid";
-import { SynthEditorSolid } from "../Synth/SynthEditor/SynthEditor.solid";
-import { TrackDetailsModalSolid } from "../TrackDetails/TrackDetailsModal.solid";
-import { TrackEffectsPanelSolid } from "../TrackEffects/TrackEffectsPanel.solid";
+import { ComponentEditorModal } from "../ComponentLibrary/ComponentEditorModal.solid";
+import { EqAutomationModal } from "../EqAutomation/EqAutomationModal.solid";
+import { InstrumentEditorModal } from "../InstrumentEditor/InstrumentEditorModal.solid";
+import { NodeInstrumentEditor } from "../NodeInstrumentEditor/NodeInstrumentEditor.solid";
+import { PluginHostModal } from "../PluginLibrary/PluginHostModal.solid";
+import { PreferencesModal } from "../Preferences/PreferencesModal.solid";
+import { ProjectHealthModal } from "../ProjectHealth/ProjectHealthModal.solid";
+import { SegmentEditorModal } from "../SegmentEditor/SegmentEditorModal.solid";
+import { SynthEditor } from "../Synth/SynthEditor/SynthEditor.solid";
+import { TrackDetailsModal } from "../TrackDetails/TrackDetailsModal.solid";
+import { TrackEffectsPanel } from "../TrackEffects/TrackEffectsPanel.solid";
 
-export function EditorHostSolid() {
+export function EditorHost() {
   const openEditors = createStoreSelector(useUiStore, (state) => state.openEditors);
   const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
   const closeEditor = useUiStore.getState().closeEditor;
@@ -22,14 +22,14 @@ export function EditorHostSolid() {
 
   return (
     <>
-      <TrackEffectsPanelSolid />
+      <TrackEffectsPanel />
       <For each={openEditors()}>
         {(editor) => {
           switch (editor.kind) {
             case "instrument":
             case "samplerInstrument":
               return (
-                <InstrumentEditorModalSolid
+                <InstrumentEditorModal
                   instrumentId={editor.instrumentId}
                   editorKind={editor.kind === "instrument" ? "instrument" : "samplerInstrument"}
                 />
@@ -46,9 +46,9 @@ export function EditorHostSolid() {
                   onClose={() => closeEditor({ kind: "synthInstrument", instrumentId: editor.instrumentId })}
                 >
                   {instrument()?.nodeGraph ? (
-                    <NodeInstrumentEditorSolid instrument={instrument()} updateInstrument={updateInstrument} />
+                    <NodeInstrumentEditor instrument={instrument()} updateInstrument={updateInstrument} />
                   ) : (
-                    <SynthEditorSolid instrumentId={editor.instrumentId} />
+                    <SynthEditor instrumentId={editor.instrumentId} />
                   )}
                 </Modal>
               );
@@ -63,23 +63,23 @@ export function EditorHostSolid() {
                   flushBody
                   onClose={() => closeEditor({ kind: "synth" })}
                 >
-                  <SynthEditorSolid />
+                  <SynthEditor />
                 </Modal>
               );
             case "track":
-              return <TrackDetailsModalSolid trackId={editor.trackId} />;
+              return <TrackDetailsModal trackId={editor.trackId} />;
             case "segment":
-              return <SegmentEditorModalSolid segmentId={editor.segmentId} />;
+              return <SegmentEditorModal segmentId={editor.segmentId} />;
             case "component":
-              return <ComponentEditorModalSolid componentId={editor.componentId} />;
+              return <ComponentEditorModal componentId={editor.componentId} />;
             case "plugin":
-              return <PluginHostModalSolid pluginId={editor.pluginId} />;
+              return <PluginHostModal pluginId={editor.pluginId} />;
             case "eq":
-              return <EqAutomationModalSolid />;
+              return <EqAutomationModal />;
             case "projectHealth":
-              return <ProjectHealthModalSolid />;
+              return <ProjectHealthModal />;
             case "preferences":
-              return <PreferencesModalSolid />;
+              return <PreferencesModal />;
             default:
               return null;
           }

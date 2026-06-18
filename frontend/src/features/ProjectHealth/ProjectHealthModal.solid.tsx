@@ -99,7 +99,7 @@ const REPAIR_LABELS: Record<RepairAction, { idle: string; busy: string; complete
   },
 };
 
-export function ProjectHealthModalSolid() {
+export function ProjectHealthModal() {
   const currentFilePath = createStoreSelector(useDocumentStore, (s) => s.currentFilePath);
   const missingAssets = createStoreSelector(useDocumentStore, (s) => s.missingAssets);
   const integrityReport = createStoreSelector(useDocumentStore, (s) => s.integrityReport);
