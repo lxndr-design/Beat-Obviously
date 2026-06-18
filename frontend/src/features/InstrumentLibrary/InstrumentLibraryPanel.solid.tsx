@@ -525,6 +525,8 @@ function InstrumentSetSection(props: {
 }) {
   const [draftName, setDraftName] = createSignal(props.set.name);
   const displayName = () => instrumentSetDisplayName(props.set);
+  const hasItems = () => props.items.length > 0;
+  const expanded = () => props.open && hasItems();
   const menu = createContextMenu((): ContextMenuItem[] => [
     {
       label: "Rename",
@@ -563,21 +565,26 @@ function InstrumentSetSection(props: {
   return (
     <section class={styles.setSection} onDragOver={onDragOver} onDrop={onDrop}>
       <div
-        class={`${styles.setHeader} ${props.open ? styles.setHeaderOpen : ""}`}
-        role={props.renaming ? undefined : "button"}
-        tabIndex={props.renaming ? undefined : 0}
-        aria-expanded={props.renaming ? undefined : props.open}
-        aria-label={props.renaming ? undefined : `${props.open ? "Collapse" : "Expand"} ${displayName()}`}
-        onClick={props.renaming ? undefined : props.onToggle}
+        class={[
+          styles.setHeader,
+          expanded() && styles.setHeaderOpen,
+          !hasItems() && styles.setHeaderDisabled,
+        ].filter(Boolean).join(" ")}
+        role={props.renaming || !hasItems() ? undefined : "button"}
+        tabIndex={props.renaming || !hasItems() ? undefined : 0}
+        aria-expanded={props.renaming || !hasItems() ? undefined : expanded()}
+        aria-disabled={props.renaming || hasItems() ? undefined : true}
+        aria-label={props.renaming ? undefined : hasItems() ? `${expanded() ? "Collapse" : "Expand"} ${displayName()}` : displayName()}
+        onClick={props.renaming || !hasItems() ? undefined : props.onToggle}
         onContextMenu={menu.onContextMenu}
-        onKeyDown={props.renaming ? undefined : (event) => {
+        onKeyDown={props.renaming || !hasItems() ? undefined : (event) => {
           if (event.key !== "Enter" && event.key !== " ") return;
           event.preventDefault();
           props.onToggle();
         }}
       >
         <span class={styles.setToggle} aria-hidden>
-          <Icon name={props.open ? "ph:caret-down" : "ph:caret-right"} size={12} decorative />
+          <Icon name={expanded() ? "ph:caret-down" : "ph:caret-right"} size={12} decorative />
         </span>
         <Show
           when={props.renaming}
@@ -603,7 +610,7 @@ function InstrumentSetSection(props: {
         </Show>
         <Tag className={styles.setCount} tone={props.items.length === 0 ? "zero" : "default"}>{props.items.length}</Tag>
       </div>
-      <ul class={`${styles.setList} ${props.open ? styles.setListOpen : ""}`} aria-hidden={!props.open}>
+      <ul class={`${styles.setList} ${expanded() ? styles.setListOpen : ""}`} aria-hidden={!expanded()}>
         {props.children}
       </ul>
       {menu.menu()}

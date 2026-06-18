@@ -105,6 +105,20 @@
   background: var(--color-bg);
 }
 
+.setHeaderDisabled {
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+  cursor: default;
+}
+
+.setHeaderDisabled:hover {
+  background: var(--color-bg);
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+}
+
+.setHeaderDisabled .setToggle {
+  color: color-mix(in srgb, var(--color-fg) 34%, transparent);
+}
+
 .setToggle,
 .setNameButton {
   display: inline-flex;
