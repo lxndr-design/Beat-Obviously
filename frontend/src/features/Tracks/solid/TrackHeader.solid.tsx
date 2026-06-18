@@ -1,6 +1,7 @@
 /** @jsxImportSource solid-js */
 import { createMemo, createSignal, Show } from "solid-js";
 import { nanoid as newNanoid } from "nanoid";
+import { appConfirm } from "../../../components";
 import { createStoreSelector } from "../../../solid-utils/store";
 import { createContextMenu, HoverInfo, Icon, type ContextMenuItem } from "../../../solid-ui";
 import { useAnalyzerStore } from "../../../state/analyzerStore";
@@ -74,7 +75,7 @@ export function TrackHeaderSolid(props: Props) {
       {
         label: "Delete track",
         icon: "ph:trash",
-        onSelect: () => projectStore.removeTrack(props.trackId),
+        onSelect: () => void removeTrackWithConfirmation(props.trackId),
         separatorBefore: true,
       },
     ];
@@ -315,4 +316,28 @@ function duplicateTrackAction(trackId: Id) {
   const tracks = [...project.tracks];
   tracks.splice(index + 1, 0, copy);
   loadProject({ ...project, tracks });
+}
+
+async function removeTrackWithConfirmation(trackId: Id) {
+  const projectStore = useProjectStore.getState();
+  const track = projectStore.project.tracks.find((candidate) => candidate.id === trackId);
+  if (!track) return;
+  if (trackHasDestructiveContent(track)) {
+    const confirmed = await appConfirm(`Delete "${track.name}" and remove its clips, effects, routing, and track settings?`);
+    if (!confirmed) return;
+  }
+  projectStore.removeTrack(trackId);
+}
+
+function trackHasDestructiveContent(track: Track): boolean {
+  return Boolean(
+    track.segments.length > 0
+    || track.instrumentId
+    || track.audioFileId
+    || track.parentTrackId
+    || (track.sends?.length ?? 0) > 0
+    || track.effects.filters.length > 0
+    || track.recordArmed
+    || track.inputMonitoring,
+  );
 }

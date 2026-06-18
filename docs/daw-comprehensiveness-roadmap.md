@@ -62,13 +62,13 @@ Purpose: make timeline editing feel like a DAW instead of a demo surface.
 
 Current assets:
 
-- Timeline, tracks, segments, marquee, drag/resize, visible fade handles, split/trim/fade metadata, paste/duplicate, rename/color/icon metadata, segment group/ungroup metadata, multi-select menu actions and command bar, crossfade commands, review loop, transport actions, grouped history, grid-snap preferences, destructive undo guardrails with hotkey confirmation, invalid trim/fade warning stress, and pure geometry/interaction/backend parity verifiers exist.
+- Timeline, tracks, segments, marquee, drag/resize, visible fade handles, split/trim/fade metadata, paste/duplicate, rename/color/icon metadata, segment group/ungroup metadata, multi-select menu actions and command bar, crossfade commands, review loop, transport actions, grouped history, grid-snap preferences, destructive undo guardrails with hotkey confirmation, populated-track delete confirmation, invalid trim/fade warning stress, and pure geometry/interaction/backend parity verifiers exist.
 - `npm run verify:daw` covers edit-command behavior for move, resize, duplicate, paste, delete, rename/color/icon metadata, group/ungroup, nudge, quantize, split, trim, fade, crossfade, grouped undo/redo, destructive undo confirmation policy, and timeline geometry.
 - `npm run verify:track-interactions` covers free segment drag/resize/fade by default with Shift-based snapping.
 
 Build:
 
-- UI confirmation surface for non-undo destructive operations.
+- UI confirmation surface for remaining non-undo destructive operations.
 - Track/body/segment click behavior audit: selection, additive selection, context menu, empty-area click, drag handles, lane drop targets.
 - Sample/time snap policy for audio where relevant.
 - Browser-level smoke for marquee, drag, resize, split, fade, crossfade, and loop marker interaction.
