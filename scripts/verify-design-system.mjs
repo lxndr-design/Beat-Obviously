@@ -10,7 +10,9 @@ const solidUiDir = join(frontendSrc, "solid-ui");
 const featuresDir = join(frontendSrc, "features");
 const solidCatalogPath = join(frontendSrc, "design", "SolidUiKitCatalog.solid.tsx");
 const tokensPath = join(frontendSrc, "design", "tokens.css");
+const packageJsonPath = join(repoRoot, "frontend", "package.json");
 const tsconfigPath = join(repoRoot, "frontend", "tsconfig.json");
+const viteConfigPath = join(repoRoot, "frontend", "vite.config.ts");
 
 const failures = [];
 
@@ -188,6 +190,27 @@ if (!tsconfigSource.includes('"jsxImportSource": "solid-js"')) {
 }
 if (tsconfigSource.includes('"jsx": "react-jsx"')) {
   fail("frontend/tsconfig.json must not use the old JSX transform mode.");
+}
+
+if (existsSync(packageJsonPath)) {
+  const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+  const dependencyGroups = [
+    ["dependencies", packageJson.dependencies ?? {}],
+    ["devDependencies", packageJson.devDependencies ?? {}],
+  ];
+  const forbiddenPackages = ["react", "react-dom", "@vitejs/plugin-react", "zundo"];
+  for (const [groupName, dependencies] of dependencyGroups) {
+    for (const packageName of forbiddenPackages) {
+      if (dependencies[packageName]) {
+        fail(`Removed React-era package must not return in frontend/package.json ${groupName}: ${packageName}`);
+      }
+    }
+  }
+}
+
+const viteConfigSource = existsSync(viteConfigPath) ? readFileSync(viteConfigPath, "utf8") : "";
+if (viteConfigSource.includes("@vitejs/plugin-react") || viteConfigSource.includes("plugin-react")) {
+  fail("frontend/vite.config.ts must not use the removed React Vite plugin.");
 }
 
 // Existing feature-local exceptions are narrow: canvas/SVG fallbacks, mask alpha,
