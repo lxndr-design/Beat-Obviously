@@ -125,7 +125,7 @@ for (const file of sourceFiles) {
   if (source.includes("@iconify/react")) {
     fail(`Deprecated @iconify/react import in ${rel(file)}`);
   }
-  const solidMigrationIdentifier = source.match(/\b(?!SolidUiKitCatalog\b)[A-Z][A-Za-z0-9]*Solid[A-Z][A-Za-z0-9]*\b/);
+  const solidMigrationIdentifier = source.match(/\b(?!SolidUiKitCatalog\b)[A-Za-z_$][A-Za-z0-9_$]*Solid[A-Za-z0-9_$]*\b/);
   if (solidMigrationIdentifier) {
     fail(`Migration-era Solid identifier should be removed in ${rel(file)}: ${solidMigrationIdentifier[0]}`);
   }

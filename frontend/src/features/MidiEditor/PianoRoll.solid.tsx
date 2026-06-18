@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Button, FloatingLayer, HoverInfo, Icon } from "../../solid-ui";
-import { useContextualHotkeySolid } from "../../solid-utils/contextualHotkeys.solid";
+import { useContextualHotkey } from "../../solid-utils/contextualHotkeys.solid";
 import { useSettingsStore } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
 import type { MidiNote } from "../../state/types";
@@ -137,7 +137,7 @@ export function PianoRoll(props: PianoRollProps) {
   const height = PITCH_RANGE * PX_PER_PITCH;
   const gridLines = createMemo(() => makeGridLines(lengthBeats, pxPerBeat()));
 
-  useContextualHotkeySolid(
+  useContextualHotkey(
     () => props.hotkeyScopeId ?? "",
     "d",
     () => {
@@ -147,7 +147,7 @@ export function PianoRoll(props: PianoRollProps) {
     () => Boolean(props.hotkeyScopeId),
   );
 
-  useContextualHotkeySolid(
+  useContextualHotkey(
     () => props.hotkeyScopeId ?? "",
     "s",
     () => {

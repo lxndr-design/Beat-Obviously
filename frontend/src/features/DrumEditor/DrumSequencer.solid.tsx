@@ -5,7 +5,7 @@ import { ai } from "../../ai/aiService";
 import { DRUM_COMPLEXITY_DEFAULT, DRUM_GENRES, DRUM_MAX_STEPS, type DrumGenre, type GeneratedDrumBeat } from "../../ai/drumBeatGenerator";
 import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import { createInstrumentBufferSource, noteFrequency, preloadInstrumentSample } from "../../audio/synthPreview";
-import { useContextualHotkeySolid } from "../../solid-utils/contextualHotkeys.solid";
+import { useContextualHotkey } from "../../solid-utils/contextualHotkeys.solid";
 import { listDrumBeatFeedback, saveDrumBeatFeedback } from "../../persistence/dexie";
 import { TimeSignatureControl } from "../Transport/TimeSignatureControl.solid";
 import {
@@ -148,7 +148,7 @@ export function DrumSequencer(props: Props) {
     defaultPitchRef.current = props.defaultPitchHz;
   });
 
-  useContextualHotkeySolid(
+  useContextualHotkey(
     () => props.hotkeyScopeId ?? "",
     "space",
     () => {

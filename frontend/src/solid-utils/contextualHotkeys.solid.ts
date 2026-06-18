@@ -3,7 +3,7 @@ import { useContextualHotkeyStore } from "../hotkeys/contextualHotkeys";
 
 type HotkeyHandler = () => boolean | void;
 
-export function useContextualHotkeySolid(
+export function useContextualHotkey(
   scopeId: () => string,
   combo: string,
   handler: HotkeyHandler,
