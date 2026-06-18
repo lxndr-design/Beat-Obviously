@@ -23,7 +23,7 @@
   border: 0;
   border-right: var(--border-fg);
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
   padding: 0;
 }
 
@@ -32,17 +32,17 @@
 }
 
 .btn:hover:not(.active) {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
 }
 
 /* Selected cell — filled. Hover dims to off-white per the active-surface rule. */
 .active {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
 }
 .active:hover {
-  background: var(--color-fg-hover);
+  background: var(--interaction-active-hover-bg);
 }
 
 .selectedLabel {

@@ -14,25 +14,25 @@
   letter-spacing: 0;
   text-transform: none;
   border: 0;
-  transition:
-    background var(--duration-hover) var(--ease-out),
-    color var(--duration-hover) var(--ease-out),
-    opacity var(--duration-hover) var(--ease-out),
-    transform var(--duration-hover) var(--ease-out);
+  transition: var(--interaction-transition);
   white-space: nowrap;
   -webkit-user-select: none;
   user-select: none;
 }
 
 .button:hover:not(:disabled) {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
 }
 
 .button:active:not(:disabled) {
-  background: var(--surface-selected);
+  background: var(--interaction-pressed-bg);
   color: var(--color-fg);
-  transform: translateY(1px); /* subtle press feedback within design rules */
+  transform: var(--interaction-press-transform);
+}
+
+.button:focus-visible {
+  box-shadow: var(--interaction-focus-ring);
 }
 
 .button:disabled {
@@ -48,20 +48,26 @@
 .variant-default { /* default state */ }
 
 .variant-primary {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
 }
 /* Already white — hover dims to the off-white token instead of inverting. */
 .variant-primary:hover:not(:disabled) {
-  background: var(--color-fg-hover);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
+}
+
+.variant-primary:active:not(:disabled) {
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
+  transform: var(--interaction-press-transform);
 }
 
 .variant-ghost {
   background: transparent;
 }
 .variant-ghost:hover:not(:disabled) {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
 }
 
@@ -71,12 +77,18 @@
 
 /* Selected toggle state — same visual as primary, same off-white hover. */
 .selected {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
 }
 .selected:hover:not(:disabled) {
-  background: var(--color-fg-hover);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
+}
+
+.selected:active:not(:disabled) {
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
+  transform: var(--interaction-press-transform);
 }
 
 /* Sizes ---------------------------------------------------------------- */

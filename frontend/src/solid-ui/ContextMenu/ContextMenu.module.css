@@ -27,7 +27,7 @@
   font-family: var(--font-family-base);
   line-height: 1;
   text-align: left;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
   cursor: pointer;
 }
 
@@ -36,8 +36,16 @@
 }
 
 .item:hover:not(:disabled) {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
+}
+
+.item:active:not(:disabled) {
+  background: var(--interaction-pressed-bg);
+}
+
+.item:focus-visible {
+  box-shadow: var(--interaction-focus-ring);
 }
 
 .item:disabled {

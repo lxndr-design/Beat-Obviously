@@ -89,6 +89,24 @@
   --border-fg-color: color-mix(in srgb, var(--color-fg) 72%, transparent);
   --border-soft: 1px solid color-mix(in srgb, var(--color-fg) 35%, transparent);
 
+  /* Unified interaction states. Hover is always a tint, press is a slightly
+   * firmer tint, and selected/active states keep their own stable fills. */
+  --interaction-hover-bg: var(--surface-hover);
+  --interaction-pressed-bg: color-mix(in srgb, var(--color-fg) 22%, var(--color-bg));
+  --interaction-selected-bg: var(--surface-selected);
+  --interaction-selected-hover-bg: var(--surface-selected-strong);
+  --interaction-active-bg: var(--color-fg);
+  --interaction-active-hover-bg: var(--color-fg-hover);
+  --interaction-active-fg: var(--color-fg-inverse);
+  --interaction-focus-ring: inset 0 0 0 1px var(--border-fg-color);
+  --interaction-press-transform: translateY(1px);
+  --interaction-transition:
+    background-color var(--duration-hover) var(--ease-out),
+    color var(--duration-hover) var(--ease-out),
+    opacity var(--duration-hover) var(--ease-out),
+    transform var(--duration-hover) var(--ease-out),
+    box-shadow var(--duration-hover) var(--ease-out);
+
   /* === Spacing (8px grid) ============================================ */
   --space-unit: 8px;
   --space-1: 8px;

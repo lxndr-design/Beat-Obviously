@@ -135,8 +135,13 @@
 }
 
 .generateButton:hover:not(:disabled) {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
+.generateButton:active:not(:disabled) {
+  background: var(--interaction-pressed-bg);
+  transform: var(--interaction-press-transform);
 }
 
 .feedbackBlock {
@@ -372,7 +377,7 @@
   background: var(--color-bg);
   color: var(--color-fg);
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .stepCell:focus,
@@ -382,17 +387,17 @@
 }
 
 .stepCell:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
 }
 
 .stepCellOn {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
 }
 
 .stepCellOn:hover {
-  background: var(--color-fg-hover);
+  background: var(--interaction-active-hover-bg);
 }
 
 .stepCellSelected {
@@ -483,8 +488,12 @@
 }
 
 .cellMenuItem:hover:not(:disabled) {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
+.cellMenuItem:active:not(:disabled) {
+  background: var(--interaction-pressed-bg);
 }
 
 .cellMenuItem:disabled {

@@ -155,13 +155,22 @@ section.shell {
   background: transparent;
   color: var(--color-fg);
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
-.iconOption:hover,
+.iconOption:hover {
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
 .iconOptionSelected {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
+}
+
+.iconOptionSelected:hover {
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
 }
 
 .iconOption span {
@@ -220,7 +229,7 @@ section.shell {
   background: var(--color-bg);
   color: var(--color-fg);
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .shapeButton:last-child {
@@ -228,15 +237,19 @@ section.shell {
 }
 
 .shapeButton:hover:not(.shapeButtonActive),
-.shapeButton:focus-visible:not(.shapeButtonActive),
+.shapeButton:focus-visible:not(.shapeButtonActive) {
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
 .shapeButtonActive {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
 }
 
 .shapeButtonActive:hover,
 .shapeButtonActive:focus-visible {
-  background: var(--color-fg-hover);
+  background: var(--interaction-active-hover-bg);
 }
 
 .shapeSelectedLabel,

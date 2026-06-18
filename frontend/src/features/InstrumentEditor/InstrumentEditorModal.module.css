@@ -77,8 +77,8 @@
 .iconPickerButton:focus-visible,
 .squareIconButton:hover:not(:disabled),
 .squareIconButton:focus-visible {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
 }
 
 .iconMenu {
@@ -110,13 +110,22 @@
   background: transparent;
   color: var(--color-fg);
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
-.iconOption:hover,
+.iconOption:hover {
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
 .iconOptionSelected {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
+}
+
+.iconOptionSelected:hover {
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
 }
 
 .iconOption span {
@@ -495,7 +504,7 @@
   background: var(--color-bg);
   color: var(--color-fg);
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .lfoShapeButton:last-child {
@@ -504,18 +513,18 @@
 
 .lfoShapeButton:hover:not(.lfoShapeButtonActive),
 .lfoShapeButton:focus-visible:not(.lfoShapeButtonActive) {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
 }
 
 .lfoShapeButtonActive {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
 }
 
 .lfoShapeButtonActive:hover,
 .lfoShapeButtonActive:focus-visible {
-  background: var(--color-fg-hover);
+  background: var(--interaction-active-hover-bg);
 }
 
 .lfoShapeLabel {

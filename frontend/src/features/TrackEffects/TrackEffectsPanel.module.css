@@ -155,6 +155,10 @@
 }
 
 .addOption:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
+.addOption:active {
+  background: var(--interaction-pressed-bg);
 }

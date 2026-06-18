@@ -29,17 +29,36 @@
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .tabButton:last-child {
   border-right: 0;
 }
 
-.tabButton:hover,
+.tabButton:hover {
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
+.tabButton:active {
+  background: var(--interaction-pressed-bg);
+  transform: var(--interaction-press-transform);
+}
+
 .tabButtonActive {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
+}
+
+.tabButtonActive:hover {
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
+}
+
+.tabButtonActive:active {
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
 }
 
 .tabContent {

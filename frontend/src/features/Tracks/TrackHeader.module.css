@@ -165,17 +165,17 @@
   font-weight: var(--font-weight-regular);
   cursor: pointer;
   padding: 0;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .dot:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
 }
 
 .dotOn {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
   border-color: var(--color-fg);
 }
 
@@ -185,8 +185,8 @@
 
 /* Active dot + hover → off-white tint. Specificity (0,3,0) > .dot:hover (0,2,0). */
 .dot.dotOn:hover {
-  background: var(--color-fg-hover);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
 }
 
 .dot:disabled {

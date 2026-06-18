@@ -12,7 +12,7 @@
   padding: 0 var(--space-1);
   border: var(--border-fg);
   background: var(--color-bg);
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
   box-sizing: border-box;
 }
 
@@ -47,7 +47,7 @@
   line-height: 16px;
   text-align: left;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
   box-sizing: border-box;
 }
 
@@ -66,8 +66,17 @@
 
 .trigger:hover,
 .inline:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
+}
+
+.trigger:active,
+.inline:active {
+  background: var(--interaction-pressed-bg);
+}
+
+.trigger:focus-visible {
+  box-shadow: var(--interaction-focus-ring);
 }
 
 .inline:hover .trigger {
@@ -108,7 +117,7 @@
   line-height: 1;
   text-align: left;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .option:last-child {
@@ -116,16 +125,28 @@
 }
 
 .optionSelected {
-  background: var(--surface-selected);
+  background: var(--interaction-selected-bg);
   color: var(--color-fg);
 }
 
 .option:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
 }
 
 .optionSelected:hover {
-  background: var(--surface-selected-strong);
+  background: var(--interaction-selected-hover-bg);
   color: var(--color-fg);
+}
+
+.option:active {
+  background: var(--interaction-pressed-bg);
+}
+
+.option:focus-visible {
+  box-shadow: var(--interaction-focus-ring);
+}
+
+.optionSelected:active {
+  background: var(--interaction-selected-hover-bg);
 }

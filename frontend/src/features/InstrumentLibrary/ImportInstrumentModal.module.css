@@ -144,12 +144,16 @@
   background: transparent;
   color: inherit;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .previewButton:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
+.previewButton:active {
+  background: var(--interaction-pressed-bg);
 }
 
 .groupList {

@@ -45,9 +45,20 @@
 
 .toggle:hover:not(:disabled),
 .actionButton:hover:not(:disabled) {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
   opacity: 1;
+}
+
+.toggle:active:not(:disabled),
+.actionButton:active:not(:disabled) {
+  background: var(--interaction-pressed-bg);
+  transform: var(--interaction-press-transform);
+}
+
+.toggle:focus-visible,
+.actionButton:focus-visible {
+  box-shadow: var(--interaction-focus-ring);
 }
 
 .label {

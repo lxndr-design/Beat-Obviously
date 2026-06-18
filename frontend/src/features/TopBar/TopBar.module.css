@@ -122,13 +122,18 @@
 .tsBtn {
   gap: 4px;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
   min-width: 56px;
   justify-content: space-between;
 }
 .tsBtn:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
+.tsBtn:active {
+  background: var(--interaction-pressed-bg);
+  transform: var(--interaction-press-transform);
 }
 
 .dropdown {
@@ -153,12 +158,16 @@
   font-family: var(--font-family-mono);
   font-size: var(--font-size-ui);
   text-align: left;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
   cursor: pointer;
 }
 .dropItem:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
+.dropItem:active {
+  background: var(--interaction-pressed-bg);
 }
 
 .dropSep {

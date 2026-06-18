@@ -51,20 +51,30 @@
   font-family: var(--font-family-mono);
   font-size: var(--font-size-1);
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .beatCell:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
+.beatCell:active {
+  background: var(--interaction-pressed-bg);
+  transform: var(--interaction-press-transform);
 }
 
 .beatActive {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
 }
 /* Active cell + hover → off-white tint (already-white surface). */
 .beatActive:hover {
-  background: var(--color-fg-hover);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
+}
+
+.beatActive:active {
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
 }

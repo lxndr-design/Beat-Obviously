@@ -19,12 +19,17 @@
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .button:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
+.button:active {
+  background: var(--interaction-pressed-bg);
+  transform: var(--interaction-press-transform);
 }
 
 .dropdown {
@@ -57,12 +62,16 @@
   line-height: 1;
   text-align: left;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .dropItem:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
+.dropItem:active {
+  background: var(--interaction-pressed-bg);
 }
 
 .dropSep {

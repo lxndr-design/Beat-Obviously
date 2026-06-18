@@ -12,7 +12,19 @@
   border: var(--border-fg);
   background: var(--color-bg);
   position: relative;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
+}
+
+.wrap:hover .box {
+  background: var(--interaction-hover-bg);
+}
+
+.wrap:active .box {
+  background: var(--interaction-pressed-bg);
+}
+
+.wrap:focus-within .box {
+  box-shadow: var(--interaction-focus-ring);
 }
 
 .box::after {
@@ -27,7 +39,11 @@
 }
 
 .on {
-  background: var(--color-fg);
+  background: var(--interaction-active-bg);
+}
+
+.wrap:hover .on {
+  background: var(--interaction-active-hover-bg);
 }
 
 .on::after {

@@ -160,13 +160,22 @@
   background: transparent;
   color: var(--color-fg);
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
-.rowPlay:hover,
+.rowPlay:hover {
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
 .rowPlayActive {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
+}
+
+.rowPlayActive:hover {
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
 }
 
 .preview {
@@ -372,15 +381,24 @@
   cursor: default;
 }
 
-.sampleGrouping button:hover,
+.sampleGrouping button:hover {
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
 .sampleGroupingActive {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
+}
+
+.sampleGroupingActive:hover {
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
 }
 
 .sampleGrouping button:disabled:hover {
   background: transparent;
-  color: var(--color-fg);
+  color: var(--color-fg-hover);
 }
 
 .sampleGroupingEmpty {
@@ -438,8 +456,8 @@
 }
 
 .sampleRemoveVariable:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
 }
 
 .sampleRows {
@@ -519,8 +537,8 @@
 }
 
 .sampleSecondaryAction:hover:not(:disabled) {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
 }
 
 .sampleSecondaryAction:disabled,

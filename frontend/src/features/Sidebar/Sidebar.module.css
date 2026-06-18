@@ -53,8 +53,16 @@
 }
 
 .railButton:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
+}
+
+.railButton:active {
+  background: var(--interaction-pressed-bg);
+}
+
+.railButton:focus-visible {
+  box-shadow: var(--interaction-focus-ring);
 }
 
 .railButtonActive:hover {

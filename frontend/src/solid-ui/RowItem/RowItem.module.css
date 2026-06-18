@@ -16,12 +16,20 @@
   border-bottom: var(--row-divider);
   color: var(--color-fg);
   text-align: left;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .row:hover {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
+}
+
+.row:active {
+  background: var(--interaction-pressed-bg);
+}
+
+.row:focus-visible {
+  box-shadow: var(--interaction-focus-ring);
 }
 
 .noDragSlot {

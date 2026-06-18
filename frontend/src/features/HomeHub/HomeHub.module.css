@@ -118,7 +118,7 @@
   align-items: center;
   text-align: left;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .actionRow {
@@ -200,8 +200,12 @@
 }
 
 .recentRemove:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
+.recentRemove:active {
+  background: var(--interaction-pressed-bg);
 }
 
 .recentMeta {

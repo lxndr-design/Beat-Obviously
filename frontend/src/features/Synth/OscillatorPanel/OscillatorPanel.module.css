@@ -108,7 +108,7 @@
   background: var(--color-bg);
   color: var(--color-fg);
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .wavetableButton:last-child {
@@ -116,15 +116,19 @@
 }
 
 .wavetableButton:hover:not(.wavetableButtonActive),
-.wavetableButton:focus-visible:not(.wavetableButtonActive),
+.wavetableButton:focus-visible:not(.wavetableButtonActive) {
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
 .wavetableButtonActive {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
 }
 
 .wavetableButtonActive:hover,
 .wavetableButtonActive:focus-visible {
-  background: var(--color-fg-hover);
+  background: var(--interaction-active-hover-bg);
 }
 
 .wavetableSelectedLabel,

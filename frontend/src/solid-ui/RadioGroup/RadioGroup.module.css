@@ -34,7 +34,7 @@
   font-size: var(--font-size-ui);
   line-height: 1;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .button:last-child {
@@ -42,8 +42,17 @@
 }
 
 .button:hover:not(.active) {
-  background: var(--surface-hover);
+  background: var(--interaction-hover-bg);
   color: var(--color-fg);
+}
+
+.button:active:not(.active) {
+  background: var(--interaction-pressed-bg);
+  transform: var(--interaction-press-transform);
+}
+
+.button:focus-visible {
+  box-shadow: var(--interaction-focus-ring);
 }
 
 .button:disabled {
@@ -51,12 +60,12 @@
 }
 
 .active {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
 }
 
 .active:hover {
-  background: var(--color-fg-hover);
+  background: var(--interaction-active-hover-bg);
 }
 
 .disabled {

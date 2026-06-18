@@ -113,8 +113,14 @@
 .presetName:hover,
 .presetDelete:hover,
 .savePreset:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
+.presetName:active,
+.presetDelete:active,
+.savePreset:active {
+  background: var(--interaction-pressed-bg);
 }
 
 .title {

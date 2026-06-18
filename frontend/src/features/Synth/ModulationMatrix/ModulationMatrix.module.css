@@ -99,12 +99,12 @@
   font-size: var(--font-size-ui);
   text-align: left;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .targetTrigger:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
 }
 
 .targetOptions {
@@ -125,17 +125,26 @@
   font-size: var(--font-size-ui);
   text-align: left;
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
 .targetOption:last-child {
   border-bottom: 0;
 }
 
-.targetOption:hover,
+.targetOption:hover {
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
 .targetOptionSelected {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
+}
+
+.targetOptionSelected:hover {
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
 }
 
 .targetLabel {
@@ -214,13 +223,22 @@
 
 .modeButton {
   cursor: pointer;
-  transition: var(--transition-invert);
+  transition: var(--interaction-transition);
 }
 
-.modeButton:hover,
+.modeButton:hover {
+  background: var(--interaction-hover-bg);
+  color: var(--color-fg);
+}
+
 .modeButtonActive {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
+}
+
+.modeButtonActive:hover {
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
 }
 
 .modeStatic {

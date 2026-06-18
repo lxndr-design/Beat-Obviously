@@ -278,7 +278,7 @@ const rawMotionValuePattern = /\b\d+(?:\.\d+)?m?s\b|\b(?:ease|ease-in|ease-out|e
 const varReferencePattern = /var\(\s*(--[A-Za-z0-9_-]+)/g;
 const localTokenDefinitionPattern = /--[A-Za-z0-9_-]+(?=\s*:)/g;
 const designTokenNamespacePattern =
-  /^--(?:border|button|color|duration|ease|font|grid|height|knob|layout|letter-spacing|line-height|modal|segment|sidebar|space|surface|transition|width|z)-/;
+  /^--(?:border|button|color|duration|ease|font|grid|height|interaction|knob|layout|letter-spacing|line-height|modal|segment|sidebar|space|surface|transition|width|z)-/;
 
 for (const file of featureFiles) {
   const source = readFileSync(file, "utf8");
