@@ -73,6 +73,7 @@ try {
       "lfo.1.sync": true,
       "lfo.1.syncedRate": "1/8",
       "lfo.1.smoothing": 0.35,
+      "lfo.1.randomPhase": 0.42,
       "lfo.1.shape": "triangle",
       "lfo.1.phase": 0.25,
       "lfo.1.retrigger": false,
@@ -82,6 +83,7 @@ try {
       "lfo.2.sync": true,
       "lfo.2.syncedRate": "1/2",
       "lfo.2.smoothing": 0.6,
+      "lfo.2.randomPhase": 0.25,
       "lfo.2.shape": "square",
       "lfo.2.phase": 0.5,
       "lfo.2.retrigger": true,
@@ -168,9 +170,11 @@ try {
   assert.equal(patch.lfoSync, true);
   assert.equal(patch.lfoSyncedRate, "1/8");
   assert.equal(patch.lfoSmoothing, 0.35);
+  assert.equal(patch.lfoRandomPhase, 0.42);
   assert.equal(patch.lfo2Sync, true);
   assert.equal(patch.lfo2SyncedRate, "1/2");
   assert.equal(patch.lfo2Smoothing, 0.6);
+  assert.equal(patch.lfo2RandomPhase, 0.25);
   assert.equal(patch.lfoPhase, 0.25);
   assert.equal(patch.lfo2Phase, 0.5);
   assert.equal(patch.lfoRetrigger, false);
@@ -571,6 +575,33 @@ try {
   const smoothLevel = synthPreview.modulationAtTime(smoothSquare, 0, 1, 120).targetOffsets["osc.a.level"];
   assert.ok(Math.abs(hardLevel - 0.5) < 0.000001, "unsmoothed square LFO should keep hard high state");
   assert.ok(Math.abs(smoothLevel) < 0.000001, "fully smoothed square LFO should blend to sine at quarter-cycle zero crossing");
+
+  const fixedPhaseDraft = synthStore.normalizeSynthDraftPatch({
+    name: "LFO Random Probe",
+    parameters: {
+      "osc.a.enabled": true,
+      "osc.a.wavetable": "basic.sine",
+      "osc.a.level": 0.5,
+      "lfo.1.enabled": true,
+      "lfo.1.sync": false,
+      "lfo.1.rate": 1,
+      "lfo.1.shape": "sine",
+      "lfo.1.randomPhase": 0,
+    },
+    modulation: [
+      { id: "random_level", source: "lfo.1", target: "osc.a.level", amount: 0.5, bipolar: true, enabled: true },
+    ],
+  });
+  const randomizedPhaseDraft = synthStore.normalizeSynthDraftPatch({
+    ...fixedPhaseDraft,
+    parameters: { ...fixedPhaseDraft.parameters, "lfo.1.randomPhase": 1 },
+  });
+  const fixedPhase = synthStore.synthDraftToPreviewInstrument(fixedPhaseDraft);
+  const randomizedPhase = synthStore.synthDraftToPreviewInstrument(randomizedPhaseDraft);
+  const fixedLevel = synthPreview.modulationAtTime(fixedPhase, 0, 1, 120).targetOffsets["osc.a.level"];
+  const randomizedLevel = synthPreview.modulationAtTime(randomizedPhase, 0, 1, 120).targetOffsets["osc.a.level"];
+  assert.ok(Math.abs(fixedLevel) < 0.000001, "zero random phase should start sine LFO at fixed phase");
+  assert.ok(Math.abs(randomizedLevel - fixedLevel) > 0.01, "random phase amount should offset preview LFO phase deterministically");
 
   globalThis.fetch = async () => {
     throw new Error("force local instrument generation fallback");

@@ -362,6 +362,7 @@ namespace beat
         instrument.lfoSync = synthNumberParam(params, "lfo.1.sync", instrument.lfoSync ? 1.0 : 0.0) >= 0.5;
         instrument.lfoSyncedRate = synthStringParam(params, "lfo.1.syncedRate", instrument.lfoSyncedRate);
         instrument.lfoSmoothing = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "lfo.1.smoothing", instrument.lfoSmoothing));
+        instrument.lfoRandomPhase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "lfo.1.randomPhase", instrument.lfoRandomPhase));
         instrument.lfoPhaseOffset = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "lfo.1.phase", instrument.lfoPhaseOffset));
         instrument.lfoRetrigger = synthNumberParam(params, "lfo.1.retrigger", instrument.lfoRetrigger ? 1.0 : 0.0) >= 0.5;
         instrument.lfoOneShot = synthNumberParam(params, "lfo.1.oneShot", instrument.lfoOneShot ? 1.0 : 0.0) >= 0.5;
@@ -371,6 +372,7 @@ namespace beat
         instrument.lfo2Sync = synthNumberParam(params, "lfo.2.sync", instrument.lfo2Sync ? 1.0 : 0.0) >= 0.5;
         instrument.lfo2SyncedRate = synthStringParam(params, "lfo.2.syncedRate", instrument.lfo2SyncedRate);
         instrument.lfo2Smoothing = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "lfo.2.smoothing", instrument.lfo2Smoothing));
+        instrument.lfo2RandomPhase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "lfo.2.randomPhase", instrument.lfo2RandomPhase));
         instrument.lfo2PhaseOffset = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "lfo.2.phase", instrument.lfo2PhaseOffset));
         instrument.lfo2Retrigger = synthNumberParam(params, "lfo.2.retrigger", instrument.lfo2Retrigger ? 1.0 : 0.0) >= 0.5;
         instrument.lfo2OneShot = synthNumberParam(params, "lfo.2.oneShot", instrument.lfo2OneShot ? 1.0 : 0.0) >= 0.5;

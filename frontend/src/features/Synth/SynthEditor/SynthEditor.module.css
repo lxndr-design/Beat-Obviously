@@ -222,7 +222,7 @@ section.shell {
 
 .lfoControls {
   display: grid;
-  grid-template-columns: minmax(88px, 1fr) repeat(3, minmax(58px, 0.75fr));
+  grid-template-columns: minmax(88px, 1fr) repeat(4, minmax(54px, 0.72fr));
   gap: var(--synth-gap);
   align-items: end;
   padding: var(--synth-gap);

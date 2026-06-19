@@ -601,6 +601,7 @@ function renderRelevantInstrumentState(instrument: Instrument) {
     lfoRateHz: instrument.lfoRateHz,
     lfoSyncedRate: instrument.lfoSyncedRate,
     lfoSmoothing: instrument.lfoSmoothing,
+    lfoRandomPhase: instrument.lfoRandomPhase,
     lfoPhase: instrument.lfoPhase,
     lfoOneShot: instrument.lfoOneShot,
     lfo2Waveform: instrument.lfo2Waveform,
@@ -608,6 +609,7 @@ function renderRelevantInstrumentState(instrument: Instrument) {
     lfo2Sync: instrument.lfo2Sync,
     lfo2SyncedRate: instrument.lfo2SyncedRate,
     lfo2Smoothing: instrument.lfo2Smoothing,
+    lfo2RandomPhase: instrument.lfo2RandomPhase,
     lfo2Enabled: instrument.lfo2Enabled,
     lfo2Phase: instrument.lfo2Phase,
     lfo2OneShot: instrument.lfo2OneShot,
@@ -1347,13 +1349,13 @@ export function modulationAtTime(instrument: Instrument, timeS: number, duration
   const lfo2OneShot = instrument.synthPatch?.parameters?.["lfo.2.oneShot"] === true || instrument.lfo2OneShot === true;
   const rawLfo = lfoShapeValue(
     instrument.lfoWaveform ?? "sine",
-    timeS * effectiveLfoRateHz(instrument, 1, bpm) + (instrument.lfoPhase ?? 0),
+    timeS * effectiveLfoRateHz(instrument, 1, bpm) + (instrument.lfoPhase ?? 0) + effectiveLfoRandomPhaseOffset(instrument, 1),
     lfo1OneShot,
     effectiveLfoSmoothing(instrument, 1),
   );
   const rawLfo2 = lfoShapeValue(
     instrument.lfo2Waveform ?? "triangle",
-    timeS * effectiveLfoRateHz(instrument, 2, bpm) + (instrument.lfo2Phase ?? 0),
+    timeS * effectiveLfoRateHz(instrument, 2, bpm) + (instrument.lfo2Phase ?? 0) + effectiveLfoRandomPhaseOffset(instrument, 2),
     lfo2OneShot,
     effectiveLfoSmoothing(instrument, 2),
   );
@@ -1451,6 +1453,25 @@ function effectiveLfoSmoothing(instrument: Instrument, lfo: 1 | 2): number {
   const params = instrument.synthPatch?.parameters;
   if (lfo === 1) return clamp01(Number(params?.["lfo.1.smoothing"] ?? instrument.lfoSmoothing ?? 0));
   return clamp01(Number(params?.["lfo.2.smoothing"] ?? instrument.lfo2Smoothing ?? 0));
+}
+
+function effectiveLfoRandomPhaseOffset(instrument: Instrument, lfo: 1 | 2): number {
+  const params = instrument.synthPatch?.parameters;
+  const amount = lfo === 1
+    ? clamp01(Number(params?.["lfo.1.randomPhase"] ?? instrument.lfoRandomPhase ?? 0))
+    : clamp01(Number(params?.["lfo.2.randomPhase"] ?? instrument.lfo2RandomPhase ?? 0));
+  if (amount <= 0) return 0;
+  const seed = `${instrument.id}|${instrument.name}|lfo.${lfo}`;
+  return deterministicUnitHash(seed) * amount;
+}
+
+function deterministicUnitHash(value: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return ((hash >>> 0) & 0x00ffffff) / 0x01000000;
 }
 
 function lfoShapeValue(shape: NonNullable<Instrument["lfoWaveform"]>, cycles: number, oneShot = false, smoothing = 0): number {

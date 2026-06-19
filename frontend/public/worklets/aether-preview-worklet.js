@@ -327,13 +327,13 @@ function resonantFilter(input, filter, cutoff, resonance, type) {
 function modulationAtTime(instrument, timeS, durationS, bpm = 120) {
   const rawLfo = lfoShape(
     instrument.lfoWaveform || "sine",
-    timeS * effectiveLfoRateHz(instrument, 1, bpm) + (Number(instrument.lfoPhase) || 0),
+    timeS * effectiveLfoRateHz(instrument, 1, bpm) + (Number(instrument.lfoPhase) || 0) + effectiveLfoRandomPhaseOffset(instrument, 1),
     instrument.synthPatch?.parameters?.["lfo.1.oneShot"] === true || instrument.lfoOneShot === true,
     effectiveLfoSmoothing(instrument, 1),
   );
   const rawLfo2 = lfoShape(
     instrument.lfo2Waveform || "triangle",
-    timeS * effectiveLfoRateHz(instrument, 2, bpm) + (Number(instrument.lfo2Phase) || 0),
+    timeS * effectiveLfoRateHz(instrument, 2, bpm) + (Number(instrument.lfo2Phase) || 0) + effectiveLfoRandomPhaseOffset(instrument, 2),
     instrument.synthPatch?.parameters?.["lfo.2.oneShot"] === true || instrument.lfo2OneShot === true,
     effectiveLfoSmoothing(instrument, 2),
   );
@@ -480,6 +480,24 @@ function effectiveLfoSmoothing(instrument, lfo) {
   const params = instrument.synthPatch?.parameters;
   if (lfo === 1) return clamp01(Number(params?.["lfo.1.smoothing"] ?? instrument.lfoSmoothing ?? 0));
   return clamp01(Number(params?.["lfo.2.smoothing"] ?? instrument.lfo2Smoothing ?? 0));
+}
+
+function effectiveLfoRandomPhaseOffset(instrument, lfo) {
+  const params = instrument.synthPatch?.parameters;
+  const amount = lfo === 1
+    ? clamp01(Number(params?.["lfo.1.randomPhase"] ?? instrument.lfoRandomPhase ?? 0))
+    : clamp01(Number(params?.["lfo.2.randomPhase"] ?? instrument.lfo2RandomPhase ?? 0));
+  if (amount <= 0) return 0;
+  return deterministicUnitHash(`${instrument.id || ""}|${instrument.name || ""}|lfo.${lfo}`) * amount;
+}
+
+function deterministicUnitHash(value) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return ((hash >>> 0) & 0x00ffffff) / 0x01000000;
 }
 
 function lfoShape(shape, cycles, oneShot = false, smoothing = 0) {

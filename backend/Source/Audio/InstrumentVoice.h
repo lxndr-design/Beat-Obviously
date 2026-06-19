@@ -150,6 +150,7 @@ namespace beat
             float lfoRateHz { 4.0f };
             float lfoDepth { 0.0f };
             float lfoSmoothing { 0.0f };
+            float lfoRandomPhase { 0.0f };
             float lfoPhaseOffset { 0.0f };
             bool lfoRetrigger { true };
             bool lfoOneShot { false };
@@ -157,6 +158,7 @@ namespace beat
             int lfo2Waveform { 1 };
             float lfo2RateHz { 0.5f };
             float lfo2Smoothing { 0.0f };
+            float lfo2RandomPhase { 0.0f };
             float lfo2PhaseOffset { 0.0f };
             bool lfo2Retrigger { true };
             bool lfo2OneShot { false };

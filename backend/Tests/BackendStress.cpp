@@ -8812,6 +8812,7 @@ namespace
             "lfo.1.sync": true,
             "lfo.1.syncedRate": "1/8",
             "lfo.1.smoothing": 0.35,
+            "lfo.1.randomPhase": 0.42,
             "lfo.1.phase": 0.25,
             "lfo.1.retrigger": false,
             "lfo.1.oneShot": true,
@@ -8821,6 +8822,7 @@ namespace
             "lfo.2.sync": true,
             "lfo.2.syncedRate": "1/2",
             "lfo.2.smoothing": 0.6,
+            "lfo.2.randomPhase": 0.25,
             "lfo.2.phase": 0.5,
             "lfo.2.retrigger": true,
             "lfo.2.oneShot": false
@@ -8898,6 +8900,8 @@ namespace
             return false;
         if (!near(instrument.lfoSmoothing, 0.35f))
             return false;
+        if (!near(instrument.lfoRandomPhase, 0.42f))
+            return false;
         if (instrument.lfoRetrigger)
             return false;
         if (!instrument.lfoOneShot)
@@ -8907,6 +8911,8 @@ namespace
         if (!instrument.lfo2Sync || instrument.lfo2SyncedRate != "1/2")
             return false;
         if (!near(instrument.lfo2Smoothing, 0.6f))
+            return false;
+        if (!near(instrument.lfo2RandomPhase, 0.25f))
             return false;
         if (!instrument.lfo2Retrigger)
             return false;

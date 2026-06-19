@@ -797,8 +797,14 @@ namespace beat
             + deterministicPhaseJitter(noiseState ^ 0xa9f14c31u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscA.randomPhase);
         aetherOscBPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscB.phase)
             + deterministicPhaseJitter(noiseState ^ 0x6c8e9cf5u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscB.randomPhase);
-        if (params.lfoRetrigger) lfoPhase = params.lfoPhaseOffset;
-        if (params.lfo2Retrigger) lfo2Phase = params.lfo2PhaseOffset;
+        if (params.lfoRetrigger)
+            lfoPhase = std::fmod(juce::jlimit(0.0, 1.0, (double) params.lfoPhaseOffset)
+                + deterministicPhaseJitter(noiseState ^ 0x35a1d7bdu) * juce::jlimit(0.0, 1.0, (double) params.lfoRandomPhase),
+                1.0);
+        if (params.lfo2Retrigger)
+            lfo2Phase = std::fmod(juce::jlimit(0.0, 1.0, (double) params.lfo2PhaseOffset)
+                + deterministicPhaseJitter(noiseState ^ 0x91c2ef43u) * juce::jlimit(0.0, 1.0, (double) params.lfo2RandomPhase),
+                1.0);
         baseFrequencyHz = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
         phaseDelta = baseFrequencyHz / sampleRate;
         pitchFrequencyRamp.reset((float) baseFrequencyHz);

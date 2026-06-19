@@ -63,6 +63,7 @@ export type SynthParameterId =
   | "lfo.1.sync"
   | "lfo.1.syncedRate"
   | "lfo.1.smoothing"
+  | "lfo.1.randomPhase"
   | "lfo.1.shape"
   | "lfo.1.phase"
   | "lfo.1.retrigger"
@@ -73,6 +74,7 @@ export type SynthParameterId =
   | "lfo.2.sync"
   | "lfo.2.syncedRate"
   | "lfo.2.smoothing"
+  | "lfo.2.randomPhase"
   | "lfo.2.shape"
   | "lfo.2.phase"
   | "lfo.2.retrigger"
@@ -424,6 +426,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "lfo.1.sync": true,
   "lfo.1.syncedRate": "1/4",
   "lfo.1.smoothing": 0,
+  "lfo.1.randomPhase": 0,
   "lfo.1.shape": "sine",
   "lfo.1.phase": 0,
   "lfo.1.retrigger": true,
@@ -434,6 +437,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "lfo.2.sync": true,
   "lfo.2.syncedRate": "1/2",
   "lfo.2.smoothing": 0,
+  "lfo.2.randomPhase": 0,
   "lfo.2.shape": "triangle",
   "lfo.2.phase": 0,
   "lfo.2.retrigger": true,
@@ -491,6 +495,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "lfo.1.sync": "LFO 1 Sync",
   "lfo.1.syncedRate": "LFO 1 Sync Rate",
   "lfo.1.smoothing": "LFO 1 Smoothing",
+  "lfo.1.randomPhase": "LFO 1 Random",
   "lfo.1.shape": "LFO 1 Shape",
   "lfo.1.phase": "LFO 1 Phase",
   "lfo.1.retrigger": "LFO 1 Retrigger",
@@ -501,6 +506,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "lfo.2.sync": "LFO 2 Sync",
   "lfo.2.syncedRate": "LFO 2 Sync Rate",
   "lfo.2.smoothing": "LFO 2 Smoothing",
+  "lfo.2.randomPhase": "LFO 2 Random",
   "lfo.2.shape": "LFO 2 Shape",
   "lfo.2.phase": "LFO 2 Phase",
   "lfo.2.retrigger": "LFO 2 Retrigger",
@@ -702,6 +708,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     lfoSync: draft.parameters["lfo.1.sync"] === true,
     lfoSyncedRate: String(draft.parameters["lfo.1.syncedRate"] ?? "1/4"),
     lfoSmoothing: getNumberParam(draft, "lfo.1.smoothing"),
+    lfoRandomPhase: getNumberParam(draft, "lfo.1.randomPhase"),
     lfoPhase: getNumberParam(draft, "lfo.1.phase"),
     lfoRetrigger: getBooleanParam(draft, "lfo.1.retrigger"),
     lfoOneShot: getBooleanParam(draft, "lfo.1.oneShot"),
@@ -710,6 +717,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     lfo2Sync: draft.parameters["lfo.2.sync"] === true,
     lfo2SyncedRate: String(draft.parameters["lfo.2.syncedRate"] ?? "1/2"),
     lfo2Smoothing: getNumberParam(draft, "lfo.2.smoothing"),
+    lfo2RandomPhase: getNumberParam(draft, "lfo.2.randomPhase"),
     lfo2Enabled: getBooleanParam(draft, "lfo.2.enabled"),
     lfo2Phase: getNumberParam(draft, "lfo.2.phase"),
     lfo2Retrigger: getBooleanParam(draft, "lfo.2.retrigger"),
@@ -774,10 +782,12 @@ export function synthDraftToPreviewInstrument(draft: SynthDraftPatch): Instrumen
     lfoSync: false,
     lfoSyncedRate: "1/4",
     lfoSmoothing: 0,
+    lfoRandomPhase: 0,
     lfoRetrigger: true,
     lfo2Sync: false,
     lfo2SyncedRate: "1/2",
     lfo2Smoothing: 0,
+    lfo2RandomPhase: 0,
     lfoPositionBipolar: true,
     lfoPitchBipolar: true,
     lfoFilterBipolar: true,
@@ -813,6 +823,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["lfo.1.sync"] = instrument.lfoSync ?? false;
   draft.parameters["lfo.1.syncedRate"] = instrument.lfoSyncedRate ?? "1/4";
   draft.parameters["lfo.1.smoothing"] = instrument.lfoSmoothing ?? 0;
+  draft.parameters["lfo.1.randomPhase"] = instrument.lfoRandomPhase ?? 0;
   draft.parameters["lfo.1.shape"] = instrument.lfoWaveform ?? "sine";
   draft.parameters["lfo.1.phase"] = instrument.lfoPhase ?? 0;
   draft.parameters["lfo.1.retrigger"] = instrument.lfoRetrigger ?? true;
@@ -822,6 +833,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["lfo.2.sync"] = instrument.lfo2Sync ?? false;
   draft.parameters["lfo.2.syncedRate"] = instrument.lfo2SyncedRate ?? "1/2";
   draft.parameters["lfo.2.smoothing"] = instrument.lfo2Smoothing ?? 0;
+  draft.parameters["lfo.2.randomPhase"] = instrument.lfo2RandomPhase ?? 0;
   draft.parameters["lfo.2.shape"] = instrument.lfo2Waveform ?? "triangle";
   draft.parameters["lfo.2.phase"] = instrument.lfo2Phase ?? 0;
   draft.parameters["lfo.2.retrigger"] = instrument.lfo2Retrigger ?? true;

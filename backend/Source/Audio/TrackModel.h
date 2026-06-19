@@ -256,6 +256,7 @@ namespace beat
         bool lfoSync { false };
         juce::String lfoSyncedRate { "1/4" };
         float lfoSmoothing { 0.0f };
+        float lfoRandomPhase { 0.0f };
         float lfoPhaseOffset { 0.0f };
         bool lfoRetrigger { true };
         bool lfoOneShot { false };
@@ -265,6 +266,7 @@ namespace beat
         bool lfo2Sync { false };
         juce::String lfo2SyncedRate { "1/2" };
         float lfo2Smoothing { 0.0f };
+        float lfo2RandomPhase { 0.0f };
         float lfo2PhaseOffset { 0.0f };
         bool lfo2Retrigger { true };
         bool lfo2OneShot { false };

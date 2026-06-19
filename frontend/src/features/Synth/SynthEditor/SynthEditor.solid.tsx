@@ -571,6 +571,7 @@ function LfoLane(props: { lfo: 1 | 2 }) {
   const syncId = `${prefix}.sync` as SynthParameterId;
   const syncedRateId = `${prefix}.syncedRate` as SynthParameterId;
   const smoothingId = `${prefix}.smoothing` as SynthParameterId;
+  const randomPhaseId = `${prefix}.randomPhase` as SynthParameterId;
   const phaseId = `${prefix}.phase` as SynthParameterId;
   const retriggerId = `${prefix}.retrigger` as SynthParameterId;
   const oneShotId = `${prefix}.oneShot` as SynthParameterId;
@@ -675,6 +676,17 @@ function LfoLane(props: { lfo: 1 | 2 }) {
           defaultValue={0}
           formatValue={formatPercent}
           onChange={(value) => setNumericParameter(smoothingId, value)}
+        />
+        <Knob
+          size="sm"
+          label="Random"
+          value={getNumberParam(draft(), randomPhaseId)}
+          min={0}
+          max={1}
+          step={0.01}
+          defaultValue={0}
+          formatValue={formatPercent}
+          onChange={(value) => setNumericParameter(randomPhaseId, value)}
         />
       </div>
     </div>
