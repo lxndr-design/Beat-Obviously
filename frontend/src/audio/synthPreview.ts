@@ -111,9 +111,11 @@ export function renderInstrumentSamples(
   curve?: Array<{ timeS: number; frequency: number }>,
   automation?: SynthAutomationLane[],
   bpm = 120,
+  velocity = 127,
 ) {
   const state = createSynthRenderState();
   const durationS = out.length / sampleRate;
+  const velocity01 = clamp01(velocity / 127);
   const shouldGlide = targetFrequency != null && Number.isFinite(targetFrequency) && Math.abs(targetFrequency - frequency) > 0.01;
   const sortedCurve = curve?.filter((point) => Number.isFinite(point.timeS) && Number.isFinite(point.frequency))
     .sort((a, b) => a.timeS - b.timeS);
@@ -130,7 +132,7 @@ export function renderInstrumentSamples(
       : shouldGlide
         ? frequency + (targetFrequency - frequency) * smoothstep(glideT)
         : frequency;
-    const modulation = modulationAtTime(instrument, t, durationS, bpm);
+    const modulation = modulationAtTime(instrument, t, durationS, bpm, velocity01);
     applyAutomationOffsets(instrument, modulation, automation, t);
     const currentFrequency = baseFrequency * Math.pow(2, modulation.pitchSemitones / 12);
     out[i] = renderInstrumentSample(instrument, state, sampleRate, currentFrequency, mode, modulation) * amp;
@@ -149,11 +151,12 @@ export function renderInstrumentStereoSamples(
   curve?: Array<{ timeS: number; frequency: number }>,
   automation?: SynthAutomationLane[],
   bpm = 120,
+  velocity = 127,
 ) {
   const length = Math.min(left.length, right.length);
   if (!instrument.aether) {
     const mono = new Float32Array(length);
-    renderInstrumentSamples(instrument, mono, sampleRate, frequency, mode, fade, targetFrequency, curve, automation, bpm);
+    renderInstrumentSamples(instrument, mono, sampleRate, frequency, mode, fade, targetFrequency, curve, automation, bpm, velocity);
     const [leftGain, rightGain] = panGains(instrument.ampPan ?? 0);
     for (let i = 0; i < length; i++) {
       left[i] = mono[i] * leftGain;
@@ -166,6 +169,7 @@ export function renderInstrumentStereoSamples(
   const leftFilterState = createSynthRenderState();
   const rightFilterState = createSynthRenderState();
   const durationS = length / sampleRate;
+  const velocity01 = clamp01(velocity / 127);
   const shouldGlide = targetFrequency != null && Number.isFinite(targetFrequency) && Math.abs(targetFrequency - frequency) > 0.01;
   const sortedCurve = curve?.filter((point) => Number.isFinite(point.timeS) && Number.isFinite(point.frequency))
     .sort((a, b) => a.timeS - b.timeS);
@@ -182,7 +186,7 @@ export function renderInstrumentStereoSamples(
       : shouldGlide
         ? frequency + (targetFrequency - frequency) * smoothstep(glideT)
         : frequency;
-    const modulation = modulationAtTime(instrument, timeS, durationS, bpm);
+    const modulation = modulationAtTime(instrument, timeS, durationS, bpm, velocity01);
     applyAutomationOffsets(instrument, modulation, automation, timeS);
     const currentFrequency = baseFrequency * Math.pow(2, modulation.pitchSemitones / 12);
     const stereo = renderInstrumentStereoSample(instrument, phaseState, leftFilterState, rightFilterState, sampleRate, currentFrequency, mode, modulation);
@@ -223,7 +227,7 @@ export function createInstrumentBufferSource(
     return source;
   }
 
-  const buffer = renderedInstrumentBuffer(ctx, instrument, durationS, frequency, targetFrequency, bpm);
+  const buffer = renderedInstrumentBuffer(ctx, instrument, durationS, frequency, targetFrequency, bpm, velocity);
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   return source;
@@ -258,9 +262,10 @@ export function renderedInstrumentBuffer(
   frequency: number,
   targetFrequency?: number,
   bpm = 120,
+  velocity = 127,
 ): AudioBuffer {
   const sampleCount = Math.max(1, Math.ceil(ctx.sampleRate * durationS));
-  const key = renderedInstrumentBufferKey(instrument, sampleCount, ctx.sampleRate, frequency, targetFrequency, bpm);
+  const key = renderedInstrumentBufferKey(instrument, sampleCount, ctx.sampleRate, frequency, targetFrequency, bpm, velocity);
   const cached = renderedInstrumentBufferCache.get(key);
   if (cached) return cached;
 
@@ -277,6 +282,7 @@ export function renderedInstrumentBuffer(
     undefined,
     undefined,
     bpm,
+    velocity,
   );
   renderedInstrumentBufferCache.set(key, buffer);
   while (renderedInstrumentBufferCache.size > MAX_RENDERED_INSTRUMENT_BUFFERS) {
@@ -350,9 +356,10 @@ export function createInstrumentCurveBufferSource(
   atTimeS = ctx.currentTime,
   automation?: SynthAutomationLane[],
   bpm = 120,
+  velocity = 127,
 ): AudioBufferSourceNode {
   const sorted = normalizeFrequencyCurve(curve, durationS, frequency);
-  const sampleTarget = nextSampleTarget(instrument, frequency, 127, durationS);
+  const sampleTarget = nextSampleTarget(instrument, frequency, velocity, durationS);
   if (!automation?.length && sampleTarget && sampleBufferCache.has(sampleTarget.url)) {
     const source = ctx.createBufferSource();
     source.buffer = sampleBufferWithGain(
@@ -386,6 +393,7 @@ export function createInstrumentCurveBufferSource(
     sorted.length > 1 ? sorted : undefined,
     automation,
     bpm,
+    velocity,
   );
   const source = ctx.createBufferSource();
   source.buffer = buffer;
@@ -522,11 +530,13 @@ function renderedInstrumentBufferKey(
   frequency: number,
   targetFrequency?: number,
   bpm = 120,
+  velocity = 127,
 ): string {
   return JSON.stringify({
     sampleCount,
     sampleRate,
     bpm: quantizeKeyNumber(bpm, 0.01),
+    velocity: quantizeKeyNumber(velocity, 1),
     frequency: quantizeKeyNumber(frequency, 0.01),
     targetFrequency: targetFrequency == null ? null : quantizeKeyNumber(targetFrequency, 0.01),
     patch: renderRelevantInstrumentState(instrument),
@@ -1386,7 +1396,7 @@ function effectiveLfoRateHz(instrument: Instrument, lfo: 1 | 2, bpm: number): nu
   return Math.max(0.01, instrument.lfo2RateHz ?? 0.5);
 }
 
-export function modulationAtTime(instrument: Instrument, timeS: number, durationS: number, bpm = 120): RenderModulation {
+export function modulationAtTime(instrument: Instrument, timeS: number, durationS: number, bpm = 120, velocity = 1): RenderModulation {
   const lfo1OneShot = instrument.synthPatch?.parameters?.["lfo.1.oneShot"] === true || instrument.lfoOneShot === true;
   const lfo2OneShot = instrument.synthPatch?.parameters?.["lfo.2.oneShot"] === true || instrument.lfo2OneShot === true;
   const rawLfo = lfoShapeValue(
@@ -1402,7 +1412,7 @@ export function modulationAtTime(instrument: Instrument, timeS: number, duration
     effectiveLfoSmoothing(instrument, 2),
   );
   const env = envelopePreviewValue(timeS, durationS, instrument);
-  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env);
+  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env, velocity);
   if (targetOffsets) {
     return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, targetOffsets };
   }
@@ -1422,6 +1432,7 @@ function routeTargetOffsets(
   rawLfo: number,
   rawLfo2: number,
   env: number,
+  velocity: number,
 ): Partial<Record<RuntimeModulationTarget, number>> | null {
   const routes = instrument.synthPatch?.modulation as RuntimeModulationRoute[] | undefined;
   if (!Array.isArray(routes)) return null;
@@ -1432,7 +1443,7 @@ function routeTargetOffsets(
     const amount = Number.isFinite(route.amount) ? clamp(route.amount ?? 0, -1, 1) : 0;
     if (amount === 0) continue;
 
-    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, env);
+    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, env, velocity);
     if (sourceValue == null) continue;
     offsets[route.target] = (offsets[route.target] ?? 0) + sourceValue * amount * modulationTargetScale(route.target);
   }
@@ -1445,6 +1456,7 @@ function modulationSourceValue(
   rawLfo: number,
   rawLfo2: number,
   env: number,
+  velocity: number,
 ): number | null {
   if (route.source === "lfo.1") {
     if (instrument.synthPatch?.parameters?.["lfo.1.enabled"] === false) return 0;
@@ -1456,6 +1468,9 @@ function modulationSourceValue(
   }
   if (route.source === "env.1") {
     return route.bipolar ? env * 2 - 1 : env;
+  }
+  if (route.source === "velocity") {
+    return route.bipolar ? velocity * 2 - 1 : velocity;
   }
   return null;
 }

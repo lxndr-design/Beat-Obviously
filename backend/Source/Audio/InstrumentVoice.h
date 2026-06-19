@@ -105,6 +105,8 @@ namespace beat
                 bool lfo2Bipolar { true };
                 float env { 0.0f };
                 bool envBipolar { false };
+                float velocity { 0.0f };
+                bool velocityBipolar { false };
             };
 
             struct DynamicModulation
@@ -334,7 +336,7 @@ namespace beat
         void refreshCachedPanGains() noexcept;
         void refreshCachedPitchRates() noexcept;
         void refreshCachedDynamicModulationFlags() noexcept;
-        StereoSample renderAetherTableStack(double frequencyHz, float rawLfo, float rawLfo2, float env) noexcept;
+        StereoSample renderAetherTableStack(double frequencyHz, float rawLfo, float rawLfo2, float env, float velocity) noexcept;
         StereoSample processDriveOversampled(StereoSample sample, float driveGain) noexcept;
         float shapedEnvelope(float rawEnvelope) noexcept;
         float keytrackedCutoffHz(float normalizedCutoff) const noexcept;

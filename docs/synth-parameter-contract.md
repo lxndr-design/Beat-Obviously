@@ -169,6 +169,8 @@ Rules:
 | `macro.3` | global | `0..1` |
 | `macro.4` | global | `0..1` |
 
+`velocity` is the note-on velocity normalized to `0..1`. Browser preview, MIDI timeline preview, and the native voice path use the same unipolar/bipolar route behavior, so velocity-routed patches should respond consistently across edit preview, live playback, and export.
+
 ## Modulation Targets
 
 Initial targets:

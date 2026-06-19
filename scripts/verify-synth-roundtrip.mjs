@@ -105,6 +105,7 @@ try {
       { id: "route_lfo2_b_pan", source: "lfo.2", target: "osc.b.pan", amount: -0.25, bipolar: true, enabled: true },
       { id: "filter_env", source: "env.1", target: "filter.cutoff", amount: 0.31, bipolar: false, enabled: true },
       { id: "macro_cutoff", source: "macro.1", target: "filter.cutoff", amount: 0.12, bipolar: false, enabled: true },
+      { id: "velocity_amp", source: "velocity", target: "amp.level", amount: 0.25, bipolar: false, enabled: true },
       { id: "disabled_macro", source: "macro.1", target: "amp.level", amount: -1, bipolar: false, enabled: false },
     ],
     metadata: {
@@ -143,6 +144,12 @@ try {
     count: 1,
     amount: -0.25,
     label: "OSC B Pan -25",
+  });
+  assert.equal(synthStore.MODULATION_SOURCE_LABELS.velocity, "Velocity");
+  assert.deepEqual(synthStore.modulationSummaryForSource(draft, "velocity"), {
+    count: 1,
+    amount: 0.25,
+    label: "Amp Level +25",
   });
   assert.ok(synthStore.FACTORY_SYNTH_PRESETS.length >= 5);
   assert.equal(
@@ -246,6 +253,44 @@ try {
   synthPreview.renderInstrumentSamples(keytrackOpen, openKeytrackSamples, 48000, highPreviewFrequency, "audio", true);
   const bufferRms = (samples) => Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length);
   assert.ok(bufferRms(openKeytrackSamples) > bufferRms(closedKeytrackSamples) * 1.12, "expected filter keytracking to open high-note preview cutoff");
+
+  const velocityPreview = synthStore.synthDraftToPreviewInstrument({
+    ...draft,
+    parameters: { ...draft.parameters, "amp.level": 0 },
+    modulation: [{ id: "velocity_probe", source: "velocity", target: "amp.level", amount: 1, bipolar: false, enabled: true }],
+  });
+  const lowVelocityOffset = synthPreview.modulationAtTime(velocityPreview, 0.25, 1, 120, 32 / 127).targetOffsets["amp.level"];
+  const highVelocityOffset = synthPreview.modulationAtTime(velocityPreview, 0.25, 1, 120, 1).targetOffsets["amp.level"];
+  assert.ok(highVelocityOffset > lowVelocityOffset * 3, "expected velocity modulation source to scale target offsets");
+  const lowVelocitySamples = new Float32Array(4096);
+  const highVelocitySamples = new Float32Array(4096);
+  synthPreview.renderInstrumentSamples(
+    velocityPreview,
+    lowVelocitySamples,
+    48000,
+    synthPreview.previewFrequency(velocityPreview),
+    "audio",
+    true,
+    undefined,
+    undefined,
+    undefined,
+    120,
+    32,
+  );
+  synthPreview.renderInstrumentSamples(
+    velocityPreview,
+    highVelocitySamples,
+    48000,
+    synthPreview.previewFrequency(velocityPreview),
+    "audio",
+    true,
+    undefined,
+    undefined,
+    undefined,
+    120,
+    127,
+  );
+  assert.ok(bufferRms(highVelocitySamples) > bufferRms(lowVelocitySamples) * 3, "expected note velocity to drive preview loudness through modulation");
 
   const stereoProbe = {
     id: "stereo-probe",

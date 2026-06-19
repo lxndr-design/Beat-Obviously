@@ -104,7 +104,7 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
     vel: number,
   ) {
     const source = curve.length > 1 || automation.length > 0
-      ? createInstrumentCurveBufferSource(audioCtx, synth, durS + 0.05, frequency, curve, atTimeS, automation, props.state().bpm)
+      ? createInstrumentCurveBufferSource(audioCtx, synth, durS + 0.05, frequency, curve, atTimeS, automation, props.state().bpm, vel)
       : createInstrumentBufferSource(audioCtx, synth, durS + 0.05, frequency, targetFrequency, vel, props.state().bpm);
     connectPreviewNode(
       audioCtx,

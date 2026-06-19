@@ -100,6 +100,7 @@ export type ModulationSourceId =
   | "env.1"
   | "lfo.1"
   | "lfo.2"
+  | "velocity"
   | "macro.1"
   | "macro.2"
   | "macro.3"
@@ -562,6 +563,7 @@ export const MODULATION_SOURCE_LABELS: Record<ModulationSourceId, string> = {
   "env.1": "Amp Env",
   "lfo.1": "LFO 1",
   "lfo.2": "LFO 2",
+  velocity: "Velocity",
   "macro.1": "Macro 1",
   "macro.2": "Macro 2",
   "macro.3": "Macro 3",

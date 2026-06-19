@@ -1506,129 +1506,35 @@ namespace beat
         params.lfoToPitch = instrument.lfoToPitch;
         params.lfoToFilter = instrument.lfoToFilter;
         params.envToFilter = instrument.envToFilter;
-        params.dynamicModulation = {
-            instrument.dynamicModulation.active,
-            {
-                instrument.dynamicModulation.oscAPosition.lfo,
-                instrument.dynamicModulation.oscAPosition.lfoBipolar,
-                instrument.dynamicModulation.oscAPosition.lfo2,
-                instrument.dynamicModulation.oscAPosition.lfo2Bipolar,
-                instrument.dynamicModulation.oscAPosition.env,
-                instrument.dynamicModulation.oscAPosition.envBipolar,
-            },
-            {
-                instrument.dynamicModulation.oscAFine.lfo,
-                instrument.dynamicModulation.oscAFine.lfoBipolar,
-                instrument.dynamicModulation.oscAFine.lfo2,
-                instrument.dynamicModulation.oscAFine.lfo2Bipolar,
-                instrument.dynamicModulation.oscAFine.env,
-                instrument.dynamicModulation.oscAFine.envBipolar,
-            },
-            {
-                instrument.dynamicModulation.oscALevel.lfo,
-                instrument.dynamicModulation.oscALevel.lfoBipolar,
-                instrument.dynamicModulation.oscALevel.lfo2,
-                instrument.dynamicModulation.oscALevel.lfo2Bipolar,
-                instrument.dynamicModulation.oscALevel.env,
-                instrument.dynamicModulation.oscALevel.envBipolar,
-            },
-            {
-                instrument.dynamicModulation.oscAPan.lfo,
-                instrument.dynamicModulation.oscAPan.lfoBipolar,
-                instrument.dynamicModulation.oscAPan.lfo2,
-                instrument.dynamicModulation.oscAPan.lfo2Bipolar,
-                instrument.dynamicModulation.oscAPan.env,
-                instrument.dynamicModulation.oscAPan.envBipolar,
-            },
-            {
-                instrument.dynamicModulation.oscBPosition.lfo,
-                instrument.dynamicModulation.oscBPosition.lfoBipolar,
-                instrument.dynamicModulation.oscBPosition.lfo2,
-                instrument.dynamicModulation.oscBPosition.lfo2Bipolar,
-                instrument.dynamicModulation.oscBPosition.env,
-                instrument.dynamicModulation.oscBPosition.envBipolar,
-            },
-            {
-                instrument.dynamicModulation.oscBFine.lfo,
-                instrument.dynamicModulation.oscBFine.lfoBipolar,
-                instrument.dynamicModulation.oscBFine.lfo2,
-                instrument.dynamicModulation.oscBFine.lfo2Bipolar,
-                instrument.dynamicModulation.oscBFine.env,
-                instrument.dynamicModulation.oscBFine.envBipolar,
-            },
-            {
-                instrument.dynamicModulation.oscBLevel.lfo,
-                instrument.dynamicModulation.oscBLevel.lfoBipolar,
-                instrument.dynamicModulation.oscBLevel.lfo2,
-                instrument.dynamicModulation.oscBLevel.lfo2Bipolar,
-                instrument.dynamicModulation.oscBLevel.env,
-                instrument.dynamicModulation.oscBLevel.envBipolar,
-            },
-            {
-                instrument.dynamicModulation.oscBPan.lfo,
-                instrument.dynamicModulation.oscBPan.lfoBipolar,
-                instrument.dynamicModulation.oscBPan.lfo2,
-                instrument.dynamicModulation.oscBPan.lfo2Bipolar,
-                instrument.dynamicModulation.oscBPan.env,
-                instrument.dynamicModulation.oscBPan.envBipolar,
-            },
-            {
-                instrument.dynamicModulation.filterCutoff.lfo,
-                instrument.dynamicModulation.filterCutoff.lfoBipolar,
-                instrument.dynamicModulation.filterCutoff.lfo2,
-                instrument.dynamicModulation.filterCutoff.lfo2Bipolar,
-                instrument.dynamicModulation.filterCutoff.env,
-                instrument.dynamicModulation.filterCutoff.envBipolar,
-            },
-            {
-                instrument.dynamicModulation.filterResonance.lfo,
-                instrument.dynamicModulation.filterResonance.lfoBipolar,
-                instrument.dynamicModulation.filterResonance.lfo2,
-                instrument.dynamicModulation.filterResonance.lfo2Bipolar,
-                instrument.dynamicModulation.filterResonance.env,
-                instrument.dynamicModulation.filterResonance.envBipolar,
-            },
-            {
-                instrument.dynamicModulation.filterDrive.lfo,
-                instrument.dynamicModulation.filterDrive.lfoBipolar,
-                instrument.dynamicModulation.filterDrive.lfo2,
-                instrument.dynamicModulation.filterDrive.lfo2Bipolar,
-                instrument.dynamicModulation.filterDrive.env,
-                instrument.dynamicModulation.filterDrive.envBipolar,
-            },
-            {
-                instrument.dynamicModulation.ampLevel.lfo,
-                instrument.dynamicModulation.ampLevel.lfoBipolar,
-                instrument.dynamicModulation.ampLevel.lfo2,
-                instrument.dynamicModulation.ampLevel.lfo2Bipolar,
-                instrument.dynamicModulation.ampLevel.env,
-                instrument.dynamicModulation.ampLevel.envBipolar,
-            },
-            {
-                instrument.dynamicModulation.ampPan.lfo,
-                instrument.dynamicModulation.ampPan.lfoBipolar,
-                instrument.dynamicModulation.ampPan.lfo2,
-                instrument.dynamicModulation.ampPan.lfo2Bipolar,
-                instrument.dynamicModulation.ampPan.env,
-                instrument.dynamicModulation.ampPan.envBipolar,
-            },
-            {
-                instrument.dynamicModulation.unisonDetune.lfo,
-                instrument.dynamicModulation.unisonDetune.lfoBipolar,
-                instrument.dynamicModulation.unisonDetune.lfo2,
-                instrument.dynamicModulation.unisonDetune.lfo2Bipolar,
-                instrument.dynamicModulation.unisonDetune.env,
-                instrument.dynamicModulation.unisonDetune.envBipolar,
-            },
-            {
-                instrument.dynamicModulation.unisonSpread.lfo,
-                instrument.dynamicModulation.unisonSpread.lfoBipolar,
-                instrument.dynamicModulation.unisonSpread.lfo2,
-                instrument.dynamicModulation.unisonSpread.lfo2Bipolar,
-                instrument.dynamicModulation.unisonSpread.env,
-                instrument.dynamicModulation.unisonSpread.envBipolar,
-            },
+        const auto copyDynamicTarget = [](const InstrumentDefinition::DynamicModTarget& source)
+        {
+            InstrumentVoice::Params::DynamicModTarget target;
+            target.lfo = source.lfo;
+            target.lfoBipolar = source.lfoBipolar;
+            target.lfo2 = source.lfo2;
+            target.lfo2Bipolar = source.lfo2Bipolar;
+            target.env = source.env;
+            target.envBipolar = source.envBipolar;
+            target.velocity = source.velocity;
+            target.velocityBipolar = source.velocityBipolar;
+            return target;
         };
+        params.dynamicModulation.active = instrument.dynamicModulation.active;
+        params.dynamicModulation.oscAPosition = copyDynamicTarget(instrument.dynamicModulation.oscAPosition);
+        params.dynamicModulation.oscAFine = copyDynamicTarget(instrument.dynamicModulation.oscAFine);
+        params.dynamicModulation.oscALevel = copyDynamicTarget(instrument.dynamicModulation.oscALevel);
+        params.dynamicModulation.oscAPan = copyDynamicTarget(instrument.dynamicModulation.oscAPan);
+        params.dynamicModulation.oscBPosition = copyDynamicTarget(instrument.dynamicModulation.oscBPosition);
+        params.dynamicModulation.oscBFine = copyDynamicTarget(instrument.dynamicModulation.oscBFine);
+        params.dynamicModulation.oscBLevel = copyDynamicTarget(instrument.dynamicModulation.oscBLevel);
+        params.dynamicModulation.oscBPan = copyDynamicTarget(instrument.dynamicModulation.oscBPan);
+        params.dynamicModulation.filterCutoff = copyDynamicTarget(instrument.dynamicModulation.filterCutoff);
+        params.dynamicModulation.filterResonance = copyDynamicTarget(instrument.dynamicModulation.filterResonance);
+        params.dynamicModulation.filterDrive = copyDynamicTarget(instrument.dynamicModulation.filterDrive);
+        params.dynamicModulation.ampLevel = copyDynamicTarget(instrument.dynamicModulation.ampLevel);
+        params.dynamicModulation.ampPan = copyDynamicTarget(instrument.dynamicModulation.ampPan);
+        params.dynamicModulation.unisonDetune = copyDynamicTarget(instrument.dynamicModulation.unisonDetune);
+        params.dynamicModulation.unisonSpread = copyDynamicTarget(instrument.dynamicModulation.unisonSpread);
         params.wavetable = copyWavetable({
             instrument.wavetableBank,
             instrument.wavetableBank == 5,

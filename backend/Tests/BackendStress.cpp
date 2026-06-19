@@ -8873,7 +8873,8 @@ namespace
             { "source": "env.1", "target": "filter.drive", "amount": 0.22, "enabled": true },
             { "source": "lfo.1", "target": "filter.cutoff", "amount": -0.2, "bipolar": false, "enabled": true },
             { "source": "lfo.1", "target": "filter.cutoff", "amount": 1.0, "enabled": false },
-            { "source": "env.1", "target": "filter.cutoff", "amount": 0.3, "enabled": true }
+            { "source": "env.1", "target": "filter.cutoff", "amount": 0.3, "enabled": true },
+            { "source": "velocity", "target": "amp.level", "amount": 0.25, "bipolar": false, "enabled": true }
           ]
         }
         )json");
@@ -8974,6 +8975,8 @@ namespace
         if (instrument.dynamicModulation.filterCutoff.lfoBipolar || instrument.dynamicModulation.filterCutoff.envBipolar)
             return false;
         if (!near(instrument.dynamicModulation.filterDrive.env, 0.22f))
+            return false;
+        if (!near(instrument.dynamicModulation.ampLevel.velocity, 0.25f) || instrument.dynamicModulation.ampLevel.velocityBipolar)
             return false;
 
         const auto customPatch = juce::JSON::parse(R"json(
@@ -9177,6 +9180,44 @@ namespace
             }
         }
         if (!(keytrackOpenEnergy > keytrackClosedEnergy * 1.1))
+            return false;
+
+        auto renderWithVelocity = [](const beat::InstrumentVoice::Params& renderParams, float velocity) {
+            beat::InstrumentVoice voice;
+            voice.prepare(44100.0, 256);
+            voice.setParams(renderParams);
+            voice.startNote(69, velocity, nullptr, 0);
+
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        auto velocityBaseParams = params;
+        velocityBaseParams.ampLevel = 0.08f;
+        velocityBaseParams.wavetableUnison = 1;
+        auto velocityModParams = velocityBaseParams;
+        velocityModParams.dynamicModulation.active = true;
+        velocityModParams.dynamicModulation.ampLevel.velocity = 0.75f;
+        auto velocityBase = renderWithVelocity(velocityBaseParams, 0.5f);
+        auto velocityMod = renderWithVelocity(velocityModParams, 0.5f);
+        double velocityBaseEnergy = 0.0;
+        double velocityModEnergy = 0.0;
+        for (int channel = 0; channel < velocityBase.getNumChannels(); ++channel)
+        {
+            for (int i = 0; i < velocityBase.getNumSamples(); ++i)
+            {
+                const auto baseSample = (double) velocityBase.getSample(channel, i);
+                const auto modSample = (double) velocityMod.getSample(channel, i);
+                if (!std::isfinite(baseSample) || !std::isfinite(modSample))
+                    return false;
+                velocityBaseEnergy += baseSample * baseSample;
+                velocityModEnergy += modSample * modSample;
+            }
+        }
+        if (!(velocityModEnergy > velocityBaseEnergy * 4.0))
             return false;
 
         auto lowpassParams = params;

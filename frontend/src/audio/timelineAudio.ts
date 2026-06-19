@@ -137,7 +137,7 @@ function scheduleBufferSource(
   bpm: number,
 ) {
   const source = curve.length > 1 || automation.length > 0
-    ? createInstrumentCurveBufferSource(audio, instrument, durationS + 0.05, baseFrequency, curve, atTimeS, automation, bpm)
+    ? createInstrumentCurveBufferSource(audio, instrument, durationS + 0.05, baseFrequency, curve, atTimeS, automation, bpm, velocity)
     : createInstrumentBufferSource(audio, instrument, durationS + 0.05, baseFrequency, targetFrequency, velocity, bpm);
   const playbackDuration = source.buffer
     ? Math.max(durationS, Math.min(1.5, source.buffer.duration / source.playbackRate.value))
