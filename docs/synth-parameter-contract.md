@@ -91,6 +91,8 @@ Envelope IDs use `env.N.*`, where `N` starts at `1`.
 | `env.2.sustain` | normalized | `0..1` | `0` | Mod envelope default. |
 | `env.2.release` | seconds | `0..30` | `0.2` | Mod envelope default. |
 
+Env 1 is the amp envelope and can also route as a modulation source. Env 2 is a dedicated modulation envelope with its own ADSR timing; it does not shape voice amplitude unless routed to `amp.level`.
+
 ## LFO Parameters
 
 LFO IDs use `lfo.N.*`, where `N` starts at `1`.

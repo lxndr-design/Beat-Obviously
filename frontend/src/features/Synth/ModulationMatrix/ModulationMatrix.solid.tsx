@@ -15,6 +15,7 @@ const SOURCES = Object.keys(MODULATION_SOURCE_LABELS) as ModulationSourceId[];
 const MACRO_TARGETS = Object.keys(MODULATION_TARGET_LABELS) as ModulationTargetId[];
 const TARGETS_BY_SOURCE: Record<ModulationSourceId, ModulationTargetId[]> = {
   "env.1": MACRO_TARGETS,
+  "env.2": MACRO_TARGETS,
   "lfo.1": MACRO_TARGETS,
   "lfo.2": MACRO_TARGETS,
   velocity: MACRO_TARGETS,

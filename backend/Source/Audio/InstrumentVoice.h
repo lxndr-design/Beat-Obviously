@@ -105,6 +105,8 @@ namespace beat
                 bool lfo2Bipolar { true };
                 float env { 0.0f };
                 bool envBipolar { false };
+                float env2 { 0.0f };
+                bool env2Bipolar { false };
                 float velocity { 0.0f };
                 bool velocityBipolar { false };
             };
@@ -143,6 +145,10 @@ namespace beat
             float sustain   { 0.7f };
             float releaseMs { 200.f };
             int releaseCurve { 0 };
+            float env2AttackMs { 10.f };
+            float env2DecayMs { 300.f };
+            float env2Sustain { 0.0f };
+            float env2ReleaseMs { 200.f };
             float ampLevel  { 1.0f };
             float ampPan    { 0.0f };
             // Waveform: 0=sine, 1=saw, 2=square, 3=triangle, 4=noise, 5=wavetable
@@ -336,7 +342,7 @@ namespace beat
         void refreshCachedPanGains() noexcept;
         void refreshCachedPitchRates() noexcept;
         void refreshCachedDynamicModulationFlags() noexcept;
-        StereoSample renderAetherTableStack(double frequencyHz, float rawLfo, float rawLfo2, float env, float velocity) noexcept;
+        StereoSample renderAetherTableStack(double frequencyHz, float rawLfo, float rawLfo2, float env, float env2, float velocity) noexcept;
         StereoSample processDriveOversampled(StereoSample sample, float driveGain) noexcept;
         float shapedEnvelope(float rawEnvelope) noexcept;
         float keytrackedCutoffHz(float normalizedCutoff) const noexcept;
@@ -414,6 +420,8 @@ namespace beat
         juce::uint32 noiseState { 1 };
         juce::ADSR adsr;
         juce::ADSR::Parameters adsrParams;
+        juce::ADSR env2Adsr;
+        juce::ADSR::Parameters env2AdsrParams;
         juce::dsp::StateVariableTPTFilter<float> filterLeft;
         juce::dsp::StateVariableTPTFilter<float> filterRight;
     };

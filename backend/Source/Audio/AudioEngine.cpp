@@ -1474,6 +1474,10 @@ namespace beat
         params.sustain = instrument.sustain;
         params.releaseMs = instrument.releaseMs;
         params.releaseCurve = instrument.releaseCurve;
+        params.env2AttackMs = instrument.env2AttackMs;
+        params.env2DecayMs = instrument.env2DecayMs;
+        params.env2Sustain = instrument.env2Sustain;
+        params.env2ReleaseMs = instrument.env2ReleaseMs;
         params.ampLevel = instrument.ampLevel;
         params.ampPan = instrument.ampPan;
         params.waveform = instrument.waveform;
@@ -1515,6 +1519,8 @@ namespace beat
             target.lfo2Bipolar = source.lfo2Bipolar;
             target.env = source.env;
             target.envBipolar = source.envBipolar;
+            target.env2 = source.env2;
+            target.env2Bipolar = source.env2Bipolar;
             target.velocity = source.velocity;
             target.velocityBipolar = source.velocityBipolar;
             return target;

@@ -98,6 +98,7 @@ export type SynthParameterValue = boolean | number | string;
 
 export type ModulationSourceId =
   | "env.1"
+  | "env.2"
   | "lfo.1"
   | "lfo.2"
   | "velocity"
@@ -561,6 +562,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
 
 export const MODULATION_SOURCE_LABELS: Record<ModulationSourceId, string> = {
   "env.1": "Amp Env",
+  "env.2": "Mod Env",
   "lfo.1": "LFO 1",
   "lfo.2": "LFO 2",
   velocity: "Velocity",

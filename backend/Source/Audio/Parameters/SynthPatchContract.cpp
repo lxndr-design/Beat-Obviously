@@ -249,11 +249,14 @@ namespace beat
             target.lfo2Bipolar = routeBipolar(modulation, "lfo.2", routeTarget, true);
             target.env = routeAmount(modulation, "env.1", routeTarget);
             target.envBipolar = routeBipolar(modulation, "env.1", routeTarget, false);
+            target.env2 = routeAmount(modulation, "env.2", routeTarget);
+            target.env2Bipolar = routeBipolar(modulation, "env.2", routeTarget, false);
             target.velocity = routeAmount(modulation, "velocity", routeTarget);
             target.velocityBipolar = routeBipolar(modulation, "velocity", routeTarget, false);
             return std::abs(target.lfo) > 0.0001f
                 || std::abs(target.lfo2) > 0.0001f
                 || std::abs(target.env) > 0.0001f
+                || std::abs(target.env2) > 0.0001f
                 || std::abs(target.velocity) > 0.0001f;
         }
 
@@ -423,6 +426,10 @@ namespace beat
         instrument.sustain = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "env.1.sustain", instrument.sustain));
         instrument.releaseMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.1.release", 0.25) * 1000.0f);
         instrument.releaseCurve = envelopeCurveForId(synthStringParam(params, "env.1.releaseCurve", "linear"));
+        instrument.env2AttackMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.2.attack", 0.01) * 1000.0f);
+        instrument.env2DecayMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.2.decay", 0.3) * 1000.0f);
+        instrument.env2Sustain = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "env.2.sustain", 0.0));
+        instrument.env2ReleaseMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.2.release", 0.2) * 1000.0f);
         instrument.ampLevel = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "amp.level", instrument.ampLevel)
             + staticRouteAmount(params, modulation, metadata, "amp.level"));
         instrument.ampPan = juce::jlimit(-1.0f, 1.0f, (float) synthNumberParam(params, "amp.pan", instrument.ampPan)

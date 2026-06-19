@@ -185,6 +185,8 @@ namespace beat
             bool lfo2Bipolar { true };
             float env { 0.0f };
             bool envBipolar { false };
+            float env2 { 0.0f };
+            bool env2Bipolar { false };
             float velocity { 0.0f };
             bool velocityBipolar { false };
         };
@@ -249,6 +251,10 @@ namespace beat
         float sustain { 0.7f };
         float releaseMs { 200.0f };
         int releaseCurve { 0 };
+        float env2AttackMs { 10.0f };
+        float env2DecayMs { 300.0f };
+        float env2Sustain { 0.0f };
+        float env2ReleaseMs { 200.0f };
         float ampLevel { 1.0f };
         float ampPan { 0.0f };
         int wavetableBank { 0 };

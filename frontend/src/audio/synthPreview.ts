@@ -1412,7 +1412,8 @@ export function modulationAtTime(instrument: Instrument, timeS: number, duration
     effectiveLfoSmoothing(instrument, 2),
   );
   const env = envelopePreviewValue(timeS, durationS, instrument);
-  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env, velocity);
+  const env2 = modEnvelopePreviewValue(timeS, durationS, instrument);
+  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env, env2, velocity);
   if (targetOffsets) {
     return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, targetOffsets };
   }
@@ -1432,6 +1433,7 @@ function routeTargetOffsets(
   rawLfo: number,
   rawLfo2: number,
   env: number,
+  env2: number,
   velocity: number,
 ): Partial<Record<RuntimeModulationTarget, number>> | null {
   const routes = instrument.synthPatch?.modulation as RuntimeModulationRoute[] | undefined;
@@ -1443,7 +1445,7 @@ function routeTargetOffsets(
     const amount = Number.isFinite(route.amount) ? clamp(route.amount ?? 0, -1, 1) : 0;
     if (amount === 0) continue;
 
-    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, env, velocity);
+    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, env, env2, velocity);
     if (sourceValue == null) continue;
     offsets[route.target] = (offsets[route.target] ?? 0) + sourceValue * amount * modulationTargetScale(route.target);
   }
@@ -1456,6 +1458,7 @@ function modulationSourceValue(
   rawLfo: number,
   rawLfo2: number,
   env: number,
+  env2: number,
   velocity: number,
 ): number | null {
   if (route.source === "lfo.1") {
@@ -1468,6 +1471,9 @@ function modulationSourceValue(
   }
   if (route.source === "env.1") {
     return route.bipolar ? env * 2 - 1 : env;
+  }
+  if (route.source === "env.2") {
+    return route.bipolar ? env2 * 2 - 1 : env2;
   }
   if (route.source === "velocity") {
     return route.bipolar ? velocity * 2 - 1 : velocity;
@@ -1583,6 +1589,31 @@ function envelopePreviewValue(timeS: number, durationS: number, instrument: Inst
     return sustain * Math.max(0, 1 - t);
   }
   return sustain;
+}
+
+function modEnvelopePreviewValue(timeS: number, durationS: number, instrument: Instrument): number {
+  const params = instrument.synthPatch?.parameters;
+  const attack = Math.max(0.001, numberParam(params?.["env.2.attack"], 0.01));
+  const decay = Math.max(0.001, numberParam(params?.["env.2.decay"], 0.3));
+  const sustain = clamp01(numberParam(params?.["env.2.sustain"], 0));
+  const release = Math.max(0.001, numberParam(params?.["env.2.release"], 0.2));
+  if (timeS < attack) {
+    return timeS / attack;
+  }
+  if (timeS < attack + decay) {
+    const t = (timeS - attack) / decay;
+    return 1 + (sustain - 1) * t;
+  }
+  const releaseStart = Math.max(attack + decay, durationS - release);
+  if (timeS > releaseStart) {
+    const t = (timeS - releaseStart) / release;
+    return sustain * Math.max(0, 1 - t);
+  }
+  return sustain;
+}
+
+function numberParam(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function applyEnvelopeCurve(value: number, curve: EnvelopeCurve | undefined): number {

@@ -76,6 +76,10 @@ try {
       "env.1.sustain": 0.57,
       "env.1.release": 0.78,
       "env.1.releaseCurve": "log",
+      "env.2.attack": 0.01,
+      "env.2.decay": 0.09,
+      "env.2.sustain": 0,
+      "env.2.release": 0.16,
       "lfo.1.enabled": true,
       "lfo.1.rate": 4.5,
       "lfo.1.sync": true,
@@ -104,6 +108,7 @@ try {
       { id: "route", source: "lfo.1", target: "osc.a.fine", amount: 0.4, bipolar: true, enabled: true },
       { id: "route_lfo2_b_pan", source: "lfo.2", target: "osc.b.pan", amount: -0.25, bipolar: true, enabled: true },
       { id: "filter_env", source: "env.1", target: "filter.cutoff", amount: 0.31, bipolar: false, enabled: true },
+      { id: "env2_res", source: "env.2", target: "filter.resonance", amount: 0.2, bipolar: false, enabled: true },
       { id: "macro_cutoff", source: "macro.1", target: "filter.cutoff", amount: 0.12, bipolar: false, enabled: true },
       { id: "velocity_amp", source: "velocity", target: "amp.level", amount: 0.25, bipolar: false, enabled: true },
       { id: "disabled_macro", source: "macro.1", target: "amp.level", amount: -1, bipolar: false, enabled: false },
@@ -144,6 +149,11 @@ try {
     count: 1,
     amount: -0.25,
     label: "OSC B Pan -25",
+  });
+  assert.deepEqual(synthStore.modulationSummaryForSource(draft, "env.2"), {
+    count: 1,
+    amount: 0.2,
+    label: "Filter Res +20",
   });
   assert.equal(synthStore.MODULATION_SOURCE_LABELS.velocity, "Velocity");
   assert.deepEqual(synthStore.modulationSummaryForSource(draft, "velocity"), {
@@ -291,6 +301,32 @@ try {
     127,
   );
   assert.ok(bufferRms(highVelocitySamples) > bufferRms(lowVelocitySamples) * 3, "expected note velocity to drive preview loudness through modulation");
+
+  const env2Preview = synthStore.synthDraftToPreviewInstrument({
+    ...draft,
+    parameters: {
+      ...draft.parameters,
+      "amp.level": 0,
+      "env.1.attack": 0.001,
+      "env.1.decay": 0.01,
+      "env.1.sustain": 1,
+      "env.2.attack": 0.01,
+      "env.2.decay": 0.08,
+      "env.2.sustain": 0,
+    },
+    modulation: [{ id: "env2_probe", source: "env.2", target: "amp.level", amount: 1, bipolar: false, enabled: true }],
+  });
+  const env2EarlyOffset = synthPreview.modulationAtTime(env2Preview, 0.02, 0.5, 120, 1).targetOffsets["amp.level"];
+  const env2LateOffset = synthPreview.modulationAtTime(env2Preview, 0.25, 0.5, 120, 1).targetOffsets["amp.level"];
+  assert.ok(env2EarlyOffset > env2LateOffset + 0.5, "expected Env 2 modulation source to follow its own decay contour");
+  const env2Samples = new Float32Array(24000);
+  synthPreview.renderInstrumentSamples(env2Preview, env2Samples, 48000, synthPreview.previewFrequency(env2Preview), "audio", true);
+  const rmsRange = (samples, start, end) => {
+    let sum = 0;
+    for (let i = start; i < end; i++) sum += samples[i] * samples[i];
+    return Math.sqrt(sum / Math.max(1, end - start));
+  };
+  assert.ok(rmsRange(env2Samples, 1200, 3600) > rmsRange(env2Samples, 16000, 22000) * 3, "expected Env 2 routed preview render to decay independently of Amp Env");
 
   const stereoProbe = {
     id: "stereo-probe",

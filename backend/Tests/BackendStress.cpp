@@ -8827,6 +8827,10 @@ namespace
             "env.1.sustain": 0.55,
             "env.1.release": 0.4,
             "env.1.releaseCurve": "log",
+            "env.2.attack": 0.01,
+            "env.2.decay": 0.09,
+            "env.2.sustain": 0.0,
+            "env.2.release": 0.16,
             "amp.level": 0.7,
             "amp.pan": -0.25,
             "lfo.1.enabled": true,
@@ -8871,6 +8875,7 @@ namespace
             { "source": "lfo.2", "target": "osc.b.pan", "amount": 0.44, "bipolar": false, "enabled": true },
             { "source": "lfo.1", "target": "unison.spread", "amount": 0.33, "bipolar": false, "enabled": true },
             { "source": "env.1", "target": "filter.drive", "amount": 0.22, "enabled": true },
+            { "source": "env.2", "target": "filter.resonance", "amount": 0.2, "enabled": true },
             { "source": "lfo.1", "target": "filter.cutoff", "amount": -0.2, "bipolar": false, "enabled": true },
             { "source": "lfo.1", "target": "filter.cutoff", "amount": 1.0, "enabled": false },
             { "source": "env.1", "target": "filter.cutoff", "amount": 0.3, "enabled": true },
@@ -8924,6 +8929,8 @@ namespace
             return false;
         if (instrument.attackCurve != 1 || instrument.decayCurve != 3 || instrument.releaseCurve != 2)
             return false;
+        if (!near(instrument.env2AttackMs, 10.0f) || !near(instrument.env2DecayMs, 90.0f) || !near(instrument.env2Sustain, 0.0f) || !near(instrument.env2ReleaseMs, 160.0f))
+            return false;
         if (!near(instrument.ampLevel, 0.54f) || !near(instrument.ampPan, 0.0f))
             return false;
         if (instrument.lfoWaveform != 3 || !near(instrument.lfoRateHz, 6.5f) || !near(instrument.lfoPhaseOffset, 0.25f))
@@ -8975,6 +8982,8 @@ namespace
         if (instrument.dynamicModulation.filterCutoff.lfoBipolar || instrument.dynamicModulation.filterCutoff.envBipolar)
             return false;
         if (!near(instrument.dynamicModulation.filterDrive.env, 0.22f))
+            return false;
+        if (!near(instrument.dynamicModulation.filterResonance.env2, 0.2f) || instrument.dynamicModulation.filterResonance.env2Bipolar)
             return false;
         if (!near(instrument.dynamicModulation.ampLevel.velocity, 0.25f) || instrument.dynamicModulation.ampLevel.velocityBipolar)
             return false;
@@ -9218,6 +9227,38 @@ namespace
             }
         }
         if (!(velocityModEnergy > velocityBaseEnergy * 4.0))
+            return false;
+
+        auto env2ModParams = params;
+        env2ModParams.ampLevel = 0.0f;
+        env2ModParams.wavetableUnison = 1;
+        env2ModParams.env2AttackMs = 1.0f;
+        env2ModParams.env2DecayMs = 40.0f;
+        env2ModParams.env2Sustain = 0.0f;
+        env2ModParams.env2ReleaseMs = 30.0f;
+        env2ModParams.dynamicModulation.active = true;
+        env2ModParams.dynamicModulation.ampLevel.env2 = 1.0f;
+        auto env2Mod = renderWithVelocity(env2ModParams, 1.0f);
+        double env2EarlyEnergy = 0.0;
+        double env2LateEnergy = 0.0;
+        for (int channel = 0; channel < env2Mod.getNumChannels(); ++channel)
+        {
+            for (int i = 512; i < 2048; ++i)
+            {
+                const auto sample = (double) env2Mod.getSample(channel, i);
+                if (!std::isfinite(sample))
+                    return false;
+                env2EarlyEnergy += sample * sample;
+            }
+            for (int i = 6144; i < env2Mod.getNumSamples(); ++i)
+            {
+                const auto sample = (double) env2Mod.getSample(channel, i);
+                if (!std::isfinite(sample))
+                    return false;
+                env2LateEnergy += sample * sample;
+            }
+        }
+        if (!(env2EarlyEnergy > env2LateEnergy * 9.0))
             return false;
 
         auto lowpassParams = params;
