@@ -178,6 +178,8 @@ Rules:
 
 `keytrack` is the played MIDI note normalized as `midiNote / 127`. Browser preview derives the same value from the rendered frequency, and native render derives it from the MIDI note passed to the voice.
 
+`modWheel` is a global controller source normalized to `0..1`. Native voices update it from MIDI controller 1 and browser preview exposes it as an explicit render/modulation argument; both paths default to `0` when no wheel value is supplied.
+
 ## Modulation Targets
 
 Initial targets:

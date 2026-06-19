@@ -113,6 +113,7 @@ try {
       { id: "filter_env", source: "env.1", target: "filter.cutoff", amount: 0.31, bipolar: false, enabled: true },
       { id: "env2_res", source: "env.2", target: "filter.resonance", amount: 0.2, bipolar: false, enabled: true },
       { id: "keytrack_level", source: "keytrack", target: "osc.a.level", amount: 0.2, bipolar: false, enabled: true },
+      { id: "modwheel_pan", source: "modWheel", target: "amp.pan", amount: 0.35, bipolar: true, enabled: true },
       { id: "macro_cutoff", source: "macro.1", target: "filter.cutoff", amount: 0.12, bipolar: false, enabled: true },
       { id: "velocity_amp", source: "velocity", target: "amp.level", amount: 0.25, bipolar: false, enabled: true },
       { id: "disabled_macro", source: "macro.1", target: "amp.level", amount: -1, bipolar: false, enabled: false },
@@ -163,6 +164,11 @@ try {
     count: 1,
     amount: 0.2,
     label: "OSC A Level +20",
+  });
+  assert.deepEqual(synthStore.modulationSummaryForSource(draft, "modWheel"), {
+    count: 1,
+    amount: 0.35,
+    label: "Amp Pan +35",
   });
   assert.equal(synthStore.MODULATION_SOURCE_LABELS.velocity, "Velocity");
   assert.deepEqual(synthStore.modulationSummaryForSource(draft, "velocity"), {
@@ -326,6 +332,48 @@ try {
   synthPreview.renderInstrumentSamples(keytrackPreview, lowKeytrackSamples, 48000, synthPreview.midiFrequency(36), "audio", true);
   synthPreview.renderInstrumentSamples(keytrackPreview, highKeytrackSamples, 48000, synthPreview.midiFrequency(96), "audio", true);
   assert.ok(bufferRms(highKeytrackSamples) > bufferRms(lowKeytrackSamples) * 1.8, "expected keytrack-routed preview render to respond to played pitch");
+
+  const modWheelPreview = synthStore.synthDraftToPreviewInstrument({
+    ...draft,
+    parameters: { ...draft.parameters, "amp.level": 0 },
+    modulation: [{ id: "modwheel_probe", source: "modWheel", target: "amp.level", amount: 1, bipolar: false, enabled: true }],
+  });
+  assert.ok(
+    synthPreview.modulationAtTime(modWheelPreview, 0.25, 1, 120, 1, 0.6, 0.9).targetOffsets["amp.level"]
+      > synthPreview.modulationAtTime(modWheelPreview, 0.25, 1, 120, 1, 0.6, 0.2).targetOffsets["amp.level"] * 3,
+    "expected mod wheel modulation source to scale target offsets",
+  );
+  const lowModWheelSamples = new Float32Array(4096);
+  const highModWheelSamples = new Float32Array(4096);
+  synthPreview.renderInstrumentSamples(
+    modWheelPreview,
+    lowModWheelSamples,
+    48000,
+    synthPreview.previewFrequency(modWheelPreview),
+    "audio",
+    true,
+    undefined,
+    undefined,
+    undefined,
+    120,
+    127,
+    0.15,
+  );
+  synthPreview.renderInstrumentSamples(
+    modWheelPreview,
+    highModWheelSamples,
+    48000,
+    synthPreview.previewFrequency(modWheelPreview),
+    "audio",
+    true,
+    undefined,
+    undefined,
+    undefined,
+    120,
+    127,
+    0.95,
+  );
+  assert.ok(bufferRms(highModWheelSamples) > bufferRms(lowModWheelSamples) * 4, "expected mod wheel-routed preview render to respond to wheel value");
 
   const env2Preview = synthStore.synthDraftToPreviewInstrument({
     ...draft,

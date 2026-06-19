@@ -1528,6 +1528,8 @@ namespace beat
             target.velocityBipolar = source.velocityBipolar;
             target.keytrack = source.keytrack;
             target.keytrackBipolar = source.keytrackBipolar;
+            target.modWheel = source.modWheel;
+            target.modWheelBipolar = source.modWheelBipolar;
             return target;
         };
         params.dynamicModulation.active = instrument.dynamicModulation.active;

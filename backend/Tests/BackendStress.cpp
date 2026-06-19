@@ -8880,6 +8880,7 @@ namespace
             { "source": "env.1", "target": "filter.drive", "amount": 0.22, "enabled": true },
             { "source": "env.2", "target": "filter.resonance", "amount": 0.2, "enabled": true },
             { "source": "keytrack", "target": "osc.a.level", "amount": 0.2, "enabled": true },
+            { "source": "modWheel", "target": "amp.pan", "amount": 0.35, "bipolar": true, "enabled": true },
             { "source": "lfo.1", "target": "filter.cutoff", "amount": -0.2, "bipolar": false, "enabled": true },
             { "source": "lfo.1", "target": "filter.cutoff", "amount": 1.0, "enabled": false },
             { "source": "env.1", "target": "filter.cutoff", "amount": 0.3, "enabled": true },
@@ -8992,6 +8993,8 @@ namespace
         if (!near(instrument.dynamicModulation.filterResonance.env2, 0.2f) || instrument.dynamicModulation.filterResonance.env2Bipolar)
             return false;
         if (!near(instrument.dynamicModulation.oscALevel.keytrack, 0.2f) || instrument.dynamicModulation.oscALevel.keytrackBipolar)
+            return false;
+        if (!near(instrument.dynamicModulation.ampPan.modWheel, 0.35f) || !instrument.dynamicModulation.ampPan.modWheelBipolar)
             return false;
         if (!near(instrument.dynamicModulation.ampLevel.velocity, 0.25f) || instrument.dynamicModulation.ampLevel.velocityBipolar)
             return false;
@@ -9199,11 +9202,12 @@ namespace
         if (!(keytrackOpenEnergy > keytrackClosedEnergy * 1.1))
             return false;
 
-        auto renderWithVelocity = [](const beat::InstrumentVoice::Params& renderParams, float velocity, int midiNote = 69) {
+        auto renderWithVelocity = [](const beat::InstrumentVoice::Params& renderParams, float velocity, int midiNote = 69, int modWheelValue = 0) {
             beat::InstrumentVoice voice;
             voice.prepare(44100.0, 256);
             voice.setParams(renderParams);
             voice.startNote(midiNote, velocity, nullptr, 0);
+            voice.controllerMoved(1, modWheelValue);
 
             juce::AudioBuffer<float> buffer(2, 4096);
             buffer.clear();
@@ -9259,6 +9263,30 @@ namespace
             }
         }
         if (!(highKeytrackEnergy > lowKeytrackEnergy * 3.5))
+            return false;
+
+        auto modWheelParams = params;
+        modWheelParams.ampLevel = 0.0f;
+        modWheelParams.wavetableUnison = 1;
+        modWheelParams.dynamicModulation.active = true;
+        modWheelParams.dynamicModulation.ampLevel.modWheel = 1.0f;
+        auto lowModWheel = renderWithVelocity(modWheelParams, 1.0f, 69, 16);
+        auto highModWheel = renderWithVelocity(modWheelParams, 1.0f, 69, 127);
+        double lowModWheelEnergy = 0.0;
+        double highModWheelEnergy = 0.0;
+        for (int channel = 0; channel < lowModWheel.getNumChannels(); ++channel)
+        {
+            for (int i = 0; i < lowModWheel.getNumSamples(); ++i)
+            {
+                const auto lowSample = (double) lowModWheel.getSample(channel, i);
+                const auto highSample = (double) highModWheel.getSample(channel, i);
+                if (!std::isfinite(lowSample) || !std::isfinite(highSample))
+                    return false;
+                lowModWheelEnergy += lowSample * lowSample;
+                highModWheelEnergy += highSample * highSample;
+            }
+        }
+        if (!(highModWheelEnergy > lowModWheelEnergy * 40.0))
             return false;
 
         auto env2ModParams = params;
