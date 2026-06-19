@@ -132,7 +132,7 @@ export function renderInstrumentSamples(
       : shouldGlide
         ? frequency + (targetFrequency - frequency) * smoothstep(glideT)
         : frequency;
-    const modulation = modulationAtTime(instrument, t, durationS, bpm, velocity01);
+    const modulation = modulationAtTime(instrument, t, durationS, bpm, velocity01, keytrackSourceValue(baseFrequency));
     applyAutomationOffsets(instrument, modulation, automation, t);
     const currentFrequency = baseFrequency * Math.pow(2, modulation.pitchSemitones / 12);
     out[i] = renderInstrumentSample(instrument, state, sampleRate, currentFrequency, mode, modulation) * amp;
@@ -186,7 +186,7 @@ export function renderInstrumentStereoSamples(
       : shouldGlide
         ? frequency + (targetFrequency - frequency) * smoothstep(glideT)
         : frequency;
-    const modulation = modulationAtTime(instrument, timeS, durationS, bpm, velocity01);
+    const modulation = modulationAtTime(instrument, timeS, durationS, bpm, velocity01, keytrackSourceValue(baseFrequency));
     applyAutomationOffsets(instrument, modulation, automation, timeS);
     const currentFrequency = baseFrequency * Math.pow(2, modulation.pitchSemitones / 12);
     const stereo = renderInstrumentStereoSample(instrument, phaseState, leftFilterState, rightFilterState, sampleRate, currentFrequency, mode, modulation);
@@ -644,7 +644,7 @@ function quantizeKeyNumber(value: number, step: number): number {
   return Math.round(value / step) * step;
 }
 
-function midiFrequency(midiPitch: number): number {
+export function midiFrequency(midiPitch: number): number {
   return 440 * Math.pow(2, (midiPitch - 69) / 12);
 }
 
@@ -1396,7 +1396,7 @@ function effectiveLfoRateHz(instrument: Instrument, lfo: 1 | 2, bpm: number): nu
   return Math.max(0.01, instrument.lfo2RateHz ?? 0.5);
 }
 
-export function modulationAtTime(instrument: Instrument, timeS: number, durationS: number, bpm = 120, velocity = 1): RenderModulation {
+export function modulationAtTime(instrument: Instrument, timeS: number, durationS: number, bpm = 120, velocity = 1, keytrack = keytrackSourceValue(previewFrequency(instrument))): RenderModulation {
   const lfo1OneShot = instrument.synthPatch?.parameters?.["lfo.1.oneShot"] === true || instrument.lfoOneShot === true;
   const lfo2OneShot = instrument.synthPatch?.parameters?.["lfo.2.oneShot"] === true || instrument.lfo2OneShot === true;
   const rawLfo = lfoShapeValue(
@@ -1413,7 +1413,7 @@ export function modulationAtTime(instrument: Instrument, timeS: number, duration
   );
   const env = envelopePreviewValue(timeS, durationS, instrument);
   const env2 = modEnvelopePreviewValue(timeS, durationS, instrument);
-  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env, env2, velocity);
+  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env, env2, velocity, keytrack);
   if (targetOffsets) {
     return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, targetOffsets };
   }
@@ -1435,6 +1435,7 @@ function routeTargetOffsets(
   env: number,
   env2: number,
   velocity: number,
+  keytrack: number,
 ): Partial<Record<RuntimeModulationTarget, number>> | null {
   const routes = instrument.synthPatch?.modulation as RuntimeModulationRoute[] | undefined;
   if (!Array.isArray(routes)) return null;
@@ -1445,7 +1446,7 @@ function routeTargetOffsets(
     const amount = Number.isFinite(route.amount) ? clamp(route.amount ?? 0, -1, 1) : 0;
     if (amount === 0) continue;
 
-    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, env, env2, velocity);
+    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, env, env2, velocity, keytrack);
     if (sourceValue == null) continue;
     offsets[route.target] = (offsets[route.target] ?? 0) + sourceValue * amount * modulationTargetScale(route.target);
   }
@@ -1460,6 +1461,7 @@ function modulationSourceValue(
   env: number,
   env2: number,
   velocity: number,
+  keytrack: number,
 ): number | null {
   if (route.source === "lfo.1") {
     if (instrument.synthPatch?.parameters?.["lfo.1.enabled"] === false) return 0;
@@ -1477,6 +1479,9 @@ function modulationSourceValue(
   }
   if (route.source === "velocity") {
     return route.bipolar ? velocity * 2 - 1 : velocity;
+  }
+  if (route.source === "keytrack") {
+    return route.bipolar ? keytrack * 2 - 1 : keytrack;
   }
   return null;
 }
@@ -1544,6 +1549,12 @@ function filterKeytrackOffset(instrument: Instrument, sampleRate: number, freque
   const maxHz = Math.min(16000, sampleRate * 0.45);
   const octaveOffset = Math.log2(frequency / SYNTH_PREVIEW_BASE_HZ);
   return (octaveOffset * keytrack) / Math.log2(maxHz / minHz);
+}
+
+function keytrackSourceValue(frequency: number): number {
+  if (!Number.isFinite(frequency) || frequency <= 0) return 0;
+  const midi = 69 + 12 * Math.log2(frequency / 440);
+  return clamp01(midi / 127);
 }
 
 function lfoShapeValue(shape: NonNullable<Instrument["lfoWaveform"]>, cycles: number, oneShot = false, smoothing = 0): number {

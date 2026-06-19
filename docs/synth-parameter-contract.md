@@ -176,6 +176,8 @@ Rules:
 
 `velocity` is the note-on velocity normalized to `0..1`. Browser preview, MIDI timeline preview, and the native voice path use the same unipolar/bipolar route behavior, so velocity-routed patches should respond consistently across edit preview, live playback, and export.
 
+`keytrack` is the played MIDI note normalized as `midiNote / 127`. Browser preview derives the same value from the rendered frequency, and native render derives it from the MIDI note passed to the voice.
+
 ## Modulation Targets
 
 Initial targets:

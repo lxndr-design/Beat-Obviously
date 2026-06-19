@@ -8879,6 +8879,7 @@ namespace
             { "source": "lfo.1", "target": "unison.spread", "amount": 0.33, "bipolar": false, "enabled": true },
             { "source": "env.1", "target": "filter.drive", "amount": 0.22, "enabled": true },
             { "source": "env.2", "target": "filter.resonance", "amount": 0.2, "enabled": true },
+            { "source": "keytrack", "target": "osc.a.level", "amount": 0.2, "enabled": true },
             { "source": "lfo.1", "target": "filter.cutoff", "amount": -0.2, "bipolar": false, "enabled": true },
             { "source": "lfo.1", "target": "filter.cutoff", "amount": 1.0, "enabled": false },
             { "source": "env.1", "target": "filter.cutoff", "amount": 0.3, "enabled": true },
@@ -8989,6 +8990,8 @@ namespace
         if (!near(instrument.dynamicModulation.filterDrive.env, 0.22f))
             return false;
         if (!near(instrument.dynamicModulation.filterResonance.env2, 0.2f) || instrument.dynamicModulation.filterResonance.env2Bipolar)
+            return false;
+        if (!near(instrument.dynamicModulation.oscALevel.keytrack, 0.2f) || instrument.dynamicModulation.oscALevel.keytrackBipolar)
             return false;
         if (!near(instrument.dynamicModulation.ampLevel.velocity, 0.25f) || instrument.dynamicModulation.ampLevel.velocityBipolar)
             return false;
@@ -9196,11 +9199,11 @@ namespace
         if (!(keytrackOpenEnergy > keytrackClosedEnergy * 1.1))
             return false;
 
-        auto renderWithVelocity = [](const beat::InstrumentVoice::Params& renderParams, float velocity) {
+        auto renderWithVelocity = [](const beat::InstrumentVoice::Params& renderParams, float velocity, int midiNote = 69) {
             beat::InstrumentVoice voice;
             voice.prepare(44100.0, 256);
             voice.setParams(renderParams);
-            voice.startNote(69, velocity, nullptr, 0);
+            voice.startNote(midiNote, velocity, nullptr, 0);
 
             juce::AudioBuffer<float> buffer(2, 4096);
             buffer.clear();
@@ -9232,6 +9235,30 @@ namespace
             }
         }
         if (!(velocityModEnergy > velocityBaseEnergy * 4.0))
+            return false;
+
+        auto keytrackModParams = params;
+        keytrackModParams.ampLevel = 0.0f;
+        keytrackModParams.wavetableUnison = 1;
+        keytrackModParams.dynamicModulation.active = true;
+        keytrackModParams.dynamicModulation.ampLevel.keytrack = 1.0f;
+        auto lowKeytrack = renderWithVelocity(keytrackModParams, 1.0f, 36);
+        auto highKeytrack = renderWithVelocity(keytrackModParams, 1.0f, 96);
+        double lowKeytrackEnergy = 0.0;
+        double highKeytrackEnergy = 0.0;
+        for (int channel = 0; channel < lowKeytrack.getNumChannels(); ++channel)
+        {
+            for (int i = 0; i < lowKeytrack.getNumSamples(); ++i)
+            {
+                const auto lowSample = (double) lowKeytrack.getSample(channel, i);
+                const auto highSample = (double) highKeytrack.getSample(channel, i);
+                if (!std::isfinite(lowSample) || !std::isfinite(highSample))
+                    return false;
+                lowKeytrackEnergy += lowSample * lowSample;
+                highKeytrackEnergy += highSample * highSample;
+            }
+        }
+        if (!(highKeytrackEnergy > lowKeytrackEnergy * 3.5))
             return false;
 
         auto env2ModParams = params;

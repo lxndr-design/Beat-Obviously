@@ -109,6 +109,8 @@ namespace beat
                 bool env2Bipolar { false };
                 float velocity { 0.0f };
                 bool velocityBipolar { false };
+                float keytrack { 0.0f };
+                bool keytrackBipolar { false };
             };
 
             struct DynamicModulation
@@ -361,6 +363,7 @@ namespace beat
         double  aetherOscAPhaseOffset { 0.0 };
         double  aetherOscBPhaseOffset { 0.0 };
         float   level { 0.0f };
+        float   noteKeytrack { 0.0f };
         float   cachedFilterHz { -1.0f };
         float   cachedFilterResonance { -1.0f };
         std::shared_ptr<const Wavetable> wavetableTable;

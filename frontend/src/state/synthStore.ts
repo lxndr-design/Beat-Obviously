@@ -105,6 +105,7 @@ export type ModulationSourceId =
   | "lfo.1"
   | "lfo.2"
   | "velocity"
+  | "keytrack"
   | "macro.1"
   | "macro.2"
   | "macro.3"
@@ -575,6 +576,7 @@ export const MODULATION_SOURCE_LABELS: Record<ModulationSourceId, string> = {
   "lfo.1": "LFO 1",
   "lfo.2": "LFO 2",
   velocity: "Velocity",
+  keytrack: "Keytrack",
   "macro.1": "Macro 1",
   "macro.2": "Macro 2",
   "macro.3": "Macro 3",

@@ -112,6 +112,7 @@ try {
       { id: "route_lfo2_b_pan", source: "lfo.2", target: "osc.b.pan", amount: -0.25, bipolar: true, enabled: true },
       { id: "filter_env", source: "env.1", target: "filter.cutoff", amount: 0.31, bipolar: false, enabled: true },
       { id: "env2_res", source: "env.2", target: "filter.resonance", amount: 0.2, bipolar: false, enabled: true },
+      { id: "keytrack_level", source: "keytrack", target: "osc.a.level", amount: 0.2, bipolar: false, enabled: true },
       { id: "macro_cutoff", source: "macro.1", target: "filter.cutoff", amount: 0.12, bipolar: false, enabled: true },
       { id: "velocity_amp", source: "velocity", target: "amp.level", amount: 0.25, bipolar: false, enabled: true },
       { id: "disabled_macro", source: "macro.1", target: "amp.level", amount: -1, bipolar: false, enabled: false },
@@ -157,6 +158,11 @@ try {
     count: 1,
     amount: 0.2,
     label: "Filter Res +20",
+  });
+  assert.deepEqual(synthStore.modulationSummaryForSource(draft, "keytrack"), {
+    count: 1,
+    amount: 0.2,
+    label: "OSC A Level +20",
   });
   assert.equal(synthStore.MODULATION_SOURCE_LABELS.velocity, "Velocity");
   assert.deepEqual(synthStore.modulationSummaryForSource(draft, "velocity"), {
@@ -304,6 +310,22 @@ try {
     127,
   );
   assert.ok(bufferRms(highVelocitySamples) > bufferRms(lowVelocitySamples) * 3, "expected note velocity to drive preview loudness through modulation");
+
+  const keytrackPreview = synthStore.synthDraftToPreviewInstrument({
+    ...draft,
+    parameters: { ...draft.parameters, "amp.level": 0 },
+    modulation: [{ id: "keytrack_probe", source: "keytrack", target: "amp.level", amount: 1, bipolar: false, enabled: true }],
+  });
+  assert.ok(
+    synthPreview.modulationAtTime(keytrackPreview, 0.25, 1, 120, 1, 0.8).targetOffsets["amp.level"]
+      > synthPreview.modulationAtTime(keytrackPreview, 0.25, 1, 120, 1, 0.25).targetOffsets["amp.level"] * 3,
+    "expected keytrack modulation source to scale with normalized MIDI key",
+  );
+  const lowKeytrackSamples = new Float32Array(4096);
+  const highKeytrackSamples = new Float32Array(4096);
+  synthPreview.renderInstrumentSamples(keytrackPreview, lowKeytrackSamples, 48000, synthPreview.midiFrequency(36), "audio", true);
+  synthPreview.renderInstrumentSamples(keytrackPreview, highKeytrackSamples, 48000, synthPreview.midiFrequency(96), "audio", true);
+  assert.ok(bufferRms(highKeytrackSamples) > bufferRms(lowKeytrackSamples) * 1.8, "expected keytrack-routed preview render to respond to played pitch");
 
   const env2Preview = synthStore.synthDraftToPreviewInstrument({
     ...draft,

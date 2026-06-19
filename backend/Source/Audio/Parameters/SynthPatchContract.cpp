@@ -253,11 +253,14 @@ namespace beat
             target.env2Bipolar = routeBipolar(modulation, "env.2", routeTarget, false);
             target.velocity = routeAmount(modulation, "velocity", routeTarget);
             target.velocityBipolar = routeBipolar(modulation, "velocity", routeTarget, false);
+            target.keytrack = routeAmount(modulation, "keytrack", routeTarget);
+            target.keytrackBipolar = routeBipolar(modulation, "keytrack", routeTarget, false);
             return std::abs(target.lfo) > 0.0001f
                 || std::abs(target.lfo2) > 0.0001f
                 || std::abs(target.env) > 0.0001f
                 || std::abs(target.env2) > 0.0001f
-                || std::abs(target.velocity) > 0.0001f;
+                || std::abs(target.velocity) > 0.0001f
+                || std::abs(target.keytrack) > 0.0001f;
         }
 
         void configureDynamicModulation(

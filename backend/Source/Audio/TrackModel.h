@@ -189,6 +189,8 @@ namespace beat
             bool env2Bipolar { false };
             float velocity { 0.0f };
             bool velocityBipolar { false };
+            float keytrack { 0.0f };
+            bool keytrackBipolar { false };
         };
 
         struct DynamicModulation

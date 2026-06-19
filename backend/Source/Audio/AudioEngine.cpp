@@ -1526,6 +1526,8 @@ namespace beat
             target.env2Bipolar = source.env2Bipolar;
             target.velocity = source.velocity;
             target.velocityBipolar = source.velocityBipolar;
+            target.keytrack = source.keytrack;
+            target.keytrackBipolar = source.keytrackBipolar;
             return target;
         };
         params.dynamicModulation.active = instrument.dynamicModulation.active;
