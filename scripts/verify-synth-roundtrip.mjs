@@ -68,12 +68,17 @@ try {
       "lfo.1.rate": 4.5,
       "lfo.1.sync": false,
       "lfo.1.shape": "triangle",
+      "lfo.2.enabled": true,
+      "lfo.2.rate": 0.75,
+      "lfo.2.sync": false,
+      "lfo.2.shape": "square",
       "macro.1": 0.5,
       "future.experimental": "preserve-me",
     },
     modulation: [
       { id: "route", source: "lfo.1", target: "osc.a.position", amount: -0.21, bipolar: false, enabled: true },
       { id: "route", source: "lfo.1", target: "osc.a.fine", amount: 0.4, bipolar: true, enabled: true },
+      { id: "route_lfo2_b_pan", source: "lfo.2", target: "osc.b.pan", amount: -0.25, bipolar: true, enabled: true },
       { id: "filter_env", source: "env.1", target: "filter.cutoff", amount: 0.31, bipolar: false, enabled: true },
       { id: "macro_cutoff", source: "macro.1", target: "filter.cutoff", amount: 0.12, bipolar: false, enabled: true },
       { id: "disabled_macro", source: "macro.1", target: "amp.level", amount: -1, bipolar: false, enabled: false },
@@ -99,6 +104,11 @@ try {
     count: 1,
     amount: 0.12,
     label: "Filter Cutoff +12",
+  });
+  assert.deepEqual(synthStore.modulationSummaryForSource(draft, "lfo.2"), {
+    count: 1,
+    amount: -0.25,
+    label: "OSC B Pan -25",
   });
   assert.ok(synthStore.FACTORY_SYNTH_PRESETS.length >= 5);
   assert.equal(
@@ -134,6 +144,9 @@ try {
   assert.equal(patch.wavetable.unison, 5);
   assert.equal(patch.aether.oscA.wavetable.unison, 5);
   assert.equal(patch.aether.oscB.wavetable.unison, 5);
+  assert.equal(patch.lfo2Waveform, "square");
+  assert.equal(patch.lfo2RateHz, 0.75);
+  assert.equal(patch.lfo2Enabled, true);
   assert.equal(patch.lfoPositionBipolar, false);
   assert.equal(patch.lfoPitchBipolar, true);
   assert.equal(patch.synthPatch.parameters["future.experimental"], "preserve-me");

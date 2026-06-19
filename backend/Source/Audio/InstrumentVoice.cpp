@@ -107,16 +107,18 @@ namespace beat
 
         bool dynamicTargetActive(const InstrumentVoice::Params::DynamicModTarget& target) noexcept
         {
-            return std::abs(target.lfo) > 0.0001f || std::abs(target.env) > 0.0001f;
+            return std::abs(target.lfo) > 0.0001f || std::abs(target.lfo2) > 0.0001f || std::abs(target.env) > 0.0001f;
         }
 
         float dynamicTargetOffset(
             const InstrumentVoice::Params::DynamicModTarget& target,
             float rawLfo,
+            float rawLfo2,
             float env,
             float scale) noexcept
         {
             return (lfoRouteValue(rawLfo, target.lfoBipolar) * target.lfo
+                + lfoRouteValue(rawLfo2, target.lfo2Bipolar) * target.lfo2
                 + envRouteValue(env, target.envBipolar) * target.env) * scale;
         }
 
@@ -778,6 +780,7 @@ namespace beat
         phase     = 0.0;
         noiseState = (juce::uint32) (midiNoteNumber * 747796405u + 2891336453u);
         if (params.lfoRetrigger) lfoPhase = 0.0;
+        if (params.lfo2Retrigger) lfo2Phase = 0.0;
         baseFrequencyHz = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
         phaseDelta = baseFrequencyHz / sampleRate;
         pitchFrequencyRamp.reset((float) baseFrequencyHz);
@@ -830,8 +833,10 @@ namespace beat
             || std::abs(params.lfoToFilter) > 0.0001f
             || std::abs(params.envToFilter) > 0.0001f;
         const bool needsLfoValue = useDynamicModulation || hasPitchMod || hasPositionMod || hasFilterMod;
+        const bool needsLfo2Value = useDynamicModulation && params.lfo2Enabled;
         const bool hasAmpPanMod = cachedAmpPanDynamic;
         const double lfoPhaseDelta = juce::jmax(0.01f, params.lfoRateHz) / sampleRate;
+        const double lfo2PhaseDelta = juce::jmax(0.01f, params.lfo2RateHz) / sampleRate;
         const bool hasVoiceAutomation = voicePitchEventCount > 0 || voiceAutomationEventCount > 0;
         int64_t modulationSamples = 0;
         int64_t realtimeRampSamples = 0;
@@ -860,6 +865,7 @@ namespace beat
                 advanceRealtimeRamps();
             }
             const float rawLfo = needsLfoValue ? lfoValue(params.lfoWaveform, lfoPhase) : 0.0f;
+            const float rawLfo2 = needsLfo2Value ? lfoValue(params.lfo2Waveform, lfo2Phase) : 0.0f;
             if (needsLfoValue || useDynamicModulation)
                 ++modulationSamples;
             const float positionLfo = hasPositionMod ? lfoRouteValue(rawLfo, params.lfoPositionBipolar) * clamp01(params.lfoDepth) : 0.0f;
@@ -872,25 +878,25 @@ namespace beat
                 currentPhaseDelta *= std::exp2((pitchLfo * pitchMod) / 12.0);
             if (useDynamicModulation && !params.hasAether)
             {
-                const float oscAFineCents = dynamicTargetOffset(params.dynamicModulation.oscAFine, rawLfo, env, 100.0f);
+                const float oscAFineCents = dynamicTargetOffset(params.dynamicModulation.oscAFine, rawLfo, rawLfo2, env, 100.0f);
                 currentPhaseDelta *= std::exp2(oscAFineCents / 1200.0f);
             }
             const double currentFrequency = currentPhaseDelta * sampleRate;
             const float dynamicOscAPosition = useDynamicModulation && cachedAetherOscAPositionDynamic
-                ? dynamicTargetOffset(params.dynamicModulation.oscAPosition, rawLfo, env, 1.0f)
+                ? dynamicTargetOffset(params.dynamicModulation.oscAPosition, rawLfo, rawLfo2, env, 1.0f)
                 : 0.0f;
             const float dynamicUnisonDetune = useDynamicModulation && cachedUnisonDetuneDynamic
-                ? dynamicTargetOffset(params.dynamicModulation.unisonDetune, rawLfo, env, 100.0f)
+                ? dynamicTargetOffset(params.dynamicModulation.unisonDetune, rawLfo, rawLfo2, env, 100.0f)
                 : 0.0f;
             const float dynamicUnisonSpread = useDynamicModulation && cachedUnisonSpreadDynamic
-                ? dynamicTargetOffset(params.dynamicModulation.unisonSpread, rawLfo, env, 1.0f)
+                ? dynamicTargetOffset(params.dynamicModulation.unisonSpread, rawLfo, rawLfo2, env, 1.0f)
                 : 0.0f;
 
             // Oscillator
             StereoSample raw;
             if (params.hasAether)
             {
-                raw = renderAetherTableStack(currentFrequency, rawLfo, env);
+                raw = renderAetherTableStack(currentFrequency, rawLfo, rawLfo2, env);
             }
             else
             {
@@ -908,7 +914,7 @@ namespace beat
 
             // Drive (soft clipping)
             const float drive = clamp01(params.drive01 + (useDynamicModulation && cachedFilterDriveDynamic
-                ? dynamicTargetOffset(params.dynamicModulation.filterDrive, rawLfo, env, 1.0f)
+                ? dynamicTargetOffset(params.dynamicModulation.filterDrive, rawLfo, rawLfo2, env, 1.0f)
                 : 0.0f));
             if (drive > 0.0001f)
             {
@@ -927,7 +933,7 @@ namespace beat
             if (hasFilterMod)
             {
                     const float cutoffMod = useDynamicModulation && cachedFilterCutoffDynamic
-                        ? dynamicTargetOffset(params.dynamicModulation.filterCutoff, rawLfo, env, 0.35f)
+                        ? dynamicTargetOffset(params.dynamicModulation.filterCutoff, rawLfo, rawLfo2, env, 0.35f)
                         : filterLfo * params.lfoToFilter * 0.35f + env * params.envToFilter * 0.35f;
                 const float nextFilterHz = cutoffHz(params.cutoff01 + cutoffMod, sampleRate);
                 if (std::abs(nextFilterHz - cachedFilterHz) > 6.0f)
@@ -940,7 +946,7 @@ namespace beat
                 if (useDynamicModulation && cachedFilterResonanceDynamic)
                 {
                     const float resonance = clamp01(params.resonance01
-                        + dynamicTargetOffset(params.dynamicModulation.filterResonance, rawLfo, env, 1.0f));
+                        + dynamicTargetOffset(params.dynamicModulation.filterResonance, rawLfo, rawLfo2, env, 1.0f));
                     const float nextResonance = 0.5f + resonance * 4.0f;
                     if (std::abs(nextResonance - cachedFilterResonance) > 0.001f)
                     {
@@ -955,10 +961,10 @@ namespace beat
             right = filterRight.processSample(0, right);
 
             const float ampLevel = clamp01(params.ampLevel + (useDynamicModulation && cachedAmpLevelDynamic
-                ? dynamicTargetOffset(params.dynamicModulation.ampLevel, rawLfo, env, 1.0f)
+                ? dynamicTargetOffset(params.dynamicModulation.ampLevel, rawLfo, rawLfo2, env, 1.0f)
                 : 0.0f));
             const float ampPan = hasAmpPanMod
-                ? juce::jlimit(-1.0f, 1.0f, params.ampPan + dynamicTargetOffset(params.dynamicModulation.ampPan, rawLfo, env, 1.0f))
+                ? juce::jlimit(-1.0f, 1.0f, params.ampPan + dynamicTargetOffset(params.dynamicModulation.ampPan, rawLfo, rawLfo2, env, 1.0f))
                 : params.ampPan;
             const auto panGains = hasAmpPanMod ? equalPowerPanGains(ampPan) : cachedAmpPanGains;
             const float voiceGain = env * level * 0.4f * ampLevel;
@@ -977,6 +983,11 @@ namespace beat
             {
                 lfoPhase += lfoPhaseDelta;
                 if (lfoPhase >= 1.0) lfoPhase -= 1.0;
+                if (needsLfo2Value)
+                {
+                    lfo2Phase += lfo2PhaseDelta;
+                    if (lfo2Phase >= 1.0) lfo2Phase -= 1.0;
+                }
             }
             ++voiceSamplePosition;
         }
@@ -1254,14 +1265,14 @@ namespace beat
             || cachedUnisonSpreadDynamic;
     }
 
-    InstrumentVoice::StereoSample InstrumentVoice::renderAetherTableStack(double frequencyHz, float rawLfo, float env) noexcept
+    InstrumentVoice::StereoSample InstrumentVoice::renderAetherTableStack(double frequencyHz, float rawLfo, float rawLfo2, float env) noexcept
     {
         const bool useDynamicModulation = params.dynamicModulation.active && cachedAnyDynamicModulationTarget;
         const float unisonDetuneMod = useDynamicModulation && cachedUnisonDetuneDynamic
-            ? dynamicTargetOffset(params.dynamicModulation.unisonDetune, rawLfo, env, 100.0f)
+            ? dynamicTargetOffset(params.dynamicModulation.unisonDetune, rawLfo, rawLfo2, env, 100.0f)
             : 0.0f;
         const float unisonSpreadMod = useDynamicModulation && cachedUnisonSpreadDynamic
-            ? dynamicTargetOffset(params.dynamicModulation.unisonSpread, rawLfo, env, 1.0f)
+            ? dynamicTargetOffset(params.dynamicModulation.unisonSpread, rawLfo, rawLfo2, env, 1.0f)
             : 0.0f;
         float leftSum = 0.0f;
         float rightSum = 0.0f;
@@ -1292,16 +1303,16 @@ namespace beat
             int64_t& componentSampleCounter)
         {
             const float modulatedLevel = clamp01(osc.level + (useDynamicModulation && levelIsDynamic
-                ? dynamicTargetOffset(levelTarget, rawLfo, env, 1.0f)
+                ? dynamicTargetOffset(levelTarget, rawLfo, rawLfo2, env, 1.0f)
                 : 0.0f));
             if (!osc.enabled || modulatedLevel <= 0.0f)
                 return;
             const float modulatedPan = juce::jlimit(-1.0f, 1.0f, osc.pan + (useDynamicModulation
-                ? dynamicTargetOffset(panTarget, rawLfo, env, 1.0f)
+                ? dynamicTargetOffset(panTarget, rawLfo, rawLfo2, env, 1.0f)
                 : 0.0f));
 
             const float positionMod = useDynamicModulation && positionIsDynamic
-                ? dynamicTargetOffset(positionTarget, rawLfo, env, 1.0f)
+                ? dynamicTargetOffset(positionTarget, rawLfo, rawLfo2, env, 1.0f)
                 : 0.0f;
             if (osc.waveform == 4)
             {
@@ -1314,7 +1325,7 @@ namespace beat
             double rate = staticRate;
             if (fineIsDynamic)
             {
-                const float fineOffsetCents = dynamicTargetOffset(fineTarget, rawLfo, env, 100.0f);
+                const float fineOffsetCents = dynamicTargetOffset(fineTarget, rawLfo, rawLfo2, env, 100.0f);
                 rate *= std::exp2((double) fineOffsetCents / 1200.0);
                 ++currentBlockOscillatorRateCalculations;
             }

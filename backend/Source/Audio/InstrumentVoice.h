@@ -98,6 +98,8 @@ namespace beat
             {
                 float lfo { 0.0f };
                 bool lfoBipolar { true };
+                float lfo2 { 0.0f };
+                bool lfo2Bipolar { true };
                 float env { 0.0f };
                 bool envBipolar { false };
             };
@@ -146,6 +148,10 @@ namespace beat
             float lfoRateHz { 4.0f };
             float lfoDepth { 0.0f };
             bool lfoRetrigger { true };
+            bool lfo2Enabled { false };
+            int lfo2Waveform { 1 };
+            float lfo2RateHz { 0.5f };
+            bool lfo2Retrigger { true };
             bool lfoPositionBipolar { true };
             bool lfoPitchBipolar { true };
             bool lfoFilterBipolar { true };
@@ -312,7 +318,7 @@ namespace beat
         void refreshCachedPanGains() noexcept;
         void refreshCachedPitchRates() noexcept;
         void refreshCachedDynamicModulationFlags() noexcept;
-        StereoSample renderAetherTableStack(double frequencyHz, float rawLfo, float env) noexcept;
+        StereoSample renderAetherTableStack(double frequencyHz, float rawLfo, float rawLfo2, float env) noexcept;
         StereoSample processDriveOversampled(StereoSample sample, float driveGain) noexcept;
 
         Params  baseParams;
@@ -322,6 +328,7 @@ namespace beat
         double  phaseDelta { 0.0 };
         double  baseFrequencyHz { 440.0 };
         double  lfoPhase { 0.0 };
+        double  lfo2Phase { 0.0 };
         float   level { 0.0f };
         float   cachedFilterHz { -1.0f };
         float   cachedFilterResonance { -1.0f };

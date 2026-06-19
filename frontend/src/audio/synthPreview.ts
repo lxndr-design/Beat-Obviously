@@ -588,6 +588,9 @@ function renderRelevantInstrumentState(instrument: Instrument) {
     aether: instrument.aether,
     lfoWaveform: instrument.lfoWaveform,
     lfoRateHz: instrument.lfoRateHz,
+    lfo2Waveform: instrument.lfo2Waveform,
+    lfo2RateHz: instrument.lfo2RateHz,
+    lfo2Enabled: instrument.lfo2Enabled,
     lfoDepth: instrument.lfoDepth,
     lfoSync: instrument.lfoSync,
     lfoRetrigger: instrument.lfoRetrigger,
@@ -1276,8 +1279,9 @@ function baseAutomationValue(instrument: Instrument, target: RuntimeModulationTa
 
 export function modulationAtTime(instrument: Instrument, timeS: number, durationS: number): RenderModulation {
   const rawLfo = lfoShapeValue(instrument.lfoWaveform ?? "sine", timeS * Math.max(0.01, instrument.lfoRateHz ?? 4));
+  const rawLfo2 = lfoShapeValue(instrument.lfo2Waveform ?? "triangle", timeS * Math.max(0.01, instrument.lfo2RateHz ?? 0.5));
   const env = envelopePreviewValue(timeS, durationS, instrument);
-  const targetOffsets = routeTargetOffsets(instrument, rawLfo, env);
+  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env);
   if (targetOffsets) {
     return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, targetOffsets };
   }
@@ -1295,6 +1299,7 @@ export function modulationAtTime(instrument: Instrument, timeS: number, duration
 function routeTargetOffsets(
   instrument: Instrument,
   rawLfo: number,
+  rawLfo2: number,
   env: number,
 ): Partial<Record<RuntimeModulationTarget, number>> | null {
   const routes = instrument.synthPatch?.modulation as RuntimeModulationRoute[] | undefined;
@@ -1306,7 +1311,7 @@ function routeTargetOffsets(
     const amount = Number.isFinite(route.amount) ? clamp(route.amount ?? 0, -1, 1) : 0;
     if (amount === 0) continue;
 
-    const sourceValue = modulationSourceValue(instrument, route, rawLfo, env);
+    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, env);
     if (sourceValue == null) continue;
     offsets[route.target] = (offsets[route.target] ?? 0) + sourceValue * amount * modulationTargetScale(route.target);
   }
@@ -1317,11 +1322,16 @@ function modulationSourceValue(
   instrument: Instrument,
   route: RuntimeModulationRoute,
   rawLfo: number,
+  rawLfo2: number,
   env: number,
 ): number | null {
   if (route.source === "lfo.1") {
     if (instrument.synthPatch?.parameters?.["lfo.1.enabled"] === false) return 0;
     return lfoRouteValue(rawLfo, route.bipolar !== false);
+  }
+  if (route.source === "lfo.2") {
+    if (instrument.synthPatch?.parameters?.["lfo.2.enabled"] !== true && instrument.lfo2Enabled !== true) return 0;
+    return lfoRouteValue(rawLfo2, route.bipolar !== false);
   }
   if (route.source === "env.1") {
     return route.bipolar ? env * 2 - 1 : env;

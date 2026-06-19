@@ -186,10 +186,43 @@ section.shell {
   min-height: 136px;
 }
 
-.macros,
-.lfoControls {
+.macros {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: var(--synth-gap);
+  align-items: end;
+  padding: var(--synth-gap);
+}
+
+.lfoStack {
+  display: grid;
+  gap: var(--synth-gap);
+  padding: var(--synth-gap);
+}
+
+.lfoLane {
+  display: grid;
+  gap: var(--synth-gap);
+  min-width: 0;
+  border: var(--border-fg);
+}
+
+.lfoLaneHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  padding: 0 var(--synth-gap);
+  border-bottom: var(--border-fg);
+}
+
+.lfoLaneTitle {
+  font-weight: var(--font-weight-medium);
+}
+
+.lfoControls {
+  display: grid;
+  grid-template-columns: minmax(88px, 1fr) minmax(72px, 0.8fr);
   gap: var(--synth-gap);
   align-items: end;
   padding: var(--synth-gap);
@@ -278,6 +311,11 @@ section.shell {
 }
 
 .disabledPanel :global(.ds-panel-body) {
+  opacity: 0.42;
+  filter: grayscale(1);
+}
+
+.disabledPanel .lfoControls {
   opacity: 0.42;
   filter: grayscale(1);
 }

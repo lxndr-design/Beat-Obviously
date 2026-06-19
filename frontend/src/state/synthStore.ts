@@ -65,6 +65,13 @@ export type SynthParameterId =
   | "lfo.1.shape"
   | "lfo.1.phase"
   | "lfo.1.bipolar"
+  | "lfo.2.enabled"
+  | "lfo.2.rate"
+  | "lfo.2.sync"
+  | "lfo.2.syncedRate"
+  | "lfo.2.shape"
+  | "lfo.2.phase"
+  | "lfo.2.bipolar"
   | "macro.1"
   | "macro.2"
   | "macro.3"
@@ -75,6 +82,7 @@ export type SynthParameterValue = boolean | number | string;
 export type ModulationSourceId =
   | "env.1"
   | "lfo.1"
+  | "lfo.2"
   | "macro.1"
   | "macro.2"
   | "macro.3"
@@ -412,6 +420,13 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "lfo.1.shape": "sine",
   "lfo.1.phase": 0,
   "lfo.1.bipolar": true,
+  "lfo.2.enabled": false,
+  "lfo.2.rate": 0.5,
+  "lfo.2.sync": true,
+  "lfo.2.syncedRate": "1/2",
+  "lfo.2.shape": "triangle",
+  "lfo.2.phase": 0,
+  "lfo.2.bipolar": true,
   "macro.1": 0,
   "macro.2": 0,
   "macro.3": 0,
@@ -466,6 +481,13 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "lfo.1.shape": "LFO 1 Shape",
   "lfo.1.phase": "LFO 1 Phase",
   "lfo.1.bipolar": "LFO 1 Bipolar",
+  "lfo.2.enabled": "LFO 2 Enabled",
+  "lfo.2.rate": "LFO 2 Rate",
+  "lfo.2.sync": "LFO 2 Sync",
+  "lfo.2.syncedRate": "LFO 2 Sync Rate",
+  "lfo.2.shape": "LFO 2 Shape",
+  "lfo.2.phase": "LFO 2 Phase",
+  "lfo.2.bipolar": "LFO 2 Bipolar",
   "macro.1": "Macro 1",
   "macro.2": "Macro 2",
   "macro.3": "Macro 3",
@@ -475,6 +497,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
 export const MODULATION_SOURCE_LABELS: Record<ModulationSourceId, string> = {
   "env.1": "Amp Env",
   "lfo.1": "LFO 1",
+  "lfo.2": "LFO 2",
   "macro.1": "Macro 1",
   "macro.2": "Macro 2",
   "macro.3": "Macro 3",
@@ -660,6 +683,10 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     lfoDepth: lfoEnabled ? Math.abs(clampBipolar(routeAmount(draft, "lfo.1", "osc.a.position"))) : 0,
     lfoSync: draft.parameters["lfo.1.sync"] === true,
     lfoRetrigger: true,
+    lfo2Waveform: lfoWaveformFromDraft(draft, 2),
+    lfo2RateHz: getNumberParam(draft, "lfo.2.rate"),
+    lfo2Enabled: getBooleanParam(draft, "lfo.2.enabled"),
+    lfo2Retrigger: true,
     lfoPositionBipolar: routeBipolar(draft, "lfo.1", "osc.a.position", true),
     lfoPitchBipolar: routeBipolar(draft, "lfo.1", "osc.a.fine", true),
     lfoFilterBipolar: routeBipolar(draft, "lfo.1", "filter.cutoff", true),
@@ -753,6 +780,10 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["lfo.1.rate"] = instrument.lfoRateHz ?? 1;
   draft.parameters["lfo.1.sync"] = instrument.lfoSync ?? false;
   draft.parameters["lfo.1.shape"] = instrument.lfoWaveform ?? "sine";
+  draft.parameters["lfo.2.enabled"] = instrument.lfo2Enabled ?? false;
+  draft.parameters["lfo.2.rate"] = instrument.lfo2RateHz ?? 0.5;
+  draft.parameters["lfo.2.sync"] = false;
+  draft.parameters["lfo.2.shape"] = instrument.lfo2Waveform ?? "triangle";
   draft.parameters["amp.level"] = instrument.ampLevel ?? 0.8;
   draft.parameters["amp.pan"] = instrument.ampPan ?? 0;
 
@@ -944,7 +975,7 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (!Number.isFinite(value)) return typeof fallback === "number" ? fallback : 0;
   if (id.endsWith(".enabled") || id === "filter.type" || id.endsWith(".wavetable")) return value;
   if (id === "filter.cutoff") return Math.max(20, Math.min(20000, value));
-  if (id === "lfo.1.rate") return Math.max(0.05, Math.min(50, value));
+  if (id === "lfo.1.rate" || id === "lfo.2.rate") return Math.max(0.05, Math.min(50, value));
   if (id.includes(".octave")) return Math.max(-4, Math.min(4, Math.round(value)));
   if (id.includes(".semitone")) return Math.max(-12, Math.min(12, Math.round(value)));
   if (id.includes(".fine")) return Math.max(-100, Math.min(100, value));
@@ -1255,8 +1286,8 @@ function wavetableFromDraft(draft: SynthDraftPatch, oscillator: OscillatorKey): 
   };
 }
 
-function lfoWaveformFromDraft(draft: SynthDraftPatch): NonNullable<Instrument["lfoWaveform"]> {
-  const shape = getStringParam(draft, "lfo.1.shape");
+function lfoWaveformFromDraft(draft: SynthDraftPatch, lfo: 1 | 2 = 1): NonNullable<Instrument["lfoWaveform"]> {
+  const shape = getStringParam(draft, `lfo.${lfo}.shape` as SynthParameterId);
   return shape === "triangle" || shape === "saw" || shape === "square" ? shape : "sine";
 }
 

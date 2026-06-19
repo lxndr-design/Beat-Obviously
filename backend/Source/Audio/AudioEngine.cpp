@@ -1445,6 +1445,10 @@ namespace beat
         params.lfoRateHz = instrument.lfoRateHz;
         params.lfoDepth = instrument.lfoDepth;
         params.lfoRetrigger = instrument.lfoRetrigger;
+        params.lfo2Enabled = instrument.lfo2Enabled;
+        params.lfo2Waveform = instrument.lfo2Waveform;
+        params.lfo2RateHz = instrument.lfo2RateHz;
+        params.lfo2Retrigger = instrument.lfo2Retrigger;
         params.lfoPositionBipolar = instrument.lfoPositionBipolar;
         params.lfoPitchBipolar = instrument.lfoPitchBipolar;
         params.lfoFilterBipolar = instrument.lfoFilterBipolar;
@@ -1456,90 +1460,120 @@ namespace beat
             {
                 instrument.dynamicModulation.oscAPosition.lfo,
                 instrument.dynamicModulation.oscAPosition.lfoBipolar,
+                instrument.dynamicModulation.oscAPosition.lfo2,
+                instrument.dynamicModulation.oscAPosition.lfo2Bipolar,
                 instrument.dynamicModulation.oscAPosition.env,
                 instrument.dynamicModulation.oscAPosition.envBipolar,
             },
             {
                 instrument.dynamicModulation.oscAFine.lfo,
                 instrument.dynamicModulation.oscAFine.lfoBipolar,
+                instrument.dynamicModulation.oscAFine.lfo2,
+                instrument.dynamicModulation.oscAFine.lfo2Bipolar,
                 instrument.dynamicModulation.oscAFine.env,
                 instrument.dynamicModulation.oscAFine.envBipolar,
             },
             {
                 instrument.dynamicModulation.oscALevel.lfo,
                 instrument.dynamicModulation.oscALevel.lfoBipolar,
+                instrument.dynamicModulation.oscALevel.lfo2,
+                instrument.dynamicModulation.oscALevel.lfo2Bipolar,
                 instrument.dynamicModulation.oscALevel.env,
                 instrument.dynamicModulation.oscALevel.envBipolar,
             },
             {
                 instrument.dynamicModulation.oscAPan.lfo,
                 instrument.dynamicModulation.oscAPan.lfoBipolar,
+                instrument.dynamicModulation.oscAPan.lfo2,
+                instrument.dynamicModulation.oscAPan.lfo2Bipolar,
                 instrument.dynamicModulation.oscAPan.env,
                 instrument.dynamicModulation.oscAPan.envBipolar,
             },
             {
                 instrument.dynamicModulation.oscBPosition.lfo,
                 instrument.dynamicModulation.oscBPosition.lfoBipolar,
+                instrument.dynamicModulation.oscBPosition.lfo2,
+                instrument.dynamicModulation.oscBPosition.lfo2Bipolar,
                 instrument.dynamicModulation.oscBPosition.env,
                 instrument.dynamicModulation.oscBPosition.envBipolar,
             },
             {
                 instrument.dynamicModulation.oscBFine.lfo,
                 instrument.dynamicModulation.oscBFine.lfoBipolar,
+                instrument.dynamicModulation.oscBFine.lfo2,
+                instrument.dynamicModulation.oscBFine.lfo2Bipolar,
                 instrument.dynamicModulation.oscBFine.env,
                 instrument.dynamicModulation.oscBFine.envBipolar,
             },
             {
                 instrument.dynamicModulation.oscBLevel.lfo,
                 instrument.dynamicModulation.oscBLevel.lfoBipolar,
+                instrument.dynamicModulation.oscBLevel.lfo2,
+                instrument.dynamicModulation.oscBLevel.lfo2Bipolar,
                 instrument.dynamicModulation.oscBLevel.env,
                 instrument.dynamicModulation.oscBLevel.envBipolar,
             },
             {
                 instrument.dynamicModulation.oscBPan.lfo,
                 instrument.dynamicModulation.oscBPan.lfoBipolar,
+                instrument.dynamicModulation.oscBPan.lfo2,
+                instrument.dynamicModulation.oscBPan.lfo2Bipolar,
                 instrument.dynamicModulation.oscBPan.env,
                 instrument.dynamicModulation.oscBPan.envBipolar,
             },
             {
                 instrument.dynamicModulation.filterCutoff.lfo,
                 instrument.dynamicModulation.filterCutoff.lfoBipolar,
+                instrument.dynamicModulation.filterCutoff.lfo2,
+                instrument.dynamicModulation.filterCutoff.lfo2Bipolar,
                 instrument.dynamicModulation.filterCutoff.env,
                 instrument.dynamicModulation.filterCutoff.envBipolar,
             },
             {
                 instrument.dynamicModulation.filterResonance.lfo,
                 instrument.dynamicModulation.filterResonance.lfoBipolar,
+                instrument.dynamicModulation.filterResonance.lfo2,
+                instrument.dynamicModulation.filterResonance.lfo2Bipolar,
                 instrument.dynamicModulation.filterResonance.env,
                 instrument.dynamicModulation.filterResonance.envBipolar,
             },
             {
                 instrument.dynamicModulation.filterDrive.lfo,
                 instrument.dynamicModulation.filterDrive.lfoBipolar,
+                instrument.dynamicModulation.filterDrive.lfo2,
+                instrument.dynamicModulation.filterDrive.lfo2Bipolar,
                 instrument.dynamicModulation.filterDrive.env,
                 instrument.dynamicModulation.filterDrive.envBipolar,
             },
             {
                 instrument.dynamicModulation.ampLevel.lfo,
                 instrument.dynamicModulation.ampLevel.lfoBipolar,
+                instrument.dynamicModulation.ampLevel.lfo2,
+                instrument.dynamicModulation.ampLevel.lfo2Bipolar,
                 instrument.dynamicModulation.ampLevel.env,
                 instrument.dynamicModulation.ampLevel.envBipolar,
             },
             {
                 instrument.dynamicModulation.ampPan.lfo,
                 instrument.dynamicModulation.ampPan.lfoBipolar,
+                instrument.dynamicModulation.ampPan.lfo2,
+                instrument.dynamicModulation.ampPan.lfo2Bipolar,
                 instrument.dynamicModulation.ampPan.env,
                 instrument.dynamicModulation.ampPan.envBipolar,
             },
             {
                 instrument.dynamicModulation.unisonDetune.lfo,
                 instrument.dynamicModulation.unisonDetune.lfoBipolar,
+                instrument.dynamicModulation.unisonDetune.lfo2,
+                instrument.dynamicModulation.unisonDetune.lfo2Bipolar,
                 instrument.dynamicModulation.unisonDetune.env,
                 instrument.dynamicModulation.unisonDetune.envBipolar,
             },
             {
                 instrument.dynamicModulation.unisonSpread.lfo,
                 instrument.dynamicModulation.unisonSpread.lfoBipolar,
+                instrument.dynamicModulation.unisonSpread.lfo2,
+                instrument.dynamicModulation.unisonSpread.lfo2Bipolar,
                 instrument.dynamicModulation.unisonSpread.env,
                 instrument.dynamicModulation.unisonSpread.envBipolar,
             },

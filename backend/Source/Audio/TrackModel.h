@@ -178,6 +178,8 @@ namespace beat
         {
             float lfo { 0.0f };
             bool lfoBipolar { true };
+            float lfo2 { 0.0f };
+            bool lfo2Bipolar { true };
             float env { 0.0f };
             bool envBipolar { false };
         };
@@ -250,6 +252,10 @@ namespace beat
         float lfoRateHz { 4.0f };
         float lfoDepth { 0.0f };
         bool lfoRetrigger { true };
+        bool lfo2Enabled { false };
+        int lfo2Waveform { 1 };
+        float lfo2RateHz { 0.5f };
+        bool lfo2Retrigger { true };
         bool lfoPositionBipolar { true };
         bool lfoPitchBipolar { true };
         bool lfoFilterBipolar { true };

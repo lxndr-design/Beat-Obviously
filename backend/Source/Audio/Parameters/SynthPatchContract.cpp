@@ -189,37 +189,41 @@ namespace beat
             InstrumentDefinition::DynamicModTarget& target,
             const juce::var& modulation,
             const juce::String& routeTarget,
-            bool lfoEnabled)
+            bool lfoEnabled,
+            bool lfo2Enabled)
         {
             target.lfo = lfoEnabled ? routeAmount(modulation, "lfo.1", routeTarget) : 0.0f;
             target.lfoBipolar = routeBipolar(modulation, "lfo.1", routeTarget, true);
+            target.lfo2 = lfo2Enabled ? routeAmount(modulation, "lfo.2", routeTarget) : 0.0f;
+            target.lfo2Bipolar = routeBipolar(modulation, "lfo.2", routeTarget, true);
             target.env = routeAmount(modulation, "env.1", routeTarget);
             target.envBipolar = routeBipolar(modulation, "env.1", routeTarget, false);
-            return std::abs(target.lfo) > 0.0001f || std::abs(target.env) > 0.0001f;
+            return std::abs(target.lfo) > 0.0001f || std::abs(target.lfo2) > 0.0001f || std::abs(target.env) > 0.0001f;
         }
 
         void configureDynamicModulation(
             InstrumentDefinition::DynamicModulation& dynamicModulation,
             const juce::var& modulation,
-            bool lfoEnabled)
+            bool lfoEnabled,
+            bool lfo2Enabled)
         {
             dynamicModulation = {};
             bool active = false;
-            active |= configureDynamicTarget(dynamicModulation.oscAPosition, modulation, "osc.a.position", lfoEnabled);
-            active |= configureDynamicTarget(dynamicModulation.oscAFine, modulation, "osc.a.fine", lfoEnabled);
-            active |= configureDynamicTarget(dynamicModulation.oscALevel, modulation, "osc.a.level", lfoEnabled);
-            active |= configureDynamicTarget(dynamicModulation.oscAPan, modulation, "osc.a.pan", lfoEnabled);
-            active |= configureDynamicTarget(dynamicModulation.oscBPosition, modulation, "osc.b.position", lfoEnabled);
-            active |= configureDynamicTarget(dynamicModulation.oscBFine, modulation, "osc.b.fine", lfoEnabled);
-            active |= configureDynamicTarget(dynamicModulation.oscBLevel, modulation, "osc.b.level", lfoEnabled);
-            active |= configureDynamicTarget(dynamicModulation.oscBPan, modulation, "osc.b.pan", lfoEnabled);
-            active |= configureDynamicTarget(dynamicModulation.filterCutoff, modulation, "filter.cutoff", lfoEnabled);
-            active |= configureDynamicTarget(dynamicModulation.filterResonance, modulation, "filter.resonance", lfoEnabled);
-            active |= configureDynamicTarget(dynamicModulation.filterDrive, modulation, "filter.drive", lfoEnabled);
-            active |= configureDynamicTarget(dynamicModulation.ampLevel, modulation, "amp.level", lfoEnabled);
-            active |= configureDynamicTarget(dynamicModulation.ampPan, modulation, "amp.pan", lfoEnabled);
-            active |= configureDynamicTarget(dynamicModulation.unisonDetune, modulation, "unison.detune", lfoEnabled);
-            active |= configureDynamicTarget(dynamicModulation.unisonSpread, modulation, "unison.spread", lfoEnabled);
+            active |= configureDynamicTarget(dynamicModulation.oscAPosition, modulation, "osc.a.position", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.oscAFine, modulation, "osc.a.fine", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.oscALevel, modulation, "osc.a.level", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.oscAPan, modulation, "osc.a.pan", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.oscBPosition, modulation, "osc.b.position", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.oscBFine, modulation, "osc.b.fine", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.oscBLevel, modulation, "osc.b.level", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.oscBPan, modulation, "osc.b.pan", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.filterCutoff, modulation, "filter.cutoff", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.filterResonance, modulation, "filter.resonance", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.filterDrive, modulation, "filter.drive", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.ampLevel, modulation, "amp.level", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.ampPan, modulation, "amp.pan", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.unisonDetune, modulation, "unison.detune", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.unisonSpread, modulation, "unison.spread", lfoEnabled, lfo2Enabled);
             dynamicModulation.active = active;
         }
     }
@@ -353,6 +357,9 @@ namespace beat
             + staticRouteAmount(params, modulation, "amp.pan"));
         instrument.lfoWaveform = parseSynthLfoWaveform(synthStringParam(params, "lfo.1.shape", "sine"));
         instrument.lfoRateHz = juce::jlimit(0.01f, 50.0f, (float) synthNumberParam(params, "lfo.1.rate", instrument.lfoRateHz));
+        instrument.lfo2Enabled = synthNumberParam(params, "lfo.2.enabled", instrument.lfo2Enabled ? 1.0 : 0.0) >= 0.5;
+        instrument.lfo2Waveform = parseSynthLfoWaveform(synthStringParam(params, "lfo.2.shape", "triangle"));
+        instrument.lfo2RateHz = juce::jlimit(0.01f, 50.0f, (float) synthNumberParam(params, "lfo.2.rate", instrument.lfo2RateHz));
 
         const bool lfoEnabled = synthNumberParam(params, "lfo.1.enabled", 1.0) >= 0.5;
         instrument.lfoDepth = lfoEnabled ? std::abs(routeAmount(modulation, "lfo.1", "osc.a.position")) : 0.0f;
@@ -362,7 +369,7 @@ namespace beat
         instrument.lfoPitchBipolar = routeBipolar(modulation, "lfo.1", "osc.a.fine", true);
         instrument.lfoFilterBipolar = routeBipolar(modulation, "lfo.1", "filter.cutoff", true);
         instrument.envToFilter = routeAmount(modulation, "env.1", "filter.cutoff");
-        configureDynamicModulation(instrument.dynamicModulation, modulation, lfoEnabled);
+        configureDynamicModulation(instrument.dynamicModulation, modulation, lfoEnabled, instrument.lfo2Enabled);
         return true;
     }
 }

@@ -454,6 +454,10 @@ namespace beat
             o->setProperty("lfoRateHz", instrument.lfoRateHz);
             o->setProperty("lfoDepth", instrument.lfoDepth);
             o->setProperty("lfoRetrigger", instrument.lfoRetrigger);
+            o->setProperty("lfo2Enabled", instrument.lfo2Enabled);
+            o->setProperty("lfo2Waveform", instrument.lfo2Waveform);
+            o->setProperty("lfo2RateHz", instrument.lfo2RateHz);
+            o->setProperty("lfo2Retrigger", instrument.lfo2Retrigger);
             o->setProperty("lfoPositionBipolar", instrument.lfoPositionBipolar);
             o->setProperty("lfoPitchBipolar", instrument.lfoPitchBipolar);
             o->setProperty("lfoFilterBipolar", instrument.lfoFilterBipolar);
@@ -597,6 +601,10 @@ namespace beat
                     instrument.lfoRateHz = juce::jlimit(0.01f, 40.0f, (float) (double) iv.getProperty("lfoRateHz", instrument.lfoRateHz));
                     instrument.lfoDepth = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("lfoDepth", instrument.lfoDepth));
                     instrument.lfoRetrigger = (bool) iv.getProperty("lfoRetrigger", instrument.lfoRetrigger);
+                    instrument.lfo2Enabled = (bool) iv.getProperty("lfo2Enabled", instrument.lfo2Enabled);
+                    instrument.lfo2Waveform = juce::jlimit(0, 8, (int) iv.getProperty("lfo2Waveform", instrument.lfo2Waveform));
+                    instrument.lfo2RateHz = juce::jlimit(0.01f, 40.0f, (float) (double) iv.getProperty("lfo2RateHz", instrument.lfo2RateHz));
+                    instrument.lfo2Retrigger = (bool) iv.getProperty("lfo2Retrigger", instrument.lfo2Retrigger);
                     instrument.lfoPositionBipolar = (bool) iv.getProperty("lfoPositionBipolar", instrument.lfoPositionBipolar);
                     instrument.lfoPitchBipolar = (bool) iv.getProperty("lfoPitchBipolar", instrument.lfoPitchBipolar);
                     instrument.lfoFilterBipolar = (bool) iv.getProperty("lfoFilterBipolar", instrument.lfoFilterBipolar);

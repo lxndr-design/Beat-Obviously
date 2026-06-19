@@ -8804,7 +8804,10 @@ namespace
             "amp.pan": -0.25,
             "lfo.1.enabled": true,
             "lfo.1.shape": "square",
-            "lfo.1.rate": 6.5
+            "lfo.1.rate": 6.5,
+            "lfo.2.enabled": true,
+            "lfo.2.shape": "triangle",
+            "lfo.2.rate": 0.75
           },
           "modulation": [
             { "source": "macro.1", "target": "osc.a.position", "amount": 0.4, "enabled": true },
@@ -8824,6 +8827,7 @@ namespace
             { "source": "lfo.1", "target": "osc.a.pan", "amount": 0.4, "bipolar": false, "enabled": true },
             { "source": "lfo.1", "target": "osc.b.position", "amount": 0.25, "bipolar": false, "enabled": true },
             { "source": "lfo.1", "target": "osc.b.pan", "amount": -0.2, "bipolar": true, "enabled": true },
+            { "source": "lfo.2", "target": "osc.b.pan", "amount": 0.44, "bipolar": false, "enabled": true },
             { "source": "lfo.1", "target": "unison.spread", "amount": 0.33, "bipolar": false, "enabled": true },
             { "source": "env.1", "target": "filter.drive", "amount": 0.22, "enabled": true },
             { "source": "lfo.1", "target": "filter.cutoff", "amount": -0.2, "bipolar": false, "enabled": true },
@@ -8870,6 +8874,8 @@ namespace
             return false;
         if (instrument.lfoWaveform != 3 || !near(instrument.lfoRateHz, 6.5f))
             return false;
+        if (!instrument.lfo2Enabled || instrument.lfo2Waveform != 1 || !near(instrument.lfo2RateHz, 0.75f))
+            return false;
         if (!near(instrument.lfoDepth, 0.35f) || !near(instrument.lfoToPitch, 6.0f) || !near(instrument.lfoToFilter, -0.2f))
             return false;
         if (instrument.lfoPositionBipolar || !instrument.lfoPitchBipolar || instrument.lfoFilterBipolar)
@@ -8885,6 +8891,8 @@ namespace
         if (!near(instrument.dynamicModulation.oscBPosition.lfo, 0.25f) || instrument.dynamicModulation.oscBPosition.lfoBipolar)
             return false;
         if (!near(instrument.dynamicModulation.oscBPan.lfo, -0.2f) || !instrument.dynamicModulation.oscBPan.lfoBipolar)
+            return false;
+        if (!near(instrument.dynamicModulation.oscBPan.lfo2, 0.44f) || instrument.dynamicModulation.oscBPan.lfo2Bipolar)
             return false;
         if (!near(instrument.dynamicModulation.filterCutoff.lfo, -0.2f) || !near(instrument.dynamicModulation.filterCutoff.env, 0.3f))
             return false;

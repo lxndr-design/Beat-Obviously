@@ -16,6 +16,7 @@ const MACRO_TARGETS = Object.keys(MODULATION_TARGET_LABELS) as ModulationTargetI
 const TARGETS_BY_SOURCE: Record<ModulationSourceId, ModulationTargetId[]> = {
   "env.1": MACRO_TARGETS,
   "lfo.1": MACRO_TARGETS,
+  "lfo.2": MACRO_TARGETS,
   "macro.1": MACRO_TARGETS,
   "macro.2": MACRO_TARGETS,
   "macro.3": MACRO_TARGETS,
@@ -196,7 +197,7 @@ export function ModulationMatrix() {
                 </label>
                 <div class={styles.modeCell}>
                   <Show
-                    when={route.source === "lfo.1"}
+                    when={route.source === "lfo.1" || route.source === "lfo.2"}
                     fallback={<span class={styles.modeStatic} aria-label="Polarity only applies to LFO routes">-</span>}
                   >
                     <HoverInfo content={route.bipolar ? "LFO swings below and above the target value." : "LFO only pushes the target upward."}>

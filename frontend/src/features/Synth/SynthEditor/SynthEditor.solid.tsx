@@ -537,50 +537,68 @@ export function SynthEditor(props: SynthEditorProps) {
 }
 
 function LfoPanel() {
+  return (
+    <section class={`ds-panel ${styles.lfoPanel}`} aria-label="LFO">
+      <header class="ds-panel-header">
+        <div class="ds-panel-title">LFO</div>
+      </header>
+      <div class={`ds-panel-body ${styles.lfoStack}`}>
+        <LfoLane lfo={1} />
+        <LfoLane lfo={2} />
+      </div>
+    </section>
+  );
+}
+
+function LfoLane(props: { lfo: 1 | 2 }) {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
   const setParameter = useSynthStore.getState().setParameter;
-  const enabled = createMemo(() => draft().parameters["lfo.1.enabled"] === true);
+  const prefix = `lfo.${props.lfo}` as const;
+  const enabledId = `${prefix}.enabled` as SynthParameterId;
+  const shapeId = `${prefix}.shape` as SynthParameterId;
+  const rateId = `${prefix}.rate` as SynthParameterId;
+  const enabled = createMemo(() => draft().parameters[enabledId] === true);
 
   return (
-    <section class={`ds-panel ${styles.lfoPanel} ${enabled() ? "" : styles.disabledPanel}`} aria-label="LFO">
-      <header class="ds-panel-header">
-        <div class="ds-panel-title">LFO</div>
+    <div class={`${styles.lfoLane} ${enabled() ? "" : styles.disabledPanel}`} aria-label={`LFO ${props.lfo}`}>
+      <header class={styles.lfoLaneHeader}>
+        <div class={styles.lfoLaneTitle}>LFO {props.lfo}</div>
         <div class="ds-panel-actions">
           <Button
             iconOnly
             size="xs"
             selected={enabled()}
-            aria-label={`${enabled() ? "Disable" : "Enable"} LFO`}
-            onClick={() => setBooleanParameter("lfo.1.enabled", !enabled())}
+            aria-label={`${enabled() ? "Disable" : "Enable"} LFO ${props.lfo}`}
+            onClick={() => setBooleanParameter(enabledId, !enabled())}
           >
             <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={12} decorative />
           </Button>
         </div>
       </header>
-      <div class={`ds-panel-body ${styles.lfoControls}`}>
+      <div class={styles.lfoControls}>
         <ShapeButtonSet
-          label="LFO Shape"
-          value={String(draft().parameters["lfo.1.shape"])}
+          label={`LFO ${props.lfo} Shape`}
+          value={String(draft().parameters[shapeId])}
           options={LFO_SHAPES}
-          onChange={(value) => setParameter("lfo.1.shape", value)}
+          onChange={(value) => setParameter(shapeId, value)}
         />
         <Knob
           size="sm"
           label="Rate"
-          value={getNumberParam(draft(), "lfo.1.rate")}
+          value={getNumberParam(draft(), rateId)}
           min={0.05}
           max={50}
           step={0.01}
           unit="Hz"
           defaultValue={1}
           formatValue={(value) => `${value < 10 ? value.toFixed(2) : value.toFixed(1)}`}
-          pickSourceId="lfo.1"
-          onChange={(value) => setNumericParameter("lfo.1.rate", value)}
+          pickSourceId={`lfo.${props.lfo}` as ModulationSourceId}
+          onChange={(value) => setNumericParameter(rateId, value)}
         />
       </div>
-    </section>
+    </div>
   );
 }
 
