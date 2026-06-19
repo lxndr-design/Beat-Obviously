@@ -82,9 +82,9 @@ namespace beat
 
         float nextNoise(juce::uint32& state);
 
-        float lfoValue(int waveform, double phase)
+        float lfoValue(int waveform, double phase, bool oneShot = false)
         {
-            const float p = (float) (phase - std::floor(phase));
+            const float p = oneShot ? juce::jlimit(0.0f, 1.0f, (float) phase) : (float) (phase - std::floor(phase));
             switch (waveform)
             {
                 case 1: return p < 0.5f ? p * 4.0f - 1.0f : 3.0f - p * 4.0f;
@@ -886,8 +886,8 @@ namespace beat
                 realtimeRampSamples += activeRealtimeRampCount;
                 advanceRealtimeRamps();
             }
-            const float rawLfo = needsLfoValue ? lfoValue(params.lfoWaveform, lfoPhase) : 0.0f;
-            const float rawLfo2 = needsLfo2Value ? lfoValue(params.lfo2Waveform, lfo2Phase) : 0.0f;
+            const float rawLfo = needsLfoValue ? lfoValue(params.lfoWaveform, lfoPhase, params.lfoOneShot) : 0.0f;
+            const float rawLfo2 = needsLfo2Value ? lfoValue(params.lfo2Waveform, lfo2Phase, params.lfo2OneShot) : 0.0f;
             if (needsLfoValue || useDynamicModulation)
                 ++modulationSamples;
             const float positionLfo = hasPositionMod ? lfoRouteValue(rawLfo, params.lfoPositionBipolar) * clamp01(params.lfoDepth) : 0.0f;
@@ -1004,11 +1004,17 @@ namespace beat
             if (needsLfoValue)
             {
                 lfoPhase += lfoPhaseDelta;
-                if (lfoPhase >= 1.0) lfoPhase -= 1.0;
+                if (params.lfoOneShot)
+                    lfoPhase = juce::jmin(1.0, lfoPhase);
+                else if (lfoPhase >= 1.0)
+                    lfoPhase -= 1.0;
                 if (needsLfo2Value)
                 {
                     lfo2Phase += lfo2PhaseDelta;
-                    if (lfo2Phase >= 1.0) lfo2Phase -= 1.0;
+                    if (params.lfo2OneShot)
+                        lfo2Phase = juce::jmin(1.0, lfo2Phase);
+                    else if (lfo2Phase >= 1.0)
+                        lfo2Phase -= 1.0;
                 }
             }
             ++voiceSamplePosition;

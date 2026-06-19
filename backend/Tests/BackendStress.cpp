@@ -8811,11 +8811,13 @@ namespace
             "lfo.1.rate": 6.5,
             "lfo.1.phase": 0.25,
             "lfo.1.retrigger": false,
+            "lfo.1.oneShot": true,
             "lfo.2.enabled": true,
             "lfo.2.shape": "triangle",
             "lfo.2.rate": 0.75,
             "lfo.2.phase": 0.5,
-            "lfo.2.retrigger": true
+            "lfo.2.retrigger": true,
+            "lfo.2.oneShot": false
           },
           "modulation": [
             { "source": "macro.1", "target": "osc.a.position", "amount": 0.4, "enabled": true },
@@ -8888,9 +8890,13 @@ namespace
             return false;
         if (instrument.lfoRetrigger)
             return false;
+        if (!instrument.lfoOneShot)
+            return false;
         if (!instrument.lfo2Enabled || instrument.lfo2Waveform != 1 || !near(instrument.lfo2RateHz, 0.75f) || !near(instrument.lfo2PhaseOffset, 0.5f))
             return false;
         if (!instrument.lfo2Retrigger)
+            return false;
+        if (instrument.lfo2OneShot)
             return false;
         if (!near(instrument.lfoDepth, 0.35f) || !near(instrument.lfoToPitch, 6.0f) || !near(instrument.lfoToFilter, -0.2f))
             return false;
@@ -9068,6 +9074,33 @@ namespace
         }
 
         if (pitchOnlyDiff <= 0.1)
+            return false;
+
+        auto oneShotLoopParams = params;
+        oneShotLoopParams.lfoDepth = 0.8f;
+        oneShotLoopParams.lfoWaveform = 2;
+        oneShotLoopParams.lfoRateHz = 24.0f;
+        oneShotLoopParams.lfoPhaseOffset = 0.0f;
+        oneShotLoopParams.lfoRetrigger = true;
+        oneShotLoopParams.lfoOneShot = false;
+        auto oneShotLoop = render(oneShotLoopParams);
+        auto oneShotHoldParams = oneShotLoopParams;
+        oneShotHoldParams.lfoOneShot = true;
+        auto oneShotHold = render(oneShotHoldParams);
+        double oneShotDiff = 0.0;
+        for (int channel = 0; channel < oneShotLoop.getNumChannels(); ++channel)
+        {
+            for (int i = 0; i < oneShotLoop.getNumSamples(); ++i)
+            {
+                const float looped = oneShotLoop.getSample(channel, i);
+                const float held = oneShotHold.getSample(channel, i);
+                if (!std::isfinite(looped) || !std::isfinite(held))
+                    return false;
+                oneShotDiff += std::abs((double) looped - (double) held);
+            }
+        }
+
+        if (oneShotDiff <= 0.1)
             return false;
 
         auto unipolarFilterParams = params;

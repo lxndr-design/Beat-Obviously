@@ -455,11 +455,13 @@ namespace beat
             o->setProperty("lfoDepth", instrument.lfoDepth);
             o->setProperty("lfoPhase", instrument.lfoPhaseOffset);
             o->setProperty("lfoRetrigger", instrument.lfoRetrigger);
+            o->setProperty("lfoOneShot", instrument.lfoOneShot);
             o->setProperty("lfo2Enabled", instrument.lfo2Enabled);
             o->setProperty("lfo2Waveform", instrument.lfo2Waveform);
             o->setProperty("lfo2RateHz", instrument.lfo2RateHz);
             o->setProperty("lfo2Phase", instrument.lfo2PhaseOffset);
             o->setProperty("lfo2Retrigger", instrument.lfo2Retrigger);
+            o->setProperty("lfo2OneShot", instrument.lfo2OneShot);
             o->setProperty("lfoPositionBipolar", instrument.lfoPositionBipolar);
             o->setProperty("lfoPitchBipolar", instrument.lfoPitchBipolar);
             o->setProperty("lfoFilterBipolar", instrument.lfoFilterBipolar);
@@ -604,11 +606,13 @@ namespace beat
                     instrument.lfoDepth = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("lfoDepth", instrument.lfoDepth));
                     instrument.lfoPhaseOffset = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("lfoPhase", instrument.lfoPhaseOffset));
                     instrument.lfoRetrigger = (bool) iv.getProperty("lfoRetrigger", instrument.lfoRetrigger);
+                    instrument.lfoOneShot = (bool) iv.getProperty("lfoOneShot", instrument.lfoOneShot);
                     instrument.lfo2Enabled = (bool) iv.getProperty("lfo2Enabled", instrument.lfo2Enabled);
                     instrument.lfo2Waveform = juce::jlimit(0, 8, (int) iv.getProperty("lfo2Waveform", instrument.lfo2Waveform));
                     instrument.lfo2RateHz = juce::jlimit(0.01f, 40.0f, (float) (double) iv.getProperty("lfo2RateHz", instrument.lfo2RateHz));
                     instrument.lfo2PhaseOffset = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("lfo2Phase", instrument.lfo2PhaseOffset));
                     instrument.lfo2Retrigger = (bool) iv.getProperty("lfo2Retrigger", instrument.lfo2Retrigger);
+                    instrument.lfo2OneShot = (bool) iv.getProperty("lfo2OneShot", instrument.lfo2OneShot);
                     instrument.lfoPositionBipolar = (bool) iv.getProperty("lfoPositionBipolar", instrument.lfoPositionBipolar);
                     instrument.lfoPitchBipolar = (bool) iv.getProperty("lfoPitchBipolar", instrument.lfoPitchBipolar);
                     instrument.lfoFilterBipolar = (bool) iv.getProperty("lfoFilterBipolar", instrument.lfoFilterBipolar);

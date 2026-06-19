@@ -246,11 +246,13 @@ export interface Instrument {
   lfoSync?: boolean;        // true = tempo-synced, false = absolute Hz
   lfoPhase?: number;        // 0..1 cycle offset
   lfoRetrigger?: boolean;   // true = restart LFO per note
+  lfoOneShot?: boolean;     // true = stop at the end of one cycle
   lfo2Waveform?: "sine" | "triangle" | "saw" | "square";
   lfo2RateHz?: number;
   lfo2Enabled?: boolean;
   lfo2Phase?: number;
   lfo2Retrigger?: boolean;
+  lfo2OneShot?: boolean;
   lfoPositionBipolar?: boolean;
   lfoPitchBipolar?: boolean;
   lfoFilterBipolar?: boolean;
@@ -549,11 +551,13 @@ export interface InstrumentSnapshot {
   lfoSync?: boolean;
   lfoPhase?: number;
   lfoRetrigger?: boolean;
+  lfoOneShot?: boolean;
   lfo2Waveform?: Instrument["lfo2Waveform"];
   lfo2RateHz?: number;
   lfo2Enabled?: boolean;
   lfo2Phase?: number;
   lfo2Retrigger?: boolean;
+  lfo2OneShot?: boolean;
   lfoPositionBipolar?: boolean;
   lfoPitchBipolar?: boolean;
   lfoFilterBipolar?: boolean;

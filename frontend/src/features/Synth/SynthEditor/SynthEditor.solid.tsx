@@ -561,14 +561,25 @@ function LfoLane(props: { lfo: 1 | 2 }) {
   const rateId = `${prefix}.rate` as SynthParameterId;
   const phaseId = `${prefix}.phase` as SynthParameterId;
   const retriggerId = `${prefix}.retrigger` as SynthParameterId;
+  const oneShotId = `${prefix}.oneShot` as SynthParameterId;
   const enabled = createMemo(() => draft().parameters[enabledId] === true);
   const retrigger = createMemo(() => draft().parameters[retriggerId] !== false);
+  const oneShot = createMemo(() => draft().parameters[oneShotId] === true);
 
   return (
     <div class={`${styles.lfoLane} ${enabled() ? "" : styles.disabledPanel}`} aria-label={`LFO ${props.lfo}`}>
       <header class={styles.lfoLaneHeader}>
         <div class={styles.lfoLaneTitle}>LFO {props.lfo}</div>
         <div class="ds-panel-actions">
+          <Button
+            iconOnly
+            size="xs"
+            selected={oneShot()}
+            aria-label={`${oneShot() ? "Disable" : "Enable"} LFO ${props.lfo} one-shot`}
+            onClick={() => setBooleanParameter(oneShotId, !oneShot())}
+          >
+            <Icon name={oneShot() ? "ph:flag-pennant-fill" : "ph:flag-pennant"} size={12} decorative />
+          </Button>
           <Button
             iconOnly
             size="xs"

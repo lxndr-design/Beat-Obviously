@@ -589,10 +589,12 @@ function renderRelevantInstrumentState(instrument: Instrument) {
     lfoWaveform: instrument.lfoWaveform,
     lfoRateHz: instrument.lfoRateHz,
     lfoPhase: instrument.lfoPhase,
+    lfoOneShot: instrument.lfoOneShot,
     lfo2Waveform: instrument.lfo2Waveform,
     lfo2RateHz: instrument.lfo2RateHz,
     lfo2Enabled: instrument.lfo2Enabled,
     lfo2Phase: instrument.lfo2Phase,
+    lfo2OneShot: instrument.lfo2OneShot,
     lfoDepth: instrument.lfoDepth,
     lfoSync: instrument.lfoSync,
     lfoRetrigger: instrument.lfoRetrigger,
@@ -1291,13 +1293,17 @@ function baseAutomationValue(instrument: Instrument, target: RuntimeModulationTa
 }
 
 export function modulationAtTime(instrument: Instrument, timeS: number, durationS: number): RenderModulation {
+  const lfo1OneShot = instrument.synthPatch?.parameters?.["lfo.1.oneShot"] === true || instrument.lfoOneShot === true;
+  const lfo2OneShot = instrument.synthPatch?.parameters?.["lfo.2.oneShot"] === true || instrument.lfo2OneShot === true;
   const rawLfo = lfoShapeValue(
     instrument.lfoWaveform ?? "sine",
     timeS * Math.max(0.01, instrument.lfoRateHz ?? 4) + (instrument.lfoPhase ?? 0),
+    lfo1OneShot,
   );
   const rawLfo2 = lfoShapeValue(
     instrument.lfo2Waveform ?? "triangle",
     timeS * Math.max(0.01, instrument.lfo2RateHz ?? 0.5) + (instrument.lfo2Phase ?? 0),
+    lfo2OneShot,
   );
   const env = envelopePreviewValue(timeS, durationS, instrument);
   const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env);
@@ -1389,8 +1395,8 @@ function modulationTargetScale(target: RuntimeModulationTarget): number {
   return 1;
 }
 
-function lfoShapeValue(shape: NonNullable<Instrument["lfoWaveform"]>, cycles: number): number {
-  const phase = cycles - Math.floor(cycles);
+function lfoShapeValue(shape: NonNullable<Instrument["lfoWaveform"]>, cycles: number, oneShot = false): number {
+  const phase = oneShot ? clamp(cycles, 0, 1) : cycles - Math.floor(cycles);
   switch (shape) {
     case "square":
       return phase < 0.5 ? 1 : -1;

@@ -151,11 +151,13 @@ namespace beat
             float lfoDepth { 0.0f };
             float lfoPhaseOffset { 0.0f };
             bool lfoRetrigger { true };
+            bool lfoOneShot { false };
             bool lfo2Enabled { false };
             int lfo2Waveform { 1 };
             float lfo2RateHz { 0.5f };
             float lfo2PhaseOffset { 0.0f };
             bool lfo2Retrigger { true };
+            bool lfo2OneShot { false };
             bool lfoPositionBipolar { true };
             bool lfoPitchBipolar { true };
             bool lfoFilterBipolar { true };
