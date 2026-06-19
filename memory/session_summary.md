@@ -7,11 +7,15 @@ metadata:
 
 # Beat — session export (2026-05-23 → 2026-05-24)
 
+> Current override: this is a historical snapshot. The frontend has since been
+> migrated from React to Solid; current UI source lives in `.solid.tsx` files and
+> shared primitives live under `frontend/src/solid-ui`.
+
 ## What got built
 A near-complete frontend for a beat-sequencing DAW + the C++ JUCE backend skeleton (not yet wired to the running preview). 87 tasks tracked, all completed. The app runs at **http://localhost:6174** via `mcp__Claude_Preview__preview_start "beat-frontend"`.
 
 ## Major architectural decisions
-- **JUCE 8 C++ audio engine + React/TS UI** in an embedded WKWebView (hybrid native + web). Backend in `backend/`, frontend in `frontend/`.
+- **JUCE 8 C++ audio engine + Solid/TS UI** in an embedded WKWebView (hybrid native + web). Backend in `backend/`, frontend in `frontend/`.
 - **macOS-first**, standalone app only (no plugin variants).
 - **SQLite via JUCE** on the C++ side; **Dexie/IndexedDB** as a frontend cache mirror with debounced auto-save.
 - **Three.js for visualizer** behind a swappable `Visualizer` interface (background only, low-priority).
@@ -27,7 +31,7 @@ A near-complete frontend for a beat-sequencing DAW + the C++ JUCE backend skelet
 ## Stores at a glance
 | Store | File | Undoable | Purpose |
 |---|---|---|---|
-| `useProjectStore` | state/store.ts | yes (zundo) | Tracks, segments, EQ automation |
+| `useProjectStore` | state/store.ts | yes (local undo history) | Tracks, segments, EQ automation |
 | `useTransportStore` | state/store.ts | no | playing/position/speed/loop |
 | `useUiStore` | state/store.ts | no | selection + openEditors |
 | `useViewStore` | state/store.ts | no | zoom, sidebar width, last segment length |
@@ -38,17 +42,17 @@ A near-complete frontend for a beat-sequencing DAW + the C++ JUCE backend skelet
 
 ## Files of interest
 - **Design**: `frontend/src/design/{tokens.css, reset.css, animations.css, typography.css, global.css, README.md}`
-- **Components**: `frontend/src/components/{Button, Modal, Block, Icon, Knob, NumberInput, HoverInfo, Toggle, DitheredImage, ContextMenu}/`
+- **Components**: `frontend/src/solid-ui/{Button, Modal, Block, Icon, Knob, NumberInput, HoverInfo, Toggle, DitheredImage, ContextMenu}/`
 - **Features**:
-  - TopBar — `features/TopBar/{TopBar, BrandMark, InlineNumber}.tsx`
-  - Sidebar — `features/Sidebar/Sidebar.tsx`
-  - Instruments — `features/InstrumentLibrary/InstrumentLibraryPanel.tsx`, `features/InstrumentEditor/{InstrumentEditorModal, WaveformPicker}.tsx`, `features/InstrumentLibrary/MergeInstrumentModal.tsx`
-  - Components (saved patterns) — `features/ComponentLibrary/ComponentLibraryPanel.tsx`
-  - Tracks — `features/Tracks/{TrackList, TrackHeader, TrackLane, Timeline, Playhead, Segment, SegmentMidiPreview, SegmentWaveform, geometry}.tsx`
-  - Transport / TS — `features/Transport/TimeSignatureModal.tsx`
-  - Segment editor — `features/SegmentEditor/SegmentEditorModal.tsx`
-  - MIDI editor — `features/MidiEditor/{PianoRoll, MidiTransport}.tsx`
-  - EQ — `features/Eq/{MasterEqPanel, EqGraph, VerticalSlider}.tsx`, `features/EqAutomation/EqAutomationModal.tsx`
+  - TopBar — `features/TopBar/{TopBar, BrandMark, InlineNumber}.solid.tsx`
+  - Sidebar — `features/Sidebar/Sidebar.solid.tsx`
+  - Instruments — `features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx`, `features/InstrumentEditor/{InstrumentEditorModal, WaveformPicker}.solid.tsx`, `features/InstrumentLibrary/MergeInstrumentModal.solid.tsx`
+  - Components (saved patterns) — `features/ComponentLibrary/ComponentLibraryPanel.solid.tsx`
+  - Tracks — `features/Tracks/{TrackList, TrackHeader, TrackLane, Timeline, Playhead, Segment, SegmentMidiPreview, SegmentWaveform}.solid.tsx`
+  - Transport / TS — `features/Transport/TimeSignatureControl.solid.tsx`
+  - Segment editor — `features/SegmentEditor/SegmentEditorModal.solid.tsx`
+  - MIDI editor — `features/MidiEditor/{PianoRoll, MidiTransport}.solid.tsx`
+  - EQ — `features/Eq/{MasterEqPanel, EqGraph}.solid.tsx`, `features/EqAutomation/EqAutomationModal.solid.tsx`
   - Visualizer — `features/Visualizer/{Visualizer, visualizerApi}.ts`
 - **Backend**: `backend/Source/{Main, MainComponent}.cpp`, `backend/Source/Audio/{AudioEngine, Sequencer, TrackModel, InstrumentVoice}.cpp`, `backend/Source/Audio/Effects/{Bitcrush, MasterEq}.cpp`, `backend/Source/Persistence/{Database, ProjectRepository, InstrumentRepository}.cpp`, `backend/Source/Ipc/{Schema.h, MessageBridge.cpp}`.
 
@@ -65,7 +69,7 @@ A near-complete frontend for a beat-sequencing DAW + the C++ JUCE backend skelet
 - **JUCE bridge wiring**: `backend/Source/Ipc/MessageBridge::install()` is sketched but the actual JS↔C++ native-function hook depends on JUCE 8 specifics. Frontend mock bridge handles all messages in dev.
 - **PROJECT_SAVE deserialization**: backend has the JSON encoder, needs the inverse parser. Currently round-trips through a JSON blob without re-applying.
 - **Audio segment full editor**: only a stub modal exists for `audio` payload segments.
-- **Cross-track segment drag**: only same-track drag works today; cross-row pointer hit-testing is a TODO in `Segment.tsx`.
+- **Cross-track segment drag**: verify current behavior in `Segment.solid.tsx` / `TrackLane.solid.tsx` before changing drag math.
 - **VST3/AU hosting** + **Windows/Linux builds** — explicitly deferred to post-v1 per roadmap in README.
 - **Live Anthropic AI integration** — interface is in place; swap `MockAiService` for an `AnthropicAiService` implementation when wiring keys.
 

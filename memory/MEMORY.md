@@ -1,3 +1,3 @@
-- [Beat app project](project_beat.md) — hybrid JUCE audio engine + React UI beat sequencer, macOS first
+- [Beat app project](project_beat.md) — hybrid JUCE audio engine + Solid UI beat sequencer, macOS first
 - [Design system constraints](feedback_design_system.md) — strict B&W, Helvetica Neue, 8px grid, no outlines on buttons
 - [User collaboration preferences](user_profile.md) — prefers ambitious "go hard" technical choices, wants expandable foundations
