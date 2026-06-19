@@ -9013,6 +9013,32 @@ namespace
         if (!near(customInstrument.aether.oscA.wavetable.customFrames[2].phase, -0.16f))
             return false;
 
+        const auto macroPatch = juce::JSON::parse(R"json(
+        {
+          "instrumentType": "wavetable-synth",
+          "parameters": {
+            "osc.a.enabled": true,
+            "osc.a.wavetable": "basic.saw",
+            "amp.level": 0.4,
+            "macro.1": 0.5
+          },
+          "metadata": {
+            "macros": {
+              "macro.1": { "id": "macro.1", "label": "Brightness", "min": 0.2, "max": 0.8, "curve": "ease-in" }
+            }
+          },
+          "modulation": [
+            { "source": "macro.1", "target": "amp.level", "amount": 0.5, "enabled": true }
+          ]
+        }
+        )json");
+
+        beat::InstrumentDefinition macroInstrument;
+        if (!beat::applySynthPatchContract(macroPatch, macroInstrument))
+            return false;
+        if (!near(macroInstrument.ampLevel, 0.575f))
+            return false;
+
         return true;
     }
 

@@ -4,6 +4,7 @@ import type {
   CustomWavetableFrame,
   Instrument,
   SynthPatchSnapshot,
+  SynthPatchMacroDefinition,
   WavemapDefinition,
   WavemapSource,
   WavetableConfig,
@@ -99,6 +100,19 @@ export type ModulationSourceId =
   | "macro.3"
   | "macro.4";
 
+export type MacroId = Extract<ModulationSourceId, `macro.${1 | 2 | 3 | 4}`>;
+export type MacroCurve = SynthPatchMacroDefinition["curve"];
+export type SynthMacroDefinition = Omit<SynthPatchMacroDefinition, "id"> & { id: MacroId };
+
+export const MACRO_IDS = ["macro.1", "macro.2", "macro.3", "macro.4"] as const satisfies readonly MacroId[];
+
+const DEFAULT_MACROS: Record<MacroId, SynthMacroDefinition> = {
+  "macro.1": { id: "macro.1", label: "Motion", min: 0, max: 1, curve: "linear" },
+  "macro.2": { id: "macro.2", label: "Color", min: 0, max: 1, curve: "linear" },
+  "macro.3": { id: "macro.3", label: "Shape", min: 0, max: 1, curve: "linear" },
+  "macro.4": { id: "macro.4", label: "Space", min: 0, max: 1, curve: "linear" },
+};
+
 export type ModulationTargetId =
   | "osc.a.position"
   | "osc.a.fine"
@@ -142,6 +156,7 @@ export interface SynthDraftPatch {
     createdBy: "Beat";
     tags: string[];
     icon?: string;
+    macros: Record<MacroId, SynthMacroDefinition>;
     wavemaps?: Record<string, WavemapDefinition>;
     customWavetables?: Record<string, CustomWavetableDefinition>;
   };
@@ -169,6 +184,7 @@ interface SynthStoreState {
   setWavemap: (definition: WavemapDefinition) => void;
   updateCustomWavetableFrame: (id: string, frameIndex: number, patch: Partial<CustomWavetableFrame>) => void;
   updateWavemapMetadata: (id: string, patch: Partial<Pick<WavemapDefinition, "name" | "interpolation" | "source">>) => void;
+  updateMacroDefinition: (id: MacroId, patch: Partial<Omit<SynthMacroDefinition, "id">>) => void;
   setParameter: (id: SynthParameterId, value: SynthParameterValue) => void;
   setNumericParameter: (id: SynthParameterId, value: number) => void;
   setBooleanParameter: (id: SynthParameterId, value: boolean) => void;
@@ -586,6 +602,7 @@ export function createDefaultSynthDraft(): SynthDraftPatch {
       createdBy: "Beat",
       tags: [],
       icon: "ph:cube",
+      macros: cloneDefaultMacros(),
       wavemaps: { [DEFAULT_CUSTOM_WAVETABLE_ID]: createDefaultCustomWavetable() },
       customWavetables: { [DEFAULT_CUSTOM_WAVETABLE_ID]: createDefaultCustomWavetable() },
     },
@@ -620,7 +637,8 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
         .map(normalizeModulationRoute)
         .filter((route): route is SynthModulationRoute => route !== null)
     : base.modulation;
-  const wavemaps = normalizeCustomWavetables(input.metadata?.wavemaps ?? input.metadata?.customWavetables);
+  const inputMetadata: Record<string, unknown> = isRecord(input.metadata) ? input.metadata : {};
+  const wavemaps = normalizeCustomWavetables(inputMetadata.wavemaps ?? inputMetadata.customWavetables);
 
   return {
     schemaVersion: SYNTH_PATCH_SCHEMA_VERSION,
@@ -631,12 +649,13 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
     modulation: dedupeModulationRouteIds(modulation),
     metadata: {
       createdBy: "Beat",
-      tags: Array.isArray(input.metadata?.tags)
-        ? input.metadata.tags.filter((tag): tag is string => typeof tag === "string").slice(0, 16)
+      tags: Array.isArray(inputMetadata.tags)
+        ? inputMetadata.tags.filter((tag): tag is string => typeof tag === "string").slice(0, 16)
         : [],
-      icon: typeof input.metadata?.icon === "string" && input.metadata.icon.startsWith("ph:")
-        ? input.metadata.icon
+      icon: typeof inputMetadata.icon === "string" && inputMetadata.icon.startsWith("ph:")
+        ? inputMetadata.icon
         : base.metadata.icon,
+      macros: normalizeMacroDefinitions(inputMetadata.macros),
       wavemaps,
       customWavetables: wavemaps,
     },
@@ -659,9 +678,30 @@ export function getStringParam(draft: SynthDraftPatch, id: SynthParameterId): st
   return typeof value === "string" ? value : "";
 }
 
+export function macroDefinitionForId(draft: SynthDraftPatch, id: MacroId): SynthMacroDefinition {
+  return normalizeMacroDefinition(id, draft.metadata.macros?.[id]);
+}
+
+export function macroOutputValue(draft: SynthDraftPatch, id: MacroId): number {
+  const definition = macroDefinitionForId(draft, id);
+  const raw = clamp01(getNumberParam(draft, id));
+  const shaped = applyMacroCurve(raw, definition.curve);
+  return clamp01(definition.min + (definition.max - definition.min) * shaped);
+}
+
+export function macroAssignmentsForId(draft: SynthDraftPatch, id: MacroId): SynthModulationRoute[] {
+  return draft.modulation.filter((route) => route.enabled && route.source === id);
+}
+
+export function modulationSourceLabel(draft: SynthDraftPatch, source: ModulationSourceId): string {
+  return isMacroSource(source)
+    ? macroDefinitionForId(draft, source).label
+    : MODULATION_SOURCE_LABELS[source] ?? source;
+}
+
 export function modulationSummaryForTarget(draft: SynthDraftPatch, target: ModulationTargetId): SynthModulationSummary {
   const routes = draft.modulation.filter((route) => route.enabled && route.target === target);
-  return summarizeModulationRoutes(routes, (route) => MODULATION_SOURCE_LABELS[route.source] ?? route.source);
+  return summarizeModulationRoutes(routes, (route) => modulationSourceLabel(draft, route.source));
 }
 
 export function modulationSummaryForSource(draft: SynthDraftPatch, source: ModulationSourceId): SynthModulationSummary {
@@ -979,6 +1019,23 @@ export const useSynthStore = create<SynthStoreState>((set) => ({
         }),
       };
     }),
+  updateMacroDefinition: (id, patch) =>
+    set((state) => ({
+      draft: normalizeSynthDraftPatch({
+        ...state.draft,
+        metadata: {
+          ...state.draft.metadata,
+          macros: {
+            ...state.draft.metadata.macros,
+            [id]: {
+              ...macroDefinitionForId(state.draft, id),
+              ...patch,
+              id,
+            },
+          },
+        },
+      }),
+    })),
   setParameter: (id, value) =>
     set((state) => ({
       draft: {
@@ -1101,6 +1158,52 @@ function isSynthParameterValue(value: unknown): value is SynthParameterValue {
 
 function isSynthParameterId(value: string): value is SynthParameterId {
   return value in DEFAULT_SYNTH_PARAMETERS;
+}
+
+function cloneDefaultMacros(): Record<MacroId, SynthMacroDefinition> {
+  return Object.fromEntries(MACRO_IDS.map((id) => [id, { ...DEFAULT_MACROS[id] }])) as Record<MacroId, SynthMacroDefinition>;
+}
+
+function normalizeMacroDefinitions(value: unknown): Record<MacroId, SynthMacroDefinition> {
+  const next = cloneDefaultMacros();
+  if (!isRecord(value)) return next;
+  for (const id of MACRO_IDS) {
+    next[id] = normalizeMacroDefinition(id, value[id]);
+  }
+  return next;
+}
+
+function normalizeMacroDefinition(id: MacroId, value: unknown): SynthMacroDefinition {
+  const fallback = DEFAULT_MACROS[id];
+  if (!isRecord(value)) return { ...fallback };
+  const rawLabel = typeof value.label === "string" ? value.label.trim() : fallback.label;
+  const label = rawLabel.length > 0 ? rawLabel.slice(0, 24) : fallback.label;
+  const rawMin = typeof value.min === "number" && Number.isFinite(value.min) ? value.min : fallback.min;
+  const rawMax = typeof value.max === "number" && Number.isFinite(value.max) ? value.max : fallback.max;
+  const min = clamp01(Math.min(rawMin, rawMax));
+  const max = clamp01(Math.max(rawMin, rawMax));
+  return {
+    id,
+    label,
+    min,
+    max: max <= min ? Math.min(1, min + 0.01) : max,
+    curve: isMacroCurve(value.curve) ? value.curve : fallback.curve,
+  };
+}
+
+function isMacroCurve(value: unknown): value is MacroCurve {
+  return value === "linear" || value === "ease-in" || value === "ease-out" || value === "s-curve";
+}
+
+function applyMacroCurve(value: number, curve: MacroCurve): number {
+  const x = clamp01(value);
+  switch (curve) {
+    case "ease-in": return x * x;
+    case "ease-out": return 1 - Math.pow(1 - x, 2);
+    case "s-curve": return x * x * (3 - 2 * x);
+    case "linear":
+    default: return x;
+  }
 }
 
 function normalizeCustomWavetables(value: unknown): Record<string, CustomWavetableDefinition> {
@@ -1439,7 +1542,7 @@ function staticRouteAmount(draft: SynthDraftPatch, target: ModulationTargetId): 
       scale,
       draft.modulation
         .filter((route) => route.enabled && route.target === target && isMacroSource(route.source))
-        .reduce((sum, route) => sum + getNumberParam(draft, route.source as SynthParameterId) * route.amount * scale, 0),
+        .reduce((sum, route) => sum + (isMacroSource(route.source) ? macroOutputValue(draft, route.source) : 0) * route.amount * scale, 0),
     ),
   );
 }
@@ -1454,7 +1557,7 @@ function modulatedNumberParam(
   return Math.max(min, Math.min(max, getNumberParam(draft, id) + staticRouteAmount(draft, target)));
 }
 
-function isMacroSource(source: ModulationSourceId): source is Extract<ModulationSourceId, `macro.${1 | 2 | 3 | 4}`> {
+function isMacroSource(source: ModulationSourceId): source is MacroId {
   return source.startsWith("macro.");
 }
 

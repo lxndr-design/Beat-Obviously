@@ -5,13 +5,20 @@ import { Button, HoverInfo, Icon, Knob, TextInput } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import {
   FACTORY_SYNTH_PRESETS,
+  MACRO_IDS,
+  MODULATION_TARGET_LABELS,
   getNumberParam,
+  macroAssignmentsForId,
+  macroDefinitionForId,
+  macroOutputValue,
   modulationSummaryForSource,
   modulationSummaryForTarget,
   synthDraftFromInstrument,
   synthDraftToInstrumentPatch,
   synthDraftToPreviewInstrument,
   useSynthStore,
+  type MacroCurve,
+  type MacroId,
   type ModulationSourceId,
   type ModulationTargetId,
   type SynthDraftPatch,
@@ -26,7 +33,6 @@ import { ModulationMatrix } from "../ModulationMatrix/ModulationMatrix.solid";
 import { OscillatorPanel } from "../OscillatorPanel/OscillatorPanel.solid";
 import styles from "./SynthEditor.module.css";
 
-const MACRO_IDS = ["macro.1", "macro.2", "macro.3", "macro.4"] as const;
 const AUDITION_SECONDS = 1.4;
 const ANALYZER_BANDS = ANALYZER_BAND_COUNT;
 const FACTORY_PRESET_PREFIX = "factory:";
@@ -69,6 +75,7 @@ export function SynthEditor(props: SynthEditorProps) {
   const setDraft = useSynthStore.getState().setDraft;
   const setName = useSynthStore.getState().setName;
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
+  const updateMacroDefinition = useSynthStore.getState().updateMacroDefinition;
   const addInstrument = useInstrumentStore.getState().addInstrument;
   const updateInstrument = useInstrumentStore.getState().updateInstrument;
   const closeEditor = useUiStore.getState().closeEditor;
@@ -503,21 +510,79 @@ export function SynthEditor(props: SynthEditorProps) {
             </header>
             <div class={`ds-panel-body ${styles.macros}`}>
               <For each={MACRO_IDS}>
-                {(id, index) => (
-                  <Knob
-                    size="sm"
-                    label={`Macro ${index() + 1}`}
-                    value={getNumberParam(draft(), id)}
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    defaultValue={0}
-                    {...modulationPropsForSource(draft(), id)}
-                    pickSourceId={id}
-                    formatValue={formatPercent}
-                    onChange={(value) => setNumericParameter(id, value)}
-                  />
-                )}
+                {(id, index) => {
+                  const definition = () => macroDefinitionForId(draft(), id);
+                  const assignments = () => macroAssignmentsForId(draft(), id);
+                  const assignmentLabel = () => assignments().length === 0
+                    ? "No assignments"
+                    : assignments()
+                        .slice(0, 2)
+                        .map((route) => MODULATION_TARGET_LABELS[route.target] ?? route.target)
+                        .join(", ");
+                  return (
+                    <div class={styles.macroCard}>
+                      <TextInput
+                        layout="bare"
+                        aria-label={`Macro ${index() + 1} name`}
+                        value={definition().label}
+                        onInput={(event) => updateMacroDefinition(id, { label: event.currentTarget.value })}
+                      />
+                      <Knob
+                        size="sm"
+                        label={`M${index() + 1}`}
+                        value={getNumberParam(draft(), id)}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        defaultValue={0}
+                        {...modulationPropsForSource(draft(), id)}
+                        pickSourceId={id}
+                        formatValue={formatPercent}
+                        onChange={(value) => setNumericParameter(id, value)}
+                      />
+                      <div class={styles.macroAssignment} title={assignmentLabel()}>
+                        <span>{assignmentLabel()}</span>
+                        <Show when={assignments().length > 2}>
+                          <span>+{assignments().length - 2}</span>
+                        </Show>
+                      </div>
+                      <div class={styles.macroMetaRow}>
+                        <TextInput
+                          layout="bare"
+                          type="number"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          aria-label={`${definition().label} minimum`}
+                          value={definition().min}
+                          onInput={(event) => updateMacroDefinition(id, { min: Number(event.currentTarget.value) })}
+                        />
+                        <TextInput
+                          layout="bare"
+                          type="number"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          aria-label={`${definition().label} maximum`}
+                          value={definition().max}
+                          onInput={(event) => updateMacroDefinition(id, { max: Number(event.currentTarget.value) })}
+                        />
+                      </div>
+                      <select
+                        class={`ds-select ${styles.macroCurveSelect}`}
+                        value={definition().curve}
+                        aria-label={`${definition().label} response curve`}
+                        onInput={(event) => updateMacroDefinition(id, { curve: event.currentTarget.value as MacroCurve })}
+                      >
+                        <option value="linear">Linear</option>
+                        <option value="ease-in">Ease In</option>
+                        <option value="ease-out">Ease Out</option>
+                        <option value="s-curve">S-Curve</option>
+                      </select>
+                      <div class={styles.macroOutput}>{Math.round(macroOutputValue(draft(), id) * 100)}%</div>
+                    </div>
+                  );
+                }}
               </For>
             </div>
           </section>
@@ -969,7 +1034,7 @@ function modulationPropsForTarget(draft: SynthDraftPatch, id: SynthParameterId) 
 
 function modulationPropsForSource(draft: SynthDraftPatch, id: SynthParameterId) {
   if (!id.startsWith("macro.")) return {};
-  const summary = modulationSummaryForSource(draft, id as ModulationSourceId);
+  const summary = modulationSummaryForSource(draft, id as MacroId);
   if (summary.count === 0) return {};
   return {
     modulationAmount: summary.amount,

@@ -130,6 +130,25 @@ Initial defaults:
 | `macro.3` | normalized | `0..1` | `0` | User macro. |
 | `macro.4` | normalized | `0..1` | `0` | User macro. |
 
+Macro identity and response metadata lives in `metadata.macros[macro.N]`:
+
+```json
+{
+  "id": "macro.1",
+  "label": "Brightness",
+  "min": 0.2,
+  "max": 0.8,
+  "curve": "ease-in"
+}
+```
+
+Rules:
+
+- `label` is user-facing and can change without renaming the stable `macro.N` source ID.
+- `min` and `max` clamp to `0..1` and shape the macro output before route amount scaling.
+- `curve` is one of `linear`, `ease-in`, `ease-out`, or `s-curve`.
+- Frontend preview and native patch parsing both apply the same range/curve math for static macro routes.
+
 ## Modulation Sources
 
 | ID | Scope | Output |

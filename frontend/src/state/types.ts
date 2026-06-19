@@ -421,6 +421,14 @@ export interface SynthPatchModulationRoute {
   enabled: boolean;
 }
 
+export interface SynthPatchMacroDefinition {
+  id: string;
+  label: string;
+  min: number;
+  max: number;
+  curve: "linear" | "ease-in" | "ease-out" | "s-curve";
+}
+
 export interface SynthPatchSnapshot {
   schemaVersion: 1;
   instrumentType: "wavetable-synth";
@@ -432,6 +440,7 @@ export interface SynthPatchSnapshot {
     createdBy: "Beat";
     tags: string[];
     icon?: string;
+    macros?: Record<string, SynthPatchMacroDefinition>;
     wavemaps?: Record<string, WavemapDefinition>;
     /** Legacy alias for older Aether patches. New code writes both keys. */
     customWavetables?: Record<string, CustomWavetableDefinition>;

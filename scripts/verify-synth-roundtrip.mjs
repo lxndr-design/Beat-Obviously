@@ -103,11 +103,21 @@ try {
       { id: "macro_cutoff", source: "macro.1", target: "filter.cutoff", amount: 0.12, bipolar: false, enabled: true },
       { id: "disabled_macro", source: "macro.1", target: "amp.level", amount: -1, bipolar: false, enabled: false },
     ],
-    metadata: { tags: ["roundtrip", "probe"], icon: "ph:planet" },
+    metadata: {
+      tags: ["roundtrip", "probe"],
+      icon: "ph:planet",
+      macros: {
+        "macro.1": { id: "macro.1", label: "Brightness", min: 0.2, max: 0.8, curve: "ease-in" },
+      },
+    },
   });
 
   assert.equal(draft.parameters["future.experimental"], "preserve-me");
   assert.equal(new Set(draft.modulation.map((route) => route.id)).size, draft.modulation.length);
+  assert.equal(draft.metadata.macros["macro.1"].label, "Brightness");
+  assert.equal(Math.abs(synthStore.macroOutputValue(draft, "macro.1") - 0.35) < 0.000001, true);
+  assert.equal(synthStore.modulationSourceLabel(draft, "macro.1"), "Brightness");
+  assert.equal(synthStore.macroAssignmentsForId(draft, "macro.1").length, 1);
   assert.equal(draft.metadata.wavemaps["user.custom"].schemaVersion, 1);
   assert.equal(draft.metadata.customWavetables["user.custom"].frames.length, 4);
   assert.deepEqual(synthStore.modulationSummaryForTarget(draft, "osc.a.position"), {
