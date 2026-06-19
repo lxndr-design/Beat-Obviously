@@ -267,7 +267,10 @@ namespace beat
         const auto params = objectProperty(patch, "parameters", {});
         if (!params.isObject()) return false;
         const auto modulation = objectProperty(patch, "modulation", {});
-        const auto customWavetables = objectProperty(objectProperty(patch, "metadata", {}), "customWavetables", {});
+        const auto metadata = objectProperty(patch, "metadata", {});
+        auto customWavetables = objectProperty(metadata, "wavemaps", {});
+        if (!customWavetables.isObject())
+            customWavetables = objectProperty(metadata, "customWavetables", {});
 
         instrument.kind = "wavetable";
         instrument.waveform = 5;

@@ -1,5 +1,13 @@
 import { createStore as create } from "zustand/vanilla";
-import type { CustomWavetableDefinition, CustomWavetableFrame, Instrument, SynthPatchSnapshot, WavetableConfig } from "./types";
+import type {
+  CustomWavetableDefinition,
+  CustomWavetableFrame,
+  Instrument,
+  SynthPatchSnapshot,
+  WavemapDefinition,
+  WavemapSource,
+  WavetableConfig,
+} from "./types";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 1;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
@@ -115,6 +123,7 @@ export interface SynthDraftPatch {
     createdBy: "Beat";
     tags: string[];
     icon?: string;
+    wavemaps?: Record<string, WavemapDefinition>;
     customWavetables?: Record<string, CustomWavetableDefinition>;
   };
 }
@@ -139,6 +148,7 @@ interface SynthStoreState {
   setDraft: (patch: SynthDraftPatch | SynthPatchSnapshot) => void;
   resetDraft: () => void;
   updateCustomWavetableFrame: (id: string, frameIndex: number, patch: Partial<CustomWavetableFrame>) => void;
+  updateWavemapMetadata: (id: string, patch: Partial<Pick<WavemapDefinition, "name" | "interpolation" | "source">>) => void;
   setParameter: (id: SynthParameterId, value: SynthParameterValue) => void;
   setNumericParameter: (id: SynthParameterId, value: number) => void;
   setBooleanParameter: (id: SynthParameterId, value: boolean) => void;
@@ -161,14 +171,100 @@ export const CUSTOM_WAVETABLE_FRAME_LABELS = ["A", "B", "C", "D"] as const;
 
 export function createDefaultCustomWavetable(id = DEFAULT_CUSTOM_WAVETABLE_ID): CustomWavetableDefinition {
   return {
+    schemaVersion: 1,
     id,
     name: "Custom",
+    kind: "harmonic-sketch",
+    interpolation: "linear",
+    source: {
+      kind: "drawn",
+      label: "Drawn wavemap",
+    },
     frames: [
-      { brightness: 0.22, even: 0.08, fold: 0.05, phase: 0.0 },
-      { brightness: 0.46, even: 0.28, fold: 0.16, phase: 0.12 },
-      { brightness: 0.72, even: 0.48, fold: 0.34, phase: -0.08 },
-      { brightness: 0.94, even: 0.72, fold: 0.56, phase: 0.2 },
+      { id: `${id}.frame.1`, label: "A", position: 0.0, brightness: 0.22, even: 0.08, fold: 0.05, phase: 0.0 },
+      { id: `${id}.frame.2`, label: "B", position: 0.333, brightness: 0.46, even: 0.28, fold: 0.16, phase: 0.12 },
+      { id: `${id}.frame.3`, label: "C", position: 0.667, brightness: 0.72, even: 0.48, fold: 0.34, phase: -0.08 },
+      { id: `${id}.frame.4`, label: "D", position: 1.0, brightness: 0.94, even: 0.72, fold: 0.56, phase: 0.2 },
     ],
+  };
+}
+
+export function createWavemapFromAudioSamples(
+  id: string,
+  name: string,
+  samples: ArrayLike<number>,
+  sampleRate: number,
+  source: Partial<WavemapSource> = {},
+): WavemapDefinition {
+  const safeId = id.startsWith("user.") ? id : `user.${id.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "wavemap"}`;
+  const frameCount = 4;
+  const frameLength = Math.max(1, Math.floor(samples.length / frameCount));
+  const frames: CustomWavetableFrame[] = [];
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    const start = frame * frameLength;
+    const end = frame === frameCount - 1 ? samples.length : Math.min(samples.length, start + frameLength);
+    frames.push(analyzeSamplesToWavemapFrame(samples, start, end, safeId, frame));
+  }
+  return normalizeCustomWavetable({
+    schemaVersion: 1,
+    id: safeId,
+    name,
+    kind: "resynthesized",
+    interpolation: "smooth",
+    source: {
+      kind: "resynthesized",
+      label: source.label ?? "Audio resynthesis",
+      audioFileId: source.audioFileId,
+      path: source.path,
+      sampleRate: Number.isFinite(sampleRate) && sampleRate > 0 ? sampleRate : undefined,
+      sourceStartSample: source.sourceStartSample,
+      sourceEndSample: source.sourceEndSample,
+      createdAt: source.createdAt ?? Date.now(),
+    },
+    frames,
+  });
+}
+
+function analyzeSamplesToWavemapFrame(
+  samples: ArrayLike<number>,
+  start: number,
+  end: number,
+  wavemapId: string,
+  frameIndex: number,
+): CustomWavetableFrame {
+  const safeStart = Math.max(0, Math.min(samples.length, Math.floor(start)));
+  const safeEnd = Math.max(safeStart + 1, Math.min(samples.length, Math.floor(end)));
+  let sumSquares = 0;
+  let sumAbs = 0;
+  let derivative = 0;
+  let zeroCrossings = 0;
+  let positiveEnergy = 0;
+  let negativeEnergy = 0;
+  let previous = Number(samples[safeStart]) || 0;
+  for (let index = safeStart; index < safeEnd; index += 1) {
+    const sample = Math.max(-1, Math.min(1, Number(samples[index]) || 0));
+    sumSquares += sample * sample;
+    sumAbs += Math.abs(sample);
+    derivative += Math.abs(sample - previous);
+    if ((sample >= 0 && previous < 0) || (sample < 0 && previous >= 0)) zeroCrossings += 1;
+    if (sample >= 0) positiveEnergy += sample * sample;
+    else negativeEnergy += sample * sample;
+    previous = sample;
+  }
+  const length = Math.max(1, safeEnd - safeStart);
+  const rms = Math.sqrt(sumSquares / length);
+  const averageAbs = sumAbs / length;
+  const normalizedDerivative = derivative / length;
+  const zeroCrossRate = zeroCrossings / length;
+  const asymmetry = Math.abs(positiveEnergy - negativeEnergy) / Math.max(0.0001, positiveEnergy + negativeEnergy);
+  return {
+    id: `${wavemapId}.frame.${frameIndex + 1}`,
+    label: CUSTOM_WAVETABLE_FRAME_LABELS[frameIndex] ?? `${frameIndex + 1}`,
+    position: frameIndex / 3,
+    brightness: clamp01(0.16 + rms * 1.3 + zeroCrossRate * 18),
+    even: clamp01(0.08 + asymmetry * 0.72 + averageAbs * 0.28),
+    fold: clamp01(0.04 + normalizedDerivative * 5.2 + rms * 0.18),
+    phase: sanitizeBipolar((positiveEnergy >= negativeEnergy ? 1 : -1) * clamp01(asymmetry + zeroCrossRate * 9) * 0.8, 0),
   };
 }
 
@@ -336,6 +432,7 @@ export function createDefaultSynthDraft(): SynthDraftPatch {
       createdBy: "Beat",
       tags: [],
       icon: "ph:cube",
+      wavemaps: { [DEFAULT_CUSTOM_WAVETABLE_ID]: createDefaultCustomWavetable() },
       customWavetables: { [DEFAULT_CUSTOM_WAVETABLE_ID]: createDefaultCustomWavetable() },
     },
   };
@@ -369,6 +466,7 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
         .map(normalizeModulationRoute)
         .filter((route): route is SynthModulationRoute => route !== null)
     : base.modulation;
+  const wavemaps = normalizeCustomWavetables(input.metadata?.wavemaps ?? input.metadata?.customWavetables);
 
   return {
     schemaVersion: SYNTH_PATCH_SCHEMA_VERSION,
@@ -385,7 +483,8 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
       icon: typeof input.metadata?.icon === "string" && input.metadata.icon.startsWith("ph:")
         ? input.metadata.icon
         : base.metadata.icon,
-      customWavetables: normalizeCustomWavetables(input.metadata?.customWavetables),
+      wavemaps,
+      customWavetables: wavemaps,
     },
   };
 }
@@ -626,22 +725,48 @@ export const useSynthStore = create<SynthStoreState>((set) => ({
   resetDraft: () => set({ draft: createDefaultSynthDraft(), selectedOscillator: "a" }),
   updateCustomWavetableFrame: (id, frameIndex, patch) =>
     set((state) => {
-      const current = state.draft.metadata.customWavetables?.[id] ?? createDefaultCustomWavetable(id);
+      const current = state.draft.metadata.wavemaps?.[id] ?? state.draft.metadata.customWavetables?.[id] ?? createDefaultCustomWavetable(id);
       const normalized = normalizeCustomWavetable(current);
-      const frames = normalized.frames;
+      const frames = normalized.frames.map((frame) => ({ ...frame }));
       const safeIndex = Math.max(0, Math.min(frames.length - 1, Math.round(frameIndex)));
       frames[safeIndex] = { ...frames[safeIndex], ...sanitizeCustomWavetableFramePatch(patch) };
+      const nextDefinition = normalizeCustomWavetable({ ...normalized, frames });
+      const nextWavemaps = {
+        ...(state.draft.metadata.wavemaps ?? state.draft.metadata.customWavetables ?? {}),
+        [nextDefinition.id]: nextDefinition,
+      };
       return {
-        draft: {
+        draft: normalizeSynthDraftPatch({
           ...state.draft,
           metadata: {
             ...state.draft.metadata,
-            customWavetables: {
-              ...(state.draft.metadata.customWavetables ?? {}),
-              [id]: { ...normalized, frames },
-            },
+            wavemaps: nextWavemaps,
+            customWavetables: nextWavemaps,
           },
-        },
+        }),
+      };
+    }),
+  updateWavemapMetadata: (id, patch) =>
+    set((state) => {
+      const current = state.draft.metadata.wavemaps?.[id] ?? state.draft.metadata.customWavetables?.[id] ?? createDefaultCustomWavetable(id);
+      const nextDefinition = normalizeCustomWavetable({
+        ...current,
+        ...patch,
+        source: patch.source ? { ...current.source, ...patch.source } : current.source,
+      });
+      const nextWavemaps = {
+        ...(state.draft.metadata.wavemaps ?? state.draft.metadata.customWavetables ?? {}),
+        [nextDefinition.id]: nextDefinition,
+      };
+      return {
+        draft: normalizeSynthDraftPatch({
+          ...state.draft,
+          metadata: {
+            ...state.draft.metadata,
+            wavemaps: nextWavemaps,
+            customWavetables: nextWavemaps,
+          },
+        }),
       };
     }),
   setParameter: (id, value) =>
@@ -924,8 +1049,12 @@ export function normalizeCustomWavetable(value: Partial<CustomWavetableDefinitio
   while (frames.length < 4)
     frames.push(fallback.frames[frames.length]);
   return {
+    schemaVersion: 1,
     id,
     name: typeof value.name === "string" && value.name.trim() ? value.name.trim().slice(0, 48) : fallback.name,
+    kind: value.kind === "resynthesized" ? "resynthesized" : "harmonic-sketch",
+    interpolation: value.interpolation === "smooth" ? "smooth" : "linear",
+    source: sanitizeWavemapSource(value.source, fallback.source),
     frames,
   };
 }
@@ -936,6 +1065,9 @@ function sanitizeCustomWavetableFrame(
 ): CustomWavetableFrame {
   const source = isRecord(value) ? value : {};
   return {
+    id: typeof source.id === "string" && source.id.trim() ? source.id.trim().slice(0, 64) : fallback.id,
+    label: typeof source.label === "string" && source.label.trim() ? source.label.trim().slice(0, 16) : fallback.label,
+    position: sanitize01(source.position, fallback.position ?? 0),
     brightness: sanitize01(source.brightness, fallback.brightness),
     even: sanitize01(source.even, fallback.even),
     fold: sanitize01(source.fold, fallback.fold),
@@ -943,9 +1075,38 @@ function sanitizeCustomWavetableFrame(
   };
 }
 
+function sanitizeWavemapSource(value: unknown, fallback: WavemapSource): WavemapSource {
+  const source = isRecord(value) ? value : {};
+  const kind = source.kind === "generated" || source.kind === "imported-audio" || source.kind === "resynthesized"
+    ? source.kind
+    : source.kind === "drawn"
+      ? "drawn"
+      : fallback.kind;
+  const next: WavemapSource = { kind };
+  if (typeof source.label === "string" && source.label.trim()) next.label = source.label.trim().slice(0, 64);
+  else if (fallback.label) next.label = fallback.label;
+  if (typeof source.audioFileId === "string" && source.audioFileId.trim()) next.audioFileId = source.audioFileId.trim();
+  else if (fallback.audioFileId) next.audioFileId = fallback.audioFileId;
+  if (typeof source.path === "string" && source.path.trim()) next.path = source.path.trim();
+  else if (fallback.path) next.path = fallback.path;
+  if (typeof source.sampleRate === "number" && Number.isFinite(source.sampleRate) && source.sampleRate > 0) next.sampleRate = source.sampleRate;
+  else if (fallback.sampleRate) next.sampleRate = fallback.sampleRate;
+  if (typeof source.sourceStartSample === "number" && Number.isFinite(source.sourceStartSample)) next.sourceStartSample = Math.max(0, Math.floor(source.sourceStartSample));
+  else if (fallback.sourceStartSample != null) next.sourceStartSample = fallback.sourceStartSample;
+  if (typeof source.sourceEndSample === "number" && Number.isFinite(source.sourceEndSample)) next.sourceEndSample = Math.max(0, Math.floor(source.sourceEndSample));
+  else if (fallback.sourceEndSample != null) next.sourceEndSample = fallback.sourceEndSample;
+  if (typeof source.createdAt === "number" && Number.isFinite(source.createdAt) && source.createdAt > 0) next.createdAt = source.createdAt;
+  else if (fallback.createdAt) next.createdAt = fallback.createdAt;
+  return next;
+}
+
 function sanitizeCustomWavetableFramePatch(value: Partial<CustomWavetableFrame>): Partial<CustomWavetableFrame> {
   const source = isRecord(value) ? value : {};
   const next: Partial<CustomWavetableFrame> = {};
+  if (Object.prototype.hasOwnProperty.call(source, "label") && typeof source.label === "string")
+    next.label = source.label.trim().slice(0, 16);
+  if (Object.prototype.hasOwnProperty.call(source, "position"))
+    next.position = sanitize01(source.position, 0);
   if (Object.prototype.hasOwnProperty.call(source, "brightness"))
     next.brightness = sanitize01(source.brightness, 0.5);
   if (Object.prototype.hasOwnProperty.call(source, "even"))

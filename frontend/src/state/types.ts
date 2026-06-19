@@ -352,17 +352,44 @@ export interface AetherSynthConfig {
 export type SynthPatchParameterValue = boolean | number | string;
 
 export interface CustomWavetableFrame {
+  /** Stable frame id for editor identity and future frame reordering. */
+  id?: string;
+  /** User-facing frame label. */
+  label?: string;
+  /** 0..1 position in the wavemap scan. */
+  position?: number;
   brightness: number;
   even: number;
   fold: number;
   phase: number;
 }
 
-export interface CustomWavetableDefinition {
+export type WavemapKind = "harmonic-sketch" | "resynthesized";
+export type WavemapInterpolation = "linear" | "smooth";
+
+export interface WavemapSource {
+  kind: "drawn" | "generated" | "imported-audio" | "resynthesized";
+  label?: string;
+  audioFileId?: Id;
+  path?: string;
+  sampleRate?: number;
+  sourceStartSample?: number;
+  sourceEndSample?: number;
+  createdAt?: number;
+}
+
+export interface WavemapDefinition {
+  schemaVersion: 1;
   id: string;
   name: string;
+  kind: WavemapKind;
+  interpolation: WavemapInterpolation;
+  source: WavemapSource;
   frames: CustomWavetableFrame[];
 }
+
+/** Legacy name kept while older saved synth patches still use customWavetables. */
+export type CustomWavetableDefinition = WavemapDefinition;
 
 export interface SynthPatchModulationRoute {
   id: string;
@@ -384,6 +411,8 @@ export interface SynthPatchSnapshot {
     createdBy: "Beat";
     tags: string[];
     icon?: string;
+    wavemaps?: Record<string, WavemapDefinition>;
+    /** Legacy alias for older Aether patches. New code writes both keys. */
     customWavetables?: Record<string, CustomWavetableDefinition>;
   };
 }

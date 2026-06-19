@@ -129,12 +129,13 @@ function OscillatorRow(props: {
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
   const updateCustomWavetableFrame = useSynthStore.getState().updateCustomWavetableFrame;
+  const updateWavemapMetadata = useSynthStore.getState().updateWavemapMetadata;
   const enabledId = createMemo(() => oscParam(props.oscillator, "enabled"));
   const enabled = createMemo(() => getBooleanParam(draft(), enabledId()));
   const wavetableId = createMemo(() => oscParam(props.oscillator, "wavetable"));
   const selectedWavetable = createMemo(() => getStringParam(draft(), wavetableId()) as WavetableId);
   const customTableId = createMemo(() => selectedWavetable().startsWith("user.") ? selectedWavetable() : DEFAULT_CUSTOM_WAVETABLE_ID);
-  const customTable = createMemo(() => draft().metadata.customWavetables?.[customTableId()] ?? createDefaultCustomWavetable(customTableId()));
+  const customTable = createMemo(() => draft().metadata.wavemaps?.[customTableId()] ?? draft().metadata.customWavetables?.[customTableId()] ?? createDefaultCustomWavetable(customTableId()));
   const label = createMemo(() => `Oscillator ${props.oscillator.toUpperCase()}`);
   const waveform = createMemo(() => renderAetherOutputPreviewSamples(props.previewInstrument, 160, props.oscillator));
 
@@ -188,15 +189,35 @@ function OscillatorRow(props: {
               </div>
             </div>
             <Show when={selectedWavetable().startsWith("user.")}>
-              <div class={styles.customEditor} aria-label={`${label()} custom wavetable frames`}>
+              <div class={styles.customEditor} aria-label={`${label()} wavemap frames`}>
                 <div class="ds-section-header">
-                  <div class="ds-section-title">{customTable().name} Frame Editor</div>
+                  <div class="ds-section-title">{customTable().name} Wavemap</div>
+                  <div class={styles.wavemapMeta}>
+                    <span>{customTable().source.label ?? sourceLabel(customTable().source.kind)}</span>
+                    <Button
+                      size="xs"
+                      selected={customTable().interpolation === "linear"}
+                      onClick={() => updateWavemapMetadata(customTable().id, { interpolation: "linear" })}
+                    >
+                      Linear
+                    </Button>
+                    <Button
+                      size="xs"
+                      selected={customTable().interpolation === "smooth"}
+                      onClick={() => updateWavemapMetadata(customTable().id, { interpolation: "smooth" })}
+                    >
+                      Smooth
+                    </Button>
+                  </div>
                 </div>
                 <div class={styles.customFrames}>
                   <For each={customTable().frames}>
                     {(frame, index) => (
                       <div class={styles.customFrame}>
-                        <div class={styles.frameLabel}>{CUSTOM_WAVETABLE_FRAME_LABELS[index()] ?? index() + 1}</div>
+                        <div class={styles.frameLabel}>
+                          {frame.label ?? CUSTOM_WAVETABLE_FRAME_LABELS[index()] ?? index() + 1}
+                          <span>{Math.round((frame.position ?? index() / 3) * 100)}</span>
+                        </div>
                         <MiniWaveform samples={renderCustomFramePreview(frame)} />
                         <Knob
                           size="sm"
@@ -356,6 +377,13 @@ function parsePercent(raw: string): number {
   const value = parseFloat(raw);
   if (!Number.isFinite(value)) return Number.NaN;
   return Math.abs(value) > 1 ? value / 100 : value;
+}
+
+function sourceLabel(kind: string): string {
+  if (kind === "resynthesized") return "Resynthesized";
+  if (kind === "imported-audio") return "Audio import";
+  if (kind === "generated") return "Generated";
+  return "Drawn";
 }
 
 function renderCustomFramePreview(frame: CustomWavetableFrame, sampleCount = 96): number[] {

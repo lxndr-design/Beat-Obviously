@@ -571,7 +571,7 @@ function trimCache<K, V>(cache: Map<K, V>, maxEntries: number) {
 }
 
 function renderRelevantInstrumentState(instrument: Instrument) {
-  const customWavetables = instrument.synthPatch?.metadata?.customWavetables;
+  const customWavetables = instrument.synthPatch?.metadata?.wavemaps ?? instrument.synthPatch?.metadata?.customWavetables;
   return {
     kind: instrument.kind,
     waveform: instrument.waveform,
@@ -1040,18 +1040,25 @@ function previewWavetableSample(
 
 function customWavetableForInstrument(instrument: Instrument, id?: string): CustomWavetableDefinition | null {
   const customId = id?.startsWith("user.") ? id : "user.custom";
-  const table = instrument.synthPatch?.metadata?.customWavetables?.[customId];
+  const table = instrument.synthPatch?.metadata?.wavemaps?.[customId] ?? instrument.synthPatch?.metadata?.customWavetables?.[customId];
   if (!table || !Array.isArray(table.frames) || table.frames.length === 0)
     return null;
   return {
+    schemaVersion: 1,
     id: table.id,
     name: table.name,
+    kind: table.kind ?? "harmonic-sketch",
+    interpolation: table.interpolation ?? "linear",
+    source: table.source ?? { kind: "drawn", label: "Drawn wavemap" },
     frames: table.frames.slice(0, 4).map(sanitizeCustomFrame),
   };
 }
 
 function sanitizeCustomFrame(frame: CustomWavetableFrame): CustomWavetableFrame {
   return {
+    id: frame.id,
+    label: frame.label,
+    position: frame.position == null ? undefined : clamp01(frame.position),
     brightness: clamp01(frame.brightness),
     even: clamp01(frame.even),
     fold: clamp01(frame.fold),

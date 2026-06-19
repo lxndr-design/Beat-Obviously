@@ -83,6 +83,7 @@ try {
 
   assert.equal(draft.parameters["future.experimental"], "preserve-me");
   assert.equal(new Set(draft.modulation.map((route) => route.id)).size, draft.modulation.length);
+  assert.equal(draft.metadata.wavemaps["user.custom"].schemaVersion, 1);
   assert.equal(draft.metadata.customWavetables["user.custom"].frames.length, 4);
   assert.deepEqual(synthStore.modulationSummaryForTarget(draft, "osc.a.position"), {
     count: 1,
@@ -255,8 +256,12 @@ try {
       tags: ["custom", "wavetable"],
       customWavetables: {
         "user.custom": {
+          schemaVersion: 1,
           id: "user.custom",
           name: "Verifier Custom",
+          kind: "harmonic-sketch",
+          interpolation: "linear",
+          source: { kind: "drawn", label: "Verifier sketch" },
           frames: [
             { brightness: 0.12, even: 0.04, fold: 0.0, phase: 0 },
             { brightness: 0.38, even: 0.18, fold: 0.2, phase: 0.25 },
@@ -271,18 +276,71 @@ try {
   assert.equal(customPatch.wavetable.bank, "custom");
   assert.equal(customPatch.wavetable.customId, "user.custom");
   assert.equal(customPatch.aether.oscA.wavetable.bank, "custom");
+  assert.equal(customPatch.synthPatch.metadata.wavemaps["user.custom"].source.label, "Verifier sketch");
   assert.equal(customPatch.synthPatch.metadata.customWavetables["user.custom"].frames[3].fold, 0.68);
   assert.deepEqual(synthStore.normalizeSynthDraftPatch(JSON.parse(JSON.stringify(customPatch.synthPatch))), customDraft);
 
   synthStore.useSynthStore.getState().resetDraft();
   synthStore.useSynthStore.getState().setParameter("osc.a.wavetable", "user.custom");
-  const frameBeforeEdit = { ...synthStore.useSynthStore.getState().draft.metadata.customWavetables["user.custom"].frames[1] };
+  const frameBeforeEdit = { ...synthStore.useSynthStore.getState().draft.metadata.wavemaps["user.custom"].frames[1] };
   synthStore.useSynthStore.getState().updateCustomWavetableFrame("user.custom", 1, { brightness: 0.91 });
-  const frameAfterEdit = synthStore.useSynthStore.getState().draft.metadata.customWavetables["user.custom"].frames[1];
+  synthStore.useSynthStore.getState().updateWavemapMetadata("user.custom", {
+    interpolation: "smooth",
+    source: { kind: "generated", label: "Verifier generated wavemap" },
+  });
+  const frameAfterEdit = synthStore.useSynthStore.getState().draft.metadata.wavemaps["user.custom"].frames[1];
   assert.equal(frameAfterEdit.brightness, 0.91);
   assert.equal(frameAfterEdit.even, frameBeforeEdit.even);
   assert.equal(frameAfterEdit.fold, frameBeforeEdit.fold);
   assert.equal(frameAfterEdit.phase, frameBeforeEdit.phase);
+  assert.equal(synthStore.useSynthStore.getState().draft.metadata.wavemaps["user.custom"].interpolation, "smooth");
+  assert.equal(synthStore.useSynthStore.getState().draft.metadata.customWavetables["user.custom"].source.label, "Verifier generated wavemap");
+
+  const resynthSamples = Float32Array.from({ length: 4096 }, (_, index) => {
+    const phase = index / 4096;
+    return Math.sin(phase * Math.PI * 2 * 9) * 0.7 + Math.sin(phase * Math.PI * 2 * 23 + 0.4) * 0.28;
+  });
+  const resynthWavemap = synthStore.createWavemapFromAudioSamples(
+    "user.resynth.verify",
+    "Verifier Resynth",
+    resynthSamples,
+    48000,
+    { kind: "imported-audio", label: "Verifier Audio", path: "/tmp/verifier.wav", sourceStartSample: 10, sourceEndSample: 4000 },
+  );
+  assert.equal(resynthWavemap.kind, "resynthesized");
+  assert.equal(resynthWavemap.interpolation, "smooth");
+  assert.equal(resynthWavemap.source.path, "/tmp/verifier.wav");
+  assert.equal(resynthWavemap.frames.length, 4);
+  assert.equal(resynthWavemap.frames.every((frame) => frame.id?.startsWith("user.resynth.verify.frame.")), true);
+
+  const resynthDraft = synthStore.normalizeSynthDraftPatch({
+    name: "Resynth Probe",
+    parameters: {
+      "osc.a.wavetable": "user.resynth.verify",
+      "osc.a.position": 0.5,
+      "osc.a.level": 0.86,
+      "filter.cutoff": 12000,
+      "amp.level": 0.75,
+    },
+    modulation: [],
+    metadata: {
+      tags: ["resynth"],
+      wavemaps: { [resynthWavemap.id]: resynthWavemap },
+    },
+  });
+  assert.deepEqual(resynthDraft.metadata.wavemaps[resynthWavemap.id], resynthDraft.metadata.customWavetables[resynthWavemap.id]);
+  const resynthPatch = synthStore.synthDraftToInstrumentPatch(resynthDraft);
+  assert.equal(resynthPatch.wavetable.customId, "user.resynth.verify");
+  assert.equal(resynthPatch.synthPatch.metadata.wavemaps["user.resynth.verify"].source.label, "Verifier Audio");
+  const resynthPreview = synthStore.synthDraftToPreviewInstrument(resynthDraft);
+  const resynthRendered = new Float32Array(16000);
+  synthPreview.renderInstrumentSamples(resynthPreview, resynthRendered, 48000, synthPreview.previewFrequency(resynthPreview), "audio", true);
+  let resynthEnergy = 0;
+  for (const sample of resynthRendered) {
+    assert.equal(Number.isFinite(sample), true);
+    resynthEnergy += sample * sample;
+  }
+  assert.ok(Math.sqrt(resynthEnergy / resynthRendered.length) > 0.008, "expected resynthesized wavemap to render audible output");
 
   const customPreview = synthStore.synthDraftToPreviewInstrument(customDraft);
   const customSamples = new Float32Array(24000);
