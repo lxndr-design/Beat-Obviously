@@ -560,13 +560,24 @@ function LfoLane(props: { lfo: 1 | 2 }) {
   const shapeId = `${prefix}.shape` as SynthParameterId;
   const rateId = `${prefix}.rate` as SynthParameterId;
   const phaseId = `${prefix}.phase` as SynthParameterId;
+  const retriggerId = `${prefix}.retrigger` as SynthParameterId;
   const enabled = createMemo(() => draft().parameters[enabledId] === true);
+  const retrigger = createMemo(() => draft().parameters[retriggerId] !== false);
 
   return (
     <div class={`${styles.lfoLane} ${enabled() ? "" : styles.disabledPanel}`} aria-label={`LFO ${props.lfo}`}>
       <header class={styles.lfoLaneHeader}>
         <div class={styles.lfoLaneTitle}>LFO {props.lfo}</div>
         <div class="ds-panel-actions">
+          <Button
+            iconOnly
+            size="xs"
+            selected={retrigger()}
+            aria-label={`${retrigger() ? "Disable" : "Enable"} LFO ${props.lfo} retrigger`}
+            onClick={() => setBooleanParameter(retriggerId, !retrigger())}
+          >
+            <Icon name={retrigger() ? "ph:arrow-counter-clockwise-fill" : "ph:arrow-counter-clockwise"} size={12} decorative />
+          </Button>
           <Button
             iconOnly
             size="xs"

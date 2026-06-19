@@ -64,6 +64,7 @@ export type SynthParameterId =
   | "lfo.1.syncedRate"
   | "lfo.1.shape"
   | "lfo.1.phase"
+  | "lfo.1.retrigger"
   | "lfo.1.bipolar"
   | "lfo.2.enabled"
   | "lfo.2.rate"
@@ -71,6 +72,7 @@ export type SynthParameterId =
   | "lfo.2.syncedRate"
   | "lfo.2.shape"
   | "lfo.2.phase"
+  | "lfo.2.retrigger"
   | "lfo.2.bipolar"
   | "macro.1"
   | "macro.2"
@@ -419,6 +421,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "lfo.1.syncedRate": "1/4",
   "lfo.1.shape": "sine",
   "lfo.1.phase": 0,
+  "lfo.1.retrigger": true,
   "lfo.1.bipolar": true,
   "lfo.2.enabled": false,
   "lfo.2.rate": 0.5,
@@ -426,6 +429,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "lfo.2.syncedRate": "1/2",
   "lfo.2.shape": "triangle",
   "lfo.2.phase": 0,
+  "lfo.2.retrigger": true,
   "lfo.2.bipolar": true,
   "macro.1": 0,
   "macro.2": 0,
@@ -480,6 +484,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "lfo.1.syncedRate": "LFO 1 Sync Rate",
   "lfo.1.shape": "LFO 1 Shape",
   "lfo.1.phase": "LFO 1 Phase",
+  "lfo.1.retrigger": "LFO 1 Retrigger",
   "lfo.1.bipolar": "LFO 1 Bipolar",
   "lfo.2.enabled": "LFO 2 Enabled",
   "lfo.2.rate": "LFO 2 Rate",
@@ -487,6 +492,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "lfo.2.syncedRate": "LFO 2 Sync Rate",
   "lfo.2.shape": "LFO 2 Shape",
   "lfo.2.phase": "LFO 2 Phase",
+  "lfo.2.retrigger": "LFO 2 Retrigger",
   "lfo.2.bipolar": "LFO 2 Bipolar",
   "macro.1": "Macro 1",
   "macro.2": "Macro 2",
@@ -683,12 +689,12 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     lfoDepth: lfoEnabled ? Math.abs(clampBipolar(routeAmount(draft, "lfo.1", "osc.a.position"))) : 0,
     lfoSync: draft.parameters["lfo.1.sync"] === true,
     lfoPhase: getNumberParam(draft, "lfo.1.phase"),
-    lfoRetrigger: true,
+    lfoRetrigger: getBooleanParam(draft, "lfo.1.retrigger"),
     lfo2Waveform: lfoWaveformFromDraft(draft, 2),
     lfo2RateHz: getNumberParam(draft, "lfo.2.rate"),
     lfo2Enabled: getBooleanParam(draft, "lfo.2.enabled"),
     lfo2Phase: getNumberParam(draft, "lfo.2.phase"),
-    lfo2Retrigger: true,
+    lfo2Retrigger: getBooleanParam(draft, "lfo.2.retrigger"),
     lfoPositionBipolar: routeBipolar(draft, "lfo.1", "osc.a.position", true),
     lfoPitchBipolar: routeBipolar(draft, "lfo.1", "osc.a.fine", true),
     lfoFilterBipolar: routeBipolar(draft, "lfo.1", "filter.cutoff", true),
@@ -783,11 +789,13 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["lfo.1.sync"] = instrument.lfoSync ?? false;
   draft.parameters["lfo.1.shape"] = instrument.lfoWaveform ?? "sine";
   draft.parameters["lfo.1.phase"] = instrument.lfoPhase ?? 0;
+  draft.parameters["lfo.1.retrigger"] = instrument.lfoRetrigger ?? true;
   draft.parameters["lfo.2.enabled"] = instrument.lfo2Enabled ?? false;
   draft.parameters["lfo.2.rate"] = instrument.lfo2RateHz ?? 0.5;
   draft.parameters["lfo.2.sync"] = false;
   draft.parameters["lfo.2.shape"] = instrument.lfo2Waveform ?? "triangle";
   draft.parameters["lfo.2.phase"] = instrument.lfo2Phase ?? 0;
+  draft.parameters["lfo.2.retrigger"] = instrument.lfo2Retrigger ?? true;
   draft.parameters["amp.level"] = instrument.ampLevel ?? 0.8;
   draft.parameters["amp.pan"] = instrument.ampPan ?? 0;
 
