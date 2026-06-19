@@ -12,7 +12,7 @@ import {
 } from "../../persistence/dexie";
 import { characterizeInstrument, defaultAetherSynthConfig, defaultWavetableConfig, snapshotInstrument, useAudioFileStore, useInstrumentStore, useUiStore } from "../../state/store";
 import { INSTRUMENT_ICON_OPTIONS, instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
-import type { Instrument, InstrumentSnapshot } from "../../state/types";
+import type { Instrument, InstrumentSnapshot, WavetableWarpMode } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { WaveformPicker } from "./WaveformPicker.solid";
 import { InstrumentWaveformPreview } from "./InstrumentWaveformPreview.solid";
@@ -613,6 +613,10 @@ export function InstrumentEditorModal(props: Props) {
                 parseValue={parsePercent}
                 onChange={(warp) => applyGlobalWavetablePatch({ warp })}
               />
+              <WavetableWarpModeSelect
+                value={(currentDraft().wavetable ?? defaultWavetableConfig()).warpMode ?? "shape"}
+                onChange={(warpMode) => applyGlobalWavetablePatch({ warpMode })}
+              />
               <Knob
                 size="sm"
                 value={(currentDraft().wavetable ?? defaultWavetableConfig()).unison}
@@ -880,6 +884,10 @@ function AetherOscModule({
               formatValue={formatPercent}
               parseValue={parsePercent}
               onChange={(warp) => onChange({ wavetable: { ...value.wavetable, warp } })}
+            />
+            <WavetableWarpModeSelect
+              value={value.wavetable.warpMode ?? "shape"}
+              onChange={(warpMode) => onChange({ wavetable: { ...value.wavetable, warpMode } })}
             />
             <Knob
               size="sm"
@@ -1215,6 +1223,31 @@ function WavetableBankSelect({
       open={open()}
       onOpenChange={setOpen}
       onChange={(next) => onChange(next as NonNullable<Instrument["wavetable"]>["bank"])}
+    />
+  );
+}
+
+function WavetableWarpModeSelect({
+  value,
+  onChange,
+}: {
+  value: WavetableWarpMode;
+  onChange: (value: WavetableWarpMode) => void;
+}) {
+  const [open, setOpen] = createSignal(false);
+  return (
+    <FloatingSelect
+      label="Warp"
+      value={value}
+      ariaLabel="Wavetable warp mode"
+      options={[
+        { value: "shape", label: "Shape" },
+        { value: "fold", label: "Fold" },
+        { value: "pinch", label: "Pinch" },
+      ]}
+      open={open()}
+      onOpenChange={setOpen}
+      onChange={(next) => onChange((next === "fold" || next === "pinch" ? next : "shape") as WavetableWarpMode)}
     />
   );
 }

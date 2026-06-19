@@ -7,6 +7,7 @@ import type {
   WavemapDefinition,
   WavemapSource,
   WavetableConfig,
+  WavetableWarpMode,
 } from "./types";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 1;
@@ -28,6 +29,8 @@ export type OscillatorParamSuffix =
   | "enabled"
   | "wavetable"
   | "position"
+  | "warp"
+  | "warpMode"
   | "octave"
   | "semitone"
   | "fine"
@@ -384,6 +387,8 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "osc.a.enabled": true,
   "osc.a.wavetable": "basic.saw",
   "osc.a.position": 0,
+  "osc.a.warp": 0.2,
+  "osc.a.warpMode": "shape",
   "osc.a.octave": 0,
   "osc.a.semitone": 0,
   "osc.a.fine": 0,
@@ -394,6 +399,8 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "osc.b.enabled": false,
   "osc.b.wavetable": "basic.square",
   "osc.b.position": 0,
+  "osc.b.warp": 0.2,
+  "osc.b.warpMode": "shape",
   "osc.b.octave": 0,
   "osc.b.semitone": 0,
   "osc.b.fine": 0,
@@ -453,6 +460,8 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "osc.a.enabled": "OSC A Enabled",
   "osc.a.wavetable": "OSC A Table",
   "osc.a.position": "OSC A Pos",
+  "osc.a.warp": "OSC A Warp",
+  "osc.a.warpMode": "OSC A Warp Mode",
   "osc.a.octave": "OSC A Oct",
   "osc.a.semitone": "OSC A Semi",
   "osc.a.fine": "OSC A Fine",
@@ -463,6 +472,8 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "osc.b.enabled": "OSC B Enabled",
   "osc.b.wavetable": "OSC B Table",
   "osc.b.position": "OSC B Pos",
+  "osc.b.warp": "OSC B Warp",
+  "osc.b.warpMode": "OSC B Warp Mode",
   "osc.b.octave": "OSC B Oct",
   "osc.b.semitone": "OSC B Semi",
   "osc.b.fine": "OSC B Fine",
@@ -1027,7 +1038,7 @@ export const useSynthStore = create<SynthStoreState>((set) => ({
 function sanitizeNumber(value: number, id: SynthParameterId): number {
   const fallback = DEFAULT_SYNTH_PARAMETERS[id];
   if (!Number.isFinite(value)) return typeof fallback === "number" ? fallback : 0;
-  if (id.endsWith(".enabled") || id === "filter.type" || id.endsWith(".wavetable")) return value;
+  if (id.endsWith(".enabled") || id === "filter.type" || id.endsWith(".wavetable") || id.endsWith(".warpMode")) return value;
   if (id === "filter.cutoff") return Math.max(20, Math.min(20000, value));
   if (id === "lfo.1.rate" || id === "lfo.2.rate") return Math.max(0.05, Math.min(50, value));
   if (id.includes(".octave")) return Math.max(-4, Math.min(4, Math.round(value)));
@@ -1327,13 +1338,15 @@ function isModulationTargetId(value: unknown): value is ModulationTargetId {
 
 function wavetableFromDraft(draft: SynthDraftPatch, oscillator: OscillatorKey): WavetableConfig {
   const wavetableId = getStringParam(draft, `osc.${oscillator}.wavetable` as SynthParameterId) as WavetableId;
+  const warpMode = getStringParam(draft, `osc.${oscillator}.warpMode` as SynthParameterId);
   const unisonEnabled = getBooleanParam(draft, "unison.enabled");
   const positionTarget = `osc.${oscillator}.position` as ModulationTargetId;
   return {
     bank: bankFromWavetableId(wavetableId),
     customId: wavetableId.startsWith("user.") ? wavetableId : undefined,
     position: modulatedNumberParam(draft, `osc.${oscillator}.position` as SynthParameterId, positionTarget, 0, 1),
-    warp: 0,
+    warp: getNumberParam(draft, `osc.${oscillator}.warp` as SynthParameterId),
+    warpMode: isWavetableWarpMode(warpMode) ? warpMode : "shape",
     unison: unisonEnabled ? getNumberParam(draft, "unison.voices") : 1,
     detuneCents: unisonEnabled ? modulatedNumberParam(draft, "unison.detune", "unison.detune", 0, 1) * 100 : 0,
     blend: unisonEnabled ? modulatedNumberParam(draft, "unison.spread", "unison.spread", 0, 1) : 0,
@@ -1388,12 +1401,18 @@ function applyWavetableToDraft(
     ? wavetable.customId
     : wavetableIdFromBank(wavetable.bank);
   draft.parameters[`osc.${oscillator}.position` as SynthParameterId] = wavetable.position;
+  draft.parameters[`osc.${oscillator}.warp` as SynthParameterId] = wavetable.warp;
+  draft.parameters[`osc.${oscillator}.warpMode` as SynthParameterId] = wavetable.warpMode ?? "shape";
   if (!applyGlobalUnison) return;
   draft.parameters["unison.enabled"] = wavetable.unison > 1;
   draft.parameters["unison.voices"] = wavetable.unison;
   draft.parameters["unison.detune"] = wavetable.detuneCents / 100;
   draft.parameters["unison.blend"] = wavetable.blend;
   draft.parameters["unison.spread"] = wavetable.blend;
+}
+
+function isWavetableWarpMode(value: unknown): value is WavetableWarpMode {
+  return value === "shape" || value === "fold" || value === "pinch";
 }
 
 function routeAmount(draft: SynthDraftPatch, source: ModulationSourceId, target: ModulationTargetId): number {

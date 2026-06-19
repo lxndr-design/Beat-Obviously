@@ -4,7 +4,7 @@ import { renderAetherOutputPreviewSamples } from "../../../audio/synthPreview";
 import { resynthesizeAudioFileToWavemap } from "../../../audio/wavemapResynthesis";
 import { appAlert, Button, HoverInfo, Icon, Knob } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
-import type { CustomWavetableFrame, WavemapDefinition } from "../../../state/types";
+import type { CustomWavetableFrame, WavemapDefinition, WavetableWarpMode } from "../../../state/types";
 import {
   CUSTOM_WAVETABLE_FRAME_LABELS,
   DEFAULT_CUSTOM_WAVETABLE_ID,
@@ -27,7 +27,7 @@ import {
 import styles from "./OscillatorPanel.module.css";
 
 const OSC_PARAMS: Array<{
-  suffix: "position" | "level" | "pan" | "octave" | "semitone" | "fine" | "phase" | "randomPhase";
+  suffix: "position" | "warp" | "level" | "pan" | "octave" | "semitone" | "fine" | "phase" | "randomPhase";
   label: string;
   min: number;
   max: number;
@@ -36,6 +36,7 @@ const OSC_PARAMS: Array<{
   bipolar?: boolean;
 }> = [
   { suffix: "position", label: "Position", min: 0, max: 1, step: 0.01, defaultValue: 0 },
+  { suffix: "warp", label: "Warp", min: 0, max: 1, step: 0.01, defaultValue: 0.2 },
   { suffix: "level", label: "Level", min: 0, max: 1, step: 0.01, defaultValue: 0.8 },
   { suffix: "pan", label: "Pan", min: -1, max: 1, step: 0.01, defaultValue: 0, bipolar: true },
   { suffix: "octave", label: "Oct", min: -4, max: 4, step: 1, defaultValue: 0, bipolar: true },
@@ -53,6 +54,12 @@ const WAVETABLE_ICONS: Record<WavetableId, string> = {
   "basic.pulse": "ph:waveform",
   [DEFAULT_CUSTOM_WAVETABLE_ID]: "ph:sliders-horizontal",
 };
+
+const WARP_MODE_OPTIONS: Array<{ value: WavetableWarpMode; label: string; icon: string }> = [
+  { value: "shape", label: "Shape", icon: "ph:waveform" },
+  { value: "fold", label: "Fold", icon: "ph:intersect-three" },
+  { value: "pinch", label: "Pinch", icon: "ph:arrows-in-line-horizontal" },
+];
 
 export function OscillatorPanel() {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
@@ -141,7 +148,12 @@ function OscillatorRow(props: {
   const enabledId = createMemo(() => oscParam(props.oscillator, "enabled"));
   const enabled = createMemo(() => getBooleanParam(draft(), enabledId()));
   const wavetableId = createMemo(() => oscParam(props.oscillator, "wavetable"));
+  const warpModeId = createMemo(() => oscParam(props.oscillator, "warpMode"));
   const selectedWavetable = createMemo(() => getStringParam(draft(), wavetableId()) as WavetableId);
+  const selectedWarpMode = createMemo(() => {
+    const mode = getStringParam(draft(), warpModeId());
+    return mode === "fold" || mode === "pinch" ? mode : "shape";
+  });
   const customTableId = createMemo(() => selectedWavetable().startsWith("user.") ? selectedWavetable() : DEFAULT_CUSTOM_WAVETABLE_ID);
   const customTable = createMemo(() => draft().metadata.wavemaps?.[customTableId()] ?? draft().metadata.customWavetables?.[customTableId()] ?? createDefaultCustomWavetable(customTableId()));
   const label = createMemo(() => `Oscillator ${props.oscillator.toUpperCase()}`);
@@ -192,6 +204,10 @@ function OscillatorRow(props: {
                 value={selectedWavetable()}
                 onChange={(value) => setParameter(wavetableId(), value)}
               />
+              <WarpModeButtons
+                value={selectedWarpMode()}
+                onChange={(value) => setParameter(warpModeId(), value)}
+              />
               <div class={styles.rowKnobs}>
                 <For each={OSC_PARAMS}>
                   {(param) => {
@@ -209,7 +225,7 @@ function OscillatorRow(props: {
                         {...modulationPropsForTarget(draft(), id)}
                         pickTargetId={MODULATABLE_TARGETS.has(id) ? id : undefined}
                         formatValue={formatValue(param.suffix)}
-                        parseValue={param.suffix === "position" || param.suffix === "level" || param.suffix === "pan" ? parsePercent : undefined}
+                        parseValue={param.suffix === "position" || param.suffix === "warp" || param.suffix === "level" || param.suffix === "pan" ? parsePercent : undefined}
                         onChange={(value) => setNumericParameter(id, value)}
                       />
                     );
@@ -403,6 +419,37 @@ function WavetableShapeButtons(props: { value: WavetableId; onChange: (value: Wa
       </div>
       <span class={styles.wavetableSelectedLabel}>{selected()?.label ?? props.value}</span>
       <span class={styles.wavetableControlLabel}>Wavetable</span>
+    </div>
+  );
+}
+
+function WarpModeButtons(props: { value: WavetableWarpMode; onChange: (value: WavetableWarpMode) => void }) {
+  const selected = createMemo(() => WARP_MODE_OPTIONS.find((option) => option.value === props.value) ?? WARP_MODE_OPTIONS[0]);
+  return (
+    <div class={styles.wavetableControl}>
+      <div class={styles.wavetableButtons} role="radiogroup" aria-label="Warp mode">
+        <For each={WARP_MODE_OPTIONS}>
+          {(option) => {
+            const active = () => option.value === props.value;
+            return (
+              <HoverInfo content={option.label}>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={active()}
+                  aria-label={`${option.label} warp mode`}
+                  class={`${styles.wavetableButton} ${active() ? styles.wavetableButtonActive : ""}`}
+                  onClick={() => props.onChange(option.value)}
+                >
+                  <Icon name={option.icon} size={12} decorative />
+                </button>
+              </HoverInfo>
+            );
+          }}
+        </For>
+      </div>
+      <span class={styles.wavetableSelectedLabel}>{selected().label}</span>
+      <span class={styles.wavetableControlLabel}>Warp Mode</span>
     </div>
   );
 }

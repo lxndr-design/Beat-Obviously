@@ -150,7 +150,7 @@ function renderAetherStack(instrument, state, frequency, modulation) {
 }
 
 function wavetableOscillatorSample(instrument, state, phase, frequency, config, positionOffset, detuneOffset, spreadOffset) {
-  const tableConfig = config || instrument.wavetable || { bank: "aether", position: 0.35, warp: 0.2, unison: 1, detuneCents: 12, blend: 0.5 };
+  const tableConfig = config || instrument.wavetable || { bank: "aether", position: 0.35, warp: 0.2, warpMode: "shape", unison: 1, detuneCents: 12, blend: 0.5 };
   const unison = Math.max(1, Math.min(8, Math.round(tableConfig.unison || 1)));
   const detune = Math.max(0, Math.min(100, (tableConfig.detuneCents || 0) + (detuneOffset || 0)));
   const blend = clamp01((tableConfig.blend || 0) + (spreadOffset || 0));
@@ -158,13 +158,13 @@ function wavetableOscillatorSample(instrument, state, phase, frequency, config, 
   let sum = 0;
   for (let voice = 0; voice < unison; voice++) {
     const rate = plan.rates[voice];
-    sum += wavetableFrameMorph(instrument, state, tableConfig, phase * rate + plan.phaseOffsets[voice], frequency * rate, clamp01((tableConfig.position || 0) + (positionOffset || 0)), tableConfig.warp || 0) * plan.weights[voice];
+    sum += wavetableFrameMorph(instrument, state, tableConfig, phase * rate + plan.phaseOffsets[voice], frequency * rate, clamp01((tableConfig.position || 0) + (positionOffset || 0)), tableConfig.warp || 0, tableConfig.warpMode || "shape") * plan.weights[voice];
   }
   return clamp(sum / Math.max(1, plan.weightSum), -1, 1);
 }
 
-function wavetableFrameMorph(instrument, state, config, phase, frequency, position, warp) {
-  const table = getWavetable(instrument, state, config, frequency, warp);
+function wavetableFrameMorph(instrument, state, config, phase, frequency, position, warp, warpMode) {
+  const table = getWavetable(instrument, state, config, frequency, warp, warpMode);
   const pos = clamp01(position) * (table.frameCount - 1);
   const base = Math.floor(pos);
   const frac = pos - base;
@@ -173,23 +173,23 @@ function wavetableFrameMorph(instrument, state, config, phase, frequency, positi
   return y1 + (y2 - y1) * frac;
 }
 
-function getWavetable(instrument, state, config, frequency, warp) {
+function getWavetable(instrument, state, config, frequency, warp, warpMode) {
   const custom = config.bank === "custom" ? customWavetableForInstrument(instrument, config.customId) : null;
   const harmonicLimit = Math.min(32, Math.max(1, Math.floor((sampleRate * 0.48) / Math.max(20, frequency))));
-  const key = wavetableKey(config, custom, harmonicLimit, warp);
+  const key = wavetableKey(config, custom, harmonicLimit, warp, warpMode);
   const cached = state.tableCache.get(key);
   if (cached) return cached;
-  const table = createWavetable(config, custom, harmonicLimit, warp);
+  const table = createWavetable(config, custom, harmonicLimit, warp, warpMode);
   state.tableCache.set(key, table);
   return table;
 }
 
-function wavetableKey(config, custom, harmonicLimit, warp) {
+function wavetableKey(config, custom, harmonicLimit, warp, warpMode) {
   const customKey = custom ? custom.frames.map((frame) => [frame.brightness, frame.even, frame.fold, frame.phase].map((value) => Number(value || 0).toFixed(3)).join(",")).join(";") : "";
-  return [config.bank, config.customId || "", harmonicLimit, clamp01(warp || 0).toFixed(3), customKey].join("|");
+  return [config.bank, config.customId || "", harmonicLimit, clamp01(warp || 0).toFixed(3), warpMode || "shape", customKey].join("|");
 }
 
-function createWavetable(config, custom, harmonicLimit, warp) {
+function createWavetable(config, custom, harmonicLimit, warp, warpMode) {
   const frameCount = custom ? custom.frames.length : 8;
   const frameSize = 512;
   const samples = new Float32Array(frameCount * frameSize);
@@ -203,9 +203,9 @@ function createWavetable(config, custom, harmonicLimit, warp) {
       let sample = 0;
       let normalizer = 0;
       for (let harmonic = 1; harmonic <= harmonicLimit; harmonic++) {
-        const amp = customFrame ? customAmp(customFrame, harmonic, warp) : harmonicAmp(config.bank, harmonic, normalizedFrame, warp);
+        const amp = customFrame ? customAmp(customFrame, harmonic, warp, warpMode) : harmonicAmp(config.bank, harmonic, normalizedFrame, warp, warpMode);
         if (amp <= 0.0001) continue;
-        const harmonicPhase = customFrame ? customPhase(customFrame, harmonic, warp) : harmonicPhaseForBank(config.bank, harmonic, normalizedFrame);
+        const harmonicPhase = customFrame ? customPhase(customFrame, harmonic, warp, warpMode) : harmonicPhaseForBank(config.bank, harmonic, normalizedFrame, warp, warpMode);
         sample += Math.sin(phase * Math.PI * 2 * harmonic + harmonicPhase) * amp;
         normalizer += amp;
       }
@@ -245,45 +245,68 @@ function customWavetableForInstrument(instrument, id) {
   })) };
 }
 
-function customAmp(frame, harmonic, warp) {
+function warpModeIntensity(warp, warpMode) {
+  if (warpMode === "fold") return clamp01(warp) * 1.35;
+  if (warpMode === "pinch") return Math.pow(clamp01(warp), 0.72);
+  return clamp01(warp);
+}
+
+function customAmp(frame, harmonic, warp, warpMode) {
   const brightness = clamp01(frame.brightness);
   const even = clamp01(frame.even);
-  const fold = clamp01(frame.fold + clamp01(warp) * 0.35);
+  const shapedWarp = warpModeIntensity(warp, warpMode);
+  const fold = clamp01(frame.fold + shapedWarp * 0.35);
   const parity = harmonic % 2 === 1 ? 1 : even;
   const rolloff = Math.exp(-harmonic * (0.016 + (1 - brightness) * 0.085));
   const foldPeak = Math.exp(-Math.pow((harmonic - (3 + brightness * 20)) / (1.6 + fold * 8), 2));
+  const folded = warpMode === "fold" ? Math.abs(Math.sin(harmonic * 0.62 + frame.phase)) * shapedWarp * 0.24 : 0;
+  const pinched = warpMode === "pinch" ? Math.exp(-Math.pow((harmonic - (2 + brightness * 8)) / 2.4, 2)) * shapedWarp * 0.28 : 0;
   const motion = 1 + Math.sin(harmonic * 1.7 + frame.phase * Math.PI) * fold * 0.28;
-  return Math.max(0, parity * rolloff * motion / Math.sqrt(harmonic) + foldPeak * fold * 0.35);
+  return Math.max(0, parity * rolloff * motion / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + folded + pinched);
 }
 
-function customPhase(frame, harmonic, warp) {
-  return frame.phase * harmonic * 0.28 + Math.sin(harmonic * 0.41) * clamp01(frame.fold + clamp01(warp) * 0.25) * 0.55;
+function customPhase(frame, harmonic, warp, warpMode) {
+  const shapedWarp = warpModeIntensity(warp, warpMode);
+  const modePhase = warpMode === "fold"
+    ? Math.sin(harmonic * 0.73) * shapedWarp * 0.45
+    : warpMode === "pinch"
+      ? Math.cos(harmonic * 0.29) * shapedWarp * 0.24
+      : 0;
+  return frame.phase * harmonic * 0.28 + Math.sin(harmonic * 0.41) * clamp01(frame.fold + shapedWarp * 0.25) * 0.55 + modePhase;
 }
 
-function harmonicAmp(bank, harmonic, frame, warp) {
+function harmonicAmp(bank, harmonic, frame, warp, warpMode) {
   const odd = harmonic % 2 === 1;
+  const shapedWarp = warpModeIntensity(warp, warpMode);
+  const folded = warpMode === "fold" ? Math.abs(Math.sin(harmonic * 0.58 + frame * 4)) * shapedWarp * 0.22 / Math.sqrt(harmonic) : 0;
+  const pinched = warpMode === "pinch" ? Math.exp(-Math.pow((harmonic - (2 + frame * 10)) / (1.8 + shapedWarp * 3), 2)) * shapedWarp * 0.34 : 0;
   switch (bank) {
     case "glass":
-      return Math.exp(-harmonic * (0.045 + frame * 0.025)) * (odd ? 1 : 0.22 + warp * 0.45) * (1 + Math.sin(harmonic * 1.7 + frame * 5) * 0.18);
+      return Math.exp(-harmonic * (0.045 + frame * 0.025)) * (odd ? 1 : 0.22 + shapedWarp * 0.45) * (1 + Math.sin(harmonic * 1.7 + frame * 5) * 0.18) + folded + pinched;
     case "vocal": {
-      const formantA = Math.exp(-Math.pow((harmonic - (3 + frame * 9)) / (1.4 + warp * 3), 2));
-      const formantB = Math.exp(-Math.pow((harmonic - (11 + frame * 18)) / (2.5 + warp * 6), 2));
-      return (formantA * 1.4 + formantB * 0.9 + (odd ? 0.08 : 0.03)) / Math.sqrt(harmonic);
+      const formantA = Math.exp(-Math.pow((harmonic - (3 + frame * 9)) / (1.4 + shapedWarp * 3), 2));
+      const formantB = Math.exp(-Math.pow((harmonic - (11 + frame * 18)) / (2.5 + shapedWarp * 6), 2));
+      return (formantA * 1.4 + formantB * 0.9 + (odd ? 0.08 : 0.03)) / Math.sqrt(harmonic) + folded + pinched;
     }
     case "organ":
-      return [1, 0, 0.55, 0.22, 0.38, 0, 0.18, 0.1][(harmonic - 1) % 8] * Math.exp(-frame * harmonic * 0.01) + (warp * 0.08) / harmonic;
+      return [1, 0, 0.55, 0.22, 0.38, 0, 0.18, 0.1][(harmonic - 1) % 8] * Math.exp(-frame * harmonic * 0.01) + (shapedWarp * 0.08) / harmonic + folded + pinched;
     case "fm":
-      return Math.abs(Math.sin(harmonic * (0.45 + frame * 0.9))) * Math.exp(-harmonic * (0.028 + (1 - warp) * 0.028)) / Math.sqrt(harmonic);
+      return Math.abs(Math.sin(harmonic * (0.45 + frame * 0.9))) * Math.exp(-harmonic * (0.028 + (1 - shapedWarp) * 0.028)) / Math.sqrt(harmonic) + folded + pinched;
     case "aether":
     default:
-      return Math.exp(-harmonic * (0.022 + frame * 0.04)) * (odd ? 1 : frame * 0.8 + warp * 0.35) / Math.sqrt(harmonic);
+      return Math.exp(-harmonic * (0.022 + frame * 0.04)) * (odd ? 1 : frame * 0.8 + shapedWarp * 0.35) / Math.sqrt(harmonic) + folded + pinched;
   }
 }
 
-function harmonicPhaseForBank(bank, harmonic, frame) {
-  if (bank === "fm" || bank === "glass") return Math.sin(harmonic * 0.37 + frame * Math.PI) * 0.8;
-  if (bank === "vocal") return frame * harmonic * 0.08;
-  return 0;
+function harmonicPhaseForBank(bank, harmonic, frame, warp, warpMode) {
+  const modePhase = warpMode === "fold"
+    ? Math.sin(harmonic * 0.47 + frame * Math.PI) * warpModeIntensity(warp, warpMode) * 0.55
+    : warpMode === "pinch"
+      ? Math.cos(harmonic * 0.33 + frame) * warpModeIntensity(warp, warpMode) * 0.3
+      : 0;
+  if (bank === "fm" || bank === "glass") return Math.sin(harmonic * 0.37 + frame * Math.PI) * 0.8 + modePhase;
+  if (bank === "vocal") return frame * harmonic * 0.08 + modePhase;
+  return modePhase;
 }
 
 function oscillatorSample(waveform, phase, color) {

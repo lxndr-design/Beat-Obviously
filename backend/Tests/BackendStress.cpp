@@ -8655,6 +8655,21 @@ namespace
             }
         }
 
+        {
+            const auto shape = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::Shape, 8, 2048);
+            const auto fold = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::Fold, 8, 2048);
+            const auto pinch = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::Pinch, 8, 2048);
+            double foldDiff = 0.0;
+            double pinchDiff = 0.0;
+            for (int i = 0; i < 2048; i += 8)
+            {
+                foldDiff += std::abs(shape.getSample(7, i) - fold.getSample(7, i));
+                pinchDiff += std::abs(shape.getSample(7, i) - pinch.getSample(7, i));
+            }
+            if (foldDiff <= 0.01 || pinchDiff <= 0.01)
+                return false;
+        }
+
         const auto sine = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Sine, 8, 2048);
         beat::WavetableOscillator oscillator;
         oscillator.prepare(44100.0);
@@ -8773,6 +8788,8 @@ namespace
             "osc.a.enabled": true,
             "osc.a.wavetable": "basic.pulse",
             "osc.a.position": 0.25,
+            "osc.a.warp": 0.58,
+            "osc.a.warpMode": "fold",
             "osc.a.octave": -1,
             "osc.a.semitone": 12,
             "osc.a.fine": 7,
@@ -8783,6 +8800,8 @@ namespace
             "osc.b.enabled": true,
             "osc.b.wavetable": "basic.triangle",
             "osc.b.position": 0.1,
+            "osc.b.warp": 0.36,
+            "osc.b.warpMode": "pinch",
             "osc.b.octave": 1,
             "osc.b.semitone": 7,
             "osc.b.fine": -5,
@@ -8870,11 +8889,15 @@ namespace
             return false;
         if (!near(instrument.aether.oscA.wavetable.position, 0.45f) || instrument.aether.oscA.wavetable.unison != 5)
             return false;
+        if (!near(instrument.aether.oscA.wavetable.warp, 0.58f) || instrument.aether.oscA.wavetable.warpMode != 1)
+            return false;
         if (!near(instrument.aether.oscA.pan, -0.3f))
             return false;
         if (!near(instrument.aether.oscA.phase, 0.33f) || !near(instrument.aether.oscA.randomPhase, 0.2f))
             return false;
         if (!instrument.aether.oscB.enabled || instrument.aether.oscB.wavetable.bank != 3)
+            return false;
+        if (!near(instrument.aether.oscB.wavetable.warp, 0.36f) || instrument.aether.oscB.wavetable.warpMode != 2)
             return false;
         if (!near(instrument.aether.oscB.level, 0.7f) || !near(instrument.aether.oscB.wavetable.position, 0.0f))
             return false;

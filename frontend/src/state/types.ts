@@ -12,6 +12,8 @@ export type DrumSpeed = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type TrackKind = "audio" | "midi" | "mixed" | "group";
 
+export type WavetableWarpMode = "shape" | "fold" | "pinch";
+
 export type MidiAutomationTarget =
   | "pitch"
   | "osc.a.position"
@@ -325,6 +327,8 @@ export interface WavetableConfig {
   position: number;
   /** 0..1 harmonic warp / folding pressure. */
   warp: number;
+  /** Bounded table-generation warp style. */
+  warpMode: WavetableWarpMode;
   /** 1..8 stacked voice count. */
   unison: number;
   /** 0..100 cents spread across unison voices. */

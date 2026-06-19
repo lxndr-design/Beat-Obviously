@@ -4,6 +4,9 @@
 
 namespace beat
 {
+    int synthWavetableBankForId(const juce::String& id);
+    int synthWavetableWarpModeForId(const juce::String& id);
+
     namespace
     {
         juce::var objectProperty(const juce::var& object, const juce::String& name, const juce::var& fallback = {})
@@ -151,6 +154,8 @@ namespace beat
                 1.0f,
                 (float) synthNumberParam(params, prefix + "position", fallback.position)
                     + staticRouteAmount(params, modulation, prefix + "position"));
+            fallback.warp = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "warp", fallback.warp));
+            fallback.warpMode = synthWavetableWarpModeForId(synthStringParam(params, prefix + "warpMode", "shape"));
             return fallback;
         }
 
@@ -265,6 +270,13 @@ namespace beat
         return 0;
     }
 
+    int synthWavetableWarpModeForId(const juce::String& id)
+    {
+        if (id == "fold") return 1;
+        if (id == "pinch") return 2;
+        return 0;
+    }
+
     bool applySynthPatchContract(const juce::var& patch, InstrumentDefinition& instrument)
     {
         if (!patch.isObject()) return false;
@@ -286,6 +298,8 @@ namespace beat
             1.0f,
             (float) synthNumberParam(params, "osc.a.position", instrument.wavetablePosition)
                 + staticRouteAmount(params, modulation, "osc.a.position"));
+        instrument.wavetableWarp = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "osc.a.warp", instrument.wavetableWarp));
+        instrument.wavetableWarpMode = synthWavetableWarpModeForId(synthStringParam(params, "osc.a.warpMode", "shape"));
         const bool unisonEnabled = synthNumberParam(params, "unison.enabled", 0.0) >= 0.5;
         instrument.wavetableUnison = unisonEnabled
             ? juce::jlimit(1, 8, (int) std::round(synthNumberParam(params, "unison.voices", instrument.wavetableUnison)))
@@ -309,6 +323,7 @@ namespace beat
         baseWavetable.bank = instrument.wavetableBank;
         baseWavetable.position = instrument.wavetablePosition;
         baseWavetable.warp = instrument.wavetableWarp;
+        baseWavetable.warpMode = instrument.wavetableWarpMode;
         baseWavetable.unison = instrument.wavetableUnison;
         baseWavetable.detuneCents = instrument.wavetableDetuneCents;
         baseWavetable.blend = instrument.wavetableBlend;

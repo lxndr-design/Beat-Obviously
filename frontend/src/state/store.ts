@@ -1815,6 +1815,7 @@ export function defaultWavetableConfig() {
     bank: "aether",
     position: 0.35,
     warp: 0.2,
+    warpMode: "shape",
     unison: 1,
     detuneCents: 12,
     blend: 0.5,
@@ -1846,7 +1847,7 @@ export function defaultAetherSynthConfig() {
       fineCents: -4,
       phase: 0,
       randomPhase: 0.25,
-      wavetable: { ...oscA, bank: "glass", position: 0.25, warp: 0.16, detuneCents: 8, blend: 0.35 },
+      wavetable: { ...oscA, bank: "glass", position: 0.25, warp: 0.16, warpMode: "shape", detuneCents: 8, blend: 0.35 },
     },
     sub: {
       enabled: true,

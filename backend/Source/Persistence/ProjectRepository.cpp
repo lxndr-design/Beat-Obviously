@@ -447,6 +447,7 @@ namespace beat
             o->setProperty("wavetableBank", instrument.wavetableBank);
             o->setProperty("wavetablePosition", instrument.wavetablePosition);
             o->setProperty("wavetableWarp", instrument.wavetableWarp);
+            o->setProperty("wavetableWarpMode", instrument.wavetableWarpMode);
             o->setProperty("wavetableUnison", instrument.wavetableUnison);
             o->setProperty("wavetableDetuneCents", instrument.wavetableDetuneCents);
             o->setProperty("wavetableBlend", instrument.wavetableBlend);
@@ -606,6 +607,7 @@ namespace beat
                     instrument.wavetableBank = juce::jlimit(0, 8, (int) iv.getProperty("wavetableBank", instrument.wavetableBank));
                     instrument.wavetablePosition = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("wavetablePosition", instrument.wavetablePosition));
                     instrument.wavetableWarp = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("wavetableWarp", instrument.wavetableWarp));
+                    instrument.wavetableWarpMode = juce::jlimit(0, 2, (int) iv.getProperty("wavetableWarpMode", instrument.wavetableWarpMode));
                     instrument.wavetableUnison = juce::jlimit(1, 8, (int) iv.getProperty("wavetableUnison", instrument.wavetableUnison));
                     instrument.wavetableDetuneCents = juce::jlimit(0.0f, 100.0f, (float) (double) iv.getProperty("wavetableDetuneCents", instrument.wavetableDetuneCents));
                     instrument.wavetableBlend = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("wavetableBlend", instrument.wavetableBlend));

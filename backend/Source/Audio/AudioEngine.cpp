@@ -1445,6 +1445,7 @@ namespace beat
             target.custom = source.custom;
             target.position = source.position;
             target.warp = source.warp;
+            target.warpMode = source.warpMode;
             target.unison = source.unison;
             target.detuneCents = source.detuneCents;
             target.blend = source.blend;
@@ -1475,6 +1476,7 @@ namespace beat
         params.wavetableBank = instrument.wavetableBank;
         params.wavetablePosition = instrument.wavetablePosition;
         params.wavetableWarp = instrument.wavetableWarp;
+        params.wavetableWarpMode = instrument.wavetableWarpMode;
         params.wavetableUnison = instrument.wavetableUnison;
         params.wavetableDetuneCents = instrument.wavetableDetuneCents;
         params.wavetableBlend = instrument.wavetableBlend;
@@ -1628,6 +1630,7 @@ namespace beat
             instrument.wavetableBank == 5,
             instrument.wavetablePosition,
             instrument.wavetableWarp,
+            instrument.wavetableWarpMode,
             instrument.wavetableUnison,
             instrument.wavetableDetuneCents,
             instrument.wavetableBlend,

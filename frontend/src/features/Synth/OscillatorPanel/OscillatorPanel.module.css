@@ -55,7 +55,7 @@
 
 .rowBody {
   display: grid;
-  grid-template-columns: 156px minmax(0, 1fr);
+  grid-template-columns: 156px 88px minmax(0, 1fr);
   gap: 6px;
   align-items: end;
   min-width: 0;
@@ -71,7 +71,7 @@
 
 .rowKnobs {
   display: grid;
-  grid-template-columns: repeat(6, minmax(64px, 1fr));
+  grid-template-columns: repeat(5, minmax(58px, 1fr));
   gap: 6px;
   align-items: end;
   min-width: 0;

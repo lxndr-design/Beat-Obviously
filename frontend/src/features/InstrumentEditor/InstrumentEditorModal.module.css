@@ -323,13 +323,13 @@
 
 .aetherKnobs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(56px, 1fr));
+  grid-template-columns: repeat(6, minmax(56px, 1fr));
   gap: 4px;
 }
 
 .aetherGlobalGrid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(56px, 1fr));
+  grid-template-columns: repeat(7, minmax(56px, 1fr));
   gap: 4px;
   align-items: end;
 }

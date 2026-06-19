@@ -14,6 +14,13 @@ namespace beat
         Pulse
     };
 
+    enum class WavetableWarpMode
+    {
+        Shape,
+        Fold,
+        Pinch
+    };
+
     class WavetableFactory
     {
     public:
@@ -29,10 +36,22 @@ namespace beat
         static constexpr int defaultFrameSize = 2048;
 
         static Wavetable createBasic(BasicWavetableShape shape,
+                                     int frameCount,
+                                     int frameSize);
+
+        static Wavetable createBasic(BasicWavetableShape shape,
+                                     float warp = 0.0f,
+                                     WavetableWarpMode warpMode = WavetableWarpMode::Shape,
                                      int frameCount = defaultFrameCount,
                                      int frameSize = defaultFrameSize);
 
         static Wavetable createCustom(const std::array<CustomFrame, 4>& frames,
+                                      int frameCount,
+                                      int frameSize);
+
+        static Wavetable createCustom(const std::array<CustomFrame, 4>& frames,
+                                      float warp = 0.0f,
+                                      WavetableWarpMode warpMode = WavetableWarpMode::Shape,
                                       int frameCount = defaultFrameCount,
                                       int frameSize = defaultFrameSize);
     };

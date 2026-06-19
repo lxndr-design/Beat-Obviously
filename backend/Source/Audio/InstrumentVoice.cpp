@@ -225,17 +225,25 @@ namespace beat
 
         Wavetable createTableForConfig(const InstrumentVoice::Params::WavetableConfig& config)
         {
+            const auto warpMode = config.warpMode == 1
+                ? WavetableWarpMode::Fold
+                : config.warpMode == 2
+                    ? WavetableWarpMode::Pinch
+                    : WavetableWarpMode::Shape;
             if (config.custom || config.bank == 5)
-                return WavetableFactory::createCustom(factoryCustomFrames(config));
+                return WavetableFactory::createCustom(factoryCustomFrames(config), config.warp, warpMode);
 
-            return WavetableFactory::createBasic(basicShapeForBank(config.bank));
+            return WavetableFactory::createBasic(basicShapeForBank(config.bank), config.warp, warpMode);
         }
 
         juce::String wavetableCacheKey(const InstrumentVoice::Params::WavetableConfig& config)
         {
             juce::String key;
             const bool custom = config.custom || config.bank == 5;
-            key << "bank=" << config.bank << "|custom=" << (custom ? 1 : 0);
+            key << "bank=" << config.bank
+                << "|custom=" << (custom ? 1 : 0)
+                << "|warp=" << juce::String(juce::jlimit(0.0f, 1.0f, config.warp), 4)
+                << "|warpMode=" << juce::jlimit(0, 2, config.warpMode);
             if (custom)
             {
                 for (const auto& frame : config.customFrames)
@@ -353,6 +361,7 @@ namespace beat
         params.wavetable.custom = params.wavetableBank == 5;
         params.wavetable.position = params.wavetablePosition;
         params.wavetable.warp = params.wavetableWarp;
+        params.wavetable.warpMode = params.wavetableWarpMode;
         params.wavetable.unison = params.wavetableUnison;
         params.wavetable.detuneCents = params.wavetableDetuneCents;
         params.wavetable.blend = params.wavetableBlend;

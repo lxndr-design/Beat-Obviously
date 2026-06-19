@@ -1196,6 +1196,18 @@ namespace beat
             return juce::jlimit(0, 4, (int) value);
         }
 
+        int parseWavetableWarpMode(const juce::var& value)
+        {
+            if (value.isString())
+            {
+                const auto mode = value.toString();
+                if (mode == "fold") return 1;
+                if (mode == "pinch") return 2;
+                return 0;
+            }
+            return juce::jlimit(0, 2, (int) value);
+        }
+
         int parseSubWaveform(const juce::var& value)
         {
             if (value.isString())
@@ -1219,6 +1231,7 @@ namespace beat
             fallback.bank = parseWavetableBank(value.getProperty("bank", fallback.bank));
             fallback.position = normalizedParam(value, "position", fallback.position);
             fallback.warp = normalizedParam(value, "warp", fallback.warp);
+            fallback.warpMode = parseWavetableWarpMode(value.getProperty("warpMode", fallback.warpMode));
             fallback.unison = juce::jlimit(1, 8, (int) value.getProperty("unison", fallback.unison));
             fallback.detuneCents = floatParam(value, "detuneCents", fallback.detuneCents, 0.0f, 100.0f);
             fallback.blend = normalizedParam(value, "blend", fallback.blend);
@@ -1781,6 +1794,7 @@ namespace beat
                         instrument.wavetableBank = parseWavetableBank(wavetable.getProperty("bank", "aether"));
                         instrument.wavetablePosition = normalizedParam(wavetable, "position", instrument.wavetablePosition);
                         instrument.wavetableWarp = normalizedParam(wavetable, "warp", instrument.wavetableWarp);
+                        instrument.wavetableWarpMode = parseWavetableWarpMode(wavetable.getProperty("warpMode", instrument.wavetableWarpMode));
                         instrument.wavetableUnison = juce::jlimit(1, 8, (int) wavetable.getProperty("unison", instrument.wavetableUnison));
                         instrument.wavetableDetuneCents = floatParam(wavetable, "detuneCents", instrument.wavetableDetuneCents, 0.0f, 100.0f);
                         instrument.wavetableBlend = normalizedParam(wavetable, "blend", instrument.wavetableBlend);
@@ -1829,6 +1843,7 @@ namespace beat
                     globalWavetable.bank = instrument.wavetableBank;
                     globalWavetable.position = instrument.wavetablePosition;
                     globalWavetable.warp = instrument.wavetableWarp;
+                    globalWavetable.warpMode = instrument.wavetableWarpMode;
                     globalWavetable.unison = instrument.wavetableUnison;
                     globalWavetable.detuneCents = instrument.wavetableDetuneCents;
                     globalWavetable.blend = instrument.wavetableBlend;

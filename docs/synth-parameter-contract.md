@@ -25,6 +25,8 @@ This document defines stable names for the first Serum-style synth pass. Backend
 | `osc.a.enabled` | boolean | off/on | `true` | Main oscillator enable. |
 | `osc.a.wavetable` | string | wavetable ID | `basic.saw` | References factory or imported wavetable. |
 | `osc.a.position` | normalized | `0..1` | `0` | Frame position within wavetable. |
+| `osc.a.warp` | normalized | `0..1` | `0.2` | Table-generation warp amount. |
+| `osc.a.warpMode` | enum | `shape`, `fold`, `pinch` | `shape` | Bounded table-generation warp style. |
 | `osc.a.octave` | integer | `-4..4` | `0` | Octave transpose. |
 | `osc.a.semitone` | integer | `-12..12` | `0` | Semitone transpose. |
 | `osc.a.fine` | cents | `-100..100` | `0` | Fine tuning in cents. |

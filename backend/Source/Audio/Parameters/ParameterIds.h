@@ -15,6 +15,8 @@ namespace beat::params
             inline constexpr std::string_view enabled { "osc.a.enabled" };
             inline constexpr std::string_view wavetable { "osc.a.wavetable" };
             inline constexpr std::string_view position { "osc.a.position" };
+            inline constexpr std::string_view warp { "osc.a.warp" };
+            inline constexpr std::string_view warpMode { "osc.a.warpMode" };
             inline constexpr std::string_view octave { "osc.a.octave" };
             inline constexpr std::string_view semitone { "osc.a.semitone" };
             inline constexpr std::string_view fine { "osc.a.fine" };
@@ -29,6 +31,8 @@ namespace beat::params
             inline constexpr std::string_view enabled { "osc.b.enabled" };
             inline constexpr std::string_view wavetable { "osc.b.wavetable" };
             inline constexpr std::string_view position { "osc.b.position" };
+            inline constexpr std::string_view warp { "osc.b.warp" };
+            inline constexpr std::string_view warpMode { "osc.b.warpMode" };
             inline constexpr std::string_view octave { "osc.b.octave" };
             inline constexpr std::string_view semitone { "osc.b.semitone" };
             inline constexpr std::string_view fine { "osc.b.fine" };

@@ -70,6 +70,41 @@ namespace beat
             return 0.0f;
         }
 
+        float warpModeIntensity(float warp, WavetableWarpMode mode)
+        {
+            const float clamped = juce::jlimit(0.0f, 1.0f, warp);
+            switch (mode)
+            {
+                case WavetableWarpMode::Fold: return clamped * 1.35f;
+                case WavetableWarpMode::Pinch: return std::pow(clamped, 0.72f);
+                case WavetableWarpMode::Shape:
+                default: return clamped;
+            }
+        }
+
+        float warpAmplitudeOffset(WavetableWarpMode mode, int harmonic, float frame, float warp)
+        {
+            const float shapedWarp = warpModeIntensity(warp, mode);
+            if (mode == WavetableWarpMode::Fold)
+                return std::abs(std::sin((float) harmonic * 0.58f + frame * 4.0f)) * shapedWarp * 0.22f / std::sqrt((float) harmonic);
+            if (mode == WavetableWarpMode::Pinch)
+            {
+                const float width = 1.8f + shapedWarp * 3.0f;
+                return std::exp(-std::pow(((float) harmonic - (2.0f + frame * 10.0f)) / width, 2.0f)) * shapedWarp * 0.34f;
+            }
+            return 0.0f;
+        }
+
+        float warpPhaseOffset(WavetableWarpMode mode, int harmonic, float frame, float warp)
+        {
+            const float shapedWarp = warpModeIntensity(warp, mode);
+            if (mode == WavetableWarpMode::Fold)
+                return std::sin((float) harmonic * 0.47f + frame * juce::MathConstants<float>::pi) * shapedWarp * 0.55f;
+            if (mode == WavetableWarpMode::Pinch)
+                return std::cos((float) harmonic * 0.33f + frame) * shapedWarp * 0.3f;
+            return 0.0f;
+        }
+
         void normalizeFrame(std::vector<float>& samples, int frameStart, int frameSize)
         {
             float peak = 0.0f;
@@ -84,25 +119,33 @@ namespace beat
                 samples[(size_t) frameStart + (size_t) i] *= gain;
         }
 
-        float customAmplitude(const WavetableFactory::CustomFrame& frame, int harmonic)
+        float customAmplitude(const WavetableFactory::CustomFrame& frame, int harmonic, float warp, WavetableWarpMode warpMode)
         {
             const float brightness = juce::jlimit(0.0f, 1.0f, frame.brightness);
             const float even = juce::jlimit(0.0f, 1.0f, frame.even);
-            const float fold = juce::jlimit(0.0f, 1.0f, frame.fold);
+            const float shapedWarp = warpModeIntensity(warp, warpMode);
+            const float fold = juce::jlimit(0.0f, 1.0f, frame.fold + shapedWarp * 0.35f);
             const float parity = (harmonic % 2) == 1 ? 1.0f : even;
             const float rolloff = std::exp(-(float) harmonic * (0.016f + (1.0f - brightness) * 0.085f));
             const float center = 3.0f + brightness * 20.0f;
             const float width = 1.6f + fold * 8.0f;
             const float foldPeak = std::exp(-std::pow(((float) harmonic - center) / width, 2.0f));
             const float motion = 1.0f + std::sin((float) harmonic * 1.7f + frame.phase * juce::MathConstants<float>::pi) * fold * 0.28f;
-            return juce::jmax(0.0f, parity * rolloff * motion / std::sqrt((float) harmonic) + foldPeak * fold * 0.35f);
+            return juce::jmax(
+                0.0f,
+                parity * rolloff * motion / std::sqrt((float) harmonic)
+                    + foldPeak * fold * 0.35f
+                    + warpAmplitudeOffset(warpMode, harmonic, brightness, warp));
         }
 
-        float customPhase(const WavetableFactory::CustomFrame& frame, int harmonic)
+        float customPhase(const WavetableFactory::CustomFrame& frame, int harmonic, float warp, WavetableWarpMode warpMode)
         {
-            const float fold = juce::jlimit(0.0f, 1.0f, frame.fold);
+            const float shapedWarp = warpModeIntensity(warp, warpMode);
+            const float fold = juce::jlimit(0.0f, 1.0f, frame.fold + shapedWarp * 0.25f);
             const float phase = juce::jlimit(-1.0f, 1.0f, frame.phase);
-            return phase * (float) harmonic * 0.28f + std::sin((float) harmonic * 0.41f) * fold * 0.55f;
+            return phase * (float) harmonic * 0.28f
+                + std::sin((float) harmonic * 0.41f) * fold * 0.55f
+                + warpPhaseOffset(warpMode, harmonic, phase, warp);
         }
 
         WavetableFactory::CustomFrame interpolateCustomFrame(
@@ -124,6 +167,11 @@ namespace beat
     }
 
     Wavetable WavetableFactory::createBasic(BasicWavetableShape shape, int frameCount, int frameSize)
+    {
+        return createBasic(shape, 0.0f, WavetableWarpMode::Shape, frameCount, frameSize);
+    }
+
+    Wavetable WavetableFactory::createBasic(BasicWavetableShape shape, float warp, WavetableWarpMode warpMode, int frameCount, int frameSize)
     {
         frameCount = juce::jlimit(1, 64, frameCount);
         frameSize = juce::jlimit(32, 32768, frameSize);
@@ -148,7 +196,11 @@ namespace beat
                 {
                     const float amp = harmonicAmplitude(shape, harmonic);
                     if (amp != 0.0f)
-                        value += std::sin(twoPi * phase * (double) harmonic) * (double) amp;
+                    {
+                        const float harmonicWarp = warpAmplitudeOffset(warpMode, harmonic, frameNorm, warp);
+                        const float shapedAmp = amp + harmonicWarp;
+                        value += std::sin(twoPi * phase * (double) harmonic + (double) warpPhaseOffset(warpMode, harmonic, frameNorm, warp)) * (double) shapedAmp;
+                    }
                 }
 
                 samples[(size_t) frameStart + (size_t) i] = (float) value;
@@ -170,6 +222,11 @@ namespace beat
 
     Wavetable WavetableFactory::createCustom(const std::array<CustomFrame, 4>& frames, int frameCount, int frameSize)
     {
+        return createCustom(frames, 0.0f, WavetableWarpMode::Shape, frameCount, frameSize);
+    }
+
+    Wavetable WavetableFactory::createCustom(const std::array<CustomFrame, 4>& frames, float warp, WavetableWarpMode warpMode, int frameCount, int frameSize)
+    {
         frameCount = juce::jlimit(1, 64, frameCount);
         frameSize = juce::jlimit(32, 32768, frameSize);
 
@@ -189,9 +246,9 @@ namespace beat
 
                 for (int harmonic = 1; harmonic <= maxTableHarmonic; ++harmonic)
                 {
-                    const float amp = customAmplitude(customFrame, harmonic);
+                    const float amp = customAmplitude(customFrame, harmonic, warp, warpMode);
                     if (amp <= 0.0001f) continue;
-                    value += std::sin(twoPi * phase * (double) harmonic + (double) customPhase(customFrame, harmonic)) * (double) amp;
+                    value += std::sin(twoPi * phase * (double) harmonic + (double) customPhase(customFrame, harmonic, warp, warpMode)) * (double) amp;
                 }
 
                 samples[(size_t) frameStart + (size_t) i] = (float) value;

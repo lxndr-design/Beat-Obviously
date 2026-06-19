@@ -128,6 +128,7 @@ namespace beat
             bool custom { false };
             float position { 0.35f };
             float warp { 0.2f };
+            int warpMode { 0 };
             int unison { 1 };
             float detuneCents { 12.0f };
             float blend { 0.5f };
@@ -247,6 +248,7 @@ namespace beat
         int wavetableBank { 0 };
         float wavetablePosition { 0.35f };
         float wavetableWarp { 0.2f };
+        int wavetableWarpMode { 0 };
         int wavetableUnison { 1 };
         float wavetableDetuneCents { 12.0f };
         float wavetableBlend { 0.5f };

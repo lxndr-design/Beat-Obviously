@@ -36,6 +36,8 @@ try {
       "osc.a.enabled": true,
       "osc.a.wavetable": "basic.pulse",
       "osc.a.position": 0.42,
+      "osc.a.warp": 0.58,
+      "osc.a.warpMode": "fold",
       "osc.a.octave": -1,
       "osc.a.semitone": 7,
       "osc.a.fine": -14,
@@ -46,6 +48,8 @@ try {
       "osc.b.enabled": true,
       "osc.b.wavetable": "basic.triangle",
       "osc.b.position": 0.81,
+      "osc.b.warp": 0.36,
+      "osc.b.warpMode": "pinch",
       "osc.b.octave": 1,
       "osc.b.semitone": -5,
       "osc.b.fine": 23,
@@ -158,8 +162,12 @@ try {
   assert.equal(patch.aether.oscB.pan, 0.45);
   assert.equal(patch.aether.oscA.phase, 0.33);
   assert.equal(patch.aether.oscA.randomPhase, 0.2);
+  assert.equal(patch.aether.oscA.wavetable.warp, 0.58);
+  assert.equal(patch.aether.oscA.wavetable.warpMode, "fold");
   assert.equal(patch.aether.oscB.phase, 0.66);
   assert.equal(patch.aether.oscB.randomPhase, 0.1);
+  assert.equal(patch.aether.oscB.wavetable.warp, 0.36);
+  assert.equal(patch.aether.oscB.wavetable.warpMode, "pinch");
   assert.equal(patch.aether.oscB.wavetable.bank, "organ");
   assert.equal(patch.wavetable.unison, 5);
   assert.equal(patch.aether.oscA.wavetable.unison, 5);
@@ -259,7 +267,7 @@ try {
     knobs: { cutoff: 0.5, resonance: 0.2, drive: 0.1, color: 0.4 },
     waveform: "wavetable",
     sampleIds: [],
-    wavetable: { bank: "fm", position: 0.25, warp: 0, unison: 5, detuneCents: 24, blend: 0.7 },
+    wavetable: { bank: "fm", position: 0.25, warp: 0.5, warpMode: "fold", unison: 5, detuneCents: 24, blend: 0.7 },
     aether: {
       oscA: {
         enabled: true,
@@ -269,7 +277,7 @@ try {
         octave: 0,
         semitone: 0,
         fineCents: 0,
-        wavetable: { bank: "fm", position: 0.25, warp: 0, unison: 5, detuneCents: 24, blend: 0.7 },
+        wavetable: { bank: "fm", position: 0.25, warp: 0.5, warpMode: "fold", unison: 5, detuneCents: 24, blend: 0.7 },
       },
       oscB: {
         enabled: false,
@@ -279,7 +287,7 @@ try {
         octave: 1,
         semitone: 0,
         fineCents: 0,
-        wavetable: { bank: "organ", position: 0.8, warp: 0, unison: 1, detuneCents: 0, blend: 0 },
+        wavetable: { bank: "organ", position: 0.8, warp: 0.3, warpMode: "pinch", unison: 1, detuneCents: 0, blend: 0 },
       },
       sub: { enabled: false, level: 0, octave: -1, waveform: "sine" },
       noise: { enabled: false, level: 0, color: 0.5 },
@@ -287,7 +295,39 @@ try {
   });
   assert.equal(legacyAether.parameters["unison.enabled"], true);
   assert.equal(legacyAether.parameters["unison.voices"], 5);
+  assert.equal(legacyAether.parameters["osc.a.warp"], 0.5);
+  assert.equal(legacyAether.parameters["osc.a.warpMode"], "fold");
   assert.equal(legacyAether.parameters["osc.b.position"], 0.8);
+  assert.equal(legacyAether.parameters["osc.b.warpMode"], "pinch");
+
+  const warpShape = synthPreview.renderWavetablePreviewSamples({
+    ...patch,
+    wavetable: { ...patch.wavetable, warp: 0.8, warpMode: "shape" },
+    aether: {
+      ...patch.aether,
+      oscA: { ...patch.aether.oscA, wavetable: { ...patch.aether.oscA.wavetable, warp: 0.8, warpMode: "shape" } },
+    },
+  }, 256, "a");
+  const warpFold = synthPreview.renderWavetablePreviewSamples({
+    ...patch,
+    wavetable: { ...patch.wavetable, warp: 0.8, warpMode: "fold" },
+    aether: {
+      ...patch.aether,
+      oscA: { ...patch.aether.oscA, wavetable: { ...patch.aether.oscA.wavetable, warp: 0.8, warpMode: "fold" } },
+    },
+  }, 256, "a");
+  const warpPinch = synthPreview.renderWavetablePreviewSamples({
+    ...patch,
+    wavetable: { ...patch.wavetable, warp: 0.8, warpMode: "pinch" },
+    aether: {
+      ...patch.aether,
+      oscA: { ...patch.aether.oscA, wavetable: { ...patch.aether.oscA.wavetable, warp: 0.8, warpMode: "pinch" } },
+    },
+  }, 256, "a");
+  const diffFold = warpShape.reduce((sum, sample, index) => sum + Math.abs(sample - warpFold[index]), 0) / warpShape.length;
+  const diffPinch = warpShape.reduce((sum, sample, index) => sum + Math.abs(sample - warpPinch[index]), 0) / warpShape.length;
+  assert.ok(diffFold > 0.002, `expected fold warp mode to change preview, got ${diffFold}`);
+  assert.ok(diffPinch > 0.002, `expected pinch warp mode to change preview, got ${diffPinch}`);
 
   const customDraft = synthStore.normalizeSynthDraftPatch({
     name: "Custom Table Probe",
