@@ -427,9 +427,12 @@ namespace beat
         instrument.releaseMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.1.release", 0.25) * 1000.0f);
         instrument.releaseCurve = envelopeCurveForId(synthStringParam(params, "env.1.releaseCurve", "linear"));
         instrument.env2AttackMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.2.attack", 0.01) * 1000.0f);
+        instrument.env2AttackCurve = envelopeCurveForId(synthStringParam(params, "env.2.attackCurve", "linear"));
         instrument.env2DecayMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.2.decay", 0.3) * 1000.0f);
+        instrument.env2DecayCurve = envelopeCurveForId(synthStringParam(params, "env.2.decayCurve", "linear"));
         instrument.env2Sustain = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "env.2.sustain", 0.0));
         instrument.env2ReleaseMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.2.release", 0.2) * 1000.0f);
+        instrument.env2ReleaseCurve = envelopeCurveForId(synthStringParam(params, "env.2.releaseCurve", "linear"));
         instrument.ampLevel = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "amp.level", instrument.ampLevel)
             + staticRouteAmount(params, modulation, metadata, "amp.level"));
         instrument.ampPan = juce::jlimit(-1.0f, 1.0f, (float) synthNumberParam(params, "amp.pan", instrument.ampPan)

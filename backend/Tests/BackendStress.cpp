@@ -8828,9 +8828,12 @@ namespace
             "env.1.release": 0.4,
             "env.1.releaseCurve": "log",
             "env.2.attack": 0.01,
+            "env.2.attackCurve": "exp",
             "env.2.decay": 0.09,
+            "env.2.decayCurve": "s-curve",
             "env.2.sustain": 0.0,
             "env.2.release": 0.16,
+            "env.2.releaseCurve": "log",
             "amp.level": 0.7,
             "amp.pan": -0.25,
             "lfo.1.enabled": true,
@@ -8930,6 +8933,8 @@ namespace
         if (instrument.attackCurve != 1 || instrument.decayCurve != 3 || instrument.releaseCurve != 2)
             return false;
         if (!near(instrument.env2AttackMs, 10.0f) || !near(instrument.env2DecayMs, 90.0f) || !near(instrument.env2Sustain, 0.0f) || !near(instrument.env2ReleaseMs, 160.0f))
+            return false;
+        if (instrument.env2AttackCurve != 1 || instrument.env2DecayCurve != 3 || instrument.env2ReleaseCurve != 2)
             return false;
         if (!near(instrument.ampLevel, 0.54f) || !near(instrument.ampPan, 0.0f))
             return false;
@@ -9259,6 +9264,32 @@ namespace
             }
         }
         if (!(env2EarlyEnergy > env2LateEnergy * 9.0))
+            return false;
+
+        auto env2LinearAttackParams = env2ModParams;
+        env2LinearAttackParams.env2AttackMs = 80.0f;
+        env2LinearAttackParams.env2DecayMs = 80.0f;
+        env2LinearAttackParams.env2Sustain = 1.0f;
+        env2LinearAttackParams.env2AttackCurve = 0;
+        auto env2ExpAttackParams = env2LinearAttackParams;
+        env2ExpAttackParams.env2AttackCurve = 1;
+        auto env2LinearAttack = renderWithVelocity(env2LinearAttackParams, 1.0f);
+        auto env2ExpAttack = renderWithVelocity(env2ExpAttackParams, 1.0f);
+        double env2LinearAttackEnergy = 0.0;
+        double env2ExpAttackEnergy = 0.0;
+        for (int channel = 0; channel < env2LinearAttack.getNumChannels(); ++channel)
+        {
+            for (int i = 512; i < 2048; ++i)
+            {
+                const auto linearSample = (double) env2LinearAttack.getSample(channel, i);
+                const auto expSample = (double) env2ExpAttack.getSample(channel, i);
+                if (!std::isfinite(linearSample) || !std::isfinite(expSample))
+                    return false;
+                env2LinearAttackEnergy += linearSample * linearSample;
+                env2ExpAttackEnergy += expSample * expSample;
+            }
+        }
+        if (!(env2ExpAttackEnergy < env2LinearAttackEnergy * 0.7))
             return false;
 
         auto lowpassParams = params;

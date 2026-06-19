@@ -1598,15 +1598,15 @@ function modEnvelopePreviewValue(timeS: number, durationS: number, instrument: I
   const sustain = clamp01(numberParam(params?.["env.2.sustain"], 0));
   const release = Math.max(0.001, numberParam(params?.["env.2.release"], 0.2));
   if (timeS < attack) {
-    return timeS / attack;
+    return applyEnvelopeCurve(timeS / attack, envelopeCurveParam(params?.["env.2.attackCurve"]));
   }
   if (timeS < attack + decay) {
-    const t = (timeS - attack) / decay;
+    const t = applyEnvelopeCurve((timeS - attack) / decay, envelopeCurveParam(params?.["env.2.decayCurve"]));
     return 1 + (sustain - 1) * t;
   }
   const releaseStart = Math.max(attack + decay, durationS - release);
   if (timeS > releaseStart) {
-    const t = (timeS - releaseStart) / release;
+    const t = applyEnvelopeCurve((timeS - releaseStart) / release, envelopeCurveParam(params?.["env.2.releaseCurve"]));
     return sustain * Math.max(0, 1 - t);
   }
   return sustain;
@@ -1614,6 +1614,10 @@ function modEnvelopePreviewValue(timeS: number, durationS: number, instrument: I
 
 function numberParam(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function envelopeCurveParam(value: unknown): EnvelopeCurve {
+  return value === "exp" || value === "log" || value === "s-curve" ? value : "linear";
 }
 
 function applyEnvelopeCurve(value: number, curve: EnvelopeCurve | undefined): number {

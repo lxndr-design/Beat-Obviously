@@ -252,9 +252,12 @@ namespace beat
         float releaseMs { 200.0f };
         int releaseCurve { 0 };
         float env2AttackMs { 10.0f };
+        int env2AttackCurve { 0 };
         float env2DecayMs { 300.0f };
+        int env2DecayCurve { 0 };
         float env2Sustain { 0.0f };
         float env2ReleaseMs { 200.0f };
+        int env2ReleaseCurve { 0 };
         float ampLevel { 1.0f };
         float ampPan { 0.0f };
         int wavetableBank { 0 };

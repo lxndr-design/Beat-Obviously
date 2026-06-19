@@ -146,9 +146,12 @@ namespace beat
             float releaseMs { 200.f };
             int releaseCurve { 0 };
             float env2AttackMs { 10.f };
+            int env2AttackCurve { 0 };
             float env2DecayMs { 300.f };
+            int env2DecayCurve { 0 };
             float env2Sustain { 0.0f };
             float env2ReleaseMs { 200.f };
+            int env2ReleaseCurve { 0 };
             float ampLevel  { 1.0f };
             float ampPan    { 0.0f };
             // Waveform: 0=sine, 1=saw, 2=square, 3=triangle, 4=noise, 5=wavetable
@@ -417,6 +420,7 @@ namespace beat
         StereoSample previousDriveInput;
         StereoSample driveDownsampleState;
         float previousRawEnvelope { 0.0f };
+        float previousRawEnv2Envelope { 0.0f };
         juce::uint32 noiseState { 1 };
         juce::ADSR adsr;
         juce::ADSR::Parameters adsrParams;

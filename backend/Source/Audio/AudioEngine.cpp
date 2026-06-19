@@ -1475,9 +1475,12 @@ namespace beat
         params.releaseMs = instrument.releaseMs;
         params.releaseCurve = instrument.releaseCurve;
         params.env2AttackMs = instrument.env2AttackMs;
+        params.env2AttackCurve = instrument.env2AttackCurve;
         params.env2DecayMs = instrument.env2DecayMs;
+        params.env2DecayCurve = instrument.env2DecayCurve;
         params.env2Sustain = instrument.env2Sustain;
         params.env2ReleaseMs = instrument.env2ReleaseMs;
+        params.env2ReleaseCurve = instrument.env2ReleaseCurve;
         params.ampLevel = instrument.ampLevel;
         params.ampPan = instrument.ampPan;
         params.waveform = instrument.waveform;

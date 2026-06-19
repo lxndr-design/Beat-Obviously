@@ -64,9 +64,12 @@ export type SynthParameterId =
   | "env.1.release"
   | "env.1.releaseCurve"
   | "env.2.attack"
+  | "env.2.attackCurve"
   | "env.2.decay"
+  | "env.2.decayCurve"
   | "env.2.sustain"
   | "env.2.release"
+  | "env.2.releaseCurve"
   | "lfo.1.enabled"
   | "lfo.1.rate"
   | "lfo.1.sync"
@@ -452,9 +455,12 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "env.1.release": 0.25,
   "env.1.releaseCurve": "linear",
   "env.2.attack": 0.01,
+  "env.2.attackCurve": "linear",
   "env.2.decay": 0.3,
+  "env.2.decayCurve": "linear",
   "env.2.sustain": 0,
   "env.2.release": 0.2,
+  "env.2.releaseCurve": "linear",
   "lfo.1.enabled": true,
   "lfo.1.rate": 1,
   "lfo.1.sync": true,
@@ -529,9 +535,12 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "env.1.release": "Env 1 Release",
   "env.1.releaseCurve": "Env 1 Release Curve",
   "env.2.attack": "Env 2 Attack",
+  "env.2.attackCurve": "Env 2 Attack Curve",
   "env.2.decay": "Env 2 Decay",
+  "env.2.decayCurve": "Env 2 Decay Curve",
   "env.2.sustain": "Env 2 Sustain",
   "env.2.release": "Env 2 Release",
+  "env.2.releaseCurve": "Env 2 Release Curve",
   "lfo.1.enabled": "LFO 1 Enabled",
   "lfo.1.rate": "LFO 1 Rate",
   "lfo.1.sync": "LFO 1 Sync",

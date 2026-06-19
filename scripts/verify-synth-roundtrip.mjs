@@ -77,9 +77,12 @@ try {
       "env.1.release": 0.78,
       "env.1.releaseCurve": "log",
       "env.2.attack": 0.01,
+      "env.2.attackCurve": "exp",
       "env.2.decay": 0.09,
+      "env.2.decayCurve": "s-curve",
       "env.2.sustain": 0,
       "env.2.release": 0.16,
+      "env.2.releaseCurve": "log",
       "lfo.1.enabled": true,
       "lfo.1.rate": 4.5,
       "lfo.1.sync": true,
@@ -327,6 +330,39 @@ try {
     return Math.sqrt(sum / Math.max(1, end - start));
   };
   assert.ok(rmsRange(env2Samples, 1200, 3600) > rmsRange(env2Samples, 16000, 22000) * 3, "expected Env 2 routed preview render to decay independently of Amp Env");
+
+  const env2LinearAttack = synthStore.synthDraftToPreviewInstrument({
+    ...draft,
+    parameters: {
+      ...draft.parameters,
+      "amp.level": 0,
+      "env.1.attack": 0.001,
+      "env.1.decay": 0.01,
+      "env.1.sustain": 1,
+      "env.2.attack": 0.08,
+      "env.2.attackCurve": "linear",
+      "env.2.decay": 0.1,
+      "env.2.sustain": 1,
+    },
+    modulation: [{ id: "env2_attack_probe", source: "env.2", target: "amp.level", amount: 1, bipolar: false, enabled: true }],
+  });
+  const env2ExpAttack = synthStore.synthDraftToPreviewInstrument({
+    ...env2LinearAttack.synthPatch,
+    parameters: { ...env2LinearAttack.synthPatch.parameters, "env.2.attackCurve": "exp" },
+  });
+  assert.ok(
+    synthPreview.modulationAtTime(env2ExpAttack, 0.04, 0.5, 120, 1).targetOffsets["amp.level"]
+      < synthPreview.modulationAtTime(env2LinearAttack, 0.04, 0.5, 120, 1).targetOffsets["amp.level"] * 0.6,
+    "expected Env 2 exponential attack to soften modulation onset",
+  );
+  const env2LinearAttackSamples = new Float32Array(6000);
+  const env2ExpAttackSamples = new Float32Array(6000);
+  synthPreview.renderInstrumentSamples(env2LinearAttack, env2LinearAttackSamples, 48000, synthPreview.previewFrequency(env2LinearAttack), "audio", true);
+  synthPreview.renderInstrumentSamples(env2ExpAttack, env2ExpAttackSamples, 48000, synthPreview.previewFrequency(env2ExpAttack), "audio", true);
+  assert.ok(
+    rmsRange(env2ExpAttackSamples, 1000, 2600) < rmsRange(env2LinearAttackSamples, 1000, 2600) * 0.7,
+    "expected Env 2 attack curve to affect rendered preview audio",
+  );
 
   const stereoProbe = {
     id: "stereo-probe",

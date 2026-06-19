@@ -820,6 +820,10 @@ function AmpFilterPanel() {
           ["env.1.decay", "Decay", 0.15, false],
           ["env.1.sustain", "Sustain", 0.8, false],
           ["env.1.release", "Release", 0.25, false],
+          ["env.2.attack", "Mod Atk", 0.01, false],
+          ["env.2.decay", "Mod Dec", 0.3, false],
+          ["env.2.sustain", "Mod Sus", 0, false],
+          ["env.2.release", "Mod Rel", 0.2, false],
         ] as Array<[SynthParameterId, string, number, boolean]>}>
           {([id, label, defaultValue, bipolar]) => (
             <Knob
@@ -827,13 +831,13 @@ function AmpFilterPanel() {
               label={label}
               value={getNumberParam(draft(), id)}
               min={bipolar ? -1 : 0}
-              max={id.includes("env.1") && id !== "env.1.sustain" ? 30 : 1}
-              step={id.includes("env.1") && id !== "env.1.sustain" ? 0.001 : 0.01}
+              max={id.startsWith("env.") && !id.endsWith("sustain") ? 30 : 1}
+              step={id.startsWith("env.") && !id.endsWith("sustain") ? 0.001 : 0.01}
               defaultValue={defaultValue}
               bipolar={bipolar}
               {...modulationPropsForTarget(draft(), id)}
               pickTargetId={MODULATABLE_PARAMETER_IDS.has(id) ? id : undefined}
-              formatValue={id.includes("env.1") && id !== "env.1.sustain" ? formatSeconds : formatPercent}
+              formatValue={id.startsWith("env.") && !id.endsWith("sustain") ? formatSeconds : formatPercent}
               onChange={(value) => setNumericParameter(id, value)}
             />
           )}
@@ -842,6 +846,9 @@ function AmpFilterPanel() {
           ["env.1.attackCurve", "Atk Curve"],
           ["env.1.decayCurve", "Dec Curve"],
           ["env.1.releaseCurve", "Rel Curve"],
+          ["env.2.attackCurve", "Mod Atk"],
+          ["env.2.decayCurve", "Mod Dec"],
+          ["env.2.releaseCurve", "Mod Rel"],
         ] as Array<[SynthParameterId, string]>}>
           {([id, label]) => (
             <ShapeButtonSet
