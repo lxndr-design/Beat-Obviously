@@ -240,9 +240,12 @@ namespace beat
         float color01 { 0.5f };
         int filterType { 0 };
         float attackMs { 5.0f };
+        int attackCurve { 0 };
         float decayMs { 100.0f };
+        int decayCurve { 0 };
         float sustain { 0.7f };
         float releaseMs { 200.0f };
+        int releaseCurve { 0 };
         float ampLevel { 1.0f };
         float ampPan { 0.0f };
         int wavetableBank { 0 };

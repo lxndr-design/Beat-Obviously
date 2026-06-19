@@ -8820,9 +8820,12 @@ namespace
             "filter.resonance": 0.2,
             "filter.drive": 0.35,
             "env.1.attack": 0.01,
+            "env.1.attackCurve": "exp",
             "env.1.decay": 0.2,
+            "env.1.decayCurve": "s-curve",
             "env.1.sustain": 0.55,
             "env.1.release": 0.4,
+            "env.1.releaseCurve": "log",
             "amp.level": 0.7,
             "amp.pan": -0.25,
             "lfo.1.enabled": true,
@@ -8914,6 +8917,8 @@ namespace
         if (!near(instrument.attackMs, 10.0f) || !near(instrument.decayMs, 200.0f))
             return false;
         if (!near(instrument.sustain, 0.55f) || !near(instrument.releaseMs, 400.0f))
+            return false;
+        if (instrument.attackCurve != 1 || instrument.decayCurve != 3 || instrument.releaseCurve != 2)
             return false;
         if (!near(instrument.ampLevel, 0.54f) || !near(instrument.ampPan, 0.0f))
             return false;
@@ -9110,6 +9115,29 @@ namespace
         }
 
         if (diff <= 0.1)
+            return false;
+
+        auto linearAttackParams = params;
+        linearAttackParams.attackMs = 200.0f;
+        linearAttackParams.attackCurve = 0;
+        linearAttackParams.sustain = 1.0f;
+        auto expAttackParams = linearAttackParams;
+        expAttackParams.attackCurve = 1;
+        auto linearAttack = render(linearAttackParams);
+        auto expAttack = render(expAttackParams);
+        double linearAttackEnergy = 0.0;
+        double expAttackEnergy = 0.0;
+        for (int channel = 0; channel < linearAttack.getNumChannels(); ++channel)
+        {
+            for (int i = 0; i < 1200; ++i)
+            {
+                const auto linearSample = (double) linearAttack.getSample(channel, i);
+                const auto expSample = (double) expAttack.getSample(channel, i);
+                linearAttackEnergy += linearSample * linearSample;
+                expAttackEnergy += expSample * expSample;
+            }
+        }
+        if (!(expAttackEnergy < linearAttackEnergy * 0.85))
             return false;
 
         auto lowpassParams = params;

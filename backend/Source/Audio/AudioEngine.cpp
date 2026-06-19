@@ -1467,9 +1467,12 @@ namespace beat
         params.color01 = instrument.color01;
         params.filterType = instrument.filterType;
         params.attackMs = instrument.attackMs;
+        params.attackCurve = instrument.attackCurve;
         params.decayMs = instrument.decayMs;
+        params.decayCurve = instrument.decayCurve;
         params.sustain = instrument.sustain;
         params.releaseMs = instrument.releaseMs;
+        params.releaseCurve = instrument.releaseCurve;
         params.ampLevel = instrument.ampLevel;
         params.ampPan = instrument.ampPan;
         params.waveform = instrument.waveform;

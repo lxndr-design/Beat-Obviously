@@ -1,4 +1,4 @@
-import type { CustomWavetableDefinition, CustomWavetableFrame, Instrument, WavetableConfig } from "../state/types";
+import type { CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, WavetableConfig } from "../state/types";
 
 export type SynthRenderMode = "visual" | "audio";
 
@@ -1536,14 +1536,25 @@ function envelopePreviewValue(timeS: number, durationS: number, instrument: Inst
   const decay = Math.max(0.001, (instrument.envelope.decayMs ?? 100) / 1000);
   const sustain = clamp01(instrument.envelope.sustain ?? 0.7);
   const release = Math.max(0.001, (instrument.envelope.releaseMs ?? 200) / 1000);
-  if (timeS < attack) return timeS / attack;
+  if (timeS < attack) {
+    return applyEnvelopeCurve(timeS / attack, instrument.envelope.attackCurve);
+  }
   if (timeS < attack + decay) {
-    const t = (timeS - attack) / decay;
+    const t = applyEnvelopeCurve((timeS - attack) / decay, instrument.envelope.decayCurve);
     return 1 + (sustain - 1) * t;
   }
   const releaseStart = Math.max(attack + decay, durationS - release);
   if (timeS > releaseStart) {
-    return sustain * Math.max(0, 1 - (timeS - releaseStart) / release);
+    const t = applyEnvelopeCurve((timeS - releaseStart) / release, instrument.envelope.releaseCurve);
+    return sustain * Math.max(0, 1 - t);
   }
   return sustain;
+}
+
+function applyEnvelopeCurve(value: number, curve: EnvelopeCurve | undefined): number {
+  const x = clamp01(value);
+  if (curve === "exp") return x * x;
+  if (curve === "log") return 1 - (1 - x) * (1 - x);
+  if (curve === "s-curve") return x * x * (3 - 2 * x);
+  return x;
 }

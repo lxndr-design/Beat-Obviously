@@ -439,9 +439,12 @@ namespace beat
             o->setProperty("color01", instrument.color01);
             o->setProperty("filterType", instrument.filterType);
             o->setProperty("attackMs", instrument.attackMs);
+            o->setProperty("attackCurve", instrument.attackCurve);
             o->setProperty("decayMs", instrument.decayMs);
+            o->setProperty("decayCurve", instrument.decayCurve);
             o->setProperty("sustain", instrument.sustain);
             o->setProperty("releaseMs", instrument.releaseMs);
+            o->setProperty("releaseCurve", instrument.releaseCurve);
             o->setProperty("ampLevel", instrument.ampLevel);
             o->setProperty("ampPan", instrument.ampPan);
             o->setProperty("wavetableBank", instrument.wavetableBank);
@@ -599,9 +602,12 @@ namespace beat
                     instrument.color01 = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("color01", instrument.color01));
                     instrument.filterType = juce::jlimit(0, 8, (int) iv.getProperty("filterType", instrument.filterType));
                     instrument.attackMs = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty("attackMs", instrument.attackMs));
+                    instrument.attackCurve = juce::jlimit(0, 3, (int) iv.getProperty("attackCurve", instrument.attackCurve));
                     instrument.decayMs = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty("decayMs", instrument.decayMs));
+                    instrument.decayCurve = juce::jlimit(0, 3, (int) iv.getProperty("decayCurve", instrument.decayCurve));
                     instrument.sustain = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("sustain", instrument.sustain));
                     instrument.releaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty("releaseMs", instrument.releaseMs));
+                    instrument.releaseCurve = juce::jlimit(0, 3, (int) iv.getProperty("releaseCurve", instrument.releaseCurve));
                     instrument.ampLevel = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("ampLevel", instrument.ampLevel));
                     instrument.ampPan = juce::jlimit(-1.0f, 1.0f, (float) (double) iv.getProperty("ampPan", instrument.ampPan));
                     instrument.wavetableBank = juce::jlimit(0, 8, (int) iv.getProperty("wavetableBank", instrument.wavetableBank));

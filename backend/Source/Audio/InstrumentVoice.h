@@ -134,9 +134,12 @@ namespace beat
             int filterType    { 0 };
             // ADSR in ms / 0..1
             float attackMs  { 5.f };
+            int attackCurve { 0 };
             float decayMs   { 100.f };
+            int decayCurve { 0 };
             float sustain   { 0.7f };
             float releaseMs { 200.f };
+            int releaseCurve { 0 };
             float ampLevel  { 1.0f };
             float ampPan    { 0.0f };
             // Waveform: 0=sine, 1=saw, 2=square, 3=triangle, 4=noise, 5=wavetable
@@ -332,6 +335,7 @@ namespace beat
         void refreshCachedDynamicModulationFlags() noexcept;
         StereoSample renderAetherTableStack(double frequencyHz, float rawLfo, float rawLfo2, float env) noexcept;
         StereoSample processDriveOversampled(StereoSample sample, float driveGain) noexcept;
+        float shapedEnvelope(float rawEnvelope) noexcept;
 
         Params  baseParams;
         Params  params;
@@ -402,6 +406,7 @@ namespace beat
         int64_t currentBlockWavetablePositionUpdates { 0 };
         StereoSample previousDriveInput;
         StereoSample driveDownsampleState;
+        float previousRawEnvelope { 0.0f };
         juce::uint32 noiseState { 1 };
         juce::ADSR adsr;
         juce::ADSR::Parameters adsrParams;

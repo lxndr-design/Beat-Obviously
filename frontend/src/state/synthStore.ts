@@ -2,6 +2,7 @@ import { createStore as create } from "zustand/vanilla";
 import type {
   CustomWavetableDefinition,
   CustomWavetableFrame,
+  EnvelopeCurve,
   Instrument,
   SynthPatchSnapshot,
   SynthPatchMacroDefinition,
@@ -55,9 +56,12 @@ export type SynthParameterId =
   | "amp.level"
   | "amp.pan"
   | "env.1.attack"
+  | "env.1.attackCurve"
   | "env.1.decay"
+  | "env.1.decayCurve"
   | "env.1.sustain"
   | "env.1.release"
+  | "env.1.releaseCurve"
   | "env.2.attack"
   | "env.2.decay"
   | "env.2.sustain"
@@ -437,9 +441,12 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "amp.level": 0.8,
   "amp.pan": 0,
   "env.1.attack": 0.005,
+  "env.1.attackCurve": "linear",
   "env.1.decay": 0.15,
+  "env.1.decayCurve": "linear",
   "env.1.sustain": 0.8,
   "env.1.release": 0.25,
+  "env.1.releaseCurve": "linear",
   "env.2.attack": 0.01,
   "env.2.decay": 0.3,
   "env.2.sustain": 0,
@@ -510,9 +517,12 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "amp.level": "Amp Level",
   "amp.pan": "Amp Pan",
   "env.1.attack": "Env 1 Attack",
+  "env.1.attackCurve": "Env 1 Attack Curve",
   "env.1.decay": "Env 1 Decay",
+  "env.1.decayCurve": "Env 1 Decay Curve",
   "env.1.sustain": "Env 1 Sustain",
   "env.1.release": "Env 1 Release",
+  "env.1.releaseCurve": "Env 1 Release Curve",
   "env.2.attack": "Env 2 Attack",
   "env.2.decay": "Env 2 Decay",
   "env.2.sustain": "Env 2 Sustain",
@@ -678,6 +688,12 @@ export function getStringParam(draft: SynthDraftPatch, id: SynthParameterId): st
   return typeof value === "string" ? value : "";
 }
 
+export function getEnvelopeCurveParam(draft: SynthDraftPatch, id: SynthParameterId): EnvelopeCurve {
+  const value = getStringParam(draft, id);
+  if (value === "exp" || value === "log" || value === "s-curve") return value;
+  return "linear";
+}
+
 export function macroDefinitionForId(draft: SynthDraftPatch, id: MacroId): SynthMacroDefinition {
   return normalizeMacroDefinition(id, draft.metadata.macros?.[id]);
 }
@@ -733,9 +749,12 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     filterType: filterTypeFromDraft(draft),
     envelope: {
       attackMs: getNumberParam(draft, "env.1.attack") * 1000,
+      attackCurve: getEnvelopeCurveParam(draft, "env.1.attackCurve"),
       decayMs: getNumberParam(draft, "env.1.decay") * 1000,
+      decayCurve: getEnvelopeCurveParam(draft, "env.1.decayCurve"),
       sustain: getNumberParam(draft, "env.1.sustain"),
       releaseMs: getNumberParam(draft, "env.1.release") * 1000,
+      releaseCurve: getEnvelopeCurveParam(draft, "env.1.releaseCurve"),
     },
     wavetable,
     aether: {
@@ -867,9 +886,12 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["filter.type"] = instrument.filterType ?? "lowpass";
   draft.parameters["amp.level"] = 0.8;
   draft.parameters["env.1.attack"] = instrument.envelope.attackMs / 1000;
+  draft.parameters["env.1.attackCurve"] = instrument.envelope.attackCurve ?? "linear";
   draft.parameters["env.1.decay"] = instrument.envelope.decayMs / 1000;
+  draft.parameters["env.1.decayCurve"] = instrument.envelope.decayCurve ?? "linear";
   draft.parameters["env.1.sustain"] = instrument.envelope.sustain;
   draft.parameters["env.1.release"] = instrument.envelope.releaseMs / 1000;
+  draft.parameters["env.1.releaseCurve"] = instrument.envelope.releaseCurve ?? "linear";
   draft.parameters["lfo.1.rate"] = instrument.lfoRateHz ?? 1;
   draft.parameters["lfo.1.sync"] = instrument.lfoSync ?? false;
   draft.parameters["lfo.1.syncedRate"] = instrument.lfoSyncedRate ?? "1/4";

@@ -193,11 +193,16 @@ export interface Track {
   rowHeight: "normal" | "compact";
 }
 
+export type EnvelopeCurve = "linear" | "exp" | "log" | "s-curve";
+
 export interface AdsrEnvelope {
   attackMs: number;
   decayMs: number;
   sustain: number; // 0..1
   releaseMs: number;
+  attackCurve?: EnvelopeCurve;
+  decayCurve?: EnvelopeCurve;
+  releaseCurve?: EnvelopeCurve;
 }
 
 /**

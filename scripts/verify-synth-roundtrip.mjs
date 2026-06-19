@@ -69,9 +69,12 @@ try {
       "amp.level": 0.66,
       "amp.pan": -0.24,
       "env.1.attack": 0.012,
+      "env.1.attackCurve": "exp",
       "env.1.decay": 0.34,
+      "env.1.decayCurve": "s-curve",
       "env.1.sustain": 0.57,
       "env.1.release": 0.78,
+      "env.1.releaseCurve": "log",
       "lfo.1.enabled": true,
       "lfo.1.rate": 4.5,
       "lfo.1.sync": true,
@@ -201,8 +204,28 @@ try {
   assert.equal(patch.lfo2OneShot, false);
   assert.equal(patch.lfoPositionBipolar, false);
   assert.equal(patch.lfoPitchBipolar, true);
+  assert.equal(patch.envelope.attackCurve, "exp");
+  assert.equal(patch.envelope.decayCurve, "s-curve");
+  assert.equal(patch.envelope.releaseCurve, "log");
   assert.equal(patch.synthPatch.parameters["future.experimental"], "preserve-me");
   assert.equal(patch.synthPatch.metadata.icon, "ph:planet");
+
+  const linearAttack = synthStore.synthDraftToPreviewInstrument({
+    ...draft,
+    parameters: { ...draft.parameters, "amp.level": 0, "env.1.attack": 0.2, "env.1.attackCurve": "linear" },
+    modulation: [{ id: "attack_probe", source: "env.1", target: "amp.level", amount: 1, bipolar: false, enabled: true }],
+  });
+  const expAttack = synthStore.synthDraftToPreviewInstrument({
+    ...draft,
+    parameters: { ...draft.parameters, "amp.level": 0, "env.1.attack": 0.2, "env.1.attackCurve": "exp" },
+    modulation: [{ id: "attack_probe", source: "env.1", target: "amp.level", amount: 1, bipolar: false, enabled: true }],
+  });
+  const linearAttackSamples = new Float32Array(3200);
+  const expAttackSamples = new Float32Array(3200);
+  synthPreview.renderInstrumentSamples(linearAttack, linearAttackSamples, 48000, synthPreview.previewFrequency(linearAttack), "audio", true);
+  synthPreview.renderInstrumentSamples(expAttack, expAttackSamples, 48000, synthPreview.previewFrequency(expAttack), "audio", true);
+  const headEnergy = (samples) => samples.slice(0, 1200).reduce((sum, sample) => sum + sample * sample, 0);
+  assert.ok(headEnergy(expAttackSamples) < headEnergy(linearAttackSamples) * 0.85, "expected exponential attack curve to soften preview attack");
 
   const stereoProbe = {
     id: "stereo-probe",

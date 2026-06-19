@@ -90,6 +90,14 @@ namespace beat
             return 0;
         }
 
+        int envelopeCurveForId(const juce::String& id)
+        {
+            if (id == "exp") return 1;
+            if (id == "log") return 2;
+            if (id == "s-curve") return 3;
+            return 0;
+        }
+
         float applyMacroCurve(float value, const juce::String& curve)
         {
             const float x = juce::jlimit(0.0f, 1.0f, value);
@@ -401,9 +409,12 @@ namespace beat
         instrument.drive01 = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "filter.drive", instrument.drive01)
             + staticRouteAmount(params, modulation, metadata, "filter.drive"));
         instrument.attackMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.1.attack", 0.005) * 1000.0f);
+        instrument.attackCurve = envelopeCurveForId(synthStringParam(params, "env.1.attackCurve", "linear"));
         instrument.decayMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.1.decay", 0.15) * 1000.0f);
+        instrument.decayCurve = envelopeCurveForId(synthStringParam(params, "env.1.decayCurve", "linear"));
         instrument.sustain = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "env.1.sustain", instrument.sustain));
         instrument.releaseMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.1.release", 0.25) * 1000.0f);
+        instrument.releaseCurve = envelopeCurveForId(synthStringParam(params, "env.1.releaseCurve", "linear"));
         instrument.ampLevel = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "amp.level", instrument.ampLevel)
             + staticRouteAmount(params, modulation, metadata, "amp.level"));
         instrument.ampPan = juce::jlimit(-1.0f, 1.0f, (float) synthNumberParam(params, "amp.pan", instrument.ampPan)

@@ -1223,6 +1223,20 @@ namespace beat
         float normalizedParam(const juce::var& object, const juce::Identifier& name, float fallback);
         float floatParam(const juce::var& object, const juce::Identifier& name, float fallback, float minValue, float maxValue);
 
+        int parseEnvelopeCurve(const juce::var& value, int fallback)
+        {
+            if (value.isString())
+            {
+                const auto curve = value.toString();
+                if (curve == "exp") return 1;
+                if (curve == "log") return 2;
+                if (curve == "s-curve") return 3;
+                if (curve == "linear") return 0;
+                return fallback;
+            }
+            return juce::jlimit(0, 3, (int) value);
+        }
+
         InstrumentDefinition::WavetableConfig parseWavetableConfig(
             const juce::var& value,
             InstrumentDefinition::WavetableConfig fallback)
@@ -1784,9 +1798,12 @@ namespace beat
 
                     const auto envelope = instrumentVar.getProperty("envelope", {});
                     instrument.attackMs = floatParam(envelope, "attack", instrument.attackMs, 0.0f, 10000.0f);
+                    instrument.attackCurve = parseEnvelopeCurve(envelope.getProperty("attackCurve", instrument.attackCurve), instrument.attackCurve);
                     instrument.decayMs = floatParam(envelope, "decay", instrument.decayMs, 0.0f, 10000.0f);
+                    instrument.decayCurve = parseEnvelopeCurve(envelope.getProperty("decayCurve", instrument.decayCurve), instrument.decayCurve);
                     instrument.sustain = normalizedParam(envelope, "sustain", instrument.sustain);
                     instrument.releaseMs = floatParam(envelope, "release", instrument.releaseMs, 0.0f, 10000.0f);
+                    instrument.releaseCurve = parseEnvelopeCurve(envelope.getProperty("releaseCurve", instrument.releaseCurve), instrument.releaseCurve);
 
                     const auto wavetable = instrumentVar.getProperty("wavetable", {});
                     if (wavetable.isObject())

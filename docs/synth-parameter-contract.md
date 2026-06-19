@@ -79,9 +79,12 @@ Envelope IDs use `env.N.*`, where `N` starts at `1`.
 | ID | Type | Range | Default | Notes |
 | --- | --- | --- | --- | --- |
 | `env.1.attack` | seconds | `0..30` | `0.005` | Amp envelope attack. |
+| `env.1.attackCurve` | enum | `linear`, `exp`, `log`, `s-curve` | `linear` | Attack response curve used by browser preview and native render shaping. |
 | `env.1.decay` | seconds | `0..30` | `0.15` | Amp envelope decay. |
+| `env.1.decayCurve` | enum | `linear`, `exp`, `log`, `s-curve` | `linear` | Decay response curve used by browser preview and native render shaping. |
 | `env.1.sustain` | normalized | `0..1` | `0.8` | Amp envelope sustain. |
 | `env.1.release` | seconds | `0..30` | `0.25` | Amp envelope release. |
+| `env.1.releaseCurve` | enum | `linear`, `exp`, `log`, `s-curve` | `linear` | Release response curve used by browser preview and native render shaping. |
 | `env.2.attack` | seconds | `0..30` | `0.01` | Mod envelope default. |
 | `env.2.decay` | seconds | `0..30` | `0.3` | Mod envelope default. |
 | `env.2.sustain` | normalized | `0..1` | `0` | Mod envelope default. |

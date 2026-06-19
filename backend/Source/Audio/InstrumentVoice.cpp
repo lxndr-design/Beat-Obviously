@@ -819,6 +819,7 @@ namespace beat
         pitchFrequencyRamp.reset((float) baseFrequencyHz);
         previousDriveInput = {};
         driveDownsampleState = {};
+        previousRawEnvelope = 0.0f;
         if (legacyWavetableNeedsSetup())
             configureWavetableOscillators(baseFrequencyHz);
         else
@@ -912,7 +913,7 @@ namespace beat
             const float positionLfo = hasPositionMod ? lfoRouteValue(rawLfo, params.lfoPositionBipolar) * clamp01(params.lfoDepth) : 0.0f;
             const float pitchLfo = hasPitchMod ? lfoRouteValue(rawLfo, params.lfoPitchBipolar) : 0.0f;
             const float filterLfo = !useDynamicModulation && hasFilterMod ? lfoRouteValue(rawLfo, params.lfoFilterBipolar) : 0.0f;
-            const float env = adsr.getNextSample();
+            const float env = shapedEnvelope(adsr.getNextSample());
             const double currentPitchFrequency = juce::jmax(1.0f, pitchFrequencyRamp.next());
             double currentPhaseDelta = currentPitchFrequency / sampleRate;
             if (hasPitchMod)
@@ -1080,6 +1081,43 @@ namespace beat
             + downsampleAlpha * (rightDownsampled - driveDownsampleState.right));
         previousDriveInput = sample;
         return driveDownsampleState;
+    }
+
+    float InstrumentVoice::shapedEnvelope(float rawEnvelope) noexcept
+    {
+        const float raw = clamp01(rawEnvelope);
+        const float sustain = clamp01(params.sustain);
+
+        const auto applyCurve = [] (float value, int curve)
+        {
+            const float x = clamp01(value);
+            if (curve == 1) return x * x;
+            if (curve == 2) return 1.0f - (1.0f - x) * (1.0f - x);
+            if (curve == 3) return x * x * (3.0f - 2.0f * x);
+            return x;
+        };
+
+        float shaped = raw;
+        if (std::abs(raw - previousRawEnvelope) < 0.00001f)
+        {
+            shaped = raw;
+        }
+        else if (raw > previousRawEnvelope)
+        {
+            shaped = applyCurve(raw, params.attackCurve);
+        }
+        else if (raw > sustain && sustain < 0.999f)
+        {
+            const float progress = (1.0f - raw) / juce::jmax(0.001f, 1.0f - sustain);
+            shaped = 1.0f - applyCurve(progress, params.decayCurve) * (1.0f - sustain);
+        }
+        else if (sustain > 0.001f)
+        {
+            const float progress = 1.0f - raw / sustain;
+            shaped = sustain * (1.0f - applyCurve(progress, params.releaseCurve));
+        }
+        previousRawEnvelope = raw;
+        return clamp01(shaped);
     }
 
     void InstrumentVoice::configureWavetableOscillators(double frequencyHz) noexcept

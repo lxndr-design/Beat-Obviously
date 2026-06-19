@@ -7,6 +7,7 @@ import {
   FACTORY_SYNTH_PRESETS,
   MACRO_IDS,
   MODULATION_TARGET_LABELS,
+  getEnvelopeCurveParam,
   getNumberParam,
   macroAssignmentsForId,
   macroDefinitionForId,
@@ -42,6 +43,12 @@ const FILTER_TYPES = [
   ["lowpass", "LP", "Lowpass", "ph:wave-sine"],
   ["highpass", "HP", "Highpass", "ph:wave-triangle"],
   ["bandpass", "BP", "Bandpass", "ph:wave-square"],
+] as const;
+const ENVELOPE_CURVES = [
+  ["linear", "Lin", "Linear", "ph:minus"],
+  ["exp", "Exp", "Exponential", "ph:trend-up"],
+  ["log", "Log", "Logarithmic", "ph:trend-down"],
+  ["s-curve", "S", "S-curve", "ph:wave-sine"],
 ] as const;
 const LFO_SHAPES = [
   ["sine", "Sine", "ph:wave-sine"],
@@ -827,6 +834,20 @@ function AmpFilterPanel() {
               pickTargetId={MODULATABLE_PARAMETER_IDS.has(id) ? id : undefined}
               formatValue={id.includes("env.1") && id !== "env.1.sustain" ? formatSeconds : formatPercent}
               onChange={(value) => setNumericParameter(id, value)}
+            />
+          )}
+        </For>
+        <For each={[
+          ["env.1.attackCurve", "Atk Curve"],
+          ["env.1.decayCurve", "Dec Curve"],
+          ["env.1.releaseCurve", "Rel Curve"],
+        ] as Array<[SynthParameterId, string]>}>
+          {([id, label]) => (
+            <ShapeButtonSet
+              label={label}
+              value={getEnvelopeCurveParam(draft(), id)}
+              options={ENVELOPE_CURVES}
+              onChange={(value) => setParameter(id, value)}
             />
           )}
         </For>
