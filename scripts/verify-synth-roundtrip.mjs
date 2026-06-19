@@ -320,6 +320,41 @@ try {
     synthStore.useSynthStore.getState().draft.metadata.wavemaps[resynthWavemap.id],
     synthStore.useSynthStore.getState().draft.metadata.customWavetables[resynthWavemap.id],
   );
+  const flatWavemap = synthStore.normalizeSynthDraftPatch({
+    metadata: {
+      wavemaps: {
+        "user.flat": {
+          ...resynthWavemap,
+          id: "user.flat",
+          frames: resynthWavemap.frames.map((frame, index) => ({
+            ...frame,
+            id: `user.flat.frame.${index + 1}`,
+            brightness: 0.4,
+            even: 0.3,
+            fold: 0.2,
+            phase: 0,
+          })),
+        },
+      },
+    },
+  }).metadata.wavemaps["user.flat"];
+  const normalizedFlat = synthStore.normalizeWavemapFrames(flatWavemap);
+  assert.equal(normalizedFlat.source.kind, "generated");
+  assert.equal(normalizedFlat.frames[0].position, 0);
+  assert.equal(normalizedFlat.frames[3].position, 1);
+  assert.ok(normalizedFlat.frames[3].brightness > normalizedFlat.frames[0].brightness, "expected normalized wavemap to add frame contrast");
+  assert.ok(normalizedFlat.frames[3].fold > normalizedFlat.frames[0].fold, "expected normalized wavemap to spread fold values");
+  const evolvedA = synthStore.evolveWavemapFrames(normalizedFlat, 12345, 0.5);
+  const evolvedB = synthStore.evolveWavemapFrames(normalizedFlat, 12345, 0.5);
+  const evolvedC = synthStore.evolveWavemapFrames(normalizedFlat, 54321, 0.5);
+  assert.deepEqual(evolvedA.frames, evolvedB.frames);
+  assert.notDeepEqual(evolvedA.frames, evolvedC.frames);
+  assert.equal(evolvedA.frames.every((frame) =>
+    frame.brightness >= 0 && frame.brightness <= 1
+    && frame.even >= 0 && frame.even <= 1
+    && frame.fold >= 0 && frame.fold <= 1
+    && frame.phase >= -1 && frame.phase <= 1
+  ), true);
 
   const resynthDraft = synthStore.normalizeSynthDraftPatch({
     name: "Resynth Probe",

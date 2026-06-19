@@ -4,16 +4,18 @@ import { renderAetherOutputPreviewSamples } from "../../../audio/synthPreview";
 import { resynthesizeAudioFileToWavemap } from "../../../audio/wavemapResynthesis";
 import { appAlert, Button, HoverInfo, Icon, Knob } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
-import type { CustomWavetableFrame } from "../../../state/types";
+import type { CustomWavetableFrame, WavemapDefinition } from "../../../state/types";
 import {
   CUSTOM_WAVETABLE_FRAME_LABELS,
   DEFAULT_CUSTOM_WAVETABLE_ID,
   FACTORY_WAVETABLES,
   createDefaultCustomWavetable,
+  evolveWavemapFrames,
   getBooleanParam,
   getNumberParam,
   getStringParam,
   modulationSummaryForTarget,
+  normalizeWavemapFrames,
   synthDraftToPreviewInstrument,
   useSynthStore,
   type ModulationTargetId,
@@ -159,6 +161,11 @@ function OscillatorRow(props: {
     }
   }
 
+  function replaceCurrentWavemap(next: WavemapDefinition) {
+    setWavemap(next);
+    setParameter(wavetableId(), next.id as WavetableId);
+  }
+
   return (
     <div class={`${styles.row} ${enabled() ? "" : styles.disabledRow}`} aria-label={`${label()} row`}>
       <div class="ds-section-header">
@@ -220,6 +227,18 @@ function OscillatorRow(props: {
                       onClick={() => void importAudioWavemap()}
                     >
                       {resynthesizing() ? "Analyzing" : "Import Audio"}
+                    </Button>
+                    <Button
+                      size="xs"
+                      onClick={() => replaceCurrentWavemap(normalizeWavemapFrames(customTable()))}
+                    >
+                      Normalize
+                    </Button>
+                    <Button
+                      size="xs"
+                      onClick={() => replaceCurrentWavemap(evolveWavemapFrames(customTable()))}
+                    >
+                      Evolve
                     </Button>
                     <Button
                       size="xs"

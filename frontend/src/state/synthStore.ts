@@ -226,6 +226,101 @@ export function createWavemapFromAudioSamples(
   });
 }
 
+export function normalizeWavemapFrames(definition: WavemapDefinition): WavemapDefinition {
+  const normalized = normalizeCustomWavetable(definition);
+  const frames = normalized.frames.map((frame, index) => ({
+    ...frame,
+    id: frame.id ?? `${normalized.id}.frame.${index + 1}`,
+    label: frame.label ?? CUSTOM_WAVETABLE_FRAME_LABELS[index] ?? `${index + 1}`,
+    position: index / Math.max(1, normalized.frames.length - 1),
+  }));
+  const brightness = spreadFrameValues(frames.map((frame) => frame.brightness), 0.18, 0.94, [0.18, 0.42, 0.7, 0.94]);
+  const even = spreadFrameValues(frames.map((frame) => frame.even), 0.08, 0.72, [0.08, 0.26, 0.48, 0.72]);
+  const fold = spreadFrameValues(frames.map((frame) => frame.fold), 0.04, 0.62, [0.04, 0.14, 0.34, 0.62]);
+  const phase = spreadBipolarFrameValues(frames.map((frame) => frame.phase), [-0.18, 0.08, -0.08, 0.18]);
+
+  return normalizeCustomWavetable({
+    ...normalized,
+    source: {
+      ...normalized.source,
+      kind: "generated",
+      label: `${normalized.source.label ?? normalized.name} normalized`,
+      createdAt: Date.now(),
+    },
+    frames: frames.map((frame, index) => ({
+      ...frame,
+      brightness: brightness[index] ?? frame.brightness,
+      even: even[index] ?? frame.even,
+      fold: fold[index] ?? frame.fold,
+      phase: phase[index] ?? frame.phase,
+    })),
+  });
+}
+
+export function evolveWavemapFrames(
+  definition: WavemapDefinition,
+  seed = Date.now(),
+  amount = 0.34,
+): WavemapDefinition {
+  const normalized = normalizeCustomWavetable(definition);
+  const rng = seededRandom(seed);
+  const strength = sanitize01(amount, 0.34);
+  return normalizeCustomWavetable({
+    ...normalized,
+    source: {
+      ...normalized.source,
+      kind: "generated",
+      label: `${normalized.source.label ?? normalized.name} evolved`,
+      createdAt: Date.now(),
+    },
+    frames: normalized.frames.map((frame, index) => {
+      const motion = Math.sin((index + 1) * 1.87 + rng() * Math.PI) * strength;
+      return {
+        ...frame,
+        position: index / Math.max(1, normalized.frames.length - 1),
+        brightness: clamp01(frame.brightness + randomSigned(rng) * 0.24 * strength + motion * 0.12),
+        even: clamp01(frame.even + randomSigned(rng) * 0.28 * strength - motion * 0.08),
+        fold: clamp01(frame.fold + randomSigned(rng) * 0.34 * strength + Math.abs(motion) * 0.12),
+        phase: clampBipolar(frame.phase + randomSigned(rng) * 0.72 * strength + motion * 0.2),
+      };
+    }),
+  });
+}
+
+function spreadFrameValues(values: number[], targetMin: number, targetMax: number, fallback: number[]): number[] {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min;
+  if (!Number.isFinite(span) || span < 0.035) {
+    const center = sanitize01(values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length), 0.5);
+    return fallback.map((value) => clamp01(center + (value - 0.5) * 0.72));
+  }
+  return values.map((value) => clamp01(targetMin + ((value - min) / span) * (targetMax - targetMin)));
+}
+
+function spreadBipolarFrameValues(values: number[], fallback: number[]): number[] {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min;
+  if (!Number.isFinite(span) || span < 0.035) return fallback.map(clampBipolar);
+  return values.map((value) => clampBipolar(-0.46 + ((value - min) / span) * 0.92));
+}
+
+function seededRandom(seed: number): () => number {
+  let state = (Math.floor(seed) || 1) >>> 0;
+  return () => {
+    state += 0x6D2B79F5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function randomSigned(rng: () => number): number {
+  return rng() * 2 - 1;
+}
+
 function analyzeSamplesToWavemapFrame(
   samples: ArrayLike<number>,
   start: number,
