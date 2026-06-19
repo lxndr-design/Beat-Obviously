@@ -264,6 +264,13 @@ Aether/native wavetable rendering now separates expensive table generation from 
 - `instrument.renderPreview` renders a bounded one-note instrument preview through the same isolated offline engine used by WAV export, then returns native render analysis plus waveform buckets. Callers can request an `audioDataUrl` for a compact rendered WAV preview, allowing synth/Aether audition to share the same native render path as the displayed waveform/analysis instead of duplicating synthesis in the UI.
 - The Home Instruments page uses actual sample waveforms for sampler instruments and native/rendered synth waveforms for synth/Aether instruments. Sampler preview cycles through associated sample files deterministically, while synth/Aether preview sustains until pause. Sample instruments also expose their associated audio-file structure: single sample, hit variance, velocity/volume layers, length layers, and pitch zones. The first management pass lets users reorder associated sample paths, choose the visible grouping intent, and save/revert that structure back onto `sampleUrls`/`sampleMap` metadata.
 
+Native app audio boundary:
+
+- Native timeline playback, transport clocking, export, bounce, recording, metering, and instrument-preview rendering are C++ `AudioEngine` responsibilities.
+- The Solid frontend still carries WebAudio helpers for plain Vite/browser preview and for decoding short rendered preview WAVs into UI audition buffers, but these helpers are not the native timeline engine.
+- `TimelineMidiPlayback` exits immediately when the JUCE bridge is present, transport actions only prime WebAudio outside native mode, and startup sample preloading no longer creates a browser audio context in native mode.
+- `npm run verify:audio-boundary` guards this split by checking the native timeline guard, transport priming guard, `instrument.renderPreview` IPC contract, and the explicit WebAudio fallback allowlist.
+
 Project document IO has a frontend validation/migration gate:
 
 - `.beat` documents must declare the current schema version.
@@ -329,6 +336,7 @@ The current audio-engine chunk was verified with:
 
 ```sh
 npm run typecheck
+npm run verify:audio-boundary
 npm run verify:synth
 npm run verify:documents
 npm run build

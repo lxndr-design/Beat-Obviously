@@ -2,6 +2,7 @@ import { createEffect, onCleanup, untrack } from "solid-js";
 import { createStoreSelector } from "../solid-utils/store";
 import { useInstrumentStore, useProjectStore, useTransportStore } from "../state/store";
 import { expandTrackSegments, isTrackAudible } from "../state/selectors";
+import { isNative } from "../ipc/bridge";
 import { getTimelineAudioContext, scheduleTimelineMidiNote, stopTimelineAudio } from "./timelineAudio";
 import { useAnalyzerStore } from "../state/analyzerStore";
 import type { Instrument, MidiNote } from "../state/types";
@@ -25,6 +26,8 @@ const fallbackInstrument: Instrument = {
 };
 
 export function TimelineMidiPlayback() {
+  if (isNative()) return null;
+
   const playing = createStoreSelector(useTransportStore, (s) => s.playing);
   const positionBeat = createStoreSelector(useTransportStore, (s) => s.positionBeat);
   const speed = createStoreSelector(useTransportStore, (s) => s.speed);

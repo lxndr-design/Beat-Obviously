@@ -13,6 +13,7 @@
     "verify:documents": "node ../scripts/verify-document-roundtrip.mjs",
     "verify:native-doc": "node ../scripts/verify-native-document-registration.mjs",
     "verify:design-system": "node ../scripts/verify-design-system.mjs",
+    "verify:audio-boundary": "node ../scripts/verify-audio-boundary.mjs",
     "verify:synth": "node ../scripts/verify-synth-roundtrip.mjs",
     "verify:node-instrument": "node ../scripts/verify-node-instrument-editor.mjs",
     "verify:track-interactions": "node ../scripts/verify-track-interactions.mjs",

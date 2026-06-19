@@ -179,12 +179,14 @@ export function App() {
         }
         useInstrumentStore.getState().seedSystemInstruments();
         useComponentStore.getState().seedDefaultDrumLoops(useInstrumentStore.getState().instruments);
-        const ctx = getTimelineAudioContext();
-        for (const instrument of useInstrumentStore.getState().instruments) {
-          if (!instrument.sampleUrl) continue;
-          void preloadInstrumentSample(ctx, instrument).catch(() => {
-            // Synth fallback remains available if a bundled sample cannot decode.
-          });
+        if (!isNative()) {
+          const ctx = getTimelineAudioContext();
+          for (const instrument of useInstrumentStore.getState().instruments) {
+            if (!instrument.sampleUrl) continue;
+            void preloadInstrumentSample(ctx, instrument).catch(() => {
+              // Synth fallback remains available if a bundled sample cannot decode.
+            });
+          }
         }
         hydrated = true;
         markStartupReady("instruments");

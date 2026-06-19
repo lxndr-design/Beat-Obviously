@@ -1,4 +1,4 @@
-import { send } from "../ipc/bridge";
+import { isNative, send } from "../ipc/bridge";
 import { useTransportStore } from "../state/store";
 import { primeTimelineAudio, stopTimelineAudio } from "./timelineAudio";
 
@@ -7,7 +7,7 @@ function sendTransport(message: Parameters<typeof send>[0]) {
 }
 
 export function playTransport() {
-  primeTimelineAudio();
+  if (!isNative()) primeTimelineAudio();
   useTransportStore.getState().play();
   sendTransport({ kind: "transport.play" });
 }
@@ -28,10 +28,9 @@ export function stopTransport() {
 }
 
 export function restartTransport() {
-  primeTimelineAudio();
+  if (!isNative()) primeTimelineAudio();
   const transport = useTransportStore.getState();
   transport.setPosition(0);
   transport.play();
   sendTransport({ kind: "transport.restart" });
 }
-
