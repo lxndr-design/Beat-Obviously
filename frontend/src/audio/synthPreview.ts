@@ -769,10 +769,11 @@ function aetherStackSample(
     const wavetableOffset = legacyPositionOffset + modulationTargetOffset(modulation, `osc.${key}.position`);
     const unisonDetuneOffset = modulationTargetOffset(modulation, "unison.detune");
     const unisonSpreadOffset = modulationTargetOffset(modulation, "unison.spread");
+    const phaseOffset = oscillatorPhaseOffset(osc, key);
     const sourceSample = waveform === "wavetable"
       ? wavetableOscillatorSample(
           instrument,
-          state.phase * rate,
+          state.phase * rate + phaseOffset,
           sampleRate,
           frequency * rate,
           osc.wavetable,
@@ -782,7 +783,7 @@ function aetherStackSample(
         )
       : waveform === "noise"
       ? mode === "audio" ? Math.random() * 2 - 1 : whiteNoiseSample(state.index + Math.round(rate * 97))
-      : oscillatorSample(waveform, state.phase * rate, clamp01(instrument.knobs.color));
+      : oscillatorSample(waveform, state.phase * rate + phaseOffset, clamp01(instrument.knobs.color));
     sum += sourceSample * level;
     levelSum += level;
   };
@@ -844,10 +845,11 @@ function aetherStackStereoSample(
     const wavetableOffset = legacyPositionOffset + modulationTargetOffset(modulation, `osc.${key}.position`);
     const unisonDetuneOffset = modulationTargetOffset(modulation, "unison.detune");
     const unisonSpreadOffset = modulationTargetOffset(modulation, "unison.spread");
+    const phaseOffset = oscillatorPhaseOffset(osc, key);
     const sourceSample = waveform === "wavetable"
       ? wavetableOscillatorSample(
           instrument,
-          state.phase * rate,
+          state.phase * rate + phaseOffset,
           sampleRate,
           frequency * rate,
           osc.wavetable,
@@ -857,7 +859,7 @@ function aetherStackStereoSample(
         )
       : waveform === "noise"
       ? mode === "audio" ? Math.random() * 2 - 1 : whiteNoiseSample(state.index + Math.round(rate * 97))
-      : oscillatorSample(waveform, state.phase * rate, clamp01(instrument.knobs.color));
+      : oscillatorSample(waveform, state.phase * rate + phaseOffset, clamp01(instrument.knobs.color));
     add(sourceSample, level, osc.pan + modulationTargetOffset(modulation, `osc.${key}.pan`));
   };
 
@@ -1155,6 +1157,15 @@ function whiteNoiseSample(index: number): number {
   x = Math.imul(x ^ (x >>> 15), x | 1);
   x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
   return (((x ^ (x >>> 14)) >>> 0) / 4294967295) * 2 - 1;
+}
+
+function oscillatorPhaseOffset(osc: NonNullable<Instrument["aether"]>["oscA"], key: "a" | "b"): number {
+  const basePhase = clamp01(osc.phase ?? 0);
+  const randomDepth = clamp01(osc.randomPhase ?? 0);
+  if (randomDepth <= 0) return basePhase;
+  const seed = key === "a" ? 9176 : 3613;
+  const jitter = (whiteNoiseSample(seed + Math.round(basePhase * 10000)) + 1) * 0.5;
+  return basePhase + jitter * randomDepth;
 }
 
 function clamp01(v: number) {

@@ -76,6 +76,8 @@ namespace beat
                 int octave { 0 };
                 int semitone { 0 };
                 float fineCents { 0.0f };
+                float phase { 0.0f };
+                float randomPhase { 0.0f };
                 WavetableConfig wavetable;
             };
 
@@ -331,6 +333,8 @@ namespace beat
         double  baseFrequencyHz { 440.0 };
         double  lfoPhase { 0.0 };
         double  lfo2Phase { 0.0 };
+        double  aetherOscAPhaseOffset { 0.0 };
+        double  aetherOscBPhaseOffset { 0.0 };
         float   level { 0.0f };
         float   cachedFilterHz { -1.0f };
         float   cachedFilterResonance { -1.0f };

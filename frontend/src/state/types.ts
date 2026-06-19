@@ -332,6 +332,8 @@ export interface AetherOscillatorConfig {
   octave: number;
   semitone: number;
   fineCents: number;
+  phase: number;
+  randomPhase: number;
   wavetable: WavetableConfig;
 }
 

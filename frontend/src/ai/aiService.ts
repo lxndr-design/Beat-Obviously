@@ -393,6 +393,8 @@ function sanitizeAether(value: unknown, fallback?: Instrument["aether"]): Instru
       octave: 0,
       semitone: 0,
       fineCents: 0,
+      phase: 0,
+      randomPhase: 0.25,
       wavetable: sanitizeWavetable(undefined),
     },
     oscB: {
@@ -403,6 +405,8 @@ function sanitizeAether(value: unknown, fallback?: Instrument["aether"]): Instru
       octave: 0,
       semitone: 7,
       fineCents: -4,
+      phase: 0,
+      randomPhase: 0.25,
       wavetable: sanitizeWavetable({ bank: "glass", position: 0.25, warp: 0.16, detuneCents: 8, blend: 0.35 }),
     },
     sub: { enabled: true, level: 0.18, octave: -1, waveform: "sine" as const },
@@ -436,6 +440,8 @@ function sanitizeAetherOsc(value: unknown, fallback: NonNullable<Instrument["aet
     octave: Math.round(clamp(record.octave, -4, 4, fallback.octave)),
     semitone: Math.round(clamp(record.semitone, -24, 24, fallback.semitone)),
     fineCents: clamp(record.fineCents, -100, 100, fallback.fineCents),
+    phase: clamp(record.phase, 0, 1, fallback.phase ?? 0),
+    randomPhase: clamp(record.randomPhase, 0, 1, fallback.randomPhase ?? 0.25),
     wavetable: sanitizeWavetable(record.wavetable, fallback.wavetable),
   };
 }

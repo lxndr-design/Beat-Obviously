@@ -181,6 +181,8 @@ namespace beat
                 100.0f,
                 (float) synthNumberParam(params, prefix + "fine", fallback.fineCents)
                     + staticRouteAmount(params, modulation, prefix + "fine"));
+            fallback.phase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "phase", fallback.phase));
+            fallback.randomPhase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "randomPhase", fallback.randomPhase));
             fallback.wavetable = synthWavetableConfig(params, modulation, customWavetables, oscillator, fallback.wavetable);
             return fallback;
         }

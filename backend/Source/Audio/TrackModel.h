@@ -148,6 +148,8 @@ namespace beat
             int octave { 0 };
             int semitone { 0 };
             float fineCents { 0.0f };
+            float phase { 0.0f };
+            float randomPhase { 0.0f };
             WavetableConfig wavetable;
         };
 

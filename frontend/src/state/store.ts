@@ -1823,6 +1823,8 @@ export function defaultAetherSynthConfig() {
       octave: 0,
       semitone: 0,
       fineCents: 0,
+      phase: 0,
+      randomPhase: 0.25,
       wavetable: oscA,
     },
     oscB: {
@@ -1833,6 +1835,8 @@ export function defaultAetherSynthConfig() {
       octave: 0,
       semitone: 7,
       fineCents: -4,
+      phase: 0,
+      randomPhase: 0.25,
       wavetable: { ...oscA, bank: "glass", position: 0.25, warp: 0.16, detuneCents: 8, blend: 0.35 },
     },
     sub: {

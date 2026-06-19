@@ -97,7 +97,21 @@ LFO IDs use `lfo.N.*`, where `N` starts at `1`.
 | `lfo.1.syncedRate` | enum | note division | `1/4` | Used when sync is on. |
 | `lfo.1.shape` | enum | `sine`, `triangle`, `saw`, `square`, `sampleHold` | `sine` | First-pass shapes. |
 | `lfo.1.phase` | normalized | `0..1` | `0` | Start phase. |
+| `lfo.1.retrigger` | boolean | off/on | `true` | Restart phase per note when enabled. |
 | `lfo.1.bipolar` | boolean | off/on | `true` | Output range mode. |
+
+Use the same parameter suffixes as LFO 1 with the `lfo.2.*` prefix.
+
+Initial defaults:
+
+- `lfo.2.enabled`: `false`
+- `lfo.2.rate`: `0.5`
+- `lfo.2.sync`: `true`
+- `lfo.2.syncedRate`: `1/2`
+- `lfo.2.shape`: `triangle`
+- `lfo.2.phase`: `0`
+- `lfo.2.retrigger`: `true`
+- `lfo.2.bipolar`: `true`
 
 ## Macro Parameters
 

@@ -1318,6 +1318,8 @@ function oscillatorFromDraft(draft: SynthDraftPatch, oscillator: OscillatorKey, 
     octave: getNumberParam(draft, `osc.${oscillator}.octave` as SynthParameterId),
     semitone: getNumberParam(draft, `osc.${oscillator}.semitone` as SynthParameterId),
     fineCents: modulatedNumberParam(draft, `${prefix}.fine` as SynthParameterId, `${prefix}.fine` as ModulationTargetId, -100, 100),
+    phase: getNumberParam(draft, `${prefix}.phase` as SynthParameterId),
+    randomPhase: getNumberParam(draft, `${prefix}.randomPhase` as SynthParameterId),
     wavetable,
   };
 }
@@ -1329,6 +1331,8 @@ function applyOscillatorToDraft(draft: SynthDraftPatch, oscillator: OscillatorKe
   draft.parameters[`osc.${oscillator}.octave` as SynthParameterId] = source.octave;
   draft.parameters[`osc.${oscillator}.semitone` as SynthParameterId] = source.semitone;
   draft.parameters[`osc.${oscillator}.fine` as SynthParameterId] = source.fineCents;
+  draft.parameters[`osc.${oscillator}.phase` as SynthParameterId] = source.phase ?? 0;
+  draft.parameters[`osc.${oscillator}.randomPhase` as SynthParameterId] = source.randomPhase ?? 0.25;
   applyWavetableToDraft(draft, oscillator, source.wavetable, oscillator === "a");
 }
 

@@ -100,6 +100,16 @@ namespace beat
             return bipolar ? raw : (raw + 1.0f) * 0.5f;
         }
 
+        double deterministicPhaseJitter(juce::uint32 seed) noexcept
+        {
+            seed ^= seed >> 16;
+            seed *= 0x7feb352du;
+            seed ^= seed >> 15;
+            seed *= 0x846ca68bu;
+            seed ^= seed >> 16;
+            return (double) (seed & 0x00ffffffu) / (double) 0x01000000u;
+        }
+
         float envRouteValue(float env, bool bipolar) noexcept
         {
             return bipolar ? env * 2.0f - 1.0f : env;
@@ -779,6 +789,10 @@ namespace beat
         level     = velocity;
         phase     = 0.0;
         noiseState = (juce::uint32) (midiNoteNumber * 747796405u + 2891336453u);
+        aetherOscAPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscA.phase)
+            + deterministicPhaseJitter(noiseState ^ 0xa9f14c31u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscA.randomPhase);
+        aetherOscBPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscB.phase)
+            + deterministicPhaseJitter(noiseState ^ 0x6c8e9cf5u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscB.randomPhase);
         if (params.lfoRetrigger) lfoPhase = params.lfoPhaseOffset;
         if (params.lfo2Retrigger) lfo2Phase = params.lfo2PhaseOffset;
         baseFrequencyHz = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
@@ -791,12 +805,20 @@ namespace beat
         else
             clearWavetableOscillatorBank(wavetableOscillators, wavetableUnisonPlan);
         if (aetherOscillatorNeedsWavetable(params.aetherOscA))
+        {
             configureWavetableOscillatorBank(aetherOscillatorsA, aetherTableA.get(), params.aetherOscA.wavetable, baseFrequencyHz);
+            for (auto& osc : aetherOscillatorsA)
+                osc.setPhase(aetherOscAPhaseOffset);
+        }
         else
             clearWavetableOscillatorBank(aetherOscillatorsA, aetherUnisonPlanA);
 
         if (aetherOscillatorNeedsWavetable(params.aetherOscB))
+        {
             configureWavetableOscillatorBank(aetherOscillatorsB, aetherTableB.get(), params.aetherOscB.wavetable, baseFrequencyHz);
+            for (auto& osc : aetherOscillatorsB)
+                osc.setPhase(aetherOscBPhaseOffset);
+        }
         else
             clearWavetableOscillatorBank(aetherOscillatorsB, aetherUnisonPlanB);
         refreshCachedPitchRates();
@@ -1300,6 +1322,7 @@ namespace beat
             bool positionIsDynamic,
             bool levelIsDynamic,
             double staticRate,
+            double phaseOffset,
             int64_t& componentSampleCounter)
         {
             const float modulatedLevel = clamp01(osc.level + (useDynamicModulation && levelIsDynamic
@@ -1346,7 +1369,7 @@ namespace beat
             }
             else
             {
-                value = oscillatorSample(osc.waveform, phase * rate, (frequencyHz * rate) / sampleRate);
+                value = oscillatorSample(osc.waveform, phase * rate + phaseOffset, (frequencyHz * rate) / sampleRate);
                 ++currentBlockOscillatorSamples;
                 ++componentSampleCounter;
             }
@@ -1366,6 +1389,7 @@ namespace beat
             cachedAetherOscAPositionDynamic,
             cachedAetherOscALevelDynamic,
             cachedAetherOscARate,
+            aetherOscAPhaseOffset,
             currentBlockAetherOscASamples);
         renderOsc(
             params.aetherOscB,
@@ -1380,6 +1404,7 @@ namespace beat
             cachedAetherOscBPositionDynamic,
             cachedAetherOscBLevelDynamic,
             cachedAetherOscBRate,
+            aetherOscBPhaseOffset,
             currentBlockAetherOscBSamples);
 
         if (params.aetherSub.enabled && params.aetherSub.level > 0.0f)

@@ -27,7 +27,7 @@ import {
 import styles from "./OscillatorPanel.module.css";
 
 const OSC_PARAMS: Array<{
-  suffix: "position" | "level" | "pan" | "octave" | "semitone" | "fine";
+  suffix: "position" | "level" | "pan" | "octave" | "semitone" | "fine" | "phase" | "randomPhase";
   label: string;
   min: number;
   max: number;
@@ -41,6 +41,8 @@ const OSC_PARAMS: Array<{
   { suffix: "octave", label: "Oct", min: -4, max: 4, step: 1, defaultValue: 0, bipolar: true },
   { suffix: "semitone", label: "Semi", min: -12, max: 12, step: 1, defaultValue: 0, bipolar: true },
   { suffix: "fine", label: "Fine", min: -100, max: 100, step: 1, defaultValue: 0, bipolar: true },
+  { suffix: "phase", label: "Phase", min: 0, max: 1, step: 0.01, defaultValue: 0 },
+  { suffix: "randomPhase", label: "Random", min: 0, max: 1, step: 0.01, defaultValue: 0.25 },
 ];
 
 const WAVETABLE_ICONS: Record<WavetableId, string> = {

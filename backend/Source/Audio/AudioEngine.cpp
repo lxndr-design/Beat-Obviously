@@ -1598,6 +1598,8 @@ namespace beat
             instrument.aether.oscA.octave,
             instrument.aether.oscA.semitone,
             instrument.aether.oscA.fineCents,
+            instrument.aether.oscA.phase,
+            instrument.aether.oscA.randomPhase,
             copyWavetable(instrument.aether.oscA.wavetable),
         };
         params.aetherOscB = {
@@ -1608,6 +1610,8 @@ namespace beat
             instrument.aether.oscB.octave,
             instrument.aether.oscB.semitone,
             instrument.aether.oscB.fineCents,
+            instrument.aether.oscB.phase,
+            instrument.aether.oscB.randomPhase,
             copyWavetable(instrument.aether.oscB.wavetable),
         };
         params.aetherSub = {

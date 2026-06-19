@@ -41,6 +41,8 @@ try {
       "osc.a.fine": -14,
       "osc.a.level": 0.74,
       "osc.a.pan": -0.35,
+      "osc.a.phase": 0.33,
+      "osc.a.randomPhase": 0.2,
       "osc.b.enabled": true,
       "osc.b.wavetable": "basic.triangle",
       "osc.b.position": 0.81,
@@ -49,6 +51,8 @@ try {
       "osc.b.fine": 23,
       "osc.b.level": 0.33,
       "osc.b.pan": 0.45,
+      "osc.b.phase": 0.66,
+      "osc.b.randomPhase": 0.1,
       "unison.enabled": true,
       "unison.voices": 5,
       "unison.detune": 0.27,
@@ -144,6 +148,10 @@ try {
   assert.equal(patch.aether.oscB.enabled, true);
   assert.equal(patch.aether.oscA.pan, -0.35);
   assert.equal(patch.aether.oscB.pan, 0.45);
+  assert.equal(patch.aether.oscA.phase, 0.33);
+  assert.equal(patch.aether.oscA.randomPhase, 0.2);
+  assert.equal(patch.aether.oscB.phase, 0.66);
+  assert.equal(patch.aether.oscB.randomPhase, 0.1);
   assert.equal(patch.aether.oscB.wavetable.bank, "organ");
   assert.equal(patch.wavetable.unison, 5);
   assert.equal(patch.aether.oscA.wavetable.unison, 5);

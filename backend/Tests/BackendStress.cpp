@@ -8778,6 +8778,8 @@ namespace
             "osc.a.fine": 7,
             "osc.a.level": 0.7,
             "osc.a.pan": -0.4,
+            "osc.a.phase": 0.33,
+            "osc.a.randomPhase": 0.2,
             "osc.b.enabled": true,
             "osc.b.wavetable": "basic.triangle",
             "osc.b.position": 0.1,
@@ -8786,6 +8788,8 @@ namespace
             "osc.b.fine": -5,
             "osc.b.level": 0.3,
             "osc.b.pan": 0.2,
+            "osc.b.phase": 0.66,
+            "osc.b.randomPhase": 0.1,
             "unison.enabled": true,
             "unison.voices": 5,
             "unison.detune": 0.2,
@@ -8858,11 +8862,15 @@ namespace
             return false;
         if (!near(instrument.aether.oscA.pan, -0.3f))
             return false;
+        if (!near(instrument.aether.oscA.phase, 0.33f) || !near(instrument.aether.oscA.randomPhase, 0.2f))
+            return false;
         if (!instrument.aether.oscB.enabled || instrument.aether.oscB.wavetable.bank != 3)
             return false;
         if (!near(instrument.aether.oscB.level, 0.7f) || !near(instrument.aether.oscB.wavetable.position, 0.0f))
             return false;
         if (!near(instrument.aether.oscB.pan, 0.0f))
+            return false;
+        if (!near(instrument.aether.oscB.phase, 0.66f) || !near(instrument.aether.oscB.randomPhase, 0.1f))
             return false;
         if (instrument.aether.oscB.octave != 1 || instrument.aether.oscB.semitone != 7 || !near(instrument.aether.oscB.fineCents, 15.0f))
             return false;

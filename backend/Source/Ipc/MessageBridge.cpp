@@ -1237,6 +1237,8 @@ namespace beat
             fallback.octave = juce::jlimit(-4, 4, (int) value.getProperty("octave", fallback.octave));
             fallback.semitone = juce::jlimit(-24, 24, (int) value.getProperty("semitone", fallback.semitone));
             fallback.fineCents = floatParam(value, "fineCents", fallback.fineCents, -100.0f, 100.0f);
+            fallback.phase = normalizedParam(value, "phase", fallback.phase);
+            fallback.randomPhase = normalizedParam(value, "randomPhase", fallback.randomPhase);
             fallback.wavetable = parseWavetableConfig(value.getProperty("wavetable", {}), fallback.wavetable);
             return fallback;
         }
