@@ -1481,12 +1481,14 @@ namespace beat
         params.lfoWaveform = instrument.lfoWaveform;
         params.lfoRateHz = effectiveLfoRateHz(instrument.lfoRateHz, instrument.lfoSync, instrument.lfoSyncedRate, seq.getTempo());
         params.lfoDepth = instrument.lfoDepth;
+        params.lfoSmoothing = juce::jlimit(0.0f, 1.0f, instrument.lfoSmoothing);
         params.lfoPhaseOffset = juce::jlimit(0.0f, 1.0f, instrument.lfoPhaseOffset);
         params.lfoRetrigger = instrument.lfoRetrigger;
         params.lfoOneShot = instrument.lfoOneShot;
         params.lfo2Enabled = instrument.lfo2Enabled;
         params.lfo2Waveform = instrument.lfo2Waveform;
         params.lfo2RateHz = effectiveLfoRateHz(instrument.lfo2RateHz, instrument.lfo2Sync, instrument.lfo2SyncedRate, seq.getTempo());
+        params.lfo2Smoothing = juce::jlimit(0.0f, 1.0f, instrument.lfo2Smoothing);
         params.lfo2PhaseOffset = juce::jlimit(0.0f, 1.0f, instrument.lfo2PhaseOffset);
         params.lfo2Retrigger = instrument.lfo2Retrigger;
         params.lfo2OneShot = instrument.lfo2OneShot;

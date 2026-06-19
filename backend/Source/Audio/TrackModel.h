@@ -255,6 +255,7 @@ namespace beat
         float lfoDepth { 0.0f };
         bool lfoSync { false };
         juce::String lfoSyncedRate { "1/4" };
+        float lfoSmoothing { 0.0f };
         float lfoPhaseOffset { 0.0f };
         bool lfoRetrigger { true };
         bool lfoOneShot { false };
@@ -263,6 +264,7 @@ namespace beat
         float lfo2RateHz { 0.5f };
         bool lfo2Sync { false };
         juce::String lfo2SyncedRate { "1/2" };
+        float lfo2Smoothing { 0.0f };
         float lfo2PhaseOffset { 0.0f };
         bool lfo2Retrigger { true };
         bool lfo2OneShot { false };

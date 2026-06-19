@@ -600,12 +600,14 @@ function renderRelevantInstrumentState(instrument: Instrument) {
     lfoWaveform: instrument.lfoWaveform,
     lfoRateHz: instrument.lfoRateHz,
     lfoSyncedRate: instrument.lfoSyncedRate,
+    lfoSmoothing: instrument.lfoSmoothing,
     lfoPhase: instrument.lfoPhase,
     lfoOneShot: instrument.lfoOneShot,
     lfo2Waveform: instrument.lfo2Waveform,
     lfo2RateHz: instrument.lfo2RateHz,
     lfo2Sync: instrument.lfo2Sync,
     lfo2SyncedRate: instrument.lfo2SyncedRate,
+    lfo2Smoothing: instrument.lfo2Smoothing,
     lfo2Enabled: instrument.lfo2Enabled,
     lfo2Phase: instrument.lfo2Phase,
     lfo2OneShot: instrument.lfo2OneShot,
@@ -1347,11 +1349,13 @@ export function modulationAtTime(instrument: Instrument, timeS: number, duration
     instrument.lfoWaveform ?? "sine",
     timeS * effectiveLfoRateHz(instrument, 1, bpm) + (instrument.lfoPhase ?? 0),
     lfo1OneShot,
+    effectiveLfoSmoothing(instrument, 1),
   );
   const rawLfo2 = lfoShapeValue(
     instrument.lfo2Waveform ?? "triangle",
     timeS * effectiveLfoRateHz(instrument, 2, bpm) + (instrument.lfo2Phase ?? 0),
     lfo2OneShot,
+    effectiveLfoSmoothing(instrument, 2),
   );
   const env = envelopePreviewValue(timeS, durationS, instrument);
   const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env);
@@ -1443,19 +1447,31 @@ function modulationTargetScale(target: RuntimeModulationTarget): number {
   return 1;
 }
 
-function lfoShapeValue(shape: NonNullable<Instrument["lfoWaveform"]>, cycles: number, oneShot = false): number {
+function effectiveLfoSmoothing(instrument: Instrument, lfo: 1 | 2): number {
+  const params = instrument.synthPatch?.parameters;
+  if (lfo === 1) return clamp01(Number(params?.["lfo.1.smoothing"] ?? instrument.lfoSmoothing ?? 0));
+  return clamp01(Number(params?.["lfo.2.smoothing"] ?? instrument.lfo2Smoothing ?? 0));
+}
+
+function lfoShapeValue(shape: NonNullable<Instrument["lfoWaveform"]>, cycles: number, oneShot = false, smoothing = 0): number {
   const phase = oneShot ? clamp(cycles, 0, 1) : cycles - Math.floor(cycles);
+  const sine = Math.sin(phase * Math.PI * 2);
+  let shaped: number;
   switch (shape) {
     case "square":
-      return phase < 0.5 ? 1 : -1;
+      shaped = phase < 0.5 ? 1 : -1;
+      break;
     case "saw":
-      return phase * 2 - 1;
+      shaped = phase * 2 - 1;
+      break;
     case "triangle":
-      return phase < 0.5 ? phase * 4 - 1 : 3 - phase * 4;
+      shaped = phase < 0.5 ? phase * 4 - 1 : 3 - phase * 4;
+      break;
     case "sine":
     default:
-      return Math.sin(phase * Math.PI * 2);
+      return sine;
   }
+  return shaped + (sine - shaped) * clamp01(smoothing);
 }
 
 function lfoRouteValue(raw: number, bipolar: boolean): number {

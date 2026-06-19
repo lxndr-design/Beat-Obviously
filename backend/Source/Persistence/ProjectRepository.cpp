@@ -455,6 +455,7 @@ namespace beat
             o->setProperty("lfoDepth", instrument.lfoDepth);
             o->setProperty("lfoSync", instrument.lfoSync);
             o->setProperty("lfoSyncedRate", instrument.lfoSyncedRate);
+            o->setProperty("lfoSmoothing", instrument.lfoSmoothing);
             o->setProperty("lfoPhase", instrument.lfoPhaseOffset);
             o->setProperty("lfoRetrigger", instrument.lfoRetrigger);
             o->setProperty("lfoOneShot", instrument.lfoOneShot);
@@ -463,6 +464,7 @@ namespace beat
             o->setProperty("lfo2RateHz", instrument.lfo2RateHz);
             o->setProperty("lfo2Sync", instrument.lfo2Sync);
             o->setProperty("lfo2SyncedRate", instrument.lfo2SyncedRate);
+            o->setProperty("lfo2Smoothing", instrument.lfo2Smoothing);
             o->setProperty("lfo2Phase", instrument.lfo2PhaseOffset);
             o->setProperty("lfo2Retrigger", instrument.lfo2Retrigger);
             o->setProperty("lfo2OneShot", instrument.lfo2OneShot);
@@ -610,6 +612,7 @@ namespace beat
                     instrument.lfoDepth = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("lfoDepth", instrument.lfoDepth));
                     instrument.lfoSync = (bool) iv.getProperty("lfoSync", instrument.lfoSync);
                     instrument.lfoSyncedRate = iv.getProperty("lfoSyncedRate", instrument.lfoSyncedRate).toString();
+                    instrument.lfoSmoothing = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("lfoSmoothing", instrument.lfoSmoothing));
                     instrument.lfoPhaseOffset = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("lfoPhase", instrument.lfoPhaseOffset));
                     instrument.lfoRetrigger = (bool) iv.getProperty("lfoRetrigger", instrument.lfoRetrigger);
                     instrument.lfoOneShot = (bool) iv.getProperty("lfoOneShot", instrument.lfoOneShot);
@@ -618,6 +621,7 @@ namespace beat
                     instrument.lfo2RateHz = juce::jlimit(0.01f, 40.0f, (float) (double) iv.getProperty("lfo2RateHz", instrument.lfo2RateHz));
                     instrument.lfo2Sync = (bool) iv.getProperty("lfo2Sync", instrument.lfo2Sync);
                     instrument.lfo2SyncedRate = iv.getProperty("lfo2SyncedRate", instrument.lfo2SyncedRate).toString();
+                    instrument.lfo2Smoothing = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("lfo2Smoothing", instrument.lfo2Smoothing));
                     instrument.lfo2PhaseOffset = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("lfo2Phase", instrument.lfo2PhaseOffset));
                     instrument.lfo2Retrigger = (bool) iv.getProperty("lfo2Retrigger", instrument.lfo2Retrigger);
                     instrument.lfo2OneShot = (bool) iv.getProperty("lfo2OneShot", instrument.lfo2OneShot);

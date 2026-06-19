@@ -245,6 +245,7 @@ export interface Instrument {
   lfoDepth?: number;        // 0..1
   lfoSync?: boolean;        // true = tempo-synced, false = absolute Hz
   lfoSyncedRate?: string;    // note division, e.g. 1/4
+  lfoSmoothing?: number;     // 0..1 shape-corner smoothing
   lfoPhase?: number;        // 0..1 cycle offset
   lfoRetrigger?: boolean;   // true = restart LFO per note
   lfoOneShot?: boolean;     // true = stop at the end of one cycle
@@ -252,6 +253,7 @@ export interface Instrument {
   lfo2RateHz?: number;
   lfo2Sync?: boolean;
   lfo2SyncedRate?: string;
+  lfo2Smoothing?: number;
   lfo2Enabled?: boolean;
   lfo2Phase?: number;
   lfo2Retrigger?: boolean;
@@ -553,6 +555,7 @@ export interface InstrumentSnapshot {
   lfoDepth?: number;
   lfoSync?: boolean;
   lfoSyncedRate?: string;
+  lfoSmoothing?: number;
   lfoPhase?: number;
   lfoRetrigger?: boolean;
   lfoOneShot?: boolean;
@@ -560,6 +563,7 @@ export interface InstrumentSnapshot {
   lfo2RateHz?: number;
   lfo2Sync?: boolean;
   lfo2SyncedRate?: string;
+  lfo2Smoothing?: number;
   lfo2Enabled?: boolean;
   lfo2Phase?: number;
   lfo2Retrigger?: boolean;

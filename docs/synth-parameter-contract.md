@@ -95,6 +95,7 @@ LFO IDs use `lfo.N.*`, where `N` starts at `1`.
 | `lfo.1.rate` | hz | `0.01..50` | `1` | Used when sync is off. |
 | `lfo.1.sync` | boolean | off/on | `true` | Tempo sync enable. |
 | `lfo.1.syncedRate` | enum | note division | `1/4` | Used when sync is on; converted to cycles/sec from the current project BPM at render time. |
+| `lfo.1.smoothing` | normalized | `0..1` | `0` | Blends hard LFO shapes toward sine for softer modulation corners. |
 | `lfo.1.shape` | enum | `sine`, `triangle`, `saw`, `square`, `sampleHold` | `sine` | First-pass shapes. |
 | `lfo.1.phase` | normalized | `0..1` | `0` | Start phase. |
 | `lfo.1.retrigger` | boolean | off/on | `true` | Restart phase per note when enabled. |
@@ -109,6 +110,7 @@ Initial defaults:
 - `lfo.2.rate`: `0.5`
 - `lfo.2.sync`: `true`
 - `lfo.2.syncedRate`: `1/2`
+- `lfo.2.smoothing`: `0`
 - `lfo.2.shape`: `triangle`
 - `lfo.2.phase`: `0`
 - `lfo.2.retrigger`: `true`

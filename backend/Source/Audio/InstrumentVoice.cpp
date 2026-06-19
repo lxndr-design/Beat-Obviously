@@ -82,17 +82,21 @@ namespace beat
 
         float nextNoise(juce::uint32& state);
 
-        float lfoValue(int waveform, double phase, bool oneShot = false)
+        float lfoValue(int waveform, double phase, float smoothing = 0.0f, bool oneShot = false)
         {
             const float p = oneShot ? juce::jlimit(0.0f, 1.0f, (float) phase) : (float) (phase - std::floor(phase));
+            const float sine = std::sin(p * juce::MathConstants<float>::twoPi);
+            float shaped;
             switch (waveform)
             {
-                case 1: return p < 0.5f ? p * 4.0f - 1.0f : 3.0f - p * 4.0f;
-                case 2: return p * 2.0f - 1.0f;
-                case 3: return p < 0.5f ? 1.0f : -1.0f;
+                case 1: shaped = p < 0.5f ? p * 4.0f - 1.0f : 3.0f - p * 4.0f; break;
+                case 2: shaped = p * 2.0f - 1.0f; break;
+                case 3: shaped = p < 0.5f ? 1.0f : -1.0f; break;
                 case 0:
-                default: return std::sin(p * juce::MathConstants<float>::twoPi);
+                default: return sine;
             }
+            const float mix = juce::jlimit(0.0f, 1.0f, smoothing);
+            return shaped + (sine - shaped) * mix;
         }
 
         float lfoRouteValue(float raw, bool bipolar) noexcept
@@ -886,8 +890,8 @@ namespace beat
                 realtimeRampSamples += activeRealtimeRampCount;
                 advanceRealtimeRamps();
             }
-            const float rawLfo = needsLfoValue ? lfoValue(params.lfoWaveform, lfoPhase, params.lfoOneShot) : 0.0f;
-            const float rawLfo2 = needsLfo2Value ? lfoValue(params.lfo2Waveform, lfo2Phase, params.lfo2OneShot) : 0.0f;
+            const float rawLfo = needsLfoValue ? lfoValue(params.lfoWaveform, lfoPhase, params.lfoSmoothing, params.lfoOneShot) : 0.0f;
+            const float rawLfo2 = needsLfo2Value ? lfoValue(params.lfo2Waveform, lfo2Phase, params.lfo2Smoothing, params.lfo2OneShot) : 0.0f;
             if (needsLfoValue || useDynamicModulation)
                 ++modulationSamples;
             const float positionLfo = hasPositionMod ? lfoRouteValue(rawLfo, params.lfoPositionBipolar) * clamp01(params.lfoDepth) : 0.0f;

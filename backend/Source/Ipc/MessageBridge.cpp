@@ -1790,6 +1790,7 @@ namespace beat
                     instrument.lfoDepth = normalizedParam(instrumentVar, "lfoDepth", instrument.lfoDepth);
                     instrument.lfoSync = (bool) instrumentVar.getProperty("lfoSync", instrument.lfoSync);
                     instrument.lfoSyncedRate = instrumentVar.getProperty("lfoSyncedRate", instrument.lfoSyncedRate).toString();
+                    instrument.lfoSmoothing = normalizedParam(instrumentVar, "lfoSmoothing", instrument.lfoSmoothing);
                     instrument.lfoPhaseOffset = normalizedParam(instrumentVar, "lfoPhase", instrument.lfoPhaseOffset);
                     instrument.lfoRetrigger = (bool) instrumentVar.getProperty("lfoRetrigger", instrument.lfoRetrigger);
                     instrument.lfoOneShot = (bool) instrumentVar.getProperty("lfoOneShot", instrument.lfoOneShot);
@@ -1798,6 +1799,7 @@ namespace beat
                     instrument.lfo2RateHz = floatParam(instrumentVar, "lfo2RateHz", instrument.lfo2RateHz, 0.01f, 40.0f);
                     instrument.lfo2Sync = (bool) instrumentVar.getProperty("lfo2Sync", instrument.lfo2Sync);
                     instrument.lfo2SyncedRate = instrumentVar.getProperty("lfo2SyncedRate", instrument.lfo2SyncedRate).toString();
+                    instrument.lfo2Smoothing = normalizedParam(instrumentVar, "lfo2Smoothing", instrument.lfo2Smoothing);
                     instrument.lfo2PhaseOffset = normalizedParam(instrumentVar, "lfo2Phase", instrument.lfo2PhaseOffset);
                     instrument.lfo2Retrigger = (bool) instrumentVar.getProperty("lfo2Retrigger", instrument.lfo2Retrigger);
                     instrument.lfo2OneShot = (bool) instrumentVar.getProperty("lfo2OneShot", instrument.lfo2OneShot);

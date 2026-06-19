@@ -329,11 +329,13 @@ function modulationAtTime(instrument, timeS, durationS, bpm = 120) {
     instrument.lfoWaveform || "sine",
     timeS * effectiveLfoRateHz(instrument, 1, bpm) + (Number(instrument.lfoPhase) || 0),
     instrument.synthPatch?.parameters?.["lfo.1.oneShot"] === true || instrument.lfoOneShot === true,
+    effectiveLfoSmoothing(instrument, 1),
   );
   const rawLfo2 = lfoShape(
     instrument.lfo2Waveform || "triangle",
     timeS * effectiveLfoRateHz(instrument, 2, bpm) + (Number(instrument.lfo2Phase) || 0),
     instrument.synthPatch?.parameters?.["lfo.2.oneShot"] === true || instrument.lfo2OneShot === true,
+    effectiveLfoSmoothing(instrument, 2),
   );
   const env = envelopeValue(timeS, durationS, instrument);
   const offsets = {};
@@ -474,14 +476,23 @@ function effectiveLfoRateHz(instrument, lfo, bpm) {
   return Math.max(0.01, Number(instrument.lfo2RateHz) || 0.5);
 }
 
-function lfoShape(shape, cycles, oneShot = false) {
+function effectiveLfoSmoothing(instrument, lfo) {
+  const params = instrument.synthPatch?.parameters;
+  if (lfo === 1) return clamp01(Number(params?.["lfo.1.smoothing"] ?? instrument.lfoSmoothing ?? 0));
+  return clamp01(Number(params?.["lfo.2.smoothing"] ?? instrument.lfo2Smoothing ?? 0));
+}
+
+function lfoShape(shape, cycles, oneShot = false, smoothing = 0) {
   const phase = oneShot ? clamp(cycles, 0, 1) : cycles - Math.floor(cycles);
+  const sine = Math.sin(phase * Math.PI * 2);
+  let shaped;
   switch (shape) {
-    case "square": return phase < 0.5 ? 1 : -1;
-    case "saw": return phase * 2 - 1;
-    case "triangle": return phase < 0.5 ? phase * 4 - 1 : 3 - phase * 4;
-    default: return Math.sin(phase * Math.PI * 2);
+    case "square": shaped = phase < 0.5 ? 1 : -1; break;
+    case "saw": shaped = phase * 2 - 1; break;
+    case "triangle": shaped = phase < 0.5 ? phase * 4 - 1 : 3 - phase * 4; break;
+    default: return sine;
   }
+  return shaped + (sine - shaped) * clamp01(smoothing);
 }
 
 function lfoRoute(raw, bipolar) {

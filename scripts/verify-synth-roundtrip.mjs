@@ -72,6 +72,7 @@ try {
       "lfo.1.rate": 4.5,
       "lfo.1.sync": true,
       "lfo.1.syncedRate": "1/8",
+      "lfo.1.smoothing": 0.35,
       "lfo.1.shape": "triangle",
       "lfo.1.phase": 0.25,
       "lfo.1.retrigger": false,
@@ -80,6 +81,7 @@ try {
       "lfo.2.rate": 0.75,
       "lfo.2.sync": true,
       "lfo.2.syncedRate": "1/2",
+      "lfo.2.smoothing": 0.6,
       "lfo.2.shape": "square",
       "lfo.2.phase": 0.5,
       "lfo.2.retrigger": true,
@@ -165,8 +167,10 @@ try {
   assert.equal(patch.lfo2Enabled, true);
   assert.equal(patch.lfoSync, true);
   assert.equal(patch.lfoSyncedRate, "1/8");
+  assert.equal(patch.lfoSmoothing, 0.35);
   assert.equal(patch.lfo2Sync, true);
   assert.equal(patch.lfo2SyncedRate, "1/2");
+  assert.equal(patch.lfo2Smoothing, 0.6);
   assert.equal(patch.lfoPhase, 0.25);
   assert.equal(patch.lfo2Phase, 0.5);
   assert.equal(patch.lfoRetrigger, false);
@@ -540,6 +544,33 @@ try {
   const absoluteFast = synthPreview.modulationAtTime(absolutePreview, 0.125, 1, 120).targetOffsets["osc.b.position"];
   const absoluteSlow = synthPreview.modulationAtTime(absolutePreview, 0.125, 1, 60).targetOffsets["osc.b.position"];
   assert.ok(Math.abs(absoluteFast - absoluteSlow) < 0.000001, "absolute-rate LFO should not change modulation phase when BPM changes");
+
+  const hardSquareDraft = synthStore.normalizeSynthDraftPatch({
+    name: "LFO Smoothing Probe",
+    parameters: {
+      "osc.a.enabled": true,
+      "osc.a.wavetable": "basic.sine",
+      "osc.a.level": 0.5,
+      "lfo.1.enabled": true,
+      "lfo.1.sync": false,
+      "lfo.1.rate": 1,
+      "lfo.1.shape": "square",
+      "lfo.1.smoothing": 0,
+    },
+    modulation: [
+      { id: "square_level", source: "lfo.1", target: "osc.a.level", amount: 0.5, bipolar: true, enabled: true },
+    ],
+  });
+  const smoothSquareDraft = synthStore.normalizeSynthDraftPatch({
+    ...hardSquareDraft,
+    parameters: { ...hardSquareDraft.parameters, "lfo.1.smoothing": 1 },
+  });
+  const hardSquare = synthStore.synthDraftToPreviewInstrument(hardSquareDraft);
+  const smoothSquare = synthStore.synthDraftToPreviewInstrument(smoothSquareDraft);
+  const hardLevel = synthPreview.modulationAtTime(hardSquare, 0, 1, 120).targetOffsets["osc.a.level"];
+  const smoothLevel = synthPreview.modulationAtTime(smoothSquare, 0, 1, 120).targetOffsets["osc.a.level"];
+  assert.ok(Math.abs(hardLevel - 0.5) < 0.000001, "unsmoothed square LFO should keep hard high state");
+  assert.ok(Math.abs(smoothLevel) < 0.000001, "fully smoothed square LFO should blend to sine at quarter-cycle zero crossing");
 
   globalThis.fetch = async () => {
     throw new Error("force local instrument generation fallback");
