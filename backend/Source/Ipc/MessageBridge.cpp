@@ -1786,10 +1786,12 @@ namespace beat
                     instrument.lfoWaveform = parseSynthLfoWaveform(instrumentVar.getProperty("lfoWaveform", "sine"));
                     instrument.lfoRateHz = floatParam(instrumentVar, "lfoRateHz", instrument.lfoRateHz, 0.01f, 40.0f);
                     instrument.lfoDepth = normalizedParam(instrumentVar, "lfoDepth", instrument.lfoDepth);
+                    instrument.lfoPhaseOffset = normalizedParam(instrumentVar, "lfoPhase", instrument.lfoPhaseOffset);
                     instrument.lfoRetrigger = (bool) instrumentVar.getProperty("lfoRetrigger", instrument.lfoRetrigger);
                     instrument.lfo2Enabled = (bool) instrumentVar.getProperty("lfo2Enabled", instrument.lfo2Enabled);
                     instrument.lfo2Waveform = parseSynthLfoWaveform(instrumentVar.getProperty("lfo2Waveform", "triangle"));
                     instrument.lfo2RateHz = floatParam(instrumentVar, "lfo2RateHz", instrument.lfo2RateHz, 0.01f, 40.0f);
+                    instrument.lfo2PhaseOffset = normalizedParam(instrumentVar, "lfo2Phase", instrument.lfo2PhaseOffset);
                     instrument.lfo2Retrigger = (bool) instrumentVar.getProperty("lfo2Retrigger", instrument.lfo2Retrigger);
                     instrument.lfoPositionBipolar = (bool) instrumentVar.getProperty("lfoPositionBipolar", instrument.lfoPositionBipolar);
                     instrument.lfoPitchBipolar = (bool) instrumentVar.getProperty("lfoPitchBipolar", instrument.lfoPitchBipolar);

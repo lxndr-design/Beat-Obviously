@@ -68,10 +68,12 @@ try {
       "lfo.1.rate": 4.5,
       "lfo.1.sync": false,
       "lfo.1.shape": "triangle",
+      "lfo.1.phase": 0.25,
       "lfo.2.enabled": true,
       "lfo.2.rate": 0.75,
       "lfo.2.sync": false,
       "lfo.2.shape": "square",
+      "lfo.2.phase": 0.5,
       "macro.1": 0.5,
       "future.experimental": "preserve-me",
     },
@@ -147,6 +149,8 @@ try {
   assert.equal(patch.lfo2Waveform, "square");
   assert.equal(patch.lfo2RateHz, 0.75);
   assert.equal(patch.lfo2Enabled, true);
+  assert.equal(patch.lfoPhase, 0.25);
+  assert.equal(patch.lfo2Phase, 0.5);
   assert.equal(patch.lfoPositionBipolar, false);
   assert.equal(patch.lfoPitchBipolar, true);
   assert.equal(patch.synthPatch.parameters["future.experimental"], "preserve-me");

@@ -559,6 +559,7 @@ function LfoLane(props: { lfo: 1 | 2 }) {
   const enabledId = `${prefix}.enabled` as SynthParameterId;
   const shapeId = `${prefix}.shape` as SynthParameterId;
   const rateId = `${prefix}.rate` as SynthParameterId;
+  const phaseId = `${prefix}.phase` as SynthParameterId;
   const enabled = createMemo(() => draft().parameters[enabledId] === true);
 
   return (
@@ -596,6 +597,17 @@ function LfoLane(props: { lfo: 1 | 2 }) {
           formatValue={(value) => `${value < 10 ? value.toFixed(2) : value.toFixed(1)}`}
           pickSourceId={`lfo.${props.lfo}` as ModulationSourceId}
           onChange={(value) => setNumericParameter(rateId, value)}
+        />
+        <Knob
+          size="sm"
+          label="Phase"
+          value={getNumberParam(draft(), phaseId)}
+          min={0}
+          max={1}
+          step={0.01}
+          defaultValue={0}
+          formatValue={(value) => `${Math.round(value * 360)} deg`}
+          onChange={(value) => setNumericParameter(phaseId, value)}
         />
       </div>
     </div>

@@ -779,8 +779,8 @@ namespace beat
         level     = velocity;
         phase     = 0.0;
         noiseState = (juce::uint32) (midiNoteNumber * 747796405u + 2891336453u);
-        if (params.lfoRetrigger) lfoPhase = 0.0;
-        if (params.lfo2Retrigger) lfo2Phase = 0.0;
+        if (params.lfoRetrigger) lfoPhase = params.lfoPhaseOffset;
+        if (params.lfo2Retrigger) lfo2Phase = params.lfo2PhaseOffset;
         baseFrequencyHz = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
         phaseDelta = baseFrequencyHz / sampleRate;
         pitchFrequencyRamp.reset((float) baseFrequencyHz);

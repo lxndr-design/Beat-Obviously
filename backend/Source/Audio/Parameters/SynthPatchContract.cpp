@@ -357,9 +357,11 @@ namespace beat
             + staticRouteAmount(params, modulation, "amp.pan"));
         instrument.lfoWaveform = parseSynthLfoWaveform(synthStringParam(params, "lfo.1.shape", "sine"));
         instrument.lfoRateHz = juce::jlimit(0.01f, 50.0f, (float) synthNumberParam(params, "lfo.1.rate", instrument.lfoRateHz));
+        instrument.lfoPhaseOffset = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "lfo.1.phase", instrument.lfoPhaseOffset));
         instrument.lfo2Enabled = synthNumberParam(params, "lfo.2.enabled", instrument.lfo2Enabled ? 1.0 : 0.0) >= 0.5;
         instrument.lfo2Waveform = parseSynthLfoWaveform(synthStringParam(params, "lfo.2.shape", "triangle"));
         instrument.lfo2RateHz = juce::jlimit(0.01f, 50.0f, (float) synthNumberParam(params, "lfo.2.rate", instrument.lfo2RateHz));
+        instrument.lfo2PhaseOffset = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "lfo.2.phase", instrument.lfo2PhaseOffset));
 
         const bool lfoEnabled = synthNumberParam(params, "lfo.1.enabled", 1.0) >= 0.5;
         instrument.lfoDepth = lfoEnabled ? std::abs(routeAmount(modulation, "lfo.1", "osc.a.position")) : 0.0f;

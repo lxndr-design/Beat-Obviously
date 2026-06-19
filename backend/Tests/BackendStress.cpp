@@ -8805,9 +8805,11 @@ namespace
             "lfo.1.enabled": true,
             "lfo.1.shape": "square",
             "lfo.1.rate": 6.5,
+            "lfo.1.phase": 0.25,
             "lfo.2.enabled": true,
             "lfo.2.shape": "triangle",
-            "lfo.2.rate": 0.75
+            "lfo.2.rate": 0.75,
+            "lfo.2.phase": 0.5
           },
           "modulation": [
             { "source": "macro.1", "target": "osc.a.position", "amount": 0.4, "enabled": true },
@@ -8872,9 +8874,9 @@ namespace
             return false;
         if (!near(instrument.ampLevel, 0.54f) || !near(instrument.ampPan, 0.0f))
             return false;
-        if (instrument.lfoWaveform != 3 || !near(instrument.lfoRateHz, 6.5f))
+        if (instrument.lfoWaveform != 3 || !near(instrument.lfoRateHz, 6.5f) || !near(instrument.lfoPhaseOffset, 0.25f))
             return false;
-        if (!instrument.lfo2Enabled || instrument.lfo2Waveform != 1 || !near(instrument.lfo2RateHz, 0.75f))
+        if (!instrument.lfo2Enabled || instrument.lfo2Waveform != 1 || !near(instrument.lfo2RateHz, 0.75f) || !near(instrument.lfo2PhaseOffset, 0.5f))
             return false;
         if (!near(instrument.lfoDepth, 0.35f) || !near(instrument.lfoToPitch, 6.0f) || !near(instrument.lfoToFilter, -0.2f))
             return false;

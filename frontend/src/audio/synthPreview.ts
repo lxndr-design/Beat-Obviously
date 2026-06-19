@@ -588,9 +588,11 @@ function renderRelevantInstrumentState(instrument: Instrument) {
     aether: instrument.aether,
     lfoWaveform: instrument.lfoWaveform,
     lfoRateHz: instrument.lfoRateHz,
+    lfoPhase: instrument.lfoPhase,
     lfo2Waveform: instrument.lfo2Waveform,
     lfo2RateHz: instrument.lfo2RateHz,
     lfo2Enabled: instrument.lfo2Enabled,
+    lfo2Phase: instrument.lfo2Phase,
     lfoDepth: instrument.lfoDepth,
     lfoSync: instrument.lfoSync,
     lfoRetrigger: instrument.lfoRetrigger,
@@ -1278,8 +1280,14 @@ function baseAutomationValue(instrument: Instrument, target: RuntimeModulationTa
 }
 
 export function modulationAtTime(instrument: Instrument, timeS: number, durationS: number): RenderModulation {
-  const rawLfo = lfoShapeValue(instrument.lfoWaveform ?? "sine", timeS * Math.max(0.01, instrument.lfoRateHz ?? 4));
-  const rawLfo2 = lfoShapeValue(instrument.lfo2Waveform ?? "triangle", timeS * Math.max(0.01, instrument.lfo2RateHz ?? 0.5));
+  const rawLfo = lfoShapeValue(
+    instrument.lfoWaveform ?? "sine",
+    timeS * Math.max(0.01, instrument.lfoRateHz ?? 4) + (instrument.lfoPhase ?? 0),
+  );
+  const rawLfo2 = lfoShapeValue(
+    instrument.lfo2Waveform ?? "triangle",
+    timeS * Math.max(0.01, instrument.lfo2RateHz ?? 0.5) + (instrument.lfo2Phase ?? 0),
+  );
   const env = envelopePreviewValue(timeS, durationS, instrument);
   const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env);
   if (targetOffsets) {
