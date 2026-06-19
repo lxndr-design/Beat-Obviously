@@ -107,85 +107,103 @@ backend/
 - `Persistence` should serialize/deserialize versioned project and patch state.
 - `Model` should hold plain data structures used by persistence, IPC, and audio snapshots.
 
-## Frontend Target Structure
+## Frontend Current Structure
 
 ```text
 frontend/src/
-  app/
-    App.solid.tsx
-    routes.ts
-    providers.solid.tsx
+  App.solid.tsx
+  main.solid.tsx
   audio/
-    nativeAudioBridge.ts
+    TimelineMidiPlayback.solid.tsx
+    audioImport.ts
+    synthPreview.ts
     timelineAudio.ts
     analyzerClient.ts
+    transportActions.ts
   solid-ui/
+    ActionFooter/
+    AppDialog/
     Button/
     Block/
+    ContextMenu/
     DitheredImage/
+    FloatingSelect/
+    HoverInfo/
+    Icon/
     Knob/
     Modal/
     NumberInput/
+    RowItem/
+    SectionRibbon/
+    Tag/
+    TextInput/
     Toggle/
     ...
   design/
+    README.md
+    SolidUiKitCatalog.solid.tsx
     tokens.css
     layout.css
     surfaces.css
     forms.css
     typography.css
   features/
-    Daw/
-      EditorHost/
-      Timeline/
-      Tracks/
-      Transport/
-      Sidebar/
+    EditorHost/
+    Tracks/
+    TopBar/
+    Sidebar/
+    HomeHub/
+    InstrumentLibrary/
+    AudioFiles/
+    ComponentLibrary/
+    PluginLibrary/
+    NodeInstrumentEditor/
+    DrumEditor/
+    MidiEditor/
+    SegmentEditor/
+    TrackDetails/
+    TrackEffects/
+    Eq/
+    EqAutomation/
     Synth/
       SynthEditor/
       OscillatorPanel/
-      WavetableView/
-      FilterPanel/
+      AnalyzerPanel/
       ModulationMatrix/
-      EnvelopeEditor/
-      LfoEditor/
-      MacroPanel/
-      EffectsRack/
-      PresetBrowser/
-    Mixer/
-      TrackEffects/
-      Eq/
-      EqAutomation/
-      Meters/
-    Library/
-      InstrumentLibrary/
-      AudioFiles/
     Preferences/
+    ProjectHealth/
+    Startup/
     Training/
+    Transport/
+    Visualizer/
   hotkeys/
     hotkeys.ts
-    keymap.ts
+    contextualHotkeys.ts
   ipc/
     schema.ts
-    client.ts
-    events.ts
+    bridge.ts
   persistence/
-    projectStorage.ts
-    patchStorage.ts
+    beatDocument.ts
+    documentActions.ts
+    dexie.ts
+  solid-utils/
+    contextualHotkeys.solid.ts
+    store.ts
   state/
-    projectStore.ts
-    transportStore.ts
+    store.ts
+    types.ts
     synthStore.ts
     analyzerStore.ts
 ```
 
 ### Frontend Ownership Notes
 
-- `components` contains reusable UI primitives only. It should not know about tracks, synths, clips, or transport.
-- `features/Daw` owns arrangement, timeline, tracks, transport, and editor shell.
+- `solid-ui` contains reusable UI primitives only. It should not know about tracks, synths, clips, or transport.
+- `App.solid.tsx` owns the current app shell, hydration, native event wiring, startup readiness, and global hosts.
+- `features/Tracks`, `features/TopBar`, `features/Sidebar`, and `features/EditorHost` own arrangement, timeline, tracks, transport surface, rail content, and modal/editor dispatch.
 - `features/Synth` owns sound-design UI.
-- `features/Mixer` owns mixing, effects, EQ, meters, and automation surfaces.
-- `features/Library` owns browsing/importing assets and instruments.
+- `features/TrackEffects`, `features/Eq`, and `features/EqAutomation` own mixing, effects, EQ, meters, and automation surfaces.
+- `features/InstrumentLibrary`, `features/AudioFiles`, `features/ComponentLibrary`, `features/PluginLibrary`, and `features/HomeHub` own browsing/importing assets and instruments.
 - `ipc` owns native bridge schemas and event translation.
 - `state` owns app-wide stores. Feature-local state should stay inside the feature unless shared globally.
 - `audio` owns browser/native audio helper code, not UI components.
@@ -224,7 +242,7 @@ Move existing files only when there is a functional reason:
 - Move `Sequencer.*` when transport/sequencing changes are already being touched.
 - Move `InstrumentVoice.*` when voice architecture is being upgraded.
 - Move `FftAnalyzer.*` when analyzer IPC/UI integration begins.
-- Move transport UI under `features/Daw` only after the native transport path stays stable.
+- Keep transport UI in the current Solid feature folders unless a functional change justifies a focused extraction.
 
 ### Phase 4: Enforce Boundaries
 
@@ -259,7 +277,9 @@ Avoids:
 Owns:
 
 - `frontend/src/features/Synth`
-- `frontend/src/features/Mixer`
+- `frontend/src/features/TrackEffects`
+- `frontend/src/features/Eq`
+- `frontend/src/features/EqAutomation`
 - `frontend/src/state`
 - `frontend/src/ipc`
 - `frontend/src/audio/analyzerClient.ts`
