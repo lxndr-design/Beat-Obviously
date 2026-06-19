@@ -110,6 +110,7 @@ export function renderInstrumentSamples(
   targetFrequency?: number,
   curve?: Array<{ timeS: number; frequency: number }>,
   automation?: SynthAutomationLane[],
+  bpm = 120,
 ) {
   const state = createSynthRenderState();
   const durationS = out.length / sampleRate;
@@ -129,7 +130,7 @@ export function renderInstrumentSamples(
       : shouldGlide
         ? frequency + (targetFrequency - frequency) * smoothstep(glideT)
         : frequency;
-    const modulation = modulationAtTime(instrument, t, durationS);
+    const modulation = modulationAtTime(instrument, t, durationS, bpm);
     applyAutomationOffsets(instrument, modulation, automation, t);
     const currentFrequency = baseFrequency * Math.pow(2, modulation.pitchSemitones / 12);
     out[i] = renderInstrumentSample(instrument, state, sampleRate, currentFrequency, mode, modulation) * amp;
@@ -147,11 +148,12 @@ export function renderInstrumentStereoSamples(
   targetFrequency?: number,
   curve?: Array<{ timeS: number; frequency: number }>,
   automation?: SynthAutomationLane[],
+  bpm = 120,
 ) {
   const length = Math.min(left.length, right.length);
   if (!instrument.aether) {
     const mono = new Float32Array(length);
-    renderInstrumentSamples(instrument, mono, sampleRate, frequency, mode, fade, targetFrequency, curve, automation);
+    renderInstrumentSamples(instrument, mono, sampleRate, frequency, mode, fade, targetFrequency, curve, automation, bpm);
     const [leftGain, rightGain] = panGains(instrument.ampPan ?? 0);
     for (let i = 0; i < length; i++) {
       left[i] = mono[i] * leftGain;
@@ -180,7 +182,7 @@ export function renderInstrumentStereoSamples(
       : shouldGlide
         ? frequency + (targetFrequency - frequency) * smoothstep(glideT)
         : frequency;
-    const modulation = modulationAtTime(instrument, timeS, durationS);
+    const modulation = modulationAtTime(instrument, timeS, durationS, bpm);
     applyAutomationOffsets(instrument, modulation, automation, timeS);
     const currentFrequency = baseFrequency * Math.pow(2, modulation.pitchSemitones / 12);
     const stereo = renderInstrumentStereoSample(instrument, phaseState, leftFilterState, rightFilterState, sampleRate, currentFrequency, mode, modulation);
@@ -196,6 +198,7 @@ export function createInstrumentBufferSource(
   frequency: number,
   targetFrequency?: number,
   velocity = 127,
+  bpm = 120,
 ): AudioBufferSourceNode {
   const shouldGlide = targetFrequency != null && Number.isFinite(targetFrequency) && Math.abs(targetFrequency - frequency) > 0.01;
   const sampleTarget = nextSampleTarget(instrument, frequency, velocity, durationS);
@@ -220,7 +223,7 @@ export function createInstrumentBufferSource(
     return source;
   }
 
-  const buffer = renderedInstrumentBuffer(ctx, instrument, durationS, frequency, targetFrequency);
+  const buffer = renderedInstrumentBuffer(ctx, instrument, durationS, frequency, targetFrequency, bpm);
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   return source;
@@ -254,9 +257,10 @@ export function renderedInstrumentBuffer(
   durationS: number,
   frequency: number,
   targetFrequency?: number,
+  bpm = 120,
 ): AudioBuffer {
   const sampleCount = Math.max(1, Math.ceil(ctx.sampleRate * durationS));
-  const key = renderedInstrumentBufferKey(instrument, sampleCount, ctx.sampleRate, frequency, targetFrequency);
+  const key = renderedInstrumentBufferKey(instrument, sampleCount, ctx.sampleRate, frequency, targetFrequency, bpm);
   const cached = renderedInstrumentBufferCache.get(key);
   if (cached) return cached;
 
@@ -270,6 +274,9 @@ export function renderedInstrumentBuffer(
     "audio",
     true,
     targetFrequency,
+    undefined,
+    undefined,
+    bpm,
   );
   renderedInstrumentBufferCache.set(key, buffer);
   while (renderedInstrumentBufferCache.size > MAX_RENDERED_INSTRUMENT_BUFFERS) {
@@ -341,6 +348,7 @@ export function createInstrumentCurveBufferSource(
   curve: Array<{ timeS: number; frequency: number }>,
   atTimeS = ctx.currentTime,
   automation?: SynthAutomationLane[],
+  bpm = 120,
 ): AudioBufferSourceNode {
   const sorted = normalizeFrequencyCurve(curve, durationS, frequency);
   const sampleTarget = nextSampleTarget(instrument, frequency, 127, durationS);
@@ -376,6 +384,7 @@ export function createInstrumentCurveBufferSource(
     undefined,
     sorted.length > 1 ? sorted : undefined,
     automation,
+    bpm,
   );
   const source = ctx.createBufferSource();
   source.buffer = buffer;
@@ -511,10 +520,12 @@ function renderedInstrumentBufferKey(
   sampleRate: number,
   frequency: number,
   targetFrequency?: number,
+  bpm = 120,
 ): string {
   return JSON.stringify({
     sampleCount,
     sampleRate,
+    bpm: quantizeKeyNumber(bpm, 0.01),
     frequency: quantizeKeyNumber(frequency, 0.01),
     targetFrequency: targetFrequency == null ? null : quantizeKeyNumber(targetFrequency, 0.01),
     patch: renderRelevantInstrumentState(instrument),
@@ -588,10 +599,13 @@ function renderRelevantInstrumentState(instrument: Instrument) {
     aether: instrument.aether,
     lfoWaveform: instrument.lfoWaveform,
     lfoRateHz: instrument.lfoRateHz,
+    lfoSyncedRate: instrument.lfoSyncedRate,
     lfoPhase: instrument.lfoPhase,
     lfoOneShot: instrument.lfoOneShot,
     lfo2Waveform: instrument.lfo2Waveform,
     lfo2RateHz: instrument.lfo2RateHz,
+    lfo2Sync: instrument.lfo2Sync,
+    lfo2SyncedRate: instrument.lfo2SyncedRate,
     lfo2Enabled: instrument.lfo2Enabled,
     lfo2Phase: instrument.lfo2Phase,
     lfo2OneShot: instrument.lfo2OneShot,
@@ -1292,17 +1306,51 @@ function baseAutomationValue(instrument: Instrument, target: RuntimeModulationTa
   }
 }
 
-export function modulationAtTime(instrument: Instrument, timeS: number, durationS: number): RenderModulation {
+function syncedLfoDivisionBeats(value: unknown): number {
+  const raw = typeof value === "string" ? value.trim() : "";
+  const dotted = raw.endsWith("d");
+  const triplet = raw.endsWith("t");
+  const core = dotted || triplet ? raw.slice(0, -1) : raw;
+  const match = core.match(/^(\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/);
+  if (!match) return 1;
+  const numerator = Number(match[1]);
+  const denominator = Number(match[2]);
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || numerator <= 0 || denominator <= 0) return 1;
+  let beats = (numerator / denominator) * 4;
+  if (dotted) beats *= 1.5;
+  if (triplet) beats *= 2 / 3;
+  return clamp(beats, 1 / 64, 64);
+}
+
+function syncedLfoRateHz(rate: unknown, bpm: number): number {
+  const safeBpm = Math.max(1, Number.isFinite(bpm) ? bpm : 120);
+  return clamp((safeBpm / 60) / syncedLfoDivisionBeats(rate), 0.01, 50);
+}
+
+function effectiveLfoRateHz(instrument: Instrument, lfo: 1 | 2, bpm: number): number {
+  const params = instrument.synthPatch?.parameters;
+  if (lfo === 1) {
+    const sync = params?.["lfo.1.sync"] === true || instrument.lfoSync === true;
+    if (sync) return syncedLfoRateHz(params?.["lfo.1.syncedRate"] ?? instrument.lfoSyncedRate ?? "1/4", bpm);
+    return Math.max(0.01, instrument.lfoRateHz ?? 4);
+  }
+
+  const sync = params?.["lfo.2.sync"] === true || instrument.lfo2Sync === true;
+  if (sync) return syncedLfoRateHz(params?.["lfo.2.syncedRate"] ?? instrument.lfo2SyncedRate ?? "1/2", bpm);
+  return Math.max(0.01, instrument.lfo2RateHz ?? 0.5);
+}
+
+export function modulationAtTime(instrument: Instrument, timeS: number, durationS: number, bpm = 120): RenderModulation {
   const lfo1OneShot = instrument.synthPatch?.parameters?.["lfo.1.oneShot"] === true || instrument.lfoOneShot === true;
   const lfo2OneShot = instrument.synthPatch?.parameters?.["lfo.2.oneShot"] === true || instrument.lfo2OneShot === true;
   const rawLfo = lfoShapeValue(
     instrument.lfoWaveform ?? "sine",
-    timeS * Math.max(0.01, instrument.lfoRateHz ?? 4) + (instrument.lfoPhase ?? 0),
+    timeS * effectiveLfoRateHz(instrument, 1, bpm) + (instrument.lfoPhase ?? 0),
     lfo1OneShot,
   );
   const rawLfo2 = lfoShapeValue(
     instrument.lfo2Waveform ?? "triangle",
-    timeS * Math.max(0.01, instrument.lfo2RateHz ?? 0.5) + (instrument.lfo2Phase ?? 0),
+    timeS * effectiveLfoRateHz(instrument, 2, bpm) + (instrument.lfo2Phase ?? 0),
     lfo2OneShot,
   );
   const env = envelopePreviewValue(timeS, durationS, instrument);

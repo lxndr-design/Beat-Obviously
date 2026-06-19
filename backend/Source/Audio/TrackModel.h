@@ -253,12 +253,16 @@ namespace beat
         int lfoWaveform { 0 };
         float lfoRateHz { 4.0f };
         float lfoDepth { 0.0f };
+        bool lfoSync { false };
+        juce::String lfoSyncedRate { "1/4" };
         float lfoPhaseOffset { 0.0f };
         bool lfoRetrigger { true };
         bool lfoOneShot { false };
         bool lfo2Enabled { false };
         int lfo2Waveform { 1 };
         float lfo2RateHz { 0.5f };
+        bool lfo2Sync { false };
+        juce::String lfo2SyncedRate { "1/2" };
         float lfo2PhaseOffset { 0.0f };
         bool lfo2Retrigger { true };
         bool lfo2OneShot { false };

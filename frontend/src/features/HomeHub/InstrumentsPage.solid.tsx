@@ -11,7 +11,7 @@ import {
 } from "../../audio/synthPreview";
 import { isNative, send } from "../../ipc/bridge";
 import type { AudioRenderAnalysis, AudioWaveformSummary } from "../../ipc/schema";
-import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore } from "../../state/store";
+import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, useProjectStore } from "../../state/store";
 import type { Instrument, InstrumentSet } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { AssetPageShell, AssetStateMessage } from "./AssetPageShell.solid";
@@ -42,6 +42,7 @@ export function InstrumentsPage() {
   const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
   const sets = createStoreSelector(useInstrumentStore, (state) => state.instrumentSets);
   const loading = createStoreSelector(useInstrumentStore, (state) => state.loading);
+  const projectBpm = createStoreSelector(useProjectStore, (state) => state.project.bpm);
   const [activeId, setActiveId] = createSignal<string | null>(null);
   const [playingId, setPlayingId] = createSignal<string | null>(null);
   const [loopPreview, setLoopPreview] = createSignal(false);
@@ -121,6 +122,7 @@ export function InstrumentsPage() {
       instrument,
       note: 60,
       velocity: 112,
+      bpm: projectBpm(),
       durationBeats: 2,
       bucketCount: 128,
       includeAudio: isSustainedPreview(instrument),
@@ -129,7 +131,7 @@ export function InstrumentsPage() {
         if (requestRef.current !== requestId) return;
         const fallbackWaveform = response.waveform && response.waveform.left.upper.length > 0
           ? null
-          : synthFallbackWaveform(previewContextRef, instrument);
+          : synthFallbackWaveform(previewContextRef, instrument, projectBpm());
         setRenderState({
           waveform: response.waveform && response.waveform.left.upper.length > 0 ? response.waveform : fallbackWaveform,
           analysis: response.analysis ?? null,
@@ -253,7 +255,7 @@ export function InstrumentsPage() {
       sampleCursorRef.current.set(instrument.id, (index + 1) % sampleUrls.length);
       source = createInstrumentSampleBufferSource(ctx, instrument, sampleUrl, previewFrequency(instrument), 112);
     }
-    source ??= createInstrumentBufferSource(ctx, instrument, PREVIEW_SECONDS, previewFrequency(instrument), undefined, 112);
+    source ??= createInstrumentBufferSource(ctx, instrument, PREVIEW_SECONDS, previewFrequency(instrument), undefined, 112, projectBpm());
     if (isSustained && activeInstrument()?.id === instrument.id && renderState().audioDataUrl) {
       source = await nativePreviewSource(ctx, nativePreviewBufferRef.current, instrument.id, renderState().audioDataUrl!) ?? source;
     }
@@ -1247,11 +1249,11 @@ function sliceAudioBuffer(buffer: AudioBuffer, startSample = 0, endSample = 0): 
   return sliced;
 }
 
-function synthFallbackWaveform(ref: RefValue<AudioContext | null>, instrument: Instrument): AudioWaveformSummary | null {
+function synthFallbackWaveform(ref: RefValue<AudioContext | null>, instrument: Instrument, bpm = 120): AudioWaveformSummary | null {
   if (!isSustainedPreview(instrument)) return null;
   try {
     const ctx = getPreviewContext(ref);
-    return audioBufferWaveform(renderedInstrumentBuffer(ctx, instrument, PREVIEW_SECONDS, previewFrequency(instrument)), 128);
+    return audioBufferWaveform(renderedInstrumentBuffer(ctx, instrument, PREVIEW_SECONDS, previewFrequency(instrument), undefined, bpm), 128);
   } catch {
     return null;
   }

@@ -94,7 +94,7 @@ LFO IDs use `lfo.N.*`, where `N` starts at `1`.
 | `lfo.1.enabled` | boolean | off/on | `true` | First modulation LFO. |
 | `lfo.1.rate` | hz | `0.01..50` | `1` | Used when sync is off. |
 | `lfo.1.sync` | boolean | off/on | `true` | Tempo sync enable. |
-| `lfo.1.syncedRate` | enum | note division | `1/4` | Used when sync is on. |
+| `lfo.1.syncedRate` | enum | note division | `1/4` | Used when sync is on; converted to cycles/sec from the current project BPM at render time. |
 | `lfo.1.shape` | enum | `sine`, `triangle`, `saw`, `square`, `sampleHold` | `sine` | First-pass shapes. |
 | `lfo.1.phase` | normalized | `0..1` | `0` | Start phase. |
 | `lfo.1.retrigger` | boolean | off/on | `true` | Restart phase per note when enabled. |

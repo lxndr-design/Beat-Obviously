@@ -301,7 +301,7 @@ export function DrumSequencer(props: Props) {
 
   function playInstrument(instrument: Instrument, frequencyHz: number, velocity = DEFAULT_DRUM_VELOCITY, atTimeS: number, maxDuration = 0.22) {
     const ctx = getCtx();
-    const source = createInstrumentBufferSource(ctx, instrument, 0.2, frequencyHz, undefined, velocity);
+    const source = createInstrumentBufferSource(ctx, instrument, 0.2, frequencyHz, undefined, velocity, props.bpm);
     const duration = source.buffer
       ? Math.max(0.05, Math.min(1.5, maxDuration, source.buffer.duration / source.playbackRate.value))
       : maxDuration;

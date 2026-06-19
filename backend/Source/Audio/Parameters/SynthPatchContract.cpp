@@ -359,12 +359,16 @@ namespace beat
             + staticRouteAmount(params, modulation, "amp.pan"));
         instrument.lfoWaveform = parseSynthLfoWaveform(synthStringParam(params, "lfo.1.shape", "sine"));
         instrument.lfoRateHz = juce::jlimit(0.01f, 50.0f, (float) synthNumberParam(params, "lfo.1.rate", instrument.lfoRateHz));
+        instrument.lfoSync = synthNumberParam(params, "lfo.1.sync", instrument.lfoSync ? 1.0 : 0.0) >= 0.5;
+        instrument.lfoSyncedRate = synthStringParam(params, "lfo.1.syncedRate", instrument.lfoSyncedRate);
         instrument.lfoPhaseOffset = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "lfo.1.phase", instrument.lfoPhaseOffset));
         instrument.lfoRetrigger = synthNumberParam(params, "lfo.1.retrigger", instrument.lfoRetrigger ? 1.0 : 0.0) >= 0.5;
         instrument.lfoOneShot = synthNumberParam(params, "lfo.1.oneShot", instrument.lfoOneShot ? 1.0 : 0.0) >= 0.5;
         instrument.lfo2Enabled = synthNumberParam(params, "lfo.2.enabled", instrument.lfo2Enabled ? 1.0 : 0.0) >= 0.5;
         instrument.lfo2Waveform = parseSynthLfoWaveform(synthStringParam(params, "lfo.2.shape", "triangle"));
         instrument.lfo2RateHz = juce::jlimit(0.01f, 50.0f, (float) synthNumberParam(params, "lfo.2.rate", instrument.lfo2RateHz));
+        instrument.lfo2Sync = synthNumberParam(params, "lfo.2.sync", instrument.lfo2Sync ? 1.0 : 0.0) >= 0.5;
+        instrument.lfo2SyncedRate = synthStringParam(params, "lfo.2.syncedRate", instrument.lfo2SyncedRate);
         instrument.lfo2PhaseOffset = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "lfo.2.phase", instrument.lfo2PhaseOffset));
         instrument.lfo2Retrigger = synthNumberParam(params, "lfo.2.retrigger", instrument.lfo2Retrigger ? 1.0 : 0.0) >= 0.5;
         instrument.lfo2OneShot = synthNumberParam(params, "lfo.2.oneShot", instrument.lfo2OneShot ? 1.0 : 0.0) >= 0.5;

@@ -694,11 +694,14 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     lfoRateHz: getNumberParam(draft, "lfo.1.rate"),
     lfoDepth: lfoEnabled ? Math.abs(clampBipolar(routeAmount(draft, "lfo.1", "osc.a.position"))) : 0,
     lfoSync: draft.parameters["lfo.1.sync"] === true,
+    lfoSyncedRate: String(draft.parameters["lfo.1.syncedRate"] ?? "1/4"),
     lfoPhase: getNumberParam(draft, "lfo.1.phase"),
     lfoRetrigger: getBooleanParam(draft, "lfo.1.retrigger"),
     lfoOneShot: getBooleanParam(draft, "lfo.1.oneShot"),
     lfo2Waveform: lfoWaveformFromDraft(draft, 2),
     lfo2RateHz: getNumberParam(draft, "lfo.2.rate"),
+    lfo2Sync: draft.parameters["lfo.2.sync"] === true,
+    lfo2SyncedRate: String(draft.parameters["lfo.2.syncedRate"] ?? "1/2"),
     lfo2Enabled: getBooleanParam(draft, "lfo.2.enabled"),
     lfo2Phase: getNumberParam(draft, "lfo.2.phase"),
     lfo2Retrigger: getBooleanParam(draft, "lfo.2.retrigger"),
@@ -761,7 +764,10 @@ export function synthDraftToPreviewInstrument(draft: SynthDraftPatch): Instrumen
     lfoRateHz: 1,
     lfoDepth: 0,
     lfoSync: false,
+    lfoSyncedRate: "1/4",
     lfoRetrigger: true,
+    lfo2Sync: false,
+    lfo2SyncedRate: "1/2",
     lfoPositionBipolar: true,
     lfoPitchBipolar: true,
     lfoFilterBipolar: true,
@@ -795,13 +801,15 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["env.1.release"] = instrument.envelope.releaseMs / 1000;
   draft.parameters["lfo.1.rate"] = instrument.lfoRateHz ?? 1;
   draft.parameters["lfo.1.sync"] = instrument.lfoSync ?? false;
+  draft.parameters["lfo.1.syncedRate"] = instrument.lfoSyncedRate ?? "1/4";
   draft.parameters["lfo.1.shape"] = instrument.lfoWaveform ?? "sine";
   draft.parameters["lfo.1.phase"] = instrument.lfoPhase ?? 0;
   draft.parameters["lfo.1.retrigger"] = instrument.lfoRetrigger ?? true;
   draft.parameters["lfo.1.oneShot"] = instrument.lfoOneShot ?? false;
   draft.parameters["lfo.2.enabled"] = instrument.lfo2Enabled ?? false;
   draft.parameters["lfo.2.rate"] = instrument.lfo2RateHz ?? 0.5;
-  draft.parameters["lfo.2.sync"] = false;
+  draft.parameters["lfo.2.sync"] = instrument.lfo2Sync ?? false;
+  draft.parameters["lfo.2.syncedRate"] = instrument.lfo2SyncedRate ?? "1/2";
   draft.parameters["lfo.2.shape"] = instrument.lfo2Waveform ?? "triangle";
   draft.parameters["lfo.2.phase"] = instrument.lfo2Phase ?? 0;
   draft.parameters["lfo.2.retrigger"] = instrument.lfo2Retrigger ?? true;

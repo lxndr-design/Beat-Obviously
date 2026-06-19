@@ -13,6 +13,7 @@ import {
   type SynthRenderState,
 } from "../../audio/synthPreview";
 import { useContextualHotkeyStore } from "../../hotkeys/contextualHotkeys";
+import { useProjectStore } from "../../state/store";
 import type { Instrument } from "../../state/types";
 import styles from "./InstrumentWaveformPreview.module.css";
 
@@ -206,13 +207,14 @@ function InstrumentWaveformPreviewRuntime(props: { state: Accessor<InstrumentWav
     stopLoop();
     const ctx = getAudioContext();
     const instrument = props.state().instrument;
+    const bpm = useProjectStore.getState().project.bpm;
     if (ctx.state === "suspended") void ctx.resume();
     await preloadInstrumentSample(ctx, instrument).catch(() => {
       // Synth fallback remains useful when a sample cannot be decoded.
     });
 
     const length = Math.ceil(ctx.sampleRate * PREVIEW_SECONDS);
-    const nextSource = createInstrumentBufferSource(ctx, instrument, length / ctx.sampleRate, previewFrequency(instrument));
+    const nextSource = createInstrumentBufferSource(ctx, instrument, length / ctx.sampleRate, previewFrequency(instrument), undefined, 127, bpm);
     const duration = nextSource.buffer
       ? Math.min(PREVIEW_SECONDS, Math.max(0.05, nextSource.buffer.duration / nextSource.playbackRate.value))
       : PREVIEW_SECONDS;
@@ -242,6 +244,7 @@ function InstrumentWaveformPreviewRuntime(props: { state: Accessor<InstrumentWav
 
     stopPreview();
     const ctx = getAudioContext();
+    const bpm = useProjectStore.getState().project.bpm;
     if (ctx.state === "suspended") void ctx.resume();
     await preloadInstrumentSample(ctx, latestInstrument).catch(() => {
       // Synth fallback remains useful when a sample cannot be decoded.
@@ -254,6 +257,9 @@ function InstrumentWaveformPreviewRuntime(props: { state: Accessor<InstrumentWav
         sampleInstrument,
         PREVIEW_SECONDS,
         previewFrequency(sampleInstrument),
+        undefined,
+        127,
+        bpm,
       );
       const duration = nextSource.buffer
         ? Math.min(PREVIEW_SECONDS, Math.max(0.05, nextSource.buffer.duration / nextSource.playbackRate.value))
@@ -284,7 +290,7 @@ function InstrumentWaveformPreviewRuntime(props: { state: Accessor<InstrumentWav
           ctx.sampleRate,
           previewFrequency(latestInstrument),
           "audio",
-          modulationAtTime(latestInstrument, (loopState.index / ctx.sampleRate) % PREVIEW_SECONDS, PREVIEW_SECONDS),
+          modulationAtTime(latestInstrument, (loopState.index / ctx.sampleRate) % PREVIEW_SECONDS, PREVIEW_SECONDS, bpm),
         );
       }
     };

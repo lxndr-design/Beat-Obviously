@@ -8809,12 +8809,16 @@ namespace
             "lfo.1.enabled": true,
             "lfo.1.shape": "square",
             "lfo.1.rate": 6.5,
+            "lfo.1.sync": true,
+            "lfo.1.syncedRate": "1/8",
             "lfo.1.phase": 0.25,
             "lfo.1.retrigger": false,
             "lfo.1.oneShot": true,
             "lfo.2.enabled": true,
             "lfo.2.shape": "triangle",
             "lfo.2.rate": 0.75,
+            "lfo.2.sync": true,
+            "lfo.2.syncedRate": "1/2",
             "lfo.2.phase": 0.5,
             "lfo.2.retrigger": true,
             "lfo.2.oneShot": false
@@ -8888,11 +8892,15 @@ namespace
             return false;
         if (instrument.lfoWaveform != 3 || !near(instrument.lfoRateHz, 6.5f) || !near(instrument.lfoPhaseOffset, 0.25f))
             return false;
+        if (!instrument.lfoSync || instrument.lfoSyncedRate != "1/8")
+            return false;
         if (instrument.lfoRetrigger)
             return false;
         if (!instrument.lfoOneShot)
             return false;
         if (!instrument.lfo2Enabled || instrument.lfo2Waveform != 1 || !near(instrument.lfo2RateHz, 0.75f) || !near(instrument.lfo2PhaseOffset, 0.5f))
+            return false;
+        if (!instrument.lfo2Sync || instrument.lfo2SyncedRate != "1/2")
             return false;
         if (!instrument.lfo2Retrigger)
             return false;

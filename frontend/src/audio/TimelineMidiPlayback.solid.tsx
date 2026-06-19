@@ -131,6 +131,8 @@ export function TimelineMidiPlayback() {
                   instrument,
                   audio.currentTime + delayS,
                   Math.max(0.05, Math.min(0.18, stepLengthBeats / beatsPerSecond)),
+                  undefined,
+                  bpm,
                 );
                 scheduled.add(key);
                 trackPeak = Math.max(trackPeak, velocity / 127);
@@ -162,6 +164,7 @@ export function TimelineMidiPlayback() {
               audio.currentTime + delayS,
               durationS,
               target ? transposeNote(target, transpose) : undefined,
+              bpm,
             );
             scheduled.add(key);
             trackPeak = Math.max(trackPeak, noteWithGain.velocity / 127);

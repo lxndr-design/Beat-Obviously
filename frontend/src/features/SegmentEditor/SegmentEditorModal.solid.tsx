@@ -244,7 +244,15 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
     gain.connect(ctx.destination);
 
     const synth = instrument ?? fallbackInstrument;
-    const sourceNode = createInstrumentBufferSource(ctx, synth, 0.24, noteFrequency(Math.max(0, Math.min(127, pitch + (currentDraft.transpose ?? 0))), synth));
+    const sourceNode = createInstrumentBufferSource(
+      ctx,
+      synth,
+      0.24,
+      noteFrequency(Math.max(0, Math.min(127, pitch + (currentDraft.transpose ?? 0))), synth),
+      undefined,
+      127,
+      bpm(),
+    );
     sourceNode.connect(gain);
     sourceNode.start(now);
     sourceNode.stop(now + 0.24);

@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "soli
 import { Button, HoverInfo, Icon, RowItem, SectionRibbon, SectionRibbonActionButton, Tag, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { appConfirm } from "../../solid-ui";
 import { createInstrumentBufferSource, preloadInstrumentSample, previewFrequency } from "../../audio/synthPreview";
-import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useUiStore } from "../../state/store";
+import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useProjectStore, useUiStore } from "../../state/store";
 import { instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
 import {
   FACTORY_SYNTH_PRESETS,
@@ -687,7 +687,7 @@ async function playInstrumentPreview(instrument: Instrument, onDone: () => void,
   if (!shouldContinue()) return;
 
   const now = ctx.currentTime;
-  const source = createInstrumentBufferSource(ctx, instrument, PREVIEW_SECONDS, previewFrequency(instrument));
+  const source = createInstrumentBufferSource(ctx, instrument, PREVIEW_SECONDS, previewFrequency(instrument), undefined, 127, useProjectStore.getState().project.bpm);
   const duration = source.buffer
     ? Math.min(PREVIEW_SECONDS, Math.max(0.05, source.buffer.duration / source.playbackRate.value))
     : PREVIEW_SECONDS;

@@ -150,6 +150,7 @@ export interface ComponentPlayback {
   sources: Set<AudioBufferSourceNode>;
   gains: Set<GainNode>;
   timers: number[];
+  bpm: number;
   onDone: () => void;
   doneTimer: number;
 }
@@ -170,6 +171,7 @@ export function playComponentPreview(
     sources: new Set(),
     gains: new Set(),
     timers: [],
+    bpm,
     onDone,
     doneTimer: 0,
   };
@@ -247,7 +249,7 @@ function schedulePreviewNote(
   durationS: number,
   velocity: number,
 ) {
-  const source = createInstrumentBufferSource(playback.ctx, instrument, durationS + 0.05, frequencyHz, undefined, velocity);
+  const source = createInstrumentBufferSource(playback.ctx, instrument, durationS + 0.05, frequencyHz, undefined, velocity, playback.bpm);
   const playbackDuration = source.buffer
     ? Math.max(durationS, Math.min(1.5, source.buffer.duration / source.playbackRate.value))
     : durationS;

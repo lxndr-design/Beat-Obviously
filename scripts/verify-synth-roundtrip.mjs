@@ -70,14 +70,16 @@ try {
       "env.1.release": 0.78,
       "lfo.1.enabled": true,
       "lfo.1.rate": 4.5,
-      "lfo.1.sync": false,
+      "lfo.1.sync": true,
+      "lfo.1.syncedRate": "1/8",
       "lfo.1.shape": "triangle",
       "lfo.1.phase": 0.25,
       "lfo.1.retrigger": false,
       "lfo.1.oneShot": true,
       "lfo.2.enabled": true,
       "lfo.2.rate": 0.75,
-      "lfo.2.sync": false,
+      "lfo.2.sync": true,
+      "lfo.2.syncedRate": "1/2",
       "lfo.2.shape": "square",
       "lfo.2.phase": 0.5,
       "lfo.2.retrigger": true,
@@ -161,6 +163,10 @@ try {
   assert.equal(patch.lfo2Waveform, "square");
   assert.equal(patch.lfo2RateHz, 0.75);
   assert.equal(patch.lfo2Enabled, true);
+  assert.equal(patch.lfoSync, true);
+  assert.equal(patch.lfoSyncedRate, "1/8");
+  assert.equal(patch.lfo2Sync, true);
+  assert.equal(patch.lfo2SyncedRate, "1/2");
   assert.equal(patch.lfoPhase, 0.25);
   assert.equal(patch.lfo2Phase, 0.5);
   assert.equal(patch.lfoRetrigger, false);
@@ -455,6 +461,7 @@ try {
       "amp.level": 0.7,
       "lfo.1.enabled": true,
       "lfo.1.rate": 1,
+      "lfo.1.sync": false,
       "lfo.1.shape": "sine",
     },
     modulation: [
@@ -498,6 +505,41 @@ try {
   }
   const dynamicDiffRms = Math.sqrt(dynamicDiff / dynamicSamples.length);
   assert.ok(dynamicDiffRms > 0.001, `expected expanded modulation routes to alter render, got diff ${dynamicDiffRms}`);
+
+  const syncedLfoDraft = synthStore.normalizeSynthDraftPatch({
+    name: "Synced LFO Probe",
+    parameters: {
+      "osc.a.enabled": true,
+      "osc.a.wavetable": "basic.sine",
+      "osc.a.level": 0.6,
+      "osc.b.enabled": true,
+      "osc.b.wavetable": "basic.sine",
+      "osc.b.level": 0.6,
+      "lfo.1.enabled": true,
+      "lfo.1.sync": true,
+      "lfo.1.syncedRate": "1/4",
+      "lfo.1.rate": 2,
+      "lfo.1.shape": "sine",
+    },
+    modulation: [
+      { id: "sync_position", source: "lfo.1", target: "osc.b.position", amount: 0.5, bipolar: true, enabled: true },
+    ],
+  });
+  const syncedPreview = synthStore.synthDraftToPreviewInstrument(syncedLfoDraft);
+  const fastTempo = synthPreview.modulationAtTime(syncedPreview, 0.125, 1, 120).targetOffsets["osc.b.position"];
+  const slowTempo = synthPreview.modulationAtTime(syncedPreview, 0.125, 1, 60).targetOffsets["osc.b.position"];
+  assert.ok(Math.abs(fastTempo - slowTempo) > 0.05, "tempo-synced LFO should change modulation phase when BPM changes");
+  const absolutePreview = {
+    ...syncedPreview,
+    lfoSync: false,
+    synthPatch: {
+      ...syncedPreview.synthPatch,
+      parameters: { ...syncedPreview.synthPatch.parameters, "lfo.1.sync": false },
+    },
+  };
+  const absoluteFast = synthPreview.modulationAtTime(absolutePreview, 0.125, 1, 120).targetOffsets["osc.b.position"];
+  const absoluteSlow = synthPreview.modulationAtTime(absolutePreview, 0.125, 1, 60).targetOffsets["osc.b.position"];
+  assert.ok(Math.abs(absoluteFast - absoluteSlow) < 0.000001, "absolute-rate LFO should not change modulation phase when BPM changes");
 
   globalThis.fetch = async () => {
     throw new Error("force local instrument generation fallback");

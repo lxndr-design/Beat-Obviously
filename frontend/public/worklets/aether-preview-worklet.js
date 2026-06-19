@@ -7,6 +7,7 @@ class AetherPreviewProcessor extends AudioWorkletProcessor {
     this.frequency = Math.max(20, Math.min(20000, Number(input.frequency) || 261.625565));
     this.targetFrequency = Number.isFinite(input.targetFrequency) ? Math.max(20, Math.min(20000, Number(input.targetFrequency))) : null;
     this.velocityGain = Math.max(0, Math.min(1.5, (Number(input.velocity) || 127) / 127));
+    this.bpm = Math.max(1, Math.min(999, Number(input.bpm) || 120));
     this.curve = normalizeFrequencyCurve(input.curve, this.durationS, this.frequency);
     this.automation = normalizeAutomation(input.automation);
     this.startFrame = Number.isFinite(input.startTimeS)
@@ -45,7 +46,7 @@ class AetherPreviewProcessor extends AudioWorkletProcessor {
       }
 
       const timeS = this.sampleIndex / sampleRate;
-      const modulation = modulationAtTime(this.instrument, timeS, durationS);
+      const modulation = modulationAtTime(this.instrument, timeS, durationS, this.bpm);
       applyAutomationOffsets(this.instrument, modulation, this.automation, timeS);
       const baseFrequency = this.curve.length > 1
         ? frequencyAtCurveTime(this.curve, timeS)
@@ -323,15 +324,30 @@ function resonantFilter(input, filter, cutoff, resonance, type) {
   return clamp(filter.low + filter.band * resonance * 1.6, -1.2, 1.2);
 }
 
-function modulationAtTime(instrument, timeS, durationS) {
-  const rawLfo = lfoShape(instrument.lfoWaveform || "sine", timeS * Math.max(0.01, instrument.lfoRateHz || 4));
+function modulationAtTime(instrument, timeS, durationS, bpm = 120) {
+  const rawLfo = lfoShape(
+    instrument.lfoWaveform || "sine",
+    timeS * effectiveLfoRateHz(instrument, 1, bpm) + (Number(instrument.lfoPhase) || 0),
+    instrument.synthPatch?.parameters?.["lfo.1.oneShot"] === true || instrument.lfoOneShot === true,
+  );
+  const rawLfo2 = lfoShape(
+    instrument.lfo2Waveform || "triangle",
+    timeS * effectiveLfoRateHz(instrument, 2, bpm) + (Number(instrument.lfo2Phase) || 0),
+    instrument.synthPatch?.parameters?.["lfo.2.oneShot"] === true || instrument.lfo2OneShot === true,
+  );
   const env = envelopeValue(timeS, durationS, instrument);
   const offsets = {};
   const routes = instrument.synthPatch?.modulation;
   if (Array.isArray(routes)) {
     for (const route of routes) {
       if (route.enabled === false || !route.target || !route.amount) continue;
-      const source = route.source === "env.1" ? (route.bipolar ? env * 2 - 1 : env) : route.source === "lfo.1" ? lfoRoute(rawLfo, route.bipolar !== false) : null;
+      const source = route.source === "env.1"
+        ? (route.bipolar ? env * 2 - 1 : env)
+        : route.source === "lfo.1"
+          ? lfoRoute(rawLfo, route.bipolar !== false)
+          : route.source === "lfo.2"
+            ? lfoRoute(rawLfo2, route.bipolar !== false)
+            : null;
       if (source == null) continue;
       offsets[route.target] = (offsets[route.target] || 0) + source * clamp(route.amount, -1, 1) * targetScale(route.target);
     }
@@ -424,8 +440,42 @@ function targetScale(target) {
   return 1;
 }
 
-function lfoShape(shape, cycles) {
-  const phase = cycles - Math.floor(cycles);
+function syncedLfoDivisionBeats(value) {
+  const raw = typeof value === "string" ? value.trim() : "";
+  const dotted = raw.endsWith("d");
+  const triplet = raw.endsWith("t");
+  const core = dotted || triplet ? raw.slice(0, -1) : raw;
+  const match = core.match(/^(\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/);
+  if (!match) return 1;
+  const numerator = Number(match[1]);
+  const denominator = Number(match[2]);
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || numerator <= 0 || denominator <= 0) return 1;
+  let beats = (numerator / denominator) * 4;
+  if (dotted) beats *= 1.5;
+  if (triplet) beats *= 2 / 3;
+  return clamp(beats, 1 / 64, 64);
+}
+
+function syncedLfoRateHz(value, bpm) {
+  const safeBpm = Math.max(1, Number.isFinite(bpm) ? bpm : 120);
+  return clamp((safeBpm / 60) / syncedLfoDivisionBeats(value), 0.01, 50);
+}
+
+function effectiveLfoRateHz(instrument, lfo, bpm) {
+  const params = instrument.synthPatch?.parameters;
+  if (lfo === 1) {
+    const sync = params?.["lfo.1.sync"] === true || instrument.lfoSync === true;
+    if (sync) return syncedLfoRateHz(params?.["lfo.1.syncedRate"] ?? instrument.lfoSyncedRate ?? "1/4", bpm);
+    return Math.max(0.01, Number(instrument.lfoRateHz) || 4);
+  }
+
+  const sync = params?.["lfo.2.sync"] === true || instrument.lfo2Sync === true;
+  if (sync) return syncedLfoRateHz(params?.["lfo.2.syncedRate"] ?? instrument.lfo2SyncedRate ?? "1/2", bpm);
+  return Math.max(0.01, Number(instrument.lfo2RateHz) || 0.5);
+}
+
+function lfoShape(shape, cycles, oneShot = false) {
+  const phase = oneShot ? clamp(cycles, 0, 1) : cycles - Math.floor(cycles);
   switch (shape) {
     case "square": return phase < 0.5 ? 1 : -1;
     case "saw": return phase * 2 - 1;

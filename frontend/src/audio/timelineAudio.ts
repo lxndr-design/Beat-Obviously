@@ -56,6 +56,7 @@ export function scheduleTimelineMidiNote(
   atTimeS: number,
   durationS: number,
   targetNote?: MidiNote,
+  bpm = 120,
 ) {
   const audio = getTimelineAudioContext();
   if (audio.state === "suspended") void audio.resume();
@@ -80,6 +81,7 @@ export function scheduleTimelineMidiNote(
           Math.max(atTimeS, audio.currentTime + 0.001),
           durationS,
           note.velocity,
+          bpm,
         );
       })
       .catch(() => undefined);
@@ -98,6 +100,7 @@ export function scheduleTimelineMidiNote(
         targetFrequency,
         curve: curve.length > 1 ? curve : undefined,
         automation,
+        bpm,
       },
     )
       .then((worklet) => {
@@ -109,16 +112,16 @@ export function scheduleTimelineMidiNote(
           connectScheduledNode(audio, worklet.node, worklet.stop, atTimeS, playbackDuration, note.velocity);
           return;
         }
-        scheduleBufferSource(audio, instrument, baseFrequency, targetFrequency, curve, automation, atTimeS, durationS, note.velocity);
+        scheduleBufferSource(audio, instrument, baseFrequency, targetFrequency, curve, automation, atTimeS, durationS, note.velocity, bpm);
       })
       .catch(() => {
         if (scheduleToken !== stopToken) return;
-        scheduleBufferSource(audio, instrument, baseFrequency, targetFrequency, curve, automation, atTimeS, durationS, note.velocity);
+        scheduleBufferSource(audio, instrument, baseFrequency, targetFrequency, curve, automation, atTimeS, durationS, note.velocity, bpm);
       });
     return;
   }
 
-  scheduleBufferSource(audio, instrument, baseFrequency, targetFrequency, curve, automation, atTimeS, durationS, note.velocity);
+  scheduleBufferSource(audio, instrument, baseFrequency, targetFrequency, curve, automation, atTimeS, durationS, note.velocity, bpm);
 }
 
 function scheduleBufferSource(
@@ -131,10 +134,11 @@ function scheduleBufferSource(
   atTimeS: number,
   durationS: number,
   velocity: number,
+  bpm: number,
 ) {
   const source = curve.length > 1 || automation.length > 0
-    ? createInstrumentCurveBufferSource(audio, instrument, durationS + 0.05, baseFrequency, curve, atTimeS, automation)
-    : createInstrumentBufferSource(audio, instrument, durationS + 0.05, baseFrequency, targetFrequency, velocity);
+    ? createInstrumentCurveBufferSource(audio, instrument, durationS + 0.05, baseFrequency, curve, atTimeS, automation, bpm)
+    : createInstrumentBufferSource(audio, instrument, durationS + 0.05, baseFrequency, targetFrequency, velocity, bpm);
   const playbackDuration = source.buffer
     ? Math.max(durationS, Math.min(1.5, source.buffer.duration / source.playbackRate.value))
     : durationS;

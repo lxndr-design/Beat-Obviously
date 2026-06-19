@@ -14,6 +14,7 @@ export interface SynthWorkletRenderOptions {
   startTimeS?: number;
   targetFrequency?: number;
   velocity?: number;
+  bpm?: number;
   curve?: Array<{ timeS: number; frequency: number }>;
   automation?: SynthAutomationLane[];
 }
@@ -43,6 +44,7 @@ export async function createSynthWorkletPreviewNode(
       startTimeS: renderOptions.startTimeS,
       targetFrequency: renderOptions.targetFrequency,
       velocity: renderOptions.velocity,
+      bpm: renderOptions.bpm,
       curve: renderOptions.curve,
       automation: renderOptions.automation,
     },

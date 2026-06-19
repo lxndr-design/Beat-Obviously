@@ -19,7 +19,7 @@ import {
 } from "../../../state/synthStore";
 import { deleteSynthPreset, listSynthPresets, saveSynthPreset, type SynthPresetRecord } from "../../../persistence/dexie";
 import { ANALYZER_BAND_COUNT, useAnalyzerStore, type AnalyzerSnapshot } from "../../../state/analyzerStore";
-import { useInstrumentStore, useUiStore } from "../../../state/store";
+import { useInstrumentStore, useProjectStore, useUiStore } from "../../../state/store";
 import { INSTRUMENT_ICON_OPTIONS, instrumentIconLabel } from "../../../state/instrumentIcons";
 import { AnalyzerPanel } from "../AnalyzerPanel/AnalyzerPanel.solid";
 import { ModulationMatrix } from "../ModulationMatrix/ModulationMatrix.solid";
@@ -42,6 +42,14 @@ const LFO_SHAPES = [
   ["triangle", "Triangle", "ph:wave-triangle"],
   ["saw", "Saw", "ph:wave-sawtooth"],
   ["square", "Square", "ph:wave-square"],
+] as const;
+const LFO_SYNC_RATES = [
+  ["1/1", "1/1", "Whole note", "ph:metronome"],
+  ["1/2", "1/2", "Half note", "ph:metronome"],
+  ["1/4", "1/4", "Quarter note", "ph:metronome"],
+  ["1/8", "1/8", "Eighth note", "ph:metronome"],
+  ["1/16", "1/16", "Sixteenth note", "ph:metronome"],
+  ["1/32", "1/32", "Thirty-second note", "ph:metronome"],
 ] as const;
 
 interface AuditionHandle {
@@ -166,6 +174,7 @@ export function SynthEditor(props: SynthEditorProps) {
     if (ctx.state === "suspended") void ctx.resume().catch(() => undefined);
 
     const instrument = synthDraftToPreviewInstrument(draft());
+    const bpm = useProjectStore.getState().project.bpm;
     const frequency = previewFrequency(instrument);
     let handle: AuditionHandle | null = null;
     let seededAnalyzer = false;
@@ -186,14 +195,14 @@ export function SynthEditor(props: SynthEditorProps) {
 
     const worklet = await createSynthWorkletPreviewNode(ctx, instrument, AUDITION_SECONDS, frequency, () => {
       if (handle) finishAudition(handle.node);
-    }).catch(() => null);
+    }, { bpm }).catch(() => null);
     if (worklet) {
       handle = {
         node: worklet.node,
         stop: () => worklet.stop(),
       };
     } else {
-      const buffer = renderedInstrumentBuffer(ctx, instrument, AUDITION_SECONDS, frequency);
+      const buffer = renderedInstrumentBuffer(ctx, instrument, AUDITION_SECONDS, frequency, undefined, bpm);
       const left = buffer.getChannelData(0);
       const right = buffer.getChannelData(1);
       seedAnalyzerFromSamples(mixStereoToMono(left, right));
@@ -559,10 +568,13 @@ function LfoLane(props: { lfo: 1 | 2 }) {
   const enabledId = `${prefix}.enabled` as SynthParameterId;
   const shapeId = `${prefix}.shape` as SynthParameterId;
   const rateId = `${prefix}.rate` as SynthParameterId;
+  const syncId = `${prefix}.sync` as SynthParameterId;
+  const syncedRateId = `${prefix}.syncedRate` as SynthParameterId;
   const phaseId = `${prefix}.phase` as SynthParameterId;
   const retriggerId = `${prefix}.retrigger` as SynthParameterId;
   const oneShotId = `${prefix}.oneShot` as SynthParameterId;
   const enabled = createMemo(() => draft().parameters[enabledId] === true);
+  const sync = createMemo(() => draft().parameters[syncId] === true);
   const retrigger = createMemo(() => draft().parameters[retriggerId] !== false);
   const oneShot = createMemo(() => draft().parameters[oneShotId] === true);
 
@@ -571,6 +583,15 @@ function LfoLane(props: { lfo: 1 | 2 }) {
       <header class={styles.lfoLaneHeader}>
         <div class={styles.lfoLaneTitle}>LFO {props.lfo}</div>
         <div class="ds-panel-actions">
+          <Button
+            iconOnly
+            size="xs"
+            selected={sync()}
+            aria-label={`${sync() ? "Disable" : "Enable"} LFO ${props.lfo} tempo sync`}
+            onClick={() => setBooleanParameter(syncId, !sync())}
+          >
+            <Icon name={sync() ? "ph:clock-countdown-fill" : "ph:clock-countdown"} size={12} decorative />
+          </Button>
           <Button
             iconOnly
             size="xs"
@@ -607,19 +628,31 @@ function LfoLane(props: { lfo: 1 | 2 }) {
           options={LFO_SHAPES}
           onChange={(value) => setParameter(shapeId, value)}
         />
-        <Knob
-          size="sm"
-          label="Rate"
-          value={getNumberParam(draft(), rateId)}
-          min={0.05}
-          max={50}
-          step={0.01}
-          unit="Hz"
-          defaultValue={1}
-          formatValue={(value) => `${value < 10 ? value.toFixed(2) : value.toFixed(1)}`}
-          pickSourceId={`lfo.${props.lfo}` as ModulationSourceId}
-          onChange={(value) => setNumericParameter(rateId, value)}
-        />
+        <Show
+          when={sync()}
+          fallback={
+            <Knob
+              size="sm"
+              label="Rate"
+              value={getNumberParam(draft(), rateId)}
+              min={0.05}
+              max={50}
+              step={0.01}
+              unit="Hz"
+              defaultValue={1}
+              formatValue={(value) => `${value < 10 ? value.toFixed(2) : value.toFixed(1)}`}
+              pickSourceId={`lfo.${props.lfo}` as ModulationSourceId}
+              onChange={(value) => setNumericParameter(rateId, value)}
+            />
+          }
+        >
+          <ShapeButtonSet
+            label={`LFO ${props.lfo} Sync Rate`}
+            value={String(draft().parameters[syncedRateId] ?? (props.lfo === 1 ? "1/4" : "1/2"))}
+            options={LFO_SYNC_RATES}
+            onChange={(value) => setParameter(syncedRateId, value)}
+          />
+        </Show>
         <Knob
           size="sm"
           label="Phase"
