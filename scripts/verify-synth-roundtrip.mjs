@@ -64,6 +64,7 @@ try {
       "filter.enabled": true,
       "filter.type": "highpass",
       "filter.cutoff": 1370,
+      "filter.keytrack": 0.62,
       "filter.resonance": 0.43,
       "filter.drive": 0.19,
       "amp.level": 0.66,
@@ -170,6 +171,7 @@ try {
   assert.equal(patch.icon, "ph:planet");
   assert.equal(patch.kind, "wavetable");
   assert.equal(patch.filterType, "highpass");
+  assert.equal(patch.filterKeytrack, 0.62);
   assert.equal(patch.aether.oscB.enabled, true);
   assert.equal(patch.aether.oscA.pan, -0.35);
   assert.equal(patch.aether.oscB.pan, 0.45);
@@ -226,6 +228,24 @@ try {
   synthPreview.renderInstrumentSamples(expAttack, expAttackSamples, 48000, synthPreview.previewFrequency(expAttack), "audio", true);
   const headEnergy = (samples) => samples.slice(0, 1200).reduce((sum, sample) => sum + sample * sample, 0);
   assert.ok(headEnergy(expAttackSamples) < headEnergy(linearAttackSamples) * 0.85, "expected exponential attack curve to soften preview attack");
+
+  const keytrackClosed = synthStore.synthDraftToPreviewInstrument({
+    ...draft,
+    parameters: { ...draft.parameters, "filter.enabled": true, "filter.type": "lowpass", "filter.cutoff": 260, "filter.keytrack": 0 },
+    modulation: [],
+  });
+  const keytrackOpen = synthStore.synthDraftToPreviewInstrument({
+    ...draft,
+    parameters: { ...draft.parameters, "filter.enabled": true, "filter.type": "lowpass", "filter.cutoff": 260, "filter.keytrack": 1 },
+    modulation: [],
+  });
+  const closedKeytrackSamples = new Float32Array(4096);
+  const openKeytrackSamples = new Float32Array(4096);
+  const highPreviewFrequency = synthPreview.SYNTH_PREVIEW_BASE_HZ * 4;
+  synthPreview.renderInstrumentSamples(keytrackClosed, closedKeytrackSamples, 48000, highPreviewFrequency, "audio", true);
+  synthPreview.renderInstrumentSamples(keytrackOpen, openKeytrackSamples, 48000, highPreviewFrequency, "audio", true);
+  const bufferRms = (samples) => Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length);
+  assert.ok(bufferRms(openKeytrackSamples) > bufferRms(closedKeytrackSamples) * 1.12, "expected filter keytracking to open high-note preview cutoff");
 
   const stereoProbe = {
     id: "stereo-probe",

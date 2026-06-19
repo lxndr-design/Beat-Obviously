@@ -51,6 +51,7 @@ export type SynthParameterId =
   | "filter.enabled"
   | "filter.type"
   | "filter.cutoff"
+  | "filter.keytrack"
   | "filter.resonance"
   | "filter.drive"
   | "amp.level"
@@ -436,6 +437,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "filter.enabled": true,
   "filter.type": "lowpass",
   "filter.cutoff": 18000,
+  "filter.keytrack": 0,
   "filter.resonance": 0.1,
   "filter.drive": 0,
   "amp.level": 0.8,
@@ -512,6 +514,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "filter.enabled": "Filter Enabled",
   "filter.type": "Filter Type",
   "filter.cutoff": "Filter Cutoff",
+  "filter.keytrack": "Filter Keytrack",
   "filter.resonance": "Filter Res",
   "filter.drive": "Filter Drive",
   "amp.level": "Amp Level",
@@ -747,6 +750,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
       color: modulatedNumberParam(draft, "osc.a.position", "osc.a.position", 0, 1),
     },
     filterType: filterTypeFromDraft(draft),
+    filterKeytrack: getNumberParam(draft, "filter.keytrack"),
     envelope: {
       attackMs: getNumberParam(draft, "env.1.attack") * 1000,
       attackCurve: getEnvelopeCurveParam(draft, "env.1.attackCurve"),
@@ -881,6 +885,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.name = instrument.name;
   draft.metadata.icon = instrument.icon ?? draft.metadata.icon;
   draft.parameters["filter.cutoff"] = normalizedCutoffToHz(instrument.knobs.cutoff);
+  draft.parameters["filter.keytrack"] = instrument.filterKeytrack ?? 0;
   draft.parameters["filter.resonance"] = instrument.knobs.resonance;
   draft.parameters["filter.drive"] = instrument.knobs.drive;
   draft.parameters["filter.type"] = instrument.filterType ?? "lowpass";

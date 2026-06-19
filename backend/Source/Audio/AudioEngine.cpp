@@ -1462,6 +1462,7 @@ namespace beat
         };
 
         params.cutoff01 = instrument.cutoff01;
+        params.filterKeytrack = instrument.filterKeytrack;
         params.resonance01 = instrument.resonance01;
         params.drive01 = instrument.drive01;
         params.color01 = instrument.color01;

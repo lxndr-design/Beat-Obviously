@@ -128,6 +128,7 @@ namespace beat
             };
 
             float cutoff01    { 0.6f };
+            float filterKeytrack { 0.0f };
             float resonance01 { 0.2f };
             float drive01     { 0.1f };
             float color01     { 0.5f };
@@ -336,6 +337,7 @@ namespace beat
         StereoSample renderAetherTableStack(double frequencyHz, float rawLfo, float rawLfo2, float env) noexcept;
         StereoSample processDriveOversampled(StereoSample sample, float driveGain) noexcept;
         float shapedEnvelope(float rawEnvelope) noexcept;
+        float keytrackedCutoffHz(float normalizedCutoff) const noexcept;
 
         Params  baseParams;
         Params  params;

@@ -62,6 +62,7 @@ Initial defaults:
 | `filter.enabled` | boolean | off/on | `true` | Main voice filter enable. |
 | `filter.type` | enum | `lowpass`, `highpass`, `bandpass`, `notch` | `lowpass` | First-pass filter modes. |
 | `filter.cutoff` | hz | `20..20000` | `18000` | Smooth before DSP. |
+| `filter.keytrack` | normalized | `0..1` | `0` | Filter cutoff follows played pitch; `1` tracks one cutoff octave per pitch octave around middle C. |
 | `filter.resonance` | normalized | `0..1` | `0.1` | Maps to Q internally. |
 | `filter.drive` | normalized | `0..1` | `0` | Optional nonlinear drive. |
 

@@ -408,9 +408,9 @@ namespace beat
 
         filterLeft.setType(filterTypeForParam(p.filterType));
         filterRight.setType(filterTypeForParam(p.filterType));
-        filterLeft.setCutoffFrequency(cutoffHz(p.cutoff01, sampleRate));
-        filterRight.setCutoffFrequency(cutoffHz(p.cutoff01, sampleRate));
-        cachedFilterHz = cutoffHz(p.cutoff01, sampleRate);
+        filterLeft.setCutoffFrequency(keytrackedCutoffHz(p.cutoff01));
+        filterRight.setCutoffFrequency(keytrackedCutoffHz(p.cutoff01));
+        cachedFilterHz = keytrackedCutoffHz(p.cutoff01);
         cachedFilterResonance = 0.5f + p.resonance01 * 4.0f;
         filterLeft.setResonance(cachedFilterResonance);
         filterRight.setResonance(cachedFilterResonance);
@@ -667,7 +667,7 @@ namespace beat
         {
             case RealtimeParam::FilterCutoff:
             {
-                const float nextFilterHz = cutoffHz(params.cutoff01, sampleRate);
+                const float nextFilterHz = keytrackedCutoffHz(params.cutoff01);
                 if (std::abs(nextFilterHz - cachedFilterHz) > 0.5f)
                 {
                     filterLeft.setCutoffFrequency(nextFilterHz);
@@ -788,11 +788,12 @@ namespace beat
     {
         params = baseParams;
         resetRealtimeRampsFromParams();
+        baseFrequencyHz = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
         filterLeft.setType(filterTypeForParam(params.filterType));
         filterRight.setType(filterTypeForParam(params.filterType));
-        filterLeft.setCutoffFrequency(cutoffHz(params.cutoff01, sampleRate));
-        filterRight.setCutoffFrequency(cutoffHz(params.cutoff01, sampleRate));
-        cachedFilterHz = cutoffHz(params.cutoff01, sampleRate);
+        filterLeft.setCutoffFrequency(keytrackedCutoffHz(params.cutoff01));
+        filterRight.setCutoffFrequency(keytrackedCutoffHz(params.cutoff01));
+        cachedFilterHz = keytrackedCutoffHz(params.cutoff01);
         cachedFilterResonance = 0.5f + params.resonance01 * 4.0f;
         filterLeft.setResonance(cachedFilterResonance);
         filterRight.setResonance(cachedFilterResonance);
@@ -814,7 +815,6 @@ namespace beat
             lfo2Phase = std::fmod(juce::jlimit(0.0, 1.0, (double) params.lfo2PhaseOffset)
                 + deterministicPhaseJitter(noiseState ^ 0x91c2ef43u) * juce::jlimit(0.0, 1.0, (double) params.lfo2RandomPhase),
                 1.0);
-        baseFrequencyHz = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
         phaseDelta = baseFrequencyHz / sampleRate;
         pitchFrequencyRamp.reset((float) baseFrequencyHz);
         previousDriveInput = {};
@@ -977,7 +977,7 @@ namespace beat
                     const float cutoffMod = useDynamicModulation && cachedFilterCutoffDynamic
                         ? dynamicTargetOffset(params.dynamicModulation.filterCutoff, rawLfo, rawLfo2, env, 0.35f)
                         : filterLfo * params.lfoToFilter * 0.35f + env * params.envToFilter * 0.35f;
-                const float nextFilterHz = cutoffHz(params.cutoff01 + cutoffMod, sampleRate);
+                const float nextFilterHz = keytrackedCutoffHz(params.cutoff01 + cutoffMod);
                 if (std::abs(nextFilterHz - cachedFilterHz) > 6.0f)
                 {
                     filterLeft.setCutoffFrequency(nextFilterHz);
@@ -1118,6 +1118,19 @@ namespace beat
         }
         previousRawEnvelope = raw;
         return clamp01(shaped);
+    }
+
+    float InstrumentVoice::keytrackedCutoffHz(float normalizedCutoff) const noexcept
+    {
+        constexpr float middleCHz = 261.625565f;
+        const float base = cutoffHz(normalizedCutoff, sampleRate);
+        const float keytrack = clamp01(params.filterKeytrack);
+        if (keytrack <= 0.0001f || baseFrequencyHz <= 0.0)
+            return base;
+
+        const float octaveOffset = (float) std::log2(juce::jmax(1.0, baseFrequencyHz) / (double) middleCHz);
+        const float tracked = base * std::exp2(octaveOffset * keytrack);
+        return juce::jlimit(20.0f, juce::jmin(20000.0f, (float) sampleRate * 0.45f), tracked);
     }
 
     void InstrumentVoice::configureWavetableOscillators(double frequencyHz) noexcept

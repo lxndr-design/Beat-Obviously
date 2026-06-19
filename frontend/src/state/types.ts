@@ -224,6 +224,7 @@ export interface Instrument {
     color: number;      // 0..1, displayed as Shape % — waveform morph
   };
   filterType?: "lowpass" | "bandpass" | "highpass";
+  filterKeytrack?: number; // 0..1 — one cutoff octave per pitch octave at 1.0
   /** Wavetable / oscillator shape. */
   waveform: "sine" | "saw" | "square" | "triangle" | "noise" | "sample" | "wavetable";
 
@@ -559,6 +560,7 @@ export interface InstrumentSnapshot {
   envelope: AdsrEnvelope;
   knobs: Instrument["knobs"];
   filterType?: Instrument["filterType"];
+  filterKeytrack?: number;
   waveform: Instrument["waveform"];
   detuneCents?: number;
   octave?: number;

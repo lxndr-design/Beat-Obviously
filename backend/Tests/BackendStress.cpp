@@ -8817,6 +8817,7 @@ namespace
             "filter.enabled": true,
             "filter.type": "highpass",
             "filter.cutoff": 1000,
+            "filter.keytrack": 0.62,
             "filter.resonance": 0.2,
             "filter.drive": 0.35,
             "env.1.attack": 0.01,
@@ -8911,6 +8912,8 @@ namespace
         if (instrument.aether.oscB.octave != 1 || instrument.aether.oscB.semitone != 7 || !near(instrument.aether.oscB.fineCents, 15.0f))
             return false;
         if (instrument.filterType != 2 || instrument.cutoff01 < 0.55f || instrument.cutoff01 > 0.7f)
+            return false;
+        if (!near(instrument.filterKeytrack, 0.62f))
             return false;
         if (!near(instrument.resonance01, 0.4f) || !near(instrument.drive01, 0.35f))
             return false;
@@ -9138,6 +9141,42 @@ namespace
             }
         }
         if (!(expAttackEnergy < linearAttackEnergy * 0.85))
+            return false;
+
+        auto keytrackClosedParams = params;
+        keytrackClosedParams.filterType = 0;
+        keytrackClosedParams.cutoff01 = 0.24f;
+        keytrackClosedParams.filterKeytrack = 0.0f;
+        keytrackClosedParams.wavetableUnison = 1;
+        auto keytrackOpenParams = keytrackClosedParams;
+        keytrackOpenParams.filterKeytrack = 1.0f;
+        auto renderHighNote = [](const beat::InstrumentVoice::Params& renderParams) {
+            beat::InstrumentVoice voice;
+            voice.prepare(44100.0, 256);
+            voice.setParams(renderParams);
+            voice.startNote(84, 1.0f, nullptr, 0);
+
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+        auto keytrackClosed = renderHighNote(keytrackClosedParams);
+        auto keytrackOpen = renderHighNote(keytrackOpenParams);
+        double keytrackClosedEnergy = 0.0;
+        double keytrackOpenEnergy = 0.0;
+        for (int channel = 0; channel < keytrackClosed.getNumChannels(); ++channel)
+        {
+            for (int i = 0; i < keytrackClosed.getNumSamples(); ++i)
+            {
+                const auto closedSample = (double) keytrackClosed.getSample(channel, i);
+                const auto openSample = (double) keytrackOpen.getSample(channel, i);
+                keytrackClosedEnergy += closedSample * closedSample;
+                keytrackOpenEnergy += openSample * openSample;
+            }
+        }
+        if (!(keytrackOpenEnergy > keytrackClosedEnergy * 1.1))
             return false;
 
         auto lowpassParams = params;

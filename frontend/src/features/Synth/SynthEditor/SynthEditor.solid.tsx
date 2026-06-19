@@ -812,6 +812,7 @@ function AmpFilterPanel() {
         />
         <For each={[
           ["filter.resonance", "Res", 0.1, false],
+          ["filter.keytrack", "Key", 0, false],
           ["filter.drive", "Drive", 0, false],
           ["amp.level", "Level", 0.8, false],
           ["amp.pan", "Pan", 0, true],

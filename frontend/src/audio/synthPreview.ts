@@ -651,7 +651,12 @@ export function renderInstrumentSample(
   mode: SynthRenderMode,
   modulation: RenderModulation = { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, targetOffsets: {} },
 ): number {
-  const cutoff = clamp01(instrument.knobs.cutoff + modulation.filterOffset + modulationTargetOffset(modulation, "filter.cutoff"));
+  const cutoff = clamp01(
+    instrument.knobs.cutoff
+      + filterKeytrackOffset(instrument, sampleRate, frequency)
+      + modulation.filterOffset
+      + modulationTargetOffset(modulation, "filter.cutoff"),
+  );
   const resonance = clamp01(instrument.knobs.resonance + modulationTargetOffset(modulation, "filter.resonance"));
   const drive = clamp01(instrument.knobs.drive + modulationTargetOffset(modulation, "filter.drive"));
   const color = clamp01(instrument.knobs.color);
@@ -700,7 +705,12 @@ function renderInstrumentStereoSample(
   mode: SynthRenderMode,
   modulation: RenderModulation,
 ): { left: number; right: number } {
-  const cutoff = clamp01(instrument.knobs.cutoff + modulation.filterOffset + modulationTargetOffset(modulation, "filter.cutoff"));
+  const cutoff = clamp01(
+    instrument.knobs.cutoff
+      + filterKeytrackOffset(instrument, sampleRate, frequency)
+      + modulation.filterOffset
+      + modulationTargetOffset(modulation, "filter.cutoff"),
+  );
   const resonance = clamp01(instrument.knobs.resonance + modulationTargetOffset(modulation, "filter.resonance"));
   const drive = clamp01(instrument.knobs.drive + modulationTargetOffset(modulation, "filter.drive"));
   const raw = aetherStackStereoSample(instrument, phaseState, sampleRate, frequency, mode, modulation);
@@ -1504,6 +1514,15 @@ function deterministicUnitHash(value: string): number {
     hash = Math.imul(hash, 16777619);
   }
   return ((hash >>> 0) & 0x00ffffff) / 0x01000000;
+}
+
+function filterKeytrackOffset(instrument: Instrument, sampleRate: number, frequency: number): number {
+  const keytrack = clamp01(instrument.filterKeytrack ?? 0);
+  if (keytrack <= 0 || !Number.isFinite(frequency) || frequency <= 0) return 0;
+  const minHz = 50;
+  const maxHz = Math.min(16000, sampleRate * 0.45);
+  const octaveOffset = Math.log2(frequency / SYNTH_PREVIEW_BASE_HZ);
+  return (octaveOffset * keytrack) / Math.log2(maxHz / minHz);
 }
 
 function lfoShapeValue(shape: NonNullable<Instrument["lfoWaveform"]>, cycles: number, oneShot = false, smoothing = 0): number {

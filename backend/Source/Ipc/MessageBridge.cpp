@@ -1791,6 +1791,7 @@ namespace beat
 
                     const auto knobs = instrumentVar.getProperty("knobs", {});
                     instrument.cutoff01 = normalizedParam(knobs, "cutoff", instrument.cutoff01);
+                    instrument.filterKeytrack = normalizedParam(instrumentVar, "filterKeytrack", instrument.filterKeytrack);
                     instrument.resonance01 = normalizedParam(knobs, "resonance", instrument.resonance01);
                     instrument.drive01 = normalizedParam(knobs, "drive", instrument.drive01);
                     instrument.color01 = normalizedParam(knobs, "color", instrument.color01);

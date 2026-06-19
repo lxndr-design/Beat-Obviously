@@ -434,6 +434,7 @@ namespace beat
             o->setProperty("kind", instrument.kind);
             o->setProperty("waveform", instrument.waveform);
             o->setProperty("cutoff01", instrument.cutoff01);
+            o->setProperty("filterKeytrack", instrument.filterKeytrack);
             o->setProperty("resonance01", instrument.resonance01);
             o->setProperty("drive01", instrument.drive01);
             o->setProperty("color01", instrument.color01);
@@ -597,6 +598,7 @@ namespace beat
 
                     instrument.waveform = juce::jlimit(0, 8, (int) iv.getProperty("waveform", instrument.waveform));
                     instrument.cutoff01 = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("cutoff01", instrument.cutoff01));
+                    instrument.filterKeytrack = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("filterKeytrack", instrument.filterKeytrack));
                     instrument.resonance01 = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("resonance01", instrument.resonance01));
                     instrument.drive01 = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("drive01", instrument.drive01));
                     instrument.color01 = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("color01", instrument.color01));

@@ -402,6 +402,9 @@ namespace beat
             ? juce::jlimit(0.0f, 1.0f, cutoffHzTo01(synthNumberParam(params, "filter.cutoff", 18000.0))
                 + staticRouteAmount(params, modulation, metadata, "filter.cutoff"))
             : 1.0f;
+        instrument.filterKeytrack = filterEnabled
+            ? juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "filter.keytrack", instrument.filterKeytrack))
+            : 0.0f;
         instrument.resonance01 = filterEnabled
             ? juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "filter.resonance", instrument.resonance01)
                 + staticRouteAmount(params, modulation, metadata, "filter.resonance"))

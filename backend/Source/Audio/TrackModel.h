@@ -235,6 +235,7 @@ namespace beat
         juce::String kind;
         int waveform { 1 };
         float cutoff01 { 0.6f };
+        float filterKeytrack { 0.0f };
         float resonance01 { 0.2f };
         float drive01 { 0.1f };
         float color01 { 0.5f };
