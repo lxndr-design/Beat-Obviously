@@ -1,6 +1,8 @@
-import { createMemo, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
+import { importAudioFile } from "../../../audio/audioImport";
 import { renderAetherOutputPreviewSamples } from "../../../audio/synthPreview";
-import { Button, HoverInfo, Icon, Knob } from "../../../solid-ui";
+import { resynthesizeAudioFileToWavemap } from "../../../audio/wavemapResynthesis";
+import { appAlert, Button, HoverInfo, Icon, Knob } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import type { CustomWavetableFrame } from "../../../state/types";
 import {
@@ -128,8 +130,10 @@ function OscillatorRow(props: {
   const setParameter = useSynthStore.getState().setParameter;
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
+  const setWavemap = useSynthStore.getState().setWavemap;
   const updateCustomWavetableFrame = useSynthStore.getState().updateCustomWavetableFrame;
   const updateWavemapMetadata = useSynthStore.getState().updateWavemapMetadata;
+  const [resynthesizing, setResynthesizing] = createSignal(false);
   const enabledId = createMemo(() => oscParam(props.oscillator, "enabled"));
   const enabled = createMemo(() => getBooleanParam(draft(), enabledId()));
   const wavetableId = createMemo(() => oscParam(props.oscillator, "wavetable"));
@@ -138,6 +142,22 @@ function OscillatorRow(props: {
   const customTable = createMemo(() => draft().metadata.wavemaps?.[customTableId()] ?? draft().metadata.customWavetables?.[customTableId()] ?? createDefaultCustomWavetable(customTableId()));
   const label = createMemo(() => `Oscillator ${props.oscillator.toUpperCase()}`);
   const waveform = createMemo(() => renderAetherOutputPreviewSamples(props.previewInstrument, 160, props.oscillator));
+
+  async function importAudioWavemap() {
+    if (resynthesizing()) return;
+    setResynthesizing(true);
+    try {
+      const audioFile = await importAudioFile();
+      if (!audioFile) return;
+      const wavemap = await resynthesizeAudioFileToWavemap(audioFile, customTableId());
+      setWavemap(wavemap);
+      setParameter(wavetableId(), wavemap.id as WavetableId);
+    } catch (error) {
+      await appAlert(error instanceof Error ? error.message : "Audio wavemap import failed.");
+    } finally {
+      setResynthesizing(false);
+    }
+  }
 
   return (
     <div class={`${styles.row} ${enabled() ? "" : styles.disabledRow}`} aria-label={`${label()} row`}>
@@ -194,6 +214,13 @@ function OscillatorRow(props: {
                   <div class="ds-section-title">{customTable().name} Wavemap</div>
                   <div class={styles.wavemapMeta}>
                     <span>{customTable().source.label ?? sourceLabel(customTable().source.kind)}</span>
+                    <Button
+                      size="xs"
+                      disabled={resynthesizing()}
+                      onClick={() => void importAudioWavemap()}
+                    >
+                      {resynthesizing() ? "Analyzing" : "Import Audio"}
+                    </Button>
                     <Button
                       size="xs"
                       selected={customTable().interpolation === "linear"}

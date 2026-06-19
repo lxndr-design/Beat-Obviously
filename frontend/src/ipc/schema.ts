@@ -16,6 +16,7 @@ import type {
   PluginAdapter,
   Project,
   Track,
+  WavemapDefinition,
 } from "../state/types";
 import type { BeatComponent } from "../state/components";
 
@@ -301,6 +302,7 @@ export type OutboundRequest =
   | { kind: "instrument.list" }
   | { kind: "instrument.importDecent"; pathHint?: string }
   | { kind: "instrument.renderPreview"; instrument: Instrument; note?: number; velocity?: number; bpm?: number; durationBeats?: Beats; bucketCount?: number; includeAudio?: boolean }
+  | { kind: "instrument.resynthesizeWavemap"; audioFile: Pick<AudioFile, "id" | "name" | "path" | "sampleRate">; wavemapId?: string; name?: string }
   // Audio files -----------------------------------------------------------
   | { kind: "audio.import"; pathHint?: string } // opens file picker
   | { kind: "audio.importMany"; pathHint?: string } // opens multi-file picker
@@ -352,6 +354,7 @@ export type ResponseFor<R extends OutboundRequest> =
   R extends { kind: "instrument.list" }? { instruments: Instrument[] } :
   R extends { kind: "instrument.importDecent" } ? { preset: DecentSamplerImport | null } :
   R extends { kind: "instrument.renderPreview" } ? { analysis?: AudioRenderAnalysis; waveform?: AudioWaveformSummary | null; audioDataUrl?: string; durationBeats?: Beats; note?: number; velocity?: number; error?: string } :
+  R extends { kind: "instrument.resynthesizeWavemap" } ? { wavemap?: WavemapDefinition; error?: string } :
   R extends { kind: "audio.import" }   ? { file: AudioFile | null } :
   R extends { kind: "audio.importMany" } ? { files: AudioFile[] } :
   R extends { kind: "audio.list" }     ? { files: AudioFile[] } :

@@ -177,6 +177,8 @@ async function mockResponse<R extends OutboundRequest>(
         note: req.note ?? 60,
         velocity: req.velocity ?? 100,
       } as unknown as ResponseFor<R>;
+    case "instrument.resynthesizeWavemap":
+      return { error: "Native wavemap resynthesis is only available in the packaged app." } as unknown as ResponseFor<R>;
     case "audio.import":
       return { file: null } as unknown as ResponseFor<R>;
     case "audio.importMany":

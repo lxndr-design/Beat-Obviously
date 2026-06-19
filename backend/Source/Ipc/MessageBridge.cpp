@@ -345,6 +345,145 @@ namespace beat
             return juce::var(audioFile.get());
         }
 
+        double clamp01(double value) noexcept
+        {
+            if (! std::isfinite(value))
+                return 0.0;
+            return juce::jlimit(0.0, 1.0, value);
+        }
+
+        juce::String sanitizeWavemapId(juce::String id, const juce::String& fallback)
+        {
+            id = id.trim();
+            if (id.isEmpty())
+                id = fallback;
+            if (! id.startsWith("user."))
+                id = "user." + id;
+
+            juce::String out;
+            for (auto c : id)
+            {
+                if (juce::CharacterFunctions::isLetterOrDigit(c) || c == '.' || c == '_' || c == '-')
+                    out << c;
+                else
+                    out << "-";
+            }
+            return out.isNotEmpty() ? out : "user.wavemap";
+        }
+
+        juce::var makeWavemapFrame(const std::vector<float>& samples,
+                                   int start,
+                                   int end,
+                                   const juce::String& wavemapId,
+                                   int frameIndex)
+        {
+            const int safeStart = juce::jlimit(0, (int) samples.size(), start);
+            const int safeEnd = juce::jlimit(safeStart + 1, (int) samples.size(), end);
+            double sumSquares = 0.0;
+            double sumAbs = 0.0;
+            double derivative = 0.0;
+            double zeroCrossings = 0.0;
+            double positiveEnergy = 0.0;
+            double negativeEnergy = 0.0;
+            double previous = samples[(size_t) safeStart];
+
+            for (int index = safeStart; index < safeEnd; ++index)
+            {
+                const double sample = juce::jlimit(-1.0, 1.0, (double) samples[(size_t) index]);
+                sumSquares += sample * sample;
+                sumAbs += std::abs(sample);
+                derivative += std::abs(sample - previous);
+                if ((sample >= 0.0 && previous < 0.0) || (sample < 0.0 && previous >= 0.0))
+                    zeroCrossings += 1.0;
+                if (sample >= 0.0)
+                    positiveEnergy += sample * sample;
+                else
+                    negativeEnergy += sample * sample;
+                previous = sample;
+            }
+
+            const auto count = std::max(1, safeEnd - safeStart);
+            const auto rms = std::sqrt(sumSquares / (double) count);
+            const auto meanAbs = sumAbs / (double) count;
+            const auto zeroDensity = zeroCrossings / (double) count;
+            const auto roughness = derivative / (double) count;
+            const auto totalPolarityEnergy = positiveEnergy + negativeEnergy + 1.0e-9;
+            const auto asymmetry = std::abs(positiveEnergy - negativeEnergy) / totalPolarityEnergy;
+
+            juce::DynamicObject::Ptr frame = new juce::DynamicObject();
+            frame->setProperty("id", wavemapId + ".frame." + juce::String(frameIndex + 1));
+            frame->setProperty("label", juce::String::charToString("ABCD"[juce::jlimit(0, 3, frameIndex)]));
+            frame->setProperty("position", frameIndex / 3.0);
+            frame->setProperty("brightness", clamp01(0.18 + rms * 0.52 + zeroDensity * 1.8 + roughness * 0.85));
+            frame->setProperty("even", clamp01(0.1 + zeroDensity * 1.25 + asymmetry * 0.55));
+            frame->setProperty("fold", clamp01(0.05 + roughness * 1.65 + meanAbs * 0.35));
+            frame->setProperty("phase", juce::jlimit(-1.0, 1.0, (positiveEnergy - negativeEnergy) / totalPolarityEnergy));
+            return juce::var(frame.get());
+        }
+
+        juce::var makeWavemapFromAudioFile(const juce::File& file,
+                                           const juce::String& audioFileId,
+                                           juce::String wavemapId,
+                                           juce::String name)
+        {
+            juce::AudioFormatManager formatManager;
+            formatManager.registerBasicFormats();
+            std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
+            if (reader == nullptr || reader->lengthInSamples <= 0)
+                return {};
+
+            constexpr int maxResynthSamples = 262144;
+            const int readCount = (int) std::min<juce::int64>(reader->lengthInSamples, maxResynthSamples);
+            juce::AudioBuffer<float> buffer((int) std::max<juce::uint32>(1, reader->numChannels), readCount);
+            if (! reader->read(&buffer, 0, readCount, 0, true, true))
+                return {};
+
+            std::vector<float> samples;
+            samples.resize((size_t) readCount);
+            const int channels = std::max(1, buffer.getNumChannels());
+            for (int sampleIndex = 0; sampleIndex < readCount; ++sampleIndex)
+            {
+                float sum = 0.0f;
+                for (int channel = 0; channel < channels; ++channel)
+                    sum += buffer.getSample(channel, sampleIndex);
+                samples[(size_t) sampleIndex] = juce::jlimit(-1.0f, 1.0f, sum / (float) channels);
+            }
+
+            wavemapId = sanitizeWavemapId(wavemapId, file.getFileNameWithoutExtension());
+            if (name.trim().isEmpty())
+                name = file.getFileNameWithoutExtension() + " Wavemap";
+
+            juce::Array<juce::var> frames;
+            constexpr int frameCount = 4;
+            const int frameLength = std::max(1, readCount / frameCount);
+            for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
+            {
+                const int start = frameIndex * frameLength;
+                const int end = frameIndex == frameCount - 1 ? readCount : std::min(readCount, start + frameLength);
+                frames.add(makeWavemapFrame(samples, start, end, wavemapId, frameIndex));
+            }
+
+            juce::DynamicObject::Ptr source = new juce::DynamicObject();
+            source->setProperty("kind", "imported-audio");
+            source->setProperty("label", file.getFileNameWithoutExtension());
+            source->setProperty("audioFileId", audioFileId);
+            source->setProperty("path", file.getFullPathName());
+            source->setProperty("sampleRate", reader->sampleRate);
+            source->setProperty("sourceStartSample", 0.0);
+            source->setProperty("sourceEndSample", static_cast<double>(readCount));
+            source->setProperty("createdAt", static_cast<double>(juce::Time::getCurrentTime().toMilliseconds()));
+
+            juce::DynamicObject::Ptr wavemap = new juce::DynamicObject();
+            wavemap->setProperty("schemaVersion", 1);
+            wavemap->setProperty("id", wavemapId);
+            wavemap->setProperty("name", name);
+            wavemap->setProperty("kind", "resynthesized");
+            wavemap->setProperty("interpolation", "smooth");
+            wavemap->setProperty("source", juce::var(source.get()));
+            wavemap->setProperty("frames", frames);
+            return juce::var(wavemap.get());
+        }
+
         double fallbackImportedAtForFile(const juce::File& file)
         {
             auto created = file.getCreationTime().toMilliseconds();
@@ -3183,6 +3322,38 @@ namespace beat
             auto presetFile = resolveDecentSamplerPreset(chooser.getResult(), importRoot);
             auto preset = presetFile.existsAsFile() ? parseDecentSamplerPreset(presetFile) : std::nullopt;
             response->setProperty("preset", preset ? makeDecentSamplerImport(database, *preset) : juce::var());
+            return juce::var(response.get());
+        }
+
+        if (kind == INSTRUMENT_RESYNTHESIZE_WAVEMAP)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto audioFile = payload.getProperty("audioFile", {});
+            if (! audioFile.isObject())
+            {
+                response->setProperty("error", "Wavemap resynthesis requires an audio file.");
+                return juce::var(response.get());
+            }
+
+            const auto path = audioFile.getProperty("path", {}).toString();
+            const auto file = juce::File(path);
+            if (path.isEmpty() || ! file.existsAsFile())
+            {
+                response->setProperty("error", "Wavemap resynthesis requires an existing audio file path.");
+                return juce::var(response.get());
+            }
+
+            auto wavemap = makeWavemapFromAudioFile(file,
+                                                    audioFile.getProperty("id", {}).toString(),
+                                                    payload.getProperty("wavemapId", {}).toString(),
+                                                    payload.getProperty("name", {}).toString());
+            if (wavemap.isVoid())
+            {
+                response->setProperty("error", "Audio file could not be decoded for wavemap resynthesis.");
+                return juce::var(response.get());
+            }
+
+            response->setProperty("wavemap", wavemap);
             return juce::var(response.get());
         }
 

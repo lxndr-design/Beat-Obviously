@@ -309,9 +309,17 @@ try {
   );
   assert.equal(resynthWavemap.kind, "resynthesized");
   assert.equal(resynthWavemap.interpolation, "smooth");
+  assert.equal(resynthWavemap.source.kind, "imported-audio");
   assert.equal(resynthWavemap.source.path, "/tmp/verifier.wav");
   assert.equal(resynthWavemap.frames.length, 4);
   assert.equal(resynthWavemap.frames.every((frame) => frame.id?.startsWith("user.resynth.verify.frame.")), true);
+
+  synthStore.useSynthStore.getState().resetDraft();
+  synthStore.useSynthStore.getState().setWavemap(resynthWavemap);
+  assert.deepEqual(
+    synthStore.useSynthStore.getState().draft.metadata.wavemaps[resynthWavemap.id],
+    synthStore.useSynthStore.getState().draft.metadata.customWavetables[resynthWavemap.id],
+  );
 
   const resynthDraft = synthStore.normalizeSynthDraftPatch({
     name: "Resynth Probe",

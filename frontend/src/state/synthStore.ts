@@ -147,6 +147,7 @@ interface SynthStoreState {
   setSelectedOscillator: (id: OscillatorKey) => void;
   setDraft: (patch: SynthDraftPatch | SynthPatchSnapshot) => void;
   resetDraft: () => void;
+  setWavemap: (definition: WavemapDefinition) => void;
   updateCustomWavetableFrame: (id: string, frameIndex: number, patch: Partial<CustomWavetableFrame>) => void;
   updateWavemapMetadata: (id: string, patch: Partial<Pick<WavemapDefinition, "name" | "interpolation" | "source">>) => void;
   setParameter: (id: SynthParameterId, value: SynthParameterValue) => void;
@@ -212,7 +213,7 @@ export function createWavemapFromAudioSamples(
     kind: "resynthesized",
     interpolation: "smooth",
     source: {
-      kind: "resynthesized",
+      kind: source.kind === "imported-audio" ? "imported-audio" : "resynthesized",
       label: source.label ?? "Audio resynthesis",
       audioFileId: source.audioFileId,
       path: source.path,
@@ -723,6 +724,24 @@ export const useSynthStore = create<SynthStoreState>((set) => ({
   setSelectedOscillator: (id) => set({ selectedOscillator: id }),
   setDraft: (draft) => set({ draft: normalizeSynthDraftPatch(draft) }),
   resetDraft: () => set({ draft: createDefaultSynthDraft(), selectedOscillator: "a" }),
+  setWavemap: (definition) =>
+    set((state) => {
+      const nextDefinition = normalizeCustomWavetable(definition);
+      const nextWavemaps = {
+        ...(state.draft.metadata.wavemaps ?? state.draft.metadata.customWavetables ?? {}),
+        [nextDefinition.id]: nextDefinition,
+      };
+      return {
+        draft: normalizeSynthDraftPatch({
+          ...state.draft,
+          metadata: {
+            ...state.draft.metadata,
+            wavemaps: nextWavemaps,
+            customWavetables: nextWavemaps,
+          },
+        }),
+      };
+    }),
   updateCustomWavetableFrame: (id, frameIndex, patch) =>
     set((state) => {
       const current = state.draft.metadata.wavemaps?.[id] ?? state.draft.metadata.customWavetables?.[id] ?? createDefaultCustomWavetable(id);
