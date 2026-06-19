@@ -39,21 +39,9 @@
 .animate-slide-in-bottom { animation: beat-slide-in-bottom var(--duration-slide) var(--ease-in-out) forwards; }
 .animate-slide-in-top    { animation: beat-slide-in-top    var(--duration-slide) var(--ease-in-out) forwards; }
 
-/* ----- Color invert (button hover, toggle) ---------------------------- */
-.hover-invert {
-  transition: var(--transition-invert);
-}
-.hover-invert:not(:hover) {
-  transition: var(--transition-invert-out);
-}
-.hover-invert:hover {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
-}
-
 /* Interactive hover color changes should feel instant on release. Components
- * still opt into hover-in with --transition-invert; this rule makes hover-out
- * snap back for the dense DAW surface without touching panel slide/fade timing.
+ * use --interaction-transition; this rule makes hover-out snap back for the
+ * dense DAW surface without touching panel slide/fade timing.
  */
 :where(
   button,

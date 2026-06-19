@@ -80,8 +80,6 @@ and section dividers may use 1px structural borders.
 Use only the transition vocabulary in `tokens.css`:
 
 - `--interaction-transition` for hover, press, selected, and focus feedback.
-- `--transition-invert` only for legacy local controls that have not yet moved
-  onto the interaction tokens.
 - `--transition-slide-x` and `--transition-slide-y` for panels and modals.
 - `--transition-opacity` for hover info.
 - Playback flash uses `--duration-flash` then `--duration-fade`.

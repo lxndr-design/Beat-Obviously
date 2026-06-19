@@ -180,8 +180,7 @@
   /* === Transitions ====================================================
    * The entire transition vocabulary. Do not invent more.
    */
-  --duration-hover: 0.1s;       /* hover info reveal, color invert hover-in */
-  --duration-hover-out: 0s;     /* color invert hover-out */
+  --duration-hover: 0.1s;       /* hover info reveal and interaction feedback */
   --duration-slide: 0.2s;       /* panels, modals enter/leave */
   --duration-flash: 0.05s;      /* playback flash to white */
   --duration-fade: 0.4s;        /* playback fade back to black */
@@ -192,12 +191,6 @@
   --ease-linear: linear;
 
   /* Reusable transition shorthands */
-  --transition-invert:
-    background-color var(--duration-hover) var(--ease-linear),
-    color var(--duration-hover) var(--ease-linear);
-  --transition-invert-out:
-    background-color var(--duration-hover-out) var(--ease-linear),
-    color var(--duration-hover-out) var(--ease-linear);
   --transition-slide-x: transform var(--duration-slide) var(--ease-in-out);
   --transition-slide-y: transform var(--duration-slide) var(--ease-in-out);
   --transition-opacity: opacity var(--duration-hover) var(--ease-out);

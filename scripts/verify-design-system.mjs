@@ -72,8 +72,8 @@ function isAllowed(allowlist, file, line, value) {
 
 function checkInteractionTokens(file, source) {
   for (const { line, lineNumber } of lineEntries(source)) {
-    if (/transition:\s*var\(--transition-invert\)/.test(line)) {
-      fail(`Use --interaction-transition for UI hover/click feedback ${location(file, lineNumber)}: ${line.trim()}`);
+    if (line.includes("--transition-invert")) {
+      fail(`Use --interaction-transition instead of removed invert motion ${location(file, lineNumber)}: ${line.trim()}`);
     }
     if (/background:\s*var\(--surface-(?:hover|selected|selected-strong)\)/.test(line)) {
       fail(`Use --interaction-* background tokens for UI state feedback ${location(file, lineNumber)}: ${line.trim()}`);
@@ -127,6 +127,7 @@ for (const file of sourceFiles) {
   if (source.includes("@iconify/react")) {
     fail(`Deprecated @iconify/react import in ${rel(file)}`);
   }
+  checkInteractionTokens(file, source);
   const solidMigrationIdentifier = source.match(/\b(?!SolidUiKitCatalog\b)[A-Za-z_$][A-Za-z0-9_$]*Solid[A-Za-z0-9_$]*\b/);
   if (solidMigrationIdentifier) {
     fail(`Migration-era Solid identifier should be removed in ${rel(file)}: ${solidMigrationIdentifier[0]}`);
@@ -179,6 +180,9 @@ const tokenSource = existsSync(tokensPath) ? readFileSync(tokensPath, "utf8") : 
 const designTokens = new Set([...tokenSource.matchAll(/--[A-Za-z0-9_-]+(?=\s*:)/g)].map((match) => match[0]));
 if (!tokenSource) {
   fail("Missing frontend/src/design/tokens.css");
+}
+if (tokenSource.includes("--transition-invert")) {
+  fail("frontend/src/design/tokens.css must not restore the removed --transition-invert token.");
 }
 
 const tsconfigSource = existsSync(tsconfigPath) ? readFileSync(tsconfigPath, "utf8") : "";

@@ -419,10 +419,10 @@ function chooseProjectBackup(backups: ProjectBackupEntry[]): Promise<ProjectBack
     cancel.style.textTransform = "uppercase";
     cancel.style.cursor = "pointer";
     cancel.style.padding = "0 12px";
-    cancel.style.transition = "var(--transition-invert)";
+    cancel.style.transition = "var(--interaction-transition)";
     cancel.addEventListener("mouseenter", () => {
-      cancel.style.background = "var(--color-fg)";
-      cancel.style.color = "var(--color-fg-inverse)";
+      cancel.style.background = "var(--interaction-hover-bg)";
+      cancel.style.color = "var(--color-fg)";
     });
     cancel.addEventListener("mouseleave", () => {
       cancel.style.background = "transparent";
