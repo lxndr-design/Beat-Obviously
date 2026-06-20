@@ -56,6 +56,7 @@ The wavemap-level `interpolation` field controls how Beat generates intermediate
 | `brightness` | normalized | `0..1` | frame default | Harmonic rolloff and upper-harmonic emphasis. |
 | `even` | normalized | `0..1` | frame default | Even-harmonic participation. |
 | `fold` | normalized | `0..1` | frame default | Fold peak and harmonic motion amount. |
+| `formant` | normalized | `0..1` | `0.12` | Focused resonant harmonic band amount. |
 | `skew` | bipolar | `-1..1` | `0` | Harmonic bias. Negative values weight lower harmonics; positive values weight higher harmonics. |
 | `phase` | bipolar | `-1..1` | frame default | Harmonic phase offset. |
 

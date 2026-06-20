@@ -1027,6 +1027,7 @@ function previewWavetableKey(
         frame.brightness.toFixed(3),
         frame.even.toFixed(3),
         frame.fold.toFixed(3),
+        frame.formant.toFixed(3),
         frame.skew.toFixed(3),
         frame.phase.toFixed(3),
       ].join(",")).join(";")].join(":")
@@ -1111,6 +1112,7 @@ function interpolatePreviewCustomFrame(
       brightness: a.brightness + (b.brightness - a.brightness) * mix,
       even: a.even + (b.even - a.even) * mix,
       fold: a.fold + (b.fold - a.fold) * mix,
+      formant: a.formant + (b.formant - a.formant) * mix,
       skew: a.skew + (b.skew - a.skew) * mix,
       phase: a.phase + (b.phase - a.phase) * mix,
     };
@@ -1122,6 +1124,7 @@ function interpolatePreviewCustomFrame(
     brightness: clamp01(interpolatePreviewValue(p0.brightness, a.brightness, b.brightness, p3.brightness, mix)),
     even: clamp01(interpolatePreviewValue(p0.even, a.even, b.even, p3.even, mix)),
     fold: clamp01(interpolatePreviewValue(p0.fold, a.fold, b.fold, p3.fold, mix)),
+    formant: clamp01(interpolatePreviewValue(p0.formant, a.formant, b.formant, p3.formant, mix)),
     skew: clamp(interpolatePreviewValue(p0.skew, a.skew, b.skew, p3.skew, mix), -1, 1),
     phase: clamp(interpolatePreviewValue(p0.phase, a.phase, b.phase, p3.phase, mix), -1, 1),
   };
@@ -1168,6 +1171,7 @@ function sanitizeCustomFrame(frame: CustomWavetableFrame): CustomWavetableFrame 
     brightness: clamp01(frame.brightness),
     even: clamp01(frame.even),
     fold: clamp01(frame.fold),
+    formant: Number.isFinite(frame.formant) ? clamp01(frame.formant) : 0.12,
     skew: clamp(frame.skew, -1, 1),
     phase: clamp(frame.phase, -1, 1),
   };
@@ -1182,6 +1186,7 @@ function warpModeIntensity(warp: number, warpMode: WavetableConfig["warpMode"] =
 function customWavetableHarmonicAmplitude(frame: CustomWavetableFrame, harmonic: number, warp: number, warpMode: WavetableConfig["warpMode"] = "shape"): number {
   const brightness = clamp01(frame.brightness);
   const even = clamp01(frame.even);
+  const formant = clamp01(frame.formant);
   const skew = clampBipolar(frame.skew);
   const shapedWarp = warpModeIntensity(warp, warpMode);
   const fold = clamp01(frame.fold + shapedWarp * 0.35);
@@ -1189,15 +1194,19 @@ function customWavetableHarmonicAmplitude(frame: CustomWavetableFrame, harmonic:
   const rolloff = Math.exp(-harmonic * (0.016 + (1 - brightness) * 0.085));
   const skewBias = Math.max(0.18, 1 + skew * ((harmonic - 8) / 18));
   const foldPeak = Math.exp(-Math.pow((harmonic - (3 + brightness * 20)) / (1.6 + fold * 8), 2));
+  const formantCenter = 4 + brightness * 24 + skew * 4;
+  const formantWidth = 1.1 + fold * 4.4;
+  const formantPeak = Math.exp(-Math.pow((harmonic - formantCenter) / formantWidth, 2));
   const folded = warpMode === "fold" ? Math.abs(Math.sin(harmonic * 0.62 + frame.phase)) * shapedWarp * 0.24 : 0;
   const pinched = warpMode === "pinch" ? Math.exp(-Math.pow((harmonic - (2 + brightness * 8)) / 2.4, 2)) * shapedWarp * 0.28 : 0;
   const motion = 1 + Math.sin(harmonic * 1.7 + frame.phase * Math.PI) * fold * 0.28;
-  return Math.max(0, parity * rolloff * motion * skewBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + folded + pinched);
+  return Math.max(0, parity * rolloff * motion * skewBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + formantPeak * formant * 0.55 + folded + pinched);
 }
 
 function customWavetableHarmonicPhase(frame: CustomWavetableFrame, harmonic: number, warp: number, warpMode: WavetableConfig["warpMode"] = "shape"): number {
   const shapedWarp = warpModeIntensity(warp, warpMode);
   const skew = clampBipolar(frame.skew);
+  const formant = clamp01(frame.formant);
   const modePhase = warpMode === "fold"
     ? Math.sin(harmonic * 0.73) * shapedWarp * 0.45
     : warpMode === "pinch"
@@ -1206,6 +1215,7 @@ function customWavetableHarmonicPhase(frame: CustomWavetableFrame, harmonic: num
   return frame.phase * harmonic * 0.28
     + Math.sin(harmonic * 0.41 + skew * 0.55) * clamp01(frame.fold + shapedWarp * 0.25) * 0.55
     + skew * Math.log2(harmonic + 1) * 0.09
+    + Math.sin(harmonic * 0.23 + frame.phase) * formant * 0.12
     + modePhase;
 }
 

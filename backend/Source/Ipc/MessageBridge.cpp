@@ -417,6 +417,7 @@ namespace beat
             frame->setProperty("brightness", clamp01(0.18 + rms * 0.52 + zeroDensity * 1.8 + roughness * 0.85));
             frame->setProperty("even", clamp01(0.1 + zeroDensity * 1.25 + asymmetry * 0.55));
             frame->setProperty("fold", clamp01(0.05 + roughness * 1.65 + meanAbs * 0.35));
+            frame->setProperty("formant", clamp01(0.08 + rms * 0.28 + roughness * 1.1 + zeroDensity * 0.7));
             frame->setProperty("skew", juce::jlimit(-1.0, 1.0, (zeroDensity * 10.0 - meanAbs) * 0.22 + (rms - 0.28) * 0.35));
             frame->setProperty("phase", juce::jlimit(-1.0, 1.0, (positiveEnergy - negativeEnergy) / totalPolarityEnergy));
             return juce::var(frame.get());

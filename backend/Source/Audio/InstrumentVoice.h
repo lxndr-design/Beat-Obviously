@@ -49,6 +49,7 @@ namespace beat
                     float brightness { 0.5f };
                     float even { 0.2f };
                     float fold { 0.1f };
+                    float formant { 0.12f };
                     float skew { 0.0f };
                     float phase { 0.0f };
                 };
@@ -63,10 +64,10 @@ namespace beat
                 float detuneCents { 12.0f };
                 float blend { 0.5f };
                 std::array<CustomFrame, 4> customFrames {{
-                    { 0.22f, 0.08f, 0.05f, -0.18f, 0.0f },
-                    { 0.46f, 0.28f, 0.16f, -0.04f, 0.12f },
-                    { 0.72f, 0.48f, 0.34f, 0.08f, -0.08f },
-                    { 0.94f, 0.72f, 0.56f, 0.22f, 0.2f },
+                    { 0.22f, 0.08f, 0.05f, 0.08f, -0.18f, 0.0f },
+                    { 0.46f, 0.28f, 0.16f, 0.18f, -0.04f, 0.12f },
+                    { 0.72f, 0.48f, 0.34f, 0.32f, 0.08f, -0.08f },
+                    { 0.94f, 0.72f, 0.56f, 0.46f, 0.22f, 0.2f },
                 }};
             };
 

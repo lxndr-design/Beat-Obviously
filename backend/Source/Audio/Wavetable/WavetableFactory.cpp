@@ -124,6 +124,7 @@ namespace beat
             const float brightness = juce::jlimit(0.0f, 1.0f, frame.brightness);
             const float even = juce::jlimit(0.0f, 1.0f, frame.even);
             const float skew = juce::jlimit(-1.0f, 1.0f, frame.skew);
+            const float formant = juce::jlimit(0.0f, 1.0f, frame.formant);
             const float shapedWarp = warpModeIntensity(warp, warpMode);
             const float fold = juce::jlimit(0.0f, 1.0f, frame.fold + shapedWarp * 0.35f);
             const float parity = (harmonic % 2) == 1 ? 1.0f : even;
@@ -132,11 +133,15 @@ namespace beat
             const float center = 3.0f + brightness * 20.0f;
             const float width = 1.6f + fold * 8.0f;
             const float foldPeak = std::exp(-std::pow(((float) harmonic - center) / width, 2.0f));
+            const float formantCenter = 4.0f + brightness * 24.0f + skew * 4.0f;
+            const float formantWidth = 1.1f + fold * 4.4f;
+            const float formantPeak = std::exp(-std::pow(((float) harmonic - formantCenter) / formantWidth, 2.0f));
             const float motion = 1.0f + std::sin((float) harmonic * 1.7f + frame.phase * juce::MathConstants<float>::pi) * fold * 0.28f;
             return juce::jmax(
                 0.0f,
                 parity * rolloff * motion * skewBias / std::sqrt((float) harmonic)
                     + foldPeak * fold * 0.35f
+                    + formantPeak * formant * 0.55f
                     + warpAmplitudeOffset(warpMode, harmonic, brightness, warp));
         }
 
@@ -144,11 +149,13 @@ namespace beat
         {
             const float shapedWarp = warpModeIntensity(warp, warpMode);
             const float fold = juce::jlimit(0.0f, 1.0f, frame.fold + shapedWarp * 0.25f);
+            const float formant = juce::jlimit(0.0f, 1.0f, frame.formant);
             const float phase = juce::jlimit(-1.0f, 1.0f, frame.phase);
             const float skew = juce::jlimit(-1.0f, 1.0f, frame.skew);
             return phase * (float) harmonic * 0.28f
                 + std::sin((float) harmonic * 0.41f + skew * 0.55f) * fold * 0.55f
                 + skew * std::log2((float) harmonic + 1.0f) * 0.09f
+                + std::sin((float) harmonic * 0.23f + phase) * formant * 0.12f
                 + warpPhaseOffset(warpMode, harmonic, phase, warp);
         }
 
@@ -182,6 +189,7 @@ namespace beat
                     juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.brightness, a.brightness, b.brightness, p3.brightness, mix)),
                     juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.even, a.even, b.even, p3.even, mix)),
                     juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.fold, a.fold, b.fold, p3.fold, mix)),
+                    juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.formant, a.formant, b.formant, p3.formant, mix)),
                     juce::jlimit(-1.0f, 1.0f, smoothInterpolate(p0.skew, a.skew, b.skew, p3.skew, mix)),
                     juce::jlimit(-1.0f, 1.0f, smoothInterpolate(p0.phase, a.phase, b.phase, p3.phase, mix)),
                 };
@@ -190,6 +198,7 @@ namespace beat
                 a.brightness + (b.brightness - a.brightness) * mix,
                 a.even + (b.even - a.even) * mix,
                 a.fold + (b.fold - a.fold) * mix,
+                a.formant + (b.formant - a.formant) * mix,
                 a.skew + (b.skew - a.skew) * mix,
                 a.phase + (b.phase - a.phase) * mix,
             };
