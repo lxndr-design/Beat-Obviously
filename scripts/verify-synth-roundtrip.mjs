@@ -61,6 +61,7 @@ try {
       "unison.voices": 5,
       "unison.detune": 0.27,
       "unison.blend": 0.61,
+      maxVoices: 6,
       "filter.enabled": true,
       "filter.type": "highpass",
       "filter.cutoff": 1370,
@@ -217,6 +218,7 @@ try {
   assert.equal(patch.aether.oscB.wavetable.warpMode, "pinch");
   assert.equal(patch.aether.oscB.wavetable.bank, "organ");
   assert.equal(patch.wavetable.unison, 5);
+  assert.equal(patch.maxVoices, 6);
   assert.equal(patch.aether.oscA.wavetable.unison, 5);
   assert.equal(patch.aether.oscB.wavetable.unison, 5);
   assert.equal(patch.lfo2Waveform, "square");

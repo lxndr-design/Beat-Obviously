@@ -78,6 +78,7 @@ Initial defaults:
 | ID | Type | Range | Default | Notes |
 | --- | --- | --- | --- | --- |
 | `glideMs` | milliseconds | `0..5000` | `0` | Portamento time for linked MIDI notes. Browser previews and native playback ramp from the source note to `connectToIndex` target pitch over this duration. |
+| `maxVoices` | integer | `1..32` | `16` | Per-instrument synth voice allocation cap. Native routes allocate this many voices and enable note stealing when dense MIDI exceeds the cap. |
 
 ## Envelope Parameters
 

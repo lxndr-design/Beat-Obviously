@@ -98,6 +98,7 @@ export function OscillatorPanel() {
                     ["unison.detune", "Detune", 0, 1, 0.01, 0.12],
                     ["unison.blend", "Blend", 0, 1, 0.01, 0.75],
                     ["unison.spread", "Spread", 0, 1, 0.01, 0.5],
+                    ["maxVoices", "Max", 1, 32, 1, 16],
                   ] as Array<[SynthParameterId, string, number, number, number, number]>}>
                     {([id, label, min, max, step, defaultValue]) => (
                       <Knob
@@ -110,8 +111,8 @@ export function OscillatorPanel() {
                         defaultValue={defaultValue}
                         {...modulationPropsForTarget(draft(), id)}
                         pickTargetId={MODULATABLE_TARGETS.has(id) ? id : undefined}
-                        formatValue={id === "unison.voices" ? (value) => Math.round(value).toString() : formatPercent}
-                        parseValue={id === "unison.voices" ? undefined : parsePercent}
+                        formatValue={id === "unison.voices" || id === "maxVoices" ? (value) => Math.round(value).toString() : formatPercent}
+                        parseValue={id === "unison.voices" || id === "maxVoices" ? undefined : parsePercent}
                         onChange={(value) => setNumericParameter(id, value)}
                       />
                     )}

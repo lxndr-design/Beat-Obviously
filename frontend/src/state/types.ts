@@ -235,6 +235,7 @@ export interface Instrument {
   octave?: number;        // ±3 — coarse octave shift
   subOscLevel?: number;   // 0..1 — square sub-osc one octave below, displayed as %
   glideMs?: number;       // 0..500 — portamento between notes
+  maxVoices?: number;     // 1..32 — synth voice allocation cap
   ampLevel?: number;      // 0..1 — final synth voice level
   ampPan?: number;        // -1..1 — final synth voice pan
 
@@ -566,6 +567,7 @@ export interface InstrumentSnapshot {
   octave?: number;
   subOscLevel?: number;
   glideMs?: number;
+  maxVoices?: number;
   ampLevel?: number;
   ampPan?: number;
   wavetable?: WavetableConfig;

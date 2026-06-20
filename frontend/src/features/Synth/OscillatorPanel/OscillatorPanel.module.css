@@ -78,7 +78,7 @@
 }
 
 .unisonKnobs {
-  grid-template-columns: repeat(4, minmax(52px, 1fr));
+  grid-template-columns: repeat(5, minmax(52px, 1fr));
 }
 
 .wavetableControl {

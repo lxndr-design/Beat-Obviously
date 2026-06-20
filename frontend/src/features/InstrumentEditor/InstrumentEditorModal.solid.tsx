@@ -1151,6 +1151,7 @@ function restoreSnapshot(snapshot: InstrumentSnapshot): Partial<Instrument> {
     octave: snapshot.octave,
     subOscLevel: snapshot.subOscLevel,
     glideMs: snapshot.glideMs,
+    maxVoices: snapshot.maxVoices,
     ampLevel: snapshot.ampLevel,
     ampPan: snapshot.ampPan,
     wavetable: snapshot.wavetable ? structuredClone(snapshot.wavetable) : undefined,

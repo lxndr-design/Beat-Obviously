@@ -194,6 +194,7 @@ namespace beat
             DynamicModulation dynamicModulation;
             WavetableConfig wavetable;
             float glideMs { 0.0f };
+            int maxVoices { 16 };
             bool hasAether { false };
             AetherOscillator aetherOscA;
             AetherOscillator aetherOscB;

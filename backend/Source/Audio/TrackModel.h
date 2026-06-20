@@ -266,6 +266,7 @@ namespace beat
         float ampLevel { 1.0f };
         float ampPan { 0.0f };
         float glideMs { 0.0f };
+        int maxVoices { 16 };
         int wavetableBank { 0 };
         float wavetablePosition { 0.35f };
         float wavetableWarp { 0.2f };

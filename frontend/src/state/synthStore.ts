@@ -56,6 +56,7 @@ export type SynthParameterId =
   | "filter.drive"
   | "amp.level"
   | "amp.pan"
+  | "maxVoices"
   | "env.1.attack"
   | "env.1.attackCurve"
   | "env.1.decay"
@@ -449,6 +450,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "filter.drive": 0,
   "amp.level": 0.8,
   "amp.pan": 0,
+  maxVoices: 16,
   "env.1.attack": 0.005,
   "env.1.attackCurve": "linear",
   "env.1.decay": 0.15,
@@ -529,6 +531,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "filter.drive": "Filter Drive",
   "amp.level": "Amp Level",
   "amp.pan": "Amp Pan",
+  maxVoices: "Max Voices",
   "env.1.attack": "Env 1 Attack",
   "env.1.attackCurve": "Env 1 Attack Curve",
   "env.1.decay": "Env 1 Decay",
@@ -821,6 +824,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     envToFilter: clampBipolar(routeAmount(draft, "env.1", "filter.cutoff")),
     ampLevel: modulatedNumberParam(draft, "amp.level", "amp.level", 0, 1),
     ampPan: modulatedNumberParam(draft, "amp.pan", "amp.pan", -1, 1),
+    maxVoices: getNumberParam(draft, "maxVoices"),
     synthPatch: cloneSynthPatch(draft),
   };
 }
@@ -865,6 +869,7 @@ export function synthDraftToPreviewInstrument(draft: SynthDraftPatch): Instrumen
     octave: 0,
     subOscLevel: 0,
     glideMs: 0,
+    maxVoices: getNumberParam(draft, "maxVoices"),
     ampLevel: 1,
     ampPan: 0,
     lfoWaveform: "sine",
@@ -935,6 +940,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["lfo.2.oneShot"] = instrument.lfo2OneShot ?? false;
   draft.parameters["amp.level"] = instrument.ampLevel ?? 0.8;
   draft.parameters["amp.pan"] = instrument.ampPan ?? 0;
+  draft.parameters.maxVoices = instrument.maxVoices ?? 16;
 
   if (instrument.wavetable) {
     applyWavetableToDraft(draft, "a", instrument.wavetable, true);
@@ -1146,6 +1152,7 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (id.includes(".semitone")) return Math.max(-12, Math.min(12, Math.round(value)));
   if (id.includes(".fine")) return Math.max(-100, Math.min(100, value));
   if (id === "unison.voices") return Math.max(1, Math.min(16, Math.round(value)));
+  if (id === "maxVoices") return Math.max(1, Math.min(32, Math.round(value)));
   if (id.includes(".pan")) return Math.max(-1, Math.min(1, value));
   if (id.includes(".attack") || id.includes(".decay") || id.includes(".release")) return Math.max(0, Math.min(30, value));
   return Math.max(0, Math.min(1, value));

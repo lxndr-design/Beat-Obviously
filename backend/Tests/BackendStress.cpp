@@ -5179,6 +5179,7 @@ namespace
         curveInstrument.id = "curve-synth";
         curveInstrument.kind = "synth";
         curveInstrument.glideMs = 140.0f;
+        curveInstrument.maxVoices = 7;
         project.instruments.push_back(curveInstrument);
 
         beat::AudioFileAsset audioFile;
@@ -5291,6 +5292,7 @@ namespace
             && loaded->tracks[1].segments.size() == 1
             && loaded->instruments.size() == 1
             && std::abs(loaded->instruments.front().glideMs - 140.0f) < 0.0001f
+            && loaded->instruments.front().maxVoices == 7
             && loaded->tracks[1].segments.front().notes.size() == 2
             && loaded->tracks[1].segments.front().notes.front().connectToIndex == 1
             && loaded->tracks[1].segments.front().notes.front().curve.size() == 2
@@ -8592,6 +8594,47 @@ namespace
         return ok;
     }
 
+    bool stressAudioEngineAetherVoiceLimit()
+    {
+        auto project = makeMaxUnisonAetherProject();
+        project.id = "limited-voice-aether-project";
+        project.instruments.front().maxVoices = 4;
+
+        beat::AudioEngine engine;
+        constexpr int blockSize = 512;
+        engine.prepareForOffline(44100.0, blockSize, 2);
+        engine.applyProject(project);
+        engine.requestPlay();
+
+        double energy = 0.0;
+        int maxSynthVoices = 0;
+        int maxAutomationEvents = 0;
+
+        for (int block = 0; block < 18; ++block)
+        {
+            const auto buffer = renderEngineBlock(engine, blockSize);
+            energy += bufferEnergy(buffer);
+
+            beat::AudioEngine::RenderTimingSnapshot timing;
+            if (!engine.pullRenderTimingSnapshot(timing))
+                return false;
+            if (!std::isfinite(timing.synthMs) || !std::isfinite(timing.totalMs))
+                return false;
+
+            maxSynthVoices = juce::jmax(maxSynthVoices, timing.activeSynthVoices);
+            maxAutomationEvents = juce::jmax(maxAutomationEvents, timing.automationEventCount);
+        }
+
+        const bool ok = energy > 0.01 && maxSynthVoices > 0 && maxSynthVoices <= 4 && maxAutomationEvents > 0;
+        if (!ok)
+        {
+            std::cerr << "Aether voice-limit stress failed energy=" << energy
+                      << " voices=" << maxSynthVoices
+                      << " automation=" << maxAutomationEvents << "\n";
+        }
+        return ok;
+    }
+
     bool stressAudioEngineDenseAetherLiveExportParity()
     {
         auto project = makeDenseAetherProject();
@@ -8860,6 +8903,7 @@ namespace
             "unison.detune": 0.2,
             "unison.blend": 0.6,
             "unison.spread": 0.4,
+            "maxVoices": 6,
             "filter.enabled": true,
             "filter.type": "highpass",
             "filter.cutoff": 1000,
@@ -8945,6 +8989,8 @@ namespace
         if (instrument.wavetableBank != 4 || !near(instrument.wavetablePosition, 0.45f))
             return false;
         if (instrument.wavetableUnison != 5 || !near(instrument.wavetableDetuneCents, 25.0f) || !near(instrument.wavetableBlend, 0.5f))
+            return false;
+        if (instrument.maxVoices != 6)
             return false;
         if (!instrument.aether.oscA.enabled || instrument.aether.oscA.wavetable.bank != 4)
             return false;
@@ -10694,6 +10740,11 @@ int main()
     if (!stressAudioEngineMaxUnisonAetherPolyphony())
     {
         std::cerr << "Audio engine max-unison Aether polyphony stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineAetherVoiceLimit())
+    {
+        std::cerr << "Audio engine Aether voice-limit stress failed\n";
         return 1;
     }
     if (!stressAudioEngineDenseAetherLiveExportParity())

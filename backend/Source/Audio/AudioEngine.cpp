@@ -1484,6 +1484,7 @@ namespace beat
         params.ampLevel = instrument.ampLevel;
         params.ampPan = instrument.ampPan;
         params.glideMs = juce::jlimit(0.0f, 5000.0f, instrument.glideMs);
+        params.maxVoices = juce::jlimit(1, 32, instrument.maxVoices);
         params.waveform = instrument.waveform;
         params.wavetableBank = instrument.wavetableBank;
         params.wavetablePosition = instrument.wavetablePosition;
@@ -1596,7 +1597,8 @@ namespace beat
             instrument.aether.noise.color,
         };
 
-        for (int i = 0; i < 16; ++i)
+        instrumentSynth->setNoteStealingEnabled(true);
+        for (int i = 0; i < params.maxVoices; ++i)
         {
             auto* voice = new InstrumentVoice();
             voice->prepare(sampleRate, mixBuf.getNumSamples() > 0 ? mixBuf.getNumSamples() : 512);

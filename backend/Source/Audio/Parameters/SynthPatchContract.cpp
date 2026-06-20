@@ -350,6 +350,7 @@ namespace beat
 
         instrument.kind = "wavetable";
         instrument.waveform = 5;
+        instrument.maxVoices = juce::jlimit(1, 32, (int) std::round(synthNumberParam(params, "maxVoices", instrument.maxVoices)));
         instrument.wavetableBank = synthWavetableBankForId(synthStringParam(params, "osc.a.wavetable", "basic.saw"));
         instrument.wavetablePosition = juce::jlimit(
             0.0f,
