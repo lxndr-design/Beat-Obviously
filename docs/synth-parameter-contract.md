@@ -180,6 +180,8 @@ Rules:
 
 `modWheel` is a global controller source normalized to `0..1`. Native voices update it from MIDI controller 1 and browser preview exposes it as an explicit render/modulation argument; both paths default to `0` when no wheel value is supplied.
 
+Pitch bend is runtime expression rather than a saved modulation source. Native Aether/basic synth voices apply standard MIDI pitch-wheel values around center `8192` with a bounded default range of `+/-2` semitones, and browser preview exposes the same semitone offset as an explicit render argument for preview/test callers.
+
 ## Modulation Targets
 
 Initial targets:

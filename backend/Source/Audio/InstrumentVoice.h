@@ -34,9 +34,9 @@ namespace beat
 
         bool canPlaySound(juce::SynthesiserSound*) override { return true; }
         void startNote(int midiNoteNumber, float velocity,
-                       juce::SynthesiserSound*, int /*currentPitchWheel*/) override;
+                       juce::SynthesiserSound*, int currentPitchWheel) override;
         void stopNote(float velocity, bool allowTailOff) override;
-        void pitchWheelMoved(int) override {}
+        void pitchWheelMoved(int newPitchWheelValue) override;
         void controllerMoved(int controllerNumber, int controllerValue) override;
         void renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
                              int startSample, int numSamples) override;
@@ -159,6 +159,7 @@ namespace beat
             float ampLevel  { 1.0f };
             float ampPan    { 0.0f };
             float modWheel  { 0.0f };
+            float pitchBendRangeSemitones { 2.0f };
             // Waveform: 0=sine, 1=saw, 2=square, 3=triangle, 4=noise, 5=wavetable
             int waveform { 1 };
             int wavetableBank { 0 };
@@ -368,6 +369,7 @@ namespace beat
         float   level { 0.0f };
         float   noteKeytrack { 0.0f };
         float   modWheel { 0.0f };
+        float   pitchWheelSemitones { 0.0f };
         float   cachedFilterHz { -1.0f };
         float   cachedFilterResonance { -1.0f };
         std::shared_ptr<const Wavetable> wavetableTable;

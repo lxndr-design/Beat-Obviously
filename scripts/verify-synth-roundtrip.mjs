@@ -375,6 +375,69 @@ try {
   );
   assert.ok(bufferRms(highModWheelSamples) > bufferRms(lowModWheelSamples) * 4, "expected mod wheel-routed preview render to respond to wheel value");
 
+  const pitchBendPreview = {
+    id: "pitch-bend-preview",
+    name: "Pitch Bend Preview",
+    kind: "wavetable",
+    waveform: "wavetable",
+    envelope: { attackMs: 1, decayMs: 10, sustain: 1, releaseMs: 20 },
+    knobs: { cutoff: 1, resonance: 0, drive: 0, color: 0.5 },
+    filterType: "lowpass",
+    detuneCents: 0,
+    octave: 0,
+    subOscLevel: 0,
+    glideMs: 0,
+    ampLevel: 0.9,
+    ampPan: 0,
+    lfoWaveform: "sine",
+    lfoRateHz: 1,
+    lfoDepth: 0,
+    lfoToPitch: 0,
+    lfoToFilter: 0,
+    envToFilter: 0,
+    sampleIds: [],
+    userCreated: true,
+    aether: {
+      oscA: {
+        enabled: true,
+        level: 1,
+        pan: 0,
+        waveform: "sine",
+        octave: 0,
+        semitone: 0,
+        fineCents: 0,
+        phase: 0,
+        randomPhase: 0,
+        wavetable: { bank: "basic.sine", position: 0, warp: 0, warpMode: "shape", unison: 1, detuneCents: 0, blend: 0 },
+      },
+      oscB: {
+        enabled: false,
+        level: 0,
+        pan: 0,
+        waveform: "sine",
+        octave: 0,
+        semitone: 0,
+        fineCents: 0,
+        phase: 0,
+        randomPhase: 0,
+        wavetable: { bank: "basic.sine", position: 0, warp: 0, warpMode: "shape", unison: 1, detuneCents: 0, blend: 0 },
+      },
+      sub: { enabled: false, level: 0, octave: -1, waveform: "sine" },
+      noise: { enabled: false, level: 0, color: 0.5 },
+    },
+  };
+  const pitchBaseSamples = new Float32Array(48000);
+  const pitchBentSamples = new Float32Array(48000);
+  synthPreview.renderInstrumentSamples(pitchBendPreview, pitchBaseSamples, 48000, 440, "audio", false);
+  synthPreview.renderInstrumentSamples(pitchBendPreview, pitchBentSamples, 48000, 440, "audio", false, undefined, undefined, undefined, 120, 127, 0, 2);
+  const baseFrequencyEstimate = estimateFrequencyFromZeroCrossings(pitchBaseSamples, 48000);
+  const bentFrequencyEstimate = estimateFrequencyFromZeroCrossings(pitchBentSamples, 48000);
+  assert.ok(baseFrequencyEstimate > 430 && baseFrequencyEstimate < 450, `expected base pitch near 440 Hz, got ${baseFrequencyEstimate}`);
+  assert.ok(
+    bentFrequencyEstimate / baseFrequencyEstimate > 1.115 && bentFrequencyEstimate / baseFrequencyEstimate < 1.13,
+    `expected +2 semitone bend ratio, got ${bentFrequencyEstimate / baseFrequencyEstimate}`,
+  );
+
   const env2Preview = synthStore.synthDraftToPreviewInstrument({
     ...draft,
     parameters: {
@@ -1025,4 +1088,20 @@ function assertMidiPart(notes, lengthBeats, label) {
     assert.equal(note.startBeat >= 0 && note.startBeat < lengthBeats, true, `${label} note should start inside loop`);
     assert.equal(note.startBeat + note.lengthBeats <= lengthBeats + 0.0001, true, `${label} note should end inside loop`);
   }
+}
+
+function estimateFrequencyFromZeroCrossings(samples, sampleRate) {
+  let crossings = 0;
+  let first = -1;
+  let last = -1;
+  const start = Math.floor(sampleRate * 0.05);
+  for (let i = start + 1; i < samples.length; i += 1) {
+    if (samples[i - 1] <= 0 && samples[i] > 0) {
+      if (first < 0) first = i;
+      last = i;
+      crossings += 1;
+    }
+  }
+  if (crossings < 2 || last <= first) return 0;
+  return ((crossings - 1) * sampleRate) / (last - first);
 }

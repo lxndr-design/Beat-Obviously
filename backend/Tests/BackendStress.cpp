@@ -9202,18 +9202,37 @@ namespace
         if (!(keytrackOpenEnergy > keytrackClosedEnergy * 1.1))
             return false;
 
-        auto renderWithVelocity = [](const beat::InstrumentVoice::Params& renderParams, float velocity, int midiNote = 69, int modWheelValue = 0) {
+        auto renderWithVelocity = [](const beat::InstrumentVoice::Params& renderParams, float velocity, int midiNote = 69, int modWheelValue = 0, int pitchWheelValue = 8192) {
             beat::InstrumentVoice voice;
             voice.prepare(44100.0, 256);
             voice.setParams(renderParams);
-            voice.startNote(midiNote, velocity, nullptr, 0);
+            voice.startNote(midiNote, velocity, nullptr, 8192);
             voice.controllerMoved(1, modWheelValue);
+            voice.pitchWheelMoved(pitchWheelValue);
 
             juce::AudioBuffer<float> buffer(2, 4096);
             buffer.clear();
             voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
             voice.stopNote(0.0f, false);
             return buffer;
+        };
+        auto estimatePositiveCrossingFrequency = [](const juce::AudioBuffer<float>& buffer) {
+            int first = -1;
+            int last = -1;
+            int crossings = 0;
+            for (int i = 257; i < buffer.getNumSamples(); ++i)
+            {
+                if (buffer.getSample(0, i - 1) <= 0.0f && buffer.getSample(0, i) > 0.0f)
+                {
+                    if (first < 0)
+                        first = i;
+                    last = i;
+                    ++crossings;
+                }
+            }
+            if (crossings < 2 || last <= first)
+                return 0.0;
+            return ((double) (crossings - 1) * 44100.0) / (double) (last - first);
         };
 
         auto velocityBaseParams = params;
@@ -9287,6 +9306,47 @@ namespace
             }
         }
         if (!(highModWheelEnergy > lowModWheelEnergy * 40.0))
+            return false;
+
+        auto pitchBendParams = params;
+        pitchBendParams.hasAether = true;
+        pitchBendParams.waveform = 5;
+        pitchBendParams.ampLevel = 0.95f;
+        pitchBendParams.ampPan = 0.0f;
+        pitchBendParams.attackMs = 1.0f;
+        pitchBendParams.decayMs = 10.0f;
+        pitchBendParams.sustain = 1.0f;
+        pitchBendParams.releaseMs = 20.0f;
+        pitchBendParams.filterType = 0;
+        pitchBendParams.cutoff01 = 1.0f;
+        pitchBendParams.resonance01 = 0.0f;
+        pitchBendParams.drive01 = 0.0f;
+        pitchBendParams.lfoDepth = 0.0f;
+        pitchBendParams.lfoToPitch = 0.0f;
+        pitchBendParams.lfoToFilter = 0.0f;
+        pitchBendParams.envToFilter = 0.0f;
+        pitchBendParams.dynamicModulation.active = false;
+        pitchBendParams.pitchBendRangeSemitones = 2.0f;
+        pitchBendParams.aetherOscA.enabled = true;
+        pitchBendParams.aetherOscA.level = 1.0f;
+        pitchBendParams.aetherOscA.pan = 0.0f;
+        pitchBendParams.aetherOscA.waveform = 0;
+        pitchBendParams.aetherOscA.octave = 0;
+        pitchBendParams.aetherOscA.semitone = 0;
+        pitchBendParams.aetherOscA.fineCents = 0.0f;
+        pitchBendParams.aetherOscA.phase = 0.0f;
+        pitchBendParams.aetherOscA.randomPhase = 0.0f;
+        pitchBendParams.aetherOscB.enabled = false;
+        pitchBendParams.aetherSub.enabled = false;
+        pitchBendParams.aetherNoise.enabled = false;
+        const auto pitchBase = renderWithVelocity(pitchBendParams, 1.0f, 69, 0, 8192);
+        const auto pitchBent = renderWithVelocity(pitchBendParams, 1.0f, 69, 0, 16383);
+        const auto pitchBaseHz = estimatePositiveCrossingFrequency(pitchBase);
+        const auto pitchBentHz = estimatePositiveCrossingFrequency(pitchBent);
+        if (!(pitchBaseHz > 430.0 && pitchBaseHz < 450.0))
+            return false;
+        const auto bendRatio = pitchBentHz / pitchBaseHz;
+        if (!(bendRatio > 1.115 && bendRatio < 1.13))
             return false;
 
         auto env2ModParams = params;

@@ -113,6 +113,7 @@ export function renderInstrumentSamples(
   bpm = 120,
   velocity = 127,
   modWheel = 0,
+  pitchBendSemitones = 0,
 ) {
   const state = createSynthRenderState();
   const durationS = out.length / sampleRate;
@@ -135,7 +136,7 @@ export function renderInstrumentSamples(
         : frequency;
     const modulation = modulationAtTime(instrument, t, durationS, bpm, velocity01, keytrackSourceValue(baseFrequency), modWheel);
     applyAutomationOffsets(instrument, modulation, automation, t);
-    const currentFrequency = baseFrequency * Math.pow(2, modulation.pitchSemitones / 12);
+    const currentFrequency = baseFrequency * Math.pow(2, (pitchBendSemitones + modulation.pitchSemitones) / 12);
     out[i] = renderInstrumentSample(instrument, state, sampleRate, currentFrequency, mode, modulation) * amp;
   }
 }
@@ -154,11 +155,12 @@ export function renderInstrumentStereoSamples(
   bpm = 120,
   velocity = 127,
   modWheel = 0,
+  pitchBendSemitones = 0,
 ) {
   const length = Math.min(left.length, right.length);
   if (!instrument.aether) {
     const mono = new Float32Array(length);
-    renderInstrumentSamples(instrument, mono, sampleRate, frequency, mode, fade, targetFrequency, curve, automation, bpm, velocity, modWheel);
+    renderInstrumentSamples(instrument, mono, sampleRate, frequency, mode, fade, targetFrequency, curve, automation, bpm, velocity, modWheel, pitchBendSemitones);
     const [leftGain, rightGain] = panGains(instrument.ampPan ?? 0);
     for (let i = 0; i < length; i++) {
       left[i] = mono[i] * leftGain;
@@ -190,7 +192,7 @@ export function renderInstrumentStereoSamples(
         : frequency;
     const modulation = modulationAtTime(instrument, timeS, durationS, bpm, velocity01, keytrackSourceValue(baseFrequency), modWheel);
     applyAutomationOffsets(instrument, modulation, automation, timeS);
-    const currentFrequency = baseFrequency * Math.pow(2, modulation.pitchSemitones / 12);
+    const currentFrequency = baseFrequency * Math.pow(2, (pitchBendSemitones + modulation.pitchSemitones) / 12);
     const stereo = renderInstrumentStereoSample(instrument, phaseState, leftFilterState, rightFilterState, sampleRate, currentFrequency, mode, modulation);
     left[i] = stereo.left * amp;
     right[i] = stereo.right * amp;

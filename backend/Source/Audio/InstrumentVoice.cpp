@@ -38,6 +38,14 @@ namespace beat
             return juce::jlimit(0.0f, 1.0f, v);
         }
 
+        float pitchWheelRatio(int value) noexcept
+        {
+            const auto clamped = juce::jlimit(0, 16383, value);
+            if (clamped >= 8192)
+                return (float) (clamped - 8192) / 8191.0f;
+            return (float) (clamped - 8192) / 8192.0f;
+        }
+
         float polyBlep(double phase, double phaseDelta) noexcept
         {
             const auto dt = juce::jlimit(1.0e-9, 0.5, std::abs(phaseDelta));
@@ -415,6 +423,7 @@ namespace beat
         baseParams = p;
         params = p;
         modWheel = juce::jlimit(0.0f, 1.0f, p.modWheel);
+        pitchWheelSemitones = 0.0f;
         params.wavetable.bank = params.wavetableBank;
         params.wavetable.custom = params.wavetableBank == 5;
         params.wavetable.position = params.wavetablePosition;
@@ -487,6 +496,12 @@ namespace beat
     {
         if (controllerNumber == 1)
             modWheel = juce::jlimit(0.0f, 1.0f, (float) controllerValue / 127.0f);
+    }
+
+    void InstrumentVoice::pitchWheelMoved(int newPitchWheelValue)
+    {
+        pitchWheelSemitones = pitchWheelRatio(newPitchWheelValue)
+            * juce::jlimit(0.0f, 24.0f, params.pitchBendRangeSemitones);
     }
 
     void InstrumentVoice::RealtimeRamp::reset(float value) noexcept
@@ -853,7 +868,7 @@ namespace beat
     }
 
     void InstrumentVoice::startNote(int midiNoteNumber, float velocity,
-                                    juce::SynthesiserSound*, int)
+                                    juce::SynthesiserSound*, int currentPitchWheel)
     {
         params = baseParams;
         resetRealtimeRampsFromParams();
@@ -871,6 +886,7 @@ namespace beat
 
         level     = velocity;
         noteKeytrack = juce::jlimit(0.0f, 1.0f, (float) midiNoteNumber / 127.0f);
+        pitchWheelMoved(currentPitchWheel == 0 ? 8192 : currentPitchWheel);
         phase     = 0.0;
         noiseState = (juce::uint32) (midiNoteNumber * 747796405u + 2891336453u);
         aetherOscAPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscA.phase)
@@ -997,7 +1013,8 @@ namespace beat
                     params.env2DecayCurve,
                     params.env2ReleaseCurve)
                 : 0.0f;
-            const double currentPitchFrequency = juce::jmax(1.0f, pitchFrequencyRamp.next());
+            const double currentPitchFrequency = juce::jmax(1.0f, pitchFrequencyRamp.next())
+                * std::exp2((double) pitchWheelSemitones / 12.0);
             double currentPhaseDelta = currentPitchFrequency / sampleRate;
             if (hasPitchMod)
                 currentPhaseDelta *= std::exp2((pitchLfo * pitchMod) / 12.0);
