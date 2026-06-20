@@ -348,6 +348,8 @@ namespace beat
                     no->setProperty("velocity",   n.velocity);
                     no->setProperty("startBeat",  n.startBeat);
                     no->setProperty("lengthBeats",n.lengthBeats);
+                    if (n.connectToIndex >= 0)
+                        no->setProperty("connectToIndex", n.connectToIndex);
                     if (!n.curve.empty())
                     {
                         juce::Array<juce::var> curveArr;
@@ -448,6 +450,7 @@ namespace beat
             o->setProperty("releaseCurve", instrument.releaseCurve);
             o->setProperty("ampLevel", instrument.ampLevel);
             o->setProperty("ampPan", instrument.ampPan);
+            o->setProperty("glideMs", instrument.glideMs);
             o->setProperty("wavetableBank", instrument.wavetableBank);
             o->setProperty("wavetablePosition", instrument.wavetablePosition);
             o->setProperty("wavetableWarp", instrument.wavetableWarp);
@@ -612,6 +615,7 @@ namespace beat
                     instrument.releaseCurve = juce::jlimit(0, 3, (int) iv.getProperty("releaseCurve", instrument.releaseCurve));
                     instrument.ampLevel = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("ampLevel", instrument.ampLevel));
                     instrument.ampPan = juce::jlimit(-1.0f, 1.0f, (float) (double) iv.getProperty("ampPan", instrument.ampPan));
+                    instrument.glideMs = juce::jlimit(0.0f, 5000.0f, (float) (double) iv.getProperty("glideMs", instrument.glideMs));
                     instrument.wavetableBank = juce::jlimit(0, 8, (int) iv.getProperty("wavetableBank", instrument.wavetableBank));
                     instrument.wavetablePosition = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("wavetablePosition", instrument.wavetablePosition));
                     instrument.wavetableWarp = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("wavetableWarp", instrument.wavetableWarp));
@@ -836,6 +840,7 @@ namespace beat
                                     n.velocity    = (int) nv.getProperty("velocity", 100);
                                     n.startBeat   = (double) nv.getProperty("startBeat", 0.0);
                                     n.lengthBeats = (double) nv.getProperty("lengthBeats", 0.25);
+                                    n.connectToIndex = juce::jmax(-1, (int) nv.getProperty("connectToIndex", -1));
                                     if (auto* curve = nv.getProperty("curve", {}).getArray())
                                     {
                                         n.curve.reserve((size_t) curve->size());

@@ -48,6 +48,7 @@ namespace beat
         int   velocity;    // 0..127
         Beats startBeat;   // relative to segment
         Beats lengthBeats;
+        int   connectToIndex { -1 };
         std::vector<MidiPitchCurvePoint> curve;
         std::vector<MidiAutomationLane> automation;
     };
@@ -264,6 +265,7 @@ namespace beat
         int env2ReleaseCurve { 0 };
         float ampLevel { 1.0f };
         float ampPan { 0.0f };
+        float glideMs { 0.0f };
         int wavetableBank { 0 };
         float wavetablePosition { 0.35f };
         float wavetableWarp { 0.2f };

@@ -1483,6 +1483,7 @@ namespace beat
         params.env2ReleaseCurve = instrument.env2ReleaseCurve;
         params.ampLevel = instrument.ampLevel;
         params.ampPan = instrument.ampPan;
+        params.glideMs = juce::jlimit(0.0f, 5000.0f, instrument.glideMs);
         params.waveform = instrument.waveform;
         params.wavetableBank = instrument.wavetableBank;
         params.wavetablePosition = instrument.wavetablePosition;
@@ -2189,7 +2190,8 @@ namespace beat
     void AudioEngine::scheduleNoteAutomationLocked(const Sequencer::TriggerEvent& ev) noexcept
     {
         const auto* note = ev.sourceNote;
-        if (note == nullptr || (note->automation.empty() && note->curve.empty())) return;
+        const bool hasGlideTarget = ev.glideTargetPitch >= 0 && ev.instrumentGlideMs > 0.0f && note != nullptr && note->curve.empty();
+        if (note == nullptr || (note->automation.empty() && note->curve.empty() && !hasGlideTarget)) return;
 
         const double sr = sampleRate > 0.0 ? sampleRate : 44100.0;
         const double tempo = juce::jmax(1.0, seq.getTempo());
@@ -2241,6 +2243,13 @@ namespace beat
         };
 
         bool emittedInitialPitch = false;
+        if (hasGlideTarget)
+        {
+            const int glideSamples = juce::jmax(1, (int) std::round((ev.instrumentGlideMs / 1000.0f) * sr));
+            pushPitchChange((double) ev.glideTargetPitch, 0, glideSamples);
+            emittedInitialPitch = true;
+        }
+
         for (size_t i = 0; i < note->curve.size(); ++i)
         {
             const auto& point = note->curve[i];

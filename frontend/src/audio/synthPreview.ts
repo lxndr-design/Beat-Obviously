@@ -100,6 +100,21 @@ export function previewFrequency(instrument: Instrument): number {
   return SYNTH_PREVIEW_BASE_HZ * Math.pow(2, detune / 1200);
 }
 
+function glideBaseFrequency(instrument: Instrument, sourceFrequency: number, targetFrequency: number | undefined, timeS: number, durationS: number) {
+  if (targetFrequency == null || !Number.isFinite(targetFrequency) || Math.abs(targetFrequency - sourceFrequency) <= 0.01) {
+    return sourceFrequency;
+  }
+
+  const glideMs = Math.max(0, instrument.glideMs ?? 0);
+  if (glideMs <= 0) {
+    return sourceFrequency;
+  }
+
+  const glideDurationS = Math.min(durationS, glideMs / 1000);
+  const glideT = clamp01(timeS / Math.max(0.001, glideDurationS));
+  return sourceFrequency + (targetFrequency - sourceFrequency) * smoothstep(glideT);
+}
+
 export function renderInstrumentSamples(
   instrument: Instrument,
   out: ArrayLike<number> & { [index: number]: number },
@@ -118,22 +133,15 @@ export function renderInstrumentSamples(
   const state = createSynthRenderState();
   const durationS = out.length / sampleRate;
   const velocity01 = clamp01(velocity / 127);
-  const shouldGlide = targetFrequency != null && Number.isFinite(targetFrequency) && Math.abs(targetFrequency - frequency) > 0.01;
   const sortedCurve = curve?.filter((point) => Number.isFinite(point.timeS) && Number.isFinite(point.frequency))
     .sort((a, b) => a.timeS - b.timeS);
 
   for (let i = 0; i < out.length; i++) {
     const t = i / sampleRate;
     const amp = fade ? Math.min(1, t / 0.025, (durationS - t) / 0.08) : 1;
-    const glideStart = durationS * 0.45;
-    const glideT = shouldGlide
-      ? clamp01((t - glideStart) / Math.max(0.001, durationS - glideStart))
-      : 0;
     const baseFrequency = sortedCurve && sortedCurve.length > 1
       ? frequencyAtCurveTime(sortedCurve, t)
-      : shouldGlide
-        ? frequency + (targetFrequency - frequency) * smoothstep(glideT)
-        : frequency;
+      : glideBaseFrequency(instrument, frequency, targetFrequency, t, durationS);
     const modulation = modulationAtTime(instrument, t, durationS, bpm, velocity01, keytrackSourceValue(baseFrequency), modWheel);
     applyAutomationOffsets(instrument, modulation, automation, t);
     const currentFrequency = baseFrequency * Math.pow(2, (pitchBendSemitones + modulation.pitchSemitones) / 12);
@@ -174,22 +182,15 @@ export function renderInstrumentStereoSamples(
   const rightFilterState = createSynthRenderState();
   const durationS = length / sampleRate;
   const velocity01 = clamp01(velocity / 127);
-  const shouldGlide = targetFrequency != null && Number.isFinite(targetFrequency) && Math.abs(targetFrequency - frequency) > 0.01;
   const sortedCurve = curve?.filter((point) => Number.isFinite(point.timeS) && Number.isFinite(point.frequency))
     .sort((a, b) => a.timeS - b.timeS);
 
   for (let i = 0; i < length; i++) {
     const timeS = i / sampleRate;
     const amp = fade ? Math.min(1, timeS / 0.025, (durationS - timeS) / 0.08) : 1;
-    const glideStart = durationS * 0.45;
-    const glideT = shouldGlide
-      ? clamp01((timeS - glideStart) / Math.max(0.001, durationS - glideStart))
-      : 0;
     const baseFrequency = sortedCurve && sortedCurve.length > 1
       ? frequencyAtCurveTime(sortedCurve, timeS)
-      : shouldGlide
-        ? frequency + (targetFrequency - frequency) * smoothstep(glideT)
-        : frequency;
+      : glideBaseFrequency(instrument, frequency, targetFrequency, timeS, durationS);
     const modulation = modulationAtTime(instrument, timeS, durationS, bpm, velocity01, keytrackSourceValue(baseFrequency), modWheel);
     applyAutomationOffsets(instrument, modulation, automation, timeS);
     const currentFrequency = baseFrequency * Math.pow(2, (pitchBendSemitones + modulation.pitchSemitones) / 12);

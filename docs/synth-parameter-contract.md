@@ -73,6 +73,12 @@ Initial defaults:
 | `amp.level` | normalized | `0..1` | `0.8` | Final voice level. |
 | `amp.pan` | bipolar | `-1..1` | `0` | Final voice pan. |
 
+## Performance Parameters
+
+| ID | Type | Range | Default | Notes |
+| --- | --- | --- | --- | --- |
+| `glideMs` | milliseconds | `0..5000` | `0` | Portamento time for linked MIDI notes. Browser previews and native playback ramp from the source note to `connectToIndex` target pitch over this duration. |
+
 ## Envelope Parameters
 
 Envelope IDs use `env.N.*`, where `N` starts at `1`.

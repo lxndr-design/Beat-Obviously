@@ -1649,6 +1649,7 @@ namespace beat
                                         n.velocity = juce::jlimit(0, 127, (int) noteVar.getProperty("velocity", 100));
                                         n.startBeat = (double) noteVar.getProperty("startBeat", 0.0);
                                         n.lengthBeats = (double) noteVar.getProperty("lengthBeats", 0.25);
+                                        n.connectToIndex = juce::jmax(-1, (int) noteVar.getProperty("connectToIndex", -1));
                                         if (auto* curve = noteVar.getProperty("curve", {}).getArray())
                                         {
                                             n.curve.reserve((size_t) curve->size());
@@ -1845,6 +1846,7 @@ namespace beat
                     instrument.envToFilter = floatParam(instrumentVar, "envToFilter", instrument.envToFilter, -1.0f, 1.0f);
                     instrument.ampLevel = floatParam(instrumentVar, "ampLevel", instrument.ampLevel, 0.0f, 1.0f);
                     instrument.ampPan = floatParam(instrumentVar, "ampPan", instrument.ampPan, -1.0f, 1.0f);
+                    instrument.glideMs = floatParam(instrumentVar, "glideMs", instrument.glideMs, 0.0f, 5000.0f);
 
                     if (auto* filters = instrumentVar.getProperty("effects", {}).getProperty("filters", {}).getArray())
                     {

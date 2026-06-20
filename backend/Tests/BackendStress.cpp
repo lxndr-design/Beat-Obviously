@@ -876,6 +876,35 @@ namespace
         return foundAutomatedNote;
     }
 
+    bool stressSequencerGlideMetadata()
+    {
+        auto project = makeStressProject();
+        project.instruments.front().glideMs = 120.0f;
+        auto& note = project.tracks.front().segments.front().notes.front();
+        note.connectToIndex = 1;
+
+        beat::Sequencer sequencer;
+        sequencer.setSampleRate(48000.0);
+        sequencer.setTempo(120.0);
+        sequencer.setProject(project);
+        sequencer.seek(0.0);
+        sequencer.play();
+
+        bool foundGlideNote = false;
+        sequencer.render(2048, [&](const beat::Sequencer::TriggerEvent& ev) {
+            if (ev.noteIndex == 0)
+            {
+                foundGlideNote = true;
+                if (ev.glideTargetPitch != project.tracks.front().segments.front().notes[1].pitch)
+                    std::abort();
+                if (!near(ev.instrumentGlideMs, 120.0f))
+                    std::abort();
+            }
+        });
+
+        return foundGlideNote;
+    }
+
     bool stressSequencerSegmentAutomation()
     {
         beat::Sequencer sequencer;
@@ -5146,6 +5175,12 @@ namespace
         project.recordingInput.reportedOutputLatencySamples = 256;
         project.recordingInput.userLatencyAdjustmentSamples = 48;
 
+        beat::InstrumentDefinition curveInstrument;
+        curveInstrument.id = "curve-synth";
+        curveInstrument.kind = "synth";
+        curveInstrument.glideMs = 140.0f;
+        project.instruments.push_back(curveInstrument);
+
         beat::AudioFileAsset audioFile;
         audioFile.id = "recorded-take-audio";
         audioFile.name = "Recorded Take";
@@ -5200,6 +5235,7 @@ namespace
         curveNote.velocity = 96;
         curveNote.startBeat = 0.25;
         curveNote.lengthBeats = 1.25;
+        curveNote.connectToIndex = 1;
         curveNote.curve.push_back({ 0.25, 60.25 });
         curveNote.curve.push_back({ 1.50, 63.75 });
         beat::MidiAutomationLane noteLane;
@@ -5208,6 +5244,13 @@ namespace
         noteLane.points.push_back({ 1.50, 0.8f, beat::AutomationCurve::Linear });
         curveNote.automation.push_back(std::move(noteLane));
         midiSegment.notes.push_back(curveNote);
+        beat::MidiNote glideTargetNote;
+        glideTargetNote.instrumentId = midiTrack.instrumentId;
+        glideTargetNote.pitch = 67;
+        glideTargetNote.velocity = 84;
+        glideTargetNote.startBeat = 1.5;
+        glideTargetNote.lengthBeats = 0.25;
+        midiSegment.notes.push_back(glideTargetNote);
         midiTrack.segments.push_back(midiSegment);
         project.tracks.push_back(midiTrack);
 
@@ -5246,7 +5289,10 @@ namespace
             && std::abs(loaded->tracks.front().segments.front().sourceStartBeat - 0.25) < 0.0001
             && std::abs(loaded->tracks.front().segments.front().audioGainDb + 3.0f) < 0.0001f
             && loaded->tracks[1].segments.size() == 1
-            && loaded->tracks[1].segments.front().notes.size() == 1
+            && loaded->instruments.size() == 1
+            && std::abs(loaded->instruments.front().glideMs - 140.0f) < 0.0001f
+            && loaded->tracks[1].segments.front().notes.size() == 2
+            && loaded->tracks[1].segments.front().notes.front().connectToIndex == 1
             && loaded->tracks[1].segments.front().notes.front().curve.size() == 2
             && std::abs(loaded->tracks[1].segments.front().notes.front().curve.front().pitch - 60.25) < 0.0001
             && std::abs(loaded->tracks[1].segments.front().notes.front().curve.back().pitch - 63.75) < 0.0001
@@ -10168,6 +10214,11 @@ int main()
     if (!stressSequencerAutomationMetadata())
     {
         std::cerr << "Sequencer automation metadata stress failed\n";
+        return 1;
+    }
+    if (!stressSequencerGlideMetadata())
+    {
+        std::cerr << "Sequencer glide metadata stress failed\n";
         return 1;
     }
     if (!stressSequencerSegmentAutomation())

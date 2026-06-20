@@ -66,6 +66,20 @@ namespace beat
                 emit(beat, value, juce::jmin(endPoint.beat, beat + stepBeats));
             }
         }
+
+        float instrumentGlideMsForId(const Project& project, const Id& instrumentId) noexcept
+        {
+            if (instrumentId.isEmpty())
+                return 0.0f;
+
+            for (const auto& instrument : project.instruments)
+            {
+                if (instrument.id == instrumentId)
+                    return juce::jlimit(0.0f, 5000.0f, instrument.glideMs);
+            }
+
+            return 0.0f;
+        }
     }
 
     void Sequencer::setProject(Project p)
@@ -446,8 +460,9 @@ namespace beat
                             || seg.kind == SegmentPayloadKind::Mixed
                             || seg.kind == SegmentPayloadKind::Drum)
                         {
-                            for (const auto& note : seg.notes)
+                            for (size_t noteIndex = 0; noteIndex < seg.notes.size(); ++noteIndex)
                             {
+                                const auto& note = seg.notes[noteIndex];
                                 if (note.startBeat < 0.0 || note.startBeat >= segLen)
                                     continue;
 
@@ -463,15 +478,22 @@ namespace beat
                                         sampleBaseOffset + (int) std::round(offsetBeats * samplesPerBeat);
                                     const int lengthSamples =
                                         juce::jmax(1, (int) std::round(clippedNoteLength * samplesPerBeat));
+                                    const auto instrumentId = note.instrumentId.isNotEmpty()
+                                        ? note.instrumentId
+                                        : seg.instrumentId.isNotEmpty()
+                                            ? seg.instrumentId
+                                            : track.instrumentId;
+                                    const bool hasGlideTarget = note.connectToIndex >= 0
+                                        && note.connectToIndex < (int) seg.notes.size()
+                                        && note.connectToIndex != (int) noteIndex;
+                                    const int glideTargetPitch = hasGlideTarget
+                                        ? seg.notes[(size_t) note.connectToIndex].pitch
+                                        : -1;
 
                                     onTrigger({
                                         track.id,
                                         seg.id,
-                                        note.instrumentId.isNotEmpty()
-                                            ? note.instrumentId
-                                            : seg.instrumentId.isNotEmpty()
-                                                ? seg.instrumentId
-                                                : track.instrumentId,
+                                        instrumentId,
                                         note.pitch,
                                         note.velocity,
                                         clippedNoteLength,
@@ -483,6 +505,9 @@ namespace beat
                                         track.pan,
                                         seg.audioGainDb,
                                         &note,
+                                        (int) noteIndex,
+                                        glideTargetPitch,
+                                        instrumentGlideMsForId(*snapshot, instrumentId),
                                     });
                                 }
                             }

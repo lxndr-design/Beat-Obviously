@@ -33,6 +33,9 @@ namespace beat
             float  trackPan { 0.0f };
             float  segmentGainDb { 0.0f };
             const MidiNote* sourceNote { nullptr };
+            int    noteIndex { -1 };
+            int    glideTargetPitch { -1 };
+            float  instrumentGlideMs { 0.0f };
         };
         using TriggerHandler = std::function<void(const TriggerEvent&)>;
 

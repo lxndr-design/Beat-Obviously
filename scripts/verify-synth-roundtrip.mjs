@@ -438,6 +438,14 @@ try {
     `expected +2 semitone bend ratio, got ${bentFrequencyEstimate / baseFrequencyEstimate}`,
   );
 
+  const glidePreview = { ...pitchBendPreview, glideMs: 120 };
+  const glideSamples = new Float32Array(48000);
+  synthPreview.renderInstrumentSamples(glidePreview, glideSamples, 48000, 440, "audio", false, 880);
+  const earlyGlideFrequency = estimateFrequencyFromZeroCrossings(glideSamples, 48000, 1200, 3600);
+  const lateGlideFrequency = estimateFrequencyFromZeroCrossings(glideSamples, 48000, 12000, 18000);
+  assert.ok(earlyGlideFrequency > 430 && earlyGlideFrequency < 620, `expected glide to begin near source pitch, got ${earlyGlideFrequency}`);
+  assert.ok(lateGlideFrequency > 820 && lateGlideFrequency < 910, `expected glide to finish near target pitch, got ${lateGlideFrequency}`);
+
   const env2Preview = synthStore.synthDraftToPreviewInstrument({
     ...draft,
     parameters: {
@@ -1090,12 +1098,13 @@ function assertMidiPart(notes, lengthBeats, label) {
   }
 }
 
-function estimateFrequencyFromZeroCrossings(samples, sampleRate) {
+function estimateFrequencyFromZeroCrossings(samples, sampleRate, startSample = 0, endSample = samples.length) {
   let crossings = 0;
   let first = -1;
   let last = -1;
-  const start = Math.floor(sampleRate * 0.05);
-  for (let i = start + 1; i < samples.length; i += 1) {
+  const start = Math.max(0, Math.min(samples.length - 1, startSample + Math.floor(sampleRate * 0.005)));
+  const end = Math.max(start + 1, Math.min(samples.length, endSample));
+  for (let i = start + 1; i < end; i += 1) {
     if (samples[i - 1] <= 0 && samples[i] > 0) {
       if (first < 0) first = i;
       last = i;

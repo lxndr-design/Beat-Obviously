@@ -193,6 +193,7 @@ namespace beat
             float envToFilter { 0.0f };
             DynamicModulation dynamicModulation;
             WavetableConfig wavetable;
+            float glideMs { 0.0f };
             bool hasAether { false };
             AetherOscillator aetherOscA;
             AetherOscillator aetherOscB;
