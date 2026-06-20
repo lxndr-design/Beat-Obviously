@@ -257,6 +257,8 @@ function buildInstrumentPrompt(opts: GenerateInstrumentOptions): string {
         subOscLevel: "0..1",
         glideMs: "0..500",
         maxVoices: "1..32 integer",
+        mono: "boolean",
+        legato: "boolean",
       },
       modulation: {
         lfoWaveform: ["sine", "triangle", "saw", "square"],
@@ -304,6 +306,8 @@ function buildInstrumentPrompt(opts: GenerateInstrumentOptions): string {
       subOscLevel: "number",
       glideMs: "number",
       maxVoices: "number",
+      mono: "boolean",
+      legato: "boolean",
       lfoWaveform: "string",
       lfoRateHz: "number",
       lfoDepth: "number",
@@ -358,6 +362,8 @@ function sanitizeInstrumentPatch(value: unknown, opts: GenerateInstrumentOptions
     subOscLevel: clamp(record.subOscLevel, 0, 1, opts.current.subOscLevel ?? 0),
     glideMs: clamp(record.glideMs, 0, 500, opts.current.glideMs ?? 0),
     maxVoices: Math.round(clamp(record.maxVoices, 1, 32, opts.current.maxVoices ?? 16)),
+    mono: typeof record.mono === "boolean" ? record.mono : opts.current.mono ?? false,
+    legato: typeof record.legato === "boolean" ? record.legato : opts.current.legato ?? false,
     lfoWaveform: isLfoWaveform(record.lfoWaveform) ? record.lfoWaveform : opts.current.lfoWaveform ?? "sine",
     lfoRateHz: clamp(record.lfoRateHz, 1, 20, opts.current.lfoRateHz ?? 4),
     lfoDepth: clamp(record.lfoDepth, 0, 1, opts.current.lfoDepth ?? 0),
@@ -370,6 +376,7 @@ function sanitizeInstrumentPatch(value: unknown, opts: GenerateInstrumentOptions
     aether: kind === "wavetable" ? sanitizeAether(record.aether, opts.current.aether) : record.aether,
     ...(sampleUrl ? { sampleUrl, sampleIds: [], source: { kind: "derived", label: "AI sample selection", url: sampleUrl, edited: false } } : {}),
   };
+  if (!patch.mono) patch.legato = false;
   return withAetherSynthPatch(patch, opts);
 }
 
@@ -520,6 +527,8 @@ function generateLocalInstrumentPatch(opts: GenerateInstrumentOptions): Partial<
     subOscLevel: clamp((/\bbass|sub|808\b/.test(lower) ? 0.34 : kind === "hybrid" ? 0.24 : lane.kind === "hybrid" ? 0.18 : kind === "sampler" ? 0.01 + sampleWarp * 0.12 : 0.03) + rnd() * (kind === "hybrid" ? 0.42 : kind === "sampler" ? 0.42 : 0.28), 0, 1, 0.08),
     glideMs: Math.round(/\bslide|glide|legato\b/.test(lower) || bowed || lane.motion === "glide" || sampleWarp > 0.7 ? 32 + rnd() * 360 : rnd() > 0.64 ? rnd() * 180 : 0),
     maxVoices: Math.max(1, Math.min(32, Math.round(/\bmono|lead|legato|slide|glide\b/.test(lower) ? 1 + rnd() * 5 : longMotion || soft ? 10 + rnd() * 14 : 6 + rnd() * 18))),
+    mono: /\bmono|monophonic|lead|bass|acid|legato|slide|glide\b/.test(lower) || lane.motion === "acid" || lane.motion === "glide",
+    legato: /\blegato|slide|glide|portamento|acid\b/.test(lower) || lane.motion === "glide",
     lfoWaveform: lane.lfoWaveform,
     lfoRateHz: Math.round((lane.motion === "swarm" ? 7 + rnd() * 10 : bowed ? 4 + rnd() * 3 : 1.2 + rnd() * 7) * 10) / 10,
     lfoDepth: clamp((longMotion ? 0.18 : bowed ? 0.12 : lane.motion === "acid" ? 0.24 : 0.04) + modulationLift + rnd() * 0.34, 0, 1, 0.08),
@@ -837,6 +846,8 @@ function summarizeInstrument(instrument: Instrument) {
     subOscLevel: instrument.subOscLevel,
     glideMs: instrument.glideMs,
     maxVoices: instrument.maxVoices,
+    mono: instrument.mono,
+    legato: instrument.legato,
     lfoWaveform: instrument.lfoWaveform,
     lfoRateHz: instrument.lfoRateHz,
     lfoDepth: instrument.lfoDepth,

@@ -67,6 +67,8 @@ export function OscillatorPanel() {
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const previewInstrument = createMemo(() => synthDraftToPreviewInstrument(draft()));
   const unisonEnabled = createMemo(() => getBooleanParam(draft(), "unison.enabled"));
+  const monoEnabled = createMemo(() => getBooleanParam(draft(), "mono.enabled"));
+  const legatoEnabled = createMemo(() => getBooleanParam(draft(), "legato.enabled"));
   const unisonWaveform = createMemo(() => renderAetherOutputPreviewSamples(previewInstrument(), 160, "mix"));
 
   return (
@@ -78,6 +80,23 @@ export function OscillatorPanel() {
           <div class="ds-section-header">
             <div class="ds-section-title">Voice Stack</div>
             <div class={styles.sectionActions}>
+              <Button
+                size="xs"
+                selected={monoEnabled()}
+                aria-label={`${monoEnabled() ? "Disable" : "Enable"} mono voice mode`}
+                onClick={() => setBooleanParameter("mono.enabled", !monoEnabled())}
+              >
+                Mono
+              </Button>
+              <Button
+                size="xs"
+                selected={legatoEnabled()}
+                disabled={!monoEnabled()}
+                aria-label={`${legatoEnabled() ? "Disable" : "Enable"} legato retune mode`}
+                onClick={() => setBooleanParameter("legato.enabled", !legatoEnabled())}
+              >
+                Legato
+              </Button>
               <Button
                 iconOnly
                 size="xs"

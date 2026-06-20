@@ -1849,6 +1849,8 @@ namespace beat
                     instrument.ampPan = floatParam(instrumentVar, "ampPan", instrument.ampPan, -1.0f, 1.0f);
                     instrument.glideMs = floatParam(instrumentVar, "glideMs", instrument.glideMs, 0.0f, 5000.0f);
                     instrument.maxVoices = juce::jlimit(1, 32, (int) instrumentVar.getProperty("maxVoices", instrument.maxVoices));
+                    instrument.mono = (bool) instrumentVar.getProperty("mono", instrument.mono);
+                    instrument.legato = (bool) instrumentVar.getProperty("legato", instrument.legato);
 
                     if (auto* filters = instrumentVar.getProperty("effects", {}).getProperty("filters", {}).getArray())
                     {

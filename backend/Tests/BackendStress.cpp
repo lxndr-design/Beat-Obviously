@@ -5180,6 +5180,8 @@ namespace
         curveInstrument.kind = "synth";
         curveInstrument.glideMs = 140.0f;
         curveInstrument.maxVoices = 7;
+        curveInstrument.mono = true;
+        curveInstrument.legato = true;
         project.instruments.push_back(curveInstrument);
 
         beat::AudioFileAsset audioFile;
@@ -5293,6 +5295,8 @@ namespace
             && loaded->instruments.size() == 1
             && std::abs(loaded->instruments.front().glideMs - 140.0f) < 0.0001f
             && loaded->instruments.front().maxVoices == 7
+            && loaded->instruments.front().mono
+            && loaded->instruments.front().legato
             && loaded->tracks[1].segments.front().notes.size() == 2
             && loaded->tracks[1].segments.front().notes.front().connectToIndex == 1
             && loaded->tracks[1].segments.front().notes.front().curve.size() == 2
@@ -8635,6 +8639,46 @@ namespace
         return ok;
     }
 
+    bool stressAudioEngineAetherMonoVoiceLimit()
+    {
+        auto project = makeMaxUnisonAetherProject();
+        project.id = "mono-voice-aether-project";
+        project.instruments.front().maxVoices = 12;
+        project.instruments.front().mono = true;
+        project.instruments.front().legato = true;
+
+        beat::AudioEngine engine;
+        constexpr int blockSize = 512;
+        engine.prepareForOffline(44100.0, blockSize, 2);
+        engine.applyProject(project);
+        engine.requestPlay();
+
+        double energy = 0.0;
+        int maxSynthVoices = 0;
+
+        for (int block = 0; block < 18; ++block)
+        {
+            const auto buffer = renderEngineBlock(engine, blockSize);
+            energy += bufferEnergy(buffer);
+
+            beat::AudioEngine::RenderTimingSnapshot timing;
+            if (!engine.pullRenderTimingSnapshot(timing))
+                return false;
+            if (!std::isfinite(timing.synthMs) || !std::isfinite(timing.totalMs))
+                return false;
+
+            maxSynthVoices = juce::jmax(maxSynthVoices, timing.activeSynthVoices);
+        }
+
+        const bool ok = energy > 0.01 && maxSynthVoices > 0 && maxSynthVoices <= 1;
+        if (!ok)
+        {
+            std::cerr << "Aether mono voice-limit stress failed energy=" << energy
+                      << " voices=" << maxSynthVoices << "\n";
+        }
+        return ok;
+    }
+
     bool stressAudioEngineDenseAetherLiveExportParity()
     {
         auto project = makeDenseAetherProject();
@@ -8904,6 +8948,8 @@ namespace
             "unison.blend": 0.6,
             "unison.spread": 0.4,
             "maxVoices": 6,
+            "mono.enabled": true,
+            "legato.enabled": true,
             "filter.enabled": true,
             "filter.type": "highpass",
             "filter.cutoff": 1000,
@@ -8991,6 +9037,8 @@ namespace
         if (instrument.wavetableUnison != 5 || !near(instrument.wavetableDetuneCents, 25.0f) || !near(instrument.wavetableBlend, 0.5f))
             return false;
         if (instrument.maxVoices != 6)
+            return false;
+        if (!instrument.mono || !instrument.legato)
             return false;
         if (!instrument.aether.oscA.enabled || instrument.aether.oscA.wavetable.bank != 4)
             return false;
@@ -9656,6 +9704,75 @@ namespace
             && squareWork.filterDriveSamples == 0;
     }
 
+    bool stressInstrumentVoiceLegatoRetune()
+    {
+        struct RetuneProbe
+        {
+            double energy { -1.0 };
+            float firstSampleAbs { 0.0f };
+            float earlyPeakAbs { 0.0f };
+        };
+
+        auto renderRetuneProbe = [](bool legato)
+        {
+            beat::InstrumentVoice::Params params;
+            params.waveform = 0;
+            params.cutoff01 = 1.0f;
+            params.resonance01 = 0.05f;
+            params.drive01 = 0.0f;
+            params.ampLevel = 0.95f;
+            params.attackMs = 220.0f;
+            params.decayMs = 20.0f;
+            params.sustain = 1.0f;
+            params.releaseMs = 20.0f;
+            params.glideMs = 24.0f;
+            params.legato = legato;
+
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 256);
+            voice.setParams(params);
+            voice.startNote(60, 1.0f, nullptr, 0);
+
+            juce::AudioBuffer<float> warmup(2, 12000);
+            warmup.clear();
+            voice.renderNextBlock(warmup, 0, warmup.getNumSamples());
+
+            voice.startNote(72, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> retuned(2, 1024);
+            retuned.clear();
+            voice.renderNextBlock(retuned, 0, retuned.getNumSamples());
+
+            RetuneProbe probe;
+            probe.energy = 0.0;
+            for (int channel = 0; channel < retuned.getNumChannels(); ++channel)
+            {
+                for (int sample = 0; sample < retuned.getNumSamples(); ++sample)
+                {
+                    const float value = retuned.getSample(channel, sample);
+                    if (!std::isfinite(value))
+                    {
+                        probe.energy = -1.0;
+                        return probe;
+                    }
+                    const float absValue = std::abs(value);
+                    if (channel == 0 && sample == 0)
+                        probe.firstSampleAbs = absValue;
+                    if (sample < 32)
+                        probe.earlyPeakAbs = std::max(probe.earlyPeakAbs, absValue);
+                    probe.energy += (double) value * (double) value;
+                }
+            }
+            return probe;
+        };
+
+        const auto retrigger = renderRetuneProbe(false);
+        const auto legato = renderRetuneProbe(true);
+        return retrigger.energy > 0.0
+            && legato.energy > 0.0
+            && legato.firstSampleAbs > retrigger.firstSampleAbs * 2.0f
+            && retrigger.earlyPeakAbs > legato.earlyPeakAbs * 1.5f;
+    }
+
     bool stressInstrumentVoiceAetherPath()
     {
         beat::InstrumentVoice::Params params;
@@ -10191,6 +10308,11 @@ int main()
     if (!stressInstrumentVoiceBandlimitedBasicOscillators())
     {
         std::cerr << "Instrument voice bandlimited basic oscillator stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceLegatoRetune())
+    {
+        std::cerr << "Instrument voice legato retune stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceAetherPath())
@@ -10747,6 +10869,11 @@ int main()
     if (!stressAudioEngineAetherVoiceLimit())
     {
         std::cerr << "Audio engine Aether voice-limit stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineAetherMonoVoiceLimit())
+    {
+        std::cerr << "Audio engine Aether mono voice-limit stress failed\n";
         return 1;
     }
     if (!stressAudioEngineDenseAetherLiveExportParity())

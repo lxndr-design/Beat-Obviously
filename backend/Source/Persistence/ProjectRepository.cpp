@@ -452,6 +452,8 @@ namespace beat
             o->setProperty("ampPan", instrument.ampPan);
             o->setProperty("glideMs", instrument.glideMs);
             o->setProperty("maxVoices", instrument.maxVoices);
+            o->setProperty("mono", instrument.mono);
+            o->setProperty("legato", instrument.legato);
             o->setProperty("wavetableBank", instrument.wavetableBank);
             o->setProperty("wavetablePosition", instrument.wavetablePosition);
             o->setProperty("wavetableWarp", instrument.wavetableWarp);
@@ -618,6 +620,8 @@ namespace beat
                     instrument.ampPan = juce::jlimit(-1.0f, 1.0f, (float) (double) iv.getProperty("ampPan", instrument.ampPan));
                     instrument.glideMs = juce::jlimit(0.0f, 5000.0f, (float) (double) iv.getProperty("glideMs", instrument.glideMs));
                     instrument.maxVoices = juce::jlimit(1, 32, (int) iv.getProperty("maxVoices", instrument.maxVoices));
+                    instrument.mono = (bool) iv.getProperty("mono", instrument.mono);
+                    instrument.legato = (bool) iv.getProperty("legato", instrument.legato);
                     instrument.wavetableBank = juce::jlimit(0, 8, (int) iv.getProperty("wavetableBank", instrument.wavetableBank));
                     instrument.wavetablePosition = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("wavetablePosition", instrument.wavetablePosition));
                     instrument.wavetableWarp = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("wavetableWarp", instrument.wavetableWarp));

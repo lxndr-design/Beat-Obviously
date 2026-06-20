@@ -872,9 +872,36 @@ namespace beat
     void InstrumentVoice::startNote(int midiNoteNumber, float velocity,
                                     juce::SynthesiserSound*, int currentPitchWheel)
     {
+        const bool legatoRetune = baseParams.legato && adsr.isActive();
         params = baseParams;
         resetRealtimeRampsFromParams();
         baseFrequencyHz = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
+        level = velocity;
+        noteKeytrack = juce::jlimit(0.0f, 1.0f, (float) midiNoteNumber / 127.0f);
+        pitchWheelMoved(currentPitchWheel == 0 ? 8192 : currentPitchWheel);
+
+        if (legatoRetune)
+        {
+            const int glideSamples = params.glideMs > 0.0f && sampleRate > 0.0
+                ? juce::jmax(1, (int) std::round((params.glideMs / 1000.0f) * (float) sampleRate))
+                : 0;
+            filterLeft.setType(filterTypeForParam(params.filterType));
+            filterRight.setType(filterTypeForParam(params.filterType));
+            filterLeft.setCutoffFrequency(keytrackedCutoffHz(params.cutoff01));
+            filterRight.setCutoffFrequency(keytrackedCutoffHz(params.cutoff01));
+            cachedFilterHz = keytrackedCutoffHz(params.cutoff01);
+            cachedFilterResonance = 0.5f + params.resonance01 * 4.0f;
+            filterLeft.setResonance(cachedFilterResonance);
+            filterRight.setResonance(cachedFilterResonance);
+            refreshCachedPanGains();
+            refreshCachedDynamicModulationFlags();
+            refreshCachedPitchRates();
+            pitchFrequencyRamp.setTarget((float) baseFrequencyHz, glideSamples);
+            phaseDelta = baseFrequencyHz / sampleRate;
+            loadPendingNoteAutomation(midiNoteNumber);
+            return;
+        }
+
         filterLeft.setType(filterTypeForParam(params.filterType));
         filterRight.setType(filterTypeForParam(params.filterType));
         filterLeft.setCutoffFrequency(keytrackedCutoffHz(params.cutoff01));
@@ -886,9 +913,6 @@ namespace beat
         refreshCachedPanGains();
         refreshCachedDynamicModulationFlags();
 
-        level     = velocity;
-        noteKeytrack = juce::jlimit(0.0f, 1.0f, (float) midiNoteNumber / 127.0f);
-        pitchWheelMoved(currentPitchWheel == 0 ? 8192 : currentPitchWheel);
         phase     = 0.0;
         noiseState = (juce::uint32) (midiNoteNumber * 747796405u + 2891336453u);
         aetherOscAPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscA.phase)

@@ -196,6 +196,8 @@ namespace beat
             WavetableConfig wavetable;
             float glideMs { 0.0f };
             int maxVoices { 16 };
+            bool mono { false };
+            bool legato { false };
             bool hasAether { false };
             AetherOscillator aetherOscA;
             AetherOscillator aetherOscB;

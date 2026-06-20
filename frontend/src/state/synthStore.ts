@@ -57,6 +57,8 @@ export type SynthParameterId =
   | "amp.level"
   | "amp.pan"
   | "maxVoices"
+  | "mono.enabled"
+  | "legato.enabled"
   | "env.1.attack"
   | "env.1.attackCurve"
   | "env.1.decay"
@@ -455,6 +457,8 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "amp.level": 0.8,
   "amp.pan": 0,
   maxVoices: 16,
+  "mono.enabled": false,
+  "legato.enabled": false,
   "env.1.attack": 0.005,
   "env.1.attackCurve": "linear",
   "env.1.decay": 0.15,
@@ -536,6 +540,8 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "amp.level": "Amp Level",
   "amp.pan": "Amp Pan",
   maxVoices: "Max Voices",
+  "mono.enabled": "Mono",
+  "legato.enabled": "Legato",
   "env.1.attack": "Env 1 Attack",
   "env.1.attackCurve": "Env 1 Attack Curve",
   "env.1.decay": "Env 1 Decay",
@@ -829,6 +835,8 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     ampLevel: modulatedNumberParam(draft, "amp.level", "amp.level", 0, 1),
     ampPan: modulatedNumberParam(draft, "amp.pan", "amp.pan", -1, 1),
     maxVoices: getNumberParam(draft, "maxVoices"),
+    mono: getBooleanParam(draft, "mono.enabled"),
+    legato: getBooleanParam(draft, "legato.enabled"),
     synthPatch: cloneSynthPatch(draft),
   };
 }
@@ -874,6 +882,8 @@ export function synthDraftToPreviewInstrument(draft: SynthDraftPatch): Instrumen
     subOscLevel: 0,
     glideMs: 0,
     maxVoices: getNumberParam(draft, "maxVoices"),
+    mono: getBooleanParam(draft, "mono.enabled"),
+    legato: getBooleanParam(draft, "legato.enabled"),
     ampLevel: 1,
     ampPan: 0,
     lfoWaveform: "sine",
@@ -945,6 +955,8 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["amp.level"] = instrument.ampLevel ?? 0.8;
   draft.parameters["amp.pan"] = instrument.ampPan ?? 0;
   draft.parameters.maxVoices = instrument.maxVoices ?? 16;
+  draft.parameters["mono.enabled"] = instrument.mono ?? false;
+  draft.parameters["legato.enabled"] = instrument.legato ?? false;
 
   if (instrument.wavetable) {
     applyWavetableToDraft(draft, "a", instrument.wavetable, true);

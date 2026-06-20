@@ -1485,7 +1485,9 @@ namespace beat
         params.ampLevel = instrument.ampLevel;
         params.ampPan = instrument.ampPan;
         params.glideMs = juce::jlimit(0.0f, 5000.0f, instrument.glideMs);
-        params.maxVoices = juce::jlimit(1, 32, instrument.maxVoices);
+        params.mono = instrument.mono;
+        params.legato = instrument.mono && instrument.legato;
+        params.maxVoices = params.mono ? 1 : juce::jlimit(1, 32, instrument.maxVoices);
         params.waveform = instrument.waveform;
         params.wavetableBank = instrument.wavetableBank;
         params.wavetablePosition = instrument.wavetablePosition;
