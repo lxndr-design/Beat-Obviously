@@ -408,6 +408,25 @@ namespace beat
             return juce::var(partials);
         }
 
+        double estimateSpectralTiltFromPartials(const juce::var& partialValues)
+        {
+            if (auto* partials = partialValues.getArray())
+            {
+                double low = 0.0;
+                double high = 0.0;
+                for (int i = 0; i < partials->size(); ++i)
+                {
+                    const auto value = clamp01((double) (*partials)[i]);
+                    if (i < 4)
+                        low += value;
+                    else if (i >= 8 && i < 16)
+                        high += value;
+                }
+                return juce::jlimit(-1.0, 1.0, (high - low) / std::max(0.001, high + low));
+            }
+            return 0.0;
+        }
+
         juce::var makeWavemapFrame(const std::vector<float>& samples,
                                    int start,
                                    int end,
@@ -457,8 +476,10 @@ namespace beat
             frame->setProperty("formant", clamp01(0.08 + rms * 0.28 + roughness * 1.1 + zeroDensity * 0.7));
             frame->setProperty("notch", clamp01(0.04 + (1.0 - rms) * 0.16 + roughness * 0.72 + asymmetry * 0.5));
             frame->setProperty("skew", juce::jlimit(-1.0, 1.0, (zeroDensity * 10.0 - meanAbs) * 0.22 + (rms - 0.28) * 0.35));
+            const auto partials = analyzeHarmonicPartials(samples, safeStart, safeEnd);
+            frame->setProperty("tilt", estimateSpectralTiltFromPartials(partials));
             frame->setProperty("phase", juce::jlimit(-1.0, 1.0, (positiveEnergy - negativeEnergy) / totalPolarityEnergy));
-            frame->setProperty("partials", analyzeHarmonicPartials(samples, safeStart, safeEnd));
+            frame->setProperty("partials", partials);
             return juce::var(frame.get());
         }
 

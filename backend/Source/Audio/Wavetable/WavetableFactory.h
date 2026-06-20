@@ -32,6 +32,7 @@ namespace beat
             float formant { 0.12f };
             float notch { 0.08f };
             float skew { 0.0f };
+            float tilt { 0.0f };
             float phase { 0.0f };
             std::array<float, 16> partials {};
         };

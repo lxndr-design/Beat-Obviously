@@ -397,6 +397,8 @@ export interface CustomWavetableFrame {
   notch: number;
   /** -1..1 harmonic bias; negative weights low harmonics, positive weights high harmonics. */
   skew: number;
+  /** -1..1 spectral slope; negative darkens upper harmonics, positive lifts them. */
+  tilt: number;
   phase: number;
   /** Optional 16-bin manual harmonic drawing overlay. */
   partials?: number[];

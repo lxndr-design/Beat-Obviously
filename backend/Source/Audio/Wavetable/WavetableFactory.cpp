@@ -124,6 +124,7 @@ namespace beat
             const float brightness = juce::jlimit(0.0f, 1.0f, frame.brightness);
             const float even = juce::jlimit(0.0f, 1.0f, frame.even);
             const float skew = juce::jlimit(-1.0f, 1.0f, frame.skew);
+            const float tilt = juce::jlimit(-1.0f, 1.0f, frame.tilt);
             const float formant = juce::jlimit(0.0f, 1.0f, frame.formant);
             const float notch = juce::jlimit(0.0f, 1.0f, frame.notch);
             const float shapedWarp = warpModeIntensity(warp, warpMode);
@@ -131,6 +132,7 @@ namespace beat
             const float parity = (harmonic % 2) == 1 ? 1.0f : even;
             const float rolloff = std::exp(-(float) harmonic * (0.016f + (1.0f - brightness) * 0.085f));
             const float skewBias = juce::jmax(0.18f, 1.0f + skew * (((float) harmonic - 8.0f) / 18.0f));
+            const float tiltBias = juce::jmax(0.12f, std::exp(tilt * (((float) harmonic - 8.0f) / 9.0f)));
             const float center = 3.0f + brightness * 20.0f;
             const float width = 1.6f + fold * 8.0f;
             const float foldPeak = std::exp(-std::pow(((float) harmonic - center) / width, 2.0f));
@@ -147,7 +149,7 @@ namespace beat
             const float motion = 1.0f + std::sin((float) harmonic * 1.7f + frame.phase * juce::MathConstants<float>::pi) * fold * 0.28f;
             return juce::jmax(
                 0.0f,
-                (parity * rolloff * motion * skewBias / std::sqrt((float) harmonic)
+                (parity * rolloff * motion * skewBias * tiltBias / std::sqrt((float) harmonic)
                     + foldPeak * fold * 0.35f
                     + formantPeak * formant * 0.55f
                     + drawnPartial * (0.08f + brightness * 0.34f)) * notchCut
@@ -203,6 +205,7 @@ namespace beat
                     juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.formant, a.formant, b.formant, p3.formant, mix)),
                     juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.notch, a.notch, b.notch, p3.notch, mix)),
                     juce::jlimit(-1.0f, 1.0f, smoothInterpolate(p0.skew, a.skew, b.skew, p3.skew, mix)),
+                    juce::jlimit(-1.0f, 1.0f, smoothInterpolate(p0.tilt, a.tilt, b.tilt, p3.tilt, mix)),
                     juce::jlimit(-1.0f, 1.0f, smoothInterpolate(p0.phase, a.phase, b.phase, p3.phase, mix)),
                 };
                 for (size_t i = 0; i < result.partials.size(); ++i)
@@ -216,6 +219,7 @@ namespace beat
                 a.formant + (b.formant - a.formant) * mix,
                 a.notch + (b.notch - a.notch) * mix,
                 a.skew + (b.skew - a.skew) * mix,
+                a.tilt + (b.tilt - a.tilt) * mix,
                 a.phase + (b.phase - a.phase) * mix,
             };
             for (size_t i = 0; i < result.partials.size(); ++i)

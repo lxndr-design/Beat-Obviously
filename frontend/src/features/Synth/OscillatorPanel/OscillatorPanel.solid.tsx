@@ -383,6 +383,19 @@ function OscillatorRow(props: {
                         />
                         <Knob
                           size="sm"
+                          label="Tilt"
+                          value={frame.tilt}
+                          min={-1}
+                          max={1}
+                          step={0.01}
+                          defaultValue={createDefaultCustomWavetable(customTable().id).frames[index()]?.tilt ?? 0}
+                          bipolar
+                          formatValue={(value) => `${Math.round(value * 100)}`}
+                          parseValue={parsePercent}
+                          onChange={(tilt) => updateCustomWavetableFrame(customTable().id, index(), { tilt })}
+                        />
+                        <Knob
+                          size="sm"
                           label="Phase"
                           value={frame.phase}
                           min={-1}
@@ -606,9 +619,11 @@ function customFrameAmplitude(frame: CustomWavetableFrame, harmonic: number): nu
   const formant = clamp01(frame.formant);
   const notch = clamp01(frame.notch);
   const skew = Math.max(-1, Math.min(1, frame.skew));
+  const tilt = Number.isFinite(frame.tilt) ? Math.max(-1, Math.min(1, frame.tilt)) : 0;
   const parity = harmonic % 2 === 1 ? 1 : even;
   const rolloff = Math.exp(-harmonic * (0.016 + (1 - brightness) * 0.085));
   const skewBias = Math.max(0.18, 1 + skew * ((harmonic - 8) / 18));
+  const tiltBias = Math.max(0.12, Math.exp(tilt * ((harmonic - 8) / 9)));
   const foldPeak = Math.exp(-Math.pow((harmonic - (3 + brightness * 20)) / (1.6 + fold * 8), 2));
   const formantCenter = 4 + brightness * 24 + skew * 4;
   const formantWidth = 1.1 + fold * 4.4;
@@ -619,7 +634,7 @@ function customFrameAmplitude(frame: CustomWavetableFrame, harmonic: number): nu
   const notchCut = Math.max(0.08, 1 - notchPeak * notch * 0.72);
   const drawnPartial = harmonic <= CUSTOM_WAVETABLE_PARTIAL_COUNT ? clamp01(frame.partials?.[harmonic - 1] ?? 0) : 0;
   const motion = 1 + Math.sin(harmonic * 1.7 + frame.phase * Math.PI) * fold * 0.28;
-  return Math.max(0, (parity * rolloff * motion * skewBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + formantPeak * formant * 0.55 + drawnPartial * (0.08 + brightness * 0.34)) * notchCut);
+  return Math.max(0, (parity * rolloff * motion * skewBias * tiltBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + formantPeak * formant * 0.55 + drawnPartial * (0.08 + brightness * 0.34)) * notchCut);
 }
 
 function customFramePhase(frame: CustomWavetableFrame, harmonic: number): number {

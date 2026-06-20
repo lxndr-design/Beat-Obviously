@@ -59,6 +59,7 @@ The wavemap-level `interpolation` field controls how Beat generates intermediate
 | `formant` | normalized | `0..1` | `0.12` | Focused resonant harmonic band amount. |
 | `notch` | normalized | `0..1` | `0.08` | Harmonic valley carve amount. |
 | `skew` | bipolar | `-1..1` | `0` | Harmonic bias. Negative values weight lower harmonics; positive values weight higher harmonics. |
+| `tilt` | bipolar | `-1..1` | `0` | Spectral slope. Negative values darken upper harmonics; positive values lift them. |
 | `phase` | bipolar | `-1..1` | frame default | Harmonic phase offset. |
 | `partials` | normalized array | 16 values, each `0..1` | omitted/zero | Optional manual harmonic drawing overlay for harmonics 1 through 16. |
 

@@ -1459,6 +1459,7 @@ namespace beat
                     source.customFrames[i].formant,
                     source.customFrames[i].notch,
                     source.customFrames[i].skew,
+                    source.customFrames[i].tilt,
                     source.customFrames[i].phase,
                 };
                 target.customFrames[i].partials = source.customFrames[i].partials;
