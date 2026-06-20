@@ -281,6 +281,7 @@ namespace beat
                     juce::jlimit(0.0f, 1.0f, config.customFrames[i].brightness),
                     juce::jlimit(0.0f, 1.0f, config.customFrames[i].even),
                     juce::jlimit(0.0f, 1.0f, config.customFrames[i].fold),
+                    juce::jlimit(-1.0f, 1.0f, config.customFrames[i].skew),
                     juce::jlimit(-1.0f, 1.0f, config.customFrames[i].phase),
                 };
             }
@@ -316,6 +317,7 @@ namespace beat
                         << juce::String(juce::jlimit(0.0f, 1.0f, frame.brightness), 4) << ","
                         << juce::String(juce::jlimit(0.0f, 1.0f, frame.even), 4) << ","
                         << juce::String(juce::jlimit(0.0f, 1.0f, frame.fold), 4) << ","
+                        << juce::String(juce::jlimit(-1.0f, 1.0f, frame.skew), 4) << ","
                         << juce::String(juce::jlimit(-1.0f, 1.0f, frame.phase), 4);
                 }
             }

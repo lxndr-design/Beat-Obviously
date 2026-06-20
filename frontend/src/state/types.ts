@@ -389,6 +389,8 @@ export interface CustomWavetableFrame {
   brightness: number;
   even: number;
   fold: number;
+  /** -1..1 harmonic bias; negative weights low harmonics, positive weights high harmonics. */
+  skew: number;
   phase: number;
 }
 

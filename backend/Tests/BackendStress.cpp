@@ -8824,10 +8824,10 @@ namespace
 
         {
             const std::array<beat::WavetableFactory::CustomFrame, 4> frames {{
-                { 0.12f, 0.04f, 0.0f, 0.0f },
-                { 0.38f, 0.18f, 0.2f, 0.25f },
-                { 0.66f, 0.55f, 0.42f, -0.16f },
-                { 0.95f, 0.86f, 0.68f, 0.36f },
+                { 0.12f, 0.04f, 0.0f, -0.24f, 0.0f },
+                { 0.38f, 0.18f, 0.2f, -0.08f, 0.25f },
+                { 0.66f, 0.55f, 0.42f, 0.18f, -0.16f },
+                { 0.95f, 0.86f, 0.68f, 0.32f, 0.36f },
             }};
             const auto custom = beat::WavetableFactory::createCustom(frames, 8, 2048);
             if (!custom.isValid() || custom.getFrameCount() != 8 || custom.getFrameSize() != 2048)
@@ -9113,10 +9113,10 @@ namespace
                 "id": "user.custom",
                 "name": "Verifier Custom",
                 "frames": [
-                  { "brightness": 0.12, "even": 0.04, "fold": 0.0, "phase": 0.0 },
-                  { "brightness": 0.38, "even": 0.18, "fold": 0.2, "phase": 0.25 },
-                  { "brightness": 0.66, "even": 0.55, "fold": 0.42, "phase": -0.16 },
-                  { "brightness": 0.95, "even": 0.86, "fold": 0.68, "phase": 0.36 }
+                  { "brightness": 0.12, "even": 0.04, "fold": 0.0, "skew": -0.24, "phase": 0.0 },
+                  { "brightness": 0.38, "even": 0.18, "fold": 0.2, "skew": -0.08, "phase": 0.25 },
+                  { "brightness": 0.66, "even": 0.55, "fold": 0.42, "skew": 0.18, "phase": -0.16 },
+                  { "brightness": 0.95, "even": 0.86, "fold": 0.68, "skew": 0.32, "phase": 0.36 }
                 ]
               }
             }
@@ -9132,6 +9132,8 @@ namespace
         if (customInstrument.aether.oscA.wavetable.bank != 5)
             return false;
         if (!near(customInstrument.aether.oscA.wavetable.customFrames[3].fold, 0.68f))
+            return false;
+        if (!near(customInstrument.aether.oscA.wavetable.customFrames[2].skew, 0.18f))
             return false;
         if (!near(customInstrument.aether.oscA.wavetable.customFrames[2].phase, -0.16f))
             return false;

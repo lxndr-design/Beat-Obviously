@@ -1455,6 +1455,7 @@ namespace beat
                     source.customFrames[i].brightness,
                     source.customFrames[i].even,
                     source.customFrames[i].fold,
+                    source.customFrames[i].skew,
                     source.customFrames[i].phase,
                 };
             }

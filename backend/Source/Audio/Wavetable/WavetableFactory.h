@@ -29,6 +29,7 @@ namespace beat
             float brightness { 0.5f };
             float even { 0.2f };
             float fold { 0.1f };
+            float skew { 0.0f };
             float phase { 0.0f };
         };
 

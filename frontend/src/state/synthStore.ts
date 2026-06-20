@@ -230,10 +230,10 @@ export function createDefaultCustomWavetable(id = DEFAULT_CUSTOM_WAVETABLE_ID): 
       label: "Drawn wavemap",
     },
     frames: [
-      { id: `${id}.frame.1`, label: "A", position: 0.0, brightness: 0.22, even: 0.08, fold: 0.05, phase: 0.0 },
-      { id: `${id}.frame.2`, label: "B", position: 0.333, brightness: 0.46, even: 0.28, fold: 0.16, phase: 0.12 },
-      { id: `${id}.frame.3`, label: "C", position: 0.667, brightness: 0.72, even: 0.48, fold: 0.34, phase: -0.08 },
-      { id: `${id}.frame.4`, label: "D", position: 1.0, brightness: 0.94, even: 0.72, fold: 0.56, phase: 0.2 },
+      { id: `${id}.frame.1`, label: "A", position: 0.0, brightness: 0.22, even: 0.08, fold: 0.05, skew: -0.18, phase: 0.0 },
+      { id: `${id}.frame.2`, label: "B", position: 0.333, brightness: 0.46, even: 0.28, fold: 0.16, skew: -0.04, phase: 0.12 },
+      { id: `${id}.frame.3`, label: "C", position: 0.667, brightness: 0.72, even: 0.48, fold: 0.34, skew: 0.08, phase: -0.08 },
+      { id: `${id}.frame.4`, label: "D", position: 1.0, brightness: 0.94, even: 0.72, fold: 0.56, skew: 0.22, phase: 0.2 },
     ],
   };
 }
@@ -285,6 +285,7 @@ export function normalizeWavemapFrames(definition: WavemapDefinition): WavemapDe
   const brightness = spreadFrameValues(frames.map((frame) => frame.brightness), 0.18, 0.94, [0.18, 0.42, 0.7, 0.94]);
   const even = spreadFrameValues(frames.map((frame) => frame.even), 0.08, 0.72, [0.08, 0.26, 0.48, 0.72]);
   const fold = spreadFrameValues(frames.map((frame) => frame.fold), 0.04, 0.62, [0.04, 0.14, 0.34, 0.62]);
+  const skew = spreadBipolarFrameValues(frames.map((frame) => frame.skew), [-0.24, -0.08, 0.1, 0.24]);
   const phase = spreadBipolarFrameValues(frames.map((frame) => frame.phase), [-0.18, 0.08, -0.08, 0.18]);
 
   return normalizeCustomWavetable({
@@ -300,6 +301,7 @@ export function normalizeWavemapFrames(definition: WavemapDefinition): WavemapDe
       brightness: brightness[index] ?? frame.brightness,
       even: even[index] ?? frame.even,
       fold: fold[index] ?? frame.fold,
+      skew: skew[index] ?? frame.skew,
       phase: phase[index] ?? frame.phase,
     })),
   });
@@ -329,6 +331,7 @@ export function evolveWavemapFrames(
         brightness: clamp01(frame.brightness + randomSigned(rng) * 0.24 * strength + motion * 0.12),
         even: clamp01(frame.even + randomSigned(rng) * 0.28 * strength - motion * 0.08),
         fold: clamp01(frame.fold + randomSigned(rng) * 0.34 * strength + Math.abs(motion) * 0.12),
+        skew: clampBipolar(frame.skew + randomSigned(rng) * 0.64 * strength + motion * 0.18),
         phase: clampBipolar(frame.phase + randomSigned(rng) * 0.72 * strength + motion * 0.2),
       };
     }),
@@ -408,6 +411,7 @@ function analyzeSamplesToWavemapFrame(
     brightness: clamp01(0.16 + rms * 1.3 + zeroCrossRate * 18),
     even: clamp01(0.08 + asymmetry * 0.72 + averageAbs * 0.28),
     fold: clamp01(0.04 + normalizedDerivative * 5.2 + rms * 0.18),
+    skew: sanitizeBipolar((zeroCrossRate * 10 - averageAbs) * 0.22 + (rms - 0.28) * 0.35, 0),
     phase: sanitizeBipolar((positiveEnergy >= negativeEnergy ? 1 : -1) * clamp01(asymmetry + zeroCrossRate * 9) * 0.8, 0),
   };
 }
@@ -1425,7 +1429,7 @@ export function normalizeCustomWavetable(value: Partial<CustomWavetableDefinitio
 
 function sanitizeCustomWavetableFrame(
   value: unknown,
-  fallback: CustomWavetableFrame = { brightness: 0.5, even: 0.2, fold: 0.1, phase: 0 },
+  fallback: CustomWavetableFrame = { brightness: 0.5, even: 0.2, fold: 0.1, skew: 0, phase: 0 },
 ): CustomWavetableFrame {
   const source = isRecord(value) ? value : {};
   return {
@@ -1435,6 +1439,7 @@ function sanitizeCustomWavetableFrame(
     brightness: sanitize01(source.brightness, fallback.brightness),
     even: sanitize01(source.even, fallback.even),
     fold: sanitize01(source.fold, fallback.fold),
+    skew: sanitizeBipolar(source.skew, fallback.skew),
     phase: sanitizeBipolar(source.phase, fallback.phase),
   };
 }
@@ -1477,6 +1482,8 @@ function sanitizeCustomWavetableFramePatch(value: Partial<CustomWavetableFrame>)
     next.even = sanitize01(source.even, 0.2);
   if (Object.prototype.hasOwnProperty.call(source, "fold"))
     next.fold = sanitize01(source.fold, 0.1);
+  if (Object.prototype.hasOwnProperty.call(source, "skew"))
+    next.skew = sanitizeBipolar(source.skew, 0);
   if (Object.prototype.hasOwnProperty.call(source, "phase"))
     next.phase = sanitizeBipolar(source.phase, 0);
   return next;

@@ -663,10 +663,10 @@ try {
           interpolation: "linear",
           source: { kind: "drawn", label: "Verifier sketch" },
           frames: [
-            { brightness: 0.12, even: 0.04, fold: 0.0, phase: 0 },
-            { brightness: 0.38, even: 0.18, fold: 0.2, phase: 0.25 },
-            { brightness: 0.66, even: 0.55, fold: 0.42, phase: -0.16 },
-            { brightness: 0.95, even: 0.86, fold: 0.68, phase: 0.36 },
+            { brightness: 0.12, even: 0.04, fold: 0.0, skew: -0.24, phase: 0 },
+            { brightness: 0.38, even: 0.18, fold: 0.2, skew: -0.08, phase: 0.25 },
+            { brightness: 0.66, even: 0.55, fold: 0.42, skew: 0.18, phase: -0.16 },
+            { brightness: 0.95, even: 0.86, fold: 0.68, skew: 0.32, phase: 0.36 },
           ],
         },
       },
@@ -678,6 +678,7 @@ try {
   assert.equal(customPatch.aether.oscA.wavetable.bank, "custom");
   assert.equal(customPatch.synthPatch.metadata.wavemaps["user.custom"].source.label, "Verifier sketch");
   assert.equal(customPatch.synthPatch.metadata.customWavetables["user.custom"].frames[3].fold, 0.68);
+  assert.equal(customPatch.synthPatch.metadata.customWavetables["user.custom"].frames[2].skew, 0.18);
   assert.deepEqual(synthStore.normalizeSynthDraftPatch(JSON.parse(JSON.stringify(customPatch.synthPatch))), customDraft);
 
   synthStore.useSynthStore.getState().resetDraft();
@@ -692,6 +693,7 @@ try {
   assert.equal(frameAfterEdit.brightness, 0.91);
   assert.equal(frameAfterEdit.even, frameBeforeEdit.even);
   assert.equal(frameAfterEdit.fold, frameBeforeEdit.fold);
+  assert.equal(frameAfterEdit.skew, frameBeforeEdit.skew);
   assert.equal(frameAfterEdit.phase, frameBeforeEdit.phase);
   assert.equal(synthStore.useSynthStore.getState().draft.metadata.wavemaps["user.custom"].interpolation, "smooth");
   assert.equal(synthStore.useSynthStore.getState().draft.metadata.customWavetables["user.custom"].source.label, "Verifier generated wavemap");
@@ -732,6 +734,7 @@ try {
             brightness: 0.4,
             even: 0.3,
             fold: 0.2,
+            skew: 0,
             phase: 0,
           })),
         },
@@ -744,6 +747,7 @@ try {
   assert.equal(normalizedFlat.frames[3].position, 1);
   assert.ok(normalizedFlat.frames[3].brightness > normalizedFlat.frames[0].brightness, "expected normalized wavemap to add frame contrast");
   assert.ok(normalizedFlat.frames[3].fold > normalizedFlat.frames[0].fold, "expected normalized wavemap to spread fold values");
+  assert.ok(normalizedFlat.frames[3].skew > normalizedFlat.frames[0].skew, "expected normalized wavemap to spread skew values");
   const evolvedA = synthStore.evolveWavemapFrames(normalizedFlat, 12345, 0.5);
   const evolvedB = synthStore.evolveWavemapFrames(normalizedFlat, 12345, 0.5);
   const evolvedC = synthStore.evolveWavemapFrames(normalizedFlat, 54321, 0.5);
@@ -753,6 +757,7 @@ try {
     frame.brightness >= 0 && frame.brightness <= 1
     && frame.even >= 0 && frame.even <= 1
     && frame.fold >= 0 && frame.fold <= 1
+    && frame.skew >= -1 && frame.skew <= 1
     && frame.phase >= -1 && frame.phase <= 1
   ), true);
 
@@ -798,6 +803,24 @@ try {
   const customRms = Math.sqrt(customEnergy / customSamples.length);
   assert.ok(customRms > 0.01, `expected audible custom wavetable rms, got ${customRms}`);
   assert.ok(customPeak > 0.05, `expected audible custom wavetable peak, got ${customPeak}`);
+
+  const unskewedDraft = synthStore.normalizeSynthDraftPatch({
+    ...customDraft,
+    metadata: {
+      ...customDraft.metadata,
+      wavemaps: {
+        "user.custom": {
+          ...customDraft.metadata.wavemaps["user.custom"],
+          frames: customDraft.metadata.wavemaps["user.custom"].frames.map((frame) => ({ ...frame, skew: 0 })),
+        },
+      },
+    },
+  });
+  const unskewedPreview = synthStore.synthDraftToPreviewInstrument(unskewedDraft);
+  const unskewedSamples = new Float32Array(customSamples.length);
+  synthPreview.renderInstrumentSamples(unskewedPreview, unskewedSamples, 48000, synthPreview.previewFrequency(unskewedPreview), "audio", true);
+  const skewDiff = customSamples.reduce((sum, sample, index) => sum + Math.abs(sample - unskewedSamples[index]), 0) / customSamples.length;
+  assert.ok(skewDiff > 0.0004, `expected skew to alter custom wavetable preview, got ${skewDiff}`);
 
   const dynamicModDraft = synthStore.normalizeSynthDraftPatch({
     name: "Dynamic Matrix Probe",

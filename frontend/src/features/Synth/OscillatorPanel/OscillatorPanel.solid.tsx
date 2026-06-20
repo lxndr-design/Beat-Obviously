@@ -322,6 +322,19 @@ function OscillatorRow(props: {
                         />
                         <Knob
                           size="sm"
+                          label="Skew"
+                          value={frame.skew}
+                          min={-1}
+                          max={1}
+                          step={0.01}
+                          defaultValue={createDefaultCustomWavetable(customTable().id).frames[index()]?.skew ?? 0}
+                          bipolar
+                          formatValue={(value) => `${Math.round(value * 100)}`}
+                          parseValue={parsePercent}
+                          onChange={(skew) => updateCustomWavetableFrame(customTable().id, index(), { skew })}
+                        />
+                        <Knob
+                          size="sm"
                           label="Phase"
                           value={frame.phase}
                           min={-1}
@@ -503,17 +516,22 @@ function customFrameAmplitude(frame: CustomWavetableFrame, harmonic: number): nu
   const brightness = clamp01(frame.brightness);
   const even = clamp01(frame.even);
   const fold = clamp01(frame.fold);
+  const skew = Math.max(-1, Math.min(1, frame.skew));
   const parity = harmonic % 2 === 1 ? 1 : even;
   const rolloff = Math.exp(-harmonic * (0.016 + (1 - brightness) * 0.085));
+  const skewBias = Math.max(0.18, 1 + skew * ((harmonic - 8) / 18));
   const foldPeak = Math.exp(-Math.pow((harmonic - (3 + brightness * 20)) / (1.6 + fold * 8), 2));
   const motion = 1 + Math.sin(harmonic * 1.7 + frame.phase * Math.PI) * fold * 0.28;
-  return Math.max(0, parity * rolloff * motion / Math.sqrt(harmonic) + foldPeak * fold * 0.35);
+  return Math.max(0, parity * rolloff * motion * skewBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35);
 }
 
 function customFramePhase(frame: CustomWavetableFrame, harmonic: number): number {
   const fold = clamp01(frame.fold);
   const phase = Math.max(-1, Math.min(1, frame.phase));
-  return phase * harmonic * 0.28 + Math.sin(harmonic * 0.41) * fold * 0.55;
+  const skew = Math.max(-1, Math.min(1, frame.skew));
+  return phase * harmonic * 0.28
+    + Math.sin(harmonic * 0.41 + skew * 0.55) * fold * 0.55
+    + skew * Math.log2(harmonic + 1) * 0.09;
 }
 
 function makeWaveformPath(samples: number[], verticalOffset = 0): string {

@@ -45,6 +45,18 @@ Initial defaults:
 - `osc.b.wavetable`: `basic.square`
 - `osc.b.level`: `0.6`
 
+### Custom Wavemap Frames
+
+Custom wavemaps are stored in `metadata.wavemaps` with the legacy mirror `metadata.customWavetables` kept for older patches. Each wavemap owns four additive frame objects. Older saved frames that omit newer fields must use the defaults below.
+
+| Field | Type | Range | Default | Notes |
+| --- | --- | --- | --- | --- |
+| `brightness` | normalized | `0..1` | frame default | Harmonic rolloff and upper-harmonic emphasis. |
+| `even` | normalized | `0..1` | frame default | Even-harmonic participation. |
+| `fold` | normalized | `0..1` | frame default | Fold peak and harmonic motion amount. |
+| `skew` | bipolar | `-1..1` | `0` | Harmonic bias. Negative values weight lower harmonics; positive values weight higher harmonics. |
+| `phase` | bipolar | `-1..1` | frame default | Harmonic phase offset. |
+
 ## Unison Parameters
 
 | ID | Type | Range | Default | Notes |

@@ -123,17 +123,19 @@ namespace beat
         {
             const float brightness = juce::jlimit(0.0f, 1.0f, frame.brightness);
             const float even = juce::jlimit(0.0f, 1.0f, frame.even);
+            const float skew = juce::jlimit(-1.0f, 1.0f, frame.skew);
             const float shapedWarp = warpModeIntensity(warp, warpMode);
             const float fold = juce::jlimit(0.0f, 1.0f, frame.fold + shapedWarp * 0.35f);
             const float parity = (harmonic % 2) == 1 ? 1.0f : even;
             const float rolloff = std::exp(-(float) harmonic * (0.016f + (1.0f - brightness) * 0.085f));
+            const float skewBias = juce::jmax(0.18f, 1.0f + skew * (((float) harmonic - 8.0f) / 18.0f));
             const float center = 3.0f + brightness * 20.0f;
             const float width = 1.6f + fold * 8.0f;
             const float foldPeak = std::exp(-std::pow(((float) harmonic - center) / width, 2.0f));
             const float motion = 1.0f + std::sin((float) harmonic * 1.7f + frame.phase * juce::MathConstants<float>::pi) * fold * 0.28f;
             return juce::jmax(
                 0.0f,
-                parity * rolloff * motion / std::sqrt((float) harmonic)
+                parity * rolloff * motion * skewBias / std::sqrt((float) harmonic)
                     + foldPeak * fold * 0.35f
                     + warpAmplitudeOffset(warpMode, harmonic, brightness, warp));
         }
@@ -143,8 +145,10 @@ namespace beat
             const float shapedWarp = warpModeIntensity(warp, warpMode);
             const float fold = juce::jlimit(0.0f, 1.0f, frame.fold + shapedWarp * 0.25f);
             const float phase = juce::jlimit(-1.0f, 1.0f, frame.phase);
+            const float skew = juce::jlimit(-1.0f, 1.0f, frame.skew);
             return phase * (float) harmonic * 0.28f
-                + std::sin((float) harmonic * 0.41f) * fold * 0.55f
+                + std::sin((float) harmonic * 0.41f + skew * 0.55f) * fold * 0.55f
+                + skew * std::log2((float) harmonic + 1.0f) * 0.09f
                 + warpPhaseOffset(warpMode, harmonic, phase, warp);
         }
 
@@ -161,6 +165,7 @@ namespace beat
                 a.brightness + (b.brightness - a.brightness) * mix,
                 a.even + (b.even - a.even) * mix,
                 a.fold + (b.fold - a.fold) * mix,
+                a.skew + (b.skew - a.skew) * mix,
                 a.phase + (b.phase - a.phase) * mix,
             };
         }
