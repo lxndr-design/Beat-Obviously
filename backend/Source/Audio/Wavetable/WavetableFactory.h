@@ -51,8 +51,14 @@ namespace beat
                                       int frameSize);
 
         static Wavetable createCustom(const std::array<CustomFrame, 4>& frames,
+                                      bool smoothInterpolation,
+                                      int frameCount,
+                                      int frameSize);
+
+        static Wavetable createCustom(const std::array<CustomFrame, 4>& frames,
                                       float warp = 0.0f,
                                       WavetableWarpMode warpMode = WavetableWarpMode::Shape,
+                                      bool smoothInterpolation = false,
                                       int frameCount = defaultFrameCount,
                                       int frameSize = defaultFrameSize);
     };

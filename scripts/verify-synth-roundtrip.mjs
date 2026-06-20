@@ -826,6 +826,24 @@ try {
   const skewDiff = customSamples.reduce((sum, sample, index) => sum + Math.abs(sample - unskewedSamples[index]), 0) / customSamples.length;
   assert.ok(skewDiff > 0.0004, `expected skew to alter custom wavetable preview, got ${skewDiff}`);
 
+  const smoothCustomDraft = synthStore.normalizeSynthDraftPatch({
+    ...customDraft,
+    metadata: {
+      ...customDraft.metadata,
+      wavemaps: {
+        "user.custom": {
+          ...customDraft.metadata.wavemaps["user.custom"],
+          interpolation: "smooth",
+        },
+      },
+    },
+  });
+  const smoothCustomPreview = synthStore.synthDraftToPreviewInstrument(smoothCustomDraft);
+  const smoothCustomSamples = new Float32Array(customSamples.length);
+  synthPreview.renderInstrumentSamples(smoothCustomPreview, smoothCustomSamples, 48000, synthPreview.previewFrequency(smoothCustomPreview), "audio", true);
+  const interpolationDiff = customSamples.reduce((sum, sample, index) => sum + Math.abs(sample - smoothCustomSamples[index]), 0) / customSamples.length;
+  assert.ok(interpolationDiff > 0.0004, `expected smooth wavemap interpolation to alter custom wavetable preview, got ${interpolationDiff}`);
+
   const dynamicModDraft = synthStore.normalizeSynthDraftPatch({
     name: "Dynamic Matrix Probe",
     parameters: {

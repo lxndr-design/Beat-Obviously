@@ -58,6 +58,7 @@ namespace beat
                 float position { 0.35f };
                 float warp { 0.2f };
                 int warpMode { 0 };
+                bool smoothInterpolation { false };
                 int unison { 1 };
                 float detuneCents { 12.0f };
                 float blend { 0.5f };

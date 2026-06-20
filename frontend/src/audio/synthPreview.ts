@@ -1023,13 +1023,13 @@ function previewWavetableKey(
   warpMode: WavetableConfig["warpMode"],
 ): string {
   const customKey = custom
-    ? custom.frames.map((frame) => [
+    ? [custom.interpolation ?? "linear", custom.frames.map((frame) => [
         frame.brightness.toFixed(3),
         frame.even.toFixed(3),
         frame.fold.toFixed(3),
         frame.skew.toFixed(3),
         frame.phase.toFixed(3),
-      ].join(",")).join(";")
+      ].join(",")).join(";")].join(":")
     : "";
   return [
     config.bank,
@@ -1048,12 +1048,13 @@ function createPreviewWavetable(
   warp: number,
   warpMode: WavetableConfig["warpMode"],
 ): CachedPreviewWavetable {
-  const frameCount = custom ? custom.frames.length : WAVETABLE_FRAME_COUNT;
+  const smoothCustom = custom?.interpolation === "smooth";
+  const frameCount = custom ? (smoothCustom ? WAVETABLE_FRAME_COUNT : custom.frames.length) : WAVETABLE_FRAME_COUNT;
   const frameSize = PREVIEW_WAVETABLE_FRAME_SIZE;
   const samples = new Float32Array(frameCount * frameSize);
   for (let frame = 0; frame < frameCount; frame++) {
     const normalizedFrame = frame / Math.max(1, frameCount - 1);
-    const customFrame = custom?.frames[frame] ?? null;
+    const customFrame = custom ? interpolatePreviewCustomFrame(custom.frames, normalizedFrame, smoothCustom) : null;
     let peak = 0;
     const frameStart = frame * frameSize;
     for (let index = 0; index < frameSize; index++) {
@@ -1080,6 +1081,50 @@ function createPreviewWavetable(
     }
   }
   return { frameCount, frameSize, samples };
+}
+
+function interpolatePreviewValue(p0: number, p1: number, p2: number, p3: number, mix: number): number {
+  const t = clamp01(mix);
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return 0.5 * (
+    (2 * p1)
+    + (-p0 + p2) * t
+    + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2
+    + (-p0 + 3 * p1 - 3 * p2 + p3) * t3
+  );
+}
+
+function interpolatePreviewCustomFrame(
+  frames: CustomWavetableFrame[],
+  normalizedFrame: number,
+  smoothInterpolation: boolean,
+): CustomWavetableFrame {
+  const safeFrames = frames.length >= 4 ? frames : [...frames, ...frames.slice(-1), ...frames.slice(-1), ...frames.slice(-1)].slice(0, 4);
+  const scaled = clamp01(normalizedFrame) * Math.max(1, safeFrames.length - 1);
+  const base = Math.min(Math.max(0, Math.floor(scaled)), Math.max(0, safeFrames.length - 2));
+  const mix = scaled - base;
+  const a = safeFrames[base];
+  const b = safeFrames[Math.min(safeFrames.length - 1, base + 1)];
+  if (!smoothInterpolation) {
+    return {
+      brightness: a.brightness + (b.brightness - a.brightness) * mix,
+      even: a.even + (b.even - a.even) * mix,
+      fold: a.fold + (b.fold - a.fold) * mix,
+      skew: a.skew + (b.skew - a.skew) * mix,
+      phase: a.phase + (b.phase - a.phase) * mix,
+    };
+  }
+
+  const p0 = safeFrames[Math.max(0, base - 1)];
+  const p3 = safeFrames[Math.min(safeFrames.length - 1, base + 2)];
+  return {
+    brightness: clamp01(interpolatePreviewValue(p0.brightness, a.brightness, b.brightness, p3.brightness, mix)),
+    even: clamp01(interpolatePreviewValue(p0.even, a.even, b.even, p3.even, mix)),
+    fold: clamp01(interpolatePreviewValue(p0.fold, a.fold, b.fold, p3.fold, mix)),
+    skew: clamp(interpolatePreviewValue(p0.skew, a.skew, b.skew, p3.skew, mix), -1, 1),
+    phase: clamp(interpolatePreviewValue(p0.phase, a.phase, b.phase, p3.phase, mix), -1, 1),
+  };
 }
 
 function previewWavetableSample(

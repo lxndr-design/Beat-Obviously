@@ -49,6 +49,8 @@ Initial defaults:
 
 Custom wavemaps are stored in `metadata.wavemaps` with the legacy mirror `metadata.customWavetables` kept for older patches. Each wavemap owns four additive frame objects. Older saved frames that omit newer fields must use the defaults below.
 
+The wavemap-level `interpolation` field controls how Beat generates intermediate custom frames between the four saved controls. `linear` uses straight parameter interpolation. `smooth` uses bounded cubic interpolation in browser preview and native wavetable generation, and must be part of native table cache identity.
+
 | Field | Type | Range | Default | Notes |
 | --- | --- | --- | --- | --- |
 | `brightness` | normalized | `0..1` | frame default | Harmonic rolloff and upper-harmonic emphasis. |

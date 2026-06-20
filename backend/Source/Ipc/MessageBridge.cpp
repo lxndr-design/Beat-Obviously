@@ -1247,6 +1247,9 @@ namespace beat
             fallback.position = normalizedParam(value, "position", fallback.position);
             fallback.warp = normalizedParam(value, "warp", fallback.warp);
             fallback.warpMode = parseWavetableWarpMode(value.getProperty("warpMode", fallback.warpMode));
+            fallback.smoothInterpolation = (bool) value.getProperty(
+                "smoothInterpolation",
+                value.getProperty("interpolation", fallback.smoothInterpolation ? "smooth" : "linear").toString() == "smooth");
             fallback.unison = juce::jlimit(1, 8, (int) value.getProperty("unison", fallback.unison));
             fallback.detuneCents = floatParam(value, "detuneCents", fallback.detuneCents, 0.0f, 100.0f);
             fallback.blend = normalizedParam(value, "blend", fallback.blend);

@@ -152,15 +152,40 @@ namespace beat
                 + warpPhaseOffset(warpMode, harmonic, phase, warp);
         }
 
+        float smoothInterpolate(float p0, float p1, float p2, float p3, float mix) noexcept
+        {
+            const float t = juce::jlimit(0.0f, 1.0f, mix);
+            const float t2 = t * t;
+            const float t3 = t2 * t;
+            return 0.5f * (
+                (2.0f * p1)
+                + (-p0 + p2) * t
+                + (2.0f * p0 - 5.0f * p1 + 4.0f * p2 - p3) * t2
+                + (-p0 + 3.0f * p1 - 3.0f * p2 + p3) * t3);
+        }
+
         WavetableFactory::CustomFrame interpolateCustomFrame(
             const std::array<WavetableFactory::CustomFrame, 4>& frames,
-            float normalizedFrame)
+            float normalizedFrame,
+            bool smoothInterpolation)
         {
             const float scaled = juce::jlimit(0.0f, 1.0f, normalizedFrame) * 3.0f;
             const int base = juce::jlimit(0, 2, (int) std::floor(scaled));
             const float mix = scaled - (float) base;
             const auto& a = frames[(size_t) base];
             const auto& b = frames[(size_t) base + 1];
+            if (smoothInterpolation)
+            {
+                const auto& p0 = frames[(size_t) juce::jlimit(0, 3, base - 1)];
+                const auto& p3 = frames[(size_t) juce::jlimit(0, 3, base + 2)];
+                return {
+                    juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.brightness, a.brightness, b.brightness, p3.brightness, mix)),
+                    juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.even, a.even, b.even, p3.even, mix)),
+                    juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.fold, a.fold, b.fold, p3.fold, mix)),
+                    juce::jlimit(-1.0f, 1.0f, smoothInterpolate(p0.skew, a.skew, b.skew, p3.skew, mix)),
+                    juce::jlimit(-1.0f, 1.0f, smoothInterpolate(p0.phase, a.phase, b.phase, p3.phase, mix)),
+                };
+            }
             return {
                 a.brightness + (b.brightness - a.brightness) * mix,
                 a.even + (b.even - a.even) * mix,
@@ -227,10 +252,15 @@ namespace beat
 
     Wavetable WavetableFactory::createCustom(const std::array<CustomFrame, 4>& frames, int frameCount, int frameSize)
     {
-        return createCustom(frames, 0.0f, WavetableWarpMode::Shape, frameCount, frameSize);
+        return createCustom(frames, 0.0f, WavetableWarpMode::Shape, false, frameCount, frameSize);
     }
 
-    Wavetable WavetableFactory::createCustom(const std::array<CustomFrame, 4>& frames, float warp, WavetableWarpMode warpMode, int frameCount, int frameSize)
+    Wavetable WavetableFactory::createCustom(const std::array<CustomFrame, 4>& frames, bool smoothInterpolation, int frameCount, int frameSize)
+    {
+        return createCustom(frames, 0.0f, WavetableWarpMode::Shape, smoothInterpolation, frameCount, frameSize);
+    }
+
+    Wavetable WavetableFactory::createCustom(const std::array<CustomFrame, 4>& frames, float warp, WavetableWarpMode warpMode, bool smoothInterpolation, int frameCount, int frameSize)
     {
         frameCount = juce::jlimit(1, 64, frameCount);
         frameSize = juce::jlimit(32, 32768, frameSize);
@@ -241,7 +271,7 @@ namespace beat
         for (int frame = 0; frame < frameCount; ++frame)
         {
             const float frameNorm = frameCount <= 1 ? 0.0f : (float) frame / (float) (frameCount - 1);
-            const auto customFrame = interpolateCustomFrame(frames, frameNorm);
+            const auto customFrame = interpolateCustomFrame(frames, frameNorm, smoothInterpolation);
             const int frameStart = frame * frameSize;
 
             for (int i = 0; i < frameSize; ++i)

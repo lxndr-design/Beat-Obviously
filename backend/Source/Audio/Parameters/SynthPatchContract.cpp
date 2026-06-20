@@ -171,6 +171,7 @@ namespace beat
             config.custom = true;
 
             const auto definition = objectProperty(customWavetables, id, {});
+            config.smoothInterpolation = objectProperty(definition, "interpolation", "linear").toString() == "smooth";
             const auto frames = objectProperty(definition, "frames", {});
             if (auto* frameArray = frames.getArray())
             {

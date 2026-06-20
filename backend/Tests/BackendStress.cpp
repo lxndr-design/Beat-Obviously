@@ -8874,7 +8874,23 @@ namespace
                 { 0.95f, 0.86f, 0.68f, 0.32f, 0.36f },
             }};
             const auto custom = beat::WavetableFactory::createCustom(frames, 8, 2048);
+            const auto smoothCustom = beat::WavetableFactory::createCustom(frames, true, 8, 2048);
             if (!custom.isValid() || custom.getFrameCount() != 8 || custom.getFrameSize() != 2048)
+                return false;
+            if (!smoothCustom.isValid() || smoothCustom.getFrameCount() != custom.getFrameCount() || smoothCustom.getFrameSize() != custom.getFrameSize())
+                return false;
+
+            double interpolationDiff = 0.0;
+            constexpr int probeFrame = 3;
+            for (int i = 0; i < custom.getFrameSize(); ++i)
+            {
+                const float linear = custom.getSample(probeFrame, i);
+                const float smooth = smoothCustom.getSample(probeFrame, i);
+                if (!std::isfinite(linear) || !std::isfinite(smooth))
+                    return false;
+                interpolationDiff += std::abs((double) linear - (double) smooth);
+            }
+            if (interpolationDiff / (double) custom.getFrameSize() < 0.0004)
                 return false;
 
             beat::WavetableOscillator customOsc;
@@ -9157,10 +9173,11 @@ namespace
           "modulation": [],
           "metadata": {
             "customWavetables": {
-              "user.custom": {
-                "id": "user.custom",
-                "name": "Verifier Custom",
-                "frames": [
+	              "user.custom": {
+	                "id": "user.custom",
+	                "name": "Verifier Custom",
+	                "interpolation": "smooth",
+	                "frames": [
                   { "brightness": 0.12, "even": 0.04, "fold": 0.0, "skew": -0.24, "phase": 0.0 },
                   { "brightness": 0.38, "even": 0.18, "fold": 0.2, "skew": -0.08, "phase": 0.25 },
                   { "brightness": 0.66, "even": 0.55, "fold": 0.42, "skew": 0.18, "phase": -0.16 },
@@ -9179,9 +9196,11 @@ namespace
             return false;
         if (customInstrument.aether.oscA.wavetable.bank != 5)
             return false;
-        if (!near(customInstrument.aether.oscA.wavetable.customFrames[3].fold, 0.68f))
-            return false;
-        if (!near(customInstrument.aether.oscA.wavetable.customFrames[2].skew, 0.18f))
+	        if (!near(customInstrument.aether.oscA.wavetable.customFrames[3].fold, 0.68f))
+	            return false;
+	        if (!customInstrument.aether.oscA.wavetable.smoothInterpolation)
+	            return false;
+	        if (!near(customInstrument.aether.oscA.wavetable.customFrames[2].skew, 0.18f))
             return false;
         if (!near(customInstrument.aether.oscA.wavetable.customFrames[2].phase, -0.16f))
             return false;
