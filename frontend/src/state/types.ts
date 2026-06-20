@@ -393,6 +393,8 @@ export interface CustomWavetableFrame {
   fold: number;
   /** 0..1 focused resonant harmonic band amount. */
   formant: number;
+  /** 0..1 spectral notch amount that carves a harmonic valley. */
+  notch: number;
   /** -1..1 harmonic bias; negative weights low harmonics, positive weights high harmonics. */
   skew: number;
   phase: number;

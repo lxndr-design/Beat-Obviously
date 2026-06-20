@@ -667,10 +667,10 @@ try {
           interpolation: "linear",
           source: { kind: "drawn", label: "Verifier sketch" },
           frames: [
-            { brightness: 0.12, even: 0.04, fold: 0.0, formant: 0.06, skew: -0.24, phase: 0 },
-            { brightness: 0.38, even: 0.18, fold: 0.2, formant: 0.22, skew: -0.08, phase: 0.25 },
-            { brightness: 0.66, even: 0.55, fold: 0.42, formant: 0.48, skew: 0.18, phase: -0.16 },
-            { brightness: 0.95, even: 0.86, fold: 0.68, formant: 0.62, skew: 0.32, phase: 0.36 },
+            { brightness: 0.12, even: 0.04, fold: 0.0, formant: 0.06, notch: 0.04, skew: -0.24, phase: 0 },
+            { brightness: 0.38, even: 0.18, fold: 0.2, formant: 0.22, notch: 0.12, skew: -0.08, phase: 0.25 },
+            { brightness: 0.66, even: 0.55, fold: 0.42, formant: 0.48, notch: 0.28, skew: 0.18, phase: -0.16 },
+            { brightness: 0.95, even: 0.86, fold: 0.68, formant: 0.62, notch: 0.42, skew: 0.32, phase: 0.36 },
           ],
         },
       },
@@ -683,6 +683,7 @@ try {
   assert.equal(customPatch.synthPatch.metadata.wavemaps["user.custom"].source.label, "Verifier sketch");
   assert.equal(customPatch.synthPatch.metadata.customWavetables["user.custom"].frames[3].fold, 0.68);
   assert.equal(customPatch.synthPatch.metadata.customWavetables["user.custom"].frames[2].formant, 0.48);
+  assert.equal(customPatch.synthPatch.metadata.customWavetables["user.custom"].frames[2].notch, 0.28);
   assert.equal(customPatch.synthPatch.metadata.customWavetables["user.custom"].frames[2].skew, 0.18);
   assert.deepEqual(synthStore.normalizeSynthDraftPatch(JSON.parse(JSON.stringify(customPatch.synthPatch))), customDraft);
 
@@ -699,6 +700,7 @@ try {
   assert.equal(frameAfterEdit.even, frameBeforeEdit.even);
   assert.equal(frameAfterEdit.fold, frameBeforeEdit.fold);
   assert.equal(frameAfterEdit.formant, frameBeforeEdit.formant);
+  assert.equal(frameAfterEdit.notch, frameBeforeEdit.notch);
   assert.equal(frameAfterEdit.skew, frameBeforeEdit.skew);
   assert.equal(frameAfterEdit.phase, frameBeforeEdit.phase);
   assert.equal(synthStore.useSynthStore.getState().draft.metadata.wavemaps["user.custom"].interpolation, "smooth");
@@ -741,6 +743,7 @@ try {
             even: 0.3,
             fold: 0.2,
             formant: 0.1,
+            notch: 0.05,
             skew: 0,
             phase: 0,
           })),
@@ -755,6 +758,7 @@ try {
   assert.ok(normalizedFlat.frames[3].brightness > normalizedFlat.frames[0].brightness, "expected normalized wavemap to add frame contrast");
   assert.ok(normalizedFlat.frames[3].fold > normalizedFlat.frames[0].fold, "expected normalized wavemap to spread fold values");
   assert.ok(normalizedFlat.frames[3].formant > normalizedFlat.frames[0].formant, "expected normalized wavemap to spread formant values");
+  assert.ok(normalizedFlat.frames[3].notch > normalizedFlat.frames[0].notch, "expected normalized wavemap to spread notch values");
   assert.ok(normalizedFlat.frames[3].skew > normalizedFlat.frames[0].skew, "expected normalized wavemap to spread skew values");
   const evolvedA = synthStore.evolveWavemapFrames(normalizedFlat, 12345, 0.5);
   const evolvedB = synthStore.evolveWavemapFrames(normalizedFlat, 12345, 0.5);
@@ -766,6 +770,7 @@ try {
     && frame.even >= 0 && frame.even <= 1
     && frame.fold >= 0 && frame.fold <= 1
     && frame.formant >= 0 && frame.formant <= 1
+    && frame.notch >= 0 && frame.notch <= 1
     && frame.skew >= -1 && frame.skew <= 1
     && frame.phase >= -1 && frame.phase <= 1
   ), true);
@@ -848,6 +853,24 @@ try {
   synthPreview.renderInstrumentSamples(unformantedPreview, unformantedSamples, 48000, synthPreview.previewFrequency(unformantedPreview), "audio", true);
   const formantDiff = customSamples.reduce((sum, sample, index) => sum + Math.abs(sample - unformantedSamples[index]), 0) / customSamples.length;
   assert.ok(formantDiff > 0.0004, `expected formant to alter custom wavetable preview, got ${formantDiff}`);
+
+  const unnotchedDraft = synthStore.normalizeSynthDraftPatch({
+    ...customDraft,
+    metadata: {
+      ...customDraft.metadata,
+      wavemaps: {
+        "user.custom": {
+          ...customDraft.metadata.wavemaps["user.custom"],
+          frames: customDraft.metadata.wavemaps["user.custom"].frames.map((frame) => ({ ...frame, notch: 0 })),
+        },
+      },
+    },
+  });
+  const unnotchedPreview = synthStore.synthDraftToPreviewInstrument(unnotchedDraft);
+  const unnotchedSamples = new Float32Array(customSamples.length);
+  synthPreview.renderInstrumentSamples(unnotchedPreview, unnotchedSamples, 48000, synthPreview.previewFrequency(unnotchedPreview), "audio", true);
+  const notchDiff = customSamples.reduce((sum, sample, index) => sum + Math.abs(sample - unnotchedSamples[index]), 0) / customSamples.length;
+  assert.ok(notchDiff > 0.0004, `expected notch to alter custom wavetable preview, got ${notchDiff}`);
 
   const smoothCustomDraft = synthStore.normalizeSynthDraftPatch({
     ...customDraft,

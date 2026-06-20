@@ -155,6 +155,7 @@ namespace beat
             fallback.even = juce::jlimit(0.0f, 1.0f, (float) (double) objectProperty(value, "even", fallback.even));
             fallback.fold = juce::jlimit(0.0f, 1.0f, (float) (double) objectProperty(value, "fold", fallback.fold));
             fallback.formant = juce::jlimit(0.0f, 1.0f, (float) (double) objectProperty(value, "formant", fallback.formant));
+            fallback.notch = juce::jlimit(0.0f, 1.0f, (float) (double) objectProperty(value, "notch", fallback.notch));
             fallback.skew = juce::jlimit(-1.0f, 1.0f, (float) (double) objectProperty(value, "skew", fallback.skew));
             fallback.phase = juce::jlimit(-1.0f, 1.0f, (float) (double) objectProperty(value, "phase", fallback.phase));
             return fallback;

@@ -1457,6 +1457,7 @@ namespace beat
                     source.customFrames[i].even,
                     source.customFrames[i].fold,
                     source.customFrames[i].formant,
+                    source.customFrames[i].notch,
                     source.customFrames[i].skew,
                     source.customFrames[i].phase,
                 };

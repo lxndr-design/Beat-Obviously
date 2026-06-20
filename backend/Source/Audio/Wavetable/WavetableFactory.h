@@ -30,6 +30,7 @@ namespace beat
             float even { 0.2f };
             float fold { 0.1f };
             float formant { 0.12f };
+            float notch { 0.08f };
             float skew { 0.0f };
             float phase { 0.0f };
         };
