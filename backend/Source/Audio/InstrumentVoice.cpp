@@ -286,6 +286,8 @@ namespace beat
                     juce::jlimit(-1.0f, 1.0f, config.customFrames[i].skew),
                     juce::jlimit(-1.0f, 1.0f, config.customFrames[i].phase),
                 };
+                for (size_t partial = 0; partial < frames[i].partials.size(); ++partial)
+                    frames[i].partials[partial] = juce::jlimit(0.0f, 1.0f, config.customFrames[i].partials[partial]);
             }
             return frames;
         }
@@ -324,6 +326,8 @@ namespace beat
                         << juce::String(juce::jlimit(0.0f, 1.0f, frame.notch), 4) << ","
                         << juce::String(juce::jlimit(-1.0f, 1.0f, frame.skew), 4) << ","
                         << juce::String(juce::jlimit(-1.0f, 1.0f, frame.phase), 4);
+                    for (const auto partial : frame.partials)
+                        key << "," << juce::String(juce::jlimit(0.0f, 1.0f, partial), 3);
                 }
             }
             return key;

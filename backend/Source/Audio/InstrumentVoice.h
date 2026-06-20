@@ -53,6 +53,7 @@ namespace beat
                     float notch { 0.08f };
                     float skew { 0.0f };
                     float phase { 0.0f };
+                    std::array<float, 16> partials {};
                 };
 
                 int bank { 0 };

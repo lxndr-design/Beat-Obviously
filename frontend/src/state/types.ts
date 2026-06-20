@@ -398,6 +398,8 @@ export interface CustomWavetableFrame {
   /** -1..1 harmonic bias; negative weights low harmonics, positive weights high harmonics. */
   skew: number;
   phase: number;
+  /** Optional 16-bin manual harmonic drawing overlay. */
+  partials?: number[];
 }
 
 export type WavemapKind = "harmonic-sketch" | "resynthesized";

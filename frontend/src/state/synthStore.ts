@@ -219,6 +219,7 @@ export const FACTORY_WAVETABLES: Array<{ id: WavetableId; label: string }> = [
 ];
 
 export const CUSTOM_WAVETABLE_FRAME_LABELS = ["A", "B", "C", "D"] as const;
+export const CUSTOM_WAVETABLE_PARTIAL_COUNT = 16;
 
 export function createDefaultCustomWavetable(id = DEFAULT_CUSTOM_WAVETABLE_ID): CustomWavetableDefinition {
   return {
@@ -1452,7 +1453,8 @@ function sanitizeCustomWavetableFrame(
   fallback: CustomWavetableFrame = { brightness: 0.5, even: 0.2, fold: 0.1, formant: 0.12, notch: 0.08, skew: 0, phase: 0 },
 ): CustomWavetableFrame {
   const source = isRecord(value) ? value : {};
-  return {
+  const partials = sanitizeCustomWavetablePartials(source.partials, fallback.partials);
+  const next: CustomWavetableFrame = {
     id: typeof source.id === "string" && source.id.trim() ? source.id.trim().slice(0, 64) : fallback.id,
     label: typeof source.label === "string" && source.label.trim() ? source.label.trim().slice(0, 16) : fallback.label,
     position: sanitize01(source.position, fallback.position ?? 0),
@@ -1464,6 +1466,14 @@ function sanitizeCustomWavetableFrame(
     skew: sanitizeBipolar(source.skew, fallback.skew),
     phase: sanitizeBipolar(source.phase, fallback.phase),
   };
+  if (partials) next.partials = partials;
+  return next;
+}
+
+function sanitizeCustomWavetablePartials(value: unknown, fallback?: number[]): number[] | undefined {
+  const source = Array.isArray(value) ? value : fallback;
+  if (!Array.isArray(source)) return undefined;
+  return Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, (_, index) => sanitize01(source[index], 0));
 }
 
 function sanitizeWavemapSource(value: unknown, fallback: WavemapSource): WavemapSource {
@@ -1512,6 +1522,8 @@ function sanitizeCustomWavetableFramePatch(value: Partial<CustomWavetableFrame>)
     next.skew = sanitizeBipolar(source.skew, 0);
   if (Object.prototype.hasOwnProperty.call(source, "phase"))
     next.phase = sanitizeBipolar(source.phase, 0);
+  if (Object.prototype.hasOwnProperty.call(source, "partials"))
+    next.partials = sanitizeCustomWavetablePartials(source.partials) ?? [];
   return next;
 }
 

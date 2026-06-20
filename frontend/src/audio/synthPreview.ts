@@ -65,6 +65,7 @@ const oscillatorRateCache = new Map<string, number>();
 const MAX_RENDERED_INSTRUMENT_BUFFERS = 32;
 const MAX_UNISON_VOICE_PLANS = 96;
 const MAX_OSCILLATOR_RATE_ENTRIES = 128;
+const CUSTOM_WAVETABLE_PARTIAL_COUNT = 16;
 
 interface SamplePlaybackTarget {
   url: string;
@@ -1031,6 +1032,7 @@ function previewWavetableKey(
         frame.notch.toFixed(3),
         frame.skew.toFixed(3),
         frame.phase.toFixed(3),
+        ...(frame.partials ?? []).map((partial) => partial.toFixed(3)),
       ].join(",")).join(";")].join(":")
     : "";
   return [
@@ -1117,6 +1119,7 @@ function interpolatePreviewCustomFrame(
       notch: a.notch + (b.notch - a.notch) * mix,
       skew: a.skew + (b.skew - a.skew) * mix,
       phase: a.phase + (b.phase - a.phase) * mix,
+      partials: interpolatePreviewPartials(a.partials, b.partials, mix),
     };
   }
 
@@ -1130,7 +1133,18 @@ function interpolatePreviewCustomFrame(
     notch: clamp01(interpolatePreviewValue(p0.notch, a.notch, b.notch, p3.notch, mix)),
     skew: clamp(interpolatePreviewValue(p0.skew, a.skew, b.skew, p3.skew, mix), -1, 1),
     phase: clamp(interpolatePreviewValue(p0.phase, a.phase, b.phase, p3.phase, mix), -1, 1),
+    partials: interpolatePreviewPartials(a.partials, b.partials, mix, p0.partials, p3.partials),
   };
+}
+
+function interpolatePreviewPartials(a?: number[], b?: number[], mix = 0, p0?: number[], p3?: number[]): number[] | undefined {
+  if (!a && !b && !p0 && !p3) return undefined;
+  return Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, (_, index) => {
+    const av = clamp01(a?.[index] ?? 0);
+    const bv = clamp01(b?.[index] ?? 0);
+    if (!p0 || !p3) return av + (bv - av) * mix;
+    return clamp01(interpolatePreviewValue(clamp01(p0[index] ?? 0), av, bv, clamp01(p3[index] ?? 0), mix));
+  });
 }
 
 function previewWavetableSample(
@@ -1178,6 +1192,9 @@ function sanitizeCustomFrame(frame: CustomWavetableFrame): CustomWavetableFrame 
     notch: Number.isFinite(frame.notch) ? clamp01(frame.notch) : 0.08,
     skew: clamp(frame.skew, -1, 1),
     phase: clamp(frame.phase, -1, 1),
+    partials: Array.isArray(frame.partials)
+      ? Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, (_, index) => clamp01(frame.partials?.[index] ?? 0))
+      : undefined,
   };
 }
 
@@ -1208,8 +1225,9 @@ function customWavetableHarmonicAmplitude(frame: CustomWavetableFrame, harmonic:
   const notchCut = Math.max(0.08, 1 - notchPeak * notch * 0.72);
   const folded = warpMode === "fold" ? Math.abs(Math.sin(harmonic * 0.62 + frame.phase)) * shapedWarp * 0.24 : 0;
   const pinched = warpMode === "pinch" ? Math.exp(-Math.pow((harmonic - (2 + brightness * 8)) / 2.4, 2)) * shapedWarp * 0.28 : 0;
+  const drawnPartial = harmonic <= CUSTOM_WAVETABLE_PARTIAL_COUNT ? clamp01(frame.partials?.[harmonic - 1] ?? 0) : 0;
   const motion = 1 + Math.sin(harmonic * 1.7 + frame.phase * Math.PI) * fold * 0.28;
-  return Math.max(0, (parity * rolloff * motion * skewBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + formantPeak * formant * 0.55) * notchCut + folded + pinched);
+  return Math.max(0, (parity * rolloff * motion * skewBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + formantPeak * formant * 0.55 + drawnPartial * (0.08 + brightness * 0.34)) * notchCut + folded + pinched);
 }
 
 function customWavetableHarmonicPhase(frame: CustomWavetableFrame, harmonic: number, warp: number, warpMode: WavetableConfig["warpMode"] = "shape"): number {

@@ -7,6 +7,7 @@ import { createStoreSelector } from "../../../solid-utils/store";
 import type { CustomWavetableFrame, WavemapDefinition, WavetableWarpMode } from "../../../state/types";
 import {
   CUSTOM_WAVETABLE_FRAME_LABELS,
+  CUSTOM_WAVETABLE_PARTIAL_COUNT,
   DEFAULT_CUSTOM_WAVETABLE_ID,
   FACTORY_WAVETABLES,
   createDefaultCustomWavetable,
@@ -303,6 +304,10 @@ function OscillatorRow(props: {
                           <span>{Math.round((frame.position ?? index() / 3) * 100)}</span>
                         </div>
                         <MiniWaveform samples={renderCustomFramePreview(frame)} />
+                        <HarmonicDraw
+                          partials={frame.partials}
+                          onChange={(partials) => updateCustomWavetableFrame(customTable().id, index(), { partials })}
+                        />
                         <Knob
                           size="sm"
                           label="Bright"
@@ -555,6 +560,45 @@ function renderCustomFramePreview(frame: CustomWavetableFrame, sampleCount = 96)
   return peak > 0 ? samples.map((sample) => sample / peak) : samples;
 }
 
+function HarmonicDraw(props: { partials?: number[]; onChange: (partials: number[]) => void }) {
+  const bins = createMemo(() =>
+    Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, (_, index) => clamp01(props.partials?.[index] ?? 0)),
+  );
+
+  const updateFromPointer = (event: PointerEvent & { currentTarget: HTMLDivElement }) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width - 0.001, event.clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    const index = Math.max(0, Math.min(CUSTOM_WAVETABLE_PARTIAL_COUNT - 1, Math.floor((x / Math.max(1, rect.width)) * CUSTOM_WAVETABLE_PARTIAL_COUNT)));
+    const next = bins().slice();
+    next[index] = clamp01(1 - y / Math.max(1, rect.height));
+    props.onChange(next);
+  };
+
+  return (
+    <div
+      class={styles.harmonicDraw}
+      aria-label="Harmonic partials"
+      onPointerDown={(event) => {
+        event.currentTarget.setPointerCapture(event.pointerId);
+        updateFromPointer(event);
+      }}
+      onPointerMove={(event) => {
+        if (event.buttons !== 1) return;
+        updateFromPointer(event);
+      }}
+    >
+      <For each={bins()}>
+        {(value, index) => (
+          <div class={styles.harmonicDrawBin} title={`H${index() + 1} ${Math.round(value * 100)}`}>
+            <span style={{ height: `${Math.max(1, value * 100)}%` }} />
+          </div>
+        )}
+      </For>
+    </div>
+  );
+}
+
 function customFrameAmplitude(frame: CustomWavetableFrame, harmonic: number): number {
   const brightness = clamp01(frame.brightness);
   const even = clamp01(frame.even);
@@ -573,8 +617,9 @@ function customFrameAmplitude(frame: CustomWavetableFrame, harmonic: number): nu
   const notchWidth = 1.2 + fold * 4.8 + formant * 1.8;
   const notchPeak = Math.exp(-Math.pow((harmonic - notchCenter) / notchWidth, 2));
   const notchCut = Math.max(0.08, 1 - notchPeak * notch * 0.72);
+  const drawnPartial = harmonic <= CUSTOM_WAVETABLE_PARTIAL_COUNT ? clamp01(frame.partials?.[harmonic - 1] ?? 0) : 0;
   const motion = 1 + Math.sin(harmonic * 1.7 + frame.phase * Math.PI) * fold * 0.28;
-  return Math.max(0, (parity * rolloff * motion * skewBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + formantPeak * formant * 0.55) * notchCut);
+  return Math.max(0, (parity * rolloff * motion * skewBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + formantPeak * formant * 0.55 + drawnPartial * (0.08 + brightness * 0.34)) * notchCut);
 }
 
 function customFramePhase(frame: CustomWavetableFrame, harmonic: number): number {

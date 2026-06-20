@@ -9178,10 +9178,10 @@ namespace
 	                "name": "Verifier Custom",
 	                "interpolation": "smooth",
 	                "frames": [
-	                  { "brightness": 0.12, "even": 0.04, "fold": 0.0, "formant": 0.06, "notch": 0.04, "skew": -0.24, "phase": 0.0 },
-	                  { "brightness": 0.38, "even": 0.18, "fold": 0.2, "formant": 0.22, "notch": 0.12, "skew": -0.08, "phase": 0.25 },
-	                  { "brightness": 0.66, "even": 0.55, "fold": 0.42, "formant": 0.48, "notch": 0.28, "skew": 0.18, "phase": -0.16 },
-	                  { "brightness": 0.95, "even": 0.86, "fold": 0.68, "formant": 0.62, "notch": 0.42, "skew": 0.32, "phase": 0.36 }
+	                  { "brightness": 0.12, "even": 0.04, "fold": 0.0, "formant": 0.06, "notch": 0.04, "skew": -0.24, "phase": 0.0, "partials": [0.82, 0.12, 0.0, 0.36] },
+	                  { "brightness": 0.38, "even": 0.18, "fold": 0.2, "formant": 0.22, "notch": 0.12, "skew": -0.08, "phase": 0.25, "partials": [0.22, 0.74, 0.18, 0.0, 0.46] },
+	                  { "brightness": 0.66, "even": 0.55, "fold": 0.42, "formant": 0.48, "notch": 0.28, "skew": 0.18, "phase": -0.16, "partials": [0.0, 0.18, 0.68, 0.1, 0.0, 0.52] },
+	                  { "brightness": 0.95, "even": 0.86, "fold": 0.68, "formant": 0.62, "notch": 0.42, "skew": 0.32, "phase": 0.36, "partials": [0.08, 0.0, 0.22, 0.64, 0.18, 0.0, 0.44] }
                 ]
               }
             }
@@ -9203,6 +9203,8 @@ namespace
 	        if (!near(customInstrument.aether.oscA.wavetable.customFrames[2].formant, 0.48f))
 	            return false;
 	        if (!near(customInstrument.aether.oscA.wavetable.customFrames[2].notch, 0.28f))
+	            return false;
+	        if (!near(customInstrument.aether.oscA.wavetable.customFrames[2].partials[2], 0.68f))
 	            return false;
 	        if (!near(customInstrument.aether.oscA.wavetable.customFrames[2].skew, 0.18f))
             return false;

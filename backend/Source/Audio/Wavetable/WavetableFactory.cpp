@@ -141,12 +141,16 @@ namespace beat
             const float notchWidth = 1.2f + fold * 4.8f + formant * 1.8f;
             const float notchPeak = std::exp(-std::pow(((float) harmonic - notchCenter) / notchWidth, 2.0f));
             const float notchCut = juce::jmax(0.08f, 1.0f - notchPeak * notch * 0.72f);
+            const float drawnPartial = harmonic > 0 && harmonic <= (int) frame.partials.size()
+                ? juce::jlimit(0.0f, 1.0f, frame.partials[(size_t) harmonic - 1])
+                : 0.0f;
             const float motion = 1.0f + std::sin((float) harmonic * 1.7f + frame.phase * juce::MathConstants<float>::pi) * fold * 0.28f;
             return juce::jmax(
                 0.0f,
                 (parity * rolloff * motion * skewBias / std::sqrt((float) harmonic)
                     + foldPeak * fold * 0.35f
-                    + formantPeak * formant * 0.55f) * notchCut
+                    + formantPeak * formant * 0.55f
+                    + drawnPartial * (0.08f + brightness * 0.34f)) * notchCut
                     + warpAmplitudeOffset(warpMode, harmonic, brightness, warp));
         }
 
@@ -192,7 +196,7 @@ namespace beat
             {
                 const auto& p0 = frames[(size_t) juce::jlimit(0, 3, base - 1)];
                 const auto& p3 = frames[(size_t) juce::jlimit(0, 3, base + 2)];
-                return {
+                auto result = WavetableFactory::CustomFrame {
                     juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.brightness, a.brightness, b.brightness, p3.brightness, mix)),
                     juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.even, a.even, b.even, p3.even, mix)),
                     juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.fold, a.fold, b.fold, p3.fold, mix)),
@@ -201,8 +205,11 @@ namespace beat
                     juce::jlimit(-1.0f, 1.0f, smoothInterpolate(p0.skew, a.skew, b.skew, p3.skew, mix)),
                     juce::jlimit(-1.0f, 1.0f, smoothInterpolate(p0.phase, a.phase, b.phase, p3.phase, mix)),
                 };
+                for (size_t i = 0; i < result.partials.size(); ++i)
+                    result.partials[i] = juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.partials[i], a.partials[i], b.partials[i], p3.partials[i], mix));
+                return result;
             }
-            return {
+            auto result = WavetableFactory::CustomFrame {
                 a.brightness + (b.brightness - a.brightness) * mix,
                 a.even + (b.even - a.even) * mix,
                 a.fold + (b.fold - a.fold) * mix,
@@ -211,6 +218,9 @@ namespace beat
                 a.skew + (b.skew - a.skew) * mix,
                 a.phase + (b.phase - a.phase) * mix,
             };
+            for (size_t i = 0; i < result.partials.size(); ++i)
+                result.partials[i] = a.partials[i] + (b.partials[i] - a.partials[i]) * mix;
+            return result;
         }
     }
 
