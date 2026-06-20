@@ -13,6 +13,7 @@
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <thread>
 #include <vector>
@@ -371,6 +372,42 @@ namespace beat
             return out.isNotEmpty() ? out : "user.wavemap";
         }
 
+        juce::var analyzeHarmonicPartials(const std::vector<float>& samples, int start, int end)
+        {
+            constexpr int partialCount = 16;
+            const int length = std::max(1, end - start);
+            const int stride = std::max(1, length / 1024);
+            const int count = std::max(1, (length + stride - 1) / stride);
+            std::array<double, partialCount> magnitudes {};
+            double peak = 0.0001;
+
+            for (int partial = 0; partial < partialCount; ++partial)
+            {
+                const int harmonic = partial + 1;
+                double real = 0.0;
+                double imag = 0.0;
+                double windowSum = 0.0;
+                int sampleIndex = 0;
+                for (int index = start; index < end; index += stride)
+                {
+                    const double sample = juce::jlimit(-1.0, 1.0, (double) samples[(size_t) index]);
+                    const double phase = juce::MathConstants<double>::twoPi * (double) harmonic * (double) sampleIndex / (double) std::max(1, count - 1);
+                    const double window = 0.5 - 0.5 * std::cos(juce::MathConstants<double>::twoPi * (double) sampleIndex / (double) std::max(1, count - 1));
+                    real += sample * std::cos(phase) * window;
+                    imag -= sample * std::sin(phase) * window;
+                    windowSum += window;
+                    ++sampleIndex;
+                }
+                magnitudes[(size_t) partial] = std::sqrt(real * real + imag * imag) / std::max(0.0001, windowSum);
+                peak = std::max(peak, magnitudes[(size_t) partial]);
+            }
+
+            juce::Array<juce::var> partials;
+            for (const auto magnitude : magnitudes)
+                partials.add(clamp01(std::sqrt(magnitude / peak)));
+            return juce::var(partials);
+        }
+
         juce::var makeWavemapFrame(const std::vector<float>& samples,
                                    int start,
                                    int end,
@@ -421,6 +458,7 @@ namespace beat
             frame->setProperty("notch", clamp01(0.04 + (1.0 - rms) * 0.16 + roughness * 0.72 + asymmetry * 0.5));
             frame->setProperty("skew", juce::jlimit(-1.0, 1.0, (zeroDensity * 10.0 - meanAbs) * 0.22 + (rms - 0.28) * 0.35));
             frame->setProperty("phase", juce::jlimit(-1.0, 1.0, (positiveEnergy - negativeEnergy) / totalPolarityEnergy));
+            frame->setProperty("partials", analyzeHarmonicPartials(samples, safeStart, safeEnd));
             return juce::var(frame.get());
         }
 

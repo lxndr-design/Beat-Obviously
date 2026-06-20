@@ -413,6 +413,7 @@ function analyzeSamplesToWavemapFrame(
   const normalizedDerivative = derivative / length;
   const zeroCrossRate = zeroCrossings / length;
   const asymmetry = Math.abs(positiveEnergy - negativeEnergy) / Math.max(0.0001, positiveEnergy + negativeEnergy);
+  const partials = analyzeSamplesToHarmonicPartials(samples, safeStart, safeEnd);
   return {
     id: `${wavemapId}.frame.${frameIndex + 1}`,
     label: CUSTOM_WAVETABLE_FRAME_LABELS[frameIndex] ?? `${frameIndex + 1}`,
@@ -424,7 +425,33 @@ function analyzeSamplesToWavemapFrame(
     notch: clamp01(0.04 + (1 - rms) * 0.16 + normalizedDerivative * 2.2 + asymmetry * 0.9),
     skew: sanitizeBipolar((zeroCrossRate * 10 - averageAbs) * 0.22 + (rms - 0.28) * 0.35, 0),
     phase: sanitizeBipolar((positiveEnergy >= negativeEnergy ? 1 : -1) * clamp01(asymmetry + zeroCrossRate * 9) * 0.8, 0),
+    partials,
   };
+}
+
+function analyzeSamplesToHarmonicPartials(samples: ArrayLike<number>, start: number, end: number): number[] {
+  const length = Math.max(1, end - start);
+  const stride = Math.max(1, Math.floor(length / 1024));
+  const count = Math.max(1, Math.ceil(length / stride));
+  const magnitudes = Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, (_, harmonicIndex) => {
+    const harmonic = harmonicIndex + 1;
+    let real = 0;
+    let imag = 0;
+    let windowSum = 0;
+    let sampleIndex = 0;
+    for (let index = start; index < end; index += stride) {
+      const sample = Math.max(-1, Math.min(1, Number(samples[index]) || 0));
+      const phase = (Math.PI * 2 * harmonic * sampleIndex) / Math.max(1, count - 1);
+      const window = 0.5 - 0.5 * Math.cos((Math.PI * 2 * sampleIndex) / Math.max(1, count - 1));
+      real += sample * Math.cos(phase) * window;
+      imag -= sample * Math.sin(phase) * window;
+      windowSum += window;
+      sampleIndex += 1;
+    }
+    return Math.sqrt(real * real + imag * imag) / Math.max(0.0001, windowSum);
+  });
+  const peak = Math.max(...magnitudes, 0.0001);
+  return magnitudes.map((value) => clamp01(Math.sqrt(value / peak)));
 }
 
 export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterValue> = {

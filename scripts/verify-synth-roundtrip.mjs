@@ -726,6 +726,11 @@ try {
   assert.equal(resynthWavemap.source.path, "/tmp/verifier.wav");
   assert.equal(resynthWavemap.frames.length, 4);
   assert.equal(resynthWavemap.frames.every((frame) => frame.id?.startsWith("user.resynth.verify.frame.")), true);
+  assert.equal(resynthWavemap.frames.every((frame) => Array.isArray(frame.partials) && frame.partials.length === 16), true);
+  assert.ok(
+    resynthWavemap.frames.some((frame) => Math.max(...frame.partials) > 0.9 && frame.partials.some((partial) => partial > 0.15)),
+    "expected resynthesis to populate harmonic partial bins",
+  );
 
   synthStore.useSynthStore.getState().resetDraft();
   synthStore.useSynthStore.getState().setWavemap(resynthWavemap);
