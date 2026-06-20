@@ -477,7 +477,9 @@ namespace beat
             frame->setProperty("notch", clamp01(0.04 + (1.0 - rms) * 0.16 + roughness * 0.72 + asymmetry * 0.5));
             frame->setProperty("skew", juce::jlimit(-1.0, 1.0, (zeroDensity * 10.0 - meanAbs) * 0.22 + (rms - 0.28) * 0.35));
             const auto partials = analyzeHarmonicPartials(samples, safeStart, safeEnd);
-            frame->setProperty("tilt", estimateSpectralTiltFromPartials(partials));
+            const auto tilt = estimateSpectralTiltFromPartials(partials);
+            frame->setProperty("tilt", tilt);
+            frame->setProperty("focus", clamp01(0.18 + roughness * 0.68 + std::abs(tilt) * 0.24 + asymmetry * 0.18));
             frame->setProperty("phase", juce::jlimit(-1.0, 1.0, (positiveEnergy - negativeEnergy) / totalPolarityEnergy));
             frame->setProperty("partials", partials);
             return juce::var(frame.get());

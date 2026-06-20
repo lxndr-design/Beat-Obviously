@@ -396,6 +396,18 @@ function OscillatorRow(props: {
                         />
                         <Knob
                           size="sm"
+                          label="Focus"
+                          value={frame.focus}
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          defaultValue={createDefaultCustomWavetable(customTable().id).frames[index()]?.focus ?? 0.35}
+                          formatValue={formatPercent}
+                          parseValue={parsePercent}
+                          onChange={(focus) => updateCustomWavetableFrame(customTable().id, index(), { focus })}
+                        />
+                        <Knob
+                          size="sm"
                           label="Phase"
                           value={frame.phase}
                           min={-1}
@@ -620,21 +632,23 @@ function customFrameAmplitude(frame: CustomWavetableFrame, harmonic: number): nu
   const notch = clamp01(frame.notch);
   const skew = Math.max(-1, Math.min(1, frame.skew));
   const tilt = Number.isFinite(frame.tilt) ? Math.max(-1, Math.min(1, frame.tilt)) : 0;
+  const focus = clamp01(frame.focus);
   const parity = harmonic % 2 === 1 ? 1 : even;
   const rolloff = Math.exp(-harmonic * (0.016 + (1 - brightness) * 0.085));
   const skewBias = Math.max(0.18, 1 + skew * ((harmonic - 8) / 18));
   const tiltBias = Math.max(0.12, Math.exp(tilt * ((harmonic - 8) / 9)));
   const foldPeak = Math.exp(-Math.pow((harmonic - (3 + brightness * 20)) / (1.6 + fold * 8), 2));
   const formantCenter = 4 + brightness * 24 + skew * 4;
-  const formantWidth = 1.1 + fold * 4.4;
+  const focusNarrow = 1 - focus * 0.72;
+  const formantWidth = (1.1 + fold * 4.4) * focusNarrow;
   const formantPeak = Math.exp(-Math.pow((harmonic - formantCenter) / formantWidth, 2));
   const notchCenter = 6 + (1 - brightness) * 18 - skew * 4;
-  const notchWidth = 1.2 + fold * 4.8 + formant * 1.8;
+  const notchWidth = (1.2 + fold * 4.8 + formant * 1.8) * focusNarrow;
   const notchPeak = Math.exp(-Math.pow((harmonic - notchCenter) / notchWidth, 2));
-  const notchCut = Math.max(0.08, 1 - notchPeak * notch * 0.72);
+  const notchCut = Math.max(0.08, 1 - notchPeak * notch * (0.58 + focus * 0.28));
   const drawnPartial = harmonic <= CUSTOM_WAVETABLE_PARTIAL_COUNT ? clamp01(frame.partials?.[harmonic - 1] ?? 0) : 0;
   const motion = 1 + Math.sin(harmonic * 1.7 + frame.phase * Math.PI) * fold * 0.28;
-  return Math.max(0, (parity * rolloff * motion * skewBias * tiltBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + formantPeak * formant * 0.55 + drawnPartial * (0.08 + brightness * 0.34)) * notchCut);
+  return Math.max(0, (parity * rolloff * motion * skewBias * tiltBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + formantPeak * formant * (0.42 + focus * 0.28) + drawnPartial * (0.08 + brightness * 0.34)) * notchCut);
 }
 
 function customFramePhase(frame: CustomWavetableFrame, harmonic: number): number {

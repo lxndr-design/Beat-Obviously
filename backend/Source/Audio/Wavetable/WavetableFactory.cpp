@@ -125,6 +125,7 @@ namespace beat
             const float even = juce::jlimit(0.0f, 1.0f, frame.even);
             const float skew = juce::jlimit(-1.0f, 1.0f, frame.skew);
             const float tilt = juce::jlimit(-1.0f, 1.0f, frame.tilt);
+            const float focus = juce::jlimit(0.0f, 1.0f, frame.focus);
             const float formant = juce::jlimit(0.0f, 1.0f, frame.formant);
             const float notch = juce::jlimit(0.0f, 1.0f, frame.notch);
             const float shapedWarp = warpModeIntensity(warp, warpMode);
@@ -137,12 +138,13 @@ namespace beat
             const float width = 1.6f + fold * 8.0f;
             const float foldPeak = std::exp(-std::pow(((float) harmonic - center) / width, 2.0f));
             const float formantCenter = 4.0f + brightness * 24.0f + skew * 4.0f;
-            const float formantWidth = 1.1f + fold * 4.4f;
+            const float focusNarrow = 1.0f - focus * 0.72f;
+            const float formantWidth = (1.1f + fold * 4.4f) * focusNarrow;
             const float formantPeak = std::exp(-std::pow(((float) harmonic - formantCenter) / formantWidth, 2.0f));
             const float notchCenter = 6.0f + (1.0f - brightness) * 18.0f - skew * 4.0f;
-            const float notchWidth = 1.2f + fold * 4.8f + formant * 1.8f;
+            const float notchWidth = (1.2f + fold * 4.8f + formant * 1.8f) * focusNarrow;
             const float notchPeak = std::exp(-std::pow(((float) harmonic - notchCenter) / notchWidth, 2.0f));
-            const float notchCut = juce::jmax(0.08f, 1.0f - notchPeak * notch * 0.72f);
+            const float notchCut = juce::jmax(0.08f, 1.0f - notchPeak * notch * (0.58f + focus * 0.28f));
             const float drawnPartial = harmonic > 0 && harmonic <= (int) frame.partials.size()
                 ? juce::jlimit(0.0f, 1.0f, frame.partials[(size_t) harmonic - 1])
                 : 0.0f;
@@ -151,7 +153,7 @@ namespace beat
                 0.0f,
                 (parity * rolloff * motion * skewBias * tiltBias / std::sqrt((float) harmonic)
                     + foldPeak * fold * 0.35f
-                    + formantPeak * formant * 0.55f
+                    + formantPeak * formant * (0.42f + focus * 0.28f)
                     + drawnPartial * (0.08f + brightness * 0.34f)) * notchCut
                     + warpAmplitudeOffset(warpMode, harmonic, brightness, warp));
         }
@@ -206,6 +208,7 @@ namespace beat
                     juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.notch, a.notch, b.notch, p3.notch, mix)),
                     juce::jlimit(-1.0f, 1.0f, smoothInterpolate(p0.skew, a.skew, b.skew, p3.skew, mix)),
                     juce::jlimit(-1.0f, 1.0f, smoothInterpolate(p0.tilt, a.tilt, b.tilt, p3.tilt, mix)),
+                    juce::jlimit(0.0f, 1.0f, smoothInterpolate(p0.focus, a.focus, b.focus, p3.focus, mix)),
                     juce::jlimit(-1.0f, 1.0f, smoothInterpolate(p0.phase, a.phase, b.phase, p3.phase, mix)),
                 };
                 for (size_t i = 0; i < result.partials.size(); ++i)
@@ -220,6 +223,7 @@ namespace beat
                 a.notch + (b.notch - a.notch) * mix,
                 a.skew + (b.skew - a.skew) * mix,
                 a.tilt + (b.tilt - a.tilt) * mix,
+                a.focus + (b.focus - a.focus) * mix,
                 a.phase + (b.phase - a.phase) * mix,
             };
             for (size_t i = 0; i < result.partials.size(); ++i)

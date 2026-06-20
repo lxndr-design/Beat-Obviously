@@ -234,10 +234,10 @@ export function createDefaultCustomWavetable(id = DEFAULT_CUSTOM_WAVETABLE_ID): 
       label: "Drawn wavemap",
     },
     frames: [
-      { id: `${id}.frame.1`, label: "A", position: 0.0, brightness: 0.22, even: 0.08, fold: 0.05, formant: 0.08, notch: 0.04, skew: -0.18, tilt: -0.16, phase: 0.0 },
-      { id: `${id}.frame.2`, label: "B", position: 0.333, brightness: 0.46, even: 0.28, fold: 0.16, formant: 0.18, notch: 0.1, skew: -0.04, tilt: -0.04, phase: 0.12 },
-      { id: `${id}.frame.3`, label: "C", position: 0.667, brightness: 0.72, even: 0.48, fold: 0.34, formant: 0.32, notch: 0.16, skew: 0.08, tilt: 0.08, phase: -0.08 },
-      { id: `${id}.frame.4`, label: "D", position: 1.0, brightness: 0.94, even: 0.72, fold: 0.56, formant: 0.46, notch: 0.24, skew: 0.22, tilt: 0.2, phase: 0.2 },
+      { id: `${id}.frame.1`, label: "A", position: 0.0, brightness: 0.22, even: 0.08, fold: 0.05, formant: 0.08, notch: 0.04, skew: -0.18, tilt: -0.16, focus: 0.18, phase: 0.0 },
+      { id: `${id}.frame.2`, label: "B", position: 0.333, brightness: 0.46, even: 0.28, fold: 0.16, formant: 0.18, notch: 0.1, skew: -0.04, tilt: -0.04, focus: 0.32, phase: 0.12 },
+      { id: `${id}.frame.3`, label: "C", position: 0.667, brightness: 0.72, even: 0.48, fold: 0.34, formant: 0.32, notch: 0.16, skew: 0.08, tilt: 0.08, focus: 0.52, phase: -0.08 },
+      { id: `${id}.frame.4`, label: "D", position: 1.0, brightness: 0.94, even: 0.72, fold: 0.56, formant: 0.46, notch: 0.24, skew: 0.22, tilt: 0.2, focus: 0.7, phase: 0.2 },
     ],
   };
 }
@@ -293,6 +293,7 @@ export function normalizeWavemapFrames(definition: WavemapDefinition): WavemapDe
   const notch = spreadFrameValues(frames.map((frame) => frame.notch), 0.02, 0.38, [0.5, 0.58, 0.72, 0.92]);
   const skew = spreadBipolarFrameValues(frames.map((frame) => frame.skew), [-0.24, -0.08, 0.1, 0.24]);
   const tilt = spreadBipolarFrameValues(frames.map((frame) => frame.tilt), [-0.2, -0.06, 0.08, 0.22]);
+  const focus = spreadFrameValues(frames.map((frame) => frame.focus), 0.16, 0.74, [0.16, 0.3, 0.52, 0.74]);
   const phase = spreadBipolarFrameValues(frames.map((frame) => frame.phase), [-0.18, 0.08, -0.08, 0.18]);
 
   return normalizeCustomWavetable({
@@ -312,6 +313,7 @@ export function normalizeWavemapFrames(definition: WavemapDefinition): WavemapDe
       notch: notch[index] ?? frame.notch,
       skew: skew[index] ?? frame.skew,
       tilt: tilt[index] ?? frame.tilt,
+      focus: focus[index] ?? frame.focus,
       phase: phase[index] ?? frame.phase,
     })),
   });
@@ -345,6 +347,7 @@ export function evolveWavemapFrames(
         notch: clamp01(frame.notch + randomSigned(rng) * 0.36 * strength + Math.abs(motion) * 0.08),
         skew: clampBipolar(frame.skew + randomSigned(rng) * 0.64 * strength + motion * 0.18),
         tilt: clampBipolar(frame.tilt + randomSigned(rng) * 0.52 * strength + motion * 0.16),
+        focus: clamp01(frame.focus + randomSigned(rng) * 0.36 * strength + Math.abs(motion) * 0.08),
         phase: clampBipolar(frame.phase + randomSigned(rng) * 0.72 * strength + motion * 0.2),
       };
     }),
@@ -430,6 +433,7 @@ function analyzeSamplesToWavemapFrame(
     notch: clamp01(0.04 + (1 - rms) * 0.16 + normalizedDerivative * 2.2 + asymmetry * 0.9),
     skew: sanitizeBipolar((zeroCrossRate * 10 - averageAbs) * 0.22 + (rms - 0.28) * 0.35, 0),
     tilt,
+    focus: clamp01(0.18 + normalizedDerivative * 2.1 + Math.abs(tilt) * 0.24 + asymmetry * 0.18),
     phase: sanitizeBipolar((positiveEnergy >= negativeEnergy ? 1 : -1) * clamp01(asymmetry + zeroCrossRate * 9) * 0.8, 0),
     partials,
   };
@@ -1491,7 +1495,7 @@ export function normalizeCustomWavetable(value: Partial<CustomWavetableDefinitio
 
 function sanitizeCustomWavetableFrame(
   value: unknown,
-  fallback: CustomWavetableFrame = { brightness: 0.5, even: 0.2, fold: 0.1, formant: 0.12, notch: 0.08, skew: 0, tilt: 0, phase: 0 },
+  fallback: CustomWavetableFrame = { brightness: 0.5, even: 0.2, fold: 0.1, formant: 0.12, notch: 0.08, skew: 0, tilt: 0, focus: 0.35, phase: 0 },
 ): CustomWavetableFrame {
   const source = isRecord(value) ? value : {};
   const partials = sanitizeCustomWavetablePartials(source.partials, fallback.partials);
@@ -1506,6 +1510,7 @@ function sanitizeCustomWavetableFrame(
     notch: sanitize01(source.notch, fallback.notch),
     skew: sanitizeBipolar(source.skew, fallback.skew),
     tilt: sanitizeBipolar(source.tilt, fallback.tilt),
+    focus: sanitize01(source.focus, fallback.focus),
     phase: sanitizeBipolar(source.phase, fallback.phase),
   };
   if (partials) next.partials = partials;
@@ -1564,6 +1569,8 @@ function sanitizeCustomWavetableFramePatch(value: Partial<CustomWavetableFrame>)
     next.skew = sanitizeBipolar(source.skew, 0);
   if (Object.prototype.hasOwnProperty.call(source, "tilt"))
     next.tilt = sanitizeBipolar(source.tilt, 0);
+  if (Object.prototype.hasOwnProperty.call(source, "focus"))
+    next.focus = sanitize01(source.focus, 0.35);
   if (Object.prototype.hasOwnProperty.call(source, "phase"))
     next.phase = sanitizeBipolar(source.phase, 0);
   if (Object.prototype.hasOwnProperty.call(source, "partials"))

@@ -1032,6 +1032,7 @@ function previewWavetableKey(
         frame.notch.toFixed(3),
         frame.skew.toFixed(3),
         frame.tilt.toFixed(3),
+        frame.focus.toFixed(3),
         frame.phase.toFixed(3),
         ...(frame.partials ?? []).map((partial) => partial.toFixed(3)),
       ].join(",")).join(";")].join(":")
@@ -1120,6 +1121,7 @@ function interpolatePreviewCustomFrame(
       notch: a.notch + (b.notch - a.notch) * mix,
       skew: a.skew + (b.skew - a.skew) * mix,
       tilt: a.tilt + (b.tilt - a.tilt) * mix,
+      focus: a.focus + (b.focus - a.focus) * mix,
       phase: a.phase + (b.phase - a.phase) * mix,
       partials: interpolatePreviewPartials(a.partials, b.partials, mix),
     };
@@ -1135,6 +1137,7 @@ function interpolatePreviewCustomFrame(
     notch: clamp01(interpolatePreviewValue(p0.notch, a.notch, b.notch, p3.notch, mix)),
     skew: clamp(interpolatePreviewValue(p0.skew, a.skew, b.skew, p3.skew, mix), -1, 1),
     tilt: clamp(interpolatePreviewValue(p0.tilt, a.tilt, b.tilt, p3.tilt, mix), -1, 1),
+    focus: clamp01(interpolatePreviewValue(p0.focus, a.focus, b.focus, p3.focus, mix)),
     phase: clamp(interpolatePreviewValue(p0.phase, a.phase, b.phase, p3.phase, mix), -1, 1),
     partials: interpolatePreviewPartials(a.partials, b.partials, mix, p0.partials, p3.partials),
   };
@@ -1195,6 +1198,7 @@ function sanitizeCustomFrame(frame: CustomWavetableFrame): CustomWavetableFrame 
     notch: Number.isFinite(frame.notch) ? clamp01(frame.notch) : 0.08,
     skew: Number.isFinite(frame.skew) ? clamp(frame.skew, -1, 1) : 0,
     tilt: Number.isFinite(frame.tilt) ? clamp(frame.tilt, -1, 1) : 0,
+    focus: Number.isFinite(frame.focus) ? clamp01(frame.focus) : 0.35,
     phase: Number.isFinite(frame.phase) ? clamp(frame.phase, -1, 1) : 0,
     partials: Array.isArray(frame.partials)
       ? Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, (_, index) => clamp01(frame.partials?.[index] ?? 0))
@@ -1215,6 +1219,7 @@ function customWavetableHarmonicAmplitude(frame: CustomWavetableFrame, harmonic:
   const notch = clamp01(frame.notch);
   const skew = clampBipolar(frame.skew);
   const tilt = clampBipolar(frame.tilt);
+  const focus = clamp01(frame.focus);
   const shapedWarp = warpModeIntensity(warp, warpMode);
   const fold = clamp01(frame.fold + shapedWarp * 0.35);
   const parity = harmonic % 2 === 1 ? 1 : even;
@@ -1223,17 +1228,18 @@ function customWavetableHarmonicAmplitude(frame: CustomWavetableFrame, harmonic:
   const tiltBias = Math.max(0.12, Math.exp(tilt * ((harmonic - 8) / 9)));
   const foldPeak = Math.exp(-Math.pow((harmonic - (3 + brightness * 20)) / (1.6 + fold * 8), 2));
   const formantCenter = 4 + brightness * 24 + skew * 4;
-  const formantWidth = 1.1 + fold * 4.4;
+  const focusNarrow = 1 - focus * 0.72;
+  const formantWidth = (1.1 + fold * 4.4) * focusNarrow;
   const formantPeak = Math.exp(-Math.pow((harmonic - formantCenter) / formantWidth, 2));
   const notchCenter = 6 + (1 - brightness) * 18 - skew * 4;
-  const notchWidth = 1.2 + fold * 4.8 + formant * 1.8;
+  const notchWidth = (1.2 + fold * 4.8 + formant * 1.8) * focusNarrow;
   const notchPeak = Math.exp(-Math.pow((harmonic - notchCenter) / notchWidth, 2));
-  const notchCut = Math.max(0.08, 1 - notchPeak * notch * 0.72);
+  const notchCut = Math.max(0.08, 1 - notchPeak * notch * (0.58 + focus * 0.28));
   const folded = warpMode === "fold" ? Math.abs(Math.sin(harmonic * 0.62 + frame.phase)) * shapedWarp * 0.24 : 0;
   const pinched = warpMode === "pinch" ? Math.exp(-Math.pow((harmonic - (2 + brightness * 8)) / 2.4, 2)) * shapedWarp * 0.28 : 0;
   const drawnPartial = harmonic <= CUSTOM_WAVETABLE_PARTIAL_COUNT ? clamp01(frame.partials?.[harmonic - 1] ?? 0) : 0;
   const motion = 1 + Math.sin(harmonic * 1.7 + frame.phase * Math.PI) * fold * 0.28;
-  return Math.max(0, (parity * rolloff * motion * skewBias * tiltBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + formantPeak * formant * 0.55 + drawnPartial * (0.08 + brightness * 0.34)) * notchCut + folded + pinched);
+  return Math.max(0, (parity * rolloff * motion * skewBias * tiltBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + formantPeak * formant * (0.42 + focus * 0.28) + drawnPartial * (0.08 + brightness * 0.34)) * notchCut + folded + pinched);
 }
 
 function customWavetableHarmonicPhase(frame: CustomWavetableFrame, harmonic: number, warp: number, warpMode: WavetableConfig["warpMode"] = "shape"): number {

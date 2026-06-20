@@ -399,6 +399,8 @@ export interface CustomWavetableFrame {
   skew: number;
   /** -1..1 spectral slope; negative darkens upper harmonics, positive lifts them. */
   tilt: number;
+  /** 0..1 resonance focus; higher values narrow the formant and notch bands. */
+  focus: number;
   phase: number;
   /** Optional 16-bin manual harmonic drawing overlay. */
   partials?: number[];

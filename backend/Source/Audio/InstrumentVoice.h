@@ -53,6 +53,7 @@ namespace beat
                     float notch { 0.08f };
                     float skew { 0.0f };
                     float tilt { 0.0f };
+                    float focus { 0.35f };
                     float phase { 0.0f };
                     std::array<float, 16> partials {};
                 };
@@ -67,10 +68,10 @@ namespace beat
                 float detuneCents { 12.0f };
                 float blend { 0.5f };
                 std::array<CustomFrame, 4> customFrames {{
-                    { 0.22f, 0.08f, 0.05f, 0.08f, 0.04f, -0.18f, -0.16f, 0.0f },
-                    { 0.46f, 0.28f, 0.16f, 0.18f, 0.1f, -0.04f, -0.04f, 0.12f },
-                    { 0.72f, 0.48f, 0.34f, 0.32f, 0.16f, 0.08f, 0.08f, -0.08f },
-                    { 0.94f, 0.72f, 0.56f, 0.46f, 0.24f, 0.22f, 0.2f, 0.2f },
+                    { 0.22f, 0.08f, 0.05f, 0.08f, 0.04f, -0.18f, -0.16f, 0.18f, 0.0f },
+                    { 0.46f, 0.28f, 0.16f, 0.18f, 0.1f, -0.04f, -0.04f, 0.32f, 0.12f },
+                    { 0.72f, 0.48f, 0.34f, 0.32f, 0.16f, 0.08f, 0.08f, 0.52f, -0.08f },
+                    { 0.94f, 0.72f, 0.56f, 0.46f, 0.24f, 0.22f, 0.2f, 0.7f, 0.2f },
                 }};
             };
 

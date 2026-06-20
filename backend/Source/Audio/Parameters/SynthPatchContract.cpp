@@ -158,6 +158,7 @@ namespace beat
             fallback.notch = juce::jlimit(0.0f, 1.0f, (float) (double) objectProperty(value, "notch", fallback.notch));
             fallback.skew = juce::jlimit(-1.0f, 1.0f, (float) (double) objectProperty(value, "skew", fallback.skew));
             fallback.tilt = juce::jlimit(-1.0f, 1.0f, (float) (double) objectProperty(value, "tilt", fallback.tilt));
+            fallback.focus = juce::jlimit(0.0f, 1.0f, (float) (double) objectProperty(value, "focus", fallback.focus));
             fallback.phase = juce::jlimit(-1.0f, 1.0f, (float) (double) objectProperty(value, "phase", fallback.phase));
             const auto partialValues = objectProperty(value, "partials", {});
             if (auto* partials = partialValues.getArray())
