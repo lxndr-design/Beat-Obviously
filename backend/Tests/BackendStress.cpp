@@ -8986,6 +8986,7 @@ namespace
             "env.2.sustain": 0.0,
             "env.2.release": 0.16,
             "env.2.releaseCurve": "log",
+            "env.2.loop": true,
             "amp.level": 0.7,
             "amp.pan": -0.25,
             "lfo.1.enabled": true,
@@ -9093,6 +9094,8 @@ namespace
         if (!near(instrument.env2AttackMs, 10.0f) || !near(instrument.env2DecayMs, 90.0f) || !near(instrument.env2Sustain, 0.0f) || !near(instrument.env2ReleaseMs, 160.0f))
             return false;
         if (instrument.env2AttackCurve != 1 || instrument.env2DecayCurve != 3 || instrument.env2ReleaseCurve != 2)
+            return false;
+        if (!instrument.env2Loop)
             return false;
         if (!near(instrument.ampLevel, 0.54f) || !near(instrument.ampPan, 0.0f))
             return false;
@@ -9572,6 +9575,33 @@ namespace
             }
         }
         if (!(env2ExpAttackEnergy < env2LinearAttackEnergy * 0.7))
+            return false;
+
+        auto env2LoopParams = env2ModParams;
+        env2LoopParams.env2AttackMs = 15.0f;
+        env2LoopParams.env2DecayMs = 40.0f;
+        env2LoopParams.env2Sustain = 0.0f;
+        env2LoopParams.env2ReleaseMs = 50.0f;
+        env2LoopParams.env2Loop = true;
+        auto env2NoLoopParams = env2LoopParams;
+        env2NoLoopParams.env2Loop = false;
+        auto env2LoopRender = renderWithVelocity(env2LoopParams, 1.0f);
+        auto env2NoLoopRender = renderWithVelocity(env2NoLoopParams, 1.0f);
+        double env2LoopLateEnergy = 0.0;
+        double env2NoLoopLateEnergy = 0.0;
+        for (int channel = 0; channel < env2LoopRender.getNumChannels(); ++channel)
+        {
+            for (int i = 2800; i < env2LoopRender.getNumSamples(); ++i)
+            {
+                const auto loopSample = (double) env2LoopRender.getSample(channel, i);
+                const auto noLoopSample = (double) env2NoLoopRender.getSample(channel, i);
+                if (!std::isfinite(loopSample) || !std::isfinite(noLoopSample))
+                    return false;
+                env2LoopLateEnergy += loopSample * loopSample;
+                env2NoLoopLateEnergy += noLoopSample * noLoopSample;
+            }
+        }
+        if (!(env2LoopLateEnergy > env2NoLoopLateEnergy * 2.0))
             return false;
 
         auto lowpassParams = params;

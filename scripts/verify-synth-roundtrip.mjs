@@ -86,6 +86,7 @@ try {
       "env.2.sustain": 0,
       "env.2.release": 0.16,
       "env.2.releaseCurve": "log",
+      "env.2.loop": true,
       "lfo.1.enabled": true,
       "lfo.1.rate": 4.5,
       "lfo.1.sync": true,
@@ -247,6 +248,7 @@ try {
   assert.equal(patch.envelope.attackCurve, "exp");
   assert.equal(patch.envelope.decayCurve, "s-curve");
   assert.equal(patch.envelope.releaseCurve, "log");
+  assert.equal(patch.synthPatch.parameters["env.2.loop"], true);
   assert.equal(patch.synthPatch.parameters["future.experimental"], "preserve-me");
   assert.equal(patch.synthPatch.metadata.icon, "ph:planet");
 
@@ -509,6 +511,35 @@ try {
   assert.ok(
     rmsRange(env2ExpAttackSamples, 1000, 2600) < rmsRange(env2LinearAttackSamples, 1000, 2600) * 0.7,
     "expected Env 2 attack curve to affect rendered preview audio",
+  );
+
+  const env2LoopPreview = synthStore.synthDraftToPreviewInstrument({
+    ...draft,
+    parameters: {
+      ...draft.parameters,
+      "amp.level": 0,
+      "env.1.attack": 0.001,
+      "env.1.decay": 0.01,
+      "env.1.sustain": 1,
+      "env.2.attack": 0.015,
+      "env.2.decay": 0.04,
+      "env.2.sustain": 0,
+      "env.2.release": 0.05,
+      "env.2.loop": true,
+    },
+    modulation: [{ id: "env2_loop_probe", source: "env.2", target: "amp.level", amount: 1, bipolar: false, enabled: true }],
+  });
+  const env2NoLoopPreview = synthStore.synthDraftToPreviewInstrument({
+    ...env2LoopPreview.synthPatch,
+    parameters: { ...env2LoopPreview.synthPatch.parameters, "env.2.loop": false },
+  });
+  const env2LoopSamples = new Float32Array(24000);
+  const env2NoLoopSamples = new Float32Array(24000);
+  synthPreview.renderInstrumentSamples(env2LoopPreview, env2LoopSamples, 48000, synthPreview.previewFrequency(env2LoopPreview), "audio", true);
+  synthPreview.renderInstrumentSamples(env2NoLoopPreview, env2NoLoopSamples, 48000, synthPreview.previewFrequency(env2NoLoopPreview), "audio", true);
+  assert.ok(
+    rmsRange(env2LoopSamples, 12000, 18000) > rmsRange(env2NoLoopSamples, 12000, 18000) * 2,
+    "expected Env 2 loop mode to keep modulating after the first decay cycle",
   );
 
   const stereoProbe = {

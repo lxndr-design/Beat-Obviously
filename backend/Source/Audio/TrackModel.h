@@ -268,6 +268,7 @@ namespace beat
         float env2Sustain { 0.0f };
         float env2ReleaseMs { 200.0f };
         int env2ReleaseCurve { 0 };
+        bool env2Loop { false };
         float ampLevel { 1.0f };
         float ampPan { 0.0f };
         float glideMs { 0.0f };

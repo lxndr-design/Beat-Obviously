@@ -73,6 +73,7 @@ export type SynthParameterId =
   | "env.2.sustain"
   | "env.2.release"
   | "env.2.releaseCurve"
+  | "env.2.loop"
   | "lfo.1.enabled"
   | "lfo.1.rate"
   | "lfo.1.sync"
@@ -509,6 +510,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "env.2.sustain": 0,
   "env.2.release": 0.2,
   "env.2.releaseCurve": "linear",
+  "env.2.loop": false,
   "lfo.1.enabled": true,
   "lfo.1.rate": 1,
   "lfo.1.sync": true,
@@ -592,6 +594,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "env.2.sustain": "Env 2 Sustain",
   "env.2.release": "Env 2 Release",
   "env.2.releaseCurve": "Env 2 Release Curve",
+  "env.2.loop": "Env 2 Loop",
   "lfo.1.enabled": "LFO 1 Enabled",
   "lfo.1.rate": "LFO 1 Rate",
   "lfo.1.sync": "LFO 1 Sync",

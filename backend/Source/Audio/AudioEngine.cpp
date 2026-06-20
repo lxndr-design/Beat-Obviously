@@ -1486,6 +1486,7 @@ namespace beat
         params.env2Sustain = instrument.env2Sustain;
         params.env2ReleaseMs = instrument.env2ReleaseMs;
         params.env2ReleaseCurve = instrument.env2ReleaseCurve;
+        params.env2Loop = instrument.env2Loop;
         params.ampLevel = instrument.ampLevel;
         params.ampPan = instrument.ampPan;
         params.glideMs = juce::jlimit(0.0f, 5000.0f, instrument.glideMs);

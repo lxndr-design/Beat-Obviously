@@ -942,6 +942,10 @@ namespace beat
         driveDownsampleState = {};
         previousRawEnvelope = 0.0f;
         previousRawEnv2Envelope = 0.0f;
+        env2LoopSampleCounter = 0;
+        env2LoopReleaseSampleCounter = 0;
+        env2LoopReleasing = false;
+        env2LoopReleaseStartValue = 0.0f;
         if (legacyWavetableNeedsSetup())
             configureWavetableOscillators(baseFrequencyHz);
         else
@@ -974,12 +978,26 @@ namespace beat
         if (allowTailOff)
         {
             adsr.noteOff();
-            env2Adsr.noteOff();
+            if (params.env2Loop)
+            {
+                env2LoopReleaseStartValue = env2LoopValue();
+                env2LoopReleaseSampleCounter = 0;
+                env2LoopReleasing = true;
+                previousRawEnv2Envelope = env2LoopReleaseStartValue;
+            }
+            else
+            {
+                env2Adsr.noteOff();
+            }
         }
         else
         {
             adsr.reset();
             env2Adsr.reset();
+            env2LoopSampleCounter = 0;
+            env2LoopReleaseSampleCounter = 0;
+            env2LoopReleasing = false;
+            env2LoopReleaseStartValue = 0.0f;
             clearCurrentNote();
         }
     }
@@ -1040,13 +1058,15 @@ namespace beat
             const float filterLfo = !useDynamicModulation && hasFilterMod ? lfoRouteValue(rawLfo, params.lfoFilterBipolar) : 0.0f;
             const float env = shapedEnvelope(adsr.getNextSample());
             const float env2 = useDynamicModulation
-                ? shapeEnvelopeValue(
-                    env2Adsr.getNextSample(),
-                    previousRawEnv2Envelope,
-                    params.env2Sustain,
-                    params.env2AttackCurve,
-                    params.env2DecayCurve,
-                    params.env2ReleaseCurve)
+                ? (params.env2Loop
+                    ? env2LoopValue()
+                    : shapeEnvelopeValue(
+                        env2Adsr.getNextSample(),
+                        previousRawEnv2Envelope,
+                        params.env2Sustain,
+                        params.env2AttackCurve,
+                        params.env2DecayCurve,
+                        params.env2ReleaseCurve))
                 : 0.0f;
             const double currentPitchFrequency = juce::jmax(1.0f, pitchFrequencyRamp.next())
                 * std::exp2((double) pitchWheelSemitones / 12.0);
@@ -1221,6 +1241,43 @@ namespace beat
     float InstrumentVoice::shapedEnvelope(float rawEnvelope) noexcept
     {
         return shapeEnvelopeValue(rawEnvelope, previousRawEnvelope, params.sustain, params.attackCurve, params.decayCurve, params.releaseCurve);
+    }
+
+    float InstrumentVoice::env2LoopValue() noexcept
+    {
+        const double sr = juce::jmax(1.0, sampleRate);
+        const double attackSeconds = juce::jmax(0.001, (double) params.env2AttackMs * 0.001);
+        const double decaySeconds = juce::jmax(0.001, (double) params.env2DecayMs * 0.001);
+        const double releaseSeconds = juce::jmax(0.001, (double) params.env2ReleaseMs * 0.001);
+        const float sustain = clamp01(params.env2Sustain);
+
+        if (env2LoopReleasing)
+        {
+            const double releaseSamples = juce::jmax(1.0, releaseSeconds * sr);
+            const float progress = (float) juce::jlimit(0.0, 1.0, (double) env2LoopReleaseSampleCounter / releaseSamples);
+            ++env2LoopReleaseSampleCounter;
+            const float raw = clamp01(env2LoopReleaseStartValue)
+                * juce::jmax(0.0f, 1.0f - applyEnvelopeCurve(progress, params.env2ReleaseCurve));
+            previousRawEnv2Envelope = raw;
+            return raw;
+        }
+
+        const double cycleSeconds = attackSeconds + decaySeconds;
+        const double timeSeconds = (double) env2LoopSampleCounter / sr;
+        ++env2LoopSampleCounter;
+        const double localSeconds = std::fmod(timeSeconds, cycleSeconds);
+        float raw = 0.0f;
+        if (localSeconds < attackSeconds)
+        {
+            raw = applyEnvelopeCurve((float) (localSeconds / attackSeconds), params.env2AttackCurve);
+        }
+        else
+        {
+            const float progress = applyEnvelopeCurve((float) ((localSeconds - attackSeconds) / decaySeconds), params.env2DecayCurve);
+            raw = 1.0f + (sustain - 1.0f) * progress;
+        }
+        previousRawEnv2Envelope = raw;
+        return clamp01(raw);
     }
 
     float InstrumentVoice::keytrackedCutoffHz(float normalizedCutoff) const noexcept

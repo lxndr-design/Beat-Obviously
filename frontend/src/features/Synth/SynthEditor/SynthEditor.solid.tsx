@@ -772,6 +772,7 @@ function AmpFilterPanel() {
   const setParameter = useSynthStore.getState().setParameter;
   const filterType = createMemo(() => String(draft().parameters["filter.type"]));
   const filterEnabled = createMemo(() => draft().parameters["filter.enabled"] === true);
+  const env2Loop = createMemo(() => draft().parameters["env.2.loop"] === true);
 
   return (
     <section class={`ds-panel ${filterEnabled() ? "" : styles.disabledPanel}`} aria-label="Amp and filter">
@@ -859,6 +860,13 @@ function AmpFilterPanel() {
             />
           )}
         </For>
+        <Button
+          size="sm"
+          selected={env2Loop()}
+          onClick={() => setBooleanParameter("env.2.loop", !env2Loop())}
+        >
+          Env 2 Loop
+        </Button>
       </div>
     </section>
   );

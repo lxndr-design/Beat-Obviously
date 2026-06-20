@@ -161,6 +161,7 @@ namespace beat
             float env2Sustain { 0.0f };
             float env2ReleaseMs { 200.f };
             int env2ReleaseCurve { 0 };
+            bool env2Loop { false };
             float ampLevel  { 1.0f };
             float ampPan    { 0.0f };
             float modWheel  { 0.0f };
@@ -363,6 +364,7 @@ namespace beat
         StereoSample renderAetherTableStack(double frequencyHz, float rawLfo, float rawLfo2, float env, float env2, float velocity) noexcept;
         StereoSample processDriveOversampled(StereoSample sample, float driveGain) noexcept;
         float shapedEnvelope(float rawEnvelope) noexcept;
+        float env2LoopValue() noexcept;
         float keytrackedCutoffHz(float normalizedCutoff) const noexcept;
 
         Params  baseParams;
@@ -439,6 +441,10 @@ namespace beat
         StereoSample driveDownsampleState;
         float previousRawEnvelope { 0.0f };
         float previousRawEnv2Envelope { 0.0f };
+        int64_t env2LoopSampleCounter { 0 };
+        int64_t env2LoopReleaseSampleCounter { 0 };
+        bool env2LoopReleasing { false };
+        float env2LoopReleaseStartValue { 0.0f };
         juce::uint32 noiseState { 1 };
         juce::ADSR adsr;
         juce::ADSR::Parameters adsrParams;

@@ -1723,16 +1723,36 @@ function modEnvelopePreviewValue(timeS: number, durationS: number, instrument: I
   const decay = Math.max(0.001, numberParam(params?.["env.2.decay"], 0.3));
   const sustain = clamp01(numberParam(params?.["env.2.sustain"], 0));
   const release = Math.max(0.001, numberParam(params?.["env.2.release"], 0.2));
+  const attackCurve = envelopeCurveParam(params?.["env.2.attackCurve"]);
+  const decayCurve = envelopeCurveParam(params?.["env.2.decayCurve"]);
+  const releaseCurve = envelopeCurveParam(params?.["env.2.releaseCurve"]);
+  const segmentValue = (time: number) => {
+    if (time < attack) {
+      return applyEnvelopeCurve(time / attack, attackCurve);
+    }
+    const localDecay = Math.max(0, time - attack);
+    const t = applyEnvelopeCurve(Math.min(1, localDecay / decay), decayCurve);
+    return 1 + (sustain - 1) * t;
+  };
+  const releaseStart = Math.max(attack + decay, durationS - release);
+  if (params?.["env.2.loop"] === true) {
+    const cycleLength = Math.max(0.001, attack + decay);
+    if (timeS > releaseStart) {
+      const releaseValue = segmentValue(releaseStart % cycleLength);
+      const t = applyEnvelopeCurve((timeS - releaseStart) / release, releaseCurve);
+      return releaseValue * Math.max(0, 1 - t);
+    }
+    return segmentValue(timeS % cycleLength);
+  }
   if (timeS < attack) {
-    return applyEnvelopeCurve(timeS / attack, envelopeCurveParam(params?.["env.2.attackCurve"]));
+    return applyEnvelopeCurve(timeS / attack, attackCurve);
   }
   if (timeS < attack + decay) {
-    const t = applyEnvelopeCurve((timeS - attack) / decay, envelopeCurveParam(params?.["env.2.decayCurve"]));
+    const t = applyEnvelopeCurve((timeS - attack) / decay, decayCurve);
     return 1 + (sustain - 1) * t;
   }
-  const releaseStart = Math.max(attack + decay, durationS - release);
   if (timeS > releaseStart) {
-    const t = applyEnvelopeCurve((timeS - releaseStart) / release, envelopeCurveParam(params?.["env.2.releaseCurve"]));
+    const t = applyEnvelopeCurve((timeS - releaseStart) / release, releaseCurve);
     return sustain * Math.max(0, 1 - t);
   }
   return sustain;
