@@ -3,11 +3,11 @@
 #include "Modulation/DynamicModulation.h"
 #include "Modulation/Lfo.h"
 #include "Oscillator/BasicOscillator.h"
+#include "Oscillator/VoiceMath.h"
 #include "Wavetable/WavetableVoiceCache.h"
 
 #include <cmath>
 #include <atomic>
-#include <utility>
 
 namespace beat
 {
@@ -33,73 +33,11 @@ namespace beat
         std::atomic<int64_t> renderOscillatorRateCalculations { 0 };
         std::atomic<int64_t> renderWavetableFrequencyUpdates { 0 };
         std::atomic<int64_t> renderWavetablePositionUpdates { 0 };
-        constexpr std::pair<float, float> centerPanGains { 0.70710678f, 0.70710678f };
 
         float clamp01(float v)
         {
             return juce::jlimit(0.0f, 1.0f, v);
         }
-
-        float pitchWheelRatio(int value) noexcept
-        {
-            const auto clamped = juce::jlimit(0, 16383, value);
-            if (clamped >= 8192)
-                return (float) (clamped - 8192) / 8191.0f;
-            return (float) (clamped - 8192) / 8192.0f;
-        }
-
-        float nextNoise(juce::uint32& state);
-
-        double deterministicPhaseJitter(juce::uint32 seed) noexcept
-        {
-            seed ^= seed >> 16;
-            seed *= 0x7feb352du;
-            seed ^= seed >> 15;
-            seed *= 0x846ca68bu;
-            seed ^= seed >> 16;
-            return (double) (seed & 0x00ffffffu) / (double) 0x01000000u;
-        }
-
-        std::pair<float, float> equalPowerPanGains(float pan) noexcept
-        {
-            const float normalized = (juce::jlimit(-1.0f, 1.0f, pan) + 1.0f) * 0.5f;
-            const float angle = normalized * juce::MathConstants<float>::halfPi;
-            return { std::cos(angle), std::sin(angle) };
-        }
-
-        float nextNoise(juce::uint32& state)
-        {
-            state = state * 1664525u + 1013904223u;
-            return ((state >> 8) * (1.0f / 8388607.5f)) - 1.0f;
-        }
-
-        float denormalSafe(float value) noexcept
-        {
-            return std::abs(value) < 1.0e-20f ? 0.0f : value;
-        }
-
-        double pitchRate(int octave, int semitone, float fineCents) noexcept
-        {
-            return std::exp2(
-                            (double) octave
-                                + (double) semitone / 12.0
-                                + (double) fineCents / 1200.0);
-        }
-
-        float quantizeWavetablePosition(float position) noexcept
-        {
-            return std::round(clamp01(position) * 4096.0f) / 4096.0f;
-        }
-
-        double quantizeWavetableFrequency(double frequencyHz) noexcept
-        {
-            if (!std::isfinite(frequencyHz))
-                return 0.0;
-
-            constexpr double resolutionHz = 0.03125;
-            return std::round(juce::jmax(0.0, frequencyHz) / resolutionHz) * resolutionHz;
-        }
-
     }
 
     void InstrumentVoice::setPendingNoteAutomationContexts(NoteAutomationContext* contexts, int count) noexcept
@@ -232,7 +170,7 @@ namespace beat
 
     void InstrumentVoice::pitchWheelMoved(int newPitchWheelValue)
     {
-        pitchWheelSemitones = pitchWheelRatio(newPitchWheelValue)
+        pitchWheelSemitones = VoiceMath::pitchWheelRatio(newPitchWheelValue)
             * juce::jlimit(0.0f, 24.0f, params.pitchBendRangeSemitones);
     }
 
@@ -620,16 +558,16 @@ namespace beat
         phase     = 0.0;
         noiseState = (juce::uint32) (midiNoteNumber * 747796405u + 2891336453u);
         aetherOscAPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscA.phase)
-            + deterministicPhaseJitter(noiseState ^ 0xa9f14c31u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscA.randomPhase);
+            + VoiceMath::deterministicPhaseJitter(noiseState ^ 0xa9f14c31u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscA.randomPhase);
         aetherOscBPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscB.phase)
-            + deterministicPhaseJitter(noiseState ^ 0x6c8e9cf5u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscB.randomPhase);
+            + VoiceMath::deterministicPhaseJitter(noiseState ^ 0x6c8e9cf5u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscB.randomPhase);
         if (params.lfoRetrigger)
             lfoPhase = std::fmod(juce::jlimit(0.0, 1.0, (double) params.lfoPhaseOffset)
-                + deterministicPhaseJitter(noiseState ^ 0x35a1d7bdu) * juce::jlimit(0.0, 1.0, (double) params.lfoRandomPhase),
+                + VoiceMath::deterministicPhaseJitter(noiseState ^ 0x35a1d7bdu) * juce::jlimit(0.0, 1.0, (double) params.lfoRandomPhase),
                 1.0);
         if (params.lfo2Retrigger)
             lfo2Phase = std::fmod(juce::jlimit(0.0, 1.0, (double) params.lfo2PhaseOffset)
-                + deterministicPhaseJitter(noiseState ^ 0x91c2ef43u) * juce::jlimit(0.0, 1.0, (double) params.lfo2RandomPhase),
+                + VoiceMath::deterministicPhaseJitter(noiseState ^ 0x91c2ef43u) * juce::jlimit(0.0, 1.0, (double) params.lfo2RandomPhase),
                 1.0);
         phaseDelta = baseFrequencyHz / sampleRate;
         pitchFrequencyRamp.reset((float) baseFrequencyHz);
@@ -807,7 +745,7 @@ namespace beat
                 const float mono = params.waveform == 5
                     ? renderWavetableStack(currentFrequency, positionLfo + dynamicOscAPosition, dynamicUnisonDetune, dynamicUnisonSpread)
                     : params.waveform == 4
-                        ? nextNoise(noiseState)
+                        ? VoiceMath::nextNoise(noiseState)
                         : BasicOscillator::sample(params.waveform, phase, currentPhaseDelta);
                 if (params.waveform != 5)
                     ++currentBlockOscillatorSamples;
@@ -865,7 +803,7 @@ namespace beat
             const float ampPan = hasAmpPanMod
                 ? juce::jlimit(-1.0f, 1.0f, params.ampPan + DynamicModulation::targetOffset(params.dynamicModulation.ampPan, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f))
                 : params.ampPan;
-            const auto panGains = hasAmpPanMod ? equalPowerPanGains(ampPan) : cachedAmpPanGains;
+            const auto panGains = hasAmpPanMod ? VoiceMath::equalPowerPanGains(ampPan) : cachedAmpPanGains;
             const float voiceGain = env * level * 0.4f * ampLevel;
             const auto [leftGain, rightGain] = panGains;
 
@@ -873,7 +811,7 @@ namespace beat
             {
                 const float sample = ch == 0 ? left * leftGain : ch == 1 ? right * rightGain : (left + right) * 0.5f;
                 const float output = sample * voiceGain;
-                out.addSample(ch, startSample + i, denormalSafe(output));
+                out.addSample(ch, startSample + i, VoiceMath::denormalSafe(output));
             }
 
             phase += currentPhaseDelta;
@@ -1023,7 +961,7 @@ namespace beat
             frequencyHz = baseFrequencyHz;
 
         auto& renderPlan = updateWavetableUnisonPlan(plan, config, detuneCentsMod, spreadMod);
-        const float modulatedPosition = quantizeWavetablePosition(config.position + positionMod);
+        const float modulatedPosition = VoiceMath::quantizeWavetablePosition(config.position + positionMod);
         float sum = 0.0f;
         currentBlockWavetableVoiceSamples += renderPlan.unison;
 
@@ -1032,7 +970,7 @@ namespace beat
             auto& osc = oscillators[(size_t) voice];
             const auto index = (size_t) voice;
             const double phaseDriftHz = (double) renderPlan.phaseSpread[index] * sampleRate;
-            const double nextFrequencyHz = quantizeWavetableFrequency(frequencyHz * renderPlan.rates[index] + phaseDriftHz);
+            const double nextFrequencyHz = VoiceMath::quantizeWavetableFrequency(frequencyHz * renderPlan.rates[index] + phaseDriftHz);
             if (std::abs(nextFrequencyHz - renderPlan.appliedFrequencyHz[index]) > 0.000001)
             {
                 osc.setFrequency(nextFrequencyHz);
@@ -1103,19 +1041,19 @@ namespace beat
 
     void InstrumentVoice::refreshCachedPanGains() noexcept
     {
-        cachedAmpPanGains = equalPowerPanGains(params.ampPan);
-        cachedAetherOscAPanGains = equalPowerPanGains(params.aetherOscA.pan);
-        cachedAetherOscBPanGains = equalPowerPanGains(params.aetherOscB.pan);
+        cachedAmpPanGains = VoiceMath::equalPowerPanGains(params.ampPan);
+        cachedAetherOscAPanGains = VoiceMath::equalPowerPanGains(params.aetherOscA.pan);
+        cachedAetherOscBPanGains = VoiceMath::equalPowerPanGains(params.aetherOscB.pan);
     }
 
     void InstrumentVoice::refreshCachedPitchRates() noexcept
     {
-        cachedAetherOscARate = pitchRate(params.aetherOscA.octave,
-                                         params.aetherOscA.semitone,
-                                         params.aetherOscA.fineCents);
-        cachedAetherOscBRate = pitchRate(params.aetherOscB.octave,
-                                         params.aetherOscB.semitone,
-                                         params.aetherOscB.fineCents);
+        cachedAetherOscARate = VoiceMath::pitchRate(params.aetherOscA.octave,
+                                                    params.aetherOscA.semitone,
+                                                    params.aetherOscA.fineCents);
+        cachedAetherOscBRate = VoiceMath::pitchRate(params.aetherOscB.octave,
+                                                    params.aetherOscB.semitone,
+                                                    params.aetherOscB.fineCents);
         cachedAetherSubRate = std::exp2((double) params.aetherSub.octave);
     }
 
@@ -1140,7 +1078,7 @@ namespace beat
         const auto add = [&](float value, float level, float pan, std::pair<float, float> staticPanGains, bool panIsDynamic)
         {
             const float safeLevel = clamp01(level);
-            const auto [leftGain, rightGain] = panIsDynamic ? equalPowerPanGains(pan) : staticPanGains;
+            const auto [leftGain, rightGain] = panIsDynamic ? VoiceMath::equalPowerPanGains(pan) : staticPanGains;
             leftSum += value * safeLevel * leftGain;
             rightSum += value * safeLevel * rightGain;
             levelSum += safeLevel;
@@ -1178,7 +1116,7 @@ namespace beat
             {
                 ++currentBlockOscillatorSamples;
                 ++componentSampleCounter;
-                add(nextNoise(noiseState), modulatedLevel, modulatedPan, staticPanGains, panIsDynamic);
+                add(VoiceMath::nextNoise(noiseState), modulatedLevel, modulatedPan, staticPanGains, panIsDynamic);
                 return;
             }
 
@@ -1251,7 +1189,7 @@ namespace beat
             add(BasicOscillator::sample(params.aetherSub.waveform, phase * cachedAetherSubRate, (frequencyHz * cachedAetherSubRate) / sampleRate),
                 params.aetherSub.level,
                 0.0f,
-                centerPanGains,
+                VoiceMath::centerPanGains,
                 false);
         }
 
@@ -1259,8 +1197,8 @@ namespace beat
         {
             ++currentBlockOscillatorSamples;
             ++currentBlockAetherNoiseSamples;
-            const float noise = nextNoise(noiseState);
-            add(noise * (0.35f + clamp01(params.aetherNoise.color) * 0.65f), params.aetherNoise.level, 0.0f, centerPanGains, false);
+            const float noise = VoiceMath::nextNoise(noiseState);
+            add(noise * (0.35f + clamp01(params.aetherNoise.color) * 0.65f), params.aetherNoise.level, 0.0f, VoiceMath::centerPanGains, false);
         }
 
         if (levelSum <= 0.0f)
