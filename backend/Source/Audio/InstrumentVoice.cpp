@@ -1,6 +1,7 @@
 #include "InstrumentVoice.h"
 
 #include "Filter/FilterMath.h"
+#include "Modulation/DynamicModulation.h"
 #include "Modulation/Lfo.h"
 #include "Oscillator/BasicOscillator.h"
 
@@ -60,42 +61,6 @@ namespace beat
             seed *= 0x846ca68bu;
             seed ^= seed >> 16;
             return (double) (seed & 0x00ffffffu) / (double) 0x01000000u;
-        }
-
-        float envRouteValue(float env, bool bipolar) noexcept
-        {
-            return bipolar ? env * 2.0f - 1.0f : env;
-        }
-
-        bool dynamicTargetActive(const InstrumentVoice::Params::DynamicModTarget& target) noexcept
-        {
-            return std::abs(target.lfo) > 0.0001f
-                || std::abs(target.lfo2) > 0.0001f
-                || std::abs(target.env) > 0.0001f
-                || std::abs(target.env2) > 0.0001f
-                || std::abs(target.velocity) > 0.0001f
-                || std::abs(target.keytrack) > 0.0001f
-                || std::abs(target.modWheel) > 0.0001f;
-        }
-
-        float dynamicTargetOffset(
-            const InstrumentVoice::Params::DynamicModTarget& target,
-            float rawLfo,
-            float rawLfo2,
-            float env,
-            float env2,
-            float velocity,
-            float keytrack,
-            float modWheel,
-            float scale) noexcept
-        {
-            return (Lfo::routeValue(rawLfo, target.lfoBipolar) * target.lfo
-                + Lfo::routeValue(rawLfo2, target.lfo2Bipolar) * target.lfo2
-                + envRouteValue(env, target.envBipolar) * target.env
-                + envRouteValue(env2, target.env2Bipolar) * target.env2
-                + envRouteValue(velocity, target.velocityBipolar) * target.velocity
-                + envRouteValue(keytrack, target.keytrackBipolar) * target.keytrack
-                + envRouteValue(modWheel, target.modWheelBipolar) * target.modWheel) * scale;
         }
 
         std::pair<float, float> equalPowerPanGains(float pan) noexcept
@@ -966,18 +931,18 @@ namespace beat
                 currentPhaseDelta *= std::exp2((pitchLfo * pitchMod) / 12.0);
             if (useDynamicModulation && !params.hasAether)
             {
-                const float oscAFineCents = dynamicTargetOffset(params.dynamicModulation.oscAFine, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 100.0f);
+                const float oscAFineCents = DynamicModulation::targetOffset(params.dynamicModulation.oscAFine, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 100.0f);
                 currentPhaseDelta *= std::exp2(oscAFineCents / 1200.0f);
             }
             const double currentFrequency = currentPhaseDelta * sampleRate;
             const float dynamicOscAPosition = useDynamicModulation && cachedAetherOscAPositionDynamic
-                ? dynamicTargetOffset(params.dynamicModulation.oscAPosition, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f)
+                ? DynamicModulation::targetOffset(params.dynamicModulation.oscAPosition, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f)
                 : 0.0f;
             const float dynamicUnisonDetune = useDynamicModulation && cachedUnisonDetuneDynamic
-                ? dynamicTargetOffset(params.dynamicModulation.unisonDetune, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 100.0f)
+                ? DynamicModulation::targetOffset(params.dynamicModulation.unisonDetune, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 100.0f)
                 : 0.0f;
             const float dynamicUnisonSpread = useDynamicModulation && cachedUnisonSpreadDynamic
-                ? dynamicTargetOffset(params.dynamicModulation.unisonSpread, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f)
+                ? DynamicModulation::targetOffset(params.dynamicModulation.unisonSpread, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f)
                 : 0.0f;
 
             // Oscillator
@@ -1002,7 +967,7 @@ namespace beat
 
             // Drive (soft clipping)
             const float drive = clamp01(params.drive01 + (useDynamicModulation && cachedFilterDriveDynamic
-                ? dynamicTargetOffset(params.dynamicModulation.filterDrive, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f)
+                ? DynamicModulation::targetOffset(params.dynamicModulation.filterDrive, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f)
                 : 0.0f));
             if (drive > 0.0001f)
             {
@@ -1020,9 +985,9 @@ namespace beat
 
             if (hasFilterMod)
             {
-                    const float cutoffMod = useDynamicModulation && cachedFilterCutoffDynamic
-                        ? dynamicTargetOffset(params.dynamicModulation.filterCutoff, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 0.35f)
-                        : filterLfo * params.lfoToFilter * 0.35f + env * params.envToFilter * 0.35f;
+                const float cutoffMod = useDynamicModulation && cachedFilterCutoffDynamic
+                    ? DynamicModulation::targetOffset(params.dynamicModulation.filterCutoff, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 0.35f)
+                    : filterLfo * params.lfoToFilter * 0.35f + env * params.envToFilter * 0.35f;
                 const float nextFilterHz = keytrackedCutoffHz(params.cutoff01 + cutoffMod);
                 if (std::abs(nextFilterHz - cachedFilterHz) > 6.0f)
                 {
@@ -1034,7 +999,7 @@ namespace beat
                 if (useDynamicModulation && cachedFilterResonanceDynamic)
                 {
                     const float resonance = clamp01(params.resonance01
-                        + dynamicTargetOffset(params.dynamicModulation.filterResonance, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f));
+                        + DynamicModulation::targetOffset(params.dynamicModulation.filterResonance, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f));
                     const float nextResonance = FilterMath::resonanceFromNormalized(resonance);
                     if (std::abs(nextResonance - cachedFilterResonance) > 0.001f)
                     {
@@ -1049,10 +1014,10 @@ namespace beat
             right = filterRight.processSample(0, right);
 
             const float ampLevel = clamp01(params.ampLevel + (useDynamicModulation && cachedAmpLevelDynamic
-                ? dynamicTargetOffset(params.dynamicModulation.ampLevel, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f)
+                ? DynamicModulation::targetOffset(params.dynamicModulation.ampLevel, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f)
                 : 0.0f));
             const float ampPan = hasAmpPanMod
-                ? juce::jlimit(-1.0f, 1.0f, params.ampPan + dynamicTargetOffset(params.dynamicModulation.ampPan, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f))
+                ? juce::jlimit(-1.0f, 1.0f, params.ampPan + DynamicModulation::targetOffset(params.dynamicModulation.ampPan, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f))
                 : params.ampPan;
             const auto panGains = hasAmpPanMod ? equalPowerPanGains(ampPan) : cachedAmpPanGains;
             const float voiceGain = env * level * 0.4f * ampLevel;
@@ -1357,21 +1322,21 @@ namespace beat
             return;
         }
 
-        cachedAmpPanDynamic = dynamicTargetActive(modulation.ampPan);
-        cachedAetherOscAPanDynamic = dynamicTargetActive(modulation.oscAPan);
-        cachedAetherOscBPanDynamic = dynamicTargetActive(modulation.oscBPan);
-        cachedAetherOscAFineDynamic = dynamicTargetActive(modulation.oscAFine);
-        cachedAetherOscBFineDynamic = dynamicTargetActive(modulation.oscBFine);
-        cachedAetherOscAPositionDynamic = dynamicTargetActive(modulation.oscAPosition);
-        cachedAetherOscBPositionDynamic = dynamicTargetActive(modulation.oscBPosition);
-        cachedAetherOscALevelDynamic = dynamicTargetActive(modulation.oscALevel);
-        cachedAetherOscBLevelDynamic = dynamicTargetActive(modulation.oscBLevel);
-        cachedFilterCutoffDynamic = dynamicTargetActive(modulation.filterCutoff);
-        cachedFilterResonanceDynamic = dynamicTargetActive(modulation.filterResonance);
-        cachedFilterDriveDynamic = dynamicTargetActive(modulation.filterDrive);
-        cachedAmpLevelDynamic = dynamicTargetActive(modulation.ampLevel);
-        cachedUnisonDetuneDynamic = dynamicTargetActive(modulation.unisonDetune);
-        cachedUnisonSpreadDynamic = dynamicTargetActive(modulation.unisonSpread);
+        cachedAmpPanDynamic = DynamicModulation::targetActive(modulation.ampPan);
+        cachedAetherOscAPanDynamic = DynamicModulation::targetActive(modulation.oscAPan);
+        cachedAetherOscBPanDynamic = DynamicModulation::targetActive(modulation.oscBPan);
+        cachedAetherOscAFineDynamic = DynamicModulation::targetActive(modulation.oscAFine);
+        cachedAetherOscBFineDynamic = DynamicModulation::targetActive(modulation.oscBFine);
+        cachedAetherOscAPositionDynamic = DynamicModulation::targetActive(modulation.oscAPosition);
+        cachedAetherOscBPositionDynamic = DynamicModulation::targetActive(modulation.oscBPosition);
+        cachedAetherOscALevelDynamic = DynamicModulation::targetActive(modulation.oscALevel);
+        cachedAetherOscBLevelDynamic = DynamicModulation::targetActive(modulation.oscBLevel);
+        cachedFilterCutoffDynamic = DynamicModulation::targetActive(modulation.filterCutoff);
+        cachedFilterResonanceDynamic = DynamicModulation::targetActive(modulation.filterResonance);
+        cachedFilterDriveDynamic = DynamicModulation::targetActive(modulation.filterDrive);
+        cachedAmpLevelDynamic = DynamicModulation::targetActive(modulation.ampLevel);
+        cachedUnisonDetuneDynamic = DynamicModulation::targetActive(modulation.unisonDetune);
+        cachedUnisonSpreadDynamic = DynamicModulation::targetActive(modulation.unisonSpread);
         cachedAnyDynamicModulationTarget =
             cachedAmpPanDynamic
             || cachedAetherOscAPanDynamic
@@ -1394,10 +1359,10 @@ namespace beat
     {
         const bool useDynamicModulation = params.dynamicModulation.active && cachedAnyDynamicModulationTarget;
         const float unisonDetuneMod = useDynamicModulation && cachedUnisonDetuneDynamic
-            ? dynamicTargetOffset(params.dynamicModulation.unisonDetune, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 100.0f)
+            ? DynamicModulation::targetOffset(params.dynamicModulation.unisonDetune, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 100.0f)
             : 0.0f;
         const float unisonSpreadMod = useDynamicModulation && cachedUnisonSpreadDynamic
-            ? dynamicTargetOffset(params.dynamicModulation.unisonSpread, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 1.0f)
+            ? DynamicModulation::targetOffset(params.dynamicModulation.unisonSpread, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 1.0f)
             : 0.0f;
         float leftSum = 0.0f;
         float rightSum = 0.0f;
@@ -1429,16 +1394,16 @@ namespace beat
             int64_t& componentSampleCounter)
         {
             const float modulatedLevel = clamp01(osc.level + (useDynamicModulation && levelIsDynamic
-                ? dynamicTargetOffset(levelTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 1.0f)
+                ? DynamicModulation::targetOffset(levelTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 1.0f)
                 : 0.0f));
             if (!osc.enabled || modulatedLevel <= 0.0f)
                 return;
             const float modulatedPan = juce::jlimit(-1.0f, 1.0f, osc.pan + (useDynamicModulation
-                ? dynamicTargetOffset(panTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 1.0f)
+                ? DynamicModulation::targetOffset(panTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 1.0f)
                 : 0.0f));
 
             const float positionMod = useDynamicModulation && positionIsDynamic
-                ? dynamicTargetOffset(positionTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 1.0f)
+                ? DynamicModulation::targetOffset(positionTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 1.0f)
                 : 0.0f;
             if (osc.waveform == 4)
             {
@@ -1451,7 +1416,7 @@ namespace beat
             double rate = staticRate;
             if (fineIsDynamic)
             {
-                const float fineOffsetCents = dynamicTargetOffset(fineTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 100.0f);
+                const float fineOffsetCents = DynamicModulation::targetOffset(fineTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 100.0f);
                 rate *= std::exp2((double) fineOffsetCents / 1200.0);
                 ++currentBlockOscillatorRateCalculations;
             }

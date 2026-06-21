@@ -27,6 +27,7 @@ target_sources(Beat PRIVATE
     Source/Audio/InstrumentVoice.cpp
     Source/Audio/InstrumentVoice.h
     Source/Audio/Filter/FilterMath.h
+    Source/Audio/Modulation/DynamicModulation.h
     Source/Audio/Modulation/Lfo.h
     Source/Audio/Oscillator/BasicOscillator.h
     Source/Audio/Analysis/FftAnalyzer.cpp
@@ -135,6 +136,7 @@ add_executable(BeatBackendStress
     Source/Audio/InstrumentVoice.cpp
     Source/Audio/InstrumentVoice.h
     Source/Audio/Filter/FilterMath.h
+    Source/Audio/Modulation/DynamicModulation.h
     Source/Audio/Modulation/Lfo.h
     Source/Audio/Oscillator/BasicOscillator.h
     Source/Audio/Sequencer.cpp

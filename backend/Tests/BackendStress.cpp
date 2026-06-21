@@ -5,6 +5,7 @@
 #include "../Source/Audio/Envelope/EnvelopeShaper.h"
 #include "../Source/Audio/Filter/FilterMath.h"
 #include "../Source/Audio/InstrumentVoice.h"
+#include "../Source/Audio/Modulation/DynamicModulation.h"
 #include "../Source/Audio/Modulation/Lfo.h"
 #include "../Source/Audio/Oscillator/BasicOscillator.h"
 #include "../Source/Audio/Parameters/ParameterIds.h"
@@ -120,6 +121,53 @@ namespace
 
         return near(beat::Lfo::routeValue(-0.5f, true), -0.5f)
             && near(beat::Lfo::routeValue(-0.5f, false), 0.25f);
+    }
+
+    bool stressDynamicModulationHelper()
+    {
+        using Target = beat::InstrumentVoice::Params::DynamicModTarget;
+
+        Target threshold;
+        threshold.lfo = 0.00001f;
+        if (beat::DynamicModulation::targetActive(threshold))
+            return false;
+        threshold.lfo = 0.001f;
+        if (!beat::DynamicModulation::targetActive(threshold))
+            return false;
+
+        if (!near(beat::DynamicModulation::routeEnvValue(0.25f, false), 0.25f))
+            return false;
+        if (!near(beat::DynamicModulation::routeEnvValue(0.25f, true), -0.5f))
+            return false;
+
+        Target target;
+        target.lfo = 0.5f;
+        target.lfoBipolar = true;
+        target.lfo2 = 0.25f;
+        target.lfo2Bipolar = false;
+        target.env = 0.2f;
+        target.envBipolar = false;
+        target.env2 = 0.4f;
+        target.env2Bipolar = true;
+        target.velocity = 0.1f;
+        target.velocityBipolar = true;
+        target.keytrack = -0.2f;
+        target.keytrackBipolar = false;
+        target.modWheel = 0.3f;
+        target.modWheelBipolar = true;
+
+        const float offset = beat::DynamicModulation::targetOffset(
+            target,
+            -0.5f,
+            -0.5f,
+            0.75f,
+            0.75f,
+            0.75f,
+            0.5f,
+            0.25f,
+            2.0f);
+
+        return near(offset, -0.075f);
     }
 
     bool stressBasicOscillatorHelper()
@@ -10579,6 +10627,11 @@ int main()
     if (!stressLfoHelper())
     {
         std::cerr << "LFO helper stress failed\n";
+        return 1;
+    }
+    if (!stressDynamicModulationHelper())
+    {
+        std::cerr << "Dynamic modulation helper stress failed\n";
         return 1;
     }
     if (!stressBasicOscillatorHelper())
