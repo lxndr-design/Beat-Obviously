@@ -2,6 +2,7 @@
 
 #include "Lfo.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace beat::DynamicModulation
@@ -24,6 +25,18 @@ namespace beat::DynamicModulation
         bool unisonDetune { false };
         bool unisonSpread { false };
         bool any { false };
+    };
+
+    struct RenderPlan
+    {
+        float pitchMod { 0.0f };
+        bool useDynamicModulation { false };
+        bool hasPitchMod { false };
+        bool hasPositionMod { false };
+        bool hasFilterMod { false };
+        bool needsLfoValue { false };
+        bool needsLfo2Value { false };
+        bool hasAmpPanMod { false };
     };
 
     inline float routeEnvValue(float env, bool bipolar) noexcept
@@ -108,5 +121,29 @@ namespace beat::DynamicModulation
     inline bool hasFilterCoefficientMod(const TargetActivityFlags& flags) noexcept
     {
         return flags.filterCutoff || flags.filterResonance;
+    }
+
+    inline RenderPlan makeRenderPlan(
+        const TargetActivityFlags& flags,
+        bool dynamicModulationActive,
+        bool lfo2Enabled,
+        float lfoToPitch,
+        float lfoDepth,
+        float lfoToFilter,
+        float envToFilter) noexcept
+    {
+        RenderPlan plan;
+        plan.pitchMod = std::max(0.0f, lfoToPitch);
+        plan.useDynamicModulation = dynamicModulationActive && flags.any;
+        plan.hasPitchMod = !plan.useDynamicModulation && plan.pitchMod > 0.0001f;
+        plan.hasPositionMod = !plan.useDynamicModulation && std::abs(lfoDepth) > 0.0001f;
+        const bool hasDynamicFilterCoefficientMod = plan.useDynamicModulation && hasFilterCoefficientMod(flags);
+        plan.hasFilterMod = hasDynamicFilterCoefficientMod
+            || std::abs(lfoToFilter) > 0.0001f
+            || std::abs(envToFilter) > 0.0001f;
+        plan.needsLfoValue = plan.useDynamicModulation || plan.hasPitchMod || plan.hasPositionMod || plan.hasFilterMod;
+        plan.needsLfo2Value = plan.useDynamicModulation && lfo2Enabled;
+        plan.hasAmpPanMod = flags.ampPan;
+        return plan;
     }
 }

@@ -824,18 +824,22 @@ namespace beat
         juce::ScopedNoDenormals noDenormals;
         if (!adsr.isActive()) return;
 
-        const float pitchMod = juce::jmax(0.0f, params.lfoToPitch);
-        const bool useDynamicModulation = params.dynamicModulation.active && cachedDynamicTargets.any;
-        const bool hasPitchMod = !useDynamicModulation && pitchMod > 0.0001f;
-        const bool hasPositionMod = !useDynamicModulation && std::abs(params.lfoDepth) > 0.0001f;
-        const bool hasDynamicFilterCoefficientMod = useDynamicModulation
-            && DynamicModulation::hasFilterCoefficientMod(cachedDynamicTargets);
-        const bool hasFilterMod = hasDynamicFilterCoefficientMod
-            || std::abs(params.lfoToFilter) > 0.0001f
-            || std::abs(params.envToFilter) > 0.0001f;
-        const bool needsLfoValue = useDynamicModulation || hasPitchMod || hasPositionMod || hasFilterMod;
-        const bool needsLfo2Value = useDynamicModulation && params.lfo2Enabled;
-        const bool hasAmpPanMod = cachedDynamicTargets.ampPan;
+        const auto modulationPlan = DynamicModulation::makeRenderPlan(
+            cachedDynamicTargets,
+            params.dynamicModulation.active,
+            params.lfo2Enabled,
+            params.lfoToPitch,
+            params.lfoDepth,
+            params.lfoToFilter,
+            params.envToFilter);
+        const float pitchMod = modulationPlan.pitchMod;
+        const bool useDynamicModulation = modulationPlan.useDynamicModulation;
+        const bool hasPitchMod = modulationPlan.hasPitchMod;
+        const bool hasPositionMod = modulationPlan.hasPositionMod;
+        const bool hasFilterMod = modulationPlan.hasFilterMod;
+        const bool needsLfoValue = modulationPlan.needsLfoValue;
+        const bool needsLfo2Value = modulationPlan.needsLfo2Value;
+        const bool hasAmpPanMod = modulationPlan.hasAmpPanMod;
         const double lfoPhaseDelta = juce::jmax(0.01f, params.lfoRateHz) / sampleRate;
         const double lfo2PhaseDelta = juce::jmax(0.01f, params.lfo2RateHz) / sampleRate;
         const bool hasVoiceAutomation = voicePitchEventCount > 0 || voiceAutomationEventCount > 0;
