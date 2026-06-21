@@ -803,6 +803,13 @@ try {
   assert.equal(smoothedPartials[2], 0.25);
   assert.equal(smoothedPartials[3], 0);
   assert.deepEqual(synthStore.smoothHarmonicPartials([0, 1, 0, 0], 0).slice(0, 4), [0, 1, 0, 0]);
+  const flatPartials = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
+  const tiltedHighPartials = synthStore.tiltHarmonicPartials(flatPartials, 0.55);
+  const tiltedLowPartials = synthStore.tiltHarmonicPartials(flatPartials, -0.55);
+  assert.equal(tiltedHighPartials.length, 16);
+  assert.ok(tiltedHighPartials[15] > tiltedHighPartials[0], "positive partial tilt should emphasize high harmonics");
+  assert.ok(tiltedLowPartials[0] > tiltedLowPartials[15], "negative partial tilt should emphasize low harmonics");
+  assert.deepEqual(synthStore.tiltHarmonicPartials([0.1, 0.2, 0.3, 0.4], 0).slice(0, 4), [0.1, 0.2, 0.3, 0.4]);
   const drawnWaveformFrame = synthStore.deriveWavemapFrameFromDrawnWaveform(
     { id: "user.custom.frame.drawn", label: "Drawn", position: 0.5, brightness: 0.2, even: 0.1, fold: 0.05, formant: 0.08, notch: 0.04, skew: 0, tilt: 0, focus: 0.2, phase: 0 },
     Float32Array.from({ length: 256 }, (_, index) => Math.sin((index / 256) * Math.PI * 2 * 3)),

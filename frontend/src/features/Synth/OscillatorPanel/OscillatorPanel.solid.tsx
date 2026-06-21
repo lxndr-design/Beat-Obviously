@@ -21,6 +21,7 @@ import {
   normalizeWavemapFrames,
   smoothHarmonicPartials,
   synthDraftToPreviewInstrument,
+  tiltHarmonicPartials,
   useSynthStore,
   type ModulationTargetId,
   type OscillatorKey,
@@ -712,6 +713,12 @@ function HarmonicDraw(props: { partials?: number[]; onChange: (partials: number[
       </For>
     </div>
     <div class={styles.harmonicTools} aria-label="Harmonic partial tools">
+      <Button size="xs" onClick={() => props.onChange(tiltHarmonicPartials(bins(), -0.42))}>
+        Low
+      </Button>
+      <Button size="xs" onClick={() => props.onChange(tiltHarmonicPartials(bins(), 0.42))}>
+        High
+      </Button>
       <Button size="xs" onClick={() => props.onChange(smoothHarmonicPartials(bins(), 0.85))}>
         Smooth
       </Button>

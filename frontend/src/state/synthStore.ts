@@ -410,6 +410,18 @@ export function smoothHarmonicPartials(partials: unknown, amount = 0.5): number[
   });
 }
 
+export function tiltHarmonicPartials(partials: unknown, tilt = 0.35): number[] {
+  const source = sanitizeCustomWavetablePartials(partials) ?? Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, () => 0);
+  const amount = sanitizeBipolar(tilt, 0);
+  if (Math.abs(amount) < 0.0001) return source;
+  const pivot = (CUSTOM_WAVETABLE_PARTIAL_COUNT - 1) * 0.5;
+  return source.map((value, index) => {
+    const normalizedIndex = (index - pivot) / Math.max(1, pivot);
+    const emphasis = Math.exp(amount * normalizedIndex * 1.2);
+    return clamp01(value * emphasis);
+  });
+}
+
 function spreadFrameValues(values: number[], targetMin: number, targetMax: number, fallback: number[]): number[] {
   const min = Math.min(...values);
   const max = Math.max(...values);
