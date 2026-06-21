@@ -941,7 +941,7 @@ namespace beat
                 const auto driven = DriveStage::processOversampled(driveState, { left, right }, driveGain);
                 left = driven.left;
                 right = driven.right;
-                currentBlockFilterDriveSamples += 4;
+                currentBlockFilterDriveSamples += DriveStage::workSamplesForChannels(2);
             }
             else
             {

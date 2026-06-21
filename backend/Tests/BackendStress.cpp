@@ -296,6 +296,12 @@ namespace
 
     bool stressDriveStageHelper()
     {
+        if (beat::DriveStage::oversampleFactor != 2
+            || beat::DriveStage::workSamplesForChannels(0) != 0
+            || beat::DriveStage::workSamplesForChannels(1) != 2
+            || beat::DriveStage::workSamplesForChannels(2) != 4)
+            return false;
+
         beat::DriveStage::State state;
         const beat::DriveStage::StereoFrame sample { 0.5f, -0.5f };
 
@@ -311,6 +317,11 @@ namespace
 
         state.reset({ 0.2f, -0.3f });
         if (!near(state.previousInput.left, 0.2f) || !near(state.downsample.right, -0.3f))
+            return false;
+
+        state.reset();
+        const auto mono = beat::DriveStage::processMonoOversampled(state, 0.5f, 3.0f);
+        if (!(mono > 0.5f && mono < 0.6f && near(state.previousInput.left, 0.5f)))
             return false;
 
         state.reset();
@@ -3575,7 +3586,7 @@ namespace
             if (!engine.pullRenderTimingSnapshot(timing))
                 return false;
 
-            const int64_t expectedOversampledWork = (int64_t) blockSize * 2 * 2;
+            const int64_t expectedOversampledWork = (int64_t) blockSize * beat::DriveStage::workSamplesForChannels(2);
             if (timing.routeNonlinearEffectSamples < expectedOversampledWork)
             {
                 std::cerr << "Distortion nonlinear oversampling counter failed samples="
@@ -10314,7 +10325,7 @@ namespace
         const auto staticWork = beat::InstrumentVoice::consumeRenderWorkStats();
         if (staticWork.oscillatorRateCalculations != 0)
             return false;
-        if (staticWork.filterDriveSamples < (int64_t) full.getNumSamples() * 4)
+        if (staticWork.filterDriveSamples < (int64_t) full.getNumSamples() * beat::DriveStage::workSamplesForChannels(2))
             return false;
         if (staticWork.wavetableFrequencyUpdates > 8 || staticWork.wavetablePositionUpdates > 8)
             return false;
@@ -10404,7 +10415,7 @@ namespace
         const auto dynamicWork = beat::InstrumentVoice::consumeRenderWorkStats();
         if (dynamicWork.oscillatorRateCalculations <= 0)
             return false;
-        if (dynamicWork.filterDriveSamples < (int64_t) dynamic.getNumSamples() * 4)
+        if (dynamicWork.filterDriveSamples < (int64_t) dynamic.getNumSamples() * beat::DriveStage::workSamplesForChannels(2))
             return false;
         if (dynamicWork.wavetablePositionUpdates <= 0
             || dynamicWork.wavetablePositionUpdates >= dynamicWork.wavetableVoiceSamples)
