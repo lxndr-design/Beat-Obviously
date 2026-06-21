@@ -34,6 +34,8 @@ target_sources(Beat PRIVATE
     Source/Audio/Modulation/Lfo.h
     Source/Audio/Oscillator/BasicOscillator.h
     Source/Audio/Oscillator/VoiceMath.h
+    Source/Audio/Oscillator/VoiceRenderStats.cpp
+    Source/Audio/Oscillator/VoiceRenderStats.h
     Source/Audio/Analysis/FftAnalyzer.cpp
     Source/Audio/Analysis/FftAnalyzer.h
     Source/Audio/Analysis/AudioFileAnalyzer.cpp
@@ -148,6 +150,8 @@ add_executable(BeatBackendStress
     Source/Audio/Modulation/Lfo.h
     Source/Audio/Oscillator/BasicOscillator.h
     Source/Audio/Oscillator/VoiceMath.h
+    Source/Audio/Oscillator/VoiceRenderStats.cpp
+    Source/Audio/Oscillator/VoiceRenderStats.h
     Source/Audio/Sequencer.cpp
     Source/Audio/Sequencer.h
     Source/Audio/TrackModel.cpp

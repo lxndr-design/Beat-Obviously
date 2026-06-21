@@ -4,10 +4,10 @@
 #include "Modulation/Lfo.h"
 #include "Oscillator/BasicOscillator.h"
 #include "Oscillator/VoiceMath.h"
+#include "Oscillator/VoiceRenderStats.h"
 #include "Wavetable/WavetableVoiceCache.h"
 
 #include <cmath>
-#include <atomic>
 
 namespace beat
 {
@@ -15,24 +15,6 @@ namespace beat
     {
         thread_local InstrumentVoice::NoteAutomationContext* pendingNoteAutomationContexts = nullptr;
         thread_local int pendingNoteAutomationContextCount = 0;
-        std::atomic<int64_t> renderVoiceBlocks { 0 };
-        std::atomic<int64_t> renderVoiceSamples { 0 };
-        std::atomic<int64_t> renderOscillatorSamples { 0 };
-        std::atomic<int64_t> renderWavetableVoiceSamples { 0 };
-        std::atomic<int64_t> renderAetherOscASamples { 0 };
-        std::atomic<int64_t> renderAetherOscBSamples { 0 };
-        std::atomic<int64_t> renderAetherSubSamples { 0 };
-        std::atomic<int64_t> renderAetherNoiseSamples { 0 };
-        std::atomic<int64_t> renderFilterSamples { 0 };
-        std::atomic<int64_t> renderFilterDriveSamples { 0 };
-        std::atomic<int64_t> renderFilterCoefficientUpdates { 0 };
-        std::atomic<int64_t> renderFilterCutoffUpdates { 0 };
-        std::atomic<int64_t> renderFilterResonanceUpdates { 0 };
-        std::atomic<int64_t> renderModulationSamples { 0 };
-        std::atomic<int64_t> renderRealtimeRampSamples { 0 };
-        std::atomic<int64_t> renderOscillatorRateCalculations { 0 };
-        std::atomic<int64_t> renderWavetableFrequencyUpdates { 0 };
-        std::atomic<int64_t> renderWavetablePositionUpdates { 0 };
 
         float clamp01(float v)
         {
@@ -59,26 +41,7 @@ namespace beat
 
     InstrumentVoice::RenderWorkStats InstrumentVoice::consumeRenderWorkStats() noexcept
     {
-        return {
-            renderVoiceBlocks.exchange(0, std::memory_order_relaxed),
-            renderVoiceSamples.exchange(0, std::memory_order_relaxed),
-            renderOscillatorSamples.exchange(0, std::memory_order_relaxed),
-            renderWavetableVoiceSamples.exchange(0, std::memory_order_relaxed),
-            renderAetherOscASamples.exchange(0, std::memory_order_relaxed),
-            renderAetherOscBSamples.exchange(0, std::memory_order_relaxed),
-            renderAetherSubSamples.exchange(0, std::memory_order_relaxed),
-            renderAetherNoiseSamples.exchange(0, std::memory_order_relaxed),
-            renderFilterSamples.exchange(0, std::memory_order_relaxed),
-            renderFilterDriveSamples.exchange(0, std::memory_order_relaxed),
-            renderFilterCoefficientUpdates.exchange(0, std::memory_order_relaxed),
-            renderFilterCutoffUpdates.exchange(0, std::memory_order_relaxed),
-            renderFilterResonanceUpdates.exchange(0, std::memory_order_relaxed),
-            renderModulationSamples.exchange(0, std::memory_order_relaxed),
-            renderRealtimeRampSamples.exchange(0, std::memory_order_relaxed),
-            renderOscillatorRateCalculations.exchange(0, std::memory_order_relaxed),
-            renderWavetableFrequencyUpdates.exchange(0, std::memory_order_relaxed),
-            renderWavetablePositionUpdates.exchange(0, std::memory_order_relaxed),
-        };
+        return VoiceRenderStats::consume();
     }
 
     void InstrumentVoice::prepare(double sr, int blockSize)
@@ -838,24 +801,26 @@ namespace beat
         if (!adsr.isActive())
             clearCurrentNote();
 
-        renderVoiceBlocks.fetch_add(1, std::memory_order_relaxed);
-        renderVoiceSamples.fetch_add(numSamples, std::memory_order_relaxed);
-        renderOscillatorSamples.fetch_add(currentBlockOscillatorSamples, std::memory_order_relaxed);
-        renderWavetableVoiceSamples.fetch_add(currentBlockWavetableVoiceSamples, std::memory_order_relaxed);
-        renderAetherOscASamples.fetch_add(currentBlockAetherOscASamples, std::memory_order_relaxed);
-        renderAetherOscBSamples.fetch_add(currentBlockAetherOscBSamples, std::memory_order_relaxed);
-        renderAetherSubSamples.fetch_add(currentBlockAetherSubSamples, std::memory_order_relaxed);
-        renderAetherNoiseSamples.fetch_add(currentBlockAetherNoiseSamples, std::memory_order_relaxed);
-        renderFilterSamples.fetch_add((int64_t) numSamples * 2, std::memory_order_relaxed);
-        renderFilterDriveSamples.fetch_add(currentBlockFilterDriveSamples, std::memory_order_relaxed);
-        renderFilterCoefficientUpdates.fetch_add(currentBlockFilterCoefficientUpdates, std::memory_order_relaxed);
-        renderFilterCutoffUpdates.fetch_add(currentBlockFilterCutoffUpdates, std::memory_order_relaxed);
-        renderFilterResonanceUpdates.fetch_add(currentBlockFilterResonanceUpdates, std::memory_order_relaxed);
-        renderModulationSamples.fetch_add(modulationSamples, std::memory_order_relaxed);
-        renderRealtimeRampSamples.fetch_add(realtimeRampSamples, std::memory_order_relaxed);
-        renderOscillatorRateCalculations.fetch_add(currentBlockOscillatorRateCalculations, std::memory_order_relaxed);
-        renderWavetableFrequencyUpdates.fetch_add(currentBlockWavetableFrequencyUpdates, std::memory_order_relaxed);
-        renderWavetablePositionUpdates.fetch_add(currentBlockWavetablePositionUpdates, std::memory_order_relaxed);
+        RenderWorkStats blockStats;
+        blockStats.voiceBlocks = 1;
+        blockStats.voiceSamples = numSamples;
+        blockStats.oscillatorSamples = currentBlockOscillatorSamples;
+        blockStats.wavetableVoiceSamples = currentBlockWavetableVoiceSamples;
+        blockStats.aetherOscASamples = currentBlockAetherOscASamples;
+        blockStats.aetherOscBSamples = currentBlockAetherOscBSamples;
+        blockStats.aetherSubSamples = currentBlockAetherSubSamples;
+        blockStats.aetherNoiseSamples = currentBlockAetherNoiseSamples;
+        blockStats.filterSamples = (int64_t) numSamples * 2;
+        blockStats.filterDriveSamples = currentBlockFilterDriveSamples;
+        blockStats.filterCoefficientUpdates = currentBlockFilterCoefficientUpdates;
+        blockStats.filterCutoffUpdates = currentBlockFilterCutoffUpdates;
+        blockStats.filterResonanceUpdates = currentBlockFilterResonanceUpdates;
+        blockStats.modulationSamples = modulationSamples;
+        blockStats.realtimeRampSamples = realtimeRampSamples;
+        blockStats.oscillatorRateCalculations = currentBlockOscillatorRateCalculations;
+        blockStats.wavetableFrequencyUpdates = currentBlockWavetableFrequencyUpdates;
+        blockStats.wavetablePositionUpdates = currentBlockWavetablePositionUpdates;
+        VoiceRenderStats::recordBlock(blockStats);
     }
 
     float InstrumentVoice::shapedEnvelope(float rawEnvelope) noexcept
