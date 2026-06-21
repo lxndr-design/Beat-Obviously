@@ -1,5 +1,7 @@
 #include "InstrumentVoice.h"
 
+#include "Modulation/Lfo.h"
+
 #include <cmath>
 #include <atomic>
 #include <map>
@@ -90,28 +92,6 @@ namespace beat
 
         float nextNoise(juce::uint32& state);
 
-        float lfoValue(int waveform, double phase, float smoothing = 0.0f, bool oneShot = false)
-        {
-            const float p = oneShot ? juce::jlimit(0.0f, 1.0f, (float) phase) : (float) (phase - std::floor(phase));
-            const float sine = std::sin(p * juce::MathConstants<float>::twoPi);
-            float shaped;
-            switch (waveform)
-            {
-                case 1: shaped = p < 0.5f ? p * 4.0f - 1.0f : 3.0f - p * 4.0f; break;
-                case 2: shaped = p * 2.0f - 1.0f; break;
-                case 3: shaped = p < 0.5f ? 1.0f : -1.0f; break;
-                case 0:
-                default: return sine;
-            }
-            const float mix = juce::jlimit(0.0f, 1.0f, smoothing);
-            return shaped + (sine - shaped) * mix;
-        }
-
-        float lfoRouteValue(float raw, bool bipolar) noexcept
-        {
-            return bipolar ? raw : (raw + 1.0f) * 0.5f;
-        }
-
         double deterministicPhaseJitter(juce::uint32 seed) noexcept
         {
             seed ^= seed >> 16;
@@ -149,8 +129,8 @@ namespace beat
             float modWheel,
             float scale) noexcept
         {
-            return (lfoRouteValue(rawLfo, target.lfoBipolar) * target.lfo
-                + lfoRouteValue(rawLfo2, target.lfo2Bipolar) * target.lfo2
+            return (Lfo::routeValue(rawLfo, target.lfoBipolar) * target.lfo
+                + Lfo::routeValue(rawLfo2, target.lfo2Bipolar) * target.lfo2
                 + envRouteValue(env, target.envBipolar) * target.env
                 + envRouteValue(env2, target.env2Bipolar) * target.env2
                 + envRouteValue(velocity, target.velocityBipolar) * target.velocity
@@ -1016,13 +996,13 @@ namespace beat
                 realtimeRampSamples += activeRealtimeRampCount;
                 advanceRealtimeRamps();
             }
-            const float rawLfo = needsLfoValue ? lfoValue(params.lfoWaveform, lfoPhase, params.lfoSmoothing, params.lfoOneShot) : 0.0f;
-            const float rawLfo2 = needsLfo2Value ? lfoValue(params.lfo2Waveform, lfo2Phase, params.lfo2Smoothing, params.lfo2OneShot) : 0.0f;
+            const float rawLfo = needsLfoValue ? Lfo::value(params.lfoWaveform, lfoPhase, params.lfoSmoothing, params.lfoOneShot) : 0.0f;
+            const float rawLfo2 = needsLfo2Value ? Lfo::value(params.lfo2Waveform, lfo2Phase, params.lfo2Smoothing, params.lfo2OneShot) : 0.0f;
             if (needsLfoValue || useDynamicModulation)
                 ++modulationSamples;
-            const float positionLfo = hasPositionMod ? lfoRouteValue(rawLfo, params.lfoPositionBipolar) * clamp01(params.lfoDepth) : 0.0f;
-            const float pitchLfo = hasPitchMod ? lfoRouteValue(rawLfo, params.lfoPitchBipolar) : 0.0f;
-            const float filterLfo = !useDynamicModulation && hasFilterMod ? lfoRouteValue(rawLfo, params.lfoFilterBipolar) : 0.0f;
+            const float positionLfo = hasPositionMod ? Lfo::routeValue(rawLfo, params.lfoPositionBipolar) * clamp01(params.lfoDepth) : 0.0f;
+            const float pitchLfo = hasPitchMod ? Lfo::routeValue(rawLfo, params.lfoPitchBipolar) : 0.0f;
+            const float filterLfo = !useDynamicModulation && hasFilterMod ? Lfo::routeValue(rawLfo, params.lfoFilterBipolar) : 0.0f;
             const float env = params.env1Loop
                 ? env1LoopValue()
                 : shapedEnvelope(adsr.getNextSample());

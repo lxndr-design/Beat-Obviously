@@ -26,6 +26,7 @@ target_sources(Beat PRIVATE
     Source/Audio/Envelope/EnvelopeShaper.h
     Source/Audio/InstrumentVoice.cpp
     Source/Audio/InstrumentVoice.h
+    Source/Audio/Modulation/Lfo.h
     Source/Audio/Analysis/FftAnalyzer.cpp
     Source/Audio/Analysis/FftAnalyzer.h
     Source/Audio/Analysis/AudioFileAnalyzer.cpp
@@ -131,6 +132,7 @@ add_executable(BeatBackendStress
     Source/Audio/Effects/TrackEffectDefaults.h
     Source/Audio/InstrumentVoice.cpp
     Source/Audio/InstrumentVoice.h
+    Source/Audio/Modulation/Lfo.h
     Source/Audio/Sequencer.cpp
     Source/Audio/Sequencer.h
     Source/Audio/TrackModel.cpp

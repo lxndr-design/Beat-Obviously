@@ -4,6 +4,7 @@
 #include "../Source/Audio/Analysis/FftAnalyzer.h"
 #include "../Source/Audio/Envelope/EnvelopeShaper.h"
 #include "../Source/Audio/InstrumentVoice.h"
+#include "../Source/Audio/Modulation/Lfo.h"
 #include "../Source/Audio/Parameters/ParameterIds.h"
 #include "../Source/Audio/Parameters/SynthPatchContract.h"
 #include "../Source/Audio/Realtime/FixedObjectPool.h"
@@ -88,6 +89,35 @@ namespace
                 return false;
         }
         return completed && released < 0.001f;
+    }
+
+    bool stressLfoHelper()
+    {
+        const float sineQuarter = beat::Lfo::value(0, 0.25);
+        const float triangleQuarter = beat::Lfo::value(1, 0.25);
+        const float sawQuarter = beat::Lfo::value(2, 0.25);
+        const float squareQuarter = beat::Lfo::value(3, 0.25);
+        if (!near(sineQuarter, 1.0f, 0.0001f))
+            return false;
+        if (!near(triangleQuarter, 0.0f, 0.0001f))
+            return false;
+        if (!near(sawQuarter, -0.5f, 0.0001f))
+            return false;
+        if (!near(squareQuarter, 1.0f, 0.0001f))
+            return false;
+
+        const float unsmoothed = beat::Lfo::value(3, 0.125, 0.0f);
+        const float smoothed = beat::Lfo::value(3, 0.125, 1.0f);
+        if (!(smoothed < unsmoothed && smoothed > 0.7f))
+            return false;
+
+        const float oneShotHeld = beat::Lfo::value(2, 1.4, 0.0f, true);
+        const float looped = beat::Lfo::value(2, 1.4, 0.0f, false);
+        if (!near(oneShotHeld, 1.0f, 0.0001f) || !near(looped, -0.2f, 0.0001f))
+            return false;
+
+        return near(beat::Lfo::routeValue(-0.5f, true), -0.5f)
+            && near(beat::Lfo::routeValue(-0.5f, false), 0.25f);
     }
 
     beat::Project makeStressProject()
@@ -10483,6 +10513,11 @@ int main()
     if (!stressEnvelopeShaper())
     {
         std::cerr << "Envelope shaper stress failed\n";
+        return 1;
+    }
+    if (!stressLfoHelper())
+    {
+        std::cerr << "LFO helper stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceWavetablePath())
