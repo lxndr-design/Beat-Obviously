@@ -5,6 +5,7 @@
 #include "../Source/Audio/Envelope/EnvelopeShaper.h"
 #include "../Source/Audio/InstrumentVoice.h"
 #include "../Source/Audio/Modulation/Lfo.h"
+#include "../Source/Audio/Oscillator/BasicOscillator.h"
 #include "../Source/Audio/Parameters/ParameterIds.h"
 #include "../Source/Audio/Parameters/SynthPatchContract.h"
 #include "../Source/Audio/Realtime/FixedObjectPool.h"
@@ -118,6 +119,38 @@ namespace
 
         return near(beat::Lfo::routeValue(-0.5f, true), -0.5f)
             && near(beat::Lfo::routeValue(-0.5f, false), 0.25f);
+    }
+
+    bool stressBasicOscillatorHelper()
+    {
+        const double delta = 0.01;
+        if (!near(beat::BasicOscillator::sample(0, 0.25, delta), 1.0f))
+            return false;
+        if (!near(beat::BasicOscillator::sample(3, 0.5, delta), -1.0f))
+            return false;
+        if (!near(beat::BasicOscillator::sample(1, 0.5, delta), 0.0f))
+            return false;
+        if (!near(beat::BasicOscillator::sample(2, 0.25, delta), 1.0f))
+            return false;
+
+        const float sawAtEdge = beat::BasicOscillator::sample(1, 0.001, delta);
+        const float sawAwayFromEdge = beat::BasicOscillator::sample(1, 0.25, delta);
+        if (!(sawAtEdge > -0.25f && sawAtEdge < 0.25f && near(sawAwayFromEdge, -0.5f)))
+            return false;
+
+        const float squareAtEdge = beat::BasicOscillator::sample(2, 0.001, delta);
+        const float squareAwayFromEdge = beat::BasicOscillator::sample(2, 0.25, delta);
+        if (!(squareAtEdge > 0.0f && squareAtEdge < 0.5f && squareAwayFromEdge > 0.99f))
+            return false;
+
+        for (int i = 0; i < 128; ++i)
+        {
+            const float noise = beat::BasicOscillator::sample(4, (double) i / 128.0, delta);
+            if (!std::isfinite(noise) || noise < -1.0001f || noise > 1.0001f)
+                return false;
+        }
+
+        return true;
     }
 
     beat::Project makeStressProject()
@@ -10518,6 +10551,11 @@ int main()
     if (!stressLfoHelper())
     {
         std::cerr << "LFO helper stress failed\n";
+        return 1;
+    }
+    if (!stressBasicOscillatorHelper())
+    {
+        std::cerr << "Basic oscillator helper stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceWavetablePath())

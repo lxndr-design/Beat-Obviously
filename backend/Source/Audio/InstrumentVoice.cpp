@@ -1,6 +1,7 @@
 #include "InstrumentVoice.h"
 
 #include "Modulation/Lfo.h"
+#include "Oscillator/BasicOscillator.h"
 
 #include <cmath>
 #include <atomic>
@@ -46,48 +47,6 @@ namespace beat
             if (clamped >= 8192)
                 return (float) (clamped - 8192) / 8191.0f;
             return (float) (clamped - 8192) / 8192.0f;
-        }
-
-        float polyBlep(double phase, double phaseDelta) noexcept
-        {
-            const auto dt = juce::jlimit(1.0e-9, 0.5, std::abs(phaseDelta));
-            if (phase < dt)
-            {
-                const auto t = phase / dt;
-                return (float) (t + t - t * t - 1.0);
-            }
-            if (phase > 1.0 - dt)
-            {
-                const auto t = (phase - 1.0) / dt;
-                return (float) (t * t + t + t + 1.0);
-            }
-            return 0.0f;
-        }
-
-        float oscillatorSample(int waveform, double phase, double phaseDelta)
-        {
-            const float p = (float) (phase - std::floor(phase));
-            switch (waveform)
-            {
-                case 0:  return std::sin(p * juce::MathConstants<float>::twoPi);
-                case 1:
-                {
-                    auto value = 2.0f * p - 1.0f;
-                    value -= polyBlep(p, phaseDelta);
-                    return value;
-                }
-                case 2:
-                {
-                    auto value = p < 0.5f ? 1.0f : -1.0f;
-                    value += polyBlep(p, phaseDelta);
-                    auto shifted = p + 0.5f;
-                    if (shifted >= 1.0f) shifted -= 1.0f;
-                    value -= polyBlep(shifted, phaseDelta);
-                    return value;
-                }
-                case 3:  return 4.f * std::abs(p - 0.5f) - 1.f;
-                default: return juce::Random::getSystemRandom().nextFloat() * 2.f - 1.f;
-            }
         }
 
         float nextNoise(juce::uint32& state);
@@ -1050,7 +1009,7 @@ namespace beat
                     ? renderWavetableStack(currentFrequency, positionLfo + dynamicOscAPosition, dynamicUnisonDetune, dynamicUnisonSpread)
                     : params.waveform == 4
                         ? nextNoise(noiseState)
-                        : oscillatorSample(params.waveform, phase, currentPhaseDelta);
+                        : BasicOscillator::sample(params.waveform, phase, currentPhaseDelta);
                 if (params.waveform != 5)
                     ++currentBlockOscillatorSamples;
                 raw = { mono, mono };
@@ -1538,7 +1497,7 @@ namespace beat
             }
             else
             {
-                value = oscillatorSample(osc.waveform, phase * rate + phaseOffset, (frequencyHz * rate) / sampleRate);
+                value = BasicOscillator::sample(osc.waveform, phase * rate + phaseOffset, (frequencyHz * rate) / sampleRate);
                 ++currentBlockOscillatorSamples;
                 ++componentSampleCounter;
             }
@@ -1580,7 +1539,7 @@ namespace beat
         {
             ++currentBlockOscillatorSamples;
             ++currentBlockAetherSubSamples;
-            add(oscillatorSample(params.aetherSub.waveform, phase * cachedAetherSubRate, (frequencyHz * cachedAetherSubRate) / sampleRate),
+            add(BasicOscillator::sample(params.aetherSub.waveform, phase * cachedAetherSubRate, (frequencyHz * cachedAetherSubRate) / sampleRate),
                 params.aetherSub.level,
                 0.0f,
                 centerPanGains,
