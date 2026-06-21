@@ -230,6 +230,8 @@
   margin: 0 -4px;
   width: calc(100% + 8px);
   border-bottom: var(--border-fg);
+  touch-action: none;
+  cursor: crosshair;
 }
 
 .frameWaveformPath {
@@ -269,6 +271,17 @@
   bottom: 0;
   min-height: 1px;
   background: color-mix(in srgb, var(--color-fg) 78%, transparent);
+}
+
+.harmonicTools {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin: -1px -4px 1px;
+  padding: 3px 4px;
+  border-bottom: var(--border-fg);
 }
 
 .customFrame :global(.knob) {

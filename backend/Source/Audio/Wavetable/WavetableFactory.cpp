@@ -186,14 +186,22 @@ namespace beat
                 + (-p0 + 3.0f * p1 - 3.0f * p2 + p3) * t3);
         }
 
+        float morphMix(float mix, float morph) noexcept
+        {
+            const float t = juce::jlimit(0.0f, 1.0f, mix);
+            const float eased = t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
+            return t + (eased - t) * juce::jlimit(0.0f, 1.0f, morph);
+        }
+
         WavetableFactory::CustomFrame interpolateCustomFrame(
             const std::array<WavetableFactory::CustomFrame, 4>& frames,
             float normalizedFrame,
-            bool smoothInterpolation)
+            bool smoothInterpolation,
+            float morph)
         {
             const float scaled = juce::jlimit(0.0f, 1.0f, normalizedFrame) * 3.0f;
             const int base = juce::jlimit(0, 2, (int) std::floor(scaled));
-            const float mix = scaled - (float) base;
+            const float mix = morphMix(scaled - (float) base, morph);
             const auto& a = frames[(size_t) base];
             const auto& b = frames[(size_t) base + 1];
             if (smoothInterpolation)
@@ -288,15 +296,15 @@ namespace beat
 
     Wavetable WavetableFactory::createCustom(const std::array<CustomFrame, 4>& frames, int frameCount, int frameSize)
     {
-        return createCustom(frames, 0.0f, WavetableWarpMode::Shape, false, frameCount, frameSize);
+        return createCustom(frames, 0.0f, WavetableWarpMode::Shape, false, 0.0f, frameCount, frameSize);
     }
 
     Wavetable WavetableFactory::createCustom(const std::array<CustomFrame, 4>& frames, bool smoothInterpolation, int frameCount, int frameSize)
     {
-        return createCustom(frames, 0.0f, WavetableWarpMode::Shape, smoothInterpolation, frameCount, frameSize);
+        return createCustom(frames, 0.0f, WavetableWarpMode::Shape, smoothInterpolation, 0.0f, frameCount, frameSize);
     }
 
-    Wavetable WavetableFactory::createCustom(const std::array<CustomFrame, 4>& frames, float warp, WavetableWarpMode warpMode, bool smoothInterpolation, int frameCount, int frameSize)
+    Wavetable WavetableFactory::createCustom(const std::array<CustomFrame, 4>& frames, float warp, WavetableWarpMode warpMode, bool smoothInterpolation, float morph, int frameCount, int frameSize)
     {
         frameCount = juce::jlimit(1, 64, frameCount);
         frameSize = juce::jlimit(32, 32768, frameSize);
@@ -307,7 +315,7 @@ namespace beat
         for (int frame = 0; frame < frameCount; ++frame)
         {
             const float frameNorm = frameCount <= 1 ? 0.0f : (float) frame / (float) (frameCount - 1);
-            const auto customFrame = interpolateCustomFrame(frames, frameNorm, smoothInterpolation);
+            const auto customFrame = interpolateCustomFrame(frames, frameNorm, smoothInterpolation, morph);
             const int frameStart = frame * frameSize;
 
             for (int i = 0; i < frameSize; ++i)

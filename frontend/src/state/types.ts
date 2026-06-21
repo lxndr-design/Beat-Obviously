@@ -426,6 +426,8 @@ export interface WavemapDefinition {
   name: string;
   kind: WavemapKind;
   interpolation: WavemapInterpolation;
+  /** 0..1 frame-morph curve amount; older patches omit this and render as 0. */
+  morph: number;
   source: WavemapSource;
   frames: CustomWavetableFrame[];
 }

@@ -2,7 +2,7 @@ juce_add_gui_app(Beat
     PRODUCT_NAME "Beat"
     COMPANY_NAME "Beat"
     BUNDLE_ID com.beat.app
-    VERSION 0.1.0
+    VERSION ${BEAT_VERSION}
     ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/Assets/BeatIcon.png"
     ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/Assets/BeatIcon.png"
     NEEDS_WEB_BROWSER TRUE

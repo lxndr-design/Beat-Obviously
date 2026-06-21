@@ -46,7 +46,7 @@ Purpose: make sure we do not regress the recovered project while adding a large 
 Deliverables:
 
 - Add this roadmap.
-- Keep `npm run verify:design-system`, `npm run typecheck`, `npm run build`, and `build-native/bin/BeatBackendStress` green.
+- Keep `npm run verify:non-native` and `build-native/bin/BeatBackendStress` green.
 - Add a single command/script later if useful, but do not block the roadmap on test orchestration.
 - Confirm current DAW percentage in `docs/serum-style-synth-roadmap.md` after each major slice.
 
@@ -345,7 +345,10 @@ Purpose: make “100%” defensible.
 
 Required verification:
 
+- `npm run verify:non-native` for the full Node/Vite/Solid gate.
 - `npm run verify:design-system`
+- `npm run verify:version`
+- `npm run verify:audio-boundary`
 - `npm run typecheck`
 - `npm run build`
 - `npm run verify:daw`

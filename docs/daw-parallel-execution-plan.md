@@ -215,7 +215,7 @@ Single-owner files:
 ## Integration Order
 
 1. Land Wave 1 feature-local UI and verifier changes.
-2. Run `npm run verify:design-system`, `npm run verify:interactions`, `npm run verify:daw`, `npm run typecheck`, and `npm run build`.
+2. Run `npm run verify:non-native`; for narrower handoffs, run `npm run verify:design-system`, `npm run verify:interactions`, `npm run verify:daw`, `npm run typecheck`, and `npm run build`.
 3. Land recording frontend model fields and document roundtrip coverage.
 4. Land recording IPC lifecycle and backend workflow.
 5. Land recording UI surfaces: Preferences, Track Header/Details, Transport, Take Review.
@@ -230,12 +230,12 @@ Single-owner files:
 | Lane | Minimum checks |
 | --- | --- |
 | Arrangement interaction | `npm run verify:interactions`, `npm run verify:daw`, `npm run typecheck` |
-| UI kit verifier | `npm run verify:design-system`, `npm run typecheck` |
+| UI kit verifier | `npm run verify:design-system`, `npm run verify:version`, `npm run typecheck` |
 | Project Health UI | `npm run typecheck`, `npm run build` |
 | Home asset UI | `npm run typecheck`, `npm run build` |
 | Recording contract/backend | `npm run verify:documents`, `npm run typecheck`, `cmake --build build-native --target BeatBackendStress`, `build-native/bin/BeatBackendStress` |
 | Mixer/routing/freeze backend | `npm run verify:daw`, `npm run verify:documents`, `cmake --build build-native --target BeatBackendStress`, `build-native/bin/BeatBackendStress` |
-| Export/recovery | `npm run verify:documents`, `npm run verify:native-doc`, `npm run typecheck`, `build-native/bin/BeatBackendStress` |
+| Export/recovery | `npm run verify:documents`, `npm run verify:native-doc`, `npm run verify:audio-boundary`, `npm run typecheck`, `build-native/bin/BeatBackendStress` |
 
 ## Handoff Rule
 

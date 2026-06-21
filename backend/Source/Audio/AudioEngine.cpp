@@ -1447,6 +1447,7 @@ namespace beat
             target.warp = source.warp;
             target.warpMode = source.warpMode;
             target.smoothInterpolation = source.smoothInterpolation;
+            target.morph = source.morph;
             target.unison = source.unison;
             target.detuneCents = source.detuneCents;
             target.blend = source.blend;
@@ -1567,6 +1568,7 @@ namespace beat
             instrument.wavetableWarp,
             instrument.wavetableWarpMode,
             false,
+            0.0f,
             instrument.wavetableUnison,
             instrument.wavetableDetuneCents,
             instrument.wavetableBlend,

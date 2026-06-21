@@ -49,10 +49,11 @@ Initial defaults:
 
 Custom wavemaps are stored in `metadata.wavemaps` with the legacy mirror `metadata.customWavetables` kept for older patches. Each wavemap owns four additive frame objects. Older saved frames that omit newer fields must use the defaults below.
 
-The wavemap-level `interpolation` field controls how Beat generates intermediate custom frames between the four saved controls. `linear` uses straight parameter interpolation. `smooth` uses bounded cubic interpolation in browser preview and native wavetable generation, and must be part of native table cache identity.
+The wavemap-level `interpolation` field controls how Beat generates intermediate custom frames between the four saved controls. `linear` uses straight parameter interpolation. `smooth` uses bounded cubic interpolation in browser preview and native wavetable generation, and must be part of native table cache identity. The wavemap-level `morph` field is a normalized frame-morph curve amount; missing values default to `0` for older patches.
 
 | Field | Type | Range | Default | Notes |
 | --- | --- | --- | --- | --- |
+| `morph` | normalized | `0..1` | `0` | Wavemap-level frame-morph amount. Higher values ease the scan between saved frames for more animated transitions. |
 | `brightness` | normalized | `0..1` | frame default | Harmonic rolloff and upper-harmonic emphasis. |
 | `even` | normalized | `0..1` | frame default | Even-harmonic participation. |
 | `fold` | normalized | `0..1` | frame default | Fold peak and harmonic motion amount. |

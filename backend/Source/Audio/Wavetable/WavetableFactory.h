@@ -64,6 +64,7 @@ namespace beat
                                       float warp = 0.0f,
                                       WavetableWarpMode warpMode = WavetableWarpMode::Shape,
                                       bool smoothInterpolation = false,
+                                      float morph = 0.0f,
                                       int frameCount = defaultFrameCount,
                                       int frameSize = defaultFrameSize);
     };

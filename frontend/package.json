@@ -12,13 +12,16 @@
     "verify:daw": "node ../scripts/verify-daw-core.mjs",
     "verify:documents": "node ../scripts/verify-document-roundtrip.mjs",
     "verify:native-doc": "node ../scripts/verify-native-document-registration.mjs",
+    "verify:native-toolchain": "node ../scripts/verify-native-toolchain.mjs",
     "verify:design-system": "node ../scripts/verify-design-system.mjs",
+    "verify:version": "node ../scripts/verify-version.mjs",
     "verify:audio-boundary": "node ../scripts/verify-audio-boundary.mjs",
     "verify:synth": "node ../scripts/verify-synth-roundtrip.mjs",
     "verify:node-instrument": "node ../scripts/verify-node-instrument-editor.mjs",
     "verify:track-interactions": "node ../scripts/verify-track-interactions.mjs",
     "verify:drums": "node ../scripts/verify-drum-generation.mjs",
     "verify:interactions": "node ../scripts/verify-frontend-interactions.mjs",
+    "verify:non-native": "npm run verify:version && npm run verify:design-system && npm run verify:audio-boundary && npm run typecheck && npm run verify:synth && npm run verify:daw && npm run verify:documents && npm run verify:track-interactions && npm run verify:interactions && npm run verify:node-instrument && npm run verify:drums && npm run build",
     "benchmark:midi-stress": "node ../scripts/benchmark-dense-midi.mjs"
   },
   "dependencies": {

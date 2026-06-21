@@ -302,7 +302,7 @@ namespace beat
                     ? WavetableWarpMode::Pinch
                     : WavetableWarpMode::Shape;
             if (config.custom || config.bank == 5)
-                return WavetableFactory::createCustom(factoryCustomFrames(config), config.warp, warpMode, config.smoothInterpolation);
+                return WavetableFactory::createCustom(factoryCustomFrames(config), config.warp, warpMode, config.smoothInterpolation, config.morph);
 
             return WavetableFactory::createBasic(basicShapeForBank(config.bank), config.warp, warpMode);
         }
@@ -315,7 +315,8 @@ namespace beat
                 << "|custom=" << (custom ? 1 : 0)
                 << "|warp=" << juce::String(juce::jlimit(0.0f, 1.0f, config.warp), 4)
                 << "|warpMode=" << juce::jlimit(0, 2, config.warpMode)
-                << "|smooth=" << (config.smoothInterpolation ? 1 : 0);
+                << "|smooth=" << (config.smoothInterpolation ? 1 : 0)
+                << "|morph=" << juce::String(juce::jlimit(0.0f, 1.0f, config.morph), 4);
             if (custom)
             {
                 for (const auto& frame : config.customFrames)

@@ -543,6 +543,7 @@ namespace beat
             wavemap->setProperty("name", name);
             wavemap->setProperty("kind", "resynthesized");
             wavemap->setProperty("interpolation", "smooth");
+            wavemap->setProperty("morph", 0.42);
             wavemap->setProperty("source", juce::var(source.get()));
             wavemap->setProperty("frames", frames);
             return juce::var(wavemap.get());
@@ -1313,6 +1314,7 @@ namespace beat
             fallback.smoothInterpolation = (bool) value.getProperty(
                 "smoothInterpolation",
                 value.getProperty("interpolation", fallback.smoothInterpolation ? "smooth" : "linear").toString() == "smooth");
+            fallback.morph = normalizedParam(value, "morph", fallback.morph);
             fallback.unison = juce::jlimit(1, 8, (int) value.getProperty("unison", fallback.unison));
             fallback.detuneCents = floatParam(value, "detuneCents", fallback.detuneCents, 0.0f, 100.0f);
             fallback.blend = normalizedParam(value, "blend", fallback.blend);

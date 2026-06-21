@@ -199,7 +199,7 @@ interface SynthStoreState {
   resetDraft: () => void;
   setWavemap: (definition: WavemapDefinition) => void;
   updateCustomWavetableFrame: (id: string, frameIndex: number, patch: Partial<CustomWavetableFrame>) => void;
-  updateWavemapMetadata: (id: string, patch: Partial<Pick<WavemapDefinition, "name" | "interpolation" | "source">>) => void;
+  updateWavemapMetadata: (id: string, patch: Partial<Pick<WavemapDefinition, "name" | "interpolation" | "morph" | "source">>) => void;
   updateMacroDefinition: (id: MacroId, patch: Partial<Omit<SynthMacroDefinition, "id">>) => void;
   setParameter: (id: SynthParameterId, value: SynthParameterValue) => void;
   setNumericParameter: (id: SynthParameterId, value: number) => void;
@@ -229,6 +229,7 @@ export function createDefaultCustomWavetable(id = DEFAULT_CUSTOM_WAVETABLE_ID): 
     name: "Custom",
     kind: "harmonic-sketch",
     interpolation: "linear",
+    morph: 0.28,
     source: {
       kind: "drawn",
       label: "Drawn wavemap",
@@ -264,6 +265,7 @@ export function createWavemapFromAudioSamples(
     name,
     kind: "resynthesized",
     interpolation: "smooth",
+    morph: 0.42,
     source: {
       kind: source.kind === "imported-audio" ? "imported-audio" : "resynthesized",
       label: source.label ?? "Audio resynthesis",
@@ -276,6 +278,27 @@ export function createWavemapFromAudioSamples(
     },
     frames,
   });
+}
+
+export function deriveWavemapFrameFromDrawnWaveform(
+  frame: Partial<CustomWavetableFrame>,
+  samples: ArrayLike<number>,
+): CustomWavetableFrame {
+  const source = sanitizeCustomWavetableFrame(frame);
+  const analyzed = analyzeSamplesToWavemapFrame(samples, 0, samples.length, source.id ?? "user.drawn.frame", 0);
+  return sanitizeCustomWavetableFrame({
+    ...source,
+    brightness: analyzed.brightness,
+    even: analyzed.even,
+    fold: analyzed.fold,
+    formant: analyzed.formant,
+    notch: analyzed.notch,
+    skew: analyzed.skew,
+    tilt: analyzed.tilt,
+    focus: analyzed.focus,
+    phase: analyzed.phase,
+    partials: analyzed.partials,
+  }, source);
 }
 
 export function normalizeWavemapFrames(definition: WavemapDefinition): WavemapDefinition {
@@ -354,6 +377,38 @@ export function evolveWavemapFrames(
   });
 }
 
+export function drawHarmonicPartialLine(
+  partials: unknown,
+  fromIndex: number,
+  fromValue: number,
+  toIndex: number,
+  toValue: number,
+): number[] {
+  const next = sanitizeCustomWavetablePartials(partials) ?? Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, () => 0);
+  const startIndex = Math.max(0, Math.min(CUSTOM_WAVETABLE_PARTIAL_COUNT - 1, Math.round(fromIndex)));
+  const endIndex = Math.max(0, Math.min(CUSTOM_WAVETABLE_PARTIAL_COUNT - 1, Math.round(toIndex)));
+  const startValue = clamp01(fromValue);
+  const endValue = clamp01(toValue);
+  const direction = startIndex <= endIndex ? 1 : -1;
+  const distance = Math.max(1, Math.abs(endIndex - startIndex));
+  for (let index = startIndex; direction > 0 ? index <= endIndex : index >= endIndex; index += direction) {
+    const t = Math.abs(index - startIndex) / distance;
+    next[index] = clamp01(startValue + (endValue - startValue) * t);
+  }
+  return next;
+}
+
+export function smoothHarmonicPartials(partials: unknown, amount = 0.5): number[] {
+  const source = sanitizeCustomWavetablePartials(partials) ?? Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, () => 0);
+  const mix = clamp01(amount);
+  return source.map((value, index) => {
+    const previous = source[Math.max(0, index - 1)] ?? value;
+    const next = source[Math.min(CUSTOM_WAVETABLE_PARTIAL_COUNT - 1, index + 1)] ?? value;
+    const smoothed = previous * 0.25 + value * 0.5 + next * 0.25;
+    return clamp01(value + (smoothed - value) * mix);
+  });
+}
+
 function spreadFrameValues(values: number[], targetMin: number, targetMax: number, fallback: number[]): number[] {
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -420,7 +475,8 @@ function analyzeSamplesToWavemapFrame(
   const normalizedDerivative = derivative / length;
   const zeroCrossRate = zeroCrossings / length;
   const asymmetry = Math.abs(positiveEnergy - negativeEnergy) / Math.max(0.0001, positiveEnergy + negativeEnergy);
-  const partials = analyzeSamplesToHarmonicPartials(samples, safeStart, safeEnd);
+  const spectrum = analyzeSamplesToHarmonicSpectrum(samples, safeStart, safeEnd);
+  const partials = spectrum.partials;
   const tilt = estimateSpectralTiltFromPartials(partials);
   return {
     id: `${wavemapId}.frame.${frameIndex + 1}`,
@@ -434,7 +490,7 @@ function analyzeSamplesToWavemapFrame(
     skew: sanitizeBipolar((zeroCrossRate * 10 - averageAbs) * 0.22 + (rms - 0.28) * 0.35, 0),
     tilt,
     focus: clamp01(0.18 + normalizedDerivative * 2.1 + Math.abs(tilt) * 0.24 + asymmetry * 0.18),
-    phase: sanitizeBipolar((positiveEnergy >= negativeEnergy ? 1 : -1) * clamp01(asymmetry + zeroCrossRate * 9) * 0.8, 0),
+    phase: sanitizeBipolar(spectrum.dominantPhase / Math.PI, 0),
     partials,
   };
 }
@@ -445,10 +501,15 @@ function estimateSpectralTiltFromPartials(partials: number[]): number {
   return sanitizeBipolar((high - low) / Math.max(0.001, high + low), 0);
 }
 
-function analyzeSamplesToHarmonicPartials(samples: ArrayLike<number>, start: number, end: number): number[] {
+function analyzeSamplesToHarmonicSpectrum(samples: ArrayLike<number>, start: number, end: number): {
+  partials: number[];
+  dominantHarmonic: number;
+  dominantPhase: number;
+} {
   const length = Math.max(1, end - start);
   const stride = Math.max(1, Math.floor(length / 1024));
   const count = Math.max(1, Math.ceil(length / stride));
+  const phases: number[] = [];
   const magnitudes = Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, (_, harmonicIndex) => {
     const harmonic = harmonicIndex + 1;
     let real = 0;
@@ -464,10 +525,19 @@ function analyzeSamplesToHarmonicPartials(samples: ArrayLike<number>, start: num
       windowSum += window;
       sampleIndex += 1;
     }
+    phases[harmonicIndex] = Math.atan2(real, -imag);
     return Math.sqrt(real * real + imag * imag) / Math.max(0.0001, windowSum);
   });
   const peak = Math.max(...magnitudes, 0.0001);
-  return magnitudes.map((value) => clamp01(Math.sqrt(value / peak)));
+  let dominantIndex = 0;
+  for (let index = 1; index < magnitudes.length; index += 1) {
+    if (magnitudes[index] > magnitudes[dominantIndex]) dominantIndex = index;
+  }
+  return {
+    partials: magnitudes.map((value) => clamp01(Math.sqrt(value / peak))),
+    dominantHarmonic: dominantIndex + 1,
+    dominantPhase: phases[dominantIndex] ?? 0,
+  };
 }
 
 export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterValue> = {
@@ -1488,6 +1558,7 @@ export function normalizeCustomWavetable(value: Partial<CustomWavetableDefinitio
     name: typeof value.name === "string" && value.name.trim() ? value.name.trim().slice(0, 48) : fallback.name,
     kind: value.kind === "resynthesized" ? "resynthesized" : "harmonic-sketch",
     interpolation: value.interpolation === "smooth" ? "smooth" : "linear",
+    morph: sanitize01(value.morph, 0),
     source: sanitizeWavemapSource(value.source, fallback.source),
     frames,
   };

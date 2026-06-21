@@ -183,6 +183,7 @@ namespace beat
 
             const auto definition = objectProperty(customWavetables, id, {});
             config.smoothInterpolation = objectProperty(definition, "interpolation", "linear").toString() == "smooth";
+            config.morph = juce::jlimit(0.0f, 1.0f, (float) (double) objectProperty(definition, "morph", config.morph));
             const auto frames = objectProperty(definition, "frames", {});
             if (auto* frameArray = frames.getArray())
             {

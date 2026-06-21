@@ -107,6 +107,20 @@ backend/
 - `Persistence` should serialize/deserialize versioned project and patch state.
 - `Model` should hold plain data structures used by persistence, IPC, and audio snapshots.
 
+## Release Version Ownership
+
+- `VERSION` is the canonical Beat app release version.
+- Root CMake and the JUCE app bundle read `BEAT_VERSION` from `VERSION`.
+- `frontend/package.json` and `frontend/package-lock.json` must stay in sync with `VERSION`.
+- Run `npm run verify:version` from `frontend/` before packaging or cutting a release.
+- App release versioning is separate from project, patch, effect, plugin, and wavemap `schemaVersion` fields, which track data compatibility.
+
+## Native Toolchain Gate
+
+- `npm run verify:non-native` is the Xcode-free frontend/document/synth verification path.
+- `npm run verify:native-toolchain` checks the local macOS developer directory, SDK, `git`, and `cmake` before native build or release work.
+- Native build, `BeatBackendStress`, native document registration, commit, and push are not trustworthy until the active developer directory and macOS SDK are available.
+
 ## Frontend Current Structure
 
 ```text

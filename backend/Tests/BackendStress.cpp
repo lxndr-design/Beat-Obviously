@@ -8875,9 +8875,12 @@ namespace
             }};
             const auto custom = beat::WavetableFactory::createCustom(frames, 8, 2048);
             const auto smoothCustom = beat::WavetableFactory::createCustom(frames, true, 8, 2048);
+            const auto morphedCustom = beat::WavetableFactory::createCustom(frames, 0.0f, beat::WavetableWarpMode::Shape, false, 0.95f, 8, 2048);
             if (!custom.isValid() || custom.getFrameCount() != 8 || custom.getFrameSize() != 2048)
                 return false;
             if (!smoothCustom.isValid() || smoothCustom.getFrameCount() != custom.getFrameCount() || smoothCustom.getFrameSize() != custom.getFrameSize())
+                return false;
+            if (!morphedCustom.isValid() || morphedCustom.getFrameCount() != custom.getFrameCount() || morphedCustom.getFrameSize() != custom.getFrameSize())
                 return false;
 
             double interpolationDiff = 0.0;
@@ -8891,6 +8894,18 @@ namespace
                 interpolationDiff += std::abs((double) linear - (double) smooth);
             }
             if (interpolationDiff / (double) custom.getFrameSize() < 0.0004)
+                return false;
+
+            double morphDiff = 0.0;
+            for (int i = 0; i < custom.getFrameSize(); ++i)
+            {
+                const float linear = custom.getSample(probeFrame, i);
+                const float morphed = morphedCustom.getSample(probeFrame, i);
+                if (!std::isfinite(linear) || !std::isfinite(morphed))
+                    return false;
+                morphDiff += std::abs((double) linear - (double) morphed);
+            }
+            if (morphDiff / (double) custom.getFrameSize() < 0.0002)
                 return false;
 
             auto flatTiltFrames = frames;
@@ -9200,6 +9215,7 @@ namespace
 	                "id": "user.custom",
 	                "name": "Verifier Custom",
 	                "interpolation": "smooth",
+	                "morph": 0.62,
 	                "frames": [
 	                  { "brightness": 0.12, "even": 0.04, "fold": 0.0, "formant": 0.06, "notch": 0.04, "skew": -0.24, "tilt": -0.55, "focus": 0.18, "phase": 0.0, "partials": [0.82, 0.12, 0.0, 0.36] },
 	                  { "brightness": 0.38, "even": 0.18, "fold": 0.2, "formant": 0.22, "notch": 0.12, "skew": -0.08, "tilt": -0.15, "focus": 0.36, "phase": 0.25, "partials": [0.22, 0.74, 0.18, 0.0, 0.46] },
@@ -9222,6 +9238,8 @@ namespace
 	        if (!near(customInstrument.aether.oscA.wavetable.customFrames[3].fold, 0.68f))
 	            return false;
 	        if (!customInstrument.aether.oscA.wavetable.smoothInterpolation)
+	            return false;
+	        if (!near(customInstrument.aether.oscA.wavetable.morph, 0.62f))
 	            return false;
 	        if (!near(customInstrument.aether.oscA.wavetable.customFrames[2].formant, 0.48f))
 	            return false;

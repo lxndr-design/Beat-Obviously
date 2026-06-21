@@ -39,6 +39,7 @@ function lineEntries(source) {
 const appPath = join(frontendSrc, "App.solid.tsx");
 const timelinePath = join(frontendSrc, "audio", "TimelineMidiPlayback.solid.tsx");
 const transportActionsPath = join(frontendSrc, "audio", "transportActions.ts");
+const wavemapResynthesisPath = join(frontendSrc, "audio", "wavemapResynthesis.ts");
 const schemaPath = join(frontendSrc, "ipc", "schema.ts");
 const bridgePath = join(frontendSrc, "ipc", "bridge.ts");
 const backendSchemaPath = join(repoRoot, "backend", "Source", "Ipc", "Schema.h");
@@ -48,6 +49,7 @@ for (const requiredPath of [
   appPath,
   timelinePath,
   transportActionsPath,
+  wavemapResynthesisPath,
   schemaPath,
   bridgePath,
   backendSchemaPath,
@@ -73,6 +75,19 @@ if (existsSync(transportActionsPath)) {
   }
   if (!/if \(!isNative\(\)\) primeTimelineAudio\(\);/.test(source)) {
     fail("Transport play/restart must not prime WebAudio when native transport is active.");
+  }
+}
+
+if (existsSync(wavemapResynthesisPath)) {
+  const source = read(wavemapResynthesisPath);
+  if (!source.includes('import { isNative, send } from "../ipc/bridge";')) {
+    fail("Wavemap resynthesis must import native IPC helpers.");
+  }
+  if (!source.includes('kind: "instrument.resynthesizeWavemap"')) {
+    fail("Wavemap resynthesis must prefer native instrument.resynthesizeWavemap when available.");
+  }
+  if (!/if \(isNative\(\) && audioFile\.path && !audioFile\.path\.startsWith\("data:"\)\)/.test(source)) {
+    fail("Wavemap resynthesis WebAudio decode must remain behind the native-file IPC guard.");
   }
 }
 
@@ -123,6 +138,7 @@ const webAudioAllowlist = new Set([
   "frontend/src/audio/synthWorkletPreview.ts",
   "frontend/src/audio/timelineAudio.ts",
   "frontend/src/audio/TimelineMidiPlayback.solid.tsx",
+  "frontend/src/audio/wavemapResynthesis.ts",
   "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx",
   "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx",
   "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx",

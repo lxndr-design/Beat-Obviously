@@ -64,6 +64,7 @@ namespace beat
                 float warp { 0.2f };
                 int warpMode { 0 };
                 bool smoothInterpolation { false };
+                float morph { 0.0f };
                 int unison { 1 };
                 float detuneCents { 12.0f };
                 float blend { 0.5f };

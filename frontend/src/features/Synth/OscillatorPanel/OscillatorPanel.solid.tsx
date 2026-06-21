@@ -11,12 +11,15 @@ import {
   DEFAULT_CUSTOM_WAVETABLE_ID,
   FACTORY_WAVETABLES,
   createDefaultCustomWavetable,
+  deriveWavemapFrameFromDrawnWaveform,
+  drawHarmonicPartialLine,
   evolveWavemapFrames,
   getBooleanParam,
   getNumberParam,
   getStringParam,
   modulationSummaryForTarget,
   normalizeWavemapFrames,
+  smoothHarmonicPartials,
   synthDraftToPreviewInstrument,
   useSynthStore,
   type ModulationTargetId,
@@ -260,6 +263,18 @@ function OscillatorRow(props: {
                   <div class="ds-section-title">{customTable().name} Wavemap</div>
                   <div class={styles.wavemapMeta}>
                     <span>{customTable().source.label ?? sourceLabel(customTable().source.kind)}</span>
+                    <Knob
+                      size="sm"
+                      label="Morph"
+                      value={customTable().morph}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      defaultValue={0}
+                      formatValue={formatPercent}
+                      parseValue={parsePercent}
+                      onChange={(morph) => updateWavemapMetadata(customTable().id, { morph })}
+                    />
                     <Button
                       size="xs"
                       disabled={resynthesizing()}
@@ -303,7 +318,24 @@ function OscillatorRow(props: {
                           {frame.label ?? CUSTOM_WAVETABLE_FRAME_LABELS[index()] ?? index() + 1}
                           <span>{Math.round((frame.position ?? index() / 3) * 100)}</span>
                         </div>
-                        <MiniWaveform samples={renderCustomFramePreview(frame)} />
+                        <MiniWaveform
+                          samples={renderCustomFramePreview(frame)}
+                          onDrawSamples={(samples) =>
+                            updateCustomWavetableFrame(customTable().id, index(), deriveWavemapFrameFromDrawnWaveform(frame, samples))
+                          }
+                        />
+                        <Knob
+                          size="sm"
+                          label="Scan"
+                          value={frame.position ?? index() / Math.max(1, customTable().frames.length - 1)}
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          defaultValue={index() / Math.max(1, customTable().frames.length - 1)}
+                          formatValue={formatPercent}
+                          parseValue={parsePercent}
+                          onChange={(position) => updateCustomWavetableFrame(customTable().id, index(), { position })}
+                        />
                         <HarmonicDraw
                           partials={frame.partials}
                           onChange={(partials) => updateCustomWavetableFrame(customTable().id, index(), { partials })}
@@ -433,10 +465,58 @@ function OscillatorRow(props: {
   );
 }
 
-function MiniWaveform(props: { samples: number[] }) {
-  const path = createMemo(() => makeWaveformPath(props.samples));
+function MiniWaveform(props: { samples: number[]; onDrawSamples?: (samples: number[]) => void }) {
+  const [workingSamples, setWorkingSamples] = createSignal<number[] | null>(null);
+  const [lastDrawPoint, setLastDrawPoint] = createSignal<{ index: number; value: number } | null>(null);
+  const visibleSamples = createMemo(() => workingSamples() ?? props.samples);
+  const path = createMemo(() => makeWaveformPath(visibleSamples()));
+
+  const pointFromPointer = (event: PointerEvent & { currentTarget: SVGSVGElement }) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width - 0.001, event.clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    const count = Math.max(2, visibleSamples().length || props.samples.length || 96);
+    const index = Math.max(0, Math.min(count - 1, Math.floor((x / Math.max(1, rect.width)) * count)));
+    return { index, value: Math.max(-1, Math.min(1, 1 - (y / Math.max(1, rect.height)) * 2)) };
+  };
+
+  const updateFromPointer = (event: PointerEvent & { currentTarget: SVGSVGElement }) => {
+    if (!props.onDrawSamples) return;
+    const point = pointFromPointer(event);
+    const previous = lastDrawPoint() ?? point;
+    const next = drawWaveformSampleLine(visibleSamples(), previous.index, previous.value, point.index, point.value);
+    setWorkingSamples(next);
+    setLastDrawPoint(point);
+    props.onDrawSamples(next);
+  };
+
   return (
-    <svg class={styles.frameWaveform} viewBox="0 0 100 48" preserveAspectRatio="none" aria-hidden="true">
+    <svg
+      class={styles.frameWaveform}
+      viewBox="0 0 100 48"
+      preserveAspectRatio="none"
+      aria-hidden={props.onDrawSamples ? undefined : "true"}
+      aria-label={props.onDrawSamples ? "Draw waveform" : undefined}
+      onPointerDown={(event) => {
+        if (!props.onDrawSamples) return;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        setWorkingSamples(props.samples.slice());
+        setLastDrawPoint(null);
+        updateFromPointer(event);
+      }}
+      onPointerMove={(event) => {
+        if (!props.onDrawSamples || event.buttons !== 1) return;
+        updateFromPointer(event);
+      }}
+      onPointerUp={() => {
+        setLastDrawPoint(null);
+        setWorkingSamples(null);
+      }}
+      onPointerCancel={() => {
+        setLastDrawPoint(null);
+        setWorkingSamples(null);
+      }}
+    >
       <line class={styles.zeroLine} x1="0" y1="24" x2="100" y2="24" />
       <Show when={path()}>
         <path class={styles.frameWaveformPath} d={path()} />
@@ -586,32 +666,42 @@ function renderCustomFramePreview(frame: CustomWavetableFrame, sampleCount = 96)
 }
 
 function HarmonicDraw(props: { partials?: number[]; onChange: (partials: number[]) => void }) {
+  const [lastDrawPoint, setLastDrawPoint] = createSignal<{ index: number; value: number } | null>(null);
   const bins = createMemo(() =>
     Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, (_, index) => clamp01(props.partials?.[index] ?? 0)),
   );
 
-  const updateFromPointer = (event: PointerEvent & { currentTarget: HTMLDivElement }) => {
+  const pointFromPointer = (event: PointerEvent & { currentTarget: HTMLDivElement }) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const x = Math.max(0, Math.min(rect.width - 0.001, event.clientX - rect.left));
     const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
     const index = Math.max(0, Math.min(CUSTOM_WAVETABLE_PARTIAL_COUNT - 1, Math.floor((x / Math.max(1, rect.width)) * CUSTOM_WAVETABLE_PARTIAL_COUNT)));
-    const next = bins().slice();
-    next[index] = clamp01(1 - y / Math.max(1, rect.height));
-    props.onChange(next);
+    return { index, value: clamp01(1 - y / Math.max(1, rect.height)) };
+  };
+
+  const updateFromPointer = (event: PointerEvent & { currentTarget: HTMLDivElement }) => {
+    const point = pointFromPointer(event);
+    const previous = lastDrawPoint() ?? point;
+    props.onChange(drawHarmonicPartialLine(bins(), previous.index, previous.value, point.index, point.value));
+    setLastDrawPoint(point);
   };
 
   return (
+    <>
     <div
       class={styles.harmonicDraw}
       aria-label="Harmonic partials"
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture(event.pointerId);
+        setLastDrawPoint(null);
         updateFromPointer(event);
       }}
       onPointerMove={(event) => {
         if (event.buttons !== 1) return;
         updateFromPointer(event);
       }}
+      onPointerUp={() => setLastDrawPoint(null)}
+      onPointerCancel={() => setLastDrawPoint(null)}
     >
       <For each={bins()}>
         {(value, index) => (
@@ -621,6 +711,15 @@ function HarmonicDraw(props: { partials?: number[]; onChange: (partials: number[
         )}
       </For>
     </div>
+    <div class={styles.harmonicTools} aria-label="Harmonic partial tools">
+      <Button size="xs" onClick={() => props.onChange(smoothHarmonicPartials(bins(), 0.85))}>
+        Smooth
+      </Button>
+      <Button size="xs" onClick={() => props.onChange(Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, () => 0))}>
+        Clear
+      </Button>
+    </div>
+    </>
   );
 }
 
@@ -672,6 +771,28 @@ function makeWaveformPath(samples: number[], verticalOffset = 0): string {
     const y = 24 - Math.max(-1, Math.min(1, sample)) * 18 + verticalOffset;
     return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
   }).join(" ");
+}
+
+function drawWaveformSampleLine(
+  samples: number[],
+  fromIndex: number,
+  fromValue: number,
+  toIndex: number,
+  toValue: number,
+): number[] {
+  const count = Math.max(2, samples.length || 96);
+  const next = samples.length === count ? samples.slice() : Array.from({ length: count }, (_, index) => samples[index] ?? 0);
+  const startIndex = Math.max(0, Math.min(count - 1, Math.round(fromIndex)));
+  const endIndex = Math.max(0, Math.min(count - 1, Math.round(toIndex)));
+  const startValue = Math.max(-1, Math.min(1, fromValue));
+  const endValue = Math.max(-1, Math.min(1, toValue));
+  const direction = startIndex <= endIndex ? 1 : -1;
+  const distance = Math.max(1, Math.abs(endIndex - startIndex));
+  for (let index = startIndex; direction > 0 ? index <= endIndex : index >= endIndex; index += direction) {
+    const t = Math.abs(index - startIndex) / distance;
+    next[index] = Math.max(-1, Math.min(1, startValue + (endValue - startValue) * t));
+  }
+  return next;
 }
 
 function clamp01(value: number): number {

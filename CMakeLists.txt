@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.22)
 
+file(STRINGS "${CMAKE_SOURCE_DIR}/VERSION" BEAT_VERSION LIMIT_COUNT 1)
+string(STRIP "${BEAT_VERSION}" BEAT_VERSION)
+
 project(Beat
-    VERSION 0.1.0
+    VERSION ${BEAT_VERSION}
     DESCRIPTION "Beat — a beat sequencing DAW"
     LANGUAGES CXX C
 )

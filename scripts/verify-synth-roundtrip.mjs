@@ -696,6 +696,7 @@ try {
           name: "Verifier Custom",
           kind: "harmonic-sketch",
           interpolation: "linear",
+          morph: 0.62,
           source: { kind: "drawn", label: "Verifier sketch" },
           frames: [
             { brightness: 0.12, even: 0.04, fold: 0.0, formant: 0.06, notch: 0.04, skew: -0.24, tilt: -0.55, focus: 0.18, phase: 0, partials: [0.82, 0.12, 0.0, 0.36] },
@@ -712,6 +713,7 @@ try {
   assert.equal(customPatch.wavetable.customId, "user.custom");
   assert.equal(customPatch.aether.oscA.wavetable.bank, "custom");
   assert.equal(customPatch.synthPatch.metadata.wavemaps["user.custom"].source.label, "Verifier sketch");
+  assert.equal(customPatch.synthPatch.metadata.wavemaps["user.custom"].morph, 0.62);
   assert.equal(customPatch.synthPatch.metadata.customWavetables["user.custom"].frames[3].fold, 0.68);
   assert.equal(customPatch.synthPatch.metadata.customWavetables["user.custom"].frames[2].formant, 0.48);
   assert.equal(customPatch.synthPatch.metadata.customWavetables["user.custom"].frames[2].notch, 0.28);
@@ -728,6 +730,7 @@ try {
   synthStore.useSynthStore.getState().updateCustomWavetableFrame("user.custom", 1, { brightness: 0.91 });
   synthStore.useSynthStore.getState().updateWavemapMetadata("user.custom", {
     interpolation: "smooth",
+    morph: 0.41,
     source: { kind: "generated", label: "Verifier generated wavemap" },
   });
   const frameAfterEdit = synthStore.useSynthStore.getState().draft.metadata.wavemaps["user.custom"].frames[1];
@@ -742,7 +745,43 @@ try {
   assert.equal(frameAfterEdit.focus, frameBeforeEdit.focus);
   assert.equal(frameAfterEdit.phase, frameBeforeEdit.phase);
   assert.equal(synthStore.useSynthStore.getState().draft.metadata.wavemaps["user.custom"].interpolation, "smooth");
+  assert.equal(synthStore.useSynthStore.getState().draft.metadata.wavemaps["user.custom"].morph, 0.41);
   assert.equal(synthStore.useSynthStore.getState().draft.metadata.customWavetables["user.custom"].source.label, "Verifier generated wavemap");
+  const drawnPartials = synthStore.drawHarmonicPartialLine([0, 0, 0, 0, 0, 0], 1, 0.25, 5, 0.75);
+  assert.equal(drawnPartials.length, 16);
+  assert.equal(drawnPartials[1], 0.25);
+  assert.equal(drawnPartials[3], 0.5);
+  assert.equal(drawnPartials[5], 0.75);
+  assert.equal(drawnPartials[0], 0);
+  assert.equal(drawnPartials[6], 0);
+  const reversePartials = synthStore.drawHarmonicPartialLine([], 4, 1.2, 2, -0.5);
+  assert.equal(reversePartials[4], 1);
+  assert.equal(reversePartials[3], 0.5);
+  assert.equal(reversePartials[2], 0);
+  const smoothedPartials = synthStore.smoothHarmonicPartials([0, 1, 0, 0], 1);
+  assert.equal(smoothedPartials.length, 16);
+  assert.equal(smoothedPartials[0], 0.25);
+  assert.equal(smoothedPartials[1], 0.5);
+  assert.equal(smoothedPartials[2], 0.25);
+  assert.equal(smoothedPartials[3], 0);
+  assert.deepEqual(synthStore.smoothHarmonicPartials([0, 1, 0, 0], 0).slice(0, 4), [0, 1, 0, 0]);
+  const drawnWaveformFrame = synthStore.deriveWavemapFrameFromDrawnWaveform(
+    { id: "user.custom.frame.drawn", label: "Drawn", position: 0.5, brightness: 0.2, even: 0.1, fold: 0.05, formant: 0.08, notch: 0.04, skew: 0, tilt: 0, focus: 0.2, phase: 0 },
+    Float32Array.from({ length: 256 }, (_, index) => Math.sin((index / 256) * Math.PI * 2 * 3)),
+  );
+  assert.equal(drawnWaveformFrame.id, "user.custom.frame.drawn");
+  assert.equal(drawnWaveformFrame.label, "Drawn");
+  assert.equal(drawnWaveformFrame.position, 0.5);
+  assert.equal(drawnWaveformFrame.partials.length, 16);
+  assert.ok(drawnWaveformFrame.partials[2] > 0.9, "drawn waveform should derive the dominant third harmonic");
+  assert.ok(drawnWaveformFrame.partials[0] < 0.2, "drawn waveform should not collapse into the fundamental");
+  assert.ok(drawnWaveformFrame.formant > 0.08, "drawn waveform should update frame spectral controls");
+  const phaseShiftedFrame = synthStore.deriveWavemapFrameFromDrawnWaveform(
+    { id: "user.custom.frame.phase", label: "Phase", position: 0.25, brightness: 0.2, even: 0.1, fold: 0.05, formant: 0.08, notch: 0.04, skew: 0, tilt: 0, focus: 0.2, phase: 0 },
+    Float32Array.from({ length: 256 }, (_, index) => Math.sin((index / 256) * Math.PI * 2 * 3 + Math.PI / 2)),
+  );
+  assert.ok(phaseShiftedFrame.partials[2] > 0.9, "phase-shifted drawn waveform should keep the same dominant harmonic");
+  assert.ok(Math.abs(phaseShiftedFrame.phase - drawnWaveformFrame.phase) > 0.32, "drawn waveform phase should track dominant harmonic phase");
 
   const resynthSamples = Float32Array.from({ length: 4096 }, (_, index) => {
     const phase = index / 4096;
@@ -866,6 +905,58 @@ try {
   const customRms = Math.sqrt(customEnergy / customSamples.length);
   assert.ok(customRms > 0.01, `expected audible custom wavetable rms, got ${customRms}`);
   assert.ok(customPeak > 0.05, `expected audible custom wavetable peak, got ${customPeak}`);
+
+  const unmorphedDraft = synthStore.normalizeSynthDraftPatch({
+    ...customDraft,
+    metadata: {
+      ...customDraft.metadata,
+      wavemaps: {
+        "user.custom": {
+          ...customDraft.metadata.wavemaps["user.custom"],
+          morph: 0,
+        },
+      },
+      customWavetables: {
+        "user.custom": {
+          ...customDraft.metadata.customWavetables["user.custom"],
+          morph: 0,
+        },
+      },
+    },
+  });
+  const unmorphedPreview = synthStore.synthDraftToPreviewInstrument(unmorphedDraft);
+  const unmorphedSamples = new Float32Array(customSamples.length);
+  synthPreview.renderInstrumentSamples(unmorphedPreview, unmorphedSamples, 48000, synthPreview.previewFrequency(unmorphedPreview), "audio", true);
+  const morphDiff = customSamples.reduce((sum, sample, index) => sum + Math.abs(sample - unmorphedSamples[index]), 0) / customSamples.length;
+  assert.ok(morphDiff > 0.0002, `expected wavemap morph to alter custom wavetable preview, got ${morphDiff}`);
+
+  const anchoredFrames = customDraft.metadata.wavemaps["user.custom"].frames.map((frame, index) => ({
+    ...frame,
+    position: [0, 0.08, 0.92, 1][index],
+  }));
+  const anchoredDraft = synthStore.normalizeSynthDraftPatch({
+    ...customDraft,
+    metadata: {
+      ...customDraft.metadata,
+      wavemaps: {
+        "user.custom": {
+          ...customDraft.metadata.wavemaps["user.custom"],
+          frames: anchoredFrames,
+        },
+      },
+      customWavetables: {
+        "user.custom": {
+          ...customDraft.metadata.customWavetables["user.custom"],
+          frames: anchoredFrames,
+        },
+      },
+    },
+  });
+  const anchoredPreview = synthStore.synthDraftToPreviewInstrument(anchoredDraft);
+  const anchoredSamples = new Float32Array(customSamples.length);
+  synthPreview.renderInstrumentSamples(anchoredPreview, anchoredSamples, 48000, synthPreview.previewFrequency(anchoredPreview), "audio", true);
+  const anchorDiff = customSamples.reduce((sum, sample, index) => sum + Math.abs(sample - anchoredSamples[index]), 0) / customSamples.length;
+  assert.ok(anchorDiff > 0.0002, `expected frame scan anchors to alter custom wavetable preview, got ${anchorDiff}`);
 
   const unskewedDraft = synthStore.normalizeSynthDraftPatch({
     ...customDraft,
