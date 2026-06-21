@@ -28,6 +28,7 @@ target_sources(Beat PRIVATE
     Source/Audio/InstrumentVoice.h
     Source/Audio/Filter/DriveStage.h
     Source/Audio/Filter/FilterMath.h
+    Source/Audio/Filter/FilterStage.h
     Source/Audio/Modulation/DynamicModulation.h
     Source/Audio/Modulation/Lfo.h
     Source/Audio/Oscillator/BasicOscillator.h
@@ -138,6 +139,7 @@ add_executable(BeatBackendStress
     Source/Audio/InstrumentVoice.h
     Source/Audio/Filter/DriveStage.h
     Source/Audio/Filter/FilterMath.h
+    Source/Audio/Filter/FilterStage.h
     Source/Audio/Modulation/DynamicModulation.h
     Source/Audio/Modulation/Lfo.h
     Source/Audio/Oscillator/BasicOscillator.h

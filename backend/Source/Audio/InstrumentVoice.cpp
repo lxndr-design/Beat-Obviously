@@ -1,6 +1,5 @@
 #include "InstrumentVoice.h"
 
-#include "Filter/FilterMath.h"
 #include "Modulation/DynamicModulation.h"
 #include "Modulation/Lfo.h"
 #include "Oscillator/BasicOscillator.h"
@@ -273,10 +272,7 @@ namespace beat
             osc.prepare(sampleRate);
         adsr.setSampleRate(sr);
         env2Adsr.setSampleRate(sr);
-        filterLeft.prepare({ sr, (juce::uint32) blockSize, 1u });
-        filterRight.prepare({ sr, (juce::uint32) blockSize, 1u });
-        filterLeft.setType(FilterMath::typeForParam(params.filterType));
-        filterRight.setType(FilterMath::typeForParam(params.filterType));
+        filterState.prepare(sr, blockSize, params.filterType);
     }
 
     void InstrumentVoice::setParams(const Params& p)
@@ -339,14 +335,7 @@ namespace beat
         env2AdsrParams.release = juce::jmax(0.001f, p.env2ReleaseMs * 0.001f);
         env2Adsr.setParameters(env2AdsrParams);
 
-        filterLeft.setType(FilterMath::typeForParam(p.filterType));
-        filterRight.setType(FilterMath::typeForParam(p.filterType));
-        filterLeft.setCutoffFrequency(keytrackedCutoffHz(p.cutoff01));
-        filterRight.setCutoffFrequency(keytrackedCutoffHz(p.cutoff01));
-        cachedFilterHz = keytrackedCutoffHz(p.cutoff01);
-        cachedFilterResonance = FilterMath::resonanceFromNormalized(p.resonance01);
-        filterLeft.setResonance(cachedFilterResonance);
-        filterRight.setResonance(cachedFilterResonance);
+        filterState.configure(p.filterType, p.cutoff01, p.resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
         refreshCachedPanGains();
         refreshCachedPitchRates();
         refreshCachedDynamicModulationFlags();
@@ -612,24 +601,12 @@ namespace beat
         {
             case RealtimeParam::FilterCutoff:
             {
-                const float nextFilterHz = keytrackedCutoffHz(params.cutoff01);
-                if (std::abs(nextFilterHz - cachedFilterHz) > 0.5f)
-                {
-                    filterLeft.setCutoffFrequency(nextFilterHz);
-                    filterRight.setCutoffFrequency(nextFilterHz);
-                    cachedFilterHz = nextFilterHz;
-                }
+                filterState.updateCutoffIfChanged(params.cutoff01, sampleRate, params.filterKeytrack, baseFrequencyHz, 0.5f);
                 break;
             }
             case RealtimeParam::FilterResonance:
             {
-                const float nextResonance = FilterMath::resonanceFromNormalized(params.resonance01);
-                if (std::abs(nextResonance - cachedFilterResonance) > 0.001f)
-                {
-                    filterLeft.setResonance(nextResonance);
-                    filterRight.setResonance(nextResonance);
-                    cachedFilterResonance = nextResonance;
-                }
+                filterState.updateResonanceIfChanged(params.resonance01, 0.001f);
                 break;
             }
             case RealtimeParam::FilterDrive:
@@ -744,14 +721,7 @@ namespace beat
             const int glideSamples = params.glideMs > 0.0f && sampleRate > 0.0
                 ? juce::jmax(1, (int) std::round((params.glideMs / 1000.0f) * (float) sampleRate))
                 : 0;
-            filterLeft.setType(FilterMath::typeForParam(params.filterType));
-            filterRight.setType(FilterMath::typeForParam(params.filterType));
-            filterLeft.setCutoffFrequency(keytrackedCutoffHz(params.cutoff01));
-            filterRight.setCutoffFrequency(keytrackedCutoffHz(params.cutoff01));
-            cachedFilterHz = keytrackedCutoffHz(params.cutoff01);
-            cachedFilterResonance = FilterMath::resonanceFromNormalized(params.resonance01);
-            filterLeft.setResonance(cachedFilterResonance);
-            filterRight.setResonance(cachedFilterResonance);
+            filterState.configure(params.filterType, params.cutoff01, params.resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
             refreshCachedPanGains();
             refreshCachedDynamicModulationFlags();
             refreshCachedPitchRates();
@@ -761,14 +731,7 @@ namespace beat
             return;
         }
 
-        filterLeft.setType(FilterMath::typeForParam(params.filterType));
-        filterRight.setType(FilterMath::typeForParam(params.filterType));
-        filterLeft.setCutoffFrequency(keytrackedCutoffHz(params.cutoff01));
-        filterRight.setCutoffFrequency(keytrackedCutoffHz(params.cutoff01));
-        cachedFilterHz = keytrackedCutoffHz(params.cutoff01);
-        cachedFilterResonance = FilterMath::resonanceFromNormalized(params.resonance01);
-        filterLeft.setResonance(cachedFilterResonance);
-        filterRight.setResonance(cachedFilterResonance);
+        filterState.configure(params.filterType, params.cutoff01, params.resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
         refreshCachedPanGains();
         refreshCachedDynamicModulationFlags();
 
@@ -986,30 +949,22 @@ namespace beat
                 const float cutoffMod = useDynamicModulation && cachedFilterCutoffDynamic
                     ? DynamicModulation::targetOffset(params.dynamicModulation.filterCutoff, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 0.35f)
                     : filterLfo * params.lfoToFilter * 0.35f + env * params.envToFilter * 0.35f;
-                const float nextFilterHz = keytrackedCutoffHz(params.cutoff01 + cutoffMod);
-                if (std::abs(nextFilterHz - cachedFilterHz) > 6.0f)
-                {
-                    filterLeft.setCutoffFrequency(nextFilterHz);
-                    filterRight.setCutoffFrequency(nextFilterHz);
-                    cachedFilterHz = nextFilterHz;
-                    currentBlockFilterCoefficientUpdates += 2;
-                }
+                currentBlockFilterCoefficientUpdates += filterState.updateCutoffIfChanged(
+                    params.cutoff01 + cutoffMod,
+                    sampleRate,
+                    params.filterKeytrack,
+                    baseFrequencyHz,
+                    6.0f);
                 if (useDynamicModulation && cachedFilterResonanceDynamic)
                 {
                     const float resonance = clamp01(params.resonance01
                         + DynamicModulation::targetOffset(params.dynamicModulation.filterResonance, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f));
-                    const float nextResonance = FilterMath::resonanceFromNormalized(resonance);
-                    if (std::abs(nextResonance - cachedFilterResonance) > 0.001f)
-                    {
-                        filterLeft.setResonance(nextResonance);
-                        filterRight.setResonance(nextResonance);
-                        cachedFilterResonance = nextResonance;
-                        currentBlockFilterCoefficientUpdates += 2;
-                    }
+                    currentBlockFilterCoefficientUpdates += filterState.updateResonanceIfChanged(resonance, 0.001f);
                 }
             }
-            left = filterLeft.processSample(0, left);
-            right = filterRight.processSample(0, right);
+            const auto filtered = filterState.process(left, right);
+            left = filtered.left;
+            right = filtered.right;
 
             const float ampLevel = clamp01(params.ampLevel + (useDynamicModulation && cachedAmpLevelDynamic
                 ? DynamicModulation::targetOffset(params.dynamicModulation.ampLevel, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f)
@@ -1094,11 +1049,6 @@ namespace beat
             { params.env2AttackMs, params.env2DecayMs, params.env2Sustain, params.env2ReleaseMs, params.env2AttackCurve, params.env2DecayCurve, params.env2ReleaseCurve },
             sampleRate,
             previousRawEnv2Envelope).value;
-    }
-
-    float InstrumentVoice::keytrackedCutoffHz(float normalizedCutoff) const noexcept
-    {
-        return FilterMath::keytrackedCutoffHz(normalizedCutoff, sampleRate, params.filterKeytrack, baseFrequencyHz);
     }
 
     void InstrumentVoice::configureWavetableOscillators(double frequencyHz) noexcept

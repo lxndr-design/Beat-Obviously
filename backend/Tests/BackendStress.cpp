@@ -5,6 +5,7 @@
 #include "../Source/Audio/Envelope/EnvelopeShaper.h"
 #include "../Source/Audio/Filter/DriveStage.h"
 #include "../Source/Audio/Filter/FilterMath.h"
+#include "../Source/Audio/Filter/FilterStage.h"
 #include "../Source/Audio/InstrumentVoice.h"
 #include "../Source/Audio/Modulation/DynamicModulation.h"
 #include "../Source/Audio/Modulation/Lfo.h"
@@ -252,6 +253,38 @@ namespace
         state.reset();
         const auto tiny = beat::DriveStage::processOversampled(state, { 1.0e-24f, -1.0e-24f }, 1.0f);
         return near(tiny.left, 0.0f) && near(tiny.right, 0.0f);
+    }
+
+    bool stressFilterStageHelper()
+    {
+        beat::FilterStage::State state;
+        state.prepare(48000.0, 64, 0);
+        state.configure(0, 0.5f, 0.25f, 48000.0, 0.0f, 440.0);
+
+        const float initialCutoff = state.currentCutoffHz();
+        if (!(initialCutoff > 20.0f && initialCutoff < 20000.0f))
+            return false;
+        if (!near(state.currentResonance(), 1.5f))
+            return false;
+        if (state.updateCutoffIfChanged(0.5f, 48000.0, 0.0f, 440.0, 0.5f) != 0)
+            return false;
+        if (state.updateResonanceIfChanged(0.25f, 0.001f) != 0)
+            return false;
+
+        if (state.updateCutoffIfChanged(0.75f, 48000.0, 0.0f, 440.0, 0.5f) != 2)
+            return false;
+        if (!(state.currentCutoffHz() > initialCutoff))
+            return false;
+        if (state.updateResonanceIfChanged(0.75f, 0.001f) != 2)
+            return false;
+        if (!near(state.currentResonance(), 3.5f))
+            return false;
+
+        state.configure(2, 0.4f, 0.1f, 48000.0, 1.0f, 880.0);
+        auto frame = state.process(0.5f, -0.25f);
+        for (int i = 0; i < 64; ++i)
+            frame = state.process(i == 0 ? 1.0f : 0.0f, i == 0 ? -1.0f : 0.0f);
+        return std::isfinite(frame.left) && std::isfinite(frame.right);
     }
 
     beat::Project makeStressProject()
@@ -10672,6 +10705,11 @@ int main()
     if (!stressDriveStageHelper())
     {
         std::cerr << "Drive stage helper stress failed\n";
+        return 1;
+    }
+    if (!stressFilterStageHelper())
+    {
+        std::cerr << "Filter stage helper stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceWavetablePath())

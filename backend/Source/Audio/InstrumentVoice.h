@@ -2,6 +2,7 @@
 
 #include "Envelope/EnvelopeShaper.h"
 #include "Filter/DriveStage.h"
+#include "Filter/FilterStage.h"
 #include "Realtime/RealtimeParameterQueue.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
@@ -367,7 +368,6 @@ namespace beat
         float shapedEnvelope(float rawEnvelope) noexcept;
         float env1LoopValue() noexcept;
         float env2LoopValue() noexcept;
-        float keytrackedCutoffHz(float normalizedCutoff) const noexcept;
 
         Params  baseParams;
         Params  params;
@@ -383,8 +383,6 @@ namespace beat
         float   noteKeytrack { 0.0f };
         float   modWheel { 0.0f };
         float   pitchWheelSemitones { 0.0f };
-        float   cachedFilterHz { -1.0f };
-        float   cachedFilterResonance { -1.0f };
         std::shared_ptr<const Wavetable> wavetableTable;
         std::shared_ptr<const Wavetable> aetherTableA;
         std::shared_ptr<const Wavetable> aetherTableB;
@@ -440,6 +438,7 @@ namespace beat
         int64_t currentBlockWavetableFrequencyUpdates { 0 };
         int64_t currentBlockWavetablePositionUpdates { 0 };
         DriveStage::State driveState;
+        FilterStage::State filterState;
         float previousRawEnvelope { 0.0f };
         float previousRawEnv2Envelope { 0.0f };
         EnvelopeShaper::LoopState env1LoopState;
@@ -449,7 +448,5 @@ namespace beat
         juce::ADSR::Parameters adsrParams;
         juce::ADSR env2Adsr;
         juce::ADSR::Parameters env2AdsrParams;
-        juce::dsp::StateVariableTPTFilter<float> filterLeft;
-        juce::dsp::StateVariableTPTFilter<float> filterRight;
     };
 }
