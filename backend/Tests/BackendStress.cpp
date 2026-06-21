@@ -3,6 +3,7 @@
 #include "../Source/Audio/Analysis/AudioFileAnalyzer.h"
 #include "../Source/Audio/Analysis/FftAnalyzer.h"
 #include "../Source/Audio/Envelope/EnvelopeShaper.h"
+#include "../Source/Audio/Filter/FilterMath.h"
 #include "../Source/Audio/InstrumentVoice.h"
 #include "../Source/Audio/Modulation/Lfo.h"
 #include "../Source/Audio/Oscillator/BasicOscillator.h"
@@ -151,6 +152,33 @@ namespace
         }
 
         return true;
+    }
+
+    bool stressFilterMathHelper()
+    {
+        const float low = beat::FilterMath::cutoffHz(0.0f, 48000.0);
+        const float mid = beat::FilterMath::cutoffHz(0.5f, 48000.0);
+        const float high = beat::FilterMath::cutoffHz(1.0f, 48000.0);
+        if (!(near(low, 20.0f) && mid > low && high > mid && high <= 20000.0f))
+            return false;
+
+        const float trackedLowNote = beat::FilterMath::keytrackedCutoffHz(0.5f, 48000.0, 1.0f, 130.8127825);
+        const float trackedHighNote = beat::FilterMath::keytrackedCutoffHz(0.5f, 48000.0, 1.0f, 523.25113);
+        const float untrackedHighNote = beat::FilterMath::keytrackedCutoffHz(0.5f, 48000.0, 0.0f, 523.25113);
+        if (!(trackedLowNote < untrackedHighNote && trackedHighNote > untrackedHighNote))
+            return false;
+
+        if (!near(beat::FilterMath::resonanceFromNormalized(-1.0f), 0.5f))
+            return false;
+        if (!near(beat::FilterMath::resonanceFromNormalized(0.5f), 2.5f))
+            return false;
+        if (!near(beat::FilterMath::resonanceFromNormalized(2.0f), 4.5f))
+            return false;
+
+        return beat::FilterMath::typeForParam(0) == juce::dsp::StateVariableTPTFilterType::lowpass
+            && beat::FilterMath::typeForParam(1) == juce::dsp::StateVariableTPTFilterType::bandpass
+            && beat::FilterMath::typeForParam(2) == juce::dsp::StateVariableTPTFilterType::highpass
+            && beat::FilterMath::typeForParam(99) == juce::dsp::StateVariableTPTFilterType::lowpass;
     }
 
     beat::Project makeStressProject()
@@ -10556,6 +10584,11 @@ int main()
     if (!stressBasicOscillatorHelper())
     {
         std::cerr << "Basic oscillator helper stress failed\n";
+        return 1;
+    }
+    if (!stressFilterMathHelper())
+    {
+        std::cerr << "Filter math helper stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceWavetablePath())

@@ -1,5 +1,6 @@
 #include "InstrumentVoice.h"
 
+#include "Filter/FilterMath.h"
 #include "Modulation/Lfo.h"
 #include "Oscillator/BasicOscillator.h"
 
@@ -95,24 +96,6 @@ namespace beat
                 + envRouteValue(velocity, target.velocityBipolar) * target.velocity
                 + envRouteValue(keytrack, target.keytrackBipolar) * target.keytrack
                 + envRouteValue(modWheel, target.modWheelBipolar) * target.modWheel) * scale;
-        }
-
-        float cutoffHz(float normalized, double sampleRate)
-        {
-            const float minF = 20.0f;
-            const float maxF = juce::jmin(20000.0f, (float) sampleRate * 0.45f);
-            return minF * std::pow(maxF / minF, clamp01(normalized));
-        }
-
-        juce::dsp::StateVariableTPTFilterType filterTypeForParam(int type) noexcept
-        {
-            switch (type)
-            {
-                case 1: return juce::dsp::StateVariableTPTFilterType::bandpass;
-                case 2: return juce::dsp::StateVariableTPTFilterType::highpass;
-                case 0:
-                default: return juce::dsp::StateVariableTPTFilterType::lowpass;
-            }
         }
 
         std::pair<float, float> equalPowerPanGains(float pan) noexcept
@@ -327,8 +310,8 @@ namespace beat
         env2Adsr.setSampleRate(sr);
         filterLeft.prepare({ sr, (juce::uint32) blockSize, 1u });
         filterRight.prepare({ sr, (juce::uint32) blockSize, 1u });
-        filterLeft.setType(filterTypeForParam(params.filterType));
-        filterRight.setType(filterTypeForParam(params.filterType));
+        filterLeft.setType(FilterMath::typeForParam(params.filterType));
+        filterRight.setType(FilterMath::typeForParam(params.filterType));
     }
 
     void InstrumentVoice::setParams(const Params& p)
@@ -391,12 +374,12 @@ namespace beat
         env2AdsrParams.release = juce::jmax(0.001f, p.env2ReleaseMs * 0.001f);
         env2Adsr.setParameters(env2AdsrParams);
 
-        filterLeft.setType(filterTypeForParam(p.filterType));
-        filterRight.setType(filterTypeForParam(p.filterType));
+        filterLeft.setType(FilterMath::typeForParam(p.filterType));
+        filterRight.setType(FilterMath::typeForParam(p.filterType));
         filterLeft.setCutoffFrequency(keytrackedCutoffHz(p.cutoff01));
         filterRight.setCutoffFrequency(keytrackedCutoffHz(p.cutoff01));
         cachedFilterHz = keytrackedCutoffHz(p.cutoff01);
-        cachedFilterResonance = 0.5f + p.resonance01 * 4.0f;
+        cachedFilterResonance = FilterMath::resonanceFromNormalized(p.resonance01);
         filterLeft.setResonance(cachedFilterResonance);
         filterRight.setResonance(cachedFilterResonance);
         refreshCachedPanGains();
@@ -675,7 +658,7 @@ namespace beat
             }
             case RealtimeParam::FilterResonance:
             {
-                const float nextResonance = 0.5f + params.resonance01 * 4.0f;
+                const float nextResonance = FilterMath::resonanceFromNormalized(params.resonance01);
                 if (std::abs(nextResonance - cachedFilterResonance) > 0.001f)
                 {
                     filterLeft.setResonance(nextResonance);
@@ -796,12 +779,12 @@ namespace beat
             const int glideSamples = params.glideMs > 0.0f && sampleRate > 0.0
                 ? juce::jmax(1, (int) std::round((params.glideMs / 1000.0f) * (float) sampleRate))
                 : 0;
-            filterLeft.setType(filterTypeForParam(params.filterType));
-            filterRight.setType(filterTypeForParam(params.filterType));
+            filterLeft.setType(FilterMath::typeForParam(params.filterType));
+            filterRight.setType(FilterMath::typeForParam(params.filterType));
             filterLeft.setCutoffFrequency(keytrackedCutoffHz(params.cutoff01));
             filterRight.setCutoffFrequency(keytrackedCutoffHz(params.cutoff01));
             cachedFilterHz = keytrackedCutoffHz(params.cutoff01);
-            cachedFilterResonance = 0.5f + params.resonance01 * 4.0f;
+            cachedFilterResonance = FilterMath::resonanceFromNormalized(params.resonance01);
             filterLeft.setResonance(cachedFilterResonance);
             filterRight.setResonance(cachedFilterResonance);
             refreshCachedPanGains();
@@ -813,12 +796,12 @@ namespace beat
             return;
         }
 
-        filterLeft.setType(filterTypeForParam(params.filterType));
-        filterRight.setType(filterTypeForParam(params.filterType));
+        filterLeft.setType(FilterMath::typeForParam(params.filterType));
+        filterRight.setType(FilterMath::typeForParam(params.filterType));
         filterLeft.setCutoffFrequency(keytrackedCutoffHz(params.cutoff01));
         filterRight.setCutoffFrequency(keytrackedCutoffHz(params.cutoff01));
         cachedFilterHz = keytrackedCutoffHz(params.cutoff01);
-        cachedFilterResonance = 0.5f + params.resonance01 * 4.0f;
+        cachedFilterResonance = FilterMath::resonanceFromNormalized(params.resonance01);
         filterLeft.setResonance(cachedFilterResonance);
         filterRight.setResonance(cachedFilterResonance);
         refreshCachedPanGains();
@@ -1052,7 +1035,7 @@ namespace beat
                 {
                     const float resonance = clamp01(params.resonance01
                         + dynamicTargetOffset(params.dynamicModulation.filterResonance, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f));
-                    const float nextResonance = 0.5f + resonance * 4.0f;
+                    const float nextResonance = FilterMath::resonanceFromNormalized(resonance);
                     if (std::abs(nextResonance - cachedFilterResonance) > 0.001f)
                     {
                         filterLeft.setResonance(nextResonance);
@@ -1174,15 +1157,7 @@ namespace beat
 
     float InstrumentVoice::keytrackedCutoffHz(float normalizedCutoff) const noexcept
     {
-        constexpr float middleCHz = 261.625565f;
-        const float base = cutoffHz(normalizedCutoff, sampleRate);
-        const float keytrack = clamp01(params.filterKeytrack);
-        if (keytrack <= 0.0001f || baseFrequencyHz <= 0.0)
-            return base;
-
-        const float octaveOffset = (float) std::log2(juce::jmax(1.0, baseFrequencyHz) / (double) middleCHz);
-        const float tracked = base * std::exp2(octaveOffset * keytrack);
-        return juce::jlimit(20.0f, juce::jmin(20000.0f, (float) sampleRate * 0.45f), tracked);
+        return FilterMath::keytrackedCutoffHz(normalizedCutoff, sampleRate, params.filterKeytrack, baseFrequencyHz);
     }
 
     void InstrumentVoice::configureWavetableOscillators(double frequencyHz) noexcept
