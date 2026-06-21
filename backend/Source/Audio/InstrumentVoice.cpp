@@ -839,6 +839,7 @@ namespace beat
         const bool hasFilterMod = modulationPlan.hasFilterMod;
         const bool needsLfoValue = modulationPlan.needsLfoValue;
         const bool needsLfo2Value = modulationPlan.needsLfo2Value;
+        const bool needsEnv2Value = modulationPlan.needsEnv2Value;
         const bool hasAmpPanMod = modulationPlan.hasAmpPanMod;
         const double lfoPhaseDelta = juce::jmax(0.01f, params.lfoRateHz) / sampleRate;
         const double lfo2PhaseDelta = juce::jmax(0.01f, params.lfo2RateHz) / sampleRate;
@@ -879,7 +880,7 @@ namespace beat
             const float env = params.env1Loop
                 ? env1LoopValue()
                 : shapedEnvelope(adsr.getNextSample());
-            const float env2 = useDynamicModulation
+            const float env2 = needsEnv2Value
                 ? (params.env2Loop
                     ? env2LoopValue()
                     : EnvelopeShaper::shapeAdsrSample(

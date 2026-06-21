@@ -24,6 +24,13 @@ namespace beat::DynamicModulation
         bool ampLevel { false };
         bool unisonDetune { false };
         bool unisonSpread { false };
+        bool lfo { false };
+        bool lfo2 { false };
+        bool env { false };
+        bool env2 { false };
+        bool velocity { false };
+        bool keytrack { false };
+        bool modWheel { false };
         bool any { false };
     };
 
@@ -36,6 +43,7 @@ namespace beat::DynamicModulation
         bool hasFilterMod { false };
         bool needsLfoValue { false };
         bool needsLfo2Value { false };
+        bool needsEnv2Value { false };
         bool hasAmpPanMod { false };
     };
 
@@ -54,6 +62,18 @@ namespace beat::DynamicModulation
             || std::abs(target.velocity) > 0.0001f
             || std::abs(target.keytrack) > 0.0001f
             || std::abs(target.modWheel) > 0.0001f;
+    }
+
+    template <typename Target>
+    void addSourceActivity(TargetActivityFlags& flags, const Target& target) noexcept
+    {
+        flags.lfo = flags.lfo || std::abs(target.lfo) > 0.0001f;
+        flags.lfo2 = flags.lfo2 || std::abs(target.lfo2) > 0.0001f;
+        flags.env = flags.env || std::abs(target.env) > 0.0001f;
+        flags.env2 = flags.env2 || std::abs(target.env2) > 0.0001f;
+        flags.velocity = flags.velocity || std::abs(target.velocity) > 0.0001f;
+        flags.keytrack = flags.keytrack || std::abs(target.keytrack) > 0.0001f;
+        flags.modWheel = flags.modWheel || std::abs(target.modWheel) > 0.0001f;
     }
 
     template <typename Target>
@@ -99,6 +119,21 @@ namespace beat::DynamicModulation
         flags.ampLevel = targetActive(modulation.ampLevel);
         flags.unisonDetune = targetActive(modulation.unisonDetune);
         flags.unisonSpread = targetActive(modulation.unisonSpread);
+        addSourceActivity(flags, modulation.ampPan);
+        addSourceActivity(flags, modulation.oscAPan);
+        addSourceActivity(flags, modulation.oscBPan);
+        addSourceActivity(flags, modulation.oscAFine);
+        addSourceActivity(flags, modulation.oscBFine);
+        addSourceActivity(flags, modulation.oscAPosition);
+        addSourceActivity(flags, modulation.oscBPosition);
+        addSourceActivity(flags, modulation.oscALevel);
+        addSourceActivity(flags, modulation.oscBLevel);
+        addSourceActivity(flags, modulation.filterCutoff);
+        addSourceActivity(flags, modulation.filterResonance);
+        addSourceActivity(flags, modulation.filterDrive);
+        addSourceActivity(flags, modulation.ampLevel);
+        addSourceActivity(flags, modulation.unisonDetune);
+        addSourceActivity(flags, modulation.unisonSpread);
         flags.any =
             flags.ampPan
             || flags.oscAPan
@@ -138,11 +173,14 @@ namespace beat::DynamicModulation
         plan.hasPitchMod = !plan.useDynamicModulation && plan.pitchMod > 0.0001f;
         plan.hasPositionMod = !plan.useDynamicModulation && std::abs(lfoDepth) > 0.0001f;
         const bool hasDynamicFilterCoefficientMod = plan.useDynamicModulation && hasFilterCoefficientMod(flags);
+        const bool hasLegacyFilterLfoMod = !plan.useDynamicModulation && std::abs(lfoToFilter) > 0.0001f;
+        const bool hasLegacyFilterEnvMod = !plan.useDynamicModulation && std::abs(envToFilter) > 0.0001f;
         plan.hasFilterMod = hasDynamicFilterCoefficientMod
-            || std::abs(lfoToFilter) > 0.0001f
-            || std::abs(envToFilter) > 0.0001f;
-        plan.needsLfoValue = plan.useDynamicModulation || plan.hasPitchMod || plan.hasPositionMod || plan.hasFilterMod;
-        plan.needsLfo2Value = plan.useDynamicModulation && lfo2Enabled;
+            || hasLegacyFilterLfoMod
+            || hasLegacyFilterEnvMod;
+        plan.needsLfoValue = (plan.useDynamicModulation && flags.lfo) || plan.hasPitchMod || plan.hasPositionMod || hasLegacyFilterLfoMod;
+        plan.needsLfo2Value = plan.useDynamicModulation && lfo2Enabled && flags.lfo2;
+        plan.needsEnv2Value = plan.useDynamicModulation && flags.env2;
         plan.hasAmpPanMod = flags.ampPan;
         return plan;
     }

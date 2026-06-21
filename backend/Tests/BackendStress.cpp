@@ -191,6 +191,13 @@ namespace
             || !legacyFilterPlan.needsLfoValue)
             return false;
 
+        const auto legacyEnvFilterPlan = beat::DynamicModulation::makeRenderPlan(noFlags, false, false, 0.0f, 0.0f, 0.0f, 0.4f);
+        if (!legacyEnvFilterPlan.hasFilterMod
+            || legacyEnvFilterPlan.needsLfoValue
+            || legacyEnvFilterPlan.needsLfo2Value
+            || legacyEnvFilterPlan.needsEnv2Value)
+            return false;
+
         beat::InstrumentVoice::Params::DynamicModulation disabled;
         disabled.oscAPosition.lfo = 1.0f;
         if (beat::DynamicModulation::targetActivityFlags(disabled).any)
@@ -200,6 +207,7 @@ namespace
         modulation.active = true;
         modulation.oscAPosition.lfo = 0.5f;
         modulation.oscBPan.env2 = 0.2f;
+        modulation.oscBPan.lfo2 = 0.15f;
         modulation.filterCutoff.velocity = 0.3f;
         modulation.filterResonance.modWheel = 0.4f;
         modulation.ampLevel.keytrack = 0.2f;
@@ -214,6 +222,12 @@ namespace
             && flags.ampPan
             && !flags.oscAPan
             && !flags.filterDrive
+            && flags.lfo
+            && flags.lfo2
+            && flags.env2
+            && flags.velocity
+            && flags.keytrack
+            && flags.modWheel
             && beat::DynamicModulation::hasFilterCoefficientMod(flags);
         if (!ok)
             return false;
@@ -225,14 +239,37 @@ namespace
             || !dynamicPlan.hasFilterMod
             || !dynamicPlan.needsLfoValue
             || !dynamicPlan.needsLfo2Value
+            || !dynamicPlan.needsEnv2Value
             || !dynamicPlan.hasAmpPanMod)
             return false;
 
         const auto inactiveDynamicPlan = beat::DynamicModulation::makeRenderPlan(flags, false, true, 0.0f, 0.0f, 0.0f, 0.0f);
-        return !inactiveDynamicPlan.useDynamicModulation
-            && !inactiveDynamicPlan.hasFilterMod
-            && !inactiveDynamicPlan.needsLfoValue
-            && inactiveDynamicPlan.hasAmpPanMod;
+        if (inactiveDynamicPlan.useDynamicModulation
+            || inactiveDynamicPlan.hasFilterMod
+            || inactiveDynamicPlan.needsLfoValue
+            || inactiveDynamicPlan.needsLfo2Value
+            || inactiveDynamicPlan.needsEnv2Value
+            || !inactiveDynamicPlan.hasAmpPanMod)
+            return false;
+
+        beat::InstrumentVoice::Params::DynamicModulation sourceLiteModulation;
+        sourceLiteModulation.active = true;
+        sourceLiteModulation.ampLevel.velocity = 0.25f;
+        sourceLiteModulation.filterDrive.modWheel = 0.2f;
+        const auto sourceLiteFlags = beat::DynamicModulation::targetActivityFlags(sourceLiteModulation);
+        const auto sourceLitePlan = beat::DynamicModulation::makeRenderPlan(sourceLiteFlags, true, true, 0.0f, 0.0f, 0.0f, 0.0f);
+        if (!sourceLitePlan.useDynamicModulation
+            || !sourceLiteFlags.velocity
+            || !sourceLiteFlags.modWheel
+            || sourceLiteFlags.lfo
+            || sourceLiteFlags.lfo2
+            || sourceLiteFlags.env2
+            || sourceLitePlan.needsLfoValue
+            || sourceLitePlan.needsLfo2Value
+            || sourceLitePlan.needsEnv2Value)
+            return false;
+
+        return true;
     }
 
     bool stressBasicOscillatorHelper()
