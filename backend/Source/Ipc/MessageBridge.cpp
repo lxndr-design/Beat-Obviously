@@ -2207,6 +2207,8 @@ namespace beat
             timingObject->setProperty("filterSamples", (double) timing.filterSamples);
             timingObject->setProperty("filterDriveSamples", (double) timing.filterDriveSamples);
             timingObject->setProperty("filterCoefficientUpdates", (double) timing.filterCoefficientUpdates);
+            timingObject->setProperty("filterCutoffUpdates", (double) timing.filterCutoffUpdates);
+            timingObject->setProperty("filterResonanceUpdates", (double) timing.filterResonanceUpdates);
             timingObject->setProperty("modulationSamples", (double) timing.modulationSamples);
             timingObject->setProperty("realtimeRampSamples", (double) timing.realtimeRampSamples);
             timingObject->setProperty("oscillatorRateCalculations", (double) timing.oscillatorRateCalculations);

@@ -51,6 +51,8 @@ export function startAnalyzerClient(): () => void {
         filterSamples: positiveNumber(event.filterSamples),
         filterDriveSamples: positiveNumber(event.filterDriveSamples),
         filterCoefficientUpdates: positiveNumber(event.filterCoefficientUpdates),
+        filterCutoffUpdates: positiveNumber(event.filterCutoffUpdates),
+        filterResonanceUpdates: positiveNumber(event.filterResonanceUpdates),
         modulationSamples: positiveNumber(event.modulationSamples),
         realtimeRampSamples: positiveNumber(event.realtimeRampSamples),
         oscillatorRateCalculations: positiveNumber(event.oscillatorRateCalculations),

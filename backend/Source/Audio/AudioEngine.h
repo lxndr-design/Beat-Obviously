@@ -200,6 +200,8 @@ namespace beat
             int64_t filterSamples { 0 };
             int64_t filterDriveSamples { 0 };
             int64_t filterCoefficientUpdates { 0 };
+            int64_t filterCutoffUpdates { 0 };
+            int64_t filterResonanceUpdates { 0 };
             int64_t modulationSamples { 0 };
             int64_t realtimeRampSamples { 0 };
             int64_t oscillatorRateCalculations { 0 };
@@ -683,6 +685,8 @@ namespace beat
         std::atomic<int64_t> renderTimingFilterSamples { 0 };
         std::atomic<int64_t> renderTimingFilterDriveSamples { 0 };
         std::atomic<int64_t> renderTimingFilterCoefficientUpdates { 0 };
+        std::atomic<int64_t> renderTimingFilterCutoffUpdates { 0 };
+        std::atomic<int64_t> renderTimingFilterResonanceUpdates { 0 };
         std::atomic<int64_t> renderTimingModulationSamples { 0 };
         std::atomic<int64_t> renderTimingRealtimeRampSamples { 0 };
         std::atomic<int64_t> renderTimingOscillatorRateCalculations { 0 };

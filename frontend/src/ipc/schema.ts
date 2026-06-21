@@ -419,6 +419,8 @@ export type InboundEvent =
       filterSamples: number;
       filterDriveSamples: number;
       filterCoefficientUpdates: number;
+      filterCutoffUpdates: number;
+      filterResonanceUpdates: number;
       modulationSamples: number;
       realtimeRampSamples: number;
       oscillatorRateCalculations: number;

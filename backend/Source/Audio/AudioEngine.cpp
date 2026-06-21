@@ -1130,6 +1130,8 @@ namespace beat
         out.filterSamples = renderTimingFilterSamples.load(std::memory_order_relaxed);
         out.filterDriveSamples = renderTimingFilterDriveSamples.load(std::memory_order_relaxed);
         out.filterCoefficientUpdates = renderTimingFilterCoefficientUpdates.load(std::memory_order_relaxed);
+        out.filterCutoffUpdates = renderTimingFilterCutoffUpdates.load(std::memory_order_relaxed);
+        out.filterResonanceUpdates = renderTimingFilterResonanceUpdates.load(std::memory_order_relaxed);
         out.modulationSamples = renderTimingModulationSamples.load(std::memory_order_relaxed);
         out.realtimeRampSamples = renderTimingRealtimeRampSamples.load(std::memory_order_relaxed);
         out.oscillatorRateCalculations = renderTimingOscillatorRateCalculations.load(std::memory_order_relaxed);
@@ -3693,6 +3695,8 @@ namespace beat
         renderTimingFilterSamples.store(voiceWork.filterSamples, std::memory_order_relaxed);
         renderTimingFilterDriveSamples.store(voiceWork.filterDriveSamples, std::memory_order_relaxed);
         renderTimingFilterCoefficientUpdates.store(voiceWork.filterCoefficientUpdates, std::memory_order_relaxed);
+        renderTimingFilterCutoffUpdates.store(voiceWork.filterCutoffUpdates, std::memory_order_relaxed);
+        renderTimingFilterResonanceUpdates.store(voiceWork.filterResonanceUpdates, std::memory_order_relaxed);
         renderTimingModulationSamples.store(voiceWork.modulationSamples, std::memory_order_relaxed);
         renderTimingRealtimeRampSamples.store(voiceWork.realtimeRampSamples, std::memory_order_relaxed);
         renderTimingOscillatorRateCalculations.store(voiceWork.oscillatorRateCalculations, std::memory_order_relaxed);

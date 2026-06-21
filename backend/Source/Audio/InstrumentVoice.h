@@ -264,6 +264,8 @@ namespace beat
             int64_t filterSamples { 0 };
             int64_t filterDriveSamples { 0 };
             int64_t filterCoefficientUpdates { 0 };
+            int64_t filterCutoffUpdates { 0 };
+            int64_t filterResonanceUpdates { 0 };
             int64_t modulationSamples { 0 };
             int64_t realtimeRampSamples { 0 };
             int64_t oscillatorRateCalculations { 0 };
@@ -421,6 +423,8 @@ namespace beat
         int64_t currentBlockOscillatorRateCalculations { 0 };
         int64_t currentBlockFilterDriveSamples { 0 };
         int64_t currentBlockFilterCoefficientUpdates { 0 };
+        int64_t currentBlockFilterCutoffUpdates { 0 };
+        int64_t currentBlockFilterResonanceUpdates { 0 };
         int64_t currentBlockWavetableFrequencyUpdates { 0 };
         int64_t currentBlockWavetablePositionUpdates { 0 };
         DriveStage::State driveState;

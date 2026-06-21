@@ -103,6 +103,11 @@ export function RenderTimingPanel() {
             value={stale() ? "--" : `M ${formatCount(timing().modulationSamples)} / R ${formatCount(timing().realtimeRampSamples)} / P ${formatCount(timing().oscillatorRateCalculations)}`}
           />
           <StaticRow
+            label="Filter Churn"
+            staticValue={stale() ? "--" : `Cut ${formatCount(timing().filterCutoffUpdates)}`}
+            value={stale() ? "--" : `Res ${formatCount(timing().filterResonanceUpdates)}`}
+          />
+          <StaticRow
             label="WT Churn"
             staticValue={stale() ? "--" : `F ${formatCount(timing().wavetableFrequencyUpdates)}`}
             value={stale() ? "--" : `P ${formatCount(timing().wavetablePositionUpdates)}`}

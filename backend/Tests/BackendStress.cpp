@@ -518,6 +518,8 @@ namespace
         instrument.dynamicModulation.oscBPosition.lfo = 0.38f;
         instrument.dynamicModulation.oscBPosition.lfoBipolar = false;
         instrument.dynamicModulation.filterCutoff.env = 0.18f;
+        instrument.dynamicModulation.filterResonance.lfo = 0.16f;
+        instrument.dynamicModulation.filterResonance.lfoBipolar = false;
         instrument.dynamicModulation.unisonDetune.lfo = 0.08f;
         instrument.dynamicModulation.unisonDetune.lfoBipolar = false;
         instrument.dynamicModulation.unisonSpread.lfo = 0.2f;
@@ -8781,11 +8783,14 @@ namespace
         int64_t maxFilterSamples = 0;
         int64_t maxFilterDriveSamples = 0;
         int64_t maxFilterCoefficientUpdates = 0;
+        int64_t maxFilterCutoffUpdates = 0;
+        int64_t maxFilterResonanceUpdates = 0;
         int64_t maxModulationSamples = 0;
         int64_t maxRealtimeRampSamples = 0;
         int64_t maxRouteEffectSamples = 0;
         int64_t maxRouteFilterEffectSamples = 0;
         int64_t maxRouteNonlinearEffectSamples = 0;
+        bool filterCoefficientSplitMatched = true;
 
         for (int block = 0; block < 64; ++block)
         {
@@ -8831,6 +8836,10 @@ namespace
             maxFilterSamples = juce::jmax(maxFilterSamples, timing.filterSamples);
             maxFilterDriveSamples = juce::jmax(maxFilterDriveSamples, timing.filterDriveSamples);
             maxFilterCoefficientUpdates = juce::jmax(maxFilterCoefficientUpdates, timing.filterCoefficientUpdates);
+            maxFilterCutoffUpdates = juce::jmax(maxFilterCutoffUpdates, timing.filterCutoffUpdates);
+            maxFilterResonanceUpdates = juce::jmax(maxFilterResonanceUpdates, timing.filterResonanceUpdates);
+            filterCoefficientSplitMatched = filterCoefficientSplitMatched
+                && timing.filterCoefficientUpdates == timing.filterCutoffUpdates + timing.filterResonanceUpdates;
             maxModulationSamples = juce::jmax(maxModulationSamples, timing.modulationSamples);
             maxRealtimeRampSamples = juce::jmax(maxRealtimeRampSamples, timing.realtimeRampSamples);
             maxRouteEffectSamples = juce::jmax(maxRouteEffectSamples, timing.routeEffectSamples);
@@ -8853,6 +8862,9 @@ namespace
             && maxFilterSamples > 0
             && maxFilterDriveSamples > 0
             && maxFilterCoefficientUpdates > 0
+            && maxFilterCutoffUpdates > 0
+            && maxFilterResonanceUpdates > 0
+            && filterCoefficientSplitMatched
             && maxModulationSamples > 0
             && maxRealtimeRampSamples > 0
             && maxRouteEffectSamples > 0
@@ -8874,6 +8886,9 @@ namespace
                       << " filterSamples=" << maxFilterSamples
                       << " filterDriveSamples=" << maxFilterDriveSamples
                       << " filterCoeffUpdates=" << maxFilterCoefficientUpdates
+                      << " filterCutoffUpdates=" << maxFilterCutoffUpdates
+                      << " filterResonanceUpdates=" << maxFilterResonanceUpdates
+                      << " filterCoeffSplitMatched=" << (filterCoefficientSplitMatched ? 1 : 0)
                       << " modSamples=" << maxModulationSamples
                       << " rampSamples=" << maxRealtimeRampSamples
                       << " routeFxSamples=" << maxRouteEffectSamples

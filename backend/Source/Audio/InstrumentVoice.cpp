@@ -30,6 +30,8 @@ namespace beat
         std::atomic<int64_t> renderFilterSamples { 0 };
         std::atomic<int64_t> renderFilterDriveSamples { 0 };
         std::atomic<int64_t> renderFilterCoefficientUpdates { 0 };
+        std::atomic<int64_t> renderFilterCutoffUpdates { 0 };
+        std::atomic<int64_t> renderFilterResonanceUpdates { 0 };
         std::atomic<int64_t> renderModulationSamples { 0 };
         std::atomic<int64_t> renderRealtimeRampSamples { 0 };
         std::atomic<int64_t> renderOscillatorRateCalculations { 0 };
@@ -253,6 +255,8 @@ namespace beat
             renderFilterSamples.exchange(0, std::memory_order_relaxed),
             renderFilterDriveSamples.exchange(0, std::memory_order_relaxed),
             renderFilterCoefficientUpdates.exchange(0, std::memory_order_relaxed),
+            renderFilterCutoffUpdates.exchange(0, std::memory_order_relaxed),
+            renderFilterResonanceUpdates.exchange(0, std::memory_order_relaxed),
             renderModulationSamples.exchange(0, std::memory_order_relaxed),
             renderRealtimeRampSamples.exchange(0, std::memory_order_relaxed),
             renderOscillatorRateCalculations.exchange(0, std::memory_order_relaxed),
@@ -855,6 +859,8 @@ namespace beat
         currentBlockOscillatorRateCalculations = 0;
         currentBlockFilterDriveSamples = 0;
         currentBlockFilterCoefficientUpdates = 0;
+        currentBlockFilterCutoffUpdates = 0;
+        currentBlockFilterResonanceUpdates = 0;
         currentBlockWavetableFrequencyUpdates = 0;
         currentBlockWavetablePositionUpdates = 0;
 
@@ -954,17 +960,21 @@ namespace beat
                 const float cutoffMod = useDynamicModulation && cachedDynamicTargets.filterCutoff
                     ? DynamicModulation::targetOffset(params.dynamicModulation.filterCutoff, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 0.35f)
                     : filterLfo * params.lfoToFilter * 0.35f + env * params.envToFilter * 0.35f;
-                currentBlockFilterCoefficientUpdates += filterState.updateCutoffIfChanged(
+                const int cutoffUpdates = filterState.updateCutoffIfChanged(
                     params.cutoff01 + cutoffMod,
                     sampleRate,
                     params.filterKeytrack,
                     baseFrequencyHz,
                     6.0f);
+                currentBlockFilterCutoffUpdates += cutoffUpdates;
+                currentBlockFilterCoefficientUpdates += cutoffUpdates;
                 if (useDynamicModulation && cachedDynamicTargets.filterResonance)
                 {
                     const float resonance = clamp01(params.resonance01
                         + DynamicModulation::targetOffset(params.dynamicModulation.filterResonance, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f));
-                    currentBlockFilterCoefficientUpdates += filterState.updateResonanceIfChanged(resonance, 0.001f);
+                    const int resonanceUpdates = filterState.updateResonanceIfChanged(resonance, 0.001f);
+                    currentBlockFilterResonanceUpdates += resonanceUpdates;
+                    currentBlockFilterCoefficientUpdates += resonanceUpdates;
                 }
             }
             const auto filtered = filterState.process(left, right);
@@ -1023,6 +1033,8 @@ namespace beat
         renderFilterSamples.fetch_add((int64_t) numSamples * 2, std::memory_order_relaxed);
         renderFilterDriveSamples.fetch_add(currentBlockFilterDriveSamples, std::memory_order_relaxed);
         renderFilterCoefficientUpdates.fetch_add(currentBlockFilterCoefficientUpdates, std::memory_order_relaxed);
+        renderFilterCutoffUpdates.fetch_add(currentBlockFilterCutoffUpdates, std::memory_order_relaxed);
+        renderFilterResonanceUpdates.fetch_add(currentBlockFilterResonanceUpdates, std::memory_order_relaxed);
         renderModulationSamples.fetch_add(modulationSamples, std::memory_order_relaxed);
         renderRealtimeRampSamples.fetch_add(realtimeRampSamples, std::memory_order_relaxed);
         renderOscillatorRateCalculations.fetch_add(currentBlockOscillatorRateCalculations, std::memory_order_relaxed);

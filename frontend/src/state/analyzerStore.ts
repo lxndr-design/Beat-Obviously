@@ -48,6 +48,8 @@ export interface RenderTimingSnapshot {
   filterSamples: number;
   filterDriveSamples: number;
   filterCoefficientUpdates: number;
+  filterCutoffUpdates: number;
+  filterResonanceUpdates: number;
   modulationSamples: number;
   realtimeRampSamples: number;
   oscillatorRateCalculations: number;
@@ -132,6 +134,8 @@ function createEmptyRenderTiming(): RenderTimingSnapshot {
     filterSamples: 0,
     filterDriveSamples: 0,
     filterCoefficientUpdates: 0,
+    filterCutoffUpdates: 0,
+    filterResonanceUpdates: 0,
     modulationSamples: 0,
     realtimeRampSamples: 0,
     oscillatorRateCalculations: 0,
