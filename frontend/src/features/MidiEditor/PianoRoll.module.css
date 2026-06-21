@@ -212,6 +212,23 @@
   opacity: 0.45;
 }
 
+.noteAuditioned {
+  border-color: color-mix(in srgb, var(--interaction-playback-accent) 80%, var(--color-fg));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interaction-playback-accent) 64%, transparent),
+    0 0 16px color-mix(in srgb, var(--interaction-playback-accent) 42%, transparent);
+}
+
+.noteAuditioned::before {
+  background: color-mix(in srgb, var(--interaction-playback-accent) 28%, transparent);
+  opacity: 1;
+}
+
+.noteAuditioned::after {
+  background: var(--interaction-playback-accent);
+  opacity: 1;
+}
+
 .noteVolumeOverlay {
   position: absolute;
   left: 3px;

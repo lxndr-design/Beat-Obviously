@@ -7,3 +7,8 @@
 .note {
   fill: var(--color-bg); /* black on white segment body */
 }
+
+.playing {
+  fill: color-mix(in srgb, var(--color-bg) 76%, var(--interaction-playback-accent));
+  filter: drop-shadow(0 0 0.08px var(--interaction-playback-accent));
+}

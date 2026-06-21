@@ -376,6 +376,9 @@ export function App() {
             stopTimelineAudio();
           }
           break;
+        case "engine.segmentTrigger":
+          useUiStore.getState().triggerSegmentPlayback(event.segmentId);
+          break;
         case "native.menuCommand":
           void handleNativeMenuCommand(event.command).catch((error) => {
             void appAlert(error instanceof Error ? error.message : "Project command failed.");

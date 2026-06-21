@@ -1647,6 +1647,8 @@ export const usePluginStore = create<PluginLibrarySlice>()(
 // ---------------------------------------------------------------------------
 // UI: ephemeral selection / modal state.
 // ---------------------------------------------------------------------------
+let segmentPlaybackToken = 0;
+
 interface UiSlice extends UiState {
   selectTrack: (id: Id, additive?: boolean) => void;
   setSelectedTracks: (ids: Id[]) => void;
@@ -1654,6 +1656,7 @@ interface UiSlice extends UiState {
   setSelectedSegments: (ids: Id[]) => void;
   selectTrackEffectAutomationPoint: (key: string, additive?: boolean) => void;
   clearSelection: () => void;
+  triggerSegmentPlayback: (id: Id) => void;
   openEditor: (e: UiState["openEditors"][number]) => void;
   closeEditor: (e: UiState["openEditors"][number]) => void;
   openTrackEffects: (trackId: Id) => void;
@@ -1664,6 +1667,7 @@ export const useUiStore = create<UiSlice>()((set) => ({
   selectedTrackIds: [],
   selectedSegmentIds: [],
   selectedTrackEffectAutomationPointKeys: [],
+  activeSegmentPlayback: {},
   openEditors: [],
   trackEffectsEditorTrackId: null,
   selectTrack: (id, additive) =>
@@ -1706,6 +1710,22 @@ export const useUiStore = create<UiSlice>()((set) => ({
     })),
   clearSelection: () =>
     set({ selectedTrackIds: [], selectedSegmentIds: [], selectedTrackEffectAutomationPointKeys: [] }),
+  triggerSegmentPlayback: (id) => {
+    const token = ++segmentPlaybackToken;
+    set((s) => ({
+      activeSegmentPlayback: {
+        ...s.activeSegmentPlayback,
+        [id]: token,
+      },
+    }));
+    globalThis.setTimeout(() => {
+      set((s) => {
+        if (s.activeSegmentPlayback[id] !== token) return s;
+        const { [id]: _expired, ...nextActive } = s.activeSegmentPlayback;
+        return { activeSegmentPlayback: nextActive };
+      });
+    }, 220);
+  },
   openEditor: (e) =>
     set((s) => ({
       openEditors: dedupeEditor(s.openEditors, e),

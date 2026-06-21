@@ -86,6 +86,7 @@ export function Segment(props: Props) {
   const timelineSmartGrid = createStoreSelector(useSettingsStore, (state) => state.timelineSmartGrid);
   const timelineSubdivision = createStoreSelector(useSettingsStore, (state) => state.timelineSubdivision);
   const selectedSegmentIds = createStoreSelector(useUiStore, (state) => state.selectedSegmentIds);
+  const activeSegmentPlayback = createStoreSelector(useUiStore, (state) => state.activeSegmentPlayback);
   const openEditors = createStoreSelector(useUiStore, (state) => state.openEditors);
   const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
   const plugins = createStoreSelector(usePluginStore, (state) => state.plugins);
@@ -97,6 +98,7 @@ export function Segment(props: Props) {
 
   const liveSeg = createMemo(() => project().tracks.flatMap((track) => track.segments).find((segment) => segment.id === props.segmentId));
   const selected = createMemo(() => selectedSegmentIds().includes(props.segmentId));
+  const playing = createMemo(() => Boolean(activeSegmentPlayback()[props.segmentId]));
   const editing = createMemo(() => openEditors().some((editor) => editor.kind === "segment" && editor.segmentId === props.segmentId));
   const liveInstrument = createMemo(() => {
     const segment = liveSeg();
@@ -552,6 +554,7 @@ export function Segment(props: Props) {
         selected() && styles.selected,
         editing() && styles.editing,
         dragging() && styles.dragging,
+        playing() && styles.playing,
         props.layer > 0 && styles.layered,
         props.repetition > 0 && styles.virtual,
       ].filter(Boolean).join(" ")}
@@ -641,10 +644,10 @@ export function Segment(props: Props) {
         </div>
         <div class={styles.content}>
           <Show when={props.payloadKind === "midi" && liveSeg()}>
-            {(segment) => <SegmentMidiPreview segment={segment()} displayLengthBeats={visualLengthBeats()} />}
+            {(segment) => <SegmentMidiPreview segment={segment()} displayLengthBeats={visualLengthBeats()} playing={playing()} />}
           </Show>
           <Show when={props.payloadKind === "drum" && liveSeg()}>
-            {(segment) => <SegmentDrumPreview segment={segment()} displayLengthBeats={visualLengthBeats()} />}
+            {(segment) => <SegmentDrumPreview segment={segment()} displayLengthBeats={visualLengthBeats()} playing={playing()} />}
           </Show>
           <Show when={props.payloadKind === "audio" && liveSeg()}>
             {(segment) => <SegmentWaveform segment={segment()} />}

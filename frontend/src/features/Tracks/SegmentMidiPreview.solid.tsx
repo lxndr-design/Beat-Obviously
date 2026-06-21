@@ -5,6 +5,7 @@ import styles from "./SegmentMidiPreview.module.css";
 interface Props {
   segment: Segment;
   displayLengthBeats?: number;
+  playing?: boolean;
 }
 
 export function SegmentMidiPreview(props: Props) {
@@ -45,7 +46,7 @@ export function SegmentMidiPreview(props: Props) {
                 y={Math.max(0, Math.min(98, y - 2))}
                 width={Math.max(0, Math.min(viewLength() - note.startBeat, Math.max(0.04, note.lengthBeats)))}
                 height={3}
-                class={styles.note}
+                class={`${styles.note} ${props.playing ? styles.playing : ""}`}
               />
             );
           }}

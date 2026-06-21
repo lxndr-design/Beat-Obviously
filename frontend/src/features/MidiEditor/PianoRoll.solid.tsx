@@ -101,6 +101,8 @@ export function PianoRoll(props: PianoRollProps) {
   const lastDrawnLengthRef = createRef(DEFAULT_NOTE_LENGTH_BEATS);
   const lastPointerTargetRef = createRef<PasteTarget | null>(null);
   const historyRef = createRef<MidiNote[][]>([]);
+  const dragAuditionRef = createRef<{ idx: number; pitch: number } | null>(null);
+  const [auditionedNoteIndex, setAuditionedNoteIndex] = createSignal<number | null>(null);
   const midiSmartGrid = createStoreSelector(useSettingsStore, (s) => s.midiSmartGrid);
   const midiSubdivision = createStoreSelector(useSettingsStore, (s) => s.midiSubdivision);
   const drag = createRef<
@@ -132,6 +134,32 @@ export function PianoRoll(props: PianoRollProps) {
     | { mode: "select"; anchorX: number; anchorY: number; pointerId: number }
     | null
   >(null);
+  let auditionTimer: number | null = null;
+
+  function clearDragAudition() {
+    dragAuditionRef.current = null;
+    setAuditionedNoteIndex(null);
+    if (auditionTimer != null) {
+      window.clearTimeout(auditionTimer);
+      auditionTimer = null;
+    }
+  }
+
+  function previewDraggedNote(idx: number, pitch: number, velocity?: number) {
+    if (dragAuditionRef.current?.idx === idx && dragAuditionRef.current.pitch === pitch) return;
+    dragAuditionRef.current = { idx, pitch };
+    onPreviewNote(pitch, velocity);
+    setAuditionedNoteIndex(idx);
+    if (auditionTimer != null) window.clearTimeout(auditionTimer);
+    auditionTimer = window.setTimeout(() => {
+      setAuditionedNoteIndex((current) => current === idx ? null : current);
+      auditionTimer = null;
+    }, 150);
+  }
+
+  onCleanup(() => {
+    if (auditionTimer != null) window.clearTimeout(auditionTimer);
+  });
 
   const width = () => lengthBeats * pxPerBeat();
   const height = PITCH_RANGE * PX_PER_PITCH;
@@ -374,6 +402,10 @@ export function PianoRoll(props: PianoRollProps) {
         })),
         historyPushed: true,
       };
+      const auditionIdx = duplicated.indices.length === 1 ? duplicated.indices[0] : null;
+      dragAuditionRef.current = auditionIdx == null
+        ? null
+        : { idx: auditionIdx, pitch: duplicated.notes[auditionIdx]?.pitch ?? -1 };
       setDragActive(true);
       return;
     }
@@ -390,6 +422,10 @@ export function PianoRoll(props: PianoRollProps) {
         curve: structuredClone(notes[i].curve),
       })),
     };
+    const auditionIdx = indices.length === 1 ? indices[0] : null;
+    dragAuditionRef.current = auditionIdx == null
+      ? null
+      : { idx: auditionIdx, pitch: notes[auditionIdx]?.pitch ?? -1 };
     setDragActive(true);
     setSelected(e.shiftKey
       ? selected().includes(idx) ? selected() : [...selected(), idx]
@@ -463,6 +499,11 @@ export function PianoRoll(props: PianoRollProps) {
           curve: shiftCurveWithNote(start.curve, start.pitch, startBeat, pitch, start.lengthBeats),
         };
       });
+      if (d.indices.length === 1) {
+        const idx = d.indices[0];
+        const moved = next[idx];
+        if (moved) previewDraggedNote(idx, moved.pitch, moved.velocity);
+      }
       applyTransientChange(next);
     } else if (d.mode === "resize") {
       ensureDragHistory(d);
@@ -526,6 +567,7 @@ export function PianoRoll(props: PianoRollProps) {
     }
     setLengthHandleActive(false);
     drag.current = null;
+    clearDragAudition();
     setDragActive(false);
   }
 
@@ -1089,12 +1131,13 @@ export function PianoRoll(props: PianoRollProps) {
               const rect = visibleNoteRect(n);
               if (!rect) return null;
               const isSelected = selected().includes(i);
+              const isAuditioned = auditionedNoteIndex() === i;
               const hovered = hoveredNoteSide();
               const hoveredSide = hovered?.idx === i ? hovered.side : null;
               const volumePercent = Math.round((clamp(n.velocity, 0, 127) / 127) * 100);
               return (
                 <div
-                  class={`${styles.note} ${isSelected ? styles.noteSelected : ""} ${hoveredSide === "left" ? styles.noteHoverLeft : ""} ${hoveredSide === "right" ? styles.noteHoverRight : ""}`}
+                  class={`${styles.note} ${isSelected ? styles.noteSelected : ""} ${isAuditioned ? styles.noteAuditioned : ""} ${hoveredSide === "left" ? styles.noteHoverLeft : ""} ${hoveredSide === "right" ? styles.noteHoverRight : ""}`}
                   style={{
                     left: px(rect.left),
                     top: px(rect.top),

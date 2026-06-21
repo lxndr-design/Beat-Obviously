@@ -70,6 +70,7 @@
   --aether-bridge-deep-red: #1b0603;
   --aether-bridge-deep-orange: #381006;
   --aether-bridge-deep-cyan: #05313d;
+  --interaction-playback-accent: #00f5ff;
 
   /* Off-white for foreground-active surfaces and high-contrast controls.
    * List rows use --surface-hover so scanning does not flash full white. */
@@ -89,18 +90,46 @@
   --border-fg-color: color-mix(in srgb, var(--color-fg) 72%, transparent);
   --border-soft: 1px solid color-mix(in srgb, var(--color-fg) 35%, transparent);
 
+  /* Low-opacity mesh tints. These replace flat white hover fills while keeping
+   * the monochrome base intact. Components can opt into a variant by assigning
+   * --interaction-mesh-current. */
+  --interaction-mesh-a:
+    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.18), transparent 30%),
+    radial-gradient(circle at 86% 80%, rgba(255, 255, 255, 0.10), transparent 36%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.12));
+  --interaction-mesh-b:
+    radial-gradient(circle at 78% 20%, rgba(255, 255, 255, 0.16), transparent 34%),
+    radial-gradient(circle at 16% 88%, rgba(255, 255, 255, 0.08), transparent 38%),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.11));
+  --interaction-mesh-c:
+    radial-gradient(circle at 52% 10%, rgba(255, 255, 255, 0.13), transparent 28%),
+    radial-gradient(circle at 10% 62%, rgba(255, 255, 255, 0.09), transparent 42%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.115));
+  --interaction-mesh-d:
+    radial-gradient(circle at 8% 22%, rgba(255, 255, 255, 0.12), transparent 32%),
+    radial-gradient(circle at 92% 52%, rgba(255, 255, 255, 0.11), transparent 34%),
+    linear-gradient(100deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.105));
+  --interaction-mesh-current: var(--interaction-mesh-a);
+
   /* Unified interaction states. Hover is always a tint, press is a slightly
    * firmer tint, and selected/active states keep their own stable fills. */
-  --interaction-hover-bg: var(--surface-hover);
-  --interaction-pressed-bg: color-mix(in srgb, var(--color-fg) 22%, var(--color-bg));
-  --interaction-selected-bg: var(--surface-selected);
-  --interaction-selected-hover-bg: var(--surface-selected-strong);
+  --interaction-hover-bg: var(--interaction-mesh-current);
+  --interaction-pressed-bg:
+    var(--interaction-mesh-current),
+    linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08));
+  --interaction-selected-bg:
+    var(--interaction-mesh-current),
+    linear-gradient(rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.18));
+  --interaction-selected-hover-bg:
+    var(--interaction-mesh-current),
+    linear-gradient(rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.25));
   --interaction-active-bg: var(--color-fg);
   --interaction-active-hover-bg: var(--color-fg-hover);
   --interaction-active-fg: var(--color-fg-inverse);
   --interaction-focus-ring: inset 0 0 0 1px var(--border-fg-color);
   --interaction-press-transform: translateY(1px);
   --interaction-transition:
+    background var(--duration-hover) var(--ease-out),
     background-color var(--duration-hover) var(--ease-out),
     color var(--duration-hover) var(--ease-out),
     opacity var(--duration-hover) var(--ease-out),
@@ -182,6 +211,7 @@
    */
   --duration-hover: 0.1s;       /* hover info reveal and interaction feedback */
   --duration-slide: 0.2s;       /* panels, modals enter/leave */
+  --duration-playback-pulse: 0.22s;
   --duration-flash: 0.05s;      /* playback flash to white */
   --duration-fade: 0.4s;        /* playback fade back to black */
 

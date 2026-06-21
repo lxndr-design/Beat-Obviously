@@ -7,7 +7,10 @@
   overflow: hidden;
   user-select: none;
   border: var(--border-fg);
-  transition: background var(--duration-hover) var(--ease-linear);
+  transition:
+    background var(--duration-hover) var(--ease-linear),
+    border-color var(--duration-hover) var(--ease-linear),
+    box-shadow var(--duration-hover) var(--ease-linear);
 }
 
 .segment::before,
@@ -317,7 +320,46 @@
   outline-offset: 2px;
 }
 
-/* Track playback flash — applied when sequencer reports trigger */
 .segment.playing {
-  animation: beat-playback-flash var(--duration-fade) var(--ease-out);
+  background: var(--interaction-playback-accent);
+  border-color: color-mix(in srgb, var(--interaction-playback-accent) 80%, var(--color-fg));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interaction-playback-accent) 70%, transparent),
+    0 0 18px color-mix(in srgb, var(--interaction-playback-accent) 42%, transparent);
+  animation: segment-playback-pulse var(--duration-playback-pulse) var(--ease-out);
+}
+
+.segment.playing:hover,
+.segment.playing.selected,
+.segment.playing.editing {
+  background: var(--interaction-playback-accent);
+}
+
+.segment.playing .labelStrip {
+  background: color-mix(in srgb, var(--interaction-playback-accent) 82%, var(--color-bg));
+  color: var(--color-bg);
+  border-bottom-color: color-mix(in srgb, var(--color-bg) 55%, transparent);
+}
+
+.segment.playing .content {
+  background: inherit;
+  color: var(--color-bg);
+}
+
+.segment.playing .handle {
+  background: var(--color-bg);
+}
+
+.segment.playing .fadeHandle {
+  color: var(--color-bg);
+}
+
+@keyframes segment-playback-pulse {
+  from {
+    filter: brightness(1.35);
+  }
+
+  to {
+    filter: brightness(1);
+  }
 }

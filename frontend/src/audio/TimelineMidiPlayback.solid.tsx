@@ -1,6 +1,6 @@
 import { createEffect, onCleanup, untrack } from "solid-js";
 import { createStoreSelector } from "../solid-utils/store";
-import { useInstrumentStore, useProjectStore, useTransportStore } from "../state/store";
+import { useInstrumentStore, useProjectStore, useTransportStore, useUiStore } from "../state/store";
 import { expandTrackSegments, isTrackAudible } from "../state/selectors";
 import { isNative } from "../ipc/bridge";
 import { getTimelineAudioContext, scheduleTimelineMidiNote, stopTimelineAudio } from "./timelineAudio";
@@ -135,6 +135,7 @@ export function TimelineMidiPlayback() {
                   bpm,
                 );
                 scheduled.add(key);
+                useUiStore.getState().triggerSegmentPlayback(seg.id);
                 trackPeak = Math.max(trackPeak, velocity / 127);
               }
             }
@@ -167,6 +168,7 @@ export function TimelineMidiPlayback() {
               bpm,
             );
             scheduled.add(key);
+            useUiStore.getState().triggerSegmentPlayback(seg.id);
             trackPeak = Math.max(trackPeak, noteWithGain.velocity / 127);
           });
         }

@@ -6,6 +6,7 @@ import styles from "./SegmentDrumPreview.module.css";
 interface Props {
   segment: Segment;
   displayLengthBeats?: number;
+  playing?: boolean;
 }
 
 export function SegmentDrumPreview(props: Props) {
@@ -38,7 +39,7 @@ export function SegmentDrumPreview(props: Props) {
                           y={rowTop + rowHeight * 0.22}
                           width={markerWidth}
                           height={Math.max(2.5, rowHeight * 0.56)}
-                          class={styles.hit}
+                          class={`${styles.hit} ${props.playing ? styles.playing : ""}`}
                         />
                       );
                     }}

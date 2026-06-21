@@ -753,6 +753,8 @@ export interface UiState {
   selectedTrackIds: Id[];
   selectedSegmentIds: Id[];
   selectedTrackEffectAutomationPointKeys: string[];
+  /** Segment ids that are currently receiving a short playback pulse. */
+  activeSegmentPlayback: Record<Id, number>;
   /** Open editors. Multiple modals can be open at once. */
   openEditors: Array<
     | { kind: "instrument"; instrumentId: Id }
