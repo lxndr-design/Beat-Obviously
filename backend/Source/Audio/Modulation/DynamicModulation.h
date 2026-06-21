@@ -6,6 +6,26 @@
 
 namespace beat::DynamicModulation
 {
+    struct TargetActivityFlags
+    {
+        bool ampPan { false };
+        bool oscAPan { false };
+        bool oscBPan { false };
+        bool oscAFine { false };
+        bool oscBFine { false };
+        bool oscAPosition { false };
+        bool oscBPosition { false };
+        bool oscALevel { false };
+        bool oscBLevel { false };
+        bool filterCutoff { false };
+        bool filterResonance { false };
+        bool filterDrive { false };
+        bool ampLevel { false };
+        bool unisonDetune { false };
+        bool unisonSpread { false };
+        bool any { false };
+    };
+
     inline float routeEnvValue(float env, bool bipolar) noexcept
     {
         return bipolar ? env * 2.0f - 1.0f : env;
@@ -42,5 +62,51 @@ namespace beat::DynamicModulation
             + routeEnvValue(velocity, target.velocityBipolar) * target.velocity
             + routeEnvValue(keytrack, target.keytrackBipolar) * target.keytrack
             + routeEnvValue(modWheel, target.modWheelBipolar) * target.modWheel) * scale;
+    }
+
+    template <typename Modulation>
+    TargetActivityFlags targetActivityFlags(const Modulation& modulation) noexcept
+    {
+        if (!modulation.active)
+            return {};
+
+        TargetActivityFlags flags;
+        flags.ampPan = targetActive(modulation.ampPan);
+        flags.oscAPan = targetActive(modulation.oscAPan);
+        flags.oscBPan = targetActive(modulation.oscBPan);
+        flags.oscAFine = targetActive(modulation.oscAFine);
+        flags.oscBFine = targetActive(modulation.oscBFine);
+        flags.oscAPosition = targetActive(modulation.oscAPosition);
+        flags.oscBPosition = targetActive(modulation.oscBPosition);
+        flags.oscALevel = targetActive(modulation.oscALevel);
+        flags.oscBLevel = targetActive(modulation.oscBLevel);
+        flags.filterCutoff = targetActive(modulation.filterCutoff);
+        flags.filterResonance = targetActive(modulation.filterResonance);
+        flags.filterDrive = targetActive(modulation.filterDrive);
+        flags.ampLevel = targetActive(modulation.ampLevel);
+        flags.unisonDetune = targetActive(modulation.unisonDetune);
+        flags.unisonSpread = targetActive(modulation.unisonSpread);
+        flags.any =
+            flags.ampPan
+            || flags.oscAPan
+            || flags.oscBPan
+            || flags.oscAFine
+            || flags.oscBFine
+            || flags.oscAPosition
+            || flags.oscBPosition
+            || flags.oscALevel
+            || flags.oscBLevel
+            || flags.filterCutoff
+            || flags.filterResonance
+            || flags.filterDrive
+            || flags.ampLevel
+            || flags.unisonDetune
+            || flags.unisonSpread;
+        return flags;
+    }
+
+    inline bool hasFilterCoefficientMod(const TargetActivityFlags& flags) noexcept
+    {
+        return flags.filterCutoff || flags.filterResonance;
     }
 }

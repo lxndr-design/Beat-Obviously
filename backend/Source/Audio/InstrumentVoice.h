@@ -3,6 +3,7 @@
 #include "Envelope/EnvelopeShaper.h"
 #include "Filter/DriveStage.h"
 #include "Filter/FilterStage.h"
+#include "Modulation/DynamicModulation.h"
 #include "Realtime/RealtimeParameterQueue.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
@@ -398,22 +399,7 @@ namespace beat
         double cachedAetherOscARate { 1.0 };
         double cachedAetherOscBRate { 1.0 };
         double cachedAetherSubRate { 0.5 };
-        bool cachedAmpPanDynamic { false };
-        bool cachedAetherOscAPanDynamic { false };
-        bool cachedAetherOscBPanDynamic { false };
-        bool cachedAetherOscAFineDynamic { false };
-        bool cachedAetherOscBFineDynamic { false };
-        bool cachedAetherOscAPositionDynamic { false };
-        bool cachedAetherOscBPositionDynamic { false };
-        bool cachedAetherOscALevelDynamic { false };
-        bool cachedAetherOscBLevelDynamic { false };
-        bool cachedFilterCutoffDynamic { false };
-        bool cachedFilterResonanceDynamic { false };
-        bool cachedFilterDriveDynamic { false };
-        bool cachedAmpLevelDynamic { false };
-        bool cachedUnisonDetuneDynamic { false };
-        bool cachedUnisonSpreadDynamic { false };
-        bool cachedAnyDynamicModulationTarget { false };
+        DynamicModulation::TargetActivityFlags cachedDynamicTargets;
         std::array<RealtimeRamp, (size_t) RealtimeParam::Count> realtimeRamps;
         std::array<size_t, (size_t) RealtimeParam::Count> activeRealtimeRampIndices {};
         int activeRealtimeRampCount { 0 };

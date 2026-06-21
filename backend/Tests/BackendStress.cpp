@@ -170,7 +170,31 @@ namespace
             0.25f,
             2.0f);
 
-        return near(offset, -0.075f);
+        if (!near(offset, -0.075f))
+            return false;
+
+        beat::InstrumentVoice::Params::DynamicModulation disabled;
+        disabled.oscAPosition.lfo = 1.0f;
+        if (beat::DynamicModulation::targetActivityFlags(disabled).any)
+            return false;
+
+        beat::InstrumentVoice::Params::DynamicModulation modulation;
+        modulation.active = true;
+        modulation.oscAPosition.lfo = 0.5f;
+        modulation.oscBPan.env2 = 0.2f;
+        modulation.filterCutoff.velocity = 0.3f;
+        modulation.filterResonance.modWheel = 0.4f;
+        modulation.ampLevel.keytrack = 0.2f;
+        const auto flags = beat::DynamicModulation::targetActivityFlags(modulation);
+        return flags.any
+            && flags.oscAPosition
+            && flags.oscBPan
+            && flags.filterCutoff
+            && flags.filterResonance
+            && flags.ampLevel
+            && !flags.oscAPan
+            && !flags.filterDrive
+            && beat::DynamicModulation::hasFilterCoefficientMod(flags);
     }
 
     bool stressBasicOscillatorHelper()
