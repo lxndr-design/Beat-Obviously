@@ -20,6 +20,7 @@
 #include "../Source/Audio/Recording/RecordingSessionPlanner.h"
 #include "../Source/Audio/Rendering/TrackBouncePlanner.h"
 #include "../Source/Audio/Sampler/DecentSamplerImporter.h"
+#include "../Source/Audio/VoiceAllocation.h"
 #include "../Source/Audio/Wavetable/WavetableFactory.h"
 #include "../Source/Audio/Wavetable/WavetableOscillator.h"
 #include "../Source/Persistence/ProjectAssetPackage.h"
@@ -285,6 +286,27 @@ namespace
         for (int i = 0; i < 64; ++i)
             frame = state.process(i == 0 ? 1.0f : 0.0f, i == 0 ? -1.0f : 0.0f);
         return std::isfinite(frame.left) && std::isfinite(frame.right);
+    }
+
+    bool stressVoiceAllocationHelper()
+    {
+        const auto minPoly = beat::VoiceAllocation::policyFor(0, false, true);
+        if (minPoly.voiceCount != 1 || minPoly.mono || minPoly.legato || !minPoly.noteStealing)
+            return false;
+
+        const auto maxPoly = beat::VoiceAllocation::policyFor(99, false, true);
+        if (maxPoly.voiceCount != 32 || maxPoly.mono || maxPoly.legato || !maxPoly.noteStealing)
+            return false;
+
+        const auto monoLegato = beat::VoiceAllocation::policyFor(12, true, true);
+        if (monoLegato.voiceCount != 1 || !monoLegato.mono || !monoLegato.legato || !monoLegato.noteStealing)
+            return false;
+
+        const auto monoNoLegato = beat::VoiceAllocation::policyFor(12, true, false);
+        return monoNoLegato.voiceCount == 1
+            && monoNoLegato.mono
+            && !monoNoLegato.legato
+            && monoNoLegato.noteStealing;
     }
 
     beat::Project makeStressProject()
@@ -10710,6 +10732,11 @@ int main()
     if (!stressFilterStageHelper())
     {
         std::cerr << "Filter stage helper stress failed\n";
+        return 1;
+    }
+    if (!stressVoiceAllocationHelper())
+    {
+        std::cerr << "Voice allocation helper stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceWavetablePath())

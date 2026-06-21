@@ -1,5 +1,6 @@
 #include "AudioEngine.h"
 #include "Effects/TrackEffectDefaults.h"
+#include "VoiceAllocation.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1494,9 +1495,10 @@ namespace beat
         params.ampLevel = instrument.ampLevel;
         params.ampPan = instrument.ampPan;
         params.glideMs = juce::jlimit(0.0f, 5000.0f, instrument.glideMs);
-        params.mono = instrument.mono;
-        params.legato = instrument.mono && instrument.legato;
-        params.maxVoices = params.mono ? 1 : juce::jlimit(1, 32, instrument.maxVoices);
+        const auto allocation = VoiceAllocation::policyFor(instrument.maxVoices, instrument.mono, instrument.legato);
+        params.mono = allocation.mono;
+        params.legato = allocation.legato;
+        params.maxVoices = allocation.voiceCount;
         params.waveform = instrument.waveform;
         params.wavetableBank = instrument.wavetableBank;
         params.wavetablePosition = instrument.wavetablePosition;
@@ -1611,8 +1613,8 @@ namespace beat
             instrument.aether.noise.color,
         };
 
-        instrumentSynth->setNoteStealingEnabled(true);
-        for (int i = 0; i < params.maxVoices; ++i)
+        instrumentSynth->setNoteStealingEnabled(allocation.noteStealing);
+        for (int i = 0; i < allocation.voiceCount; ++i)
         {
             auto* voice = new InstrumentVoice();
             voice->prepare(sampleRate, mixBuf.getNumSamples() > 0 ? mixBuf.getNumSamples() : 512);
