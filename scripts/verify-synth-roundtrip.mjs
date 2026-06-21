@@ -147,13 +147,13 @@ try {
   });
   assert.deepEqual(synthStore.modulationSummaryForTarget(draft, "filter.cutoff"), {
     count: 2,
-    amount: 0.43,
-    label: "2 routes +43",
+    amount: 0.352,
+    label: "2 routes +35",
   });
   assert.deepEqual(synthStore.modulationSummaryForSource(draft, "macro.1"), {
     count: 1,
-    amount: 0.12,
-    label: "Filter Cutoff +12",
+    amount: 0.042,
+    label: "Filter Cutoff +4",
   });
   assert.deepEqual(synthStore.modulationSummaryForSource(draft, "lfo.2"), {
     count: 1,

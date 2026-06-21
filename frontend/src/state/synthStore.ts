@@ -877,12 +877,20 @@ export function modulationSourceLabel(draft: SynthDraftPatch, source: Modulation
 
 export function modulationSummaryForTarget(draft: SynthDraftPatch, target: ModulationTargetId): SynthModulationSummary {
   const routes = draft.modulation.filter((route) => route.enabled && route.target === target);
-  return summarizeModulationRoutes(routes, (route) => modulationSourceLabel(draft, route.source));
+  return summarizeModulationRoutes(
+    routes,
+    (route) => modulationSourceLabel(draft, route.source),
+    (route) => modulationDisplayAmountForRoute(draft, route),
+  );
 }
 
 export function modulationSummaryForSource(draft: SynthDraftPatch, source: ModulationSourceId): SynthModulationSummary {
   const routes = draft.modulation.filter((route) => route.enabled && route.source === source);
-  return summarizeModulationRoutes(routes, (route) => MODULATION_TARGET_LABELS[route.target] ?? route.target);
+  return summarizeModulationRoutes(
+    routes,
+    (route) => MODULATION_TARGET_LABELS[route.target] ?? route.target,
+    (route) => modulationDisplayAmountForRoute(draft, route),
+  );
 }
 
 export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Instrument> {
@@ -972,14 +980,16 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
 function summarizeModulationRoutes(
   routes: SynthModulationRoute[],
   labelForRoute: (route: SynthModulationRoute) => string,
+  amountForRoute: (route: SynthModulationRoute) => number = (route) => route.amount,
 ): SynthModulationSummary {
-  const amount = clampBipolar(routes.reduce((sum, route) => sum + route.amount, 0));
+  const amount = roundSummaryAmount(clampBipolar(routes.reduce((sum, route) => sum + amountForRoute(route), 0)));
   if (routes.length === 0) return { count: 0, amount: 0, label: "" };
   if (routes.length === 1) {
+    const routeAmount = amountForRoute(routes[0]);
     return {
       count: 1,
       amount,
-      label: `${labelForRoute(routes[0])} ${formatSignedModAmount(routes[0].amount)}`,
+      label: `${labelForRoute(routes[0])} ${formatSignedModAmount(routeAmount)}`,
     };
   }
   return {
@@ -987,6 +997,16 @@ function summarizeModulationRoutes(
     amount,
     label: `${routes.length} routes ${formatSignedModAmount(amount)}`,
   };
+}
+
+function roundSummaryAmount(amount: number): number {
+  return Math.round(amount * 1_000_000) / 1_000_000;
+}
+
+function modulationDisplayAmountForRoute(draft: SynthDraftPatch, route: SynthModulationRoute): number {
+  return isMacroSource(route.source)
+    ? macroOutputValue(draft, route.source) * route.amount
+    : route.amount;
 }
 
 function formatSignedModAmount(amount: number): string {
