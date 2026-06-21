@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Envelope/EnvelopeShaper.h"
 #include "Realtime/RealtimeParameterQueue.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
@@ -446,14 +447,8 @@ namespace beat
         StereoSample driveDownsampleState;
         float previousRawEnvelope { 0.0f };
         float previousRawEnv2Envelope { 0.0f };
-        int64_t env1LoopSampleCounter { 0 };
-        int64_t env1LoopReleaseSampleCounter { 0 };
-        bool env1LoopReleasing { false };
-        float env1LoopReleaseStartValue { 0.0f };
-        int64_t env2LoopSampleCounter { 0 };
-        int64_t env2LoopReleaseSampleCounter { 0 };
-        bool env2LoopReleasing { false };
-        float env2LoopReleaseStartValue { 0.0f };
+        EnvelopeShaper::LoopState env1LoopState;
+        EnvelopeShaper::LoopState env2LoopState;
         juce::uint32 noiseState { 1 };
         juce::ADSR adsr;
         juce::ADSR::Parameters adsrParams;

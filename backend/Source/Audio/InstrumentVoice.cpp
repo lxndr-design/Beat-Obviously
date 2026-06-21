@@ -127,48 +127,6 @@ namespace beat
             return bipolar ? env * 2.0f - 1.0f : env;
         }
 
-        float applyEnvelopeCurve(float value, int curve) noexcept
-        {
-            const float x = clamp01(value);
-            if (curve == 1) return x * x;
-            if (curve == 2) return 1.0f - (1.0f - x) * (1.0f - x);
-            if (curve == 3) return x * x * (3.0f - 2.0f * x);
-            return x;
-        }
-
-        float shapeEnvelopeValue(
-            float rawEnvelope,
-            float& previousRawEnvelope,
-            float sustainValue,
-            int attackCurve,
-            int decayCurve,
-            int releaseCurve) noexcept
-        {
-            const float raw = clamp01(rawEnvelope);
-            const float sustain = clamp01(sustainValue);
-            float shaped = raw;
-            if (std::abs(raw - previousRawEnvelope) < 0.00001f)
-            {
-                shaped = raw;
-            }
-            else if (raw > previousRawEnvelope)
-            {
-                shaped = applyEnvelopeCurve(raw, attackCurve);
-            }
-            else if (raw > sustain && sustain < 0.999f)
-            {
-                const float progress = (1.0f - raw) / juce::jmax(0.001f, 1.0f - sustain);
-                shaped = 1.0f - applyEnvelopeCurve(progress, decayCurve) * (1.0f - sustain);
-            }
-            else if (sustain > 0.001f)
-            {
-                const float progress = 1.0f - raw / sustain;
-                shaped = sustain * (1.0f - applyEnvelopeCurve(progress, releaseCurve));
-            }
-            previousRawEnvelope = raw;
-            return clamp01(shaped);
-        }
-
         bool dynamicTargetActive(const InstrumentVoice::Params::DynamicModTarget& target) noexcept
         {
             return std::abs(target.lfo) > 0.0001f
@@ -947,14 +905,8 @@ namespace beat
         driveDownsampleState = {};
         previousRawEnvelope = 0.0f;
         previousRawEnv2Envelope = 0.0f;
-        env1LoopSampleCounter = 0;
-        env1LoopReleaseSampleCounter = 0;
-        env1LoopReleasing = false;
-        env1LoopReleaseStartValue = 0.0f;
-        env2LoopSampleCounter = 0;
-        env2LoopReleaseSampleCounter = 0;
-        env2LoopReleasing = false;
-        env2LoopReleaseStartValue = 0.0f;
+        env1LoopState.reset();
+        env2LoopState.reset();
         if (legacyWavetableNeedsSetup())
             configureWavetableOscillators(baseFrequencyHz);
         else
@@ -988,10 +940,9 @@ namespace beat
         {
             if (params.env1Loop)
             {
-                env1LoopReleaseStartValue = env1LoopValue();
-                env1LoopReleaseSampleCounter = 0;
-                env1LoopReleasing = true;
-                previousRawEnvelope = env1LoopReleaseStartValue;
+                const float value = env1LoopValue();
+                env1LoopState.beginRelease(value);
+                previousRawEnvelope = value;
             }
             else
             {
@@ -999,10 +950,9 @@ namespace beat
             }
             if (params.env2Loop)
             {
-                env2LoopReleaseStartValue = env2LoopValue();
-                env2LoopReleaseSampleCounter = 0;
-                env2LoopReleasing = true;
-                previousRawEnv2Envelope = env2LoopReleaseStartValue;
+                const float value = env2LoopValue();
+                env2LoopState.beginRelease(value);
+                previousRawEnv2Envelope = value;
             }
             else
             {
@@ -1013,14 +963,8 @@ namespace beat
         {
             adsr.reset();
             env2Adsr.reset();
-            env1LoopSampleCounter = 0;
-            env1LoopReleaseSampleCounter = 0;
-            env1LoopReleasing = false;
-            env1LoopReleaseStartValue = 0.0f;
-            env2LoopSampleCounter = 0;
-            env2LoopReleaseSampleCounter = 0;
-            env2LoopReleasing = false;
-            env2LoopReleaseStartValue = 0.0f;
+            env1LoopState.reset();
+            env2LoopState.reset();
             clearCurrentNote();
         }
     }
@@ -1085,7 +1029,7 @@ namespace beat
             const float env2 = useDynamicModulation
                 ? (params.env2Loop
                     ? env2LoopValue()
-                    : shapeEnvelopeValue(
+                    : EnvelopeShaper::shapeAdsrSample(
                         env2Adsr.getNextSample(),
                         previousRawEnv2Envelope,
                         params.env2Sustain,
@@ -1265,83 +1209,28 @@ namespace beat
 
     float InstrumentVoice::shapedEnvelope(float rawEnvelope) noexcept
     {
-        return shapeEnvelopeValue(rawEnvelope, previousRawEnvelope, params.sustain, params.attackCurve, params.decayCurve, params.releaseCurve);
+        return EnvelopeShaper::shapeAdsrSample(rawEnvelope, previousRawEnvelope, params.sustain, params.attackCurve, params.decayCurve, params.releaseCurve);
     }
 
     float InstrumentVoice::env1LoopValue() noexcept
     {
-        const double sr = juce::jmax(1.0, sampleRate);
-        const double attackSeconds = juce::jmax(0.001, (double) params.attackMs * 0.001);
-        const double decaySeconds = juce::jmax(0.001, (double) params.decayMs * 0.001);
-        const double releaseSeconds = juce::jmax(0.001, (double) params.releaseMs * 0.001);
-        const float sustain = clamp01(params.sustain);
-
-        if (env1LoopReleasing)
-        {
-            const double releaseSamples = juce::jmax(1.0, releaseSeconds * sr);
-            const float progress = (float) juce::jlimit(0.0, 1.0, (double) env1LoopReleaseSampleCounter / releaseSamples);
-            ++env1LoopReleaseSampleCounter;
-            const float raw = clamp01(env1LoopReleaseStartValue)
-                * juce::jmax(0.0f, 1.0f - applyEnvelopeCurve(progress, params.releaseCurve));
-            previousRawEnvelope = raw;
-            if (progress >= 1.0f)
-                adsr.reset();
-            return raw;
-        }
-
-        const double cycleSeconds = attackSeconds + decaySeconds;
-        const double timeSeconds = (double) env1LoopSampleCounter / sr;
-        ++env1LoopSampleCounter;
-        const double localSeconds = std::fmod(timeSeconds, cycleSeconds);
-        float raw = 0.0f;
-        if (localSeconds < attackSeconds)
-        {
-            raw = applyEnvelopeCurve((float) (localSeconds / attackSeconds), params.attackCurve);
-        }
-        else
-        {
-            const float progress = applyEnvelopeCurve((float) ((localSeconds - attackSeconds) / decaySeconds), params.decayCurve);
-            raw = 1.0f + (sustain - 1.0f) * progress;
-        }
-        previousRawEnvelope = raw;
-        return clamp01(raw);
+        const auto result = EnvelopeShaper::renderLoop(
+            env1LoopState,
+            { params.attackMs, params.decayMs, params.sustain, params.releaseMs, params.attackCurve, params.decayCurve, params.releaseCurve },
+            sampleRate,
+            previousRawEnvelope);
+        if (result.releaseComplete)
+            adsr.reset();
+        return result.value;
     }
 
     float InstrumentVoice::env2LoopValue() noexcept
     {
-        const double sr = juce::jmax(1.0, sampleRate);
-        const double attackSeconds = juce::jmax(0.001, (double) params.env2AttackMs * 0.001);
-        const double decaySeconds = juce::jmax(0.001, (double) params.env2DecayMs * 0.001);
-        const double releaseSeconds = juce::jmax(0.001, (double) params.env2ReleaseMs * 0.001);
-        const float sustain = clamp01(params.env2Sustain);
-
-        if (env2LoopReleasing)
-        {
-            const double releaseSamples = juce::jmax(1.0, releaseSeconds * sr);
-            const float progress = (float) juce::jlimit(0.0, 1.0, (double) env2LoopReleaseSampleCounter / releaseSamples);
-            ++env2LoopReleaseSampleCounter;
-            const float raw = clamp01(env2LoopReleaseStartValue)
-                * juce::jmax(0.0f, 1.0f - applyEnvelopeCurve(progress, params.env2ReleaseCurve));
-            previousRawEnv2Envelope = raw;
-            return raw;
-        }
-
-        const double cycleSeconds = attackSeconds + decaySeconds;
-        const double timeSeconds = (double) env2LoopSampleCounter / sr;
-        ++env2LoopSampleCounter;
-        const double localSeconds = std::fmod(timeSeconds, cycleSeconds);
-        float raw = 0.0f;
-        if (localSeconds < attackSeconds)
-        {
-            raw = applyEnvelopeCurve((float) (localSeconds / attackSeconds), params.env2AttackCurve);
-        }
-        else
-        {
-            const float progress = applyEnvelopeCurve((float) ((localSeconds - attackSeconds) / decaySeconds), params.env2DecayCurve);
-            raw = 1.0f + (sustain - 1.0f) * progress;
-        }
-        previousRawEnv2Envelope = raw;
-        return clamp01(raw);
+        return EnvelopeShaper::renderLoop(
+            env2LoopState,
+            { params.env2AttackMs, params.env2DecayMs, params.env2Sustain, params.env2ReleaseMs, params.env2AttackCurve, params.env2DecayCurve, params.env2ReleaseCurve },
+            sampleRate,
+            previousRawEnv2Envelope).value;
     }
 
     float InstrumentVoice::keytrackedCutoffHz(float normalizedCutoff) const noexcept

@@ -2,6 +2,7 @@
 #include "../Source/Audio/AudioEngine.h"
 #include "../Source/Audio/Analysis/AudioFileAnalyzer.h"
 #include "../Source/Audio/Analysis/FftAnalyzer.h"
+#include "../Source/Audio/Envelope/EnvelopeShaper.h"
 #include "../Source/Audio/InstrumentVoice.h"
 #include "../Source/Audio/Parameters/ParameterIds.h"
 #include "../Source/Audio/Parameters/SynthPatchContract.h"
@@ -38,6 +39,55 @@ namespace
     bool near(float actual, float expected, float tolerance = 0.0001f)
     {
         return std::abs(actual - expected) <= tolerance;
+    }
+
+    bool stressEnvelopeShaper()
+    {
+        if (!(beat::EnvelopeShaper::applyCurve(0.5f, 1) < beat::EnvelopeShaper::applyCurve(0.5f, 0)))
+            return false;
+        if (!(beat::EnvelopeShaper::applyCurve(0.5f, 2) > beat::EnvelopeShaper::applyCurve(0.5f, 0)))
+            return false;
+
+        float previous = 0.0f;
+        beat::EnvelopeShaper::LoopState state;
+        const beat::EnvelopeShaper::LoopConfig config {
+            10.0f,
+            30.0f,
+            0.0f,
+            20.0f,
+            0,
+            0,
+            0,
+        };
+
+        float firstCyclePeak = 0.0f;
+        float secondCyclePeak = 0.0f;
+        float latest = 0.0f;
+        for (int i = 0; i < 90; ++i)
+        {
+            latest = beat::EnvelopeShaper::renderLoop(state, config, 1000.0, previous).value;
+            if (i < 40)
+                firstCyclePeak = std::max(firstCyclePeak, latest);
+            else if (i < 80)
+                secondCyclePeak = std::max(secondCyclePeak, latest);
+            if (!std::isfinite(latest))
+                return false;
+        }
+        if (!(firstCyclePeak > 0.9f && secondCyclePeak > 0.9f))
+            return false;
+
+        state.beginRelease(latest);
+        bool completed = false;
+        float released = 1.0f;
+        for (int i = 0; i < 30; ++i)
+        {
+            const auto result = beat::EnvelopeShaper::renderLoop(state, config, 1000.0, previous);
+            released = result.value;
+            completed = completed || result.releaseComplete;
+            if (!std::isfinite(released))
+                return false;
+        }
+        return completed && released < 0.001f;
     }
 
     beat::Project makeStressProject()
@@ -10430,6 +10480,11 @@ int main()
     std::cerr << "synth contract: done\n";
 
     std::cerr << "voice: start\n";
+    if (!stressEnvelopeShaper())
+    {
+        std::cerr << "Envelope shaper stress failed\n";
+        return 1;
+    }
     if (!stressInstrumentVoiceWavetablePath())
     {
         std::cerr << "Instrument voice wavetable stress failed\n";
