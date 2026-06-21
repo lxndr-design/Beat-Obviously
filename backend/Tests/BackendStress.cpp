@@ -3,6 +3,7 @@
 #include "../Source/Audio/Analysis/AudioFileAnalyzer.h"
 #include "../Source/Audio/Analysis/FftAnalyzer.h"
 #include "../Source/Audio/Envelope/EnvelopeShaper.h"
+#include "../Source/Audio/Filter/DriveStage.h"
 #include "../Source/Audio/Filter/FilterMath.h"
 #include "../Source/Audio/InstrumentVoice.h"
 #include "../Source/Audio/Modulation/DynamicModulation.h"
@@ -227,6 +228,30 @@ namespace
             && beat::FilterMath::typeForParam(1) == juce::dsp::StateVariableTPTFilterType::bandpass
             && beat::FilterMath::typeForParam(2) == juce::dsp::StateVariableTPTFilterType::highpass
             && beat::FilterMath::typeForParam(99) == juce::dsp::StateVariableTPTFilterType::lowpass;
+    }
+
+    bool stressDriveStageHelper()
+    {
+        beat::DriveStage::State state;
+        const beat::DriveStage::StereoFrame sample { 0.5f, -0.5f };
+
+        const auto first = beat::DriveStage::processOversampled(state, sample, 3.0f);
+        if (!(first.left > 0.5f && first.left < 0.6f && near(first.left, -first.right)))
+            return false;
+        if (!near(state.previousInput.left, sample.left) || !near(state.previousInput.right, sample.right))
+            return false;
+
+        const auto second = beat::DriveStage::processOversampled(state, sample, 3.0f);
+        if (!(second.left > first.left && second.left < 1.0f && near(second.left, -second.right)))
+            return false;
+
+        state.reset({ 0.2f, -0.3f });
+        if (!near(state.previousInput.left, 0.2f) || !near(state.downsample.right, -0.3f))
+            return false;
+
+        state.reset();
+        const auto tiny = beat::DriveStage::processOversampled(state, { 1.0e-24f, -1.0e-24f }, 1.0f);
+        return near(tiny.left, 0.0f) && near(tiny.right, 0.0f);
     }
 
     beat::Project makeStressProject()
@@ -10642,6 +10667,11 @@ int main()
     if (!stressFilterMathHelper())
     {
         std::cerr << "Filter math helper stress failed\n";
+        return 1;
+    }
+    if (!stressDriveStageHelper())
+    {
+        std::cerr << "Drive stage helper stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceWavetablePath())

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Envelope/EnvelopeShaper.h"
+#include "Filter/DriveStage.h"
 #include "Realtime/RealtimeParameterQueue.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
@@ -272,11 +273,7 @@ namespace beat
         static RenderWorkStats consumeRenderWorkStats() noexcept;
 
     private:
-        struct StereoSample
-        {
-            float left { 0.0f };
-            float right { 0.0f };
-        };
+        using StereoSample = DriveStage::StereoFrame;
 
         struct WavetableUnisonPlan
         {
@@ -367,7 +364,6 @@ namespace beat
         void refreshCachedPitchRates() noexcept;
         void refreshCachedDynamicModulationFlags() noexcept;
         StereoSample renderAetherTableStack(double frequencyHz, float rawLfo, float rawLfo2, float env, float env2, float velocity) noexcept;
-        StereoSample processDriveOversampled(StereoSample sample, float driveGain) noexcept;
         float shapedEnvelope(float rawEnvelope) noexcept;
         float env1LoopValue() noexcept;
         float env2LoopValue() noexcept;
@@ -443,8 +439,7 @@ namespace beat
         int64_t currentBlockFilterCoefficientUpdates { 0 };
         int64_t currentBlockWavetableFrequencyUpdates { 0 };
         int64_t currentBlockWavetablePositionUpdates { 0 };
-        StereoSample previousDriveInput;
-        StereoSample driveDownsampleState;
+        DriveStage::State driveState;
         float previousRawEnvelope { 0.0f };
         float previousRawEnv2Envelope { 0.0f };
         EnvelopeShaper::LoopState env1LoopState;

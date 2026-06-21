@@ -788,8 +788,7 @@ namespace beat
                 1.0);
         phaseDelta = baseFrequencyHz / sampleRate;
         pitchFrequencyRamp.reset((float) baseFrequencyHz);
-        previousDriveInput = {};
-        driveDownsampleState = {};
+        driveState.reset();
         previousRawEnvelope = 0.0f;
         previousRawEnv2Envelope = 0.0f;
         env1LoopState.reset();
@@ -972,15 +971,14 @@ namespace beat
             if (drive > 0.0001f)
             {
                 const float driveGain = 1.0f + drive * 6.0f;
-                const auto driven = processDriveOversampled({ left, right }, driveGain);
+                const auto driven = DriveStage::processOversampled(driveState, { left, right }, driveGain);
                 left = driven.left;
                 right = driven.right;
                 currentBlockFilterDriveSamples += 4;
             }
             else
             {
-                previousDriveInput = { left, right };
-                driveDownsampleState = { left, right };
+                driveState.reset({ left, right });
             }
 
             if (hasFilterMod)
@@ -1070,28 +1068,6 @@ namespace beat
         renderOscillatorRateCalculations.fetch_add(currentBlockOscillatorRateCalculations, std::memory_order_relaxed);
         renderWavetableFrequencyUpdates.fetch_add(currentBlockWavetableFrequencyUpdates, std::memory_order_relaxed);
         renderWavetablePositionUpdates.fetch_add(currentBlockWavetablePositionUpdates, std::memory_order_relaxed);
-    }
-
-    InstrumentVoice::StereoSample InstrumentVoice::processDriveOversampled(StereoSample sample, float driveGain) noexcept
-    {
-        constexpr float downsampleAlpha = 0.72f;
-
-        const auto processChannel = [driveGain] (float input)
-        {
-            return std::tanh(input * driveGain);
-        };
-
-        const float leftMidpoint = 0.5f * (previousDriveInput.left + sample.left);
-        const float rightMidpoint = 0.5f * (previousDriveInput.right + sample.right);
-        const float leftDownsampled = 0.5f * (processChannel(leftMidpoint) + processChannel(sample.left));
-        const float rightDownsampled = 0.5f * (processChannel(rightMidpoint) + processChannel(sample.right));
-
-        driveDownsampleState.left = denormalSafe(driveDownsampleState.left
-            + downsampleAlpha * (leftDownsampled - driveDownsampleState.left));
-        driveDownsampleState.right = denormalSafe(driveDownsampleState.right
-            + downsampleAlpha * (rightDownsampled - driveDownsampleState.right));
-        previousDriveInput = sample;
-        return driveDownsampleState;
     }
 
     float InstrumentVoice::shapedEnvelope(float rawEnvelope) noexcept

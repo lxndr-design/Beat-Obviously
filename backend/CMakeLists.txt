@@ -26,6 +26,7 @@ target_sources(Beat PRIVATE
     Source/Audio/Envelope/EnvelopeShaper.h
     Source/Audio/InstrumentVoice.cpp
     Source/Audio/InstrumentVoice.h
+    Source/Audio/Filter/DriveStage.h
     Source/Audio/Filter/FilterMath.h
     Source/Audio/Modulation/DynamicModulation.h
     Source/Audio/Modulation/Lfo.h
@@ -135,6 +136,7 @@ add_executable(BeatBackendStress
     Source/Audio/Effects/TrackEffectDefaults.h
     Source/Audio/InstrumentVoice.cpp
     Source/Audio/InstrumentVoice.h
+    Source/Audio/Filter/DriveStage.h
     Source/Audio/Filter/FilterMath.h
     Source/Audio/Modulation/DynamicModulation.h
     Source/Audio/Modulation/Lfo.h
