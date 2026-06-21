@@ -449,6 +449,7 @@ namespace beat
         instrument.sustain = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "env.1.sustain", instrument.sustain));
         instrument.releaseMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.1.release", 0.25) * 1000.0f);
         instrument.releaseCurve = envelopeCurveForId(synthStringParam(params, "env.1.releaseCurve", "linear"));
+        instrument.env1Loop = synthNumberParam(params, "env.1.loop", instrument.env1Loop ? 1.0 : 0.0) >= 0.5;
         instrument.env2AttackMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.2.attack", 0.01) * 1000.0f);
         instrument.env2AttackCurve = envelopeCurveForId(synthStringParam(params, "env.2.attackCurve", "linear"));
         instrument.env2DecayMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.2.decay", 0.3) * 1000.0f);

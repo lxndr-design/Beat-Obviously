@@ -66,6 +66,7 @@ export type SynthParameterId =
   | "env.1.sustain"
   | "env.1.release"
   | "env.1.releaseCurve"
+  | "env.1.loop"
   | "env.2.attack"
   | "env.2.attackCurve"
   | "env.2.decay"
@@ -588,6 +589,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "env.1.sustain": 0.8,
   "env.1.release": 0.25,
   "env.1.releaseCurve": "linear",
+  "env.1.loop": false,
   "env.2.attack": 0.01,
   "env.2.attackCurve": "linear",
   "env.2.decay": 0.3,
@@ -672,6 +674,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "env.1.sustain": "Env 1 Sustain",
   "env.1.release": "Env 1 Release",
   "env.1.releaseCurve": "Env 1 Release Curve",
+  "env.1.loop": "Env 1 Loop",
   "env.2.attack": "Env 2 Attack",
   "env.2.attackCurve": "Env 2 Attack Curve",
   "env.2.decay": "Env 2 Decay",
@@ -913,6 +916,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
       sustain: getNumberParam(draft, "env.1.sustain"),
       releaseMs: getNumberParam(draft, "env.1.release") * 1000,
       releaseCurve: getEnvelopeCurveParam(draft, "env.1.releaseCurve"),
+      loop: getBooleanParam(draft, "env.1.loop"),
     },
     wavetable,
     aether: {
@@ -1057,6 +1061,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["env.1.sustain"] = instrument.envelope.sustain;
   draft.parameters["env.1.release"] = instrument.envelope.releaseMs / 1000;
   draft.parameters["env.1.releaseCurve"] = instrument.envelope.releaseCurve ?? "linear";
+  draft.parameters["env.1.loop"] = instrument.envelope.loop ?? false;
   draft.parameters["lfo.1.rate"] = instrument.lfoRateHz ?? 1;
   draft.parameters["lfo.1.sync"] = instrument.lfoSync ?? false;
   draft.parameters["lfo.1.syncedRate"] = instrument.lfoSyncedRate ?? "1/4";

@@ -79,6 +79,7 @@ try {
       "env.1.sustain": 0.57,
       "env.1.release": 0.78,
       "env.1.releaseCurve": "log",
+      "env.1.loop": true,
       "env.2.attack": 0.01,
       "env.2.attackCurve": "exp",
       "env.2.decay": 0.09,
@@ -248,6 +249,8 @@ try {
   assert.equal(patch.envelope.attackCurve, "exp");
   assert.equal(patch.envelope.decayCurve, "s-curve");
   assert.equal(patch.envelope.releaseCurve, "log");
+  assert.equal(patch.envelope.loop, true);
+  assert.equal(patch.synthPatch.parameters["env.1.loop"], true);
   assert.equal(patch.synthPatch.parameters["env.2.loop"], true);
   assert.equal(patch.synthPatch.parameters["future.experimental"], "preserve-me");
   assert.equal(patch.synthPatch.metadata.icon, "ph:planet");
@@ -268,6 +271,38 @@ try {
   synthPreview.renderInstrumentSamples(expAttack, expAttackSamples, 48000, synthPreview.previewFrequency(expAttack), "audio", true);
   const headEnergy = (samples) => samples.slice(0, 1200).reduce((sum, sample) => sum + sample * sample, 0);
   assert.ok(headEnergy(expAttackSamples) < headEnergy(linearAttackSamples) * 0.85, "expected exponential attack curve to soften preview attack");
+
+  const env1LoopPreview = synthStore.synthDraftToPreviewInstrument({
+    ...draft,
+    parameters: {
+      ...draft.parameters,
+      "amp.level": 0.9,
+      "env.1.attack": 0.015,
+      "env.1.decay": 0.04,
+      "env.1.sustain": 0,
+      "env.1.release": 0.05,
+      "env.1.loop": true,
+      "env.2.loop": false,
+    },
+    modulation: [],
+  });
+  const env1NoLoopPreview = synthStore.synthDraftToPreviewInstrument({
+    ...env1LoopPreview.synthPatch,
+    parameters: { ...env1LoopPreview.synthPatch.parameters, "env.1.loop": false },
+  });
+  const env1LoopSamples = new Float32Array(24000);
+  const env1NoLoopSamples = new Float32Array(24000);
+  synthPreview.renderInstrumentSamples(env1LoopPreview, env1LoopSamples, 48000, synthPreview.previewFrequency(env1LoopPreview), "audio", true);
+  synthPreview.renderInstrumentSamples(env1NoLoopPreview, env1NoLoopSamples, 48000, synthPreview.previewFrequency(env1NoLoopPreview), "audio", true);
+  const rmsRange = (samples, start, end) => {
+    let sum = 0;
+    for (let i = start; i < end; i++) sum += samples[i] * samples[i];
+    return Math.sqrt(sum / Math.max(1, end - start));
+  };
+  assert.ok(
+    rmsRange(env1LoopSamples, 12000, 18000) > rmsRange(env1NoLoopSamples, 12000, 18000) * 2,
+    "expected Env 1 loop mode to keep amp energy after the first decay cycle",
+  );
 
   const keytrackClosed = synthStore.synthDraftToPreviewInstrument({
     ...draft,
@@ -462,9 +497,12 @@ try {
       "env.1.attack": 0.001,
       "env.1.decay": 0.01,
       "env.1.sustain": 1,
+      "env.1.release": 0.05,
+      "env.1.loop": false,
       "env.2.attack": 0.01,
       "env.2.decay": 0.08,
       "env.2.sustain": 0,
+      "env.2.loop": false,
     },
     modulation: [{ id: "env2_probe", source: "env.2", target: "amp.level", amount: 1, bipolar: false, enabled: true }],
   });
@@ -473,11 +511,6 @@ try {
   assert.ok(env2EarlyOffset > env2LateOffset + 0.5, "expected Env 2 modulation source to follow its own decay contour");
   const env2Samples = new Float32Array(24000);
   synthPreview.renderInstrumentSamples(env2Preview, env2Samples, 48000, synthPreview.previewFrequency(env2Preview), "audio", true);
-  const rmsRange = (samples, start, end) => {
-    let sum = 0;
-    for (let i = start; i < end; i++) sum += samples[i] * samples[i];
-    return Math.sqrt(sum / Math.max(1, end - start));
-  };
   assert.ok(rmsRange(env2Samples, 1200, 3600) > rmsRange(env2Samples, 16000, 22000) * 3, "expected Env 2 routed preview render to decay independently of Amp Env");
 
   const env2LinearAttack = synthStore.synthDraftToPreviewInstrument({
@@ -488,10 +521,13 @@ try {
       "env.1.attack": 0.001,
       "env.1.decay": 0.01,
       "env.1.sustain": 1,
+      "env.1.release": 0.05,
+      "env.1.loop": false,
       "env.2.attack": 0.08,
       "env.2.attackCurve": "linear",
       "env.2.decay": 0.1,
       "env.2.sustain": 1,
+      "env.2.loop": false,
     },
     modulation: [{ id: "env2_attack_probe", source: "env.2", target: "amp.level", amount: 1, bipolar: false, enabled: true }],
   });
@@ -521,6 +557,8 @@ try {
       "env.1.attack": 0.001,
       "env.1.decay": 0.01,
       "env.1.sustain": 1,
+      "env.1.release": 0.05,
+      "env.1.loop": false,
       "env.2.attack": 0.015,
       "env.2.decay": 0.04,
       "env.2.sustain": 0,

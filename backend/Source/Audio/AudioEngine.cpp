@@ -1482,6 +1482,7 @@ namespace beat
         params.sustain = instrument.sustain;
         params.releaseMs = instrument.releaseMs;
         params.releaseCurve = instrument.releaseCurve;
+        params.env1Loop = instrument.env1Loop;
         params.env2AttackMs = instrument.env2AttackMs;
         params.env2AttackCurve = instrument.env2AttackCurve;
         params.env2DecayMs = instrument.env2DecayMs;

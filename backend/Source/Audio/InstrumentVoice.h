@@ -157,6 +157,7 @@ namespace beat
             float sustain   { 0.7f };
             float releaseMs { 200.f };
             int releaseCurve { 0 };
+            bool env1Loop { false };
             float env2AttackMs { 10.f };
             int env2AttackCurve { 0 };
             float env2DecayMs { 300.f };
@@ -367,6 +368,7 @@ namespace beat
         StereoSample renderAetherTableStack(double frequencyHz, float rawLfo, float rawLfo2, float env, float env2, float velocity) noexcept;
         StereoSample processDriveOversampled(StereoSample sample, float driveGain) noexcept;
         float shapedEnvelope(float rawEnvelope) noexcept;
+        float env1LoopValue() noexcept;
         float env2LoopValue() noexcept;
         float keytrackedCutoffHz(float normalizedCutoff) const noexcept;
 
@@ -444,6 +446,10 @@ namespace beat
         StereoSample driveDownsampleState;
         float previousRawEnvelope { 0.0f };
         float previousRawEnv2Envelope { 0.0f };
+        int64_t env1LoopSampleCounter { 0 };
+        int64_t env1LoopReleaseSampleCounter { 0 };
+        bool env1LoopReleasing { false };
+        float env1LoopReleaseStartValue { 0.0f };
         int64_t env2LoopSampleCounter { 0 };
         int64_t env2LoopReleaseSampleCounter { 0 };
         bool env2LoopReleasing { false };

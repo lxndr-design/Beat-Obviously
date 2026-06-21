@@ -115,6 +115,7 @@ Envelope IDs use `env.N.*`, where `N` starts at `1`.
 | `env.1.sustain` | normalized | `0..1` | `0.8` | Amp envelope sustain. |
 | `env.1.release` | seconds | `0..30` | `0.25` | Amp envelope release. |
 | `env.1.releaseCurve` | enum | `linear`, `exp`, `log`, `s-curve` | `linear` | Release response curve used by browser preview and native render shaping. |
+| `env.1.loop` | boolean | `false`, `true` | `false` | Repeats the amp envelope attack/decay shape while the note is held, then releases from the current loop value. |
 | `env.2.attack` | seconds | `0..30` | `0.01` | Mod envelope default. |
 | `env.2.attackCurve` | enum | `linear`, `exp`, `log`, `s-curve` | `linear` | Mod envelope attack response curve used by browser preview and native render shaping. |
 | `env.2.decay` | seconds | `0..30` | `0.3` | Mod envelope default. |
@@ -124,7 +125,7 @@ Envelope IDs use `env.N.*`, where `N` starts at `1`.
 | `env.2.releaseCurve` | enum | `linear`, `exp`, `log`, `s-curve` | `linear` | Mod envelope release response curve used by browser preview and native render shaping. |
 | `env.2.loop` | boolean | `false`, `true` | `false` | Repeats the mod envelope attack/decay shape while the note is held, then releases from the current loop value. |
 
-Env 1 is the amp envelope and can also route as a modulation source. Env 2 is a dedicated modulation envelope with its own ADSR timing and optional attack/decay loop mode; it does not shape voice amplitude unless routed to `amp.level`.
+Env 1 is the amp envelope and can also route as a modulation source. Env 2 is a dedicated modulation envelope with its own ADSR timing and optional attack/decay loop mode; it does not shape voice amplitude unless routed to `amp.level`. When either envelope loop flag is enabled, the attack/decay contour cycles while held and release starts from the current loop value.
 
 ## LFO Parameters
 

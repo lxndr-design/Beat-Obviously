@@ -1875,6 +1875,7 @@ namespace beat
                     instrument.sustain = normalizedParam(envelope, "sustain", instrument.sustain);
                     instrument.releaseMs = floatParam(envelope, "release", instrument.releaseMs, 0.0f, 10000.0f);
                     instrument.releaseCurve = parseEnvelopeCurve(envelope.getProperty("releaseCurve", instrument.releaseCurve), instrument.releaseCurve);
+                    instrument.env1Loop = (bool) envelope.getProperty("loop", instrument.env1Loop);
 
                     const auto wavetable = instrumentVar.getProperty("wavetable", {});
                     if (wavetable.isObject())

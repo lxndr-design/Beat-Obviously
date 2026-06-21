@@ -448,6 +448,7 @@ namespace beat
             o->setProperty("sustain", instrument.sustain);
             o->setProperty("releaseMs", instrument.releaseMs);
             o->setProperty("releaseCurve", instrument.releaseCurve);
+            o->setProperty("env1Loop", instrument.env1Loop);
             o->setProperty("ampLevel", instrument.ampLevel);
             o->setProperty("ampPan", instrument.ampPan);
             o->setProperty("glideMs", instrument.glideMs);
@@ -616,6 +617,7 @@ namespace beat
                     instrument.sustain = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("sustain", instrument.sustain));
                     instrument.releaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty("releaseMs", instrument.releaseMs));
                     instrument.releaseCurve = juce::jlimit(0, 3, (int) iv.getProperty("releaseCurve", instrument.releaseCurve));
+                    instrument.env1Loop = (bool) iv.getProperty("env1Loop", instrument.env1Loop);
                     instrument.ampLevel = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("ampLevel", instrument.ampLevel));
                     instrument.ampPan = juce::jlimit(-1.0f, 1.0f, (float) (double) iv.getProperty("ampPan", instrument.ampPan));
                     instrument.glideMs = juce::jlimit(0.0f, 5000.0f, (float) (double) iv.getProperty("glideMs", instrument.glideMs));

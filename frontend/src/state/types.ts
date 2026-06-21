@@ -203,6 +203,7 @@ export interface AdsrEnvelope {
   attackCurve?: EnvelopeCurve;
   decayCurve?: EnvelopeCurve;
   releaseCurve?: EnvelopeCurve;
+  loop?: boolean;
 }
 
 /**

@@ -947,6 +947,10 @@ namespace beat
         driveDownsampleState = {};
         previousRawEnvelope = 0.0f;
         previousRawEnv2Envelope = 0.0f;
+        env1LoopSampleCounter = 0;
+        env1LoopReleaseSampleCounter = 0;
+        env1LoopReleasing = false;
+        env1LoopReleaseStartValue = 0.0f;
         env2LoopSampleCounter = 0;
         env2LoopReleaseSampleCounter = 0;
         env2LoopReleasing = false;
@@ -982,7 +986,17 @@ namespace beat
     {
         if (allowTailOff)
         {
-            adsr.noteOff();
+            if (params.env1Loop)
+            {
+                env1LoopReleaseStartValue = env1LoopValue();
+                env1LoopReleaseSampleCounter = 0;
+                env1LoopReleasing = true;
+                previousRawEnvelope = env1LoopReleaseStartValue;
+            }
+            else
+            {
+                adsr.noteOff();
+            }
             if (params.env2Loop)
             {
                 env2LoopReleaseStartValue = env2LoopValue();
@@ -999,6 +1013,10 @@ namespace beat
         {
             adsr.reset();
             env2Adsr.reset();
+            env1LoopSampleCounter = 0;
+            env1LoopReleaseSampleCounter = 0;
+            env1LoopReleasing = false;
+            env1LoopReleaseStartValue = 0.0f;
             env2LoopSampleCounter = 0;
             env2LoopReleaseSampleCounter = 0;
             env2LoopReleasing = false;
@@ -1061,7 +1079,9 @@ namespace beat
             const float positionLfo = hasPositionMod ? lfoRouteValue(rawLfo, params.lfoPositionBipolar) * clamp01(params.lfoDepth) : 0.0f;
             const float pitchLfo = hasPitchMod ? lfoRouteValue(rawLfo, params.lfoPitchBipolar) : 0.0f;
             const float filterLfo = !useDynamicModulation && hasFilterMod ? lfoRouteValue(rawLfo, params.lfoFilterBipolar) : 0.0f;
-            const float env = shapedEnvelope(adsr.getNextSample());
+            const float env = params.env1Loop
+                ? env1LoopValue()
+                : shapedEnvelope(adsr.getNextSample());
             const float env2 = useDynamicModulation
                 ? (params.env2Loop
                     ? env2LoopValue()
@@ -1246,6 +1266,45 @@ namespace beat
     float InstrumentVoice::shapedEnvelope(float rawEnvelope) noexcept
     {
         return shapeEnvelopeValue(rawEnvelope, previousRawEnvelope, params.sustain, params.attackCurve, params.decayCurve, params.releaseCurve);
+    }
+
+    float InstrumentVoice::env1LoopValue() noexcept
+    {
+        const double sr = juce::jmax(1.0, sampleRate);
+        const double attackSeconds = juce::jmax(0.001, (double) params.attackMs * 0.001);
+        const double decaySeconds = juce::jmax(0.001, (double) params.decayMs * 0.001);
+        const double releaseSeconds = juce::jmax(0.001, (double) params.releaseMs * 0.001);
+        const float sustain = clamp01(params.sustain);
+
+        if (env1LoopReleasing)
+        {
+            const double releaseSamples = juce::jmax(1.0, releaseSeconds * sr);
+            const float progress = (float) juce::jlimit(0.0, 1.0, (double) env1LoopReleaseSampleCounter / releaseSamples);
+            ++env1LoopReleaseSampleCounter;
+            const float raw = clamp01(env1LoopReleaseStartValue)
+                * juce::jmax(0.0f, 1.0f - applyEnvelopeCurve(progress, params.releaseCurve));
+            previousRawEnvelope = raw;
+            if (progress >= 1.0f)
+                adsr.reset();
+            return raw;
+        }
+
+        const double cycleSeconds = attackSeconds + decaySeconds;
+        const double timeSeconds = (double) env1LoopSampleCounter / sr;
+        ++env1LoopSampleCounter;
+        const double localSeconds = std::fmod(timeSeconds, cycleSeconds);
+        float raw = 0.0f;
+        if (localSeconds < attackSeconds)
+        {
+            raw = applyEnvelopeCurve((float) (localSeconds / attackSeconds), params.attackCurve);
+        }
+        else
+        {
+            const float progress = applyEnvelopeCurve((float) ((localSeconds - attackSeconds) / decaySeconds), params.decayCurve);
+            raw = 1.0f + (sustain - 1.0f) * progress;
+        }
+        previousRawEnvelope = raw;
+        return clamp01(raw);
     }
 
     float InstrumentVoice::env2LoopValue() noexcept

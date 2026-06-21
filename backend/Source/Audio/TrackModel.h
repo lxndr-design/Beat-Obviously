@@ -264,6 +264,7 @@ namespace beat
         float sustain { 0.7f };
         float releaseMs { 200.0f };
         int releaseCurve { 0 };
+        bool env1Loop { false };
         float env2AttackMs { 10.0f };
         int env2AttackCurve { 0 };
         float env2DecayMs { 300.0f };

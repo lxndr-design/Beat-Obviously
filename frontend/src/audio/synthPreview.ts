@@ -17,6 +17,7 @@ interface RenderModulation {
   pitchSemitones: number;
   filterOffset: number;
   positionOffset: number;
+  ampEnvelope: number;
   targetOffsets: Partial<Record<RuntimeModulationTarget, number>>;
 }
 
@@ -344,7 +345,7 @@ export function renderAetherOutputPreviewSamples(
 
   const frequency = previewFrequency(scopedInstrument);
   const sampleRate = 48000;
-  const modulation: RenderModulation = { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, targetOffsets: {} };
+  const modulation: RenderModulation = { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, ampEnvelope: 1, targetOffsets: {} };
   const state = createSynthRenderState();
   return Array.from({ length: sampleCount }, (_, index) => {
     state.phase = index / sampleCount;
@@ -665,7 +666,7 @@ export function renderInstrumentSample(
   sampleRate: number,
   frequency: number,
   mode: SynthRenderMode,
-  modulation: RenderModulation = { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, targetOffsets: {} },
+  modulation: RenderModulation = { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, ampEnvelope: 1, targetOffsets: {} },
 ): number {
   const cutoff = clamp01(
     instrument.knobs.cutoff
@@ -708,7 +709,7 @@ export function renderInstrumentSample(
   const level = clamp01((instrument.ampLevel ?? 1) + modulationTargetOffset(modulation, "amp.level"));
   state.phase += frequency / sampleRate;
   state.index += 1;
-  return clamp(filtered * level, -1, 1);
+  return clamp(filtered * level * clamp01(modulation.ampEnvelope ?? 1), -1, 1);
 }
 
 function renderInstrumentStereoSample(
@@ -744,12 +745,13 @@ function renderInstrumentStereoSample(
   right = resonantFilter(right, rightFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass");
 
   const level = clamp01((instrument.ampLevel ?? 1) + modulationTargetOffset(modulation, "amp.level"));
+  const ampEnvelope = clamp01(modulation.ampEnvelope ?? 1);
   const [ampLeft, ampRight] = panGains((instrument.ampPan ?? 0) + modulationTargetOffset(modulation, "amp.pan"));
   phaseState.phase += frequency / sampleRate;
   phaseState.index += 1;
   return {
-    left: clamp(left * level * ampLeft, -1, 1),
-    right: clamp(right * level * ampRight, -1, 1),
+    left: clamp(left * level * ampEnvelope * ampLeft, -1, 1),
+    right: clamp(right * level * ampEnvelope * ampRight, -1, 1),
   };
 }
 
@@ -1571,7 +1573,7 @@ export function modulationAtTime(
   const env2 = modEnvelopePreviewValue(timeS, durationS, instrument);
   const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env, env2, velocity, keytrack, modWheel);
   if (targetOffsets) {
-    return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, targetOffsets };
+    return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, ampEnvelope: env, targetOffsets };
   }
 
   const positionLfo = lfoRouteValue(rawLfo, instrument.lfoPositionBipolar ?? true);
@@ -1581,7 +1583,7 @@ export function modulationAtTime(
   const pitchSemitones = pitchLfo * Math.max(0, instrument.lfoToPitch ?? 0);
   const lfoFilter = filterLfo * clamp(instrument.lfoToFilter ?? 0, -1, 1) * 0.35;
   const envFilter = env * clamp(instrument.envToFilter ?? 0, -1, 1) * 0.35;
-  return { pitchSemitones, filterOffset: lfoFilter + envFilter, positionOffset, targetOffsets: {} };
+  return { pitchSemitones, filterOffset: lfoFilter + envFilter, positionOffset, ampEnvelope: env, targetOffsets: {} };
 }
 
 function routeTargetOffsets(
@@ -1745,20 +1747,41 @@ function lfoRouteValue(raw: number, bipolar: boolean): number {
 }
 
 function envelopePreviewValue(timeS: number, durationS: number, instrument: Instrument): number {
+  const params = instrument.synthPatch?.parameters;
   const attack = Math.max(0.001, (instrument.envelope.attackMs ?? 5) / 1000);
   const decay = Math.max(0.001, (instrument.envelope.decayMs ?? 100) / 1000);
   const sustain = clamp01(instrument.envelope.sustain ?? 0.7);
   const release = Math.max(0.001, (instrument.envelope.releaseMs ?? 200) / 1000);
+  const attackCurve = envelopeCurveParam(params?.["env.1.attackCurve"] ?? instrument.envelope.attackCurve);
+  const decayCurve = envelopeCurveParam(params?.["env.1.decayCurve"] ?? instrument.envelope.decayCurve);
+  const releaseCurve = envelopeCurveParam(params?.["env.1.releaseCurve"] ?? instrument.envelope.releaseCurve);
+  const segmentValue = (time: number) => {
+    if (time < attack) {
+      return applyEnvelopeCurve(time / attack, attackCurve);
+    }
+    const localDecay = Math.max(0, time - attack);
+    const t = applyEnvelopeCurve(Math.min(1, localDecay / decay), decayCurve);
+    return 1 + (sustain - 1) * t;
+  };
+  const releaseStart = Math.max(attack + decay, durationS - release);
+  if (params?.["env.1.loop"] === true || instrument.envelope.loop === true) {
+    const cycleLength = Math.max(0.001, attack + decay);
+    if (timeS > releaseStart) {
+      const releaseValue = segmentValue(releaseStart % cycleLength);
+      const t = applyEnvelopeCurve((timeS - releaseStart) / release, releaseCurve);
+      return releaseValue * Math.max(0, 1 - t);
+    }
+    return segmentValue(timeS % cycleLength);
+  }
   if (timeS < attack) {
-    return applyEnvelopeCurve(timeS / attack, instrument.envelope.attackCurve);
+    return applyEnvelopeCurve(timeS / attack, attackCurve);
   }
   if (timeS < attack + decay) {
-    const t = applyEnvelopeCurve((timeS - attack) / decay, instrument.envelope.decayCurve);
+    const t = applyEnvelopeCurve((timeS - attack) / decay, decayCurve);
     return 1 + (sustain - 1) * t;
   }
-  const releaseStart = Math.max(attack + decay, durationS - release);
   if (timeS > releaseStart) {
-    const t = applyEnvelopeCurve((timeS - releaseStart) / release, instrument.envelope.releaseCurve);
+    const t = applyEnvelopeCurve((timeS - releaseStart) / release, releaseCurve);
     return sustain * Math.max(0, 1 - t);
   }
   return sustain;

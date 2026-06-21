@@ -772,6 +772,7 @@ function AmpFilterPanel() {
   const setParameter = useSynthStore.getState().setParameter;
   const filterType = createMemo(() => String(draft().parameters["filter.type"]));
   const filterEnabled = createMemo(() => draft().parameters["filter.enabled"] === true);
+  const env1Loop = createMemo(() => draft().parameters["env.1.loop"] === true);
   const env2Loop = createMemo(() => draft().parameters["env.2.loop"] === true);
 
   return (
@@ -860,6 +861,13 @@ function AmpFilterPanel() {
             />
           )}
         </For>
+        <Button
+          size="sm"
+          selected={env1Loop()}
+          onClick={() => setBooleanParameter("env.1.loop", !env1Loop())}
+        >
+          Env 1 Loop
+        </Button>
         <Button
           size="sm"
           selected={env2Loop()}
