@@ -6,6 +6,7 @@
 #include "Modulation/DynamicModulation.h"
 #include "Realtime/RealtimeParameterQueue.h"
 #include "Realtime/RealtimeRamp.h"
+#include "Realtime/VoiceRealtimeParams.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
 #include "Wavetable/WavetableUnisonPlan.h"
@@ -283,27 +284,7 @@ namespace beat
 
         using WavetableUnisonPlan = WavetableUnison::Plan;
 
-        enum class RealtimeParam : size_t
-        {
-            FilterCutoff,
-            FilterResonance,
-            FilterDrive,
-            AmpLevel,
-            AmpPan,
-            OscAPosition,
-            OscBPosition,
-            OscAFine,
-            OscBFine,
-            OscALevel,
-            OscBLevel,
-            OscAPan,
-            OscBPan,
-            UnisonDetune,
-            UnisonSpread,
-            LfoRate,
-            LfoDepth,
-            Count,
-        };
+        using RealtimeParam = VoiceRealtimeParams::Id;
 
         void configureWavetableOscillators(double frequencyHz) noexcept;
         void clearWavetableOscillatorBank(
@@ -373,8 +354,8 @@ namespace beat
         double cachedAetherOscBRate { 1.0 };
         double cachedAetherSubRate { 0.5 };
         DynamicModulation::TargetActivityFlags cachedDynamicTargets;
-        std::array<RealtimeRamp, (size_t) RealtimeParam::Count> realtimeRamps;
-        std::array<size_t, (size_t) RealtimeParam::Count> activeRealtimeRampIndices {};
+        std::array<RealtimeRamp, VoiceRealtimeParams::count> realtimeRamps;
+        std::array<size_t, VoiceRealtimeParams::count> activeRealtimeRampIndices {};
         int activeRealtimeRampCount { 0 };
         std::array<RealtimeParameterChange, maxNoteAutomationEvents> voiceAutomationEvents;
         std::array<NoteAutomationContext::PitchEvent, maxNoteAutomationEvents> voicePitchEvents;

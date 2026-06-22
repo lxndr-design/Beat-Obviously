@@ -125,31 +125,6 @@ namespace beat
             * juce::jlimit(0.0f, 24.0f, params.pitchBendRangeSemitones);
     }
 
-    namespace
-    {
-        int realtimeParamIndexForId(std::string_view parameterId) noexcept
-        {
-            if (parameterId == "filter.cutoff") return 0;
-            if (parameterId == "filter.resonance") return 1;
-            if (parameterId == "filter.drive") return 2;
-            if (parameterId == "amp.level") return 3;
-            if (parameterId == "amp.pan") return 4;
-            if (parameterId == "osc.a.position") return 5;
-            if (parameterId == "osc.b.position") return 6;
-            if (parameterId == "osc.a.fine") return 7;
-            if (parameterId == "osc.b.fine") return 8;
-            if (parameterId == "osc.a.level") return 9;
-            if (parameterId == "osc.b.level") return 10;
-            if (parameterId == "osc.a.pan") return 11;
-            if (parameterId == "osc.b.pan") return 12;
-            if (parameterId == "unison.detune") return 13;
-            if (parameterId == "unison.spread") return 14;
-            if (parameterId == "lfo.1.rate") return 15;
-            if (parameterId == "lfo.1.depth") return 16;
-            return -1;
-        }
-    }
-
     void InstrumentVoice::resetRealtimeRampsFromParams() noexcept
     {
         realtimeRamps[(size_t) RealtimeParam::FilterCutoff].reset(params.cutoff01);
@@ -222,7 +197,7 @@ namespace beat
     bool InstrumentVoice::setRealtimeParameterValue(std::string_view parameterId, float value, int rampSamples, bool updateBaseline) noexcept
     {
         const auto normalized = VoiceMath::clamp01(value);
-        const int index = realtimeParamIndexForId(parameterId);
+        const int index = VoiceRealtimeParams::indexForParameterId(parameterId);
         if (index < 0)
             return false;
 

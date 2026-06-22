@@ -49,6 +49,7 @@ target_sources(Beat PRIVATE
     Source/Audio/Realtime/SpscRingBuffer.h
     Source/Audio/Realtime/VoiceAutomationInbox.cpp
     Source/Audio/Realtime/VoiceAutomationInbox.h
+    Source/Audio/Realtime/VoiceRealtimeParams.h
     Source/Audio/Recording/RecordingCalibration.cpp
     Source/Audio/Recording/RecordingCalibration.h
     Source/Audio/Recording/RecordingCapture.cpp
@@ -175,6 +176,7 @@ add_executable(BeatBackendStress
     Source/Audio/Realtime/SpscRingBuffer.h
     Source/Audio/Realtime/VoiceAutomationInbox.cpp
     Source/Audio/Realtime/VoiceAutomationInbox.h
+    Source/Audio/Realtime/VoiceRealtimeParams.h
     Source/Audio/Recording/RecordingCalibration.cpp
     Source/Audio/Recording/RecordingCalibration.h
     Source/Audio/Recording/RecordingCapture.cpp
