@@ -2,6 +2,7 @@ import { createStore as create } from "zustand/vanilla";
 import { immer } from "zustand/middleware/immer";
 import { nanoid } from "nanoid";
 import { temporal, type TemporalStoreApi } from "./temporal";
+import { defaultTrackEffectParams } from "./effects";
 import type { BeatProjectAsset, BeatProjectIntegrityReport, ProjectSidecarCleanupReport, RecentProjectEntry } from "../ipc/schema";
 import type {
   Beats,
@@ -1056,36 +1057,6 @@ function clampProjectBeat(beat: Beats, projectLengthBeats: Beats): Beats {
 
 function clampAutomationValue(value: number): number {
   return Math.max(-100000, Math.min(100000, Number.isFinite(value) ? value : 0));
-}
-
-function defaultTrackEffectParams(kind: TrackEffect["kind"]): Record<string, number> {
-  switch (kind) {
-    case "delay":
-      return { timeMs: 250, feedback: 25, mix: 18 };
-    case "lowpass":
-      return { cutoffHz: 8000, resonance: 8 };
-    case "highpass":
-      return { cutoffHz: 80, resonance: 0 };
-    case "saturator":
-      return { drive: 20, mix: 100 };
-    case "distortion":
-      return { drive: 55, shape: 35, trimDb: 6, mix: 45 };
-    case "bitcrush":
-      return { bits: 8, rate: 50, mix: 35 };
-    case "compressor":
-      return { thresholdDb: -18, ratio: 4, attackMs: 10, releaseMs: 120, makeupDb: 0, mix: 100 };
-    case "chorus":
-      return { rateHz: 0.8, depthMs: 8, delayMs: 12, feedback: 8, mix: 35 };
-    case "phaser":
-      return { rateHz: 0.45, centerHz: 900, depthOct: 1.8, feedback: 35, mix: 45 };
-    case "flanger":
-      return { rateHz: 0.28, depthMs: 2, delayMs: 2.5, feedback: 45, mix: 50 };
-    case "plugin":
-      return { mix: 100 };
-    case "reverb":
-    default:
-      return { roomSize: 40, damping: 35, mix: 20 };
-  }
 }
 
 // ---------------------------------------------------------------------------

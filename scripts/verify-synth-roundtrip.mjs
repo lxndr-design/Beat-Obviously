@@ -123,6 +123,23 @@ try {
       { id: "velocity_amp", source: "velocity", target: "amp.level", amount: 0.25, bipolar: false, enabled: true },
       { id: "disabled_macro", source: "macro.1", target: "amp.level", amount: -1, bipolar: false, enabled: false },
     ],
+    effects: {
+      filters: [
+        {
+          id: "aether-fx-drive",
+          kind: "saturator",
+          bypassed: false,
+          params: { drive: 36, mix: 72 },
+        },
+        {
+          id: "aether-fx-space",
+          kind: "delay",
+          bypassed: true,
+          latencySamples: 128,
+          params: { timeMs: 375, feedback: 31, mix: 14 },
+        },
+      ],
+    },
     metadata: {
       tags: ["roundtrip", "probe"],
       icon: "ph:planet",
@@ -140,6 +157,13 @@ try {
   assert.equal(synthStore.macroAssignmentsForId(draft, "macro.1").length, 1);
   assert.equal(draft.metadata.wavemaps["user.custom"].schemaVersion, 1);
   assert.equal(draft.metadata.customWavetables["user.custom"].frames.length, 4);
+  assert.equal(draft.effects.filters.length, 2);
+  assert.equal(draft.effects.filters[0].kind, "saturator");
+  assert.equal(draft.effects.filters[0].params.drive, 36);
+  assert.equal(draft.effects.filters[0].params.mix, 72);
+  assert.equal(draft.effects.filters[1].kind, "delay");
+  assert.equal(draft.effects.filters[1].bypassed, true);
+  assert.equal(draft.effects.filters[1].latencySamples, 128);
   assert.deepEqual(synthStore.modulationSummaryForTarget(draft, "osc.a.position"), {
     count: 1,
     amount: -0.21,
@@ -254,6 +278,30 @@ try {
   assert.equal(patch.synthPatch.parameters["env.2.loop"], true);
   assert.equal(patch.synthPatch.parameters["future.experimental"], "preserve-me");
   assert.equal(patch.synthPatch.metadata.icon, "ph:planet");
+  assert.equal(patch.effects.filters.length, 2);
+  assert.equal(patch.effects.filters[0].params.drive, 36);
+  assert.equal(patch.synthPatch.effects.filters[1].params.timeMs, 375);
+
+  const loadedEffectDraft = synthStore.synthDraftFromInstrument({
+    id: "loaded-aether",
+    sampleIds: [],
+    userCreated: true,
+    ...patch,
+    effects: {
+      filters: [
+        {
+          id: "loaded-fx",
+          kind: "reverb",
+          bypassed: false,
+          params: { roomSize: 63, damping: 18, mix: 27 },
+        },
+      ],
+    },
+  });
+  assert.equal(loadedEffectDraft.effects.filters.length, 1);
+  assert.equal(loadedEffectDraft.effects.filters[0].id, "loaded-fx");
+  assert.equal(loadedEffectDraft.effects.filters[0].kind, "reverb");
+  assert.equal(loadedEffectDraft.effects.filters[0].params.roomSize, 63);
 
   const linearAttack = synthStore.synthDraftToPreviewInstrument({
     ...draft,

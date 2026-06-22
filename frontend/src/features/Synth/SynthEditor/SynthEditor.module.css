@@ -62,6 +62,106 @@ section.shell {
   min-width: 0;
 }
 
+.fxPanel {
+  min-width: 0;
+}
+
+.fxAddSelect {
+  width: 132px;
+}
+
+.fxBody {
+  padding: var(--synth-gap);
+}
+
+.fxEmpty {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  color: color-mix(in srgb, var(--color-fg) 68%, transparent);
+  font-size: var(--font-size-ui);
+  line-height: 1.2;
+}
+
+.fxChain {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(236px, 1fr));
+  gap: var(--synth-gap);
+  min-width: 0;
+}
+
+.fxBlock {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  border: var(--border-fg);
+  background: var(--color-bg);
+}
+
+.fxBlockBypassed {
+  opacity: 0.52;
+}
+
+.fxHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 30px;
+  border-bottom: var(--border-fg);
+}
+
+.fxTitleBlock {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 4px var(--synth-gap);
+}
+
+.fxTitle {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fxBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-width: 0;
+}
+
+.fxBadges span {
+  min-height: 16px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-fg) 22%, transparent);
+  color: var(--color-fg);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.fxActions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 var(--synth-gap);
+}
+
+.fxParams {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+  gap: var(--synth-gap);
+  align-items: end;
+  padding: var(--synth-gap);
+}
+
 .identityBody {
   display: grid;
   grid-template-rows: 32px 32px;

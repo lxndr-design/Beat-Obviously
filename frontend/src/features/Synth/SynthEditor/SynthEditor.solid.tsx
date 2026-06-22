@@ -1,8 +1,19 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { previewFrequency, renderedInstrumentBuffer } from "../../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../../audio/synthWorkletPreview";
-import { Button, HoverInfo, Icon, Knob, TextInput } from "../../../solid-ui";
+import { Button, HoverInfo, Icon, Knob, NumberInput, TextInput, Toggle } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
+import {
+  createTrackEffect,
+  EFFECT_DEFAULT_PARAMS,
+  EFFECT_LABELS,
+  EFFECT_OPTIONS,
+  EFFECT_PARAM_SPECS,
+  formatEffectLatency,
+  formatEffectTail,
+  normalizeTrackEffectChain,
+  type EffectKind,
+} from "../../../state/effects";
 import {
   FACTORY_SYNTH_PRESETS,
   MACRO_IDS,
@@ -29,6 +40,7 @@ import { deleteSynthPreset, listSynthPresets, saveSynthPreset, type SynthPresetR
 import { ANALYZER_BAND_COUNT, useAnalyzerStore, type AnalyzerSnapshot } from "../../../state/analyzerStore";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../../state/store";
 import { INSTRUMENT_ICON_OPTIONS, instrumentIconLabel } from "../../../state/instrumentIcons";
+import type { TrackEffect } from "../../../state/types";
 import { AnalyzerPanel } from "../AnalyzerPanel/AnalyzerPanel.solid";
 import { ModulationMatrix } from "../ModulationMatrix/ModulationMatrix.solid";
 import { OscillatorPanel } from "../OscillatorPanel/OscillatorPanel.solid";
@@ -595,6 +607,8 @@ export function SynthEditor(props: SynthEditorProps) {
           </section>
         </div>
 
+        <InstrumentFxRack />
+
         <div class={styles.bottomGrid}>
           <AmpFilterPanel />
           <ModulationMatrix />
@@ -613,6 +627,154 @@ export function SynthEditor(props: SynthEditorProps) {
           Save
         </Button>
       </footer>
+    </section>
+  );
+}
+
+function InstrumentFxRack() {
+  const draft = createStoreSelector(useSynthStore, (state) => state.draft);
+  const setDraft = useSynthStore.getState().setDraft;
+  const effects = createMemo(() => draft().effects.filters);
+
+  function updateEffects(filters: TrackEffect[]) {
+    setDraft({
+      ...draft(),
+      effects: normalizeTrackEffectChain({ filters }),
+    });
+  }
+
+  function addEffect(kind: EffectKind) {
+    updateEffects([...effects(), createTrackEffect(kind)]);
+  }
+
+  function patchEffect(effectId: string, patch: Partial<TrackEffect>) {
+    updateEffects(effects().map((effect) => (
+      effect.id === effectId ? { ...effect, ...patch } : effect
+    )));
+  }
+
+  function patchParam(effect: TrackEffect, key: string, value: number) {
+    patchEffect(effect.id, {
+      params: {
+        ...effect.params,
+        [key]: value,
+      },
+    });
+  }
+
+  function moveEffect(effectId: string, direction: -1 | 1) {
+    const current = effects();
+    const index = current.findIndex((effect) => effect.id === effectId);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return;
+    const next = current.slice();
+    const [item] = next.splice(index, 1);
+    next.splice(nextIndex, 0, item);
+    updateEffects(next);
+  }
+
+  function removeEffect(effectId: string) {
+    updateEffects(effects().filter((effect) => effect.id !== effectId));
+  }
+
+  return (
+    <section class={`ds-panel ${styles.fxPanel}`} aria-label="Aether instrument effects">
+      <header class="ds-panel-header">
+        <div class="ds-panel-title">Instrument FX</div>
+        <div class="ds-panel-actions">
+          <select
+            class={`ds-select ${styles.fxAddSelect}`}
+            aria-label="Add instrument effect"
+            value=""
+            onChange={(event) => {
+              const value = event.currentTarget.value as EffectKind;
+              if (!value) return;
+              addEffect(value);
+              event.currentTarget.value = "";
+            }}
+          >
+            <option value="">Add effect</option>
+            <For each={EFFECT_OPTIONS}>
+              {(option) => <option value={option.value}>{option.label}</option>}
+            </For>
+          </select>
+        </div>
+      </header>
+      <div class={`ds-panel-body ${styles.fxBody}`}>
+        <Show when={effects().length > 0} fallback={<div class={styles.fxEmpty}>No instrument FX. Output goes directly to the track chain.</div>}>
+          <div class={styles.fxChain}>
+            <For each={effects()}>
+              {(effect, index) => (
+                <article class={`${styles.fxBlock} ${effect.bypassed ? styles.fxBlockBypassed : ""}`}>
+                  <div class={styles.fxHeader}>
+                    <div class={styles.fxTitleBlock}>
+                      <div class={styles.fxTitle}>{EFFECT_LABELS[effect.kind]}</div>
+                      <div class={styles.fxBadges}>
+                        <span>{formatEffectLatency(effect)}</span>
+                        <span>{formatEffectTail(effect)}</span>
+                      </div>
+                    </div>
+                    <div class={styles.fxActions}>
+                      <HoverInfo content="Move left">
+                        <Button
+                          iconOnly
+                          size="xs"
+                          disabled={index() === 0}
+                          aria-label={`Move ${EFFECT_LABELS[effect.kind]} earlier`}
+                          onClick={() => moveEffect(effect.id, -1)}
+                        >
+                          <Icon name="ph:caret-left" size={12} decorative />
+                        </Button>
+                      </HoverInfo>
+                      <HoverInfo content="Move right">
+                        <Button
+                          iconOnly
+                          size="xs"
+                          disabled={index() === effects().length - 1}
+                          aria-label={`Move ${EFFECT_LABELS[effect.kind]} later`}
+                          onClick={() => moveEffect(effect.id, 1)}
+                        >
+                          <Icon name="ph:caret-right" size={12} decorative />
+                        </Button>
+                      </HoverInfo>
+                      <Toggle
+                        checked={!effect.bypassed}
+                        onChange={(enabled) => patchEffect(effect.id, { bypassed: !enabled })}
+                      />
+                      <HoverInfo content="Remove effect">
+                        <Button
+                          iconOnly
+                          size="xs"
+                          aria-label={`Remove ${EFFECT_LABELS[effect.kind]}`}
+                          onClick={() => removeEffect(effect.id)}
+                        >
+                          <Icon name="ph:trash" size={12} decorative />
+                        </Button>
+                      </HoverInfo>
+                    </div>
+                  </div>
+                  <div class={styles.fxParams}>
+                    <For each={EFFECT_PARAM_SPECS[effect.kind]}>
+                      {(param) => (
+                        <NumberInput
+                          label={param.label}
+                          value={effect.params[param.key] ?? EFFECT_DEFAULT_PARAMS[effect.kind][param.key] ?? param.min}
+                          min={param.min}
+                          max={param.max}
+                          step={param.step}
+                          unit={param.unit}
+                          layout="inline"
+                          onChange={(value) => patchParam(effect, param.key, value)}
+                        />
+                      )}
+                    </For>
+                  </div>
+                </article>
+              )}
+            </For>
+          </div>
+        </Show>
+      </div>
     </section>
   );
 }

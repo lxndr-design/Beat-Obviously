@@ -462,6 +462,8 @@ export interface SynthPatchSnapshot {
   name: string;
   parameters: Record<string, SynthPatchParameterValue>;
   modulation: SynthPatchModulationRoute[];
+  /** Instrument-owned FX inserted before track FX. Older patches omit this. */
+  effects?: TrackEffectChain;
   metadata: {
     createdBy: "Beat";
     tags: string[];

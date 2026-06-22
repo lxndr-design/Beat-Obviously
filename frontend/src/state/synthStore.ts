@@ -6,11 +6,13 @@ import type {
   Instrument,
   SynthPatchSnapshot,
   SynthPatchMacroDefinition,
+  TrackEffectChain,
   WavemapDefinition,
   WavemapSource,
   WavetableConfig,
   WavetableWarpMode,
 } from "./types";
+import { normalizeTrackEffectChain } from "./effects";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 1;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
@@ -169,6 +171,8 @@ export interface SynthDraftPatch {
   name: string;
   parameters: Record<SynthParameterId, SynthParameterValue> & Record<string, SynthParameterValue>;
   modulation: SynthModulationRoute[];
+  /** Instrument-owned FX inserted before track FX. */
+  effects: TrackEffectChain;
   metadata: {
     createdBy: "Beat";
     tags: string[];
@@ -780,6 +784,7 @@ export function createDefaultSynthDraft(): SynthDraftPatch {
         enabled: true,
       },
     ],
+    effects: { filters: [] },
     metadata: {
       createdBy: "Beat",
       tags: [],
@@ -819,6 +824,7 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
         .map(normalizeModulationRoute)
         .filter((route): route is SynthModulationRoute => route !== null)
     : base.modulation;
+  const effects = normalizeTrackEffectChain(input.effects);
   const inputMetadata: Record<string, unknown> = isRecord(input.metadata) ? input.metadata : {};
   const wavemaps = normalizeCustomWavetables(inputMetadata.wavemaps ?? inputMetadata.customWavetables);
 
@@ -829,6 +835,7 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
     name: typeof input.name === "string" && input.name.trim() ? input.name.trim() : base.name,
     parameters,
     modulation: dedupeModulationRouteIds(modulation),
+    effects,
     metadata: {
       createdBy: "Beat",
       tags: Array.isArray(inputMetadata.tags)
@@ -985,6 +992,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     maxVoices: getNumberParam(draft, "maxVoices"),
     mono: getBooleanParam(draft, "mono.enabled"),
     legato: getBooleanParam(draft, "legato.enabled"),
+    effects: structuredClone(draft.effects),
     synthPatch: cloneSynthPatch(draft),
   };
 }
@@ -1074,12 +1082,14 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   if (instrument.synthPatch) {
     const draft = normalizeSynthDraftPatch(instrument.synthPatch as SynthDraftPatch);
     if (instrument.icon) draft.metadata.icon = instrument.icon;
+    draft.effects = normalizeTrackEffectChain(instrument.effects ?? draft.effects);
     return draft;
   }
 
   const draft = createDefaultSynthDraft();
   draft.name = instrument.name;
   draft.metadata.icon = instrument.icon ?? draft.metadata.icon;
+  draft.effects = normalizeTrackEffectChain(instrument.effects);
   draft.parameters["filter.cutoff"] = normalizedCutoffToHz(instrument.knobs.cutoff);
   draft.parameters["filter.keytrack"] = instrument.filterKeytrack ?? 0;
   draft.parameters["filter.resonance"] = instrument.knobs.resonance;

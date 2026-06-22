@@ -72,6 +72,7 @@ See [frontend/src/design/README.md](frontend/src/design/README.md). Short versio
 ## Roadmap (post-v1)
 
 - [DAW comprehensiveness roadmap](docs/daw-comprehensiveness-roadmap.md) — focused pass plan for moving Beat from prototype DAW coverage to v1-complete DAW workflows.
+- [Remaining work checklist](docs/remaining-work-checklist.md) — consolidated open-item checklist used for implementation order and closeout.
 - [DAW parallel execution plan](docs/daw-parallel-execution-plan.md) — worker split, file locks, serial contracts, and verification gates for the comprehensiveness pass.
 - [DAW + Aether roadmap](docs/serum-style-synth-roadmap.md) — broader product and engine progress tracker.
 - VST3/AU plugin hosting via JUCE's plugin host
