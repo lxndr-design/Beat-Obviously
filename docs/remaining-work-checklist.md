@@ -34,7 +34,9 @@ Status legend:
 4. `[ ]` Aether preset storage and migration.
    - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.
    - `[x]` Add schema-versioned local instrument-effect chain presets with save/load/delete and legacy normalization.
-   - Add migration fixtures for older preset/effect defaults.
+   - `[x]` Add document roundtrip coverage for preset-grade Aether patches, macro routes, custom wavemap analysis metadata, and instrument-owned FX.
+   - `[ ]` Add native repository roundtrip coverage for Aether presets/effect presets.
+   - `[ ]` Add browser smoke for preset save/load/delete flows.
 
 ## DAW Editing
 
@@ -125,7 +127,7 @@ Status legend:
 
 - `[ ]` Heavier nonlinear warp experiments after runtime warp oversampling strategy exists.
 - `[~]` Browser preview parity for live macro route changes.
-- `[~]` Project/document roundtrip fixtures for macro route state.
+- `[x]` Project/document roundtrip fixtures for macro route state.
 - `[~]` Visible macro lanes and macro conflict display.
 - `[~]` Modulation matrix semantic cleanup: per-target ranges, conflict clarity, disabled routes, source-specific editing.
 - `[~]` Deeper envelope visual editing with better loop/curve handles and assignment feedback.
@@ -181,7 +183,7 @@ Status legend:
 - `[ ]` Group/send stem export stress.
 - `[ ]` Recording commit rollback stress.
 - `[ ]` Asset package/relink stress.
-- `[ ]` Document roundtrip fixtures for mixer groups/returns/sends, automation lanes, freeze/bounce metadata, recording input profiles, export presets, and Aether preset migrations.
+- `[ ]` Document roundtrip fixtures for mixer groups/returns/sends, automation lanes, freeze/bounce metadata, export presets, and remaining Aether preset migrations not covered by the current document verifier.
 
 ## Release Gate
 

@@ -25,8 +25,8 @@ Status legend:
 - `[x]` Per-note native/browser lanes cover pitch, amp level/pan, filter cutoff/resonance/drive, oscillator position/fine/level/pan/phase, and unison detune/spread.
 - `[~]` Runtime macro semantics.
   - Done: macro labels, ranges, curves, visible assignment summaries, browser static route math, native macro range/curve parsing, first-class voice macro state, macro route storage in dynamic targets, and `macro.1`-`macro.4` realtime/note automation with backend no-leak stress.
-  - Remaining: browser preview parity for live macro route changes, explicit project/document roundtrip fixtures for macro route state, visible macro lanes, and conflict display.
-  - Proof still needed: browser preview, project/document roundtrip, and editor interaction coverage for macro lanes.
+  - Remaining: browser preview parity for live macro route changes, visible macro lanes, and conflict display.
+  - Proof: document roundtrip verifier covers macro definitions/routes inside Aether preset-grade patches; browser preview and editor interaction coverage for macro lanes still needed.
 - `[~]` Modulation matrix UX.
   - Done: target/source selection and visible assignments.
   - Remaining: semantic cleanup for per-target range displays, conflict clarity, disabled route states, and source-specific editing affordances.
@@ -72,9 +72,9 @@ Status legend:
 - `[ ]` Named Aether effect/instrument preset library.
   - Done: schema-versioned local instrument preset records, schema-versioned local instrument-effect chain presets, legacy record normalization, explicit Save As preset, user preset delete, Restore Init action, and FX preset save/load/delete.
   - Remaining: native repository roundtrip and fuller browser coverage.
-  - Proof: synth verifier covers schema creation/migration; frontend interaction verifier covers preset state transitions.
+  - Proof: synth verifier covers schema creation/migration; frontend interaction verifier covers preset state transitions; document roundtrip verifier covers preset-grade Aether synth patches, macro routes, custom wavemap analysis metadata, and instrument-owned FX.
 - `[ ]` Aether FX preset/version migration.
-  - Proof: migration fixtures for old effect defaults and current instrument-owned FX chains.
+  - Proof: synth and interaction verifiers cover legacy effect-default normalization; document roundtrip verifier covers current instrument-owned FX chains.
 
 ## 6. UI And Editing Workflow
 

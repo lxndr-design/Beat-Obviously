@@ -78,6 +78,22 @@ try {
   assert.equal(migrated.instruments?.[0].sampleMap?.[0].durationSeconds, 0.42);
   assert.equal(migrated.instruments?.[0].sampleMap?.[0].loLengthSeconds, 0);
   assert.equal(migrated.instruments?.[0].sampleMap?.[0].hiLengthSeconds, 0.5);
+  const migratedAetherInstrument = migrated.instruments?.find((instrument) => instrument.id === "inst-aether-preset");
+  assert.equal(migratedAetherInstrument?.kind, "wavetable", "Aether preset instruments should survive document migration");
+  assert.equal(migratedAetherInstrument?.effects?.filters?.[0]?.kind, "saturator", "instrument-owned Aether FX should roundtrip");
+  assert.equal(migratedAetherInstrument?.effects?.filters?.[0]?.params.drive, 37, "instrument-owned Aether FX params should roundtrip");
+  assert.equal(migratedAetherInstrument?.synthPatch?.metadata.macros?.["macro.1"]?.label, "Glow", "macro definitions should roundtrip");
+  assert.equal(migratedAetherInstrument?.synthPatch?.modulation?.[0]?.source, "macro.1", "macro routes should roundtrip");
+  assert.equal(
+    migratedAetherInstrument?.synthPatch?.metadata.wavemaps?.["user.scan"]?.frames?.[0]?.analysis?.spectralCentroid,
+    0.42,
+    "wavemap analysis metadata should roundtrip",
+  );
+  assert.equal(
+    migratedAetherInstrument?.aether?.oscA.wavetable.customId,
+    "user.scan",
+    "Aether oscillator custom wavemap references should roundtrip",
+  );
   assert.equal(migrated.instrumentSets?.[0].name, "User Imports");
   assert.equal(migrated.audioFiles?.[0].sampleRate, 48000);
   assert.equal(migrated.components?.[0].kind, "drum");
@@ -121,6 +137,30 @@ try {
     beatDocumentFingerprint(migrated),
     beatDocumentFingerprint(changedRecordingInput),
     "document dirty fingerprint should include recording latency calibration",
+  );
+
+  const changedAetherMacro = structuredClone(migrated);
+  changedAetherMacro.instruments.find((instrument) => instrument.id === "inst-aether-preset").synthPatch.metadata.macros["macro.1"].label = "Heat";
+  assert.notEqual(
+    beatDocumentFingerprint(migrated),
+    beatDocumentFingerprint(changedAetherMacro),
+    "document dirty fingerprint should include Aether preset macro edits",
+  );
+
+  const changedAetherFx = structuredClone(migrated);
+  changedAetherFx.instruments.find((instrument) => instrument.id === "inst-aether-preset").effects.filters[0].params.drive += 5;
+  assert.notEqual(
+    beatDocumentFingerprint(migrated),
+    beatDocumentFingerprint(changedAetherFx),
+    "document dirty fingerprint should include instrument-owned Aether FX edits",
+  );
+
+  const changedAetherWavemap = structuredClone(migrated);
+  changedAetherWavemap.instruments.find((instrument) => instrument.id === "inst-aether-preset").synthPatch.metadata.wavemaps["user.scan"].frames[0].analysis.spectralCentroid += 0.1;
+  assert.notEqual(
+    beatDocumentFingerprint(migrated),
+    beatDocumentFingerprint(changedAetherWavemap),
+    "document dirty fingerprint should include custom wavemap analysis edits",
   );
 
   const relinked = replaceBeatDocumentAssetPath(migrated, "/Samples/Kick.wav", "/Relinked/Kick.wav");
@@ -319,6 +359,7 @@ function makeRepresentativeDocument() {
         },
         userCreated: true,
       },
+      makeAetherPresetInstrument(),
     ],
     instrumentSets: [{ id: "set-user-imports", name: "User Imports", collapsed: false }],
     audioFiles: [
@@ -358,5 +399,236 @@ function makeRepresentativeDocument() {
         installedAt: 1780600000000,
       },
     ],
+  };
+}
+
+function makeAetherPresetInstrument() {
+  const wavetable = {
+    bank: "custom",
+    customId: "user.scan",
+    position: 0.64,
+    warp: 0.38,
+    warpMode: "fold",
+    unison: 5,
+    detuneCents: 18,
+    blend: 0.72,
+  };
+  const wavemap = {
+    schemaVersion: 1,
+    id: "user.scan",
+    name: "Verifier Scan",
+    kind: "resynthesized",
+    interpolation: "smooth",
+    morph: 0.3,
+    source: {
+      kind: "resynthesized",
+      label: "Verifier Sweep",
+      audioFileId: "audio-wavemap",
+      path: "/Wavemaps/Sweep.wav",
+      sampleRate: 48000,
+      channelCount: 1,
+      bitDepth: 24,
+      sourceSampleCount: 96000,
+      analyzedSampleCount: 48000,
+      frameCount: 2,
+      sourceStartSample: 128,
+      sourceEndSample: 48128,
+      createdAt: 1780600000100,
+    },
+    frames: [
+      {
+        id: "frame-a",
+        label: "Bright",
+        position: 0,
+        brightness: 0.7,
+        even: 0.2,
+        fold: 0.45,
+        formant: 0.33,
+        notch: 0.1,
+        skew: -0.2,
+        tilt: 0.25,
+        focus: 0.55,
+        phase: 0.15,
+        partials: [0.9, 0.4, 0.2, 0.1],
+        analysis: {
+          sourceStartSample: 128,
+          sourceEndSample: 24128,
+          rms: 0.18,
+          peak: 0.8,
+          zeroCrossRate: 0.11,
+          roughness: 0.27,
+          asymmetry: -0.04,
+          spectralCentroid: 0.42,
+          dominantHarmonic: 3,
+          dominantPhase: 0.61,
+        },
+      },
+      {
+        id: "frame-b",
+        label: "Hollow",
+        position: 1,
+        brightness: 0.38,
+        even: 0.55,
+        fold: 0.2,
+        formant: 0.7,
+        notch: 0.28,
+        skew: 0.35,
+        tilt: -0.18,
+        focus: 0.74,
+        phase: 0.5,
+        partials: [0.6, 0.15, 0.5, 0.2],
+        analysis: {
+          sourceStartSample: 24128,
+          sourceEndSample: 48128,
+          rms: 0.14,
+          peak: 0.62,
+          zeroCrossRate: 0.16,
+          roughness: 0.31,
+          asymmetry: 0.08,
+          spectralCentroid: 0.57,
+          dominantHarmonic: 5,
+          dominantPhase: 0.2,
+        },
+      },
+    ],
+  };
+  const effects = {
+    filters: [
+      {
+        id: "aether-sat",
+        kind: "saturator",
+        bypassed: false,
+        params: { drive: 37, mix: 71 },
+      },
+      {
+        id: "aether-delay",
+        kind: "delay",
+        bypassed: true,
+        params: { timeMs: 390, feedback: 31, mix: 18 },
+      },
+    ],
+  };
+  const synthPatch = {
+    schemaVersion: 1,
+    instrumentType: "wavetable-synth",
+    namespace: "synth",
+    name: "Verifier Aether Preset",
+    parameters: {
+      "osc.a.enabled": true,
+      "osc.a.wavetable": "user.scan",
+      "osc.a.position": 0.64,
+      "osc.a.warp": 0.38,
+      "osc.a.warpMode": "fold",
+      "osc.a.phase": 0.22,
+      "osc.b.enabled": true,
+      "osc.b.wavetable": "basic.triangle",
+      "osc.b.level": 0.28,
+      "filter.enabled": true,
+      "filter.cutoff": 5200,
+      "filter.resonance": 0.34,
+      "amp.level": 0.82,
+    },
+    modulation: [
+      {
+        id: "macro-glow-cutoff",
+        source: "macro.1",
+        target: "filter.cutoff",
+        amount: 0.42,
+        bipolar: false,
+        enabled: true,
+      },
+      {
+        id: "lfo-scan",
+        source: "lfo.1",
+        target: "osc.a.position",
+        amount: 0.18,
+        bipolar: true,
+        enabled: true,
+      },
+    ],
+    effects,
+    metadata: {
+      createdBy: "Beat",
+      tags: ["verifier", "aether"],
+      icon: "ph:cube",
+      macros: {
+        "macro.1": { id: "macro.1", label: "Glow", min: 0, max: 1, curve: "s-curve" },
+        "macro.2": { id: "macro.2", label: "Motion", min: 0, max: 1, curve: "linear" },
+        "macro.3": { id: "macro.3", label: "Edge", min: 0, max: 1, curve: "ease-in" },
+        "macro.4": { id: "macro.4", label: "Air", min: 0, max: 1, curve: "ease-out" },
+      },
+      wavemaps: { "user.scan": wavemap },
+      customWavetables: { "user.scan": wavemap },
+    },
+  };
+  return {
+    id: "inst-aether-preset",
+    name: "Verifier Aether Preset",
+    icon: "ph:cube",
+    kind: "wavetable",
+    envelope: { attackMs: 8, decayMs: 140, sustain: 0.72, releaseMs: 260 },
+    knobs: { cutoff: 0.6, resonance: 0.34, drive: 0.25, color: 0.64 },
+    filterType: "lowpass",
+    filterKeytrack: 0.4,
+    waveform: "wavetable",
+    detuneCents: 4,
+    octave: 0,
+    subOscLevel: 0.15,
+    glideMs: 22,
+    maxVoices: 10,
+    mono: false,
+    legato: false,
+    ampLevel: 0.82,
+    ampPan: -0.1,
+    wavetable,
+    aether: {
+      oscA: {
+        enabled: true,
+        level: 0.84,
+        pan: -0.12,
+        waveform: "wavetable",
+        octave: 0,
+        semitone: 0,
+        fineCents: 4,
+        phase: 0.22,
+        randomPhase: 0.1,
+        wavetable,
+      },
+      oscB: {
+        enabled: true,
+        level: 0.28,
+        pan: 0.24,
+        waveform: "triangle",
+        octave: 1,
+        semitone: -7,
+        fineCents: -3,
+        phase: 0.4,
+        randomPhase: 0.2,
+        wavetable: { ...wavetable, bank: "glass", customId: undefined, position: 0.25, warp: 0.12, warpMode: "shape" },
+      },
+      sub: { enabled: true, level: 0.18, octave: -1, waveform: "sine" },
+      noise: { enabled: true, level: 0.08, color: 0.6 },
+    },
+    lfoWaveform: "triangle",
+    lfoRateHz: 2,
+    lfoDepth: 0.18,
+    lfoSync: true,
+    lfoSyncedRate: "1/8",
+    lfoSmoothing: 0.15,
+    lfoRandomPhase: 0.2,
+    lfoPhase: 0.1,
+    lfoRetrigger: true,
+    lfoOneShot: false,
+    envToFilter: 0.3,
+    effects,
+    synthPatch,
+    sampleIds: [],
+    setId: "set-user-imports",
+    source: {
+      kind: "generated",
+      label: "Aether preset fixture",
+      importedAt: 1780600000200,
+    },
+    userCreated: true,
   };
 }
