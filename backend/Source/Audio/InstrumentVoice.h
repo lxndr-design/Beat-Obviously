@@ -293,7 +293,6 @@ namespace beat
         void resetRealtimeRampsFromParams() noexcept;
         void setRealtimeRamp(RealtimeParam param, float value, int rampSamples) noexcept;
         bool setRealtimeParameterValue(std::string_view parameterId, float value, int rampSamples, bool updateBaseline) noexcept;
-        void applyParamToParams(Params& target, RealtimeParam param, float value) noexcept;
         void applyRealtimeValue(RealtimeParam param, float value) noexcept;
         void advanceRealtimeRamps() noexcept;
         void loadPendingNoteAutomation(int midiNoteNumber) noexcept;

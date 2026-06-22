@@ -128,23 +128,11 @@ namespace beat
 
     void InstrumentVoice::resetRealtimeRampsFromParams() noexcept
     {
-        realtimeRampState.ramp(RealtimeParam::FilterCutoff).reset(params.cutoff01);
-        realtimeRampState.ramp(RealtimeParam::FilterResonance).reset(params.resonance01);
-        realtimeRampState.ramp(RealtimeParam::FilterDrive).reset(params.drive01);
-        realtimeRampState.ramp(RealtimeParam::AmpLevel).reset(params.ampLevel);
-        realtimeRampState.ramp(RealtimeParam::AmpPan).reset(params.ampPan);
-        realtimeRampState.ramp(RealtimeParam::OscAPosition).reset(params.aetherOscA.wavetable.position);
-        realtimeRampState.ramp(RealtimeParam::OscBPosition).reset(params.aetherOscB.wavetable.position);
-        realtimeRampState.ramp(RealtimeParam::OscAFine).reset(params.aetherOscA.fineCents);
-        realtimeRampState.ramp(RealtimeParam::OscBFine).reset(params.aetherOscB.fineCents);
-        realtimeRampState.ramp(RealtimeParam::OscALevel).reset(params.aetherOscA.level);
-        realtimeRampState.ramp(RealtimeParam::OscBLevel).reset(params.aetherOscB.level);
-        realtimeRampState.ramp(RealtimeParam::OscAPan).reset(params.aetherOscA.pan);
-        realtimeRampState.ramp(RealtimeParam::OscBPan).reset(params.aetherOscB.pan);
-        realtimeRampState.ramp(RealtimeParam::UnisonDetune).reset(params.wavetableDetuneCents);
-        realtimeRampState.ramp(RealtimeParam::UnisonSpread).reset(params.wavetableBlend);
-        realtimeRampState.ramp(RealtimeParam::LfoRate).reset(params.lfoRateHz);
-        realtimeRampState.ramp(RealtimeParam::LfoDepth).reset(params.lfoDepth);
+        for (size_t index = 0; index < VoiceRealtimeParams::count; ++index)
+        {
+            const auto param = (RealtimeParam) index;
+            realtimeRampState.ramp(param).reset(VoiceRealtimeParams::initialValueFor(params, param));
+        }
         realtimeRampState.clearActive();
     }
 
@@ -178,82 +166,14 @@ namespace beat
         if (!isVoiceActive())
             rampSamples = 0;
         if (updateBaseline)
-            applyParamToParams(baseParams, param, value);
+            VoiceRealtimeParams::applyValue(baseParams, param, value);
         setRealtimeRamp(param, VoiceRealtimeParams::clampValue(param, value), rampSamples);
         return true;
     }
 
-    void InstrumentVoice::applyParamToParams(Params& target, RealtimeParam param, float value) noexcept
-    {
-        switch (param)
-        {
-            case RealtimeParam::FilterCutoff:
-                target.cutoff01 = VoiceMath::clamp01(value);
-                break;
-            case RealtimeParam::FilterResonance:
-                target.resonance01 = VoiceMath::clamp01(value);
-                break;
-            case RealtimeParam::FilterDrive:
-                target.drive01 = VoiceMath::clamp01(value);
-                break;
-            case RealtimeParam::AmpLevel:
-                target.ampLevel = VoiceMath::clamp01(value);
-                break;
-            case RealtimeParam::AmpPan:
-                target.ampPan = juce::jlimit(-1.0f, 1.0f, value);
-                break;
-            case RealtimeParam::OscAPosition:
-                target.wavetablePosition = VoiceMath::clamp01(value);
-                target.wavetable.position = target.wavetablePosition;
-                target.aetherOscA.wavetable.position = target.wavetablePosition;
-                break;
-            case RealtimeParam::OscBPosition:
-                target.aetherOscB.wavetable.position = VoiceMath::clamp01(value);
-                break;
-            case RealtimeParam::OscAFine:
-                target.aetherOscA.fineCents = juce::jlimit(-100.0f, 100.0f, value);
-                break;
-            case RealtimeParam::OscBFine:
-                target.aetherOscB.fineCents = juce::jlimit(-100.0f, 100.0f, value);
-                break;
-            case RealtimeParam::OscALevel:
-                target.aetherOscA.level = VoiceMath::clamp01(value);
-                break;
-            case RealtimeParam::OscBLevel:
-                target.aetherOscB.level = VoiceMath::clamp01(value);
-                break;
-            case RealtimeParam::OscAPan:
-                target.aetherOscA.pan = juce::jlimit(-1.0f, 1.0f, value);
-                break;
-            case RealtimeParam::OscBPan:
-                target.aetherOscB.pan = juce::jlimit(-1.0f, 1.0f, value);
-                break;
-            case RealtimeParam::UnisonDetune:
-                target.wavetableDetuneCents = juce::jlimit(0.0f, 100.0f, value);
-                target.wavetable.detuneCents = target.wavetableDetuneCents;
-                target.aetherOscA.wavetable.detuneCents = target.wavetableDetuneCents;
-                target.aetherOscB.wavetable.detuneCents = target.wavetableDetuneCents;
-                break;
-            case RealtimeParam::UnisonSpread:
-                target.wavetableBlend = VoiceMath::clamp01(value);
-                target.wavetable.blend = target.wavetableBlend;
-                target.aetherOscA.wavetable.blend = target.wavetableBlend;
-                target.aetherOscB.wavetable.blend = target.wavetableBlend;
-                break;
-            case RealtimeParam::LfoRate:
-                target.lfoRateHz = juce::jlimit(0.01f, 50.0f, value);
-                break;
-            case RealtimeParam::LfoDepth:
-                target.lfoDepth = VoiceMath::clamp01(value);
-                break;
-            case RealtimeParam::Count:
-                break;
-        }
-    }
-
     void InstrumentVoice::applyRealtimeValue(RealtimeParam param, float value) noexcept
     {
-        applyParamToParams(params, param, value);
+        VoiceRealtimeParams::applyValue(params, param, value);
         switch (param)
         {
             case RealtimeParam::FilterCutoff:
