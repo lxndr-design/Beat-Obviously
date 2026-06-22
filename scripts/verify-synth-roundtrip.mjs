@@ -1377,6 +1377,34 @@ try {
     [{ target: "macro.1", points: [{ timeS: 0, value: 1 }, { timeS: 0.25, value: 1 }] }],
   );
   assert.ok(bufferRms(macroAutomatedSamples) > bufferRms(macroBaseSamples) * 1.8, "macro note automation should audibly affect browser preview renders");
+  const macroLinearRampSamples = new Float32Array(12000);
+  const macroHoldRampSamples = new Float32Array(12000);
+  synthPreview.renderInstrumentSamples(
+    macroNoteAutomationPreview,
+    macroLinearRampSamples,
+    48000,
+    synthPreview.previewFrequency(macroNoteAutomationPreview),
+    "audio",
+    true,
+    undefined,
+    undefined,
+    [{ target: "macro.1", points: [{ timeS: 0, value: 0, curve: "linear" }, { timeS: 0.25, value: 1 }] }],
+  );
+  synthPreview.renderInstrumentSamples(
+    macroNoteAutomationPreview,
+    macroHoldRampSamples,
+    48000,
+    synthPreview.previewFrequency(macroNoteAutomationPreview),
+    "audio",
+    true,
+    undefined,
+    undefined,
+    [{ target: "macro.1", points: [{ timeS: 0, value: 0, curve: "hold" }, { timeS: 0.25, value: 1 }] }],
+  );
+  assert.ok(
+    bufferRms(macroLinearRampSamples) > bufferRms(macroHoldRampSamples) * 1.8,
+    "browser preview should honor note automation curve metadata",
+  );
 
   const disabledDynamicDraft = synthStore.normalizeSynthDraftPatch({
     ...dynamicModDraft,
