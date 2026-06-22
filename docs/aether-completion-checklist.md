@@ -47,9 +47,10 @@ Status legend:
   - Done: deterministic browser/native source provenance fields, deterministic full/transient/sustain/manual imported-audio selection windows, Solid import mode controls, native IPC selection support, absolute source-range frame metadata, and per-frame RMS/peak/zero-cross/roughness/asymmetry/centroid/dominant-harmonic analysis metadata.
   - Remaining: visual/manual range picker polish and deeper analysis display controls.
   - Proof: deterministic fixture import that produces stable frame metadata and audible/rendered differences.
-- `[ ]` Wavemap preset/version migration.
-  - Add explicit migration for older wavemap schema versions once the current editing semantics settle.
-  - Proof: JS document verifier plus native repository roundtrip for old and current wavemap shapes.
+- `[~]` Wavemap preset/version migration.
+  - Done: JS synth verifier covers mixed-era wavemap metadata migration, including legacy-only `customWavetables`, modern `wavemaps` precedence for duplicate IDs, schema/default backfill, source sanitization, frame completion, and alias mirroring.
+  - Remaining: native repository roundtrip for old and current wavemap shapes, plus document-level fixture coverage once old preset storage fixtures are formalized.
+  - Proof: JS synth verifier covers mixed-era old/current wavemap shape normalization; native repository proof still needed.
 
 ## 4. Envelopes, LFOs, And Performance Controls
 
@@ -96,7 +97,9 @@ Status legend:
   - Covers project, segment, note, route, instrument-effect, track-effect, macro, and master EQ automation in one live/export parity render, with a stripped-automation baseline proving the automation materially changes output.
 - `[ ]` Null-test style live/offline comparisons where deterministic output is expected.
 - `[ ]` Browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, and note automation lanes.
-- `[ ]` Preset migration fixtures once Aether preset storage is formalized.
+- `[~]` Preset migration fixtures once Aether preset storage is formalized.
+  - Done: JS synth verifier covers mixed-era wavemap metadata migration and legacy Aether/FX preset record normalization.
+  - Remaining: browser-level preset-flow smoke plus native/document fixtures for older wavemap preset records.
 
 ## Near-Term Slice Order
 

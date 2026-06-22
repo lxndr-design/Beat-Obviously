@@ -897,6 +897,60 @@ try {
   assert.equal(synthStore.useSynthStore.getState().draft.metadata.wavemaps["user.custom"].interpolation, "smooth");
   assert.equal(synthStore.useSynthStore.getState().draft.metadata.wavemaps["user.custom"].morph, 0.41);
   assert.equal(synthStore.useSynthStore.getState().draft.metadata.customWavetables["user.custom"].source.label, "Verifier generated wavemap");
+
+  const mixedEraWavemapDraft = synthStore.normalizeSynthDraftPatch({
+    name: "Mixed Era Wavemap Probe",
+    metadata: {
+      wavemaps: {
+        "user.modern": {
+          schemaVersion: 1,
+          id: "user.modern",
+          name: "Modern Current",
+          kind: "harmonic-sketch",
+          interpolation: "linear",
+          morph: 0.12,
+          source: { kind: "generated", label: "Modern wavemap" },
+          frames: [
+            { brightness: 0.33, even: 0.22, fold: 0.11, formant: 0.1, notch: 0.05, skew: 0.1, tilt: 0.2, focus: 0.3, phase: 0.4 },
+          ],
+        },
+      },
+      customWavetables: {
+        "user.modern": {
+          name: "Stale Legacy Copy",
+          frames: [{ brightness: 0.01 }],
+        },
+        "user.legacy-only": {
+          name: "  Legacy Only  ",
+          kind: "resynthesized",
+          interpolation: "smooth",
+          morph: 0.77,
+          source: { kind: "imported-audio", label: "Legacy File", path: " /tmp/legacy.wav " },
+          frames: [
+            { brightness: 2, even: -1, partials: [1, 0.5] },
+            { id: "legacy-frame-b", label: "Legacy B", position: 0.42, phase: 2 },
+          ],
+        },
+      },
+    },
+  });
+  assert.equal(mixedEraWavemapDraft.metadata.wavemaps["user.modern"].name, "Modern Current");
+  assert.equal(mixedEraWavemapDraft.metadata.wavemaps["user.modern"].frames.length, 4);
+  assert.equal(mixedEraWavemapDraft.metadata.wavemaps["user.legacy-only"].schemaVersion, 1);
+  assert.equal(mixedEraWavemapDraft.metadata.wavemaps["user.legacy-only"].name, "Legacy Only");
+  assert.equal(mixedEraWavemapDraft.metadata.wavemaps["user.legacy-only"].kind, "resynthesized");
+  assert.equal(mixedEraWavemapDraft.metadata.wavemaps["user.legacy-only"].source.kind, "imported-audio");
+  assert.equal(mixedEraWavemapDraft.metadata.wavemaps["user.legacy-only"].source.path, "/tmp/legacy.wav");
+  assert.equal(mixedEraWavemapDraft.metadata.wavemaps["user.legacy-only"].frames.length, 4);
+  assert.equal(mixedEraWavemapDraft.metadata.wavemaps["user.legacy-only"].frames[0].brightness, 1);
+  assert.equal(mixedEraWavemapDraft.metadata.wavemaps["user.legacy-only"].frames[0].even, 0);
+  assert.equal(mixedEraWavemapDraft.metadata.wavemaps["user.legacy-only"].frames[0].partials.length, 16);
+  assert.equal(mixedEraWavemapDraft.metadata.wavemaps["user.legacy-only"].frames[1].phase, 1);
+  assert.deepEqual(
+    mixedEraWavemapDraft.metadata.wavemaps["user.legacy-only"],
+    mixedEraWavemapDraft.metadata.customWavetables["user.legacy-only"],
+  );
+
   const drawnPartials = synthStore.drawHarmonicPartialLine([0, 0, 0, 0, 0, 0], 1, 0.25, 5, 0.75);
   assert.equal(drawnPartials.length, 16);
   assert.equal(drawnPartials[1], 0.25);

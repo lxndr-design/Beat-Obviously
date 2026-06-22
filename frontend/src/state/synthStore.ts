@@ -989,7 +989,7 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
     : base.modulation;
   const effects = normalizeTrackEffectChain(input.effects);
   const inputMetadata: Record<string, unknown> = isRecord(input.metadata) ? input.metadata : {};
-  const wavemaps = normalizeCustomWavetables(inputMetadata.wavemaps ?? inputMetadata.customWavetables);
+  const wavemaps = normalizeWavemapMetadata(inputMetadata.wavemaps, inputMetadata.customWavetables);
 
   return {
     schemaVersion: SYNTH_PATCH_SCHEMA_VERSION,
@@ -1607,10 +1607,22 @@ function applyMacroCurve(value: number, curve: MacroCurve): number {
   }
 }
 
-function normalizeCustomWavetables(value: unknown): Record<string, CustomWavetableDefinition> {
+function normalizeWavemapMetadata(
+  wavemaps: unknown,
+  legacyCustomWavetables: unknown,
+): Record<string, CustomWavetableDefinition> {
   const defaults = { [DEFAULT_CUSTOM_WAVETABLE_ID]: createDefaultCustomWavetable() };
-  if (!isRecord(value)) return defaults;
-  const next: Record<string, CustomWavetableDefinition> = { ...defaults };
+  return {
+    ...defaults,
+    ...normalizeCustomWavetables(legacyCustomWavetables, false),
+    ...normalizeCustomWavetables(wavemaps, false),
+  };
+}
+
+function normalizeCustomWavetables(value: unknown, includeDefaults = true): Record<string, CustomWavetableDefinition> {
+  const defaults = { [DEFAULT_CUSTOM_WAVETABLE_ID]: createDefaultCustomWavetable() };
+  if (!isRecord(value)) return includeDefaults ? defaults : {};
+  const next: Record<string, CustomWavetableDefinition> = includeDefaults ? { ...defaults } : {};
   for (const [id, definition] of Object.entries(value)) {
     if (!id.startsWith("user.") || !isRecord(definition)) continue;
     next[id] = normalizeCustomWavetable({ ...definition, id });
