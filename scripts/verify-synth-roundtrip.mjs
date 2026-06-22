@@ -16,6 +16,7 @@ try {
     esbuild,
     [
       join(repoRoot, "frontend/src/state/synthStore.ts"),
+      join(repoRoot, "frontend/src/state/synthPresets.ts"),
       join(repoRoot, "frontend/src/audio/synthPreview.ts"),
       join(repoRoot, "frontend/src/ai/aiService.ts"),
       "--bundle",
@@ -27,6 +28,7 @@ try {
   );
 
   const synthStore = await import(pathToFileURL(join(outDir, "state/synthStore.js")));
+  const synthPresets = await import(pathToFileURL(join(outDir, "state/synthPresets.js")));
   const synthPreview = await import(pathToFileURL(join(outDir, "audio/synthPreview.js")));
   const aiService = await import(pathToFileURL(join(outDir, "ai/aiService.js")));
 
@@ -226,6 +228,35 @@ try {
     assert.ok(Math.sqrt(presetEnergy / presetSamples.length) > 0.005, `expected audible factory preset ${preset.id}`);
     assert.ok(presetPeak > 0.02, `expected factory preset peak for ${preset.id}`);
   }
+
+  const userPreset = synthPresets.createSynthPresetRecord({
+    name: "  Verifier Aether Preset  ",
+    patch: draft,
+    tags: ["lead", "lead", "", "macro"],
+    now: 1234,
+  });
+  assert.equal(userPreset.schemaVersion, 1);
+  assert.equal(userPreset.kind, "instrument");
+  assert.equal(userPreset.name, "Verifier Aether Preset");
+  assert.deepEqual(userPreset.tags, ["lead", "macro"]);
+  assert.equal(userPreset.createdAt, 1234);
+  assert.equal(userPreset.updatedAt, 1234);
+  assert.equal(userPreset.id.startsWith("preset:verifier-aether-preset:"), true);
+  assert.deepEqual(userPreset.patch, draft);
+  userPreset.patch.name = "Mutated Copy";
+  assert.equal(draft.name, "Roundtrip Probe");
+
+  const migratedPreset = synthPresets.normalizeSynthPresetRecord({
+    id: "legacy",
+    name: "Legacy Preset",
+    patch: draft,
+    tags: ["legacy"],
+    updatedAt: 5678,
+  });
+  assert.equal(migratedPreset.schemaVersion, 1);
+  assert.equal(migratedPreset.kind, "instrument");
+  assert.equal(migratedPreset.createdAt, 5678);
+  assert.equal(migratedPreset.updatedAt, 5678);
 
   const patch = synthStore.synthDraftToInstrumentPatch(draft);
   assert.equal(patch.name, "Roundtrip Probe");

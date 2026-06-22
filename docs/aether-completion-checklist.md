@@ -70,8 +70,9 @@ Status legend:
   - Remaining: preset handoff.
   - Proof: synth roundtrip verifier plus existing live/export parity stress for a patch with instrument FX and track FX.
 - `[ ]` Named Aether effect/instrument preset library.
-  - Include schema versioning, migration, save-as-new preset, delete, and restore default behavior.
-  - Proof: document verifier, native repository roundtrip, and UI interaction coverage.
+  - Done: schema-versioned local instrument preset records, legacy record normalization, explicit Save As preset, user preset delete, and Restore Init action.
+  - Remaining: named effect presets, native repository roundtrip, and fuller UI interaction coverage.
+  - Proof: synth verifier covers schema creation/migration; browser interaction coverage still needed.
 - `[ ]` Aether FX preset/version migration.
   - Proof: migration fixtures for old effect defaults and current instrument-owned FX chains.
 

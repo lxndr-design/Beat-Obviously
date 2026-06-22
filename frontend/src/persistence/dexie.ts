@@ -2,7 +2,8 @@ import Dexie, { type Table } from "dexie";
 import type { GeneratedInstrument, GenerateInstrumentOptions } from "../ai/aiService";
 import type { DrumGenre, GeneratedDrumBeat, GenerateDrumBeatOptions } from "../ai/drumBeatGenerator";
 import type { BeatComponent } from "../state/components";
-import type { AudioFile, Instrument, InstrumentSet, MidiNote, Project, Segment, SynthPatchSnapshot } from "../state/types";
+import { normalizeSynthPresetRecord, type SynthPresetRecord } from "../state/synthPresets";
+import type { AudioFile, Instrument, InstrumentSet, MidiNote, Project, Segment } from "../state/types";
 
 export interface DrumBeatFeedback {
   id: string;
@@ -80,15 +81,6 @@ export interface TrainingSignalStats {
   drums: number;
   instruments: number;
   midi: number;
-}
-
-export interface SynthPresetRecord {
-  id: string;
-  name: string;
-  patch: SynthPatchSnapshot;
-  tags: string[];
-  createdAt: number;
-  updatedAt: number;
 }
 
 /**
@@ -172,6 +164,17 @@ export class BeatDB extends Dexie {
       midiSongFeedback: "id, rating, createdAt",
       synthPresets: "id, name, updatedAt",
     });
+    this.version(8).stores({
+      projects: "id, name, savedAt",
+      instruments: "id, name, userCreated, setId",
+      instrumentSets: "id, name, factory",
+      audioFiles: "id, name, path",
+      components: "id, name, kind, factory, createdAt",
+      drumBeatFeedback: "id, genre, rating, createdAt",
+      instrumentGenerationFeedback: "id, rating, createdAt",
+      midiSongFeedback: "id, rating, createdAt",
+      synthPresets: "id, kind, name, updatedAt",
+    });
   }
 }
 
@@ -231,11 +234,16 @@ export async function listInstruments(): Promise<{ instruments: Instrument[]; se
 }
 
 export async function saveSynthPreset(record: SynthPresetRecord) {
-  await db.synthPresets.put(record);
+  const normalized = normalizeSynthPresetRecord(record);
+  if (!normalized) throw new Error("Synth preset is missing a patch.");
+  await db.synthPresets.put(normalized);
 }
 
 export async function listSynthPresets(): Promise<SynthPresetRecord[]> {
-  return db.synthPresets.orderBy("updatedAt").reverse().toArray();
+  const records = await db.synthPresets.orderBy("updatedAt").reverse().toArray();
+  return records
+    .map(normalizeSynthPresetRecord)
+    .filter((record): record is SynthPresetRecord => record !== null);
 }
 
 export async function deleteSynthPreset(id: string) {

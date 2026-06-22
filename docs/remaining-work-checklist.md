@@ -32,8 +32,8 @@ Status legend:
    - Cover track, segment, and piano-roll note automation entrypoints.
    - Add point drag, curve selection, playback preview, and live/export parity coverage.
 4. `[ ]` Aether preset storage and migration.
-   - Add named instrument presets and effect presets.
-   - Add Save As preset, delete, restore default, and schema-version behavior.
+   - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.
+   - `[ ]` Add named effect presets.
    - Add migration fixtures for older preset/effect defaults.
 
 ## DAW Editing

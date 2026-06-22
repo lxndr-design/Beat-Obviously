@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { previewFrequency, renderedInstrumentBuffer } from "../../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../../audio/synthWorkletPreview";
-import { Button, HoverInfo, Icon, Knob, NumberInput, TextInput, Toggle } from "../../../solid-ui";
+import { appPrompt, Button, HoverInfo, Icon, Knob, NumberInput, TextInput, Toggle } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import {
   createTrackEffect,
@@ -15,6 +15,7 @@ import {
   type EffectKind,
 } from "../../../state/effects";
 import {
+  createDefaultSynthDraft,
   FACTORY_SYNTH_PRESETS,
   MACRO_IDS,
   MODULATION_TARGET_LABELS,
@@ -36,7 +37,8 @@ import {
   type SynthDraftPatch,
   type SynthParameterId,
 } from "../../../state/synthStore";
-import { deleteSynthPreset, listSynthPresets, saveSynthPreset, type SynthPresetRecord } from "../../../persistence/dexie";
+import { createSynthPresetRecord, type SynthPresetRecord } from "../../../state/synthPresets";
+import { deleteSynthPreset, listSynthPresets, saveSynthPreset } from "../../../persistence/dexie";
 import { ANALYZER_BAND_COUNT, useAnalyzerStore, type AnalyzerSnapshot } from "../../../state/analyzerStore";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../../state/store";
 import { INSTRUMENT_ICON_OPTIONS, instrumentIconLabel } from "../../../state/instrumentIcons";
@@ -344,17 +346,15 @@ export function SynthEditor(props: SynthEditorProps) {
     }
 
     if (patch.synthPatch) {
-      const now = Date.now();
       const presetId = `instrument:${id}`;
       const existingPreset = presets().find((preset) => preset.id === presetId);
-      await saveSynthPreset({
+      await saveSynthPreset(createSynthPresetRecord({
         id: presetId,
         name: patch.name ?? draft().name,
         patch: patch.synthPatch,
         tags: patch.synthPatch.metadata?.tags ?? [],
-        createdAt: existingPreset?.createdAt ?? now,
-        updatedAt: now,
-      });
+        existing: existingPreset,
+      }));
       setSelectedPresetId(`${USER_PRESET_PREFIX}${presetId}`);
       await refreshPresets();
     }
@@ -397,6 +397,29 @@ export function SynthEditor(props: SynthEditorProps) {
     await deleteSynthPreset(selectedPresetId().slice(USER_PRESET_PREFIX.length));
     setSelectedPresetId("");
     await refreshPresets();
+  }
+
+  async function onSaveAsPreset() {
+    const name = await appPrompt("Preset name", draft().name || "Aether Preset", "Save Preset");
+    if (!name?.trim()) return;
+    const record = createSynthPresetRecord({
+      name,
+      patch: synthDraftToInstrumentPatch(draft()).synthPatch ?? draft(),
+      tags: draft().metadata.tags,
+    });
+    await saveSynthPreset(record);
+    setSelectedPresetId(`${USER_PRESET_PREFIX}${record.id}`);
+    await refreshPresets();
+  }
+
+  function onRestoreInitPreset() {
+    didAutoBind = true;
+    const initPreset = FACTORY_SYNTH_PRESETS.find((preset) => preset.id === "factory.init")?.patch ?? createDefaultSynthDraft();
+    setDraft({
+      ...initPreset,
+      name: boundInstrumentId() ? draft().name : initPreset.name,
+    });
+    setSelectedPresetId(`${FACTORY_PRESET_PREFIX}factory.init`);
   }
 
   function setInstrumentIcon(icon: string) {
@@ -506,6 +529,12 @@ export function SynthEditor(props: SynthEditorProps) {
                     Delete
                   </Button>
                 </Show>
+                <Button size="sm" variant="ghost" onClick={() => void onSaveAsPreset()}>
+                  Save As
+                </Button>
+                <Button size="sm" variant="ghost" onClick={onRestoreInitPreset}>
+                  Restore Init
+                </Button>
               </div>
             </div>
           </section>

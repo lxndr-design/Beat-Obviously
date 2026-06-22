@@ -164,7 +164,7 @@ section.shell {
 
 .identityBody {
   display: grid;
-  grid-template-rows: 32px 32px;
+  grid-template-rows: 32px auto;
   align-items: stretch;
   gap: var(--synth-gap);
   min-width: 0;
@@ -173,7 +173,7 @@ section.shell {
 
 .presetRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) repeat(3, auto);
   gap: var(--synth-gap);
   min-width: 0;
 }
