@@ -65,7 +65,7 @@ namespace beat
             activeWavetableUnison = juce::jlimit(1, 8, params.wavetable.unison);
             wavetableTable = WavetableVoiceCache::sharedTableForConfig(params.wavetable);
             configureWavetableOscillatorBank(wavetableOscillators, wavetableTable.get(), params.wavetable, baseFrequencyHz);
-            invalidateWavetableBankCache(wavetableUnisonPlan);
+            WavetableUnison::invalidate(wavetableUnisonPlan);
         }
         else
         {
@@ -791,7 +791,7 @@ namespace beat
     void InstrumentVoice::configureWavetableOscillators(double frequencyHz) noexcept
     {
         configureWavetableOscillatorBank(wavetableOscillators, wavetableTable.get(), params.wavetable, frequencyHz);
-        invalidateWavetableBankCache(wavetableUnisonPlan);
+        WavetableUnison::invalidate(wavetableUnisonPlan);
         activeWavetableUnison = juce::jlimit(1, 8, params.wavetable.unison);
     }
 
@@ -827,7 +827,7 @@ namespace beat
     {
         for (auto& osc : oscillators)
             osc.setWavetable(nullptr);
-        invalidateWavetableBankCache(plan);
+        WavetableUnison::invalidate(plan);
     }
 
     bool InstrumentVoice::legacyWavetableNeedsSetup() const noexcept
@@ -864,7 +864,7 @@ namespace beat
         if (!std::isfinite(frequencyHz) || frequencyHz <= 0.0)
             frequencyHz = baseFrequencyHz;
 
-        auto& renderPlan = updateWavetableUnisonPlan(plan, config, detuneCentsMod, spreadMod);
+        auto& renderPlan = WavetableUnison::update(plan, config.unison, config.detuneCents, config.blend, detuneCentsMod, spreadMod);
         const float modulatedPosition = VoiceMath::quantizeWavetablePosition(config.position + positionMod);
         float sum = 0.0f;
         currentBlockWavetableVoiceSamples += renderPlan.unison;
@@ -892,55 +892,6 @@ namespace beat
         }
 
         return juce::jlimit(-1.0f, 1.0f, sum / juce::jmax(1.0f, renderPlan.weightSum));
-    }
-
-    InstrumentVoice::WavetableUnisonPlan& InstrumentVoice::updateWavetableUnisonPlan(
-        WavetableUnisonPlan& plan,
-        const Params::WavetableConfig& config,
-        float detuneCentsMod,
-        float spreadMod) noexcept
-    {
-        const int unison = juce::jlimit(1, 8, config.unison);
-        const float rawDetuneCents = juce::jlimit(0.0f, 100.0f, config.detuneCents + detuneCentsMod);
-        const float rawSpread = VoiceMath::clamp01(config.blend + spreadMod);
-        const float detuneCents = std::round(rawDetuneCents * 10.0f) * 0.1f;
-        const float spread = std::round(rawSpread * 512.0f) / 512.0f;
-
-        if (plan.unison == unison
-            && std::abs(plan.detuneCents - detuneCents) < 0.0001f
-            && std::abs(plan.spread - spread) < 0.0001f)
-            return plan;
-
-        plan.unison = unison;
-        plan.detuneCents = detuneCents;
-        plan.spread = spread;
-        plan.weightSum = 0.0f;
-
-        for (int voice = 0; voice < (int) plan.rates.size(); ++voice)
-        {
-            const float centered = unison == 1
-                ? 0.0f
-                : ((float) voice / (float) (unison - 1)) * 2.0f - 1.0f;
-            const float weight = voice == 0 ? 1.0f : 0.72f;
-            plan.centered[(size_t) voice] = centered;
-            plan.rates[(size_t) voice] = voice < unison
-                ? std::exp2(((double) centered * (double) detuneCents) / 1200.0)
-                : 1.0;
-            plan.weights[(size_t) voice] = voice < unison ? weight : 0.0f;
-            plan.phaseSpread[(size_t) voice] = voice < unison ? centered * 0.00008f * spread : 0.0f;
-            if (voice < unison)
-                plan.weightSum += weight;
-        }
-
-        plan.weightSum = juce::jmax(1.0f, plan.weightSum);
-        invalidateWavetableBankCache(plan);
-        return plan;
-    }
-
-    void InstrumentVoice::invalidateWavetableBankCache(WavetableUnisonPlan& plan) noexcept
-    {
-        plan.appliedFrequencyHz.fill(-1.0);
-        plan.appliedPosition.fill(-1.0f);
     }
 
     void InstrumentVoice::refreshCachedPanGains() noexcept

@@ -8,6 +8,7 @@
 #include "Realtime/RealtimeRamp.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
+#include "Wavetable/WavetableUnisonPlan.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_dsp/juce_dsp.h>
@@ -280,19 +281,7 @@ namespace beat
     private:
         using StereoSample = DriveStage::StereoFrame;
 
-        struct WavetableUnisonPlan
-        {
-            int unison { 0 };
-            float detuneCents { -1.0f };
-            float spread { -1.0f };
-            float weightSum { 1.0f };
-            std::array<double, 8> rates {};
-            std::array<double, 8> appliedFrequencyHz {};
-            std::array<float, 8> centered {};
-            std::array<float, 8> weights {};
-            std::array<float, 8> phaseSpread {};
-            std::array<float, 8> appliedPosition {};
-        };
+        using WavetableUnisonPlan = WavetableUnison::Plan;
 
         enum class RealtimeParam : size_t
         {
@@ -346,12 +335,6 @@ namespace beat
             float positionMod,
             float detuneCentsMod,
             float spreadMod) noexcept;
-        WavetableUnisonPlan& updateWavetableUnisonPlan(
-            WavetableUnisonPlan& plan,
-            const Params::WavetableConfig& config,
-            float detuneCentsMod,
-            float spreadMod) noexcept;
-        void invalidateWavetableBankCache(WavetableUnisonPlan& plan) noexcept;
         void refreshCachedPanGains() noexcept;
         void refreshCachedPitchRates() noexcept;
         void refreshCachedDynamicModulationFlags() noexcept;
