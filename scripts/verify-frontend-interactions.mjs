@@ -16,18 +16,41 @@ try {
     esbuild,
     [
       join(repoRoot, "frontend/src/testing/interactionRunner.ts"),
+      join(repoRoot, "frontend/src/automation/aetherNoteAutomation.ts"),
       "--bundle",
       "--format=esm",
       "--platform=node",
-      `--outfile=${join(outDir, "interactionRunner.js")}`,
+      `--outdir=${outDir}`,
     ],
     { stdio: "inherit" },
   );
 
-  const runner = await import(pathToFileURL(join(outDir, "interactionRunner.js")));
+  const runner = await import(pathToFileURL(join(outDir, "testing/interactionRunner.js")));
+  const noteAutomation = await import(pathToFileURL(join(outDir, "automation/aetherNoteAutomation.js")));
 
   assert.equal(runner.snapBeat(1.12, 0.25), 1, "snapBeat should snap to nearest grid");
   assert.equal(runner.snapBeat(1.13, 0.25), 1.25, "snapBeat should round upward past the midpoint");
+
+  assert.ok(
+    noteAutomation.AETHER_NOTE_AUTOMATION_TARGETS.some((meta) => meta.target === "macro.1"),
+    "Aether note automation catalog should expose macro lanes",
+  );
+  const automationNotes = [
+    { pitch: 60, velocity: 100, startBeat: 2, lengthBeats: 1 },
+    { pitch: 64, velocity: 100, startBeat: 4, lengthBeats: 2 },
+  ];
+  const withMacroLane = noteAutomation.upsertMidiNoteAutomationTarget(automationNotes, [0, 1], "macro.1");
+  assert.equal(withMacroLane[0].automation[0].target, "macro.1", "macro lane should be attached to selected notes");
+  assert.deepEqual(withMacroLane[0].automation[0].points.map((point) => point.beat), [2, 3]);
+  assert.deepEqual(withMacroLane[1].automation[0].points.map((point) => point.beat), [4, 6]);
+  assert.equal(noteAutomation.selectedMidiNoteAutomationSummary(withMacroLane, [0, 1], "macro.1"), "2/2 notes");
+  const movedMacroLane = noteAutomation.offsetMidiNoteAutomation(withMacroLane[0].automation, 3);
+  assert.deepEqual(movedMacroLane[0].points.map((point) => point.beat), [5, 6], "note automation points should move with dragged/copied notes");
+  const withPitchLane = noteAutomation.upsertMidiNoteAutomationTarget(automationNotes, [0], "pitch");
+  assert.equal(withPitchLane[0].curve.length, 2, "pitch automation should use the note pitch-curve path");
+  const clearedMacroLane = noteAutomation.clearMidiNoteAutomationTarget(withMacroLane, [0], "macro.1");
+  assert.equal(clearedMacroLane[0].automation, undefined, "clearing the only lane should remove note automation clutter");
+  assert.equal(clearedMacroLane[1].automation[0].target, "macro.1", "clearing one note should not affect other selected lanes");
 
   assert.deepEqual(
     runner.previewSegmentDrag({

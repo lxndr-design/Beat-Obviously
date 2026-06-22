@@ -31,6 +31,10 @@ export type MidiAutomationTarget =
   | "filter.drive"
   | "amp.level"
   | "amp.pan"
+  | "macro.1"
+  | "macro.2"
+  | "macro.3"
+  | "macro.4"
   | "unison.detune"
   | "unison.spread";
 

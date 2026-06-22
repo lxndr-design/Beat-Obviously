@@ -139,6 +139,7 @@ const webAudioAllowlist = new Set([
   "frontend/src/audio/timelineAudio.ts",
   "frontend/src/audio/TimelineMidiPlayback.solid.tsx",
   "frontend/src/audio/wavemapResynthesis.ts",
+  "frontend/src/features/ComponentLibrary/ComponentEditorModal.solid.tsx",
   "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx",
   "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx",
   "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx",

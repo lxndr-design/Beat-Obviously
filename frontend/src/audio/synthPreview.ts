@@ -21,7 +21,7 @@ interface RenderModulation {
   targetOffsets: Partial<Record<RuntimeModulationTarget, number>>;
 }
 
-type RuntimeModulationTarget =
+type DirectRuntimeModulationTarget =
   | "osc.a.position"
   | "osc.a.fine"
   | "osc.a.level"
@@ -39,6 +39,9 @@ type RuntimeModulationTarget =
   | "amp.pan"
   | "unison.detune"
   | "unison.spread";
+
+type MacroAutomationTarget = "macro.1" | "macro.2" | "macro.3" | "macro.4";
+type RuntimeModulationTarget = DirectRuntimeModulationTarget | MacroAutomationTarget;
 
 export type SynthAutomationTarget = RuntimeModulationTarget;
 
@@ -146,7 +149,16 @@ export function renderInstrumentSamples(
     const baseFrequency = sortedCurve && sortedCurve.length > 1
       ? frequencyAtCurveTime(sortedCurve, t)
       : glideBaseFrequency(instrument, frequency, targetFrequency, t, durationS);
-    const modulation = modulationAtTime(instrument, t, durationS, bpm, velocity01, keytrackSourceValue(baseFrequency), modWheel);
+    const modulation = modulationAtTime(
+      instrument,
+      t,
+      durationS,
+      bpm,
+      velocity01,
+      keytrackSourceValue(baseFrequency),
+      modWheel,
+      automationMacroValues(instrument, automation, t),
+    );
     applyAutomationOffsets(instrument, modulation, automation, t);
     const currentFrequency = baseFrequency * Math.pow(2, (pitchBendSemitones + modulation.pitchSemitones) / 12);
     out[i] = renderInstrumentSample(instrument, state, sampleRate, currentFrequency, mode, modulation) * amp;
@@ -195,7 +207,16 @@ export function renderInstrumentStereoSamples(
     const baseFrequency = sortedCurve && sortedCurve.length > 1
       ? frequencyAtCurveTime(sortedCurve, timeS)
       : glideBaseFrequency(instrument, frequency, targetFrequency, timeS, durationS);
-    const modulation = modulationAtTime(instrument, timeS, durationS, bpm, velocity01, keytrackSourceValue(baseFrequency), modWheel);
+    const modulation = modulationAtTime(
+      instrument,
+      timeS,
+      durationS,
+      bpm,
+      velocity01,
+      keytrackSourceValue(baseFrequency),
+      modWheel,
+      automationMacroValues(instrument, automation, timeS),
+    );
     applyAutomationOffsets(instrument, modulation, automation, timeS);
     const currentFrequency = baseFrequency * Math.pow(2, (pitchBendSemitones + modulation.pitchSemitones) / 12);
     const stereo = renderInstrumentStereoSample(instrument, phaseState, leftFilterState, rightFilterState, sampleRate, currentFrequency, mode, modulation);
@@ -1452,12 +1473,31 @@ function applyAutomationOffsets(
   if (!automation?.length) return;
   for (const lane of automation) {
     if (!isRuntimeModulationTarget(lane.target) || lane.points.length === 0) continue;
+    if (isMacroAutomationTarget(lane.target)) continue;
     const value = automationValueAtTime(lane.points, timeS);
     if (value == null) continue;
     const base = baseAutomationValue(instrument, lane.target);
     if (base == null) continue;
     modulation.targetOffsets[lane.target] = (modulation.targetOffsets[lane.target] ?? 0) + value - base;
   }
+}
+
+function automationMacroValues(
+  instrument: Instrument,
+  automation: SynthAutomationLane[] | undefined,
+  timeS: number,
+): Partial<Record<MacroAutomationTarget, number>> | undefined {
+  if (!automation?.length) return undefined;
+  const values: Partial<Record<MacroAutomationTarget, number>> = {};
+  for (const lane of automation) {
+    if (!isMacroAutomationTarget(lane.target) || lane.points.length === 0) continue;
+    const value = automationValueAtTime(lane.points, timeS);
+    if (value == null) continue;
+    const base = baseAutomationValue(instrument, lane.target);
+    if (base == null) continue;
+    values[lane.target] = value;
+  }
+  return Object.keys(values).length > 0 ? values : undefined;
 }
 
 function automationValueAtTime(points: Array<{ timeS: number; value: number }>, timeS: number): number | null {
@@ -1509,6 +1549,11 @@ function baseAutomationValue(instrument: Instrument, target: RuntimeModulationTa
       return instrument.ampLevel ?? 1;
     case "amp.pan":
       return instrument.ampPan ?? 0;
+    case "macro.1":
+    case "macro.2":
+    case "macro.3":
+    case "macro.4":
+      return clamp01(Number(instrument.synthPatch?.parameters?.[target] ?? 0));
     case "unison.detune":
       return instrument.wavetable?.detuneCents ?? instrument.aether?.oscA.wavetable.detuneCents ?? 0;
     case "unison.spread":
@@ -1560,6 +1605,7 @@ export function modulationAtTime(
   velocity = 1,
   keytrack = keytrackSourceValue(previewFrequency(instrument)),
   modWheel = 0,
+  macroOverrides?: Partial<Record<MacroAutomationTarget, number>>,
 ): RenderModulation {
   const lfo1OneShot = instrument.synthPatch?.parameters?.["lfo.1.oneShot"] === true || instrument.lfoOneShot === true;
   const lfo2OneShot = instrument.synthPatch?.parameters?.["lfo.2.oneShot"] === true || instrument.lfo2OneShot === true;
@@ -1577,7 +1623,7 @@ export function modulationAtTime(
   );
   const env = envelopePreviewValue(timeS, durationS, instrument);
   const env2 = modEnvelopePreviewValue(timeS, durationS, instrument);
-  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env, env2, velocity, keytrack, modWheel);
+  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env, env2, velocity, keytrack, modWheel, macroOverrides);
   if (targetOffsets) {
     return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, ampEnvelope: env, targetOffsets };
   }
@@ -1601,17 +1647,18 @@ function routeTargetOffsets(
   velocity: number,
   keytrack: number,
   modWheel: number,
-): Partial<Record<RuntimeModulationTarget, number>> | null {
+  macroOverrides?: Partial<Record<MacroAutomationTarget, number>>,
+): Partial<Record<DirectRuntimeModulationTarget, number>> | null {
   const routes = instrument.synthPatch?.modulation as RuntimeModulationRoute[] | undefined;
   if (!Array.isArray(routes)) return null;
 
-  const offsets: Partial<Record<RuntimeModulationTarget, number>> = {};
+  const offsets: Partial<Record<DirectRuntimeModulationTarget, number>> = {};
   for (const route of routes) {
-    if (route.enabled === false || !isRuntimeModulationTarget(route.target)) continue;
+    if (route.enabled === false || !isDirectRuntimeModulationTarget(route.target)) continue;
     const amount = Number.isFinite(route.amount) ? clamp(route.amount ?? 0, -1, 1) : 0;
     if (amount === 0) continue;
 
-    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, env, env2, velocity, keytrack, modWheel);
+    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, env, env2, velocity, keytrack, modWheel, macroOverrides);
     if (sourceValue == null) continue;
     offsets[route.target] = (offsets[route.target] ?? 0) + sourceValue * amount * modulationTargetScale(route.target);
   }
@@ -1628,6 +1675,7 @@ function modulationSourceValue(
   velocity: number,
   keytrack: number,
   modWheel: number,
+  macroOverrides?: Partial<Record<MacroAutomationTarget, number>>,
 ): number | null {
   if (route.source === "lfo.1") {
     if (instrument.synthPatch?.parameters?.["lfo.1.enabled"] === false) return 0;
@@ -1653,15 +1701,23 @@ function modulationSourceValue(
     const value = clamp01(modWheel);
     return route.bipolar ? value * 2 - 1 : value;
   }
+  if (isMacroAutomationTarget(route.source)) {
+    const value = clamp01(Number(macroOverrides?.[route.source] ?? instrument.synthPatch?.parameters?.[route.source] ?? 0));
+    return route.bipolar ? value * 2 - 1 : value;
+  }
   return null;
 }
 
-function modulationTargetOffset(modulation: RenderModulation, target: RuntimeModulationTarget): number {
+function modulationTargetOffset(modulation: RenderModulation, target: DirectRuntimeModulationTarget): number {
   const value = modulation.targetOffsets[target] ?? 0;
   return Number.isFinite(value) ? value : 0;
 }
 
 function isRuntimeModulationTarget(value: unknown): value is RuntimeModulationTarget {
+  return isDirectRuntimeModulationTarget(value) || isMacroAutomationTarget(value);
+}
+
+function isDirectRuntimeModulationTarget(value: unknown): value is DirectRuntimeModulationTarget {
   return typeof value === "string" && [
     "osc.a.position",
     "osc.a.fine",
@@ -1683,7 +1739,11 @@ function isRuntimeModulationTarget(value: unknown): value is RuntimeModulationTa
   ].includes(value);
 }
 
-function modulationTargetScale(target: RuntimeModulationTarget): number {
+function isMacroAutomationTarget(value: unknown): value is MacroAutomationTarget {
+  return value === "macro.1" || value === "macro.2" || value === "macro.3" || value === "macro.4";
+}
+
+function modulationTargetScale(target: DirectRuntimeModulationTarget): number {
   if (target.endsWith(".fine") || target === "unison.detune") return 100;
   if (target === "filter.cutoff") return 0.35;
   return 1;

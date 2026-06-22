@@ -1,10 +1,20 @@
 import { createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
+import {
+  AETHER_NOTE_AUTOMATION_TARGETS,
+  aetherNoteAutomationTargetLabel,
+  clearMidiNoteAutomationTarget,
+  midiNoteAutomationTargetCount,
+  midiNoteHasAutomationTarget,
+  offsetMidiNoteAutomation,
+  selectedMidiNoteAutomationSummary,
+  upsertMidiNoteAutomationTarget,
+} from "../../automation/aetherNoteAutomation";
 import { Button, FloatingLayer, HoverInfo, Icon } from "../../solid-ui";
 import { useContextualHotkey } from "../../solid-utils/contextualHotkeys.solid";
 import { useSettingsStore } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
-import type { MidiNote } from "../../state/types";
+import type { MidiAutomationTarget, MidiNote } from "../../state/types";
 import styles from "./PianoRoll.module.css";
 
 export interface PianoRollProps {
@@ -92,6 +102,7 @@ export function PianoRoll(props: PianoRollProps) {
   const [noteEditor, setNoteEditor] = createSignal<NoteEditorState | null>(null);
   const [hoveredNoteSide, setHoveredNoteSide] = createSignal<{ idx: number; side: "left" | "right" } | null>(null);
   const [toolMode, setToolMode] = createSignal<MidiToolMode>("draw");
+  const [activeAutomationTarget, setActiveAutomationTarget] = createSignal<MidiAutomationTarget>("amp.level");
   const [dragActive, setDragActive] = createSignal(false);
   const [lengthHandleActive, setLengthHandleActive] = createSignal(false);
   const [connectFrom, setConnectFrom] = createSignal<number | null>(null);
@@ -118,7 +129,7 @@ export function PianoRoll(props: PianoRollProps) {
         indices: number[];
         startX: number;
         startY: number;
-        startNotes: Array<Pick<MidiNote, "startBeat" | "pitch" | "lengthBeats"> & { curve?: MidiNote["curve"] }>;
+        startNotes: Array<Pick<MidiNote, "startBeat" | "pitch" | "lengthBeats"> & { curve?: MidiNote["curve"]; automation?: MidiNote["automation"] }>;
         historyPushed?: boolean;
       }
     | {
@@ -126,7 +137,7 @@ export function PianoRoll(props: PianoRollProps) {
         indices: number[];
         edge: "left" | "right";
         startX: number;
-        startNotes: Array<Pick<MidiNote, "startBeat" | "lengthBeats"> & { curve?: MidiNote["curve"] }>;
+        startNotes: Array<Pick<MidiNote, "startBeat" | "lengthBeats"> & { curve?: MidiNote["curve"]; automation?: MidiNote["automation"] }>;
         historyPushed?: boolean;
       }
     | { mode: "curve-handle"; idx: number; edge: "start" | "end"; historyPushed?: boolean }
@@ -164,6 +175,9 @@ export function PianoRoll(props: PianoRollProps) {
   const width = () => lengthBeats * pxPerBeat();
   const height = PITCH_RANGE * PX_PER_PITCH;
   const gridLines = createMemo(() => makeGridLines(lengthBeats, pxPerBeat()));
+  const selectedAutomationSummary = createMemo(() =>
+    selectedMidiNoteAutomationSummary(notes, selected(), activeAutomationTarget())
+  );
 
   useContextualHotkey(
     () => props.hotkeyScopeId ?? "",
@@ -399,6 +413,7 @@ export function PianoRoll(props: PianoRollProps) {
           pitch: duplicated.notes[i].pitch,
           lengthBeats: duplicated.notes[i].lengthBeats,
           curve: structuredClone(duplicated.notes[i].curve),
+          automation: structuredClone(duplicated.notes[i].automation),
         })),
         historyPushed: true,
       };
@@ -420,6 +435,7 @@ export function PianoRoll(props: PianoRollProps) {
         pitch: notes[i].pitch,
         lengthBeats: notes[i].lengthBeats,
         curve: structuredClone(notes[i].curve),
+        automation: structuredClone(notes[i].automation),
       })),
     };
     const auditionIdx = indices.length === 1 ? indices[0] : null;
@@ -446,6 +462,7 @@ export function PianoRoll(props: PianoRollProps) {
         startBeat: notes[i].startBeat,
         lengthBeats: notes[i].lengthBeats,
         curve: structuredClone(notes[i].curve),
+        automation: structuredClone(notes[i].automation),
       })),
     };
     setDragActive(true);
@@ -497,6 +514,7 @@ export function PianoRoll(props: PianoRollProps) {
           startBeat,
           pitch,
           curve: shiftCurveWithNote(start.curve, start.pitch, startBeat, pitch, start.lengthBeats),
+          automation: offsetMidiNoteAutomation(start.automation, startBeat - start.startBeat),
         };
       });
       if (d.indices.length === 1) {
@@ -746,6 +764,16 @@ export function PianoRoll(props: PianoRollProps) {
     setSelected([]);
   }
 
+  function addAutomationLaneToSelection() {
+    if (selected().length === 0) return;
+    commitChange(upsertMidiNoteAutomationTarget(notes, selected(), activeAutomationTarget()));
+  }
+
+  function clearAutomationLaneFromSelection() {
+    if (selected().length === 0) return;
+    commitChange(clearMidiNoteAutomationTarget(notes, selected(), activeAutomationTarget()));
+  }
+
   function copyNotes(indices: number[]): boolean {
     const unique = Array.from(new Set(indices))
       .filter((idx) => notes[idx])
@@ -763,6 +791,8 @@ export function PianoRoll(props: PianoRollProps) {
           ...note,
           startBeat: note.startBeat - minStart,
           pitch: note.pitch - minPitch,
+          curve: offsetNoteCurve(note.curve, -minStart),
+          automation: offsetMidiNoteAutomation(note.automation, -minStart),
           connectToIndex: mappedConnection,
         };
       }),
@@ -793,6 +823,8 @@ export function PianoRoll(props: PianoRollProps) {
       ...note,
       startBeat: startBeat + note.startBeat,
       pitch: basePitch + note.pitch,
+      curve: offsetNoteCurve(note.curve, startBeat),
+      automation: offsetMidiNoteAutomation(note.automation, startBeat),
       connectToIndex: note.connectToIndex == null ? undefined : baseIndex + note.connectToIndex,
     }));
     commitChange([...notes, ...pasted]);
@@ -1142,6 +1174,8 @@ export function PianoRoll(props: PianoRollProps) {
               const hovered = hoveredNoteSide();
               const hoveredSide = hovered?.idx === i ? hovered.side : null;
               const volumePercent = Math.round((clamp(n.velocity, 0, 127) / 127) * 100);
+              const laneCount = midiNoteAutomationTargetCount(n);
+              const hasActiveAutomation = midiNoteHasAutomationTarget(n, activeAutomationTarget());
               return (
                 <div
                   class={[
@@ -1178,6 +1212,12 @@ export function PianoRoll(props: PianoRollProps) {
                   {volumePercent < 100 && (
                     <div class={styles.noteVolumeOverlay} aria-hidden>
                       {volumePercent}%
+                    </div>
+                  )}
+                  {hasActiveAutomation && <div class={styles.noteAutomationStripe} aria-hidden />}
+                  {laneCount > 0 && (
+                    <div class={styles.noteAutomationBadge} aria-label={`${laneCount} automation lane${laneCount === 1 ? "" : "s"}`}>
+                      {laneCount}
                     </div>
                   )}
                   <div
@@ -1268,6 +1308,32 @@ export function PianoRoll(props: PianoRollProps) {
               <Icon name="ph:magnifying-glass-plus" size={16} decorative />
             </Button>
           </HoverInfo>
+        </div>
+        <div class={styles.automationPanel} aria-label="Aether note automation lanes">
+          <div class={styles.automationHeader}>
+            <span>Aether lanes</span>
+            <span>{aetherNoteAutomationTargetLabel(activeAutomationTarget())} · {selectedAutomationSummary()}</span>
+          </div>
+          <div class={styles.automationTargets} role="radiogroup" aria-label="Aether note automation target">
+            {AETHER_NOTE_AUTOMATION_TARGETS.map((target) => (
+              <Button
+                size="xs"
+                selected={activeAutomationTarget() === target.target}
+                aria-label={`${target.label} automation lane`}
+                onClick={() => setActiveAutomationTarget(target.target)}
+              >
+                {target.label}
+              </Button>
+            ))}
+          </div>
+          <div class={styles.automationActions}>
+            <Button size="xs" disabled={selected().length === 0} onClick={addAutomationLaneToSelection}>
+              Add lane
+            </Button>
+            <Button size="xs" disabled={selected().length === 0} onClick={clearAutomationLaneFromSelection}>
+              Clear
+            </Button>
+          </div>
         </div>
       </div>
       {(() => {
@@ -1653,6 +1719,14 @@ function normalizeNoteCurveToBounds(note: MidiNote): MidiNote {
       { beat: note.startBeat + note.lengthBeats, pitch: curveEdgePitch(note, "end") },
     ],
   };
+}
+
+function offsetNoteCurve(curve: MidiNote["curve"], beatDelta: number): MidiNote["curve"] {
+  if (!curve?.length || !Number.isFinite(beatDelta) || Math.abs(beatDelta) < 0.000001) return curve ? structuredClone(curve) : undefined;
+  return curve.map((point) => ({
+    ...point,
+    beat: point.beat + beatDelta,
+  }));
 }
 
 function shiftCurveWithNote(

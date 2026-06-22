@@ -29,8 +29,9 @@ Status legend:
    - `[x]` Add deterministic full/transient/sustain/manual imported-audio selection windows, native IPC support, source-range metadata, and Solid import mode controls.
    - `[ ]` Add visual/manual range picker polish for imported audio.
 3. `[ ]` Visible Aether automation lanes.
-   - Add lanes for pitch, level, phase, filter, wavetable position, and macro targets.
-   - Cover track, segment, and piano-roll note automation entrypoints.
+   - `[x]` Add first visible piano-roll note automation lane selector/badges for pitch, wavemap, filter, amp, and macro targets.
+   - `[x]` Preserve note automation point timing during note drag/copy/paste and cover the helper behavior.
+   - `[~]` Cover track, segment, and piano-roll note automation entrypoints.
    - Add point drag, curve selection, playback preview, and live/export parity coverage.
 4. `[ ]` Aether preset storage and migration.
    - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.

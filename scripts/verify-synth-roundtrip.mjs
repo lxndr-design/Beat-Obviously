@@ -1344,6 +1344,40 @@ try {
   assert.ok(Math.abs(dynamicOffsets["unison.detune"] - 8) < 0.000001);
   assert.ok(Math.abs(dynamicOffsets["unison.spread"] - 0.32) < 0.000001);
 
+  const macroNoteAutomationDraft = synthStore.normalizeSynthDraftPatch({
+    name: "Macro Note Automation Probe",
+    parameters: {
+      "osc.a.enabled": true,
+      "osc.a.wavetable": "basic.sine",
+      "osc.a.level": 0.45,
+      "amp.level": 0.18,
+      "macro.1": 0,
+    },
+    modulation: [
+      { id: "macro_note_level", source: "macro.1", target: "amp.level", amount: 0.72, bipolar: false, enabled: true },
+    ],
+  });
+  const macroNoteAutomationPreview = synthStore.synthDraftToPreviewInstrument(macroNoteAutomationDraft);
+  const macroBaseOffsets = synthPreview.modulationAtTime(macroNoteAutomationPreview, 0.25, 1).targetOffsets;
+  const macroAutomatedOffsets = synthPreview.modulationAtTime(macroNoteAutomationPreview, 0.25, 1, 120, 1, 0.5, 0, { "macro.1": 1 }).targetOffsets;
+  assert.ok(Math.abs((macroBaseOffsets["amp.level"] ?? 0)) < 0.000001, "base macro should not offset amp when macro value is zero");
+  assert.ok((macroAutomatedOffsets["amp.level"] ?? 0) > 0.7, "macro note automation should drive macro-routed preview targets");
+  const macroBaseSamples = new Float32Array(12000);
+  const macroAutomatedSamples = new Float32Array(12000);
+  synthPreview.renderInstrumentSamples(macroNoteAutomationPreview, macroBaseSamples, 48000, synthPreview.previewFrequency(macroNoteAutomationPreview), "audio", true);
+  synthPreview.renderInstrumentSamples(
+    macroNoteAutomationPreview,
+    macroAutomatedSamples,
+    48000,
+    synthPreview.previewFrequency(macroNoteAutomationPreview),
+    "audio",
+    true,
+    undefined,
+    undefined,
+    [{ target: "macro.1", points: [{ timeS: 0, value: 1 }, { timeS: 0.25, value: 1 }] }],
+  );
+  assert.ok(bufferRms(macroAutomatedSamples) > bufferRms(macroBaseSamples) * 1.8, "macro note automation should audibly affect browser preview renders");
+
   const disabledDynamicDraft = synthStore.normalizeSynthDraftPatch({
     ...dynamicModDraft,
     modulation: dynamicModDraft.modulation.map((route) => ({ ...route, enabled: false })),
