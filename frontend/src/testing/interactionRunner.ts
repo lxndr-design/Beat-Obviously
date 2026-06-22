@@ -16,8 +16,23 @@ import {
   decentSamplerPluginForInstrument,
 } from "../features/PluginLibrary/decentSamplerPluginAdapter";
 import type { DecentSamplerImport, DecentSamplerUiControl } from "../ipc/schema";
+import {
+  createAetherEffectPresetRecord,
+  normalizeAetherEffectPresetRecord,
+  type AetherEffectPresetRecord,
+} from "../state/effectPresets";
 import { mergePluginAdaptersById, normalizePluginAdapter } from "../state/store";
-import type { Instrument, PluginAdapter, Segment, TrackEffect } from "../state/types";
+import {
+  createDefaultSynthDraft,
+  FACTORY_SYNTH_PRESETS,
+  normalizeSynthDraftPatch,
+} from "../state/synthStore";
+import {
+  createSynthPresetRecord,
+  normalizeSynthPresetRecord,
+  type SynthPresetRecord,
+} from "../state/synthPresets";
+import type { Instrument, PluginAdapter, Segment, SynthPatchSnapshot, TrackEffect, TrackEffectChain } from "../state/types";
 
 export type SegmentResizeEdge = "start" | "end";
 export type SegmentFadeEdge = "in" | "out";
@@ -292,6 +307,84 @@ export function shouldCloseModal(policy: ModalClosePolicy): boolean {
   if (policy.reason === "button") return true;
   if (policy.reason === "escape") return !policy.dirty;
   return Boolean(policy.allowBackdropClose) && !policy.dirty;
+}
+
+export function previewSaveAetherPreset({
+  name,
+  patch,
+  existing,
+  now,
+}: {
+  name: string;
+  patch: SynthPatchSnapshot;
+  existing?: Partial<SynthPresetRecord> | null;
+  now?: number;
+}) {
+  const record = createSynthPresetRecord({
+    name,
+    patch,
+    tags: patch.metadata?.tags ?? [],
+    existing,
+    now,
+  });
+  return {
+    record,
+    selectedPresetId: `user:${record.id}`,
+  };
+}
+
+export function previewNormalizeAetherPreset(value: unknown) {
+  return normalizeSynthPresetRecord(value);
+}
+
+export function previewRestoreAetherInit({ preserveName }: { preserveName?: string } = {}) {
+  const initPreset = FACTORY_SYNTH_PRESETS.find((preset) => preset.id === "factory.init")?.patch ?? createDefaultSynthDraft();
+  return {
+    selectedPresetId: "factory:factory.init",
+    patch: normalizeSynthDraftPatch({
+      ...initPreset,
+      name: preserveName ?? initPreset.name,
+    }),
+  };
+}
+
+export function previewSaveAetherEffectPreset({
+  name,
+  chain,
+  existing,
+  now,
+}: {
+  name: string;
+  chain: TrackEffectChain;
+  existing?: Partial<AetherEffectPresetRecord> | null;
+  now?: number;
+}) {
+  const record = createAetherEffectPresetRecord({
+    name,
+    chain,
+    tags: ["aether", "instrument-fx"],
+    existing,
+    now,
+  });
+  return {
+    record,
+    selectedEffectPresetId: record.id,
+  };
+}
+
+export function previewLoadAetherEffectPreset(preset: unknown) {
+  const normalized = normalizeAetherEffectPresetRecord(preset);
+  return {
+    selectedEffectPresetId: normalized?.id ?? "",
+    chain: normalized?.chain ?? { filters: [] },
+  };
+}
+
+export function previewDeleteAetherEffectPreset(id: string, presets: AetherEffectPresetRecord[]) {
+  return {
+    selectedEffectPresetId: "",
+    presets: presets.filter((preset) => preset.id !== id),
+  };
 }
 
 function snapFadeLength(value: number, lengthBeats: number, gridBeats: number): number {

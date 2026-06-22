@@ -304,6 +304,72 @@ try {
   assert.equal(runner.shouldCloseModal({ reason: "escape", dirty: false }), true);
   assert.equal(runner.shouldCloseModal({ reason: "button", dirty: true }), true);
 
+  const aetherPatch = runner.previewRestoreAetherInit().patch;
+  const savedPreset = runner.previewSaveAetherPreset({
+    name: "  Interaction Lead  ",
+    patch: {
+      ...aetherPatch,
+      name: "Interaction Lead",
+      metadata: {
+        ...aetherPatch.metadata,
+        tags: ["lead", "lead", "interaction"],
+      },
+    },
+    now: 111,
+  });
+  assert.equal(savedPreset.record.schemaVersion, 1, "saved Aether presets should carry schema version");
+  assert.equal(savedPreset.record.kind, "instrument", "saved Aether presets should be instrument presets");
+  assert.equal(savedPreset.record.name, "Interaction Lead", "Save As should trim preset names");
+  assert.deepEqual(savedPreset.record.tags, ["lead", "interaction"], "Save As should normalize preset tags");
+  assert.equal(savedPreset.selectedPresetId, `user:${savedPreset.record.id}`, "Save As should select the new user preset");
+  savedPreset.record.patch.name = "Mutated";
+  assert.equal(aetherPatch.name, "Init", "saving a preset should clone the patch payload");
+  const migratedPreset = runner.previewNormalizeAetherPreset({
+    id: "legacy-aether",
+    name: "Legacy Aether",
+    patch: aetherPatch,
+    updatedAt: 222,
+  });
+  assert.equal(migratedPreset.schemaVersion, 1, "legacy Aether presets should normalize to the current schema");
+  assert.equal(migratedPreset.createdAt, 222, "legacy Aether presets should backfill createdAt from updatedAt");
+  const restoredInit = runner.previewRestoreAetherInit({ preserveName: "Existing Instrument" });
+  assert.equal(restoredInit.selectedPresetId, "factory:factory.init", "Restore Init should select the factory init preset");
+  assert.equal(restoredInit.patch.name, "Existing Instrument", "Restore Init should preserve the bound instrument name");
+  assert.equal(restoredInit.patch.effects.filters.length, 0, "Restore Init should clear instrument FX");
+
+  const savedFxPreset = runner.previewSaveAetherEffectPreset({
+    name: "  Interaction FX  ",
+    chain: {
+      filters: [
+        { id: "sat", kind: "saturator", params: { drive: 44, mix: 80 } },
+        { id: "delay", kind: "delay", bypassed: true, params: { timeMs: 420, feedback: 28, mix: 12 } },
+      ],
+    },
+    now: 333,
+  });
+  assert.equal(savedFxPreset.record.schemaVersion, 1, "saved FX presets should carry schema version");
+  assert.equal(savedFxPreset.record.kind, "instrument-fx-chain", "saved FX presets should be instrument FX chains");
+  assert.equal(savedFxPreset.record.name, "Interaction FX", "Save FX should trim names");
+  assert.deepEqual(savedFxPreset.record.tags, ["aether", "instrument-fx"], "Save FX should tag effect-chain presets");
+  assert.equal(savedFxPreset.selectedEffectPresetId, savedFxPreset.record.id, "Save FX should select the new preset");
+  const loadedFxPreset = runner.previewLoadAetherEffectPreset(savedFxPreset.record);
+  assert.equal(loadedFxPreset.selectedEffectPresetId, savedFxPreset.record.id, "loading FX preset should select that preset");
+  assert.equal(loadedFxPreset.chain.filters.length, 2, "loading FX preset should return the full chain");
+  assert.equal(loadedFxPreset.chain.filters[0].params.drive, 44, "loading FX preset should preserve effect params");
+  const migratedFxPreset = runner.previewLoadAetherEffectPreset({
+    id: "legacy-fx",
+    name: "Legacy FX",
+    chain: { filters: [{ kind: "reverb", params: { mix: 31 } }] },
+    updatedAt: 444,
+  });
+  assert.equal(migratedFxPreset.chain.filters[0].params.mix, 31, "legacy FX presets should preserve authored params");
+  assert.equal(migratedFxPreset.chain.filters[0].params.roomSize, 40, "legacy FX presets should fill default params");
+  assert.deepEqual(
+    runner.previewDeleteAetherEffectPreset(savedFxPreset.record.id, [savedFxPreset.record]),
+    { selectedEffectPresetId: "", presets: [] },
+    "Delete FX should clear selection and remove the preset from the list",
+  );
+
   const plugin = (id, patch = {}) => ({
     id,
     name: id,

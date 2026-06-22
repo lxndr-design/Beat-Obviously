@@ -20,7 +20,7 @@ Status legend:
    - `[x]` Show latency/tail badges.
    - `[x]` Preserve instrument-owned FX through synth patch/instrument roundtrip.
    - `[x]` Wire local effect-chain preset save/load/delete handoff.
-   - `[~]` Verify with synth roundtrip coverage and live/export parity stress using both instrument FX and track FX; still add browser-level interaction coverage.
+   - `[~]` Verify with synth roundtrip coverage, frontend interaction coverage, and live/export parity stress using both instrument FX and track FX; still add browser-level smoke.
 2. `[~]` Wavemap drawing and resynthesis refinement.
    - Add richer draw modes beyond mini-waveform and partial lanes.
    - Clarify frame editing constraints.
