@@ -2,6 +2,7 @@
 
 #include "Modulation/DynamicModulation.h"
 #include "Modulation/Lfo.h"
+#include "Oscillator/AetherTableStackRenderer.h"
 #include "Oscillator/BasicOscillator.h"
 #include "Oscillator/VoiceMath.h"
 #include "Oscillator/VoiceRenderStats.h"
@@ -436,7 +437,39 @@ namespace beat
             StereoSample raw;
             if (params.hasAether)
             {
-                raw = renderAetherTableStack(currentFrequency, rawLfo, rawLfo2, env, env2, level);
+                const auto aetherResult = AetherTableStackRenderer::render(
+                    params,
+                    cachedDynamicTargets,
+                    cachedPanGains,
+                    cachedPitchRates,
+                    aetherOscillatorsA,
+                    aetherOscillatorsB,
+                    aetherUnisonPlanA,
+                    aetherUnisonPlanB,
+                    currentFrequency,
+                    baseFrequencyHz,
+                    sampleRate,
+                    phase,
+                    aetherOscAPhaseOffset,
+                    aetherOscBPhaseOffset,
+                    rawLfo,
+                    rawLfo2,
+                    env,
+                    env2,
+                    level,
+                    noteKeytrack,
+                    modWheel,
+                    noiseState);
+                raw = { aetherResult.frame.left, aetherResult.frame.right };
+                currentBlockOscillatorSamples += aetherResult.work.oscillatorSamples;
+                currentBlockWavetableVoiceSamples += aetherResult.work.wavetableVoiceSamples;
+                currentBlockAetherOscASamples += aetherResult.work.aetherOscASamples;
+                currentBlockAetherOscBSamples += aetherResult.work.aetherOscBSamples;
+                currentBlockAetherSubSamples += aetherResult.work.aetherSubSamples;
+                currentBlockAetherNoiseSamples += aetherResult.work.aetherNoiseSamples;
+                currentBlockOscillatorRateCalculations += aetherResult.work.oscillatorRateCalculations;
+                currentBlockWavetableFrequencyUpdates += aetherResult.work.wavetableFrequencyUpdates;
+                currentBlockWavetablePositionUpdates += aetherResult.work.wavetablePositionUpdates;
             }
             else
             {
@@ -641,158 +674,4 @@ namespace beat
         cachedDynamicTargets = DynamicModulation::targetActivityFlags(params.dynamicModulation);
     }
 
-    InstrumentVoice::StereoSample InstrumentVoice::renderAetherTableStack(double frequencyHz, float rawLfo, float rawLfo2, float env, float env2, float velocity) noexcept
-    {
-        const bool useDynamicModulation = params.dynamicModulation.active && cachedDynamicTargets.any;
-        const float unisonDetuneMod = useDynamicModulation && cachedDynamicTargets.unisonDetune
-            ? DynamicModulation::targetOffset(params.dynamicModulation.unisonDetune, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 100.0f)
-            : 0.0f;
-        const float unisonSpreadMod = useDynamicModulation && cachedDynamicTargets.unisonSpread
-            ? DynamicModulation::targetOffset(params.dynamicModulation.unisonSpread, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 1.0f)
-            : 0.0f;
-        float leftSum = 0.0f;
-        float rightSum = 0.0f;
-        float levelSum = 0.0f;
-
-        const auto add = [&](float value, float level, float pan, std::pair<float, float> staticPanGains, bool panIsDynamic)
-        {
-            const float safeLevel = VoiceMath::clamp01(level);
-            const auto [leftGain, rightGain] = panIsDynamic ? VoiceMath::equalPowerPanGains(pan) : staticPanGains;
-            leftSum += value * safeLevel * leftGain;
-            rightSum += value * safeLevel * rightGain;
-            levelSum += safeLevel;
-        };
-
-        const auto renderOsc = [&](
-            const Params::AetherOscillator& osc,
-            std::array<WavetableOscillator, 8>& oscillators,
-            const Params::DynamicModTarget& positionTarget,
-            const Params::DynamicModTarget& fineTarget,
-            const Params::DynamicModTarget& levelTarget,
-            const Params::DynamicModTarget& panTarget,
-            std::pair<float, float> staticPanGains,
-            bool panIsDynamic,
-            bool fineIsDynamic,
-            bool positionIsDynamic,
-            bool levelIsDynamic,
-            double staticRate,
-            double phaseOffset,
-            int64_t& componentSampleCounter)
-        {
-            const float modulatedLevel = VoiceMath::clamp01(osc.level + (useDynamicModulation && levelIsDynamic
-                ? DynamicModulation::targetOffset(levelTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 1.0f)
-                : 0.0f));
-            if (!osc.enabled || modulatedLevel <= 0.0f)
-                return;
-            const float modulatedPan = juce::jlimit(-1.0f, 1.0f, osc.pan + (useDynamicModulation
-                ? DynamicModulation::targetOffset(panTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 1.0f)
-                : 0.0f));
-
-            const float positionMod = useDynamicModulation && positionIsDynamic
-                ? DynamicModulation::targetOffset(positionTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 1.0f)
-                : 0.0f;
-            if (osc.waveform == 4)
-            {
-                ++currentBlockOscillatorSamples;
-                ++componentSampleCounter;
-                add(VoiceMath::nextNoise(noiseState), modulatedLevel, modulatedPan, staticPanGains, panIsDynamic);
-                return;
-            }
-
-            double rate = staticRate;
-            if (fineIsDynamic)
-            {
-                const float fineOffsetCents = DynamicModulation::targetOffset(fineTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 100.0f);
-                rate *= std::exp2((double) fineOffsetCents / 1200.0);
-                ++currentBlockOscillatorRateCalculations;
-            }
-
-            float value = 0.0f;
-            if (osc.waveform == 5)
-            {
-                auto& plan = &oscillators == &aetherOscillatorsA ? aetherUnisonPlanA : aetherUnisonPlanB;
-                const auto result = WavetableOscillatorBank::render(
-                    oscillators,
-                    plan,
-                    osc.wavetable,
-                    frequencyHz * rate,
-                    baseFrequencyHz,
-                    sampleRate,
-                    positionMod,
-                    unisonDetuneMod,
-                    unisonSpreadMod);
-                value = result.sample;
-                currentBlockWavetableVoiceSamples += result.voiceSamples;
-                currentBlockWavetableFrequencyUpdates += result.frequencyUpdates;
-                currentBlockWavetablePositionUpdates += result.positionUpdates;
-                componentSampleCounter += result.voiceSamples;
-            }
-            else
-            {
-                value = BasicOscillator::sample(osc.waveform, phase * rate + phaseOffset, (frequencyHz * rate) / sampleRate);
-                ++currentBlockOscillatorSamples;
-                ++componentSampleCounter;
-            }
-            add(value, modulatedLevel, modulatedPan, staticPanGains, panIsDynamic);
-        };
-
-        renderOsc(
-            params.aetherOscA,
-            aetherOscillatorsA,
-            params.dynamicModulation.oscAPosition,
-            params.dynamicModulation.oscAFine,
-            params.dynamicModulation.oscALevel,
-            params.dynamicModulation.oscAPan,
-            cachedPanGains.oscA,
-            cachedDynamicTargets.oscAPan,
-            cachedDynamicTargets.oscAFine,
-            cachedDynamicTargets.oscAPosition,
-            cachedDynamicTargets.oscALevel,
-            cachedPitchRates.oscA,
-            aetherOscAPhaseOffset,
-            currentBlockAetherOscASamples);
-        renderOsc(
-            params.aetherOscB,
-            aetherOscillatorsB,
-            params.dynamicModulation.oscBPosition,
-            params.dynamicModulation.oscBFine,
-            params.dynamicModulation.oscBLevel,
-            params.dynamicModulation.oscBPan,
-            cachedPanGains.oscB,
-            cachedDynamicTargets.oscBPan,
-            cachedDynamicTargets.oscBFine,
-            cachedDynamicTargets.oscBPosition,
-            cachedDynamicTargets.oscBLevel,
-            cachedPitchRates.oscB,
-            aetherOscBPhaseOffset,
-            currentBlockAetherOscBSamples);
-
-        if (params.aetherSub.enabled && params.aetherSub.level > 0.0f)
-        {
-            ++currentBlockOscillatorSamples;
-            ++currentBlockAetherSubSamples;
-            add(BasicOscillator::sample(params.aetherSub.waveform, phase * cachedPitchRates.sub, (frequencyHz * cachedPitchRates.sub) / sampleRate),
-                params.aetherSub.level,
-                0.0f,
-                VoiceMath::centerPanGains,
-                false);
-        }
-
-        if (params.aetherNoise.enabled && params.aetherNoise.level > 0.0f)
-        {
-            ++currentBlockOscillatorSamples;
-            ++currentBlockAetherNoiseSamples;
-            const float noise = VoiceMath::nextNoise(noiseState);
-            add(noise * (0.35f + VoiceMath::clamp01(params.aetherNoise.color) * 0.65f), params.aetherNoise.level, 0.0f, VoiceMath::centerPanGains, false);
-        }
-
-        if (levelSum <= 0.0f)
-            return {};
-
-        const float normalizer = juce::jmax(0.35f, levelSum);
-        return {
-            juce::jlimit(-1.0f, 1.0f, leftSum / normalizer),
-            juce::jlimit(-1.0f, 1.0f, rightSum / normalizer),
-        };
-    }
 }

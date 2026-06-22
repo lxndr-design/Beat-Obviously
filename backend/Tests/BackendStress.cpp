@@ -9,6 +9,7 @@
 #include "../Source/Audio/InstrumentVoice.h"
 #include "../Source/Audio/Modulation/DynamicModulation.h"
 #include "../Source/Audio/Modulation/Lfo.h"
+#include "../Source/Audio/Oscillator/AetherTableStackRenderer.h"
 #include "../Source/Audio/Oscillator/BasicOscillator.h"
 #include "../Source/Audio/Parameters/ParameterIds.h"
 #include "../Source/Audio/Parameters/SynthPatchContract.h"
@@ -304,6 +305,126 @@ namespace
         }
 
         return true;
+    }
+
+    bool stressAetherTableStackRenderer()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAether = true;
+        params.aetherOscA.enabled = true;
+        params.aetherOscA.level = 0.74f;
+        params.aetherOscA.pan = -0.4f;
+        params.aetherOscA.waveform = 0;
+        params.aetherOscA.fineCents = 3.0f;
+        params.aetherOscB.enabled = true;
+        params.aetherOscB.level = 0.38f;
+        params.aetherOscB.pan = 0.55f;
+        params.aetherOscB.waveform = 1;
+        params.aetherOscB.semitone = 7;
+        params.aetherSub.enabled = true;
+        params.aetherSub.level = 0.2f;
+        params.aetherSub.octave = -1;
+        params.aetherSub.waveform = 2;
+        params.aetherNoise.enabled = true;
+        params.aetherNoise.level = 0.08f;
+        params.aetherNoise.color = 0.7f;
+        params.dynamicModulation.active = true;
+        params.dynamicModulation.oscAFine.lfo = 0.2f;
+        params.dynamicModulation.oscALevel.velocity = 0.1f;
+        params.dynamicModulation.oscAPan.lfo2 = 0.25f;
+        params.dynamicModulation.oscBPan.env2 = -0.15f;
+        params.dynamicModulation.unisonDetune.lfo = 0.1f;
+        params.dynamicModulation.unisonSpread.env = 0.1f;
+
+        std::array<beat::WavetableOscillator, 8> oscillatorsA;
+        std::array<beat::WavetableOscillator, 8> oscillatorsB;
+        for (auto& oscillator : oscillatorsA)
+            oscillator.prepare(48000.0);
+        for (auto& oscillator : oscillatorsB)
+            oscillator.prepare(48000.0);
+
+        beat::WavetableUnison::Plan unisonPlanA;
+        beat::WavetableUnison::Plan unisonPlanB;
+        juce::uint32 noiseState = 0x12345678u;
+        const auto panGains = beat::VoiceAetherCache::panGainsFor(params);
+        const auto pitchRates = beat::VoiceAetherCache::pitchRatesFor(params);
+        const auto targets = beat::DynamicModulation::targetActivityFlags(params.dynamicModulation);
+        const auto result = beat::AetherTableStackRenderer::render(
+            params,
+            targets,
+            panGains,
+            pitchRates,
+            oscillatorsA,
+            oscillatorsB,
+            unisonPlanA,
+            unisonPlanB,
+            220.0,
+            220.0,
+            48000.0,
+            0.125,
+            0.0,
+            0.25,
+            0.5f,
+            -0.25f,
+            0.8f,
+            0.35f,
+            0.9f,
+            60.0f / 127.0f,
+            0.2f,
+            noiseState);
+
+        if (!std::isfinite(result.frame.left)
+            || !std::isfinite(result.frame.right)
+            || std::abs(result.frame.left) > 1.0f
+            || std::abs(result.frame.right) > 1.0f)
+            return false;
+        if (std::abs(result.frame.left) <= 0.0001f && std::abs(result.frame.right) <= 0.0001f)
+            return false;
+        if (result.work.aetherOscASamples != 1
+            || result.work.aetherOscBSamples != 1
+            || result.work.aetherSubSamples != 1
+            || result.work.aetherNoiseSamples != 1
+            || result.work.oscillatorSamples != 4
+            || result.work.oscillatorRateCalculations != 1)
+            return false;
+        if (noiseState == 0x12345678u)
+            return false;
+
+        params.aetherOscA.enabled = false;
+        params.aetherOscB.enabled = false;
+        params.aetherSub.enabled = false;
+        params.aetherNoise.enabled = false;
+        const auto silent = beat::AetherTableStackRenderer::render(
+            params,
+            beat::DynamicModulation::targetActivityFlags(params.dynamicModulation),
+            beat::VoiceAetherCache::panGainsFor(params),
+            beat::VoiceAetherCache::pitchRatesFor(params),
+            oscillatorsA,
+            oscillatorsB,
+            unisonPlanA,
+            unisonPlanB,
+            220.0,
+            220.0,
+            48000.0,
+            0.25,
+            0.0,
+            0.0,
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            noiseState);
+
+        return near(silent.frame.left, 0.0f)
+            && near(silent.frame.right, 0.0f)
+            && silent.work.oscillatorSamples == 0
+            && silent.work.aetherOscASamples == 0
+            && silent.work.aetherOscBSamples == 0
+            && silent.work.aetherSubSamples == 0
+            && silent.work.aetherNoiseSamples == 0;
     }
 
     bool stressFilterMathHelper()
@@ -10906,6 +11027,11 @@ int main()
     if (!stressBasicOscillatorHelper())
     {
         std::cerr << "Basic oscillator helper stress failed\n";
+        return 1;
+    }
+    if (!stressAetherTableStackRenderer())
+    {
+        std::cerr << "Aether table stack renderer stress failed\n";
         return 1;
     }
     if (!stressFilterMathHelper())

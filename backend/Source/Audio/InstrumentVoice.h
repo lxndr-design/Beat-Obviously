@@ -255,7 +255,6 @@ namespace beat
         void refreshCachedPanGains() noexcept;
         void refreshCachedPitchRates() noexcept;
         void refreshCachedDynamicModulationFlags() noexcept;
-        StereoSample renderAetherTableStack(double frequencyHz, float rawLfo, float rawLfo2, float env, float env2, float velocity) noexcept;
         float shapedEnvelope(float rawEnvelope) noexcept;
         float env1LoopValue() noexcept;
         float env2LoopValue() noexcept;

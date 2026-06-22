@@ -32,6 +32,7 @@ target_sources(Beat PRIVATE
     Source/Audio/Filter/FilterStage.h
     Source/Audio/Modulation/DynamicModulation.h
     Source/Audio/Modulation/Lfo.h
+    Source/Audio/Oscillator/AetherTableStackRenderer.h
     Source/Audio/Oscillator/BasicOscillator.h
     Source/Audio/Oscillator/VoiceAetherCache.h
     Source/Audio/Oscillator/VoiceMath.h
@@ -159,6 +160,7 @@ add_executable(BeatBackendStress
     Source/Audio/Filter/FilterStage.h
     Source/Audio/Modulation/DynamicModulation.h
     Source/Audio/Modulation/Lfo.h
+    Source/Audio/Oscillator/AetherTableStackRenderer.h
     Source/Audio/Oscillator/BasicOscillator.h
     Source/Audio/Oscillator/VoiceAetherCache.h
     Source/Audio/Oscillator/VoiceMath.h
