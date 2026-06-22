@@ -2,6 +2,8 @@
 
 #include "../Parameters/ParameterIds.h"
 
+#include <juce_core/juce_core.h>
+
 #include <cstddef>
 #include <string_view>
 
@@ -30,6 +32,43 @@ namespace beat::VoiceRealtimeParams
     };
 
     inline constexpr size_t count = (size_t) Id::Count;
+
+    inline bool isValid(Id param) noexcept
+    {
+        return param != Id::Count;
+    }
+
+    inline float clampValue(Id param, float value) noexcept
+    {
+        switch (param)
+        {
+            case Id::FilterCutoff:
+            case Id::FilterResonance:
+            case Id::FilterDrive:
+            case Id::AmpLevel:
+            case Id::OscAPosition:
+            case Id::OscBPosition:
+            case Id::OscALevel:
+            case Id::OscBLevel:
+            case Id::UnisonSpread:
+            case Id::LfoDepth:
+                return juce::jlimit(0.0f, 1.0f, value);
+            case Id::AmpPan:
+            case Id::OscAPan:
+            case Id::OscBPan:
+                return juce::jlimit(-1.0f, 1.0f, value);
+            case Id::OscAFine:
+            case Id::OscBFine:
+                return juce::jlimit(-100.0f, 100.0f, value);
+            case Id::UnisonDetune:
+                return juce::jlimit(0.0f, 100.0f, value);
+            case Id::LfoRate:
+                return juce::jlimit(0.01f, 50.0f, value);
+            case Id::Count:
+                break;
+        }
+        return value;
+    }
 
     inline int indexForParameterId(std::string_view parameterId) noexcept
     {

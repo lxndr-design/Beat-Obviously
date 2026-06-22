@@ -168,49 +168,19 @@ namespace beat
 
     bool InstrumentVoice::setRealtimeParameterValue(std::string_view parameterId, float value, int rampSamples, bool updateBaseline) noexcept
     {
-        const auto normalized = VoiceMath::clamp01(value);
         const int index = VoiceRealtimeParams::indexForParameterId(parameterId);
         if (index < 0)
             return false;
 
         const auto param = (RealtimeParam) index;
+        if (!VoiceRealtimeParams::isValid(param))
+            return false;
         if (!isVoiceActive())
             rampSamples = 0;
         if (updateBaseline)
             applyParamToParams(baseParams, param, value);
-        switch (param)
-        {
-            case RealtimeParam::FilterCutoff:
-            case RealtimeParam::FilterResonance:
-            case RealtimeParam::FilterDrive:
-            case RealtimeParam::AmpLevel:
-            case RealtimeParam::OscAPosition:
-            case RealtimeParam::OscBPosition:
-            case RealtimeParam::OscALevel:
-            case RealtimeParam::OscBLevel:
-            case RealtimeParam::UnisonSpread:
-            case RealtimeParam::LfoDepth:
-                setRealtimeRamp(param, normalized, rampSamples);
-                return true;
-            case RealtimeParam::AmpPan:
-            case RealtimeParam::OscAPan:
-            case RealtimeParam::OscBPan:
-                setRealtimeRamp(param, juce::jlimit(-1.0f, 1.0f, value), rampSamples);
-                return true;
-            case RealtimeParam::OscAFine:
-            case RealtimeParam::OscBFine:
-                setRealtimeRamp(param, juce::jlimit(-100.0f, 100.0f, value), rampSamples);
-                return true;
-            case RealtimeParam::UnisonDetune:
-                setRealtimeRamp(param, juce::jlimit(0.0f, 100.0f, value), rampSamples);
-                return true;
-            case RealtimeParam::LfoRate:
-                setRealtimeRamp(param, juce::jlimit(0.01f, 50.0f, value), rampSamples);
-                return true;
-            case RealtimeParam::Count:
-                break;
-        }
-        return false;
+        setRealtimeRamp(param, VoiceRealtimeParams::clampValue(param, value), rampSamples);
+        return true;
     }
 
     void InstrumentVoice::applyParamToParams(Params& target, RealtimeParam param, float value) noexcept
