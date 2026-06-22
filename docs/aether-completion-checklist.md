@@ -89,16 +89,15 @@ Status legend:
 
 - `[x]` Aether-specific stress for high polyphony, high unison, dense modulation, and rapid parameter edits.
 - `[x]` Backend stress for render-work counters, wavetable cache stats, note-local pitch/parameter/phase automation, glide, mono/legato, LFOs, envelopes, and modulation helpers.
-- `[ ]` Dense overlapping automation parity stress with high-polyphony Aether patches.
-  - Cover project, segment, note, route, and effect automation in one render.
+- `[x]` Dense overlapping automation parity stress with high-polyphony Aether patches.
+  - Covers project, segment, note, route, instrument-effect, track-effect, macro, and master EQ automation in one live/export parity render, with a stripped-automation baseline proving the automation materially changes output.
 - `[ ]` Null-test style live/offline comparisons where deterministic output is expected.
 - `[ ]` Browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, and note automation lanes.
 - `[ ]` Preset migration fixtures once Aether preset storage is formalized.
 
 ## Near-Term Slice Order
 
-1. Add dense overlapping Aether automation parity stress.
-2. Add an instrument FX rack UI backed by existing instrument-owned FX rendering.
-3. Tighten wavemap drawing/resynthesis semantics and add deterministic fixtures.
-4. Add visible note/segment automation lanes for the Aether targets.
-5. Add Aether preset storage, Save As preset flow, and migration fixtures.
+1. Add an instrument FX rack UI backed by existing instrument-owned FX rendering.
+2. Tighten wavemap drawing/resynthesis semantics and add deterministic fixtures.
+3. Add visible note/segment automation lanes for the Aether targets.
+4. Add Aether preset storage, Save As preset flow, and migration fixtures.

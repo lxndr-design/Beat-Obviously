@@ -721,6 +721,10 @@ namespace
         instrument.dynamicModulation.unisonDetune.lfoBipolar = false;
         instrument.dynamicModulation.unisonSpread.lfo = 0.2f;
         instrument.dynamicModulation.unisonSpread.lfoBipolar = false;
+        instrument.dynamicModulation.ampPan.macro1 = -0.4f;
+        instrument.dynamicModulation.oscBLevel.macro2 = -0.28f;
+        instrument.dynamicModulation.filterDrive.macro3 = 0.22f;
+        instrument.macroValues = { 0.15f, 0.25f, 0.0f, 0.0f };
 
         instrument.aether.oscA.enabled = true;
         instrument.aether.oscA.level = 0.72f;
@@ -750,6 +754,14 @@ namespace
         instrument.aether.noise.enabled = true;
         instrument.aether.noise.level = 0.035f;
         instrument.aether.noise.color = 0.72f;
+
+        beat::TrackEffect instrumentFilter;
+        instrumentFilter.id = "dense-aether-instrument-filter";
+        instrumentFilter.kind = beat::TrackEffectKind::Lowpass;
+        instrumentFilter.params.push_back({ "cutoffHz", 6200.0f });
+        instrumentFilter.params.push_back({ "resonance", 5.0f });
+        instrument.effects.push_back(std::move(instrumentFilter));
+
         project.instruments.push_back(std::move(instrument));
 
         beat::Track track;
@@ -802,6 +814,22 @@ namespace
                     lane.points.push_back({ note.startBeat + note.lengthBeats, 0.8f });
                     note.automation.push_back(std::move(lane));
                 }
+                if ((step + voice) % 7 == 0)
+                {
+                    beat::MidiAutomationLane lane;
+                    lane.target = "macro.3";
+                    lane.points.push_back({ note.startBeat, 0.0f });
+                    lane.points.push_back({ note.startBeat + note.lengthBeats, 0.9f, beat::AutomationCurve::Smoothstep });
+                    note.automation.push_back(std::move(lane));
+                }
+                if ((step + voice) % 11 == 0)
+                {
+                    beat::MidiAutomationLane lane;
+                    lane.target = "osc.a.phase";
+                    lane.points.push_back({ note.startBeat, 0.08f });
+                    lane.points.push_back({ note.startBeat + note.lengthBeats, 0.42f, beat::AutomationCurve::Linear });
+                    note.automation.push_back(std::move(lane));
+                }
 
                 segment.notes.push_back(std::move(note));
             }
@@ -814,7 +842,45 @@ namespace
         ampLane.points.push_back({ 8.0, 0.55f });
         segment.automation.push_back(std::move(ampLane));
 
+        beat::MidiAutomationLane macroLane;
+        macroLane.target = "macro.2";
+        macroLane.points.push_back({ 0.0, 0.1f });
+        macroLane.points.push_back({ 3.0, 0.85f, beat::AutomationCurve::Cubic });
+        macroLane.points.push_back({ 8.0, 0.35f });
+        segment.automation.push_back(std::move(macroLane));
+
+        beat::MidiAutomationLane oscBPanLane;
+        oscBPanLane.target = "osc.b.pan";
+        oscBPanLane.points.push_back({ 0.0, -0.45f });
+        oscBPanLane.points.push_back({ 2.5, 0.5f, beat::AutomationCurve::Quadratic });
+        oscBPanLane.points.push_back({ 8.0, 0.1f });
+        segment.automation.push_back(std::move(oscBPanLane));
+
         track.segments.push_back(std::move(segment));
+
+        beat::ProjectAutomationLane macroProjectLane;
+        macroProjectLane.instrumentId = "dense-aether";
+        macroProjectLane.target = "macro.1";
+        macroProjectLane.points.push_back({ 0.0, 0.0f });
+        macroProjectLane.points.push_back({ 1.5, 0.9f, beat::AutomationCurve::EaseOut });
+        macroProjectLane.points.push_back({ 7.0, 0.25f });
+        project.automation.push_back(std::move(macroProjectLane));
+
+        beat::ProjectAutomationLane filterProjectLane;
+        filterProjectLane.instrumentId = "dense-aether";
+        filterProjectLane.target = "filter.cutoff";
+        filterProjectLane.points.push_back({ 0.0, 0.45f });
+        filterProjectLane.points.push_back({ 3.5, 0.9f, beat::AutomationCurve::Smoothstep });
+        filterProjectLane.points.push_back({ 8.0, 0.52f });
+        project.automation.push_back(std::move(filterProjectLane));
+
+        beat::ProjectAutomationLane instrumentEffectLane;
+        instrumentEffectLane.trackId = track.id;
+        instrumentEffectLane.target = "effect.dense-aether-instrument-filter.cutoffHz";
+        instrumentEffectLane.points.push_back({ 0.0, 1800.0f });
+        instrumentEffectLane.points.push_back({ 2.25, 12000.0f, beat::AutomationCurve::Quadratic });
+        instrumentEffectLane.points.push_back({ 8.0, 3000.0f });
+        project.automation.push_back(std::move(instrumentEffectLane));
 
         beat::ProjectAutomationLane cutoffLane;
         cutoffLane.trackId = track.id;
@@ -9276,9 +9342,30 @@ namespace
         project.eqAutomation.push_back({ 0.0, -1.5f, 1.0f, -0.5f, 1.5f });
         project.eqAutomation.push_back({ 4.0, 1.0f, -1.0f, 0.75f, -1.25f });
 
+        auto staticProject = project;
+        staticProject.automation.clear();
+        staticProject.eqAutomation.clear();
+        for (auto& instrument : staticProject.instruments)
+        {
+            for (auto& effect : instrument.effects)
+                effect.automation.clear();
+        }
+        for (auto& track : staticProject.tracks)
+        {
+            for (auto& effect : track.effects)
+                effect.automation.clear();
+            for (auto& segment : track.segments)
+            {
+                segment.automation.clear();
+                for (auto& note : segment.notes)
+                    note.automation.clear();
+            }
+        }
+
         constexpr int samples = 12000;
         constexpr int blockSize = 257;
         auto live = renderOfflineChunks(project, samples, blockSize);
+        auto staticRender = renderOfflineChunks(staticProject, samples, blockSize);
 
         auto exportFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-dense-aether-parity.wav");
         if (exportFile.existsAsFile())
@@ -9298,6 +9385,7 @@ namespace
             return false;
 
         double sumAbsDiff = 0.0;
+        double staticAbsDiff = 0.0;
         float maxAbsDiff = 0.0f;
         double liveEnergy = 0.0;
         for (int ch = 0; ch < live.getNumChannels(); ++ch)
@@ -9305,24 +9393,30 @@ namespace
             for (int i = 0; i < samples; ++i)
             {
                 const float liveSample = live.getSample(ch, i);
+                const float staticSample = staticRender.getSample(ch, i);
                 const float exportSample = exported.getSample(ch, i);
-                if (!std::isfinite(liveSample) || !std::isfinite(exportSample))
+                if (!std::isfinite(liveSample) || !std::isfinite(staticSample) || !std::isfinite(exportSample))
                     return false;
 
                 const float diff = std::abs(liveSample - exportSample);
                 maxAbsDiff = std::max(maxAbsDiff, diff);
                 sumAbsDiff += diff;
+                staticAbsDiff += std::abs(liveSample - staticSample);
                 liveEnergy += (double) liveSample * (double) liveSample;
             }
         }
 
-        const double meanAbsDiff = sumAbsDiff / (double) (live.getNumChannels() * samples);
+        const double sampleCount = (double) (live.getNumChannels() * samples);
+        const double meanAbsDiff = sumAbsDiff / sampleCount;
+        const double meanStaticDiff = staticAbsDiff / sampleCount;
         const bool ok = liveEnergy > 0.0001
+            && meanStaticDiff > 0.00005
             && maxAbsDiff <= 0.00008f
             && meanAbsDiff <= 0.00002;
         if (!ok)
         {
             std::cerr << "Dense Aether live/export parity failed liveEnergy=" << liveEnergy
+                      << " meanStaticDiff=" << meanStaticDiff
                       << " maxAbsDiff=" << maxAbsDiff
                       << " meanAbsDiff=" << meanAbsDiff << "\n";
         }
