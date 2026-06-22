@@ -10,6 +10,7 @@
 #include "Realtime/VoiceRealtimeRampState.h"
 #include "Realtime/VoiceRealtimeParams.h"
 #include "Realtime/VoiceNoteAutomation.h"
+#include "Realtime/VoiceNoteAutomationState.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
 #include "Wavetable/WavetableUnisonPlan.h"
@@ -311,13 +312,7 @@ namespace beat
         VoiceAetherCache::PitchRates cachedPitchRates;
         DynamicModulation::TargetActivityFlags cachedDynamicTargets;
         VoiceRealtimeRampState realtimeRampState;
-        std::array<RealtimeParameterChange, VoiceNoteAutomation::maxEvents> voiceAutomationEvents;
-        std::array<VoiceNoteAutomation::PitchEvent, VoiceNoteAutomation::maxEvents> voicePitchEvents;
-        int voiceAutomationEventCount { 0 };
-        int voicePitchEventCount { 0 };
-        int nextVoiceAutomationEvent { 0 };
-        int nextVoicePitchEvent { 0 };
-        int voiceSamplePosition { 0 };
+        VoiceNoteAutomationState noteAutomationState;
         RealtimeRamp pitchFrequencyRamp;
         int activeWavetableUnison { 1 };
         int64_t currentBlockOscillatorSamples { 0 };

@@ -201,36 +201,20 @@ namespace beat
 
     void InstrumentVoice::loadPendingNoteAutomation(int midiNoteNumber) noexcept
     {
-        nextVoiceAutomationEvent = 0;
-        nextVoicePitchEvent = 0;
-        voiceSamplePosition = 0;
-        VoiceAutomationInbox::consumeForNote(
-            midiNoteNumber,
-            voiceAutomationEvents,
-            voiceAutomationEventCount,
-            voicePitchEvents,
-            voicePitchEventCount);
+        noteAutomationState.loadPending(midiNoteNumber);
     }
 
     void InstrumentVoice::advanceVoiceAutomation() noexcept
     {
-        while (nextVoicePitchEvent < voicePitchEventCount)
-        {
-            const auto& event = voicePitchEvents[(size_t) nextVoicePitchEvent];
-            if (event.sampleOffset > voiceSamplePosition)
-                break;
-            pitchFrequencyRamp.setTarget(juce::jlimit(1.0f, 24000.0f, event.frequencyHz), event.rampSamples);
-            ++nextVoicePitchEvent;
-        }
-
-        while (nextVoiceAutomationEvent < voiceAutomationEventCount)
-        {
-            const auto& event = voiceAutomationEvents[(size_t) nextVoiceAutomationEvent];
-            if (event.sampleOffset > voiceSamplePosition)
-                break;
-            setRealtimeParameterValue(event.parameterIdView(), event.value, event.rampSamples, false);
-            ++nextVoiceAutomationEvent;
-        }
+        noteAutomationState.advance(
+            [this](const VoiceNoteAutomation::PitchEvent& event)
+            {
+                pitchFrequencyRamp.setTarget(juce::jlimit(1.0f, 24000.0f, event.frequencyHz), event.rampSamples);
+            },
+            [this](const RealtimeParameterChange& event)
+            {
+                setRealtimeParameterValue(event.parameterIdView(), event.value, event.rampSamples, false);
+            });
     }
 
     void InstrumentVoice::startNote(int midiNoteNumber, float velocity,
@@ -371,7 +355,7 @@ namespace beat
         const bool hasAmpPanMod = modulationPlan.hasAmpPanMod;
         const double lfoPhaseDelta = juce::jmax(0.01f, params.lfoRateHz) / sampleRate;
         const double lfo2PhaseDelta = juce::jmax(0.01f, params.lfo2RateHz) / sampleRate;
-        const bool hasVoiceAutomation = voicePitchEventCount > 0 || voiceAutomationEventCount > 0;
+        const bool hasVoiceAutomation = noteAutomationState.active();
         int64_t modulationSamples = 0;
         int64_t realtimeRampSamples = 0;
         currentBlockOscillatorSamples = 0;
@@ -540,7 +524,7 @@ namespace beat
                         lfo2Phase -= 1.0;
                 }
             }
-            ++voiceSamplePosition;
+            noteAutomationState.advanceSample();
         }
 
         if (!adsr.isActive())
