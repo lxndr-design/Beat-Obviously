@@ -54,12 +54,21 @@ try {
   assert.equal(noteAutomation.denormalizeAetherNoteAutomationValue("macro.1", 0.375), 0.38, "lane drag values should quantize to the target step");
   assert.deepEqual(
     noteAutomation.selectedMidiNoteAutomationValueRange(withMacroLane, [0, 1], "macro.1"),
-    { startValue: 0.5, endValue: 0.5, activeCount: 2 },
+    { startValue: 0.5, midValue: 0.5, endValue: 0.5, activeCount: 2, midCount: 0 },
     "selected value ranges should average active note lanes",
   );
   const editedMacroLane = noteAutomation.setMidiNoteAutomationTargetValues(withMacroLane, [0, 1], "macro.1", 0.2, 0.92);
   assert.deepEqual(editedMacroLane[0].automation[0].points.map((point) => point.value), [0.2, 0.92]);
   assert.deepEqual(editedMacroLane[1].automation[0].points.map((point) => point.value), [0.2, 0.92]);
+  const midpointMacroLane = noteAutomation.setMidiNoteAutomationTargetValues(withMacroLane, [0, 1], "macro.1", 0.2, 0.92, 0.65);
+  assert.deepEqual(midpointMacroLane[0].automation[0].points.map((point) => point.beat), [2, 2.5, 3]);
+  assert.deepEqual(midpointMacroLane[1].automation[0].points.map((point) => point.beat), [4, 5, 6]);
+  assert.deepEqual(midpointMacroLane[0].automation[0].points.map((point) => point.value), [0.2, 0.65, 0.92]);
+  assert.deepEqual(
+    noteAutomation.selectedMidiNoteAutomationValueRange(midpointMacroLane, [0, 1], "macro.1"),
+    { startValue: 0.2, midValue: 0.65, endValue: 0.92, activeCount: 2, midCount: 2 },
+    "midpoint lane values should be reported separately for visible multi-point editing",
+  );
   const clampedPanLane = noteAutomation.setMidiNoteAutomationTargetValues(automationNotes, [0], "amp.pan", -2, 2);
   assert.deepEqual(clampedPanLane[0].automation[0].points.map((point) => point.value), [-1, 1], "bipolar lane values should clamp to their target range");
   const withPitchLane = noteAutomation.upsertMidiNoteAutomationTarget(automationNotes, [0], "pitch");

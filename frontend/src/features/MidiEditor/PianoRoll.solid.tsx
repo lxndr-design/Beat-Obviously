@@ -115,7 +115,7 @@ export function PianoRoll(props: PianoRollProps) {
   const [connectPointer, setConnectPointer] = createSignal<{ x: number; y: number } | null>(null);
   const [curveFrom, setCurveFrom] = createSignal<number | null>(null);
   const [curvePointer, setCurvePointer] = createSignal<{ x: number; y: number } | null>(null);
-  const [draggedAutomationEdge, setDraggedAutomationEdge] = createSignal<"start" | "end" | null>(null);
+  const [draggedAutomationEdge, setDraggedAutomationEdge] = createSignal<"start" | "mid" | "end" | null>(null);
   const lastDrawnLengthRef = createRef(DEFAULT_NOTE_LENGTH_BEATS);
   const lastPointerTargetRef = createRef<PasteTarget | null>(null);
   const historyRef = createRef<MidiNote[][]>([]);
@@ -786,7 +786,7 @@ export function PianoRoll(props: PianoRollProps) {
     commitChange(clearMidiNoteAutomationTarget(notes, selected(), activeAutomationTarget()));
   }
 
-  function setAutomationValueEdge(edge: "start" | "end", rawValue: string) {
+  function setAutomationValueEdge(edge: "start" | "mid" | "end", rawValue: string) {
     if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
     const value = Number(rawValue);
     if (!Number.isFinite(value)) return;
@@ -797,10 +797,11 @@ export function PianoRoll(props: PianoRollProps) {
       activeAutomationTarget(),
       edge === "start" ? value : current.startValue,
       edge === "end" ? value : current.endValue,
+      edge === "mid" ? value : current.midCount > 0 ? current.midValue : undefined,
     ));
   }
 
-  function setAutomationValue(edge: "start" | "end", value: number, transient = false) {
+  function setAutomationValue(edge: "start" | "mid" | "end", value: number, transient = false) {
     if (selected().length === 0 || activeAutomationTarget() === "pitch" || !Number.isFinite(value)) return;
     const current = selectedAutomationValueRange();
     const next = setMidiNoteAutomationTargetValues(
@@ -809,12 +810,13 @@ export function PianoRoll(props: PianoRollProps) {
       activeAutomationTarget(),
       edge === "start" ? value : current.startValue,
       edge === "end" ? value : current.endValue,
+      edge === "mid" ? value : current.midCount > 0 ? current.midValue : undefined,
     );
     if (transient) applyTransientChange(next);
     else commitChange(next);
   }
 
-  function startAutomationPointDrag(edge: "start" | "end", event: PointerEvent) {
+  function startAutomationPointDrag(edge: "start" | "mid" | "end", event: PointerEvent) {
     if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
     event.preventDefault();
     event.stopPropagation();
@@ -828,7 +830,7 @@ export function PianoRoll(props: PianoRollProps) {
     updateAutomationPointDrag(edge, event);
   }
 
-  function updateAutomationPointDrag(edge: "start" | "end", event: PointerEvent) {
+  function updateAutomationPointDrag(edge: "start" | "mid" | "end", event: PointerEvent) {
     if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
     const element = event.currentTarget as HTMLElement;
     const rect = element.parentElement?.getBoundingClientRect();
@@ -837,7 +839,7 @@ export function PianoRoll(props: PianoRollProps) {
     setAutomationValue(edge, value, true);
   }
 
-  function stopAutomationPointDrag(edge: "start" | "end", event: PointerEvent) {
+  function stopAutomationPointDrag(edge: "start" | "mid" | "end", event: PointerEvent) {
     if (draggedAutomationEdge() === edge) {
       updateAutomationPointDrag(edge, event);
       setDraggedAutomationEdge(null);
@@ -1425,6 +1427,19 @@ export function PianoRoll(props: PianoRollProps) {
                 <span>{formatAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().startValue)}</span>
               </label>
               <label>
+                <span>Mid</span>
+                <input
+                  type="range"
+                  min={activeAutomationMeta().min}
+                  max={activeAutomationMeta().max}
+                  step={activeAutomationMeta().step}
+                  value={selectedAutomationValueRange().midValue}
+                  disabled={selected().length === 0}
+                  onChange={(event) => setAutomationValueEdge("mid", event.currentTarget.value)}
+                />
+                <span>{formatAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().midValue)}</span>
+              </label>
+              <label>
                 <span>End</span>
                 <input
                   type="range"
@@ -1453,6 +1468,21 @@ export function PianoRoll(props: PianoRollProps) {
                   onPointerCancel={(event) => stopAutomationPointDrag("start", event)}
                 >
                   S
+                </button>
+                <button
+                  type="button"
+                  class={`${styles.automationPointHandle} ${draggedAutomationEdge() === "mid" ? styles.automationPointHandleActive : ""}`}
+                  style={{
+                    left: `${normalizeAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().midValue) * 100}%`,
+                  }}
+                  disabled={selected().length === 0}
+                  aria-label={`Drag midpoint ${aetherNoteAutomationTargetLabel(activeAutomationTarget())} value`}
+                  onPointerDown={(event) => startAutomationPointDrag("mid", event)}
+                  onPointerMove={(event) => draggedAutomationEdge() === "mid" && updateAutomationPointDrag("mid", event)}
+                  onPointerUp={(event) => stopAutomationPointDrag("mid", event)}
+                  onPointerCancel={(event) => stopAutomationPointDrag("mid", event)}
+                >
+                  M
                 </button>
                 <button
                   type="button"

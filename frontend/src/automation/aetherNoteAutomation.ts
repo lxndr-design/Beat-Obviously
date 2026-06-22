@@ -117,6 +117,7 @@ export function setMidiNoteAutomationTargetValues(
   target: MidiAutomationTarget,
   startValue: number,
   endValue: number,
+  midValue?: number,
 ): MidiNote[] {
   if (target === "pitch") return notes;
   const targets = new Set(indices.filter((index) => notes[index]));
@@ -124,14 +125,21 @@ export function setMidiNoteAutomationTargetValues(
   const meta = aetherNoteAutomationTargetMeta(target);
   const start = clamp(startValue, meta.min, meta.max);
   const end = clamp(endValue, meta.min, meta.max);
+  const mid = midValue == null || !Number.isFinite(midValue)
+    ? undefined
+    : clamp(midValue, meta.min, meta.max);
   return notes.map((note, index) => {
     if (!targets.has(index)) return note;
+    const points = [
+      { beat: note.startBeat, value: start },
+      ...(mid == null
+        ? []
+        : [{ beat: note.startBeat + Math.max(0.001, note.lengthBeats) / 2, value: mid }]),
+      { beat: note.startBeat + Math.max(0.001, note.lengthBeats), value: end },
+    ];
     const lane: MidiAutomationLane = {
       target,
-      points: [
-        { beat: note.startBeat, value: start },
-        { beat: note.startBeat + Math.max(0.001, note.lengthBeats), value: end },
-      ],
+      points,
     };
     const lanes = (note.automation ?? []).filter((candidate) => candidate.target !== target);
     return {
@@ -170,21 +178,33 @@ export function selectedMidiNoteAutomationValueRange(
   notes: MidiNote[],
   indices: number[],
   target: MidiAutomationTarget,
-): { startValue: number; endValue: number; activeCount: number } {
+): { startValue: number; midValue: number; endValue: number; activeCount: number; midCount: number } {
   const defaultValue = aetherNoteAutomationDefaultValue(target);
-  if (target === "pitch") return { startValue: defaultValue, endValue: defaultValue, activeCount: 0 };
+  if (target === "pitch") return { startValue: defaultValue, midValue: defaultValue, endValue: defaultValue, activeCount: 0, midCount: 0 };
   const selectedNotes = indices.map((index) => notes[index]).filter(Boolean) as MidiNote[];
   const lanes = selectedNotes
     .map((note) => note.automation?.find((lane) => lane.target === target && lane.points.length > 0))
     .filter(Boolean) as MidiAutomationLane[];
-  if (lanes.length === 0) return { startValue: defaultValue, endValue: defaultValue, activeCount: 0 };
+  if (lanes.length === 0) return { startValue: defaultValue, midValue: defaultValue, endValue: defaultValue, activeCount: 0, midCount: 0 };
   const starts = lanes.map((lane) => lane.points[0]?.value ?? defaultValue);
   const ends = lanes.map((lane) => lane.points[lane.points.length - 1]?.value ?? starts[starts.length - 1] ?? defaultValue);
+  const mids = lanes
+    .map((lane) => midpointValue(lane))
+    .filter((value): value is number => value != null && Number.isFinite(value));
+  const startValue = average(starts, defaultValue);
+  const endValue = average(ends, defaultValue);
   return {
-    startValue: average(starts, defaultValue),
-    endValue: average(ends, defaultValue),
+    startValue,
+    midValue: mids.length > 0 ? average(mids, defaultValue) : (startValue + endValue) / 2,
+    endValue,
     activeCount: lanes.length,
+    midCount: mids.length,
   };
+}
+
+function midpointValue(lane: MidiAutomationLane): number | undefined {
+  if (lane.points.length < 3) return undefined;
+  return lane.points[Math.floor(lane.points.length / 2)]?.value;
 }
 
 function defaultMidiAutomationLane(note: MidiNote, target: MidiAutomationTarget): MidiAutomationLane {
