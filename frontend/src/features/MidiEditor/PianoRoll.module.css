@@ -422,6 +422,10 @@
   gap: 3px;
 }
 
+.automationCurveSelect {
+  min-width: 96px;
+}
+
 .automationValueEditor {
   grid-column: 1 / -1;
   display: grid;

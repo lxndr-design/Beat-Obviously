@@ -40,7 +40,7 @@ export type MidiAutomationTarget =
 
 export interface MidiAutomationLane {
   target: MidiAutomationTarget;
-  points: Array<{ beat: Beats; value: number }>;
+  points: Array<{ beat: Beats; value: number; curve?: AutomationCurve }>;
 }
 
 export interface MidiNote {

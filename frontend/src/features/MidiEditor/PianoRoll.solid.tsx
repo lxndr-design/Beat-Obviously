@@ -11,12 +11,15 @@ import {
   midiNoteHasAutomationTarget,
   normalizeAetherNoteAutomationValue,
   offsetMidiNoteAutomation,
+  selectedMidiNoteAutomationCurve,
   selectedMidiNoteAutomationSummary,
   selectedMidiNoteAutomationValueRange,
+  setMidiNoteAutomationTargetCurve,
   setMidiNoteAutomationTargetValues,
   upsertMidiNoteAutomationTarget,
 } from "../../automation/aetherNoteAutomation";
-import { Button, FloatingLayer, HoverInfo, Icon } from "../../solid-ui";
+import { AUTOMATION_CURVES, automationCurveLabel } from "../../automation/curves";
+import { Button, FloatingLayer, FloatingSelect, HoverInfo, Icon } from "../../solid-ui";
 import { useContextualHotkey } from "../../solid-utils/contextualHotkeys.solid";
 import { useSettingsStore } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
@@ -116,6 +119,7 @@ export function PianoRoll(props: PianoRollProps) {
   const [curveFrom, setCurveFrom] = createSignal<number | null>(null);
   const [curvePointer, setCurvePointer] = createSignal<{ x: number; y: number } | null>(null);
   const [draggedAutomationEdge, setDraggedAutomationEdge] = createSignal<"start" | "mid" | "end" | null>(null);
+  const [automationCurveSelectOpen, setAutomationCurveSelectOpen] = createSignal(false);
   const lastDrawnLengthRef = createRef(DEFAULT_NOTE_LENGTH_BEATS);
   const lastPointerTargetRef = createRef<PasteTarget | null>(null);
   const historyRef = createRef<MidiNote[][]>([]);
@@ -190,6 +194,10 @@ export function PianoRoll(props: PianoRollProps) {
   const selectedAutomationValueRange = createMemo(() =>
     selectedMidiNoteAutomationValueRange(notes, selected(), activeAutomationTarget())
   );
+  const selectedAutomationCurve = createMemo(() =>
+    selectedMidiNoteAutomationCurve(notes, selected(), activeAutomationTarget())
+  );
+  const automationCurveOptions = AUTOMATION_CURVES.map((curve) => ({ value: curve, label: automationCurveLabel(curve) }));
 
   useContextualHotkey(
     () => props.hotkeyScopeId ?? "",
@@ -784,6 +792,11 @@ export function PianoRoll(props: PianoRollProps) {
   function clearAutomationLaneFromSelection() {
     if (selected().length === 0) return;
     commitChange(clearMidiNoteAutomationTarget(notes, selected(), activeAutomationTarget()));
+  }
+
+  function setAutomationCurve(curve: string) {
+    if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
+    commitChange(setMidiNoteAutomationTargetCurve(notes, selected(), activeAutomationTarget(), curve as typeof AUTOMATION_CURVES[number]));
   }
 
   function setAutomationValueEdge(edge: "start" | "mid" | "end", rawValue: string) {
@@ -1406,6 +1419,18 @@ export function PianoRoll(props: PianoRollProps) {
             <Button size="xs" disabled={selected().length === 0} onClick={clearAutomationLaneFromSelection}>
               Clear
             </Button>
+            {activeAutomationTarget() !== "pitch" && (
+              <FloatingSelect
+                value={selectedAutomationCurve()}
+                options={automationCurveOptions}
+                open={automationCurveSelectOpen()}
+                className={styles.automationCurveSelect}
+                layout="inline"
+                ariaLabel="Aether note automation curve"
+                onOpenChange={setAutomationCurveSelectOpen}
+                onChange={setAutomationCurve}
+              />
+            )}
           </div>
           {activeAutomationTarget() === "pitch" ? (
             <div class={styles.automationValueEditor}>

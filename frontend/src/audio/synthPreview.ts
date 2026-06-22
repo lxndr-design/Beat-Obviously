@@ -1,4 +1,5 @@
-import type { CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, WavetableConfig } from "../state/types";
+import { evaluateAutomationCurve } from "../automation/curves";
+import type { AutomationCurve, CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, WavetableConfig } from "../state/types";
 
 export type SynthRenderMode = "visual" | "audio";
 
@@ -47,7 +48,7 @@ export type SynthAutomationTarget = RuntimeModulationTarget;
 
 export interface SynthAutomationLane {
   target: SynthAutomationTarget;
-  points: Array<{ timeS: number; value: number }>;
+  points: Array<{ timeS: number; value: number; curve?: AutomationCurve }>;
 }
 
 interface RuntimeModulationRoute {
@@ -1500,7 +1501,7 @@ function automationMacroValues(
   return Object.keys(values).length > 0 ? values : undefined;
 }
 
-function automationValueAtTime(points: Array<{ timeS: number; value: number }>, timeS: number): number | null {
+function automationValueAtTime(points: Array<{ timeS: number; value: number; curve?: AutomationCurve }>, timeS: number): number | null {
   const clean = points
     .filter((point) => Number.isFinite(point.timeS) && Number.isFinite(point.value))
     .sort((a, b) => a.timeS - b.timeS);
@@ -1511,7 +1512,7 @@ function automationValueAtTime(points: Array<{ timeS: number; value: number }>, 
     const next = clean[i];
     if (timeS <= next.timeS) {
       const mix = clamp01((timeS - prev.timeS) / Math.max(0.0001, next.timeS - prev.timeS));
-      return prev.value + (next.value - prev.value) * smoothstep(mix);
+      return evaluateAutomationCurve(prev.curve, prev.value, next.value, mix);
     }
   }
   return clean[clean.length - 1].value;

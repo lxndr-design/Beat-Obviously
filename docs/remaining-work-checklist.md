@@ -34,8 +34,9 @@ Status legend:
    - `[x]` Preserve note automation point timing during note drag/copy/paste and cover the helper behavior.
    - `[x]` Add draggable start/end point handles for visible piano-roll Aether lanes.
    - `[x]` Add editable midpoint values for visible piano-roll Aether lanes.
+   - `[x]` Add curve selection for visible piano-roll Aether lanes.
    - `[~]` Cover track, segment, and piano-roll note automation entrypoints.
-   - Add arbitrary multi-point lane editing, curve selection, playback preview, and live/export parity coverage.
+   - Add arbitrary multi-point lane editing, playback preview, and live/export parity coverage.
 4. `[ ]` Aether preset storage and migration.
    - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.
    - `[x]` Add schema-versioned local instrument-effect chain presets with save/load/delete and legacy normalization.

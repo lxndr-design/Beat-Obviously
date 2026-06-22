@@ -357,6 +357,7 @@ function midiAutomationToSynthLanes(note: MidiNote, durationS: number): SynthAut
         .map((point) => ({
           timeS: ((point.beat - note.startBeat) / Math.max(0.001, note.lengthBeats)) * durationS,
           value: point.value,
+          curve: point.curve,
         })),
     }))
     .filter((lane) => lane.points.length > 0);

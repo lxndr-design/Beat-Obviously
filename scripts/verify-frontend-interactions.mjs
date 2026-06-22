@@ -69,6 +69,20 @@ try {
     { startValue: 0.2, midValue: 0.65, endValue: 0.92, activeCount: 2, midCount: 2 },
     "midpoint lane values should be reported separately for visible multi-point editing",
   );
+  assert.equal(noteAutomation.selectedMidiNoteAutomationCurve(midpointMacroLane, [0, 1], "macro.1"), "linear");
+  const curvedMacroLane = noteAutomation.setMidiNoteAutomationTargetCurve(midpointMacroLane, [0, 1], "macro.1", "smoothstep");
+  assert.deepEqual(
+    curvedMacroLane[0].automation[0].points.map((point) => point.curve),
+    ["smoothstep", "smoothstep", "smoothstep"],
+    "visible lane curve selection should annotate note automation points",
+  );
+  assert.equal(noteAutomation.selectedMidiNoteAutomationCurve(curvedMacroLane, [0, 1], "macro.1"), "smoothstep");
+  const curvedValueEdit = noteAutomation.setMidiNoteAutomationTargetValues(curvedMacroLane, [0], "macro.1", 0.1, 0.9, 0.5);
+  assert.deepEqual(
+    curvedValueEdit[0].automation[0].points.map((point) => point.curve),
+    ["smoothstep", "smoothstep", "smoothstep"],
+    "value editing should preserve selected lane curve metadata",
+  );
   const clampedPanLane = noteAutomation.setMidiNoteAutomationTargetValues(automationNotes, [0], "amp.pan", -2, 2);
   assert.deepEqual(clampedPanLane[0].automation[0].points.map((point) => point.value), [-1, 1], "bipolar lane values should clamp to their target range");
   const withPitchLane = noteAutomation.upsertMidiNoteAutomationTarget(automationNotes, [0], "pitch");
