@@ -180,6 +180,324 @@ namespace beat
             return juce::var(eo.get());
         }
 
+        juce::var wavetableFrameToVar(const InstrumentDefinition::WavetableConfig::CustomFrame& frame)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("brightness", frame.brightness);
+            o->setProperty("even", frame.even);
+            o->setProperty("fold", frame.fold);
+            o->setProperty("formant", frame.formant);
+            o->setProperty("notch", frame.notch);
+            o->setProperty("skew", frame.skew);
+            o->setProperty("tilt", frame.tilt);
+            o->setProperty("focus", frame.focus);
+            o->setProperty("phase", frame.phase);
+            juce::Array<juce::var> partials;
+            for (const auto partial : frame.partials)
+                partials.add(partial);
+            o->setProperty("partials", partials);
+            return juce::var(o.get());
+        }
+
+        InstrumentDefinition::WavetableConfig::CustomFrame wavetableFrameFromVar(
+            const juce::var& frameVar,
+            InstrumentDefinition::WavetableConfig::CustomFrame fallback)
+        {
+            if (!frameVar.isObject())
+                return fallback;
+
+            fallback.brightness = juce::jlimit(0.0f, 1.0f, (float) (double) frameVar.getProperty("brightness", fallback.brightness));
+            fallback.even = juce::jlimit(0.0f, 1.0f, (float) (double) frameVar.getProperty("even", fallback.even));
+            fallback.fold = juce::jlimit(0.0f, 1.0f, (float) (double) frameVar.getProperty("fold", fallback.fold));
+            fallback.formant = juce::jlimit(0.0f, 1.0f, (float) (double) frameVar.getProperty("formant", fallback.formant));
+            fallback.notch = juce::jlimit(0.0f, 1.0f, (float) (double) frameVar.getProperty("notch", fallback.notch));
+            fallback.skew = juce::jlimit(-1.0f, 1.0f, (float) (double) frameVar.getProperty("skew", fallback.skew));
+            fallback.tilt = juce::jlimit(-1.0f, 1.0f, (float) (double) frameVar.getProperty("tilt", fallback.tilt));
+            fallback.focus = juce::jlimit(0.0f, 1.0f, (float) (double) frameVar.getProperty("focus", fallback.focus));
+            fallback.phase = juce::jlimit(0.0f, 1.0f, (float) (double) frameVar.getProperty("phase", fallback.phase));
+
+            if (auto* partials = frameVar.getProperty("partials", {}).getArray())
+            {
+                const auto count = juce::jmin((int) partials->size(), (int) fallback.partials.size());
+                for (int i = 0; i < count; ++i)
+                    fallback.partials[(size_t) i] = juce::jlimit(0.0f, 1.0f, (float) (double) partials->getReference(i));
+            }
+            return fallback;
+        }
+
+        juce::var wavetableConfigToVar(const InstrumentDefinition::WavetableConfig& wavetable)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("bank", wavetable.bank);
+            o->setProperty("custom", wavetable.custom);
+            o->setProperty("position", wavetable.position);
+            o->setProperty("warp", wavetable.warp);
+            o->setProperty("warpMode", wavetable.warpMode);
+            o->setProperty("smoothInterpolation", wavetable.smoothInterpolation);
+            o->setProperty("morph", wavetable.morph);
+            o->setProperty("unison", wavetable.unison);
+            o->setProperty("detuneCents", wavetable.detuneCents);
+            o->setProperty("blend", wavetable.blend);
+
+            juce::Array<juce::var> frames;
+            for (const auto& frame : wavetable.customFrames)
+                frames.add(wavetableFrameToVar(frame));
+            o->setProperty("customFrames", frames);
+            return juce::var(o.get());
+        }
+
+        InstrumentDefinition::WavetableConfig wavetableConfigFromVar(
+            const juce::var& wavetableVar,
+            InstrumentDefinition::WavetableConfig fallback)
+        {
+            if (!wavetableVar.isObject())
+                return fallback;
+
+            fallback.bank = juce::jlimit(0, 8, (int) wavetableVar.getProperty("bank", fallback.bank));
+            fallback.custom = (bool) wavetableVar.getProperty("custom", fallback.custom);
+            fallback.position = juce::jlimit(0.0f, 1.0f, (float) (double) wavetableVar.getProperty("position", fallback.position));
+            fallback.warp = juce::jlimit(0.0f, 1.0f, (float) (double) wavetableVar.getProperty("warp", fallback.warp));
+            fallback.warpMode = juce::jlimit(0, 2, (int) wavetableVar.getProperty("warpMode", fallback.warpMode));
+            fallback.smoothInterpolation = (bool) wavetableVar.getProperty("smoothInterpolation", fallback.smoothInterpolation);
+            fallback.morph = juce::jlimit(0.0f, 1.0f, (float) (double) wavetableVar.getProperty("morph", fallback.morph));
+            fallback.unison = juce::jlimit(1, 8, (int) wavetableVar.getProperty("unison", fallback.unison));
+            fallback.detuneCents = juce::jlimit(0.0f, 100.0f, (float) (double) wavetableVar.getProperty("detuneCents", fallback.detuneCents));
+            fallback.blend = juce::jlimit(0.0f, 1.0f, (float) (double) wavetableVar.getProperty("blend", fallback.blend));
+
+            if (auto* frames = wavetableVar.getProperty("customFrames", {}).getArray())
+            {
+                const auto count = juce::jmin((int) frames->size(), (int) fallback.customFrames.size());
+                for (int i = 0; i < count; ++i)
+                    fallback.customFrames[(size_t) i] = wavetableFrameFromVar(frames->getReference(i), fallback.customFrames[(size_t) i]);
+            }
+            return fallback;
+        }
+
+        juce::var aetherOscillatorToVar(const InstrumentDefinition::AetherOscillator& oscillator)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("enabled", oscillator.enabled);
+            o->setProperty("level", oscillator.level);
+            o->setProperty("pan", oscillator.pan);
+            o->setProperty("waveform", oscillator.waveform);
+            o->setProperty("octave", oscillator.octave);
+            o->setProperty("semitone", oscillator.semitone);
+            o->setProperty("fineCents", oscillator.fineCents);
+            o->setProperty("phase", oscillator.phase);
+            o->setProperty("randomPhase", oscillator.randomPhase);
+            o->setProperty("wavetable", wavetableConfigToVar(oscillator.wavetable));
+            return juce::var(o.get());
+        }
+
+        InstrumentDefinition::AetherOscillator aetherOscillatorFromVar(
+            const juce::var& oscillatorVar,
+            InstrumentDefinition::AetherOscillator fallback)
+        {
+            if (!oscillatorVar.isObject())
+                return fallback;
+
+            fallback.enabled = (bool) oscillatorVar.getProperty("enabled", fallback.enabled);
+            fallback.level = juce::jlimit(0.0f, 1.0f, (float) (double) oscillatorVar.getProperty("level", fallback.level));
+            fallback.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) oscillatorVar.getProperty("pan", fallback.pan));
+            fallback.waveform = juce::jlimit(0, 8, (int) oscillatorVar.getProperty("waveform", fallback.waveform));
+            fallback.octave = juce::jlimit(-4, 4, (int) oscillatorVar.getProperty("octave", fallback.octave));
+            fallback.semitone = juce::jlimit(-24, 24, (int) oscillatorVar.getProperty("semitone", fallback.semitone));
+            fallback.fineCents = juce::jlimit(-100.0f, 100.0f, (float) (double) oscillatorVar.getProperty("fineCents", fallback.fineCents));
+            fallback.phase = juce::jlimit(0.0f, 1.0f, (float) (double) oscillatorVar.getProperty("phase", fallback.phase));
+            fallback.randomPhase = juce::jlimit(0.0f, 1.0f, (float) (double) oscillatorVar.getProperty("randomPhase", fallback.randomPhase));
+            fallback.wavetable = wavetableConfigFromVar(oscillatorVar.getProperty("wavetable", {}), fallback.wavetable);
+            return fallback;
+        }
+
+        InstrumentDefinition::AetherConfig defaultAetherConfigForWavetable(const InstrumentDefinition::WavetableConfig& globalWavetable)
+        {
+            InstrumentDefinition::AetherConfig config;
+            config.oscA.enabled = true;
+            config.oscA.level = 0.78f;
+            config.oscA.wavetable = globalWavetable;
+
+            config.oscB.enabled = false;
+            config.oscB.level = 0.42f;
+            config.oscB.semitone = 7;
+            config.oscB.fineCents = -4.0f;
+            config.oscB.wavetable = globalWavetable;
+            config.oscB.wavetable.bank = 1;
+            config.oscB.wavetable.position = 0.25f;
+            config.oscB.wavetable.warp = 0.16f;
+            config.oscB.wavetable.detuneCents = 8.0f;
+            config.oscB.wavetable.blend = 0.35f;
+
+            config.sub.enabled = true;
+            config.sub.level = 0.18f;
+            config.sub.octave = -1;
+            config.sub.waveform = 0;
+
+            config.noise.enabled = false;
+            config.noise.level = 0.08f;
+            config.noise.color = 0.45f;
+            return config;
+        }
+
+        juce::var aetherConfigToVar(const InstrumentDefinition::AetherConfig& aether)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("oscA", aetherOscillatorToVar(aether.oscA));
+            o->setProperty("oscB", aetherOscillatorToVar(aether.oscB));
+
+            juce::DynamicObject::Ptr sub = new juce::DynamicObject();
+            sub->setProperty("enabled", aether.sub.enabled);
+            sub->setProperty("level", aether.sub.level);
+            sub->setProperty("octave", aether.sub.octave);
+            sub->setProperty("waveform", aether.sub.waveform);
+            o->setProperty("sub", juce::var(sub.get()));
+
+            juce::DynamicObject::Ptr noise = new juce::DynamicObject();
+            noise->setProperty("enabled", aether.noise.enabled);
+            noise->setProperty("level", aether.noise.level);
+            noise->setProperty("color", aether.noise.color);
+            o->setProperty("noise", juce::var(noise.get()));
+            return juce::var(o.get());
+        }
+
+        InstrumentDefinition::AetherConfig aetherConfigFromVar(
+            const juce::var& aetherVar,
+            const InstrumentDefinition::WavetableConfig& globalWavetable)
+        {
+            auto config = defaultAetherConfigForWavetable(globalWavetable);
+            if (!aetherVar.isObject())
+                return config;
+
+            config.oscA = aetherOscillatorFromVar(aetherVar.getProperty("oscA", {}), config.oscA);
+            config.oscB = aetherOscillatorFromVar(aetherVar.getProperty("oscB", {}), config.oscB);
+
+            const auto sub = aetherVar.getProperty("sub", {});
+            if (sub.isObject())
+            {
+                config.sub.enabled = (bool) sub.getProperty("enabled", config.sub.enabled);
+                config.sub.level = juce::jlimit(0.0f, 1.0f, (float) (double) sub.getProperty("level", config.sub.level));
+                config.sub.octave = juce::jlimit(-4, 0, (int) sub.getProperty("octave", config.sub.octave));
+                config.sub.waveform = juce::jlimit(0, 8, (int) sub.getProperty("waveform", config.sub.waveform));
+            }
+
+            const auto noise = aetherVar.getProperty("noise", {});
+            if (noise.isObject())
+            {
+                config.noise.enabled = (bool) noise.getProperty("enabled", config.noise.enabled);
+                config.noise.level = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("level", config.noise.level));
+                config.noise.color = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("color", config.noise.color));
+            }
+            return config;
+        }
+
+        juce::var dynamicModTargetToVar(const InstrumentDefinition::DynamicModTarget& target)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("lfo", target.lfo);
+            o->setProperty("lfoBipolar", target.lfoBipolar);
+            o->setProperty("lfo2", target.lfo2);
+            o->setProperty("lfo2Bipolar", target.lfo2Bipolar);
+            o->setProperty("env", target.env);
+            o->setProperty("envBipolar", target.envBipolar);
+            o->setProperty("env2", target.env2);
+            o->setProperty("env2Bipolar", target.env2Bipolar);
+            o->setProperty("velocity", target.velocity);
+            o->setProperty("velocityBipolar", target.velocityBipolar);
+            o->setProperty("keytrack", target.keytrack);
+            o->setProperty("keytrackBipolar", target.keytrackBipolar);
+            o->setProperty("modWheel", target.modWheel);
+            o->setProperty("modWheelBipolar", target.modWheelBipolar);
+            o->setProperty("macro1", target.macro1);
+            o->setProperty("macro2", target.macro2);
+            o->setProperty("macro3", target.macro3);
+            o->setProperty("macro4", target.macro4);
+            return juce::var(o.get());
+        }
+
+        InstrumentDefinition::DynamicModTarget dynamicModTargetFromVar(
+            const juce::var& targetVar,
+            InstrumentDefinition::DynamicModTarget fallback)
+        {
+            if (!targetVar.isObject())
+                return fallback;
+
+            const auto bipolar = [] (const juce::var& value, const juce::Identifier& key, bool defaultValue)
+            {
+                return (bool) value.getProperty(key, defaultValue);
+            };
+            const auto amount = [] (const juce::var& value, const juce::Identifier& key, float defaultValue)
+            {
+                return juce::jlimit(-1.0f, 1.0f, (float) (double) value.getProperty(key, defaultValue));
+            };
+
+            fallback.lfo = amount(targetVar, "lfo", fallback.lfo);
+            fallback.lfoBipolar = bipolar(targetVar, "lfoBipolar", fallback.lfoBipolar);
+            fallback.lfo2 = amount(targetVar, "lfo2", fallback.lfo2);
+            fallback.lfo2Bipolar = bipolar(targetVar, "lfo2Bipolar", fallback.lfo2Bipolar);
+            fallback.env = amount(targetVar, "env", fallback.env);
+            fallback.envBipolar = bipolar(targetVar, "envBipolar", fallback.envBipolar);
+            fallback.env2 = amount(targetVar, "env2", fallback.env2);
+            fallback.env2Bipolar = bipolar(targetVar, "env2Bipolar", fallback.env2Bipolar);
+            fallback.velocity = amount(targetVar, "velocity", fallback.velocity);
+            fallback.velocityBipolar = bipolar(targetVar, "velocityBipolar", fallback.velocityBipolar);
+            fallback.keytrack = amount(targetVar, "keytrack", fallback.keytrack);
+            fallback.keytrackBipolar = bipolar(targetVar, "keytrackBipolar", fallback.keytrackBipolar);
+            fallback.modWheel = amount(targetVar, "modWheel", fallback.modWheel);
+            fallback.modWheelBipolar = bipolar(targetVar, "modWheelBipolar", fallback.modWheelBipolar);
+            fallback.macro1 = amount(targetVar, "macro1", fallback.macro1);
+            fallback.macro2 = amount(targetVar, "macro2", fallback.macro2);
+            fallback.macro3 = amount(targetVar, "macro3", fallback.macro3);
+            fallback.macro4 = amount(targetVar, "macro4", fallback.macro4);
+            return fallback;
+        }
+
+        juce::var dynamicModulationToVar(const InstrumentDefinition::DynamicModulation& modulation)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("active", modulation.active);
+            o->setProperty("oscAPosition", dynamicModTargetToVar(modulation.oscAPosition));
+            o->setProperty("oscAFine", dynamicModTargetToVar(modulation.oscAFine));
+            o->setProperty("oscALevel", dynamicModTargetToVar(modulation.oscALevel));
+            o->setProperty("oscAPan", dynamicModTargetToVar(modulation.oscAPan));
+            o->setProperty("oscBPosition", dynamicModTargetToVar(modulation.oscBPosition));
+            o->setProperty("oscBFine", dynamicModTargetToVar(modulation.oscBFine));
+            o->setProperty("oscBLevel", dynamicModTargetToVar(modulation.oscBLevel));
+            o->setProperty("oscBPan", dynamicModTargetToVar(modulation.oscBPan));
+            o->setProperty("filterCutoff", dynamicModTargetToVar(modulation.filterCutoff));
+            o->setProperty("filterResonance", dynamicModTargetToVar(modulation.filterResonance));
+            o->setProperty("filterDrive", dynamicModTargetToVar(modulation.filterDrive));
+            o->setProperty("ampLevel", dynamicModTargetToVar(modulation.ampLevel));
+            o->setProperty("ampPan", dynamicModTargetToVar(modulation.ampPan));
+            o->setProperty("unisonDetune", dynamicModTargetToVar(modulation.unisonDetune));
+            o->setProperty("unisonSpread", dynamicModTargetToVar(modulation.unisonSpread));
+            return juce::var(o.get());
+        }
+
+        InstrumentDefinition::DynamicModulation dynamicModulationFromVar(
+            const juce::var& modulationVar,
+            InstrumentDefinition::DynamicModulation fallback)
+        {
+            if (!modulationVar.isObject())
+                return fallback;
+
+            fallback.active = (bool) modulationVar.getProperty("active", fallback.active);
+            fallback.oscAPosition = dynamicModTargetFromVar(modulationVar.getProperty("oscAPosition", {}), fallback.oscAPosition);
+            fallback.oscAFine = dynamicModTargetFromVar(modulationVar.getProperty("oscAFine", {}), fallback.oscAFine);
+            fallback.oscALevel = dynamicModTargetFromVar(modulationVar.getProperty("oscALevel", {}), fallback.oscALevel);
+            fallback.oscAPan = dynamicModTargetFromVar(modulationVar.getProperty("oscAPan", {}), fallback.oscAPan);
+            fallback.oscBPosition = dynamicModTargetFromVar(modulationVar.getProperty("oscBPosition", {}), fallback.oscBPosition);
+            fallback.oscBFine = dynamicModTargetFromVar(modulationVar.getProperty("oscBFine", {}), fallback.oscBFine);
+            fallback.oscBLevel = dynamicModTargetFromVar(modulationVar.getProperty("oscBLevel", {}), fallback.oscBLevel);
+            fallback.oscBPan = dynamicModTargetFromVar(modulationVar.getProperty("oscBPan", {}), fallback.oscBPan);
+            fallback.filterCutoff = dynamicModTargetFromVar(modulationVar.getProperty("filterCutoff", {}), fallback.filterCutoff);
+            fallback.filterResonance = dynamicModTargetFromVar(modulationVar.getProperty("filterResonance", {}), fallback.filterResonance);
+            fallback.filterDrive = dynamicModTargetFromVar(modulationVar.getProperty("filterDrive", {}), fallback.filterDrive);
+            fallback.ampLevel = dynamicModTargetFromVar(modulationVar.getProperty("ampLevel", {}), fallback.ampLevel);
+            fallback.ampPan = dynamicModTargetFromVar(modulationVar.getProperty("ampPan", {}), fallback.ampPan);
+            fallback.unisonDetune = dynamicModTargetFromVar(modulationVar.getProperty("unisonDetune", {}), fallback.unisonDetune);
+            fallback.unisonSpread = dynamicModTargetFromVar(modulationVar.getProperty("unisonSpread", {}), fallback.unisonSpread);
+            return fallback;
+        }
+
         juce::var returnBusToVar(const ReturnBus& bus)
         {
             juce::DynamicObject::Ptr o = new juce::DynamicObject();
@@ -449,6 +767,14 @@ namespace beat
             o->setProperty("releaseMs", instrument.releaseMs);
             o->setProperty("releaseCurve", instrument.releaseCurve);
             o->setProperty("env1Loop", instrument.env1Loop);
+            o->setProperty("env2AttackMs", instrument.env2AttackMs);
+            o->setProperty("env2AttackCurve", instrument.env2AttackCurve);
+            o->setProperty("env2DecayMs", instrument.env2DecayMs);
+            o->setProperty("env2DecayCurve", instrument.env2DecayCurve);
+            o->setProperty("env2Sustain", instrument.env2Sustain);
+            o->setProperty("env2ReleaseMs", instrument.env2ReleaseMs);
+            o->setProperty("env2ReleaseCurve", instrument.env2ReleaseCurve);
+            o->setProperty("env2Loop", instrument.env2Loop);
             o->setProperty("ampLevel", instrument.ampLevel);
             o->setProperty("ampPan", instrument.ampPan);
             o->setProperty("glideMs", instrument.glideMs);
@@ -488,7 +814,14 @@ namespace beat
             o->setProperty("lfoToPitch", instrument.lfoToPitch);
             o->setProperty("lfoToFilter", instrument.lfoToFilter);
             o->setProperty("envToFilter", instrument.envToFilter);
+            juce::Array<juce::var> macroValues;
+            for (const auto macroValue : instrument.macroValues)
+                macroValues.add(macroValue);
+            o->setProperty("macroValues", macroValues);
+            o->setProperty("dynamicModulation", dynamicModulationToVar(instrument.dynamicModulation));
             o->setProperty("hasAether", instrument.hasAether);
+            if (instrument.hasAether)
+                o->setProperty("aether", aetherConfigToVar(instrument.aether));
 
             juce::Array<juce::var> effectArr;
             for (const auto& effect : instrument.effects)
@@ -618,6 +951,14 @@ namespace beat
                     instrument.releaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty("releaseMs", instrument.releaseMs));
                     instrument.releaseCurve = juce::jlimit(0, 3, (int) iv.getProperty("releaseCurve", instrument.releaseCurve));
                     instrument.env1Loop = (bool) iv.getProperty("env1Loop", instrument.env1Loop);
+                    instrument.env2AttackMs = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty("env2AttackMs", instrument.env2AttackMs));
+                    instrument.env2AttackCurve = juce::jlimit(0, 3, (int) iv.getProperty("env2AttackCurve", instrument.env2AttackCurve));
+                    instrument.env2DecayMs = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty("env2DecayMs", instrument.env2DecayMs));
+                    instrument.env2DecayCurve = juce::jlimit(0, 3, (int) iv.getProperty("env2DecayCurve", instrument.env2DecayCurve));
+                    instrument.env2Sustain = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("env2Sustain", instrument.env2Sustain));
+                    instrument.env2ReleaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty("env2ReleaseMs", instrument.env2ReleaseMs));
+                    instrument.env2ReleaseCurve = juce::jlimit(0, 3, (int) iv.getProperty("env2ReleaseCurve", instrument.env2ReleaseCurve));
+                    instrument.env2Loop = (bool) iv.getProperty("env2Loop", instrument.env2Loop);
                     instrument.ampLevel = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("ampLevel", instrument.ampLevel));
                     instrument.ampPan = juce::jlimit(-1.0f, 1.0f, (float) (double) iv.getProperty("ampPan", instrument.ampPan));
                     instrument.glideMs = juce::jlimit(0.0f, 5000.0f, (float) (double) iv.getProperty("glideMs", instrument.glideMs));
@@ -657,7 +998,28 @@ namespace beat
                     instrument.lfoToPitch = juce::jlimit(0.0f, 24.0f, (float) (double) iv.getProperty("lfoToPitch", instrument.lfoToPitch));
                     instrument.lfoToFilter = juce::jlimit(-1.0f, 1.0f, (float) (double) iv.getProperty("lfoToFilter", instrument.lfoToFilter));
                     instrument.envToFilter = juce::jlimit(-1.0f, 1.0f, (float) (double) iv.getProperty("envToFilter", instrument.envToFilter));
+                    if (auto* macroValues = iv.getProperty("macroValues", {}).getArray())
+                    {
+                        const auto count = juce::jmin((int) macroValues->size(), (int) instrument.macroValues.size());
+                        for (int i = 0; i < count; ++i)
+                            instrument.macroValues[(size_t) i] = juce::jlimit(0.0f, 1.0f, (float) (double) macroValues->getReference(i));
+                    }
+                    instrument.dynamicModulation = dynamicModulationFromVar(iv.getProperty("dynamicModulation", {}), instrument.dynamicModulation);
                     instrument.hasAether = (bool) iv.getProperty("hasAether", instrument.hasAether);
+                    InstrumentDefinition::WavetableConfig globalWavetable;
+                    globalWavetable.bank = instrument.wavetableBank;
+                    globalWavetable.position = instrument.wavetablePosition;
+                    globalWavetable.warp = instrument.wavetableWarp;
+                    globalWavetable.warpMode = instrument.wavetableWarpMode;
+                    globalWavetable.unison = instrument.wavetableUnison;
+                    globalWavetable.detuneCents = instrument.wavetableDetuneCents;
+                    globalWavetable.blend = instrument.wavetableBlend;
+                    const auto aether = iv.getProperty("aether", {});
+                    if (aether.isObject() || instrument.hasAether)
+                    {
+                        instrument.hasAether = true;
+                        instrument.aether = aetherConfigFromVar(aether, globalWavetable);
+                    }
 
                     if (auto* filters = iv.getProperty("effects", {}).getProperty("filters", {}).getArray())
                     {

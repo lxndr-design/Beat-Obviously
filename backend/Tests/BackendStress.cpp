@@ -5790,6 +5790,176 @@ namespace
         return ok;
     }
 
+    bool stressProjectRepositoryAetherInstrumentRoundtrip()
+    {
+        const auto root = juce::File("/private/tmp")
+            .getChildFile("BeatBackendStress-aether-instrument-repository-" + juce::Uuid().toString());
+        const auto dbFile = root.getChildFile("projects.sqlite");
+
+        if (!root.createDirectory())
+        {
+            std::cerr << "Could not create Aether instrument repository fixture at "
+                      << root.getFullPathName() << "\n";
+            root.deleteRecursively();
+            return false;
+        }
+
+        auto project = makeDenseAetherProject();
+        project.id = "aether-instrument-repository-project";
+        project.name = "Aether Instrument Repository Project";
+        auto& instrument = project.instruments.front();
+        instrument.env2AttackMs = 18.0f;
+        instrument.env2AttackCurve = 1;
+        instrument.env2DecayMs = 240.0f;
+        instrument.env2DecayCurve = 2;
+        instrument.env2Sustain = 0.42f;
+        instrument.env2ReleaseMs = 480.0f;
+        instrument.env2ReleaseCurve = 3;
+        instrument.env2Loop = true;
+        instrument.macroValues = { 0.11f, 0.57f, 0.83f, 0.25f };
+        instrument.dynamicModulation.oscAFine.lfo2 = 0.19f;
+        instrument.dynamicModulation.oscAFine.lfo2Bipolar = false;
+        instrument.dynamicModulation.filterCutoff.macro4 = -0.31f;
+        instrument.dynamicModulation.ampLevel.velocity = 0.27f;
+        instrument.dynamicModulation.ampLevel.velocityBipolar = false;
+
+        auto& oscA = instrument.aether.oscA;
+        oscA.phase = 0.37f;
+        oscA.randomPhase = 0.18f;
+        oscA.wavetable.custom = true;
+        oscA.wavetable.warpMode = 2;
+        oscA.wavetable.smoothInterpolation = true;
+        oscA.wavetable.morph = 0.44f;
+        oscA.wavetable.customFrames[0].brightness = 0.91f;
+        oscA.wavetable.customFrames[0].skew = -0.33f;
+        oscA.wavetable.customFrames[0].tilt = 0.27f;
+        oscA.wavetable.customFrames[0].focus = 0.66f;
+        oscA.wavetable.customFrames[0].partials[0] = 0.84f;
+        oscA.wavetable.customFrames[0].partials[7] = 0.46f;
+        oscA.wavetable.customFrames[3].phase = 0.73f;
+        oscA.wavetable.customFrames[3].partials[15] = 0.28f;
+
+        auto& oscB = instrument.aether.oscB;
+        oscB.enabled = true;
+        oscB.level = 0.33f;
+        oscB.pan = 0.41f;
+        oscB.octave = 1;
+        oscB.phase = 0.22f;
+        oscB.randomPhase = 0.12f;
+        oscB.wavetable.custom = true;
+        oscB.wavetable.bank = 3;
+        oscB.wavetable.warpMode = 1;
+        oscB.wavetable.smoothInterpolation = true;
+        oscB.wavetable.morph = 0.21f;
+        oscB.wavetable.customFrames[1].formant = 0.77f;
+        oscB.wavetable.customFrames[1].notch = 0.18f;
+        oscB.wavetable.customFrames[1].partials[4] = 0.62f;
+
+        instrument.aether.sub.enabled = true;
+        instrument.aether.sub.level = 0.24f;
+        instrument.aether.sub.octave = -2;
+        instrument.aether.sub.waveform = 1;
+        instrument.aether.noise.enabled = true;
+        instrument.aether.noise.level = 0.06f;
+        instrument.aether.noise.color = 0.81f;
+
+        const auto beforeEnergy = bufferEnergy(renderOfflineBlock(project, 16000));
+
+        beat::Database db(dbFile);
+        beat::ProjectRepository repo(db);
+        repo.save(project);
+        const auto loaded = repo.load(project.id);
+
+        bool metadataOk = loaded.has_value()
+            && loaded->instruments.size() == 1
+            && loaded->instruments.front().id == instrument.id
+            && loaded->instruments.front().hasAether
+            && loaded->instruments.front().effects.size() == instrument.effects.size();
+
+        if (metadataOk)
+        {
+            const auto& loadedInstrument = loaded->instruments.front();
+            const auto& loadedOscA = loadedInstrument.aether.oscA;
+            const auto& loadedOscB = loadedInstrument.aether.oscB;
+
+            metadataOk = near(loadedInstrument.env2AttackMs, 18.0f)
+                && loadedInstrument.env2AttackCurve == 1
+                && near(loadedInstrument.env2DecayMs, 240.0f)
+                && loadedInstrument.env2DecayCurve == 2
+                && near(loadedInstrument.env2Sustain, 0.42f)
+                && near(loadedInstrument.env2ReleaseMs, 480.0f)
+                && loadedInstrument.env2ReleaseCurve == 3
+                && loadedInstrument.env2Loop
+                && near(loadedInstrument.macroValues[0], 0.11f)
+                && near(loadedInstrument.macroValues[1], 0.57f)
+                && near(loadedInstrument.macroValues[2], 0.83f)
+                && near(loadedInstrument.macroValues[3], 0.25f)
+                && loadedInstrument.dynamicModulation.active
+                && near(loadedInstrument.dynamicModulation.oscAFine.lfo2, 0.19f)
+                && !loadedInstrument.dynamicModulation.oscAFine.lfo2Bipolar
+                && near(loadedInstrument.dynamicModulation.filterCutoff.macro4, -0.31f)
+                && near(loadedInstrument.dynamicModulation.ampLevel.velocity, 0.27f)
+                && !loadedInstrument.dynamicModulation.ampLevel.velocityBipolar
+                && loadedOscA.enabled
+                && near(loadedOscA.phase, 0.37f)
+                && near(loadedOscA.randomPhase, 0.18f)
+                && loadedOscA.wavetable.custom
+                && loadedOscA.wavetable.warpMode == 2
+                && loadedOscA.wavetable.smoothInterpolation
+                && near(loadedOscA.wavetable.morph, 0.44f)
+                && near(loadedOscA.wavetable.customFrames[0].brightness, 0.91f)
+                && near(loadedOscA.wavetable.customFrames[0].skew, -0.33f)
+                && near(loadedOscA.wavetable.customFrames[0].tilt, 0.27f)
+                && near(loadedOscA.wavetable.customFrames[0].focus, 0.66f)
+                && near(loadedOscA.wavetable.customFrames[0].partials[0], 0.84f)
+                && near(loadedOscA.wavetable.customFrames[0].partials[7], 0.46f)
+                && near(loadedOscA.wavetable.customFrames[3].phase, 0.73f)
+                && near(loadedOscA.wavetable.customFrames[3].partials[15], 0.28f)
+                && loadedOscB.enabled
+                && near(loadedOscB.level, 0.33f)
+                && near(loadedOscB.pan, 0.41f)
+                && loadedOscB.octave == 1
+                && near(loadedOscB.phase, 0.22f)
+                && near(loadedOscB.randomPhase, 0.12f)
+                && loadedOscB.wavetable.custom
+                && loadedOscB.wavetable.bank == 3
+                && loadedOscB.wavetable.warpMode == 1
+                && loadedOscB.wavetable.smoothInterpolation
+                && near(loadedOscB.wavetable.morph, 0.21f)
+                && near(loadedOscB.wavetable.customFrames[1].formant, 0.77f)
+                && near(loadedOscB.wavetable.customFrames[1].notch, 0.18f)
+                && near(loadedOscB.wavetable.customFrames[1].partials[4], 0.62f)
+                && loadedInstrument.aether.sub.enabled
+                && near(loadedInstrument.aether.sub.level, 0.24f)
+                && loadedInstrument.aether.sub.octave == -2
+                && loadedInstrument.aether.sub.waveform == 1
+                && loadedInstrument.aether.noise.enabled
+                && near(loadedInstrument.aether.noise.level, 0.06f)
+                && near(loadedInstrument.aether.noise.color, 0.81f)
+                && loadedInstrument.effects.front().id == instrument.effects.front().id;
+        }
+
+        double afterEnergy = 0.0;
+        if (loaded.has_value())
+            afterEnergy = bufferEnergy(renderOfflineBlock(*loaded, 16000));
+
+        root.deleteRecursively();
+        const bool renderOk = std::isfinite(beforeEnergy)
+            && std::isfinite(afterEnergy)
+            && beforeEnergy > 0.0001
+            && afterEnergy > 0.0001;
+        const bool ok = metadataOk && renderOk;
+        if (!ok)
+        {
+            std::cerr << "Project repository Aether instrument roundtrip failed metadata=" << metadataOk
+                      << " beforeEnergy=" << beforeEnergy
+                      << " afterEnergy=" << afterEnergy
+                      << " loaded=" << loaded.has_value()
+                      << "\n";
+        }
+        return ok;
+    }
+
     bool stressProjectRepositoryAudioFileRoundtrip()
     {
         const auto root = juce::File("/private/tmp")
@@ -11473,6 +11643,11 @@ int main()
     if (!stressProjectRepositoryEffectDefaultsMigration())
     {
         std::cerr << "Project repository effect defaults migration stress failed\n";
+        return 1;
+    }
+    if (!stressProjectRepositoryAetherInstrumentRoundtrip())
+    {
+        std::cerr << "Project repository Aether instrument roundtrip stress failed\n";
         return 1;
     }
     if (!stressProjectRepositoryAudioFileRoundtrip())

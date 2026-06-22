@@ -71,10 +71,10 @@ Status legend:
   - Proof: synth roundtrip verifier, frontend interaction verifier, plus existing live/export parity stress for a patch with instrument FX and track FX.
 - `[ ]` Named Aether effect/instrument preset library.
   - Done: schema-versioned local instrument preset records, schema-versioned local instrument-effect chain presets, legacy record normalization, explicit Save As preset, user preset delete, Restore Init action, and FX preset save/load/delete.
-  - Remaining: native repository roundtrip and fuller browser coverage.
-  - Proof: synth verifier covers schema creation/migration; frontend interaction verifier covers preset state transitions; document roundtrip verifier covers preset-grade Aether synth patches, macro routes, custom wavemap analysis metadata, and instrument-owned FX.
+  - Remaining: fuller browser coverage.
+  - Proof: synth verifier covers schema creation/migration; frontend interaction verifier covers preset state transitions; document roundtrip verifier covers preset-grade Aether synth patches, macro routes, custom wavemap analysis metadata, and instrument-owned FX; backend stress covers native repository roundtrip for Aether oscillator/sub/noise config, wavemap frame controls/partials, macro values/routes, Env 2, and instrument-owned FX.
 - `[ ]` Aether FX preset/version migration.
-  - Proof: synth and interaction verifiers cover legacy effect-default normalization; document roundtrip verifier covers current instrument-owned FX chains.
+  - Proof: synth and interaction verifiers cover legacy effect-default normalization; document roundtrip verifier and backend stress cover current instrument-owned FX chains.
 
 ## 6. UI And Editing Workflow
 

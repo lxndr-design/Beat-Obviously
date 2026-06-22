@@ -35,7 +35,7 @@ Status legend:
    - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.
    - `[x]` Add schema-versioned local instrument-effect chain presets with save/load/delete and legacy normalization.
    - `[x]` Add document roundtrip coverage for preset-grade Aether patches, macro routes, custom wavemap analysis metadata, and instrument-owned FX.
-   - `[ ]` Add native repository roundtrip coverage for Aether presets/effect presets.
+   - `[x]` Add native repository roundtrip coverage for Aether oscillator/sub/noise config, wavemap frame controls/partials, macro values/routes, Env 2, and instrument-owned FX.
    - `[ ]` Add browser smoke for preset save/load/delete flows.
 
 ## DAW Editing
