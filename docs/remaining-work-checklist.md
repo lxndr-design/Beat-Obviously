@@ -30,9 +30,10 @@ Status legend:
    - `[ ]` Add visual/manual range picker polish for imported audio.
 3. `[ ]` Visible Aether automation lanes.
    - `[x]` Add first visible piano-roll note automation lane selector/badges for pitch, wavemap, filter, amp, and macro targets.
+   - `[x]` Add selected-note start/end value editing for visible piano-roll Aether lanes.
    - `[x]` Preserve note automation point timing during note drag/copy/paste and cover the helper behavior.
    - `[~]` Cover track, segment, and piano-roll note automation entrypoints.
-   - Add point drag, curve selection, playback preview, and live/export parity coverage.
+   - Add direct point drag, curve selection, playback preview, and live/export parity coverage.
 4. `[ ]` Aether preset storage and migration.
    - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.
    - `[x]` Add schema-versioned local instrument-effect chain presets with save/load/delete and legacy normalization.

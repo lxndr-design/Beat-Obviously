@@ -422,6 +422,43 @@
   gap: 3px;
 }
 
+.automationValueEditor {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+  color: color-mix(in srgb, var(--color-fg) 74%, transparent);
+  font-size: var(--font-size-ui);
+}
+
+.automationValueEditor > span {
+  grid-column: 1 / -1;
+  font-family: var(--font-family-mono);
+}
+
+.automationValueEditor label {
+  display: grid;
+  grid-template-columns: 36px minmax(72px, 1fr) 44px;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.automationValueEditor label span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automationValueEditor input {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--color-fg);
+}
+
 .playhead {
   position: absolute;
   top: 0;

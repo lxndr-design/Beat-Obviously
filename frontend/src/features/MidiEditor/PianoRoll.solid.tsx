@@ -3,11 +3,15 @@ import { Portal } from "solid-js/web";
 import {
   AETHER_NOTE_AUTOMATION_TARGETS,
   aetherNoteAutomationTargetLabel,
+  aetherNoteAutomationTargetMeta,
   clearMidiNoteAutomationTarget,
+  formatAetherNoteAutomationValue,
   midiNoteAutomationTargetCount,
   midiNoteHasAutomationTarget,
   offsetMidiNoteAutomation,
   selectedMidiNoteAutomationSummary,
+  selectedMidiNoteAutomationValueRange,
+  setMidiNoteAutomationTargetValues,
   upsertMidiNoteAutomationTarget,
 } from "../../automation/aetherNoteAutomation";
 import { Button, FloatingLayer, HoverInfo, Icon } from "../../solid-ui";
@@ -177,6 +181,10 @@ export function PianoRoll(props: PianoRollProps) {
   const gridLines = createMemo(() => makeGridLines(lengthBeats, pxPerBeat()));
   const selectedAutomationSummary = createMemo(() =>
     selectedMidiNoteAutomationSummary(notes, selected(), activeAutomationTarget())
+  );
+  const activeAutomationMeta = createMemo(() => aetherNoteAutomationTargetMeta(activeAutomationTarget()));
+  const selectedAutomationValueRange = createMemo(() =>
+    selectedMidiNoteAutomationValueRange(notes, selected(), activeAutomationTarget())
   );
 
   useContextualHotkey(
@@ -774,6 +782,20 @@ export function PianoRoll(props: PianoRollProps) {
     commitChange(clearMidiNoteAutomationTarget(notes, selected(), activeAutomationTarget()));
   }
 
+  function setAutomationValueEdge(edge: "start" | "end", rawValue: string) {
+    if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
+    const value = Number(rawValue);
+    if (!Number.isFinite(value)) return;
+    const current = selectedAutomationValueRange();
+    commitChange(setMidiNoteAutomationTargetValues(
+      notes,
+      selected(),
+      activeAutomationTarget(),
+      edge === "start" ? value : current.startValue,
+      edge === "end" ? value : current.endValue,
+    ));
+  }
+
   function copyNotes(indices: number[]): boolean {
     const unique = Array.from(new Set(indices))
       .filter((idx) => notes[idx])
@@ -1334,6 +1356,40 @@ export function PianoRoll(props: PianoRollProps) {
               Clear
             </Button>
           </div>
+          {activeAutomationTarget() === "pitch" ? (
+            <div class={styles.automationValueEditor}>
+              <span>Pitch uses note curve handles</span>
+            </div>
+          ) : (
+            <div class={styles.automationValueEditor}>
+              <label>
+                <span>Start</span>
+                <input
+                  type="range"
+                  min={activeAutomationMeta().min}
+                  max={activeAutomationMeta().max}
+                  step={activeAutomationMeta().step}
+                  value={selectedAutomationValueRange().startValue}
+                  disabled={selected().length === 0}
+                  onChange={(event) => setAutomationValueEdge("start", event.currentTarget.value)}
+                />
+                <span>{formatAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().startValue)}</span>
+              </label>
+              <label>
+                <span>End</span>
+                <input
+                  type="range"
+                  min={activeAutomationMeta().min}
+                  max={activeAutomationMeta().max}
+                  step={activeAutomationMeta().step}
+                  value={selectedAutomationValueRange().endValue}
+                  disabled={selected().length === 0}
+                  onChange={(event) => setAutomationValueEdge("end", event.currentTarget.value)}
+                />
+                <span>{formatAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().endValue)}</span>
+              </label>
+            </div>
+          )}
         </div>
       </div>
       {(() => {
