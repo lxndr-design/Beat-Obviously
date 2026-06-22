@@ -76,11 +76,6 @@ namespace beat
             return fallback;
         }
 
-        float staticRouteScale(const juce::String& target)
-        {
-            return target.endsWith(".fine") ? 100.0f : 1.0f;
-        }
-
         int macroIndexForSource(const juce::String& source)
         {
             if (source == "macro.1") return 1;
@@ -121,29 +116,6 @@ namespace beat
             const float max = juce::jmax(rawMin, rawMax);
             const auto curve = objectProperty(macro, "curve", "linear").toString();
             return juce::jlimit(0.0f, 1.0f, min + (max - min) * applyMacroCurve(raw, curve));
-        }
-
-        float staticRouteAmount(const juce::var& params, const juce::var& modulation, const juce::var& metadata, const juce::String& target)
-        {
-            float amount = 0.0f;
-            const float scale = staticRouteScale(target);
-            if (auto* routes = modulation.getArray())
-            {
-                for (const auto& route : *routes)
-                {
-                    if (!route.isObject()) continue;
-                    if (!(bool) objectProperty(route, "enabled", true)) continue;
-                    if (objectProperty(route, "target", {}).toString() != target) continue;
-
-                    const auto source = objectProperty(route, "source", {}).toString();
-                    if (!source.startsWith("macro.")) continue;
-
-                    const float sourceValue = macroSourceValue(params, metadata, source);
-                    const float routeValue = juce::jlimit(-1.0f, 1.0f, (float) (double) objectProperty(route, "amount", 0.0));
-                    amount += sourceValue * routeValue * scale;
-                }
-            }
-            return juce::jlimit(-scale, scale, amount);
         }
 
         InstrumentDefinition::WavetableConfig::CustomFrame customFrameFromVar(
@@ -209,8 +181,7 @@ namespace beat
             fallback.position = juce::jlimit(
                 0.0f,
                 1.0f,
-                (float) synthNumberParam(params, prefix + "position", fallback.position)
-                    + staticRouteAmount(params, modulation, metadata, prefix + "position"));
+                (float) synthNumberParam(params, prefix + "position", fallback.position));
             fallback.warp = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "warp", fallback.warp));
             fallback.warpMode = synthWavetableWarpModeForId(synthStringParam(params, prefix + "warpMode", "shape"));
             return fallback;
@@ -229,21 +200,18 @@ namespace beat
             fallback.level = juce::jlimit(
                 0.0f,
                 1.0f,
-                (float) synthNumberParam(params, prefix + "level", fallback.level)
-                    + staticRouteAmount(params, modulation, metadata, prefix + "level"));
+                (float) synthNumberParam(params, prefix + "level", fallback.level));
             fallback.pan = juce::jlimit(
                 -1.0f,
                 1.0f,
-                (float) synthNumberParam(params, prefix + "pan", fallback.pan)
-                    + staticRouteAmount(params, modulation, metadata, prefix + "pan"));
+                (float) synthNumberParam(params, prefix + "pan", fallback.pan));
             fallback.waveform = 5;
             fallback.octave = juce::jlimit(-4, 4, (int) std::round(synthNumberParam(params, prefix + "octave", fallback.octave)));
             fallback.semitone = juce::jlimit(-24, 24, (int) std::round(synthNumberParam(params, prefix + "semitone", fallback.semitone)));
             fallback.fineCents = juce::jlimit(
                 -100.0f,
                 100.0f,
-                (float) synthNumberParam(params, prefix + "fine", fallback.fineCents)
-                    + staticRouteAmount(params, modulation, metadata, prefix + "fine"));
+                (float) synthNumberParam(params, prefix + "fine", fallback.fineCents));
             fallback.phase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "phase", fallback.phase));
             fallback.randomPhase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "randomPhase", fallback.randomPhase));
             fallback.wavetable = synthWavetableConfig(params, modulation, metadata, customWavetables, oscillator, fallback.wavetable);
@@ -271,13 +239,21 @@ namespace beat
             target.keytrackBipolar = routeBipolar(modulation, "keytrack", routeTarget, false);
             target.modWheel = routeAmount(modulation, "modWheel", routeTarget);
             target.modWheelBipolar = routeBipolar(modulation, "modWheel", routeTarget, false);
+            target.macro1 = routeAmount(modulation, "macro.1", routeTarget);
+            target.macro2 = routeAmount(modulation, "macro.2", routeTarget);
+            target.macro3 = routeAmount(modulation, "macro.3", routeTarget);
+            target.macro4 = routeAmount(modulation, "macro.4", routeTarget);
             return std::abs(target.lfo) > 0.0001f
                 || std::abs(target.lfo2) > 0.0001f
                 || std::abs(target.env) > 0.0001f
                 || std::abs(target.env2) > 0.0001f
                 || std::abs(target.velocity) > 0.0001f
                 || std::abs(target.keytrack) > 0.0001f
-                || std::abs(target.modWheel) > 0.0001f;
+                || std::abs(target.modWheel) > 0.0001f
+                || std::abs(target.macro1) > 0.0001f
+                || std::abs(target.macro2) > 0.0001f
+                || std::abs(target.macro3) > 0.0001f
+                || std::abs(target.macro4) > 0.0001f;
         }
 
         void configureDynamicModulation(
@@ -371,8 +347,7 @@ namespace beat
         instrument.wavetablePosition = juce::jlimit(
             0.0f,
             1.0f,
-            (float) synthNumberParam(params, "osc.a.position", instrument.wavetablePosition)
-                + staticRouteAmount(params, modulation, metadata, "osc.a.position"));
+            (float) synthNumberParam(params, "osc.a.position", instrument.wavetablePosition));
         instrument.wavetableWarp = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "osc.a.warp", instrument.wavetableWarp));
         instrument.wavetableWarpMode = synthWavetableWarpModeForId(synthStringParam(params, "osc.a.warpMode", "shape"));
         const bool unisonEnabled = synthNumberParam(params, "unison.enabled", 0.0) >= 0.5;
@@ -383,15 +358,13 @@ namespace beat
             ? juce::jlimit(
                 0.0f,
                 100.0f,
-                ((float) synthNumberParam(params, "unison.detune", 0.12)
-                    + staticRouteAmount(params, modulation, metadata, "unison.detune")) * 100.0f)
+                (float) synthNumberParam(params, "unison.detune", 0.12) * 100.0f)
             : 0.0f;
         instrument.wavetableBlend = unisonEnabled
             ? juce::jlimit(
                 0.0f,
                 1.0f,
-                (float) synthNumberParam(params, "unison.spread", synthNumberParam(params, "unison.blend", instrument.wavetableBlend))
-                    + staticRouteAmount(params, modulation, metadata, "unison.spread"))
+                (float) synthNumberParam(params, "unison.spread", synthNumberParam(params, "unison.blend", instrument.wavetableBlend)))
             : 0.0f;
 
         InstrumentDefinition::WavetableConfig baseWavetable;
@@ -430,18 +403,15 @@ namespace beat
         const bool filterEnabled = synthNumberParam(params, "filter.enabled", 1.0) >= 0.5;
         instrument.filterType = parseSynthFilterType(synthStringParam(params, "filter.type", "lowpass"));
         instrument.cutoff01 = filterEnabled
-            ? juce::jlimit(0.0f, 1.0f, cutoffHzTo01(synthNumberParam(params, "filter.cutoff", 18000.0))
-                + staticRouteAmount(params, modulation, metadata, "filter.cutoff"))
+            ? juce::jlimit(0.0f, 1.0f, cutoffHzTo01(synthNumberParam(params, "filter.cutoff", 18000.0)))
             : 1.0f;
         instrument.filterKeytrack = filterEnabled
             ? juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "filter.keytrack", instrument.filterKeytrack))
             : 0.0f;
         instrument.resonance01 = filterEnabled
-            ? juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "filter.resonance", instrument.resonance01)
-                + staticRouteAmount(params, modulation, metadata, "filter.resonance"))
+            ? juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "filter.resonance", instrument.resonance01))
             : 0.0f;
-        instrument.drive01 = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "filter.drive", instrument.drive01)
-            + staticRouteAmount(params, modulation, metadata, "filter.drive"));
+        instrument.drive01 = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "filter.drive", instrument.drive01));
         instrument.attackMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.1.attack", 0.005) * 1000.0f);
         instrument.attackCurve = envelopeCurveForId(synthStringParam(params, "env.1.attackCurve", "linear"));
         instrument.decayMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.1.decay", 0.15) * 1000.0f);
@@ -458,10 +428,8 @@ namespace beat
         instrument.env2ReleaseMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.2.release", 0.2) * 1000.0f);
         instrument.env2ReleaseCurve = envelopeCurveForId(synthStringParam(params, "env.2.releaseCurve", "linear"));
         instrument.env2Loop = synthNumberParam(params, "env.2.loop", instrument.env2Loop ? 1.0 : 0.0) >= 0.5;
-        instrument.ampLevel = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "amp.level", instrument.ampLevel)
-            + staticRouteAmount(params, modulation, metadata, "amp.level"));
-        instrument.ampPan = juce::jlimit(-1.0f, 1.0f, (float) synthNumberParam(params, "amp.pan", instrument.ampPan)
-            + staticRouteAmount(params, modulation, metadata, "amp.pan"));
+        instrument.ampLevel = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "amp.level", instrument.ampLevel));
+        instrument.ampPan = juce::jlimit(-1.0f, 1.0f, (float) synthNumberParam(params, "amp.pan", instrument.ampPan));
         instrument.lfoWaveform = parseSynthLfoWaveform(synthStringParam(params, "lfo.1.shape", "sine"));
         instrument.lfoRateHz = juce::jlimit(0.01f, 50.0f, (float) synthNumberParam(params, "lfo.1.rate", instrument.lfoRateHz));
         instrument.lfoSync = synthNumberParam(params, "lfo.1.sync", instrument.lfoSync ? 1.0 : 0.0) >= 0.5;
@@ -490,6 +458,12 @@ namespace beat
         instrument.lfoPitchBipolar = routeBipolar(modulation, "lfo.1", "osc.a.fine", true);
         instrument.lfoFilterBipolar = routeBipolar(modulation, "lfo.1", "filter.cutoff", true);
         instrument.envToFilter = routeAmount(modulation, "env.1", "filter.cutoff");
+        instrument.macroValues = {
+            macroSourceValue(params, metadata, "macro.1"),
+            macroSourceValue(params, metadata, "macro.2"),
+            macroSourceValue(params, metadata, "macro.3"),
+            macroSourceValue(params, metadata, "macro.4"),
+        };
         configureDynamicModulation(instrument.dynamicModulation, modulation, lfoEnabled, instrument.lfo2Enabled);
         return true;
     }

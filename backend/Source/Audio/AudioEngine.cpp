@@ -1532,6 +1532,7 @@ namespace beat
         params.lfoToPitch = instrument.lfoToPitch;
         params.lfoToFilter = instrument.lfoToFilter;
         params.envToFilter = instrument.envToFilter;
+        params.macroValues = instrument.macroValues;
         const auto copyDynamicTarget = [](const InstrumentDefinition::DynamicModTarget& source)
         {
             InstrumentVoice::Params::DynamicModTarget target;
@@ -1549,6 +1550,10 @@ namespace beat
             target.keytrackBipolar = source.keytrackBipolar;
             target.modWheel = source.modWheel;
             target.modWheelBipolar = source.modWheelBipolar;
+            target.macro1 = source.macro1;
+            target.macro2 = source.macro2;
+            target.macro3 = source.macro3;
+            target.macro4 = source.macro4;
             return target;
         };
         params.dynamicModulation.active = instrument.dynamicModulation.active;

@@ -24,9 +24,9 @@ Status legend:
 - `[x]` Dynamic modulation routes exist for LFO 1, LFO 2, Env 1, Env 2, velocity, keytrack, and mod wheel to oscillator, filter, amp, and unison targets.
 - `[x]` Per-note native/browser lanes cover pitch, amp level/pan, filter cutoff/resonance/drive, oscillator position/fine/level/pan/phase, and unison detune/spread.
 - `[~]` Runtime macro semantics.
-  - Done: macro labels, ranges, curves, visible assignment summaries, and browser/native static route math.
-  - Remaining: first-class voice-level macro state so macro lanes can modulate routed targets at runtime instead of being baked into patch parameters at parse time.
-  - Proof: browser preview, native parser, `InstrumentVoice`, sequencer note automation, project/document roundtrip, and backend no-leak stress for macro lanes.
+  - Done: macro labels, ranges, curves, visible assignment summaries, browser static route math, native macro range/curve parsing, first-class voice macro state, macro route storage in dynamic targets, and `macro.1`-`macro.4` realtime/note automation with backend no-leak stress.
+  - Remaining: browser preview parity for live macro route changes, explicit project/document roundtrip fixtures for macro route state, visible macro lanes, and conflict display.
+  - Proof still needed: browser preview, project/document roundtrip, and editor interaction coverage for macro lanes.
 - `[~]` Modulation matrix UX.
   - Done: target/source selection and visible assignments.
   - Remaining: semantic cleanup for per-target range displays, conflict clarity, disabled route states, and source-specific editing affordances.
@@ -97,9 +97,8 @@ Status legend:
 
 ## Near-Term Slice Order
 
-1. Add runtime macro state and macro lane automation with backend no-leak stress.
-2. Add dense overlapping Aether automation parity stress.
-3. Add an instrument FX rack UI backed by existing instrument-owned FX rendering.
-4. Tighten wavemap drawing/resynthesis semantics and add deterministic fixtures.
-5. Add visible note/segment automation lanes for the Aether targets.
-6. Add Aether preset storage, Save As preset flow, and migration fixtures.
+1. Add dense overlapping Aether automation parity stress.
+2. Add an instrument FX rack UI backed by existing instrument-owned FX rendering.
+3. Tighten wavemap drawing/resynthesis semantics and add deterministic fixtures.
+4. Add visible note/segment automation lanes for the Aether targets.
+5. Add Aether preset storage, Save As preset flow, and migration fixtures.

@@ -140,6 +140,10 @@ namespace
         threshold.lfo = 0.001f;
         if (!beat::DynamicModulation::targetActive(threshold))
             return false;
+        threshold = {};
+        threshold.macro1 = 0.001f;
+        if (!beat::DynamicModulation::targetActive(threshold))
+            return false;
 
         if (!near(beat::DynamicModulation::routeEnvValue(0.25f, false), 0.25f))
             return false;
@@ -171,9 +175,26 @@ namespace
             0.75f,
             0.5f,
             0.25f,
+            std::array<float, 4> {},
             2.0f);
 
         if (!near(offset, -0.075f))
+            return false;
+
+        target.macro1 = 0.2f;
+        const float macroOffset = beat::DynamicModulation::targetOffset(
+            target,
+            -0.5f,
+            -0.5f,
+            0.75f,
+            0.75f,
+            0.75f,
+            0.5f,
+            0.25f,
+            { 0.5f, 0.0f, 0.0f, 0.0f },
+            2.0f);
+
+        if (!near(macroOffset, 0.125f))
             return false;
 
         beat::DynamicModulation::TargetActivityFlags noFlags;
@@ -9655,9 +9676,9 @@ namespace
 
         if (instrument.kind != "wavetable" || instrument.waveform != 5 || !instrument.hasAether)
             return false;
-        if (instrument.wavetableBank != 4 || !near(instrument.wavetablePosition, 0.45f))
+        if (instrument.wavetableBank != 4 || !near(instrument.wavetablePosition, 0.25f))
             return false;
-        if (instrument.wavetableUnison != 5 || !near(instrument.wavetableDetuneCents, 25.0f) || !near(instrument.wavetableBlend, 0.5f))
+        if (instrument.wavetableUnison != 5 || !near(instrument.wavetableDetuneCents, 20.0f) || !near(instrument.wavetableBlend, 0.4f))
             return false;
         if (instrument.maxVoices != 6)
             return false;
@@ -9665,11 +9686,11 @@ namespace
             return false;
         if (!instrument.aether.oscA.enabled || instrument.aether.oscA.wavetable.bank != 4)
             return false;
-        if (!near(instrument.aether.oscA.wavetable.position, 0.45f) || instrument.aether.oscA.wavetable.unison != 5)
+        if (!near(instrument.aether.oscA.wavetable.position, 0.25f) || instrument.aether.oscA.wavetable.unison != 5)
             return false;
         if (!near(instrument.aether.oscA.wavetable.warp, 0.58f) || instrument.aether.oscA.wavetable.warpMode != 1)
             return false;
-        if (!near(instrument.aether.oscA.pan, -0.3f))
+        if (!near(instrument.aether.oscA.pan, -0.4f))
             return false;
         if (!near(instrument.aether.oscA.phase, 0.33f) || !near(instrument.aether.oscA.randomPhase, 0.2f))
             return false;
@@ -9677,19 +9698,19 @@ namespace
             return false;
         if (!near(instrument.aether.oscB.wavetable.warp, 0.36f) || instrument.aether.oscB.wavetable.warpMode != 2)
             return false;
-        if (!near(instrument.aether.oscB.level, 0.7f) || !near(instrument.aether.oscB.wavetable.position, 0.0f))
+        if (!near(instrument.aether.oscB.level, 0.3f) || !near(instrument.aether.oscB.wavetable.position, 0.1f))
             return false;
-        if (!near(instrument.aether.oscB.pan, 0.0f))
+        if (!near(instrument.aether.oscB.pan, 0.2f))
             return false;
         if (!near(instrument.aether.oscB.phase, 0.66f) || !near(instrument.aether.oscB.randomPhase, 0.1f))
             return false;
-        if (instrument.aether.oscB.octave != 1 || instrument.aether.oscB.semitone != 7 || !near(instrument.aether.oscB.fineCents, 15.0f))
+        if (instrument.aether.oscB.octave != 1 || instrument.aether.oscB.semitone != 7 || !near(instrument.aether.oscB.fineCents, -5.0f))
             return false;
         if (instrument.filterType != 2 || instrument.cutoff01 < 0.55f || instrument.cutoff01 > 0.7f)
             return false;
         if (!near(instrument.filterKeytrack, 0.62f))
             return false;
-        if (!near(instrument.resonance01, 0.4f) || !near(instrument.drive01, 0.35f))
+        if (!near(instrument.resonance01, 0.2f) || !near(instrument.drive01, 0.35f))
             return false;
         if (!near(instrument.attackMs, 10.0f) || !near(instrument.decayMs, 200.0f))
             return false;
@@ -9705,7 +9726,7 @@ namespace
             return false;
         if (!instrument.env2Loop)
             return false;
-        if (!near(instrument.ampLevel, 0.54f) || !near(instrument.ampPan, 0.0f))
+        if (!near(instrument.ampLevel, 0.7f) || !near(instrument.ampPan, -0.25f))
             return false;
         if (instrument.lfoWaveform != 3 || !near(instrument.lfoRateHz, 6.5f) || !near(instrument.lfoPhaseOffset, 0.25f))
             return false;
@@ -9738,6 +9759,32 @@ namespace
         if (!near(instrument.envToFilter, 0.3f))
             return false;
         if (!instrument.dynamicModulation.active)
+            return false;
+        if (!near(instrument.macroValues[0], 0.5f) || !near(instrument.macroValues[1], 0.8f))
+            return false;
+        if (!near(instrument.dynamicModulation.oscAPosition.macro1, 0.4f))
+            return false;
+        if (!near(instrument.dynamicModulation.oscBPosition.macro1, -0.3f))
+            return false;
+        if (!near(instrument.dynamicModulation.oscBLevel.macro2, 0.5f))
+            return false;
+        if (!near(instrument.dynamicModulation.oscBFine.macro2, 0.25f))
+            return false;
+        if (!near(instrument.dynamicModulation.oscAPan.macro1, 0.2f))
+            return false;
+        if (!near(instrument.dynamicModulation.oscBPan.macro2, -0.25f))
+            return false;
+        if (!near(instrument.dynamicModulation.unisonDetune.macro1, 0.1f))
+            return false;
+        if (!near(instrument.dynamicModulation.unisonSpread.macro1, 0.2f))
+            return false;
+        if (!near(instrument.dynamicModulation.filterCutoff.macro1, 0.1f))
+            return false;
+        if (!near(instrument.dynamicModulation.filterResonance.macro2, 0.25f))
+            return false;
+        if (!near(instrument.dynamicModulation.ampLevel.macro2, -0.2f))
+            return false;
+        if (!near(instrument.dynamicModulation.ampPan.macro1, 0.5f))
             return false;
         if (!near(instrument.dynamicModulation.oscAPosition.lfo, -0.35f) || instrument.dynamicModulation.oscAPosition.lfoBipolar)
             return false;
@@ -9852,7 +9899,11 @@ namespace
         beat::InstrumentDefinition macroInstrument;
         if (!beat::applySynthPatchContract(macroPatch, macroInstrument))
             return false;
-        if (!near(macroInstrument.ampLevel, 0.575f))
+        if (!near(macroInstrument.ampLevel, 0.4f))
+            return false;
+        if (!near(macroInstrument.macroValues[0], 0.35f))
+            return false;
+        if (!near(macroInstrument.dynamicModulation.ampLevel.macro1, 0.5f))
             return false;
 
         return true;
@@ -10917,6 +10968,65 @@ namespace
         return balance > 0.5 && balance < 2.0;
     }
 
+    bool stressInstrumentVoiceMacroAutomation()
+    {
+        beat::InstrumentVoice::Params params;
+        params.waveform = 0;
+        params.cutoff01 = 1.0f;
+        params.ampLevel = 1.0f;
+        params.ampPan = 0.0f;
+        params.attackMs = 1.0f;
+        params.releaseMs = 5.0f;
+        params.dynamicModulation.active = true;
+        params.dynamicModulation.ampPan.macro1 = -1.0f;
+        params.macroValues[0] = 0.0f;
+
+        beat::InstrumentVoice voice;
+        voice.prepare(48000.0, 256);
+        voice.setParams(params);
+
+        std::array<beat::VoiceNoteAutomation::Context, beat::VoiceNoteAutomation::maxPendingContexts> contexts {};
+        contexts[0].midiNoteNumber = 60;
+        contexts[0].eventCount = 1;
+        contexts[0].events[0] = beat::makeRealtimeParameterChange(std::string_view {}, "macro.1", 1.0f, 0, 0);
+
+        beat::VoiceAutomationInbox::setPending(contexts.data(), 1);
+        voice.startNote(60, 1.0f, nullptr, 0);
+        beat::VoiceAutomationInbox::clearPending();
+
+        juce::AudioBuffer<float> macroBuffer(2, 512);
+        macroBuffer.clear();
+        voice.renderNextBlock(macroBuffer, 0, macroBuffer.getNumSamples());
+
+        double leftEnergy = 0.0;
+        double rightEnergy = 0.0;
+        for (int i = 0; i < macroBuffer.getNumSamples(); ++i)
+        {
+            leftEnergy += (double) macroBuffer.getSample(0, i) * (double) macroBuffer.getSample(0, i);
+            rightEnergy += (double) macroBuffer.getSample(1, i) * (double) macroBuffer.getSample(1, i);
+        }
+        if (leftEnergy <= rightEnergy * 8.0)
+            return false;
+
+        voice.stopNote(0.0f, false);
+        voice.startNote(60, 1.0f, nullptr, 0);
+
+        juce::AudioBuffer<float> resetBuffer(2, 512);
+        resetBuffer.clear();
+        voice.renderNextBlock(resetBuffer, 0, resetBuffer.getNumSamples());
+
+        leftEnergy = 0.0;
+        rightEnergy = 0.0;
+        for (int i = 0; i < resetBuffer.getNumSamples(); ++i)
+        {
+            leftEnergy += (double) resetBuffer.getSample(0, i) * (double) resetBuffer.getSample(0, i);
+            rightEnergy += (double) resetBuffer.getSample(1, i) * (double) resetBuffer.getSample(1, i);
+        }
+
+        const double balance = rightEnergy > 0.0 ? leftEnergy / rightEnergy : 999.0;
+        return balance > 0.5 && balance < 2.0;
+    }
+
     bool stressInstrumentVoicePerNotePitchCurve()
     {
         beat::InstrumentVoice::Params params;
@@ -11150,6 +11260,11 @@ int main()
     if (!stressInstrumentVoicePerNoteAutomation())
     {
         std::cerr << "Instrument voice per-note automation stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceMacroAutomation())
+    {
+        std::cerr << "Instrument voice macro automation stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoicePerNotePitchCurve())

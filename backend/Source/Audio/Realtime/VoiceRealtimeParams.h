@@ -30,6 +30,10 @@ namespace beat::VoiceRealtimeParams
         UnisonSpread,
         LfoRate,
         LfoDepth,
+        Macro1,
+        Macro2,
+        Macro3,
+        Macro4,
         Count,
     };
 
@@ -56,6 +60,10 @@ namespace beat::VoiceRealtimeParams
             case Id::OscBPhase:
             case Id::UnisonSpread:
             case Id::LfoDepth:
+            case Id::Macro1:
+            case Id::Macro2:
+            case Id::Macro3:
+            case Id::Macro4:
                 return juce::jlimit(0.0f, 1.0f, value);
             case Id::AmpPan:
             case Id::OscAPan:
@@ -98,6 +106,10 @@ namespace beat::VoiceRealtimeParams
             case Id::UnisonSpread: return params.wavetableBlend;
             case Id::LfoRate: return params.lfoRateHz;
             case Id::LfoDepth: return params.lfoDepth;
+            case Id::Macro1: return params.macroValues[0];
+            case Id::Macro2: return params.macroValues[1];
+            case Id::Macro3: return params.macroValues[2];
+            case Id::Macro4: return params.macroValues[3];
             case Id::Count:
                 break;
         }
@@ -175,6 +187,18 @@ namespace beat::VoiceRealtimeParams
             case Id::LfoDepth:
                 target.lfoDepth = clamped;
                 break;
+            case Id::Macro1:
+                target.macroValues[0] = clamped;
+                break;
+            case Id::Macro2:
+                target.macroValues[1] = clamped;
+                break;
+            case Id::Macro3:
+                target.macroValues[2] = clamped;
+                break;
+            case Id::Macro4:
+                target.macroValues[3] = clamped;
+                break;
             case Id::Count:
                 break;
         }
@@ -201,6 +225,10 @@ namespace beat::VoiceRealtimeParams
         if (parameterId == params::unison::spread) return (int) Id::UnisonSpread;
         if (parameterId == "lfo.1.rate") return (int) Id::LfoRate;
         if (parameterId == "lfo.1.depth") return (int) Id::LfoDepth;
+        if (parameterId == params::modulation::sourceMacro1) return (int) Id::Macro1;
+        if (parameterId == params::modulation::sourceMacro2) return (int) Id::Macro2;
+        if (parameterId == params::modulation::sourceMacro3) return (int) Id::Macro3;
+        if (parameterId == params::modulation::sourceMacro4) return (int) Id::Macro4;
         return -1;
     }
 }

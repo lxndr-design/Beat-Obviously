@@ -3,6 +3,7 @@
 #include "Lfo.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace beat::DynamicModulation
@@ -61,7 +62,11 @@ namespace beat::DynamicModulation
             || std::abs(target.env2) > 0.0001f
             || std::abs(target.velocity) > 0.0001f
             || std::abs(target.keytrack) > 0.0001f
-            || std::abs(target.modWheel) > 0.0001f;
+            || std::abs(target.modWheel) > 0.0001f
+            || std::abs(target.macro1) > 0.0001f
+            || std::abs(target.macro2) > 0.0001f
+            || std::abs(target.macro3) > 0.0001f
+            || std::abs(target.macro4) > 0.0001f;
     }
 
     template <typename Target>
@@ -86,6 +91,7 @@ namespace beat::DynamicModulation
         float velocity,
         float keytrack,
         float modWheel,
+        const std::array<float, 4>& macroValues,
         float scale) noexcept
     {
         return (Lfo::routeValue(rawLfo, target.lfoBipolar) * target.lfo
@@ -94,7 +100,11 @@ namespace beat::DynamicModulation
             + routeEnvValue(env2, target.env2Bipolar) * target.env2
             + routeEnvValue(velocity, target.velocityBipolar) * target.velocity
             + routeEnvValue(keytrack, target.keytrackBipolar) * target.keytrack
-            + routeEnvValue(modWheel, target.modWheelBipolar) * target.modWheel) * scale;
+            + routeEnvValue(modWheel, target.modWheelBipolar) * target.modWheel
+            + macroValues[0] * target.macro1
+            + macroValues[1] * target.macro2
+            + macroValues[2] * target.macro3
+            + macroValues[3] * target.macro4) * scale;
     }
 
     template <typename Modulation>
