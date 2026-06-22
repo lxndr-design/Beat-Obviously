@@ -427,6 +427,42 @@ namespace beat
             return 0.0;
         }
 
+        double estimateSpectralCentroidFromPartials(const juce::var& partialValues)
+        {
+            if (auto* partials = partialValues.getArray())
+            {
+                double weighted = 0.0;
+                double total = 0.0;
+                for (int i = 0; i < partials->size(); ++i)
+                {
+                    const auto value = clamp01((double) (*partials)[i]);
+                    weighted += value * (double) (i + 1);
+                    total += value;
+                }
+                return total > 0.0 ? weighted / total : 0.0;
+            }
+            return 0.0;
+        }
+
+        int dominantHarmonicFromPartials(const juce::var& partialValues)
+        {
+            int harmonic = 0;
+            double peak = 0.0;
+            if (auto* partials = partialValues.getArray())
+            {
+                for (int i = 0; i < partials->size(); ++i)
+                {
+                    const auto value = clamp01((double) (*partials)[i]);
+                    if (value > peak)
+                    {
+                        peak = value;
+                        harmonic = i + 1;
+                    }
+                }
+            }
+            return harmonic;
+        }
+
         juce::var makeWavemapFrame(const std::vector<float>& samples,
                                    int start,
                                    int end,
@@ -441,6 +477,7 @@ namespace beat
             double zeroCrossings = 0.0;
             double positiveEnergy = 0.0;
             double negativeEnergy = 0.0;
+            double peak = 0.0;
             double previous = samples[(size_t) safeStart];
 
             for (int index = safeStart; index < safeEnd; ++index)
@@ -449,6 +486,7 @@ namespace beat
                 sumSquares += sample * sample;
                 sumAbs += std::abs(sample);
                 derivative += std::abs(sample - previous);
+                peak = std::max(peak, std::abs(sample));
                 if ((sample >= 0.0 && previous < 0.0) || (sample < 0.0 && previous >= 0.0))
                     zeroCrossings += 1.0;
                 if (sample >= 0.0)
@@ -478,10 +516,27 @@ namespace beat
             frame->setProperty("skew", juce::jlimit(-1.0, 1.0, (zeroDensity * 10.0 - meanAbs) * 0.22 + (rms - 0.28) * 0.35));
             const auto partials = analyzeHarmonicPartials(samples, safeStart, safeEnd);
             const auto tilt = estimateSpectralTiltFromPartials(partials);
+            const auto spectralCentroid = estimateSpectralCentroidFromPartials(partials);
+            const auto dominantHarmonic = dominantHarmonicFromPartials(partials);
+            const auto dominantPhase = juce::jlimit(-juce::MathConstants<double>::pi,
+                                                    juce::MathConstants<double>::pi,
+                                                    (positiveEnergy - negativeEnergy) / totalPolarityEnergy * juce::MathConstants<double>::pi);
             frame->setProperty("tilt", tilt);
             frame->setProperty("focus", clamp01(0.18 + roughness * 0.68 + std::abs(tilt) * 0.24 + asymmetry * 0.18));
             frame->setProperty("phase", juce::jlimit(-1.0, 1.0, (positiveEnergy - negativeEnergy) / totalPolarityEnergy));
             frame->setProperty("partials", partials);
+            juce::DynamicObject::Ptr analysis = new juce::DynamicObject();
+            analysis->setProperty("sourceStartSample", static_cast<double>(safeStart));
+            analysis->setProperty("sourceEndSample", static_cast<double>(safeEnd));
+            analysis->setProperty("rms", rms);
+            analysis->setProperty("peak", peak);
+            analysis->setProperty("zeroCrossRate", zeroDensity);
+            analysis->setProperty("roughness", roughness);
+            analysis->setProperty("asymmetry", asymmetry);
+            analysis->setProperty("spectralCentroid", spectralCentroid);
+            analysis->setProperty("dominantHarmonic", dominantHarmonic);
+            analysis->setProperty("dominantPhase", dominantPhase);
+            frame->setProperty("analysis", juce::var(analysis.get()));
             return juce::var(frame.get());
         }
 
@@ -533,6 +588,11 @@ namespace beat
             source->setProperty("audioFileId", audioFileId);
             source->setProperty("path", file.getFullPathName());
             source->setProperty("sampleRate", reader->sampleRate);
+            source->setProperty("channelCount", static_cast<int>(reader->numChannels));
+            source->setProperty("bitDepth", static_cast<int>(reader->bitsPerSample));
+            source->setProperty("sourceSampleCount", static_cast<double>(reader->lengthInSamples));
+            source->setProperty("analyzedSampleCount", static_cast<double>(readCount));
+            source->setProperty("frameCount", frameCount);
             source->setProperty("sourceStartSample", 0.0);
             source->setProperty("sourceEndSample", static_cast<double>(readCount));
             source->setProperty("createdAt", static_cast<double>(juce::Time::getCurrentTime().toMilliseconds()));

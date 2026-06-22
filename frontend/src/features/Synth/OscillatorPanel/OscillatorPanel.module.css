@@ -184,6 +184,10 @@
   white-space: nowrap;
 }
 
+.wavemapMeta .wavemapMetaWide {
+  max-width: 220px;
+}
+
 .customFrames {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -241,6 +245,21 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
+}
+
+.frameAnalysis {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: -1px -4px 0;
+  padding: 3px 4px;
+  border-bottom: var(--border-fg);
+  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-hint);
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .harmonicDraw {

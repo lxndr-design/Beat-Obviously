@@ -27,6 +27,9 @@ export async function resynthesizeAudioFileToWavemap(
     audioFileId: audioFile.id,
     path: audioFile.path,
     sampleRate: decoded.sampleRate,
+    channelCount: decoded.channelCount,
+    bitDepth: audioFile.bitDepth,
+    sourceSampleCount: decoded.sourceLength,
     sourceStartSample: 0,
     sourceEndSample: decoded.sourceLength,
   });
@@ -66,6 +69,7 @@ async function decodeAudioFileToMonoSamples(audioFile: AudioFile) {
     return {
       samples,
       sampleRate: buffer.sampleRate,
+      channelCount: channels,
       sourceLength: buffer.length,
     };
   } finally {

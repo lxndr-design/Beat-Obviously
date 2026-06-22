@@ -407,10 +407,25 @@ export interface CustomWavetableFrame {
   phase: number;
   /** Optional 16-bin manual harmonic drawing overlay. */
   partials?: number[];
+  /** Deterministic analysis summary for drawn/imported/resynthesized frames. */
+  analysis?: WavemapFrameAnalysis;
 }
 
 export type WavemapKind = "harmonic-sketch" | "resynthesized";
 export type WavemapInterpolation = "linear" | "smooth";
+
+export interface WavemapFrameAnalysis {
+  sourceStartSample?: number;
+  sourceEndSample?: number;
+  rms: number;
+  peak: number;
+  zeroCrossRate: number;
+  roughness: number;
+  asymmetry: number;
+  spectralCentroid: number;
+  dominantHarmonic: number;
+  dominantPhase: number;
+}
 
 export interface WavemapSource {
   kind: "drawn" | "generated" | "imported-audio" | "resynthesized";
@@ -418,6 +433,11 @@ export interface WavemapSource {
   audioFileId?: Id;
   path?: string;
   sampleRate?: number;
+  channelCount?: number;
+  bitDepth?: number;
+  sourceSampleCount?: number;
+  analyzedSampleCount?: number;
+  frameCount?: number;
   sourceStartSample?: number;
   sourceEndSample?: number;
   createdAt?: number;

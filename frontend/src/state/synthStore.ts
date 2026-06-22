@@ -7,6 +7,7 @@ import type {
   SynthPatchSnapshot,
   SynthPatchMacroDefinition,
   TrackEffectChain,
+  WavemapFrameAnalysis,
   WavemapDefinition,
   WavemapSource,
   WavetableConfig,
@@ -277,6 +278,11 @@ export function createWavemapFromAudioSamples(
       audioFileId: source.audioFileId,
       path: source.path,
       sampleRate: Number.isFinite(sampleRate) && sampleRate > 0 ? sampleRate : undefined,
+      channelCount: source.channelCount,
+      bitDepth: source.bitDepth,
+      sourceSampleCount: source.sourceSampleCount ?? samples.length,
+      analyzedSampleCount: samples.length,
+      frameCount,
       sourceStartSample: source.sourceStartSample,
       sourceEndSample: source.sourceEndSample,
       createdAt: source.createdAt ?? Date.now(),
@@ -303,6 +309,7 @@ export function deriveWavemapFrameFromDrawnWaveform(
     focus: analyzed.focus,
     phase: analyzed.phase,
     partials: analyzed.partials,
+    analysis: analyzed.analysis,
   }, source);
 }
 
@@ -473,6 +480,7 @@ function analyzeSamplesToWavemapFrame(
   let sumAbs = 0;
   let derivative = 0;
   let zeroCrossings = 0;
+  let peak = 0;
   let positiveEnergy = 0;
   let negativeEnergy = 0;
   let previous = Number(samples[safeStart]) || 0;
@@ -481,6 +489,7 @@ function analyzeSamplesToWavemapFrame(
     sumSquares += sample * sample;
     sumAbs += Math.abs(sample);
     derivative += Math.abs(sample - previous);
+    peak = Math.max(peak, Math.abs(sample));
     if ((sample >= 0 && previous < 0) || (sample < 0 && previous >= 0)) zeroCrossings += 1;
     if (sample >= 0) positiveEnergy += sample * sample;
     else negativeEnergy += sample * sample;
@@ -495,6 +504,7 @@ function analyzeSamplesToWavemapFrame(
   const spectrum = analyzeSamplesToHarmonicSpectrum(samples, safeStart, safeEnd);
   const partials = spectrum.partials;
   const tilt = estimateSpectralTiltFromPartials(partials);
+  const spectralCentroid = estimateSpectralCentroidFromPartials(partials);
   return {
     id: `${wavemapId}.frame.${frameIndex + 1}`,
     label: CUSTOM_WAVETABLE_FRAME_LABELS[frameIndex] ?? `${frameIndex + 1}`,
@@ -509,6 +519,18 @@ function analyzeSamplesToWavemapFrame(
     focus: clamp01(0.18 + normalizedDerivative * 2.1 + Math.abs(tilt) * 0.24 + asymmetry * 0.18),
     phase: sanitizeBipolar(spectrum.dominantPhase / Math.PI, 0),
     partials,
+    analysis: {
+      sourceStartSample: safeStart,
+      sourceEndSample: safeEnd,
+      rms,
+      peak,
+      zeroCrossRate,
+      roughness: normalizedDerivative,
+      asymmetry,
+      spectralCentroid,
+      dominantHarmonic: spectrum.dominantHarmonic,
+      dominantPhase: spectrum.dominantPhase,
+    },
   };
 }
 
@@ -516,6 +538,17 @@ function estimateSpectralTiltFromPartials(partials: number[]): number {
   const low = partials.slice(0, 4).reduce((sum, value) => sum + clamp01(value), 0);
   const high = partials.slice(8, 16).reduce((sum, value) => sum + clamp01(value), 0);
   return sanitizeBipolar((high - low) / Math.max(0.001, high + low), 0);
+}
+
+function estimateSpectralCentroidFromPartials(partials: number[]): number {
+  let weighted = 0;
+  let total = 0;
+  for (let index = 0; index < partials.length; index += 1) {
+    const value = clamp01(partials[index]);
+    weighted += value * (index + 1);
+    total += value;
+  }
+  return total > 0 ? weighted / total : 0;
 }
 
 function analyzeSamplesToHarmonicSpectrum(samples: ArrayLike<number>, start: number, end: number): {
@@ -1632,6 +1665,8 @@ function sanitizeCustomWavetableFrame(
     phase: sanitizeBipolar(source.phase, fallback.phase),
   };
   if (partials) next.partials = partials;
+  const analysis = sanitizeWavemapFrameAnalysis(source.analysis, fallback.analysis);
+  if (analysis) next.analysis = analysis;
   return next;
 }
 
@@ -1657,6 +1692,16 @@ function sanitizeWavemapSource(value: unknown, fallback: WavemapSource): Wavemap
   else if (fallback.path) next.path = fallback.path;
   if (typeof source.sampleRate === "number" && Number.isFinite(source.sampleRate) && source.sampleRate > 0) next.sampleRate = source.sampleRate;
   else if (fallback.sampleRate) next.sampleRate = fallback.sampleRate;
+  if (typeof source.channelCount === "number" && Number.isFinite(source.channelCount) && source.channelCount > 0) next.channelCount = Math.floor(source.channelCount);
+  else if (fallback.channelCount) next.channelCount = fallback.channelCount;
+  if (typeof source.bitDepth === "number" && Number.isFinite(source.bitDepth) && source.bitDepth > 0) next.bitDepth = Math.floor(source.bitDepth);
+  else if (fallback.bitDepth) next.bitDepth = fallback.bitDepth;
+  if (typeof source.sourceSampleCount === "number" && Number.isFinite(source.sourceSampleCount) && source.sourceSampleCount >= 0) next.sourceSampleCount = Math.floor(source.sourceSampleCount);
+  else if (fallback.sourceSampleCount != null) next.sourceSampleCount = fallback.sourceSampleCount;
+  if (typeof source.analyzedSampleCount === "number" && Number.isFinite(source.analyzedSampleCount) && source.analyzedSampleCount >= 0) next.analyzedSampleCount = Math.floor(source.analyzedSampleCount);
+  else if (fallback.analyzedSampleCount != null) next.analyzedSampleCount = fallback.analyzedSampleCount;
+  if (typeof source.frameCount === "number" && Number.isFinite(source.frameCount) && source.frameCount > 0) next.frameCount = Math.floor(source.frameCount);
+  else if (fallback.frameCount) next.frameCount = fallback.frameCount;
   if (typeof source.sourceStartSample === "number" && Number.isFinite(source.sourceStartSample)) next.sourceStartSample = Math.max(0, Math.floor(source.sourceStartSample));
   else if (fallback.sourceStartSample != null) next.sourceStartSample = fallback.sourceStartSample;
   if (typeof source.sourceEndSample === "number" && Number.isFinite(source.sourceEndSample)) next.sourceEndSample = Math.max(0, Math.floor(source.sourceEndSample));
@@ -1664,6 +1709,35 @@ function sanitizeWavemapSource(value: unknown, fallback: WavemapSource): Wavemap
   if (typeof source.createdAt === "number" && Number.isFinite(source.createdAt) && source.createdAt > 0) next.createdAt = source.createdAt;
   else if (fallback.createdAt) next.createdAt = fallback.createdAt;
   return next;
+}
+
+function sanitizeWavemapFrameAnalysis(value: unknown, fallback?: WavemapFrameAnalysis): WavemapFrameAnalysis | undefined {
+  const source = isRecord(value) ? value : {};
+  if (!isRecord(value) && !fallback) return undefined;
+  const next: WavemapFrameAnalysis = {
+    rms: sanitize01(source.rms, fallback?.rms ?? 0),
+    peak: sanitize01(source.peak, fallback?.peak ?? 0),
+    zeroCrossRate: sanitize01(source.zeroCrossRate, fallback?.zeroCrossRate ?? 0),
+    roughness: sanitize01(source.roughness, fallback?.roughness ?? 0),
+    asymmetry: sanitize01(source.asymmetry, fallback?.asymmetry ?? 0),
+    spectralCentroid: sanitizeFinite(source.spectralCentroid, fallback?.spectralCentroid ?? 0, 0, 128),
+    dominantHarmonic: Math.max(0, Math.min(128, Math.round(sanitizeFinite(source.dominantHarmonic, fallback?.dominantHarmonic ?? 0, 0, 128)))),
+    dominantPhase: sanitizeFinite(source.dominantPhase, fallback?.dominantPhase ?? 0, -Math.PI, Math.PI),
+  };
+  if (typeof source.sourceStartSample === "number" && Number.isFinite(source.sourceStartSample))
+    next.sourceStartSample = Math.max(0, Math.floor(source.sourceStartSample));
+  else if (fallback?.sourceStartSample != null)
+    next.sourceStartSample = fallback.sourceStartSample;
+  if (typeof source.sourceEndSample === "number" && Number.isFinite(source.sourceEndSample))
+    next.sourceEndSample = Math.max(0, Math.floor(source.sourceEndSample));
+  else if (fallback?.sourceEndSample != null)
+    next.sourceEndSample = fallback.sourceEndSample;
+  return next;
+}
+
+function sanitizeFinite(value: unknown, fallback: number, min: number, max: number): number {
+  const number = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  return Math.max(min, Math.min(max, number));
 }
 
 function sanitizeCustomWavetableFramePatch(value: Partial<CustomWavetableFrame>): Partial<CustomWavetableFrame> {
@@ -1693,6 +1767,8 @@ function sanitizeCustomWavetableFramePatch(value: Partial<CustomWavetableFrame>)
     next.phase = sanitizeBipolar(source.phase, 0);
   if (Object.prototype.hasOwnProperty.call(source, "partials"))
     next.partials = sanitizeCustomWavetablePartials(source.partials) ?? [];
+  if (Object.prototype.hasOwnProperty.call(source, "analysis"))
+    next.analysis = sanitizeWavemapFrameAnalysis(source.analysis);
   return next;
 }
 

@@ -25,7 +25,8 @@ Status legend:
    - Add richer draw modes beyond mini-waveform and partial lanes.
    - Clarify frame editing constraints.
    - Add additive-vs-freehand editing tools.
-   - Add deterministic resynthesis fixtures with stable source metadata.
+   - `[x]` Add deterministic browser/native source metadata and frame-analysis fixtures.
+   - `[ ]` Add transient/frame selection controls for imported audio.
 3. `[ ]` Visible Aether automation lanes.
    - Add lanes for pitch, level, phase, filter, wavetable position, and macro targets.
    - Cover track, segment, and piano-roll note automation entrypoints.

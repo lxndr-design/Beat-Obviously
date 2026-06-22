@@ -44,7 +44,8 @@ Status legend:
   - Remaining: richer draw modes beyond the current mini-waveform/partial lanes, clearer frame editing constraints, and intentional tools for additive-vs-freehand editing.
   - Proof: browser preview differences, native table generation differences, patch persistence, verifier snapshots, and backend stress for cache identity.
 - `[~]` Richer FFT/resynthesis analysis.
-  - Remaining: more informative analysis controls, better transient/frame selection, and source metadata that explains how a wavemap was derived.
+  - Done: deterministic browser/native source provenance fields and per-frame RMS/peak/zero-cross/roughness/asymmetry/centroid/dominant-harmonic analysis metadata.
+  - Remaining: more informative analysis controls and better transient/frame selection.
   - Proof: deterministic fixture import that produces stable frame metadata and audible/rendered differences.
 - `[ ]` Wavemap preset/version migration.
   - Add explicit migration for older wavemap schema versions once the current editing semantics settle.
@@ -99,6 +100,6 @@ Status legend:
 ## Near-Term Slice Order
 
 1. Add an instrument FX rack UI backed by existing instrument-owned FX rendering.
-2. Tighten wavemap drawing/resynthesis semantics and add deterministic fixtures.
+2. Tighten wavemap drawing/resynthesis editing semantics beyond deterministic source/frame analysis metadata.
 3. Add visible note/segment automation lanes for the Aether targets.
 4. Add Aether preset storage, Save As preset flow, and migration fixtures.

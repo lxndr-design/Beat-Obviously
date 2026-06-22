@@ -869,11 +869,16 @@ try {
   assert.ok(drawnWaveformFrame.partials[2] > 0.9, "drawn waveform should derive the dominant third harmonic");
   assert.ok(drawnWaveformFrame.partials[0] < 0.2, "drawn waveform should not collapse into the fundamental");
   assert.ok(drawnWaveformFrame.formant > 0.08, "drawn waveform should update frame spectral controls");
+  assert.equal(drawnWaveformFrame.analysis.dominantHarmonic, 3);
+  assert.ok(drawnWaveformFrame.analysis.rms > 0.6, "drawn waveform should persist frame RMS analysis");
+  assert.ok(drawnWaveformFrame.analysis.peak > 0.9, "drawn waveform should persist frame peak analysis");
+  assert.ok(drawnWaveformFrame.analysis.spectralCentroid > 2.5, "drawn waveform should persist spectral centroid analysis");
   const phaseShiftedFrame = synthStore.deriveWavemapFrameFromDrawnWaveform(
     { id: "user.custom.frame.phase", label: "Phase", position: 0.25, brightness: 0.2, even: 0.1, fold: 0.05, formant: 0.08, notch: 0.04, skew: 0, tilt: 0, focus: 0.2, phase: 0 },
     Float32Array.from({ length: 256 }, (_, index) => Math.sin((index / 256) * Math.PI * 2 * 3 + Math.PI / 2)),
   );
   assert.ok(phaseShiftedFrame.partials[2] > 0.9, "phase-shifted drawn waveform should keep the same dominant harmonic");
+  assert.equal(phaseShiftedFrame.analysis.dominantHarmonic, 3);
   assert.ok(Math.abs(phaseShiftedFrame.phase - drawnWaveformFrame.phase) > 0.32, "drawn waveform phase should track dominant harmonic phase");
 
   const resynthSamples = Float32Array.from({ length: 4096 }, (_, index) => {
@@ -885,15 +890,24 @@ try {
     "Verifier Resynth",
     resynthSamples,
     48000,
-    { kind: "imported-audio", label: "Verifier Audio", path: "/tmp/verifier.wav", sourceStartSample: 10, sourceEndSample: 4000 },
+    { kind: "imported-audio", label: "Verifier Audio", path: "/tmp/verifier.wav", sampleRate: 48000, channelCount: 2, bitDepth: 24, sourceSampleCount: 4096, sourceStartSample: 10, sourceEndSample: 4000 },
   );
   assert.equal(resynthWavemap.kind, "resynthesized");
   assert.equal(resynthWavemap.interpolation, "smooth");
   assert.equal(resynthWavemap.source.kind, "imported-audio");
   assert.equal(resynthWavemap.source.path, "/tmp/verifier.wav");
+  assert.equal(resynthWavemap.source.sampleRate, 48000);
+  assert.equal(resynthWavemap.source.channelCount, 2);
+  assert.equal(resynthWavemap.source.bitDepth, 24);
+  assert.equal(resynthWavemap.source.sourceSampleCount, 4096);
+  assert.equal(resynthWavemap.source.analyzedSampleCount, 4096);
+  assert.equal(resynthWavemap.source.frameCount, 4);
   assert.equal(resynthWavemap.frames.length, 4);
   assert.equal(resynthWavemap.frames.every((frame) => frame.id?.startsWith("user.resynth.verify.frame.")), true);
   assert.equal(resynthWavemap.frames.every((frame) => Array.isArray(frame.partials) && frame.partials.length === 16), true);
+  assert.equal(resynthWavemap.frames.every((frame) => frame.analysis && frame.analysis.sourceEndSample > frame.analysis.sourceStartSample), true);
+  assert.equal(resynthWavemap.frames.every((frame) => frame.analysis && frame.analysis.peak > 0 && frame.analysis.rms > 0), true);
+  assert.ok(resynthWavemap.frames.some((frame) => frame.analysis.dominantHarmonic >= 1), "expected resynthesis to persist dominant harmonic analysis");
   assert.ok(
     resynthWavemap.frames.some((frame) => Math.max(...frame.partials) > 0.9 && frame.partials.some((partial) => partial > 0.15)),
     "expected resynthesis to populate harmonic partial bins",
@@ -975,6 +989,8 @@ try {
   const resynthPatch = synthStore.synthDraftToInstrumentPatch(resynthDraft);
   assert.equal(resynthPatch.wavetable.customId, "user.resynth.verify");
   assert.equal(resynthPatch.synthPatch.metadata.wavemaps["user.resynth.verify"].source.label, "Verifier Audio");
+  assert.equal(resynthPatch.synthPatch.metadata.wavemaps["user.resynth.verify"].source.sourceSampleCount, 4096);
+  assert.equal(resynthPatch.synthPatch.metadata.wavemaps["user.resynth.verify"].frames[0].analysis.dominantHarmonic >= 1, true);
   const resynthPreview = synthStore.synthDraftToPreviewInstrument(resynthDraft);
   const resynthRendered = new Float32Array(16000);
   synthPreview.renderInstrumentSamples(resynthPreview, resynthRendered, 48000, synthPreview.previewFrequency(resynthPreview), "audio", true);

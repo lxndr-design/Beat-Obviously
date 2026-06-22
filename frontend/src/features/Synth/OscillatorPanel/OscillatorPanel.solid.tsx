@@ -264,6 +264,7 @@ function OscillatorRow(props: {
                   <div class="ds-section-title">{customTable().name} Wavemap</div>
                   <div class={styles.wavemapMeta}>
                     <span>{customTable().source.label ?? sourceLabel(customTable().source.kind)}</span>
+                    <span class={styles.wavemapMetaWide}>{sourceAnalysisLabel(customTable())}</span>
                     <Knob
                       size="sm"
                       label="Morph"
@@ -325,6 +326,7 @@ function OscillatorRow(props: {
                             updateCustomWavetableFrame(customTable().id, index(), deriveWavemapFrameFromDrawnWaveform(frame, samples))
                           }
                         />
+                        <div class={styles.frameAnalysis}>{frameAnalysisLabel(frame)}</div>
                         <Knob
                           size="sm"
                           label="Scan"
@@ -647,6 +649,35 @@ function sourceLabel(kind: string): string {
   if (kind === "imported-audio") return "Audio import";
   if (kind === "generated") return "Generated";
   return "Drawn";
+}
+
+function sourceAnalysisLabel(table: WavemapDefinition): string {
+  const source = table.source;
+  const parts = [
+    source.sampleRate ? `${Math.round(source.sampleRate / 100) / 10} kHz` : "",
+    source.channelCount ? `${source.channelCount} ch` : "",
+    source.bitDepth ? `${source.bitDepth} bit` : "",
+    formatSamples(source.analyzedSampleCount ?? source.sourceSampleCount),
+    source.frameCount ? `${source.frameCount} frames` : `${table.frames.length} frames`,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : sourceLabel(source.kind);
+}
+
+function frameAnalysisLabel(frame: CustomWavetableFrame): string {
+  const analysis = frame.analysis;
+  if (!analysis) return "Analysis pending";
+  const harmonic = analysis.dominantHarmonic > 0 ? `H${Math.round(analysis.dominantHarmonic)}` : "H-";
+  const rms = Math.round(analysis.rms * 100);
+  const peak = Math.round(analysis.peak * 100);
+  const centroid = analysis.spectralCentroid > 0 ? `C${analysis.spectralCentroid.toFixed(1)}` : "C-";
+  return `${harmonic} · ${centroid} · RMS ${rms} · PK ${peak}`;
+}
+
+function formatSamples(count?: number): string {
+  if (!Number.isFinite(count) || !count) return "";
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M smp`;
+  if (count >= 1_000) return `${Math.round(count / 100) / 10}k smp`;
+  return `${Math.round(count)} smp`;
 }
 
 function renderCustomFramePreview(frame: CustomWavetableFrame, sampleCount = 96): number[] {
