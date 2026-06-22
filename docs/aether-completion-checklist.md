@@ -48,9 +48,9 @@ Status legend:
   - Remaining: visual/manual range picker polish and deeper analysis display controls.
   - Proof: deterministic fixture import that produces stable frame metadata and audible/rendered differences.
 - `[~]` Wavemap preset/version migration.
-  - Done: JS synth verifier covers mixed-era wavemap metadata migration, including legacy-only `customWavetables`, modern `wavemaps` precedence for duplicate IDs, schema/default backfill, source sanitization, frame completion, and alias mirroring.
-  - Remaining: native repository roundtrip for old and current wavemap shapes, plus document-level fixture coverage once old preset storage fixtures are formalized.
-  - Proof: JS synth verifier covers mixed-era old/current wavemap shape normalization; native repository proof still needed.
+  - Done: JS synth verifier covers mixed-era wavemap metadata migration, including legacy-only `customWavetables`, modern `wavemaps` precedence for duplicate IDs, schema/default backfill, source sanitization, frame completion, and alias mirroring; native synth-contract stress covers the same mixed-era old/current map merge for Aether oscillator custom frames.
+  - Remaining: document-level fixture coverage once old preset storage fixtures are formalized.
+  - Proof: JS synth verifier covers mixed-era old/current wavemap shape normalization; `BeatBackendStress` covers native old/current map merge and current repository roundtrip for Aether wavemap frame controls.
 
 ## 4. Envelopes, LFOs, And Performance Controls
 
@@ -98,8 +98,8 @@ Status legend:
 - `[ ]` Null-test style live/offline comparisons where deterministic output is expected.
 - `[ ]` Browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, and note automation lanes.
 - `[~]` Preset migration fixtures once Aether preset storage is formalized.
-  - Done: JS synth verifier covers mixed-era wavemap metadata migration and legacy Aether/FX preset record normalization.
-  - Remaining: browser-level preset-flow smoke plus native/document fixtures for older wavemap preset records.
+  - Done: JS synth verifier covers mixed-era wavemap metadata migration and legacy Aether/FX preset record normalization; backend stress covers native mixed-era wavemap map merging.
+  - Remaining: browser-level preset-flow smoke plus document fixtures for older wavemap preset records.
 
 ## Near-Term Slice Order
 

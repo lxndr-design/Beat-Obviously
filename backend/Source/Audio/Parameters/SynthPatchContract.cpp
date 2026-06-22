@@ -20,6 +20,21 @@ namespace beat
             return fallback;
         }
 
+        void copyObjectProperties(juce::DynamicObject& target, const juce::var& source)
+        {
+            if (auto* dyn = source.getDynamicObject())
+                for (const auto& pair : dyn->getProperties())
+                    target.setProperty(pair.name, pair.value);
+        }
+
+        juce::var mergedWavemapMetadata(const juce::var& metadata)
+        {
+            auto* merged = new juce::DynamicObject();
+            copyObjectProperties(*merged, objectProperty(metadata, "customWavetables", {}));
+            copyObjectProperties(*merged, objectProperty(metadata, "wavemaps", {}));
+            return juce::var(merged);
+        }
+
         double synthNumberParam(const juce::var& params, const juce::String& id, double fallback)
         {
             const auto value = objectProperty(params, id, fallback);
@@ -334,9 +349,7 @@ namespace beat
         if (!params.isObject()) return false;
         const auto modulation = objectProperty(patch, "modulation", {});
         const auto metadata = objectProperty(patch, "metadata", {});
-        auto customWavetables = objectProperty(metadata, "wavemaps", {});
-        if (!customWavetables.isObject())
-            customWavetables = objectProperty(metadata, "customWavetables", {});
+        const auto customWavetables = mergedWavemapMetadata(metadata);
 
         instrument.kind = "wavetable";
         instrument.waveform = 5;

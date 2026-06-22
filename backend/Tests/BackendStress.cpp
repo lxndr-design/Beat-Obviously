@@ -10140,6 +10140,76 @@ namespace
         if (!near(customInstrument.aether.oscA.wavetable.customFrames[2].phase, -0.16f))
             return false;
 
+        const auto mixedEraWavemapPatch = juce::JSON::parse(R"json(
+        {
+          "schemaVersion": 1,
+          "instrumentType": "wavetable-synth",
+          "parameters": {
+            "osc.a.enabled": true,
+            "osc.a.wavetable": "user.modern",
+            "osc.a.position": 0.35,
+            "osc.a.level": 0.78,
+            "osc.b.enabled": true,
+            "osc.b.wavetable": "user.legacy-only",
+            "osc.b.position": 0.66,
+            "osc.b.level": 0.5,
+            "filter.enabled": true,
+            "amp.level": 0.72
+          },
+          "modulation": [],
+          "metadata": {
+            "wavemaps": {
+              "user.modern": {
+                "id": "user.modern",
+                "name": "Modern Current",
+                "interpolation": "smooth",
+                "morph": 0.22,
+                "frames": [
+                  { "brightness": 0.41, "even": 0.18, "fold": 0.66, "formant": 0.24, "notch": 0.11, "skew": 0.25, "tilt": 0.15, "focus": 0.44, "phase": 0.18, "partials": [0.1, 0.2, 0.3, 0.4] }
+                ]
+              }
+            },
+            "customWavetables": {
+              "user.modern": {
+                "name": "Stale Legacy Copy",
+                "frames": [
+                  { "brightness": 0.02, "fold": 0.03, "formant": 0.04 }
+                ]
+              },
+              "user.legacy-only": {
+                "id": "user.legacy-only",
+                "name": "Legacy Only",
+                "interpolation": "smooth",
+                "morph": 0.77,
+                "frames": [
+                  { "brightness": 0.82, "even": 0.21, "fold": 0.17, "formant": 0.69, "notch": 0.27, "skew": -0.42, "tilt": -0.19, "focus": 0.58, "phase": -0.31, "partials": [0.9, 0.7, 0.5] }
+                ]
+              }
+            }
+          }
+        }
+        )json");
+
+        beat::InstrumentDefinition mixedEraInstrument;
+        if (!beat::applySynthPatchContract(mixedEraWavemapPatch, mixedEraInstrument))
+            return false;
+        if (!mixedEraInstrument.aether.oscA.wavetable.custom || !mixedEraInstrument.aether.oscB.wavetable.custom)
+            return false;
+        if (!near(mixedEraInstrument.aether.oscA.wavetable.customFrames[0].fold, 0.66f))
+            return false;
+        if (!near(mixedEraInstrument.aether.oscA.wavetable.customFrames[0].formant, 0.24f))
+            return false;
+        if (!near(mixedEraInstrument.aether.oscA.wavetable.morph, 0.22f))
+            return false;
+        if (!near(mixedEraInstrument.aether.oscB.wavetable.customFrames[0].formant, 0.69f))
+            return false;
+        if (!near(mixedEraInstrument.aether.oscB.wavetable.customFrames[0].notch, 0.27f))
+            return false;
+        if (!near(mixedEraInstrument.aether.oscB.wavetable.customFrames[0].partials[1], 0.7f))
+            return false;
+        if (!near(mixedEraInstrument.aether.oscB.wavetable.morph, 0.77f))
+            return false;
+
         const auto macroPatch = juce::JSON::parse(R"json(
         {
           "instrumentType": "wavetable-synth",
