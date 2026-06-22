@@ -12,14 +12,6 @@
 
 namespace beat
 {
-    namespace
-    {
-        float clamp01(float v)
-        {
-            return juce::jlimit(0.0f, 1.0f, v);
-        }
-    }
-
     void InstrumentVoice::setPendingNoteAutomationContexts(NoteAutomationContext* contexts, int count) noexcept
     {
         VoiceAutomationInbox::setPending(contexts, count);
@@ -260,7 +252,7 @@ namespace beat
 
     bool InstrumentVoice::setRealtimeParameterValue(std::string_view parameterId, float value, int rampSamples, bool updateBaseline) noexcept
     {
-        const auto normalized = clamp01(value);
+        const auto normalized = VoiceMath::clamp01(value);
         const int index = realtimeParamIndexForId(parameterId);
         if (index < 0)
             return false;
@@ -310,27 +302,27 @@ namespace beat
         switch (param)
         {
             case RealtimeParam::FilterCutoff:
-                target.cutoff01 = clamp01(value);
+                target.cutoff01 = VoiceMath::clamp01(value);
                 break;
             case RealtimeParam::FilterResonance:
-                target.resonance01 = clamp01(value);
+                target.resonance01 = VoiceMath::clamp01(value);
                 break;
             case RealtimeParam::FilterDrive:
-                target.drive01 = clamp01(value);
+                target.drive01 = VoiceMath::clamp01(value);
                 break;
             case RealtimeParam::AmpLevel:
-                target.ampLevel = clamp01(value);
+                target.ampLevel = VoiceMath::clamp01(value);
                 break;
             case RealtimeParam::AmpPan:
                 target.ampPan = juce::jlimit(-1.0f, 1.0f, value);
                 break;
             case RealtimeParam::OscAPosition:
-                target.wavetablePosition = clamp01(value);
+                target.wavetablePosition = VoiceMath::clamp01(value);
                 target.wavetable.position = target.wavetablePosition;
                 target.aetherOscA.wavetable.position = target.wavetablePosition;
                 break;
             case RealtimeParam::OscBPosition:
-                target.aetherOscB.wavetable.position = clamp01(value);
+                target.aetherOscB.wavetable.position = VoiceMath::clamp01(value);
                 break;
             case RealtimeParam::OscAFine:
                 target.aetherOscA.fineCents = juce::jlimit(-100.0f, 100.0f, value);
@@ -339,10 +331,10 @@ namespace beat
                 target.aetherOscB.fineCents = juce::jlimit(-100.0f, 100.0f, value);
                 break;
             case RealtimeParam::OscALevel:
-                target.aetherOscA.level = clamp01(value);
+                target.aetherOscA.level = VoiceMath::clamp01(value);
                 break;
             case RealtimeParam::OscBLevel:
-                target.aetherOscB.level = clamp01(value);
+                target.aetherOscB.level = VoiceMath::clamp01(value);
                 break;
             case RealtimeParam::OscAPan:
                 target.aetherOscA.pan = juce::jlimit(-1.0f, 1.0f, value);
@@ -357,7 +349,7 @@ namespace beat
                 target.aetherOscB.wavetable.detuneCents = target.wavetableDetuneCents;
                 break;
             case RealtimeParam::UnisonSpread:
-                target.wavetableBlend = clamp01(value);
+                target.wavetableBlend = VoiceMath::clamp01(value);
                 target.wavetable.blend = target.wavetableBlend;
                 target.aetherOscA.wavetable.blend = target.wavetableBlend;
                 target.aetherOscB.wavetable.blend = target.wavetableBlend;
@@ -366,7 +358,7 @@ namespace beat
                 target.lfoRateHz = juce::jlimit(0.01f, 50.0f, value);
                 break;
             case RealtimeParam::LfoDepth:
-                target.lfoDepth = clamp01(value);
+                target.lfoDepth = VoiceMath::clamp01(value);
                 break;
             case RealtimeParam::Count:
                 break;
@@ -637,7 +629,7 @@ namespace beat
             const float rawLfo2 = needsLfo2Value ? Lfo::value(params.lfo2Waveform, lfo2Phase, params.lfo2Smoothing, params.lfo2OneShot) : 0.0f;
             if (needsLfoValue || useDynamicModulation)
                 ++modulationSamples;
-            const float positionLfo = hasPositionMod ? Lfo::routeValue(rawLfo, params.lfoPositionBipolar) * clamp01(params.lfoDepth) : 0.0f;
+            const float positionLfo = hasPositionMod ? Lfo::routeValue(rawLfo, params.lfoPositionBipolar) * VoiceMath::clamp01(params.lfoDepth) : 0.0f;
             const float pitchLfo = hasPitchMod ? Lfo::routeValue(rawLfo, params.lfoPitchBipolar) : 0.0f;
             const float filterLfo = !useDynamicModulation && hasFilterMod ? Lfo::routeValue(rawLfo, params.lfoFilterBipolar) : 0.0f;
             const float env = params.env1Loop
@@ -696,7 +688,7 @@ namespace beat
             float right = raw.right;
 
             // Drive (soft clipping)
-            const float drive = clamp01(params.drive01 + (useDynamicModulation && cachedDynamicTargets.filterDrive
+            const float drive = VoiceMath::clamp01(params.drive01 + (useDynamicModulation && cachedDynamicTargets.filterDrive
                 ? DynamicModulation::targetOffset(params.dynamicModulation.filterDrive, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f)
                 : 0.0f));
             if (drive > 0.0001f)
@@ -727,7 +719,7 @@ namespace beat
                 currentBlockFilterCoefficientUpdates += cutoffUpdates;
                 if (useDynamicModulation && cachedDynamicTargets.filterResonance)
                 {
-                    const float resonance = clamp01(params.resonance01
+                    const float resonance = VoiceMath::clamp01(params.resonance01
                         + DynamicModulation::targetOffset(params.dynamicModulation.filterResonance, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f));
                     const int resonanceUpdates = filterState.updateResonanceIfChanged(resonance, 0.001f);
                     currentBlockFilterResonanceUpdates += resonanceUpdates;
@@ -738,7 +730,7 @@ namespace beat
             left = filtered.left;
             right = filtered.right;
 
-            const float ampLevel = clamp01(params.ampLevel + (useDynamicModulation && cachedDynamicTargets.ampLevel
+            const float ampLevel = VoiceMath::clamp01(params.ampLevel + (useDynamicModulation && cachedDynamicTargets.ampLevel
                 ? DynamicModulation::targetOffset(params.dynamicModulation.ampLevel, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f)
                 : 0.0f));
             const float ampPan = hasAmpPanMod
@@ -842,8 +834,8 @@ namespace beat
     {
         const int unison = juce::jlimit(1, 8, config.unison);
         const float detuneCents = juce::jlimit(0.0f, 100.0f, config.detuneCents);
-        const float blend = clamp01(config.blend);
-        const float position = clamp01(config.position);
+        const float blend = VoiceMath::clamp01(config.blend);
+        const float position = VoiceMath::clamp01(config.position);
 
         for (int voice = 0; voice < (int) oscillators.size(); ++voice)
         {
@@ -941,7 +933,7 @@ namespace beat
     {
         const int unison = juce::jlimit(1, 8, config.unison);
         const float rawDetuneCents = juce::jlimit(0.0f, 100.0f, config.detuneCents + detuneCentsMod);
-        const float rawSpread = clamp01(config.blend + spreadMod);
+        const float rawSpread = VoiceMath::clamp01(config.blend + spreadMod);
         const float detuneCents = std::round(rawDetuneCents * 10.0f) * 0.1f;
         const float spread = std::round(rawSpread * 512.0f) / 512.0f;
 
@@ -1020,7 +1012,7 @@ namespace beat
 
         const auto add = [&](float value, float level, float pan, std::pair<float, float> staticPanGains, bool panIsDynamic)
         {
-            const float safeLevel = clamp01(level);
+            const float safeLevel = VoiceMath::clamp01(level);
             const auto [leftGain, rightGain] = panIsDynamic ? VoiceMath::equalPowerPanGains(pan) : staticPanGains;
             leftSum += value * safeLevel * leftGain;
             rightSum += value * safeLevel * rightGain;
@@ -1043,7 +1035,7 @@ namespace beat
             double phaseOffset,
             int64_t& componentSampleCounter)
         {
-            const float modulatedLevel = clamp01(osc.level + (useDynamicModulation && levelIsDynamic
+            const float modulatedLevel = VoiceMath::clamp01(osc.level + (useDynamicModulation && levelIsDynamic
                 ? DynamicModulation::targetOffset(levelTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, 1.0f)
                 : 0.0f));
             if (!osc.enabled || modulatedLevel <= 0.0f)
@@ -1141,7 +1133,7 @@ namespace beat
             ++currentBlockOscillatorSamples;
             ++currentBlockAetherNoiseSamples;
             const float noise = VoiceMath::nextNoise(noiseState);
-            add(noise * (0.35f + clamp01(params.aetherNoise.color) * 0.65f), params.aetherNoise.level, 0.0f, VoiceMath::centerPanGains, false);
+            add(noise * (0.35f + VoiceMath::clamp01(params.aetherNoise.color) * 0.65f), params.aetherNoise.level, 0.0f, VoiceMath::centerPanGains, false);
         }
 
         if (levelSum <= 0.0f)

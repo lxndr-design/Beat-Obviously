@@ -9,6 +9,11 @@ namespace beat::VoiceMath
 {
     inline constexpr std::pair<float, float> centerPanGains { 0.70710678f, 0.70710678f };
 
+    inline float clamp01(float value) noexcept
+    {
+        return juce::jlimit(0.0f, 1.0f, value);
+    }
+
     inline float pitchWheelRatio(int value) noexcept
     {
         const auto clamped = juce::jlimit(0, 16383, value);
@@ -55,7 +60,7 @@ namespace beat::VoiceMath
 
     inline float quantizeWavetablePosition(float position) noexcept
     {
-        return std::round(juce::jlimit(0.0f, 1.0f, position) * 4096.0f) / 4096.0f;
+        return std::round(clamp01(position) * 4096.0f) / 4096.0f;
     }
 
     inline double quantizeWavetableFrequency(double frequencyHz) noexcept
