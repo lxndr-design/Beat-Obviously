@@ -6,6 +6,7 @@
 #include "Oscillator/VoiceMath.h"
 #include "Oscillator/VoiceRenderStats.h"
 #include "Realtime/VoiceAutomationInbox.h"
+#include "Wavetable/WavetableOscillatorBank.h"
 #include "Wavetable/WavetableVoiceCache.h"
 
 #include <cmath>
@@ -64,36 +65,36 @@ namespace beat
         {
             activeWavetableUnison = juce::jlimit(1, 8, params.wavetable.unison);
             wavetableTable = WavetableVoiceCache::sharedTableForConfig(params.wavetable);
-            configureWavetableOscillatorBank(wavetableOscillators, wavetableTable.get(), params.wavetable, baseFrequencyHz);
+            WavetableOscillatorBank::configure(wavetableOscillators, wavetableTable.get(), params.wavetable, sampleRate, baseFrequencyHz);
             WavetableUnison::invalidate(wavetableUnisonPlan);
         }
         else
         {
             activeWavetableUnison = 1;
             wavetableTable.reset();
-            clearWavetableOscillatorBank(wavetableOscillators, wavetableUnisonPlan);
+            WavetableOscillatorBank::clear(wavetableOscillators, wavetableUnisonPlan);
         }
 
         if (aetherOscillatorNeedsWavetable(params.aetherOscA))
         {
             aetherTableA = WavetableVoiceCache::sharedTableForConfig(params.aetherOscA.wavetable);
-            configureWavetableOscillatorBank(aetherOscillatorsA, aetherTableA.get(), params.aetherOscA.wavetable, baseFrequencyHz);
+            WavetableOscillatorBank::configure(aetherOscillatorsA, aetherTableA.get(), params.aetherOscA.wavetable, sampleRate, baseFrequencyHz);
         }
         else
         {
             aetherTableA.reset();
-            clearWavetableOscillatorBank(aetherOscillatorsA, aetherUnisonPlanA);
+            WavetableOscillatorBank::clear(aetherOscillatorsA, aetherUnisonPlanA);
         }
 
         if (aetherOscillatorNeedsWavetable(params.aetherOscB))
         {
             aetherTableB = WavetableVoiceCache::sharedTableForConfig(params.aetherOscB.wavetable);
-            configureWavetableOscillatorBank(aetherOscillatorsB, aetherTableB.get(), params.aetherOscB.wavetable, baseFrequencyHz);
+            WavetableOscillatorBank::configure(aetherOscillatorsB, aetherTableB.get(), params.aetherOscB.wavetable, sampleRate, baseFrequencyHz);
         }
         else
         {
             aetherTableB.reset();
-            clearWavetableOscillatorBank(aetherOscillatorsB, aetherUnisonPlanB);
+            WavetableOscillatorBank::clear(aetherOscillatorsB, aetherUnisonPlanB);
         }
         adsrParams.attack  = juce::jmax(0.001f, p.attackMs  * 0.001f);
         adsrParams.decay   = juce::jmax(0.001f, p.decayMs   * 0.001f);
@@ -456,24 +457,24 @@ namespace beat
         if (legacyWavetableNeedsSetup())
             configureWavetableOscillators(baseFrequencyHz);
         else
-            clearWavetableOscillatorBank(wavetableOscillators, wavetableUnisonPlan);
+            WavetableOscillatorBank::clear(wavetableOscillators, wavetableUnisonPlan);
         if (aetherOscillatorNeedsWavetable(params.aetherOscA))
         {
-            configureWavetableOscillatorBank(aetherOscillatorsA, aetherTableA.get(), params.aetherOscA.wavetable, baseFrequencyHz);
+            WavetableOscillatorBank::configure(aetherOscillatorsA, aetherTableA.get(), params.aetherOscA.wavetable, sampleRate, baseFrequencyHz);
             for (auto& osc : aetherOscillatorsA)
                 osc.setPhase(aetherOscAPhaseOffset);
         }
         else
-            clearWavetableOscillatorBank(aetherOscillatorsA, aetherUnisonPlanA);
+            WavetableOscillatorBank::clear(aetherOscillatorsA, aetherUnisonPlanA);
 
         if (aetherOscillatorNeedsWavetable(params.aetherOscB))
         {
-            configureWavetableOscillatorBank(aetherOscillatorsB, aetherTableB.get(), params.aetherOscB.wavetable, baseFrequencyHz);
+            WavetableOscillatorBank::configure(aetherOscillatorsB, aetherTableB.get(), params.aetherOscB.wavetable, sampleRate, baseFrequencyHz);
             for (auto& osc : aetherOscillatorsB)
                 osc.setPhase(aetherOscBPhaseOffset);
         }
         else
-            clearWavetableOscillatorBank(aetherOscillatorsB, aetherUnisonPlanB);
+            WavetableOscillatorBank::clear(aetherOscillatorsB, aetherUnisonPlanB);
         refreshCachedPitchRates();
         loadPendingNoteAutomation(midiNoteNumber);
         adsr.noteOn();
@@ -765,44 +766,9 @@ namespace beat
 
     void InstrumentVoice::configureWavetableOscillators(double frequencyHz) noexcept
     {
-        configureWavetableOscillatorBank(wavetableOscillators, wavetableTable.get(), params.wavetable, frequencyHz);
+        WavetableOscillatorBank::configure(wavetableOscillators, wavetableTable.get(), params.wavetable, sampleRate, frequencyHz);
         WavetableUnison::invalidate(wavetableUnisonPlan);
         activeWavetableUnison = juce::jlimit(1, 8, params.wavetable.unison);
-    }
-
-    void InstrumentVoice::configureWavetableOscillatorBank(
-        std::array<WavetableOscillator, 8>& oscillators,
-        const Wavetable* table,
-        const Params::WavetableConfig& config,
-        double frequencyHz) noexcept
-    {
-        const int unison = juce::jlimit(1, 8, config.unison);
-        const float detuneCents = juce::jlimit(0.0f, 100.0f, config.detuneCents);
-        const float blend = VoiceMath::clamp01(config.blend);
-        const float position = VoiceMath::clamp01(config.position);
-
-        for (int voice = 0; voice < (int) oscillators.size(); ++voice)
-        {
-            auto& osc = oscillators[(size_t) voice];
-            const float centered = unison == 1
-                ? 0.0f
-                : ((float) voice / (float) (unison - 1)) * 2.0f - 1.0f;
-            const double rate = std::exp2((centered * detuneCents) / 1200.0);
-            osc.prepare(sampleRate);
-            osc.setWavetable(table);
-            osc.setPosition(position);
-            osc.setFrequency(frequencyHz * rate);
-            osc.reset((double) voice * 0.071 * (double) blend + (double) centered * 0.00008 * (double) blend);
-        }
-    }
-
-    void InstrumentVoice::clearWavetableOscillatorBank(
-        std::array<WavetableOscillator, 8>& oscillators,
-        WavetableUnisonPlan& plan) noexcept
-    {
-        for (auto& osc : oscillators)
-            osc.setWavetable(nullptr);
-        WavetableUnison::invalidate(plan);
     }
 
     bool InstrumentVoice::legacyWavetableNeedsSetup() const noexcept
@@ -824,49 +790,20 @@ namespace beat
         float detuneCentsMod,
         float spreadMod) noexcept
     {
-        return renderWavetableOscillatorBank(wavetableOscillators, wavetableUnisonPlan, params.wavetable, frequencyHz, positionMod, detuneCentsMod, spreadMod);
-    }
-
-    float InstrumentVoice::renderWavetableOscillatorBank(
-        std::array<WavetableOscillator, 8>& oscillators,
-        WavetableUnisonPlan& plan,
-        const Params::WavetableConfig& config,
-        double frequencyHz,
-        float positionMod,
-        float detuneCentsMod,
-        float spreadMod) noexcept
-    {
-        if (!std::isfinite(frequencyHz) || frequencyHz <= 0.0)
-            frequencyHz = baseFrequencyHz;
-
-        auto& renderPlan = WavetableUnison::update(plan, config.unison, config.detuneCents, config.blend, detuneCentsMod, spreadMod);
-        const float modulatedPosition = VoiceMath::quantizeWavetablePosition(config.position + positionMod);
-        float sum = 0.0f;
-        currentBlockWavetableVoiceSamples += renderPlan.unison;
-
-        for (int voice = 0; voice < renderPlan.unison; ++voice)
-        {
-            auto& osc = oscillators[(size_t) voice];
-            const auto index = (size_t) voice;
-            const double phaseDriftHz = (double) renderPlan.phaseSpread[index] * sampleRate;
-            const double nextFrequencyHz = VoiceMath::quantizeWavetableFrequency(frequencyHz * renderPlan.rates[index] + phaseDriftHz);
-            if (std::abs(nextFrequencyHz - renderPlan.appliedFrequencyHz[index]) > 0.000001)
-            {
-                osc.setFrequency(nextFrequencyHz);
-                renderPlan.appliedFrequencyHz[index] = nextFrequencyHz;
-                ++currentBlockWavetableFrequencyUpdates;
-            }
-
-            if (std::abs(modulatedPosition - renderPlan.appliedPosition[index]) > 0.000001f)
-            {
-                osc.setPosition(modulatedPosition);
-                renderPlan.appliedPosition[index] = modulatedPosition;
-                ++currentBlockWavetablePositionUpdates;
-            }
-            sum += osc.renderSample() * renderPlan.weights[(size_t) voice];
-        }
-
-        return juce::jlimit(-1.0f, 1.0f, sum / juce::jmax(1.0f, renderPlan.weightSum));
+        const auto result = WavetableOscillatorBank::render(
+            wavetableOscillators,
+            wavetableUnisonPlan,
+            params.wavetable,
+            frequencyHz,
+            baseFrequencyHz,
+            sampleRate,
+            positionMod,
+            detuneCentsMod,
+            spreadMod);
+        currentBlockWavetableVoiceSamples += result.voiceSamples;
+        currentBlockWavetableFrequencyUpdates += result.frequencyUpdates;
+        currentBlockWavetablePositionUpdates += result.positionUpdates;
+        return result.sample;
     }
 
     void InstrumentVoice::refreshCachedPanGains() noexcept
@@ -953,16 +890,22 @@ namespace beat
             float value = 0.0f;
             if (osc.waveform == 5)
             {
-                const auto before = currentBlockWavetableVoiceSamples;
-                value = renderWavetableOscillatorBank(
+                auto& plan = &oscillators == &aetherOscillatorsA ? aetherUnisonPlanA : aetherUnisonPlanB;
+                const auto result = WavetableOscillatorBank::render(
                     oscillators,
-                    (&oscillators == &aetherOscillatorsA ? aetherUnisonPlanA : aetherUnisonPlanB),
+                    plan,
                     osc.wavetable,
                     frequencyHz * rate,
+                    baseFrequencyHz,
+                    sampleRate,
                     positionMod,
                     unisonDetuneMod,
                     unisonSpreadMod);
-                componentSampleCounter += currentBlockWavetableVoiceSamples - before;
+                value = result.sample;
+                currentBlockWavetableVoiceSamples += result.voiceSamples;
+                currentBlockWavetableFrequencyUpdates += result.frequencyUpdates;
+                currentBlockWavetablePositionUpdates += result.positionUpdates;
+                componentSampleCounter += result.voiceSamples;
             }
             else
             {

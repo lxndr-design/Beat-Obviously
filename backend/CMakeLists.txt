@@ -69,6 +69,7 @@ target_sources(Beat PRIVATE
     Source/Audio/Wavetable/WavetableFactory.h
     Source/Audio/Wavetable/WavetableOscillator.cpp
     Source/Audio/Wavetable/WavetableOscillator.h
+    Source/Audio/Wavetable/WavetableOscillatorBank.h
     Source/Audio/Wavetable/WavetableUnisonPlan.h
     Source/Audio/Wavetable/WavetableVoiceCache.cpp
     Source/Audio/Wavetable/WavetableVoiceCache.h
@@ -197,6 +198,7 @@ add_executable(BeatBackendStress
     Source/Audio/Wavetable/WavetableFactory.h
     Source/Audio/Wavetable/WavetableOscillator.cpp
     Source/Audio/Wavetable/WavetableOscillator.h
+    Source/Audio/Wavetable/WavetableOscillatorBank.h
     Source/Audio/Wavetable/WavetableUnisonPlan.h
     Source/Audio/Wavetable/WavetableVoiceCache.cpp
     Source/Audio/Wavetable/WavetableVoiceCache.h

@@ -287,9 +287,6 @@ namespace beat
         using RealtimeParam = VoiceRealtimeParams::Id;
 
         void configureWavetableOscillators(double frequencyHz) noexcept;
-        void clearWavetableOscillatorBank(
-            std::array<WavetableOscillator, 8>& oscillators,
-            WavetableUnisonPlan& plan) noexcept;
         bool legacyWavetableNeedsSetup() const noexcept;
         bool aetherOscillatorNeedsWavetable(const Params::AetherOscillator& osc) const noexcept;
         void resetRealtimeRampsFromParams() noexcept;
@@ -303,19 +300,6 @@ namespace beat
         void loadPendingNoteAutomation(int midiNoteNumber) noexcept;
         void advanceVoiceAutomation() noexcept;
         float renderWavetableStack(double frequencyHz, float positionMod, float detuneCentsMod, float spreadMod) noexcept;
-        void configureWavetableOscillatorBank(
-            std::array<WavetableOscillator, 8>& oscillators,
-            const Wavetable* table,
-            const Params::WavetableConfig& config,
-            double frequencyHz) noexcept;
-        float renderWavetableOscillatorBank(
-            std::array<WavetableOscillator, 8>& oscillators,
-            WavetableUnisonPlan& plan,
-            const Params::WavetableConfig& config,
-            double frequencyHz,
-            float positionMod,
-            float detuneCentsMod,
-            float spreadMod) noexcept;
         void refreshCachedPanGains() noexcept;
         void refreshCachedPitchRates() noexcept;
         void refreshCachedDynamicModulationFlags() noexcept;
