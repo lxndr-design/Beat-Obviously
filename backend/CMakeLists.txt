@@ -45,6 +45,7 @@ target_sources(Beat PRIVATE
     Source/Audio/Parameters/SynthPatchContract.h
     Source/Audio/Realtime/FixedObjectPool.h
     Source/Audio/Realtime/RealtimeParameterQueue.h
+    Source/Audio/Realtime/RealtimeRamp.h
     Source/Audio/Realtime/SpscRingBuffer.h
     Source/Audio/Realtime/VoiceAutomationInbox.cpp
     Source/Audio/Realtime/VoiceAutomationInbox.h
@@ -169,6 +170,7 @@ add_executable(BeatBackendStress
     Source/Audio/Parameters/SynthPatchContract.h
     Source/Audio/Realtime/FixedObjectPool.h
     Source/Audio/Realtime/RealtimeParameterQueue.h
+    Source/Audio/Realtime/RealtimeRamp.h
     Source/Audio/Realtime/SpscRingBuffer.h
     Source/Audio/Realtime/VoiceAutomationInbox.cpp
     Source/Audio/Realtime/VoiceAutomationInbox.h

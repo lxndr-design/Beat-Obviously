@@ -5,6 +5,7 @@
 #include "Filter/FilterStage.h"
 #include "Modulation/DynamicModulation.h"
 #include "Realtime/RealtimeParameterQueue.h"
+#include "Realtime/RealtimeRamp.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
 
@@ -313,19 +314,6 @@ namespace beat
             LfoRate,
             LfoDepth,
             Count,
-        };
-
-        struct RealtimeRamp
-        {
-            float current { 0.0f };
-            float target { 0.0f };
-            float step { 0.0f };
-            int remaining { 0 };
-
-            void reset(float value) noexcept;
-            void setTarget(float value, int rampSamples) noexcept;
-            float next() noexcept;
-            bool active() const noexcept { return remaining > 0; }
         };
 
         void configureWavetableOscillators(double frequencyHz) noexcept;

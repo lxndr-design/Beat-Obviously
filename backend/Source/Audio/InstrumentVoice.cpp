@@ -125,37 +125,6 @@ namespace beat
             * juce::jlimit(0.0f, 24.0f, params.pitchBendRangeSemitones);
     }
 
-    void InstrumentVoice::RealtimeRamp::reset(float value) noexcept
-    {
-        current = value;
-        target = value;
-        step = 0.0f;
-        remaining = 0;
-    }
-
-    void InstrumentVoice::RealtimeRamp::setTarget(float value, int rampSamples) noexcept
-    {
-        target = value;
-        remaining = juce::jmax(0, rampSamples);
-        if (remaining == 0)
-        {
-            reset(value);
-            return;
-        }
-        step = (target - current) / (float) remaining;
-    }
-
-    float InstrumentVoice::RealtimeRamp::next() noexcept
-    {
-        if (remaining <= 0)
-            return current;
-        current += step;
-        --remaining;
-        if (remaining == 0)
-            current = target;
-        return current;
-    }
-
     namespace
     {
         int realtimeParamIndexForId(std::string_view parameterId) noexcept
