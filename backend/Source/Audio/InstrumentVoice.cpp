@@ -680,7 +680,7 @@ namespace beat
             const float ampPan = hasAmpPanMod
                 ? juce::jlimit(-1.0f, 1.0f, params.ampPan + DynamicModulation::targetOffset(params.dynamicModulation.ampPan, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f))
                 : params.ampPan;
-            const auto panGains = hasAmpPanMod ? VoiceMath::equalPowerPanGains(ampPan) : cachedAmpPanGains;
+            const auto panGains = hasAmpPanMod ? VoiceMath::equalPowerPanGains(ampPan) : cachedPanGains.amp;
             const float voiceGain = env * level * 0.4f * ampLevel;
             const auto [leftGain, rightGain] = panGains;
 
@@ -871,20 +871,12 @@ namespace beat
 
     void InstrumentVoice::refreshCachedPanGains() noexcept
     {
-        cachedAmpPanGains = VoiceMath::equalPowerPanGains(params.ampPan);
-        cachedAetherOscAPanGains = VoiceMath::equalPowerPanGains(params.aetherOscA.pan);
-        cachedAetherOscBPanGains = VoiceMath::equalPowerPanGains(params.aetherOscB.pan);
+        cachedPanGains = VoiceAetherCache::panGainsFor(params);
     }
 
     void InstrumentVoice::refreshCachedPitchRates() noexcept
     {
-        cachedAetherOscARate = VoiceMath::pitchRate(params.aetherOscA.octave,
-                                                    params.aetherOscA.semitone,
-                                                    params.aetherOscA.fineCents);
-        cachedAetherOscBRate = VoiceMath::pitchRate(params.aetherOscB.octave,
-                                                    params.aetherOscB.semitone,
-                                                    params.aetherOscB.fineCents);
-        cachedAetherSubRate = std::exp2((double) params.aetherSub.octave);
+        cachedPitchRates = VoiceAetherCache::pitchRatesFor(params);
     }
 
     void InstrumentVoice::refreshCachedDynamicModulationFlags() noexcept
@@ -988,12 +980,12 @@ namespace beat
             params.dynamicModulation.oscAFine,
             params.dynamicModulation.oscALevel,
             params.dynamicModulation.oscAPan,
-            cachedAetherOscAPanGains,
+            cachedPanGains.oscA,
             cachedDynamicTargets.oscAPan,
             cachedDynamicTargets.oscAFine,
             cachedDynamicTargets.oscAPosition,
             cachedDynamicTargets.oscALevel,
-            cachedAetherOscARate,
+            cachedPitchRates.oscA,
             aetherOscAPhaseOffset,
             currentBlockAetherOscASamples);
         renderOsc(
@@ -1003,12 +995,12 @@ namespace beat
             params.dynamicModulation.oscBFine,
             params.dynamicModulation.oscBLevel,
             params.dynamicModulation.oscBPan,
-            cachedAetherOscBPanGains,
+            cachedPanGains.oscB,
             cachedDynamicTargets.oscBPan,
             cachedDynamicTargets.oscBFine,
             cachedDynamicTargets.oscBPosition,
             cachedDynamicTargets.oscBLevel,
-            cachedAetherOscBRate,
+            cachedPitchRates.oscB,
             aetherOscBPhaseOffset,
             currentBlockAetherOscBSamples);
 
@@ -1016,7 +1008,7 @@ namespace beat
         {
             ++currentBlockOscillatorSamples;
             ++currentBlockAetherSubSamples;
-            add(BasicOscillator::sample(params.aetherSub.waveform, phase * cachedAetherSubRate, (frequencyHz * cachedAetherSubRate) / sampleRate),
+            add(BasicOscillator::sample(params.aetherSub.waveform, phase * cachedPitchRates.sub, (frequencyHz * cachedPitchRates.sub) / sampleRate),
                 params.aetherSub.level,
                 0.0f,
                 VoiceMath::centerPanGains,

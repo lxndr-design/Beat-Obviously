@@ -4,6 +4,7 @@
 #include "Filter/DriveStage.h"
 #include "Filter/FilterStage.h"
 #include "Modulation/DynamicModulation.h"
+#include "Oscillator/VoiceAetherCache.h"
 #include "Realtime/RealtimeParameterQueue.h"
 #include "Realtime/RealtimeRamp.h"
 #include "Realtime/VoiceRealtimeParams.h"
@@ -17,7 +18,6 @@
 #include <array>
 #include <memory>
 #include <string_view>
-#include <utility>
 
 namespace beat
 {
@@ -347,12 +347,8 @@ namespace beat
         WavetableUnisonPlan wavetableUnisonPlan;
         WavetableUnisonPlan aetherUnisonPlanA;
         WavetableUnisonPlan aetherUnisonPlanB;
-        std::pair<float, float> cachedAmpPanGains { 1.0f, 1.0f };
-        std::pair<float, float> cachedAetherOscAPanGains { 1.0f, 1.0f };
-        std::pair<float, float> cachedAetherOscBPanGains { 1.0f, 1.0f };
-        double cachedAetherOscARate { 1.0 };
-        double cachedAetherOscBRate { 1.0 };
-        double cachedAetherSubRate { 0.5 };
+        VoiceAetherCache::PanGains cachedPanGains;
+        VoiceAetherCache::PitchRates cachedPitchRates;
         DynamicModulation::TargetActivityFlags cachedDynamicTargets;
         std::array<RealtimeRamp, VoiceRealtimeParams::count> realtimeRamps;
         std::array<size_t, VoiceRealtimeParams::count> activeRealtimeRampIndices {};
