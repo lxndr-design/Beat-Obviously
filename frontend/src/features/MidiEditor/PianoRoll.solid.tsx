@@ -5,9 +5,11 @@ import {
   aetherNoteAutomationTargetLabel,
   aetherNoteAutomationTargetMeta,
   clearMidiNoteAutomationTarget,
+  denormalizeAetherNoteAutomationValue,
   formatAetherNoteAutomationValue,
   midiNoteAutomationTargetCount,
   midiNoteHasAutomationTarget,
+  normalizeAetherNoteAutomationValue,
   offsetMidiNoteAutomation,
   selectedMidiNoteAutomationSummary,
   selectedMidiNoteAutomationValueRange,
@@ -113,10 +115,12 @@ export function PianoRoll(props: PianoRollProps) {
   const [connectPointer, setConnectPointer] = createSignal<{ x: number; y: number } | null>(null);
   const [curveFrom, setCurveFrom] = createSignal<number | null>(null);
   const [curvePointer, setCurvePointer] = createSignal<{ x: number; y: number } | null>(null);
+  const [draggedAutomationEdge, setDraggedAutomationEdge] = createSignal<"start" | "end" | null>(null);
   const lastDrawnLengthRef = createRef(DEFAULT_NOTE_LENGTH_BEATS);
   const lastPointerTargetRef = createRef<PasteTarget | null>(null);
   const historyRef = createRef<MidiNote[][]>([]);
   const dragAuditionRef = createRef<{ idx: number; pitch: number } | null>(null);
+  const automationDragHistoryPushedRef = createRef(false);
   const [auditionedNoteIndex, setAuditionedNoteIndex] = createSignal<number | null>(null);
   const midiSmartGrid = createStoreSelector(useSettingsStore, (s) => s.midiSmartGrid);
   const midiSubdivision = createStoreSelector(useSettingsStore, (s) => s.midiSubdivision);
@@ -796,6 +800,51 @@ export function PianoRoll(props: PianoRollProps) {
     ));
   }
 
+  function setAutomationValue(edge: "start" | "end", value: number, transient = false) {
+    if (selected().length === 0 || activeAutomationTarget() === "pitch" || !Number.isFinite(value)) return;
+    const current = selectedAutomationValueRange();
+    const next = setMidiNoteAutomationTargetValues(
+      notes,
+      selected(),
+      activeAutomationTarget(),
+      edge === "start" ? value : current.startValue,
+      edge === "end" ? value : current.endValue,
+    );
+    if (transient) applyTransientChange(next);
+    else commitChange(next);
+  }
+
+  function startAutomationPointDrag(edge: "start" | "end", event: PointerEvent) {
+    if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
+    event.preventDefault();
+    event.stopPropagation();
+    setDraggedAutomationEdge(edge);
+    if (!automationDragHistoryPushedRef.current) {
+      pushHistorySnapshot();
+      automationDragHistoryPushedRef.current = true;
+    }
+    const target = event.currentTarget as HTMLElement;
+    target.setPointerCapture(event.pointerId);
+    updateAutomationPointDrag(edge, event);
+  }
+
+  function updateAutomationPointDrag(edge: "start" | "end", event: PointerEvent) {
+    if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
+    const element = event.currentTarget as HTMLElement;
+    const rect = element.parentElement?.getBoundingClientRect();
+    if (!rect || rect.width <= 0) return;
+    const value = denormalizeAetherNoteAutomationValue(activeAutomationTarget(), (event.clientX - rect.left) / rect.width);
+    setAutomationValue(edge, value, true);
+  }
+
+  function stopAutomationPointDrag(edge: "start" | "end", event: PointerEvent) {
+    if (draggedAutomationEdge() === edge) {
+      updateAutomationPointDrag(edge, event);
+      setDraggedAutomationEdge(null);
+      automationDragHistoryPushedRef.current = false;
+    }
+  }
+
   function copyNotes(indices: number[]): boolean {
     const unique = Array.from(new Set(indices))
       .filter((idx) => notes[idx])
@@ -1388,6 +1437,39 @@ export function PianoRoll(props: PianoRollProps) {
                 />
                 <span>{formatAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().endValue)}</span>
               </label>
+              <div class={styles.automationPointRail} aria-label="Drag start and end automation values">
+                <div class={styles.automationPointLine} aria-hidden="true" />
+                <button
+                  type="button"
+                  class={`${styles.automationPointHandle} ${draggedAutomationEdge() === "start" ? styles.automationPointHandleActive : ""}`}
+                  style={{
+                    left: `${normalizeAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().startValue) * 100}%`,
+                  }}
+                  disabled={selected().length === 0}
+                  aria-label={`Drag start ${aetherNoteAutomationTargetLabel(activeAutomationTarget())} value`}
+                  onPointerDown={(event) => startAutomationPointDrag("start", event)}
+                  onPointerMove={(event) => draggedAutomationEdge() === "start" && updateAutomationPointDrag("start", event)}
+                  onPointerUp={(event) => stopAutomationPointDrag("start", event)}
+                  onPointerCancel={(event) => stopAutomationPointDrag("start", event)}
+                >
+                  S
+                </button>
+                <button
+                  type="button"
+                  class={`${styles.automationPointHandle} ${draggedAutomationEdge() === "end" ? styles.automationPointHandleActive : ""}`}
+                  style={{
+                    left: `${normalizeAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().endValue) * 100}%`,
+                  }}
+                  disabled={selected().length === 0}
+                  aria-label={`Drag end ${aetherNoteAutomationTargetLabel(activeAutomationTarget())} value`}
+                  onPointerDown={(event) => startAutomationPointDrag("end", event)}
+                  onPointerMove={(event) => draggedAutomationEdge() === "end" && updateAutomationPointDrag("end", event)}
+                  onPointerUp={(event) => stopAutomationPointDrag("end", event)}
+                  onPointerCancel={(event) => stopAutomationPointDrag("end", event)}
+                >
+                  E
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -459,6 +459,55 @@
   accent-color: var(--color-fg);
 }
 
+.automationPointRail {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 24px;
+  margin-top: 2px;
+  border: var(--border-fg);
+  background: var(--interaction-mesh-current);
+  overflow: hidden;
+}
+
+.automationPointLine {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 50%;
+  height: 1px;
+  background: color-mix(in srgb, var(--color-fg) 35%, transparent);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.automationPointHandle {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 16px;
+  padding: 0;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-hint);
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  cursor: ew-resize;
+  transition: var(--interaction-transition);
+}
+
+.automationPointHandle:hover,
+.automationPointHandleActive {
+  background: var(--interaction-hover-bg);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--interaction-playback-accent) 32%, transparent);
+}
+
+.automationPointHandle:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
 .playhead {
   position: absolute;
   top: 0;

@@ -48,6 +48,10 @@ try {
   assert.deepEqual(movedMacroLane[0].points.map((point) => point.beat), [5, 6], "note automation points should move with dragged/copied notes");
   assert.equal(noteAutomation.formatAetherNoteAutomationValue("macro.1", 0.73), "73%", "macro value labels should format as percent");
   assert.equal(noteAutomation.formatAetherNoteAutomationValue("amp.pan", -0.25), "-25", "pan value labels should format as signed bipolar values");
+  assert.equal(noteAutomation.normalizeAetherNoteAutomationValue("amp.pan", 0), 0.5, "bipolar lane center should normalize to the rail midpoint");
+  assert.equal(noteAutomation.denormalizeAetherNoteAutomationValue("amp.pan", 0), -1, "bipolar lane left edge should denormalize to the minimum");
+  assert.equal(noteAutomation.denormalizeAetherNoteAutomationValue("amp.pan", 1), 1, "bipolar lane right edge should denormalize to the maximum");
+  assert.equal(noteAutomation.denormalizeAetherNoteAutomationValue("macro.1", 0.375), 0.38, "lane drag values should quantize to the target step");
   assert.deepEqual(
     noteAutomation.selectedMidiNoteAutomationValueRange(withMacroLane, [0, 1], "macro.1"),
     { startValue: 0.5, endValue: 0.5, activeCount: 2 },

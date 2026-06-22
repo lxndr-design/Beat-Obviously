@@ -47,6 +47,18 @@ export function formatAetherNoteAutomationValue(target: MidiAutomationTarget, va
   return `${Math.round(value * 100)}%`;
 }
 
+export function normalizeAetherNoteAutomationValue(target: MidiAutomationTarget, value: number): number {
+  const meta = aetherNoteAutomationTargetMeta(target);
+  const span = Math.max(0.000001, meta.max - meta.min);
+  return clamp((value - meta.min) / span, 0, 1);
+}
+
+export function denormalizeAetherNoteAutomationValue(target: MidiAutomationTarget, normalized: number): number {
+  const meta = aetherNoteAutomationTargetMeta(target);
+  const value = meta.min + clamp(normalized, 0, 1) * (meta.max - meta.min);
+  return Math.round(value / meta.step) * meta.step;
+}
+
 export function midiNoteHasAutomationTarget(note: MidiNote | undefined, target: MidiAutomationTarget): boolean {
   if (!note) return false;
   if (target === "pitch") return Boolean(note.curve && note.curve.length >= 2);

@@ -32,8 +32,9 @@ Status legend:
    - `[x]` Add first visible piano-roll note automation lane selector/badges for pitch, wavemap, filter, amp, and macro targets.
    - `[x]` Add selected-note start/end value editing for visible piano-roll Aether lanes.
    - `[x]` Preserve note automation point timing during note drag/copy/paste and cover the helper behavior.
+   - `[x]` Add draggable start/end point handles for visible piano-roll Aether lanes.
    - `[~]` Cover track, segment, and piano-roll note automation entrypoints.
-   - Add direct point drag, curve selection, playback preview, and live/export parity coverage.
+   - Add multi-point lane editing, curve selection, playback preview, and live/export parity coverage.
 4. `[ ]` Aether preset storage and migration.
    - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.
    - `[x]` Add schema-versioned local instrument-effect chain presets with save/load/delete and legacy normalization.
@@ -158,6 +159,10 @@ Status legend:
 
 ## UI Coherence
 
+- `[~]` Happy playback feedback pass.
+  - `[ ]` Segment playback, active beat nodes, and active MIDI notes should use the approved cyan playback accent instead of white-only emphasis.
+  - `[ ]` MIDI note drag audition should preview the note currently under the pointer while a single note is dragged.
+  - `[~]` Low-opacity tints should use approved mesh-gradient variants instead of one flat white tint; keep playback as the only chromatic product feedback state.
 - `[~]` Audit every modal footer/action row against shared footer primitives.
 - `[~]` Replace one-off selects/dropdowns with shared primitives.
 - `[~]` Extract shared asset browser list/table primitives.
@@ -165,6 +170,14 @@ Status legend:
 - `[~]` Add consistent keyboard shortcuts and shortcut hints for transport, edit commands, tools, zoom, selection, and modals.
 - `[~]` Preferences page for DAW behavior: snap, recording, export defaults, monitoring, autosave, backups.
 - `[ ]` Browser smoke for visible hover, selected, disabled, and loading states on critical screens.
+
+## Frontend Framework Migration
+
+- `[x]` React-to-Solid migration for app entry/root shell, sidebar, top bar, home hub, transport surfaces, track shell, track headers, timeline, playhead, lanes, segments, piano roll, drum sequencer, project health, preferences, plugin/DS surfaces, editor host, node instrument editor, synth editor, segment editor, component editor, EQ, visualizer, debug panels, and shared modal/dialog hosts.
+- `[x]` Remove React source, React demos, React bridge folders, `@vitejs/plugin-react`, `react`, `react-dom`, and React-era `zundo` coupling.
+- `[x]` Solid UI kit foundation exists under `frontend/src/solid-ui` with demos and design-system verifier coverage.
+- `[~]` Continue consolidating feature-local controls into Solid UI kit primitives as surfaces are touched.
+- `[ ]` Add broader browser-level smoke for migrated critical flows so the completed framework migration has runtime interaction proof, not only source/design-system proof.
 
 ## Codebase Organization
 

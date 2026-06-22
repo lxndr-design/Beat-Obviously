@@ -84,9 +84,9 @@ Status legend:
   - Remaining: reduce one-off controls inside synth surfaces, unify range fields/sliders/selects against the Solid UI kit, and make assignment/automation states readable at a glance.
   - Proof: `verify-design-system`, interaction verifier coverage, and manual preview pass.
 - `[~]` Note/segment automation UI.
-  - Done: backend/native note and segment automation paths; first visible piano-roll note automation lane selector/badges for pitch, wavemap, filter, amp, and macro targets; selected-note start/end value editing for visible Aether lanes; macro note lanes drive macro-routed browser preview output; note automation point timing is preserved during note drag/copy/paste.
-  - Remaining: track and segment automation lane surfaces, direct point drag inside visible lanes, curve selection, and fuller playback/live-export parity coverage.
-  - Proof: editor interaction tests for lane creation/value-edit helpers, synth verifier coverage for macro-lane preview output, plus future browser/editor interaction tests for direct point drag and lane editing.
+  - Done: backend/native note and segment automation paths; first visible piano-roll note automation lane selector/badges for pitch, wavemap, filter, amp, and macro targets; selected-note start/end value editing for visible Aether lanes; draggable start/end point handles for visible piano-roll lanes; macro note lanes drive macro-routed browser preview output; note automation point timing is preserved during note drag/copy/paste.
+  - Remaining: track and segment automation lane surfaces, multi-point lane editing, curve selection, and fuller playback/live-export parity coverage.
+  - Proof: editor interaction tests for lane creation/value-edit/drag-value helpers, synth verifier coverage for macro-lane preview output, plus future browser/editor interaction tests for multi-point lane editing.
 
 ## 7. Verification Gates Still Needed
 
