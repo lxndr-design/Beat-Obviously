@@ -15,7 +15,7 @@ import { listDrumBeatFeedback, updateDrumBeatFeedback } from "../../persistence/
 import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import { selectedCrossfadeCandidate } from "./arrangementActions";
 import { decentSamplerPluginForInstrument } from "../PluginLibrary/decentSamplerPluginAdapter";
-import { appPrompt } from "../../solid-ui";
+import { appPrompt, meshTintVariantFor } from "../../solid-ui";
 import { createContextMenu, Icon, type ContextMenuItem } from "../../solid-ui";
 import { SEGMENT_LAYER_OFFSET_PX } from "./geometry";
 import {
@@ -567,6 +567,7 @@ export function Segment(props: Props) {
       }}
       onContextMenu={handleContextMenu}
       data-segment-id={props.segmentId}
+      data-mesh-variant={meshTintVariantFor(props.segmentId)}
       data-track-id={liveSeg()?.trackId}
       data-segment-repetition={props.repetition}
     >

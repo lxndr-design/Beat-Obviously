@@ -1,5 +1,6 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { Portal } from "solid-js/web";
+import { meshTintVariantFor } from "../meshTint";
 import { Icon } from "../Icon";
 import styles from "./ContextMenu.module.css";
 
@@ -133,6 +134,7 @@ function ContextMenuPortal(props: {
                   role="menuitem"
                   disabled={item.disabled}
                   class={styles.item}
+                  data-mesh-variant={meshTintVariantFor(item.label)}
                   onClick={() => {
                     if (item.disabled || item.submenu) return;
                     item.onSelect?.();
@@ -156,6 +158,7 @@ function ContextMenuPortal(props: {
                           role="menuitem"
                           disabled={child.disabled}
                           class={styles.item}
+                          data-mesh-variant={meshTintVariantFor(child.label)}
                           onClick={() => {
                             if (child.disabled) return;
                             child.onSelect?.();

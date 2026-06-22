@@ -944,6 +944,12 @@ export function PianoRoll(props: PianoRollProps) {
     };
   }
 
+  function isNotePlaying(note: MidiNote): boolean {
+    const beat = props.playheadBeat;
+    if (beat == null) return false;
+    return beat >= note.startBeat && beat < note.startBeat + note.lengthBeats;
+  }
+
   function noteViewportRect(note: MidiNote): DOMRect | null {
     const gridRect = containerRef.current?.getBoundingClientRect();
     if (!gridRect) return null;
@@ -1132,12 +1138,20 @@ export function PianoRoll(props: PianoRollProps) {
               if (!rect) return null;
               const isSelected = selected().includes(i);
               const isAuditioned = auditionedNoteIndex() === i;
+              const isPlaying = isNotePlaying(n);
               const hovered = hoveredNoteSide();
               const hoveredSide = hovered?.idx === i ? hovered.side : null;
               const volumePercent = Math.round((clamp(n.velocity, 0, 127) / 127) * 100);
               return (
                 <div
-                  class={`${styles.note} ${isSelected ? styles.noteSelected : ""} ${isAuditioned ? styles.noteAuditioned : ""} ${hoveredSide === "left" ? styles.noteHoverLeft : ""} ${hoveredSide === "right" ? styles.noteHoverRight : ""}`}
+                  class={[
+                    styles.note,
+                    isSelected && styles.noteSelected,
+                    isAuditioned && styles.noteAuditioned,
+                    isPlaying && styles.notePlaying,
+                    hoveredSide === "left" && styles.noteHoverLeft,
+                    hoveredSide === "right" && styles.noteHoverRight,
+                  ].filter(Boolean).join(" ")}
                   style={{
                     left: px(rect.left),
                     top: px(rect.top),

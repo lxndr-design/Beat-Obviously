@@ -31,11 +31,13 @@ Allowed exceptions:
 - `--color-highlight` for text selection only.
 - `--color-scrim` for modal and unsaved-state overlays.
 - `--color-fg-hover` for hover on surfaces that are already foreground-filled.
+- `--interaction-playback-accent` for active playback feedback only.
 - `--grid-line-*` and `--surface-*` for dense editor internals, browser rows,
   waveform grids, timeline subdivisions, and secondary data marks.
 
 Do not introduce hue. If a feature needs status, use copy, iconography, position,
-or monochrome emphasis before adding a token.
+or monochrome emphasis before adding a token. Playback is the only chromatic
+product feedback state.
 
 ### Typography
 
@@ -92,6 +94,10 @@ Hover is a light tint, never a full color inversion. Pressed states use
 `--interaction-pressed-bg` plus the shared press transform. Selected or active
 states use `--interaction-active-*` tokens and only dim on hover. New controls
 should consume these tokens through the Solid UI kit primitives when possible.
+
+Low-opacity tints use the mesh presets in `tokens.css`, not flat white fills.
+Shared primitives assign stable seeded variants via `data-mesh-variant` so dense
+lists, context menus, and clips do not repeat the same wash on every item.
 
 ### Icons
 

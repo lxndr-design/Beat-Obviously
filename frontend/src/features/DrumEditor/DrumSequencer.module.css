@@ -319,7 +319,10 @@
     var(--play-step) * (var(--cell-width) + var(--cell-gap))
   );
   width: var(--cell-width);
-  background: color-mix(in srgb, var(--color-fg) 18%, transparent);
+  background: color-mix(in srgb, var(--interaction-playback-accent) 18%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interaction-playback-accent) 32%, transparent),
+    0 0 16px color-mix(in srgb, var(--interaction-playback-accent) 20%, transparent);
   pointer-events: none;
   z-index: 2;
 }
@@ -406,6 +409,23 @@
 
 .stepCellOn.stepCellSelected {
   box-shadow: inset 0 0 0 1px var(--color-bg);
+}
+
+.stepCellPlaying {
+  border-color: color-mix(in srgb, var(--interaction-playback-accent) 84%, var(--color-fg));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--interaction-playback-accent) 56%, transparent),
+    0 0 12px color-mix(in srgb, var(--interaction-playback-accent) 32%, transparent);
+}
+
+.stepCellOn.stepCellPlaying {
+  background: var(--interaction-playback-accent);
+  color: var(--color-bg);
+}
+
+.stepCellOn.stepCellPlaying .cellNote,
+.stepCellOn.stepCellPlaying:hover .cellNote {
+  color: var(--color-bg);
 }
 
 .stepCellCustomVolume {

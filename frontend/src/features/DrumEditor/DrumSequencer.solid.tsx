@@ -930,6 +930,7 @@ export function DrumSequencer(props: Props) {
                 <div class={styles.stepGrid}>
                   {normalizeDrumSteps(row.steps, props.stepCount).map((cell, step) => {
                     const selected = selectedCells().has(cellKey(row.id, step));
+                    const activeStep = playStep() === step;
                     const customVolume = hasCustomDrumVelocity(row.steps[step]);
                     const volumePercent = customVolume ? velocityToPercent(effectiveDrumVelocity(cell)) : 0;
                     return (
@@ -939,6 +940,7 @@ export function DrumSequencer(props: Props) {
                           styles.stepCell,
                           isStrongBeat(step, props.speed, activeTimeSignature) && styles.stepStrong,
                           cell.on && styles.stepCellOn,
+                          activeStep && styles.stepCellPlaying,
                           selected && styles.stepCellSelected,
                           cell.pitchHz && styles.stepCellTuned,
                           customVolume && styles.stepCellCustomVolume,

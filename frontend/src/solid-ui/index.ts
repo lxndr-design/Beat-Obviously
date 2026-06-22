@@ -18,3 +18,4 @@ export * from "./FloatingLayer.solid";
 export * from "./ActionFooter";
 export * from "./MarqueeText";
 export * from "./DitheredImage";
+export * from "./meshTint";

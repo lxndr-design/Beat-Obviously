@@ -1,5 +1,6 @@
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { DRUM_MAX_STEPS } from "../../ai/drumBeatGenerator";
+import { createInstrumentBufferSource, noteFrequency } from "../../audio/synthPreview";
 import { useModalStack } from "../../solid-ui";
 import { Button, FloatingSelect, Icon, Modal, NumberInput, TextInput } from "../../solid-ui";
 import { useComponentStore, type BeatComponent, type DrumComponent, type MidiComponent } from "../../state/components";
@@ -25,10 +26,15 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
   const scopeId = () => `component-${props.componentId}`;
   const [draft, setDraft] = createSignal<BeatComponent | undefined>(source() ? structuredClone(source()) : undefined, { equals: false });
   const [instrumentSelectOpen, setInstrumentSelectOpen] = createSignal(false);
+  let previewCtx: AudioContext | null = null;
 
   createEffect(() => {
     const currentSource = source();
     if (currentSource && !draft()) setDraft(structuredClone(currentSource));
+  });
+
+  onCleanup(() => {
+    if (previewCtx) void previewCtx.close();
   });
 
   const dirty = createMemo(() => Boolean(source() && draft() && JSON.stringify(source()) !== JSON.stringify(draft())));
@@ -82,6 +88,35 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
     setDraft((current) => current?.kind === "drum"
       ? { ...(current as DrumComponent), ...patch }
       : current);
+  }
+
+  function previewMidiNote(pitch: number, velocity = 100) {
+    const current = midi();
+    if (!current) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const Ctor = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
+    if (!previewCtx) previewCtx = new Ctor();
+    const ctx = previewCtx;
+    if (ctx.state === "suspended") void ctx.resume();
+    const instrument = instruments().find((item) => item.id === current.instrumentId) ?? fallbackInstrument;
+    const now = ctx.currentTime;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime((Math.max(0, Math.min(127, velocity)) / 127) * 0.22, now + 0.005);
+    gain.gain.linearRampToValueAtTime(0, now + 0.2);
+    gain.connect(ctx.destination);
+    const sourceNode = createInstrumentBufferSource(
+      ctx,
+      instrument,
+      0.24,
+      noteFrequency(Math.max(0, Math.min(127, pitch)), instrument),
+      undefined,
+      velocity,
+      project().bpm,
+    );
+    sourceNode.connect(gain);
+    sourceNode.start(now);
+    sourceNode.stop(now + 0.24);
   }
 
   return (
@@ -157,6 +192,7 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
               lengthBeats={midiDraft().lengthBeats}
               playheadBeat={null}
               onChange={(notes: MidiNote[]) => setMidiPatch({ notes })}
+              onPreviewNote={previewMidiNote}
             />
           )}
         </Show>
@@ -202,3 +238,18 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
     </Show>
   );
 }
+
+const fallbackInstrument = {
+  id: "component-preview-fallback",
+  name: "Preview",
+  kind: "synth" as const,
+  envelope: { attackMs: 5, decayMs: 100, sustain: 0.7, releaseMs: 200 },
+  knobs: { cutoff: 0.75, resonance: 0, drive: 0, color: 0.5 },
+  waveform: "saw" as const,
+  detuneCents: 0,
+  octave: 0,
+  subOscLevel: 0,
+  glideMs: 0,
+  sampleIds: [],
+  userCreated: false,
+};

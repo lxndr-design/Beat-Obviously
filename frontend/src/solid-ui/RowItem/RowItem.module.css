@@ -24,18 +24,6 @@
   color: var(--color-fg);
 }
 
-.row:nth-of-type(4n + 2) {
-  --interaction-mesh-current: var(--interaction-mesh-b);
-}
-
-.row:nth-of-type(4n + 3) {
-  --interaction-mesh-current: var(--interaction-mesh-c);
-}
-
-.row:nth-of-type(4n) {
-  --interaction-mesh-current: var(--interaction-mesh-d);
-}
-
 .row:active {
   background: var(--interaction-pressed-bg);
 }

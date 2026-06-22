@@ -34,20 +34,28 @@
 }
 
 .segment:hover {
-  background: color-mix(in srgb, var(--color-fg) 88%, var(--color-bg));
+  background:
+    var(--interaction-mesh-current),
+    color-mix(in srgb, var(--color-fg) 88%, var(--color-bg));
 }
 
 .selected {
-  background: color-mix(in srgb, var(--color-fg) 72%, var(--color-bg));
+  background:
+    var(--interaction-mesh-current),
+    color-mix(in srgb, var(--color-fg) 72%, var(--color-bg));
   outline: 0;
 }
 
 .selected:hover {
-  background: color-mix(in srgb, var(--color-fg) 72%, var(--color-bg));
+  background:
+    var(--interaction-mesh-current),
+    color-mix(in srgb, var(--color-fg) 72%, var(--color-bg));
 }
 
 .editing {
-  background: color-mix(in srgb, var(--color-fg) 72%, var(--color-bg));
+  background:
+    var(--interaction-mesh-current),
+    color-mix(in srgb, var(--color-fg) 72%, var(--color-bg));
   border-color: color-mix(in srgb, var(--color-fg) 72%, transparent);
 }
 
@@ -325,7 +333,8 @@
   border-color: color-mix(in srgb, var(--interaction-playback-accent) 80%, var(--color-fg));
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--interaction-playback-accent) 70%, transparent),
-    0 0 18px color-mix(in srgb, var(--interaction-playback-accent) 42%, transparent);
+    0 0 18px color-mix(in srgb, var(--interaction-playback-accent) 42%, transparent),
+    inset 0 0 18px color-mix(in srgb, var(--color-fg) 28%, transparent);
   animation: segment-playback-pulse var(--duration-playback-pulse) var(--ease-out);
 }
 

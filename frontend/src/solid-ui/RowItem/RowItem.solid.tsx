@@ -1,4 +1,5 @@
 import { Show, splitProps, type JSX } from "solid-js";
+import { meshTintVariantFor, type MeshTintVariant } from "../meshTint";
 import styles from "./RowItem.module.css";
 
 type RowItemDensity = "compact" | "standard" | "media";
@@ -15,6 +16,7 @@ export interface RowItemProps extends JSX.LiHTMLAttributes<HTMLLIElement> {
   detail?: JSX.Element;
   action?: JSX.Element;
   cursor?: "pointer" | "grab" | "default";
+  meshVariant?: MeshTintVariant;
   className?: string;
 }
 
@@ -31,6 +33,7 @@ export function RowItem(allProps: RowItemProps) {
     "detail",
     "action",
     "cursor",
+    "meshVariant",
     "class",
     "className",
     "children",
@@ -46,7 +49,7 @@ export function RowItem(allProps: RowItemProps) {
   ].filter(Boolean).join(" ");
 
   return (
-    <li class={cls()} {...props}>
+    <li class={cls()} data-mesh-variant={local.meshVariant ?? meshTintVariantFor(local.name)} {...props}>
       <Show when={reserveDragSlot()}>
         <span class={styles.dragSlot} aria-hidden="true">{local.dragSlot}</span>
       </Show>

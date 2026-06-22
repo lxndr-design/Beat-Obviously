@@ -52,6 +52,22 @@
   background-color: color-mix(in srgb, var(--color-fg) 28%, transparent) !important;
 }
 
+[data-mesh-variant="a"] {
+  --interaction-mesh-current: var(--interaction-mesh-a);
+}
+
+[data-mesh-variant="b"] {
+  --interaction-mesh-current: var(--interaction-mesh-b);
+}
+
+[data-mesh-variant="c"] {
+  --interaction-mesh-current: var(--interaction-mesh-c);
+}
+
+[data-mesh-variant="d"] {
+  --interaction-mesh-current: var(--interaction-mesh-d);
+}
+
 /* App-wide layout primitives */
 
 .app-root {
