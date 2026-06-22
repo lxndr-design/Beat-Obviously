@@ -1,17 +1,19 @@
 #include "VoiceAutomationInbox.h"
 
+#include <juce_core/juce_core.h>
+
 namespace beat::VoiceAutomationInbox
 {
     namespace
     {
-        thread_local InstrumentVoice::NoteAutomationContext* pendingNoteAutomationContexts = nullptr;
+        thread_local VoiceNoteAutomation::Context* pendingNoteAutomationContexts = nullptr;
         thread_local int pendingNoteAutomationContextCount = 0;
     }
 
-    void setPending(InstrumentVoice::NoteAutomationContext* contexts, int count) noexcept
+    void setPending(VoiceNoteAutomation::Context* contexts, int count) noexcept
     {
         pendingNoteAutomationContexts = contexts;
-        pendingNoteAutomationContextCount = juce::jlimit(0, (int) InstrumentVoice::maxPendingNoteAutomationContexts, count);
+        pendingNoteAutomationContextCount = juce::jlimit(0, (int) VoiceNoteAutomation::maxPendingContexts, count);
     }
 
     void clearPending() noexcept
@@ -22,9 +24,9 @@ namespace beat::VoiceAutomationInbox
 
     void consumeForNote(
         int midiNoteNumber,
-        std::array<RealtimeParameterChange, InstrumentVoice::maxNoteAutomationEvents>& automationEvents,
+        std::array<RealtimeParameterChange, VoiceNoteAutomation::maxEvents>& automationEvents,
         int& automationEventCount,
-        std::array<InstrumentVoice::NoteAutomationContext::PitchEvent, InstrumentVoice::maxNoteAutomationEvents>& pitchEvents,
+        std::array<VoiceNoteAutomation::PitchEvent, VoiceNoteAutomation::maxEvents>& pitchEvents,
         int& pitchEventCount) noexcept
     {
         automationEventCount = 0;
@@ -39,11 +41,11 @@ namespace beat::VoiceAutomationInbox
             if (context.midiNoteNumber != midiNoteNumber)
                 continue;
 
-            automationEventCount = juce::jlimit(0, (int) InstrumentVoice::maxNoteAutomationEvents, context.eventCount);
+            automationEventCount = juce::jlimit(0, (int) VoiceNoteAutomation::maxEvents, context.eventCount);
             for (int eventIndex = 0; eventIndex < automationEventCount; ++eventIndex)
                 automationEvents[(size_t) eventIndex] = context.events[(size_t) eventIndex];
 
-            pitchEventCount = juce::jlimit(0, (int) InstrumentVoice::maxNoteAutomationEvents, context.pitchEventCount);
+            pitchEventCount = juce::jlimit(0, (int) VoiceNoteAutomation::maxEvents, context.pitchEventCount);
             for (int eventIndex = 0; eventIndex < pitchEventCount; ++eventIndex)
                 pitchEvents[(size_t) eventIndex] = context.pitchEvents[(size_t) eventIndex];
 

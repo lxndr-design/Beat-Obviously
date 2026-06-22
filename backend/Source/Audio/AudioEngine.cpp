@@ -1,5 +1,6 @@
 #include "AudioEngine.h"
 #include "Effects/TrackEffectDefaults.h"
+#include "Realtime/VoiceAutomationInbox.h"
 #include "VoiceAllocation.h"
 
 #include <algorithm>
@@ -2238,7 +2239,7 @@ namespace beat
                                          int samplesFromNoteStart,
                                          int rampSamples) noexcept
         {
-            if (context.pitchEventCount >= (int) InstrumentVoice::maxNoteAutomationEvents) return;
+            if (context.pitchEventCount >= (int) VoiceNoteAutomation::maxEvents) return;
             context.pitchEvents[(size_t) context.pitchEventCount] = {
                 juce::jmax(0, samplesFromNoteStart),
                 midiPitchToHz(pitch),
@@ -2253,7 +2254,7 @@ namespace beat
                                          int rampSamples) noexcept
         {
             if (target.empty() || target == std::string_view("pitch")) return;
-            if (context.eventCount >= (int) InstrumentVoice::maxNoteAutomationEvents) return;
+            if (context.eventCount >= (int) VoiceNoteAutomation::maxEvents) return;
             context.events[(size_t) context.eventCount] = makeRealtimeParameterChange(std::string_view {},
                                                                                       target,
                                                                                       value,
@@ -3873,13 +3874,13 @@ namespace beat
             const juce::ScopedTryLock lock(sampleLock);
             if (lock.isLocked())
             {
-                InstrumentVoice::setPendingNoteAutomationContexts(defaultNoteAutomationContexts.data(),
-                                                                   defaultNoteAutomationContextCount);
+                VoiceAutomationInbox::setPending(defaultNoteAutomationContexts.data(),
+                                                 defaultNoteAutomationContextCount);
                 auto voiceStartTicks = markTicks();
                 renderSynthWithRealtimeParametersLocked(synth, mixBuf, midi, {}, numSamples);
                 voiceTicks += ticksBetween(voiceStartTicks, markTicks());
                 activeSynthVoiceCount += countActiveSynthVoices(synth);
-                InstrumentVoice::clearPendingNoteAutomationContexts();
+                VoiceAutomationInbox::clearPending();
                 for (auto& bus : returnRenderStates)
                     bus.returnBuffer.clear();
                 for (auto& group : groupRenderStates)
@@ -3889,8 +3890,8 @@ namespace beat
                     routeBuf.clear();
                     if (route.synth != nullptr)
                     {
-                        InstrumentVoice::setPendingNoteAutomationContexts(route.noteAutomationContexts.data(),
-                                                                           route.noteAutomationContextCount);
+                        VoiceAutomationInbox::setPending(route.noteAutomationContexts.data(),
+                                                         route.noteAutomationContextCount);
                         voiceStartTicks = markTicks();
                         renderSynthWithRealtimeParametersLocked(*route.synth,
                                                                 routeBuf,
@@ -3899,7 +3900,7 @@ namespace beat
                                                                 numSamples);
                         voiceTicks += ticksBetween(voiceStartTicks, markTicks());
                         activeSynthVoiceCount += countActiveSynthVoices(*route.synth);
-                        InstrumentVoice::clearPendingNoteAutomationContexts();
+                        VoiceAutomationInbox::clearPending();
                     }
 
                     const auto routeSampleStartTicks = markTicks();
@@ -3924,7 +3925,7 @@ namespace beat
             }
             else
             {
-                InstrumentVoice::clearPendingNoteAutomationContexts();
+                VoiceAutomationInbox::clearPending();
                 const auto voiceStartTicks = markTicks();
                 synth.renderNextBlock(mixBuf, midi, 0, numSamples);
                 voiceTicks += ticksBetween(voiceStartTicks, markTicks());

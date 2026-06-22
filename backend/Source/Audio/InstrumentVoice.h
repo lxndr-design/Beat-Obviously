@@ -9,6 +9,7 @@
 #include "Realtime/RealtimeRamp.h"
 #include "Realtime/VoiceRealtimeRampState.h"
 #include "Realtime/VoiceRealtimeParams.h"
+#include "Realtime/VoiceNoteAutomation.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
 #include "Wavetable/WavetableUnisonPlan.h"
@@ -226,28 +227,6 @@ namespace beat
         bool applyRealtimeParameter(std::string_view parameterId, float value, int rampSamples = 0) noexcept;
         void prepare(double sampleRate, int blockSize);
 
-        static constexpr size_t maxNoteAutomationEvents = 128;
-        static constexpr size_t maxPendingNoteAutomationContexts = 64;
-
-        struct NoteAutomationContext
-        {
-            struct PitchEvent
-            {
-                int sampleOffset { 0 };
-                float frequencyHz { 440.0f };
-                int rampSamples { 0 };
-            };
-
-            int midiNoteNumber { -1 };
-            int eventCount { 0 };
-            std::array<RealtimeParameterChange, maxNoteAutomationEvents> events {};
-            int pitchEventCount { 0 };
-            std::array<PitchEvent, maxNoteAutomationEvents> pitchEvents {};
-        };
-
-        static void setPendingNoteAutomationContexts(NoteAutomationContext* contexts, int count) noexcept;
-        static void clearPendingNoteAutomationContexts() noexcept;
-
         struct WavetableCacheStats
         {
             int64_t hits { 0 };
@@ -332,8 +311,8 @@ namespace beat
         VoiceAetherCache::PitchRates cachedPitchRates;
         DynamicModulation::TargetActivityFlags cachedDynamicTargets;
         VoiceRealtimeRampState realtimeRampState;
-        std::array<RealtimeParameterChange, maxNoteAutomationEvents> voiceAutomationEvents;
-        std::array<NoteAutomationContext::PitchEvent, maxNoteAutomationEvents> voicePitchEvents;
+        std::array<RealtimeParameterChange, VoiceNoteAutomation::maxEvents> voiceAutomationEvents;
+        std::array<VoiceNoteAutomation::PitchEvent, VoiceNoteAutomation::maxEvents> voicePitchEvents;
         int voiceAutomationEventCount { 0 };
         int voicePitchEventCount { 0 };
         int nextVoiceAutomationEvent { 0 };

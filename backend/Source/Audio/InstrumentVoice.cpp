@@ -13,16 +13,6 @@
 
 namespace beat
 {
-    void InstrumentVoice::setPendingNoteAutomationContexts(NoteAutomationContext* contexts, int count) noexcept
-    {
-        VoiceAutomationInbox::setPending(contexts, count);
-    }
-
-    void InstrumentVoice::clearPendingNoteAutomationContexts() noexcept
-    {
-        VoiceAutomationInbox::clearPending();
-    }
-
     InstrumentVoice::WavetableCacheStats InstrumentVoice::getWavetableCacheStats() noexcept
     {
         return WavetableVoiceCache::stats();

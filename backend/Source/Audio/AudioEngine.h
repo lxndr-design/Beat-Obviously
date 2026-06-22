@@ -10,6 +10,7 @@
 #include "Effects/MasterLimiter.h"
 #include "Recording/RecordingCapture.h"
 #include "Realtime/RealtimeParameterQueue.h"
+#include "Realtime/VoiceNoteAutomation.h"
 #include <array>
 #include <atomic>
 #include <functional>
@@ -419,7 +420,7 @@ namespace beat
             std::vector<std::unique_ptr<PhaserEffectState>> phaserStates;
             std::unique_ptr<DelayEffectState> compensationDelayState;
             std::vector<CompressorEffectState> compressorStates;
-            std::array<InstrumentVoice::NoteAutomationContext, InstrumentVoice::maxPendingNoteAutomationContexts> noteAutomationContexts {};
+            std::array<VoiceNoteAutomation::Context, VoiceNoteAutomation::maxPendingContexts> noteAutomationContexts {};
             int noteAutomationContextCount { 0 };
             int routeLatencySamples { 0 };
             int routeCompensationSamples { 0 };
@@ -530,7 +531,7 @@ namespace beat
         std::vector<PendingParameterAutomation> pendingParameterAutomation;
         std::vector<RealtimeParameterChange> blockRealtimeParameterEvents;
         std::vector<RouteParameterAutomationEvent> blockRouteParameterEvents;
-        std::array<InstrumentVoice::NoteAutomationContext, InstrumentVoice::maxPendingNoteAutomationContexts> defaultNoteAutomationContexts {};
+        std::array<VoiceNoteAutomation::Context, VoiceNoteAutomation::maxPendingContexts> defaultNoteAutomationContexts {};
         int defaultNoteAutomationContextCount { 0 };
         std::vector<ActiveSampleVoice> activeSampleVoices;
         std::vector<ActiveAudioClipVoice> activeAudioClipVoices;

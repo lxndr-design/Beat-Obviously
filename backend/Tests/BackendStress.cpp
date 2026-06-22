@@ -15,6 +15,8 @@
 #include "../Source/Audio/Realtime/FixedObjectPool.h"
 #include "../Source/Audio/Realtime/RealtimeParameterQueue.h"
 #include "../Source/Audio/Realtime/SpscRingBuffer.h"
+#include "../Source/Audio/Realtime/VoiceAutomationInbox.h"
+#include "../Source/Audio/Realtime/VoiceNoteAutomation.h"
 #include "../Source/Audio/Recording/RecordingCalibration.h"
 #include "../Source/Audio/Recording/RecordingPlanner.h"
 #include "../Source/Audio/Recording/RecordingSessionPlanner.h"
@@ -10699,14 +10701,14 @@ namespace
         voice.prepare(48000.0, 256);
         voice.setParams(params);
 
-        std::array<beat::InstrumentVoice::NoteAutomationContext, beat::InstrumentVoice::maxPendingNoteAutomationContexts> contexts {};
+        std::array<beat::VoiceNoteAutomation::Context, beat::VoiceNoteAutomation::maxPendingContexts> contexts {};
         contexts[0].midiNoteNumber = 60;
         contexts[0].eventCount = 1;
         contexts[0].events[0] = beat::makeRealtimeParameterChange(std::string_view {}, "amp.pan", -1.0f, 0, 0);
 
-        beat::InstrumentVoice::setPendingNoteAutomationContexts(contexts.data(), 1);
+        beat::VoiceAutomationInbox::setPending(contexts.data(), 1);
         voice.startNote(60, 1.0f, nullptr, 0);
-        beat::InstrumentVoice::clearPendingNoteAutomationContexts();
+        beat::VoiceAutomationInbox::clearPending();
 
         juce::AudioBuffer<float> leftPanBuffer(2, 512);
         leftPanBuffer.clear();
@@ -10753,15 +10755,15 @@ namespace
         voice.prepare(48000.0, 256);
         voice.setParams(params);
 
-        std::array<beat::InstrumentVoice::NoteAutomationContext, beat::InstrumentVoice::maxPendingNoteAutomationContexts> contexts {};
+        std::array<beat::VoiceNoteAutomation::Context, beat::VoiceNoteAutomation::maxPendingContexts> contexts {};
         contexts[0].midiNoteNumber = 60;
         contexts[0].pitchEventCount = 2;
         contexts[0].pitchEvents[0] = { 0, (float) juce::MidiMessage::getMidiNoteInHertz(60), 0 };
         contexts[0].pitchEvents[1] = { 0, (float) juce::MidiMessage::getMidiNoteInHertz(72), 1024 };
 
-        beat::InstrumentVoice::setPendingNoteAutomationContexts(contexts.data(), 1);
+        beat::VoiceAutomationInbox::setPending(contexts.data(), 1);
         voice.startNote(60, 1.0f, nullptr, 0);
-        beat::InstrumentVoice::clearPendingNoteAutomationContexts();
+        beat::VoiceAutomationInbox::clearPending();
 
         juce::AudioBuffer<float> buffer(2, 2048);
         buffer.clear();

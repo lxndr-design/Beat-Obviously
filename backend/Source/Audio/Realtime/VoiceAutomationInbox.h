@@ -1,17 +1,17 @@
 #pragma once
 
-#include "../InstrumentVoice.h"
+#include "VoiceNoteAutomation.h"
 
 #include <array>
 
 namespace beat::VoiceAutomationInbox
 {
-    void setPending(InstrumentVoice::NoteAutomationContext* contexts, int count) noexcept;
+    void setPending(VoiceNoteAutomation::Context* contexts, int count) noexcept;
     void clearPending() noexcept;
     void consumeForNote(
         int midiNoteNumber,
-        std::array<RealtimeParameterChange, InstrumentVoice::maxNoteAutomationEvents>& automationEvents,
+        std::array<RealtimeParameterChange, VoiceNoteAutomation::maxEvents>& automationEvents,
         int& automationEventCount,
-        std::array<InstrumentVoice::NoteAutomationContext::PitchEvent, InstrumentVoice::maxNoteAutomationEvents>& pitchEvents,
+        std::array<VoiceNoteAutomation::PitchEvent, VoiceNoteAutomation::maxEvents>& pitchEvents,
         int& pitchEventCount) noexcept;
 }
