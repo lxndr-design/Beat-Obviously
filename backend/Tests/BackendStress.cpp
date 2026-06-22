@@ -307,6 +307,59 @@ namespace
         return true;
     }
 
+    bool stressVoiceRenderWorkBlock()
+    {
+        beat::VoiceStats::RenderWorkBlock block;
+        block.begin(128, 2);
+        block.addOscillatorSamples(7);
+        block.addWavetableRender(16, 3, 4);
+        block.addFilterDriveSamples(256);
+        block.addFilterCutoffUpdates(5);
+        block.addFilterResonanceUpdates(2);
+        block.addModulationSamples(64);
+        block.addRealtimeRampSamples(9);
+
+        beat::VoiceStats::RenderWork delta;
+        delta.aetherOscASamples = 11;
+        delta.aetherOscBSamples = 12;
+        delta.aetherSubSamples = 13;
+        delta.aetherNoiseSamples = 14;
+        delta.oscillatorRateCalculations = 6;
+        delta.wavetableFrequencyUpdates = 8;
+        delta.wavetablePositionUpdates = 10;
+        block.add(delta);
+
+        const auto& work = block.snapshot();
+        if (work.voiceBlocks != 1
+            || work.voiceSamples != 128
+            || work.filterSamples != 256
+            || work.oscillatorSamples != 7
+            || work.wavetableVoiceSamples != 16
+            || work.wavetableFrequencyUpdates != 11
+            || work.wavetablePositionUpdates != 14
+            || work.filterDriveSamples != 256
+            || work.filterCutoffUpdates != 5
+            || work.filterResonanceUpdates != 2
+            || work.filterCoefficientUpdates != 7
+            || work.modulationSamples != 64
+            || work.realtimeRampSamples != 9
+            || work.aetherOscASamples != 11
+            || work.aetherOscBSamples != 12
+            || work.aetherSubSamples != 13
+            || work.aetherNoiseSamples != 14
+            || work.oscillatorRateCalculations != 6)
+            return false;
+
+        block.begin(4, 1);
+        const auto& reset = block.snapshot();
+        return reset.voiceBlocks == 1
+            && reset.voiceSamples == 4
+            && reset.filterSamples == 4
+            && reset.oscillatorSamples == 0
+            && reset.filterCoefficientUpdates == 0
+            && reset.wavetableFrequencyUpdates == 0;
+    }
+
     bool stressAetherTableStackRenderer()
     {
         beat::InstrumentVoice::Params params;
@@ -11027,6 +11080,11 @@ int main()
     if (!stressBasicOscillatorHelper())
     {
         std::cerr << "Basic oscillator helper stress failed\n";
+        return 1;
+    }
+    if (!stressVoiceRenderWorkBlock())
+    {
+        std::cerr << "Voice render work block stress failed\n";
         return 1;
     }
     if (!stressAetherTableStackRenderer())

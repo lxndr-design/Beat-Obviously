@@ -363,38 +363,24 @@ namespace beat
         const double lfoPhaseDelta = juce::jmax(0.01f, params.lfoRateHz) / sampleRate;
         const double lfo2PhaseDelta = juce::jmax(0.01f, params.lfo2RateHz) / sampleRate;
         const bool hasVoiceAutomation = noteAutomationState.active();
-        int64_t modulationSamples = 0;
-        int64_t realtimeRampSamples = 0;
-        currentBlockOscillatorSamples = 0;
-        currentBlockWavetableVoiceSamples = 0;
-        currentBlockAetherOscASamples = 0;
-        currentBlockAetherOscBSamples = 0;
-        currentBlockAetherSubSamples = 0;
-        currentBlockAetherNoiseSamples = 0;
-        currentBlockOscillatorRateCalculations = 0;
-        currentBlockFilterDriveSamples = 0;
-        currentBlockFilterCoefficientUpdates = 0;
-        currentBlockFilterCutoffUpdates = 0;
-        currentBlockFilterResonanceUpdates = 0;
-        currentBlockWavetableFrequencyUpdates = 0;
-        currentBlockWavetablePositionUpdates = 0;
+        currentBlockWork.begin(numSamples, 2);
 
         for (int i = 0; i < numSamples; ++i)
         {
             if (hasVoiceAutomation)
             {
                 advanceVoiceAutomation();
-                ++modulationSamples;
+                currentBlockWork.addModulationSamples(1);
             }
             if (realtimeRampState.activeCount > 0)
             {
-                realtimeRampSamples += realtimeRampState.activeCount;
+                currentBlockWork.addRealtimeRampSamples(realtimeRampState.activeCount);
                 advanceRealtimeRamps();
             }
             const float rawLfo = needsLfoValue ? Lfo::value(params.lfoWaveform, lfoPhase, params.lfoSmoothing, params.lfoOneShot) : 0.0f;
             const float rawLfo2 = needsLfo2Value ? Lfo::value(params.lfo2Waveform, lfo2Phase, params.lfo2Smoothing, params.lfo2OneShot) : 0.0f;
             if (needsLfoValue || useDynamicModulation)
-                ++modulationSamples;
+                currentBlockWork.addModulationSamples(1);
             const float positionLfo = hasPositionMod ? Lfo::routeValue(rawLfo, params.lfoPositionBipolar) * VoiceMath::clamp01(params.lfoDepth) : 0.0f;
             const float pitchLfo = hasPitchMod ? Lfo::routeValue(rawLfo, params.lfoPitchBipolar) : 0.0f;
             const float filterLfo = !useDynamicModulation && hasFilterMod ? Lfo::routeValue(rawLfo, params.lfoFilterBipolar) : 0.0f;
@@ -461,15 +447,7 @@ namespace beat
                     modWheel,
                     noiseState);
                 raw = { aetherResult.frame.left, aetherResult.frame.right };
-                currentBlockOscillatorSamples += aetherResult.work.oscillatorSamples;
-                currentBlockWavetableVoiceSamples += aetherResult.work.wavetableVoiceSamples;
-                currentBlockAetherOscASamples += aetherResult.work.aetherOscASamples;
-                currentBlockAetherOscBSamples += aetherResult.work.aetherOscBSamples;
-                currentBlockAetherSubSamples += aetherResult.work.aetherSubSamples;
-                currentBlockAetherNoiseSamples += aetherResult.work.aetherNoiseSamples;
-                currentBlockOscillatorRateCalculations += aetherResult.work.oscillatorRateCalculations;
-                currentBlockWavetableFrequencyUpdates += aetherResult.work.wavetableFrequencyUpdates;
-                currentBlockWavetablePositionUpdates += aetherResult.work.wavetablePositionUpdates;
+                currentBlockWork.add(aetherResult.work);
             }
             else
             {
@@ -479,7 +457,7 @@ namespace beat
                         ? VoiceMath::nextNoise(noiseState)
                         : BasicOscillator::sample(params.waveform, phase, currentPhaseDelta);
                 if (params.waveform != 5)
-                    ++currentBlockOscillatorSamples;
+                    currentBlockWork.addOscillatorSamples(1);
                 raw = { mono, mono };
             }
             float left = raw.left;
@@ -495,7 +473,7 @@ namespace beat
                 const auto driven = DriveStage::processOversampled(driveState, { left, right }, driveGain);
                 left = driven.left;
                 right = driven.right;
-                currentBlockFilterDriveSamples += DriveStage::workSamplesForChannels(2);
+                currentBlockWork.addFilterDriveSamples(DriveStage::workSamplesForChannels(2));
             }
             else
             {
@@ -513,15 +491,13 @@ namespace beat
                     params.filterKeytrack,
                     baseFrequencyHz,
                     6.0f);
-                currentBlockFilterCutoffUpdates += cutoffUpdates;
-                currentBlockFilterCoefficientUpdates += cutoffUpdates;
+                currentBlockWork.addFilterCutoffUpdates(cutoffUpdates);
                 if (useDynamicModulation && cachedDynamicTargets.filterResonance)
                 {
                     const float resonance = VoiceMath::clamp01(params.resonance01
                         + DynamicModulation::targetOffset(params.dynamicModulation.filterResonance, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, 1.0f));
                     const int resonanceUpdates = filterState.updateResonanceIfChanged(resonance, 0.001f);
-                    currentBlockFilterResonanceUpdates += resonanceUpdates;
-                    currentBlockFilterCoefficientUpdates += resonanceUpdates;
+                    currentBlockWork.addFilterResonanceUpdates(resonanceUpdates);
                 }
             }
             const auto filtered = filterState.process(left, right);
@@ -569,26 +545,7 @@ namespace beat
         if (!adsr.isActive())
             clearCurrentNote();
 
-        VoiceStats::RenderWork blockStats;
-        blockStats.voiceBlocks = 1;
-        blockStats.voiceSamples = numSamples;
-        blockStats.oscillatorSamples = currentBlockOscillatorSamples;
-        blockStats.wavetableVoiceSamples = currentBlockWavetableVoiceSamples;
-        blockStats.aetherOscASamples = currentBlockAetherOscASamples;
-        blockStats.aetherOscBSamples = currentBlockAetherOscBSamples;
-        blockStats.aetherSubSamples = currentBlockAetherSubSamples;
-        blockStats.aetherNoiseSamples = currentBlockAetherNoiseSamples;
-        blockStats.filterSamples = (int64_t) numSamples * 2;
-        blockStats.filterDriveSamples = currentBlockFilterDriveSamples;
-        blockStats.filterCoefficientUpdates = currentBlockFilterCoefficientUpdates;
-        blockStats.filterCutoffUpdates = currentBlockFilterCutoffUpdates;
-        blockStats.filterResonanceUpdates = currentBlockFilterResonanceUpdates;
-        blockStats.modulationSamples = modulationSamples;
-        blockStats.realtimeRampSamples = realtimeRampSamples;
-        blockStats.oscillatorRateCalculations = currentBlockOscillatorRateCalculations;
-        blockStats.wavetableFrequencyUpdates = currentBlockWavetableFrequencyUpdates;
-        blockStats.wavetablePositionUpdates = currentBlockWavetablePositionUpdates;
-        VoiceRenderStats::recordBlock(blockStats);
+        VoiceRenderStats::recordBlock(currentBlockWork.snapshot());
     }
 
     float InstrumentVoice::shapedEnvelope(float rawEnvelope) noexcept
@@ -653,9 +610,7 @@ namespace beat
             positionMod,
             detuneCentsMod,
             spreadMod);
-        currentBlockWavetableVoiceSamples += result.voiceSamples;
-        currentBlockWavetableFrequencyUpdates += result.frequencyUpdates;
-        currentBlockWavetablePositionUpdates += result.positionUpdates;
+        currentBlockWork.addWavetableRender(result.voiceSamples, result.frequencyUpdates, result.positionUpdates);
         return result.sample;
     }
 

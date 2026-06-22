@@ -13,9 +13,9 @@ Status legend:
 - `[x]` Native wavetable oscillator, cached frame selection, interpolation, shared table cache, unison planning, and basic factory tables.
 - `[x]` Aether oscillator A/B, sub, noise, unison, detune, spread, pan, level, phase, random phase, mono, legato, glide, pitch bend, mod wheel, velocity, and keytracking.
 - `[x]` Bounded CPU behavior for built-in oscillator polyBLEP, route nonlinear oversampling, Aether filter-drive oversampling, zero-drive bypass, cached pan, cached pitch-rate math, quantized wavetable frequency/position updates, and render-work counters.
-- `[~]` Continue thinning `InstrumentVoice`.
-  - Done: envelope shaper, LFO helper, dynamic-modulation helpers, oscillator helpers, Aether table-stack renderer, filter stage, drive stage, wavetable cache/table ownership, wavetable oscillator-bank rendering, wavetable unison planning, Aether pan/pitch cache helpers, voice math helpers, render-stat types, note-automation inbox/types/runtime state, realtime ramp state, realtime parameter mapper/application, active-ramp bookkeeping, and voice allocation.
-  - Remaining: split per-block counter assembly out of `InstrumentVoice`; keep direct backend stress for every extraction.
+- `[x]` Continue thinning `InstrumentVoice`.
+  - Done: envelope shaper, LFO helper, dynamic-modulation helpers, oscillator helpers, Aether table-stack renderer, filter stage, drive stage, wavetable cache/table ownership, wavetable oscillator-bank rendering, wavetable unison planning, Aether pan/pitch cache helpers, voice math helpers, render-stat types, per-block render-work assembly, note-automation inbox/types/runtime state, realtime ramp state, realtime parameter mapper/application, active-ramp bookkeeping, and voice allocation.
+  - Remaining: none for the current extraction plan; keep direct backend stress for any future extraction.
 - `[ ]` Add heavier nonlinear warp experiments only after the oversampling strategy is extended to any runtime warp stage.
   - Proof: backend stress showing bounded work counters, continuity across block boundaries, and dense Aether route stability.
 
@@ -97,10 +97,9 @@ Status legend:
 
 ## Near-Term Slice Order
 
-1. Split remaining per-block counter assembly out of `InstrumentVoice`.
-2. Add runtime macro state and macro lane automation with backend no-leak stress.
-3. Add dense overlapping Aether automation parity stress.
-4. Add an instrument FX rack UI backed by existing instrument-owned FX rendering.
-5. Tighten wavemap drawing/resynthesis semantics and add deterministic fixtures.
-6. Add visible note/segment automation lanes for the Aether targets.
-7. Add Aether preset storage, Save As preset flow, and migration fixtures.
+1. Add runtime macro state and macro lane automation with backend no-leak stress.
+2. Add dense overlapping Aether automation parity stress.
+3. Add an instrument FX rack UI backed by existing instrument-owned FX rendering.
+4. Tighten wavemap drawing/resynthesis semantics and add deterministic fixtures.
+5. Add visible note/segment automation lanes for the Aether targets.
+6. Add Aether preset storage, Save As preset flow, and migration fixtures.
