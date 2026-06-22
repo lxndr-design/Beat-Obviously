@@ -73,6 +73,16 @@ try {
     ],
     "effect automation lanes should survive document migration",
   );
+  const migratedMidiPayload = migrated.project.tracks[0].segments[0].payload;
+  assert.equal(migratedMidiPayload.kind, "midi");
+  assert.deepEqual(
+    migratedMidiPayload.notes[0].automation?.[0].points.map((point) => [point.beat, point.value, point.curve]),
+    [
+      [0, 1200, "smoothstep"],
+      [2, 4200, "easeOut"],
+    ],
+    "MIDI note automation curve metadata should survive document migration",
+  );
   assert.equal(migrated.instruments?.[0].source?.pluginId, "plug-decent-kit");
   assert.equal(migrated.instruments?.[0].sampleMap?.[0].loopEnabled, true);
   assert.equal(migrated.instruments?.[0].sampleMap?.[0].durationSeconds, 0.42);
@@ -303,8 +313,8 @@ function makeRepresentativeDocument() {
                       {
                         target: "filter.cutoff",
                         points: [
-                          { beat: 0, value: 1200 },
-                          { beat: 2, value: 4200 },
+                          { beat: 0, value: 1200, curve: "smoothstep" },
+                          { beat: 2, value: 4200, curve: "easeOut" },
                         ],
                       },
                     ],

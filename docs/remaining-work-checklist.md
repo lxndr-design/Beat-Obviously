@@ -35,6 +35,7 @@ Status legend:
    - `[x]` Add draggable start/end point handles for visible piano-roll Aether lanes.
    - `[x]` Add editable midpoint values for visible piano-roll Aether lanes.
    - `[x]` Add curve selection for visible piano-roll Aether lanes.
+   - `[x]` Add document roundtrip coverage for visible note-lane curve metadata.
    - `[x]` Add browser preview coverage that proves visible note-lane curve metadata changes Aether macro automation output.
    - `[~]` Cover track, segment, and piano-roll note automation entrypoints.
    - Add arbitrary multi-point lane editing and live/export parity coverage.
