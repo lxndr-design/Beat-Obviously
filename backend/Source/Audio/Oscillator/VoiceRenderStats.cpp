@@ -26,7 +26,7 @@ namespace beat::VoiceRenderStats
         std::atomic<int64_t> renderWavetablePositionUpdates { 0 };
     }
 
-    void recordBlock(const InstrumentVoice::RenderWorkStats& stats) noexcept
+    void recordBlock(const VoiceStats::RenderWork& stats) noexcept
     {
         renderVoiceBlocks.fetch_add(stats.voiceBlocks, std::memory_order_relaxed);
         renderVoiceSamples.fetch_add(stats.voiceSamples, std::memory_order_relaxed);
@@ -48,7 +48,7 @@ namespace beat::VoiceRenderStats
         renderWavetablePositionUpdates.fetch_add(stats.wavetablePositionUpdates, std::memory_order_relaxed);
     }
 
-    InstrumentVoice::RenderWorkStats consume() noexcept
+    VoiceStats::RenderWork consume() noexcept
     {
         return {
             renderVoiceBlocks.exchange(0, std::memory_order_relaxed),

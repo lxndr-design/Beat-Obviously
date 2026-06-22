@@ -130,7 +130,7 @@ namespace beat::WavetableVoiceCache
         return table;
     }
 
-    InstrumentVoice::WavetableCacheStats stats() noexcept
+    VoiceStats::WavetableCache stats() noexcept
     {
         return {
             wavetableCacheHits.load(std::memory_order_relaxed),

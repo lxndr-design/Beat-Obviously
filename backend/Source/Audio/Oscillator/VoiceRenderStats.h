@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../InstrumentVoice.h"
+#include "VoiceStats.h"
 
 namespace beat::VoiceRenderStats
 {
-    void recordBlock(const InstrumentVoice::RenderWorkStats& stats) noexcept;
-    InstrumentVoice::RenderWorkStats consume() noexcept;
+    void recordBlock(const VoiceStats::RenderWork& stats) noexcept;
+    VoiceStats::RenderWork consume() noexcept;
 }

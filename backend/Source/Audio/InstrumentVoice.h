@@ -5,6 +5,7 @@
 #include "Filter/FilterStage.h"
 #include "Modulation/DynamicModulation.h"
 #include "Oscillator/VoiceAetherCache.h"
+#include "Oscillator/VoiceStats.h"
 #include "Realtime/RealtimeParameterQueue.h"
 #include "Realtime/RealtimeRamp.h"
 #include "Realtime/VoiceRealtimeRampState.h"
@@ -228,37 +229,11 @@ namespace beat
         bool applyRealtimeParameter(std::string_view parameterId, float value, int rampSamples = 0) noexcept;
         void prepare(double sampleRate, int blockSize);
 
-        struct WavetableCacheStats
-        {
-            int64_t hits { 0 };
-            int64_t misses { 0 };
-            int size { 0 };
-        };
+        using WavetableCacheStats = VoiceStats::WavetableCache;
+        using RenderWorkStats = VoiceStats::RenderWork;
 
-        struct RenderWorkStats
-        {
-            int64_t voiceBlocks { 0 };
-            int64_t voiceSamples { 0 };
-            int64_t oscillatorSamples { 0 };
-            int64_t wavetableVoiceSamples { 0 };
-            int64_t aetherOscASamples { 0 };
-            int64_t aetherOscBSamples { 0 };
-            int64_t aetherSubSamples { 0 };
-            int64_t aetherNoiseSamples { 0 };
-            int64_t filterSamples { 0 };
-            int64_t filterDriveSamples { 0 };
-            int64_t filterCoefficientUpdates { 0 };
-            int64_t filterCutoffUpdates { 0 };
-            int64_t filterResonanceUpdates { 0 };
-            int64_t modulationSamples { 0 };
-            int64_t realtimeRampSamples { 0 };
-            int64_t oscillatorRateCalculations { 0 };
-            int64_t wavetableFrequencyUpdates { 0 };
-            int64_t wavetablePositionUpdates { 0 };
-        };
-
-        static WavetableCacheStats getWavetableCacheStats() noexcept;
-        static RenderWorkStats consumeRenderWorkStats() noexcept;
+        static VoiceStats::WavetableCache getWavetableCacheStats() noexcept;
+        static VoiceStats::RenderWork consumeRenderWorkStats() noexcept;
 
     private:
         using StereoSample = DriveStage::StereoFrame;

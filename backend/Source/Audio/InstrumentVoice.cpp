@@ -13,12 +13,12 @@
 
 namespace beat
 {
-    InstrumentVoice::WavetableCacheStats InstrumentVoice::getWavetableCacheStats() noexcept
+    VoiceStats::WavetableCache InstrumentVoice::getWavetableCacheStats() noexcept
     {
         return WavetableVoiceCache::stats();
     }
 
-    InstrumentVoice::RenderWorkStats InstrumentVoice::consumeRenderWorkStats() noexcept
+    VoiceStats::RenderWork InstrumentVoice::consumeRenderWorkStats() noexcept
     {
         return VoiceRenderStats::consume();
     }
@@ -530,7 +530,7 @@ namespace beat
         if (!adsr.isActive())
             clearCurrentNote();
 
-        RenderWorkStats blockStats;
+        VoiceStats::RenderWork blockStats;
         blockStats.voiceBlocks = 1;
         blockStats.voiceSamples = numSamples;
         blockStats.oscillatorSamples = currentBlockOscillatorSamples;
