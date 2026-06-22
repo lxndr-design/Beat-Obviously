@@ -44,6 +44,15 @@ export interface BeatProjectAsset {
   references: string[];
 }
 
+export type WavemapResynthesisSelectionMode = "full" | "transient" | "sustain" | "manual";
+
+export interface WavemapResynthesisSelection {
+  mode?: WavemapResynthesisSelectionMode;
+  startRatio?: number;
+  endRatio?: number;
+  windowRatio?: number;
+}
+
 export type BeatProjectIntegritySeverity = "info" | "warning" | "error";
 
 export interface BeatProjectIntegrityIssue {
@@ -302,7 +311,7 @@ export type OutboundRequest =
   | { kind: "instrument.list" }
   | { kind: "instrument.importDecent"; pathHint?: string }
   | { kind: "instrument.renderPreview"; instrument: Instrument; note?: number; velocity?: number; bpm?: number; durationBeats?: Beats; bucketCount?: number; includeAudio?: boolean }
-  | { kind: "instrument.resynthesizeWavemap"; audioFile: Pick<AudioFile, "id" | "name" | "path" | "sampleRate">; wavemapId?: string; name?: string }
+  | { kind: "instrument.resynthesizeWavemap"; audioFile: Pick<AudioFile, "id" | "name" | "path" | "sampleRate">; wavemapId?: string; name?: string; selection?: WavemapResynthesisSelection }
   // Audio files -----------------------------------------------------------
   | { kind: "audio.import"; pathHint?: string } // opens file picker
   | { kind: "audio.importMany"; pathHint?: string } // opens multi-file picker

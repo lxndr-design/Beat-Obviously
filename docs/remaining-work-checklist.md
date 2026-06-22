@@ -26,7 +26,8 @@ Status legend:
    - Clarify frame editing constraints.
    - Add additive-vs-freehand editing tools.
    - `[x]` Add deterministic browser/native source metadata and frame-analysis fixtures.
-   - `[ ]` Add transient/frame selection controls for imported audio.
+   - `[x]` Add deterministic full/transient/sustain/manual imported-audio selection windows, native IPC support, source-range metadata, and Solid import mode controls.
+   - `[ ]` Add visual/manual range picker polish for imported audio.
 3. `[ ]` Visible Aether automation lanes.
    - Add lanes for pitch, level, phase, filter, wavetable position, and macro targets.
    - Cover track, segment, and piano-roll note automation entrypoints.

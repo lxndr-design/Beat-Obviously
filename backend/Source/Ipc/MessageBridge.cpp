@@ -540,10 +540,105 @@ namespace beat
             return juce::var(frame.get());
         }
 
+        std::pair<int, int> clampSampleWindow(int start, int end, int length)
+        {
+            const auto width = std::max(1, end - start);
+            auto safeStart = juce::jlimit(0, std::max(0, length - 1), start);
+            auto safeEnd = std::min(length, safeStart + width);
+            if (safeEnd - safeStart < width)
+            {
+                safeStart = std::max(0, safeEnd - width);
+                safeEnd = std::min(length, safeStart + width);
+            }
+            return { safeStart, std::max(safeStart + 1, safeEnd) };
+        }
+
+        int peakSampleIndex(const std::vector<float>& samples, int start, int end)
+        {
+            const auto safeStart = juce::jlimit(0, std::max(0, (int) samples.size() - 1), start);
+            const auto safeEnd = std::max(safeStart + 1, std::min((int) samples.size(), end));
+            auto peakIndex = safeStart;
+            auto peak = 0.0f;
+            for (int index = safeStart; index < safeEnd; ++index)
+            {
+                const auto value = std::abs(samples[(size_t) index]);
+                if (value > peak)
+                {
+                    peak = value;
+                    peakIndex = index;
+                }
+            }
+            return peakIndex;
+        }
+
+        int strongestRmsWindowStart(const std::vector<float>& samples, int start, int end, int window)
+        {
+            const auto safeStart = juce::jlimit(0, std::max(0, (int) samples.size() - 1), start);
+            const auto safeEnd = std::max(safeStart + 1, std::min((int) samples.size(), end));
+            const auto safeWindow = juce::jlimit(1, safeEnd - safeStart, window);
+            const auto step = std::max(1, safeWindow / 8);
+            auto bestStart = safeStart;
+            auto bestEnergy = -1.0;
+            for (int index = safeStart; index <= safeEnd - safeWindow; index += step)
+            {
+                auto energy = 0.0;
+                for (int sampleIndex = index; sampleIndex < index + safeWindow; ++sampleIndex)
+                {
+                    const auto sample = samples[(size_t) sampleIndex];
+                    energy += (double) sample * (double) sample;
+                }
+                if (energy > bestEnergy)
+                {
+                    bestEnergy = energy;
+                    bestStart = index;
+                }
+            }
+            return bestStart;
+        }
+
+        std::pair<int, int> wavemapSelectionWindow(const std::vector<float>& samples, const juce::var& selection)
+        {
+            const auto length = (int) samples.size();
+            if (length <= 0)
+                return { 0, 1 };
+
+            const auto mode = selection.isObject()
+                ? selection.getProperty("mode", "full").toString()
+                : juce::String("full");
+            auto start = 0;
+            auto end = length;
+            if (mode == "manual")
+            {
+                const auto startRatio = juce::jlimit(0.0, 1.0, (double) selection.getProperty("startRatio", 0.0));
+                const auto endRatio = juce::jlimit(0.0, 1.0, (double) selection.getProperty("endRatio", 1.0));
+                start = (int) std::floor(std::min(startRatio, endRatio) * length);
+                end = (int) std::ceil(std::max(startRatio, endRatio) * length);
+            }
+            else if (mode == "transient")
+            {
+                const auto ratio = juce::jlimit(0.0, 1.0, (double) selection.getProperty("windowRatio", 0.28));
+                const auto window = std::max(1, std::min(length, std::max(256, (int) std::floor(length * ratio))));
+                const auto peak = peakSampleIndex(samples, 0, length);
+                start = peak - (int) std::floor(window * 0.18);
+                end = start + window;
+            }
+            else if (mode == "sustain")
+            {
+                const auto ratio = juce::jlimit(0.0, 1.0, (double) selection.getProperty("windowRatio", 0.5));
+                const auto window = std::max(1, std::min(length, std::max(512, (int) std::floor(length * ratio))));
+                const auto searchStart = std::min(length - 1, (int) std::floor(length * 0.22));
+                start = strongestRmsWindowStart(samples, searchStart, length, window);
+                end = start + window;
+            }
+
+            return clampSampleWindow(start, end, length);
+        }
+
         juce::var makeWavemapFromAudioFile(const juce::File& file,
                                            const juce::String& audioFileId,
                                            juce::String wavemapId,
-                                           juce::String name)
+                                           juce::String name,
+                                           const juce::var& selection)
         {
             juce::AudioFormatManager formatManager;
             formatManager.registerBasicFormats();
@@ -572,29 +667,37 @@ namespace beat
             if (name.trim().isEmpty())
                 name = file.getFileNameWithoutExtension() + " Wavemap";
 
+            const auto [selectionStart, selectionEnd] = wavemapSelectionWindow(samples, selection);
+            const int selectedLength = std::max(1, selectionEnd - selectionStart);
+
             juce::Array<juce::var> frames;
             constexpr int frameCount = 4;
-            const int frameLength = std::max(1, readCount / frameCount);
+            const int frameLength = std::max(1, selectedLength / frameCount);
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
-                const int start = frameIndex * frameLength;
-                const int end = frameIndex == frameCount - 1 ? readCount : std::min(readCount, start + frameLength);
+                const int start = selectionStart + frameIndex * frameLength;
+                const int end = frameIndex == frameCount - 1 ? selectionEnd : std::min(selectionEnd, start + frameLength);
                 frames.add(makeWavemapFrame(samples, start, end, wavemapId, frameIndex));
             }
 
+            const auto selectionMode = selection.isObject()
+                ? selection.getProperty("mode", "full").toString()
+                : juce::String("full");
             juce::DynamicObject::Ptr source = new juce::DynamicObject();
             source->setProperty("kind", "imported-audio");
-            source->setProperty("label", file.getFileNameWithoutExtension());
+            source->setProperty("label", selectionMode == "full"
+                ? file.getFileNameWithoutExtension()
+                : file.getFileNameWithoutExtension() + " " + selectionMode);
             source->setProperty("audioFileId", audioFileId);
             source->setProperty("path", file.getFullPathName());
             source->setProperty("sampleRate", reader->sampleRate);
             source->setProperty("channelCount", static_cast<int>(reader->numChannels));
             source->setProperty("bitDepth", static_cast<int>(reader->bitsPerSample));
             source->setProperty("sourceSampleCount", static_cast<double>(reader->lengthInSamples));
-            source->setProperty("analyzedSampleCount", static_cast<double>(readCount));
+            source->setProperty("analyzedSampleCount", static_cast<double>(selectedLength));
             source->setProperty("frameCount", frameCount);
-            source->setProperty("sourceStartSample", 0.0);
-            source->setProperty("sourceEndSample", static_cast<double>(readCount));
+            source->setProperty("sourceStartSample", static_cast<double>(selectionStart));
+            source->setProperty("sourceEndSample", static_cast<double>(selectionEnd));
             source->setProperty("createdAt", static_cast<double>(juce::Time::getCurrentTime().toMilliseconds()));
 
             juce::DynamicObject::Ptr wavemap = new juce::DynamicObject();
@@ -3534,7 +3637,8 @@ namespace beat
             auto wavemap = makeWavemapFromAudioFile(file,
                                                     audioFile.getProperty("id", {}).toString(),
                                                     payload.getProperty("wavemapId", {}).toString(),
-                                                    payload.getProperty("name", {}).toString());
+                                                    payload.getProperty("name", {}).toString(),
+                                                    payload.getProperty("selection", {}));
             if (wavemap.isVoid())
             {
                 response->setProperty("error", "Audio file could not be decoded for wavemap resynthesis.");

@@ -1,6 +1,6 @@
 import { isNative, send } from "../ipc/bridge";
 import type { AudioFile, WavemapDefinition } from "../state/types";
-import { createWavemapFromAudioSamples } from "../state/synthStore";
+import { createWavemapFromAudioSamples, selectWavemapAudioWindow, type WavemapAudioSelectionOptions } from "../state/synthStore";
 
 const MAX_RESYNTH_SAMPLES = 262_144;
 
@@ -8,6 +8,7 @@ export async function resynthesizeAudioFileToWavemap(
   audioFile: AudioFile,
   wavemapId: string,
   name = `${stripAudioExtension(audioFile.name)} Wavemap`,
+  selection: WavemapAudioSelectionOptions = {},
 ): Promise<WavemapDefinition> {
   if (isNative() && audioFile.path && !audioFile.path.startsWith("data:")) {
     const response = await send({
@@ -15,23 +16,26 @@ export async function resynthesizeAudioFileToWavemap(
       audioFile,
       wavemapId,
       name,
+      selection,
     });
     if (response.wavemap) return response.wavemap;
     throw new Error(response.error ?? "Audio file could not be resynthesized.");
   }
 
   const decoded = await decodeAudioFileToMonoSamples(audioFile);
-  return createWavemapFromAudioSamples(wavemapId, name, decoded.samples, decoded.sampleRate, {
+  const selected = selectWavemapAudioWindow(decoded.samples, selection);
+  const labelSuffix = selected.mode === "full" ? "" : ` ${selected.mode}`;
+  return createWavemapFromAudioSamples(wavemapId, name, selected.samples, decoded.sampleRate, {
     kind: "imported-audio",
-    label: stripAudioExtension(audioFile.name),
+    label: `${stripAudioExtension(audioFile.name)}${labelSuffix}`,
     audioFileId: audioFile.id,
     path: audioFile.path,
     sampleRate: decoded.sampleRate,
     channelCount: decoded.channelCount,
     bitDepth: audioFile.bitDepth,
     sourceSampleCount: decoded.sourceLength,
-    sourceStartSample: 0,
-    sourceEndSample: decoded.sourceLength,
+    sourceStartSample: selected.sourceStartSample,
+    sourceEndSample: selected.sourceEndSample,
   });
 }
 

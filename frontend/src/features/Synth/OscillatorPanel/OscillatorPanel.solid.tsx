@@ -23,6 +23,7 @@ import {
   synthDraftToPreviewInstrument,
   tiltHarmonicPartials,
   useSynthStore,
+  type WavemapAudioSelectionMode,
   type ModulationTargetId,
   type OscillatorKey,
   type SynthDraftPatch,
@@ -64,6 +65,12 @@ const WARP_MODE_OPTIONS: Array<{ value: WavetableWarpMode; label: string; icon: 
   { value: "shape", label: "Shape", icon: "ph:waveform" },
   { value: "fold", label: "Fold", icon: "ph:intersect-three" },
   { value: "pinch", label: "Pinch", icon: "ph:arrows-in-line-horizontal" },
+];
+
+const RESYNTHESIS_MODE_OPTIONS: Array<{ value: WavemapAudioSelectionMode; label: string }> = [
+  { value: "full", label: "Full" },
+  { value: "transient", label: "Transient" },
+  { value: "sustain", label: "Sustain" },
 ];
 
 export function OscillatorPanel() {
@@ -170,6 +177,7 @@ function OscillatorRow(props: {
   const updateCustomWavetableFrame = useSynthStore.getState().updateCustomWavetableFrame;
   const updateWavemapMetadata = useSynthStore.getState().updateWavemapMetadata;
   const [resynthesizing, setResynthesizing] = createSignal(false);
+  const [resynthesisMode, setResynthesisMode] = createSignal<WavemapAudioSelectionMode>("full");
   const enabledId = createMemo(() => oscParam(props.oscillator, "enabled"));
   const enabled = createMemo(() => getBooleanParam(draft(), enabledId()));
   const wavetableId = createMemo(() => oscParam(props.oscillator, "wavetable"));
@@ -190,7 +198,9 @@ function OscillatorRow(props: {
     try {
       const audioFile = await importAudioFile();
       if (!audioFile) return;
-      const wavemap = await resynthesizeAudioFileToWavemap(audioFile, customTableId());
+      const wavemap = await resynthesizeAudioFileToWavemap(audioFile, customTableId(), undefined, {
+        mode: resynthesisMode(),
+      });
       setWavemap(wavemap);
       setParameter(wavetableId(), wavemap.id as WavetableId);
     } catch (error) {
@@ -277,6 +287,20 @@ function OscillatorRow(props: {
                       parseValue={parsePercent}
                       onChange={(morph) => updateWavemapMetadata(customTable().id, { morph })}
                     />
+                    <div class={styles.resynthesisModes} role="radiogroup" aria-label="Audio resynthesis window">
+                      <For each={RESYNTHESIS_MODE_OPTIONS}>
+                        {(option) => (
+                          <Button
+                            size="xs"
+                            selected={resynthesisMode() === option.value}
+                            aria-label={`${option.label} audio resynthesis window`}
+                            onClick={() => setResynthesisMode(option.value)}
+                          >
+                            {option.label}
+                          </Button>
+                        )}
+                      </For>
+                    </div>
                     <Button
                       size="xs"
                       disabled={resynthesizing()}

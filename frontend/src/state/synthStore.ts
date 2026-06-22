@@ -29,6 +29,24 @@ export type WavetableId =
   | typeof DEFAULT_CUSTOM_WAVETABLE_ID
   | `user.${string}`;
 
+export type WavemapAudioSelectionMode = "full" | "transient" | "sustain" | "manual";
+
+export interface WavemapAudioSelectionOptions {
+  mode?: WavemapAudioSelectionMode;
+  startRatio?: number;
+  endRatio?: number;
+  windowRatio?: number;
+}
+
+export interface WavemapAudioSelection {
+  mode: WavemapAudioSelectionMode;
+  samples: Float32Array;
+  sourceStartSample: number;
+  sourceEndSample: number;
+  peakSample: number;
+  rms: number;
+}
+
 export type OscillatorKey = "a" | "b";
 export type OscillatorParamSuffix =
   | "enabled"
@@ -259,11 +277,14 @@ export function createWavemapFromAudioSamples(
   const safeId = id.startsWith("user.") ? id : `user.${id.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "wavemap"}`;
   const frameCount = 4;
   const frameLength = Math.max(1, Math.floor(samples.length / frameCount));
+  const sourceOffset = typeof source.sourceStartSample === "number" && Number.isFinite(source.sourceStartSample)
+    ? Math.max(0, Math.floor(source.sourceStartSample))
+    : 0;
   const frames: CustomWavetableFrame[] = [];
   for (let frame = 0; frame < frameCount; frame += 1) {
     const start = frame * frameLength;
     const end = frame === frameCount - 1 ? samples.length : Math.min(samples.length, start + frameLength);
-    frames.push(analyzeSamplesToWavemapFrame(samples, start, end, safeId, frame));
+    frames.push(analyzeSamplesToWavemapFrame(samples, start, end, safeId, frame, sourceOffset));
   }
   return normalizeCustomWavetable({
     schemaVersion: 1,
@@ -284,11 +305,68 @@ export function createWavemapFromAudioSamples(
       analyzedSampleCount: samples.length,
       frameCount,
       sourceStartSample: source.sourceStartSample,
-      sourceEndSample: source.sourceEndSample,
+      sourceEndSample: source.sourceEndSample ?? sourceOffset + samples.length,
       createdAt: source.createdAt ?? Date.now(),
     },
     frames,
   });
+}
+
+export function selectWavemapAudioWindow(
+  samples: ArrayLike<number>,
+  options: WavemapAudioSelectionOptions = {},
+): WavemapAudioSelection {
+  const length = samples.length;
+  if (length <= 0) {
+    return {
+      mode: options.mode ?? "full",
+      samples: new Float32Array([0]),
+      sourceStartSample: 0,
+      sourceEndSample: 1,
+      peakSample: 0,
+      rms: 0,
+    };
+  }
+
+  const mode = options.mode ?? "full";
+  let start = 0;
+  let end = length;
+  if (mode === "manual") {
+    const startRatio = sanitize01(options.startRatio, 0);
+    const endRatio = sanitize01(options.endRatio, 1);
+    start = Math.floor(Math.min(startRatio, endRatio) * length);
+    end = Math.ceil(Math.max(startRatio, endRatio) * length);
+  } else if (mode === "transient") {
+    const window = selectionWindowSamples(length, options.windowRatio ?? 0.28, 256);
+    const peak = peakSampleIndex(samples, 0, length);
+    start = peak - Math.floor(window * 0.18);
+    end = start + window;
+  } else if (mode === "sustain") {
+    const window = selectionWindowSamples(length, options.windowRatio ?? 0.5, 512);
+    const searchStart = Math.min(length - 1, Math.floor(length * 0.22));
+    const peak = strongestRmsWindowStart(samples, searchStart, length, window);
+    start = peak;
+    end = peak + window;
+  }
+
+  const bounded = clampSampleWindow(start, end, length);
+  const selected = new Float32Array(bounded.end - bounded.start);
+  let sumSquares = 0;
+  let peak = 0;
+  for (let index = 0; index < selected.length; index += 1) {
+    const sample = Math.max(-1, Math.min(1, Number(samples[bounded.start + index]) || 0));
+    selected[index] = sample;
+    sumSquares += sample * sample;
+    peak = Math.max(peak, Math.abs(sample));
+  }
+  return {
+    mode,
+    samples: selected,
+    sourceStartSample: bounded.start,
+    sourceEndSample: bounded.end,
+    peakSample: peak,
+    rms: Math.sqrt(sumSquares / Math.max(1, selected.length)),
+  };
 }
 
 export function deriveWavemapFrameFromDrawnWaveform(
@@ -467,12 +545,64 @@ function randomSigned(rng: () => number): number {
   return rng() * 2 - 1;
 }
 
+function selectionWindowSamples(length: number, ratio: number, minimum: number): number {
+  return Math.max(1, Math.min(length, Math.max(minimum, Math.floor(length * sanitize01(ratio, 0.25)))));
+}
+
+function clampSampleWindow(start: number, end: number, length: number): { start: number; end: number } {
+  const width = Math.max(1, Math.floor(end) - Math.floor(start));
+  let safeStart = Math.max(0, Math.min(length - 1, Math.floor(start)));
+  let safeEnd = Math.min(length, safeStart + width);
+  if (safeEnd - safeStart < width) {
+    safeStart = Math.max(0, safeEnd - width);
+    safeEnd = Math.min(length, safeStart + width);
+  }
+  return { start: safeStart, end: Math.max(safeStart + 1, safeEnd) };
+}
+
+function peakSampleIndex(samples: ArrayLike<number>, start: number, end: number): number {
+  const safeStart = Math.max(0, Math.min(samples.length - 1, Math.floor(start)));
+  const safeEnd = Math.max(safeStart + 1, Math.min(samples.length, Math.floor(end)));
+  let peakIndex = safeStart;
+  let peak = 0;
+  for (let index = safeStart; index < safeEnd; index += 1) {
+    const value = Math.abs(Number(samples[index]) || 0);
+    if (value > peak) {
+      peak = value;
+      peakIndex = index;
+    }
+  }
+  return peakIndex;
+}
+
+function strongestRmsWindowStart(samples: ArrayLike<number>, start: number, end: number, window: number): number {
+  const safeStart = Math.max(0, Math.min(samples.length - 1, Math.floor(start)));
+  const safeEnd = Math.max(safeStart + 1, Math.min(samples.length, Math.floor(end)));
+  const safeWindow = Math.max(1, Math.min(window, safeEnd - safeStart));
+  const step = Math.max(1, Math.floor(safeWindow / 8));
+  let bestStart = safeStart;
+  let bestEnergy = -1;
+  for (let index = safeStart; index <= safeEnd - safeWindow; index += step) {
+    let energy = 0;
+    for (let sampleIndex = index; sampleIndex < index + safeWindow; sampleIndex += 1) {
+      const sample = Number(samples[sampleIndex]) || 0;
+      energy += sample * sample;
+    }
+    if (energy > bestEnergy) {
+      bestEnergy = energy;
+      bestStart = index;
+    }
+  }
+  return bestStart;
+}
+
 function analyzeSamplesToWavemapFrame(
   samples: ArrayLike<number>,
   start: number,
   end: number,
   wavemapId: string,
   frameIndex: number,
+  sourceOffset = 0,
 ): CustomWavetableFrame {
   const safeStart = Math.max(0, Math.min(samples.length, Math.floor(start)));
   const safeEnd = Math.max(safeStart + 1, Math.min(samples.length, Math.floor(end)));
@@ -520,8 +650,8 @@ function analyzeSamplesToWavemapFrame(
     phase: sanitizeBipolar(spectrum.dominantPhase / Math.PI, 0),
     partials,
     analysis: {
-      sourceStartSample: safeStart,
-      sourceEndSample: safeEnd,
+      sourceStartSample: sourceOffset + safeStart,
+      sourceEndSample: sourceOffset + safeEnd,
       rms,
       peak,
       zeroCrossRate,

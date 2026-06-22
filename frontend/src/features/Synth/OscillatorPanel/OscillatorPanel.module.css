@@ -188,6 +188,13 @@
   max-width: 220px;
 }
 
+.resynthesisModes {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
 .customFrames {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

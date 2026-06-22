@@ -949,12 +949,46 @@ try {
     const phase = index / 4096;
     return Math.sin(phase * Math.PI * 2 * 9) * 0.7 + Math.sin(phase * Math.PI * 2 * 23 + 0.4) * 0.28;
   });
+  const selectionSamples = Float32Array.from({ length: 4096 }, (_, index) => {
+    if (index === 384) return 1;
+    if (index > 2380 && index < 3200) return Math.sin(index * 0.19) * 0.72;
+    return Math.sin(index * 0.05) * 0.08;
+  });
+  const transientSelection = synthStore.selectWavemapAudioWindow(selectionSamples, { mode: "transient", windowRatio: 0.25 });
+  assert.equal(transientSelection.samples.length, 1024);
+  assert.ok(transientSelection.sourceStartSample <= 384 && transientSelection.sourceEndSample > 384, "transient selection should include the strongest attack");
+  assert.ok(transientSelection.peakSample > 0.9, "transient selection should report the selected peak");
+  const sustainSelection = synthStore.selectWavemapAudioWindow(selectionSamples, { mode: "sustain", windowRatio: 0.25 });
+  assert.equal(sustainSelection.samples.length, 1024);
+  assert.ok(sustainSelection.sourceStartSample > transientSelection.sourceStartSample, "sustain selection should choose the later steady-energy window");
+  assert.ok(sustainSelection.rms > transientSelection.rms * 0.5, "sustain selection should preserve meaningful RMS energy");
+  const manualSelection = synthStore.selectWavemapAudioWindow(selectionSamples, { mode: "manual", startRatio: 0.25, endRatio: 0.5 });
+  assert.equal(manualSelection.sourceStartSample, 1024);
+  assert.equal(manualSelection.sourceEndSample, 2048);
+  assert.equal(manualSelection.samples.length, 1024);
+  const transientWavemap = synthStore.createWavemapFromAudioSamples(
+    "user.resynth.transient.verify",
+    "Transient Resynth",
+    transientSelection.samples,
+    48000,
+    {
+      kind: "imported-audio",
+      label: "Transient Source",
+      sourceSampleCount: selectionSamples.length,
+      sourceStartSample: transientSelection.sourceStartSample,
+      sourceEndSample: transientSelection.sourceEndSample,
+    },
+  );
+  assert.equal(transientWavemap.source.sourceStartSample, transientSelection.sourceStartSample);
+  assert.equal(transientWavemap.source.sourceEndSample, transientSelection.sourceEndSample);
+  assert.equal(transientWavemap.frames[0].analysis.sourceStartSample, transientSelection.sourceStartSample);
+  assert.equal(transientWavemap.frames.at(-1).analysis.sourceEndSample, transientSelection.sourceEndSample);
   const resynthWavemap = synthStore.createWavemapFromAudioSamples(
     "user.resynth.verify",
     "Verifier Resynth",
     resynthSamples,
     48000,
-    { kind: "imported-audio", label: "Verifier Audio", path: "/tmp/verifier.wav", sampleRate: 48000, channelCount: 2, bitDepth: 24, sourceSampleCount: 4096, sourceStartSample: 10, sourceEndSample: 4000 },
+    { kind: "imported-audio", label: "Verifier Audio", path: "/tmp/verifier.wav", sampleRate: 48000, channelCount: 2, bitDepth: 24, sourceSampleCount: 4096, sourceStartSample: 10, sourceEndSample: 4106 },
   );
   assert.equal(resynthWavemap.kind, "resynthesized");
   assert.equal(resynthWavemap.interpolation, "smooth");
@@ -966,9 +1000,13 @@ try {
   assert.equal(resynthWavemap.source.sourceSampleCount, 4096);
   assert.equal(resynthWavemap.source.analyzedSampleCount, 4096);
   assert.equal(resynthWavemap.source.frameCount, 4);
+  assert.equal(resynthWavemap.source.sourceStartSample, 10);
+  assert.equal(resynthWavemap.source.sourceEndSample, 4106);
   assert.equal(resynthWavemap.frames.length, 4);
   assert.equal(resynthWavemap.frames.every((frame) => frame.id?.startsWith("user.resynth.verify.frame.")), true);
   assert.equal(resynthWavemap.frames.every((frame) => Array.isArray(frame.partials) && frame.partials.length === 16), true);
+  assert.equal(resynthWavemap.frames[0].analysis.sourceStartSample, 10);
+  assert.equal(resynthWavemap.frames.at(-1).analysis.sourceEndSample, 4106);
   assert.equal(resynthWavemap.frames.every((frame) => frame.analysis && frame.analysis.sourceEndSample > frame.analysis.sourceStartSample), true);
   assert.equal(resynthWavemap.frames.every((frame) => frame.analysis && frame.analysis.peak > 0 && frame.analysis.rms > 0), true);
   assert.ok(resynthWavemap.frames.some((frame) => frame.analysis.dominantHarmonic >= 1), "expected resynthesis to persist dominant harmonic analysis");

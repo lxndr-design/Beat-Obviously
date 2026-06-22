@@ -44,8 +44,8 @@ Status legend:
   - Remaining: richer draw modes beyond the current mini-waveform/partial lanes, clearer frame editing constraints, and intentional tools for additive-vs-freehand editing.
   - Proof: browser preview differences, native table generation differences, patch persistence, verifier snapshots, and backend stress for cache identity.
 - `[~]` Richer FFT/resynthesis analysis.
-  - Done: deterministic browser/native source provenance fields and per-frame RMS/peak/zero-cross/roughness/asymmetry/centroid/dominant-harmonic analysis metadata.
-  - Remaining: more informative analysis controls and better transient/frame selection.
+  - Done: deterministic browser/native source provenance fields, deterministic full/transient/sustain/manual imported-audio selection windows, Solid import mode controls, native IPC selection support, absolute source-range frame metadata, and per-frame RMS/peak/zero-cross/roughness/asymmetry/centroid/dominant-harmonic analysis metadata.
+  - Remaining: visual/manual range picker polish and deeper analysis display controls.
   - Proof: deterministic fixture import that produces stable frame metadata and audible/rendered differences.
 - `[ ]` Wavemap preset/version migration.
   - Add explicit migration for older wavemap schema versions once the current editing semantics settle.
