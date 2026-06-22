@@ -7,6 +7,7 @@
 #include "Oscillator/VoiceAetherCache.h"
 #include "Realtime/RealtimeParameterQueue.h"
 #include "Realtime/RealtimeRamp.h"
+#include "Realtime/VoiceRealtimeRampState.h"
 #include "Realtime/VoiceRealtimeParams.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
@@ -291,8 +292,6 @@ namespace beat
         bool aetherOscillatorNeedsWavetable(const Params::AetherOscillator& osc) const noexcept;
         void resetRealtimeRampsFromParams() noexcept;
         void setRealtimeRamp(RealtimeParam param, float value, int rampSamples) noexcept;
-        void activateRealtimeRamp(RealtimeParam param) noexcept;
-        void deactivateRealtimeRamp(RealtimeParam param) noexcept;
         bool setRealtimeParameterValue(std::string_view parameterId, float value, int rampSamples, bool updateBaseline) noexcept;
         void applyParamToParams(Params& target, RealtimeParam param, float value) noexcept;
         void applyRealtimeValue(RealtimeParam param, float value) noexcept;
@@ -334,9 +333,7 @@ namespace beat
         VoiceAetherCache::PanGains cachedPanGains;
         VoiceAetherCache::PitchRates cachedPitchRates;
         DynamicModulation::TargetActivityFlags cachedDynamicTargets;
-        std::array<RealtimeRamp, VoiceRealtimeParams::count> realtimeRamps;
-        std::array<size_t, VoiceRealtimeParams::count> activeRealtimeRampIndices {};
-        int activeRealtimeRampCount { 0 };
+        VoiceRealtimeRampState realtimeRampState;
         std::array<RealtimeParameterChange, maxNoteAutomationEvents> voiceAutomationEvents;
         std::array<NoteAutomationContext::PitchEvent, maxNoteAutomationEvents> voicePitchEvents;
         int voiceAutomationEventCount { 0 };

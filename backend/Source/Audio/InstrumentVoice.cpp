@@ -128,66 +128,37 @@ namespace beat
 
     void InstrumentVoice::resetRealtimeRampsFromParams() noexcept
     {
-        realtimeRamps[(size_t) RealtimeParam::FilterCutoff].reset(params.cutoff01);
-        realtimeRamps[(size_t) RealtimeParam::FilterResonance].reset(params.resonance01);
-        realtimeRamps[(size_t) RealtimeParam::FilterDrive].reset(params.drive01);
-        realtimeRamps[(size_t) RealtimeParam::AmpLevel].reset(params.ampLevel);
-        realtimeRamps[(size_t) RealtimeParam::AmpPan].reset(params.ampPan);
-        realtimeRamps[(size_t) RealtimeParam::OscAPosition].reset(params.aetherOscA.wavetable.position);
-        realtimeRamps[(size_t) RealtimeParam::OscBPosition].reset(params.aetherOscB.wavetable.position);
-        realtimeRamps[(size_t) RealtimeParam::OscAFine].reset(params.aetherOscA.fineCents);
-        realtimeRamps[(size_t) RealtimeParam::OscBFine].reset(params.aetherOscB.fineCents);
-        realtimeRamps[(size_t) RealtimeParam::OscALevel].reset(params.aetherOscA.level);
-        realtimeRamps[(size_t) RealtimeParam::OscBLevel].reset(params.aetherOscB.level);
-        realtimeRamps[(size_t) RealtimeParam::OscAPan].reset(params.aetherOscA.pan);
-        realtimeRamps[(size_t) RealtimeParam::OscBPan].reset(params.aetherOscB.pan);
-        realtimeRamps[(size_t) RealtimeParam::UnisonDetune].reset(params.wavetableDetuneCents);
-        realtimeRamps[(size_t) RealtimeParam::UnisonSpread].reset(params.wavetableBlend);
-        realtimeRamps[(size_t) RealtimeParam::LfoRate].reset(params.lfoRateHz);
-        realtimeRamps[(size_t) RealtimeParam::LfoDepth].reset(params.lfoDepth);
-        activeRealtimeRampCount = 0;
+        realtimeRampState.ramp(RealtimeParam::FilterCutoff).reset(params.cutoff01);
+        realtimeRampState.ramp(RealtimeParam::FilterResonance).reset(params.resonance01);
+        realtimeRampState.ramp(RealtimeParam::FilterDrive).reset(params.drive01);
+        realtimeRampState.ramp(RealtimeParam::AmpLevel).reset(params.ampLevel);
+        realtimeRampState.ramp(RealtimeParam::AmpPan).reset(params.ampPan);
+        realtimeRampState.ramp(RealtimeParam::OscAPosition).reset(params.aetherOscA.wavetable.position);
+        realtimeRampState.ramp(RealtimeParam::OscBPosition).reset(params.aetherOscB.wavetable.position);
+        realtimeRampState.ramp(RealtimeParam::OscAFine).reset(params.aetherOscA.fineCents);
+        realtimeRampState.ramp(RealtimeParam::OscBFine).reset(params.aetherOscB.fineCents);
+        realtimeRampState.ramp(RealtimeParam::OscALevel).reset(params.aetherOscA.level);
+        realtimeRampState.ramp(RealtimeParam::OscBLevel).reset(params.aetherOscB.level);
+        realtimeRampState.ramp(RealtimeParam::OscAPan).reset(params.aetherOscA.pan);
+        realtimeRampState.ramp(RealtimeParam::OscBPan).reset(params.aetherOscB.pan);
+        realtimeRampState.ramp(RealtimeParam::UnisonDetune).reset(params.wavetableDetuneCents);
+        realtimeRampState.ramp(RealtimeParam::UnisonSpread).reset(params.wavetableBlend);
+        realtimeRampState.ramp(RealtimeParam::LfoRate).reset(params.lfoRateHz);
+        realtimeRampState.ramp(RealtimeParam::LfoDepth).reset(params.lfoDepth);
+        realtimeRampState.clearActive();
     }
 
     void InstrumentVoice::setRealtimeRamp(RealtimeParam param, float value, int rampSamples) noexcept
     {
-        auto& ramp = realtimeRamps[(size_t) param];
+        auto& ramp = realtimeRampState.ramp(param);
         ramp.setTarget(value, rampSamples);
         if (rampSamples <= 0)
         {
-            deactivateRealtimeRamp(param);
+            realtimeRampState.deactivate(param);
             applyRealtimeValue(param, ramp.current);
             return;
         }
-        activateRealtimeRamp(param);
-    }
-
-    void InstrumentVoice::activateRealtimeRamp(RealtimeParam param) noexcept
-    {
-        const auto index = (size_t) param;
-        for (int i = 0; i < activeRealtimeRampCount; ++i)
-            if (activeRealtimeRampIndices[(size_t) i] == index)
-                return;
-
-        if (activeRealtimeRampCount >= (int) activeRealtimeRampIndices.size())
-            return;
-
-        activeRealtimeRampIndices[(size_t) activeRealtimeRampCount] = index;
-        ++activeRealtimeRampCount;
-    }
-
-    void InstrumentVoice::deactivateRealtimeRamp(RealtimeParam param) noexcept
-    {
-        const auto index = (size_t) param;
-        for (int i = 0; i < activeRealtimeRampCount; ++i)
-        {
-            if (activeRealtimeRampIndices[(size_t) i] != index)
-                continue;
-
-            --activeRealtimeRampCount;
-            if (i != activeRealtimeRampCount)
-                activeRealtimeRampIndices[(size_t) i] = activeRealtimeRampIndices[(size_t) activeRealtimeRampCount];
-            return;
-        }
+        realtimeRampState.activate(param);
     }
 
     bool InstrumentVoice::applyRealtimeParameter(std::string_view parameterId, float value, int rampSamples) noexcept
@@ -352,21 +323,10 @@ namespace beat
 
     void InstrumentVoice::advanceRealtimeRamps() noexcept
     {
-        int writeIndex = 0;
-        for (int readIndex = 0; readIndex < activeRealtimeRampCount; ++readIndex)
+        realtimeRampState.advance([this](RealtimeParam param, float value)
         {
-            const auto paramIndex = activeRealtimeRampIndices[(size_t) readIndex];
-            auto& ramp = realtimeRamps[paramIndex];
-            if (!ramp.active())
-                continue;
-            applyRealtimeValue((RealtimeParam) paramIndex, ramp.next());
-            if (ramp.active())
-            {
-                activeRealtimeRampIndices[(size_t) writeIndex] = paramIndex;
-                ++writeIndex;
-            }
-        }
-        activeRealtimeRampCount = writeIndex;
+            applyRealtimeValue(param, value);
+        });
     }
 
     void InstrumentVoice::loadPendingNoteAutomation(int midiNoteNumber) noexcept
@@ -565,9 +525,9 @@ namespace beat
                 advanceVoiceAutomation();
                 ++modulationSamples;
             }
-            if (activeRealtimeRampCount > 0)
+            if (realtimeRampState.activeCount > 0)
             {
-                realtimeRampSamples += activeRealtimeRampCount;
+                realtimeRampSamples += realtimeRampState.activeCount;
                 advanceRealtimeRamps();
             }
             const float rawLfo = needsLfoValue ? Lfo::value(params.lfoWaveform, lfoPhase, params.lfoSmoothing, params.lfoOneShot) : 0.0f;
