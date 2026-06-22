@@ -14,6 +14,7 @@ import {
   normalizeTrackEffectChain,
   type EffectKind,
 } from "../../../state/effects";
+import { createAetherEffectPresetRecord, type AetherEffectPresetRecord } from "../../../state/effectPresets";
 import {
   createDefaultSynthDraft,
   FACTORY_SYNTH_PRESETS,
@@ -38,7 +39,14 @@ import {
   type SynthParameterId,
 } from "../../../state/synthStore";
 import { createSynthPresetRecord, type SynthPresetRecord } from "../../../state/synthPresets";
-import { deleteSynthPreset, listSynthPresets, saveSynthPreset } from "../../../persistence/dexie";
+import {
+  deleteAetherEffectPreset,
+  deleteSynthPreset,
+  listAetherEffectPresets,
+  listSynthPresets,
+  saveAetherEffectPreset,
+  saveSynthPreset,
+} from "../../../persistence/dexie";
 import { ANALYZER_BAND_COUNT, useAnalyzerStore, type AnalyzerSnapshot } from "../../../state/analyzerStore";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../../state/store";
 import { INSTRUMENT_ICON_OPTIONS, instrumentIconLabel } from "../../../state/instrumentIcons";
@@ -664,6 +672,16 @@ function InstrumentFxRack() {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setDraft = useSynthStore.getState().setDraft;
   const effects = createMemo(() => draft().effects.filters);
+  const [effectPresets, setEffectPresets] = createSignal<AetherEffectPresetRecord[]>([]);
+  const [selectedEffectPresetId, setSelectedEffectPresetId] = createSignal("");
+
+  onMount(() => {
+    void refreshEffectPresets();
+  });
+
+  async function refreshEffectPresets() {
+    setEffectPresets(await listAetherEffectPresets());
+  }
 
   function updateEffects(filters: TrackEffect[]) {
     setDraft({
@@ -706,11 +724,63 @@ function InstrumentFxRack() {
     updateEffects(effects().filter((effect) => effect.id !== effectId));
   }
 
+  function loadEffectPreset(id: string) {
+    setSelectedEffectPresetId(id);
+    const preset = effectPresets().find((candidate) => candidate.id === id);
+    if (!preset) return;
+    setDraft({
+      ...draft(),
+      effects: normalizeTrackEffectChain(preset.chain),
+    });
+  }
+
+  async function saveEffectPreset() {
+    const name = await appPrompt("FX preset name", draft().name ? `${draft().name} FX` : "Aether FX", "Save FX Preset");
+    if (!name?.trim()) return;
+    const record = createAetherEffectPresetRecord({
+      name,
+      chain: draft().effects,
+      tags: ["aether", "instrument-fx"],
+    });
+    await saveAetherEffectPreset(record);
+    setSelectedEffectPresetId(record.id);
+    await refreshEffectPresets();
+  }
+
+  async function deleteEffectPreset() {
+    const id = selectedEffectPresetId();
+    if (!id) return;
+    await deleteAetherEffectPreset(id);
+    setSelectedEffectPresetId("");
+    await refreshEffectPresets();
+  }
+
   return (
     <section class={`ds-panel ${styles.fxPanel}`} aria-label="Aether instrument effects">
       <header class="ds-panel-header">
         <div class="ds-panel-title">Instrument FX</div>
         <div class="ds-panel-actions">
+          <Show when={effectPresets().length > 0}>
+            <select
+              class={`ds-select ${styles.fxPresetSelect}`}
+              aria-label="Load instrument FX preset"
+              value={selectedEffectPresetId()}
+              onChange={(event) => loadEffectPreset(event.currentTarget.value)}
+            >
+              <option value="">FX preset</option>
+              <For each={effectPresets()}>
+                {(preset) => <option value={preset.id}>{preset.name}</option>}
+              </For>
+            </select>
+          </Show>
+          <Button size="xs" variant="ghost" onClick={() => void saveEffectPreset()}>
+            Save FX
+          </Button>
+          <Show when={selectedEffectPresetId()}>
+            <Button size="xs" variant="ghost" onClick={() => void deleteEffectPreset()}>
+              Delete FX
+            </Button>
+          </Show>
           <select
             class={`ds-select ${styles.fxAddSelect}`}
             aria-label="Add instrument effect"

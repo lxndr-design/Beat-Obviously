@@ -66,12 +66,12 @@ Status legend:
 
 - `[x]` Instrument-owned FX chains render through the same route FX processor before track FX and share live/export parity behavior.
 - `[~]` Aether FX rack UI.
-  - Done: dedicated Solid instrument FX rack controls, add/remove/reorder/bypass affordances, latency/tail badges, shared effect defaults/specs, and synth patch/instrument roundtrip for instrument-owned FX.
-  - Remaining: preset handoff.
+  - Done: dedicated Solid instrument FX rack controls, add/remove/reorder/bypass affordances, latency/tail badges, shared effect defaults/specs, preset save/load/delete controls, and synth patch/instrument roundtrip for instrument-owned FX.
+  - Remaining: browser interaction coverage for preset controls.
   - Proof: synth roundtrip verifier plus existing live/export parity stress for a patch with instrument FX and track FX.
 - `[ ]` Named Aether effect/instrument preset library.
-  - Done: schema-versioned local instrument preset records, legacy record normalization, explicit Save As preset, user preset delete, and Restore Init action.
-  - Remaining: named effect presets, native repository roundtrip, and fuller UI interaction coverage.
+  - Done: schema-versioned local instrument preset records, schema-versioned local instrument-effect chain presets, legacy record normalization, explicit Save As preset, user preset delete, Restore Init action, and FX preset save/load/delete.
+  - Remaining: native repository roundtrip and fuller UI interaction coverage.
   - Proof: synth verifier covers schema creation/migration; browser interaction coverage still needed.
 - `[ ]` Aether FX preset/version migration.
   - Proof: migration fixtures for old effect defaults and current instrument-owned FX chains.

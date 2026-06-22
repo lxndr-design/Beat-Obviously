@@ -70,6 +70,10 @@ section.shell {
   width: 132px;
 }
 
+.fxPresetSelect {
+  width: 132px;
+}
+
 .fxBody {
   padding: var(--synth-gap);
 }

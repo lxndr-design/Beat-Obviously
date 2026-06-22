@@ -19,7 +19,7 @@ Status legend:
    - `[x]` Add add/remove/reorder/bypass affordances.
    - `[x]` Show latency/tail badges.
    - `[x]` Preserve instrument-owned FX through synth patch/instrument roundtrip.
-   - `[ ]` Wire preset handoff once preset storage exists.
+   - `[x]` Wire local effect-chain preset save/load/delete handoff.
    - `[~]` Verify with synth roundtrip coverage and live/export parity stress using both instrument FX and track FX; still add browser-level interaction coverage.
 2. `[~]` Wavemap drawing and resynthesis refinement.
    - Add richer draw modes beyond mini-waveform and partial lanes.
@@ -33,7 +33,7 @@ Status legend:
    - Add point drag, curve selection, playback preview, and live/export parity coverage.
 4. `[ ]` Aether preset storage and migration.
    - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.
-   - `[ ]` Add named effect presets.
+   - `[x]` Add schema-versioned local instrument-effect chain presets with save/load/delete and legacy normalization.
    - Add migration fixtures for older preset/effect defaults.
 
 ## DAW Editing

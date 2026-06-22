@@ -2,6 +2,7 @@ import Dexie, { type Table } from "dexie";
 import type { GeneratedInstrument, GenerateInstrumentOptions } from "../ai/aiService";
 import type { DrumGenre, GeneratedDrumBeat, GenerateDrumBeatOptions } from "../ai/drumBeatGenerator";
 import type { BeatComponent } from "../state/components";
+import { normalizeAetherEffectPresetRecord, type AetherEffectPresetRecord } from "../state/effectPresets";
 import { normalizeSynthPresetRecord, type SynthPresetRecord } from "../state/synthPresets";
 import type { AudioFile, Instrument, InstrumentSet, MidiNote, Project, Segment } from "../state/types";
 
@@ -105,6 +106,7 @@ export class BeatDB extends Dexie {
   instrumentGenerationFeedback!: Table<InstrumentGenerationFeedback, string>;
   midiSongFeedback!: Table<MidiSongFeedback, string>;
   synthPresets!: Table<SynthPresetRecord, string>;
+  effectPresets!: Table<AetherEffectPresetRecord, string>;
 
   constructor() {
     super("beat");
@@ -174,6 +176,18 @@ export class BeatDB extends Dexie {
       instrumentGenerationFeedback: "id, rating, createdAt",
       midiSongFeedback: "id, rating, createdAt",
       synthPresets: "id, kind, name, updatedAt",
+    });
+    this.version(9).stores({
+      projects: "id, name, savedAt",
+      instruments: "id, name, userCreated, setId",
+      instrumentSets: "id, name, factory",
+      audioFiles: "id, name, path",
+      components: "id, name, kind, factory, createdAt",
+      drumBeatFeedback: "id, genre, rating, createdAt",
+      instrumentGenerationFeedback: "id, rating, createdAt",
+      midiSongFeedback: "id, rating, createdAt",
+      synthPresets: "id, kind, name, updatedAt",
+      effectPresets: "id, kind, name, updatedAt",
     });
   }
 }
@@ -248,6 +262,23 @@ export async function listSynthPresets(): Promise<SynthPresetRecord[]> {
 
 export async function deleteSynthPreset(id: string) {
   await db.synthPresets.delete(id);
+}
+
+export async function saveAetherEffectPreset(record: AetherEffectPresetRecord) {
+  const normalized = normalizeAetherEffectPresetRecord(record);
+  if (!normalized) throw new Error("Aether effect preset is missing an effect chain.");
+  await db.effectPresets.put(normalized);
+}
+
+export async function listAetherEffectPresets(): Promise<AetherEffectPresetRecord[]> {
+  const records = await db.effectPresets.orderBy("updatedAt").reverse().toArray();
+  return records
+    .map(normalizeAetherEffectPresetRecord)
+    .filter((record): record is AetherEffectPresetRecord => record !== null);
+}
+
+export async function deleteAetherEffectPreset(id: string) {
+  await db.effectPresets.delete(id);
 }
 
 export async function saveAudioFiles(files: AudioFile[]) {

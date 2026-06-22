@@ -16,6 +16,7 @@ try {
     esbuild,
     [
       join(repoRoot, "frontend/src/state/synthStore.ts"),
+      join(repoRoot, "frontend/src/state/effectPresets.ts"),
       join(repoRoot, "frontend/src/state/synthPresets.ts"),
       join(repoRoot, "frontend/src/audio/synthPreview.ts"),
       join(repoRoot, "frontend/src/ai/aiService.ts"),
@@ -28,6 +29,7 @@ try {
   );
 
   const synthStore = await import(pathToFileURL(join(outDir, "state/synthStore.js")));
+  const effectPresets = await import(pathToFileURL(join(outDir, "state/effectPresets.js")));
   const synthPresets = await import(pathToFileURL(join(outDir, "state/synthPresets.js")));
   const synthPreview = await import(pathToFileURL(join(outDir, "audio/synthPreview.js")));
   const aiService = await import(pathToFileURL(join(outDir, "ai/aiService.js")));
@@ -257,6 +259,37 @@ try {
   assert.equal(migratedPreset.kind, "instrument");
   assert.equal(migratedPreset.createdAt, 5678);
   assert.equal(migratedPreset.updatedAt, 5678);
+
+  const fxPreset = effectPresets.createAetherEffectPresetRecord({
+    name: "  Wide FX Chain  ",
+    chain: draft.effects,
+    tags: ["aether", "aether", "fx"],
+    now: 2468,
+  });
+  assert.equal(fxPreset.schemaVersion, 1);
+  assert.equal(fxPreset.kind, "instrument-fx-chain");
+  assert.equal(fxPreset.name, "Wide FX Chain");
+  assert.deepEqual(fxPreset.tags, ["aether", "fx"]);
+  assert.equal(fxPreset.createdAt, 2468);
+  assert.equal(fxPreset.updatedAt, 2468);
+  assert.equal(fxPreset.id.startsWith("fx-preset:wide-fx-chain:"), true);
+  assert.equal(fxPreset.chain.filters.length, 2);
+  assert.equal(fxPreset.chain.filters[0].kind, "saturator");
+  assert.equal(fxPreset.chain.filters[1].bypassed, true);
+  fxPreset.chain.filters[0].params.drive = 1;
+  assert.equal(draft.effects.filters[0].params.drive, 36);
+
+  const migratedFxPreset = effectPresets.normalizeAetherEffectPresetRecord({
+    id: "legacy-fx",
+    name: "Legacy FX",
+    chain: { filters: [{ kind: "delay", params: { timeMs: 510 } }] },
+    updatedAt: 9753,
+  });
+  assert.equal(migratedFxPreset.schemaVersion, 1);
+  assert.equal(migratedFxPreset.kind, "instrument-fx-chain");
+  assert.equal(migratedFxPreset.createdAt, 9753);
+  assert.equal(migratedFxPreset.chain.filters[0].params.timeMs, 510);
+  assert.equal(migratedFxPreset.chain.filters[0].params.feedback, 25);
 
   const patch = synthStore.synthDraftToInstrumentPatch(draft);
   assert.equal(patch.name, "Roundtrip Probe");
