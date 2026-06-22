@@ -24,6 +24,17 @@ namespace beat
             activeCount = 0;
         }
 
+        template <typename Params>
+        void resetFromParams(const Params& params) noexcept
+        {
+            for (size_t index = 0; index < VoiceRealtimeParams::count; ++index)
+            {
+                const auto param = (VoiceRealtimeParams::Id) index;
+                ramp(param).reset(VoiceRealtimeParams::initialValueFor(params, param));
+            }
+            clearActive();
+        }
+
         void activate(VoiceRealtimeParams::Id param) noexcept
         {
             const auto index = (size_t) param;

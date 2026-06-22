@@ -290,7 +290,6 @@ namespace beat
         void configureWavetableOscillators(double frequencyHz) noexcept;
         bool legacyWavetableNeedsSetup() const noexcept;
         bool aetherOscillatorNeedsWavetable(const Params::AetherOscillator& osc) const noexcept;
-        void resetRealtimeRampsFromParams() noexcept;
         void setRealtimeRamp(RealtimeParam param, float value, int rampSamples) noexcept;
         bool setRealtimeParameterValue(std::string_view parameterId, float value, int rampSamples, bool updateBaseline) noexcept;
         void applyRealtimeValue(RealtimeParam param, float value) noexcept;

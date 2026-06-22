@@ -111,7 +111,7 @@ namespace beat
         refreshCachedPanGains();
         refreshCachedPitchRates();
         refreshCachedDynamicModulationFlags();
-        resetRealtimeRampsFromParams();
+        realtimeRampState.resetFromParams(params);
     }
 
     void InstrumentVoice::controllerMoved(int controllerNumber, int controllerValue)
@@ -124,16 +124,6 @@ namespace beat
     {
         pitchWheelSemitones = VoiceMath::pitchWheelRatio(newPitchWheelValue)
             * juce::jlimit(0.0f, 24.0f, params.pitchBendRangeSemitones);
-    }
-
-    void InstrumentVoice::resetRealtimeRampsFromParams() noexcept
-    {
-        for (size_t index = 0; index < VoiceRealtimeParams::count; ++index)
-        {
-            const auto param = (RealtimeParam) index;
-            realtimeRampState.ramp(param).reset(VoiceRealtimeParams::initialValueFor(params, param));
-        }
-        realtimeRampState.clearActive();
     }
 
     void InstrumentVoice::setRealtimeRamp(RealtimeParam param, float value, int rampSamples) noexcept
@@ -258,7 +248,7 @@ namespace beat
     {
         const bool legatoRetune = baseParams.legato && adsr.isActive();
         params = baseParams;
-        resetRealtimeRampsFromParams();
+        realtimeRampState.resetFromParams(params);
         baseFrequencyHz = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
         level = velocity;
         noteKeytrack = juce::jlimit(0.0f, 1.0f, (float) midiNoteNumber / 127.0f);
