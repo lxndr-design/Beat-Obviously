@@ -108,6 +108,8 @@ Native MIDI notes now preserve per-note automation lanes from the frontend proje
 
 Each voice stores a baseline patch snapshot. Patch/global realtime changes update that baseline for future notes, while per-note automation starts from the baseline and stays local to the active voice. This prevents note automation from leaking into the next note when a voice is reused.
 
+Per-note parameter lanes share the realtime voice-parameter mapper. In addition to amp, filter, wavetable position/fine/level/pan, and unison targets, Aether oscillator phase targets (`osc.a.phase` and `osc.b.phase`) update the active voice phase offsets and are covered by backend no-leak stress.
+
 Native MIDI pitch curves now use the same voice-owned context. Frontend note `curve` points are parsed into the backend model, preserved through native project repository save/load, converted to fractional MIDI-frequency targets during scheduling, and consumed by the assigned `InstrumentVoice` as a local pitch ramp. This makes `Curve To`-style pitch movement part of native playback instead of only the browser preview path and avoids quantizing editor pitch handles to whole-note steps.
 
 Segment-level parameter automation is also native. `Segment::automation` lanes are parsed from either `segment.automation` or `payload.automation`, emitted by `Sequencer` as sample-offset `ParameterAutomationEvent`s, and routed into the same bounded block realtime event vector used by `engine.setParameter`. The sequencer emits an interpolated value at block entry when playback starts midway through a ramp, then ramps toward the next point over the remaining samples.

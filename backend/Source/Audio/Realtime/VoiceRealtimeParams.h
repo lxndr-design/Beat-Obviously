@@ -24,6 +24,8 @@ namespace beat::VoiceRealtimeParams
         OscBLevel,
         OscAPan,
         OscBPan,
+        OscAPhase,
+        OscBPhase,
         UnisonDetune,
         UnisonSpread,
         LfoRate,
@@ -50,6 +52,8 @@ namespace beat::VoiceRealtimeParams
             case Id::OscBPosition:
             case Id::OscALevel:
             case Id::OscBLevel:
+            case Id::OscAPhase:
+            case Id::OscBPhase:
             case Id::UnisonSpread:
             case Id::LfoDepth:
                 return juce::jlimit(0.0f, 1.0f, value);
@@ -88,6 +92,8 @@ namespace beat::VoiceRealtimeParams
             case Id::OscBLevel: return params.aetherOscB.level;
             case Id::OscAPan: return params.aetherOscA.pan;
             case Id::OscBPan: return params.aetherOscB.pan;
+            case Id::OscAPhase: return params.aetherOscA.phase;
+            case Id::OscBPhase: return params.aetherOscB.phase;
             case Id::UnisonDetune: return params.wavetableDetuneCents;
             case Id::UnisonSpread: return params.wavetableBlend;
             case Id::LfoRate: return params.lfoRateHz;
@@ -145,6 +151,12 @@ namespace beat::VoiceRealtimeParams
             case Id::OscBPan:
                 target.aetherOscB.pan = clamped;
                 break;
+            case Id::OscAPhase:
+                target.aetherOscA.phase = clamped;
+                break;
+            case Id::OscBPhase:
+                target.aetherOscB.phase = clamped;
+                break;
             case Id::UnisonDetune:
                 target.wavetableDetuneCents = clamped;
                 target.wavetable.detuneCents = target.wavetableDetuneCents;
@@ -183,6 +195,8 @@ namespace beat::VoiceRealtimeParams
         if (parameterId == params::oscillator::b::level) return (int) Id::OscBLevel;
         if (parameterId == params::oscillator::a::pan) return (int) Id::OscAPan;
         if (parameterId == params::oscillator::b::pan) return (int) Id::OscBPan;
+        if (parameterId == params::oscillator::a::phase) return (int) Id::OscAPhase;
+        if (parameterId == params::oscillator::b::phase) return (int) Id::OscBPhase;
         if (parameterId == params::unison::detune) return (int) Id::UnisonDetune;
         if (parameterId == params::unison::spread) return (int) Id::UnisonSpread;
         if (parameterId == "lfo.1.rate") return (int) Id::LfoRate;

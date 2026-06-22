@@ -10787,6 +10787,68 @@ namespace
         const int lateCrossings = countCrossings(1152, 1920);
         return lateCrossings > earlyCrossings;
     }
+
+    bool stressInstrumentVoicePerNotePhaseAutomation()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAether = true;
+        params.ampLevel = 1.0f;
+        params.cutoff01 = 1.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 10.0f;
+        params.sustain = 1.0f;
+        params.releaseMs = 1.0f;
+        params.aetherOscA.enabled = true;
+        params.aetherOscA.level = 1.0f;
+        params.aetherOscA.waveform = 0;
+        params.aetherOscA.phase = 0.0f;
+        params.aetherOscA.randomPhase = 0.0f;
+        params.aetherOscB.enabled = false;
+        params.aetherSub.enabled = false;
+        params.aetherNoise.enabled = false;
+
+        beat::InstrumentVoice voice;
+        voice.prepare(48000.0, 256);
+        voice.setParams(params);
+
+        std::array<beat::VoiceNoteAutomation::Context, beat::VoiceNoteAutomation::maxPendingContexts> contexts {};
+        contexts[0].midiNoteNumber = 60;
+        contexts[0].eventCount = 1;
+        contexts[0].events[0] = beat::makeRealtimeParameterChange(std::string_view {}, "osc.a.phase", 0.25f, 0, 0);
+
+        beat::VoiceAutomationInbox::setPending(contexts.data(), 1);
+        voice.startNote(60, 1.0f, nullptr, 0);
+        beat::VoiceAutomationInbox::clearPending();
+
+        juce::AudioBuffer<float> shiftedBuffer(2, 32);
+        shiftedBuffer.clear();
+        voice.renderNextBlock(shiftedBuffer, 0, shiftedBuffer.getNumSamples());
+
+        auto earlyPeak = [](const juce::AudioBuffer<float>& buffer)
+        {
+            double peak = 0.0;
+            for (int i = 0; i < juce::jmin(8, buffer.getNumSamples()); ++i)
+                peak = juce::jmax(peak, std::abs((double) buffer.getSample(0, i)));
+            return peak;
+        };
+
+        const double shiftedPeak = earlyPeak(shiftedBuffer);
+
+        voice.stopNote(0.0f, false);
+        voice.startNote(60, 1.0f, nullptr, 0);
+
+        juce::AudioBuffer<float> baselineBuffer(2, 32);
+        baselineBuffer.clear();
+        voice.renderNextBlock(baselineBuffer, 0, baselineBuffer.getNumSamples());
+
+        const double baselinePeak = earlyPeak(baselineBuffer);
+        if (shiftedPeak <= 0.005 || baselinePeak >= shiftedPeak * 0.35)
+        {
+            std::cerr << "phase automation baseline leak peak: " << baselinePeak << " shifted: " << shiftedPeak << "\n";
+            return false;
+        }
+        return true;
+    }
 }
 
 int main()
@@ -10909,6 +10971,11 @@ int main()
     if (!stressInstrumentVoicePerNotePitchCurve())
     {
         std::cerr << "Instrument voice per-note pitch curve stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoicePerNotePhaseAutomation())
+    {
+        std::cerr << "Instrument voice per-note phase automation stress failed\n";
         return 1;
     }
     std::cerr << "voice: done\n";

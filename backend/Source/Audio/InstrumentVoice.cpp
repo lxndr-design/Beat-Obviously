@@ -186,6 +186,12 @@ namespace beat
             case RealtimeParam::OscBPan:
                 refreshCachedPanGains();
                 break;
+            case RealtimeParam::OscAPhase:
+                aetherOscAPhaseOffset = (double) juce::jlimit(0.0f, 1.0f, params.aetherOscA.phase);
+                break;
+            case RealtimeParam::OscBPhase:
+                aetherOscBPhaseOffset = (double) juce::jlimit(0.0f, 1.0f, params.aetherOscB.phase);
+                break;
             case RealtimeParam::Count:
                 break;
         }

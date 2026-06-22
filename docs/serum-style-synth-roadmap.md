@@ -262,13 +262,13 @@ Purpose: let users shape sound over time with DAW-grade precision.
 
 Checklist:
 
-- `[x]` Native note automation can drive per-note pitch and parameter events.
+- `[x]` Native note automation can drive per-note pitch and parameter events, including Aether oscillator phase targets.
 - `[x]` Segment automation and project automation are parsed and emitted.
 - `[x]` Route-level automation supports track gain/pan/effect targets.
 - `[~]` MIDI “curve to” concept exists, but should generalize beyond pitch.
 - `[ ]` Add visible automation lanes in track view.
 - `[ ]` Add per-segment automation editor with percent/time anchors.
-- `[ ]` Add note-specific modulation timelines for pitch, level, phase, filter, wavetable position, and macros.
+- `[~]` Add note-specific modulation timelines for pitch, level, phase, filter, wavetable position, and macros. Native/browser note lanes now cover pitch, amp level/pan, filter cutoff/resonance/drive, oscillator position/fine/level/pan/phase, and unison detune/spread; runtime macro-source lanes still need a first-class voice-level macro state instead of patch-time static macro baking.
 - `[~]` Add curve interpolation modes: hold, linear, quadratic, cubic, ease-in, ease-out, and smoothstep are native and control-checkpoint stress-covered; richer exponential/tension editing and stepped-pattern variants remain.
 - `[ ]` Add automation capture/write/read modes later.
 - `[ ]` Add automation conflict rules: project vs segment vs note vs live knob.

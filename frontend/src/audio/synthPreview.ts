@@ -26,10 +26,12 @@ type RuntimeModulationTarget =
   | "osc.a.fine"
   | "osc.a.level"
   | "osc.a.pan"
+  | "osc.a.phase"
   | "osc.b.position"
   | "osc.b.fine"
   | "osc.b.level"
   | "osc.b.pan"
+  | "osc.b.phase"
   | "filter.cutoff"
   | "filter.resonance"
   | "filter.drive"
@@ -818,7 +820,7 @@ function aetherStackSample(
     const wavetableOffset = legacyPositionOffset + modulationTargetOffset(modulation, `osc.${key}.position`);
     const unisonDetuneOffset = modulationTargetOffset(modulation, "unison.detune");
     const unisonSpreadOffset = modulationTargetOffset(modulation, "unison.spread");
-    const phaseOffset = oscillatorPhaseOffset(osc, key);
+    const phaseOffset = oscillatorPhaseOffset(osc, key) + modulationTargetOffset(modulation, `osc.${key}.phase`);
     const sourceSample = waveform === "wavetable"
       ? wavetableOscillatorSample(
           instrument,
@@ -894,7 +896,7 @@ function aetherStackStereoSample(
     const wavetableOffset = legacyPositionOffset + modulationTargetOffset(modulation, `osc.${key}.position`);
     const unisonDetuneOffset = modulationTargetOffset(modulation, "unison.detune");
     const unisonSpreadOffset = modulationTargetOffset(modulation, "unison.spread");
-    const phaseOffset = oscillatorPhaseOffset(osc, key);
+    const phaseOffset = oscillatorPhaseOffset(osc, key) + modulationTargetOffset(modulation, `osc.${key}.phase`);
     const sourceSample = waveform === "wavetable"
       ? wavetableOscillatorSample(
           instrument,
@@ -1493,6 +1495,10 @@ function baseAutomationValue(instrument: Instrument, target: RuntimeModulationTa
       return instrument.aether?.oscA.pan ?? 0;
     case "osc.b.pan":
       return instrument.aether?.oscB.pan ?? 0;
+    case "osc.a.phase":
+      return instrument.aether?.oscA.phase ?? 0;
+    case "osc.b.phase":
+      return instrument.aether?.oscB.phase ?? 0;
     case "filter.cutoff":
       return instrument.knobs.cutoff ?? 1;
     case "filter.resonance":
@@ -1661,10 +1667,12 @@ function isRuntimeModulationTarget(value: unknown): value is RuntimeModulationTa
     "osc.a.fine",
     "osc.a.level",
     "osc.a.pan",
+    "osc.a.phase",
     "osc.b.position",
     "osc.b.fine",
     "osc.b.level",
     "osc.b.pan",
+    "osc.b.phase",
     "filter.cutoff",
     "filter.resonance",
     "filter.drive",
