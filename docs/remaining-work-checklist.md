@@ -46,6 +46,7 @@ Status legend:
    - `[x]` Add native repository roundtrip coverage for Aether oscillator/sub/noise config, wavemap frame controls/partials, macro values/routes, Env 2, and instrument-owned FX.
    - `[x]` Add JS synth verifier coverage for mixed-era wavemap metadata migration, including legacy-only `customWavetables`, modern `wavemaps` precedence, schema/default backfill, and alias mirroring.
    - `[x]` Add backend stress coverage for native mixed-era wavemap metadata merging so legacy-only custom maps survive while modern duplicate IDs win.
+   - `[x]` Add document roundtrip coverage for legacy-only wavemap metadata preservation and dirty fingerprint sensitivity.
    - `[ ]` Add browser smoke for preset save/load/delete flows.
 
 ## DAW Editing

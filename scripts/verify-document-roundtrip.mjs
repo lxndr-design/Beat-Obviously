@@ -100,6 +100,16 @@ try {
     "wavemap analysis metadata should roundtrip",
   );
   assert.equal(
+    migratedAetherInstrument?.synthPatch?.metadata.customWavetables?.["user.legacy-only"]?.frames?.[0]?.formant,
+    0.69,
+    "legacy-only custom wavemap metadata should survive document migration",
+  );
+  assert.equal(
+    migratedAetherInstrument?.aether?.oscB.wavetable.customId,
+    "user.legacy-only",
+    "legacy-only Aether oscillator custom wavemap references should roundtrip",
+  );
+  assert.equal(
     migratedAetherInstrument?.aether?.oscA.wavetable.customId,
     "user.scan",
     "Aether oscillator custom wavemap references should roundtrip",
@@ -171,6 +181,14 @@ try {
     beatDocumentFingerprint(migrated),
     beatDocumentFingerprint(changedAetherWavemap),
     "document dirty fingerprint should include custom wavemap analysis edits",
+  );
+
+  const changedLegacyAetherWavemap = structuredClone(migrated);
+  changedLegacyAetherWavemap.instruments.find((instrument) => instrument.id === "inst-aether-preset").synthPatch.metadata.customWavetables["user.legacy-only"].frames[0].formant += 0.05;
+  assert.notEqual(
+    beatDocumentFingerprint(migrated),
+    beatDocumentFingerprint(changedLegacyAetherWavemap),
+    "document dirty fingerprint should include legacy-only custom wavemap edits",
   );
 
   const relinked = replaceBeatDocumentAssetPath(migrated, "/Samples/Kick.wav", "/Relinked/Kick.wav");
@@ -502,6 +520,39 @@ function makeAetherPresetInstrument() {
       },
     ],
   };
+  const legacyOnlyWavemap = {
+    name: "Legacy Only",
+    kind: "resynthesized",
+    interpolation: "smooth",
+    morph: 0.77,
+    source: {
+      kind: "imported-audio",
+      label: "Legacy Sweep",
+      path: "/Wavemaps/LegacySweep.wav",
+      sampleRate: 48000,
+      channelCount: 1,
+      sourceSampleCount: 48000,
+      analyzedSampleCount: 24000,
+      frameCount: 1,
+    },
+    frames: [
+      {
+        id: "legacy-frame-a",
+        label: "Legacy",
+        position: 0,
+        brightness: 0.82,
+        even: 0.21,
+        fold: 0.17,
+        formant: 0.69,
+        notch: 0.27,
+        skew: -0.42,
+        tilt: -0.19,
+        focus: 0.58,
+        phase: -0.31,
+        partials: [0.9, 0.7, 0.5],
+      },
+    ],
+  };
   const effects = {
     filters: [
       {
@@ -531,7 +582,7 @@ function makeAetherPresetInstrument() {
       "osc.a.warpMode": "fold",
       "osc.a.phase": 0.22,
       "osc.b.enabled": true,
-      "osc.b.wavetable": "basic.triangle",
+      "osc.b.wavetable": "user.legacy-only",
       "osc.b.level": 0.28,
       "filter.enabled": true,
       "filter.cutoff": 5200,
@@ -568,7 +619,7 @@ function makeAetherPresetInstrument() {
         "macro.4": { id: "macro.4", label: "Air", min: 0, max: 1, curve: "ease-out" },
       },
       wavemaps: { "user.scan": wavemap },
-      customWavetables: { "user.scan": wavemap },
+      customWavetables: { "user.scan": wavemap, "user.legacy-only": legacyOnlyWavemap },
     },
   };
   return {
@@ -614,7 +665,7 @@ function makeAetherPresetInstrument() {
         fineCents: -3,
         phase: 0.4,
         randomPhase: 0.2,
-        wavetable: { ...wavetable, bank: "glass", customId: undefined, position: 0.25, warp: 0.12, warpMode: "shape" },
+        wavetable: { ...wavetable, bank: "custom", customId: "user.legacy-only", position: 0.25, warp: 0.12, warpMode: "shape" },
       },
       sub: { enabled: true, level: 0.18, octave: -1, waveform: "sine" },
       noise: { enabled: true, level: 0.08, color: 0.6 },
