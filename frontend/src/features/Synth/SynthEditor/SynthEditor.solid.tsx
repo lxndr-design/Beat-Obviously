@@ -682,7 +682,9 @@ function InstrumentFxRack() {
   });
 
   async function refreshEffectPresets() {
-    setEffectPresets(await listAetherEffectPresets());
+    const nextPresets = await listAetherEffectPresets();
+    setEffectPresets(nextPresets);
+    return nextPresets;
   }
 
   function updateEffects(filters: TrackEffect[]) {
@@ -745,8 +747,8 @@ function InstrumentFxRack() {
       tags: ["aether", "instrument-fx"],
     });
     await saveAetherEffectPreset(record);
-    setSelectedEffectPresetId(record.id);
     await refreshEffectPresets();
+    setSelectedEffectPresetId(record.id);
   }
 
   async function deleteEffectPreset() {

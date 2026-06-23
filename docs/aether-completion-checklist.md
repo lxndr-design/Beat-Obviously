@@ -68,11 +68,11 @@ Status legend:
 - `[x]` Instrument-owned FX chains render through the same route FX processor before track FX and share live/export parity behavior.
 - `[~]` Aether FX rack UI.
   - Done: dedicated Solid instrument FX rack controls, add/remove/reorder/bypass affordances, latency/tail badges, shared effect defaults/specs, preset save/load/delete controls, and synth patch/instrument roundtrip for instrument-owned FX.
-  - Remaining: true browser smoke for FX preset controls.
-  - Proof: synth roundtrip verifier, frontend interaction verifier for preset state transitions, true browser smoke for current instrument preset Save As/load/delete controls, plus existing live/export parity stress for a patch with instrument FX and track FX.
+  - Remaining: browser smoke for older/mixed-era FX preset fixtures.
+  - Proof: synth roundtrip verifier, frontend interaction verifier for preset state transitions, true browser smoke for current instrument preset Save As/load/delete controls, true browser smoke for current FX preset save/load/delete controls, plus existing live/export parity stress for a patch with instrument FX and track FX.
 - `[ ]` Named Aether effect/instrument preset library.
   - Done: schema-versioned local instrument preset records, schema-versioned local instrument-effect chain presets, legacy record normalization, explicit Save As preset, user preset load/delete, Restore Init action, and FX preset save/load/delete.
-  - Remaining: fuller true browser coverage for older/mixed-era preset fixtures and FX presets.
+  - Remaining: fuller true browser coverage for older/mixed-era instrument and FX preset fixtures.
   - Proof: synth verifier covers schema creation/migration; frontend interaction verifier covers Save As/load/delete/Restore Init state transitions, including mixed-era wavemap user preset loading; document roundtrip verifier covers preset-grade Aether synth patches, macro routes, custom wavemap analysis metadata, and instrument-owned FX; backend stress covers native repository roundtrip for Aether oscillator/sub/noise config, wavemap frame controls/partials, macro values/routes, Env 2, and instrument-owned FX.
 - `[ ]` Aether FX preset/version migration.
   - Proof: synth and interaction verifiers cover legacy effect-default normalization; document roundtrip verifier and backend stress cover current instrument-owned FX chains.

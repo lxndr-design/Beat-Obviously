@@ -20,7 +20,7 @@ Status legend:
    - `[x]` Show latency/tail badges.
    - `[x]` Preserve instrument-owned FX through synth patch/instrument roundtrip.
    - `[x]` Wire local effect-chain preset save/load/delete handoff.
-   - `[~]` Verify with synth roundtrip coverage, frontend interaction coverage, and live/export parity stress using both instrument FX and track FX; still add browser-level smoke.
+   - `[x]` Verify with synth roundtrip coverage, frontend interaction coverage, live/export parity stress using both instrument FX and track FX, and true browser smoke for current FX preset save/load/delete controls.
 2. `[~]` Wavemap drawing and resynthesis refinement.
    - Add richer draw modes beyond mini-waveform and partial lanes.
    - Clarify frame editing constraints.
@@ -49,6 +49,7 @@ Status legend:
    - `[x]` Add document roundtrip coverage for legacy-only wavemap metadata preservation and dirty fingerprint sensitivity.
    - `[x]` Add frontend interaction smoke for Aether preset Save As/load/delete/Restore Init flows, including mixed-era wavemap user preset loading.
    - `[x]` Add true browser smoke for current Aether preset Save As/load/delete flows.
+   - `[x]` Add true browser smoke for current Aether FX preset save/load/delete flows.
    - `[ ]` Add true browser smoke for older/mixed-era wavemap preset records exposed through the UI.
 
 ## DAW Editing
