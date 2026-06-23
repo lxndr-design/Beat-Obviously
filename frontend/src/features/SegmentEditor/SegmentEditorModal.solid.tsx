@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
+import { For, createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { DRUM_MAX_STEPS, type GeneratedDrumBeat } from "../../ai/drumBeatGenerator";
 import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import {
@@ -9,6 +9,8 @@ import {
   clearSegmentAutomationTarget,
   clipSegmentAutomation,
   formatAetherArrangementAutomationValue,
+  insertSegmentAutomationPoint,
+  removeSegmentAutomationPoint,
   segmentAutomationCurve,
   segmentAutomationSummary,
   segmentAutomationTargetCount,
@@ -16,6 +18,7 @@ import {
   segmentHasAutomationTarget,
   setSegmentAutomationTargetCurve,
   setSegmentAutomationTargetValues,
+  updateSegmentAutomationPoint,
   upsertSegmentAutomationTarget,
 } from "../../automation/aetherArrangementAutomation";
 import { AUTOMATION_CURVES, automationCurveLabel } from "../../automation/curves";
@@ -92,6 +95,9 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const activeSegmentAutomationMeta = createMemo(() => aetherArrangementAutomationTargetMeta(activeSegmentAutomationTarget()));
   const segmentAutomationRange = createMemo(() => segmentAutomationValueRange(draft(), activeSegmentAutomationTarget()));
   const activeSegmentAutomationCurve = createMemo(() => segmentAutomationCurve(draft(), activeSegmentAutomationTarget()));
+  const activeSegmentAutomationPoints = createMemo(() =>
+    draft()?.automation?.find((lane) => lane.target === activeSegmentAutomationTarget())?.points ?? []
+  );
   const segmentAutomationCurveOptions = AUTOMATION_CURVES.map((curve) => ({ value: curve, label: automationCurveLabel(curve) }));
   const previewMidiNotes = createMemo(() => midiNotes().map((note) => ({
     ...note,
@@ -182,6 +188,52 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       edge === "end" ? value : current.endValue,
       edge === "mid" ? value : current.midValue,
     ));
+  }
+
+  function addSegmentAutomationPoint() {
+    const currentDraft = draft();
+    if (!currentDraft) return;
+    const range = segmentAutomationValueRange(currentDraft, activeSegmentAutomationTarget());
+    setDraftSegment(insertSegmentAutomationPoint(
+      currentDraft,
+      activeSegmentAutomationTarget(),
+      currentDraft.lengthBeats / 2,
+      range.midValue,
+    ));
+  }
+
+  function setSegmentAutomationPointBeat(index: number, rawBeat: string) {
+    const currentDraft = draft();
+    if (!currentDraft) return;
+    const point = activeSegmentAutomationPoints()[index];
+    if (!point) return;
+    setDraftSegment(updateSegmentAutomationPoint(
+      currentDraft,
+      activeSegmentAutomationTarget(),
+      index,
+      Number(rawBeat),
+      point.value,
+    ));
+  }
+
+  function setSegmentAutomationPointValue(index: number, rawValue: string) {
+    const currentDraft = draft();
+    if (!currentDraft) return;
+    const point = activeSegmentAutomationPoints()[index];
+    if (!point) return;
+    setDraftSegment(updateSegmentAutomationPoint(
+      currentDraft,
+      activeSegmentAutomationTarget(),
+      index,
+      point.beat,
+      Number(rawValue),
+    ));
+  }
+
+  function deleteSegmentAutomationPoint(index: number) {
+    const currentDraft = draft();
+    if (!currentDraft) return;
+    setDraftSegment(removeSegmentAutomationPoint(currentDraft, activeSegmentAutomationTarget(), index));
   }
 
   function updateDrumRows(rows: DrumRow[]) {
@@ -497,6 +549,47 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                   />
                   <span>{formatAetherArrangementAutomationValue(activeSegmentAutomationTarget(), segmentAutomationRange().endValue)}</span>
                 </label>
+              </div>
+              <div class={styles.automationPointEditor} aria-label="Aether segment automation points">
+                <div class={styles.automationPointHeader}>
+                  <span>Points</span>
+                  <Button size="xs" onClick={addSegmentAutomationPoint}>Add point</Button>
+                </div>
+                <For each={activeSegmentAutomationPoints()}>
+                  {(point, index) => (
+                    <div class={styles.automationPointRow}>
+                      <span class={styles.automationPointIndex}>{index() + 1}</span>
+                      <label>
+                        <span>Beat</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={draft()!.lengthBeats}
+                          step={0.125}
+                          value={point.beat}
+                          onChange={(event) => setSegmentAutomationPointBeat(index(), event.currentTarget.value)}
+                        />
+                      </label>
+                      <label>
+                        <span>Value</span>
+                        <input
+                          type="number"
+                          min={activeSegmentAutomationMeta().min}
+                          max={activeSegmentAutomationMeta().max}
+                          step={activeSegmentAutomationMeta().step}
+                          value={point.value}
+                          onChange={(event) => setSegmentAutomationPointValue(index(), event.currentTarget.value)}
+                        />
+                      </label>
+                      <span class={styles.automationPointValue}>
+                        {formatAetherArrangementAutomationValue(activeSegmentAutomationTarget(), point.value)}
+                      </span>
+                      <Button size="xs" variant="ghost" onClick={() => deleteSegmentAutomationPoint(index())}>
+                        Remove
+                      </Button>
+                    </div>
+                  )}
+                </For>
               </div>
             </div>
           </>

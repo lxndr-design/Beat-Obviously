@@ -143,6 +143,70 @@
   accent-color: var(--color-fg);
 }
 
+.automationPointEditor {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding-top: 2px;
+  border-top: 1px solid color-mix(in srgb, var(--color-fg) 24%, transparent);
+}
+
+.automationPointHeader,
+.automationPointRow {
+  display: grid;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: var(--font-size-ui);
+}
+
+.automationPointHeader {
+  grid-template-columns: minmax(0, 1fr) auto;
+  color: color-mix(in srgb, var(--color-fg) 74%, transparent);
+}
+
+.automationPointHeader span {
+  font-weight: var(--font-weight-medium);
+}
+
+.automationPointRow {
+  grid-template-columns: 20px minmax(72px, 0.8fr) minmax(80px, 1fr) 44px auto;
+}
+
+.automationPointIndex,
+.automationPointValue {
+  font-family: var(--font-family-mono);
+  color: color-mix(in srgb, var(--color-fg) 68%, transparent);
+}
+
+.automationPointRow label {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.automationPointRow label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+}
+
+.automationPointRow input {
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--color-fg) 45%, transparent);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+}
+
 .audioPanel {
   display: flex;
   flex-direction: column;

@@ -25,7 +25,8 @@ Use this section as the short working list. The detailed domain lists below rema
 2. `[~]` Automation editing completion.
    - Add arrangement-view track automation lanes.
    - Done: point-level add, move, delete helper coverage exists for Aether note, segment, and track lanes.
-   - Add visible arbitrary multi-point lane editing UI with multi-select, copy/paste, quantize, and value snapping.
+   - Done: visible segment and track Aether point editors expose point beat/value editing plus add/remove controls.
+   - Add visible note arbitrary point editing UI, multi-select, copy/paste, quantize, and value snapping.
    - Define project vs track vs segment vs note vs live-write conflict rules and surface invalid automation warnings.
 3. `[~]` DAW editing and recording closeout.
    - Broaden marquee, drag, resize, split, fade, crossfade, loop marker, and selection edge-case tests.
@@ -97,7 +98,8 @@ Use this section as the short working list. The detailed domain lists below rema
    - `[x]` Cover first track, segment, and piano-roll note automation entrypoints.
    - `[x]` Add true browser fixture smoke for Aether track, segment, and selected-note Macro 1 lane entrypoints.
    - `[x]` Add verified point-level add, move, and delete helpers for note, segment, and track Aether lanes.
-   - Add visible arbitrary multi-point lane editing UI and live/export parity coverage.
+   - `[x]` Add first visible multi-point editors for Segment Editor and Track Details Aether lanes.
+   - Add visible note multi-point editing UI and live/export parity coverage.
 4. `[x]` Aether preset storage and migration.
    - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.
    - `[x]` Add schema-versioned local instrument-effect chain presets with save/load/delete and legacy normalization.
@@ -146,7 +148,8 @@ Use this section as the short working list. The detailed domain lists below rema
 - `[~]` Lane chooser for Aether track/segment/note targets exists; gain, pan, effect params, master params, sends, and broader macros remain pending.
 - `[~]` Automation point add/move/delete, multi-select, copy/paste, quantize, value snapping.
   - Done: Aether note/segment/track helper coverage exists for point add, move, delete, beat clamping, value clamping, sorting, and curve preservation.
-  - Remaining: visible arbitrary point editing UI, multi-select, copy/paste, quantize, and value snapping.
+  - Done: Segment Editor and Track Details expose visible point beat/value editing plus add/remove controls for Aether lanes.
+  - Remaining: visible note point editing UI, multi-select, copy/paste, quantize, and value snapping.
 - `[ ]` Curve editing UI using the existing curve types.
 - `[~]` Segment-local automation editor for Aether targets.
 - `[~]` Note automation lanes in piano roll for pitch, velocity/level, filter, wavetable position, and macro targets.

@@ -1,4 +1,4 @@
-import { createMemo, createSignal, Show } from "solid-js";
+import { For, createMemo, createSignal, Show } from "solid-js";
 import {
   AETHER_ARRANGEMENT_AUTOMATION_TARGETS,
   type AetherArrangementAutomationTarget,
@@ -6,6 +6,8 @@ import {
   aetherArrangementAutomationTargetMeta,
   clearTrackAutomationTarget,
   formatAetherArrangementAutomationValue,
+  insertTrackAutomationPoint,
+  removeTrackAutomationPoint,
   setTrackAutomationTargetCurve,
   setTrackAutomationTargetValues,
   trackAutomationCurve,
@@ -13,6 +15,7 @@ import {
   trackAutomationTargetCount,
   trackAutomationValueRange,
   trackHasAutomationTarget,
+  updateTrackAutomationPoint,
   upsertTrackAutomationTarget,
 } from "../../automation/aetherArrangementAutomation";
 import { AUTOMATION_CURVES, automationCurveLabel } from "../../automation/curves";
@@ -35,6 +38,9 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
   const activeAutomationMeta = createMemo(() => aetherArrangementAutomationTargetMeta(activeAutomationTarget()));
   const automationRange = createMemo(() => trackAutomationValueRange(track(), activeAutomationTarget()));
   const activeAutomationCurve = createMemo(() => trackAutomationCurve(track(), activeAutomationTarget()));
+  const activeAutomationPoints = createMemo(() =>
+    track()?.automation?.find((lane) => lane.target === activeAutomationTarget())?.points ?? []
+  );
   const automationCurveOptions = AUTOMATION_CURVES.map((curve) => ({ value: curve, label: automationCurveLabel(curve) }));
 
   function close() {
@@ -80,6 +86,55 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
       edge === "end" ? value : range.endValue,
       edge === "mid" ? value : range.midValue,
     ));
+  }
+
+  function addTrackAutomationPoint() {
+    const current = track();
+    if (!current) return;
+    const range = trackAutomationValueRange(current, activeAutomationTarget());
+    updateTrackAutomation(insertTrackAutomationPoint(
+      current,
+      activeAutomationTarget(),
+      projectLengthBeats(),
+      projectLengthBeats() / 2,
+      range.midValue,
+    ));
+  }
+
+  function setTrackAutomationPointBeat(index: number, rawBeat: string) {
+    const current = track();
+    if (!current) return;
+    const point = activeAutomationPoints()[index];
+    if (!point) return;
+    updateTrackAutomation(updateTrackAutomationPoint(
+      current,
+      activeAutomationTarget(),
+      projectLengthBeats(),
+      index,
+      Number(rawBeat),
+      point.value,
+    ));
+  }
+
+  function setTrackAutomationPointValue(index: number, rawValue: string) {
+    const current = track();
+    if (!current) return;
+    const point = activeAutomationPoints()[index];
+    if (!point) return;
+    updateTrackAutomation(updateTrackAutomationPoint(
+      current,
+      activeAutomationTarget(),
+      projectLengthBeats(),
+      index,
+      point.beat,
+      Number(rawValue),
+    ));
+  }
+
+  function deleteTrackAutomationPoint(index: number) {
+    const current = track();
+    if (!current) return;
+    updateTrackAutomation(removeTrackAutomationPoint(current, activeAutomationTarget(), index));
   }
 
   return (
@@ -222,6 +277,47 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
                     />
                     <span>{formatAetherArrangementAutomationValue(activeAutomationTarget(), automationRange().endValue)}</span>
                   </label>
+                </div>
+                <div class={styles.automationPointEditor} aria-label="Aether track automation points">
+                  <div class={styles.automationPointHeader}>
+                    <span>Points</span>
+                    <Button size="xs" onClick={addTrackAutomationPoint}>Add point</Button>
+                  </div>
+                  <For each={activeAutomationPoints()}>
+                    {(point, index) => (
+                      <div class={styles.automationPointRow}>
+                        <span class={styles.automationPointIndex}>{index() + 1}</span>
+                        <label>
+                          <span>Beat</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={projectLengthBeats()}
+                            step={0.125}
+                            value={point.beat}
+                            onChange={(event) => setTrackAutomationPointBeat(index(), event.currentTarget.value)}
+                          />
+                        </label>
+                        <label>
+                          <span>Value</span>
+                          <input
+                            type="number"
+                            min={activeAutomationMeta().min}
+                            max={activeAutomationMeta().max}
+                            step={activeAutomationMeta().step}
+                            value={point.value}
+                            onChange={(event) => setTrackAutomationPointValue(index(), event.currentTarget.value)}
+                          />
+                        </label>
+                        <span class={styles.automationPointValue}>
+                          {formatAetherArrangementAutomationValue(activeAutomationTarget(), point.value)}
+                        </span>
+                        <Button size="xs" variant="ghost" onClick={() => deleteTrackAutomationPoint(index())}>
+                          Remove
+                        </Button>
+                      </div>
+                    )}
+                  </For>
                 </div>
               </div>
             </section>
