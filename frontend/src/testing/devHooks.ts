@@ -16,7 +16,7 @@ import type { MidiAutomationTarget, PluginAdapter } from "../state/types";
 import { compileNodeGraphToInstrumentPatch, createDefaultInstrumentNodeGraph } from "../features/NodeInstrumentEditor/nodeGraph";
 
 type DevDecentSamplerFixture = "lorenzo" | "wide";
-type DevAetherAutomationEditor = "track" | "segment" | "note";
+type DevAetherAutomationEditor = "arrangement" | "track" | "segment" | "note";
 
 const DEV_MIXED_ERA_AETHER_PRESET_ID = "dev-mixed-era-aether";
 const DEV_MIXED_ERA_AETHER_INSTRUMENT_ID = "dev-mixed-era-aether-host";
@@ -92,6 +92,12 @@ interface DevAetherAutomationFixtureState {
   trackLaneTargets: MidiAutomationTarget[];
   segmentLaneTargets: MidiAutomationTarget[];
   noteLaneTargets: MidiAutomationTarget[];
+  arrangementLane: {
+    exists: boolean;
+    target: string | null;
+    text: string;
+    pointCount: number;
+  };
   panels: {
     note: DevAutomationPanelState;
     segment: DevAutomationPanelState;
@@ -421,6 +427,11 @@ export function installBeatDevHooks() {
   const openAetherAutomationFixtureEditor = async (editor: DevAetherAutomationEditor) => {
     const fixture = ensureAetherAutomationFixture();
     useUiStore.setState({ openEditors: [] });
+    if (editor === "arrangement") {
+      await nextFrame();
+      writeAetherAutomationFixtureMarker();
+      return readAetherAutomationFixtureState();
+    }
     if (editor === "track") {
       useUiStore.getState().openEditor({ kind: "track", trackId: fixture.trackId });
     } else {
@@ -452,6 +463,7 @@ export function installBeatDevHooks() {
       trackLaneTargets: (track?.automation ?? []).map((lane) => lane.target),
       segmentLaneTargets: (segment?.automation ?? []).map((lane) => lane.target),
       noteLaneTargets: (firstNote?.automation ?? []).map((lane) => lane.target),
+      arrangementLane: readArrangementAutomationLaneState(),
       panels: {
         note: readPanelState("Aether note automation lanes"),
         segment: readPanelState("Aether segment automation lanes"),
@@ -512,7 +524,17 @@ export function installBeatDevHooks() {
 }
 
 function isAetherAutomationEditor(value: string | null): value is DevAetherAutomationEditor {
-  return value === "track" || value === "segment" || value === "note";
+  return value === "arrangement" || value === "track" || value === "segment" || value === "note";
+}
+
+function readArrangementAutomationLaneState() {
+  const lane = document.querySelector<HTMLElement>("[data-aether-arrangement-automation]");
+  return {
+    exists: Boolean(lane),
+    target: lane?.dataset.aetherArrangementAutomation ?? null,
+    text: normalizeText(lane?.textContent ?? ""),
+    pointCount: lane?.querySelectorAll("[class*='automationPoint']").length ?? 0,
+  };
 }
 
 function readPanelState(label: string): DevAutomationPanelState {

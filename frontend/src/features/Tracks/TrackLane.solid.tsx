@@ -18,6 +18,14 @@ import { useComponentStore } from "../../state/components";
 import { clipboardStore } from "../../state/clipboard";
 import { expandTrackSegments } from "../../state/selectors";
 import {
+  AETHER_ARRANGEMENT_AUTOMATION_TARGETS,
+  aetherArrangementAutomationTargetLabel,
+  aetherArrangementAutomationTargetMeta,
+  formatAetherArrangementAutomationValue,
+  trackAutomationTargetCount,
+  type AetherArrangementAutomationTarget,
+} from "../../automation/aetherArrangementAutomation";
+import {
   decentSamplerEditorKind,
   decentSamplerInstrumentInstancePatch,
   decentSamplerPluginForInstrument,
@@ -25,7 +33,7 @@ import {
 import { createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { Segment } from "./Segment.solid";
 import styles from "./TrackLane.module.css";
-import type { DrumRow, Id, Instrument, Segment as SegmentModel, Track } from "../../state/types";
+import type { DrumRow, Id, Instrument, MidiAutomationLane, Segment as SegmentModel, Track } from "../../state/types";
 
 interface Props {
   trackId: Id;
@@ -50,6 +58,7 @@ export function TrackLane(props: Props) {
     const currentTrack = track();
     return currentTrack ? expandTrackSegments(currentTrack, lengthBeats()) : [];
   });
+  const visibleAutomation = createMemo(() => arrangementAutomationPreview(track(), lengthBeats(), beatsToPx()));
 
   const menu = createContextMenu((): ContextMenuItem[] => {
     if (!track()) return [];
@@ -301,6 +310,40 @@ export function TrackLane(props: Props) {
           )}
         </For>
 
+        <Show when={visibleAutomation()}>
+          {(preview) => (
+            <div
+              class={styles.automationPreview}
+              data-aether-arrangement-automation={preview().target}
+              aria-label={`${track()?.name ?? "Track"} Aether arrangement automation lane`}
+            >
+              <div class={styles.automationLabel}>
+                <span>{preview().label}</span>
+                <Show when={preview().count > 1}>
+                  <span class={styles.automationCount}>{preview().count}</span>
+                </Show>
+              </div>
+              <svg
+                class={styles.automationCurve}
+                viewBox={`0 0 ${preview().width} ${preview().height}`}
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <polyline class={styles.automationCurveLine} points={preview().polyline} />
+              </svg>
+              <For each={preview().points}>
+                {(point) => (
+                  <div
+                    class={styles.automationPoint}
+                    title={point.title}
+                    style={{ left: `${point.x}px`, top: `${point.y}px` }}
+                  />
+                )}
+              </For>
+            </div>
+          )}
+        </Show>
+
         <For each={expanded()}>
           {(occurrence) => {
             const original = () => segById().get(occurrence.segmentId);
@@ -325,6 +368,70 @@ export function TrackLane(props: Props) {
       </div>
     </Show>
   );
+}
+
+interface ArrangementAutomationPreview {
+  count: number;
+  height: number;
+  label: string;
+  points: Array<{ title: string; x: number; y: number }>;
+  polyline: string;
+  target: AetherArrangementAutomationTarget;
+  width: number;
+}
+
+const ARRANGEMENT_AUTOMATION_TARGETS = new Set<AetherArrangementAutomationTarget>(
+  AETHER_ARRANGEMENT_AUTOMATION_TARGETS.map((target) => target.target),
+);
+const ARRANGEMENT_AUTOMATION_HEIGHT = 22;
+
+function arrangementAutomationPreview(
+  track: Track | undefined,
+  projectLengthBeats: number,
+  beatsToPx: number,
+): ArrangementAutomationPreview | null {
+  const lane = firstVisibleArrangementAutomationLane(track?.automation);
+  if (!lane) return null;
+  const target = lane.target as AetherArrangementAutomationTarget;
+  const meta = aetherArrangementAutomationTargetMeta(target);
+  const width = Math.max(1, projectLengthBeats * beatsToPx);
+  const height = ARRANGEMENT_AUTOMATION_HEIGHT;
+  const points = lane.points
+    .filter((point) => Number.isFinite(point.beat) && Number.isFinite(point.value))
+    .map((point) => {
+      const beat = clamp(point.beat, 0, Math.max(0.001, projectLengthBeats));
+      const normalized = meta.max === meta.min ? 0.5 : (clamp(point.value, meta.min, meta.max) - meta.min) / (meta.max - meta.min);
+      const x = beat * beatsToPx;
+      const y = height - 4 - normalized * (height - 8);
+      return {
+        title: `${aetherArrangementAutomationTargetLabel(target)} ${formatAetherArrangementAutomationValue(target, point.value)} @ ${beat.toFixed(2)}`,
+        x,
+        y,
+      };
+    });
+  if (points.length === 0) return null;
+  return {
+    count: trackAutomationTargetCount(track),
+    height,
+    label: aetherArrangementAutomationTargetLabel(target),
+    points,
+    polyline: points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" "),
+    target,
+    width,
+  };
+}
+
+function firstVisibleArrangementAutomationLane(
+  automation: MidiAutomationLane[] | undefined,
+): MidiAutomationLane | undefined {
+  return automation?.find((lane) =>
+    ARRANGEMENT_AUTOMATION_TARGETS.has(lane.target as AetherArrangementAutomationTarget)
+    && lane.points.length > 0
+  );
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
 function nextSegmentName(tracks: Track[], kind: "midi" | "audio" | "drum"): string {
