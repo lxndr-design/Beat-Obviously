@@ -68,6 +68,11 @@ try {
   assert.equal(preview.points.length, 3);
   assert.equal(preview.points[1].index, 1, "preview points retain source point indexes");
   assert.equal(preview.points[1].x, 256);
+  assert.equal(automationLane.arrangementAutomationAddPointBeat(8), 4, "arrangement automation add uses the project midpoint");
+  assert.equal(automationLane.arrangementAutomationAddPointBeat(0), 0.0005, "arrangement automation add keeps zero-length projects bounded");
+  assert.equal(automationLane.arrangementAutomationRemovePointIndex(preview.points, 1), 1, "arrangement automation remove uses the active point when present");
+  assert.equal(automationLane.arrangementAutomationRemovePointIndex(preview.points, 99), 2, "arrangement automation remove falls back to the last rendered point");
+  assert.equal(automationLane.arrangementAutomationRemovePointIndex([], 0), null, "arrangement automation remove is empty-lane safe");
 
   const freeAutomationDrag = automationLane.arrangementAutomationDragValue({
     clientX: 193,
@@ -107,6 +112,8 @@ try {
     shiftDragBeat: math.snapDragBeat(3.49, true, dense),
     shiftResizeStep: math.snapStepBeats(true, dense),
     automationPointCount: preview.points.length,
+    automationAddBeat: automationLane.arrangementAutomationAddPointBeat(8),
+    automationRemoveFallback: automationLane.arrangementAutomationRemovePointIndex(preview.points, 99),
     freeAutomationBeat: freeAutomationDrag.beat,
     shiftAutomationBeat: snappedAutomationDrag.beat,
   }, null, 2));

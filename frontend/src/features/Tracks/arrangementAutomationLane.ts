@@ -32,6 +32,19 @@ export interface ArrangementAutomationDragValue {
   value: number;
 }
 
+export function arrangementAutomationAddPointBeat(projectLengthBeats: number): number {
+  return Math.max(0.001, projectLengthBeats) / 2;
+}
+
+export function arrangementAutomationRemovePointIndex(
+  points: Array<Pick<ArrangementAutomationPreviewPoint, "index">>,
+  activePointIndex: number | null | undefined,
+): number | null {
+  if (points.length === 0) return null;
+  if (activePointIndex != null && points.some((point) => point.index === activePointIndex)) return activePointIndex;
+  return points[points.length - 1]?.index ?? null;
+}
+
 const ARRANGEMENT_AUTOMATION_TARGETS = new Set<AetherArrangementAutomationTarget>(
   AETHER_ARRANGEMENT_AUTOMATION_TARGETS.map((target) => target.target),
 );

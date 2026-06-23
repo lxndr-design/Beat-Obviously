@@ -19,6 +19,9 @@ import { useComponentStore } from "../../state/components";
 import { clipboardStore } from "../../state/clipboard";
 import { expandTrackSegments } from "../../state/selectors";
 import {
+  insertTrackAutomationPoint,
+  removeTrackAutomationPoint,
+  trackAutomationValueRange,
   updateTrackAutomationPoint,
   type AetherArrangementAutomationTarget,
 } from "../../automation/aetherArrangementAutomation";
@@ -30,8 +33,10 @@ import {
 import { createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { Segment } from "./Segment.solid";
 import {
+  arrangementAutomationAddPointBeat,
   arrangementAutomationDragValue,
   arrangementAutomationPreview,
+  arrangementAutomationRemovePointIndex,
   type ArrangementAutomationPreviewPoint,
 } from "./arrangementAutomationLane";
 import styles from "./TrackLane.module.css";
@@ -48,6 +53,7 @@ export function TrackLane(props: Props) {
   let releaseAutomationDrag: (() => void) | undefined;
   let lastClickBeat = 0;
   const [dragOver, setDragOver] = createSignal(false);
+  const [activeAutomationPoint, setActiveAutomationPoint] = createSignal<number | null>(null);
   const [draggingAutomationPoint, setDraggingAutomationPoint] = createSignal<number | null>(null);
   const track = createStoreSelector(useProjectStore, (state) => state.project.tracks.find((candidate) => candidate.id === props.trackId));
   const tracks = createStoreSelector(useProjectStore, (state) => state.project.tracks);
@@ -301,6 +307,7 @@ export function TrackLane(props: Props) {
     releaseAutomationDrag?.();
     let dragBeat = point.beat;
     let dragValue = point.value;
+    setActiveAutomationPoint(point.index);
     const move = (moveEvent: PointerEvent) => {
       const laneRect = laneElement?.getBoundingClientRect();
       const previewRect = automationPreviewElement?.getBoundingClientRect();
@@ -340,6 +347,32 @@ export function TrackLane(props: Props) {
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
+  }
+
+  function addArrangementAutomationPoint(event: MouseEvent, target: AetherArrangementAutomationTarget) {
+    event.preventDefault();
+    event.stopPropagation();
+    const currentTrack = track();
+    if (!currentTrack) return;
+    const range = trackAutomationValueRange(currentTrack, target);
+    const beat = arrangementAutomationAddPointBeat(lengthBeats());
+    const nextTrack = insertTrackAutomationPoint(currentTrack, target, lengthBeats(), beat, range.midValue);
+    useProjectStore.getState().updateTrack(props.trackId, { automation: nextTrack.automation });
+    const nextPreview = arrangementAutomationPreview(nextTrack, lengthBeats(), beatsToPx());
+    setActiveAutomationPoint(nextPreview?.points.find((point) => Math.abs(point.beat - beat) < 0.000001)?.index ?? null);
+  }
+
+  function removeArrangementAutomationPoint(event: MouseEvent, target: AetherArrangementAutomationTarget) {
+    event.preventDefault();
+    event.stopPropagation();
+    const currentTrack = track();
+    const preview = visibleAutomation();
+    if (!currentTrack || !preview || preview.points.length === 0) return;
+    const pointIndex = arrangementAutomationRemovePointIndex(preview.points, activeAutomationPoint());
+    if (pointIndex == null) return;
+    const nextTrack = removeTrackAutomationPoint(currentTrack, target, pointIndex);
+    useProjectStore.getState().updateTrack(props.trackId, { automation: nextTrack.automation });
+    setActiveAutomationPoint(null);
   }
 
   const segById = createMemo(() => new Map((track()?.segments ?? []).map((segment) => [segment.id, segment])));
@@ -382,6 +415,23 @@ export function TrackLane(props: Props) {
                 <Show when={preview().count > 1}>
                   <span class={styles.automationCount}>{preview().count}</span>
                 </Show>
+                <button
+                  type="button"
+                  class={styles.automationAction}
+                  aria-label={`Add ${preview().label} arrangement automation point`}
+                  onClick={(event) => addArrangementAutomationPoint(event, preview().target)}
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  class={styles.automationAction}
+                  aria-label={`Remove ${preview().label} arrangement automation point`}
+                  disabled={preview().points.length === 0}
+                  onClick={(event) => removeArrangementAutomationPoint(event, preview().target)}
+                >
+                  -
+                </button>
               </div>
               <svg
                 class={styles.automationCurve}
@@ -396,6 +446,7 @@ export function TrackLane(props: Props) {
                   <div
                     class={[
                       styles.automationPoint,
+                      activeAutomationPoint() === point.index && styles.automationPointActive,
                       draggingAutomationPoint() === point.index && styles.automationPointDragging,
                     ].filter(Boolean).join(" ")}
                     data-aether-arrangement-automation-point={point.index}

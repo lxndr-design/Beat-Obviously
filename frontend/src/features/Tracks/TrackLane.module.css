@@ -70,6 +70,35 @@
   white-space: nowrap;
 }
 
+.automationAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--color-fg) 78%, transparent);
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+  pointer-events: auto;
+}
+
+.automationAction:hover,
+.automationAction:focus-visible {
+  background: color-mix(in srgb, var(--color-fg) 16%, transparent);
+  color: var(--color-fg);
+  outline: 0;
+}
+
+.automationAction:disabled {
+  color: color-mix(in srgb, var(--color-fg) 28%, transparent);
+  cursor: default;
+}
+
 .automationCount {
   display: inline-flex;
   align-items: center;
@@ -115,6 +144,7 @@
 }
 
 .automationPoint:hover,
+.automationPointActive,
 .automationPointDragging {
   transform: scale(1.25);
   box-shadow:
