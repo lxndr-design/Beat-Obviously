@@ -40,9 +40,9 @@ Status legend:
 - `[x]` First-class wavemap metadata with legacy custom-wavetable compatibility.
 - `[x]` Audio-file wavemap import through Solid editor and native IPC, with deterministic browser/native resynthesis.
 - `[x]` Phase-aware harmonic partial extraction, deterministic normalize/evolve transforms, 16-bin partial drawing, per-frame skew/tilt/focus/formant/notch/phase controls, direct mini-waveform sketching, editable scan anchors, interpolation mode, and wavemap morph.
-- `[~]` Deeper waveform drawing semantics.
-  - Remaining: richer draw modes beyond the current mini-waveform/partial lanes, clearer frame editing constraints, and intentional tools for additive-vs-freehand editing.
-  - Proof: browser preview differences, native table generation differences, patch persistence, verifier snapshots, and backend stress for cache identity.
+- `[x]` Deeper waveform drawing semantics.
+  - Done: explicit Freehand/Additive editor modes, waveform drawing locked to Freehand mode, harmonic partial drawing and additive partial presets in Additive mode, and bounded scan-anchor editing that keeps endpoints fixed and middle frames from crossing neighbors.
+  - Proof: synth verifier covers additive partial presets and bounded scan-anchor math; browser smoke verified Freehand/Additive controls, additive preset tools, and scan constraint labels on a mixed-era Aether wavemap fixture.
 - `[x]` Richer FFT/resynthesis analysis.
   - Done: deterministic browser/native source provenance fields, deterministic full/transient/sustain/manual imported-audio selection windows, native IPC selection support, absolute source-range frame metadata, per-frame RMS/peak/zero-cross/roughness/asymmetry/centroid/dominant-harmonic analysis metadata, Solid import mode controls, visible manual range picker controls for imported audio, and deeper analysis display controls.
   - Proof: deterministic fixture import that produces stable frame metadata and audible/rendered differences; synth verifier covers manual range normalization/clamping, selected sample windows, and analysis summary aggregation; browser smoke verified Manual mode shows Start/End controls, updates the `20-65%` range readout, and moves the visual range strip to the same span; browser smoke also verified the Details analysis view exposes analyzed frame count, RMS, peak, zero-crossing, roughness, asymmetry, centroid, dominant harmonic, and source sample span.
@@ -102,7 +102,6 @@ Status legend:
 
 ## Near-Term Slice Order
 
-1. Tighten wavemap drawing/resynthesis editing semantics beyond deterministic source/frame analysis metadata.
-2. Add visible track/segment automation lanes for the Aether targets.
-3. Add browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, and note automation lanes.
-4. Curate the named Aether instrument/effect preset library UX beyond local Save As lists.
+1. Add visible track/segment automation lanes for the Aether targets.
+2. Add browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, and note automation lanes.
+3. Curate the named Aether instrument/effect preset library UX beyond local Save As lists.

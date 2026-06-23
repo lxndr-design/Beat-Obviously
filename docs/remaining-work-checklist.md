@@ -22,10 +22,10 @@ Status legend:
    - `[x]` Wire local effect-chain preset save/load/delete handoff.
    - `[x]` Verify with synth roundtrip coverage, frontend interaction coverage, live/export parity stress using both instrument FX and track FX, and true browser smoke for current FX preset save/load/delete controls.
    - `[x]` Add true browser smoke for older/mixed-era FX preset load/delete with default-filled legacy params.
-2. `[~]` Wavemap drawing and resynthesis refinement.
-   - Add richer draw modes beyond mini-waveform and partial lanes.
-   - Clarify frame editing constraints.
-   - Add additive-vs-freehand editing tools.
+2. `[x]` Wavemap drawing and resynthesis refinement.
+   - `[x]` Add richer draw modes beyond mini-waveform and partial lanes.
+   - `[x]` Clarify frame editing constraints.
+   - `[x]` Add additive-vs-freehand editing tools.
    - `[x]` Add deterministic browser/native source metadata and frame-analysis fixtures.
    - `[x]` Add deterministic full/transient/sustain/manual imported-audio selection windows, native IPC support, source-range metadata, and Solid import mode controls.
    - `[x]` Add visual/manual range picker polish for imported audio.

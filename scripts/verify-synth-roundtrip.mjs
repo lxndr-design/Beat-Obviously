@@ -976,6 +976,24 @@ try {
   assert.ok(tiltedHighPartials[15] > tiltedHighPartials[0], "positive partial tilt should emphasize high harmonics");
   assert.ok(tiltedLowPartials[0] > tiltedLowPartials[15], "negative partial tilt should emphasize low harmonics");
   assert.deepEqual(synthStore.tiltHarmonicPartials([0.1, 0.2, 0.3, 0.4], 0).slice(0, 4), [0.1, 0.2, 0.3, 0.4]);
+  const fundamentalPartials = synthStore.createHarmonicPartialPreset("fundamental");
+  assert.equal(fundamentalPartials.length, 16);
+  assert.equal(fundamentalPartials[0], 1);
+  assert.equal(fundamentalPartials.slice(1).every((value) => value === 0), true);
+  const oddPartials = synthStore.createHarmonicPartialPreset("odd");
+  assert.ok(oddPartials[0] > oddPartials[2] && oddPartials[2] > oddPartials[4], "odd additive preset should decay across odd harmonics");
+  assert.equal(oddPartials[1], 0);
+  const evenPartials = synthStore.createHarmonicPartialPreset("even");
+  assert.equal(evenPartials[0], 0);
+  assert.ok(evenPartials[1] > evenPartials[3], "even additive preset should decay across even harmonics");
+
+  const constrainedWavemap = synthStore.normalizeWavemapFrames(synthStore.createDefaultCustomWavetable("user.constraint"));
+  assert.equal(synthStore.constrainWavemapFramePosition(constrainedWavemap, 0, 0.5), 0);
+  assert.equal(synthStore.constrainWavemapFramePosition(constrainedWavemap, 3, 0.5), 1);
+  assert.equal(synthStore.constrainWavemapFramePosition(constrainedWavemap, 1, -1), 0.01);
+  assert.ok(Math.abs(synthStore.constrainWavemapFramePosition(constrainedWavemap, 1, 0.99) - 0.6567) < 0.001);
+  assert.ok(Math.abs(synthStore.constrainWavemapFramePosition(constrainedWavemap, 2, 0.01) - 0.3433) < 0.001);
+  assert.equal(synthStore.constrainWavemapFramePosition(constrainedWavemap, 2, 2), 0.99);
   const drawnWaveformFrame = synthStore.deriveWavemapFrameFromDrawnWaveform(
     { id: "user.custom.frame.drawn", label: "Drawn", position: 0.5, brightness: 0.2, even: 0.1, fold: 0.05, formant: 0.08, notch: 0.04, skew: 0, tilt: 0, focus: 0.2, phase: 0 },
     Float32Array.from({ length: 256 }, (_, index) => Math.sin((index / 256) * Math.PI * 2 * 3)),

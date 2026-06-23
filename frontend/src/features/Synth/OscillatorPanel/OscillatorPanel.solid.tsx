@@ -10,7 +10,9 @@ import {
   CUSTOM_WAVETABLE_PARTIAL_COUNT,
   DEFAULT_CUSTOM_WAVETABLE_ID,
   FACTORY_WAVETABLES,
+  constrainWavemapFramePosition,
   createDefaultCustomWavetable,
+  createHarmonicPartialPreset,
   deriveWavemapFrameFromDrawnWaveform,
   drawHarmonicPartialLine,
   evolveWavemapFrames,
@@ -26,6 +28,7 @@ import {
   tiltHarmonicPartials,
   useSynthStore,
   type WavemapAudioSelectionMode,
+  type HarmonicPartialPreset,
   type ModulationTargetId,
   type OscillatorKey,
   type SynthDraftPatch,
@@ -77,10 +80,16 @@ const RESYNTHESIS_MODE_OPTIONS: Array<{ value: WavemapAudioSelectionMode; label:
 ];
 
 type WavemapAnalysisView = "compact" | "details";
+type WavemapEditMode = "freehand" | "additive";
 
 const WAVEMAP_ANALYSIS_VIEW_OPTIONS: Array<{ value: WavemapAnalysisView; label: string }> = [
   { value: "compact", label: "Compact" },
   { value: "details", label: "Details" },
+];
+
+const WAVEMAP_EDIT_MODE_OPTIONS: Array<{ value: WavemapEditMode; label: string }> = [
+  { value: "freehand", label: "Freehand" },
+  { value: "additive", label: "Additive" },
 ];
 
 export function OscillatorPanel() {
@@ -189,6 +198,7 @@ function OscillatorRow(props: {
   const [resynthesizing, setResynthesizing] = createSignal(false);
   const [resynthesisMode, setResynthesisMode] = createSignal<WavemapAudioSelectionMode>("full");
   const [analysisView, setAnalysisView] = createSignal<WavemapAnalysisView>("compact");
+  const [editMode, setEditMode] = createSignal<WavemapEditMode>("freehand");
   const [manualStartPercent, setManualStartPercent] = createSignal(0);
   const [manualEndPercent, setManualEndPercent] = createSignal(100);
   const enabledId = createMemo(() => oscParam(props.oscillator, "enabled"));
@@ -317,6 +327,20 @@ function OscillatorRow(props: {
                         )}
                       </For>
                     </div>
+                    <div class={styles.editModes} role="radiogroup" aria-label="Wavemap edit mode">
+                      <For each={WAVEMAP_EDIT_MODE_OPTIONS}>
+                        {(option) => (
+                          <Button
+                            size="xs"
+                            selected={editMode() === option.value}
+                            aria-label={`${option.label} wavemap editing`}
+                            onClick={() => setEditMode(option.value)}
+                          >
+                            {option.label}
+                          </Button>
+                        )}
+                      </For>
+                    </div>
                     <div class={styles.resynthesisModes} role="radiogroup" aria-label="Audio resynthesis window">
                       <For each={RESYNTHESIS_MODE_OPTIONS}>
                         {(option) => (
@@ -414,8 +438,12 @@ function OscillatorRow(props: {
                           {frame.label ?? CUSTOM_WAVETABLE_FRAME_LABELS[index()] ?? index() + 1}
                           <span>{Math.round((frame.position ?? index() / 3) * 100)}</span>
                         </div>
+                        <div class={styles.frameConstraint}>
+                          {scanConstraintLabel(customTable(), index())}
+                        </div>
                         <MiniWaveform
                           samples={renderCustomFramePreview(frame)}
+                          disabled={editMode() !== "freehand"}
                           onDrawSamples={(samples) =>
                             updateCustomWavetableFrame(customTable().id, index(), deriveWavemapFrameFromDrawnWaveform(frame, samples))
                           }
@@ -431,10 +459,13 @@ function OscillatorRow(props: {
                           defaultValue={index() / Math.max(1, customTable().frames.length - 1)}
                           formatValue={formatPercent}
                           parseValue={parsePercent}
-                          onChange={(position) => updateCustomWavetableFrame(customTable().id, index(), { position })}
+                          onChange={(position) => updateCustomWavetableFrame(customTable().id, index(), {
+                            position: constrainWavemapFramePosition(customTable(), index(), position),
+                          })}
                         />
                         <HarmonicDraw
                           partials={frame.partials}
+                          mode={editMode()}
                           onChange={(partials) => updateCustomWavetableFrame(customTable().id, index(), { partials })}
                         />
                         <Knob
@@ -609,7 +640,7 @@ function WavemapAnalysisDetails(props: { table: WavemapDefinition }) {
   );
 }
 
-function MiniWaveform(props: { samples: number[]; onDrawSamples?: (samples: number[]) => void }) {
+function MiniWaveform(props: { samples: number[]; disabled?: boolean; onDrawSamples?: (samples: number[]) => void }) {
   const [workingSamples, setWorkingSamples] = createSignal<number[] | null>(null);
   const [lastDrawPoint, setLastDrawPoint] = createSignal<{ index: number; value: number } | null>(null);
   const visibleSamples = createMemo(() => workingSamples() ?? props.samples);
@@ -625,7 +656,7 @@ function MiniWaveform(props: { samples: number[]; onDrawSamples?: (samples: numb
   };
 
   const updateFromPointer = (event: PointerEvent & { currentTarget: SVGSVGElement }) => {
-    if (!props.onDrawSamples) return;
+    if (!props.onDrawSamples || props.disabled) return;
     const point = pointFromPointer(event);
     const previous = lastDrawPoint() ?? point;
     const next = drawWaveformSampleLine(visibleSamples(), previous.index, previous.value, point.index, point.value);
@@ -636,20 +667,20 @@ function MiniWaveform(props: { samples: number[]; onDrawSamples?: (samples: numb
 
   return (
     <svg
-      class={styles.frameWaveform}
+      class={`${styles.frameWaveform} ${props.disabled ? styles.frameWaveformLocked : ""}`}
       viewBox="0 0 100 48"
       preserveAspectRatio="none"
-      aria-hidden={props.onDrawSamples ? undefined : "true"}
-      aria-label={props.onDrawSamples ? "Draw waveform" : undefined}
+      aria-hidden={props.onDrawSamples && !props.disabled ? undefined : "true"}
+      aria-label={props.onDrawSamples && !props.disabled ? "Draw waveform" : undefined}
       onPointerDown={(event) => {
-        if (!props.onDrawSamples) return;
+        if (!props.onDrawSamples || props.disabled) return;
         event.currentTarget.setPointerCapture(event.pointerId);
         setWorkingSamples(props.samples.slice());
         setLastDrawPoint(null);
         updateFromPointer(event);
       }}
       onPointerMove={(event) => {
-        if (!props.onDrawSamples || event.buttons !== 1) return;
+        if (!props.onDrawSamples || props.disabled || event.buttons !== 1) return;
         updateFromPointer(event);
       }}
       onPointerUp={() => {
@@ -856,7 +887,7 @@ function renderCustomFramePreview(frame: CustomWavetableFrame, sampleCount = 96)
   return peak > 0 ? samples.map((sample) => sample / peak) : samples;
 }
 
-function HarmonicDraw(props: { partials?: number[]; onChange: (partials: number[]) => void }) {
+function HarmonicDraw(props: { partials?: number[]; mode: WavemapEditMode; onChange: (partials: number[]) => void }) {
   const [lastDrawPoint, setLastDrawPoint] = createSignal<{ index: number; value: number } | null>(null);
   const bins = createMemo(() =>
     Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, (_, index) => clamp01(props.partials?.[index] ?? 0)),
@@ -871,6 +902,7 @@ function HarmonicDraw(props: { partials?: number[]; onChange: (partials: number[
   };
 
   const updateFromPointer = (event: PointerEvent & { currentTarget: HTMLDivElement }) => {
+    if (props.mode !== "additive") return;
     const point = pointFromPointer(event);
     const previous = lastDrawPoint() ?? point;
     props.onChange(drawHarmonicPartialLine(bins(), previous.index, previous.value, point.index, point.value));
@@ -880,15 +912,16 @@ function HarmonicDraw(props: { partials?: number[]; onChange: (partials: number[
   return (
     <>
     <div
-      class={styles.harmonicDraw}
+      class={`${styles.harmonicDraw} ${props.mode === "additive" ? "" : styles.harmonicDrawLocked}`}
       aria-label="Harmonic partials"
       onPointerDown={(event) => {
+        if (props.mode !== "additive") return;
         event.currentTarget.setPointerCapture(event.pointerId);
         setLastDrawPoint(null);
         updateFromPointer(event);
       }}
       onPointerMove={(event) => {
-        if (event.buttons !== 1) return;
+        if (props.mode !== "additive" || event.buttons !== 1) return;
         updateFromPointer(event);
       }}
       onPointerUp={() => setLastDrawPoint(null)}
@@ -903,6 +936,17 @@ function HarmonicDraw(props: { partials?: number[]; onChange: (partials: number[
       </For>
     </div>
     <div class={styles.harmonicTools} aria-label="Harmonic partial tools">
+      <For each={[
+        ["fundamental", "Fund"],
+        ["odd", "Odd"],
+        ["even", "Even"],
+      ] as Array<[HarmonicPartialPreset, string]>}>
+        {([preset, label]) => (
+          <Button size="xs" onClick={() => props.onChange(createHarmonicPartialPreset(preset))}>
+            {label}
+          </Button>
+        )}
+      </For>
       <Button size="xs" onClick={() => props.onChange(tiltHarmonicPartials(bins(), -0.42))}>
         Low
       </Button>
@@ -918,6 +962,14 @@ function HarmonicDraw(props: { partials?: number[]; onChange: (partials: number[
     </div>
     </>
   );
+}
+
+function scanConstraintLabel(table: WavemapDefinition, index: number): string {
+  if (index === 0) return "Anchor 0%";
+  if (index === table.frames.length - 1) return "Anchor 100%";
+  const minimum = Math.round(constrainWavemapFramePosition(table, index, 0) * 100);
+  const maximum = Math.round(constrainWavemapFramePosition(table, index, 1) * 100);
+  return `Scan ${minimum}-${maximum}%`;
 }
 
 function customFrameAmplitude(frame: CustomWavetableFrame, harmonic: number): number {

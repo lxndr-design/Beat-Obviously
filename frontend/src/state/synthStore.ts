@@ -252,6 +252,9 @@ export const FACTORY_WAVETABLES: Array<{ id: WavetableId; label: string }> = [
 
 export const CUSTOM_WAVETABLE_FRAME_LABELS = ["A", "B", "C", "D"] as const;
 export const CUSTOM_WAVETABLE_PARTIAL_COUNT = 16;
+const WAVEMAP_SCAN_ANCHOR_MARGIN = 0.01;
+
+export type HarmonicPartialPreset = "fundamental" | "odd" | "even";
 
 export interface WavemapAnalysisSummary {
   frameCount: number;
@@ -315,6 +318,35 @@ export function summarizeWavemapAnalysis(definition: Pick<WavemapDefinition, "fr
     sourceStartSample: sourceStartSamples.length ? Math.min(...sourceStartSamples) : undefined,
     sourceEndSample: sourceEndSamples.length ? Math.max(...sourceEndSamples) : undefined,
   };
+}
+
+export function constrainWavemapFramePosition(
+  definition: Pick<WavemapDefinition, "frames">,
+  frameIndex: number,
+  position: number,
+): number {
+  const frameCount = definition.frames.length;
+  if (frameCount <= 1) return 0;
+  const safeIndex = Math.max(0, Math.min(frameCount - 1, Math.floor(frameIndex)));
+  if (safeIndex === 0) return 0;
+  if (safeIndex === frameCount - 1) return 1;
+  const defaultPosition = safeIndex / Math.max(1, frameCount - 1);
+  const previous = definition.frames[safeIndex - 1]?.position ?? (safeIndex - 1) / Math.max(1, frameCount - 1);
+  const next = definition.frames[safeIndex + 1]?.position ?? (safeIndex + 1) / Math.max(1, frameCount - 1);
+  const lower = Math.min(1, Math.max(0, previous) + WAVEMAP_SCAN_ANCHOR_MARGIN);
+  const upper = Math.max(0, Math.min(1, next) - WAVEMAP_SCAN_ANCHOR_MARGIN);
+  if (lower > upper) return Math.max(0, Math.min(1, defaultPosition));
+  const safePosition = Number.isFinite(position) ? position : defaultPosition;
+  return Math.max(lower, Math.min(upper, safePosition));
+}
+
+export function createHarmonicPartialPreset(preset: HarmonicPartialPreset): number[] {
+  return Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, (_, index) => {
+    const harmonic = index + 1;
+    if (preset === "fundamental") return harmonic === 1 ? 1 : 0;
+    if (preset === "odd") return harmonic % 2 === 1 ? Math.max(0.12, 1 / Math.sqrt(harmonic)) : 0;
+    return harmonic % 2 === 0 ? Math.max(0.1, 0.8 / Math.sqrt(harmonic)) : 0;
+  });
 }
 
 export function createWavemapFromAudioSamples(
