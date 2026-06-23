@@ -195,6 +195,13 @@
   min-width: 0;
 }
 
+.analysisModes {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
 .manualRangeControl {
   display: inline-grid;
   grid-template-columns: 72px 104px 104px auto;
@@ -230,6 +237,64 @@
   line-height: 1;
   color: color-mix(in srgb, var(--color-fg) 62%, transparent);
   white-space: nowrap;
+}
+
+.analysisDetails {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px;
+  border-top: var(--border-fg);
+}
+
+.analysisHeader,
+.analysisFrameRow {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) repeat(8, minmax(42px, auto)) minmax(76px, auto);
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px 6px;
+  color: color-mix(in srgb, var(--color-fg) 72%, transparent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-hint);
+  line-height: 1;
+}
+
+.analysisHeader {
+  background: var(--interaction-hover-bg);
+}
+
+.analysisHeader strong,
+.analysisFrameRow strong {
+  overflow: hidden;
+  color: var(--color-fg);
+  font-family: var(--font-family-base);
+  font-weight: var(--font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysisFrameRows {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.analysisFrameRow {
+  border: var(--border-fg);
+}
+
+.analysisFrameRow span,
+.analysisHeader span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysisPending {
+  grid-column: 2 / -1;
+  color: color-mix(in srgb, var(--color-fg) 52%, transparent);
 }
 
 .customFrames {

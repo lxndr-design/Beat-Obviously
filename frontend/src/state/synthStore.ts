@@ -253,6 +253,20 @@ export const FACTORY_WAVETABLES: Array<{ id: WavetableId; label: string }> = [
 export const CUSTOM_WAVETABLE_FRAME_LABELS = ["A", "B", "C", "D"] as const;
 export const CUSTOM_WAVETABLE_PARTIAL_COUNT = 16;
 
+export interface WavemapAnalysisSummary {
+  frameCount: number;
+  analyzedFrameCount: number;
+  averageRms: number;
+  peak: number;
+  averageZeroCrossRate: number;
+  averageRoughness: number;
+  averageAsymmetry: number;
+  averageSpectralCentroid: number;
+  dominantHarmonic: number;
+  sourceStartSample?: number;
+  sourceEndSample?: number;
+}
+
 export function createDefaultCustomWavetable(id = DEFAULT_CUSTOM_WAVETABLE_ID): CustomWavetableDefinition {
   return {
     schemaVersion: 1,
@@ -271,6 +285,35 @@ export function createDefaultCustomWavetable(id = DEFAULT_CUSTOM_WAVETABLE_ID): 
       { id: `${id}.frame.3`, label: "C", position: 0.667, brightness: 0.72, even: 0.48, fold: 0.34, formant: 0.32, notch: 0.16, skew: 0.08, tilt: 0.08, focus: 0.52, phase: -0.08 },
       { id: `${id}.frame.4`, label: "D", position: 1.0, brightness: 0.94, even: 0.72, fold: 0.56, formant: 0.46, notch: 0.24, skew: 0.22, tilt: 0.2, focus: 0.7, phase: 0.2 },
     ],
+  };
+}
+
+export function summarizeWavemapAnalysis(definition: Pick<WavemapDefinition, "frames">): WavemapAnalysisSummary {
+  const analyses = definition.frames.map((frame) => frame.analysis).filter((analysis): analysis is WavemapFrameAnalysis => Boolean(analysis));
+  const analyzedFrameCount = analyses.length;
+  const analyzed = Math.max(1, analyzedFrameCount);
+  const peakFrame = analyses.reduce<WavemapFrameAnalysis | null>((best, analysis) => {
+    if (!best) return analysis;
+    return analysis.peak > best.peak ? analysis : best;
+  }, null);
+  const sourceStartSamples = analyses
+    .map((analysis) => analysis.sourceStartSample)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const sourceEndSamples = analyses
+    .map((analysis) => analysis.sourceEndSample)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  return {
+    frameCount: definition.frames.length,
+    analyzedFrameCount,
+    averageRms: analyses.reduce((sum, analysis) => sum + analysis.rms, 0) / analyzed,
+    peak: peakFrame?.peak ?? 0,
+    averageZeroCrossRate: analyses.reduce((sum, analysis) => sum + analysis.zeroCrossRate, 0) / analyzed,
+    averageRoughness: analyses.reduce((sum, analysis) => sum + analysis.roughness, 0) / analyzed,
+    averageAsymmetry: analyses.reduce((sum, analysis) => sum + analysis.asymmetry, 0) / analyzed,
+    averageSpectralCentroid: analyses.reduce((sum, analysis) => sum + analysis.spectralCentroid, 0) / analyzed,
+    dominantHarmonic: peakFrame?.dominantHarmonic ?? 0,
+    sourceStartSample: sourceStartSamples.length ? Math.min(...sourceStartSamples) : undefined,
+    sourceEndSample: sourceEndSamples.length ? Math.max(...sourceEndSamples) : undefined,
   };
 }
 

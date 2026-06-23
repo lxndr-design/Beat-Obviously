@@ -21,6 +21,7 @@ import {
   normalizeWavemapManualRange,
   normalizeWavemapFrames,
   smoothHarmonicPartials,
+  summarizeWavemapAnalysis,
   synthDraftToPreviewInstrument,
   tiltHarmonicPartials,
   useSynthStore,
@@ -73,6 +74,13 @@ const RESYNTHESIS_MODE_OPTIONS: Array<{ value: WavemapAudioSelectionMode; label:
   { value: "transient", label: "Transient" },
   { value: "sustain", label: "Sustain" },
   { value: "manual", label: "Manual" },
+];
+
+type WavemapAnalysisView = "compact" | "details";
+
+const WAVEMAP_ANALYSIS_VIEW_OPTIONS: Array<{ value: WavemapAnalysisView; label: string }> = [
+  { value: "compact", label: "Compact" },
+  { value: "details", label: "Details" },
 ];
 
 export function OscillatorPanel() {
@@ -180,6 +188,7 @@ function OscillatorRow(props: {
   const updateWavemapMetadata = useSynthStore.getState().updateWavemapMetadata;
   const [resynthesizing, setResynthesizing] = createSignal(false);
   const [resynthesisMode, setResynthesisMode] = createSignal<WavemapAudioSelectionMode>("full");
+  const [analysisView, setAnalysisView] = createSignal<WavemapAnalysisView>("compact");
   const [manualStartPercent, setManualStartPercent] = createSignal(0);
   const [manualEndPercent, setManualEndPercent] = createSignal(100);
   const enabledId = createMemo(() => oscParam(props.oscillator, "enabled"));
@@ -294,6 +303,20 @@ function OscillatorRow(props: {
                       parseValue={parsePercent}
                       onChange={(morph) => updateWavemapMetadata(customTable().id, { morph })}
                     />
+                    <div class={styles.analysisModes} role="radiogroup" aria-label="Wavemap analysis display">
+                      <For each={WAVEMAP_ANALYSIS_VIEW_OPTIONS}>
+                        {(option) => (
+                          <Button
+                            size="xs"
+                            selected={analysisView() === option.value}
+                            aria-label={`${option.label} wavemap analysis`}
+                            onClick={() => setAnalysisView(option.value)}
+                          >
+                            {option.label}
+                          </Button>
+                        )}
+                      </For>
+                    </div>
                     <div class={styles.resynthesisModes} role="radiogroup" aria-label="Audio resynthesis window">
                       <For each={RESYNTHESIS_MODE_OPTIONS}>
                         {(option) => (
@@ -380,6 +403,9 @@ function OscillatorRow(props: {
                     </Button>
                   </div>
                 </div>
+                <Show when={analysisView() === "details"}>
+                  <WavemapAnalysisDetails table={customTable()} />
+                </Show>
                 <div class={styles.customFrames}>
                   <For each={customTable().frames}>
                     {(frame, index) => (
@@ -532,6 +558,53 @@ function OscillatorRow(props: {
           <WaveformPreview label={`${label()} Waveform`} samples={waveform()} disabled={!enabled()} />
         </div>
       </Show>
+    </div>
+  );
+}
+
+function WavemapAnalysisDetails(props: { table: WavemapDefinition }) {
+  const summary = createMemo(() => summarizeWavemapAnalysis(props.table));
+
+  return (
+    <div class={styles.analysisDetails} aria-label="Wavemap analysis details">
+      <div class={styles.analysisHeader}>
+        <strong>Analysis Details</strong>
+        <span>Frames {summary().analyzedFrameCount}/{summary().frameCount}</span>
+        <span>RMS {formatAnalysisPercent(summary().averageRms)}</span>
+        <span>Peak {formatAnalysisPercent(summary().peak)}</span>
+        <span>ZC {formatAnalysisPercent(summary().averageZeroCrossRate)}</span>
+        <span>Rough {formatAnalysisPercent(summary().averageRoughness)}</span>
+        <span>Asym {formatAnalysisSignedPercent(summary().averageAsymmetry)}</span>
+        <span>C{formatAnalysisDecimal(summary().averageSpectralCentroid)}</span>
+        <span>{summary().dominantHarmonic > 0 ? `H${Math.round(summary().dominantHarmonic)}` : "H-"}</span>
+        <span>{formatSampleSpan(summary().sourceStartSample, summary().sourceEndSample)}</span>
+      </div>
+      <div class={styles.analysisFrameRows}>
+        <For each={props.table.frames}>
+          {(frame, index) => (
+            <div class={styles.analysisFrameRow}>
+              <strong>{frame.label ?? CUSTOM_WAVETABLE_FRAME_LABELS[index()] ?? index() + 1}</strong>
+              <Show
+                when={frame.analysis}
+                fallback={<span class={styles.analysisPending}>Analysis pending</span>}
+              >
+                {(analysis) => (
+                  <>
+                    <span>RMS {formatAnalysisPercent(analysis().rms)}</span>
+                    <span>Peak {formatAnalysisPercent(analysis().peak)}</span>
+                    <span>ZC {formatAnalysisPercent(analysis().zeroCrossRate)}</span>
+                    <span>Rough {formatAnalysisPercent(analysis().roughness)}</span>
+                    <span>Asym {formatAnalysisSignedPercent(analysis().asymmetry)}</span>
+                    <span>C{formatAnalysisDecimal(analysis().spectralCentroid)}</span>
+                    <span>{analysis().dominantHarmonic > 0 ? `H${Math.round(analysis().dominantHarmonic)}` : "H-"}</span>
+                    <span>{formatSampleSpan(analysis().sourceStartSample, analysis().sourceEndSample)}</span>
+                  </>
+                )}
+              </Show>
+            </div>
+          )}
+        </For>
+      </div>
     </div>
   );
 }
@@ -746,6 +819,24 @@ function formatSamples(count?: number): string {
   if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M smp`;
   if (count >= 1_000) return `${Math.round(count / 100) / 10}k smp`;
   return `${Math.round(count)} smp`;
+}
+
+function formatAnalysisPercent(value: number): string {
+  return `${Math.round((Number.isFinite(value) ? value : 0) * 100)}`;
+}
+
+function formatAnalysisSignedPercent(value: number): string {
+  const percent = Math.round((Number.isFinite(value) ? value : 0) * 100);
+  return percent > 0 ? `+${percent}` : `${percent}`;
+}
+
+function formatAnalysisDecimal(value: number): string {
+  return Number.isFinite(value) && value > 0 ? value.toFixed(1) : "-";
+}
+
+function formatSampleSpan(start?: number, end?: number): string {
+  if (typeof start !== "number" || typeof end !== "number" || !Number.isFinite(start) || !Number.isFinite(end)) return "No span";
+  return `${Math.round(start)}-${Math.round(end)} smp`;
 }
 
 function renderCustomFramePreview(frame: CustomWavetableFrame, sampleCount = 96): number[] {

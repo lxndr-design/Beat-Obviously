@@ -1087,6 +1087,16 @@ try {
   assert.equal(resynthWavemap.frames.every((frame) => frame.analysis && frame.analysis.sourceEndSample > frame.analysis.sourceStartSample), true);
   assert.equal(resynthWavemap.frames.every((frame) => frame.analysis && frame.analysis.peak > 0 && frame.analysis.rms > 0), true);
   assert.ok(resynthWavemap.frames.some((frame) => frame.analysis.dominantHarmonic >= 1), "expected resynthesis to persist dominant harmonic analysis");
+  const resynthAnalysisSummary = synthStore.summarizeWavemapAnalysis(resynthWavemap);
+  assert.equal(resynthAnalysisSummary.frameCount, 4);
+  assert.equal(resynthAnalysisSummary.analyzedFrameCount, 4);
+  assert.equal(resynthAnalysisSummary.sourceStartSample, 10);
+  assert.equal(resynthAnalysisSummary.sourceEndSample, 4106);
+  assert.ok(resynthAnalysisSummary.averageRms > 0, "expected wavemap analysis summary to average RMS");
+  assert.ok(resynthAnalysisSummary.peak > 0, "expected wavemap analysis summary to expose peak");
+  assert.ok(resynthAnalysisSummary.averageZeroCrossRate > 0, "expected wavemap analysis summary to expose zero-cross rate");
+  assert.ok(resynthAnalysisSummary.averageSpectralCentroid > 0, "expected wavemap analysis summary to expose centroid");
+  assert.ok(resynthAnalysisSummary.dominantHarmonic >= 1, "expected wavemap analysis summary to expose dominant harmonic");
   assert.ok(
     resynthWavemap.frames.some((frame) => Math.max(...frame.partials) > 0.9 && frame.partials.some((partial) => partial > 0.15)),
     "expected resynthesis to populate harmonic partial bins",
