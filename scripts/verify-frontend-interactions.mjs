@@ -17,6 +17,7 @@ try {
     [
       join(repoRoot, "frontend/src/testing/interactionRunner.ts"),
       join(repoRoot, "frontend/src/automation/aetherNoteAutomation.ts"),
+      join(repoRoot, "frontend/src/automation/aetherArrangementAutomation.ts"),
       "--bundle",
       "--format=esm",
       "--platform=node",
@@ -27,6 +28,7 @@ try {
 
   const runner = await import(pathToFileURL(join(outDir, "testing/interactionRunner.js")));
   const noteAutomation = await import(pathToFileURL(join(outDir, "automation/aetherNoteAutomation.js")));
+  const arrangementAutomation = await import(pathToFileURL(join(outDir, "automation/aetherArrangementAutomation.js")));
 
   assert.equal(runner.snapBeat(1.12, 0.25), 1, "snapBeat should snap to nearest grid");
   assert.equal(runner.snapBeat(1.13, 0.25), 1.25, "snapBeat should round upward past the midpoint");
@@ -91,6 +93,48 @@ try {
   const clearedMacroLane = noteAutomation.clearMidiNoteAutomationTarget(withMacroLane, [0], "macro.1");
   assert.equal(clearedMacroLane[0].automation, undefined, "clearing the only lane should remove note automation clutter");
   assert.equal(clearedMacroLane[1].automation[0].target, "macro.1", "clearing one note should not affect other selected lanes");
+
+  assert.ok(
+    arrangementAutomation.AETHER_ARRANGEMENT_AUTOMATION_TARGETS.every((meta) => meta.target !== "pitch"),
+    "arrangement automation should expose parameter lanes, not the piano-roll pitch lane",
+  );
+  const automationSegment = {
+    id: "seg-auto",
+    trackId: "track-a",
+    name: "Automation Segment",
+    startBeat: 8,
+    lengthBeats: 4,
+    repeats: 0,
+    layer: 0,
+    payload: { kind: "midi", notes: [] },
+  };
+  const withSegmentLane = arrangementAutomation.upsertSegmentAutomationTarget(automationSegment, "macro.1");
+  assert.deepEqual(withSegmentLane.automation[0].points.map((point) => point.beat), [0, 4], "segment automation should use segment-local beats");
+  assert.equal(arrangementAutomation.segmentAutomationSummary(withSegmentLane, "macro.1"), "1/1 segment");
+  assert.equal(arrangementAutomation.segmentAutomationTargetCount(withSegmentLane), 1);
+  const editedSegmentLane = arrangementAutomation.setSegmentAutomationTargetValues(withSegmentLane, "macro.1", 0.2, 0.9, 0.55);
+  assert.deepEqual(editedSegmentLane.automation[0].points.map((point) => point.beat), [0, 2, 4]);
+  assert.deepEqual(editedSegmentLane.automation[0].points.map((point) => point.value), [0.2, 0.55, 0.9]);
+  assert.deepEqual(
+    arrangementAutomation.segmentAutomationValueRange(editedSegmentLane, "macro.1"),
+    { startValue: 0.2, midValue: 0.55, endValue: 0.9, active: true, midCount: 1 },
+    "segment automation should report start/mid/end values for the visible editor",
+  );
+  const curvedSegmentLane = arrangementAutomation.setSegmentAutomationTargetCurve(editedSegmentLane, "macro.1", "smoothstep");
+  assert.deepEqual(
+    curvedSegmentLane.automation[0].points.map((point) => point.curve),
+    ["smoothstep", "smoothstep", "smoothstep"],
+    "segment automation curve selection should annotate points",
+  );
+  assert.equal(arrangementAutomation.segmentAutomationCurve(curvedSegmentLane, "macro.1"), "smoothstep");
+  const clampedSegmentPanLane = arrangementAutomation.setSegmentAutomationTargetValues(automationSegment, "amp.pan", -2, 2);
+  assert.deepEqual(clampedSegmentPanLane.automation[0].points.map((point) => point.value), [-1, 1], "segment automation should clamp bipolar targets");
+  const unclutteredCurveEdit = arrangementAutomation.setSegmentAutomationTargetCurve(automationSegment, "macro.1", "cubic");
+  assert.equal(unclutteredCurveEdit.automation, undefined, "curve edits should not create empty segment automation lanes");
+  const clippedSegmentLanes = arrangementAutomation.clipSegmentAutomation(curvedSegmentLane.automation, 3);
+  assert.deepEqual(clippedSegmentLanes[0].points.map((point) => point.beat), [0, 2], "segment automation should clip points outside the saved segment length");
+  const clearedSegmentLane = arrangementAutomation.clearSegmentAutomationTarget(curvedSegmentLane, "macro.1");
+  assert.equal(clearedSegmentLane.automation, undefined, "clearing the only segment lane should remove automation clutter");
 
   assert.deepEqual(
     runner.previewSegmentDrag({

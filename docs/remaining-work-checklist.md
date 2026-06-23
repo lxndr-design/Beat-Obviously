@@ -30,7 +30,7 @@ Status legend:
    - `[x]` Add deterministic full/transient/sustain/manual imported-audio selection windows, native IPC support, source-range metadata, and Solid import mode controls.
    - `[x]` Add visual/manual range picker polish for imported audio.
    - `[x]` Add deeper analysis display controls with source span, RMS, peak, zero-crossing, roughness, asymmetry, centroid, and dominant harmonic summaries.
-3. `[ ]` Visible Aether automation lanes.
+3. `[~]` Visible Aether automation lanes.
    - `[x]` Add first visible piano-roll note automation lane selector/badges for pitch, wavemap, filter, amp, and macro targets.
    - `[x]` Add selected-note start/end value editing for visible piano-roll Aether lanes.
    - `[x]` Preserve note automation point timing during note drag/copy/paste and cover the helper behavior.
@@ -39,7 +39,9 @@ Status legend:
    - `[x]` Add curve selection for visible piano-roll Aether lanes.
    - `[x]` Add document roundtrip coverage for visible note-lane curve metadata.
    - `[x]` Add browser preview coverage that proves visible note-lane curve metadata changes Aether macro automation output.
-   - `[~]` Cover track, segment, and piano-roll note automation entrypoints.
+   - `[x]` Add first visible Segment Editor Aether segment lanes for wavemap, filter, amp, and macro targets.
+   - `[x]` Add segment-lane start/mid/end value editing, curve selection, segment-local beat clipping, and document roundtrip coverage.
+   - `[~]` Cover track, segment, and piano-roll note automation entrypoints; segment and note entrypoints are now visible, track lanes remain pending.
    - Add arbitrary multi-point lane editing and live/export parity coverage.
 4. `[x]` Aether preset storage and migration.
    - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.
@@ -89,8 +91,8 @@ Status legend:
 - `[ ]` Lane chooser for track gain, pan, effect params, instrument params, master params, sends, and macros.
 - `[ ]` Automation point add/move/delete, multi-select, copy/paste, quantize, value snapping.
 - `[ ]` Curve editing UI using the existing curve types.
-- `[ ]` Segment-local automation editor.
-- `[ ]` Note automation lanes in piano roll for pitch, velocity/level, filter, wavetable position, and macro targets.
+- `[~]` Segment-local automation editor for Aether targets.
+- `[~]` Note automation lanes in piano roll for pitch, velocity/level, filter, wavetable position, and macro targets.
 - `[ ]` Automation visibility policy: active lanes, empty lane hiding, pinned favorites.
 - `[ ]` Automation conflict rules for project vs segment vs note vs live knob writes.
 - `[ ]` Invalid automation repair/warning paths in Project Health.

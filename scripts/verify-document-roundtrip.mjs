@@ -83,6 +83,14 @@ try {
     ],
     "MIDI note automation curve metadata should survive document migration",
   );
+  assert.deepEqual(
+    migrated.project.tracks[0].segments[0].automation?.[0].points.map((point) => [point.beat, point.value, point.curve]),
+    [
+      [0, 0.2, "linear"],
+      [4, 0.78, "smoothstep"],
+    ],
+    "segment Aether automation lanes should survive document migration",
+  );
   assert.equal(migrated.instruments?.[0].source?.pluginId, "plug-decent-kit");
   assert.equal(migrated.instruments?.[0].sampleMap?.[0].loopEnabled, true);
   assert.equal(migrated.instruments?.[0].sampleMap?.[0].durationSeconds, 0.42);
@@ -181,6 +189,14 @@ try {
     beatDocumentFingerprint(migrated),
     beatDocumentFingerprint(changedAetherWavemap),
     "document dirty fingerprint should include custom wavemap analysis edits",
+  );
+
+  const changedSegmentAutomation = structuredClone(migrated);
+  changedSegmentAutomation.project.tracks[0].segments[0].automation[0].points[1].value = 0.33;
+  assert.notEqual(
+    beatDocumentFingerprint(migrated),
+    beatDocumentFingerprint(changedSegmentAutomation),
+    "document dirty fingerprint should include segment Aether automation edits",
   );
 
   const changedLegacyAetherWavemap = structuredClone(migrated);
@@ -314,6 +330,15 @@ function makeRepresentativeDocument() {
               fadeOutBeats: 0.5,
               repeats: 0,
               layer: 0,
+              automation: [
+                {
+                  target: "macro.1",
+                  points: [
+                    { beat: 0, value: 0.2, curve: "linear" },
+                    { beat: 4, value: 0.78, curve: "smoothstep" },
+                  ],
+                },
+              ],
               payload: {
                 kind: "midi",
                 gainDb: -3,

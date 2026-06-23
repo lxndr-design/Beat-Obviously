@@ -113,6 +113,8 @@ export interface Segment {
   /** When > 0, repeat this segment until the next segment / end of track. */
   repeats: number;
   payload: SegmentPayload;
+  /** Segment-local Aether/instrument parameter automation, stored in beats relative to segment start. */
+  automation?: MidiAutomationLane[];
   /** Layer index within the track row (0 = base). Higher = overlaid. */
   layer: number;
   muted?: boolean;
@@ -193,6 +195,8 @@ export interface Track {
   recordGainDb: number;
   /** Color is not exposed in this design system — kept here for future themes. */
   sends?: TrackSend[];
+  /** Track-level Aether/instrument parameter automation, stored on the project timeline. */
+  automation?: MidiAutomationLane[];
   effects: TrackEffectChain;
   segments: Segment[];
   /** UI-only: row height variant. */

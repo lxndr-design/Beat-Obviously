@@ -1,6 +1,24 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { DRUM_MAX_STEPS, type GeneratedDrumBeat } from "../../ai/drumBeatGenerator";
 import { maybeRunDueTraining } from "../../ai/trainingRunner";
+import {
+  AETHER_ARRANGEMENT_AUTOMATION_TARGETS,
+  type AetherArrangementAutomationTarget,
+  aetherArrangementAutomationTargetLabel,
+  aetherArrangementAutomationTargetMeta,
+  clearSegmentAutomationTarget,
+  clipSegmentAutomation,
+  formatAetherArrangementAutomationValue,
+  segmentAutomationCurve,
+  segmentAutomationSummary,
+  segmentAutomationTargetCount,
+  segmentAutomationValueRange,
+  segmentHasAutomationTarget,
+  setSegmentAutomationTargetCurve,
+  setSegmentAutomationTargetValues,
+  upsertSegmentAutomationTarget,
+} from "../../automation/aetherArrangementAutomation";
+import { AUTOMATION_CURVES, automationCurveLabel } from "../../automation/curves";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
 import { createInstrumentBufferSource, noteFrequency } from "../../audio/synthPreview";
@@ -17,7 +35,7 @@ import {
   useTransportStore,
   useUiStore,
 } from "../../state/store";
-import type { DrumRow, DrumSpeed, Instrument, MidiNote, Segment, TimeSignature } from "../../state/types";
+import type { AutomationCurve, DrumRow, DrumSpeed, Instrument, MidiNote, Segment, TimeSignature } from "../../state/types";
 import { DrumSequencer } from "../DrumEditor/DrumSequencer.solid";
 import { PianoRoll } from "../MidiEditor/PianoRoll.solid";
 import { MidiTransport } from "../MidiEditor/MidiTransport.solid";
@@ -47,6 +65,8 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const [draft, setDraft] = createSignal<Segment | undefined>(source() ? structuredClone(source()) : undefined, { equals: false });
   const [instrumentSelectOpen, setInstrumentSelectOpen] = createSignal(false);
   const [midiTimeSignatureOpen, setMidiTimeSignatureOpen] = createSignal(false);
+  const [segmentAutomationCurveOpen, setSegmentAutomationCurveOpen] = createSignal(false);
+  const [activeSegmentAutomationTarget, setActiveSegmentAutomationTarget] = createSignal<AetherArrangementAutomationTarget>("macro.1");
   const [midiPreviewBeat, setMidiPreviewBeat] = createSignal<number | null>(null);
   const [drumTrainingSessionId, setDrumTrainingSessionId] = createSignal<string | null>(null);
   let previewCtx: AudioContext | null = null;
@@ -69,6 +89,10 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const midiGainDb = createMemo(() => draft() ? midiSegmentGainDb(draft()!.payload) : 0);
   const midiVolumePercent = createMemo(() => gainDbToVolumePercent(midiGainDb()));
   const midiTimeSignature = createMemo(() => draft()?.timeSignature ?? timeSignature());
+  const activeSegmentAutomationMeta = createMemo(() => aetherArrangementAutomationTargetMeta(activeSegmentAutomationTarget()));
+  const segmentAutomationRange = createMemo(() => segmentAutomationValueRange(draft(), activeSegmentAutomationTarget()));
+  const activeSegmentAutomationCurve = createMemo(() => segmentAutomationCurve(draft(), activeSegmentAutomationTarget()));
+  const segmentAutomationCurveOptions = AUTOMATION_CURVES.map((curve) => ({ value: curve, label: automationCurveLabel(curve) }));
   const previewMidiNotes = createMemo(() => midiNotes().map((note) => ({
     ...note,
     pitch: Math.max(0, Math.min(127, note.pitch + transpose())),
@@ -122,6 +146,42 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       if (!current || (current.payload.kind !== "midi" && current.payload.kind !== "mixed")) return current;
       return { ...current, payload: { ...current.payload, gainDb } };
     });
+  }
+
+  function setDraftSegment(next: Segment) {
+    setDraft(next);
+  }
+
+  function addSegmentAutomationLane() {
+    const currentDraft = draft();
+    if (!currentDraft) return;
+    setDraftSegment(upsertSegmentAutomationTarget(currentDraft, activeSegmentAutomationTarget()));
+  }
+
+  function clearSegmentAutomationLane() {
+    const currentDraft = draft();
+    if (!currentDraft) return;
+    setDraftSegment(clearSegmentAutomationTarget(currentDraft, activeSegmentAutomationTarget()));
+  }
+
+  function setSegmentAutomationCurveValue(curve: string) {
+    const currentDraft = draft();
+    if (!currentDraft) return;
+    setDraftSegment(setSegmentAutomationTargetCurve(currentDraft, activeSegmentAutomationTarget(), curve as AutomationCurve));
+  }
+
+  function setSegmentAutomationValueEdge(edge: "start" | "mid" | "end", rawValue: string) {
+    const currentDraft = draft();
+    if (!currentDraft) return;
+    const value = Number(rawValue);
+    const current = segmentAutomationValueRange(currentDraft, activeSegmentAutomationTarget());
+    setDraftSegment(setSegmentAutomationTargetValues(
+      currentDraft,
+      activeSegmentAutomationTarget(),
+      edge === "start" ? value : current.startValue,
+      edge === "end" ? value : current.endValue,
+      edge === "mid" ? value : current.midValue,
+    ));
   }
 
   function updateDrumRows(rows: DrumRow[]) {
@@ -354,6 +414,91 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
               onChange={updateMidi}
               onPreviewNote={previewNote}
             />
+
+            <div class={styles.automationPanel} aria-label="Aether segment automation lanes">
+              <div class={styles.automationHeader}>
+                <span>Aether segment lanes</span>
+                <span>
+                  {aetherArrangementAutomationTargetLabel(activeSegmentAutomationTarget())}
+                  {" · "}
+                  {segmentAutomationSummary(draft(), activeSegmentAutomationTarget())}
+                  {" · "}
+                  {segmentAutomationTargetCount(draft())} active
+                </span>
+              </div>
+              <div class={styles.automationTargets} role="radiogroup" aria-label="Aether segment automation target">
+                {AETHER_ARRANGEMENT_AUTOMATION_TARGETS.map((target) => (
+                  <Button
+                    size="xs"
+                    selected={activeSegmentAutomationTarget() === target.target}
+                    aria-label={`${target.label} segment automation lane`}
+                    onClick={() => setActiveSegmentAutomationTarget(target.target)}
+                  >
+                    {target.label}
+                  </Button>
+                ))}
+              </div>
+              <div class={styles.automationActions}>
+                <Button size="xs" onClick={addSegmentAutomationLane}>
+                  Add lane
+                </Button>
+                <Button
+                  size="xs"
+                  disabled={!segmentHasAutomationTarget(draft(), activeSegmentAutomationTarget())}
+                  onClick={clearSegmentAutomationLane}
+                >
+                  Clear
+                </Button>
+                <FloatingSelect
+                  value={activeSegmentAutomationCurve()}
+                  options={segmentAutomationCurveOptions}
+                  open={segmentAutomationCurveOpen()}
+                  className={styles.automationCurveSelect}
+                  layout="inline"
+                  ariaLabel="Aether segment automation curve"
+                  onOpenChange={setSegmentAutomationCurveOpen}
+                  onChange={setSegmentAutomationCurveValue}
+                />
+              </div>
+              <div class={styles.automationValueEditor}>
+                <label>
+                  <span>Start</span>
+                  <input
+                    type="range"
+                    min={activeSegmentAutomationMeta().min}
+                    max={activeSegmentAutomationMeta().max}
+                    step={activeSegmentAutomationMeta().step}
+                    value={segmentAutomationRange().startValue}
+                    onInput={(event) => setSegmentAutomationValueEdge("start", event.currentTarget.value)}
+                  />
+                  <span>{formatAetherArrangementAutomationValue(activeSegmentAutomationTarget(), segmentAutomationRange().startValue)}</span>
+                </label>
+                <label>
+                  <span>Mid</span>
+                  <input
+                    type="range"
+                    min={activeSegmentAutomationMeta().min}
+                    max={activeSegmentAutomationMeta().max}
+                    step={activeSegmentAutomationMeta().step}
+                    value={segmentAutomationRange().midValue}
+                    onInput={(event) => setSegmentAutomationValueEdge("mid", event.currentTarget.value)}
+                  />
+                  <span>{formatAetherArrangementAutomationValue(activeSegmentAutomationTarget(), segmentAutomationRange().midValue)}</span>
+                </label>
+                <label>
+                  <span>End</span>
+                  <input
+                    type="range"
+                    min={activeSegmentAutomationMeta().min}
+                    max={activeSegmentAutomationMeta().max}
+                    step={activeSegmentAutomationMeta().step}
+                    value={segmentAutomationRange().endValue}
+                    onInput={(event) => setSegmentAutomationValueEdge("end", event.currentTarget.value)}
+                  />
+                  <span>{formatAetherArrangementAutomationValue(activeSegmentAutomationTarget(), segmentAutomationRange().endValue)}</span>
+                </label>
+              </div>
+            </div>
           </>
         </Show>
 
@@ -468,7 +613,7 @@ function prepareSegmentForSave(segment: Segment): Segment {
     ...segment.payload,
     notes: clipMidiNotesToLength(segment.payload.notes, lengthBeats),
   };
-  return { ...segment, lengthBeats, payload };
+  return { ...segment, lengthBeats, automation: clipSegmentAutomation(segment.automation, lengthBeats), payload };
 }
 
 function clipMidiNotesToLength(notes: MidiNote[], lengthBeats: number): MidiNote[] {

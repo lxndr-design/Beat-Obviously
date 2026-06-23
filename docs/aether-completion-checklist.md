@@ -84,9 +84,9 @@ Status legend:
   - Remaining: reduce one-off controls inside synth surfaces, unify range fields/sliders/selects against the Solid UI kit, and make assignment/automation states readable at a glance.
   - Proof: `verify-design-system`, interaction verifier coverage, and manual preview pass.
 - `[~]` Note/segment automation UI.
-  - Done: backend/native note and segment automation paths; first visible piano-roll note automation lane selector/badges for pitch, wavemap, filter, amp, and macro targets; selected-note start/mid/end value editing for visible Aether lanes; draggable start/mid/end point handles for visible piano-roll lanes; curve selection for visible note lanes; document roundtrip coverage for note-lane curve metadata; browser preview coverage proving note-lane curves change Aether macro automation output; macro note lanes drive macro-routed browser preview output; note automation point timing is preserved during note drag/copy/paste.
-  - Remaining: track and segment automation lane surfaces, arbitrary multi-point lane editing, and fuller playback/live-export parity coverage.
-  - Proof: editor interaction tests for lane creation/value-edit/drag-value helpers, document verifier coverage for note-lane curve metadata, synth verifier coverage for macro-lane preview output and curve-shaped preview output, plus future browser/editor interaction tests for arbitrary multi-point lane editing.
+  - Done: backend/native note and segment automation paths; first visible piano-roll note automation lane selector/badges for pitch, wavemap, filter, amp, and macro targets; selected-note start/mid/end value editing for visible Aether lanes; draggable start/mid/end point handles for visible piano-roll lanes; curve selection for visible note lanes; document roundtrip coverage for note-lane curve metadata; browser preview coverage proving note-lane curves change Aether macro automation output; macro note lanes drive macro-routed browser preview output; note automation point timing is preserved during note drag/copy/paste; first visible Segment Editor Aether segment lane selector for wavemap, filter, amp, and macro targets; segment-lane start/mid/end value editing, curve selection, segment-local beat clipping, and document roundtrip coverage.
+  - Remaining: track automation lane surfaces, arbitrary multi-point lane editing, and fuller playback/live-export parity coverage.
+  - Proof: editor interaction tests for note and segment lane creation/value-edit/drag-value helpers, document verifier coverage for note-lane curve metadata and segment-lane persistence, synth verifier coverage for macro-lane preview output and curve-shaped preview output, plus future browser/editor interaction tests for arbitrary multi-point lane editing.
 
 ## 7. Verification Gates Still Needed
 
@@ -102,6 +102,6 @@ Status legend:
 
 ## Near-Term Slice Order
 
-1. Add visible track/segment automation lanes for the Aether targets.
+1. Add visible track automation lanes for the Aether targets.
 2. Add browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, and note automation lanes.
 3. Curate the named Aether instrument/effect preset library UX beyond local Save As lists.
