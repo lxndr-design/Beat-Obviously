@@ -3,16 +3,28 @@ import { db } from "../persistence/dexie";
 import type { AetherEffectPresetRecord } from "../state/effectPresets";
 import { createDefaultSynthDraft, synthDraftToInstrumentPatch, useSynthStore, type SynthDraftPatch } from "../state/synthStore";
 import type { SynthPresetRecord } from "../state/synthPresets";
-import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useUiStore } from "../state/store";
-import type { PluginAdapter } from "../state/types";
+import {
+  TEMPORARY_DS_INSTRUMENT_SET_ID,
+  USER_INSTRUMENT_SET_ID,
+  createEmptyProject,
+  useInstrumentStore,
+  usePluginStore,
+  useProjectStore,
+  useUiStore,
+} from "../state/store";
+import type { MidiAutomationTarget, PluginAdapter } from "../state/types";
 import { compileNodeGraphToInstrumentPatch, createDefaultInstrumentNodeGraph } from "../features/NodeInstrumentEditor/nodeGraph";
 
 type DevDecentSamplerFixture = "lorenzo" | "wide";
+type DevAetherAutomationEditor = "track" | "segment" | "note";
 
 const DEV_MIXED_ERA_AETHER_PRESET_ID = "dev-mixed-era-aether";
 const DEV_MIXED_ERA_AETHER_INSTRUMENT_ID = "dev-mixed-era-aether-host";
 const DEV_MIXED_ERA_AETHER_FX_PRESET_ID = "dev-mixed-era-aether-fx";
 const DEV_MIXED_ERA_AETHER_FX_INSTRUMENT_ID = "dev-mixed-era-aether-fx-host";
+const DEV_AETHER_AUTOMATION_INSTRUMENT_ID_MARKER = "Aether automation dev fixture";
+const DEV_AETHER_AUTOMATION_TRACK_ID = "dev-aether-automation-track";
+const DEV_AETHER_AUTOMATION_SEGMENT_ID = "dev-aether-automation-segment";
 
 declare global {
   interface Window {
@@ -53,8 +65,38 @@ declare global {
         secondMix: number | null;
         secondBypassed: boolean | null;
       };
+      installAetherAutomationFixture: () => {
+        trackId: string;
+        segmentId: string;
+        instrumentId: string;
+      };
+      openAetherAutomationFixtureEditor: (editor: DevAetherAutomationEditor) => Promise<DevAetherAutomationFixtureState>;
+      readAetherAutomationFixtureState: () => DevAetherAutomationFixtureState;
     };
   }
+}
+
+interface DevAutomationPanelState {
+  exists: boolean;
+  text: string;
+  buttonLabels: string[];
+  rangeCount: number;
+  disabledControlCount: number;
+}
+
+interface DevAetherAutomationFixtureState {
+  trackId: string | null;
+  segmentId: string | null;
+  instrumentId: string | null;
+  openEditors: string[];
+  trackLaneTargets: MidiAutomationTarget[];
+  segmentLaneTargets: MidiAutomationTarget[];
+  noteLaneTargets: MidiAutomationTarget[];
+  panels: {
+    note: DevAutomationPanelState;
+    segment: DevAutomationPanelState;
+    track: DevAutomationPanelState;
+  };
 }
 
 let installed = false;
@@ -276,6 +318,156 @@ export function installBeatDevHooks() {
     };
   };
 
+  const installAetherAutomationFixture = () => {
+    const instrumentStore = useInstrumentStore.getState();
+    for (const instrument of instrumentStore.instruments) {
+      if (instrument.source?.label === DEV_AETHER_AUTOMATION_INSTRUMENT_ID_MARKER && instrument.userCreated) {
+        instrumentStore.removeInstrument(instrument.id);
+      }
+    }
+
+    const baseDraft = createDefaultSynthDraft();
+    const draft = {
+      ...baseDraft,
+      name: "Aether Automation Fixture",
+      metadata: {
+        ...baseDraft.metadata,
+        tags: ["dev", "automation", "aether"],
+      },
+    };
+    const instrumentId = instrumentStore.addInstrument({
+      ...synthDraftToInstrumentPatch(draft),
+      name: draft.name,
+      setId: USER_INSTRUMENT_SET_ID,
+      source: { kind: "created", label: DEV_AETHER_AUTOMATION_INSTRUMENT_ID_MARKER },
+      userCreated: true,
+    });
+
+    const project = createEmptyProject();
+    project.id = "dev-aether-automation-project";
+    project.name = "Aether Automation Fixture";
+    project.lengthBeats = 64;
+    project.bpm = 124;
+    const track = project.tracks[0];
+    track.id = DEV_AETHER_AUTOMATION_TRACK_ID;
+    track.name = "Aether Automation Track";
+    track.kind = "midi";
+    track.instrumentId = instrumentId;
+    track.automation = [
+      {
+        target: "macro.1",
+        points: [
+          { beat: 0, value: 0.22, curve: "linear" },
+          { beat: 32, value: 0.58, curve: "smoothstep" },
+          { beat: 64, value: 0.88, curve: "easeIn" },
+        ],
+      },
+    ];
+    track.segments = [
+      {
+        id: DEV_AETHER_AUTOMATION_SEGMENT_ID,
+        trackId: DEV_AETHER_AUTOMATION_TRACK_ID,
+        name: "Aether Automation Segment",
+        instrumentId,
+        startBeat: 4,
+        lengthBeats: 8,
+        repeats: 0,
+        layer: 0,
+        automation: [
+          {
+            target: "macro.1",
+            points: [
+              { beat: 0, value: 0.18, curve: "linear" },
+              { beat: 4, value: 0.52, curve: "smoothstep" },
+              { beat: 8, value: 0.76, curve: "easeOut" },
+            ],
+          },
+        ],
+        payload: {
+          kind: "midi",
+          notes: [
+            {
+              pitch: 60,
+              velocity: 104,
+              startBeat: 0,
+              lengthBeats: 2,
+              automation: [
+                {
+                  target: "macro.1",
+                  points: [
+                    { beat: 0, value: 0.12, curve: "linear" },
+                    { beat: 1, value: 0.48, curve: "smoothstep" },
+                    { beat: 2, value: 0.82, curve: "easeIn" },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ];
+
+    useProjectStore.getState().loadProject(project);
+    useUiStore.setState({
+      openEditors: [],
+      selectedTrackIds: [],
+      selectedSegmentIds: [],
+      selectedTrackEffectAutomationPointKeys: [],
+    });
+    writeAetherAutomationFixtureMarker();
+    return { trackId: track.id, segmentId: DEV_AETHER_AUTOMATION_SEGMENT_ID, instrumentId };
+  };
+
+  const openAetherAutomationFixtureEditor = async (editor: DevAetherAutomationEditor) => {
+    const fixture = ensureAetherAutomationFixture();
+    useUiStore.setState({ openEditors: [] });
+    if (editor === "track") {
+      useUiStore.getState().openEditor({ kind: "track", trackId: fixture.trackId });
+    } else {
+      useUiStore.getState().openEditor({ kind: "segment", segmentId: fixture.segmentId });
+    }
+    await waitForEditorPanel(editor === "track" ? "Aether track automation lanes" : "Aether segment automation lanes");
+    if (editor === "note") {
+      clickFirstMidiNote();
+      await waitForEditorPanel("Aether note automation lanes");
+      clickPanelButton("Aether note automation lanes", "Macro 1 automation lane");
+      await nextFrame();
+    }
+    writeAetherAutomationFixtureMarker();
+    return readAetherAutomationFixtureState();
+  };
+
+  const readAetherAutomationFixtureState = (): DevAetherAutomationFixtureState => {
+    const project = useProjectStore.getState().project;
+    const track = project.tracks.find((candidate) => candidate.id === DEV_AETHER_AUTOMATION_TRACK_ID) ?? null;
+    const segment = track?.segments.find((candidate) => candidate.id === DEV_AETHER_AUTOMATION_SEGMENT_ID) ?? null;
+    const firstNote = segment?.payload.kind === "midi" || segment?.payload.kind === "mixed"
+      ? segment.payload.notes[0] ?? null
+      : null;
+    return {
+      trackId: track?.id ?? null,
+      segmentId: segment?.id ?? null,
+      instrumentId: track?.instrumentId ?? segment?.instrumentId ?? null,
+      openEditors: useUiStore.getState().openEditors.map((editor) => editor.kind),
+      trackLaneTargets: (track?.automation ?? []).map((lane) => lane.target),
+      segmentLaneTargets: (segment?.automation ?? []).map((lane) => lane.target),
+      noteLaneTargets: (firstNote?.automation ?? []).map((lane) => lane.target),
+      panels: {
+        note: readPanelState("Aether note automation lanes"),
+        segment: readPanelState("Aether segment automation lanes"),
+        track: readPanelState("Aether track automation lanes"),
+      },
+    };
+  };
+
+  function ensureAetherAutomationFixture() {
+    const project = useProjectStore.getState().project;
+    const track = project.tracks.find((candidate) => candidate.id === DEV_AETHER_AUTOMATION_TRACK_ID);
+    const segment = track?.segments.find((candidate) => candidate.id === DEV_AETHER_AUTOMATION_SEGMENT_ID);
+    if (track && segment && track.instrumentId) return { trackId: track.id, segmentId: segment.id, instrumentId: track.instrumentId };
+    return installAetherAutomationFixture();
+  }
+
   window.__beatTestHooks = {
     ...(window.__beatTestHooks ?? {}),
     installDecentSamplerFixture,
@@ -284,6 +476,9 @@ export function installBeatDevHooks() {
     installMixedEraAetherFxPresetFixture,
     readMixedEraAetherPresetFixtureState,
     readMixedEraAetherFxPresetFixtureState,
+    installAetherAutomationFixture,
+    openAetherAutomationFixtureEditor,
+    readAetherAutomationFixtureState,
   };
 
   document.addEventListener("beat:install-decent-sampler-fixture", (event) => {
@@ -308,7 +503,97 @@ export function installBeatDevHooks() {
     window.setTimeout(() => {
       void installMixedEraAetherFxPresetFixture();
     }, 0);
+  } else if (fixture === "aether-automation") {
+    window.setTimeout(() => {
+      const editor = new URLSearchParams(window.location.search).get("beatAutomationEditor");
+      void openAetherAutomationFixtureEditor(isAetherAutomationEditor(editor) ? editor : "segment");
+    }, 0);
   }
+}
+
+function isAetherAutomationEditor(value: string | null): value is DevAetherAutomationEditor {
+  return value === "track" || value === "segment" || value === "note";
+}
+
+function readPanelState(label: string): DevAutomationPanelState {
+  const panel = document.querySelector<HTMLElement>(`[aria-label="${label}"]`);
+  return {
+    exists: Boolean(panel),
+    text: normalizeText(panel?.textContent ?? ""),
+    buttonLabels: Array.from(panel?.querySelectorAll<HTMLButtonElement>("button[aria-label]") ?? [])
+      .map((button) => button.getAttribute("aria-label") ?? "")
+      .filter(Boolean),
+    rangeCount: panel?.querySelectorAll('input[type="range"]').length ?? 0,
+    disabledControlCount: panel?.querySelectorAll("button:disabled,input:disabled,select:disabled").length ?? 0,
+  };
+}
+
+function clickPanelButton(panelLabel: string, buttonLabel: string) {
+  const panel = document.querySelector<HTMLElement>(`[aria-label="${panelLabel}"]`);
+  const button = Array.from(panel?.querySelectorAll<HTMLButtonElement>("button[aria-label]") ?? [])
+    .find((candidate) => candidate.getAttribute("aria-label") === buttonLabel);
+  button?.click();
+}
+
+function clickFirstMidiNote() {
+  const note = document.querySelector<HTMLElement>("[data-midi-note-index='0']");
+  if (!note) return;
+  const rect = note.getBoundingClientRect();
+  const pointerInit = {
+    bubbles: true,
+    cancelable: true,
+    clientX: rect.left + Math.max(1, rect.width / 2),
+    clientY: rect.top + Math.max(1, rect.height / 2),
+    button: 0,
+    pointerId: 1,
+    pointerType: "mouse",
+  };
+  note.dispatchEvent(new PointerEvent("pointerdown", pointerInit));
+  note.dispatchEvent(new PointerEvent("pointerup", pointerInit));
+}
+
+function writeAetherAutomationFixtureMarker() {
+  const project = useProjectStore.getState().project;
+  const track = project.tracks.find((candidate) => candidate.id === DEV_AETHER_AUTOMATION_TRACK_ID) ?? null;
+  const segment = track?.segments.find((candidate) => candidate.id === DEV_AETHER_AUTOMATION_SEGMENT_ID) ?? null;
+  const notes = segment?.payload.kind === "midi" || segment?.payload.kind === "mixed"
+    ? segment.payload.notes
+    : [];
+  document.documentElement.dataset.beatAetherAutomationFixture = JSON.stringify({
+    trackId: track?.id ?? null,
+    segmentId: segment?.id ?? null,
+    instrumentId: track?.instrumentId ?? segment?.instrumentId ?? null,
+    trackLaneTargets: (track?.automation ?? []).map((lane) => lane.target),
+    segmentLaneTargets: (segment?.automation ?? []).map((lane) => lane.target),
+    noteLaneTargets: (notes[0]?.automation ?? []).map((lane) => lane.target),
+    noteCount: notes.length,
+    firstNote: notes[0]
+      ? {
+          pitch: notes[0].pitch,
+          startBeat: notes[0].startBeat,
+          lengthBeats: notes[0].lengthBeats,
+          automationTargets: (notes[0].automation ?? []).map((lane) => lane.target),
+        }
+      : null,
+    openEditors: useUiStore.getState().openEditors.map((editor) => editor.kind),
+  });
+}
+
+async function waitForEditorPanel(label: string) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await nextFrame();
+    if (document.querySelector(`[aria-label="${label}"]`)) return;
+  }
+}
+
+function nextFrame() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+function normalizeText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 function createMixedEraAetherPresetFixture() {

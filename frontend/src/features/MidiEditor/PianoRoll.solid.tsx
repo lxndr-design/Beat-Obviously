@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js";
+import { For, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import {
   AETHER_NOTE_AUTOMATION_TARGETS,
@@ -1141,6 +1141,7 @@ export function PianoRoll(props: PianoRollProps) {
               }}
               class={`${styles.grid} ${toolMode() === "select" ? styles.gridSelectMode : styles.gridDrawMode}`}
               style={{ width: px(width()), height: px(height) }}
+              data-midi-note-count={notes.length}
               onPointerDown={onGridPointerDown}
               onPointerMove={onNotePointerMove}
               onPointerUp={onNotePointerUp}
@@ -1251,84 +1252,88 @@ export function PianoRoll(props: PianoRollProps) {
               </svg>
 
             {/* Notes */}
-            {notes.map((n, i) => {
-              const rect = visibleNoteRect(n);
-              if (!rect) return null;
-              const isSelected = selected().includes(i);
-              const isAuditioned = auditionedNoteIndex() === i;
-              const isPlaying = isNotePlaying(n);
-              const hovered = hoveredNoteSide();
-              const hoveredSide = hovered?.idx === i ? hovered.side : null;
-              const volumePercent = Math.round((clamp(n.velocity, 0, 127) / 127) * 100);
-              const laneCount = midiNoteAutomationTargetCount(n);
-              const hasActiveAutomation = midiNoteHasAutomationTarget(n, activeAutomationTarget());
-              return (
-                <div
-                  class={[
-                    styles.note,
-                    isSelected && styles.noteSelected,
-                    isAuditioned && styles.noteAuditioned,
-                    isPlaying && styles.notePlaying,
-                    hoveredSide === "left" && styles.noteHoverLeft,
-                    hoveredSide === "right" && styles.noteHoverRight,
-                  ].filter(Boolean).join(" ")}
-                  style={{
-                    left: px(rect.left),
-                    top: px(rect.top),
-                    width: px(rect.width),
-                    height: px(rect.height),
-                    "--note-volume": `${volumePercent}%`,
-                  } as JSX.CSSProperties}
-                  onPointerDown={(e) => startMove(i, e)}
-                  onPointerMove={onNotePointerMove}
-                  onPointerUp={onNotePointerUp}
-                  onMouseMove={(event) => {
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    setHoveredNoteSide({ idx: i, side: event.clientX - rect.left < rect.width / 2 ? "left" : "right" });
-                  }}
-                  onMouseLeave={() => {
-                    setHoveredNoteSide((current) => current?.idx === i ? null : current);
-                  }}
-                  onDblClick={(e) => {
-                    e.stopPropagation();
-                    openNoteEditor(i);
-                  }}
-                  onContextMenu={(e) => openNoteMenu(i, e)}
-                >
-                  {volumePercent < 100 && (
-                    <div class={styles.noteVolumeOverlay} aria-hidden>
-                      {volumePercent}%
-                    </div>
-                  )}
-                  {hasActiveAutomation && <div class={styles.noteAutomationStripe} aria-hidden />}
-                  {laneCount > 0 && (
-                    <div class={styles.noteAutomationBadge} aria-label={`${laneCount} automation lane${laneCount === 1 ? "" : "s"}`}>
-                      {laneCount}
-                    </div>
-                  )}
+            <For each={props.notes}>
+              {(n, index) => {
+                const i = index();
+                const rect = visibleNoteRect(n);
+                if (!rect) return null;
+                const isSelected = selected().includes(i);
+                const isAuditioned = auditionedNoteIndex() === i;
+                const isPlaying = isNotePlaying(n);
+                const hovered = hoveredNoteSide();
+                const hoveredSide = hovered?.idx === i ? hovered.side : null;
+                const volumePercent = Math.round((clamp(n.velocity, 0, 127) / 127) * 100);
+                const laneCount = midiNoteAutomationTargetCount(n);
+                const hasActiveAutomation = midiNoteHasAutomationTarget(n, activeAutomationTarget());
+                return (
                   <div
-                    class={`${styles.noteResize} ${styles.noteResizeLeft}`}
-                    onPointerDown={(e) => startResize(i, "left", e)}
+                    class={[
+                      styles.note,
+                      isSelected && styles.noteSelected,
+                      isAuditioned && styles.noteAuditioned,
+                      isPlaying && styles.notePlaying,
+                      hoveredSide === "left" && styles.noteHoverLeft,
+                      hoveredSide === "right" && styles.noteHoverRight,
+                    ].filter(Boolean).join(" ")}
+                    style={{
+                      left: px(rect.left),
+                      top: px(rect.top),
+                      width: px(rect.width),
+                      height: px(rect.height),
+                      "--note-volume": `${volumePercent}%`,
+                    } as JSX.CSSProperties}
+                    data-midi-note-index={String(i)}
+                    onPointerDown={(e) => startMove(i, e)}
                     onPointerMove={onNotePointerMove}
                     onPointerUp={onNotePointerUp}
-                  />
-                  <div
-                    class={`${styles.noteResize} ${styles.noteResizeRight}`}
-                    onPointerDown={(e) => startResize(i, "right", e)}
-                    onPointerMove={onNotePointerMove}
-                    onPointerUp={onNotePointerUp}
-                  />
-                  {noteEditor()?.idx === i && (
-                    <CurveHandles
-                      note={n}
-                      pxPerBeat={pxPerBeat()}
-                      onPointerDown={startCurveHandleDrag}
-                      noteIndex={i}
+                    onMouseMove={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      setHoveredNoteSide({ idx: i, side: event.clientX - rect.left < rect.width / 2 ? "left" : "right" });
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredNoteSide((current) => current?.idx === i ? null : current);
+                    }}
+                    onDblClick={(e) => {
+                      e.stopPropagation();
+                      openNoteEditor(i);
+                    }}
+                    onContextMenu={(e) => openNoteMenu(i, e)}
+                  >
+                    {volumePercent < 100 && (
+                      <div class={styles.noteVolumeOverlay} aria-hidden>
+                        {volumePercent}%
+                      </div>
+                    )}
+                    {hasActiveAutomation && <div class={styles.noteAutomationStripe} aria-hidden />}
+                    {laneCount > 0 && (
+                      <div class={styles.noteAutomationBadge} aria-label={`${laneCount} automation lane${laneCount === 1 ? "" : "s"}`}>
+                        {laneCount}
+                      </div>
+                    )}
+                    <div
+                      class={`${styles.noteResize} ${styles.noteResizeLeft}`}
+                      onPointerDown={(e) => startResize(i, "left", e)}
+                      onPointerMove={onNotePointerMove}
+                      onPointerUp={onNotePointerUp}
                     />
-                  )}
-                </div>
-              );
-            })}
+                    <div
+                      class={`${styles.noteResize} ${styles.noteResizeRight}`}
+                      onPointerDown={(e) => startResize(i, "right", e)}
+                      onPointerMove={onNotePointerMove}
+                      onPointerUp={onNotePointerUp}
+                    />
+                    {noteEditor()?.idx === i && (
+                      <CurveHandles
+                        note={n}
+                        pxPerBeat={pxPerBeat()}
+                        onPointerDown={startCurveHandleDrag}
+                        noteIndex={i}
+                      />
+                    )}
+                  </div>
+                );
+              }}
+            </For>
             {selectBox() && (
               <div
                 class={styles.selectBox}

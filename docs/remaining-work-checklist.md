@@ -12,6 +12,56 @@ Status legend:
 - `[~]` partly done; usable, but not complete enough to close.
 - `[ ]` not done or only placeholder-level.
 
+## Current Closeout View
+
+Last audited: 2026-06-23.
+
+Use this section as the short working list. The detailed domain lists below remain the full source of truth.
+
+1. `[~]` Browser/runtime proof for critical flows.
+   - Done: Aether automation browser fixture coverage for note, segment, and track lane entrypoints.
+   - Add browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, arrangement editing, export, relink, backup restore, and Project Health repairs.
+   - Add visible hover, selected, disabled, loading, and migrated-framework smoke coverage on critical screens.
+2. `[~]` Automation editing completion.
+   - Add arrangement-view track automation lanes.
+   - Add arbitrary multi-point lane editing with add, move, delete, multi-select, copy/paste, quantize, and value snapping.
+   - Define project vs track vs segment vs note vs live-write conflict rules and surface invalid automation warnings.
+3. `[~]` DAW editing and recording closeout.
+   - Broaden marquee, drag, resize, split, fade, crossfade, loop marker, and selection edge-case tests.
+   - Finish visible fade/crossfade UI polish and destructive-operation undo/redo policy.
+   - Finish take naming, commit/cancel UX, take-list management, and recording health warnings.
+4. `[~]` Mixer, routing, freeze, and export UX.
+   - Build the mixer/channel-strip surface with fader, pan, meter, mute, solo, arm, sends, inserts, input, output, and group routing.
+   - Finish return-bus, group/folder routing, freeze/bounce UI, reversible unfreeze metadata, and latency reporting.
+   - Add export preset UI, export review panel, batch stem naming, export preference serialization, and remaining parity/null-test coverage.
+5. `[~]` Asset and sampler management.
+   - Finish global relink, replace, reveal, delete, copy-into-project, remove-unused, reference-count, and project-package flows.
+   - Add sampler/keymap editors for velocity layers, sample trim, loop markers, crossfade loops, root-note helpers, round-robin, choke, and exclusive groups.
+   - Run a real AU/VST3 plugin-host feasibility pass after the protected adapter layer is stable.
+6. `[~]` Aether synth maturity.
+   - Finish macro live-preview parity, visible macro lanes, macro conflict display, and modulation matrix semantic cleanup.
+   - Improve envelope visual editing, loop/curve handles, expression-source feedback, and remaining one-off synth controls.
+   - Curate named Aether instrument/effect preset library UX beyond local Save As lists.
+7. `[~]` Generation and musical intelligence.
+   - Measure Aether-aware instrument generation against the current Aether schema.
+   - Add structured beat/pattern generation with phrase sections, fills, rests, density maps, accents, ghost notes, and editable provenance.
+   - Add genre/invariant tests and training/export loops that preserve accepted user edits.
+8. `[~]` UI coherence and framework cleanup.
+   - Continue replacing one-off selects, dropdowns, modal footers, action rows, asset lists/tables, and feature-local controls with Solid UI kit primitives.
+   - Complete happy playback feedback: cyan active playback for segments/nodes/notes, MIDI drag audition, and approved mesh-gradient tint variants.
+   - Keep React removed; continue consolidating remaining local controls into `frontend/src/solid-ui`.
+9. `[~]` Codebase organization.
+   - Continue backend extraction around wavetable, realtime, sampler, effects, analysis, sequencing, and parameters.
+   - Split `AudioEngine`, `InstrumentVoice`, giant frontend stores, and feature-boundary modules as related work lands.
+   - Keep IPC additive/versioned and add focused tests beside each subsystem split.
+10. `[ ]` Release gate.
+    - No known data-loss path.
+    - No known export-clobber path.
+    - No silent missing-media path.
+    - No untested document migration for new persisted fields.
+    - No backend feature without stress or verifier coverage.
+    - No critical UI workflow without browser or pure interaction smoke.
+
 ## Immediate Build Queue
 
 1. `[x]` Aether instrument FX rack UI.
@@ -44,6 +94,7 @@ Status legend:
    - `[x]` Add first visible Track Details Aether track lanes for wavemap, filter, amp, and macro targets.
    - `[x]` Add track-lane start/mid/end value editing, curve selection, project-timeline beat clipping, and document roundtrip coverage.
    - `[x]` Cover first track, segment, and piano-roll note automation entrypoints.
+   - `[x]` Add true browser fixture smoke for Aether track, segment, and selected-note Macro 1 lane entrypoints.
    - Add arbitrary multi-point lane editing and live/export parity coverage.
 4. `[x]` Aether preset storage and migration.
    - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.
@@ -209,7 +260,8 @@ Status legend:
 
 ## Verification Still Needed
 
-- `[ ]` Browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, automation lanes, arrangement editing, export, relink, backup restore, and project health repairs.
+- `[~]` Browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, automation lanes, arrangement editing, export, relink, backup restore, and project health repairs.
+  - Done: true browser fixture smoke covers Aether track, segment, and selected-note Macro 1 automation lane entrypoints with seeded project data and rendered controls.
 - `[ ]` Null-test style live/offline comparisons where deterministic output is expected.
 - `[ ]` Crossfade parity stress.
 - `[ ]` Automation-heavy parity stress beyond the current dense Aether parity path.

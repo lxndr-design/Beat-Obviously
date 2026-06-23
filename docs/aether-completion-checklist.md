@@ -86,7 +86,7 @@ Status legend:
 - `[~]` Note/segment automation UI.
   - Done: backend/native note and segment automation paths; first visible piano-roll note automation lane selector/badges for pitch, wavemap, filter, amp, and macro targets; selected-note start/mid/end value editing for visible Aether lanes; draggable start/mid/end point handles for visible piano-roll lanes; curve selection for visible note lanes; document roundtrip coverage for note-lane curve metadata; browser preview coverage proving note-lane curves change Aether macro automation output; macro note lanes drive macro-routed browser preview output; note automation point timing is preserved during note drag/copy/paste; first visible Segment Editor Aether segment lane selector for wavemap, filter, amp, and macro targets; segment-lane start/mid/end value editing, curve selection, segment-local beat clipping, and document roundtrip coverage; first visible Track Details Aether track lane selector for wavemap, filter, amp, and macro targets; track-lane start/mid/end value editing, curve selection, project-timeline beat clipping, and document roundtrip coverage.
   - Remaining: arrangement-view track automation lanes, arbitrary multi-point lane editing, and fuller playback/live-export parity coverage.
-  - Proof: editor interaction tests for note, segment, and track lane creation/value-edit/drag-value helpers, document verifier coverage for note-lane curve metadata plus segment-lane and track-lane persistence, synth verifier coverage for macro-lane preview output and curve-shaped preview output, plus future browser/editor interaction tests for arbitrary multi-point lane editing.
+  - Proof: editor interaction tests for note, segment, and track lane creation/value-edit/drag-value helpers, document verifier coverage for note-lane curve metadata plus segment-lane and track-lane persistence, synth verifier coverage for macro-lane preview output and curve-shaped preview output, and true browser fixture smoke for rendered Aether track, segment, and selected-note Macro 1 lane entrypoints.
 
 ## 7. Verification Gates Still Needed
 
@@ -95,13 +95,15 @@ Status legend:
 - `[x]` Dense overlapping automation parity stress with high-polyphony Aether patches.
   - Covers project, segment, note, route, instrument-effect, track-effect, macro, and master EQ automation in one live/export parity render, with a stripped-automation baseline proving the automation materially changes output.
 - `[ ]` Null-test style live/offline comparisons where deterministic output is expected.
-- `[ ]` Browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, and note automation lanes.
+- `[~]` Browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, and note automation lanes.
+  - Done: browser fixture coverage now proves seeded Aether track, segment, and selected-note Macro 1 automation lane entrypoints render with live controls.
+  - Remaining: broader synth editing, wavemap import/draw, macro assignment, arbitrary multi-point lane editing, and full note automation interaction flows.
 - `[x]` Preset migration fixtures once Aether preset storage is formalized.
   - Done: JS synth verifier covers mixed-era wavemap metadata migration and legacy Aether/FX preset record normalization; backend stress covers native mixed-era wavemap map merging; document verifier covers legacy-only wavemap metadata preservation; frontend interaction verifier covers mixed-era wavemap user preset load/delete flow; true browser smoke covers current Aether instrument preset Save As/load/delete; true browser smoke covers older mixed-era wavemap preset load/delete through the preset dropdown; true browser smoke covers older mixed-era FX preset load/delete through the FX preset dropdown.
   - Remaining: none for the current preset migration fixture plan; add new fixtures alongside any future preset schema changes.
 
 ## Near-Term Slice Order
 
-1. Add browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, and note/segment/track automation lanes.
+1. Add browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, arbitrary multi-point lane editing, and broader note/segment/track automation interactions.
 2. Add arrangement-view track automation lanes and arbitrary multi-point lane editing.
 3. Curate the named Aether instrument/effect preset library UX beyond local Save As lists.
