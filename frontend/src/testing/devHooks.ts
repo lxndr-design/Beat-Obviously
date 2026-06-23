@@ -1,5 +1,6 @@
 import type { DecentSamplerUiControl } from "../ipc/schema";
 import { db } from "../persistence/dexie";
+import type { AetherEffectPresetRecord } from "../state/effectPresets";
 import { createDefaultSynthDraft, synthDraftToInstrumentPatch, useSynthStore, type SynthDraftPatch } from "../state/synthStore";
 import type { SynthPresetRecord } from "../state/synthPresets";
 import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useUiStore } from "../state/store";
@@ -10,6 +11,8 @@ type DevDecentSamplerFixture = "lorenzo" | "wide";
 
 const DEV_MIXED_ERA_AETHER_PRESET_ID = "dev-mixed-era-aether";
 const DEV_MIXED_ERA_AETHER_INSTRUMENT_ID = "dev-mixed-era-aether-host";
+const DEV_MIXED_ERA_AETHER_FX_PRESET_ID = "dev-mixed-era-aether-fx";
+const DEV_MIXED_ERA_AETHER_FX_INSTRUMENT_ID = "dev-mixed-era-aether-fx-host";
 
 declare global {
   interface Window {
@@ -25,6 +28,10 @@ declare global {
         presetId: string;
         instrumentId: string;
       }>;
+      installMixedEraAetherFxPresetFixture: () => Promise<{
+        presetId: string;
+        instrumentId: string;
+      }>;
       readMixedEraAetherPresetFixtureState: () => {
         name: string;
         selectedOscA: string;
@@ -36,6 +43,15 @@ declare global {
         legacyOnlyFormant: number | null;
         legacyOnlyPartials: number;
         legacyAliasMatches: boolean;
+      };
+      readMixedEraAetherFxPresetFixtureState: () => {
+        name: string;
+        effectKinds: string[];
+        firstMix: number | null;
+        firstRoomSize: number | null;
+        secondFeedback: number | null;
+        secondMix: number | null;
+        secondBypassed: boolean | null;
       };
     };
   }
@@ -197,6 +213,35 @@ export function installBeatDevHooks() {
     return { presetId: DEV_MIXED_ERA_AETHER_PRESET_ID, instrumentId: nextInstrumentId };
   };
 
+  const installMixedEraAetherFxPresetFixture = async () => {
+    const instrumentStore = useInstrumentStore.getState();
+    const existingInstrument = instrumentStore.instruments.find((instrument) => instrument.id === DEV_MIXED_ERA_AETHER_FX_INSTRUMENT_ID);
+    if (existingInstrument?.userCreated) instrumentStore.removeInstrument(existingInstrument.id);
+    await db.effectPresets.delete(DEV_MIXED_ERA_AETHER_FX_PRESET_ID);
+    await db.effectPresets.put(createMixedEraAetherFxPresetFixture() as unknown as AetherEffectPresetRecord);
+
+    const hostDraft = createDefaultSynthDraft();
+    const hostPatch: SynthDraftPatch = {
+      ...hostDraft,
+      name: "Mixed Era FX Browser Host",
+      effects: { filters: [] },
+      metadata: {
+        ...hostDraft.metadata,
+        tags: [...new Set([...hostDraft.metadata.tags, "dev", "mixed-era", "fx"])],
+      },
+    };
+    const nextInstrumentId = instrumentStore.addInstrument({
+      ...synthDraftToInstrumentPatch(hostPatch),
+      id: DEV_MIXED_ERA_AETHER_FX_INSTRUMENT_ID,
+      name: hostPatch.name,
+      userCreated: true,
+    });
+    useSynthStore.getState().bindInstrument(nextInstrumentId);
+    useSynthStore.getState().setDraft(hostPatch);
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
+    return { presetId: DEV_MIXED_ERA_AETHER_FX_PRESET_ID, instrumentId: nextInstrumentId };
+  };
+
   const readMixedEraAetherPresetFixtureState = () => {
     const draft = useSynthStore.getState().draft;
     const modern = draft.metadata.wavemaps?.["user.modern"] ?? null;
@@ -216,12 +261,29 @@ export function installBeatDevHooks() {
     };
   };
 
+  const readMixedEraAetherFxPresetFixtureState = () => {
+    const draft = useSynthStore.getState().draft;
+    const first = draft.effects.filters[0] ?? null;
+    const second = draft.effects.filters[1] ?? null;
+    return {
+      name: draft.name,
+      effectKinds: draft.effects.filters.map((effect) => effect.kind),
+      firstMix: first?.params.mix ?? null,
+      firstRoomSize: first?.params.roomSize ?? null,
+      secondFeedback: second?.params.feedback ?? null,
+      secondMix: second?.params.mix ?? null,
+      secondBypassed: second?.bypassed ?? null,
+    };
+  };
+
   window.__beatTestHooks = {
     ...(window.__beatTestHooks ?? {}),
     installDecentSamplerFixture,
     installNodeInstrumentFixture,
     installMixedEraAetherPresetFixture,
+    installMixedEraAetherFxPresetFixture,
     readMixedEraAetherPresetFixtureState,
+    readMixedEraAetherFxPresetFixtureState,
   };
 
   document.addEventListener("beat:install-decent-sampler-fixture", (event) => {
@@ -241,6 +303,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-mixed-preset") {
     window.setTimeout(() => {
       void installMixedEraAetherPresetFixture();
+    }, 0);
+  } else if (fixture === "aether-mixed-fx-preset") {
+    window.setTimeout(() => {
+      void installMixedEraAetherFxPresetFixture();
     }, 0);
   }
 }
@@ -297,6 +363,28 @@ function createMixedEraAetherPresetFixture() {
     },
     tags: ["legacy", "mixed-era"],
     updatedAt: 1_700_000_225_000,
+  };
+}
+
+function createMixedEraAetherFxPresetFixture() {
+  return {
+    id: DEV_MIXED_ERA_AETHER_FX_PRESET_ID,
+    name: "Mixed Era Browser FX",
+    chain: {
+      filters: [
+        {
+          kind: "reverb",
+          params: { mix: 37 },
+        },
+        {
+          kind: "delay",
+          bypassed: true,
+          params: { timeMs: 680 },
+        },
+      ],
+    },
+    tags: ["legacy", "mixed-era", "fx"],
+    updatedAt: 1_700_000_325_000,
   };
 }
 

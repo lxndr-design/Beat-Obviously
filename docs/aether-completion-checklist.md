@@ -66,16 +66,16 @@ Status legend:
 ## 5. Aether FX And Presets
 
 - `[x]` Instrument-owned FX chains render through the same route FX processor before track FX and share live/export parity behavior.
-- `[~]` Aether FX rack UI.
+- `[x]` Aether FX rack UI.
   - Done: dedicated Solid instrument FX rack controls, add/remove/reorder/bypass affordances, latency/tail badges, shared effect defaults/specs, preset save/load/delete controls, and synth patch/instrument roundtrip for instrument-owned FX.
-  - Remaining: browser smoke for older/mixed-era FX preset fixtures.
-  - Proof: synth roundtrip verifier, frontend interaction verifier for preset state transitions, true browser smoke for current instrument preset Save As/load/delete controls, true browser smoke for current FX preset save/load/delete controls, plus existing live/export parity stress for a patch with instrument FX and track FX.
+  - Remaining: none for the current FX rack and preset fixture plan; keep adding browser smoke when new effect kinds or preset fields land.
+  - Proof: synth roundtrip verifier, frontend interaction verifier for preset state transitions, true browser smoke for current instrument preset Save As/load/delete controls, true browser smoke for current FX preset save/load/delete controls, true browser smoke for older mixed-era FX preset load/delete with default-filled params, plus existing live/export parity stress for a patch with instrument FX and track FX.
 - `[ ]` Named Aether effect/instrument preset library.
   - Done: schema-versioned local instrument preset records, schema-versioned local instrument-effect chain presets, legacy record normalization, explicit Save As preset, user preset load/delete, Restore Init action, and FX preset save/load/delete.
-  - Remaining: fuller true browser coverage for older/mixed-era FX preset fixtures.
+  - Remaining: curate factory/user preset library UX beyond the local Save As lists.
   - Proof: synth verifier covers schema creation/migration; frontend interaction verifier covers Save As/load/delete/Restore Init state transitions, including mixed-era wavemap user preset loading; document roundtrip verifier covers preset-grade Aether synth patches, macro routes, custom wavemap analysis metadata, and instrument-owned FX; backend stress covers native repository roundtrip for Aether oscillator/sub/noise config, wavemap frame controls/partials, macro values/routes, Env 2, and instrument-owned FX.
-- `[ ]` Aether FX preset/version migration.
-  - Proof: synth and interaction verifiers cover legacy effect-default normalization; document roundtrip verifier and backend stress cover current instrument-owned FX chains.
+- `[x]` Aether FX preset/version migration.
+  - Proof: synth and interaction verifiers cover legacy effect-default normalization; true browser smoke loads and deletes an older mixed-era FX preset, preserving authored reverb/delay values while filling missing default params; document roundtrip verifier and backend stress cover current instrument-owned FX chains.
 
 ## 6. UI And Editing Workflow
 
@@ -97,13 +97,13 @@ Status legend:
   - Covers project, segment, note, route, instrument-effect, track-effect, macro, and master EQ automation in one live/export parity render, with a stripped-automation baseline proving the automation materially changes output.
 - `[ ]` Null-test style live/offline comparisons where deterministic output is expected.
 - `[ ]` Browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, and note automation lanes.
-- `[~]` Preset migration fixtures once Aether preset storage is formalized.
-  - Done: JS synth verifier covers mixed-era wavemap metadata migration and legacy Aether/FX preset record normalization; backend stress covers native mixed-era wavemap map merging; document verifier covers legacy-only wavemap metadata preservation; frontend interaction verifier covers mixed-era wavemap user preset load/delete flow; true browser smoke covers current Aether instrument preset Save As/load/delete; true browser smoke covers older mixed-era wavemap preset load/delete through the preset dropdown.
-  - Remaining: true browser-level preset-flow smoke for older FX preset records.
+- `[x]` Preset migration fixtures once Aether preset storage is formalized.
+  - Done: JS synth verifier covers mixed-era wavemap metadata migration and legacy Aether/FX preset record normalization; backend stress covers native mixed-era wavemap map merging; document verifier covers legacy-only wavemap metadata preservation; frontend interaction verifier covers mixed-era wavemap user preset load/delete flow; true browser smoke covers current Aether instrument preset Save As/load/delete; true browser smoke covers older mixed-era wavemap preset load/delete through the preset dropdown; true browser smoke covers older mixed-era FX preset load/delete through the FX preset dropdown.
+  - Remaining: none for the current preset migration fixture plan; add new fixtures alongside any future preset schema changes.
 
 ## Near-Term Slice Order
 
-1. Add an instrument FX rack UI backed by existing instrument-owned FX rendering.
-2. Tighten wavemap drawing/resynthesis editing semantics beyond deterministic source/frame analysis metadata.
-3. Add visible note/segment automation lanes for the Aether targets.
-4. Add Aether preset storage, Save As preset flow, and migration fixtures.
+1. Tighten wavemap drawing/resynthesis editing semantics beyond deterministic source/frame analysis metadata.
+2. Add visible track/segment automation lanes for the Aether targets.
+3. Add browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, and note automation lanes.
+4. Curate the named Aether instrument/effect preset library UX beyond local Save As lists.

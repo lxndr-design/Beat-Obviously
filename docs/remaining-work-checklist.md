@@ -14,13 +14,14 @@ Status legend:
 
 ## Immediate Build Queue
 
-1. `[~]` Aether instrument FX rack UI.
+1. `[x]` Aether instrument FX rack UI.
    - `[x]` Build dedicated instrument-owned FX rack controls.
    - `[x]` Add add/remove/reorder/bypass affordances.
    - `[x]` Show latency/tail badges.
    - `[x]` Preserve instrument-owned FX through synth patch/instrument roundtrip.
    - `[x]` Wire local effect-chain preset save/load/delete handoff.
    - `[x]` Verify with synth roundtrip coverage, frontend interaction coverage, live/export parity stress using both instrument FX and track FX, and true browser smoke for current FX preset save/load/delete controls.
+   - `[x]` Add true browser smoke for older/mixed-era FX preset load/delete with default-filled legacy params.
 2. `[~]` Wavemap drawing and resynthesis refinement.
    - Add richer draw modes beyond mini-waveform and partial lanes.
    - Clarify frame editing constraints.
@@ -39,7 +40,7 @@ Status legend:
    - `[x]` Add browser preview coverage that proves visible note-lane curve metadata changes Aether macro automation output.
    - `[~]` Cover track, segment, and piano-roll note automation entrypoints.
    - Add arbitrary multi-point lane editing and live/export parity coverage.
-4. `[ ]` Aether preset storage and migration.
+4. `[x]` Aether preset storage and migration.
    - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.
    - `[x]` Add schema-versioned local instrument-effect chain presets with save/load/delete and legacy normalization.
    - `[x]` Add document roundtrip coverage for preset-grade Aether patches, macro routes, custom wavemap analysis metadata, and instrument-owned FX.
@@ -51,6 +52,7 @@ Status legend:
    - `[x]` Add true browser smoke for current Aether preset Save As/load/delete flows.
    - `[x]` Add true browser smoke for current Aether FX preset save/load/delete flows.
    - `[x]` Add true browser smoke for older/mixed-era wavemap preset records exposed through the UI.
+   - `[x]` Add true browser smoke for older/mixed-era FX preset records exposed through the UI.
 
 ## DAW Editing
 
