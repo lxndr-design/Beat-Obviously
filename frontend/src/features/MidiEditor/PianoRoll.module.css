@@ -512,6 +512,76 @@
   cursor: default;
 }
 
+.automationPointEditor {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.automationPointHeader,
+.automationPointRow {
+  display: grid;
+  align-items: center;
+  min-width: 0;
+}
+
+.automationPointHeader {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  color: var(--color-fg);
+  font-weight: var(--font-weight-medium);
+}
+
+.automationPointRow {
+  grid-template-columns: 18px minmax(88px, 1fr) minmax(88px, 1fr) 46px auto;
+  gap: 4px;
+  min-height: 24px;
+  border-top: 1px solid color-mix(in srgb, var(--color-fg) 24%, transparent);
+  color: color-mix(in srgb, var(--color-fg) 78%, transparent);
+}
+
+.automationPointRow label {
+  display: grid;
+  grid-template-columns: 30px minmax(42px, 1fr);
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+}
+
+.automationPointRow label span,
+.automationPointValue,
+.automationPointIndex {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automationPointRow input {
+  width: 100%;
+  min-width: 0;
+  height: 20px;
+  margin: 0;
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--color-fg) 30%, transparent);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-hint);
+}
+
+.automationPointIndex,
+.automationPointValue {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-hint);
+}
+
+.automationPointIndex {
+  color: color-mix(in srgb, var(--color-fg) 54%, transparent);
+}
+
 .playhead {
   position: absolute;
   top: 0;

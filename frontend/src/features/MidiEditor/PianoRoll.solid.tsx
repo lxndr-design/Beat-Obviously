@@ -7,15 +7,18 @@ import {
   clearMidiNoteAutomationTarget,
   denormalizeAetherNoteAutomationValue,
   formatAetherNoteAutomationValue,
+  insertMidiNoteAutomationPoint,
   midiNoteAutomationTargetCount,
   midiNoteHasAutomationTarget,
   normalizeAetherNoteAutomationValue,
   offsetMidiNoteAutomation,
+  removeMidiNoteAutomationPoint,
   selectedMidiNoteAutomationCurve,
   selectedMidiNoteAutomationSummary,
   selectedMidiNoteAutomationValueRange,
   setMidiNoteAutomationTargetCurve,
   setMidiNoteAutomationTargetValues,
+  updateMidiNoteAutomationPoint,
   upsertMidiNoteAutomationTarget,
 } from "../../automation/aetherNoteAutomation";
 import { AUTOMATION_CURVES, automationCurveLabel } from "../../automation/curves";
@@ -80,6 +83,11 @@ function createPortal(children: JSX.Element, mount: HTMLElement) {
 
 function px(value: number): string {
   return `${value}px`;
+}
+
+function roundTo(value: number, step: number): number {
+  const precision = Math.max(0, Math.ceil(Math.log10(1 / Math.max(0.000001, step))));
+  return Number(value.toFixed(Math.min(6, precision)));
 }
 
 function createCompatEffect(effect: () => void | (() => void), _deps?: unknown[]) {
@@ -188,15 +196,46 @@ export function PianoRoll(props: PianoRollProps) {
   const height = PITCH_RANGE * PX_PER_PITCH;
   const gridLines = createMemo(() => makeGridLines(lengthBeats, pxPerBeat()));
   const selectedAutomationSummary = createMemo(() =>
-    selectedMidiNoteAutomationSummary(notes, selected(), activeAutomationTarget())
+    selectedMidiNoteAutomationSummary(props.notes, selected(), activeAutomationTarget())
   );
   const activeAutomationMeta = createMemo(() => aetherNoteAutomationTargetMeta(activeAutomationTarget()));
   const selectedAutomationValueRange = createMemo(() =>
-    selectedMidiNoteAutomationValueRange(notes, selected(), activeAutomationTarget())
+    selectedMidiNoteAutomationValueRange(props.notes, selected(), activeAutomationTarget())
   );
   const selectedAutomationCurve = createMemo(() =>
-    selectedMidiNoteAutomationCurve(notes, selected(), activeAutomationTarget())
+    selectedMidiNoteAutomationCurve(props.notes, selected(), activeAutomationTarget())
   );
+  const selectedAutomationPoints = createMemo(() => {
+    if (activeAutomationTarget() === "pitch") return [];
+    const firstSelectedNote = selected().map((index) => props.notes[index]).find(Boolean) as MidiNote | undefined;
+    if (!firstSelectedNote) return [];
+    const lane = firstSelectedNote.automation?.find((candidate) => candidate.target === activeAutomationTarget());
+    return (lane?.points ?? []).map((point) => ({
+      beat: Math.max(0, point.beat - firstSelectedNote.startBeat),
+      value: point.value,
+    }));
+  });
+  const selectedAutomationPointLength = createMemo(() => {
+    const firstSelectedNote = selected().map((index) => props.notes[index]).find(Boolean) as MidiNote | undefined;
+    return Math.max(MIN_NOTE_LENGTH_BEATS, firstSelectedNote?.lengthBeats ?? DEFAULT_NOTE_LENGTH_BEATS);
+  });
+  const nextAutomationPointBeat = createMemo(() => {
+    const length = selectedAutomationPointLength();
+    const beats = selectedAutomationPoints()
+      .map((point) => clamp(point.beat, 0, length))
+      .sort((a, b) => a - b);
+    if (beats.length === 0) return length / 2;
+    const gaps = [
+      { start: 0, end: beats[0] },
+      ...beats.slice(1).map((beat, index) => ({ start: beats[index], end: beat })),
+      { start: beats[beats.length - 1], end: length },
+    ].filter((gap) => gap.end - gap.start > 0.000001);
+    if (gaps.length === 0) return length / 2;
+    const widest = gaps.reduce((best, gap) =>
+      gap.end - gap.start > best.end - best.start ? gap : best
+    );
+    return (widest.start + widest.end) / 2;
+  });
   const automationCurveOptions = AUTOMATION_CURVES.map((curve) => ({ value: curve, label: automationCurveLabel(curve) }));
 
   useContextualHotkey(
@@ -286,7 +325,7 @@ export function PianoRoll(props: PianoRollProps) {
   }
 
   function pushHistorySnapshot() {
-    historyRef.current.push(structuredClone(notes));
+    historyRef.current.push(structuredClone(props.notes));
     if (historyRef.current.length > 100) historyRef.current.shift();
   }
 
@@ -786,17 +825,17 @@ export function PianoRoll(props: PianoRollProps) {
 
   function addAutomationLaneToSelection() {
     if (selected().length === 0) return;
-    commitChange(upsertMidiNoteAutomationTarget(notes, selected(), activeAutomationTarget()));
+    commitChange(upsertMidiNoteAutomationTarget(props.notes, selected(), activeAutomationTarget()));
   }
 
   function clearAutomationLaneFromSelection() {
     if (selected().length === 0) return;
-    commitChange(clearMidiNoteAutomationTarget(notes, selected(), activeAutomationTarget()));
+    commitChange(clearMidiNoteAutomationTarget(props.notes, selected(), activeAutomationTarget()));
   }
 
   function setAutomationCurve(curve: string) {
     if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
-    commitChange(setMidiNoteAutomationTargetCurve(notes, selected(), activeAutomationTarget(), curve as typeof AUTOMATION_CURVES[number]));
+    commitChange(setMidiNoteAutomationTargetCurve(props.notes, selected(), activeAutomationTarget(), curve as typeof AUTOMATION_CURVES[number]));
   }
 
   function setAutomationValueEdge(edge: "start" | "mid" | "end", rawValue: string) {
@@ -805,7 +844,7 @@ export function PianoRoll(props: PianoRollProps) {
     if (!Number.isFinite(value)) return;
     const current = selectedAutomationValueRange();
     commitChange(setMidiNoteAutomationTargetValues(
-      notes,
+      props.notes,
       selected(),
       activeAutomationTarget(),
       edge === "start" ? value : current.startValue,
@@ -818,7 +857,7 @@ export function PianoRoll(props: PianoRollProps) {
     if (selected().length === 0 || activeAutomationTarget() === "pitch" || !Number.isFinite(value)) return;
     const current = selectedAutomationValueRange();
     const next = setMidiNoteAutomationTargetValues(
-      notes,
+      props.notes,
       selected(),
       activeAutomationTarget(),
       edge === "start" ? value : current.startValue,
@@ -827,6 +866,55 @@ export function PianoRoll(props: PianoRollProps) {
     );
     if (transient) applyTransientChange(next);
     else commitChange(next);
+  }
+
+  function addAutomationPointToSelection() {
+    if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
+    const current = selectedAutomationValueRange();
+    commitChange(insertMidiNoteAutomationPoint(
+      props.notes,
+      selected(),
+      activeAutomationTarget(),
+      nextAutomationPointBeat(),
+      current.midValue,
+    ));
+  }
+
+  function setAutomationPointBeat(pointIndex: number, rawBeat: string) {
+    if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
+    const beat = Number(rawBeat);
+    if (!Number.isFinite(beat)) return;
+    const point = selectedAutomationPoints()[pointIndex];
+    if (!point) return;
+    commitChange(updateMidiNoteAutomationPoint(
+      props.notes,
+      selected(),
+      activeAutomationTarget(),
+      pointIndex,
+      beat,
+      point.value,
+    ));
+  }
+
+  function setAutomationPointValue(pointIndex: number, rawValue: string) {
+    if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
+    const value = Number(rawValue);
+    if (!Number.isFinite(value)) return;
+    const point = selectedAutomationPoints()[pointIndex];
+    if (!point) return;
+    commitChange(updateMidiNoteAutomationPoint(
+      props.notes,
+      selected(),
+      activeAutomationTarget(),
+      pointIndex,
+      point.beat,
+      value,
+    ));
+  }
+
+  function deleteAutomationPoint(pointIndex: number) {
+    if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
+    commitChange(removeMidiNoteAutomationPoint(props.notes, selected(), activeAutomationTarget(), pointIndex));
   }
 
   function startAutomationPointDrag(edge: "start" | "mid" | "end", event: PointerEvent) {
@@ -1529,6 +1617,60 @@ export function PianoRoll(props: PianoRollProps) {
                 >
                   E
                 </button>
+              </div>
+              <div class={styles.automationPointEditor} aria-label="Aether note automation points">
+                <div class={styles.automationPointHeader}>
+                  <span>Points</span>
+                  <Button
+                    size="xs"
+                    disabled={selected().length === 0}
+                    onClick={addAutomationPointToSelection}
+                  >
+                    Add point
+                  </Button>
+                </div>
+                <For each={selectedAutomationPoints()}>
+                  {(point, index) => (
+                    <div class={styles.automationPointRow}>
+                      <span class={styles.automationPointIndex}>{index() + 1}</span>
+                      <label>
+                        <span>Beat</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={selectedAutomationPointLength()}
+                          step={0.125}
+                          value={roundTo(point.beat, 0.001)}
+                          disabled={selected().length === 0}
+                          onChange={(event) => setAutomationPointBeat(index(), event.currentTarget.value)}
+                        />
+                      </label>
+                      <label>
+                        <span>Value</span>
+                        <input
+                          type="number"
+                          min={activeAutomationMeta().min}
+                          max={activeAutomationMeta().max}
+                          step={activeAutomationMeta().step}
+                          value={roundTo(point.value, activeAutomationMeta().step)}
+                          disabled={selected().length === 0}
+                          onChange={(event) => setAutomationPointValue(index(), event.currentTarget.value)}
+                        />
+                      </label>
+                      <span class={styles.automationPointValue}>
+                        {formatAetherNoteAutomationValue(activeAutomationTarget(), point.value)}
+                      </span>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        disabled={selected().length === 0}
+                        onClick={() => deleteAutomationPoint(index())}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  )}
+                </For>
               </div>
             </div>
           )}
