@@ -152,7 +152,9 @@ export function SynthEditor(props: SynthEditorProps) {
   });
 
   async function refreshPresets() {
-    setPresets(await listSynthPresets());
+    const nextPresets = await listSynthPresets();
+    setPresets(nextPresets);
+    return nextPresets;
   }
 
   function getAudioContext(): AudioContext {
@@ -363,8 +365,8 @@ export function SynthEditor(props: SynthEditorProps) {
         tags: patch.synthPatch.metadata?.tags ?? [],
         existing: existingPreset,
       }));
-      setSelectedPresetId(`${USER_PRESET_PREFIX}${presetId}`);
       await refreshPresets();
+      setSelectedPresetId(`${USER_PRESET_PREFIX}${presetId}`);
     }
 
     return id;
@@ -416,8 +418,8 @@ export function SynthEditor(props: SynthEditorProps) {
       tags: draft().metadata.tags,
     });
     await saveSynthPreset(record);
-    setSelectedPresetId(`${USER_PRESET_PREFIX}${record.id}`);
     await refreshPresets();
+    setSelectedPresetId(`${USER_PRESET_PREFIX}${record.id}`);
   }
 
   function onRestoreInitPreset() {

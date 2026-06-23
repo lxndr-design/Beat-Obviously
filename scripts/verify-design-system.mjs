@@ -13,6 +13,7 @@ const tokensPath = join(frontendSrc, "design", "tokens.css");
 const packageJsonPath = join(repoRoot, "frontend", "package.json");
 const tsconfigPath = join(repoRoot, "frontend", "tsconfig.json");
 const viteConfigPath = join(repoRoot, "frontend", "vite.config.ts");
+const appDialogPath = join(frontendSrc, "solid-ui", "AppDialog", "AppDialog.solid.tsx");
 
 const failures = [];
 
@@ -215,6 +216,11 @@ if (existsSync(packageJsonPath)) {
 const viteConfigSource = existsSync(viteConfigPath) ? readFileSync(viteConfigPath, "utf8") : "";
 if (viteConfigSource.includes("@vitejs/plugin-react") || viteConfigSource.includes("plugin-react")) {
   fail("frontend/vite.config.ts must not use the removed React Vite plugin.");
+}
+
+const appDialogSource = existsSync(appDialogPath) ? readFileSync(appDialogPath, "utf8") : "";
+if (appDialogSource.includes('layout="bare"')) {
+  fail("AppDialog prompts must use a framed TextInput; bare prompt fields collapse inside stacked modals.");
 }
 
 // Existing feature-local exceptions are narrow: canvas/SVG fallbacks, mask alpha,

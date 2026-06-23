@@ -49,16 +49,19 @@ export function AppDialogHost() {
         )}
       >
         <div class={styles.body}>
-          <p class={styles.message}>{dialog()?.message}</p>
-          <Show when={dialog()?.kind === "prompt"}>
+          <Show
+            when={dialog()?.kind === "prompt"}
+            fallback={<p class={styles.message}>{dialog()?.message}</p>}
+          >
             <form
+              class={styles.promptForm}
               onSubmit={(event) => {
                 event.preventDefault();
                 accept();
               }}
             >
               <TextInput
-                layout="bare"
+                label={dialog()?.message}
                 value={promptValue()}
                 onInput={(event) => setPromptValue(event.currentTarget.value)}
                 autofocus

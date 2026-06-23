@@ -48,7 +48,8 @@ Status legend:
    - `[x]` Add backend stress coverage for native mixed-era wavemap metadata merging so legacy-only custom maps survive while modern duplicate IDs win.
    - `[x]` Add document roundtrip coverage for legacy-only wavemap metadata preservation and dirty fingerprint sensitivity.
    - `[x]` Add frontend interaction smoke for Aether preset Save As/load/delete/Restore Init flows, including mixed-era wavemap user preset loading.
-   - `[ ]` Add true browser smoke for preset save/load/delete flows.
+   - `[x]` Add true browser smoke for current Aether preset Save As/load/delete flows.
+   - `[ ]` Add true browser smoke for older/mixed-era wavemap preset records exposed through the UI.
 
 ## DAW Editing
 
