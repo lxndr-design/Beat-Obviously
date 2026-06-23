@@ -101,10 +101,27 @@
 .automationPoint {
   position: absolute;
   z-index: 2;
-  width: 5px;
-  height: 5px;
-  margin: -2.5px 0 0 -2.5px;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
   border-radius: 50%;
   background: var(--color-fg);
   box-shadow: 0 0 0 1px var(--color-bg);
+  cursor: grab;
+  pointer-events: auto;
+  transition:
+    transform var(--duration-hover) var(--ease-linear),
+    box-shadow var(--duration-hover) var(--ease-linear);
+}
+
+.automationPoint:hover,
+.automationPointDragging {
+  transform: scale(1.25);
+  box-shadow:
+    0 0 0 1px var(--color-bg),
+    0 0 0 3px color-mix(in srgb, var(--color-fg) 18%, transparent);
+}
+
+.automationPointDragging {
+  cursor: grabbing;
 }

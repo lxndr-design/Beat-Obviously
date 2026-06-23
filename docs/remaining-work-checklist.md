@@ -24,6 +24,7 @@ Use this section as the short working list. The detailed domain lists below rema
    - Add visible hover, selected, disabled, loading, and migrated-framework smoke coverage on critical screens.
 2. `[~]` Automation editing completion.
    - Done: first visible arrangement-view Aether track automation lane preview renders track-scoped automation without taking over timeline drag/drop.
+   - Done: arrangement-view Aether track automation points can be dragged with free movement by default and shift-snap to the timeline subdivision.
    - Done: point-level add, move, delete helper coverage exists for Aether note, segment, and track lanes.
    - Done: visible note, segment, and track Aether point editors expose point beat/value editing plus add/remove controls.
    - Done: native IPC maps frontend `track.automation` lanes into backend project automation with track and instrument IDs, and dense Aether live/export stress covers a track-scoped multi-point Aether lane.
@@ -103,8 +104,9 @@ Use this section as the short working list. The detailed domain lists below rema
    - `[x]` Add visible selected-note multi-point editing UI.
    - `[x]` Add backend live/export parity coverage for multi-point note, segment, and track-scoped Aether lane edits.
    - `[x]` Add first visible arrangement-view Aether track automation lane preview.
+   - `[x]` Add arrangement-view drag editing for existing Aether track automation points.
    - Add broader browser interaction parity coverage for multi-point note, segment, and track lane edits.
-   - Add arrangement-view automation editing for point add/move/delete after the preview lane interaction model is settled.
+   - Add arrangement-view automation point add/remove controls after the preview lane interaction model is settled.
 4. `[x]` Aether preset storage and migration.
    - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.
    - `[x]` Add schema-versioned local instrument-effect chain presets with save/load/delete and legacy normalization.
@@ -149,7 +151,7 @@ Use this section as the short working list. The detailed domain lists below rema
 
 ## Automation
 
-- `[~]` Track automation lanes: first Track Details Aether lane surface and first arrangement-view Aether lane preview exist; arrangement-view point editing remains pending.
+- `[~]` Track automation lanes: first Track Details Aether lane surface and first arrangement-view Aether lane preview exist; existing arrangement-view points can be dragged, while arrangement add/remove controls remain pending.
   - Done: native IPC maps Track Details `track.automation` payloads into backend project automation lanes.
 - `[~]` Lane chooser for Aether track/segment/note targets exists; gain, pan, effect params, master params, sends, and broader macros remain pending.
 - `[~]` Automation point add/move/delete, multi-select, copy/paste, quantize, value snapping.

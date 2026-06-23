@@ -16,6 +16,7 @@ try {
     esbuild,
     [
       join(repoRoot, "frontend/src/features/Tracks/segmentMath.ts"),
+      join(repoRoot, "frontend/src/features/Tracks/arrangementAutomationLane.ts"),
       "--bundle",
       "--format=esm",
       "--platform=node",
@@ -25,6 +26,7 @@ try {
   );
 
   const math = await import(pathToFileURL(join(outDir, "segmentMath.js")));
+  const automationLane = await import(pathToFileURL(join(outDir, "arrangementAutomationLane.js")));
   const smart = { timeSignatureBeats: 4, timelineSmartGrid: true, timelineSubdivision: 4 };
   const dense = { timeSignatureBeats: 3, timelineSmartGrid: true, timelineSubdivision: 8 };
   const fixed = { timeSignatureBeats: 4, timelineSmartGrid: false, timelineSubdivision: 4 };
@@ -50,11 +52,63 @@ try {
   assert.equal(math.clampFadeLen(-1, 4), 0);
   assert.equal(math.clampFadeLen(5, 4), 4);
 
+  const automationTrack = {
+    automation: [{
+      target: "macro.1",
+      points: [
+        { beat: 0, value: 0.2, curve: "linear" },
+        { beat: 4, value: 0.5, curve: "smoothstep" },
+        { beat: 8, value: 0.8, curve: "easeOut" },
+      ],
+    }],
+  };
+  const preview = automationLane.arrangementAutomationPreview(automationTrack, 8, 64);
+  assert.ok(preview, "arrangement automation preview should render active Aether lanes");
+  assert.equal(preview.target, "macro.1");
+  assert.equal(preview.points.length, 3);
+  assert.equal(preview.points[1].index, 1, "preview points retain source point indexes");
+  assert.equal(preview.points[1].x, 256);
+
+  const freeAutomationDrag = automationLane.arrangementAutomationDragValue({
+    clientX: 193,
+    clientY: 8,
+    laneLeft: 0,
+    previewTop: 0,
+    projectLengthBeats: 8,
+    beatsToPx: 64,
+    height: 22,
+    target: "macro.1",
+    shiftKey: false,
+    timelineSmartGrid: true,
+    timelineSubdivision: 4,
+  });
+  assert.equal(freeAutomationDrag.beat, 193 / 64, "arrangement automation point drag stays free by default");
+  assert.ok(freeAutomationDrag.value > 0.5 && freeAutomationDrag.value < 0.8, "drag value maps Y into the target range");
+
+  const snappedAutomationDrag = automationLane.arrangementAutomationDragValue({
+    ...freeAutomationDrag,
+    clientX: 193,
+    clientY: 8,
+    laneLeft: 0,
+    previewTop: 0,
+    projectLengthBeats: 8,
+    beatsToPx: 64,
+    height: 22,
+    target: "macro.1",
+    shiftKey: true,
+    timelineSmartGrid: true,
+    timelineSubdivision: 4,
+  });
+  assert.equal(snappedAutomationDrag.beat, 3, "shift arrangement automation drag snaps to the timeline subdivision");
+
   console.log(JSON.stringify({
     ok: true,
     freeDragBeat: math.snapDragBeat(3.375, false, smart),
     shiftDragBeat: math.snapDragBeat(3.49, true, dense),
     shiftResizeStep: math.snapStepBeats(true, dense),
+    automationPointCount: preview.points.length,
+    freeAutomationBeat: freeAutomationDrag.beat,
+    shiftAutomationBeat: snappedAutomationDrag.beat,
   }, null, 2));
 } finally {
   rmSync(outDir, { recursive: true, force: true });
