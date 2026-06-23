@@ -41,7 +41,9 @@ Status legend:
    - `[x]` Add browser preview coverage that proves visible note-lane curve metadata changes Aether macro automation output.
    - `[x]` Add first visible Segment Editor Aether segment lanes for wavemap, filter, amp, and macro targets.
    - `[x]` Add segment-lane start/mid/end value editing, curve selection, segment-local beat clipping, and document roundtrip coverage.
-   - `[~]` Cover track, segment, and piano-roll note automation entrypoints; segment and note entrypoints are now visible, track lanes remain pending.
+   - `[x]` Add first visible Track Details Aether track lanes for wavemap, filter, amp, and macro targets.
+   - `[x]` Add track-lane start/mid/end value editing, curve selection, project-timeline beat clipping, and document roundtrip coverage.
+   - `[x]` Cover first track, segment, and piano-roll note automation entrypoints.
    - Add arbitrary multi-point lane editing and live/export parity coverage.
 4. `[x]` Aether preset storage and migration.
    - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.
@@ -87,8 +89,8 @@ Status legend:
 
 ## Automation
 
-- `[ ]` Track automation lanes in arrangement view.
-- `[ ]` Lane chooser for track gain, pan, effect params, instrument params, master params, sends, and macros.
+- `[~]` Track automation lanes: first Track Details Aether lane surface exists; arrangement-view lanes remain pending.
+- `[~]` Lane chooser for Aether track/segment/note targets exists; gain, pan, effect params, master params, sends, and broader macros remain pending.
 - `[ ]` Automation point add/move/delete, multi-select, copy/paste, quantize, value snapping.
 - `[ ]` Curve editing UI using the existing curve types.
 - `[~]` Segment-local automation editor for Aether targets.

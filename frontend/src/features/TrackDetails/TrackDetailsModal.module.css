@@ -26,6 +26,12 @@
   text-transform: uppercase;
 }
 
+.sectionHeader span:last-child {
+  color: color-mix(in srgb, var(--color-fg) 60%, transparent);
+  font-family: var(--font-family-mono);
+  font-weight: var(--font-weight-regular);
+}
+
 .sectionBody {
   display: grid;
   gap: var(--space-1);
@@ -62,5 +68,79 @@
 
 .range {
   width: 100%;
+  accent-color: var(--color-fg);
+}
+
+.automationPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px;
+  align-items: center;
+  padding: var(--space-1);
+}
+
+.automationHeader {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  color: color-mix(in srgb, var(--color-fg) 72%, transparent);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.automationHeader span:first-child {
+  color: var(--color-fg);
+  font-weight: var(--font-weight-medium);
+}
+
+.automationTargets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-width: 0;
+}
+
+.automationActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.automationCurveSelect {
+  min-width: 96px;
+}
+
+.automationValueEditor {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+  color: color-mix(in srgb, var(--color-fg) 74%, transparent);
+  font-size: var(--font-size-ui);
+}
+
+.automationValueEditor label {
+  display: grid;
+  grid-template-columns: 30px minmax(56px, 1fr) 42px;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.automationValueEditor label span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automationValueEditor input {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
   accent-color: var(--color-fg);
 }

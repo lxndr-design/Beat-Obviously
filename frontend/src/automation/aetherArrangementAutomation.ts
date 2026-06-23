@@ -6,7 +6,7 @@ import {
   aetherNoteAutomationTargetMeta,
   formatAetherNoteAutomationValue,
 } from "./aetherNoteAutomation";
-import type { AutomationCurve, MidiAutomationLane, MidiAutomationTarget, Segment } from "../state/types";
+import type { AutomationCurve, MidiAutomationLane, MidiAutomationTarget, Segment, Track } from "../state/types";
 
 export type AetherArrangementAutomationTarget = Exclude<MidiAutomationTarget, "pitch">;
 type AetherArrangementAutomationTargetMeta = Omit<AetherNoteAutomationTargetMeta, "target"> & {
@@ -24,12 +24,12 @@ export {
 
 export function segmentAutomationTargetCount(segment: Segment | undefined): number {
   if (!segment) return 0;
-  return new Set((segment.automation ?? []).filter((lane) => lane.points.length > 0).map((lane) => lane.target)).size;
+  return automationTargetCount(segment.automation);
 }
 
 export function segmentHasAutomationTarget(segment: Segment | undefined, target: AetherArrangementAutomationTarget): boolean {
   if (!segment) return false;
-  return Boolean(segment.automation?.some((lane) => lane.target === target && lane.points.length > 0));
+  return hasAutomationTarget(segment.automation, target);
 }
 
 export function upsertSegmentAutomationTarget(
@@ -62,23 +62,14 @@ export function setSegmentAutomationTargetValues(
   endValue: number,
   midValue?: number,
 ): Segment {
-  const meta = aetherNoteAutomationTargetMeta(target);
-  const start = clamp(startValue, meta.min, meta.max);
-  const end = clamp(endValue, meta.min, meta.max);
-  const mid = midValue == null || !Number.isFinite(midValue)
-    ? undefined
-    : clamp(midValue, meta.min, meta.max);
-  const existingLane = segment.automation?.find((candidate) => candidate.target === target);
-  const curve = laneAutomationCurve(existingLane);
-  const lengthBeats = Math.max(0.001, segment.lengthBeats);
-  const lane: MidiAutomationLane = {
+  const lane = makeArrangementAutomationLane(
+    segment.automation,
     target,
-    points: [
-      automationPoint(0, start, curve),
-      ...(mid == null ? [] : [automationPoint(lengthBeats / 2, mid, curve)]),
-      automationPoint(lengthBeats, end, curve),
-    ],
-  };
+    segment.lengthBeats,
+    startValue,
+    endValue,
+    midValue,
+  );
   const lanes = (segment.automation ?? []).filter((candidate) => candidate.target !== target);
   return {
     ...segment,
@@ -115,8 +106,145 @@ export function segmentAutomationValueRange(
   segment: Segment | undefined,
   target: AetherArrangementAutomationTarget,
 ): { startValue: number; midValue: number; endValue: number; active: boolean; midCount: number } {
-  const defaultValue = aetherNoteAutomationDefaultValue(target);
+  return automationValueRange(segment?.automation, target);
+}
+
+export function segmentAutomationCurve(
+  segment: Segment | undefined,
+  target: AetherArrangementAutomationTarget,
+): AutomationCurve {
   const lane = segment?.automation?.find((candidate) => candidate.target === target && candidate.points.length > 0);
+  return laneAutomationCurve(lane) ?? "linear";
+}
+
+export function trackAutomationTargetCount(track: Track | undefined): number {
+  if (!track) return 0;
+  return automationTargetCount(track.automation);
+}
+
+export function trackHasAutomationTarget(track: Track | undefined, target: AetherArrangementAutomationTarget): boolean {
+  if (!track) return false;
+  return hasAutomationTarget(track.automation, target);
+}
+
+export function upsertTrackAutomationTarget(
+  track: Track,
+  target: AetherArrangementAutomationTarget,
+  projectLengthBeats: number,
+): Track {
+  const lane = defaultArrangementAutomationLane(projectLengthBeats, target);
+  const lanes = (track.automation ?? []).filter((candidate) => candidate.target !== target);
+  return {
+    ...track,
+    automation: [...lanes, lane],
+  };
+}
+
+export function clearTrackAutomationTarget(
+  track: Track,
+  target: AetherArrangementAutomationTarget,
+): Track {
+  const automation = (track.automation ?? []).filter((lane) => lane.target !== target);
+  return {
+    ...track,
+    automation: automation.length > 0 ? automation : undefined,
+  };
+}
+
+export function setTrackAutomationTargetValues(
+  track: Track,
+  target: AetherArrangementAutomationTarget,
+  projectLengthBeats: number,
+  startValue: number,
+  endValue: number,
+  midValue?: number,
+): Track {
+  const lane = makeArrangementAutomationLane(
+    track.automation,
+    target,
+    projectLengthBeats,
+    startValue,
+    endValue,
+    midValue,
+  );
+  const lanes = (track.automation ?? []).filter((candidate) => candidate.target !== target);
+  return {
+    ...track,
+    automation: [...lanes, lane],
+  };
+}
+
+export function setTrackAutomationTargetCurve(
+  track: Track,
+  target: AetherArrangementAutomationTarget,
+  curve: AutomationCurve,
+): Track {
+  const existingLane = track.automation?.find((candidate) => candidate.target === target);
+  if (!existingLane) return track;
+  const lanes = (track.automation ?? []).filter((candidate) => candidate.target !== target);
+  return {
+    ...track,
+    automation: [
+      ...lanes,
+      {
+        ...existingLane,
+        points: existingLane.points.map((point) => ({ ...point, curve })),
+      },
+    ],
+  };
+}
+
+export function trackAutomationSummary(track: Track | undefined, target: AetherArrangementAutomationTarget): string {
+  if (!track) return "No track";
+  return trackHasAutomationTarget(track, target) ? "1/1 track" : "0/1 track";
+}
+
+export function trackAutomationValueRange(
+  track: Track | undefined,
+  target: AetherArrangementAutomationTarget,
+): { startValue: number; midValue: number; endValue: number; active: boolean; midCount: number } {
+  return automationValueRange(track?.automation, target);
+}
+
+export function trackAutomationCurve(
+  track: Track | undefined,
+  target: AetherArrangementAutomationTarget,
+): AutomationCurve {
+  const lane = track?.automation?.find((candidate) => candidate.target === target && candidate.points.length > 0);
+  return laneAutomationCurve(lane) ?? "linear";
+}
+
+export function clipTrackAutomation(
+  automation: MidiAutomationLane[] | undefined,
+  projectLengthBeats: number,
+): MidiAutomationLane[] | undefined {
+  return clipAutomation(automation, projectLengthBeats);
+}
+
+export function clipSegmentAutomation(
+  automation: MidiAutomationLane[] | undefined,
+  lengthBeats: number,
+): MidiAutomationLane[] | undefined {
+  return clipAutomation(automation, lengthBeats);
+}
+
+function automationTargetCount(automation: MidiAutomationLane[] | undefined): number {
+  return new Set((automation ?? []).filter((lane) => lane.points.length > 0).map((lane) => lane.target)).size;
+}
+
+function hasAutomationTarget(
+  automation: MidiAutomationLane[] | undefined,
+  target: AetherArrangementAutomationTarget,
+): boolean {
+  return Boolean(automation?.some((lane) => lane.target === target && lane.points.length > 0));
+}
+
+function automationValueRange(
+  automation: MidiAutomationLane[] | undefined,
+  target: AetherArrangementAutomationTarget,
+): { startValue: number; midValue: number; endValue: number; active: boolean; midCount: number } {
+  const defaultValue = aetherNoteAutomationDefaultValue(target);
+  const lane = automation?.find((candidate) => candidate.target === target && candidate.points.length > 0);
   if (!lane) return { startValue: defaultValue, midValue: defaultValue, endValue: defaultValue, active: false, midCount: 0 };
   const startValue = lane.points[0]?.value ?? defaultValue;
   const endValue = lane.points[lane.points.length - 1]?.value ?? startValue;
@@ -130,15 +258,45 @@ export function segmentAutomationValueRange(
   };
 }
 
-export function segmentAutomationCurve(
-  segment: Segment | undefined,
+function makeArrangementAutomationLane(
+  automation: MidiAutomationLane[] | undefined,
   target: AetherArrangementAutomationTarget,
-): AutomationCurve {
-  const lane = segment?.automation?.find((candidate) => candidate.target === target && candidate.points.length > 0);
-  return laneAutomationCurve(lane) ?? "linear";
+  lengthBeats: number,
+  startValue: number,
+  endValue: number,
+  midValue?: number,
+): MidiAutomationLane {
+  const meta = aetherNoteAutomationTargetMeta(target);
+  const start = clamp(startValue, meta.min, meta.max);
+  const end = clamp(endValue, meta.min, meta.max);
+  const mid = midValue == null || !Number.isFinite(midValue)
+    ? undefined
+    : clamp(midValue, meta.min, meta.max);
+  const existingLane = automation?.find((candidate) => candidate.target === target);
+  const curve = laneAutomationCurve(existingLane);
+  const safeLength = Math.max(0.001, lengthBeats);
+  return {
+    target,
+    points: [
+      automationPoint(0, start, curve),
+      ...(mid == null ? [] : [automationPoint(safeLength / 2, mid, curve)]),
+      automationPoint(safeLength, end, curve),
+    ],
+  };
 }
 
-export function clipSegmentAutomation(
+function defaultArrangementAutomationLane(lengthBeats: number, target: AetherArrangementAutomationTarget): MidiAutomationLane {
+  const value = aetherNoteAutomationDefaultValue(target);
+  return {
+    target,
+    points: [
+      { beat: 0, value },
+      { beat: Math.max(0.001, lengthBeats), value },
+    ],
+  };
+}
+
+function clipAutomation(
   automation: MidiAutomationLane[] | undefined,
   lengthBeats: number,
 ): MidiAutomationLane[] | undefined {
@@ -156,14 +314,7 @@ export function clipSegmentAutomation(
 }
 
 function defaultSegmentAutomationLane(segment: Segment, target: AetherArrangementAutomationTarget): MidiAutomationLane {
-  const value = aetherNoteAutomationDefaultValue(target);
-  return {
-    target,
-    points: [
-      { beat: 0, value },
-      { beat: Math.max(0.001, segment.lengthBeats), value },
-    ],
-  };
+  return defaultArrangementAutomationLane(segment.lengthBeats, target);
 }
 
 function midpointValue(lane: MidiAutomationLane): number | undefined {

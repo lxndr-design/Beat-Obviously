@@ -136,6 +136,52 @@ try {
   const clearedSegmentLane = arrangementAutomation.clearSegmentAutomationTarget(curvedSegmentLane, "macro.1");
   assert.equal(clearedSegmentLane.automation, undefined, "clearing the only segment lane should remove automation clutter");
 
+  const automationTrack = {
+    id: "track-auto",
+    name: "Automation Track",
+    kind: "mixed",
+    gainDb: 0,
+    pan: 0,
+    mute: false,
+    solo: false,
+    recordArmed: false,
+    inputMonitoring: false,
+    inputDeviceId: "",
+    inputChannelStart: 0,
+    inputChannelCount: 2,
+    recordGainDb: 0,
+    effects: { filters: [] },
+    segments: [],
+    rowHeight: "normal",
+  };
+  const withTrackLane = arrangementAutomation.upsertTrackAutomationTarget(automationTrack, "filter.cutoff", 64);
+  assert.deepEqual(withTrackLane.automation[0].points.map((point) => point.beat), [0, 64], "track automation should use project-timeline beats");
+  assert.equal(arrangementAutomation.trackAutomationSummary(withTrackLane, "filter.cutoff"), "1/1 track");
+  assert.equal(arrangementAutomation.trackAutomationTargetCount(withTrackLane), 1);
+  const editedTrackLane = arrangementAutomation.setTrackAutomationTargetValues(withTrackLane, "filter.cutoff", 64, 0.12, 0.88, 0.44);
+  assert.deepEqual(editedTrackLane.automation[0].points.map((point) => point.beat), [0, 32, 64]);
+  assert.deepEqual(editedTrackLane.automation[0].points.map((point) => point.value), [0.12, 0.44, 0.88]);
+  assert.deepEqual(
+    arrangementAutomation.trackAutomationValueRange(editedTrackLane, "filter.cutoff"),
+    { startValue: 0.12, midValue: 0.44, endValue: 0.88, active: true, midCount: 1 },
+    "track automation should report start/mid/end values for the visible editor",
+  );
+  const curvedTrackLane = arrangementAutomation.setTrackAutomationTargetCurve(editedTrackLane, "filter.cutoff", "easeIn");
+  assert.deepEqual(
+    curvedTrackLane.automation[0].points.map((point) => point.curve),
+    ["easeIn", "easeIn", "easeIn"],
+    "track automation curve selection should annotate points",
+  );
+  assert.equal(arrangementAutomation.trackAutomationCurve(curvedTrackLane, "filter.cutoff"), "easeIn");
+  const clampedTrackPanLane = arrangementAutomation.setTrackAutomationTargetValues(automationTrack, "amp.pan", 64, -2, 2);
+  assert.deepEqual(clampedTrackPanLane.automation[0].points.map((point) => point.value), [-1, 1], "track automation should clamp bipolar targets");
+  const unclutteredTrackCurveEdit = arrangementAutomation.setTrackAutomationTargetCurve(automationTrack, "macro.1", "cubic");
+  assert.equal(unclutteredTrackCurveEdit.automation, undefined, "curve edits should not create empty track automation lanes");
+  const clippedTrackLanes = arrangementAutomation.clipTrackAutomation(curvedTrackLane.automation, 40);
+  assert.deepEqual(clippedTrackLanes[0].points.map((point) => point.beat), [0, 32], "track automation should clip points outside project length");
+  const clearedTrackLane = arrangementAutomation.clearTrackAutomationTarget(curvedTrackLane, "filter.cutoff");
+  assert.equal(clearedTrackLane.automation, undefined, "clearing the only track lane should remove automation clutter");
+
   assert.deepEqual(
     runner.previewSegmentDrag({
       originStartBeat: 4,

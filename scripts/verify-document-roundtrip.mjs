@@ -73,6 +73,14 @@ try {
     ],
     "effect automation lanes should survive document migration",
   );
+  assert.deepEqual(
+    migrated.project.tracks[0].automation?.[0].points.map((point) => [point.beat, point.value, point.curve]),
+    [
+      [0, 0.15, "linear"],
+      [64, 0.85, "easeIn"],
+    ],
+    "track Aether automation lanes should survive document migration",
+  );
   const migratedMidiPayload = migrated.project.tracks[0].segments[0].payload;
   assert.equal(migratedMidiPayload.kind, "midi");
   assert.deepEqual(
@@ -199,6 +207,14 @@ try {
     "document dirty fingerprint should include segment Aether automation edits",
   );
 
+  const changedTrackAutomation = structuredClone(migrated);
+  changedTrackAutomation.project.tracks[0].automation[0].points[1].value = 0.22;
+  assert.notEqual(
+    beatDocumentFingerprint(migrated),
+    beatDocumentFingerprint(changedTrackAutomation),
+    "document dirty fingerprint should include track Aether automation edits",
+  );
+
   const changedLegacyAetherWavemap = structuredClone(migrated);
   changedLegacyAetherWavemap.instruments.find((instrument) => instrument.id === "inst-aether-preset").synthPatch.metadata.customWavetables["user.legacy-only"].frames[0].formant += 0.05;
   assert.notEqual(
@@ -289,6 +305,15 @@ function makeRepresentativeDocument() {
           inputChannelCount: -2,
           recordGainDb: 99,
           rowHeight: "normal",
+          automation: [
+            {
+              target: "filter.cutoff",
+              points: [
+                { beat: 0, value: 0.15, curve: "linear" },
+                { beat: 64, value: 0.85, curve: "easeIn" },
+              ],
+            },
+          ],
           effects: {
             filters: [
               {
