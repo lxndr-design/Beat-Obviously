@@ -130,6 +130,11 @@ if (existsSync(messageBridgePath)) {
   if (!source.includes("makeWavDataUrl")) {
     fail("Backend instrument preview must keep the optional rendered WAV data URL path.");
   }
+  if (!source.includes('trackVar.getProperty("automation", {})')
+      || !source.includes("lane.trackId = t.id;")
+      || !source.includes("lane.instrumentId = t.instrumentId;")) {
+    fail("Backend bridge must map frontend track.automation lanes into native project automation with track and instrument ids.");
+  }
 }
 
 const webAudioAllowlist = new Set([

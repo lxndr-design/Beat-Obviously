@@ -1771,6 +1771,43 @@ namespace beat
                     t.inputChannelCount = juce::jlimit(1, 1024, (int) trackVar.getProperty("inputChannelCount", 1));
                     t.recordGainDb = (float) (double) trackVar.getProperty("recordGainDb", 0.0);
 
+                    if (auto* automation = trackVar.getProperty("automation", {}).getArray())
+                    {
+                        for (const auto& laneVar : *automation)
+                        {
+                            if (!laneVar.isObject()) continue;
+                            ProjectAutomationLane lane;
+                            lane.trackId = t.id;
+                            lane.instrumentId = t.instrumentId;
+                            lane.target = laneVar.getProperty("target", "").toString();
+                            if (lane.target.isEmpty() || lane.target == "pitch") continue;
+
+                            if (auto* points = laneVar.getProperty("points", {}).getArray())
+                            {
+                                lane.points.reserve((size_t) points->size());
+                                for (const auto& pointVar : *points)
+                                {
+                                    if (!pointVar.isObject()) continue;
+                                    MidiAutomationPoint point;
+                                    point.beat = (double) pointVar.getProperty("beat", 0.0);
+                                    point.value = (float) (double) pointVar.getProperty("value", 0.0);
+                                    point.curve = parseAutomationCurve(pointVar.getProperty("curve", "linear"));
+                                    if (std::isfinite(point.beat) && std::isfinite(point.value))
+                                        lane.points.push_back(point);
+                                }
+                            }
+
+                            if (!lane.points.empty())
+                            {
+                                std::sort(lane.points.begin(), lane.points.end(),
+                                          [](const MidiAutomationPoint& a, const MidiAutomationPoint& b) {
+                                              return a.beat < b.beat;
+                                          });
+                                p.automation.push_back(std::move(lane));
+                            }
+                        }
+                    }
+
                     if (auto* sends = trackVar.getProperty("sends", {}).getArray())
                     {
                         for (const auto& sendVar : *sends)

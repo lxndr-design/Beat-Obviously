@@ -890,6 +890,15 @@ namespace
         cutoffLane.points.push_back({ 6.0, 3600.0f });
         project.automation.push_back(std::move(cutoffLane));
 
+        beat::ProjectAutomationLane trackScopedAmpLane;
+        trackScopedAmpLane.trackId = track.id;
+        trackScopedAmpLane.instrumentId = "dense-aether";
+        trackScopedAmpLane.target = "amp.pan";
+        trackScopedAmpLane.points.push_back({ 0.0, -0.25f });
+        trackScopedAmpLane.points.push_back({ 3.0, 0.7f, beat::AutomationCurve::Smoothstep });
+        trackScopedAmpLane.points.push_back({ 8.0, 0.05f });
+        project.automation.push_back(std::move(trackScopedAmpLane));
+
         project.tracks.push_back(std::move(track));
         return project;
     }
