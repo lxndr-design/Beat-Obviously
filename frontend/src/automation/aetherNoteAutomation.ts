@@ -178,6 +178,45 @@ export function setMidiNoteAutomationTargetCurve(
   });
 }
 
+export function insertMidiNoteAutomationPoint(
+  notes: MidiNote[],
+  indices: number[],
+  target: MidiAutomationTarget,
+  localBeat: number,
+  value: number,
+): MidiNote[] {
+  if (target === "pitch") return notes;
+  return mutateSelectedNoteAutomationLanes(notes, indices, target, (note, lane) =>
+    insertNoteAutomationPoint(note, lane, target, localBeat, value)
+  );
+}
+
+export function updateMidiNoteAutomationPoint(
+  notes: MidiNote[],
+  indices: number[],
+  target: MidiAutomationTarget,
+  pointIndex: number,
+  localBeat: number,
+  value: number,
+): MidiNote[] {
+  if (target === "pitch") return notes;
+  return mutateSelectedNoteAutomationLanes(notes, indices, target, (note, lane) =>
+    updateNoteAutomationPoint(note, lane, target, pointIndex, localBeat, value)
+  );
+}
+
+export function removeMidiNoteAutomationPoint(
+  notes: MidiNote[],
+  indices: number[],
+  target: MidiAutomationTarget,
+  pointIndex: number,
+): MidiNote[] {
+  if (target === "pitch") return notes;
+  return mutateSelectedNoteAutomationLanes(notes, indices, target, (_note, lane) =>
+    removeAutomationPoint(lane, pointIndex)
+  );
+}
+
 export function offsetMidiNoteAutomation(
   automation: MidiAutomationLane[] | undefined,
   beatDelta: number,
@@ -246,6 +285,73 @@ export function selectedMidiNoteAutomationCurve(
   return "linear";
 }
 
+function mutateSelectedNoteAutomationLanes(
+  notes: MidiNote[],
+  indices: number[],
+  target: MidiAutomationTarget,
+  mutator: (note: MidiNote, lane: MidiAutomationLane) => MidiAutomationLane | null,
+): MidiNote[] {
+  const targets = new Set(indices.filter((index) => notes[index]));
+  if (targets.size === 0) return notes;
+  return notes.map((note, index) => {
+    if (!targets.has(index)) return note;
+    const existingLane = note.automation?.find((candidate) => candidate.target === target);
+    const lane = existingLane ?? defaultMidiAutomationLane(note, target);
+    const nextLane = mutator(note, lane);
+    const lanes = (note.automation ?? []).filter((candidate) => candidate.target !== target);
+    return {
+      ...note,
+      automation: nextLane ? [...lanes, nextLane] : lanes.length > 0 ? lanes : undefined,
+    };
+  });
+}
+
+function insertNoteAutomationPoint(
+  note: MidiNote,
+  lane: MidiAutomationLane,
+  target: MidiAutomationTarget,
+  localBeat: number,
+  value: number,
+): MidiAutomationLane {
+  const curve = laneAutomationCurve(lane);
+  const point = automationPoint(note.startBeat + clampLocalBeat(localBeat, note), clampTargetValue(target, value), curve);
+  return {
+    ...lane,
+    points: normalizeAutomationPoints([...lane.points, point]),
+  };
+}
+
+function updateNoteAutomationPoint(
+  note: MidiNote,
+  lane: MidiAutomationLane,
+  target: MidiAutomationTarget,
+  pointIndex: number,
+  localBeat: number,
+  value: number,
+): MidiAutomationLane {
+  if (!Number.isInteger(pointIndex) || pointIndex < 0 || pointIndex >= lane.points.length) return lane;
+  return {
+    ...lane,
+    points: normalizeAutomationPoints(lane.points.map((point, index) =>
+      index === pointIndex
+        ? { ...point, beat: note.startBeat + clampLocalBeat(localBeat, note), value: clampTargetValue(target, value) }
+        : { ...point },
+    )),
+  };
+}
+
+function removeAutomationPoint(lane: MidiAutomationLane, pointIndex: number): MidiAutomationLane | null {
+  if (!Number.isInteger(pointIndex) || pointIndex < 0 || pointIndex >= lane.points.length) return lane;
+  const points = lane.points.filter((_, index) => index !== pointIndex).map((point) => ({ ...point }));
+  return points.length > 0 ? { ...lane, points } : null;
+}
+
+function normalizeAutomationPoints(points: MidiAutomationLane["points"]): MidiAutomationLane["points"] {
+  return points
+    .map((point) => ({ ...point }))
+    .sort((a, b) => a.beat - b.beat);
+}
+
 function midpointValue(lane: MidiAutomationLane): number | undefined {
   if (lane.points.length < 3) return undefined;
   return lane.points[Math.floor(lane.points.length / 2)]?.value;
@@ -268,6 +374,15 @@ function defaultMidiAutomationLane(note: MidiNote, target: MidiAutomationTarget)
 
 function automationPoint(beat: number, value: number, curve: AutomationCurve | undefined): MidiAutomationLane["points"][number] {
   return curve ? { beat, value, curve } : { beat, value };
+}
+
+function clampLocalBeat(value: number, note: MidiNote): number {
+  return Math.max(0, Math.min(Math.max(0.001, note.lengthBeats), Number.isFinite(value) ? value : 0));
+}
+
+function clampTargetValue(target: MidiAutomationTarget, value: number): number {
+  const meta = aetherNoteAutomationTargetMeta(target);
+  return clamp(value, meta.min, meta.max);
 }
 
 function clamp(value: number, min: number, max: number): number {

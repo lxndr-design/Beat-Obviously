@@ -85,11 +85,43 @@ try {
     ["smoothstep", "smoothstep", "smoothstep"],
     "value editing should preserve selected lane curve metadata",
   );
+  const insertedNotePoint = noteAutomation.insertMidiNoteAutomationPoint(curvedMacroLane, [0], "macro.1", 0.75, 0.77);
+  assert.deepEqual(
+    insertedNotePoint[0].automation[0].points.map((point) => point.beat),
+    [2, 2.5, 2.75, 3],
+    "note point insertion should use note-local beats and keep points sorted",
+  );
+  assert.equal(insertedNotePoint[0].automation[0].points[2].curve, "smoothstep", "inserted note points should inherit lane curve metadata");
+  const movedNotePoint = noteAutomation.updateMidiNoteAutomationPoint(insertedNotePoint, [0], "macro.1", 2, 0.9, 0.81);
+  assert.deepEqual(
+    movedNotePoint[0].automation[0].points.map((point) => point.beat),
+    [2, 2.5, 2.9, 3],
+    "note point editing should move the addressed point in note-local space",
+  );
+  assert.equal(movedNotePoint[0].automation[0].points[2].value, 0.81, "note point editing should update the addressed value");
+  const removedNotePoint = noteAutomation.removeMidiNoteAutomationPoint(movedNotePoint, [0], "macro.1", 2);
+  assert.deepEqual(
+    removedNotePoint[0].automation[0].points.map((point) => point.beat),
+    [2, 2.5, 3],
+    "note point removal should leave the rest of the lane intact",
+  );
   const clampedPanLane = noteAutomation.setMidiNoteAutomationTargetValues(automationNotes, [0], "amp.pan", -2, 2);
   assert.deepEqual(clampedPanLane[0].automation[0].points.map((point) => point.value), [-1, 1], "bipolar lane values should clamp to their target range");
+  const insertedClampedPanPoint = noteAutomation.insertMidiNoteAutomationPoint(clampedPanLane, [0], "amp.pan", 99, 8);
+  assert.deepEqual(
+    insertedClampedPanPoint[0].automation[0].points.map((point) => point.value),
+    [-1, 1, 1],
+    "inserted note points should clamp values to the target range",
+  );
+  assert.deepEqual(
+    insertedClampedPanPoint[0].automation[0].points.map((point) => point.beat),
+    [2, 3, 3],
+    "inserted note points should clamp local beats to the note duration",
+  );
   const withPitchLane = noteAutomation.upsertMidiNoteAutomationTarget(automationNotes, [0], "pitch");
   assert.equal(withPitchLane[0].curve.length, 2, "pitch automation should use the note pitch-curve path");
   assert.equal(noteAutomation.setMidiNoteAutomationTargetValues(withPitchLane, [0], "pitch", 0.1, 0.9), withPitchLane, "pitch value editing should stay on curve handles");
+  assert.equal(noteAutomation.insertMidiNoteAutomationPoint(withPitchLane, [0], "pitch", 0.5, 0.5), withPitchLane, "pitch point editing should stay on curve handles");
   const clearedMacroLane = noteAutomation.clearMidiNoteAutomationTarget(withMacroLane, [0], "macro.1");
   assert.equal(clearedMacroLane[0].automation, undefined, "clearing the only lane should remove note automation clutter");
   assert.equal(clearedMacroLane[1].automation[0].target, "macro.1", "clearing one note should not affect other selected lanes");
@@ -127,8 +159,39 @@ try {
     "segment automation curve selection should annotate points",
   );
   assert.equal(arrangementAutomation.segmentAutomationCurve(curvedSegmentLane, "macro.1"), "smoothstep");
+  const insertedSegmentPoint = arrangementAutomation.insertSegmentAutomationPoint(curvedSegmentLane, "macro.1", 1, 0.61);
+  assert.deepEqual(
+    insertedSegmentPoint.automation[0].points.map((point) => point.beat),
+    [0, 1, 2, 4],
+    "segment point insertion should use segment-local beats and sort points",
+  );
+  assert.equal(insertedSegmentPoint.automation[0].points[1].curve, "smoothstep", "inserted segment points should inherit lane curve metadata");
+  const movedSegmentPoint = arrangementAutomation.updateSegmentAutomationPoint(insertedSegmentPoint, "macro.1", 1, 3.5, 0.73);
+  assert.deepEqual(
+    movedSegmentPoint.automation[0].points.map((point) => point.beat),
+    [0, 2, 3.5, 4],
+    "segment point editing should move the addressed point and keep sorting stable",
+  );
+  assert.equal(movedSegmentPoint.automation[0].points[2].value, 0.73, "segment point editing should update the addressed value");
+  const removedSegmentPoint = arrangementAutomation.removeSegmentAutomationPoint(movedSegmentPoint, "macro.1", 2);
+  assert.deepEqual(
+    removedSegmentPoint.automation[0].points.map((point) => point.beat),
+    [0, 2, 4],
+    "segment point removal should leave the rest of the lane intact",
+  );
   const clampedSegmentPanLane = arrangementAutomation.setSegmentAutomationTargetValues(automationSegment, "amp.pan", -2, 2);
   assert.deepEqual(clampedSegmentPanLane.automation[0].points.map((point) => point.value), [-1, 1], "segment automation should clamp bipolar targets");
+  const insertedClampedSegmentPoint = arrangementAutomation.insertSegmentAutomationPoint(clampedSegmentPanLane, "amp.pan", 99, 8);
+  assert.deepEqual(
+    insertedClampedSegmentPoint.automation[0].points.map((point) => point.value),
+    [-1, 1, 1],
+    "inserted segment points should clamp values to the target range",
+  );
+  assert.deepEqual(
+    insertedClampedSegmentPoint.automation[0].points.map((point) => point.beat),
+    [0, 4, 4],
+    "inserted segment points should clamp beats to the segment length",
+  );
   const unclutteredCurveEdit = arrangementAutomation.setSegmentAutomationTargetCurve(automationSegment, "macro.1", "cubic");
   assert.equal(unclutteredCurveEdit.automation, undefined, "curve edits should not create empty segment automation lanes");
   const clippedSegmentLanes = arrangementAutomation.clipSegmentAutomation(curvedSegmentLane.automation, 3);
@@ -173,8 +236,39 @@ try {
     "track automation curve selection should annotate points",
   );
   assert.equal(arrangementAutomation.trackAutomationCurve(curvedTrackLane, "filter.cutoff"), "easeIn");
+  const insertedTrackPoint = arrangementAutomation.insertTrackAutomationPoint(curvedTrackLane, "filter.cutoff", 64, 12, 0.66);
+  assert.deepEqual(
+    insertedTrackPoint.automation[0].points.map((point) => point.beat),
+    [0, 12, 32, 64],
+    "track point insertion should use project-timeline beats and sort points",
+  );
+  assert.equal(insertedTrackPoint.automation[0].points[1].curve, "easeIn", "inserted track points should inherit lane curve metadata");
+  const movedTrackPoint = arrangementAutomation.updateTrackAutomationPoint(insertedTrackPoint, "filter.cutoff", 64, 1, 48, 0.74);
+  assert.deepEqual(
+    movedTrackPoint.automation[0].points.map((point) => point.beat),
+    [0, 32, 48, 64],
+    "track point editing should move the addressed point and keep sorting stable",
+  );
+  assert.equal(movedTrackPoint.automation[0].points[2].value, 0.74, "track point editing should update the addressed value");
+  const removedTrackPoint = arrangementAutomation.removeTrackAutomationPoint(movedTrackPoint, "filter.cutoff", 2);
+  assert.deepEqual(
+    removedTrackPoint.automation[0].points.map((point) => point.beat),
+    [0, 32, 64],
+    "track point removal should leave the rest of the lane intact",
+  );
   const clampedTrackPanLane = arrangementAutomation.setTrackAutomationTargetValues(automationTrack, "amp.pan", 64, -2, 2);
   assert.deepEqual(clampedTrackPanLane.automation[0].points.map((point) => point.value), [-1, 1], "track automation should clamp bipolar targets");
+  const insertedClampedTrackPoint = arrangementAutomation.insertTrackAutomationPoint(clampedTrackPanLane, "amp.pan", 64, 99, 8);
+  assert.deepEqual(
+    insertedClampedTrackPoint.automation[0].points.map((point) => point.value),
+    [-1, 1, 1],
+    "inserted track points should clamp values to the target range",
+  );
+  assert.deepEqual(
+    insertedClampedTrackPoint.automation[0].points.map((point) => point.beat),
+    [0, 64, 64],
+    "inserted track points should clamp beats to the project length",
+  );
   const unclutteredTrackCurveEdit = arrangementAutomation.setTrackAutomationTargetCurve(automationTrack, "macro.1", "cubic");
   assert.equal(unclutteredTrackCurveEdit.automation, undefined, "curve edits should not create empty track automation lanes");
   const clippedTrackLanes = arrangementAutomation.clipTrackAutomation(curvedTrackLane.automation, 40);
