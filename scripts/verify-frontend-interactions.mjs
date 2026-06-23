@@ -387,6 +387,60 @@ try {
   assert.equal(savedPreset.selectedPresetId, `user:${savedPreset.record.id}`, "Save As should select the new user preset");
   savedPreset.record.patch.name = "Mutated";
   assert.equal(aetherPatch.name, "Init", "saving a preset should clone the patch payload");
+  const mixedEraPreset = runner.previewNormalizeAetherPreset({
+    id: "mixed-era-aether",
+    name: "Mixed Era Aether",
+    patch: {
+      ...aetherPatch,
+      name: "Mixed Era Aether",
+      parameters: {
+        ...aetherPatch.parameters,
+        "osc.a.wavetable": "user.modern",
+        "osc.b.enabled": true,
+        "osc.b.wavetable": "user.legacy-only",
+      },
+      metadata: {
+        ...aetherPatch.metadata,
+        wavemaps: {
+          "user.modern": {
+            schemaVersion: 1,
+            id: "user.modern",
+            name: "Modern Current",
+            kind: "harmonic-sketch",
+            interpolation: "linear",
+            morph: 0.12,
+            source: { kind: "generated", label: "Modern wavemap" },
+            frames: [{ brightness: 0.42, even: 0.2, fold: 0.12, formant: 0.22, notch: 0.1, skew: 0.1, tilt: 0.2, focus: 0.4, phase: 0.1 }],
+          },
+        },
+        customWavetables: {
+          "user.modern": {
+            name: "Stale Legacy",
+            frames: [{ brightness: 0.01, formant: 0.02 }],
+          },
+          "user.legacy-only": {
+            name: "Legacy Only",
+            kind: "resynthesized",
+            interpolation: "smooth",
+            morph: 0.77,
+            source: { kind: "imported-audio", label: "Legacy File", path: "/tmp/legacy.wav" },
+            frames: [{ brightness: 0.82, even: 0.21, fold: 0.17, formant: 0.69, notch: 0.27, skew: -0.42, tilt: -0.19, focus: 0.58, phase: -0.31, partials: [0.9, 0.7, 0.5] }],
+          },
+        },
+      },
+    },
+    updatedAt: 225,
+  });
+  const loadedMixedEraPreset = runner.previewLoadAetherPreset(mixedEraPreset, { preserveName: "Bound Instrument" });
+  assert.equal(loadedMixedEraPreset.selectedPresetId, "user:mixed-era-aether", "loading user preset should select that preset");
+  assert.equal(loadedMixedEraPreset.patch.name, "Bound Instrument", "loading user preset should preserve bound instrument name when requested");
+  assert.equal(loadedMixedEraPreset.patch.metadata.wavemaps["user.modern"].name, "Modern Current", "modern wavemap should win over stale legacy duplicate on load");
+  assert.equal(loadedMixedEraPreset.patch.metadata.wavemaps["user.legacy-only"].frames[0].formant, 0.69, "legacy-only wavemap should survive user preset load");
+  assert.deepEqual(
+    runner.previewDeleteAetherPreset(mixedEraPreset.id, [savedPreset.record, mixedEraPreset]),
+    { selectedPresetId: "", presets: [savedPreset.record] },
+    "Delete user preset should clear selection and remove only the deleted preset",
+  );
   const migratedPreset = runner.previewNormalizeAetherPreset({
     id: "legacy-aether",
     name: "Legacy Aether",

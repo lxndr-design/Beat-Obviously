@@ -47,7 +47,8 @@ Status legend:
    - `[x]` Add JS synth verifier coverage for mixed-era wavemap metadata migration, including legacy-only `customWavetables`, modern `wavemaps` precedence, schema/default backfill, and alias mirroring.
    - `[x]` Add backend stress coverage for native mixed-era wavemap metadata merging so legacy-only custom maps survive while modern duplicate IDs win.
    - `[x]` Add document roundtrip coverage for legacy-only wavemap metadata preservation and dirty fingerprint sensitivity.
-   - `[ ]` Add browser smoke for preset save/load/delete flows.
+   - `[x]` Add frontend interaction smoke for Aether preset Save As/load/delete/Restore Init flows, including mixed-era wavemap user preset loading.
+   - `[ ]` Add true browser smoke for preset save/load/delete flows.
 
 ## DAW Editing
 
