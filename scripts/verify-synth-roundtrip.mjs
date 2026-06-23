@@ -1020,6 +1020,29 @@ try {
   assert.equal(manualSelection.sourceStartSample, 1024);
   assert.equal(manualSelection.sourceEndSample, 2048);
   assert.equal(manualSelection.samples.length, 1024);
+  const normalizedManualRange = synthStore.normalizeWavemapManualRange(75, 25);
+  assert.deepEqual(
+    normalizedManualRange,
+    { startRatio: 0.25, endRatio: 0.75, startPercent: 25, endPercent: 75 },
+    "manual wavemap range should sort UI percentages into stable ratios",
+  );
+  const clampedManualRange = synthStore.normalizeWavemapManualRange(-10, 160);
+  assert.deepEqual(
+    clampedManualRange,
+    { startRatio: 0, endRatio: 1, startPercent: 0, endPercent: 100 },
+    "manual wavemap range should clamp UI percentages to the audio extent",
+  );
+  const minimumManualRange = synthStore.normalizeWavemapManualRange(42, 42);
+  assert.equal(minimumManualRange.startPercent, 42, "manual wavemap range should preserve the requested start when possible");
+  assert.equal(minimumManualRange.endPercent, 43, "manual wavemap range should enforce a visible minimum span");
+  const swappedManualSelection = synthStore.selectWavemapAudioWindow(selectionSamples, {
+    mode: "manual",
+    startRatio: normalizedManualRange.startRatio,
+    endRatio: normalizedManualRange.endRatio,
+  });
+  assert.equal(swappedManualSelection.sourceStartSample, 1024);
+  assert.equal(swappedManualSelection.sourceEndSample, 3072);
+  assert.equal(swappedManualSelection.samples.length, 2048);
   const transientWavemap = synthStore.createWavemapFromAudioSamples(
     "user.resynth.transient.verify",
     "Transient Resynth",

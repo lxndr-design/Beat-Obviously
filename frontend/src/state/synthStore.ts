@@ -47,6 +47,13 @@ export interface WavemapAudioSelection {
   rms: number;
 }
 
+export interface WavemapManualRange {
+  startRatio: number;
+  endRatio: number;
+  startPercent: number;
+  endPercent: number;
+}
+
 export type OscillatorKey = "a" | "b";
 export type OscillatorParamSuffix =
   | "enabled"
@@ -366,6 +373,21 @@ export function selectWavemapAudioWindow(
     sourceEndSample: bounded.end,
     peakSample: peak,
     rms: Math.sqrt(sumSquares / Math.max(1, selected.length)),
+  };
+}
+
+export function normalizeWavemapManualRange(startPercent: number, endPercent: number): WavemapManualRange {
+  const start = sanitize01(startPercent / 100, 0);
+  const end = sanitize01(endPercent / 100, 1);
+  const low = Math.min(start, end);
+  const high = Math.max(start, end);
+  const safeHigh = Math.min(1, Math.max(high, low + 0.01));
+  const safeLow = Math.max(0, Math.min(low, safeHigh - 0.01));
+  return {
+    startRatio: safeLow,
+    endRatio: safeHigh,
+    startPercent: Math.round(safeLow * 100),
+    endPercent: Math.round(safeHigh * 100),
   };
 }
 

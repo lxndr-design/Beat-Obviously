@@ -2,7 +2,7 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { importAudioFile } from "../../../audio/audioImport";
 import { renderAetherOutputPreviewSamples } from "../../../audio/synthPreview";
 import { resynthesizeAudioFileToWavemap } from "../../../audio/wavemapResynthesis";
-import { appAlert, Button, HoverInfo, Icon, Knob } from "../../../solid-ui";
+import { appAlert, Button, HoverInfo, Icon, Knob, NumberInput } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import type { CustomWavetableFrame, WavemapDefinition, WavetableWarpMode } from "../../../state/types";
 import {
@@ -18,6 +18,7 @@ import {
   getNumberParam,
   getStringParam,
   modulationSummaryForTarget,
+  normalizeWavemapManualRange,
   normalizeWavemapFrames,
   smoothHarmonicPartials,
   synthDraftToPreviewInstrument,
@@ -71,6 +72,7 @@ const RESYNTHESIS_MODE_OPTIONS: Array<{ value: WavemapAudioSelectionMode; label:
   { value: "full", label: "Full" },
   { value: "transient", label: "Transient" },
   { value: "sustain", label: "Sustain" },
+  { value: "manual", label: "Manual" },
 ];
 
 export function OscillatorPanel() {
@@ -178,6 +180,8 @@ function OscillatorRow(props: {
   const updateWavemapMetadata = useSynthStore.getState().updateWavemapMetadata;
   const [resynthesizing, setResynthesizing] = createSignal(false);
   const [resynthesisMode, setResynthesisMode] = createSignal<WavemapAudioSelectionMode>("full");
+  const [manualStartPercent, setManualStartPercent] = createSignal(0);
+  const [manualEndPercent, setManualEndPercent] = createSignal(100);
   const enabledId = createMemo(() => oscParam(props.oscillator, "enabled"));
   const enabled = createMemo(() => getBooleanParam(draft(), enabledId()));
   const wavetableId = createMemo(() => oscParam(props.oscillator, "wavetable"));
@@ -189,6 +193,7 @@ function OscillatorRow(props: {
   });
   const customTableId = createMemo(() => selectedWavetable().startsWith("user.") ? selectedWavetable() : DEFAULT_CUSTOM_WAVETABLE_ID);
   const customTable = createMemo(() => draft().metadata.wavemaps?.[customTableId()] ?? draft().metadata.customWavetables?.[customTableId()] ?? createDefaultCustomWavetable(customTableId()));
+  const manualRange = createMemo(() => normalizeWavemapManualRange(manualStartPercent(), manualEndPercent()));
   const label = createMemo(() => `Oscillator ${props.oscillator.toUpperCase()}`);
   const waveform = createMemo(() => renderAetherOutputPreviewSamples(props.previewInstrument, 160, props.oscillator));
 
@@ -198,8 +203,10 @@ function OscillatorRow(props: {
     try {
       const audioFile = await importAudioFile();
       if (!audioFile) return;
+      const range = manualRange();
       const wavemap = await resynthesizeAudioFileToWavemap(audioFile, customTableId(), undefined, {
         mode: resynthesisMode(),
+        ...(resynthesisMode() === "manual" ? { startRatio: range.startRatio, endRatio: range.endRatio } : {}),
       });
       setWavemap(wavemap);
       setParameter(wavetableId(), wavemap.id as WavetableId);
@@ -301,6 +308,43 @@ function OscillatorRow(props: {
                         )}
                       </For>
                     </div>
+                    <Show when={resynthesisMode() === "manual"}>
+                      <div class={styles.manualRangeControl} aria-label="Manual audio resynthesis range">
+                        <div class={styles.manualRangeStrip} aria-hidden="true">
+                          <span
+                            style={{
+                              left: `${manualRange().startPercent}%`,
+                              width: `${Math.max(1, manualRange().endPercent - manualRange().startPercent)}%`,
+                            }}
+                          />
+                        </div>
+                        <NumberInput
+                          label="Start"
+                          value={manualStartPercent()}
+                          min={0}
+                          max={100}
+                          step={1}
+                          unit="%"
+                          layout="inline"
+                          commitOnChange
+                          onChange={setManualStartPercent}
+                        />
+                        <NumberInput
+                          label="End"
+                          value={manualEndPercent()}
+                          min={0}
+                          max={100}
+                          step={1}
+                          unit="%"
+                          layout="inline"
+                          commitOnChange
+                          onChange={setManualEndPercent}
+                        />
+                        <span class={styles.manualRangeReadout}>
+                          {manualRange().startPercent}-{manualRange().endPercent}%
+                        </span>
+                      </div>
+                    </Show>
                     <Button
                       size="xs"
                       disabled={resynthesizing()}

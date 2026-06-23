@@ -44,9 +44,9 @@ Status legend:
   - Remaining: richer draw modes beyond the current mini-waveform/partial lanes, clearer frame editing constraints, and intentional tools for additive-vs-freehand editing.
   - Proof: browser preview differences, native table generation differences, patch persistence, verifier snapshots, and backend stress for cache identity.
 - `[~]` Richer FFT/resynthesis analysis.
-  - Done: deterministic browser/native source provenance fields, deterministic full/transient/sustain/manual imported-audio selection windows, Solid import mode controls, native IPC selection support, absolute source-range frame metadata, and per-frame RMS/peak/zero-cross/roughness/asymmetry/centroid/dominant-harmonic analysis metadata.
-  - Remaining: visual/manual range picker polish and deeper analysis display controls.
-  - Proof: deterministic fixture import that produces stable frame metadata and audible/rendered differences.
+  - Done: deterministic browser/native source provenance fields, deterministic full/transient/sustain/manual imported-audio selection windows, native IPC selection support, absolute source-range frame metadata, per-frame RMS/peak/zero-cross/roughness/asymmetry/centroid/dominant-harmonic analysis metadata, Solid import mode controls, and visible manual range picker controls for imported audio.
+  - Remaining: deeper analysis display controls.
+  - Proof: deterministic fixture import that produces stable frame metadata and audible/rendered differences; synth verifier covers manual range normalization/clamping and selected sample windows; browser smoke verified Manual mode shows Start/End controls, updates the `20-65%` range readout, and moves the visual range strip to the same span.
 - `[~]` Wavemap preset/version migration.
   - Done: JS synth verifier covers mixed-era wavemap metadata migration, including legacy-only `customWavetables`, modern `wavemaps` precedence for duplicate IDs, schema/default backfill, source sanitization, frame completion, and alias mirroring; native synth-contract stress covers the same mixed-era old/current map merge for Aether oscillator custom frames; document roundtrip verifier preserves legacy-only wavemap metadata and oscillator references in saved `.beat` instruments; true browser smoke loads and deletes an older mixed-era preset record exposed through the preset dropdown.
   - Remaining: none for current wavemap preset migration coverage; keep adding fixtures when the preset schema changes.

@@ -195,6 +195,43 @@
   min-width: 0;
 }
 
+.manualRangeControl {
+  display: inline-grid;
+  grid-template-columns: 72px 104px 104px auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.manualRangeStrip {
+  position: relative;
+  width: 72px;
+  height: 10px;
+  border: var(--border-fg);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--color-fg) 10%, transparent), transparent 48%),
+    var(--color-bg);
+  overflow: hidden;
+}
+
+.manualRangeStrip span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background:
+    radial-gradient(circle at 20% 40%, color-mix(in srgb, var(--color-fg) 32%, transparent), transparent 56%),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-fg) 48%, transparent), color-mix(in srgb, var(--color-fg) 20%, transparent));
+}
+
+.manualRangeReadout {
+  min-width: 42px;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-hint);
+  line-height: 1;
+  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+  white-space: nowrap;
+}
+
 .customFrames {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
