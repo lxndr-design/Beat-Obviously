@@ -1,9 +1,15 @@
 import type { DecentSamplerUiControl } from "../ipc/schema";
+import { db } from "../persistence/dexie";
+import { createDefaultSynthDraft, synthDraftToInstrumentPatch, useSynthStore, type SynthDraftPatch } from "../state/synthStore";
+import type { SynthPresetRecord } from "../state/synthPresets";
 import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useUiStore } from "../state/store";
 import type { PluginAdapter } from "../state/types";
 import { compileNodeGraphToInstrumentPatch, createDefaultInstrumentNodeGraph } from "../features/NodeInstrumentEditor/nodeGraph";
 
 type DevDecentSamplerFixture = "lorenzo" | "wide";
+
+const DEV_MIXED_ERA_AETHER_PRESET_ID = "dev-mixed-era-aether";
+const DEV_MIXED_ERA_AETHER_INSTRUMENT_ID = "dev-mixed-era-aether-host";
 
 declare global {
   interface Window {
@@ -14,6 +20,22 @@ declare global {
       };
       installNodeInstrumentFixture: () => {
         instrumentId: string;
+      };
+      installMixedEraAetherPresetFixture: () => Promise<{
+        presetId: string;
+        instrumentId: string;
+      }>;
+      readMixedEraAetherPresetFixtureState: () => {
+        name: string;
+        selectedOscA: string;
+        selectedOscB: string;
+        modernName: string | null;
+        modernFormant: number | null;
+        legacyOnlyName: string | null;
+        legacyOnlyKind: string | null;
+        legacyOnlyFormant: number | null;
+        legacyOnlyPartials: number;
+        legacyAliasMatches: boolean;
       };
     };
   }
@@ -147,10 +169,59 @@ export function installBeatDevHooks() {
     return { instrumentId: nextInstrumentId };
   };
 
+  const installMixedEraAetherPresetFixture = async () => {
+    const instrumentStore = useInstrumentStore.getState();
+    const existingInstrument = instrumentStore.instruments.find((instrument) => instrument.id === DEV_MIXED_ERA_AETHER_INSTRUMENT_ID);
+    if (existingInstrument?.userCreated) instrumentStore.removeInstrument(existingInstrument.id);
+    await db.synthPresets.delete(DEV_MIXED_ERA_AETHER_PRESET_ID);
+    await db.synthPresets.put(createMixedEraAetherPresetFixture() as unknown as SynthPresetRecord);
+
+    const hostDraft = createDefaultSynthDraft();
+    const hostPatch: SynthDraftPatch = {
+      ...hostDraft,
+      name: "Mixed Era Browser Host",
+      metadata: {
+        ...hostDraft.metadata,
+        tags: [...new Set([...hostDraft.metadata.tags, "dev", "mixed-era"])],
+      },
+    };
+    const nextInstrumentId = instrumentStore.addInstrument({
+      ...synthDraftToInstrumentPatch(hostPatch),
+      id: DEV_MIXED_ERA_AETHER_INSTRUMENT_ID,
+      name: hostPatch.name,
+      userCreated: true,
+    });
+    useSynthStore.getState().bindInstrument(nextInstrumentId);
+    useSynthStore.getState().setDraft(hostPatch);
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
+    return { presetId: DEV_MIXED_ERA_AETHER_PRESET_ID, instrumentId: nextInstrumentId };
+  };
+
+  const readMixedEraAetherPresetFixtureState = () => {
+    const draft = useSynthStore.getState().draft;
+    const modern = draft.metadata.wavemaps?.["user.modern"] ?? null;
+    const legacyOnly = draft.metadata.wavemaps?.["user.legacy-only"] ?? null;
+    const legacyOnlyAlias = draft.metadata.customWavetables?.["user.legacy-only"] ?? null;
+    return {
+      name: draft.name,
+      selectedOscA: String(draft.parameters["osc.a.wavetable"] ?? ""),
+      selectedOscB: String(draft.parameters["osc.b.wavetable"] ?? ""),
+      modernName: modern?.name ?? null,
+      modernFormant: modern?.frames?.[0]?.formant ?? null,
+      legacyOnlyName: legacyOnly?.name ?? null,
+      legacyOnlyKind: legacyOnly?.kind ?? null,
+      legacyOnlyFormant: legacyOnly?.frames?.[0]?.formant ?? null,
+      legacyOnlyPartials: legacyOnly?.frames?.[0]?.partials?.length ?? 0,
+      legacyAliasMatches: JSON.stringify(legacyOnly) === JSON.stringify(legacyOnlyAlias),
+    };
+  };
+
   window.__beatTestHooks = {
     ...(window.__beatTestHooks ?? {}),
     installDecentSamplerFixture,
     installNodeInstrumentFixture,
+    installMixedEraAetherPresetFixture,
+    readMixedEraAetherPresetFixtureState,
   };
 
   document.addEventListener("beat:install-decent-sampler-fixture", (event) => {
@@ -167,7 +238,66 @@ export function installBeatDevHooks() {
     window.setTimeout(() => {
       installNodeInstrumentFixture();
     }, 0);
+  } else if (fixture === "aether-mixed-preset") {
+    window.setTimeout(() => {
+      void installMixedEraAetherPresetFixture();
+    }, 0);
   }
+}
+
+function createMixedEraAetherPresetFixture() {
+  const draft = createDefaultSynthDraft();
+  return {
+    id: DEV_MIXED_ERA_AETHER_PRESET_ID,
+    name: "Mixed Era Browser Aether",
+    patch: {
+      ...draft,
+      name: "Mixed Era Browser Aether",
+      parameters: {
+        ...draft.parameters,
+        "osc.a.wavetable": "user.modern",
+        "osc.b.enabled": true,
+        "osc.b.wavetable": "user.legacy-only",
+        "osc.b.level": 0.46,
+      },
+      metadata: {
+        ...draft.metadata,
+        tags: ["legacy", "mixed-era", "browser-smoke"],
+        wavemaps: {
+          "user.modern": {
+            schemaVersion: 1,
+            id: "user.modern",
+            name: "Modern Current",
+            kind: "harmonic-sketch",
+            interpolation: "linear",
+            morph: 0.12,
+            source: { kind: "generated", label: "Modern wavemap" },
+            frames: [
+              { brightness: 0.42, even: 0.2, fold: 0.12, formant: 0.22, notch: 0.1, skew: 0.1, tilt: 0.2, focus: 0.4, phase: 0.1 },
+            ],
+          },
+        },
+        customWavetables: {
+          "user.modern": {
+            name: "Stale Legacy",
+            frames: [{ brightness: 0.01, formant: 0.02 }],
+          },
+          "user.legacy-only": {
+            name: "Legacy Only",
+            kind: "resynthesized",
+            interpolation: "smooth",
+            morph: 0.77,
+            source: { kind: "imported-audio", label: "Legacy File", path: "/tmp/legacy.wav" },
+            frames: [
+              { brightness: 0.82, even: 0.21, fold: 0.17, formant: 0.69, notch: 0.27, skew: -0.42, tilt: -0.19, focus: 0.58, phase: -0.31, partials: [0.9, 0.7, 0.5] },
+            ],
+          },
+        },
+      },
+    },
+    tags: ["legacy", "mixed-era"],
+    updatedAt: 1_700_000_225_000,
+  };
 }
 
 function sampleZone(name: string, note: number) {

@@ -50,7 +50,7 @@ Status legend:
    - `[x]` Add frontend interaction smoke for Aether preset Save As/load/delete/Restore Init flows, including mixed-era wavemap user preset loading.
    - `[x]` Add true browser smoke for current Aether preset Save As/load/delete flows.
    - `[x]` Add true browser smoke for current Aether FX preset save/load/delete flows.
-   - `[ ]` Add true browser smoke for older/mixed-era wavemap preset records exposed through the UI.
+   - `[x]` Add true browser smoke for older/mixed-era wavemap preset records exposed through the UI.
 
 ## DAW Editing
 

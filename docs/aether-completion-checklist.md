@@ -48,9 +48,9 @@ Status legend:
   - Remaining: visual/manual range picker polish and deeper analysis display controls.
   - Proof: deterministic fixture import that produces stable frame metadata and audible/rendered differences.
 - `[~]` Wavemap preset/version migration.
-  - Done: JS synth verifier covers mixed-era wavemap metadata migration, including legacy-only `customWavetables`, modern `wavemaps` precedence for duplicate IDs, schema/default backfill, source sanitization, frame completion, and alias mirroring; native synth-contract stress covers the same mixed-era old/current map merge for Aether oscillator custom frames; document roundtrip verifier preserves legacy-only wavemap metadata and oscillator references in saved `.beat` instruments.
-  - Remaining: browser preset-flow smoke once older preset fixtures are exposed in the UI.
-  - Proof: JS synth verifier covers mixed-era old/current wavemap shape normalization; `BeatBackendStress` covers native old/current map merge and current repository roundtrip for Aether wavemap frame controls; document verifier covers legacy-only wavemap preservation and dirty fingerprint sensitivity.
+  - Done: JS synth verifier covers mixed-era wavemap metadata migration, including legacy-only `customWavetables`, modern `wavemaps` precedence for duplicate IDs, schema/default backfill, source sanitization, frame completion, and alias mirroring; native synth-contract stress covers the same mixed-era old/current map merge for Aether oscillator custom frames; document roundtrip verifier preserves legacy-only wavemap metadata and oscillator references in saved `.beat` instruments; true browser smoke loads and deletes an older mixed-era preset record exposed through the preset dropdown.
+  - Remaining: none for current wavemap preset migration coverage; keep adding fixtures when the preset schema changes.
+  - Proof: JS synth verifier covers mixed-era old/current wavemap shape normalization; `BeatBackendStress` covers native old/current map merge and current repository roundtrip for Aether wavemap frame controls; document verifier covers legacy-only wavemap preservation and dirty fingerprint sensitivity; browser smoke verified the mixed-era preset selected `user.modern`, rendered the modern duplicate instead of stale legacy data, preserved the legacy-only `user.legacy-only` Oscillator B wavemap, and removed the preset after Delete.
 
 ## 4. Envelopes, LFOs, And Performance Controls
 
@@ -72,7 +72,7 @@ Status legend:
   - Proof: synth roundtrip verifier, frontend interaction verifier for preset state transitions, true browser smoke for current instrument preset Save As/load/delete controls, true browser smoke for current FX preset save/load/delete controls, plus existing live/export parity stress for a patch with instrument FX and track FX.
 - `[ ]` Named Aether effect/instrument preset library.
   - Done: schema-versioned local instrument preset records, schema-versioned local instrument-effect chain presets, legacy record normalization, explicit Save As preset, user preset load/delete, Restore Init action, and FX preset save/load/delete.
-  - Remaining: fuller true browser coverage for older/mixed-era instrument and FX preset fixtures.
+  - Remaining: fuller true browser coverage for older/mixed-era FX preset fixtures.
   - Proof: synth verifier covers schema creation/migration; frontend interaction verifier covers Save As/load/delete/Restore Init state transitions, including mixed-era wavemap user preset loading; document roundtrip verifier covers preset-grade Aether synth patches, macro routes, custom wavemap analysis metadata, and instrument-owned FX; backend stress covers native repository roundtrip for Aether oscillator/sub/noise config, wavemap frame controls/partials, macro values/routes, Env 2, and instrument-owned FX.
 - `[ ]` Aether FX preset/version migration.
   - Proof: synth and interaction verifiers cover legacy effect-default normalization; document roundtrip verifier and backend stress cover current instrument-owned FX chains.
@@ -98,8 +98,8 @@ Status legend:
 - `[ ]` Null-test style live/offline comparisons where deterministic output is expected.
 - `[ ]` Browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, and note automation lanes.
 - `[~]` Preset migration fixtures once Aether preset storage is formalized.
-  - Done: JS synth verifier covers mixed-era wavemap metadata migration and legacy Aether/FX preset record normalization; backend stress covers native mixed-era wavemap map merging; document verifier covers legacy-only wavemap metadata preservation; frontend interaction verifier covers mixed-era wavemap user preset load/delete flow; true browser smoke covers current Aether instrument preset Save As/load/delete.
-  - Remaining: true browser-level preset-flow smoke for older wavemap preset records.
+  - Done: JS synth verifier covers mixed-era wavemap metadata migration and legacy Aether/FX preset record normalization; backend stress covers native mixed-era wavemap map merging; document verifier covers legacy-only wavemap metadata preservation; frontend interaction verifier covers mixed-era wavemap user preset load/delete flow; true browser smoke covers current Aether instrument preset Save As/load/delete; true browser smoke covers older mixed-era wavemap preset load/delete through the preset dropdown.
+  - Remaining: true browser-level preset-flow smoke for older FX preset records.
 
 ## Near-Term Slice Order
 
