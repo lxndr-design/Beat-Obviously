@@ -11341,6 +11341,66 @@ namespace
         return rightEnergy > leftEnergy * 8.0;
     }
 
+    bool stressInstrumentVoiceLiveBaselineVsNoteAutomation()
+    {
+        beat::InstrumentVoice::Params params;
+        params.waveform = 0;
+        params.cutoff01 = 1.0f;
+        params.ampLevel = 1.0f;
+        params.ampPan = 0.0f;
+        params.attackMs = 1.0f;
+        params.releaseMs = 5.0f;
+
+        beat::InstrumentVoice voice;
+        voice.prepare(48000.0, 256);
+        voice.setParams(params);
+
+        const auto renderPanBalance = [&voice]()
+        {
+            juce::AudioBuffer<float> buffer(2, 512);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+
+            double leftEnergy = 0.0;
+            double rightEnergy = 0.0;
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+            {
+                leftEnergy += (double) buffer.getSample(0, i) * (double) buffer.getSample(0, i);
+                rightEnergy += (double) buffer.getSample(1, i) * (double) buffer.getSample(1, i);
+            }
+            return std::pair<double, double> { leftEnergy, rightEnergy };
+        };
+
+        voice.startNote(60, 1.0f, nullptr, 0);
+        if (!voice.applyRealtimeParameter("amp.pan", 1.0f, 0))
+            return false;
+
+        const auto liveRight = renderPanBalance();
+        if (liveRight.second <= liveRight.first * 8.0)
+            return false;
+
+        voice.stopNote(0.0f, false);
+
+        std::array<beat::VoiceNoteAutomation::Context, beat::VoiceNoteAutomation::maxPendingContexts> contexts {};
+        contexts[0].midiNoteNumber = 60;
+        contexts[0].eventCount = 1;
+        contexts[0].events[0] = beat::makeRealtimeParameterChange(std::string_view {}, "amp.pan", -1.0f, 0, 0);
+
+        beat::VoiceAutomationInbox::setPending(contexts.data(), 1);
+        voice.startNote(60, 1.0f, nullptr, 0);
+        beat::VoiceAutomationInbox::clearPending();
+
+        const auto noteLocalLeft = renderPanBalance();
+        if (noteLocalLeft.first <= noteLocalLeft.second * 8.0)
+            return false;
+
+        voice.stopNote(0.0f, false);
+        voice.startNote(60, 1.0f, nullptr, 0);
+
+        const auto restoredLiveRight = renderPanBalance();
+        return restoredLiveRight.second > restoredLiveRight.first * 8.0;
+    }
+
     bool stressInstrumentVoicePerNoteAutomation()
     {
         beat::InstrumentVoice::Params params;
@@ -11684,6 +11744,11 @@ int main()
     if (!stressInstrumentVoiceRealtimeRampOverride())
     {
         std::cerr << "Instrument voice realtime ramp override stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceLiveBaselineVsNoteAutomation())
+    {
+        std::cerr << "Instrument voice live baseline vs note automation stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoicePerNoteAutomation())
