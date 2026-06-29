@@ -26,6 +26,7 @@ import {
   macroConflictDetailsForId,
   macroConflictSummaryForId,
   macroDefinitionForId,
+  macroLaneStateForId,
   macroOutputValue,
   modulationSummaryForSource,
   modulationSummaryForTarget,
@@ -575,12 +576,22 @@ export function SynthEditor(props: SynthEditorProps) {
                   const assignments = () => macroAssignmentsForId(draft(), id);
                   const conflict = () => macroConflictSummaryForId(draft(), id);
                   const conflictDetails = () => macroConflictDetailsForId(draft(), id);
+                  const macroLane = () => macroLaneStateForId(draft(), id);
                   const assignmentLabel = () => assignments().length === 0
                     ? "No assignments"
                     : assignments()
                         .slice(0, 2)
                         .map((route) => MODULATION_TARGET_LABELS[route.target] ?? route.target)
                         .join(", ");
+                  const macroLaneStyle = () => {
+                    const lane = macroLane();
+                    const start = Math.round(lane.rangeStart * 100);
+                    const end = Math.round(lane.rangeEnd * 100);
+                    const left = Math.min(start, end);
+                    const width = Math.max(1, Math.abs(end - start));
+                    return `--macro-range-left:${left}%; --macro-range-width:${width}%; --macro-output:${Math.round(lane.outputValue * 100)}%;`;
+                  };
+                  const macroLaneTargets = () => macroLane().targetLabels.slice(0, 2).join(", ") || "No routed targets";
                   return (
                     <div class={styles.macroCard}>
                       <TextInput
@@ -602,6 +613,17 @@ export function SynthEditor(props: SynthEditorProps) {
                         formatValue={formatPercent}
                         onChange={(value) => setNumericParameter(id, value)}
                       />
+                      <div class={styles.macroLane} style={macroLaneStyle()} aria-label={`${definition().label} macro lane`}>
+                        <div class={styles.macroLaneTrack} aria-hidden="true">
+                          <span class={styles.macroLaneRange} />
+                          <span class={styles.macroLaneOutput} />
+                        </div>
+                        <div class={styles.macroLaneMeta}>
+                          <span>{Math.round(macroLane().rangeStart * 100)}-{Math.round(macroLane().rangeEnd * 100)}%</span>
+                          <span>{macroLane().curve}</span>
+                          <span>{macroLaneTargets()}</span>
+                        </div>
+                      </div>
                       <div class={styles.macroAssignment} title={assignmentLabel()}>
                         <span>{assignmentLabel()}</span>
                         <Show when={assignments().length > 2}>

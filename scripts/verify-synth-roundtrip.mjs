@@ -159,6 +159,21 @@ try {
   assert.equal(Math.abs(synthStore.macroOutputValue(draft, "macro.1") - 0.35) < 0.000001, true);
   assert.equal(synthStore.modulationSourceLabel(draft, "macro.1"), "Brightness");
   assert.equal(synthStore.macroAssignmentsForId(draft, "macro.1").length, 1);
+  const macroLaneState = synthStore.macroLaneStateForId(draft, "macro.1");
+  assert.deepEqual({
+    ...macroLaneState,
+    outputValue: Number(macroLaneState.outputValue.toFixed(6)),
+  }, {
+    id: "macro.1",
+    label: "Brightness",
+    rawValue: 0.5,
+    outputValue: 0.35,
+    rangeStart: 0.2,
+    rangeEnd: 0.8,
+    curve: "ease-in",
+    assignmentCount: 1,
+    targetLabels: ["Filter Cutoff"],
+  });
   assert.deepEqual(synthStore.macroConflictSummaryForId(draft, "macro.1"), {
     count: 1,
     label: "Filter Cutoff with Amp Env",

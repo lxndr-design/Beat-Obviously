@@ -1148,6 +1148,35 @@ export function macroAssignmentsForId(draft: SynthDraftPatch, id: MacroId): Synt
   return draft.modulation.filter((route) => route.enabled && route.source === id);
 }
 
+export interface SynthMacroLaneState {
+  id: MacroId;
+  label: string;
+  rawValue: number;
+  outputValue: number;
+  rangeStart: number;
+  rangeEnd: number;
+  curve: MacroCurve;
+  assignmentCount: number;
+  targetLabels: string[];
+}
+
+export function macroLaneStateForId(draft: SynthDraftPatch, id: MacroId): SynthMacroLaneState {
+  const definition = macroDefinitionForId(draft, id);
+  const assignments = macroAssignmentsForId(draft, id);
+  const rawValue = clamp01(getNumberParam(draft, id));
+  return {
+    id,
+    label: definition.label,
+    rawValue,
+    outputValue: macroOutputValue(draft, id),
+    rangeStart: definition.min,
+    rangeEnd: definition.max,
+    curve: definition.curve,
+    assignmentCount: assignments.length,
+    targetLabels: assignments.map((route) => MODULATION_TARGET_LABELS[route.target] ?? route.target),
+  };
+}
+
 export interface SynthMacroConflictSummary {
   count: number;
   label: string;

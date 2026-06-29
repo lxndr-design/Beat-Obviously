@@ -327,6 +327,61 @@ section.shell {
   white-space: nowrap;
 }
 
+.macroLane {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.macroLaneTrack {
+  position: relative;
+  height: 9px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-fg) 10%, transparent);
+}
+
+.macroLaneRange {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--macro-range-left, 0%);
+  width: var(--macro-range-width, 100%);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-fg) 18%, transparent),
+      color-mix(in srgb, var(--color-fg) 30%, transparent)
+    );
+}
+
+.macroLaneOutput {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: var(--macro-output, 0%);
+  width: 2px;
+  background: var(--color-fg);
+  transform: translateX(-1px);
+}
+
+.macroLaneMeta {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 4px;
+  min-width: 0;
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.macroLaneMeta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .macroConflict {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
