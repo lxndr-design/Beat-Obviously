@@ -190,6 +190,14 @@ export interface SynthModulationSummary {
   label: string;
 }
 
+export interface SynthModulationRouteDisplay {
+  sourceLabel: string;
+  targetLabel: string;
+  amountLabel: string;
+  rangeLabel: string;
+  stateLabel: "Active" | "Off";
+}
+
 export interface SynthDraftPatch {
   schemaVersion: typeof SYNTH_PATCH_SCHEMA_VERSION;
   instrumentType: typeof SYNTH_INSTRUMENT_TYPE;
@@ -1253,6 +1261,16 @@ export function modulationSummaryForSource(draft: SynthDraftPatch, source: Modul
   );
 }
 
+export function modulationRouteDisplay(draft: SynthDraftPatch, route: SynthModulationRoute): SynthModulationRouteDisplay {
+  return {
+    sourceLabel: modulationSourceLabel(draft, route.source),
+    targetLabel: MODULATION_TARGET_LABELS[route.target] ?? route.target,
+    amountLabel: formatSignedModAmount(route.amount),
+    rangeLabel: formatRouteTargetRange(route.target, route.amount),
+    stateLabel: route.enabled ? "Active" : "Off",
+  };
+}
+
 export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Instrument> {
   const wavetable = wavetableFromDraft(draft, "a");
   const oscA = oscillatorFromDraft(draft, "a", wavetable);
@@ -1372,6 +1390,21 @@ function formatSignedModAmount(amount: number): string {
   const clamped = clampBipolar(amount);
   const sign = clamped >= 0 ? "+" : "";
   return `${sign}${Math.round(clamped * 100)}`;
+}
+
+function formatRouteTargetRange(target: ModulationTargetId, amount: number): string {
+  const clamped = clampBipolar(amount);
+  const sign = clamped >= 0 ? "+" : "";
+  if (target.endsWith(".fine") || target === "unison.detune") {
+    return `${sign}${Math.round(clamped * 100)} ct`;
+  }
+  if (target === "filter.cutoff") {
+    return `${sign}${Math.round(clamped * 35)}% cutoff`;
+  }
+  if (target.endsWith(".pan") || target === "unison.spread") {
+    return `${sign}${Math.round(clamped * 100)}%`;
+  }
+  return `${sign}${Math.round(clamped * 100)}%`;
 }
 
 export function synthDraftToPreviewInstrument(draft: SynthDraftPatch): Instrument {

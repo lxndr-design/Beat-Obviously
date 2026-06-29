@@ -5,6 +5,7 @@ import { createStoreSelector } from "../../../solid-utils/store";
 import {
   MODULATION_SOURCE_LABELS,
   MODULATION_TARGET_LABELS,
+  modulationRouteDisplay,
   useSynthStore,
   type ModulationSourceId,
   type ModulationTargetId,
@@ -35,6 +36,7 @@ type PickMode = {
 };
 
 export function ModulationMatrix() {
+  const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const routes = createStoreSelector(useSynthStore, (state) => state.draft.modulation);
   const updateRoute = useSynthStore.getState().updateModulationRoute;
   const addRoute = useSynthStore.getState().addModulationRoute;
@@ -132,8 +134,9 @@ export function ModulationMatrix() {
           {(route) => {
             const targets = () => targetsForSource(route.source);
             const selectedTarget = () => targets().includes(route.target) ? route.target : targets()[0];
+            const display = () => modulationRouteDisplay(draft(), route);
             return (
-              <div class={styles.routeRow}>
+              <div class={`${styles.routeRow} ${route.enabled ? "" : styles.routeRowDisabled}`}>
                 <div class={styles.onCell}>
                   <Toggle checked={route.enabled} onChange={(enabled) => updateRoute(route.id, { enabled })} />
                 </div>
@@ -197,7 +200,11 @@ export function ModulationMatrix() {
                     value={route.amount}
                     onChange={(event) => updateRoute(route.id, { amount: Number(event.currentTarget.value) })}
                   />
-                  <span>{formatStrength(route.amount)}</span>
+                  <span>
+                    <span>{display().amountLabel}</span>
+                    <span>{display().rangeLabel}</span>
+                    <span>{display().stateLabel}</span>
+                  </span>
                 </label>
                 <div class={styles.modeCell}>
                   <Show
@@ -427,11 +434,6 @@ function isModulationTarget(value: string | undefined): value is ModulationTarge
 
 function isModulationSource(value: string | undefined): value is ModulationSourceId {
   return Boolean(value && SOURCES.includes(value as ModulationSourceId));
-}
-
-function formatStrength(value: number): string {
-  const rounded = Math.round(value * 100);
-  return rounded > 0 ? `+${rounded}` : `${rounded}`;
 }
 
 function targetLabelParts(target: ModulationTargetId): { prefix: string; name: string } {

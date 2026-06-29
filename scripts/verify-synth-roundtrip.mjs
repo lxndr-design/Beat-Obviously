@@ -242,6 +242,33 @@ try {
     amount: 0.25,
     label: "Amp Level +25",
   });
+  const fineRoute = draft.modulation.find((route) => route.target === "osc.a.fine");
+  assert.ok(fineRoute, "expected fine modulation route fixture");
+  assert.deepEqual(synthStore.modulationRouteDisplay(draft, fineRoute), {
+    sourceLabel: "LFO 1",
+    targetLabel: "OSC A Fine",
+    amountLabel: "+40",
+    rangeLabel: "+40 ct",
+    stateLabel: "Active",
+  });
+  const cutoffMacroRoute = draft.modulation.find((route) => route.id === "macro_cutoff");
+  assert.ok(cutoffMacroRoute, "expected macro cutoff modulation route fixture");
+  assert.deepEqual(synthStore.modulationRouteDisplay(draft, cutoffMacroRoute), {
+    sourceLabel: "Brightness",
+    targetLabel: "Filter Cutoff",
+    amountLabel: "+12",
+    rangeLabel: "+4% cutoff",
+    stateLabel: "Active",
+  });
+  const disabledRoute = draft.modulation.find((route) => route.id === "disabled_macro");
+  assert.ok(disabledRoute, "expected disabled modulation route fixture");
+  assert.deepEqual(synthStore.modulationRouteDisplay(draft, disabledRoute), {
+    sourceLabel: "Brightness",
+    targetLabel: "Amp Level",
+    amountLabel: "-100",
+    rangeLabel: "-100%",
+    stateLabel: "Off",
+  });
   assert.ok(synthStore.FACTORY_SYNTH_PRESETS.length >= 5);
   assert.equal(
     new Set(synthStore.FACTORY_SYNTH_PRESETS.map((preset) => preset.id)).size,

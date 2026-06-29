@@ -27,9 +27,9 @@ Status legend:
   - Done: macro labels, ranges, curves, visible assignment summaries, visible macro source lanes for raw value/range/output/targets, structured macro conflict rows with target/source/summed behavior for overlapping modulation targets, browser static route math, browser live-preview parity that keeps macro routes dynamic instead of baking them into base preview values, native macro range/curve parsing, first-class voice macro state, macro route storage in dynamic targets, and `macro.1`-`macro.4` realtime/note automation with backend no-leak stress.
   - Proof: document roundtrip verifier covers macro definitions/routes inside Aether preset-grade patches; synth verifier covers macro lane state, macro conflict summary/detail detection, and browser dynamic macro-route preview semantics.
 - `[~]` Modulation matrix UX.
-  - Done: target/source selection and visible assignments.
-  - Remaining: semantic cleanup for per-target range displays, conflict clarity, disabled route states, and source-specific editing affordances.
-  - Proof: design-system/interaction verifier coverage for route add/edit/remove/disable and assignment display.
+  - Done: target/source selection, visible assignments, target-scaled range displays, and explicit disabled route state display.
+  - Remaining: source-specific editing affordances.
+  - Proof: design-system/interaction verifier coverage for route add/edit/remove/disable and assignment display; synth verifier covers target-scaled route display labels and disabled route state labels.
 - `[ ]` Automation conflict rules.
   - Define precedence for project, segment, note, live knob, and macro writes.
   - Proof: backend sequencer stress for overlapping targets and frontend editor tests for the displayed effective value.
