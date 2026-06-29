@@ -3,7 +3,7 @@ import type { SynthPresetRecord } from "./synthPresets";
 import type { Instrument } from "./types";
 
 export type AetherPresetLibrarySource = "factory" | "user-preset" | "user-instrument";
-export type AetherPresetLibrarySort = "source" | "name" | "category" | "complexity";
+export type AetherPresetLibrarySort = "source" | "name" | "category" | "complexity" | "favorite";
 
 export interface AetherPresetLibraryEntry {
   id: string;
@@ -13,6 +13,7 @@ export interface AetherPresetLibraryEntry {
   name: string;
   description: string;
   tags: string[];
+  favorite: boolean;
   routeCount: number;
   effectCount: number;
 }
@@ -20,6 +21,7 @@ export interface AetherPresetLibraryEntry {
 export interface AetherPresetLibraryFilters {
   search?: string;
   category?: string;
+  favoritesOnly?: boolean;
   sort?: AetherPresetLibrarySort;
 }
 
@@ -41,6 +43,7 @@ export function filterAetherPresetLibraryEntries(
   const searchTokens = normalizeSearch(filters.search ?? "").split(/\s+/).filter(Boolean);
   const category = normalizeSearch(filters.category ?? "");
   const filtered = entries.filter((entry) => {
+    if (filters.favoritesOnly && !entry.favorite) return false;
     if (category && normalizeSearch(entry.category) !== category) return false;
     if (searchTokens.length === 0) return true;
     const text = searchablePresetText(entry);
@@ -69,6 +72,7 @@ function factoryPresetEntry(preset: SynthFactoryPresetRecord): AetherPresetLibra
     name: preset.name,
     description: preset.description,
     tags: preset.tags.filter((tag) => tag !== "factory"),
+    favorite: false,
     routeCount: preset.patch.modulation.length,
     effectCount: preset.patch.effects?.filters.length ?? 0,
   };
@@ -86,6 +90,7 @@ function userPresetEntry(preset: SynthPresetRecord): AetherPresetLibraryEntry {
     name: preset.name,
     description: `${routeCount} routes / ${effectCount} instrument FX`,
     tags,
+    favorite: preset.favorite,
     routeCount,
     effectCount,
   };
@@ -104,6 +109,7 @@ function userInstrumentEntry(instrument: Instrument): AetherPresetLibraryEntry {
     name: instrument.name,
     description: `${routeCount} routes / ${effectCount} instrument FX`,
     tags,
+    favorite: false,
     routeCount,
     effectCount,
   };
@@ -118,6 +124,9 @@ function comparePresetEntries(a: AetherPresetLibraryEntry, b: AetherPresetLibrar
     const aComplexity = a.routeCount + a.effectCount;
     const bComplexity = b.routeCount + b.effectCount;
     return bComplexity - aComplexity || compareByName(a, b);
+  }
+  if (sort === "favorite") {
+    return Number(b.favorite) - Number(a.favorite) || sourceOrder(a.source) - sourceOrder(b.source) || compareByName(a, b);
   }
   return sourceOrder(a.source) - sourceOrder(b.source) || compareByName(a, b);
 }

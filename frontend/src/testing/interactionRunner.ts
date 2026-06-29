@@ -361,6 +361,20 @@ export function previewDeleteAetherPreset(id: string, presets: SynthPresetRecord
   };
 }
 
+export function previewToggleAetherPresetFavorite(preset: SynthPresetRecord, now = preset.updatedAt + 1) {
+  const normalized = normalizeSynthPresetRecord(preset);
+  if (!normalized) return null;
+  return createSynthPresetRecord({
+    id: normalized.id,
+    name: normalized.name,
+    patch: normalized.patch,
+    tags: normalized.tags,
+    favorite: !normalized.favorite,
+    existing: normalized,
+    now,
+  });
+}
+
 export function previewRestoreAetherInit({ preserveName }: { preserveName?: string } = {}) {
   const initPreset = FACTORY_SYNTH_PRESETS.find((preset) => preset.id === "factory.init")?.patch ?? createDefaultSynthDraft();
   return {

@@ -146,13 +146,20 @@ export function SynthEditor(props: SynthEditorProps) {
   const [presetSearch, setPresetSearch] = createSignal("");
   const [presetCategory, setPresetCategory] = createSignal("");
   const [presetSort, setPresetSort] = createSignal<AetherPresetLibrarySort>("source");
+  const [presetFavoritesOnly, setPresetFavoritesOnly] = createSignal(false);
   const presetLibraryEntries = createMemo(() => buildAetherPresetLibraryEntries(presets(), userInstrumentPresets()));
   const presetLibraryCategories = createMemo(() => aetherPresetLibraryCategories(presetLibraryEntries()));
   const visiblePresetLibraryEntries = createMemo(() => filterAetherPresetLibraryEntries(presetLibraryEntries(), {
     search: presetSearch(),
     category: presetCategory(),
+    favoritesOnly: presetFavoritesOnly(),
     sort: presetSort(),
   }));
+  const selectedUserPreset = createMemo(() => {
+    if (!selectedPresetId().startsWith(USER_PRESET_PREFIX)) return null;
+    const id = selectedPresetId().slice(USER_PRESET_PREFIX.length);
+    return presets().find((candidate) => candidate.id === id) ?? null;
+  });
   const visibleFactoryPresetEntries = createMemo(() => visiblePresetLibraryEntries().filter((entry) => entry.source === "factory"));
   const visibleUserPresetEntries = createMemo(() => visiblePresetLibraryEntries().filter((entry) => entry.source === "user-preset"));
   const visibleUserInstrumentEntries = createMemo(() => visiblePresetLibraryEntries().filter((entry) => entry.source === "user-instrument"));
@@ -175,7 +182,7 @@ export function SynthEditor(props: SynthEditorProps) {
       const preset = presets().find((candidate) => candidate.id === presetId);
       if (preset) {
         return {
-          source: "User preset",
+          source: preset.favorite ? "User preset / Favorite" : "User preset",
           name: preset.name,
           description: `${preset.patch.modulation.length} routes / ${preset.patch.effects?.filters.length ?? 0} instrument FX`,
           tags: preset.tags,
@@ -511,6 +518,15 @@ export function SynthEditor(props: SynthEditorProps) {
     setSelectedPresetId(`${USER_PRESET_PREFIX}${record.id}`);
   }
 
+  async function onTogglePresetFavorite() {
+    const preset = selectedUserPreset();
+    if (!preset) return;
+    const next = { ...preset, favorite: !preset.favorite, updatedAt: Date.now() };
+    await saveSynthPreset(next);
+    await refreshPresets();
+    setSelectedPresetId(`${USER_PRESET_PREFIX}${next.id}`);
+  }
+
   function onRestoreInitPreset() {
     didAutoBind = true;
     const initPreset = FACTORY_SYNTH_PRESETS.find((preset) => preset.id === "factory.init")?.patch ?? createDefaultSynthDraft();
@@ -632,8 +648,17 @@ export function SynthEditor(props: SynthEditorProps) {
                     <option value="name">Name</option>
                     <option value="category">Category</option>
                     <option value="complexity">Complexity</option>
+                    <option value="favorite">Favorites</option>
                   </select>
                 </label>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  selected={presetFavoritesOnly()}
+                  onClick={() => setPresetFavoritesOnly((value) => !value)}
+                >
+                  Favorites
+                </Button>
               </div>
               <div class={styles.presetRow}>
                 <label class={styles.presetSelect}>
@@ -683,6 +708,9 @@ export function SynthEditor(props: SynthEditorProps) {
                   </select>
                 </label>
                 <Show when={selectedPresetId().startsWith(USER_PRESET_PREFIX)}>
+                  <Button size="sm" variant="ghost" selected={selectedUserPreset()?.favorite === true} onClick={() => void onTogglePresetFavorite()}>
+                    {selectedUserPreset()?.favorite ? "Favorited" : "Favorite"}
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={onDeletePreset}>
                     Delete
                   </Button>

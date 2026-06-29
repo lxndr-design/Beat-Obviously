@@ -193,8 +193,9 @@ section.shell {
 
 .presetTools {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(140px, 0.42fr) minmax(126px, 0.34fr);
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 0.42fr) minmax(126px, 0.34fr) auto;
   gap: var(--synth-gap);
+  align-items: center;
   min-width: 0;
 }
 

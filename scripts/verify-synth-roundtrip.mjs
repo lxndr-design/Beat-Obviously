@@ -424,13 +424,27 @@ try {
   assert.deepEqual(userPreset.tags, ["lead", "macro"]);
   assert.equal(userPreset.createdAt, 1234);
   assert.equal(userPreset.updatedAt, 1234);
+  assert.equal(userPreset.favorite, false);
   assert.equal(userPreset.id.startsWith("preset:verifier-aether-preset:"), true);
   assert.deepEqual(userPreset.patch, draft);
   userPreset.patch.name = "Mutated Copy";
   assert.equal(draft.name, "Roundtrip Probe");
 
+  const favoritedUserPreset = synthPresets.createSynthPresetRecord({
+    id: userPreset.id,
+    name: userPreset.name,
+    patch: draft,
+    tags: userPreset.tags,
+    favorite: true,
+    existing: userPreset,
+    now: 2345,
+  });
+  assert.equal(favoritedUserPreset.favorite, true);
+  assert.equal(favoritedUserPreset.createdAt, 1234);
+  assert.equal(favoritedUserPreset.updatedAt, 2345);
+
   const presetLibraryEntries = aetherPresetLibrary.buildAetherPresetLibraryEntries(
-    [userPreset],
+    [favoritedUserPreset],
     [{
       id: "instrument-glass-user",
       name: "Saved Glass Instrument",
@@ -450,7 +464,7 @@ try {
   assert.ok(presetCategories.includes("Glass"), "user instrument tags should become searchable category facets");
   const leadPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { category: "Lead" });
   assert.ok(leadPresetResults.some((entry) => entry.id === "factory.wt-lead"), "category facets should include matching factory presets");
-  assert.ok(leadPresetResults.some((entry) => entry.id === userPreset.id), "category facets should include matching user presets");
+  assert.ok(leadPresetResults.some((entry) => entry.id === favoritedUserPreset.id), "category facets should include matching user presets");
   assert.ok(
     presetLibraryEntries.every((entry) => Number.isInteger(entry.routeCount) && Number.isInteger(entry.effectCount)),
     "preset library entries should expose sortable complexity metadata",
@@ -461,7 +475,18 @@ try {
   const macroUserPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, {
     search: "macro user preset",
   });
-  assert.deepEqual(macroUserPresetResults.map((entry) => entry.id), [userPreset.id]);
+  assert.deepEqual(macroUserPresetResults.map((entry) => entry.id), [favoritedUserPreset.id]);
+  assert.deepEqual(
+    aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { favoritesOnly: true })
+      .map((entry) => entry.id),
+    [favoritedUserPreset.id],
+    "favorites filter should return only favorited user presets",
+  );
+  assert.equal(
+    aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { sort: "favorite" })[0].id,
+    favoritedUserPreset.id,
+    "favorite sort should place favorited user presets first",
+  );
   assert.deepEqual(
     aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { search: "glass", sort: "name" })
       .map((entry) => entry.name),
@@ -486,6 +511,16 @@ try {
   assert.equal(migratedPreset.kind, "instrument");
   assert.equal(migratedPreset.createdAt, 5678);
   assert.equal(migratedPreset.updatedAt, 5678);
+  assert.equal(migratedPreset.favorite, false);
+
+  const migratedFavoritePreset = synthPresets.normalizeSynthPresetRecord({
+    id: "legacy-favorite",
+    name: "Legacy Favorite",
+    patch: draft,
+    favorite: true,
+    updatedAt: 6789,
+  });
+  assert.equal(migratedFavoritePreset.favorite, true);
 
   const fxPreset = effectPresets.createAetherEffectPresetRecord({
     name: "  Wide FX Chain  ",

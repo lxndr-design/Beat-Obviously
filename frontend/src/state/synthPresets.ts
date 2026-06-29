@@ -11,6 +11,7 @@ export interface SynthPresetRecord {
   name: string;
   patch: SynthPatchSnapshot;
   tags: string[];
+  favorite: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -20,6 +21,7 @@ export interface CreateSynthPresetOptions {
   name: string;
   patch: SynthPatchSnapshot;
   tags?: unknown[];
+  favorite?: unknown;
   existing?: Partial<SynthPresetRecord> | null;
   now?: number;
 }
@@ -34,6 +36,7 @@ export function createSynthPresetRecord(options: CreateSynthPresetOptions): Synt
     name,
     patch: clonePatch(options.patch),
     tags: sanitizePresetTags(options.tags ?? options.patch.metadata?.tags),
+    favorite: sanitizeFavorite(options.favorite ?? options.existing?.favorite),
     createdAt: safeTimestamp(options.existing?.createdAt, now),
     updatedAt: now,
   };
@@ -50,6 +53,7 @@ export function normalizeSynthPresetRecord(value: unknown): SynthPresetRecord | 
     name,
     patch: clonePatch(value.patch as unknown as SynthPatchSnapshot),
     tags: sanitizePresetTags(value.tags),
+    favorite: sanitizeFavorite(value.favorite),
     createdAt: safeTimestamp(value.createdAt, updatedAt),
     updatedAt,
   };
@@ -82,6 +86,10 @@ function sanitizePresetTags(value: unknown): string[] {
 
 function safeTimestamp(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function sanitizeFavorite(value: unknown): boolean {
+  return value === true;
 }
 
 function clonePatch(patch: SynthPatchSnapshot): SynthPatchSnapshot {

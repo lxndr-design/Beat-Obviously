@@ -758,6 +758,15 @@ try {
   assert.equal(savedPreset.record.name, "Interaction Lead", "Save As should trim preset names");
   assert.deepEqual(savedPreset.record.tags, ["lead", "interaction"], "Save As should normalize preset tags");
   assert.equal(savedPreset.selectedPresetId, `user:${savedPreset.record.id}`, "Save As should select the new user preset");
+  assert.equal(savedPreset.record.favorite, false, "Save As should default user presets to not favorited");
+  const favoritedPreset = runner.previewToggleAetherPresetFavorite(savedPreset.record, 222);
+  assert.ok(favoritedPreset, "favorite toggle should return a normalized preset record");
+  assert.equal(favoritedPreset.favorite, true, "favorite toggle should mark an unfavorited preset as favorite");
+  assert.equal(favoritedPreset.createdAt, 111, "favorite toggle should preserve original creation time");
+  assert.equal(favoritedPreset.updatedAt, 222, "favorite toggle should refresh update time");
+  const unfavoritedPreset = runner.previewToggleAetherPresetFavorite(favoritedPreset, 333);
+  assert.equal(unfavoritedPreset.favorite, false, "favorite toggle should clear an already favorited preset");
+  assert.equal(unfavoritedPreset.updatedAt, 333, "favorite clear should refresh update time");
   savedPreset.record.patch.name = "Mutated";
   assert.equal(aetherPatch.name, "Init", "saving a preset should clone the patch payload");
   const mixedEraPreset = runner.previewNormalizeAetherPreset({
