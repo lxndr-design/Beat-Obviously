@@ -27,6 +27,7 @@ Current implementation focus:
 1. `[~]` Browser/runtime proof for critical flows.
    - Done: Aether automation browser fixture coverage for note, segment, and track lane entrypoints.
    - Done: Synth Editor macro browser fixture coverage for visible assignment lanes and overlapping-route conflict rows.
+   - Done: Aether automation point-editor browser fixture coverage for Add Point, field editing, Quantize, and Snap Values across note, segment, and track Macro 1 lanes.
    - Add browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, arrangement editing, export, relink, backup restore, and Project Health repairs.
    - Add visible hover, selected, disabled, loading, and migrated-framework smoke coverage on critical screens.
 2. `[~]` Automation editing completion.
@@ -37,7 +38,7 @@ Current implementation focus:
    - Done: visible note, segment, and track Aether point editors expose point beat/value editing plus add/remove controls.
    - Done: visible note, segment, and track Aether point editors expose quantize and value snapping controls with pure interaction verifier coverage.
    - Done: native IPC maps frontend `track.automation` lanes into backend project automation with track and instrument IDs, and dense Aether live/export stress covers a track-scoped multi-point Aether lane.
-   - Add multi-select, copy/paste, and broader browser interaction parity coverage.
+   - Add multi-select, copy/paste, and broader drag/browser interaction parity coverage.
    - Define project vs track vs segment vs note vs live-write conflict rules and surface invalid automation warnings.
 3. `[~]` DAW editing and recording closeout.
    - Broaden marquee, drag, resize, split, fade, crossfade, loop marker, and selection edge-case tests.

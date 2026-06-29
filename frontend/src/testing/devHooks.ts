@@ -23,6 +23,7 @@ import { compileNodeGraphToInstrumentPatch, createDefaultInstrumentNodeGraph } f
 
 type DevDecentSamplerFixture = "lorenzo" | "wide";
 type DevAetherAutomationEditor = "arrangement" | "track" | "segment" | "note";
+type DevAetherAutomationPointEditor = Exclude<DevAetherAutomationEditor, "arrangement">;
 
 const DEV_MIXED_ERA_AETHER_PRESET_ID = "dev-mixed-era-aether";
 const DEV_MIXED_ERA_AETHER_INSTRUMENT_ID = "dev-mixed-era-aether-host";
@@ -100,6 +101,7 @@ declare global {
       };
       openAetherAutomationFixtureEditor: (editor: DevAetherAutomationEditor) => Promise<DevAetherAutomationFixtureState>;
       readAetherAutomationFixtureState: () => DevAetherAutomationFixtureState;
+      exerciseAetherAutomationPointEditorFlow: () => Promise<DevAetherAutomationPointExerciseState>;
     };
   }
 }
@@ -131,6 +133,28 @@ interface DevAetherAutomationFixtureState {
     segment: DevAutomationPanelState;
     track: DevAutomationPanelState;
   };
+}
+
+interface DevAutomationPointSnapshot {
+  beat: number;
+  value: number;
+  curve: string | null;
+}
+
+interface DevAutomationPointEditorExercise {
+  editor: DevAetherAutomationPointEditor;
+  before: DevAutomationPointSnapshot[];
+  afterAdd: DevAutomationPointSnapshot[];
+  afterEdit: DevAutomationPointSnapshot[];
+  afterQuantize: DevAutomationPointSnapshot[];
+  afterSnap: DevAutomationPointSnapshot[];
+  pointPanelText: string;
+}
+
+interface DevAetherAutomationPointExerciseState {
+  track: DevAutomationPointEditorExercise;
+  segment: DevAutomationPointEditorExercise;
+  note: DevAutomationPointEditorExercise;
 }
 
 interface DevAetherPresetLibraryFixtureState {
@@ -608,7 +632,7 @@ export function installBeatDevHooks() {
             target: "macro.1",
             points: [
               { beat: 0, value: 0.18, curve: "linear" },
-              { beat: 4, value: 0.52, curve: "smoothstep" },
+              { beat: 2, value: 0.52, curve: "smoothstep" },
               { beat: 8, value: 0.76, curve: "easeOut" },
             ],
           },
@@ -626,7 +650,7 @@ export function installBeatDevHooks() {
                   target: "macro.1",
                   points: [
                     { beat: 0, value: 0.12, curve: "linear" },
-                    { beat: 1, value: 0.48, curve: "smoothstep" },
+                    { beat: 0.75, value: 0.48, curve: "smoothstep" },
                     { beat: 2, value: 0.82, curve: "easeIn" },
                   ],
                 },
@@ -662,6 +686,13 @@ export function installBeatDevHooks() {
       useUiStore.getState().openEditor({ kind: "segment", segmentId: fixture.segmentId });
     }
     await waitForEditorPanel(editor === "track" ? "Aether track automation lanes" : "Aether segment automation lanes");
+    if (editor === "track") {
+      clickPanelButton("Aether track automation lanes", "Macro 1 track automation lane");
+      await nextFrame();
+    } else {
+      clickPanelButton("Aether segment automation lanes", "Macro 1 segment automation lane");
+      await nextFrame();
+    }
     if (editor === "note") {
       clickFirstMidiNote();
       await waitForEditorPanel("Aether note automation lanes");
@@ -671,6 +702,49 @@ export function installBeatDevHooks() {
     writeAetherAutomationFixtureMarker();
     return readAetherAutomationFixtureState();
   };
+
+  const exerciseAetherAutomationPointEditorFlow = async (): Promise<DevAetherAutomationPointExerciseState> => {
+    installAetherAutomationFixture();
+    const state: DevAetherAutomationPointExerciseState = {
+      track: await exerciseAutomationPointEditor("track", 12.375, 0.63),
+      segment: await exerciseAutomationPointEditor("segment", 3.375, 0.64),
+      note: await exerciseAutomationPointEditor("note", 1.375, 0.65),
+    };
+    writeAetherAutomationPointExerciseMarker(state);
+    return state;
+  };
+
+  async function exerciseAutomationPointEditor(
+    editor: DevAetherAutomationPointEditor,
+    beat: number,
+    value: number,
+  ): Promise<DevAutomationPointEditorExercise> {
+    await openAetherAutomationFixtureEditor(editor);
+    const pointPanelLabel = aetherAutomationPointEditorLabel(editor);
+    const before = readAutomationPointPanelRows(pointPanelLabel);
+    clickPanelButtonByText(pointPanelLabel, "Add point");
+    await nextFrame();
+    const afterAdd = readAutomationPointPanelRows(pointPanelLabel);
+    setLastAutomationPointField(pointPanelLabel, "Beat", String(beat));
+    setLastAutomationPointField(pointPanelLabel, "Value", String(value));
+    await nextFrame();
+    const afterEdit = readAutomationPointPanelRows(pointPanelLabel);
+    clickPanelButtonByText(pointPanelLabel, "Quantize");
+    await nextFrame();
+    const afterQuantize = readAutomationPointPanelRows(pointPanelLabel);
+    clickPanelButtonByText(pointPanelLabel, "Snap values");
+    await nextFrame();
+    const afterSnap = readAutomationPointPanelRows(pointPanelLabel);
+    return {
+      editor,
+      before,
+      afterAdd,
+      afterEdit,
+      afterQuantize,
+      afterSnap,
+      pointPanelText: readPanelState(pointPanelLabel).text,
+    };
+  }
 
   const readAetherAutomationFixtureState = (): DevAetherAutomationFixtureState => {
     const project = useProjectStore.getState().project;
@@ -720,6 +794,7 @@ export function installBeatDevHooks() {
     installAetherAutomationFixture,
     openAetherAutomationFixtureEditor,
     readAetherAutomationFixtureState,
+    exerciseAetherAutomationPointEditorFlow,
   };
 
   document.addEventListener("beat:install-decent-sampler-fixture", (event) => {
@@ -756,6 +831,10 @@ export function installBeatDevHooks() {
     window.setTimeout(() => {
       const editor = new URLSearchParams(window.location.search).get("beatAutomationEditor");
       void openAetherAutomationFixtureEditor(isAetherAutomationEditor(editor) ? editor : "segment");
+    }, 0);
+  } else if (fixture === "aether-automation-points") {
+    window.setTimeout(() => {
+      void exerciseAetherAutomationPointEditorFlow();
     }, 0);
   }
 }
@@ -817,6 +896,26 @@ function clickPanelButton(panelLabel: string, buttonLabel: string) {
   const button = Array.from(panel?.querySelectorAll<HTMLButtonElement>("button[aria-label]") ?? [])
     .find((candidate) => candidate.getAttribute("aria-label") === buttonLabel);
   button?.click();
+}
+
+function clickPanelButtonByText(panelLabel: string, buttonLabel: string) {
+  const panel = document.querySelector<HTMLElement>(`[aria-label="${panelLabel}"]`);
+  const button = Array.from(panel?.querySelectorAll<HTMLButtonElement>("button") ?? [])
+    .find((candidate) => normalizeText(candidate.getAttribute("aria-label") ?? candidate.textContent ?? "") === buttonLabel);
+  button?.click();
+}
+
+function setLastAutomationPointField(panelLabel: string, fieldLabel: "Beat" | "Value", value: string) {
+  const panel = document.querySelector<HTMLElement>(`[aria-label="${panelLabel}"]`);
+  const rows = Array.from(panel?.querySelectorAll<HTMLElement>('[class*="automationPointRow"]') ?? []);
+  const row = rows[rows.length - 1];
+  const label = Array.from(row?.querySelectorAll<HTMLLabelElement>("label") ?? [])
+    .find((candidate) => normalizeText(candidate.querySelector("span")?.textContent ?? "") === fieldLabel);
+  const input = label?.querySelector<HTMLInputElement>("input");
+  if (!input) return;
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 function findFieldSelect(label: string): HTMLSelectElement | null {
@@ -885,8 +984,34 @@ function writeAetherAutomationFixtureMarker() {
   });
 }
 
+function writeAetherAutomationPointExerciseMarker(state: DevAetherAutomationPointExerciseState) {
+  document.documentElement.dataset.beatAetherAutomationPointExercise = JSON.stringify(state);
+}
+
 function writeAetherMacroFixtureMarker(state = readMacroFixtureDomState("Brightness")) {
   document.documentElement.dataset.beatAetherMacroFixture = JSON.stringify(state);
+}
+
+function aetherAutomationPointEditorLabel(editor: DevAetherAutomationPointEditor): string {
+  if (editor === "track") return "Aether track automation points";
+  if (editor === "segment") return "Aether segment automation points";
+  return "Aether note automation points";
+}
+
+function readAutomationPointPanelRows(panelLabel: string): DevAutomationPointSnapshot[] {
+  const panel = document.querySelector<HTMLElement>(`[aria-label="${panelLabel}"]`);
+  return Array.from(panel?.querySelectorAll<HTMLElement>('[class*="automationPointRow"]') ?? []).map((row) => {
+    const readField = (fieldLabel: "Beat" | "Value") => {
+      const label = Array.from(row.querySelectorAll<HTMLLabelElement>("label"))
+        .find((candidate) => normalizeText(candidate.querySelector("span")?.textContent ?? "") === fieldLabel);
+      return Number(label?.querySelector<HTMLInputElement>("input")?.value ?? 0);
+    };
+    return {
+      beat: readField("Beat"),
+      value: readField("Value"),
+      curve: null,
+    };
+  });
 }
 
 async function waitForEditorPanel(label: string) {

@@ -97,8 +97,8 @@ Status legend:
   - Done: deterministic dense Aether null-export backend stress disables noise/random phase, proves repeated live-style renders null against each other, and compares 32-bit offline export against the live prefix using residual energy, peak residual, and mean residual thresholds.
   - Remaining: extend the same residual/null reporting style to other deterministic render families where file quantization and tail handling can be bounded cleanly.
 - `[~]` Browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, and note automation lanes.
-  - Done: browser fixture coverage now proves seeded Aether track, segment, and selected-note Macro 1 automation lane entrypoints render with live controls; browser fixture coverage also proves Aether preset-library favorite sort/filter/select/toggle behavior in the live Synth Editor; browser fixture coverage also proves live macro assignment lane text and overlapping-route conflict rows in the Synth Editor.
-  - Remaining: broader synth editing, wavemap import/draw, macro assignment editing, arbitrary multi-point lane editing, and full note automation interaction flows.
+  - Done: browser fixture coverage now proves seeded Aether track, segment, and selected-note Macro 1 automation lane entrypoints render with live controls; browser fixture coverage also proves Aether preset-library favorite sort/filter/select/toggle behavior in the live Synth Editor; browser fixture coverage also proves live macro assignment lane text and overlapping-route conflict rows in the Synth Editor; browser fixture coverage now exercises visible note, segment, and track Macro 1 point editors through Add Point, field editing, Quantize, and Snap Values.
+  - Remaining: broader synth editing, wavemap import/draw, macro assignment editing, drag-based arbitrary multi-point lane editing, and full note automation interaction flows.
 - `[x]` Preset migration fixtures once Aether preset storage is formalized.
   - Done: JS synth verifier covers mixed-era wavemap metadata migration and legacy Aether/FX preset record normalization; backend stress covers native mixed-era wavemap map merging; document verifier covers legacy-only wavemap metadata preservation; frontend interaction verifier covers mixed-era wavemap user preset load/delete flow; true browser smoke covers current Aether instrument preset Save As/load/delete; true browser smoke covers older mixed-era wavemap preset load/delete through the preset dropdown; true browser smoke covers older mixed-era FX preset load/delete through the FX preset dropdown.
   - Remaining: none for the current preset migration fixture plan; add new fixtures alongside any future preset schema changes.
@@ -106,5 +106,5 @@ Status legend:
 ## Near-Term Slice Order
 
 1. Add browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, arbitrary multi-point lane editing, and broader note/segment/track automation interactions.
-2. Add fuller browser interaction coverage for arbitrary multi-point automation edits.
+2. Add fuller browser interaction coverage for drag-based arbitrary multi-point automation edits.
 3. Curate the named Aether instrument/effect preset library UX beyond local Save As lists.
