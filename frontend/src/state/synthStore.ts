@@ -1211,9 +1211,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
   const oscB = oscillatorFromDraft(draft, "b", wavetableFromDraft(draft, "b"));
   const filterEnabled = getBooleanParam(draft, "filter.enabled");
   const lfoEnabled = getBooleanParam(draft, "lfo.1.enabled");
-  const cutoff01 = filterEnabled
-    ? clamp01(hzToNormalizedCutoff(getNumberParam(draft, "filter.cutoff")) + staticRouteAmount(draft, "filter.cutoff"))
-    : 1;
+  const cutoff01 = filterEnabled ? clamp01(hzToNormalizedCutoff(getNumberParam(draft, "filter.cutoff"))) : 1;
 
   return {
     name: draft.name,
@@ -1222,9 +1220,9 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     icon: draft.metadata.icon ?? "ph:cube",
     knobs: {
       cutoff: cutoff01,
-      resonance: filterEnabled ? modulatedNumberParam(draft, "filter.resonance", "filter.resonance", 0, 1) : 0,
-      drive: modulatedNumberParam(draft, "filter.drive", "filter.drive", 0, 1),
-      color: modulatedNumberParam(draft, "osc.a.position", "osc.a.position", 0, 1),
+      resonance: filterEnabled ? clamp01(getNumberParam(draft, "filter.resonance")) : 0,
+      drive: clamp01(getNumberParam(draft, "filter.drive")),
+      color: clamp01(getNumberParam(draft, "osc.a.position")),
     },
     filterType: filterTypeFromDraft(draft),
     filterKeytrack: getNumberParam(draft, "filter.keytrack"),
@@ -1280,8 +1278,8 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     lfoToPitch: lfoEnabled ? Math.abs(clampBipolar(routeAmount(draft, "lfo.1", "osc.a.fine"))) * 12 : 0,
     lfoToFilter: lfoEnabled ? clampBipolar(routeAmount(draft, "lfo.1", "filter.cutoff")) : 0,
     envToFilter: clampBipolar(routeAmount(draft, "env.1", "filter.cutoff")),
-    ampLevel: modulatedNumberParam(draft, "amp.level", "amp.level", 0, 1),
-    ampPan: modulatedNumberParam(draft, "amp.pan", "amp.pan", -1, 1),
+    ampLevel: clamp01(getNumberParam(draft, "amp.level")),
+    ampPan: clampBipolar(getNumberParam(draft, "amp.pan")),
     maxVoices: getNumberParam(draft, "maxVoices"),
     mono: getBooleanParam(draft, "mono.enabled"),
     legato: getBooleanParam(draft, "legato.enabled"),
@@ -2056,16 +2054,15 @@ function wavetableFromDraft(draft: SynthDraftPatch, oscillator: OscillatorKey): 
   const wavetableId = getStringParam(draft, `osc.${oscillator}.wavetable` as SynthParameterId) as WavetableId;
   const warpMode = getStringParam(draft, `osc.${oscillator}.warpMode` as SynthParameterId);
   const unisonEnabled = getBooleanParam(draft, "unison.enabled");
-  const positionTarget = `osc.${oscillator}.position` as ModulationTargetId;
   return {
     bank: bankFromWavetableId(wavetableId),
     customId: wavetableId.startsWith("user.") ? wavetableId : undefined,
-    position: modulatedNumberParam(draft, `osc.${oscillator}.position` as SynthParameterId, positionTarget, 0, 1),
+    position: clamp01(getNumberParam(draft, `osc.${oscillator}.position` as SynthParameterId)),
     warp: getNumberParam(draft, `osc.${oscillator}.warp` as SynthParameterId),
     warpMode: isWavetableWarpMode(warpMode) ? warpMode : "shape",
     unison: unisonEnabled ? getNumberParam(draft, "unison.voices") : 1,
-    detuneCents: unisonEnabled ? modulatedNumberParam(draft, "unison.detune", "unison.detune", 0, 1) * 100 : 0,
-    blend: unisonEnabled ? modulatedNumberParam(draft, "unison.spread", "unison.spread", 0, 1) : 0,
+    detuneCents: unisonEnabled ? clamp01(getNumberParam(draft, "unison.detune")) * 100 : 0,
+    blend: unisonEnabled ? clamp01(getNumberParam(draft, "unison.spread")) : 0,
   };
 }
 
@@ -2083,12 +2080,12 @@ function oscillatorFromDraft(draft: SynthDraftPatch, oscillator: OscillatorKey, 
   const prefix = `osc.${oscillator}`;
   return {
     enabled: getBooleanParam(draft, `osc.${oscillator}.enabled` as SynthParameterId),
-    level: modulatedNumberParam(draft, `${prefix}.level` as SynthParameterId, `${prefix}.level` as ModulationTargetId, 0, 1),
-    pan: modulatedNumberParam(draft, `${prefix}.pan` as SynthParameterId, `${prefix}.pan` as ModulationTargetId, -1, 1),
+    level: clamp01(getNumberParam(draft, `${prefix}.level` as SynthParameterId)),
+    pan: clampBipolar(getNumberParam(draft, `${prefix}.pan` as SynthParameterId)),
     waveform: "wavetable" as const,
     octave: getNumberParam(draft, `osc.${oscillator}.octave` as SynthParameterId),
     semitone: getNumberParam(draft, `osc.${oscillator}.semitone` as SynthParameterId),
-    fineCents: modulatedNumberParam(draft, `${prefix}.fine` as SynthParameterId, `${prefix}.fine` as ModulationTargetId, -100, 100),
+    fineCents: clamp(getNumberParam(draft, `${prefix}.fine` as SynthParameterId), -100, 100),
     phase: getNumberParam(draft, `${prefix}.phase` as SynthParameterId),
     randomPhase: getNumberParam(draft, `${prefix}.randomPhase` as SynthParameterId),
     wavetable,
@@ -2147,35 +2144,8 @@ function routeBipolar(
   return route ? route.bipolar : fallback;
 }
 
-function staticRouteAmount(draft: SynthDraftPatch, target: ModulationTargetId): number {
-  const scale = staticRouteScale(target);
-  return Math.max(
-    -scale,
-    Math.min(
-      scale,
-      draft.modulation
-        .filter((route) => route.enabled && route.target === target && isMacroSource(route.source))
-        .reduce((sum, route) => sum + (isMacroSource(route.source) ? macroOutputValue(draft, route.source) : 0) * route.amount * scale, 0),
-    ),
-  );
-}
-
-function modulatedNumberParam(
-  draft: SynthDraftPatch,
-  id: SynthParameterId,
-  target: ModulationTargetId,
-  min: number,
-  max: number,
-): number {
-  return Math.max(min, Math.min(max, getNumberParam(draft, id) + staticRouteAmount(draft, target)));
-}
-
 function isMacroSource(source: ModulationSourceId): source is MacroId {
   return source.startsWith("macro.");
-}
-
-function staticRouteScale(target: ModulationTargetId): number {
-  return target.endsWith(".fine") ? 100 : 1;
 }
 
 function bankFromWavetableId(id: WavetableId): WavetableConfig["bank"] {
@@ -2218,6 +2188,11 @@ function clampBipolar(value: number): number {
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(1, value));
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
 }
 
 function sanitize01(value: unknown, fallback: number): number {

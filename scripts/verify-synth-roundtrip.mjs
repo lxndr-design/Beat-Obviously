@@ -1475,6 +1475,17 @@ try {
   const macroAutomatedOffsets = synthPreview.modulationAtTime(macroNoteAutomationPreview, 0.25, 1, 120, 1, 0.5, 0, { "macro.1": 1 }).targetOffsets;
   assert.ok(Math.abs((macroBaseOffsets["amp.level"] ?? 0)) < 0.000001, "base macro should not offset amp when macro value is zero");
   assert.ok((macroAutomatedOffsets["amp.level"] ?? 0) > 0.7, "macro note automation should drive macro-routed preview targets");
+  const macroLivePreviewDraft = synthStore.normalizeSynthDraftPatch({
+    ...macroNoteAutomationDraft,
+    parameters: {
+      ...macroNoteAutomationDraft.parameters,
+      "macro.1": 1,
+    },
+  });
+  const macroLivePreview = synthStore.synthDraftToPreviewInstrument(macroLivePreviewDraft);
+  const macroLiveOffsets = synthPreview.modulationAtTime(macroLivePreview, 0.25, 1).targetOffsets;
+  assert.ok(Math.abs((macroLivePreview.ampLevel ?? 0) - 0.18) < 0.000001, "macro routes should not be baked into browser preview base amp level");
+  assert.ok(Math.abs((macroLiveOffsets["amp.level"] ?? 0) - 0.72) < 0.000001, "macro routes should remain live dynamic preview offsets");
   const macroBaseSamples = new Float32Array(12000);
   const macroAutomatedSamples = new Float32Array(12000);
   synthPreview.renderInstrumentSamples(macroNoteAutomationPreview, macroBaseSamples, 48000, synthPreview.previewFrequency(macroNoteAutomationPreview), "audio", true);
