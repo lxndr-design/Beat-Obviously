@@ -48,6 +48,16 @@ try {
   assert.deepEqual(withMacroLane[0].automation[0].points.map((point) => point.beat), [2, 3]);
   assert.deepEqual(withMacroLane[1].automation[0].points.map((point) => point.beat), [4, 6]);
   assert.equal(noteAutomation.selectedMidiNoteAutomationSummary(withMacroLane, [0, 1], "macro.1"), "2/2 notes");
+  assert.deepEqual(
+    noteAutomation.selectedMidiNoteAutomationEffectiveBadge(withMacroLane, [0, 1], "macro.1"),
+    {
+      label: "Note lane active",
+      detail: "macro.1 direct write",
+      tone: "active",
+      report: noteAutomation.selectedMidiNoteAutomationEffectiveBadge(withMacroLane, [0, 1], "macro.1").report,
+    },
+    "selected note automation badges should expose direct-write state for the editor",
+  );
   const movedMacroLane = noteAutomation.offsetMidiNoteAutomation(withMacroLane[0].automation, 3);
   assert.deepEqual(movedMacroLane[0].points.map((point) => point.beat), [5, 6], "note automation points should move with dragged/copied notes");
   assert.equal(noteAutomation.formatAetherNoteAutomationValue("macro.1", 0.73), "73%", "macro value labels should format as percent");
@@ -155,6 +165,11 @@ try {
   const clearedMacroLane = noteAutomation.clearMidiNoteAutomationTarget(withMacroLane, [0], "macro.1");
   assert.equal(clearedMacroLane[0].automation, undefined, "clearing the only lane should remove note automation clutter");
   assert.equal(clearedMacroLane[1].automation[0].target, "macro.1", "clearing one note should not affect other selected lanes");
+  assert.equal(
+    noteAutomation.selectedMidiNoteAutomationEffectiveBadge(clearedMacroLane, [0, 1], "macro.1").label,
+    "1/2 notes active",
+    "partial selected-note automation should identify the active-note count in its badge",
+  );
 
   assert.ok(
     arrangementAutomation.AETHER_ARRANGEMENT_AUTOMATION_TARGETS.every((meta) => meta.target !== "pitch"),
@@ -174,6 +189,20 @@ try {
   assert.deepEqual(withSegmentLane.automation[0].points.map((point) => point.beat), [0, 4], "segment automation should use segment-local beats");
   assert.equal(arrangementAutomation.segmentAutomationSummary(withSegmentLane, "macro.1"), "1/1 segment");
   assert.equal(arrangementAutomation.segmentAutomationTargetCount(withSegmentLane), 1);
+  assert.deepEqual(
+    arrangementAutomation.segmentAutomationEffectiveBadge(withSegmentLane, "macro.1", [
+      { kind: "track", target: "macro.1", label: "Track macro" },
+    ]),
+    {
+      label: "Segment lane wins",
+      detail: "Segment lane wins over Track macro",
+      tone: "conflict",
+      report: arrangementAutomation.segmentAutomationEffectiveBadge(withSegmentLane, "macro.1", [
+        { kind: "track", target: "macro.1", label: "Track macro" },
+      ]).report,
+    },
+    "segment automation badges should show inherited track-lane suppression",
+  );
   const editedSegmentLane = arrangementAutomation.setSegmentAutomationTargetValues(withSegmentLane, "macro.1", 0.2, 0.9, 0.55);
   assert.deepEqual(editedSegmentLane.automation[0].points.map((point) => point.beat), [0, 2, 4]);
   assert.deepEqual(editedSegmentLane.automation[0].points.map((point) => point.value), [0.2, 0.55, 0.9]);
@@ -279,6 +308,26 @@ try {
   assert.deepEqual(withTrackLane.automation[0].points.map((point) => point.beat), [0, 64], "track automation should use project-timeline beats");
   assert.equal(arrangementAutomation.trackAutomationSummary(withTrackLane, "filter.cutoff"), "1/1 track");
   assert.equal(arrangementAutomation.trackAutomationTargetCount(withTrackLane), 1);
+  assert.deepEqual(
+    arrangementAutomation.trackAutomationEffectiveBadge(automationTrack, "filter.cutoff"),
+    {
+      label: "No automation",
+      detail: "Default value active",
+      tone: "idle",
+      report: arrangementAutomation.trackAutomationEffectiveBadge(automationTrack, "filter.cutoff").report,
+    },
+    "track automation badges should expose idle/default state",
+  );
+  assert.deepEqual(
+    arrangementAutomation.trackAutomationEffectiveBadge(withTrackLane, "filter.cutoff"),
+    {
+      label: "Track lane active",
+      detail: "filter.cutoff direct write",
+      tone: "active",
+      report: arrangementAutomation.trackAutomationEffectiveBadge(withTrackLane, "filter.cutoff").report,
+    },
+    "track automation badges should expose direct-write state",
+  );
   const editedTrackLane = arrangementAutomation.setTrackAutomationTargetValues(withTrackLane, "filter.cutoff", 64, 0.12, 0.88, 0.44);
   assert.deepEqual(editedTrackLane.automation[0].points.map((point) => point.beat), [0, 32, 64]);
   assert.deepEqual(editedTrackLane.automation[0].points.map((point) => point.value), [0.12, 0.44, 0.88]);
@@ -392,6 +441,16 @@ try {
     conflictReport.summary,
     "filter.cutoff: Note lane wins over Cutoff knob, Project lane, Track lane, Segment lane + 1 macro route",
     "conflict summaries should be compact enough for editor badges",
+  );
+  assert.deepEqual(
+    automationConflicts.aetherAutomationEffectiveBadge(conflictReport),
+    {
+      label: "Note lane wins",
+      detail: "Note lane wins over Cutoff knob, Project lane, Track lane, Segment lane + 1 macro route",
+      tone: "conflict",
+      report: conflictReport,
+    },
+    "effective badges should preserve conflict winner and detail text",
   );
   const inactiveConflictReport = automationConflicts.aetherAutomationConflictReport("macro.1", [
     { kind: "project", target: "macro.1", value: 0.2, active: false },

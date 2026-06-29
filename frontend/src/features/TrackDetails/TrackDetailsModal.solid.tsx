@@ -13,6 +13,7 @@ import {
   setTrackAutomationTargetValues,
   snapTrackAutomationPointValues,
   trackAutomationCurve,
+  trackAutomationEffectiveBadge,
   trackAutomationSummary,
   trackAutomationTargetCount,
   trackAutomationValueRange,
@@ -40,6 +41,7 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
   const activeAutomationMeta = createMemo(() => aetherArrangementAutomationTargetMeta(activeAutomationTarget()));
   const automationRange = createMemo(() => trackAutomationValueRange(track(), activeAutomationTarget()));
   const activeAutomationCurve = createMemo(() => trackAutomationCurve(track(), activeAutomationTarget()));
+  const automationEffectiveBadge = createMemo(() => trackAutomationEffectiveBadge(track(), activeAutomationTarget()));
   const activeAutomationPoints = createMemo(() =>
     track()?.automation?.find((lane) => lane.target === activeAutomationTarget())?.points ?? []
   );
@@ -224,6 +226,14 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
                     {" · "}
                     {projectLengthBeats()} beats
                   </span>
+                </div>
+                <div
+                  class={styles.automationEffectiveBadge}
+                  data-tone={automationEffectiveBadge().tone}
+                  title={automationEffectiveBadge().detail}
+                >
+                  <span>{automationEffectiveBadge().label}</span>
+                  <span>{automationEffectiveBadge().detail}</span>
                 </div>
                 <div class={styles.automationTargets} role="radiogroup" aria-label="Aether track automation target">
                   {AETHER_ARRANGEMENT_AUTOMATION_TARGETS.map((target) => (

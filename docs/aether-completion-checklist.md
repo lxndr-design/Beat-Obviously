@@ -30,9 +30,9 @@ Status legend:
   - Done: target/source selection, visible assignments, target-scaled range displays, explicit disabled route state display, compact source-specific affordance lines for LFO, envelope, macro, and performance sources, and direct source-affordance focus into the matching editor surface.
   - Proof: design-system/interaction verifier coverage for route add/edit/remove/disable and assignment display; synth verifier covers target-scaled route display labels, disabled route state labels, source affordance labels/details, and source-to-editor focus mapping.
 - `[~]` Automation conflict rules.
-  - Done: shared frontend conflict resolver defines live/project/track/segment/note direct-write precedence, treats macro routes as additive modulation instead of direct-write winners, filters inactive sources, gives deterministic same-rank replacement summaries for editor badges, and native sequencer ordering now emits same-sample project lanes before track-scoped lanes before segment lanes even when storage order differs.
-  - Remaining: editor wiring for visible effective-value badges in every automation surface, plus deeper native proof for live-vs-note-local parameter writes at the voice application layer.
-  - Proof: frontend interaction verifier covers precedence order, suppressed lower-priority writes, additive macro routes, inactive sources, and same-rank deterministic winners; backend sequencer stress covers project/track/segment same-sample precedence parity.
+  - Done: shared frontend conflict resolver defines live/project/track/segment/note direct-write precedence, treats macro routes as additive modulation instead of direct-write winners, filters inactive sources, gives deterministic same-rank replacement summaries for editor badges, exposes typed effective-state badges, wires visible effective badges into track, segment, and selected-note automation panels, and native sequencer ordering now emits same-sample project lanes before track-scoped lanes before segment lanes even when storage order differs.
+  - Remaining: deeper native proof for live-vs-note-local parameter writes at the voice application layer.
+  - Proof: frontend interaction verifier covers precedence order, suppressed lower-priority writes, additive macro routes, inactive sources, same-rank deterministic winners, idle/direct-write/conflict effective badges for track/segment/note editor surfaces; backend sequencer stress covers project/track/segment same-sample precedence parity.
 
 ## 3. Wavemap Drawing And Resynthesis
 

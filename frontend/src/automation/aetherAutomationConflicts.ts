@@ -34,6 +34,15 @@ export interface AetherAutomationConflictReport {
   hasConflict: boolean;
 }
 
+export type AetherAutomationEffectiveBadgeTone = "idle" | "active" | "conflict";
+
+export interface AetherAutomationEffectiveBadge {
+  label: string;
+  detail: string;
+  tone: AetherAutomationEffectiveBadgeTone;
+  report: AetherAutomationConflictReport;
+}
+
 export const AETHER_AUTOMATION_PRECEDENCE: Record<AetherAutomationConflictSourceKind, number> = {
   live: 0,
   project: 10,
@@ -83,6 +92,36 @@ export function aetherAutomationConflictReport(
   };
 }
 
+export function aetherAutomationEffectiveBadge(
+  report: AetherAutomationConflictReport,
+): AetherAutomationEffectiveBadge {
+  if (!report.winner && report.additive.length === 0) {
+    return {
+      label: "No automation",
+      detail: "Default value active",
+      tone: "idle",
+      report,
+    };
+  }
+
+  if (!report.winner) {
+    return {
+      label: report.additive.length === 1 ? "Macro route active" : "Macro routes sum",
+      detail: `${report.additive.length} additive macro route${report.additive.length === 1 ? "" : "s"}`,
+      tone: report.additive.length > 1 ? "conflict" : "active",
+      report,
+    };
+  }
+
+  const hasPriorityContext = report.suppressed.length > 0 || report.additive.length > 0;
+  return {
+    label: hasPriorityContext ? `${report.winner.label} wins` : `${report.winner.label} active`,
+    detail: hasPriorityContext ? stripTargetPrefix(report.summary, report.target) : `${report.target} direct write`,
+    tone: report.hasConflict ? "conflict" : "active",
+    report,
+  };
+}
+
 function normalizeSource(source: AetherAutomationConflictSource): AetherAutomationConflictLayer {
   const operation = source.operation ?? defaultOperation(source.kind);
   return {
@@ -118,4 +157,9 @@ function summarizeConflict(
     ? ` + ${additive.length} macro route${additive.length === 1 ? "" : "s"}`
     : "";
   return `${target}: ${winner.label} wins${suppressedLabel}${additiveLabel}`;
+}
+
+function stripTargetPrefix(summary: string, target: MidiAutomationTarget): string {
+  const prefix = `${target}: `;
+  return summary.startsWith(prefix) ? summary.slice(prefix.length) : summary;
 }

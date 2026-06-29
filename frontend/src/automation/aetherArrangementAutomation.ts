@@ -6,6 +6,12 @@ import {
   aetherNoteAutomationTargetMeta,
   formatAetherNoteAutomationValue,
 } from "./aetherNoteAutomation";
+import {
+  aetherAutomationConflictReport,
+  aetherAutomationEffectiveBadge,
+  type AetherAutomationConflictSource,
+  type AetherAutomationEffectiveBadge,
+} from "./aetherAutomationConflicts";
 import type { AutomationCurve, MidiAutomationLane, MidiAutomationTarget, Segment, Track } from "../state/types";
 
 export type AetherArrangementAutomationTarget = Exclude<MidiAutomationTarget, "pitch">;
@@ -150,6 +156,17 @@ export function snapSegmentAutomationPointValues(
 export function segmentAutomationSummary(segment: Segment | undefined, target: AetherArrangementAutomationTarget): string {
   if (!segment) return "No segment";
   return segmentHasAutomationTarget(segment, target) ? "1/1 segment" : "0/1 segment";
+}
+
+export function segmentAutomationEffectiveBadge(
+  segment: Segment | undefined,
+  target: AetherArrangementAutomationTarget,
+  inheritedSources: AetherAutomationConflictSource[] = [],
+): AetherAutomationEffectiveBadge {
+  return aetherAutomationEffectiveBadge(aetherAutomationConflictReport(target, [
+    ...inheritedSources,
+    ...automationSource(segmentHasAutomationTarget(segment, target), "segment", target, "Segment lane"),
+  ]));
 }
 
 export function segmentAutomationValueRange(
@@ -302,6 +319,17 @@ export function trackAutomationSummary(track: Track | undefined, target: AetherA
   return trackHasAutomationTarget(track, target) ? "1/1 track" : "0/1 track";
 }
 
+export function trackAutomationEffectiveBadge(
+  track: Track | undefined,
+  target: AetherArrangementAutomationTarget,
+  inheritedSources: AetherAutomationConflictSource[] = [],
+): AetherAutomationEffectiveBadge {
+  return aetherAutomationEffectiveBadge(aetherAutomationConflictReport(target, [
+    ...inheritedSources,
+    ...automationSource(trackHasAutomationTarget(track, target), "track", target, "Track lane"),
+  ]));
+}
+
 export function trackAutomationValueRange(
   track: Track | undefined,
   target: AetherArrangementAutomationTarget,
@@ -340,6 +368,15 @@ function hasAutomationTarget(
   target: AetherArrangementAutomationTarget,
 ): boolean {
   return Boolean(automation?.some((lane) => lane.target === target && lane.points.length > 0));
+}
+
+function automationSource(
+  active: boolean,
+  kind: AetherAutomationConflictSource["kind"],
+  target: AetherArrangementAutomationTarget,
+  label: string,
+): AetherAutomationConflictSource[] {
+  return active ? [{ kind, target, label }] : [];
 }
 
 function automationValueRange(

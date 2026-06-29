@@ -15,6 +15,7 @@ import {
   quantizeMidiNoteAutomationPoints,
   removeMidiNoteAutomationPoint,
   selectedMidiNoteAutomationCurve,
+  selectedMidiNoteAutomationEffectiveBadge,
   selectedMidiNoteAutomationSummary,
   selectedMidiNoteAutomationValueRange,
   setMidiNoteAutomationTargetCurve,
@@ -199,6 +200,9 @@ export function PianoRoll(props: PianoRollProps) {
   const gridLines = createMemo(() => makeGridLines(lengthBeats, pxPerBeat()));
   const selectedAutomationSummary = createMemo(() =>
     selectedMidiNoteAutomationSummary(props.notes, selected(), activeAutomationTarget())
+  );
+  const selectedAutomationEffective = createMemo(() =>
+    selectedMidiNoteAutomationEffectiveBadge(props.notes, selected(), activeAutomationTarget())
   );
   const activeAutomationMeta = createMemo(() => aetherNoteAutomationTargetMeta(activeAutomationTarget()));
   const selectedAutomationValueRange = createMemo(() =>
@@ -1504,6 +1508,14 @@ export function PianoRoll(props: PianoRollProps) {
           <div class={styles.automationHeader}>
             <span>Aether lanes</span>
             <span>{aetherNoteAutomationTargetLabel(activeAutomationTarget())} · {selectedAutomationSummary()}</span>
+          </div>
+          <div
+            class={styles.automationEffectiveBadge}
+            data-tone={selectedAutomationEffective().tone}
+            title={selectedAutomationEffective().detail}
+          >
+            <span>{selectedAutomationEffective().label}</span>
+            <span>{selectedAutomationEffective().detail}</span>
           </div>
           <div class={styles.automationTargets} role="radiogroup" aria-label="Aether note automation target">
             {AETHER_NOTE_AUTOMATION_TARGETS.map((target) => (

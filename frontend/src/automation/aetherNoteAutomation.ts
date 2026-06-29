@@ -1,4 +1,10 @@
 import type { AutomationCurve, MidiAutomationLane, MidiAutomationTarget, MidiNote } from "../state/types";
+import {
+  aetherAutomationConflictReport,
+  aetherAutomationEffectiveBadge,
+  type AetherAutomationConflictSource,
+  type AetherAutomationEffectiveBadge,
+} from "./aetherAutomationConflicts";
 
 export interface AetherNoteAutomationTargetMeta {
   target: MidiAutomationTarget;
@@ -263,6 +269,21 @@ export function selectedMidiNoteAutomationSummary(
   if (selectedNotes.length === 0) return "Select notes";
   const active = selectedNotes.filter((note) => midiNoteHasAutomationTarget(note, target)).length;
   return `${active}/${selectedNotes.length} notes`;
+}
+
+export function selectedMidiNoteAutomationEffectiveBadge(
+  notes: MidiNote[],
+  indices: number[],
+  target: MidiAutomationTarget,
+  inheritedSources: AetherAutomationConflictSource[] = [],
+): AetherAutomationEffectiveBadge {
+  const selectedNotes = indices.map((index) => notes[index]).filter(Boolean) as MidiNote[];
+  const active = selectedNotes.filter((note) => midiNoteHasAutomationTarget(note, target)).length;
+  const label = active === selectedNotes.length ? "Note lane" : `${active}/${selectedNotes.length} notes`;
+  return aetherAutomationEffectiveBadge(aetherAutomationConflictReport(target, [
+    ...inheritedSources,
+    ...(active > 0 ? [{ kind: "note" as const, target, label }] : []),
+  ]));
 }
 
 export function selectedMidiNoteAutomationValueRange(

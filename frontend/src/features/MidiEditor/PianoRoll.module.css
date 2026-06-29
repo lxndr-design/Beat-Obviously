@@ -409,6 +409,48 @@
   font-weight: var(--font-weight-medium);
 }
 
+.automationEffectiveBadge {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  min-height: 18px;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--interaction-hover-bg);
+  color: color-mix(in srgb, var(--color-fg) 72%, transparent);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.automationEffectiveBadge span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automationEffectiveBadge span:first-child {
+  color: var(--color-fg);
+  font-weight: var(--font-weight-medium);
+}
+
+.automationEffectiveBadge span:last-child {
+  font-family: var(--font-family-mono);
+}
+
+.automationEffectiveBadge[data-tone="idle"] {
+  background: var(--surface-subtle);
+  color: color-mix(in srgb, var(--color-fg) 48%, transparent);
+}
+
+.automationEffectiveBadge[data-tone="conflict"] span:first-child {
+  color: color-mix(in srgb, var(--interaction-playback-accent) 82%, var(--color-fg));
+}
+
 .automationTargets {
   display: flex;
   flex-wrap: wrap;

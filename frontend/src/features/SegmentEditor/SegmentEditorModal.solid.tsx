@@ -13,6 +13,7 @@ import {
   quantizeSegmentAutomationPoints,
   removeSegmentAutomationPoint,
   segmentAutomationCurve,
+  segmentAutomationEffectiveBadge,
   segmentAutomationSummary,
   segmentAutomationTargetCount,
   segmentAutomationValueRange,
@@ -97,6 +98,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const activeSegmentAutomationMeta = createMemo(() => aetherArrangementAutomationTargetMeta(activeSegmentAutomationTarget()));
   const segmentAutomationRange = createMemo(() => segmentAutomationValueRange(draft(), activeSegmentAutomationTarget()));
   const activeSegmentAutomationCurve = createMemo(() => segmentAutomationCurve(draft(), activeSegmentAutomationTarget()));
+  const segmentAutomationEffective = createMemo(() => segmentAutomationEffectiveBadge(draft(), activeSegmentAutomationTarget()));
   const activeSegmentAutomationPoints = createMemo(() =>
     draft()?.automation?.find((lane) => lane.target === activeSegmentAutomationTarget())?.points ?? []
   );
@@ -491,6 +493,14 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                   {" · "}
                   {segmentAutomationTargetCount(draft())} active
                 </span>
+              </div>
+              <div
+                class={styles.automationEffectiveBadge}
+                data-tone={segmentAutomationEffective().tone}
+                title={segmentAutomationEffective().detail}
+              >
+                <span>{segmentAutomationEffective().label}</span>
+                <span>{segmentAutomationEffective().detail}</span>
               </div>
               <div class={styles.automationTargets} role="radiogroup" aria-label="Aether segment automation target">
                 {AETHER_ARRANGEMENT_AUTOMATION_TARGETS.map((target) => (
