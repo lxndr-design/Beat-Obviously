@@ -128,6 +128,25 @@ export function removeSegmentAutomationPoint(
   return mutateSegmentAutomationLane(segment, target, (lane) => removeAutomationPoint(lane, pointIndex));
 }
 
+export function quantizeSegmentAutomationPoints(
+  segment: Segment,
+  target: AetherArrangementAutomationTarget,
+  gridBeats: number,
+): Segment {
+  if (!segment.automation?.some((lane) => lane.target === target)) return segment;
+  return mutateSegmentAutomationLane(segment, target, (lane) =>
+    quantizeAutomationLaneBeats(lane, segment.lengthBeats, gridBeats)
+  );
+}
+
+export function snapSegmentAutomationPointValues(
+  segment: Segment,
+  target: AetherArrangementAutomationTarget,
+): Segment {
+  if (!segment.automation?.some((lane) => lane.target === target)) return segment;
+  return mutateSegmentAutomationLane(segment, target, (lane) => snapAutomationLaneValues(lane, target));
+}
+
 export function segmentAutomationSummary(segment: Segment | undefined, target: AetherArrangementAutomationTarget): string {
   if (!segment) return "No segment";
   return segmentHasAutomationTarget(segment, target) ? "1/1 segment" : "0/1 segment";
@@ -256,6 +275,26 @@ export function removeTrackAutomationPoint(
   pointIndex: number,
 ): Track {
   return mutateTrackAutomationLane(track, target, undefined, (lane) => removeAutomationPoint(lane, pointIndex));
+}
+
+export function quantizeTrackAutomationPoints(
+  track: Track,
+  target: AetherArrangementAutomationTarget,
+  projectLengthBeats: number,
+  gridBeats: number,
+): Track {
+  if (!track.automation?.some((lane) => lane.target === target)) return track;
+  return mutateTrackAutomationLane(track, target, projectLengthBeats, (lane) =>
+    quantizeAutomationLaneBeats(lane, projectLengthBeats, gridBeats)
+  );
+}
+
+export function snapTrackAutomationPointValues(
+  track: Track,
+  target: AetherArrangementAutomationTarget,
+): Track {
+  if (!track.automation?.some((lane) => lane.target === target)) return track;
+  return mutateTrackAutomationLane(track, target, undefined, (lane) => snapAutomationLaneValues(lane, target));
 }
 
 export function trackAutomationSummary(track: Track | undefined, target: AetherArrangementAutomationTarget): string {
@@ -452,6 +491,34 @@ function removeAutomationPoint(lane: MidiAutomationLane, pointIndex: number): Mi
   return points.length > 0 ? { ...lane, points } : null;
 }
 
+function quantizeAutomationLaneBeats(
+  lane: MidiAutomationLane,
+  lengthBeats: number,
+  gridBeats: number,
+): MidiAutomationLane {
+  const step = Number.isFinite(gridBeats) && gridBeats > 0 ? gridBeats : 0.25;
+  return {
+    ...lane,
+    points: normalizeAutomationPoints(lane.points.map((point) => ({
+      ...point,
+      beat: clampBeat(Math.round(point.beat / step) * step, lengthBeats),
+    }))),
+  };
+}
+
+function snapAutomationLaneValues(
+  lane: MidiAutomationLane,
+  target: AetherArrangementAutomationTarget,
+): MidiAutomationLane {
+  return {
+    ...lane,
+    points: normalizeAutomationPoints(lane.points.map((point) => ({
+      ...point,
+      value: snapTargetValue(target, point.value),
+    }))),
+  };
+}
+
 function normalizeAutomationPoints(points: MidiAutomationLane["points"]): MidiAutomationLane["points"] {
   return points
     .map((point) => ({ ...point }))
@@ -478,6 +545,13 @@ function clampBeat(value: number, lengthBeats: number): number {
 function clampTargetValue(target: AetherArrangementAutomationTarget, value: number): number {
   const meta = aetherNoteAutomationTargetMeta(target);
   return clamp(value, meta.min, meta.max);
+}
+
+function snapTargetValue(target: AetherArrangementAutomationTarget, value: number): number {
+  const meta = aetherNoteAutomationTargetMeta(target);
+  const step = Number.isFinite(meta.step) && meta.step > 0 ? meta.step : 0.01;
+  const snapped = Math.round(clamp(value, meta.min, meta.max) / step) * step;
+  return clamp(Number(snapped.toFixed(6)), meta.min, meta.max);
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -7,9 +7,11 @@ import {
   clearTrackAutomationTarget,
   formatAetherArrangementAutomationValue,
   insertTrackAutomationPoint,
+  quantizeTrackAutomationPoints,
   removeTrackAutomationPoint,
   setTrackAutomationTargetCurve,
   setTrackAutomationTargetValues,
+  snapTrackAutomationPointValues,
   trackAutomationCurve,
   trackAutomationSummary,
   trackAutomationTargetCount,
@@ -99,6 +101,23 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
       projectLengthBeats() / 2,
       range.midValue,
     ));
+  }
+
+  function quantizeTrackAutomationLanePoints() {
+    const current = track();
+    if (!current) return;
+    updateTrackAutomation(quantizeTrackAutomationPoints(
+      current,
+      activeAutomationTarget(),
+      projectLengthBeats(),
+      0.25,
+    ));
+  }
+
+  function snapTrackAutomationLaneValues() {
+    const current = track();
+    if (!current) return;
+    updateTrackAutomation(snapTrackAutomationPointValues(current, activeAutomationTarget()));
   }
 
   function setTrackAutomationPointBeat(index: number, rawBeat: string) {
@@ -281,7 +300,15 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
                 <div class={styles.automationPointEditor} aria-label="Aether track automation points">
                   <div class={styles.automationPointHeader}>
                     <span>Points</span>
-                    <Button size="xs" onClick={addTrackAutomationPoint}>Add point</Button>
+                    <div class={styles.automationPointTools}>
+                      <Button size="xs" disabled={activeAutomationPoints().length === 0} onClick={quantizeTrackAutomationLanePoints}>
+                        Quantize
+                      </Button>
+                      <Button size="xs" disabled={activeAutomationPoints().length === 0} onClick={snapTrackAutomationLaneValues}>
+                        Snap values
+                      </Button>
+                      <Button size="xs" onClick={addTrackAutomationPoint}>Add point</Button>
+                    </div>
                   </div>
                   <For each={activeAutomationPoints()}>
                     {(point, index) => (

@@ -99,6 +99,24 @@ try {
     "note point editing should move the addressed point in note-local space",
   );
   assert.equal(movedNotePoint[0].automation[0].points[2].value, 0.81, "note point editing should update the addressed value");
+  const unsnappedNotePoint = noteAutomation.updateMidiNoteAutomationPoint(insertedNotePoint, [0], "macro.1", 2, 0.9, 0.813);
+  const quantizedNotePoint = noteAutomation.quantizeMidiNoteAutomationPoints(unsnappedNotePoint, [0], "macro.1", 0.25);
+  assert.deepEqual(
+    quantizedNotePoint[0].automation[0].points.map((point) => point.beat),
+    [2, 2.5, 3, 3],
+    "note point quantize should snap note-local beats to the grid and preserve note-relative timing",
+  );
+  assert.deepEqual(
+    quantizedNotePoint[0].automation[0].points.map((point) => point.curve),
+    ["smoothstep", "smoothstep", "smoothstep", "smoothstep"],
+    "note point quantize should preserve curve metadata",
+  );
+  const snappedNotePointValues = noteAutomation.snapMidiNoteAutomationPointValues(unsnappedNotePoint, [0], "macro.1");
+  assert.deepEqual(
+    snappedNotePointValues[0].automation[0].points.map((point) => point.value),
+    [0.2, 0.65, 0.81, 0.92],
+    "note point value snapping should round values to the target step",
+  );
   const removedNotePoint = noteAutomation.removeMidiNoteAutomationPoint(movedNotePoint, [0], "macro.1", 2);
   assert.deepEqual(
     removedNotePoint[0].automation[0].points.map((point) => point.beat),
@@ -122,6 +140,16 @@ try {
   assert.equal(withPitchLane[0].curve.length, 2, "pitch automation should use the note pitch-curve path");
   assert.equal(noteAutomation.setMidiNoteAutomationTargetValues(withPitchLane, [0], "pitch", 0.1, 0.9), withPitchLane, "pitch value editing should stay on curve handles");
   assert.equal(noteAutomation.insertMidiNoteAutomationPoint(withPitchLane, [0], "pitch", 0.5, 0.5), withPitchLane, "pitch point editing should stay on curve handles");
+  assert.equal(
+    noteAutomation.quantizeMidiNoteAutomationPoints(automationNotes, [0], "macro.1", 0.25)[0].automation,
+    undefined,
+    "note point quantize should not create empty automation lanes",
+  );
+  assert.equal(
+    noteAutomation.snapMidiNoteAutomationPointValues(automationNotes, [0], "macro.1")[0].automation,
+    undefined,
+    "note point value snapping should not create empty automation lanes",
+  );
   const clearedMacroLane = noteAutomation.clearMidiNoteAutomationTarget(withMacroLane, [0], "macro.1");
   assert.equal(clearedMacroLane[0].automation, undefined, "clearing the only lane should remove note automation clutter");
   assert.equal(clearedMacroLane[1].automation[0].target, "macro.1", "clearing one note should not affect other selected lanes");
@@ -173,6 +201,24 @@ try {
     "segment point editing should move the addressed point and keep sorting stable",
   );
   assert.equal(movedSegmentPoint.automation[0].points[2].value, 0.73, "segment point editing should update the addressed value");
+  const unsnappedSegmentPoint = arrangementAutomation.updateSegmentAutomationPoint(insertedSegmentPoint, "macro.1", 1, 3.37, 0.734);
+  const quantizedSegmentPoint = arrangementAutomation.quantizeSegmentAutomationPoints(unsnappedSegmentPoint, "macro.1", 0.25);
+  assert.deepEqual(
+    quantizedSegmentPoint.automation[0].points.map((point) => point.beat),
+    [0, 2, 3.25, 4],
+    "segment point quantize should snap segment-local beats to the grid",
+  );
+  assert.deepEqual(
+    quantizedSegmentPoint.automation[0].points.map((point) => point.curve),
+    ["smoothstep", "smoothstep", "smoothstep", "smoothstep"],
+    "segment point quantize should preserve curve metadata",
+  );
+  const snappedSegmentPointValues = arrangementAutomation.snapSegmentAutomationPointValues(unsnappedSegmentPoint, "macro.1");
+  assert.deepEqual(
+    snappedSegmentPointValues.automation[0].points.map((point) => point.value),
+    [0.2, 0.55, 0.73, 0.9],
+    "segment point value snapping should round values to the target step",
+  );
   const removedSegmentPoint = arrangementAutomation.removeSegmentAutomationPoint(movedSegmentPoint, "macro.1", 2);
   assert.deepEqual(
     removedSegmentPoint.automation[0].points.map((point) => point.beat),
@@ -194,6 +240,16 @@ try {
   );
   const unclutteredCurveEdit = arrangementAutomation.setSegmentAutomationTargetCurve(automationSegment, "macro.1", "cubic");
   assert.equal(unclutteredCurveEdit.automation, undefined, "curve edits should not create empty segment automation lanes");
+  assert.equal(
+    arrangementAutomation.quantizeSegmentAutomationPoints(automationSegment, "macro.1", 0.25).automation,
+    undefined,
+    "segment point quantize should not create empty automation lanes",
+  );
+  assert.equal(
+    arrangementAutomation.snapSegmentAutomationPointValues(automationSegment, "macro.1").automation,
+    undefined,
+    "segment point value snapping should not create empty automation lanes",
+  );
   const clippedSegmentLanes = arrangementAutomation.clipSegmentAutomation(curvedSegmentLane.automation, 3);
   assert.deepEqual(clippedSegmentLanes[0].points.map((point) => point.beat), [0, 2], "segment automation should clip points outside the saved segment length");
   const clearedSegmentLane = arrangementAutomation.clearSegmentAutomationTarget(curvedSegmentLane, "macro.1");
@@ -250,6 +306,24 @@ try {
     "track point editing should move the addressed point and keep sorting stable",
   );
   assert.equal(movedTrackPoint.automation[0].points[2].value, 0.74, "track point editing should update the addressed value");
+  const unsnappedTrackPoint = arrangementAutomation.updateTrackAutomationPoint(insertedTrackPoint, "filter.cutoff", 64, 1, 47.87, 0.744);
+  const quantizedTrackPoint = arrangementAutomation.quantizeTrackAutomationPoints(unsnappedTrackPoint, "filter.cutoff", 64, 0.25);
+  assert.deepEqual(
+    quantizedTrackPoint.automation[0].points.map((point) => point.beat),
+    [0, 32, 47.75, 64],
+    "track point quantize should snap project-timeline beats to the grid",
+  );
+  assert.deepEqual(
+    quantizedTrackPoint.automation[0].points.map((point) => point.curve),
+    ["easeIn", "easeIn", "easeIn", "easeIn"],
+    "track point quantize should preserve curve metadata",
+  );
+  const snappedTrackPointValues = arrangementAutomation.snapTrackAutomationPointValues(unsnappedTrackPoint, "filter.cutoff");
+  assert.deepEqual(
+    snappedTrackPointValues.automation[0].points.map((point) => point.value),
+    [0.12, 0.44, 0.74, 0.88],
+    "track point value snapping should round values to the target step",
+  );
   const removedTrackPoint = arrangementAutomation.removeTrackAutomationPoint(movedTrackPoint, "filter.cutoff", 2);
   assert.deepEqual(
     removedTrackPoint.automation[0].points.map((point) => point.beat),
@@ -271,6 +345,16 @@ try {
   );
   const unclutteredTrackCurveEdit = arrangementAutomation.setTrackAutomationTargetCurve(automationTrack, "macro.1", "cubic");
   assert.equal(unclutteredTrackCurveEdit.automation, undefined, "curve edits should not create empty track automation lanes");
+  assert.equal(
+    arrangementAutomation.quantizeTrackAutomationPoints(automationTrack, "macro.1", 64, 0.25).automation,
+    undefined,
+    "track point quantize should not create empty automation lanes",
+  );
+  assert.equal(
+    arrangementAutomation.snapTrackAutomationPointValues(automationTrack, "macro.1").automation,
+    undefined,
+    "track point value snapping should not create empty automation lanes",
+  );
   const clippedTrackLanes = arrangementAutomation.clipTrackAutomation(curvedTrackLane.automation, 40);
   assert.deepEqual(clippedTrackLanes[0].points.map((point) => point.beat), [0, 32], "track automation should clip points outside project length");
   const clearedTrackLane = arrangementAutomation.clearTrackAutomationTarget(curvedTrackLane, "filter.cutoff");

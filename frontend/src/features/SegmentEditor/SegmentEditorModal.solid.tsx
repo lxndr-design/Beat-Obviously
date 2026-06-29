@@ -10,6 +10,7 @@ import {
   clipSegmentAutomation,
   formatAetherArrangementAutomationValue,
   insertSegmentAutomationPoint,
+  quantizeSegmentAutomationPoints,
   removeSegmentAutomationPoint,
   segmentAutomationCurve,
   segmentAutomationSummary,
@@ -18,6 +19,7 @@ import {
   segmentHasAutomationTarget,
   setSegmentAutomationTargetCurve,
   setSegmentAutomationTargetValues,
+  snapSegmentAutomationPointValues,
   updateSegmentAutomationPoint,
   upsertSegmentAutomationTarget,
 } from "../../automation/aetherArrangementAutomation";
@@ -200,6 +202,18 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       currentDraft.lengthBeats / 2,
       range.midValue,
     ));
+  }
+
+  function quantizeSegmentAutomationLanePoints() {
+    const currentDraft = draft();
+    if (!currentDraft) return;
+    setDraftSegment(quantizeSegmentAutomationPoints(currentDraft, activeSegmentAutomationTarget(), 0.25));
+  }
+
+  function snapSegmentAutomationLaneValues() {
+    const currentDraft = draft();
+    if (!currentDraft) return;
+    setDraftSegment(snapSegmentAutomationPointValues(currentDraft, activeSegmentAutomationTarget()));
   }
 
   function setSegmentAutomationPointBeat(index: number, rawBeat: string) {
@@ -553,7 +567,15 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
               <div class={styles.automationPointEditor} aria-label="Aether segment automation points">
                 <div class={styles.automationPointHeader}>
                   <span>Points</span>
-                  <Button size="xs" onClick={addSegmentAutomationPoint}>Add point</Button>
+                  <div class={styles.automationPointTools}>
+                    <Button size="xs" disabled={activeSegmentAutomationPoints().length === 0} onClick={quantizeSegmentAutomationLanePoints}>
+                      Quantize
+                    </Button>
+                    <Button size="xs" disabled={activeSegmentAutomationPoints().length === 0} onClick={snapSegmentAutomationLaneValues}>
+                      Snap values
+                    </Button>
+                    <Button size="xs" onClick={addSegmentAutomationPoint}>Add point</Button>
+                  </div>
                 </div>
                 <For each={activeSegmentAutomationPoints()}>
                   {(point, index) => (

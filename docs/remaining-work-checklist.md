@@ -14,9 +14,15 @@ Status legend:
 
 ## Current Closeout View
 
-Last audited: 2026-06-23.
+Last audited: 2026-06-29.
 
 Use this section as the short working list. The detailed domain lists below remain the full source of truth.
+
+Current implementation focus:
+
+- `[x]` Finish Aether automation point quantize/value snapping across note, segment, and track lanes.
+  - Done: shared helpers, Piano Roll controls, Segment Editor controls, Track Details controls, and frontend interaction verifier coverage.
+  - Remaining in automation: multi-select/copy-paste, broader browser interaction parity, conflict rules, and invalid automation warnings.
 
 1. `[~]` Browser/runtime proof for critical flows.
    - Done: Aether automation browser fixture coverage for note, segment, and track lane entrypoints.
@@ -28,8 +34,9 @@ Use this section as the short working list. The detailed domain lists below rema
    - Done: arrangement-view Aether track automation lane controls can add midpoint points and remove the active or last point.
    - Done: point-level add, move, delete helper coverage exists for Aether note, segment, and track lanes.
    - Done: visible note, segment, and track Aether point editors expose point beat/value editing plus add/remove controls.
+   - Done: visible note, segment, and track Aether point editors expose quantize and value snapping controls with pure interaction verifier coverage.
    - Done: native IPC maps frontend `track.automation` lanes into backend project automation with track and instrument IDs, and dense Aether live/export stress covers a track-scoped multi-point Aether lane.
-   - Add multi-select, copy/paste, quantize, value snapping, and broader browser interaction parity coverage.
+   - Add multi-select, copy/paste, and broader browser interaction parity coverage.
    - Define project vs track vs segment vs note vs live-write conflict rules and surface invalid automation warnings.
 3. `[~]` DAW editing and recording closeout.
    - Broaden marquee, drag, resize, split, fade, crossfade, loop marker, and selection edge-case tests.
@@ -107,6 +114,7 @@ Use this section as the short working list. The detailed domain lists below rema
    - `[x]` Add first visible arrangement-view Aether track automation lane preview.
    - `[x]` Add arrangement-view drag editing for existing Aether track automation points.
    - `[x]` Add arrangement-view automation point add/remove controls.
+   - `[x]` Add point quantize/value snapping for note, segment, and track Aether automation lanes.
    - Add broader browser interaction parity coverage for multi-point note, segment, and track lane edits.
 4. `[x]` Aether preset storage and migration.
    - `[x]` Add schema-versioned local instrument presets with Save As, delete, Restore Init, and legacy normalization.
@@ -158,8 +166,9 @@ Use this section as the short working list. The detailed domain lists below rema
 - `[~]` Automation point add/move/delete, multi-select, copy/paste, quantize, value snapping.
   - Done: Aether note/segment/track helper coverage exists for point add, move, delete, beat clamping, value clamping, sorting, and curve preservation.
   - Done: Piano Roll, Segment Editor, and Track Details expose visible point beat/value editing plus add/remove controls for Aether lanes.
+  - Done: Aether note/segment/track point quantize and value snapping helpers are exposed in visible editors and covered by the frontend interaction verifier.
   - Done: dense native Aether live/export stress covers multi-point note, segment, project, and track-scoped Aether automation lanes.
-  - Remaining: multi-select, copy/paste, quantize, value snapping, and fuller browser/runtime interaction coverage.
+  - Remaining: multi-select, copy/paste, and fuller browser/runtime interaction coverage.
 - `[ ]` Curve editing UI using the existing curve types.
 - `[~]` Segment-local automation editor for Aether targets.
 - `[~]` Note automation lanes in piano roll for pitch, velocity/level, filter, wavetable position, and macro targets.

@@ -217,6 +217,29 @@ export function removeMidiNoteAutomationPoint(
   );
 }
 
+export function quantizeMidiNoteAutomationPoints(
+  notes: MidiNote[],
+  indices: number[],
+  target: MidiAutomationTarget,
+  gridBeats: number,
+): MidiNote[] {
+  if (target === "pitch") return notes;
+  return mutateExistingSelectedNoteAutomationLanes(notes, indices, target, (note, lane) =>
+    quantizeNoteAutomationLaneBeats(note, lane, gridBeats)
+  );
+}
+
+export function snapMidiNoteAutomationPointValues(
+  notes: MidiNote[],
+  indices: number[],
+  target: MidiAutomationTarget,
+): MidiNote[] {
+  if (target === "pitch") return notes;
+  return mutateExistingSelectedNoteAutomationLanes(notes, indices, target, (_note, lane) =>
+    snapAutomationLaneValues(lane, target)
+  );
+}
+
 export function offsetMidiNoteAutomation(
   automation: MidiAutomationLane[] | undefined,
   beatDelta: number,
@@ -306,6 +329,27 @@ function mutateSelectedNoteAutomationLanes(
   });
 }
 
+function mutateExistingSelectedNoteAutomationLanes(
+  notes: MidiNote[],
+  indices: number[],
+  target: MidiAutomationTarget,
+  mutator: (note: MidiNote, lane: MidiAutomationLane) => MidiAutomationLane | null,
+): MidiNote[] {
+  const targets = new Set(indices.filter((index) => notes[index]));
+  if (targets.size === 0) return notes;
+  return notes.map((note, index) => {
+    if (!targets.has(index)) return note;
+    const existingLane = note.automation?.find((candidate) => candidate.target === target);
+    if (!existingLane) return note;
+    const nextLane = mutator(note, existingLane);
+    const lanes = (note.automation ?? []).filter((candidate) => candidate.target !== target);
+    return {
+      ...note,
+      automation: nextLane ? [...lanes, nextLane] : lanes.length > 0 ? lanes : undefined,
+    };
+  });
+}
+
 function insertNoteAutomationPoint(
   note: MidiNote,
   lane: MidiAutomationLane,
@@ -346,6 +390,37 @@ function removeAutomationPoint(lane: MidiAutomationLane, pointIndex: number): Mi
   return points.length > 0 ? { ...lane, points } : null;
 }
 
+function quantizeNoteAutomationLaneBeats(
+  note: MidiNote,
+  lane: MidiAutomationLane,
+  gridBeats: number,
+): MidiAutomationLane {
+  const step = Number.isFinite(gridBeats) && gridBeats > 0 ? gridBeats : 0.25;
+  return {
+    ...lane,
+    points: normalizeAutomationPoints(lane.points.map((point) => {
+      const localBeat = clampLocalBeat(point.beat - note.startBeat, note);
+      return {
+        ...point,
+        beat: note.startBeat + clampLocalBeat(Math.round(localBeat / step) * step, note),
+      };
+    })),
+  };
+}
+
+function snapAutomationLaneValues(
+  lane: MidiAutomationLane,
+  target: MidiAutomationTarget,
+): MidiAutomationLane {
+  return {
+    ...lane,
+    points: normalizeAutomationPoints(lane.points.map((point) => ({
+      ...point,
+      value: snapTargetValue(target, point.value),
+    }))),
+  };
+}
+
 function normalizeAutomationPoints(points: MidiAutomationLane["points"]): MidiAutomationLane["points"] {
   return points
     .map((point) => ({ ...point }))
@@ -383,6 +458,13 @@ function clampLocalBeat(value: number, note: MidiNote): number {
 function clampTargetValue(target: MidiAutomationTarget, value: number): number {
   const meta = aetherNoteAutomationTargetMeta(target);
   return clamp(value, meta.min, meta.max);
+}
+
+function snapTargetValue(target: MidiAutomationTarget, value: number): number {
+  const meta = aetherNoteAutomationTargetMeta(target);
+  const step = Number.isFinite(meta.step) && meta.step > 0 ? meta.step : 0.01;
+  const snapped = Math.round(clamp(value, meta.min, meta.max) / step) * step;
+  return clamp(Number(snapped.toFixed(6)), meta.min, meta.max);
 }
 
 function clamp(value: number, min: number, max: number): number {

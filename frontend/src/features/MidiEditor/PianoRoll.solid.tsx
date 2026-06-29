@@ -12,12 +12,14 @@ import {
   midiNoteHasAutomationTarget,
   normalizeAetherNoteAutomationValue,
   offsetMidiNoteAutomation,
+  quantizeMidiNoteAutomationPoints,
   removeMidiNoteAutomationPoint,
   selectedMidiNoteAutomationCurve,
   selectedMidiNoteAutomationSummary,
   selectedMidiNoteAutomationValueRange,
   setMidiNoteAutomationTargetCurve,
   setMidiNoteAutomationTargetValues,
+  snapMidiNoteAutomationPointValues,
   updateMidiNoteAutomationPoint,
   upsertMidiNoteAutomationTarget,
 } from "../../automation/aetherNoteAutomation";
@@ -880,6 +882,16 @@ export function PianoRoll(props: PianoRollProps) {
     ));
   }
 
+  function quantizeAutomationPointsForSelection() {
+    if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
+    commitChange(quantizeMidiNoteAutomationPoints(props.notes, selected(), activeAutomationTarget(), 0.25));
+  }
+
+  function snapAutomationPointValuesForSelection() {
+    if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
+    commitChange(snapMidiNoteAutomationPointValues(props.notes, selected(), activeAutomationTarget()));
+  }
+
   function setAutomationPointBeat(pointIndex: number, rawBeat: string) {
     if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
     const beat = Number(rawBeat);
@@ -1621,13 +1633,29 @@ export function PianoRoll(props: PianoRollProps) {
               <div class={styles.automationPointEditor} aria-label="Aether note automation points">
                 <div class={styles.automationPointHeader}>
                   <span>Points</span>
-                  <Button
-                    size="xs"
-                    disabled={selected().length === 0}
-                    onClick={addAutomationPointToSelection}
-                  >
-                    Add point
-                  </Button>
+                  <div class={styles.automationPointTools}>
+                    <Button
+                      size="xs"
+                      disabled={selected().length === 0 || activeAutomationTarget() === "pitch" || selectedAutomationPoints().length === 0}
+                      onClick={quantizeAutomationPointsForSelection}
+                    >
+                      Quantize
+                    </Button>
+                    <Button
+                      size="xs"
+                      disabled={selected().length === 0 || activeAutomationTarget() === "pitch" || selectedAutomationPoints().length === 0}
+                      onClick={snapAutomationPointValuesForSelection}
+                    >
+                      Snap values
+                    </Button>
+                    <Button
+                      size="xs"
+                      disabled={selected().length === 0}
+                      onClick={addAutomationPointToSelection}
+                    >
+                      Add point
+                    </Button>
+                  </div>
                 </div>
                 <For each={selectedAutomationPoints()}>
                   {(point, index) => (
