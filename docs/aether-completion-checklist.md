@@ -54,7 +54,8 @@ Status legend:
 - `[x]` Env 1 and Env 2 curve shapes, loop modes, Solid controls, browser preview, native parser, runtime shaping, and stress coverage.
 - `[x]` LFO 1/2 waveform, tempo sync, one-shot, smoothing, phase, random phase, retrigger, browser/worklet preview, native render, and stress/verifier coverage.
 - `[~]` Deeper envelope editing.
-  - Remaining: richer envelope visual editing, better loop/curve handles, and clearer assignment feedback.
+  - Done: Env 1/2 visual summary cards show ADSR shape, loop mode, timing, sustain, curve choices, and routed assignment labels.
+  - Remaining: draggable envelope handles and richer direct curve editing.
   - Proof: interaction tests for handle movement, patch roundtrip, browser preview, and native render stress.
 - `[~]` Performance/expression UX.
   - Done: filter keytracking, keytrack routing, mod wheel routing, runtime pitch bend, linked-note glide, max voice caps, note stealing, mono voice caps, legato retune, Aether patch/editor glide editing, a dedicated editable Performance panel for voices/mono/legato/glide, and editor-visible expression/performance readouts for pitch bend, velocity, keytrack, and mod wheel.

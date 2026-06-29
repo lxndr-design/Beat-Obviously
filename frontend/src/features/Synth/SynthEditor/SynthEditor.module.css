@@ -672,6 +672,92 @@ section.shell {
   padding: var(--synth-gap);
 }
 
+.envelopeCards {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--synth-gap);
+  min-width: 0;
+}
+
+.envelopeCard {
+  display: grid;
+  grid-template-columns: minmax(104px, 0.4fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(48px, 1fr);
+  gap: 4px var(--synth-gap);
+  min-width: 0;
+  padding: 6px;
+  border: var(--border-soft);
+  background: var(--surface-subtle);
+}
+
+.envelopeCard[data-active="true"] {
+  background: var(--interaction-mesh-current);
+}
+
+.envelopeCardHeader,
+.envelopeCardMeta {
+  min-width: 0;
+}
+
+.envelopeCardHeader {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--synth-gap);
+}
+
+.envelopeCardHeader strong,
+.envelopeCardHeader span,
+.envelopeCardMeta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.envelopeCardHeader strong {
+  color: var(--color-fg);
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+}
+
+.envelopeCardHeader span {
+  color: color-mix(in srgb, var(--color-fg) 64%, transparent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.envelopeShape {
+  width: 100%;
+  min-width: 0;
+  height: 52px;
+  border: var(--border-soft);
+  background:
+    linear-gradient(to right, transparent 24%, var(--grid-line-faint) 24%, transparent 25%, transparent 49%, var(--grid-line-faint) 49%, transparent 50%, transparent 74%, var(--grid-line-faint) 74%, transparent 75%),
+    linear-gradient(to bottom, transparent 49%, var(--grid-line-faint) 49%, transparent 50%);
+}
+
+.envelopeShape polyline {
+  fill: none;
+  stroke: var(--color-fg);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.envelopeCardMeta {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  color: color-mix(in srgb, var(--color-fg) 68%, transparent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
 .shapeControl {
   display: grid;
   justify-items: center;

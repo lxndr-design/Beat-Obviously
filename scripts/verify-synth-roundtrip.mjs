@@ -328,6 +328,40 @@ try {
     detail: "Loop · A exp · R log",
     editor: "envelope",
   });
+  assert.deepEqual(synthStore.synthEnvelopeEditorSummary(draft, "env.1"), {
+    source: "env.1",
+    label: "Amp Env",
+    mode: "Loop",
+    timingLabel: "A 12ms / D 340ms / R 780ms",
+    sustainLabel: "S 57%",
+    curveLabel: "A exp / D s-curve / R log",
+    assignmentLabel: "Filter Cutoff +31",
+    assignmentCount: 1,
+    points: [
+      { x: 0, y: 100 },
+      { x: 2, y: 0 },
+      { x: 27, y: 43 },
+      { x: 43, y: 43 },
+      { x: 100, y: 100 },
+    ],
+  });
+  assert.deepEqual(synthStore.synthEnvelopeEditorSummary(draft, "env.2"), {
+    source: "env.2",
+    label: "Mod Env",
+    mode: "Loop",
+    timingLabel: "A 10ms / D 90ms / R 160ms",
+    sustainLabel: "S 0%",
+    curveLabel: "A exp / D s-curve / R log",
+    assignmentLabel: "Filter Res +20",
+    assignmentCount: 1,
+    points: [
+      { x: 0, y: 100 },
+      { x: 6, y: 0 },
+      { x: 24, y: 100 },
+      { x: 68, y: 100 },
+      { x: 100, y: 100 },
+    ],
+  });
   assert.deepEqual(synthStore.modulationSourceAffordance(draft, "macro.1"), {
     source: "macro.1",
     label: "Edit Brightness",

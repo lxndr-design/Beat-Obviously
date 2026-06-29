@@ -37,6 +37,7 @@ import {
   modulationSourceEditorTarget,
   modulationSummaryForSource,
   modulationSummaryForTarget,
+  synthEnvelopeEditorSummary,
   synthExpressionSummary,
   synthDraftFromInstrument,
   synthDraftToInstrumentPatch,
@@ -1386,6 +1387,34 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
         </div>
       </header>
       <div class={`ds-panel-body ${styles.controlGrid}`}>
+        <div class={styles.envelopeCards}>
+          <For each={["env.1", "env.2"] as const}>
+            {(source) => {
+              const envelope = () => synthEnvelopeEditorSummary(draft(), source);
+              return (
+                <div
+                  class={styles.envelopeCard}
+                  data-synth-source-editor={source}
+                  data-active={props.focusedSourceTarget === source ? "true" : "false"}
+                >
+                  <div class={styles.envelopeCardHeader}>
+                    <strong>{envelope().label}</strong>
+                    <span>{envelope().mode}</span>
+                  </div>
+                  <svg class={styles.envelopeShape} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                    <polyline points={envelopePolyline(envelope().points)} />
+                  </svg>
+                  <div class={styles.envelopeCardMeta}>
+                    <span>{envelope().timingLabel}</span>
+                    <span>{envelope().sustainLabel}</span>
+                    <span>{envelope().curveLabel}</span>
+                    <span>{envelope().assignmentLabel}</span>
+                  </div>
+                </div>
+              );
+            }}
+          </For>
+        </div>
         <ShapeButtonSet
           label="Filter"
           value={filterType()}
@@ -1651,6 +1680,10 @@ function formatPercent(value: number): string {
 
 function formatSeconds(value: number): string {
   return value < 1 ? `${Math.round(value * 1000)}ms` : `${value.toFixed(2)}s`;
+}
+
+function envelopePolyline(points: Array<{ x: number; y: number }>): string {
+  return points.map((point) => `${point.x},${point.y}`).join(" ");
 }
 
 const MODULATABLE_PARAMETER_IDS = new Set<string>([

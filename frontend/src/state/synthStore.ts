@@ -216,6 +216,23 @@ export interface SynthExpressionSummaryItem {
   active: boolean;
 }
 
+export interface SynthEnvelopeShapePoint {
+  x: number;
+  y: number;
+}
+
+export interface SynthEnvelopeEditorSummary {
+  source: "env.1" | "env.2";
+  label: string;
+  mode: "Loop" | "One-shot";
+  timingLabel: string;
+  sustainLabel: string;
+  curveLabel: string;
+  assignmentLabel: string;
+  assignmentCount: number;
+  points: SynthEnvelopeShapePoint[];
+}
+
 export interface SynthDraftPatch {
   schemaVersion: typeof SYNTH_PATCH_SCHEMA_VERSION;
   instrumentType: typeof SYNTH_INSTRUMENT_TYPE;
@@ -1346,6 +1363,41 @@ export function modulationSourceEditorTarget(source: ModulationSourceId): SynthM
   return source;
 }
 
+export function synthEnvelopeEditorSummary(draft: SynthDraftPatch, source: "env.1" | "env.2"): SynthEnvelopeEditorSummary {
+  const attack = getNumberParam(draft, `${source}.attack` as SynthParameterId);
+  const decay = getNumberParam(draft, `${source}.decay` as SynthParameterId);
+  const sustain = clamp01(getNumberParam(draft, `${source}.sustain` as SynthParameterId));
+  const release = getNumberParam(draft, `${source}.release` as SynthParameterId);
+  const attackCurve = getEnvelopeCurveParam(draft, `${source}.attackCurve` as SynthParameterId);
+  const decayCurve = getEnvelopeCurveParam(draft, `${source}.decayCurve` as SynthParameterId);
+  const releaseCurve = getEnvelopeCurveParam(draft, `${source}.releaseCurve` as SynthParameterId);
+  const loop = getBooleanParam(draft, `${source}.loop` as SynthParameterId);
+  const assignment = modulationSummaryForSource(draft, source);
+  const weights = normalizeEnvelopePhaseWeights(attack, decay, release);
+  const attackX = weights.attack * 100;
+  const decayX = (weights.attack + weights.decay) * 100;
+  const holdX = (weights.attack + weights.decay + weights.hold) * 100;
+  const sustainY = (1 - sustain) * 100;
+
+  return {
+    source,
+    label: source === "env.1" ? "Amp Env" : "Mod Env",
+    mode: loop ? "Loop" : "One-shot",
+    timingLabel: `A ${formatEnvelopeTime(attack)} / D ${formatEnvelopeTime(decay)} / R ${formatEnvelopeTime(release)}`,
+    sustainLabel: `S ${Math.round(sustain * 100)}%`,
+    curveLabel: `A ${attackCurve} / D ${decayCurve} / R ${releaseCurve}`,
+    assignmentLabel: assignment.count > 0 ? assignment.label : source === "env.1" ? "Amp envelope" : "No routes",
+    assignmentCount: assignment.count,
+    points: [
+      { x: 0, y: 100 },
+      { x: Math.round(attackX), y: 0 },
+      { x: Math.round(decayX), y: Math.round(sustainY) },
+      { x: Math.round(holdX), y: Math.round(sustainY) },
+      { x: 100, y: 100 },
+    ],
+  };
+}
+
 export function synthExpressionSummary(draft: SynthDraftPatch): SynthExpressionSummaryItem[] {
   const maxVoices = Math.max(1, Math.round(getNumberParam(draft, "maxVoices")));
   const mono = getBooleanParam(draft, "mono.enabled");
@@ -1527,6 +1579,26 @@ function formatSignedModAmount(amount: number): string {
 function formatDecimal(value: number, decimals: number): string {
   const safe = Number.isFinite(value) ? value : 0;
   return safe.toFixed(decimals).replace(/\.?0+$/, "");
+}
+
+function formatEnvelopeTime(seconds: number): string {
+  const safe = Math.max(0, Number.isFinite(seconds) ? seconds : 0);
+  if (safe < 1) return `${Math.round(safe * 1000)}ms`;
+  return `${formatDecimal(safe, 2)}s`;
+}
+
+function normalizeEnvelopePhaseWeights(attack: number, decay: number, release: number): { attack: number; decay: number; hold: number; release: number } {
+  const safeAttack = Math.max(0.03, Number.isFinite(attack) ? attack : 0);
+  const safeDecay = Math.max(0.03, Number.isFinite(decay) ? decay : 0);
+  const safeRelease = Math.max(0.03, Number.isFinite(release) ? release : 0);
+  const hold = 0.22;
+  const total = safeAttack + safeDecay + hold + safeRelease;
+  return {
+    attack: safeAttack / total,
+    decay: safeDecay / total,
+    hold: hold / total,
+    release: safeRelease / total,
+  };
 }
 
 function formatRouteTargetRange(target: ModulationTargetId, amount: number): string {
