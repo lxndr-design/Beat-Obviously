@@ -2,6 +2,7 @@ import type { DecentSamplerUiControl } from "../ipc/schema";
 import { db } from "../persistence/dexie";
 import type { AetherEffectPresetRecord } from "../state/effectPresets";
 import {
+  createDefaultCustomWavetable,
   createDefaultSynthDraft,
   synthDraftToInstrumentPatch,
   useSynthStore,
@@ -34,6 +35,9 @@ const DEV_AETHER_PRESET_LIBRARY_PLAIN_ID = "dev-aether-preset-library-plain";
 const DEV_AETHER_PRESET_LIBRARY_INSTRUMENT_ID = "dev-aether-preset-library-host";
 const DEV_AETHER_MACRO_INSTRUMENT_ID = "dev-aether-macro-host";
 const DEV_AETHER_MACRO_INSTRUMENT_ID_MARKER = "Aether macro browser dev fixture";
+const DEV_AETHER_WAVEMAP_INSTRUMENT_ID = "dev-aether-wavemap-editor-host";
+const DEV_AETHER_WAVEMAP_INSTRUMENT_ID_MARKER = "Aether wavemap editor dev fixture";
+const DEV_AETHER_WAVEMAP_ID = "user.browser-wavemap";
 const DEV_AETHER_AUTOMATION_INSTRUMENT_ID_MARKER = "Aether automation dev fixture";
 const DEV_AETHER_AUTOMATION_TRACK_ID = "dev-aether-automation-track";
 const DEV_AETHER_AUTOMATION_SEGMENT_ID = "dev-aether-automation-segment";
@@ -88,6 +92,7 @@ declare global {
         instrumentId: string;
       }>;
       readAetherMacroFixtureState: () => DevAetherMacroFixtureState;
+      exerciseAetherWavemapEditorFlow: () => Promise<DevAetherWavemapEditorFixtureState>;
       exerciseAetherPresetLibraryFavoriteFlow: () => Promise<{
         installed: DevAetherPresetLibraryFixtureState;
         filtered: DevAetherPresetLibraryFixtureState;
@@ -181,6 +186,24 @@ interface DevAetherMacroFixtureState {
     assignmentsText: string;
     conflictText: string;
     conflictDetails: string[];
+  };
+}
+
+interface DevAetherWavemapEditorFixtureState {
+  instrumentId: string | null;
+  selectedWavetable: string;
+  editorText: string;
+  analysisText: string;
+  manualRangeText: string;
+  interpolation: string | null;
+  morph: number | null;
+  firstPartials: number[];
+  firstFrameBrightness: number | null;
+  visibleModes: {
+    details: boolean;
+    additive: boolean;
+    manual: boolean;
+    smooth: boolean;
   };
 }
 
@@ -572,6 +595,67 @@ export function installBeatDevHooks() {
     return state;
   };
 
+  const exerciseAetherWavemapEditorFlow = async (): Promise<DevAetherWavemapEditorFixtureState> => {
+    const instrumentStore = useInstrumentStore.getState();
+    for (const instrument of instrumentStore.instruments) {
+      if ((instrument.id === DEV_AETHER_WAVEMAP_INSTRUMENT_ID || instrument.source?.label === DEV_AETHER_WAVEMAP_INSTRUMENT_ID_MARKER) && instrument.userCreated) {
+        instrumentStore.removeInstrument(instrument.id);
+      }
+    }
+
+    const baseDraft = createDefaultSynthDraft();
+    const wavemap = createBrowserWavemapFixture();
+    const patch: SynthDraftPatch = {
+      ...baseDraft,
+      name: "Wavemap Browser Host",
+      parameters: {
+        ...baseDraft.parameters,
+        "osc.a.wavetable": DEV_AETHER_WAVEMAP_ID,
+        "osc.a.position": 0.42,
+        "osc.a.warp": 0.24,
+      },
+      metadata: {
+        ...baseDraft.metadata,
+        tags: [...new Set([...baseDraft.metadata.tags, "dev", "wavemap-browser"])],
+        wavemaps: {
+          ...(baseDraft.metadata.wavemaps ?? {}),
+          [DEV_AETHER_WAVEMAP_ID]: wavemap,
+        },
+        customWavetables: {
+          ...(baseDraft.metadata.customWavetables ?? {}),
+          [DEV_AETHER_WAVEMAP_ID]: wavemap,
+        },
+      },
+    };
+
+    const nextInstrumentId = instrumentStore.addInstrument({
+      ...synthDraftToInstrumentPatch(patch),
+      id: DEV_AETHER_WAVEMAP_INSTRUMENT_ID,
+      name: patch.name,
+      source: { kind: "created", label: DEV_AETHER_WAVEMAP_INSTRUMENT_ID_MARKER },
+      userCreated: true,
+    });
+    useSynthStore.getState().bindInstrument(nextInstrumentId);
+    useSynthStore.getState().setDraft(patch);
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
+    await waitForEditorPanel("Oscillator A wavemap frames");
+
+    clickPanelButton("Oscillator A wavemap frames", "Details wavemap analysis");
+    clickPanelButton("Oscillator A wavemap frames", "Additive wavemap editing");
+    clickPanelButton("Oscillator A wavemap frames", "Manual audio resynthesis window");
+    await nextFrame();
+    setNumberInputInPanel("Manual audio resynthesis range", "Start", "20");
+    setNumberInputInPanel("Manual audio resynthesis range", "End", "65");
+    await nextFrame();
+    clickPanelButtonByText("Harmonic partial tools", "Odd");
+    await nextFrame();
+    clickPanelButtonByText("Oscillator A wavemap frames", "Smooth");
+    await nextFrame();
+    const state = readAetherWavemapEditorFixtureState();
+    writeAetherWavemapEditorFixtureMarker(state);
+    return state;
+  };
+
   const installAetherAutomationFixture = () => {
     const instrumentStore = useInstrumentStore.getState();
     for (const instrument of instrumentStore.instruments) {
@@ -790,6 +874,7 @@ export function installBeatDevHooks() {
     readAetherPresetLibraryFixtureState,
     installAetherMacroFixture,
     readAetherMacroFixtureState,
+    exerciseAetherWavemapEditorFlow,
     exerciseAetherPresetLibraryFavoriteFlow,
     installAetherAutomationFixture,
     openAetherAutomationFixtureEditor,
@@ -826,6 +911,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-macro") {
     window.setTimeout(() => {
       void installAetherMacroFixture();
+    }, 0);
+  } else if (fixture === "aether-wavemap-editor") {
+    window.setTimeout(() => {
+      void exerciseAetherWavemapEditorFlow();
     }, 0);
   } else if (fixture === "aether-automation") {
     window.setTimeout(() => {
@@ -886,9 +975,42 @@ function readMacroFixtureDomState(label: string): DevAetherMacroFixtureState {
   };
 }
 
+function readAetherWavemapEditorFixtureState(): DevAetherWavemapEditorFixtureState {
+  const draft = useSynthStore.getState().draft;
+  const table = draft.metadata.wavemaps?.[DEV_AETHER_WAVEMAP_ID] ?? draft.metadata.customWavetables?.[DEV_AETHER_WAVEMAP_ID] ?? null;
+  const editor = findElementByAriaLabel("Oscillator A wavemap frames");
+  const analysis = findElementByAriaLabel("Wavemap analysis details", editor);
+  const manualRange = findElementByAriaLabel("Manual audio resynthesis range", editor);
+  const editorText = normalizeText(editor?.textContent ?? "");
+  return {
+    instrumentId: useSynthStore.getState().boundInstrumentId,
+    selectedWavetable: String(draft.parameters["osc.a.wavetable"] ?? ""),
+    editorText,
+    analysisText: normalizeText(analysis?.textContent ?? ""),
+    manualRangeText: normalizeText(manualRange?.textContent ?? ""),
+    interpolation: table?.interpolation ?? null,
+    morph: table?.morph ?? null,
+    firstPartials: table?.frames?.[0]?.partials?.slice(0, 6) ?? [],
+    firstFrameBrightness: table?.frames?.[0]?.brightness ?? null,
+    visibleModes: {
+      details: Boolean(analysis),
+      additive: selectedButtonExists("Oscillator A wavemap frames", "Additive wavemap editing"),
+      manual: Boolean(manualRange),
+      smooth: table?.interpolation === "smooth",
+    },
+  };
+}
+
 function findElementByAriaLabel(label: string, root: ParentNode | null = document): HTMLElement | null {
   return Array.from(root?.querySelectorAll<HTMLElement>("[aria-label]") ?? [])
     .find((candidate) => candidate.getAttribute("aria-label") === label) ?? null;
+}
+
+function selectedButtonExists(panelLabel: string, buttonLabel: string): boolean {
+  const panel = findElementByAriaLabel(panelLabel);
+  const button = Array.from(panel?.querySelectorAll<HTMLButtonElement>("button") ?? [])
+    .find((candidate) => normalizeText(candidate.getAttribute("aria-label") ?? candidate.textContent ?? "") === buttonLabel);
+  return Boolean(button?.getAttribute("aria-pressed") === "true" || button?.className.includes("selected") || button?.dataset.selected === "true");
 }
 
 function clickPanelButton(panelLabel: string, buttonLabel: string) {
@@ -903,6 +1025,18 @@ function clickPanelButtonByText(panelLabel: string, buttonLabel: string) {
   const button = Array.from(panel?.querySelectorAll<HTMLButtonElement>("button") ?? [])
     .find((candidate) => normalizeText(candidate.getAttribute("aria-label") ?? candidate.textContent ?? "") === buttonLabel);
   button?.click();
+}
+
+function setNumberInputInPanel(panelLabel: string, fieldLabel: string, value: string) {
+  const panel = findElementByAriaLabel(panelLabel);
+  const label = Array.from(panel?.querySelectorAll<HTMLLabelElement>("label") ?? [])
+    .find((candidate) => normalizeText(candidate.querySelector("span")?.textContent ?? "") === fieldLabel);
+  const input = label?.querySelector<HTMLInputElement>("input");
+  if (!input) return;
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  input.dispatchEvent(new Event("blur", { bubbles: true }));
 }
 
 function setLastAutomationPointField(panelLabel: string, fieldLabel: "Beat" | "Value", value: string) {
@@ -992,6 +1126,10 @@ function writeAetherMacroFixtureMarker(state = readMacroFixtureDomState("Brightn
   document.documentElement.dataset.beatAetherMacroFixture = JSON.stringify(state);
 }
 
+function writeAetherWavemapEditorFixtureMarker(state = readAetherWavemapEditorFixtureState()) {
+  document.documentElement.dataset.beatAetherWavemapEditorFixture = JSON.stringify(state);
+}
+
 function aetherAutomationPointEditorLabel(editor: DevAetherAutomationPointEditor): string {
   if (editor === "track") return "Aether track automation points";
   if (editor === "segment") return "Aether segment automation points";
@@ -1051,6 +1189,42 @@ function nextFrame() {
 
 function normalizeText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
+}
+
+function createBrowserWavemapFixture() {
+  const base = createDefaultCustomWavetable(DEV_AETHER_WAVEMAP_ID);
+  return {
+    ...base,
+    name: "Browser Wavemap",
+    interpolation: "linear" as const,
+    morph: 0.36,
+    source: {
+      kind: "resynthesized" as const,
+      label: "Browser fixture audio",
+      sampleRate: 48_000,
+      channelCount: 2,
+      bitDepth: 24,
+      sourceSampleCount: 8192,
+      analyzedSampleCount: 4096,
+      frameCount: base.frames.length,
+    },
+    frames: base.frames.map((frame, index) => ({
+      ...frame,
+      partials: Array.from({ length: 16 }, (_, partialIndex) => partialIndex === 0 ? 0.7 - index * 0.08 : 0.05),
+      analysis: {
+        sourceStartSample: index * 1024,
+        sourceEndSample: index * 1024 + 1024,
+        rms: 0.22 + index * 0.04,
+        peak: 0.72 + index * 0.03,
+        zeroCrossRate: 0.08 + index * 0.02,
+        roughness: 0.18 + index * 0.03,
+        asymmetry: -0.12 + index * 0.07,
+        spectralCentroid: 3.5 + index * 1.2,
+        dominantHarmonic: 2 + index,
+        dominantPhase: -0.2 + index * 0.1,
+      },
+    })),
+  };
 }
 
 function createAetherPresetLibraryFixtureRecord({

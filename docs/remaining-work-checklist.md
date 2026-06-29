@@ -28,6 +28,7 @@ Current implementation focus:
    - Done: Aether automation browser fixture coverage for note, segment, and track lane entrypoints.
    - Done: Synth Editor macro browser fixture coverage for visible assignment lanes and overlapping-route conflict rows.
    - Done: Aether automation point-editor browser fixture coverage for Add Point, field editing, Quantize, and Snap Values across note, segment, and track Macro 1 lanes.
+   - Done: Aether wavemap editor browser fixture coverage for Details analysis, Additive mode, Odd partials, Manual range, and Smooth interpolation.
    - Add browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, arrangement editing, export, relink, backup restore, and Project Health repairs.
    - Add visible hover, selected, disabled, loading, and migrated-framework smoke coverage on critical screens.
 2. `[~]` Automation editing completion.
