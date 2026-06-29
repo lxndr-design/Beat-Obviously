@@ -3169,6 +3169,52 @@ namespace
         return peak;
     }
 
+    struct BufferResidualStats
+    {
+        bool ok { false };
+        double sourceEnergy { 0.0 };
+        double residualEnergy { 0.0 };
+        double meanAbsDiff { std::numeric_limits<double>::infinity() };
+        float maxAbsDiff { 0.0f };
+        int comparedSamples { 0 };
+    };
+
+    BufferResidualStats bufferResidualStats(const juce::AudioBuffer<float>& source,
+                                            const juce::AudioBuffer<float>& candidate,
+                                            int samples)
+    {
+        BufferResidualStats stats;
+        if (samples <= 0
+            || source.getNumChannels() != candidate.getNumChannels()
+            || source.getNumSamples() < samples
+            || candidate.getNumSamples() < samples)
+            return stats;
+
+        double sumAbsDiff = 0.0;
+        for (int ch = 0; ch < source.getNumChannels(); ++ch)
+        {
+            for (int i = 0; i < samples; ++i)
+            {
+                const float sourceSample = source.getSample(ch, i);
+                const float candidateSample = candidate.getSample(ch, i);
+                if (!std::isfinite(sourceSample) || !std::isfinite(candidateSample))
+                    return {};
+
+                const float diff = sourceSample - candidateSample;
+                const float absDiff = std::abs(diff);
+                stats.maxAbsDiff = std::max(stats.maxAbsDiff, absDiff);
+                sumAbsDiff += absDiff;
+                stats.sourceEnergy += (double) sourceSample * (double) sourceSample;
+                stats.residualEnergy += (double) diff * (double) diff;
+            }
+        }
+
+        stats.comparedSamples = source.getNumChannels() * samples;
+        stats.meanAbsDiff = sumAbsDiff / (double) stats.comparedSamples;
+        stats.ok = true;
+        return stats;
+    }
+
     double bufferWindowEnergy(const juce::AudioBuffer<float>& buffer, int startSample, int numSamples)
     {
         const int start = juce::jlimit(0, buffer.getNumSamples(), startSample);
@@ -9688,6 +9734,74 @@ namespace
         return ok;
     }
 
+    bool stressAudioEngineAetherDeterministicNullExport()
+    {
+        auto project = makeDenseAetherProject();
+        project.id = "deterministic-aether-null-export";
+        project.name = "Deterministic Aether Null Export";
+        project.lengthBeats = 1.25;
+
+        auto& instrument = project.instruments.front();
+        instrument.aether.noise.enabled = false;
+        instrument.aether.noise.level = 0.0f;
+        instrument.aether.oscA.randomPhase = 0.0f;
+        instrument.aether.oscB.randomPhase = 0.0f;
+
+        constexpr int samples = 18000;
+        constexpr int blockSize = 257;
+        constexpr double sampleRate = 44100.0;
+
+        auto liveA = renderOfflineChunks(project, samples, blockSize, sampleRate);
+        auto liveB = renderOfflineChunks(project, samples, blockSize, sampleRate);
+        const auto liveNull = bufferResidualStats(liveA, liveB, samples);
+
+        auto exportFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-aether-null-export.wav");
+        if (exportFile.existsAsFile())
+            exportFile.deleteFile();
+
+        juce::String error;
+        if (!beat::AudioEngine::renderProjectToWav(project, exportFile, sampleRate, blockSize, 2, &error, {}, 32))
+        {
+            std::cerr << "Aether deterministic null export error: " << error << "\n";
+            return false;
+        }
+
+        auto exported = readWavPrefix(exportFile, samples);
+        exportFile.deleteFile();
+        const auto exportNull = bufferResidualStats(liveA, exported, samples);
+        const double exportResidualRatio = exportNull.sourceEnergy > 0.0
+            ? exportNull.residualEnergy / exportNull.sourceEnergy
+            : std::numeric_limits<double>::infinity();
+
+        const bool ok = liveNull.ok
+            && exportNull.ok
+            && liveNull.sourceEnergy > 0.0001
+            && liveNull.residualEnergy <= 0.000000000001
+            && liveNull.maxAbsDiff <= 0.0000001f
+            && exportNull.sourceEnergy > 0.0001
+            && exportNull.maxAbsDiff <= 0.0000005f
+            && exportNull.meanAbsDiff <= 0.00000008
+            && exportResidualRatio <= 0.00000000001;
+
+        if (!ok)
+        {
+            std::cerr << "Aether deterministic null export failed"
+                      << " liveOk=" << liveNull.ok
+                      << " liveEnergy=" << liveNull.sourceEnergy
+                      << " liveResidual=" << liveNull.residualEnergy
+                      << " liveMaxDiff=" << liveNull.maxAbsDiff
+                      << " exportOk=" << exportNull.ok
+                      << " exportEnergy=" << exportNull.sourceEnergy
+                      << " exportResidual=" << exportNull.residualEnergy
+                      << " exportResidualRatio=" << exportResidualRatio
+                      << " exportMaxDiff=" << exportNull.maxAbsDiff
+                      << " exportMeanDiff=" << exportNull.meanAbsDiff
+                      << "\n";
+        }
+
+        return ok;
+    }
+
     bool stressWavetableOscillator()
     {
         static_assert(beat::params::patchSchemaVersion == 1);
@@ -12315,6 +12429,11 @@ int main()
     if (!stressAudioEngineDenseAetherLiveExportParity())
     {
         std::cerr << "Audio engine dense Aether live/export parity stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineAetherDeterministicNullExport())
+    {
+        std::cerr << "Audio engine Aether deterministic null export stress failed\n";
         return 1;
     }
     if (!stressAudioEngineVariableBlockSizes())
