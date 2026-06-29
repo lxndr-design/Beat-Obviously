@@ -852,6 +852,7 @@ export function SynthEditor(props: SynthEditorProps) {
         <InstrumentFxRack />
 
         <div class={styles.bottomGrid}>
+          <PerformancePanel focusedSourceTarget={focusedSourceTarget()} />
           <AmpFilterPanel focusedSourceTarget={focusedSourceTarget()} />
           <ModulationMatrix onFocusSource={focusModulationSourceEditor} />
         </div>
@@ -1279,6 +1280,81 @@ function LfoLane(props: { lfo: 1 | 2; focused?: boolean }) {
   );
 }
 
+function PerformancePanel(props: { focusedSourceTarget?: SynthModulationSourceEditorTarget | null }) {
+  const draft = createStoreSelector(useSynthStore, (state) => state.draft);
+  const setNumericParameter = useSynthStore.getState().setNumericParameter;
+  const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
+  const summary = createMemo(() => synthExpressionSummary(draft()));
+  const routedSummary = createMemo(() => summary().filter((item) => (
+    item.id === "pitch-bend" || item.id === "velocity" || item.id === "keytrack" || item.id === "mod-wheel"
+  )));
+  const mono = createMemo(() => draft().parameters["mono.enabled"] === true);
+  const legato = createMemo(() => draft().parameters["legato.enabled"] === true);
+
+  return (
+    <section
+      class={`ds-panel ${props.focusedSourceTarget === "performance" ? styles.sourceFocus : ""}`}
+      aria-label="Performance controls"
+      data-synth-source-editor="performance"
+    >
+      <header class="ds-panel-header">
+        <div class="ds-panel-title">Performance</div>
+      </header>
+      <div class={`ds-panel-body ${styles.performanceBody}`}>
+        <div class={styles.performanceControls}>
+          <NumberInput
+            label="Voices"
+            layout="inline"
+            value={getNumberParam(draft(), "maxVoices")}
+            min={1}
+            max={32}
+            step={1}
+            maxLength={2}
+            onChange={(value) => setNumericParameter("maxVoices", value)}
+          />
+          <NumberInput
+            label="Glide"
+            layout="inline"
+            value={getNumberParam(draft(), "glide.ms")}
+            min={0}
+            max={5000}
+            step={1}
+            unit="ms"
+            maxLength={4}
+            onChange={(value) => setNumericParameter("glide.ms", value)}
+          />
+          <Toggle
+            label="Mono"
+            checked={mono()}
+            onChange={(value) => setBooleanParameter("mono.enabled", value)}
+          />
+          <Toggle
+            label="Legato"
+            checked={legato()}
+            onChange={(value) => setBooleanParameter("legato.enabled", value)}
+          />
+        </div>
+        <div class={styles.performanceReadouts} aria-label="Performance source readouts">
+          <For each={routedSummary()}>
+            {(item) => (
+              <div
+                class={styles.performanceReadout}
+                data-active={item.active ? "true" : "false"}
+                data-mesh-variant={meshTintVariantFor(item.id)}
+                title={`${item.label}: ${item.value} - ${item.detail}`}
+              >
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+                <small>{item.detail}</small>
+              </div>
+            )}
+          </For>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEditorTarget | null }) {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
@@ -1291,9 +1367,9 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
 
   return (
     <section
-      class={`ds-panel ${filterEnabled() ? "" : styles.disabledPanel} ${props.focusedSourceTarget === "env.1" || props.focusedSourceTarget === "env.2" || props.focusedSourceTarget === "performance" ? styles.sourceFocus : ""}`}
+      class={`ds-panel ${filterEnabled() ? "" : styles.disabledPanel} ${props.focusedSourceTarget === "env.1" || props.focusedSourceTarget === "env.2" ? styles.sourceFocus : ""}`}
       aria-label="Amp and filter"
-      data-synth-source-editor={props.focusedSourceTarget === "env.1" || props.focusedSourceTarget === "env.2" ? props.focusedSourceTarget : "performance"}
+      data-synth-source-editor={props.focusedSourceTarget === "env.1" || props.focusedSourceTarget === "env.2" ? props.focusedSourceTarget : undefined}
     >
       <header class="ds-panel-header">
         <div class="ds-panel-title">Amp / Filter</div>
@@ -1336,7 +1412,6 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
           ["filter.drive", "Drive", 0, false],
           ["amp.level", "Level", 0.8, false],
           ["amp.pan", "Pan", 0, true],
-          ["glide.ms", "Glide", 0, false],
           ["env.1.attack", "Attack", 0.005, false],
           ["env.1.decay", "Decay", 0.15, false],
           ["env.1.sustain", "Sustain", 0.8, false],
@@ -1352,14 +1427,13 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               label={label}
               value={getNumberParam(draft(), id)}
               min={bipolar ? -1 : 0}
-              max={id === "glide.ms" ? 5000 : id.startsWith("env.") && !id.endsWith("sustain") ? 30 : 1}
-              step={id === "glide.ms" ? 1 : id.startsWith("env.") && !id.endsWith("sustain") ? 0.001 : 0.01}
-              unit={id === "glide.ms" ? "ms" : undefined}
+              max={id.startsWith("env.") && !id.endsWith("sustain") ? 30 : 1}
+              step={id.startsWith("env.") && !id.endsWith("sustain") ? 0.001 : 0.01}
               defaultValue={defaultValue}
               bipolar={bipolar}
               {...modulationPropsForTarget(draft(), id)}
               pickTargetId={MODULATABLE_PARAMETER_IDS.has(id) ? id : undefined}
-              formatValue={id === "glide.ms" ? (value) => Math.round(value).toString() : id.startsWith("env.") && !id.endsWith("sustain") ? formatSeconds : formatPercent}
+              formatValue={id.startsWith("env.") && !id.endsWith("sustain") ? formatSeconds : formatPercent}
               onChange={(value) => setNumericParameter(id, value)}
             />
           )}

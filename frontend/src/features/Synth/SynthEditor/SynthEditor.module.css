@@ -59,7 +59,7 @@ section.shell {
 
 .bottomGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--synth-gap);
   min-width: 0;
 }
@@ -311,7 +311,8 @@ section.shell {
   min-width: 0;
 }
 
-.expressionSummaryItem {
+.expressionSummaryItem,
+.performanceReadout {
   display: grid;
   grid-template-rows: auto auto auto;
   gap: 2px;
@@ -322,36 +323,69 @@ section.shell {
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
 }
 
-.expressionSummaryItem[data-active="true"] {
+.expressionSummaryItem[data-active="true"],
+.performanceReadout[data-active="true"] {
   background: var(--interaction-mesh-current);
   color: color-mix(in srgb, var(--color-fg) 78%, transparent);
 }
 
 .expressionSummaryItem span,
 .expressionSummaryItem strong,
-.expressionSummaryItem small {
+.expressionSummaryItem small,
+.performanceReadout span,
+.performanceReadout strong,
+.performanceReadout small {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.expressionSummaryItem span {
+.expressionSummaryItem span,
+.performanceReadout span {
   font-size: var(--font-size-ui);
   line-height: 1;
 }
 
-.expressionSummaryItem strong {
+.expressionSummaryItem strong,
+.performanceReadout strong {
   color: var(--color-fg);
   font-size: var(--font-size-ui);
   font-weight: var(--font-weight-medium);
   line-height: 1;
 }
 
-.expressionSummaryItem small {
+.expressionSummaryItem small,
+.performanceReadout small {
   font-family: var(--font-family-mono);
   font-size: var(--font-size-ui);
   line-height: 1;
+}
+
+.performanceBody {
+  display: grid;
+  gap: var(--synth-gap);
+  min-width: 0;
+  padding: var(--synth-gap);
+}
+
+.performanceControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--synth-gap);
+  min-width: 0;
+}
+
+.performanceControls :global(.ds-number-input),
+.performanceControls label {
+  min-width: 0;
+}
+
+.performanceReadouts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  min-width: 0;
 }
 
 .fxPresetInfo {
