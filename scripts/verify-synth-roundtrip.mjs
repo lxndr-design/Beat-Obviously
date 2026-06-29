@@ -244,6 +244,50 @@ try {
     amount: 0.25,
     label: "Amp Level +25",
   });
+  assert.deepEqual(synthStore.synthExpressionSummary(draft), [
+    {
+      id: "voices",
+      label: "Voices",
+      value: "Mono",
+      detail: "Single active voice",
+      active: true,
+    },
+    {
+      id: "legato",
+      label: "Legato",
+      value: "On",
+      detail: "Retunes held voice",
+      active: true,
+    },
+    {
+      id: "pitch-bend",
+      label: "Pitch Bend",
+      value: "+/-2 st",
+      detail: "Runtime MIDI bend",
+      active: true,
+    },
+    {
+      id: "velocity",
+      label: "Velocity",
+      value: "Amp Level +25",
+      detail: "1 routed",
+      active: true,
+    },
+    {
+      id: "keytrack",
+      label: "Keytrack",
+      value: "OSC A Level +20",
+      detail: "1 routed",
+      active: true,
+    },
+    {
+      id: "mod-wheel",
+      label: "Mod Wheel",
+      value: "Amp Pan +35",
+      detail: "1 routed",
+      active: true,
+    },
+  ]);
   const fineRoute = draft.modulation.find((route) => route.target === "osc.a.fine");
   assert.ok(fineRoute, "expected fine modulation route fixture");
   assert.deepEqual(synthStore.modulationRouteDisplay(draft, fineRoute), {

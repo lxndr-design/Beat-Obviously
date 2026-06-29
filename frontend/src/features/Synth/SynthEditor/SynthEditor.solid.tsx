@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { previewFrequency, renderedInstrumentBuffer } from "../../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../../audio/synthWorkletPreview";
-import { appPrompt, Button, HoverInfo, Icon, Knob, NumberInput, TextInput, Toggle } from "../../../solid-ui";
+import { appPrompt, Button, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, TextInput, Toggle } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import {
   createTrackEffect,
@@ -37,6 +37,7 @@ import {
   modulationSourceEditorTarget,
   modulationSummaryForSource,
   modulationSummaryForTarget,
+  synthExpressionSummary,
   synthDraftFromInstrument,
   synthDraftToInstrumentPatch,
   synthDraftToPreviewInstrument,
@@ -689,6 +690,22 @@ export function SynthEditor(props: SynthEditorProps) {
                     </For>
                   </div>
                 </Show>
+              </div>
+              <div class={styles.expressionSummary} aria-label="Aether expression and performance summary">
+                <For each={synthExpressionSummary(draft())}>
+                  {(item) => (
+                    <div
+                      class={styles.expressionSummaryItem}
+                      data-active={item.active ? "true" : "false"}
+                      data-mesh-variant={meshTintVariantFor(item.id)}
+                      title={`${item.label}: ${item.value} - ${item.detail}`}
+                    >
+                      <span>{item.label}</span>
+                      <strong>{item.value}</strong>
+                      <small>{item.detail}</small>
+                    </div>
+                  )}
+                </For>
               </div>
             </div>
           </section>

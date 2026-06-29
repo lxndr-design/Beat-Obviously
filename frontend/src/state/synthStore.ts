@@ -207,6 +207,14 @@ export interface SynthModulationSourceAffordance {
 
 export type SynthModulationSourceEditorTarget = MacroId | "lfo.1" | "lfo.2" | "env.1" | "env.2" | "performance";
 
+export interface SynthExpressionSummaryItem {
+  id: "voices" | "legato" | "pitch-bend" | "velocity" | "keytrack" | "mod-wheel";
+  label: string;
+  value: string;
+  detail: string;
+  active: boolean;
+}
+
 export interface SynthDraftPatch {
   schemaVersion: typeof SYNTH_PATCH_SCHEMA_VERSION;
   instrumentType: typeof SYNTH_INSTRUMENT_TYPE;
@@ -1333,6 +1341,61 @@ export function modulationSourceAffordance(draft: SynthDraftPatch, source: Modul
 export function modulationSourceEditorTarget(source: ModulationSourceId): SynthModulationSourceEditorTarget {
   if (source === "velocity" || source === "keytrack" || source === "modWheel") return "performance";
   return source;
+}
+
+export function synthExpressionSummary(draft: SynthDraftPatch): SynthExpressionSummaryItem[] {
+  const maxVoices = Math.max(1, Math.round(getNumberParam(draft, "maxVoices")));
+  const mono = getBooleanParam(draft, "mono.enabled");
+  const legato = getBooleanParam(draft, "legato.enabled");
+  const velocity = modulationSummaryForSource(draft, "velocity");
+  const keytrack = modulationSummaryForSource(draft, "keytrack");
+  const modWheel = modulationSummaryForSource(draft, "modWheel");
+  const filterKeytrack = clamp01(getNumberParam(draft, "filter.keytrack"));
+
+  return [
+    {
+      id: "voices",
+      label: "Voices",
+      value: mono ? "Mono" : `${maxVoices} poly`,
+      detail: mono ? "Single active voice" : `Steals above ${maxVoices}`,
+      active: mono || maxVoices < 16,
+    },
+    {
+      id: "legato",
+      label: "Legato",
+      value: legato ? "On" : "Off",
+      detail: legato ? "Retunes held voice" : "Retriggers notes",
+      active: legato,
+    },
+    {
+      id: "pitch-bend",
+      label: "Pitch Bend",
+      value: "+/-2 st",
+      detail: "Runtime MIDI bend",
+      active: true,
+    },
+    {
+      id: "velocity",
+      label: "Velocity",
+      value: velocity.count > 0 ? velocity.label : "Available",
+      detail: velocity.count > 0 ? `${velocity.count} routed` : "No routes",
+      active: velocity.count > 0,
+    },
+    {
+      id: "keytrack",
+      label: "Keytrack",
+      value: keytrack.count > 0 ? keytrack.label : `${Math.round(filterKeytrack * 100)}% filter`,
+      detail: keytrack.count > 0 ? `${keytrack.count} routed` : "Filter cutoff tracking",
+      active: keytrack.count > 0 || filterKeytrack > 0,
+    },
+    {
+      id: "mod-wheel",
+      label: "Mod Wheel",
+      value: modWheel.count > 0 ? modWheel.label : "Available",
+      detail: modWheel.count > 0 ? `${modWheel.count} routed` : "No routes",
+      active: modWheel.count > 0,
+    },
+  ];
 }
 
 export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Instrument> {

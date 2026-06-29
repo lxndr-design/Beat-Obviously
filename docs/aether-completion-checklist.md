@@ -57,8 +57,8 @@ Status legend:
   - Remaining: richer envelope visual editing, better loop/curve handles, and clearer assignment feedback.
   - Proof: interaction tests for handle movement, patch roundtrip, browser preview, and native render stress.
 - `[~]` Performance/expression UX.
-  - Done: filter keytracking, keytrack routing, mod wheel routing, runtime pitch bend, linked-note glide, max voice caps, note stealing, mono voice caps, and legato retune.
-  - Remaining: clearer editor controls and visible feedback for expression sources.
+  - Done: filter keytracking, keytrack routing, mod wheel routing, runtime pitch bend, linked-note glide, max voice caps, note stealing, mono voice caps, legato retune, and an editor-visible expression/performance summary for voices, legato, pitch bend, velocity, keytrack, and mod wheel.
+  - Remaining: dedicated editable expression controls, glide editing in the Aether patch schema, and realtime controller feedback while MIDI input/playback is active.
 
 ## 5. Aether FX And Presets
 

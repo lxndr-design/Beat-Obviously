@@ -304,6 +304,56 @@ section.shell {
   line-height: 14px;
 }
 
+.expressionSummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 3px;
+  min-width: 0;
+}
+
+.expressionSummaryItem {
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 2px;
+  min-width: 0;
+  padding: 5px 6px;
+  border: var(--border-soft);
+  background: var(--surface-subtle);
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+}
+
+.expressionSummaryItem[data-active="true"] {
+  background: var(--interaction-mesh-current);
+  color: color-mix(in srgb, var(--color-fg) 78%, transparent);
+}
+
+.expressionSummaryItem span,
+.expressionSummaryItem strong,
+.expressionSummaryItem small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expressionSummaryItem span {
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.expressionSummaryItem strong {
+  color: var(--color-fg);
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+}
+
+.expressionSummaryItem small {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
 .fxPresetInfo {
   margin-bottom: var(--synth-gap);
 }
