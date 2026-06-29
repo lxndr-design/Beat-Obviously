@@ -370,6 +370,8 @@ try {
   assert.equal(fxPreset.kind, "instrument-fx-chain");
   assert.equal(fxPreset.name, "Wide FX Chain");
   assert.deepEqual(fxPreset.tags, ["aether", "fx"]);
+  assert.equal(fxPreset.category, "Color");
+  assert.equal(fxPreset.description, "2 effects: Saturator -> Delay bypassed / 1 bypassed");
   assert.equal(fxPreset.createdAt, 2468);
   assert.equal(fxPreset.updatedAt, 2468);
   assert.equal(fxPreset.id.startsWith("fx-preset:wide-fx-chain:"), true);
@@ -387,6 +389,8 @@ try {
   });
   assert.equal(migratedFxPreset.schemaVersion, 1);
   assert.equal(migratedFxPreset.kind, "instrument-fx-chain");
+  assert.equal(migratedFxPreset.category, "Space");
+  assert.equal(migratedFxPreset.description, "1 effect: Delay");
   assert.equal(migratedFxPreset.createdAt, 9753);
   assert.equal(migratedFxPreset.chain.filters[0].params.timeMs, 510);
   assert.equal(migratedFxPreset.chain.filters[0].params.feedback, 25);

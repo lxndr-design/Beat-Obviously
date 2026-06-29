@@ -841,6 +841,8 @@ try {
   assert.equal(savedFxPreset.record.kind, "instrument-fx-chain", "saved FX presets should be instrument FX chains");
   assert.equal(savedFxPreset.record.name, "Interaction FX", "Save FX should trim names");
   assert.deepEqual(savedFxPreset.record.tags, ["aether", "instrument-fx"], "Save FX should tag effect-chain presets");
+  assert.equal(savedFxPreset.record.category, "Color", "Save FX should derive a chain category");
+  assert.equal(savedFxPreset.record.description, "2 effects: Saturator -> Delay bypassed / 1 bypassed", "Save FX should derive a readable chain description");
   assert.equal(savedFxPreset.selectedEffectPresetId, savedFxPreset.record.id, "Save FX should select the new preset");
   const loadedFxPreset = runner.previewLoadAetherEffectPreset(savedFxPreset.record);
   assert.equal(loadedFxPreset.selectedEffectPresetId, savedFxPreset.record.id, "loading FX preset should select that preset");
@@ -852,6 +854,7 @@ try {
     chain: { filters: [{ kind: "reverb", params: { mix: 31 } }] },
     updatedAt: 444,
   });
+  assert.equal(migratedFxPreset.selectedEffectPresetId, "legacy-fx", "legacy FX preset loading should preserve id");
   assert.equal(migratedFxPreset.chain.filters[0].params.mix, 31, "legacy FX presets should preserve authored params");
   assert.equal(migratedFxPreset.chain.filters[0].params.roomSize, 40, "legacy FX presets should fill default params");
   assert.deepEqual(

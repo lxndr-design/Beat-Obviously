@@ -280,6 +280,10 @@ section.shell {
   line-height: 14px;
 }
 
+.fxPresetInfo {
+  margin-bottom: var(--synth-gap);
+}
+
 .iconPicker {
   position: relative;
   display: flex;

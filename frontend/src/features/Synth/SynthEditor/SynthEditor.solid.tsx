@@ -811,6 +811,23 @@ function InstrumentFxRack() {
   const effects = createMemo(() => draft().effects.filters);
   const [effectPresets, setEffectPresets] = createSignal<AetherEffectPresetRecord[]>([]);
   const [selectedEffectPresetId, setSelectedEffectPresetId] = createSignal("");
+  const selectedEffectPresetInfo = createMemo<PresetLibraryInfo>(() => {
+    const preset = effectPresets().find((candidate) => candidate.id === selectedEffectPresetId());
+    if (preset) {
+      return {
+        source: `User FX / ${preset.category}`,
+        name: preset.name,
+        description: preset.description,
+        tags: preset.tags,
+      };
+    }
+    return {
+      source: "Current FX chain",
+      name: draft().name ? `${draft().name} FX` : "Unsaved FX",
+      description: describeEffectChain(effects()),
+      tags: effects().length > 0 ? ["draft"] : [],
+    };
+  });
 
   onMount(() => {
     void refreshEffectPresets();
@@ -939,6 +956,20 @@ function InstrumentFxRack() {
         </div>
       </header>
       <div class={`ds-panel-body ${styles.fxBody}`}>
+        <div class={`${styles.presetInfo} ${styles.fxPresetInfo}`} aria-label="Selected Aether FX preset details">
+          <div class={styles.presetInfoHeader}>
+            <span>{selectedEffectPresetInfo().source}</span>
+            <strong>{selectedEffectPresetInfo().name}</strong>
+          </div>
+          <p>{selectedEffectPresetInfo().description}</p>
+          <Show when={selectedEffectPresetInfo().tags.length > 0}>
+            <div class={styles.presetTags}>
+              <For each={selectedEffectPresetInfo().tags}>
+                {(tag) => <span>{tag}</span>}
+              </For>
+            </div>
+          </Show>
+        </div>
         <Show when={effects().length > 0} fallback={<div class={styles.fxEmpty}>No instrument FX. Output goes directly to the track chain.</div>}>
           <div class={styles.fxChain}>
             <For each={effects()}>
@@ -1015,6 +1046,17 @@ function InstrumentFxRack() {
       </div>
     </section>
   );
+}
+
+function describeEffectChain(effects: TrackEffect[]): string {
+  if (effects.length === 0) return "Empty instrument FX chain.";
+  const labels = effects.map((effect) => {
+    const label = EFFECT_LABELS[effect.kind] ?? effect.kind;
+    return effect.bypassed ? `${label} bypassed` : label;
+  });
+  const bypassed = effects.filter((effect) => effect.bypassed).length;
+  const suffix = bypassed > 0 ? ` / ${bypassed} bypassed` : "";
+  return `${labels.length} ${labels.length === 1 ? "effect" : "effects"}: ${labels.join(" -> ")}${suffix}`;
 }
 
 function LfoPanel(props: { focusedSourceTarget?: SynthModulationSourceEditorTarget | null }) {
