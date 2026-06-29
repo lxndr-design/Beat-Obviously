@@ -806,6 +806,7 @@ export function SynthEditor(props: SynthEditorProps) {
                     <div
                       class={`${styles.macroCard} ${focusedSourceTarget() === id ? styles.sourceFocus : ""}`}
                       data-synth-source-editor={id}
+                      aria-label={`${definition().label} macro control`}
                     >
                       <TextInput
                         data-synth-source-focus
@@ -838,19 +839,27 @@ export function SynthEditor(props: SynthEditorProps) {
                           <span>{macroLaneTargets()}</span>
                         </div>
                       </div>
-                      <div class={styles.macroAssignment} title={assignmentLabel()}>
+                      <div
+                        class={styles.macroAssignment}
+                        title={assignmentLabel()}
+                        aria-label={`${definition().label} macro assignments`}
+                      >
                         <span>{assignmentLabel()}</span>
                         <Show when={assignments().length > 2}>
                           <span>+{assignments().length - 2}</span>
                         </Show>
                       </div>
                       <Show when={conflict().count > 0}>
-                        <div class={styles.macroConflict} title={conflict().label}>
+                        <div
+                          class={styles.macroConflict}
+                          title={conflict().label}
+                          aria-label={`${definition().label} macro conflict`}
+                        >
                           <span>Conflict</span>
                           <span>{conflict().label}</span>
                           <For each={conflictDetails().slice(0, 2)}>
                             {(detail) => (
-                              <div class={styles.macroConflictDetail}>
+                              <div class={styles.macroConflictDetail} aria-label={`${detail.targetLabel} macro conflict detail`}>
                                 <span>{detail.targetLabel}</span>
                                 <span>{detail.competingSources.slice(0, 2).join(", ")}</span>
                                 <span>Summed</span>

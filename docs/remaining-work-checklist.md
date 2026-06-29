@@ -26,6 +26,7 @@ Current implementation focus:
 
 1. `[~]` Browser/runtime proof for critical flows.
    - Done: Aether automation browser fixture coverage for note, segment, and track lane entrypoints.
+   - Done: Synth Editor macro browser fixture coverage for visible assignment lanes and overlapping-route conflict rows.
    - Add browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, arrangement editing, export, relink, backup restore, and Project Health repairs.
    - Add visible hover, selected, disabled, loading, and migrated-framework smoke coverage on critical screens.
 2. `[~]` Automation editing completion.

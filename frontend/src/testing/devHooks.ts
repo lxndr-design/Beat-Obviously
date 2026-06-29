@@ -1,7 +1,13 @@
 import type { DecentSamplerUiControl } from "../ipc/schema";
 import { db } from "../persistence/dexie";
 import type { AetherEffectPresetRecord } from "../state/effectPresets";
-import { createDefaultSynthDraft, synthDraftToInstrumentPatch, useSynthStore, type SynthDraftPatch } from "../state/synthStore";
+import {
+  createDefaultSynthDraft,
+  synthDraftToInstrumentPatch,
+  useSynthStore,
+  type SynthDraftPatch,
+  type SynthModulationRoute,
+} from "../state/synthStore";
 import { createSynthPresetRecord, type SynthPresetRecord } from "../state/synthPresets";
 import {
   TEMPORARY_DS_INSTRUMENT_SET_ID,
@@ -25,6 +31,8 @@ const DEV_MIXED_ERA_AETHER_FX_INSTRUMENT_ID = "dev-mixed-era-aether-fx-host";
 const DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID = "dev-aether-preset-library-favorite";
 const DEV_AETHER_PRESET_LIBRARY_PLAIN_ID = "dev-aether-preset-library-plain";
 const DEV_AETHER_PRESET_LIBRARY_INSTRUMENT_ID = "dev-aether-preset-library-host";
+const DEV_AETHER_MACRO_INSTRUMENT_ID = "dev-aether-macro-host";
+const DEV_AETHER_MACRO_INSTRUMENT_ID_MARKER = "Aether macro browser dev fixture";
 const DEV_AETHER_AUTOMATION_INSTRUMENT_ID_MARKER = "Aether automation dev fixture";
 const DEV_AETHER_AUTOMATION_TRACK_ID = "dev-aether-automation-track";
 const DEV_AETHER_AUTOMATION_SEGMENT_ID = "dev-aether-automation-segment";
@@ -75,6 +83,10 @@ declare global {
         instrumentId: string;
       }>;
       readAetherPresetLibraryFixtureState: () => Promise<DevAetherPresetLibraryFixtureState>;
+      installAetherMacroFixture: () => Promise<{
+        instrumentId: string;
+      }>;
+      readAetherMacroFixtureState: () => DevAetherMacroFixtureState;
       exerciseAetherPresetLibraryFavoriteFlow: () => Promise<{
         installed: DevAetherPresetLibraryFixtureState;
         filtered: DevAetherPresetLibraryFixtureState;
@@ -134,6 +146,18 @@ interface DevAetherPresetLibraryFixtureState {
   selectedInfoText: string;
   favoritesFilterText: string | null;
   selectedFavoriteToggleText: string | null;
+}
+
+interface DevAetherMacroFixtureState {
+  instrumentId: string | null;
+  macroPanelText: string;
+  brightness: {
+    cardText: string;
+    laneText: string;
+    assignmentsText: string;
+    conflictText: string;
+    conflictDetails: string[];
+  };
 }
 
 let installed = false;
@@ -442,6 +466,88 @@ export function installBeatDevHooks() {
     return { installed, filtered, selected, toggled };
   };
 
+  const installAetherMacroFixture = async () => {
+    const instrumentStore = useInstrumentStore.getState();
+    for (const instrument of instrumentStore.instruments) {
+      if ((instrument.id === DEV_AETHER_MACRO_INSTRUMENT_ID || instrument.source?.label === DEV_AETHER_MACRO_INSTRUMENT_ID_MARKER) && instrument.userCreated) {
+        instrumentStore.removeInstrument(instrument.id);
+      }
+    }
+
+    const baseDraft = createDefaultSynthDraft();
+    const macroRoutes: SynthModulationRoute[] = [
+      {
+        id: "dev-macro-brightness-cutoff",
+        source: "macro.1",
+        target: "filter.cutoff",
+        amount: 0.35,
+        bipolar: false,
+        enabled: true,
+      },
+      {
+        id: "dev-macro-brightness-resonance",
+        source: "macro.1",
+        target: "filter.resonance",
+        amount: 0.22,
+        bipolar: false,
+        enabled: true,
+      },
+      {
+        id: "dev-lfo-cutoff-conflict",
+        source: "lfo.1",
+        target: "filter.cutoff",
+        amount: -0.18,
+        bipolar: true,
+        enabled: true,
+      },
+    ];
+    const patch: SynthDraftPatch = {
+      ...baseDraft,
+      name: "Macro Browser Host",
+      parameters: {
+        ...baseDraft.parameters,
+        "macro.1": 0.65,
+        "lfo.1.enabled": 1,
+        "lfo.1.rate": 0.35,
+      },
+      modulation: macroRoutes,
+      metadata: {
+        ...baseDraft.metadata,
+        tags: [...new Set([...baseDraft.metadata.tags, "dev", "macro-browser"])],
+        macros: {
+          ...baseDraft.metadata.macros,
+          "macro.1": {
+            id: "macro.1",
+            label: "Brightness",
+            min: 0.2,
+            max: 0.8,
+            curve: "ease-in",
+          },
+        },
+      },
+    };
+
+    const nextInstrumentId = instrumentStore.addInstrument({
+      ...synthDraftToInstrumentPatch(patch),
+      id: DEV_AETHER_MACRO_INSTRUMENT_ID,
+      name: patch.name,
+      source: { kind: "created", label: DEV_AETHER_MACRO_INSTRUMENT_ID_MARKER },
+      userCreated: true,
+    });
+    useSynthStore.getState().bindInstrument(nextInstrumentId);
+    useSynthStore.getState().setDraft(patch);
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
+    await waitForMacroControl("Brightness");
+    writeAetherMacroFixtureMarker();
+    return { instrumentId: nextInstrumentId };
+  };
+
+  const readAetherMacroFixtureState = (): DevAetherMacroFixtureState => {
+    const state = readMacroFixtureDomState("Brightness");
+    writeAetherMacroFixtureMarker(state);
+    return state;
+  };
+
   const installAetherAutomationFixture = () => {
     const instrumentStore = useInstrumentStore.getState();
     for (const instrument of instrumentStore.instruments) {
@@ -608,6 +714,8 @@ export function installBeatDevHooks() {
     readMixedEraAetherFxPresetFixtureState,
     installAetherPresetLibraryFixture,
     readAetherPresetLibraryFixtureState,
+    installAetherMacroFixture,
+    readAetherMacroFixtureState,
     exerciseAetherPresetLibraryFavoriteFlow,
     installAetherAutomationFixture,
     openAetherAutomationFixtureEditor,
@@ -639,6 +747,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-preset-library") {
     window.setTimeout(() => {
       void installAetherPresetLibraryFixture();
+    }, 0);
+  } else if (fixture === "aether-macro") {
+    window.setTimeout(() => {
+      void installAetherMacroFixture();
     }, 0);
   } else if (fixture === "aether-automation") {
     window.setTimeout(() => {
@@ -673,6 +785,31 @@ function readPanelState(label: string): DevAutomationPanelState {
     rangeCount: panel?.querySelectorAll('input[type="range"]').length ?? 0,
     disabledControlCount: panel?.querySelectorAll("button:disabled,input:disabled,select:disabled").length ?? 0,
   };
+}
+
+function readMacroFixtureDomState(label: string): DevAetherMacroFixtureState {
+  const card = findElementByAriaLabel(`${label} macro control`);
+  const lane = findElementByAriaLabel(`${label} macro lane`, card);
+  const assignments = findElementByAriaLabel(`${label} macro assignments`, card);
+  const conflict = findElementByAriaLabel(`${label} macro conflict`, card);
+  return {
+    instrumentId: useSynthStore.getState().boundInstrumentId,
+    macroPanelText: normalizeText(findElementByAriaLabel("Macros")?.textContent ?? ""),
+    brightness: {
+      cardText: normalizeText(card?.textContent ?? ""),
+      laneText: normalizeText(lane?.textContent ?? ""),
+      assignmentsText: normalizeText(assignments?.textContent ?? ""),
+      conflictText: normalizeText(conflict?.textContent ?? ""),
+      conflictDetails: Array.from(card?.querySelectorAll<HTMLElement>('[aria-label$="macro conflict detail"]') ?? [])
+        .map((detail) => normalizeText(detail.textContent ?? ""))
+        .filter(Boolean),
+    },
+  };
+}
+
+function findElementByAriaLabel(label: string, root: ParentNode | null = document): HTMLElement | null {
+  return Array.from(root?.querySelectorAll<HTMLElement>("[aria-label]") ?? [])
+    .find((candidate) => candidate.getAttribute("aria-label") === label) ?? null;
 }
 
 function clickPanelButton(panelLabel: string, buttonLabel: string) {
@@ -748,10 +885,21 @@ function writeAetherAutomationFixtureMarker() {
   });
 }
 
+function writeAetherMacroFixtureMarker(state = readMacroFixtureDomState("Brightness")) {
+  document.documentElement.dataset.beatAetherMacroFixture = JSON.stringify(state);
+}
+
 async function waitForEditorPanel(label: string) {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     await nextFrame();
     if (document.querySelector(`[aria-label="${label}"]`)) return;
+  }
+}
+
+async function waitForMacroControl(label: string) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await nextFrame();
+    if (findElementByAriaLabel(`${label} macro control`)) return;
   }
 }
 
