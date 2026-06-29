@@ -312,6 +312,10 @@ try {
   );
   for (const preset of synthStore.FACTORY_SYNTH_PRESETS) {
     assert.equal(preset.patch.name, preset.name);
+    assert.equal(typeof preset.category, "string", `expected factory preset ${preset.id} to expose a category`);
+    assert.ok(preset.category.trim().length > 0, `expected factory preset ${preset.id} to expose a category`);
+    assert.equal(typeof preset.description, "string", `expected factory preset ${preset.id} to expose a description`);
+    assert.ok(preset.description.trim().length > 0, `expected factory preset ${preset.id} to expose a description`);
     assert.deepEqual(synthStore.normalizeSynthDraftPatch(JSON.parse(JSON.stringify(preset.patch))), preset.patch);
     const presetPreview = synthStore.synthDraftToPreviewInstrument(preset.patch);
     const presetSamples = new Float32Array(12000);

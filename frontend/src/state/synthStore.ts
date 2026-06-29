@@ -231,6 +231,8 @@ export interface SynthFactoryPresetRecord {
   name: string;
   patch: SynthDraftPatch;
   tags: string[];
+  category: string;
+  description: string;
 }
 
 function cloneSynthPatch(draft: SynthDraftPatch): SynthPatchSnapshot {
@@ -1912,6 +1914,8 @@ function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
     id: string,
     name: string,
     tags: string[],
+    category: string,
+    description: string,
     parameters: Partial<Record<SynthParameterId, SynthParameterValue>>,
     modulation: SynthModulationRoute[] = createDefaultSynthDraft().modulation,
     customWavetable: CustomWavetableDefinition = custom,
@@ -1919,6 +1923,8 @@ function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
     id,
     name,
     tags,
+    category,
+    description,
     patch: normalizeSynthDraftPatch({
       name,
       parameters,
@@ -1932,8 +1938,8 @@ function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
   });
 
   return [
-    preset("factory.init", "Init", ["factory"], {}, []),
-    preset("factory.custom-table", "Custom Wavetable", ["factory", "wavetable"], {
+    preset("factory.init", "Init", ["factory"], "Template", "Neutral Aether starting point with no modulation routes.", {}, []),
+    preset("factory.custom-table", "Custom Wavetable", ["factory", "wavetable"], "Wavetable", "Animated custom wavemap patch with envelope-filter movement.", {
       "osc.a.wavetable": DEFAULT_CUSTOM_WAVETABLE_ID,
       "osc.a.position": 0.35,
       "osc.a.level": 0.82,
@@ -1944,7 +1950,7 @@ function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
       { id: "lfo_custom_pos", source: "lfo.1", target: "osc.a.position", amount: 0.18, bipolar: true, enabled: true },
       { id: "env_custom_filter", source: "env.1", target: "filter.cutoff", amount: 0.18, bipolar: false, enabled: true },
     ]),
-    preset("factory.wt-lead", "WT Lead", ["factory", "lead"], {
+    preset("factory.wt-lead", "WT Lead", ["factory", "lead"], "Lead", "Bright stacked wavetable lead with unison motion and filter push.", {
       "osc.a.wavetable": "basic.pulse",
       "osc.a.position": 0.58,
       "osc.a.level": 0.84,
@@ -1971,7 +1977,7 @@ function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
       { id: "lead_env_filter", source: "env.1", target: "filter.cutoff", amount: 0.26, bipolar: false, enabled: true },
       { id: "lead_lfo_detune", source: "lfo.1", target: "unison.detune", amount: 0.04, bipolar: false, enabled: true },
     ]),
-    preset("factory.glass-pad", "Glass Pad", ["factory", "pad"], {
+    preset("factory.glass-pad", "Glass Pad", ["factory", "pad"], "Pad", "Wide glassy pad with slow wavetable drift and soft envelope lift.", {
       "osc.a.wavetable": "basic.sine",
       "osc.a.position": 0.64,
       "osc.a.level": 0.72,
@@ -1997,7 +2003,7 @@ function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
       { id: "pad_lfo_b_pos", source: "lfo.1", target: "osc.b.position", amount: -0.18, bipolar: true, enabled: true },
       { id: "pad_env_filter", source: "env.1", target: "filter.cutoff", amount: 0.22, bipolar: false, enabled: true },
     ]),
-    preset("factory.sub-bass", "Sub Bass", ["factory", "bass"], {
+    preset("factory.sub-bass", "Sub Bass", ["factory", "bass"], "Bass", "Sub-forward square and sine stack with envelope-shaped drive.", {
       "osc.a.wavetable": "basic.square",
       "osc.a.position": 0.18,
       "osc.a.octave": -1,
@@ -2018,7 +2024,7 @@ function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
       { id: "bass_env_drive", source: "env.1", target: "filter.drive", amount: 0.16, bipolar: false, enabled: true },
       { id: "bass_env_filter", source: "env.1", target: "filter.cutoff", amount: 0.16, bipolar: false, enabled: true },
     ]),
-    preset("factory.pluck", "Digital Pluck", ["factory", "pluck"], {
+    preset("factory.pluck", "Digital Pluck", ["factory", "pluck"], "Pluck", "Short digital pluck with octave support and envelope-opened filter.", {
       "osc.a.wavetable": "basic.pulse",
       "osc.a.position": 0.78,
       "osc.a.level": 0.8,

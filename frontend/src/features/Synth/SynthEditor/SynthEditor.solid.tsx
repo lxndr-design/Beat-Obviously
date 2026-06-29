@@ -97,6 +97,13 @@ interface AuditionHandle {
   stop: (when?: number) => void;
 }
 
+interface PresetLibraryInfo {
+  source: string;
+  name: string;
+  description: string;
+  tags: string[];
+}
+
 export interface SynthEditorProps {
   instrumentId?: string;
 }
@@ -127,6 +134,51 @@ export function SynthEditor(props: SynthEditorProps) {
 
   const [presets, setPresets] = createSignal<SynthPresetRecord[]>([]);
   const [selectedPresetId, setSelectedPresetId] = createSignal("");
+  const selectedPresetInfo = createMemo<PresetLibraryInfo>(() => {
+    const id = selectedPresetId();
+    if (id.startsWith(FACTORY_PRESET_PREFIX)) {
+      const presetId = id.slice(FACTORY_PRESET_PREFIX.length);
+      const preset = FACTORY_SYNTH_PRESETS.find((candidate) => candidate.id === presetId);
+      if (preset) {
+        return {
+          source: `Factory / ${preset.category}`,
+          name: preset.name,
+          description: preset.description,
+          tags: preset.tags.filter((tag) => tag !== "factory"),
+        };
+      }
+    }
+    if (id.startsWith(USER_PRESET_PREFIX)) {
+      const presetId = id.slice(USER_PRESET_PREFIX.length);
+      const preset = presets().find((candidate) => candidate.id === presetId);
+      if (preset) {
+        return {
+          source: "User preset",
+          name: preset.name,
+          description: `${preset.patch.modulation.length} routes / ${preset.patch.effects?.filters.length ?? 0} instrument FX`,
+          tags: preset.tags,
+        };
+      }
+    }
+    if (id.startsWith(USER_INSTRUMENT_PRESET_PREFIX)) {
+      const instrumentId = id.slice(USER_INSTRUMENT_PRESET_PREFIX.length);
+      const instrument = userInstrumentPresets().find((candidate) => candidate.id === instrumentId);
+      if (instrument?.synthPatch) {
+        return {
+          source: "User instrument",
+          name: instrument.name,
+          description: `${instrument.synthPatch.modulation.length} routes / ${instrument.synthPatch.effects?.filters.length ?? 0} instrument FX`,
+          tags: instrument.synthPatch.metadata.tags,
+        };
+      }
+    }
+    return {
+      source: "Current draft",
+      name: draft().name,
+      description: `${draft().modulation.length} routes / ${draft().effects.filters.length} instrument FX`,
+      tags: draft().metadata.tags,
+    };
+  });
   const [iconOpen, setIconOpen] = createSignal(false);
   const [auditioning, setAuditioning] = createSignal(false);
   const [auditionSnapshot, setAuditionSnapshot] = createSignal<AnalyzerSnapshot>(createEmptyAnalyzerSnapshot());
@@ -572,6 +624,20 @@ export function SynthEditor(props: SynthEditorProps) {
                 <Button size="sm" variant="ghost" onClick={onRestoreInitPreset}>
                   Restore Init
                 </Button>
+              </div>
+              <div class={styles.presetInfo} aria-label="Selected Aether preset details">
+                <div class={styles.presetInfoHeader}>
+                  <span>{selectedPresetInfo().source}</span>
+                  <strong>{selectedPresetInfo().name}</strong>
+                </div>
+                <p>{selectedPresetInfo().description}</p>
+                <Show when={selectedPresetInfo().tags.length > 0}>
+                  <div class={styles.presetTags}>
+                    <For each={selectedPresetInfo().tags}>
+                      {(tag) => <span>{tag}</span>}
+                    </For>
+                  </div>
+                </Show>
               </div>
             </div>
           </section>

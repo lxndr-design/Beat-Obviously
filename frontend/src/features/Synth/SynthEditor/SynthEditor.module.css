@@ -223,6 +223,63 @@ section.shell {
   font-size: var(--font-size-ui);
 }
 
+.presetInfo {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 5px 6px;
+  background: var(--surface-subtle);
+  color: color-mix(in srgb, var(--color-fg) 68%, transparent);
+  font-size: var(--font-size-ui);
+}
+
+.presetInfoHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--synth-gap);
+  min-width: 0;
+}
+
+.presetInfoHeader span,
+.presetInfoHeader strong,
+.presetInfo p {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presetInfoHeader span {
+  color: color-mix(in srgb, var(--color-fg) 54%, transparent);
+  font-family: var(--font-family-mono);
+}
+
+.presetInfoHeader strong {
+  color: var(--color-fg);
+  font-weight: var(--font-weight-medium);
+}
+
+.presetInfo p {
+  margin: 0;
+}
+
+.presetTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-width: 0;
+}
+
+.presetTags span {
+  min-height: 14px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-fg) 18%, transparent);
+  color: var(--color-fg);
+  line-height: 14px;
+}
+
 .iconPicker {
   position: relative;
   display: flex;
