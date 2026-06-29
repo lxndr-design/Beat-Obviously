@@ -451,6 +451,10 @@ try {
   const leadPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { category: "Lead" });
   assert.ok(leadPresetResults.some((entry) => entry.id === "factory.wt-lead"), "category facets should include matching factory presets");
   assert.ok(leadPresetResults.some((entry) => entry.id === userPreset.id), "category facets should include matching user presets");
+  assert.ok(
+    presetLibraryEntries.every((entry) => Number.isInteger(entry.routeCount) && Number.isInteger(entry.effectCount)),
+    "preset library entries should expose sortable complexity metadata",
+  );
   const glassPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { search: "glass" });
   assert.ok(glassPresetResults.some((entry) => entry.id === "factory.glass-pad"), "search should match factory descriptions");
   assert.ok(glassPresetResults.some((entry) => entry.id === "instrument-glass-user"), "search should match user instrument tags");
@@ -458,6 +462,18 @@ try {
     search: "macro user preset",
   });
   assert.deepEqual(macroUserPresetResults.map((entry) => entry.id), [userPreset.id]);
+  assert.deepEqual(
+    aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { search: "glass", sort: "name" })
+      .map((entry) => entry.name),
+    ["Glass Pad", "Saved Glass Instrument"],
+    "name sort should order mixed-source preset results by display name",
+  );
+  assert.deepEqual(
+    aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { search: "glass", sort: "complexity" })
+      .map((entry) => entry.id),
+    ["instrument-glass-user", "factory.glass-pad"],
+    "complexity sort should prioritize route/effect-heavy presets",
+  );
 
   const migratedPreset = synthPresets.normalizeSynthPresetRecord({
     id: "legacy",

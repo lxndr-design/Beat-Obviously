@@ -3,6 +3,7 @@ import type { SynthPresetRecord } from "./synthPresets";
 import type { Instrument } from "./types";
 
 export type AetherPresetLibrarySource = "factory" | "user-preset" | "user-instrument";
+export type AetherPresetLibrarySort = "source" | "name" | "category" | "complexity";
 
 export interface AetherPresetLibraryEntry {
   id: string;
@@ -12,11 +13,14 @@ export interface AetherPresetLibraryEntry {
   name: string;
   description: string;
   tags: string[];
+  routeCount: number;
+  effectCount: number;
 }
 
 export interface AetherPresetLibraryFilters {
   search?: string;
   category?: string;
+  sort?: AetherPresetLibrarySort;
 }
 
 export function buildAetherPresetLibraryEntries(
@@ -36,12 +40,20 @@ export function filterAetherPresetLibraryEntries(
 ): AetherPresetLibraryEntry[] {
   const searchTokens = normalizeSearch(filters.search ?? "").split(/\s+/).filter(Boolean);
   const category = normalizeSearch(filters.category ?? "");
-  return entries.filter((entry) => {
+  const filtered = entries.filter((entry) => {
     if (category && normalizeSearch(entry.category) !== category) return false;
     if (searchTokens.length === 0) return true;
     const text = searchablePresetText(entry);
     return searchTokens.every((token) => text.includes(token));
   });
+  return sortAetherPresetLibraryEntries(filtered, filters.sort ?? "source");
+}
+
+export function sortAetherPresetLibraryEntries(
+  entries: AetherPresetLibraryEntry[],
+  sort: AetherPresetLibrarySort = "source",
+): AetherPresetLibraryEntry[] {
+  return [...entries].sort((a, b) => comparePresetEntries(a, b, sort));
 }
 
 export function aetherPresetLibraryCategories(entries: AetherPresetLibraryEntry[]): string[] {
@@ -57,34 +69,71 @@ function factoryPresetEntry(preset: SynthFactoryPresetRecord): AetherPresetLibra
     name: preset.name,
     description: preset.description,
     tags: preset.tags.filter((tag) => tag !== "factory"),
+    routeCount: preset.patch.modulation.length,
+    effectCount: preset.patch.effects?.filters.length ?? 0,
   };
 }
 
 function userPresetEntry(preset: SynthPresetRecord): AetherPresetLibraryEntry {
   const tags = preset.tags;
+  const effectCount = preset.patch.effects?.filters.length ?? 0;
+  const routeCount = preset.patch.modulation.length;
   return {
     id: preset.id,
     source: "user-preset",
     sourceLabel: "User preset",
     category: categoryFromTags(tags, "User"),
     name: preset.name,
-    description: `${preset.patch.modulation.length} routes / ${preset.patch.effects?.filters.length ?? 0} instrument FX`,
+    description: `${routeCount} routes / ${effectCount} instrument FX`,
     tags,
+    routeCount,
+    effectCount,
   };
 }
 
 function userInstrumentEntry(instrument: Instrument): AetherPresetLibraryEntry {
   const patch = instrument.synthPatch;
   const tags = patch?.metadata.tags ?? [];
+  const routeCount = patch?.modulation.length ?? 0;
+  const effectCount = patch?.effects?.filters.length ?? 0;
   return {
     id: instrument.id,
     source: "user-instrument",
     sourceLabel: "User instrument",
     category: categoryFromTags(tags, instrument.kind === "wavetable" ? "Wavetable" : "Synth"),
     name: instrument.name,
-    description: `${patch?.modulation.length ?? 0} routes / ${patch?.effects?.filters.length ?? 0} instrument FX`,
+    description: `${routeCount} routes / ${effectCount} instrument FX`,
     tags,
+    routeCount,
+    effectCount,
   };
+}
+
+function comparePresetEntries(a: AetherPresetLibraryEntry, b: AetherPresetLibraryEntry, sort: AetherPresetLibrarySort): number {
+  if (sort === "name") return compareByName(a, b);
+  if (sort === "category") {
+    return compareText(a.category, b.category) || compareByName(a, b);
+  }
+  if (sort === "complexity") {
+    const aComplexity = a.routeCount + a.effectCount;
+    const bComplexity = b.routeCount + b.effectCount;
+    return bComplexity - aComplexity || compareByName(a, b);
+  }
+  return sourceOrder(a.source) - sourceOrder(b.source) || compareByName(a, b);
+}
+
+function compareByName(a: AetherPresetLibraryEntry, b: AetherPresetLibraryEntry): number {
+  return compareText(a.name, b.name) || compareText(a.sourceLabel, b.sourceLabel) || compareText(a.id, b.id);
+}
+
+function compareText(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { sensitivity: "base" });
+}
+
+function sourceOrder(source: AetherPresetLibrarySource): number {
+  if (source === "factory") return 0;
+  if (source === "user-preset") return 1;
+  return 2;
 }
 
 function categoryFromTags(tags: string[], fallback: string): string {

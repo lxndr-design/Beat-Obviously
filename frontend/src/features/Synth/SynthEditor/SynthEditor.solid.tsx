@@ -20,6 +20,7 @@ import {
   buildAetherPresetLibraryEntries,
   filterAetherPresetLibraryEntries,
   type AetherPresetLibraryEntry,
+  type AetherPresetLibrarySort,
 } from "../../../state/aetherPresetLibrary";
 import {
   createDefaultSynthDraft,
@@ -144,11 +145,13 @@ export function SynthEditor(props: SynthEditorProps) {
   const [selectedPresetId, setSelectedPresetId] = createSignal("");
   const [presetSearch, setPresetSearch] = createSignal("");
   const [presetCategory, setPresetCategory] = createSignal("");
+  const [presetSort, setPresetSort] = createSignal<AetherPresetLibrarySort>("source");
   const presetLibraryEntries = createMemo(() => buildAetherPresetLibraryEntries(presets(), userInstrumentPresets()));
   const presetLibraryCategories = createMemo(() => aetherPresetLibraryCategories(presetLibraryEntries()));
   const visiblePresetLibraryEntries = createMemo(() => filterAetherPresetLibraryEntries(presetLibraryEntries(), {
     search: presetSearch(),
     category: presetCategory(),
+    sort: presetSort(),
   }));
   const visibleFactoryPresetEntries = createMemo(() => visiblePresetLibraryEntries().filter((entry) => entry.source === "factory"));
   const visibleUserPresetEntries = createMemo(() => visiblePresetLibraryEntries().filter((entry) => entry.source === "user-preset"));
@@ -616,6 +619,19 @@ export function SynthEditor(props: SynthEditorProps) {
                     <For each={presetLibraryCategories()}>
                       {(category) => <option value={category}>{category}</option>}
                     </For>
+                  </select>
+                </label>
+                <label class={styles.presetSort}>
+                  <span class="ds-field-label">Sort</span>
+                  <select
+                    class="ds-select"
+                    value={presetSort()}
+                    onChange={(event) => setPresetSort(event.currentTarget.value as AetherPresetLibrarySort)}
+                  >
+                    <option value="source">Source</option>
+                    <option value="name">Name</option>
+                    <option value="category">Category</option>
+                    <option value="complexity">Complexity</option>
                   </select>
                 </label>
               </div>
