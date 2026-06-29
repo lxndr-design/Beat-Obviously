@@ -30,9 +30,10 @@ Status legend:
   - Done: target/source selection, visible assignments, target-scaled range displays, and explicit disabled route state display.
   - Remaining: source-specific editing affordances.
   - Proof: design-system/interaction verifier coverage for route add/edit/remove/disable and assignment display; synth verifier covers target-scaled route display labels and disabled route state labels.
-- `[ ]` Automation conflict rules.
-  - Define precedence for project, segment, note, live knob, and macro writes.
-  - Proof: backend sequencer stress for overlapping targets and frontend editor tests for the displayed effective value.
+- `[~]` Automation conflict rules.
+  - Done: shared frontend conflict resolver defines live/project/track/segment/note direct-write precedence, treats macro routes as additive modulation instead of direct-write winners, filters inactive sources, and gives deterministic same-rank replacement summaries for editor badges.
+  - Remaining: backend sequencer stress that asserts the native scheduling/application order matches the displayed conflict contract, plus editor wiring for visible effective-value badges in every automation surface.
+  - Proof: frontend interaction verifier covers precedence order, suppressed lower-priority writes, additive macro routes, inactive sources, and same-rank deterministic winners; backend sequencer stress still needed for native parity.
 
 ## 3. Wavemap Drawing And Resynthesis
 

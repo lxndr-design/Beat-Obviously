@@ -18,6 +18,7 @@ try {
       join(repoRoot, "frontend/src/testing/interactionRunner.ts"),
       join(repoRoot, "frontend/src/automation/aetherNoteAutomation.ts"),
       join(repoRoot, "frontend/src/automation/aetherArrangementAutomation.ts"),
+      join(repoRoot, "frontend/src/automation/aetherAutomationConflicts.ts"),
       "--bundle",
       "--format=esm",
       "--platform=node",
@@ -29,6 +30,7 @@ try {
   const runner = await import(pathToFileURL(join(outDir, "testing/interactionRunner.js")));
   const noteAutomation = await import(pathToFileURL(join(outDir, "automation/aetherNoteAutomation.js")));
   const arrangementAutomation = await import(pathToFileURL(join(outDir, "automation/aetherArrangementAutomation.js")));
+  const automationConflicts = await import(pathToFileURL(join(outDir, "automation/aetherAutomationConflicts.js")));
 
   assert.equal(runner.snapBeat(1.12, 0.25), 1, "snapBeat should snap to nearest grid");
   assert.equal(runner.snapBeat(1.13, 0.25), 1.25, "snapBeat should round upward past the midpoint");
@@ -359,6 +361,50 @@ try {
   assert.deepEqual(clippedTrackLanes[0].points.map((point) => point.beat), [0, 32], "track automation should clip points outside project length");
   const clearedTrackLane = arrangementAutomation.clearTrackAutomationTarget(curvedTrackLane, "filter.cutoff");
   assert.equal(clearedTrackLane.automation, undefined, "clearing the only track lane should remove automation clutter");
+
+  assert.deepEqual(
+    automationConflicts.aetherAutomationPrecedenceOrder(),
+    ["live", "project", "track", "segment", "note", "macro"],
+    "automation conflict precedence should be explicit and stable",
+  );
+  const conflictReport = automationConflicts.aetherAutomationConflictReport("filter.cutoff", [
+    { kind: "live", target: "filter.cutoff", label: "Cutoff knob", value: 0.42 },
+    { kind: "project", target: "filter.cutoff", value: 0.1 },
+    { kind: "track", target: "filter.cutoff", value: 0.35 },
+    { kind: "segment", target: "filter.cutoff", value: 0.6 },
+    { kind: "note", target: "filter.cutoff", value: 0.8 },
+    { kind: "macro", target: "filter.cutoff", label: "Brightness", value: 0.14 },
+    { kind: "macro", target: "amp.level", label: "Shape", value: 0.2 },
+  ]);
+  assert.equal(conflictReport.hasConflict, true, "overlapping write and macro sources should be reported as a conflict");
+  assert.equal(conflictReport.winner.label, "Note lane", "note-local automation should be the strongest direct write");
+  assert.deepEqual(
+    conflictReport.suppressed.map((source) => source.label),
+    ["Cutoff knob", "Project lane", "Track lane", "Segment lane"],
+    "lower-priority direct writes should be identified as suppressed",
+  );
+  assert.deepEqual(
+    conflictReport.additive.map((source) => source.label),
+    ["Brightness"],
+    "macro routes should be reported as additive modulation, not direct write winners",
+  );
+  assert.equal(
+    conflictReport.summary,
+    "filter.cutoff: Note lane wins over Cutoff knob, Project lane, Track lane, Segment lane + 1 macro route",
+    "conflict summaries should be compact enough for editor badges",
+  );
+  const inactiveConflictReport = automationConflicts.aetherAutomationConflictReport("macro.1", [
+    { kind: "project", target: "macro.1", value: 0.2, active: false },
+    { kind: "track", target: "macro.1", value: 0.4 },
+  ]);
+  assert.equal(inactiveConflictReport.winner.label, "Track lane", "inactive sources should be ignored");
+  assert.equal(inactiveConflictReport.suppressed.length, 0, "inactive lower lanes should not produce clutter");
+  const sameRankReport = automationConflicts.aetherAutomationConflictReport("amp.level", [
+    { kind: "track", target: "amp.level", label: "Track A", value: 0.25 },
+    { kind: "track", target: "amp.level", label: "Track B", value: 0.5 },
+  ]);
+  assert.equal(sameRankReport.winner.label, "Track B", "later same-rank sources should win deterministically");
+  assert.deepEqual(sameRankReport.suppressed.map((source) => source.label), ["Track A"]);
 
   assert.deepEqual(
     runner.previewSegmentDrag({
