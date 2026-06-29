@@ -404,7 +404,7 @@ function componentKind(component: BeatComponent): PatternKind {
 }
 
 function componentIcon(component: BeatComponent): string {
-  return componentKind(component) === "drum" ? "ph:drum" : "ph:piano-keys";
+  return componentKind(component) === "drum" ? "ph:music-notes-simple" : "ph:piano-keys";
 }
 
 function componentLabel(component: BeatComponent): string {

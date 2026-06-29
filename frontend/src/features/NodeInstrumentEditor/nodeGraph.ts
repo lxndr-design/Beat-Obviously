@@ -68,7 +68,7 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
   },
   noise: {
     label: "Noise",
-    icon: "ph:grain",
+    icon: "ph:grains",
     inputs: [{ id: "level-cv", label: "Level", kind: "input", signal: "control" }],
     outputs: [AUDIO_OUT],
     parameters: [

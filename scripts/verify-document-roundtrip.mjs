@@ -398,7 +398,7 @@ function makeRepresentativeDocument() {
       {
         id: "inst-plugin",
         name: "Percussion Palette Kit",
-        icon: "ph:drum",
+        icon: "ph:music-notes-simple",
         kind: "sampler",
         envelope: { attackMs: 1, decayMs: 80, sustain: 0.8, releaseMs: 120 },
         knobs: { cutoff: 0.5, resonance: 0.2, drive: 0.1, color: 0.4 },

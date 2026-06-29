@@ -14,8 +14,10 @@ const packageJsonPath = join(repoRoot, "frontend", "package.json");
 const tsconfigPath = join(repoRoot, "frontend", "tsconfig.json");
 const viteConfigPath = join(repoRoot, "frontend", "vite.config.ts");
 const appDialogPath = join(frontendSrc, "solid-ui", "AppDialog", "AppDialog.solid.tsx");
+const phIconSubsetPath = join(frontendSrc, "solid-ui", "Icon", "phIconSubset.ts");
 
 const failures = [];
+const usedPhIconNames = new Map();
 
 function fail(message) {
   failures.push(message);
@@ -128,6 +130,9 @@ for (const file of sourceFiles) {
   if (source.includes("@iconify/react")) {
     fail(`Deprecated @iconify/react import in ${rel(file)}`);
   }
+  if (source.includes("@iconify/core/lib/api") || source.includes("fetchAPIModule") || source.includes("loadIcon(")) {
+    fail(`Runtime Iconify API loading is not allowed; bundle icon collections locally in ${rel(file)}`);
+  }
   checkInteractionTokens(file, source);
   const solidMigrationIdentifier = source.match(/\b(?!SolidUiKitCatalog\b)[A-Za-z_$][A-Za-z0-9_$]*Solid[A-Za-z0-9_$]*\b/);
   if (solidMigrationIdentifier) {
@@ -160,6 +165,23 @@ for (const file of sourceFiles) {
     if (!iconName.startsWith("ph:")) {
       fail(`Non-Phosphor icon literal "${iconName}" in ${rel(file)}`);
     }
+  }
+  for (const match of source.matchAll(/["'](ph:[a-z0-9-]+)["']/g)) {
+    const iconName = match[1];
+    if (file !== phIconSubsetPath && !usedPhIconNames.has(iconName)) {
+      usedPhIconNames.set(iconName, rel(file));
+    }
+  }
+}
+
+const phIconSubsetSource = existsSync(phIconSubsetPath) ? readFileSync(phIconSubsetPath, "utf8") : "";
+if (!phIconSubsetSource) {
+  fail("Missing generated Phosphor icon subset at frontend/src/solid-ui/Icon/phIconSubset.ts");
+}
+for (const [iconName, firstSeenFile] of usedPhIconNames) {
+  const subsetKey = `"${iconName.replace(/^ph:/, "")}"`;
+  if (!phIconSubsetSource.includes(subsetKey)) {
+    fail(`Icon ${iconName} used in ${firstSeenFile} is missing from generated offline icon subset. Run npm run generate:icons.`);
   }
 }
 
@@ -210,6 +232,12 @@ if (existsSync(packageJsonPath)) {
         fail(`Removed React-era package must not return in frontend/package.json ${groupName}: ${packageName}`);
       }
     }
+  }
+  if (!packageJson.dependencies?.["@iconify/core"]) {
+    fail("frontend/package.json must include @iconify/core for local icon rendering.");
+  }
+  if (!packageJson.devDependencies?.["@iconify-json/ph"] && !packageJson.dependencies?.["@iconify-json/ph"]) {
+    fail("frontend/package.json must include @iconify-json/ph so the offline Phosphor subset can be regenerated.");
   }
 }
 

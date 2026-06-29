@@ -702,7 +702,7 @@ function drumPayloadFromSegment(segment: Segment): GeneratedDrumBeat | undefined
 
 function segmentIcon(kind: Segment["payload"]["kind"]): string {
   if (kind === "audio") return "ph:waveform";
-  if (kind === "drum") return "ph:drum";
+  if (kind === "drum") return "ph:music-notes-simple";
   return "ph:piano-keys";
 }
 

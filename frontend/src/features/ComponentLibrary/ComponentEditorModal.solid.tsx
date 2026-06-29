@@ -124,7 +124,7 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
       <Modal
         open
         scopeId={scopeId()}
-        title={<><Icon name={kind() === "drum" ? "ph:drum" : "ph:piano-keys"} size={14} decorative />{draft()?.name}</>}
+        title={<><Icon name={kind() === "drum" ? "ph:music-notes-simple" : "ph:piano-keys"} size={14} decorative />{draft()?.name}</>}
         width="lg"
         dirty={dirty()}
         onClose={requestClose}

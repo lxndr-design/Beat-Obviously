@@ -108,11 +108,11 @@ export function PluginItem(props: PluginItemProps) {
   const menu = createContextMenu((): ContextMenuItem[] => {
     if (isBuiltInDecentSampler()) {
       return [
-        { label: "Open DecentSampler", icon: "ph:box-arrow-up-right", onSelect: props.onOpen },
+        { label: "Open DecentSampler", icon: "ph:arrow-square-out", onSelect: props.onOpen },
       ];
     }
     return [
-      { label: "Open", icon: "ph:box-arrow-up-right", onSelect: props.onOpen },
+      { label: "Open", icon: "ph:arrow-square-out", onSelect: props.onOpen },
       {
         label: props.plugin.format === "decent-sampler"
           ? (props.plugin.status === "installed" ? "Refresh Package" : "Install Package")
@@ -189,7 +189,7 @@ export function PluginItem(props: PluginItemProps) {
           }}
           aria-label={`Open ${props.plugin.name}`}
         >
-          <Icon name="ph:box-arrow-up-right" size={12} decorative />
+          <Icon name="ph:arrow-square-out" size={12} decorative />
         </Button>
       )}
     >

@@ -22,6 +22,7 @@
     "verify:drums": "node ../scripts/verify-drum-generation.mjs",
     "verify:interactions": "node ../scripts/verify-frontend-interactions.mjs",
     "verify:non-native": "npm run verify:version && npm run verify:design-system && npm run verify:audio-boundary && npm run typecheck && npm run verify:synth && npm run verify:daw && npm run verify:documents && npm run verify:track-interactions && npm run verify:interactions && npm run verify:node-instrument && npm run verify:drums && npm run build",
+    "generate:icons": "node ../scripts/generate-icon-subset.mjs",
     "benchmark:midi-stress": "node ../scripts/benchmark-dense-midi.mjs"
   },
   "dependencies": {
@@ -34,6 +35,7 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@iconify-json/ph": "^1.2.2",
     "@types/three": "^0.170.0",
     "esbuild": "^0.28.1",
     "typescript": "^5.7.2",
