@@ -29,7 +29,8 @@ Current implementation focus:
    - Done: Synth Editor macro browser fixture coverage for visible assignment lanes and overlapping-route conflict rows.
    - Done: Aether automation point-editor browser fixture coverage for Add Point, field editing, Quantize, and Snap Values across note, segment, and track Macro 1 lanes.
    - Done: Aether wavemap editor browser fixture coverage for Details analysis, Additive mode, Odd partials, Manual range, and Smooth interpolation.
-   - Add browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, arrangement editing, export, relink, backup restore, and Project Health repairs.
+   - Done: Synth Editor macro assignment fixture coverage for Modulation Matrix Add route, source selection, target menu selection, strength edit, and enable/disable controls.
+   - Add browser-level flow coverage for broader synth editing, wavemap import/draw, arrangement editing, export, relink, backup restore, and Project Health repairs.
    - Add visible hover, selected, disabled, loading, and migrated-framework smoke coverage on critical screens.
 2. `[~]` Automation editing completion.
    - Done: first visible arrangement-view Aether track automation lane preview renders track-scoped automation without taking over timeline drag/drop.
@@ -293,7 +294,7 @@ Current implementation focus:
 
 ## Verification Still Needed
 
-- `[~]` Browser-level flow coverage for synth editing, wavemap import/draw, macro assignment, automation lanes, arrangement editing, export, relink, backup restore, and project health repairs.
+- `[~]` Browser-level flow coverage for broader synth editing, wavemap import/draw, automation lanes, arrangement editing, export, relink, backup restore, and project health repairs.
   - Done: true browser fixture smoke covers Aether track, segment, and selected-note Macro 1 automation lane entrypoints with seeded project data and rendered controls.
 - `[ ]` Null-test style live/offline comparisons where deterministic output is expected.
 - `[ ]` Crossfade parity stress.

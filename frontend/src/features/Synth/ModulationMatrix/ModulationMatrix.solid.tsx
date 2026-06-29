@@ -136,20 +136,30 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
           <span />
         </div>
         <For each={routes()}>
-          {(route) => {
+          {(route, index) => {
             const targets = () => targetsForSource(route.source);
             const selectedTarget = () => targets().includes(route.target) ? route.target : targets()[0];
             const display = () => modulationRouteDisplay(draft(), route);
             const sourceAffordance = () => modulationSourceAffordance(draft(), route.source);
+            const routeNumber = () => index() + 1;
             return (
-              <div class={`${styles.routeRow} ${route.enabled ? "" : styles.routeRowDisabled}`}>
+              <div
+                class={`${styles.routeRow} ${route.enabled ? "" : styles.routeRowDisabled}`}
+                aria-label={`Modulation route ${routeNumber()}`}
+                data-modulation-route-id={route.id}
+              >
                 <div class={styles.onCell}>
-                  <Toggle checked={route.enabled} onChange={(enabled) => updateRoute(route.id, { enabled })} />
+                  <Toggle
+                    checked={route.enabled}
+                    aria-label={`Route ${routeNumber()} enabled`}
+                    onChange={(enabled) => updateRoute(route.id, { enabled })}
+                  />
                 </div>
                 <div class={styles.sourceCell}>
                   <select
                     class={`ds-select ${styles.routeSelect} ${styles.sourceSelect}`}
                     value={route.source}
+                    aria-label={`Route ${routeNumber()} source`}
                     onChange={(event) => {
                       const source = event.currentTarget.value as ModulationSourceId;
                       const nextTargets = targetsForSource(source);
@@ -192,6 +202,7 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                 <TargetSelect
                   value={selectedTarget()}
                   targets={targets()}
+                  label={`Route ${routeNumber()} target`}
                   onChange={(target) => updateRoute(route.id, { target })}
                 />
                 <HoverInfo content="Pick target">
@@ -213,6 +224,7 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                     max={1}
                     step={0.01}
                     value={route.amount}
+                    aria-label={`Route ${routeNumber()} strength`}
                     onChange={(event) => updateRoute(route.id, { amount: Number(event.currentTarget.value) })}
                   />
                   <span>
@@ -304,6 +316,7 @@ function PickerCable(props: {
 function TargetSelect(props: {
   value: ModulationTargetId;
   targets: ModulationTargetId[];
+  label?: string;
   onChange: (value: ModulationTargetId) => void;
 }) {
   const [open, setOpen] = createSignal(false);
@@ -351,6 +364,7 @@ function TargetSelect(props: {
       <button
         type="button"
         class={styles.targetTrigger}
+        aria-label={props.label ?? "Modulation target"}
         aria-haspopup="listbox"
         aria-expanded={open()}
         onClick={() => setOpen((value) => !value)}
@@ -379,6 +393,7 @@ function TargetSelect(props: {
                     type="button"
                     role="option"
                     aria-selected={target === props.value}
+                    data-modulation-target-option={target}
                     class={`${styles.targetOption} ${target === props.value ? styles.targetOptionSelected : ""}`}
                     onClick={() => {
                       props.onChange(target);

@@ -92,6 +92,7 @@ declare global {
         instrumentId: string;
       }>;
       readAetherMacroFixtureState: () => DevAetherMacroFixtureState;
+      exerciseAetherMacroAssignmentEditorFlow: () => Promise<DevAetherMacroAssignmentExerciseState>;
       exerciseAetherWavemapEditorFlow: () => Promise<DevAetherWavemapEditorFixtureState>;
       exerciseAetherPresetLibraryFavoriteFlow: () => Promise<{
         installed: DevAetherPresetLibraryFixtureState;
@@ -187,6 +188,25 @@ interface DevAetherMacroFixtureState {
     conflictText: string;
     conflictDetails: string[];
   };
+}
+
+interface DevModulationRouteSnapshot {
+  id: string;
+  source: string;
+  target: string;
+  amount: number;
+  enabled: boolean;
+  rowText: string;
+}
+
+interface DevAetherMacroAssignmentExerciseState {
+  before: DevModulationRouteSnapshot[];
+  afterAdd: DevModulationRouteSnapshot[];
+  afterEdit: DevModulationRouteSnapshot[];
+  afterDisable: DevModulationRouteSnapshot[];
+  macroAfterEdit: DevAetherMacroFixtureState;
+  macroAfterDisable: DevAetherMacroFixtureState;
+  matrixText: string;
 }
 
 interface DevAetherWavemapEditorFixtureState {
@@ -595,6 +615,42 @@ export function installBeatDevHooks() {
     return state;
   };
 
+  const exerciseAetherMacroAssignmentEditorFlow = async (): Promise<DevAetherMacroAssignmentExerciseState> => {
+    await installAetherMacroFixture();
+    await waitForEditorPanel("Modulation matrix");
+    const before = readModulationRouteSnapshots();
+
+    clickPanelButtonByText("Modulation matrix", "Add");
+    await nextFrame();
+    const afterAdd = readModulationRouteSnapshots();
+    const routeNumber = afterAdd.length;
+
+    setRouteSource(routeNumber, "macro.1");
+    await nextFrame();
+    await setRouteTarget(routeNumber, "amp.pan");
+    setRouteStrength(routeNumber, "0.44");
+    await nextFrame();
+    const afterEdit = readModulationRouteSnapshots();
+    const macroAfterEdit = readAetherMacroFixtureState();
+
+    toggleRouteEnabled(routeNumber);
+    await nextFrame();
+    const afterDisable = readModulationRouteSnapshots();
+    const macroAfterDisable = readAetherMacroFixtureState();
+
+    const state: DevAetherMacroAssignmentExerciseState = {
+      before,
+      afterAdd,
+      afterEdit,
+      afterDisable,
+      macroAfterEdit,
+      macroAfterDisable,
+      matrixText: normalizeText(findElementByAriaLabel("Modulation matrix")?.textContent ?? ""),
+    };
+    writeAetherMacroAssignmentExerciseMarker(state);
+    return state;
+  };
+
   const exerciseAetherWavemapEditorFlow = async (): Promise<DevAetherWavemapEditorFixtureState> => {
     const instrumentStore = useInstrumentStore.getState();
     for (const instrument of instrumentStore.instruments) {
@@ -874,6 +930,7 @@ export function installBeatDevHooks() {
     readAetherPresetLibraryFixtureState,
     installAetherMacroFixture,
     readAetherMacroFixtureState,
+    exerciseAetherMacroAssignmentEditorFlow,
     exerciseAetherWavemapEditorFlow,
     exerciseAetherPresetLibraryFavoriteFlow,
     installAetherAutomationFixture,
@@ -911,6 +968,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-macro") {
     window.setTimeout(() => {
       void installAetherMacroFixture();
+    }, 0);
+  } else if (fixture === "aether-macro-assignment") {
+    window.setTimeout(() => {
+      void exerciseAetherMacroAssignmentEditorFlow();
     }, 0);
   } else if (fixture === "aether-wavemap-editor") {
     window.setTimeout(() => {
@@ -973,6 +1034,54 @@ function readMacroFixtureDomState(label: string): DevAetherMacroFixtureState {
         .filter(Boolean),
     },
   };
+}
+
+function readModulationRouteSnapshots(): DevModulationRouteSnapshot[] {
+  return useSynthStore.getState().draft.modulation.map((route) => {
+    const row = Array.from(document.querySelectorAll<HTMLElement>("[data-modulation-route-id]"))
+      .find((candidate) => candidate.dataset.modulationRouteId === route.id);
+    return {
+      id: route.id,
+      source: route.source,
+      target: route.target,
+      amount: route.amount,
+      enabled: route.enabled,
+      rowText: normalizeText(row?.textContent ?? ""),
+    };
+  });
+}
+
+function routeControlRoot(routeNumber: number): HTMLElement | null {
+  return findElementByAriaLabel(`Modulation route ${routeNumber}`);
+}
+
+function setRouteSource(routeNumber: number, source: string) {
+  const select = routeControlRoot(routeNumber)?.querySelector<HTMLSelectElement>(`select[aria-label="Route ${routeNumber} source"]`);
+  if (!select) return;
+  select.value = source;
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+async function setRouteTarget(routeNumber: number, target: string) {
+  const trigger = routeControlRoot(routeNumber)?.querySelector<HTMLButtonElement>(`button[aria-label="Route ${routeNumber} target"]`);
+  trigger?.click();
+  await nextFrame();
+  const option = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-modulation-target-option]"))
+    .find((candidate) => candidate.dataset.modulationTargetOption === target);
+  option?.click();
+}
+
+function setRouteStrength(routeNumber: number, value: string) {
+  const input = routeControlRoot(routeNumber)?.querySelector<HTMLInputElement>(`input[aria-label="Route ${routeNumber} strength"]`);
+  if (!input) return;
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function toggleRouteEnabled(routeNumber: number) {
+  const button = routeControlRoot(routeNumber)?.querySelector<HTMLButtonElement>(`button[aria-label="Route ${routeNumber} enabled"]`);
+  button?.click();
 }
 
 function readAetherWavemapEditorFixtureState(): DevAetherWavemapEditorFixtureState {
@@ -1124,6 +1233,10 @@ function writeAetherAutomationPointExerciseMarker(state: DevAetherAutomationPoin
 
 function writeAetherMacroFixtureMarker(state = readMacroFixtureDomState("Brightness")) {
   document.documentElement.dataset.beatAetherMacroFixture = JSON.stringify(state);
+}
+
+function writeAetherMacroAssignmentExerciseMarker(state: DevAetherMacroAssignmentExerciseState) {
+  document.documentElement.dataset.beatAetherMacroAssignmentExercise = JSON.stringify(state);
 }
 
 function writeAetherWavemapEditorFixtureMarker(state = readAetherWavemapEditorFixtureState()) {

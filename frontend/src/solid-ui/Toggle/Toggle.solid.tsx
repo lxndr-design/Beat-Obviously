@@ -5,6 +5,7 @@ export interface ToggleProps {
   checked: boolean;
   onChange: (v: boolean) => void;
   label?: string;
+  "aria-label"?: string;
   disabled?: boolean;
   class?: string;
   className?: string;
@@ -18,6 +19,7 @@ export function Toggle(props: ToggleProps) {
         type="button"
         role="switch"
         aria-checked={props.checked}
+        aria-label={props["aria-label"]}
         disabled={props.disabled}
         onClick={() => props.onChange(!props.checked)}
         class={`${styles.box} ${props.checked ? styles.on : ""}`}
