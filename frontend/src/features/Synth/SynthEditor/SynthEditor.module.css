@@ -338,18 +338,41 @@ section.shell {
   line-height: 1;
 }
 
-.macroConflict span:first-child {
+.macroConflict > span:first-child {
   color: color-mix(in srgb, var(--color-fg) 82%, transparent);
   font-weight: var(--font-weight-medium);
 }
 
-.macroConflict span:last-child {
+.macroConflict > span:nth-child(2) {
   min-width: 0;
   overflow: hidden;
   color: color-mix(in srgb, var(--color-fg) 62%, transparent);
   font-family: var(--font-family-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.macroConflictDetail {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 4px;
+  min-width: 0;
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+  font-family: var(--font-family-mono);
+}
+
+.macroConflictDetail span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.macroConflictDetail span:last-child {
+  color: color-mix(in srgb, var(--color-fg) 72%, transparent);
+  font-family: var(--font-family-base);
+  font-weight: var(--font-weight-medium);
 }
 
 .macroMetaRow {

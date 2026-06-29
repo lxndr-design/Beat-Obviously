@@ -23,6 +23,7 @@ import {
   getEnvelopeCurveParam,
   getNumberParam,
   macroAssignmentsForId,
+  macroConflictDetailsForId,
   macroConflictSummaryForId,
   macroDefinitionForId,
   macroOutputValue,
@@ -573,6 +574,7 @@ export function SynthEditor(props: SynthEditorProps) {
                   const definition = () => macroDefinitionForId(draft(), id);
                   const assignments = () => macroAssignmentsForId(draft(), id);
                   const conflict = () => macroConflictSummaryForId(draft(), id);
+                  const conflictDetails = () => macroConflictDetailsForId(draft(), id);
                   const assignmentLabel = () => assignments().length === 0
                     ? "No assignments"
                     : assignments()
@@ -610,6 +612,15 @@ export function SynthEditor(props: SynthEditorProps) {
                         <div class={styles.macroConflict} title={conflict().label}>
                           <span>Conflict</span>
                           <span>{conflict().label}</span>
+                          <For each={conflictDetails().slice(0, 2)}>
+                            {(detail) => (
+                              <div class={styles.macroConflictDetail}>
+                                <span>{detail.targetLabel}</span>
+                                <span>{detail.competingSources.slice(0, 2).join(", ")}</span>
+                                <span>Summed</span>
+                              </div>
+                            )}
+                          </For>
                         </div>
                       </Show>
                       <div class={styles.macroMetaRow}>

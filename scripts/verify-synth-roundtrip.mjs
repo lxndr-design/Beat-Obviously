@@ -163,10 +163,20 @@ try {
     count: 1,
     label: "Filter Cutoff with Amp Env",
   });
+  assert.deepEqual(synthStore.macroConflictDetailsForId(draft, "macro.1"), [
+    {
+      target: "filter.cutoff",
+      targetLabel: "Filter Cutoff",
+      competingSources: ["Amp Env"],
+      behavior: "summed",
+      label: "Filter Cutoff with Amp Env",
+    },
+  ]);
   assert.deepEqual(synthStore.macroConflictSummaryForId(draft, "macro.2"), {
     count: 0,
     label: "",
   });
+  assert.deepEqual(synthStore.macroConflictDetailsForId(draft, "macro.2"), []);
   assert.equal(draft.metadata.wavemaps["user.custom"].schemaVersion, 1);
   assert.equal(draft.metadata.customWavetables["user.custom"].frames.length, 4);
   assert.equal(draft.effects.filters.length, 2);

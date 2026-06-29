@@ -24,9 +24,9 @@ Status legend:
 - `[x]` Dynamic modulation routes exist for LFO 1, LFO 2, Env 1, Env 2, velocity, keytrack, and mod wheel to oscillator, filter, amp, and unison targets.
 - `[x]` Per-note native/browser lanes cover pitch, amp level/pan, filter cutoff/resonance/drive, oscillator position/fine/level/pan/phase, and unison detune/spread.
 - `[~]` Runtime macro semantics.
-  - Done: macro labels, ranges, curves, visible assignment summaries, first visible macro conflict summaries for overlapping modulation targets, browser static route math, browser live-preview parity that keeps macro routes dynamic instead of baking them into base preview values, native macro range/curve parsing, first-class voice macro state, macro route storage in dynamic targets, and `macro.1`-`macro.4` realtime/note automation with backend no-leak stress.
-  - Remaining: visible macro lanes and deeper conflict/precedence display.
-  - Proof: document roundtrip verifier covers macro definitions/routes inside Aether preset-grade patches; synth verifier covers macro conflict summary detection and browser dynamic macro-route preview semantics; browser preview and editor interaction coverage for macro lanes still needed.
+  - Done: macro labels, ranges, curves, visible assignment summaries, structured macro conflict rows with target/source/summed behavior for overlapping modulation targets, browser static route math, browser live-preview parity that keeps macro routes dynamic instead of baking them into base preview values, native macro range/curve parsing, first-class voice macro state, macro route storage in dynamic targets, and `macro.1`-`macro.4` realtime/note automation with backend no-leak stress.
+  - Remaining: visible macro lanes.
+  - Proof: document roundtrip verifier covers macro definitions/routes inside Aether preset-grade patches; synth verifier covers macro conflict summary/detail detection and browser dynamic macro-route preview semantics; browser preview and editor interaction coverage for macro lanes still needed.
 - `[~]` Modulation matrix UX.
   - Done: target/source selection and visible assignments.
   - Remaining: semantic cleanup for per-target range displays, conflict clarity, disabled route states, and source-specific editing affordances.

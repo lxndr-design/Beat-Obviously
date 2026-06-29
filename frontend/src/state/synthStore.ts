@@ -1153,9 +1153,17 @@ export interface SynthMacroConflictSummary {
   label: string;
 }
 
-export function macroConflictSummaryForId(draft: SynthDraftPatch, id: MacroId): SynthMacroConflictSummary {
+export interface SynthMacroConflictDetail {
+  target: ModulationTargetId;
+  targetLabel: string;
+  competingSources: string[];
+  behavior: "summed";
+  label: string;
+}
+
+export function macroConflictDetailsForId(draft: SynthDraftPatch, id: MacroId): SynthMacroConflictDetail[] {
   const assignments = macroAssignmentsForId(draft, id);
-  if (assignments.length === 0) return { count: 0, label: "" };
+  if (assignments.length === 0) return [];
   const conflicts = new Map<ModulationTargetId, Set<string>>();
   for (const route of assignments) {
     const competingSources = draft.modulation
@@ -1166,17 +1174,28 @@ export function macroConflictSummaryForId(draft: SynthDraftPatch, id: MacroId): 
     competingSources.forEach((source) => sources.add(source));
     conflicts.set(route.target, sources);
   }
-  if (conflicts.size === 0) return { count: 0, label: "" };
-  const summaries = Array.from(conflicts.entries()).map(([target, sources]) => {
+  return Array.from(conflicts.entries()).map(([target, sources]) => {
     const sourceLabels = Array.from(sources);
     const visibleSources = sourceLabels.slice(0, 2).join(", ");
     const suffix = sourceLabels.length > 2 ? ` +${sourceLabels.length - 2}` : "";
-    return `${MODULATION_TARGET_LABELS[target] ?? target} with ${visibleSources}${suffix}`;
+    const targetLabel = MODULATION_TARGET_LABELS[target] ?? target;
+    return {
+      target,
+      targetLabel,
+      competingSources: sourceLabels,
+      behavior: "summed" as const,
+      label: `${targetLabel} with ${visibleSources}${suffix}`,
+    };
   });
-  const visibleSummaries = summaries.slice(0, 2).join("; ");
-  const suffix = summaries.length > 2 ? ` +${summaries.length - 2}` : "";
+}
+
+export function macroConflictSummaryForId(draft: SynthDraftPatch, id: MacroId): SynthMacroConflictSummary {
+  const details = macroConflictDetailsForId(draft, id);
+  if (details.length === 0) return { count: 0, label: "" };
+  const visibleSummaries = details.slice(0, 2).map((detail) => detail.label).join("; ");
+  const suffix = details.length > 2 ? ` +${details.length - 2}` : "";
   return {
-    count: conflicts.size,
+    count: details.length,
     label: `${visibleSummaries}${suffix}`,
   };
 }
