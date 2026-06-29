@@ -1620,6 +1620,92 @@ namespace
         return foundProjectAutomation && checkedProjectAutomationStart;
     }
 
+    bool stressSequencerAutomationConflictPrecedence()
+    {
+        beat::Project project;
+        project.id = "automation-conflict-precedence";
+        project.bpm = 120.0;
+        project.lengthBeats = 4.0;
+
+        beat::InstrumentDefinition instrument;
+        instrument.id = "conflict-aether";
+        instrument.kind = "wavetable";
+        project.instruments.push_back(instrument);
+
+        beat::Track track;
+        track.id = "conflict-track";
+        track.name = "Conflict Track";
+        track.kind = beat::TrackKind::Midi;
+        track.instrumentId = instrument.id;
+
+        beat::Segment segment;
+        segment.id = "conflict-segment";
+        segment.trackId = track.id;
+        segment.kind = beat::SegmentPayloadKind::Midi;
+        segment.instrumentId = instrument.id;
+        segment.startBeat = 0.0;
+        segment.lengthBeats = 2.0;
+
+        beat::MidiAutomationLane segmentLane;
+        segmentLane.target = "filter.cutoff";
+        segmentLane.points.push_back({ 0.0, 0.70f });
+        segmentLane.points.push_back({ 1.0, 0.70f });
+        segment.automation.push_back(std::move(segmentLane));
+
+        track.segments.push_back(std::move(segment));
+        project.tracks.push_back(std::move(track));
+
+        beat::ProjectAutomationLane trackLane;
+        trackLane.trackId = "conflict-track";
+        trackLane.instrumentId = instrument.id;
+        trackLane.target = "filter.cutoff";
+        trackLane.points.push_back({ 0.0, 0.45f });
+        trackLane.points.push_back({ 1.0, 0.45f });
+        project.automation.push_back(std::move(trackLane));
+
+        beat::ProjectAutomationLane projectLane;
+        projectLane.instrumentId = instrument.id;
+        projectLane.target = "filter.cutoff";
+        projectLane.points.push_back({ 0.0, 0.20f });
+        projectLane.points.push_back({ 1.0, 0.20f });
+        project.automation.push_back(std::move(projectLane));
+
+        beat::Sequencer sequencer;
+        sequencer.setSampleRate(48000.0);
+        sequencer.setTempo(120.0);
+        sequencer.setProject(project);
+        sequencer.seek(0.0);
+        sequencer.play();
+
+        std::vector<beat::Sequencer::ParameterAutomationEvent> events;
+        sequencer.render(512,
+            [](const beat::Sequencer::TriggerEvent&) {},
+            [&](const beat::Sequencer::ParameterAutomationEvent& ev) {
+                if (ev.parameterId == "filter.cutoff" && ev.sampleOffset == 0)
+                    events.push_back(ev);
+            });
+
+        if (events.size() < 3)
+            return false;
+
+        const auto& projectEvent = events[0];
+        const auto& trackEvent = events[1];
+        const auto& segmentEvent = events[2];
+
+        return projectEvent.trackId.isEmpty()
+            && projectEvent.segmentId.isEmpty()
+            && projectEvent.instrumentId == instrument.id
+            && near(projectEvent.value, 0.20f)
+            && trackEvent.trackId == "conflict-track"
+            && trackEvent.segmentId.isEmpty()
+            && trackEvent.instrumentId == instrument.id
+            && near(trackEvent.value, 0.45f)
+            && segmentEvent.trackId == "conflict-track"
+            && segmentEvent.segmentId == "conflict-segment"
+            && segmentEvent.instrumentId == instrument.id
+            && near(segmentEvent.value, 0.70f);
+    }
+
     bool stressSequencerTrackEffectAutomation()
     {
         beat::Project project;
@@ -11674,6 +11760,11 @@ int main()
     if (!stressSequencerProjectAutomation())
     {
         std::cerr << "Sequencer project automation stress failed\n";
+        return 1;
+    }
+    if (!stressSequencerAutomationConflictPrecedence())
+    {
+        std::cerr << "Sequencer automation conflict precedence stress failed\n";
         return 1;
     }
     if (!stressSequencerTrackEffectAutomation())

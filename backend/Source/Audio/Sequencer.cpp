@@ -141,10 +141,10 @@ namespace beat
                     });
                 };
 
-                for (const auto& lane : snapshot->automation)
+                const auto emitProjectLane = [&](const ProjectAutomationLane& lane)
                 {
                     if (lane.target.isEmpty() || lane.target == "pitch" || lane.points.empty())
-                        continue;
+                        return;
 
                     int currentIndex = -1;
                     int nextIndex = -1;
@@ -211,6 +211,20 @@ namespace beat
                                                       });
                         }
                     }
+                };
+
+                // Apply lower-scope project lanes before track-scoped lanes so
+                // same-sample writes match the frontend conflict contract:
+                // project < track < segment < note/live-local automation.
+                for (const auto& lane : snapshot->automation)
+                {
+                    if (lane.trackId.isEmpty())
+                        emitProjectLane(lane);
+                }
+                for (const auto& lane : snapshot->automation)
+                {
+                    if (lane.trackId.isNotEmpty())
+                        emitProjectLane(lane);
                 }
             }
 
