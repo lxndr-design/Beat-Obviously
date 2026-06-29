@@ -159,6 +159,14 @@ try {
   assert.equal(Math.abs(synthStore.macroOutputValue(draft, "macro.1") - 0.35) < 0.000001, true);
   assert.equal(synthStore.modulationSourceLabel(draft, "macro.1"), "Brightness");
   assert.equal(synthStore.macroAssignmentsForId(draft, "macro.1").length, 1);
+  assert.deepEqual(synthStore.macroConflictSummaryForId(draft, "macro.1"), {
+    count: 1,
+    label: "Filter Cutoff with Amp Env",
+  });
+  assert.deepEqual(synthStore.macroConflictSummaryForId(draft, "macro.2"), {
+    count: 0,
+    label: "",
+  });
   assert.equal(draft.metadata.wavemaps["user.custom"].schemaVersion, 1);
   assert.equal(draft.metadata.customWavetables["user.custom"].frames.length, 4);
   assert.equal(draft.effects.filters.length, 2);

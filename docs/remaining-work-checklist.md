@@ -51,7 +51,7 @@ Current implementation focus:
    - Add sampler/keymap editors for velocity layers, sample trim, loop markers, crossfade loops, root-note helpers, round-robin, choke, and exclusive groups.
    - Run a real AU/VST3 plugin-host feasibility pass after the protected adapter layer is stable.
 6. `[~]` Aether synth maturity.
-   - Finish macro live-preview parity, visible macro lanes, macro conflict display, and modulation matrix semantic cleanup.
+   - Finish macro live-preview parity, visible macro lanes, deeper macro conflict/precedence display, and modulation matrix semantic cleanup.
    - Improve envelope visual editing, loop/curve handles, expression-source feedback, and remaining one-off synth controls.
    - Curate named Aether instrument/effect preset library UX beyond local Save As lists.
 7. `[~]` Generation and musical intelligence.
@@ -227,6 +227,8 @@ Current implementation focus:
 - `[~]` Browser preview parity for live macro route changes.
 - `[x]` Project/document roundtrip fixtures for macro route state.
 - `[~]` Visible macro lanes and macro conflict display.
+  - Done: first visible macro-card conflict summaries for overlapping modulation targets.
+  - Remaining: visible macro automation lanes, browser live-preview parity, and deeper precedence/conflict feedback.
 - `[~]` Modulation matrix semantic cleanup: per-target ranges, conflict clarity, disabled routes, source-specific editing.
 - `[~]` Deeper envelope visual editing with better loop/curve handles and assignment feedback.
 - `[~]` Performance/expression UX for mod wheel, pitch bend, velocity, keytracking, mono/legato, glide, and voice caps.

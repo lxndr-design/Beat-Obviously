@@ -1148,6 +1148,39 @@ export function macroAssignmentsForId(draft: SynthDraftPatch, id: MacroId): Synt
   return draft.modulation.filter((route) => route.enabled && route.source === id);
 }
 
+export interface SynthMacroConflictSummary {
+  count: number;
+  label: string;
+}
+
+export function macroConflictSummaryForId(draft: SynthDraftPatch, id: MacroId): SynthMacroConflictSummary {
+  const assignments = macroAssignmentsForId(draft, id);
+  if (assignments.length === 0) return { count: 0, label: "" };
+  const conflicts = new Map<ModulationTargetId, Set<string>>();
+  for (const route of assignments) {
+    const competingSources = draft.modulation
+      .filter((candidate) => candidate.enabled && candidate.target === route.target && candidate.source !== id)
+      .map((candidate) => modulationSourceLabel(draft, candidate.source));
+    if (competingSources.length === 0) continue;
+    const sources = conflicts.get(route.target) ?? new Set<string>();
+    competingSources.forEach((source) => sources.add(source));
+    conflicts.set(route.target, sources);
+  }
+  if (conflicts.size === 0) return { count: 0, label: "" };
+  const summaries = Array.from(conflicts.entries()).map(([target, sources]) => {
+    const sourceLabels = Array.from(sources);
+    const visibleSources = sourceLabels.slice(0, 2).join(", ");
+    const suffix = sourceLabels.length > 2 ? ` +${sourceLabels.length - 2}` : "";
+    return `${MODULATION_TARGET_LABELS[target] ?? target} with ${visibleSources}${suffix}`;
+  });
+  const visibleSummaries = summaries.slice(0, 2).join("; ");
+  const suffix = summaries.length > 2 ? ` +${summaries.length - 2}` : "";
+  return {
+    count: conflicts.size,
+    label: `${visibleSummaries}${suffix}`,
+  };
+}
+
 export function modulationSourceLabel(draft: SynthDraftPatch, source: ModulationSourceId): string {
   return isMacroSource(source)
     ? macroDefinitionForId(draft, source).label
