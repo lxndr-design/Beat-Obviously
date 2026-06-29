@@ -16,6 +16,12 @@ import {
 } from "../../../state/effects";
 import { createAetherEffectPresetRecord, type AetherEffectPresetRecord } from "../../../state/effectPresets";
 import {
+  aetherPresetLibraryCategories,
+  buildAetherPresetLibraryEntries,
+  filterAetherPresetLibraryEntries,
+  type AetherPresetLibraryEntry,
+} from "../../../state/aetherPresetLibrary";
+import {
   createDefaultSynthDraft,
   FACTORY_SYNTH_PRESETS,
   MACRO_IDS,
@@ -134,6 +140,17 @@ export function SynthEditor(props: SynthEditorProps) {
 
   const [presets, setPresets] = createSignal<SynthPresetRecord[]>([]);
   const [selectedPresetId, setSelectedPresetId] = createSignal("");
+  const [presetSearch, setPresetSearch] = createSignal("");
+  const [presetCategory, setPresetCategory] = createSignal("");
+  const presetLibraryEntries = createMemo(() => buildAetherPresetLibraryEntries(presets(), userInstrumentPresets()));
+  const presetLibraryCategories = createMemo(() => aetherPresetLibraryCategories(presetLibraryEntries()));
+  const visiblePresetLibraryEntries = createMemo(() => filterAetherPresetLibraryEntries(presetLibraryEntries(), {
+    search: presetSearch(),
+    category: presetCategory(),
+  }));
+  const visibleFactoryPresetEntries = createMemo(() => visiblePresetLibraryEntries().filter((entry) => entry.source === "factory"));
+  const visibleUserPresetEntries = createMemo(() => visiblePresetLibraryEntries().filter((entry) => entry.source === "user-preset"));
+  const visibleUserInstrumentEntries = createMemo(() => visiblePresetLibraryEntries().filter((entry) => entry.source === "user-instrument"));
   const selectedPresetInfo = createMemo<PresetLibraryInfo>(() => {
     const id = selectedPresetId();
     if (id.startsWith(FACTORY_PRESET_PREFIX)) {
@@ -463,6 +480,12 @@ export function SynthEditor(props: SynthEditorProps) {
     });
   }
 
+  function presetOptionValue(entry: AetherPresetLibraryEntry): string {
+    if (entry.source === "factory") return `${FACTORY_PRESET_PREFIX}${entry.id}`;
+    if (entry.source === "user-preset") return `${USER_PRESET_PREFIX}${entry.id}`;
+    return `${USER_INSTRUMENT_PRESET_PREFIX}${entry.id}`;
+  }
+
   async function onDeletePreset() {
     if (!selectedPresetId().startsWith(USER_PRESET_PREFIX)) return;
     await deleteSynthPreset(selectedPresetId().slice(USER_PRESET_PREFIX.length));
@@ -571,6 +594,29 @@ export function SynthEditor(props: SynthEditorProps) {
                   </Show>
                 </div>
               </div>
+              <div class={styles.presetTools}>
+                <TextInput
+                  label="Search"
+                  layout="inline"
+                  className={styles.presetSearch}
+                  value={presetSearch()}
+                  placeholder="Preset name, tag, source"
+                  onInput={(event) => setPresetSearch(event.currentTarget.value)}
+                />
+                <label class={styles.presetCategory}>
+                  <span class="ds-field-label">Category</span>
+                  <select
+                    class="ds-select"
+                    value={presetCategory()}
+                    onChange={(event) => setPresetCategory(event.currentTarget.value)}
+                  >
+                    <option value="">All</option>
+                    <For each={presetLibraryCategories()}>
+                      {(category) => <option value={category}>{category}</option>}
+                    </For>
+                  </select>
+                </label>
+              </div>
               <div class={styles.presetRow}>
                 <label class={styles.presetSelect}>
                   <span class="ds-field-label">Preset</span>
@@ -580,32 +626,37 @@ export function SynthEditor(props: SynthEditorProps) {
                     onChange={(event) => onLoadPreset(event.currentTarget.value)}
                   >
                     <option value="">None</option>
-                    <optgroup label="Factory">
-                      <For each={FACTORY_SYNTH_PRESETS}>
-                        {(preset) => (
-                          <option value={`${FACTORY_PRESET_PREFIX}${preset.id}`}>
-                            {preset.name}
-                          </option>
-                        )}
-                      </For>
-                    </optgroup>
-                    <Show when={presets().length > 0}>
-                      <optgroup label="User Presets">
-                        <For each={presets()}>
-                          {(preset) => (
-                            <option value={`${USER_PRESET_PREFIX}${preset.id}`}>
-                              {preset.name}
+                    <Show when={visiblePresetLibraryEntries().length === 0}>
+                      <option value="" disabled>No presets match</option>
+                    </Show>
+                    <Show when={visibleFactoryPresetEntries().length > 0}>
+                      <optgroup label="Factory">
+                        <For each={visibleFactoryPresetEntries()}>
+                          {(entry) => (
+                            <option value={presetOptionValue(entry)}>
+                              {entry.name}
                             </option>
                           )}
                         </For>
                       </optgroup>
                     </Show>
-                    <Show when={userInstrumentPresets().length > 0}>
+                    <Show when={visibleUserPresetEntries().length > 0}>
+                      <optgroup label="User Presets">
+                        <For each={visibleUserPresetEntries()}>
+                          {(entry) => (
+                            <option value={presetOptionValue(entry)}>
+                              {entry.name}
+                            </option>
+                          )}
+                        </For>
+                      </optgroup>
+                    </Show>
+                    <Show when={visibleUserInstrumentEntries().length > 0}>
                       <optgroup label="User Instruments">
-                        <For each={userInstrumentPresets()}>
-                          {(instrument) => (
-                            <option value={`${USER_INSTRUMENT_PRESET_PREFIX}${instrument.id}`}>
-                              {instrument.name}
+                        <For each={visibleUserInstrumentEntries()}>
+                          {(entry) => (
+                            <option value={presetOptionValue(entry)}>
+                              {entry.name}
                             </option>
                           )}
                         </For>

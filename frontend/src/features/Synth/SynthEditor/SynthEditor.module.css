@@ -191,6 +191,30 @@ section.shell {
   min-width: 0;
 }
 
+.presetTools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 0.45fr);
+  gap: var(--synth-gap);
+  min-width: 0;
+}
+
+.presetSearch,
+.presetCategory {
+  min-width: 0;
+  min-height: 32px;
+}
+
+.presetCategory {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--synth-gap);
+}
+
+.presetCategory :global(.ds-field-label) {
+  font-size: var(--font-size-ui);
+}
+
 .nameIconRow {
   position: relative;
   display: grid;

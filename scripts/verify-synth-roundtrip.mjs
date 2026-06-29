@@ -16,6 +16,7 @@ try {
     esbuild,
     [
       join(repoRoot, "frontend/src/state/synthStore.ts"),
+      join(repoRoot, "frontend/src/state/aetherPresetLibrary.ts"),
       join(repoRoot, "frontend/src/state/effectPresets.ts"),
       join(repoRoot, "frontend/src/state/synthPresets.ts"),
       join(repoRoot, "frontend/src/audio/synthPreview.ts"),
@@ -29,6 +30,7 @@ try {
   );
 
   const synthStore = await import(pathToFileURL(join(outDir, "state/synthStore.js")));
+  const aetherPresetLibrary = await import(pathToFileURL(join(outDir, "state/aetherPresetLibrary.js")));
   const effectPresets = await import(pathToFileURL(join(outDir, "state/effectPresets.js")));
   const synthPresets = await import(pathToFileURL(join(outDir, "state/synthPresets.js")));
   const synthPreview = await import(pathToFileURL(join(outDir, "audio/synthPreview.js")));
@@ -347,6 +349,36 @@ try {
   assert.deepEqual(userPreset.patch, draft);
   userPreset.patch.name = "Mutated Copy";
   assert.equal(draft.name, "Roundtrip Probe");
+
+  const presetLibraryEntries = aetherPresetLibrary.buildAetherPresetLibraryEntries(
+    [userPreset],
+    [{
+      id: "instrument-glass-user",
+      name: "Saved Glass Instrument",
+      kind: "wavetable",
+      userCreated: true,
+      synthPatch: {
+        ...draft,
+        metadata: {
+          ...draft.metadata,
+          tags: ["aether", "glass", "pad"],
+        },
+      },
+    }],
+  );
+  const presetCategories = aetherPresetLibrary.aetherPresetLibraryCategories(presetLibraryEntries);
+  assert.ok(presetCategories.includes("Lead"), "factory preset categories should be searchable facets");
+  assert.ok(presetCategories.includes("Glass"), "user instrument tags should become searchable category facets");
+  const leadPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { category: "Lead" });
+  assert.ok(leadPresetResults.some((entry) => entry.id === "factory.wt-lead"), "category facets should include matching factory presets");
+  assert.ok(leadPresetResults.some((entry) => entry.id === userPreset.id), "category facets should include matching user presets");
+  const glassPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { search: "glass" });
+  assert.ok(glassPresetResults.some((entry) => entry.id === "factory.glass-pad"), "search should match factory descriptions");
+  assert.ok(glassPresetResults.some((entry) => entry.id === "instrument-glass-user"), "search should match user instrument tags");
+  const macroUserPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, {
+    search: "macro user preset",
+  });
+  assert.deepEqual(macroUserPresetResults.map((entry) => entry.id), [userPreset.id]);
 
   const migratedPreset = synthPresets.normalizeSynthPresetRecord({
     id: "legacy",
