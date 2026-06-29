@@ -198,6 +198,13 @@ export interface SynthModulationRouteDisplay {
   stateLabel: "Active" | "Off";
 }
 
+export interface SynthModulationSourceAffordance {
+  source: ModulationSourceId;
+  label: string;
+  detail: string;
+  editor: "lfo" | "envelope" | "macro" | "performance";
+}
+
 export interface SynthDraftPatch {
   schemaVersion: typeof SYNTH_PATCH_SCHEMA_VERSION;
   instrumentType: typeof SYNTH_INSTRUMENT_TYPE;
@@ -1271,6 +1278,54 @@ export function modulationRouteDisplay(draft: SynthDraftPatch, route: SynthModul
   };
 }
 
+export function modulationSourceAffordance(draft: SynthDraftPatch, source: ModulationSourceId): SynthModulationSourceAffordance {
+  if (source === "lfo.1" || source === "lfo.2") {
+    const enabled = getBooleanParam(draft, `${source}.enabled` as SynthParameterId);
+    const shape = getStringParam(draft, `${source}.shape` as SynthParameterId) || "sine";
+    const sync = getBooleanParam(draft, `${source}.sync` as SynthParameterId);
+    const rate = sync
+      ? getStringParam(draft, `${source}.syncedRate` as SynthParameterId) || "1/4"
+      : `${formatDecimal(getNumberParam(draft, `${source}.rate` as SynthParameterId), 2)} Hz`;
+    return {
+      source,
+      label: source === "lfo.1" ? "Edit LFO 1" : "Edit LFO 2",
+      detail: `${enabled ? "On" : "Off"} · ${shape} · ${rate}`,
+      editor: "lfo",
+    };
+  }
+
+  if (source === "env.1" || source === "env.2") {
+    const loop = getBooleanParam(draft, `${source}.loop` as SynthParameterId);
+    const attackCurve = getEnvelopeCurveParam(draft, `${source}.attackCurve` as SynthParameterId);
+    const releaseCurve = getEnvelopeCurveParam(draft, `${source}.releaseCurve` as SynthParameterId);
+    return {
+      source,
+      label: source === "env.1" ? "Edit Env 1" : "Edit Env 2",
+      detail: `${loop ? "Loop" : "One-shot"} · A ${attackCurve} · R ${releaseCurve}`,
+      editor: "envelope",
+    };
+  }
+
+  if (source.startsWith("macro.")) {
+    const id = source as MacroId;
+    const definition = macroDefinitionForId(draft, id);
+    return {
+      source,
+      label: `Edit ${definition.label}`,
+      detail: `${Math.round(definition.min * 100)}-${Math.round(definition.max * 100)}% · ${definition.curve}`,
+      editor: "macro",
+    };
+  }
+
+  if (source === "velocity") {
+    return { source, label: "Performance source", detail: "Per-note velocity", editor: "performance" };
+  }
+  if (source === "keytrack") {
+    return { source, label: "Performance source", detail: "MIDI note position", editor: "performance" };
+  }
+  return { source, label: "Performance source", detail: "Mod wheel CC1", editor: "performance" };
+}
+
 export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Instrument> {
   const wavetable = wavetableFromDraft(draft, "a");
   const oscA = oscillatorFromDraft(draft, "a", wavetable);
@@ -1390,6 +1445,11 @@ function formatSignedModAmount(amount: number): string {
   const clamped = clampBipolar(amount);
   const sign = clamped >= 0 ? "+" : "";
   return `${sign}${Math.round(clamped * 100)}`;
+}
+
+function formatDecimal(value: number, decimals: number): string {
+  const safe = Number.isFinite(value) ? value : 0;
+  return safe.toFixed(decimals).replace(/\.?0+$/, "");
 }
 
 function formatRouteTargetRange(target: ModulationTargetId, amount: number): string {

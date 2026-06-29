@@ -7,7 +7,7 @@
 .headerRow,
 .routeRow {
   display: grid;
-  grid-template-columns: 30px 100px 28px 126px 28px 150px 32px 28px;
+  grid-template-columns: 30px 124px 28px 126px 28px 150px 32px 28px;
   gap: 6px;
   align-items: center;
   min-width: 0;
@@ -72,11 +72,35 @@
 }
 
 .sourceSelect {
-  width: 100px;
+  width: 124px;
 }
 
 .sourceCell {
+  display: grid;
+  gap: 3px;
   min-width: 0;
+}
+
+.sourceAffordance {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in srgb, currentColor 66%, transparent);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.sourceAffordance span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sourceAffordance span:first-child {
+  color: color-mix(in srgb, currentColor 82%, transparent);
 }
 
 .targetSelect {

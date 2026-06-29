@@ -5,6 +5,7 @@ import { createStoreSelector } from "../../../solid-utils/store";
 import {
   MODULATION_SOURCE_LABELS,
   MODULATION_TARGET_LABELS,
+  modulationSourceAffordance,
   modulationRouteDisplay,
   useSynthStore,
   type ModulationSourceId,
@@ -135,6 +136,7 @@ export function ModulationMatrix() {
             const targets = () => targetsForSource(route.source);
             const selectedTarget = () => targets().includes(route.target) ? route.target : targets()[0];
             const display = () => modulationRouteDisplay(draft(), route);
+            const sourceAffordance = () => modulationSourceAffordance(draft(), route.source);
             return (
               <div class={`${styles.routeRow} ${route.enabled ? "" : styles.routeRowDisabled}`}>
                 <div class={styles.onCell}>
@@ -161,6 +163,10 @@ export function ModulationMatrix() {
                       )}
                     </For>
                   </select>
+                  <span class={styles.sourceAffordance} title={`${sourceAffordance().label}: ${sourceAffordance().detail}`}>
+                    <span>{sourceAffordance().label}</span>
+                    <span>{sourceAffordance().detail}</span>
+                  </span>
                 </div>
                 <HoverInfo content="Pick source">
                   <Button

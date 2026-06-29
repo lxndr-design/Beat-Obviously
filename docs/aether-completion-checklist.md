@@ -27,9 +27,9 @@ Status legend:
   - Done: macro labels, ranges, curves, visible assignment summaries, visible macro source lanes for raw value/range/output/targets, structured macro conflict rows with target/source/summed behavior for overlapping modulation targets, browser static route math, browser live-preview parity that keeps macro routes dynamic instead of baking them into base preview values, native macro range/curve parsing, first-class voice macro state, macro route storage in dynamic targets, and `macro.1`-`macro.4` realtime/note automation with backend no-leak stress.
   - Proof: document roundtrip verifier covers macro definitions/routes inside Aether preset-grade patches; synth verifier covers macro lane state, macro conflict summary/detail detection, and browser dynamic macro-route preview semantics.
 - `[~]` Modulation matrix UX.
-  - Done: target/source selection, visible assignments, target-scaled range displays, and explicit disabled route state display.
-  - Remaining: source-specific editing affordances.
-  - Proof: design-system/interaction verifier coverage for route add/edit/remove/disable and assignment display; synth verifier covers target-scaled route display labels and disabled route state labels.
+  - Done: target/source selection, visible assignments, target-scaled range displays, explicit disabled route state display, and compact source-specific affordance lines for LFO, envelope, macro, and performance sources.
+  - Remaining: direct jump/edit focus from each affordance into the matching source editor section.
+  - Proof: design-system/interaction verifier coverage for route add/edit/remove/disable and assignment display; synth verifier covers target-scaled route display labels, disabled route state labels, and source affordance labels/details.
 - `[~]` Automation conflict rules.
   - Done: shared frontend conflict resolver defines live/project/track/segment/note direct-write precedence, treats macro routes as additive modulation instead of direct-write winners, filters inactive sources, and gives deterministic same-rank replacement summaries for editor badges.
   - Remaining: backend sequencer stress that asserts the native scheduling/application order matches the displayed conflict contract, plus editor wiring for visible effective-value badges in every automation surface.

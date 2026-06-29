@@ -269,6 +269,30 @@ try {
     rangeLabel: "-100%",
     stateLabel: "Off",
   });
+  assert.deepEqual(synthStore.modulationSourceAffordance(draft, "lfo.1"), {
+    source: "lfo.1",
+    label: "Edit LFO 1",
+    detail: "On · triangle · 1/8",
+    editor: "lfo",
+  });
+  assert.deepEqual(synthStore.modulationSourceAffordance(draft, "env.1"), {
+    source: "env.1",
+    label: "Edit Env 1",
+    detail: "Loop · A exp · R log",
+    editor: "envelope",
+  });
+  assert.deepEqual(synthStore.modulationSourceAffordance(draft, "macro.1"), {
+    source: "macro.1",
+    label: "Edit Brightness",
+    detail: "20-80% · ease-in",
+    editor: "macro",
+  });
+  assert.deepEqual(synthStore.modulationSourceAffordance(draft, "velocity"), {
+    source: "velocity",
+    label: "Performance source",
+    detail: "Per-note velocity",
+    editor: "performance",
+  });
   assert.ok(synthStore.FACTORY_SYNTH_PRESETS.length >= 5);
   assert.equal(
     new Set(synthStore.FACTORY_SYNTH_PRESETS.map((preset) => preset.id)).size,
