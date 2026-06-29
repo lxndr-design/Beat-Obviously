@@ -126,6 +126,7 @@ Current implementation focus:
    - `[x]` Add document roundtrip coverage for legacy-only wavemap metadata preservation and dirty fingerprint sensitivity.
    - `[x]` Add frontend interaction smoke for Aether preset Save As/load/delete/Restore Init flows, including mixed-era wavemap user preset loading.
    - `[x]` Add user-preset favorite metadata with editor toggle, favorites-only filtering, favorite-first sorting, and verifier coverage.
+   - `[x]` Add true browser smoke for Aether preset-library favorite sort/filter/select/toggle behavior.
    - `[x]` Add true browser smoke for current Aether preset Save As/load/delete flows.
    - `[x]` Add true browser smoke for current Aether FX preset save/load/delete flows.
    - `[x]` Add true browser smoke for older/mixed-era wavemap preset records exposed through the UI.

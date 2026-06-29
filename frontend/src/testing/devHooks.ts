@@ -2,7 +2,7 @@ import type { DecentSamplerUiControl } from "../ipc/schema";
 import { db } from "../persistence/dexie";
 import type { AetherEffectPresetRecord } from "../state/effectPresets";
 import { createDefaultSynthDraft, synthDraftToInstrumentPatch, useSynthStore, type SynthDraftPatch } from "../state/synthStore";
-import type { SynthPresetRecord } from "../state/synthPresets";
+import { createSynthPresetRecord, type SynthPresetRecord } from "../state/synthPresets";
 import {
   TEMPORARY_DS_INSTRUMENT_SET_ID,
   USER_INSTRUMENT_SET_ID,
@@ -22,9 +22,13 @@ const DEV_MIXED_ERA_AETHER_PRESET_ID = "dev-mixed-era-aether";
 const DEV_MIXED_ERA_AETHER_INSTRUMENT_ID = "dev-mixed-era-aether-host";
 const DEV_MIXED_ERA_AETHER_FX_PRESET_ID = "dev-mixed-era-aether-fx";
 const DEV_MIXED_ERA_AETHER_FX_INSTRUMENT_ID = "dev-mixed-era-aether-fx-host";
+const DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID = "dev-aether-preset-library-favorite";
+const DEV_AETHER_PRESET_LIBRARY_PLAIN_ID = "dev-aether-preset-library-plain";
+const DEV_AETHER_PRESET_LIBRARY_INSTRUMENT_ID = "dev-aether-preset-library-host";
 const DEV_AETHER_AUTOMATION_INSTRUMENT_ID_MARKER = "Aether automation dev fixture";
 const DEV_AETHER_AUTOMATION_TRACK_ID = "dev-aether-automation-track";
 const DEV_AETHER_AUTOMATION_SEGMENT_ID = "dev-aether-automation-segment";
+const USER_PRESET_PREFIX = "user:";
 
 declare global {
   interface Window {
@@ -65,6 +69,18 @@ declare global {
         secondMix: number | null;
         secondBypassed: boolean | null;
       };
+      installAetherPresetLibraryFixture: () => Promise<{
+        favoritePresetId: string;
+        plainPresetId: string;
+        instrumentId: string;
+      }>;
+      readAetherPresetLibraryFixtureState: () => Promise<DevAetherPresetLibraryFixtureState>;
+      exerciseAetherPresetLibraryFavoriteFlow: () => Promise<{
+        installed: DevAetherPresetLibraryFixtureState;
+        filtered: DevAetherPresetLibraryFixtureState;
+        selected: DevAetherPresetLibraryFixtureState;
+        toggled: DevAetherPresetLibraryFixtureState;
+      }>;
       installAetherAutomationFixture: () => {
         trackId: string;
         segmentId: string;
@@ -103,6 +119,21 @@ interface DevAetherAutomationFixtureState {
     segment: DevAutomationPanelState;
     track: DevAutomationPanelState;
   };
+}
+
+interface DevAetherPresetLibraryFixtureState {
+  favoritePresetId: string;
+  plainPresetId: string;
+  instrumentId: string | null;
+  favoriteRecordFavorite: boolean | null;
+  plainRecordFavorite: boolean | null;
+  selectedPresetValue: string;
+  sortValue: string;
+  optionLabels: string[];
+  enabledOptionLabels: string[];
+  selectedInfoText: string;
+  favoritesFilterText: string | null;
+  selectedFavoriteToggleText: string | null;
 }
 
 let installed = false;
@@ -324,6 +355,93 @@ export function installBeatDevHooks() {
     };
   };
 
+  const installAetherPresetLibraryFixture = async () => {
+    const instrumentStore = useInstrumentStore.getState();
+    const existingInstrument = instrumentStore.instruments.find((instrument) => instrument.id === DEV_AETHER_PRESET_LIBRARY_INSTRUMENT_ID);
+    if (existingInstrument?.userCreated) instrumentStore.removeInstrument(existingInstrument.id);
+    await db.synthPresets.bulkDelete([DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID, DEV_AETHER_PRESET_LIBRARY_PLAIN_ID]);
+    await db.synthPresets.bulkPut([
+      createAetherPresetLibraryFixtureRecord({
+        id: DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID,
+        name: "Favorite Browser Lead",
+        tags: ["browser-smoke", "favorite", "lead"],
+        favorite: true,
+        cutoff: 0.72,
+      }) as unknown as SynthPresetRecord,
+      createAetherPresetLibraryFixtureRecord({
+        id: DEV_AETHER_PRESET_LIBRARY_PLAIN_ID,
+        name: "Plain Browser Pad",
+        tags: ["browser-smoke", "plain", "pad"],
+        favorite: false,
+        cutoff: 0.38,
+      }) as unknown as SynthPresetRecord,
+    ]);
+
+    const hostDraft = createDefaultSynthDraft();
+    const hostPatch: SynthDraftPatch = {
+      ...hostDraft,
+      name: "Preset Library Browser Host",
+      metadata: {
+        ...hostDraft.metadata,
+        tags: [...new Set([...hostDraft.metadata.tags, "dev", "preset-library"])],
+      },
+    };
+    const nextInstrumentId = instrumentStore.addInstrument({
+      ...synthDraftToInstrumentPatch(hostPatch),
+      id: DEV_AETHER_PRESET_LIBRARY_INSTRUMENT_ID,
+      name: hostPatch.name,
+      userCreated: true,
+    });
+    useSynthStore.getState().bindInstrument(nextInstrumentId);
+    useSynthStore.getState().setDraft(hostPatch);
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
+    await waitForPresetOption("Favorite Browser Lead");
+    return {
+      favoritePresetId: DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID,
+      plainPresetId: DEV_AETHER_PRESET_LIBRARY_PLAIN_ID,
+      instrumentId: nextInstrumentId,
+    };
+  };
+
+  const readAetherPresetLibraryFixtureState = async (): Promise<DevAetherPresetLibraryFixtureState> => {
+    const favoriteRecord = await db.synthPresets.get(DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID);
+    const plainRecord = await db.synthPresets.get(DEV_AETHER_PRESET_LIBRARY_PLAIN_ID);
+    const presetSelect = findFieldSelect("Preset");
+    const sortSelect = findFieldSelect("Sort");
+    const options = Array.from(presetSelect?.options ?? []);
+    return {
+      favoritePresetId: DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID,
+      plainPresetId: DEV_AETHER_PRESET_LIBRARY_PLAIN_ID,
+      instrumentId: useSynthStore.getState().boundInstrumentId,
+      favoriteRecordFavorite: favoriteRecord?.favorite ?? null,
+      plainRecordFavorite: plainRecord?.favorite ?? null,
+      selectedPresetValue: presetSelect?.value ?? "",
+      sortValue: sortSelect?.value ?? "",
+      optionLabels: options.map((option) => option.label),
+      enabledOptionLabels: options.filter((option) => !option.disabled && option.value).map((option) => option.label),
+      selectedInfoText: normalizeText(document.querySelector<HTMLElement>('[aria-label="Selected Aether preset details"]')?.textContent ?? ""),
+      favoritesFilterText: normalizeText(findButton("Toggle preset favorites filter")?.textContent ?? "") || null,
+      selectedFavoriteToggleText: normalizeText(findButton("Toggle selected Aether preset favorite")?.textContent ?? "") || null,
+    };
+  };
+
+  const exerciseAetherPresetLibraryFavoriteFlow = async () => {
+    await installAetherPresetLibraryFixture();
+    const installed = await readAetherPresetLibraryFixtureState();
+    setFieldSelectValue("Sort", "favorite");
+    await nextFrame();
+    clickButton("Toggle preset favorites filter");
+    await nextFrame();
+    const filtered = await readAetherPresetLibraryFixtureState();
+    setFieldSelectValue("Preset", `${USER_PRESET_PREFIX}${DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID}`);
+    await nextFrame();
+    const selected = await readAetherPresetLibraryFixtureState();
+    clickButton("Toggle selected Aether preset favorite");
+    await waitForPresetFavorite(DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID, false);
+    const toggled = await readAetherPresetLibraryFixtureState();
+    return { installed, filtered, selected, toggled };
+  };
+
   const installAetherAutomationFixture = () => {
     const instrumentStore = useInstrumentStore.getState();
     for (const instrument of instrumentStore.instruments) {
@@ -488,6 +606,9 @@ export function installBeatDevHooks() {
     installMixedEraAetherFxPresetFixture,
     readMixedEraAetherPresetFixtureState,
     readMixedEraAetherFxPresetFixtureState,
+    installAetherPresetLibraryFixture,
+    readAetherPresetLibraryFixtureState,
+    exerciseAetherPresetLibraryFavoriteFlow,
     installAetherAutomationFixture,
     openAetherAutomationFixtureEditor,
     readAetherAutomationFixtureState,
@@ -514,6 +635,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-mixed-fx-preset") {
     window.setTimeout(() => {
       void installMixedEraAetherFxPresetFixture();
+    }, 0);
+  } else if (fixture === "aether-preset-library") {
+    window.setTimeout(() => {
+      void installAetherPresetLibraryFixture();
     }, 0);
   } else if (fixture === "aether-automation") {
     window.setTimeout(() => {
@@ -555,6 +680,28 @@ function clickPanelButton(panelLabel: string, buttonLabel: string) {
   const button = Array.from(panel?.querySelectorAll<HTMLButtonElement>("button[aria-label]") ?? [])
     .find((candidate) => candidate.getAttribute("aria-label") === buttonLabel);
   button?.click();
+}
+
+function findFieldSelect(label: string): HTMLSelectElement | null {
+  return Array.from(document.querySelectorAll<HTMLLabelElement>("label"))
+    .find((candidate) => normalizeText(candidate.querySelector<HTMLElement>(".ds-field-label")?.textContent ?? "") === label)
+    ?.querySelector("select") ?? null;
+}
+
+function setFieldSelectValue(label: string, value: string) {
+  const select = findFieldSelect(label);
+  if (!select) return;
+  select.value = value;
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function findButton(label: string): HTMLButtonElement | null {
+  return Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+    .find((button) => button.getAttribute("aria-label") === label || normalizeText(button.textContent ?? "") === label) ?? null;
+}
+
+function clickButton(label: string) {
+  findButton(label)?.click();
 }
 
 function clickFirstMidiNote() {
@@ -608,6 +755,21 @@ async function waitForEditorPanel(label: string) {
   }
 }
 
+async function waitForPresetOption(label: string) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await nextFrame();
+    const presetSelect = findFieldSelect("Preset");
+    if (Array.from(presetSelect?.options ?? []).some((option) => option.label === label)) return;
+  }
+}
+
+async function waitForPresetFavorite(id: string, favorite: boolean) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await nextFrame();
+    if ((await db.synthPresets.get(id))?.favorite === favorite) return;
+  }
+}
+
 function nextFrame() {
   return new Promise<void>((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
@@ -616,6 +778,44 @@ function nextFrame() {
 
 function normalizeText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
+}
+
+function createAetherPresetLibraryFixtureRecord({
+  id,
+  name,
+  tags,
+  favorite,
+  cutoff,
+}: {
+  id: string;
+  name: string;
+  tags: string[];
+  favorite: boolean;
+  cutoff: number;
+}) {
+  const draft = createDefaultSynthDraft();
+  const patch: SynthDraftPatch = {
+    ...draft,
+    name,
+    parameters: {
+      ...draft.parameters,
+      "filter.cutoff": cutoff,
+      "osc.a.position": favorite ? 0.68 : 0.24,
+      "osc.a.warp": favorite ? 0.42 : 0.12,
+    },
+    metadata: {
+      ...draft.metadata,
+      tags,
+    },
+  };
+  return createSynthPresetRecord({
+    id,
+    name,
+    patch,
+    tags,
+    favorite,
+    now: favorite ? 1_700_000_425_000 : 1_700_000_426_000,
+  });
 }
 
 function createMixedEraAetherPresetFixture() {

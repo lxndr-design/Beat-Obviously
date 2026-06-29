@@ -655,6 +655,7 @@ export function SynthEditor(props: SynthEditorProps) {
                   size="sm"
                   variant="ghost"
                   selected={presetFavoritesOnly()}
+                  aria-label="Toggle preset favorites filter"
                   onClick={() => setPresetFavoritesOnly((value) => !value)}
                 >
                   Favorites
@@ -708,7 +709,13 @@ export function SynthEditor(props: SynthEditorProps) {
                   </select>
                 </label>
                 <Show when={selectedPresetId().startsWith(USER_PRESET_PREFIX)}>
-                  <Button size="sm" variant="ghost" selected={selectedUserPreset()?.favorite === true} onClick={() => void onTogglePresetFavorite()}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    selected={selectedUserPreset()?.favorite === true}
+                    aria-label="Toggle selected Aether preset favorite"
+                    onClick={() => void onTogglePresetFavorite()}
+                  >
                     {selectedUserPreset()?.favorite ? "Favorited" : "Favorite"}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={onDeletePreset}>
