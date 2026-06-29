@@ -28,6 +28,7 @@ import {
   macroDefinitionForId,
   macroLaneStateForId,
   macroOutputValue,
+  modulationSourceEditorTarget,
   modulationSummaryForSource,
   modulationSummaryForTarget,
   synthDraftFromInstrument,
@@ -39,6 +40,7 @@ import {
   type ModulationSourceId,
   type ModulationTargetId,
   type SynthDraftPatch,
+  type SynthModulationSourceEditorTarget,
   type SynthParameterId,
 } from "../../../state/synthStore";
 import { createSynthPresetRecord, type SynthPresetRecord } from "../../../state/synthPresets";
@@ -120,12 +122,15 @@ export function SynthEditor(props: SynthEditorProps) {
   let gain: GainNode | null = null;
   let analyzerFrame: number | null = null;
   let analyzerSequence = 1;
+  let bodyRef: HTMLDivElement | undefined;
+  let focusedSourceTimer: number | null = null;
 
   const [presets, setPresets] = createSignal<SynthPresetRecord[]>([]);
   const [selectedPresetId, setSelectedPresetId] = createSignal("");
   const [iconOpen, setIconOpen] = createSignal(false);
   const [auditioning, setAuditioning] = createSignal(false);
   const [auditionSnapshot, setAuditionSnapshot] = createSignal<AnalyzerSnapshot>(createEmptyAnalyzerSnapshot());
+  const [focusedSourceTarget, setFocusedSourceTarget] = createSignal<SynthModulationSourceEditorTarget | null>(null);
 
   createEffect(() => {
     const id = props.instrumentId;
@@ -150,6 +155,7 @@ export function SynthEditor(props: SynthEditorProps) {
   });
 
   onCleanup(() => {
+    if (focusedSourceTimer != null) window.clearTimeout(focusedSourceTimer);
     stopAudition();
     closeAudioContext();
   });
@@ -446,9 +452,27 @@ export function SynthEditor(props: SynthEditorProps) {
     setIconOpen(false);
   }
 
+  function focusModulationSourceEditor(source: ModulationSourceId) {
+    const targetId = modulationSourceEditorTarget(source);
+    setFocusedSourceTarget(targetId);
+    if (focusedSourceTimer != null) window.clearTimeout(focusedSourceTimer);
+    focusedSourceTimer = window.setTimeout(() => {
+      setFocusedSourceTarget((current) => current === targetId ? null : current);
+      focusedSourceTimer = null;
+    }, 1800);
+
+    queueMicrotask(() => {
+      const target = bodyRef?.querySelector<HTMLElement>(`[data-synth-source-editor="${targetId}"]`);
+      if (!target) return;
+      target.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      const focusTarget = target.querySelector<HTMLElement>("[data-synth-source-focus], input, button, select, [tabindex]");
+      focusTarget?.focus({ preventScroll: true });
+    });
+  }
+
   return (
     <section class={`ds-editor-shell ds-fill ${styles.shell}`} aria-label="Synth editor">
-      <div class={`ds-editor-body ds-scroll ${styles.body}`}>
+      <div ref={bodyRef} class={`ds-editor-body ds-scroll ${styles.body}`}>
         <div class={styles.utilityGrid}>
           <section class="ds-panel" aria-label="Synth identity">
             <header class="ds-panel-header">
@@ -564,7 +588,7 @@ export function SynthEditor(props: SynthEditorProps) {
         <OscillatorPanel />
 
         <div class={styles.sourceGrid}>
-          <LfoPanel />
+          <LfoPanel focusedSourceTarget={focusedSourceTarget()} />
           <section class={`ds-panel ${styles.macroPanel}`} aria-label="Macros">
             <header class="ds-panel-header">
               <div class="ds-panel-title">Macro Controls</div>
@@ -593,8 +617,12 @@ export function SynthEditor(props: SynthEditorProps) {
                   };
                   const macroLaneTargets = () => macroLane().targetLabels.slice(0, 2).join(", ") || "No routed targets";
                   return (
-                    <div class={styles.macroCard}>
+                    <div
+                      class={`${styles.macroCard} ${focusedSourceTarget() === id ? styles.sourceFocus : ""}`}
+                      data-synth-source-editor={id}
+                    >
                       <TextInput
+                        data-synth-source-focus
                         layout="bare"
                         aria-label={`Macro ${index() + 1} name`}
                         value={definition().label}
@@ -690,8 +718,8 @@ export function SynthEditor(props: SynthEditorProps) {
         <InstrumentFxRack />
 
         <div class={styles.bottomGrid}>
-          <AmpFilterPanel />
-          <ModulationMatrix />
+          <AmpFilterPanel focusedSourceTarget={focusedSourceTarget()} />
+          <ModulationMatrix onFocusSource={focusModulationSourceEditor} />
         </div>
       </div>
 
@@ -923,21 +951,21 @@ function InstrumentFxRack() {
   );
 }
 
-function LfoPanel() {
+function LfoPanel(props: { focusedSourceTarget?: SynthModulationSourceEditorTarget | null }) {
   return (
     <section class={`ds-panel ${styles.lfoPanel}`} aria-label="LFO">
       <header class="ds-panel-header">
         <div class="ds-panel-title">LFO</div>
       </header>
       <div class={`ds-panel-body ${styles.lfoStack}`}>
-        <LfoLane lfo={1} />
-        <LfoLane lfo={2} />
+        <LfoLane lfo={1} focused={props.focusedSourceTarget === "lfo.1"} />
+        <LfoLane lfo={2} focused={props.focusedSourceTarget === "lfo.2"} />
       </div>
     </section>
   );
 }
 
-function LfoLane(props: { lfo: 1 | 2 }) {
+function LfoLane(props: { lfo: 1 | 2; focused?: boolean }) {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
@@ -959,7 +987,11 @@ function LfoLane(props: { lfo: 1 | 2 }) {
   const oneShot = createMemo(() => draft().parameters[oneShotId] === true);
 
   return (
-    <div class={`${styles.lfoLane} ${enabled() ? "" : styles.disabledPanel}`} aria-label={`LFO ${props.lfo}`}>
+    <div
+      class={`${styles.lfoLane} ${enabled() ? "" : styles.disabledPanel} ${props.focused ? styles.sourceFocus : ""}`}
+      aria-label={`LFO ${props.lfo}`}
+      data-synth-source-editor={`lfo.${props.lfo}`}
+    >
       <header class={styles.lfoLaneHeader}>
         <div class={styles.lfoLaneTitle}>LFO {props.lfo}</div>
         <div class="ds-panel-actions">
@@ -1071,7 +1103,7 @@ function LfoLane(props: { lfo: 1 | 2 }) {
   );
 }
 
-function AmpFilterPanel() {
+function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEditorTarget | null }) {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
@@ -1082,7 +1114,11 @@ function AmpFilterPanel() {
   const env2Loop = createMemo(() => draft().parameters["env.2.loop"] === true);
 
   return (
-    <section class={`ds-panel ${filterEnabled() ? "" : styles.disabledPanel}`} aria-label="Amp and filter">
+    <section
+      class={`ds-panel ${filterEnabled() ? "" : styles.disabledPanel} ${props.focusedSourceTarget === "env.1" || props.focusedSourceTarget === "env.2" || props.focusedSourceTarget === "performance" ? styles.sourceFocus : ""}`}
+      aria-label="Amp and filter"
+      data-synth-source-editor={props.focusedSourceTarget === "env.1" || props.focusedSourceTarget === "env.2" ? props.focusedSourceTarget : "performance"}
+    >
       <header class="ds-panel-header">
         <div class="ds-panel-title">Amp / Filter</div>
         <div class="ds-panel-actions">

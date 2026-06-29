@@ -87,10 +87,19 @@
   gap: 4px;
   min-width: 0;
   overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: color-mix(in srgb, currentColor 66%, transparent);
+  cursor: pointer;
   font-size: var(--font-size-ui);
   line-height: 1;
+  text-align: left;
   white-space: nowrap;
+}
+
+.sourceAffordance:hover {
+  color: var(--color-fg);
 }
 
 .sourceAffordance span {

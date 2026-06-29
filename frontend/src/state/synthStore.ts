@@ -205,6 +205,8 @@ export interface SynthModulationSourceAffordance {
   editor: "lfo" | "envelope" | "macro" | "performance";
 }
 
+export type SynthModulationSourceEditorTarget = MacroId | "lfo.1" | "lfo.2" | "env.1" | "env.2" | "performance";
+
 export interface SynthDraftPatch {
   schemaVersion: typeof SYNTH_PATCH_SCHEMA_VERSION;
   instrumentType: typeof SYNTH_INSTRUMENT_TYPE;
@@ -1324,6 +1326,11 @@ export function modulationSourceAffordance(draft: SynthDraftPatch, source: Modul
     return { source, label: "Performance source", detail: "MIDI note position", editor: "performance" };
   }
   return { source, label: "Performance source", detail: "Mod wheel CC1", editor: "performance" };
+}
+
+export function modulationSourceEditorTarget(source: ModulationSourceId): SynthModulationSourceEditorTarget {
+  if (source === "velocity" || source === "keytrack" || source === "modWheel") return "performance";
+  return source;
 }
 
 export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Instrument> {

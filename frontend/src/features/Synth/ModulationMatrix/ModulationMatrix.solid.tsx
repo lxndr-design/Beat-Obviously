@@ -36,7 +36,11 @@ type PickMode = {
   pointer: { x: number; y: number };
 };
 
-export function ModulationMatrix() {
+export interface ModulationMatrixProps {
+  onFocusSource?: (source: ModulationSourceId) => void;
+}
+
+export function ModulationMatrix(props: ModulationMatrixProps = {}) {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const routes = createStoreSelector(useSynthStore, (state) => state.draft.modulation);
   const updateRoute = useSynthStore.getState().updateModulationRoute;
@@ -163,10 +167,15 @@ export function ModulationMatrix() {
                       )}
                     </For>
                   </select>
-                  <span class={styles.sourceAffordance} title={`${sourceAffordance().label}: ${sourceAffordance().detail}`}>
+                  <button
+                    type="button"
+                    class={styles.sourceAffordance}
+                    title={`${sourceAffordance().label}: ${sourceAffordance().detail}`}
+                    onClick={() => props.onFocusSource?.(route.source)}
+                  >
                     <span>{sourceAffordance().label}</span>
                     <span>{sourceAffordance().detail}</span>
-                  </span>
+                  </button>
                 </div>
                 <HoverInfo content="Pick source">
                   <Button

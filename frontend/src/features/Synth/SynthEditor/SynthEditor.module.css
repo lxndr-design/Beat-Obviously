@@ -33,6 +33,15 @@ section.shell {
   flex: 0 0 auto;
 }
 
+.sourceFocus {
+  outline: 1px solid color-mix(in srgb, var(--color-fg) 72%, transparent);
+  outline-offset: -2px;
+  background:
+    radial-gradient(circle at 20% 10%, color-mix(in srgb, var(--color-fg) 13%, transparent), transparent 38%),
+    radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--color-fg) 8%, transparent), transparent 34%),
+    var(--color-bg);
+}
+
 .footer {
   flex-shrink: 0;
 }

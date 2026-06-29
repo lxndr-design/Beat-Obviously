@@ -293,6 +293,18 @@ try {
     detail: "Per-note velocity",
     editor: "performance",
   });
+  assert.deepEqual(
+    [
+      synthStore.modulationSourceEditorTarget("lfo.1"),
+      synthStore.modulationSourceEditorTarget("env.2"),
+      synthStore.modulationSourceEditorTarget("macro.1"),
+      synthStore.modulationSourceEditorTarget("velocity"),
+      synthStore.modulationSourceEditorTarget("keytrack"),
+      synthStore.modulationSourceEditorTarget("modWheel"),
+    ],
+    ["lfo.1", "env.2", "macro.1", "performance", "performance", "performance"],
+    "modulation source affordances should focus the matching source editor surface",
+  );
   assert.ok(synthStore.FACTORY_SYNTH_PRESETS.length >= 5);
   assert.equal(
     new Set(synthStore.FACTORY_SYNTH_PRESETS.map((preset) => preset.id)).size,
