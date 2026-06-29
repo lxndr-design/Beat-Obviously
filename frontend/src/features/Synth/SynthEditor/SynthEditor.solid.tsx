@@ -1336,6 +1336,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
           ["filter.drive", "Drive", 0, false],
           ["amp.level", "Level", 0.8, false],
           ["amp.pan", "Pan", 0, true],
+          ["glide.ms", "Glide", 0, false],
           ["env.1.attack", "Attack", 0.005, false],
           ["env.1.decay", "Decay", 0.15, false],
           ["env.1.sustain", "Sustain", 0.8, false],
@@ -1351,13 +1352,14 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               label={label}
               value={getNumberParam(draft(), id)}
               min={bipolar ? -1 : 0}
-              max={id.startsWith("env.") && !id.endsWith("sustain") ? 30 : 1}
-              step={id.startsWith("env.") && !id.endsWith("sustain") ? 0.001 : 0.01}
+              max={id === "glide.ms" ? 5000 : id.startsWith("env.") && !id.endsWith("sustain") ? 30 : 1}
+              step={id === "glide.ms" ? 1 : id.startsWith("env.") && !id.endsWith("sustain") ? 0.001 : 0.01}
+              unit={id === "glide.ms" ? "ms" : undefined}
               defaultValue={defaultValue}
               bipolar={bipolar}
               {...modulationPropsForTarget(draft(), id)}
               pickTargetId={MODULATABLE_PARAMETER_IDS.has(id) ? id : undefined}
-              formatValue={id.startsWith("env.") && !id.endsWith("sustain") ? formatSeconds : formatPercent}
+              formatValue={id === "glide.ms" ? (value) => Math.round(value).toString() : id.startsWith("env.") && !id.endsWith("sustain") ? formatSeconds : formatPercent}
               onChange={(value) => setNumericParameter(id, value)}
             />
           )}

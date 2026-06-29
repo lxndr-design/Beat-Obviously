@@ -70,6 +70,7 @@ try {
       maxVoices: 6,
       "mono.enabled": true,
       "legato.enabled": true,
+      "glide.ms": 140,
       "filter.enabled": true,
       "filter.type": "highpass",
       "filter.cutoff": 1370,
@@ -256,7 +257,7 @@ try {
       id: "legato",
       label: "Legato",
       value: "On",
-      detail: "Retunes held voice",
+      detail: "Retunes held voice over 140 ms",
       active: true,
     },
     {
@@ -493,8 +494,14 @@ try {
   assert.equal(patch.maxVoices, 6);
   assert.equal(patch.mono, true);
   assert.equal(patch.legato, true);
+  assert.equal(patch.glideMs, 140);
   assert.equal(patch.aether.oscA.wavetable.unison, 5);
   assert.equal(patch.aether.oscB.wavetable.unison, 5);
+  const performancePreview = synthStore.synthDraftToPreviewInstrument(draft);
+  assert.equal(performancePreview.maxVoices, 6);
+  assert.equal(performancePreview.mono, true);
+  assert.equal(performancePreview.legato, true);
+  assert.equal(performancePreview.glideMs, 140);
   assert.equal(patch.lfo2Waveform, "square");
   assert.equal(patch.lfo2RateHz, 0.75);
   assert.equal(patch.lfo2Enabled, true);

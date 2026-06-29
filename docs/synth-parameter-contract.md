@@ -97,7 +97,7 @@ The wavemap-level `interpolation` field controls how Beat generates intermediate
 
 | ID | Type | Range | Default | Notes |
 | --- | --- | --- | --- | --- |
-| `glideMs` | milliseconds | `0..5000` | `0` | Portamento time for linked MIDI notes. Browser previews and native playback ramp from the source note to `connectToIndex` target pitch over this duration. |
+| `glide.ms` | milliseconds | `0..5000` | `0` | Aether patch parameter for portamento time. Exports to the instrument-level `glideMs` field so browser previews and native playback ramp from the source note to `connectToIndex` target pitch over this duration. |
 | `maxVoices` | integer | `1..32` | `16` | Per-instrument synth voice allocation cap. Native routes allocate this many voices and enable note stealing when dense MIDI exceeds the cap. |
 | `mono.enabled` | boolean | off/on | `false` | Caps native synth playback to one active voice regardless of `maxVoices`. |
 | `legato.enabled` | boolean | off/on | `false` | In mono mode, reused voices retune without restarting oscillator phase or envelopes. |

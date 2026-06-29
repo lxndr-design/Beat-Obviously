@@ -87,6 +87,7 @@ export type SynthParameterId =
   | "maxVoices"
   | "mono.enabled"
   | "legato.enabled"
+  | "glide.ms"
   | "env.1.attack"
   | "env.1.attackCurve"
   | "env.1.decay"
@@ -885,6 +886,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   maxVoices: 16,
   "mono.enabled": false,
   "legato.enabled": false,
+  "glide.ms": 0,
   "env.1.attack": 0.005,
   "env.1.attackCurve": "linear",
   "env.1.decay": 0.15,
@@ -970,6 +972,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   maxVoices: "Max Voices",
   "mono.enabled": "Mono",
   "legato.enabled": "Legato",
+  "glide.ms": "Glide",
   "env.1.attack": "Env 1 Attack",
   "env.1.attackCurve": "Env 1 Attack Curve",
   "env.1.decay": "Env 1 Decay",
@@ -1347,6 +1350,7 @@ export function synthExpressionSummary(draft: SynthDraftPatch): SynthExpressionS
   const maxVoices = Math.max(1, Math.round(getNumberParam(draft, "maxVoices")));
   const mono = getBooleanParam(draft, "mono.enabled");
   const legato = getBooleanParam(draft, "legato.enabled");
+  const glideMs = Math.round(getNumberParam(draft, "glide.ms"));
   const velocity = modulationSummaryForSource(draft, "velocity");
   const keytrack = modulationSummaryForSource(draft, "keytrack");
   const modWheel = modulationSummaryForSource(draft, "modWheel");
@@ -1364,8 +1368,8 @@ export function synthExpressionSummary(draft: SynthDraftPatch): SynthExpressionS
       id: "legato",
       label: "Legato",
       value: legato ? "On" : "Off",
-      detail: legato ? "Retunes held voice" : "Retriggers notes",
-      active: legato,
+      detail: legato ? `Retunes held voice${glideMs > 0 ? ` over ${glideMs} ms` : ""}` : "Retriggers notes",
+      active: legato || glideMs > 0,
     },
     {
       id: "pitch-bend",
@@ -1476,6 +1480,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     maxVoices: getNumberParam(draft, "maxVoices"),
     mono: getBooleanParam(draft, "mono.enabled"),
     legato: getBooleanParam(draft, "legato.enabled"),
+    glideMs: getNumberParam(draft, "glide.ms"),
     effects: structuredClone(draft.effects),
     synthPatch: cloneSynthPatch(draft),
   };
@@ -1552,7 +1557,7 @@ export function synthDraftToPreviewInstrument(draft: SynthDraftPatch): Instrumen
     detuneCents: 0,
     octave: 0,
     subOscLevel: 0,
-    glideMs: 0,
+    glideMs: getNumberParam(draft, "glide.ms"),
     maxVoices: getNumberParam(draft, "maxVoices"),
     mono: getBooleanParam(draft, "mono.enabled"),
     legato: getBooleanParam(draft, "legato.enabled"),
@@ -1632,6 +1637,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters.maxVoices = instrument.maxVoices ?? 16;
   draft.parameters["mono.enabled"] = instrument.mono ?? false;
   draft.parameters["legato.enabled"] = instrument.legato ?? false;
+  draft.parameters["glide.ms"] = instrument.glideMs ?? 0;
 
   if (instrument.wavetable) {
     applyWavetableToDraft(draft, "a", instrument.wavetable, true);
@@ -1844,6 +1850,7 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (id.includes(".fine")) return Math.max(-100, Math.min(100, value));
   if (id === "unison.voices") return Math.max(1, Math.min(16, Math.round(value)));
   if (id === "maxVoices") return Math.max(1, Math.min(32, Math.round(value)));
+  if (id === "glide.ms") return Math.max(0, Math.min(5000, Math.round(value)));
   if (id.includes(".pan")) return Math.max(-1, Math.min(1, value));
   if (id.includes(".attack") || id.includes(".decay") || id.includes(".release")) return Math.max(0, Math.min(30, value));
   return Math.max(0, Math.min(1, value));
