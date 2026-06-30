@@ -519,6 +519,22 @@ try {
     "browser fixture coverage should exercise Aether oscillator and voice-stack editing",
   );
   assert.ok(
+    synthEditorSource.includes('aria-label="Aether instrument effects"')
+      && synthEditorSource.includes('aria-label="Add instrument effect"')
+      && synthEditorSource.includes('aria-label="Selected Aether FX preset details"')
+      && synthEditorSource.includes("Move ${EFFECT_LABELS[effect.kind]} earlier")
+      && synthEditorSource.includes("Remove ${EFFECT_LABELS[effect.kind]}"),
+    "Aether Synth Editor should expose Instrument FX controls for browser coverage",
+  );
+  assert.ok(
+    devHooksSource.includes("exerciseAetherFxRackEditorFlow")
+      && devHooksSource.includes("setSelectByAriaLabel")
+      && devHooksSource.includes("setNumberInputInEffectBlock")
+      && devHooksSource.includes("beatAetherFxRackExercise")
+      && devHooksSource.includes('fixture === "aether-fx-rack"'),
+    "browser fixture coverage should exercise Aether Instrument FX rack editing",
+  );
+  assert.ok(
     synthEditorSource.includes('aria-label="Amp and filter"')
       && synthEditorSource.includes('label="Filter"')
       && synthEditorSource.includes('label="Cutoff"')

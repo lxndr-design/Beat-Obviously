@@ -37,6 +37,8 @@ const DEV_AETHER_PRESET_LIBRARY_PLAIN_ID = "dev-aether-preset-library-plain";
 const DEV_AETHER_PRESET_LIBRARY_INSTRUMENT_ID = "dev-aether-preset-library-host";
 const DEV_AETHER_OSCILLATOR_INSTRUMENT_ID = "dev-aether-oscillator-host";
 const DEV_AETHER_OSCILLATOR_INSTRUMENT_ID_MARKER = "Aether oscillator editor dev fixture";
+const DEV_AETHER_FX_RACK_INSTRUMENT_ID = "dev-aether-fx-rack-host";
+const DEV_AETHER_FX_RACK_INSTRUMENT_ID_MARKER = "Aether FX rack editor dev fixture";
 const DEV_AETHER_MACRO_INSTRUMENT_ID = "dev-aether-macro-host";
 const DEV_AETHER_MACRO_INSTRUMENT_ID_MARKER = "Aether macro browser dev fixture";
 const DEV_AETHER_WAVEMAP_INSTRUMENT_ID = "dev-aether-wavemap-editor-host";
@@ -105,6 +107,7 @@ declare global {
       }>;
       readAetherMacroFixtureState: () => DevAetherMacroFixtureState;
       exerciseAetherOscillatorEditorFlow: () => Promise<DevAetherOscillatorExerciseState>;
+      exerciseAetherFxRackEditorFlow: () => Promise<DevAetherFxRackExerciseState>;
       exerciseAetherMacroAssignmentEditorFlow: () => Promise<DevAetherMacroAssignmentExerciseState>;
       exerciseAetherWavemapEditorFlow: () => Promise<DevAetherWavemapEditorFixtureState>;
       exerciseAetherWavemapPointerDrawFlow: () => Promise<DevAetherWavemapPointerDrawExerciseState>;
@@ -338,6 +341,25 @@ interface DevAetherOscillatorExerciseState {
   instrumentId: string | null;
   before: DevAetherOscillatorSnapshot;
   afterEdit: DevAetherOscillatorSnapshot;
+}
+
+interface DevAetherFxRackSnapshot {
+  instrumentId: string | null;
+  effectKinds: string[];
+  bypassed: boolean[];
+  params: Array<Record<string, number>>;
+  detailsText: string;
+  blockTexts: string[];
+}
+
+interface DevAetherFxRackExerciseState {
+  instrumentId: string | null;
+  before: DevAetherFxRackSnapshot;
+  afterAdd: DevAetherFxRackSnapshot;
+  afterParamEdit: DevAetherFxRackSnapshot;
+  afterMove: DevAetherFxRackSnapshot;
+  afterBypass: DevAetherFxRackSnapshot;
+  afterRemove: DevAetherFxRackSnapshot;
 }
 
 interface DevAetherWavemapEditorFixtureState {
@@ -896,6 +918,75 @@ export function installBeatDevHooks() {
       afterEdit: readAetherOscillatorSnapshot(),
     };
     writeAetherOscillatorExerciseMarker(state);
+    return state;
+  };
+
+  const installAetherFxRackFixtureBase = async () => {
+    const instrumentStore = useInstrumentStore.getState();
+    for (const instrument of instrumentStore.instruments) {
+      if ((instrument.id === DEV_AETHER_FX_RACK_INSTRUMENT_ID || instrument.source?.label === DEV_AETHER_FX_RACK_INSTRUMENT_ID_MARKER) && instrument.userCreated) {
+        instrumentStore.removeInstrument(instrument.id);
+      }
+    }
+
+    const baseDraft = createDefaultSynthDraft();
+    const patch: SynthDraftPatch = {
+      ...baseDraft,
+      name: "FX Rack Browser Host",
+      effects: { filters: [] },
+      metadata: {
+        ...baseDraft.metadata,
+        tags: [...new Set([...baseDraft.metadata.tags, "dev", "fx-rack-browser"])],
+      },
+    };
+
+    const nextInstrumentId = instrumentStore.addInstrument({
+      ...synthDraftToInstrumentPatch(patch),
+      id: DEV_AETHER_FX_RACK_INSTRUMENT_ID,
+      name: patch.name,
+      source: { kind: "created", label: DEV_AETHER_FX_RACK_INSTRUMENT_ID_MARKER },
+      userCreated: true,
+    });
+    useSynthStore.getState().bindInstrument(nextInstrumentId);
+    useSynthStore.getState().setDraft(patch);
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
+    await waitForEditorPanel("Aether instrument effects");
+    return { instrumentId: nextInstrumentId };
+  };
+
+  const exerciseAetherFxRackEditorFlow = async (): Promise<DevAetherFxRackExerciseState> => {
+    await installAetherFxRackFixtureBase();
+    const before = readAetherFxRackSnapshot();
+    setSelectByAriaLabel("Add instrument effect", "saturator");
+    await nextFrame();
+    setSelectByAriaLabel("Add instrument effect", "delay");
+    await nextFrame();
+    const afterAdd = readAetherFxRackSnapshot();
+    setNumberInputInEffectBlock("Saturator", "Drive", "47");
+    setNumberInputInEffectBlock("Saturator", "Mix", "66");
+    setNumberInputInEffectBlock("Delay", "Time", "375");
+    setNumberInputInEffectBlock("Delay", "Feed", "42");
+    setNumberInputInEffectBlock("Delay", "Mix", "23");
+    await nextFrame();
+    const afterParamEdit = readAetherFxRackSnapshot();
+    clickButtonInEffectBlock("Delay", "Move Delay earlier");
+    await nextFrame();
+    const afterMove = readAetherFxRackSnapshot();
+    setEffectBlockEnabled("Saturator", false);
+    await nextFrame();
+    const afterBypass = readAetherFxRackSnapshot();
+    clickButtonInEffectBlock("Delay", "Remove Delay");
+    await nextFrame();
+    const state: DevAetherFxRackExerciseState = {
+      instrumentId: useSynthStore.getState().boundInstrumentId,
+      before,
+      afterAdd,
+      afterParamEdit,
+      afterMove,
+      afterBypass,
+      afterRemove: readAetherFxRackSnapshot(),
+    };
+    writeAetherFxRackExerciseMarker(state);
     return state;
   };
 
@@ -1757,6 +1848,7 @@ export function installBeatDevHooks() {
     installAetherMacroFixture,
     readAetherMacroFixtureState,
     exerciseAetherOscillatorEditorFlow,
+    exerciseAetherFxRackEditorFlow,
     exerciseAetherMacroAssignmentEditorFlow,
     exerciseAetherWavemapEditorFlow,
     exerciseAetherWavemapPointerDrawFlow,
@@ -1805,6 +1897,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-oscillator") {
     window.setTimeout(() => {
       void exerciseAetherOscillatorEditorFlow();
+    }, 0);
+  } else if (fixture === "aether-fx-rack") {
+    window.setTimeout(() => {
+      void exerciseAetherFxRackEditorFlow();
     }, 0);
   } else if (fixture === "aether-macro") {
     window.setTimeout(() => {
@@ -2160,6 +2256,20 @@ function readAetherOscillatorSnapshot(): DevAetherOscillatorSnapshot {
   };
 }
 
+function readAetherFxRackSnapshot(): DevAetherFxRackSnapshot {
+  const draft = useSynthStore.getState().draft;
+  const panel = findElementByAriaLabel("Aether instrument effects");
+  const details = findElementByAriaLabel("Selected Aether FX preset details", panel);
+  return {
+    instrumentId: useSynthStore.getState().boundInstrumentId,
+    effectKinds: draft.effects.filters.map((effect) => effect.kind),
+    bypassed: draft.effects.filters.map((effect) => effect.bypassed),
+    params: draft.effects.filters.map((effect) => ({ ...effect.params })),
+    detailsText: normalizeText(details?.textContent ?? ""),
+    blockTexts: findEffectBlocks().map((block) => normalizeText(block.textContent ?? "")),
+  };
+}
+
 function readAetherLfoSnapshot(lfo: 1 | 2): DevAetherLfoSnapshot {
   const draft = useSynthStore.getState().draft;
   const prefix = `lfo.${lfo}` as const;
@@ -2417,6 +2527,49 @@ function setNumberInputInPanel(panelLabel: string, fieldLabel: string, value: st
   input.dispatchEvent(new Event("blur", { bubbles: true }));
 }
 
+function setSelectByAriaLabel(label: string, value: string) {
+  const select = findElementByAriaLabel(label) as HTMLSelectElement | null;
+  if (!select) return;
+  select.value = value;
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function findEffectBlocks(): HTMLElement[] {
+  const panel = findElementByAriaLabel("Aether instrument effects");
+  return Array.from(panel?.querySelectorAll<HTMLElement>("article") ?? []);
+}
+
+function findEffectBlock(effectLabel: string): HTMLElement | null {
+  return findEffectBlocks()
+    .find((block) => normalizeText(block.textContent ?? "").includes(effectLabel)) ?? null;
+}
+
+function setNumberInputInEffectBlock(effectLabel: string, fieldLabel: string, value: string) {
+  const block = findEffectBlock(effectLabel);
+  const label = Array.from(block?.querySelectorAll<HTMLLabelElement>("label") ?? [])
+    .find((candidate) => normalizeText(candidate.querySelector("span")?.textContent ?? "") === fieldLabel);
+  const input = label?.querySelector<HTMLInputElement>("input");
+  if (!input) return;
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  input.dispatchEvent(new Event("blur", { bubbles: true }));
+}
+
+function clickButtonInEffectBlock(effectLabel: string, buttonLabel: string) {
+  const block = findEffectBlock(effectLabel);
+  const button = Array.from(block?.querySelectorAll<HTMLButtonElement>("button") ?? [])
+    .find((candidate) => normalizeText(candidate.getAttribute("aria-label") ?? candidate.textContent ?? "") === buttonLabel);
+  button?.click();
+}
+
+function setEffectBlockEnabled(effectLabel: string, enabled: boolean) {
+  const block = findEffectBlock(effectLabel);
+  const button = block?.querySelector<HTMLButtonElement>('button[role="switch"]');
+  if (!button || button.getAttribute("aria-checked") === String(enabled)) return;
+  button.click();
+}
+
 function setSwitchInPanel(panelLabel: string, switchLabel: string, checked: boolean) {
   const panel = findElementByAriaLabel(panelLabel);
   const label = Array.from(panel?.querySelectorAll<HTMLLabelElement>("label") ?? [])
@@ -2597,6 +2750,10 @@ function writeAetherMacroAssignmentExerciseMarker(state: DevAetherMacroAssignmen
 
 function writeAetherOscillatorExerciseMarker(state: DevAetherOscillatorExerciseState) {
   document.documentElement.dataset.beatAetherOscillatorExercise = JSON.stringify(state);
+}
+
+function writeAetherFxRackExerciseMarker(state: DevAetherFxRackExerciseState) {
+  document.documentElement.dataset.beatAetherFxRackExercise = JSON.stringify(state);
 }
 
 function writeAetherWavemapEditorFixtureMarker(state = readAetherWavemapEditorFixtureState()) {
