@@ -34,6 +34,7 @@ try {
   const pianoRollSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.solid.tsx"), "utf8");
   const segmentEditorSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx"), "utf8");
   const trackDetailsSource = readFileSync(join(repoRoot, "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx"), "utf8");
+  const synthEditorSource = readFileSync(join(repoRoot, "frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx"), "utf8");
   const devHooksSource = readFileSync(join(repoRoot, "frontend/src/testing/devHooks.ts"), "utf8");
 
   assert.equal(runner.snapBeat(1.12, 0.25), 1, "snapBeat should snap to nearest grid");
@@ -478,6 +479,20 @@ try {
       && devHooksSource.includes("selectedPointCount")
       && devHooksSource.includes("afterPaste"),
     "browser fixture automation point editor flow should select a multi-row point subset before Copy/Paste toolbar clicks",
+  );
+  assert.ok(
+    synthEditorSource.includes('aria-label="Performance controls"')
+      && synthEditorSource.includes('aria-label="Performance source readouts"')
+      && synthEditorSource.includes('label="Voices"')
+      && synthEditorSource.includes('label="Glide"'),
+    "Aether Synth Editor should expose Performance controls and source readouts for browser coverage",
+  );
+  assert.ok(
+    devHooksSource.includes("exerciseAetherPerformanceEditorFlow")
+      && devHooksSource.includes("setSwitchInPanel")
+      && devHooksSource.includes("beatAetherPerformanceExercise")
+      && devHooksSource.includes('fixture === "aether-performance"'),
+    "browser fixture coverage should exercise Aether Performance control editing",
   );
   const movedTrackPoint = arrangementAutomation.updateTrackAutomationPoint(insertedTrackPoint, "filter.cutoff", 64, 1, 48, 0.74);
   assert.deepEqual(

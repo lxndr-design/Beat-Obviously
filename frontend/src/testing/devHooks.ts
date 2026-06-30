@@ -42,6 +42,8 @@ const DEV_AETHER_WAVEMAP_INSTRUMENT_ID_MARKER = "Aether wavemap editor dev fixtu
 const DEV_AETHER_WAVEMAP_ID = "user.browser-wavemap";
 const DEV_AETHER_ENVELOPE_INSTRUMENT_ID = "dev-aether-envelope-host";
 const DEV_AETHER_ENVELOPE_INSTRUMENT_ID_MARKER = "Aether envelope editor dev fixture";
+const DEV_AETHER_PERFORMANCE_INSTRUMENT_ID = "dev-aether-performance-host";
+const DEV_AETHER_PERFORMANCE_INSTRUMENT_ID_MARKER = "Aether performance editor dev fixture";
 const DEV_AETHER_AUTOMATION_INSTRUMENT_ID_MARKER = "Aether automation dev fixture";
 const DEV_AETHER_AUTOMATION_TRACK_ID = "dev-aether-automation-track";
 const DEV_AETHER_AUTOMATION_SEGMENT_ID = "dev-aether-automation-segment";
@@ -101,6 +103,7 @@ declare global {
       exerciseAetherWavemapPointerDrawFlow: () => Promise<DevAetherWavemapPointerDrawExerciseState>;
       exerciseAetherWavemapImportFlow: () => Promise<DevAetherWavemapImportExerciseState>;
       exerciseAetherEnvelopeHandleFlow: () => Promise<DevAetherEnvelopeHandleExerciseState>;
+      exerciseAetherPerformanceEditorFlow: () => Promise<DevAetherPerformanceExerciseState>;
       exerciseAetherPresetLibraryFavoriteFlow: () => Promise<{
         installed: DevAetherPresetLibraryFixtureState;
         filtered: DevAetherPresetLibraryFixtureState;
@@ -343,6 +346,23 @@ interface DevAetherEnvelopeHandleExerciseState {
   afterDecaySustainDrag: DevAetherEnvelopeSnapshot;
   afterReleaseDrag: DevAetherEnvelopeSnapshot;
   afterCurveCycle: DevAetherEnvelopeSnapshot;
+}
+
+interface DevAetherPerformanceSnapshot {
+  instrumentId: string | null;
+  voices: number | null;
+  glideMs: number | null;
+  mono: boolean;
+  legato: boolean;
+  panelText: string;
+  readoutText: string;
+  readoutCount: number;
+}
+
+interface DevAetherPerformanceExerciseState {
+  instrumentId: string | null;
+  before: DevAetherPerformanceSnapshot;
+  afterEdit: DevAetherPerformanceSnapshot;
 }
 
 interface DevAetherWavemapFrameSnapshot {
@@ -1010,6 +1030,62 @@ export function installBeatDevHooks() {
     return state;
   };
 
+  const installAetherPerformanceFixtureBase = async () => {
+    const instrumentStore = useInstrumentStore.getState();
+    for (const instrument of instrumentStore.instruments) {
+      if ((instrument.id === DEV_AETHER_PERFORMANCE_INSTRUMENT_ID || instrument.source?.label === DEV_AETHER_PERFORMANCE_INSTRUMENT_ID_MARKER) && instrument.userCreated) {
+        instrumentStore.removeInstrument(instrument.id);
+      }
+    }
+
+    const baseDraft = createDefaultSynthDraft();
+    const patch: SynthDraftPatch = {
+      ...baseDraft,
+      name: "Performance Browser Host",
+      parameters: {
+        ...baseDraft.parameters,
+        maxVoices: 12,
+        "glide.ms": 90,
+        "mono.enabled": false,
+        "legato.enabled": false,
+      },
+      metadata: {
+        ...baseDraft.metadata,
+        tags: [...new Set([...baseDraft.metadata.tags, "dev", "performance-browser"])],
+      },
+    };
+
+    const nextInstrumentId = instrumentStore.addInstrument({
+      ...synthDraftToInstrumentPatch(patch),
+      id: DEV_AETHER_PERFORMANCE_INSTRUMENT_ID,
+      name: patch.name,
+      source: { kind: "created", label: DEV_AETHER_PERFORMANCE_INSTRUMENT_ID_MARKER },
+      userCreated: true,
+    });
+    useSynthStore.getState().bindInstrument(nextInstrumentId);
+    useSynthStore.getState().setDraft(patch);
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
+    await waitForEditorPanel("Performance controls");
+    return { instrumentId: nextInstrumentId };
+  };
+
+  const exerciseAetherPerformanceEditorFlow = async (): Promise<DevAetherPerformanceExerciseState> => {
+    await installAetherPerformanceFixtureBase();
+    const before = readAetherPerformanceSnapshot();
+    setNumberInputInPanel("Performance controls", "Voices", "5");
+    setNumberInputInPanel("Performance controls", "Glide", "240");
+    setSwitchInPanel("Performance controls", "Mono", true);
+    setSwitchInPanel("Performance controls", "Legato", true);
+    await nextFrame();
+    const state: DevAetherPerformanceExerciseState = {
+      instrumentId: useSynthStore.getState().boundInstrumentId,
+      before,
+      afterEdit: readAetherPerformanceSnapshot(),
+    };
+    writeAetherPerformanceExerciseMarker(state);
+    return state;
+  };
+
   const installAetherAutomationFixture = () => {
     const instrumentStore = useInstrumentStore.getState();
     for (const instrument of instrumentStore.instruments) {
@@ -1377,6 +1453,7 @@ export function installBeatDevHooks() {
     exerciseAetherWavemapPointerDrawFlow,
     exerciseAetherWavemapImportFlow,
     exerciseAetherEnvelopeHandleFlow,
+    exerciseAetherPerformanceEditorFlow,
     exerciseAetherPresetLibraryFavoriteFlow,
     installAetherAutomationFixture,
     openAetherAutomationFixtureEditor,
@@ -1437,6 +1514,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-envelope-handles") {
     window.setTimeout(() => {
       void exerciseAetherEnvelopeHandleFlow();
+    }, 0);
+  } else if (fixture === "aether-performance") {
+    window.setTimeout(() => {
+      void exerciseAetherPerformanceEditorFlow();
     }, 0);
   } else if (fixture === "aether-automation") {
     window.setTimeout(() => {
@@ -1703,6 +1784,22 @@ function readMacroFixtureDomState(label: string): DevAetherMacroFixtureState {
   };
 }
 
+function readAetherPerformanceSnapshot(): DevAetherPerformanceSnapshot {
+  const draft = useSynthStore.getState().draft;
+  const panel = findElementByAriaLabel("Performance controls");
+  const readouts = findElementByAriaLabel("Performance source readouts", panel);
+  return {
+    instrumentId: useSynthStore.getState().boundInstrumentId,
+    voices: typeof draft.parameters.maxVoices === "number" ? draft.parameters.maxVoices : null,
+    glideMs: typeof draft.parameters["glide.ms"] === "number" ? draft.parameters["glide.ms"] : null,
+    mono: draft.parameters["mono.enabled"] === true,
+    legato: draft.parameters["legato.enabled"] === true,
+    panelText: normalizeText(panel?.textContent ?? ""),
+    readoutText: normalizeText(readouts?.textContent ?? ""),
+    readoutCount: readouts?.querySelectorAll("div").length ?? 0,
+  };
+}
+
 function readModulationRouteSnapshots(): DevModulationRouteSnapshot[] {
   return useSynthStore.getState().draft.modulation.map((route) => {
     const row = Array.from(document.querySelectorAll<HTMLElement>("[data-modulation-route-id]"))
@@ -1907,6 +2004,15 @@ function setNumberInputInPanel(panelLabel: string, fieldLabel: string, value: st
   input.dispatchEvent(new Event("blur", { bubbles: true }));
 }
 
+function setSwitchInPanel(panelLabel: string, switchLabel: string, checked: boolean) {
+  const panel = findElementByAriaLabel(panelLabel);
+  const label = Array.from(panel?.querySelectorAll<HTMLLabelElement>("label") ?? [])
+    .find((candidate) => normalizeText(candidate.querySelector("span")?.textContent ?? "") === switchLabel);
+  const button = label?.querySelector<HTMLButtonElement>('button[role="switch"]');
+  if (!button || button.getAttribute("aria-checked") === String(checked)) return;
+  button.click();
+}
+
 function setLastAutomationPointField(panelLabel: string, fieldLabel: "Beat" | "Value", value: string) {
   const panel = document.querySelector<HTMLElement>(`[aria-label="${panelLabel}"]`);
   const rows = Array.from(panel?.querySelectorAll<HTMLElement>('[class*="automationPointRow"]') ?? []);
@@ -2044,6 +2150,10 @@ function writeAetherWavemapImportExerciseMarker(state: DevAetherWavemapImportExe
 
 function writeAetherEnvelopeHandleExerciseMarker(state: DevAetherEnvelopeHandleExerciseState) {
   document.documentElement.dataset.beatAetherEnvelopeHandleExercise = JSON.stringify(state);
+}
+
+function writeAetherPerformanceExerciseMarker(state: DevAetherPerformanceExerciseState) {
+  document.documentElement.dataset.beatAetherPerformanceExercise = JSON.stringify(state);
 }
 
 function findEnvelopeHandle(source: "env.1" | "env.2", kind: "attack" | "decay-sustain" | "release"): HTMLButtonElement | null {
