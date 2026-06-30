@@ -113,6 +113,7 @@ declare global {
       exerciseAetherAutomationPointEditorFlow: () => Promise<DevAetherAutomationPointExerciseState>;
       exerciseAetherArrangementAutomationDragFlow: () => Promise<DevAetherArrangementAutomationDragExerciseState>;
       exerciseAetherNoteAutomationDragFlow: () => Promise<DevAetherNoteAutomationDragExerciseState>;
+      exerciseAetherSegmentAutomationDragFlow: () => Promise<DevAetherSegmentAutomationDragExerciseState>;
     };
   }
 }
@@ -196,6 +197,25 @@ interface DevAetherNoteAutomationDragExerciseState {
     start: DevAetherNoteAutomationHandleState;
     mid: DevAetherNoteAutomationHandleState;
     end: DevAetherNoteAutomationHandleState;
+  };
+  pointPanelText: string;
+}
+
+interface DevAetherSegmentAutomationHandleState {
+  exists: boolean;
+  label: string | null;
+  left: string | null;
+}
+
+interface DevAetherSegmentAutomationDragExerciseState {
+  before: DevAutomationPointSnapshot[];
+  afterStartDrag: DevAutomationPointSnapshot[];
+  afterMidDrag: DevAutomationPointSnapshot[];
+  afterEndDrag: DevAutomationPointSnapshot[];
+  handles: {
+    start: DevAetherSegmentAutomationHandleState;
+    mid: DevAetherSegmentAutomationHandleState;
+    end: DevAetherSegmentAutomationHandleState;
   };
   pointPanelText: string;
 }
@@ -1056,6 +1076,40 @@ export function installBeatDevHooks() {
     return state;
   };
 
+  const exerciseAetherSegmentAutomationDragFlow = async (): Promise<DevAetherSegmentAutomationDragExerciseState> => {
+    installAetherAutomationFixture();
+    await openAetherAutomationFixtureEditor("segment");
+    await waitForSegmentAutomationHandle("start");
+    const before = readAutomationPointPanelRows("Aether segment automation points");
+
+    dragSegmentAutomationHandle("start", 0.26);
+    await nextFrame();
+    const afterStartDrag = readAutomationPointPanelRows("Aether segment automation points");
+
+    dragSegmentAutomationHandle("mid", 0.68);
+    await nextFrame();
+    const afterMidDrag = readAutomationPointPanelRows("Aether segment automation points");
+
+    dragSegmentAutomationHandle("end", 0.43);
+    await nextFrame();
+    const afterEndDrag = readAutomationPointPanelRows("Aether segment automation points");
+
+    const state: DevAetherSegmentAutomationDragExerciseState = {
+      before,
+      afterStartDrag,
+      afterMidDrag,
+      afterEndDrag,
+      handles: {
+        start: readSegmentAutomationHandleState("start"),
+        mid: readSegmentAutomationHandleState("mid"),
+        end: readSegmentAutomationHandleState("end"),
+      },
+      pointPanelText: readPanelState("Aether segment automation points").text,
+    };
+    writeAetherSegmentAutomationDragExerciseMarker(state);
+    return state;
+  };
+
   async function exerciseAutomationPointEditor(
     editor: DevAetherAutomationPointEditor,
     beat: number,
@@ -1143,6 +1197,7 @@ export function installBeatDevHooks() {
     exerciseAetherAutomationPointEditorFlow,
     exerciseAetherArrangementAutomationDragFlow,
     exerciseAetherNoteAutomationDragFlow,
+    exerciseAetherSegmentAutomationDragFlow,
   };
 
   document.addEventListener("beat:install-decent-sampler-fixture", (event) => {
@@ -1207,6 +1262,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-note-automation-drag") {
     window.setTimeout(() => {
       void exerciseAetherNoteAutomationDragFlow();
+    }, 0);
+  } else if (fixture === "aether-segment-automation-drag") {
+    window.setTimeout(() => {
+      void exerciseAetherSegmentAutomationDragFlow();
     }, 0);
   }
 }
@@ -1303,6 +1362,52 @@ function dragNoteAutomationHandle(edge: "start" | "mid" | "end", normalizedValue
     button: 0,
     buttons: 1,
     pointerId: 23,
+    pointerType: "mouse",
+    clientX: handleRect.left + handleRect.width / 2,
+    clientY: handleRect.top + handleRect.height / 2,
+  };
+  const targetX = railRect.left + railRect.width * clamped;
+  const targetY = railRect.top + railRect.height / 2;
+  handle.dispatchEvent(new PointerEvent("pointerdown", pointerInit));
+  handle.dispatchEvent(new PointerEvent("pointermove", {
+    ...pointerInit,
+    clientX: targetX,
+    clientY: targetY,
+  }));
+  handle.dispatchEvent(new PointerEvent("pointerup", {
+    ...pointerInit,
+    buttons: 0,
+    clientX: targetX,
+    clientY: targetY,
+  }));
+}
+
+function findSegmentAutomationHandle(edge: "start" | "mid" | "end"): HTMLButtonElement | null {
+  return document.querySelector<HTMLButtonElement>(`[data-aether-segment-automation-handle="${edge}"]`);
+}
+
+function readSegmentAutomationHandleState(edge: "start" | "mid" | "end"): DevAetherSegmentAutomationHandleState {
+  const handle = findSegmentAutomationHandle(edge);
+  return {
+    exists: Boolean(handle),
+    label: handle?.getAttribute("aria-label") ?? null,
+    left: handle?.style.left || null,
+  };
+}
+
+function dragSegmentAutomationHandle(edge: "start" | "mid" | "end", normalizedValue: number) {
+  const handle = findSegmentAutomationHandle(edge);
+  const rail = handle?.parentElement;
+  const handleRect = handle?.getBoundingClientRect();
+  const railRect = rail?.getBoundingClientRect();
+  if (!handle || !railRect || !handleRect || railRect.width <= 0) return;
+  const clamped = Math.max(0, Math.min(1, Number.isFinite(normalizedValue) ? normalizedValue : 0));
+  const pointerInit = {
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+    buttons: 1,
+    pointerId: 29,
     pointerType: "mouse",
     clientX: handleRect.left + handleRect.width / 2,
     clientY: handleRect.top + handleRect.height / 2,
@@ -1651,6 +1756,10 @@ function writeAetherNoteAutomationDragExerciseMarker(state: DevAetherNoteAutomat
   document.documentElement.dataset.beatAetherNoteAutomationDragExercise = JSON.stringify(state);
 }
 
+function writeAetherSegmentAutomationDragExerciseMarker(state: DevAetherSegmentAutomationDragExerciseState) {
+  document.documentElement.dataset.beatAetherSegmentAutomationDragExercise = JSON.stringify(state);
+}
+
 function writeAetherMacroFixtureMarker(state = readMacroFixtureDomState("Brightness")) {
   document.documentElement.dataset.beatAetherMacroFixture = JSON.stringify(state);
 }
@@ -1711,6 +1820,13 @@ async function waitForNoteAutomationHandle(edge: "start" | "mid" | "end") {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     await nextFrame();
     if (findNoteAutomationHandle(edge)) return;
+  }
+}
+
+async function waitForSegmentAutomationHandle(edge: "start" | "mid" | "end") {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await nextFrame();
+    if (findSegmentAutomationHandle(edge)) return;
   }
 }
 

@@ -24,6 +24,10 @@ import {
   updateSegmentAutomationPoint,
   upsertSegmentAutomationTarget,
 } from "../../automation/aetherArrangementAutomation";
+import {
+  denormalizeAetherNoteAutomationValue,
+  normalizeAetherNoteAutomationValue,
+} from "../../automation/aetherNoteAutomation";
 import { AUTOMATION_CURVES, automationCurveLabel } from "../../automation/curves";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
@@ -73,6 +77,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const [midiTimeSignatureOpen, setMidiTimeSignatureOpen] = createSignal(false);
   const [segmentAutomationCurveOpen, setSegmentAutomationCurveOpen] = createSignal(false);
   const [activeSegmentAutomationTarget, setActiveSegmentAutomationTarget] = createSignal<AetherArrangementAutomationTarget>("macro.1");
+  const [draggedSegmentAutomationEdge, setDraggedSegmentAutomationEdge] = createSignal<"start" | "mid" | "end" | null>(null);
   const [midiPreviewBeat, setMidiPreviewBeat] = createSignal<number | null>(null);
   const [drumTrainingSessionId, setDrumTrainingSessionId] = createSignal<string | null>(null);
   let previewCtx: AudioContext | null = null;
@@ -184,6 +189,13 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
     const currentDraft = draft();
     if (!currentDraft) return;
     const value = Number(rawValue);
+    if (!Number.isFinite(value)) return;
+    setSegmentAutomationValue(edge, value);
+  }
+
+  function setSegmentAutomationValue(edge: "start" | "mid" | "end", value: number) {
+    const currentDraft = draft();
+    if (!currentDraft || !Number.isFinite(value)) return;
     const current = segmentAutomationValueRange(currentDraft, activeSegmentAutomationTarget());
     setDraftSegment(setSegmentAutomationTargetValues(
       currentDraft,
@@ -192,6 +204,35 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       edge === "end" ? value : current.endValue,
       edge === "mid" ? value : current.midValue,
     ));
+  }
+
+  function startSegmentAutomationHandleDrag(edge: "start" | "mid" | "end", event: PointerEvent) {
+    if (!draft()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setDraggedSegmentAutomationEdge(edge);
+    const target = event.currentTarget as HTMLElement;
+    try {
+      target.setPointerCapture(event.pointerId);
+    } catch {
+      // Synthetic verifier events may not create an active browser pointer capture.
+    }
+    updateSegmentAutomationHandleDrag(edge, event);
+  }
+
+  function updateSegmentAutomationHandleDrag(edge: "start" | "mid" | "end", event: PointerEvent) {
+    if (!draft()) return;
+    const element = event.currentTarget as HTMLElement;
+    const rect = element.parentElement?.getBoundingClientRect();
+    if (!rect || rect.width <= 0) return;
+    const value = denormalizeAetherNoteAutomationValue(activeSegmentAutomationTarget(), (event.clientX - rect.left) / rect.width);
+    setSegmentAutomationValue(edge, value);
+  }
+
+  function stopSegmentAutomationHandleDrag(edge: "start" | "mid" | "end", event: PointerEvent) {
+    if (draggedSegmentAutomationEdge() !== edge) return;
+    updateSegmentAutomationHandleDrag(edge, event);
+    setDraggedSegmentAutomationEdge(null);
   }
 
   function addSegmentAutomationPoint() {
@@ -573,6 +614,63 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                   />
                   <span>{formatAetherArrangementAutomationValue(activeSegmentAutomationTarget(), segmentAutomationRange().endValue)}</span>
                 </label>
+              </div>
+              <div class={styles.automationHandleRail} aria-label="Drag segment automation values">
+                <span class={styles.automationHandleLine} aria-hidden="true" />
+                <button
+                  type="button"
+                  classList={{
+                    [styles.automationHandleButton]: true,
+                    [styles.automationHandleButtonActive]: draggedSegmentAutomationEdge() === "start",
+                  }}
+                  style={{
+                    left: `${normalizeAetherNoteAutomationValue(activeSegmentAutomationTarget(), segmentAutomationRange().startValue) * 100}%`,
+                  }}
+                  data-aether-segment-automation-handle="start"
+                  aria-label={`Drag start ${aetherArrangementAutomationTargetLabel(activeSegmentAutomationTarget())} value`}
+                  onPointerDown={(event) => startSegmentAutomationHandleDrag("start", event)}
+                  onPointerMove={(event) => draggedSegmentAutomationEdge() === "start" && updateSegmentAutomationHandleDrag("start", event)}
+                  onPointerUp={(event) => stopSegmentAutomationHandleDrag("start", event)}
+                  onPointerCancel={() => setDraggedSegmentAutomationEdge(null)}
+                >
+                  S
+                </button>
+                <button
+                  type="button"
+                  classList={{
+                    [styles.automationHandleButton]: true,
+                    [styles.automationHandleButtonActive]: draggedSegmentAutomationEdge() === "mid",
+                  }}
+                  style={{
+                    left: `${normalizeAetherNoteAutomationValue(activeSegmentAutomationTarget(), segmentAutomationRange().midValue) * 100}%`,
+                  }}
+                  data-aether-segment-automation-handle="mid"
+                  aria-label={`Drag midpoint ${aetherArrangementAutomationTargetLabel(activeSegmentAutomationTarget())} value`}
+                  onPointerDown={(event) => startSegmentAutomationHandleDrag("mid", event)}
+                  onPointerMove={(event) => draggedSegmentAutomationEdge() === "mid" && updateSegmentAutomationHandleDrag("mid", event)}
+                  onPointerUp={(event) => stopSegmentAutomationHandleDrag("mid", event)}
+                  onPointerCancel={() => setDraggedSegmentAutomationEdge(null)}
+                >
+                  M
+                </button>
+                <button
+                  type="button"
+                  classList={{
+                    [styles.automationHandleButton]: true,
+                    [styles.automationHandleButtonActive]: draggedSegmentAutomationEdge() === "end",
+                  }}
+                  style={{
+                    left: `${normalizeAetherNoteAutomationValue(activeSegmentAutomationTarget(), segmentAutomationRange().endValue) * 100}%`,
+                  }}
+                  data-aether-segment-automation-handle="end"
+                  aria-label={`Drag end ${aetherArrangementAutomationTargetLabel(activeSegmentAutomationTarget())} value`}
+                  onPointerDown={(event) => startSegmentAutomationHandleDrag("end", event)}
+                  onPointerMove={(event) => draggedSegmentAutomationEdge() === "end" && updateSegmentAutomationHandleDrag("end", event)}
+                  onPointerUp={(event) => stopSegmentAutomationHandleDrag("end", event)}
+                  onPointerCancel={() => setDraggedSegmentAutomationEdge(null)}
+                >
+                  E
+                </button>
               </div>
               <div class={styles.automationPointEditor} aria-label="Aether segment automation points">
                 <div class={styles.automationPointHeader}>
