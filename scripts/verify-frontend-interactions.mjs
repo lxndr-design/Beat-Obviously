@@ -488,6 +488,21 @@ try {
     "Aether Synth Editor should expose Performance controls and source readouts for browser coverage",
   );
   assert.ok(
+    synthEditorSource.includes('aria-label="LFO"')
+      && synthEditorSource.includes('label={`LFO ${props.lfo} Shape`}')
+      && synthEditorSource.includes('label={`LFO ${props.lfo} Sync Rate`}')
+      && synthEditorSource.includes('label="Smooth"')
+      && synthEditorSource.includes('label="Random"'),
+    "Aether Synth Editor should expose LFO shape, sync-rate, and smoothing/random controls for browser coverage",
+  );
+  assert.ok(
+    devHooksSource.includes("exerciseAetherLfoEditorFlow")
+      && devHooksSource.includes("setKnobValueInPanel")
+      && devHooksSource.includes("beatAetherLfoExercise")
+      && devHooksSource.includes('fixture === "aether-lfo"'),
+    "browser fixture coverage should exercise Aether LFO control editing",
+  );
+  assert.ok(
     devHooksSource.includes("exerciseAetherPerformanceEditorFlow")
       && devHooksSource.includes("setSwitchInPanel")
       && devHooksSource.includes("beatAetherPerformanceExercise")

@@ -42,6 +42,8 @@ const DEV_AETHER_WAVEMAP_INSTRUMENT_ID_MARKER = "Aether wavemap editor dev fixtu
 const DEV_AETHER_WAVEMAP_ID = "user.browser-wavemap";
 const DEV_AETHER_ENVELOPE_INSTRUMENT_ID = "dev-aether-envelope-host";
 const DEV_AETHER_ENVELOPE_INSTRUMENT_ID_MARKER = "Aether envelope editor dev fixture";
+const DEV_AETHER_LFO_INSTRUMENT_ID = "dev-aether-lfo-host";
+const DEV_AETHER_LFO_INSTRUMENT_ID_MARKER = "Aether LFO editor dev fixture";
 const DEV_AETHER_PERFORMANCE_INSTRUMENT_ID = "dev-aether-performance-host";
 const DEV_AETHER_PERFORMANCE_INSTRUMENT_ID_MARKER = "Aether performance editor dev fixture";
 const DEV_AETHER_AUTOMATION_INSTRUMENT_ID_MARKER = "Aether automation dev fixture";
@@ -103,6 +105,7 @@ declare global {
       exerciseAetherWavemapPointerDrawFlow: () => Promise<DevAetherWavemapPointerDrawExerciseState>;
       exerciseAetherWavemapImportFlow: () => Promise<DevAetherWavemapImportExerciseState>;
       exerciseAetherEnvelopeHandleFlow: () => Promise<DevAetherEnvelopeHandleExerciseState>;
+      exerciseAetherLfoEditorFlow: () => Promise<DevAetherLfoExerciseState>;
       exerciseAetherPerformanceEditorFlow: () => Promise<DevAetherPerformanceExerciseState>;
       exerciseAetherPresetLibraryFavoriteFlow: () => Promise<{
         installed: DevAetherPresetLibraryFixtureState;
@@ -346,6 +349,28 @@ interface DevAetherEnvelopeHandleExerciseState {
   afterDecaySustainDrag: DevAetherEnvelopeSnapshot;
   afterReleaseDrag: DevAetherEnvelopeSnapshot;
   afterCurveCycle: DevAetherEnvelopeSnapshot;
+}
+
+interface DevAetherLfoSnapshot {
+  instrumentId: string | null;
+  enabled: boolean;
+  sync: boolean;
+  syncedRate: string | null;
+  rate: number | null;
+  shape: string | null;
+  phase: number | null;
+  smoothing: number | null;
+  randomPhase: number | null;
+  retrigger: boolean;
+  oneShot: boolean;
+  laneText: string;
+  panelText: string;
+}
+
+interface DevAetherLfoExerciseState {
+  instrumentId: string | null;
+  before: DevAetherLfoSnapshot;
+  afterEdit: DevAetherLfoSnapshot;
 }
 
 interface DevAetherPerformanceSnapshot {
@@ -1030,6 +1055,74 @@ export function installBeatDevHooks() {
     return state;
   };
 
+  const installAetherLfoFixtureBase = async () => {
+    const instrumentStore = useInstrumentStore.getState();
+    for (const instrument of instrumentStore.instruments) {
+      if ((instrument.id === DEV_AETHER_LFO_INSTRUMENT_ID || instrument.source?.label === DEV_AETHER_LFO_INSTRUMENT_ID_MARKER) && instrument.userCreated) {
+        instrumentStore.removeInstrument(instrument.id);
+      }
+    }
+
+    const baseDraft = createDefaultSynthDraft();
+    const patch: SynthDraftPatch = {
+      ...baseDraft,
+      name: "LFO Browser Host",
+      parameters: {
+        ...baseDraft.parameters,
+        "lfo.1.enabled": true,
+        "lfo.1.rate": 2.4,
+        "lfo.1.sync": false,
+        "lfo.1.syncedRate": "1/4",
+        "lfo.1.smoothing": 0.05,
+        "lfo.1.randomPhase": 0,
+        "lfo.1.shape": "sine",
+        "lfo.1.phase": 0.1,
+        "lfo.1.retrigger": true,
+        "lfo.1.oneShot": false,
+      },
+      metadata: {
+        ...baseDraft.metadata,
+        tags: [...new Set([...baseDraft.metadata.tags, "dev", "lfo-browser"])],
+      },
+    };
+
+    const nextInstrumentId = instrumentStore.addInstrument({
+      ...synthDraftToInstrumentPatch(patch),
+      id: DEV_AETHER_LFO_INSTRUMENT_ID,
+      name: patch.name,
+      source: { kind: "created", label: DEV_AETHER_LFO_INSTRUMENT_ID_MARKER },
+      userCreated: true,
+    });
+    useSynthStore.getState().bindInstrument(nextInstrumentId);
+    useSynthStore.getState().setDraft(patch);
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
+    await waitForEditorPanel("LFO 1");
+    return { instrumentId: nextInstrumentId };
+  };
+
+  const exerciseAetherLfoEditorFlow = async (): Promise<DevAetherLfoExerciseState> => {
+    await installAetherLfoFixtureBase();
+    const before = readAetherLfoSnapshot(1);
+    clickRadioInPanel("LFO 1", "LFO 1 Shape", "Square");
+    await setKnobValueInPanel("LFO 1", "Rate", "7.5");
+    await setKnobValueInPanel("LFO 1", "Phase", "0.33");
+    await setKnobValueInPanel("LFO 1", "Smooth", "0.42");
+    await setKnobValueInPanel("LFO 1", "Random", "0.58");
+    clickPanelButton("LFO 1", "Enable LFO 1 tempo sync");
+    await nextFrame();
+    clickRadioInPanel("LFO 1", "LFO 1 Sync Rate", "Sixteenth note");
+    clickPanelButton("LFO 1", "Enable LFO 1 one-shot");
+    clickPanelButton("LFO 1", "Disable LFO 1 retrigger");
+    await nextFrame();
+    const state: DevAetherLfoExerciseState = {
+      instrumentId: useSynthStore.getState().boundInstrumentId,
+      before,
+      afterEdit: readAetherLfoSnapshot(1),
+    };
+    writeAetherLfoExerciseMarker(state);
+    return state;
+  };
+
   const installAetherPerformanceFixtureBase = async () => {
     const instrumentStore = useInstrumentStore.getState();
     for (const instrument of instrumentStore.instruments) {
@@ -1453,6 +1546,7 @@ export function installBeatDevHooks() {
     exerciseAetherWavemapPointerDrawFlow,
     exerciseAetherWavemapImportFlow,
     exerciseAetherEnvelopeHandleFlow,
+    exerciseAetherLfoEditorFlow,
     exerciseAetherPerformanceEditorFlow,
     exerciseAetherPresetLibraryFavoriteFlow,
     installAetherAutomationFixture,
@@ -1514,6 +1608,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-envelope-handles") {
     window.setTimeout(() => {
       void exerciseAetherEnvelopeHandleFlow();
+    }, 0);
+  } else if (fixture === "aether-lfo") {
+    window.setTimeout(() => {
+      void exerciseAetherLfoEditorFlow();
     }, 0);
   } else if (fixture === "aether-performance") {
     window.setTimeout(() => {
@@ -1800,6 +1898,36 @@ function readAetherPerformanceSnapshot(): DevAetherPerformanceSnapshot {
   };
 }
 
+function readAetherLfoSnapshot(lfo: 1 | 2): DevAetherLfoSnapshot {
+  const draft = useSynthStore.getState().draft;
+  const prefix = `lfo.${lfo}` as const;
+  const panel = findElementByAriaLabel("LFO");
+  const lane = findElementByAriaLabel(`LFO ${lfo}`, panel);
+  const readNumber = (suffix: "rate" | "phase" | "smoothing" | "randomPhase") => {
+    const value = draft.parameters[`${prefix}.${suffix}` as SynthParameterId];
+    return typeof value === "number" ? value : null;
+  };
+  return {
+    instrumentId: useSynthStore.getState().boundInstrumentId,
+    enabled: draft.parameters[`${prefix}.enabled` as SynthParameterId] === true,
+    sync: draft.parameters[`${prefix}.sync` as SynthParameterId] === true,
+    syncedRate: typeof draft.parameters[`${prefix}.syncedRate` as SynthParameterId] === "string"
+      ? String(draft.parameters[`${prefix}.syncedRate` as SynthParameterId])
+      : null,
+    rate: readNumber("rate"),
+    shape: typeof draft.parameters[`${prefix}.shape` as SynthParameterId] === "string"
+      ? String(draft.parameters[`${prefix}.shape` as SynthParameterId])
+      : null,
+    phase: readNumber("phase"),
+    smoothing: readNumber("smoothing"),
+    randomPhase: readNumber("randomPhase"),
+    retrigger: draft.parameters[`${prefix}.retrigger` as SynthParameterId] !== false,
+    oneShot: draft.parameters[`${prefix}.oneShot` as SynthParameterId] === true,
+    laneText: normalizeText(lane?.textContent ?? ""),
+    panelText: normalizeText(panel?.textContent ?? ""),
+  };
+}
+
 function readModulationRouteSnapshots(): DevModulationRouteSnapshot[] {
   return useSynthStore.getState().draft.modulation.map((route) => {
     const row = Array.from(document.querySelectorAll<HTMLElement>("[data-modulation-route-id]"))
@@ -2013,6 +2141,29 @@ function setSwitchInPanel(panelLabel: string, switchLabel: string, checked: bool
   button.click();
 }
 
+function clickRadioInPanel(panelLabel: string, groupLabel: string, optionLabel: string) {
+  const panel = findElementByAriaLabel(panelLabel);
+  const group = findElementByAriaLabel(groupLabel, panel);
+  const button = Array.from(group?.querySelectorAll<HTMLButtonElement>('button[role="radio"]') ?? [])
+    .find((candidate) => candidate.getAttribute("aria-label") === optionLabel);
+  button?.click();
+}
+
+async function setKnobValueInPanel(panelLabel: string, knobLabel: string, value: string) {
+  const panel = findElementByAriaLabel(panelLabel);
+  const button = Array.from(panel?.querySelectorAll<HTMLButtonElement>("button") ?? [])
+    .find((candidate) => candidate.getAttribute("aria-label") === `Edit ${knobLabel}`);
+  const frame = button?.parentElement;
+  button?.click();
+  await nextFrame();
+  const input = frame?.querySelector<HTMLInputElement>("input");
+  if (!input) return;
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  input.dispatchEvent(new Event("blur", { bubbles: true }));
+}
+
 function setLastAutomationPointField(panelLabel: string, fieldLabel: "Beat" | "Value", value: string) {
   const panel = document.querySelector<HTMLElement>(`[aria-label="${panelLabel}"]`);
   const rows = Array.from(panel?.querySelectorAll<HTMLElement>('[class*="automationPointRow"]') ?? []);
@@ -2150,6 +2301,10 @@ function writeAetherWavemapImportExerciseMarker(state: DevAetherWavemapImportExe
 
 function writeAetherEnvelopeHandleExerciseMarker(state: DevAetherEnvelopeHandleExerciseState) {
   document.documentElement.dataset.beatAetherEnvelopeHandleExercise = JSON.stringify(state);
+}
+
+function writeAetherLfoExerciseMarker(state: DevAetherLfoExerciseState) {
+  document.documentElement.dataset.beatAetherLfoExercise = JSON.stringify(state);
 }
 
 function writeAetherPerformanceExerciseMarker(state: DevAetherPerformanceExerciseState) {
