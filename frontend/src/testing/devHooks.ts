@@ -228,17 +228,26 @@ interface DevAetherNoteAutomationHandleState {
   left: string | null;
 }
 
-interface DevAetherNoteAutomationDragExerciseState {
+interface DevAetherAutomationDragLaneExercise {
+  target: MidiAutomationTarget;
   before: DevAutomationPointSnapshot[];
   afterStartDrag: DevAutomationPointSnapshot[];
   afterMidDrag: DevAutomationPointSnapshot[];
   afterEndDrag: DevAutomationPointSnapshot[];
+  pointPanelText: string;
+}
+
+interface DevAetherNoteAutomationDragLaneExercise extends DevAetherAutomationDragLaneExercise {
   handles: {
     start: DevAetherNoteAutomationHandleState;
     mid: DevAetherNoteAutomationHandleState;
     end: DevAetherNoteAutomationHandleState;
   };
-  pointPanelText: string;
+}
+
+interface DevAetherNoteAutomationDragExerciseState extends DevAetherNoteAutomationDragLaneExercise {
+  macro: DevAetherNoteAutomationDragLaneExercise;
+  filterCutoff: DevAetherNoteAutomationDragLaneExercise;
 }
 
 interface DevAetherSegmentAutomationHandleState {
@@ -247,17 +256,17 @@ interface DevAetherSegmentAutomationHandleState {
   left: string | null;
 }
 
-interface DevAetherSegmentAutomationDragExerciseState {
-  before: DevAutomationPointSnapshot[];
-  afterStartDrag: DevAutomationPointSnapshot[];
-  afterMidDrag: DevAutomationPointSnapshot[];
-  afterEndDrag: DevAutomationPointSnapshot[];
+interface DevAetherSegmentAutomationDragLaneExercise extends DevAetherAutomationDragLaneExercise {
   handles: {
     start: DevAetherSegmentAutomationHandleState;
     mid: DevAetherSegmentAutomationHandleState;
     end: DevAetherSegmentAutomationHandleState;
   };
-  pointPanelText: string;
+}
+
+interface DevAetherSegmentAutomationDragExerciseState extends DevAetherSegmentAutomationDragLaneExercise {
+  macro: DevAetherSegmentAutomationDragLaneExercise;
+  filterCutoff: DevAetherSegmentAutomationDragLaneExercise;
 }
 
 interface DevAetherTrackAutomationHandleState {
@@ -266,17 +275,17 @@ interface DevAetherTrackAutomationHandleState {
   left: string | null;
 }
 
-interface DevAetherTrackAutomationDragExerciseState {
-  before: DevAutomationPointSnapshot[];
-  afterStartDrag: DevAutomationPointSnapshot[];
-  afterMidDrag: DevAutomationPointSnapshot[];
-  afterEndDrag: DevAutomationPointSnapshot[];
+interface DevAetherTrackAutomationDragLaneExercise extends DevAetherAutomationDragLaneExercise {
   handles: {
     start: DevAetherTrackAutomationHandleState;
     mid: DevAetherTrackAutomationHandleState;
     end: DevAetherTrackAutomationHandleState;
   };
-  pointPanelText: string;
+}
+
+interface DevAetherTrackAutomationDragExerciseState extends DevAetherTrackAutomationDragLaneExercise {
+  macro: DevAetherTrackAutomationDragLaneExercise;
+  filterCutoff: DevAetherTrackAutomationDragLaneExercise;
 }
 
 interface DevAetherPresetLibraryFixtureState {
@@ -1769,22 +1778,41 @@ export function installBeatDevHooks() {
   const exerciseAetherNoteAutomationDragFlow = async (): Promise<DevAetherNoteAutomationDragExerciseState> => {
     installAetherAutomationFixture();
     await openAetherAutomationFixtureEditor("note");
+    const macro = await exerciseAetherNoteAutomationDragLane("macro.1", 0.31, 0.76, 0.44);
+    const filterCutoff = await exerciseAetherNoteAutomationDragLane("filter.cutoff", 0.37, 0.82, 0.49);
+    const state: DevAetherNoteAutomationDragExerciseState = {
+      ...macro,
+      macro,
+      filterCutoff,
+    };
+    writeAetherNoteAutomationDragExerciseMarker(state);
+    return state;
+  };
+
+  const exerciseAetherNoteAutomationDragLane = async (
+    target: MidiAutomationTarget,
+    startValue: number,
+    midValue: number,
+    endValue: number,
+  ): Promise<DevAetherNoteAutomationDragLaneExercise> => {
+    await ensureAetherAutomationTargetLane("note", target);
     await waitForNoteAutomationHandle("start");
     const before = readAutomationPointPanelRows("Aether note automation points");
 
-    dragNoteAutomationHandle("start", 0.31);
+    dragNoteAutomationHandle("start", startValue);
     await nextFrame();
     const afterStartDrag = readAutomationPointPanelRows("Aether note automation points");
 
-    dragNoteAutomationHandle("mid", 0.76);
+    dragNoteAutomationHandle("mid", midValue);
     await nextFrame();
     const afterMidDrag = readAutomationPointPanelRows("Aether note automation points");
 
-    dragNoteAutomationHandle("end", 0.44);
+    dragNoteAutomationHandle("end", endValue);
     await nextFrame();
     const afterEndDrag = readAutomationPointPanelRows("Aether note automation points");
 
-    const state: DevAetherNoteAutomationDragExerciseState = {
+    return {
+      target,
       before,
       afterStartDrag,
       afterMidDrag,
@@ -1796,29 +1824,46 @@ export function installBeatDevHooks() {
       },
       pointPanelText: readPanelState("Aether note automation points").text,
     };
-    writeAetherNoteAutomationDragExerciseMarker(state);
-    return state;
   };
 
   const exerciseAetherSegmentAutomationDragFlow = async (): Promise<DevAetherSegmentAutomationDragExerciseState> => {
     installAetherAutomationFixture();
     await openAetherAutomationFixtureEditor("segment");
+    const macro = await exerciseAetherSegmentAutomationDragLane("macro.1", 0.26, 0.68, 0.43);
+    const filterCutoff = await exerciseAetherSegmentAutomationDragLane("filter.cutoff", 0.36, 0.74, 0.48);
+    const state: DevAetherSegmentAutomationDragExerciseState = {
+      ...macro,
+      macro,
+      filterCutoff,
+    };
+    writeAetherSegmentAutomationDragExerciseMarker(state);
+    return state;
+  };
+
+  const exerciseAetherSegmentAutomationDragLane = async (
+    target: MidiAutomationTarget,
+    startValue: number,
+    midValue: number,
+    endValue: number,
+  ): Promise<DevAetherSegmentAutomationDragLaneExercise> => {
+    await ensureAetherAutomationTargetLane("segment", target);
     await waitForSegmentAutomationHandle("start");
     const before = readAutomationPointPanelRows("Aether segment automation points");
 
-    dragSegmentAutomationHandle("start", 0.26);
+    dragSegmentAutomationHandle("start", startValue);
     await nextFrame();
     const afterStartDrag = readAutomationPointPanelRows("Aether segment automation points");
 
-    dragSegmentAutomationHandle("mid", 0.68);
+    dragSegmentAutomationHandle("mid", midValue);
     await nextFrame();
     const afterMidDrag = readAutomationPointPanelRows("Aether segment automation points");
 
-    dragSegmentAutomationHandle("end", 0.43);
+    dragSegmentAutomationHandle("end", endValue);
     await nextFrame();
     const afterEndDrag = readAutomationPointPanelRows("Aether segment automation points");
 
-    const state: DevAetherSegmentAutomationDragExerciseState = {
+    return {
+      target,
       before,
       afterStartDrag,
       afterMidDrag,
@@ -1830,29 +1875,46 @@ export function installBeatDevHooks() {
       },
       pointPanelText: readPanelState("Aether segment automation points").text,
     };
-    writeAetherSegmentAutomationDragExerciseMarker(state);
-    return state;
   };
 
   const exerciseAetherTrackAutomationDragFlow = async (): Promise<DevAetherTrackAutomationDragExerciseState> => {
     installAetherAutomationFixture();
     await openAetherAutomationFixtureEditor("track");
+    const macro = await exerciseAetherTrackAutomationDragLane("macro.1", 0.28, 0.73, 0.39);
+    const filterCutoff = await exerciseAetherTrackAutomationDragLane("filter.cutoff", 0.34, 0.79, 0.47);
+    const state: DevAetherTrackAutomationDragExerciseState = {
+      ...macro,
+      macro,
+      filterCutoff,
+    };
+    writeAetherTrackAutomationDragExerciseMarker(state);
+    return state;
+  };
+
+  const exerciseAetherTrackAutomationDragLane = async (
+    target: MidiAutomationTarget,
+    startValue: number,
+    midValue: number,
+    endValue: number,
+  ): Promise<DevAetherTrackAutomationDragLaneExercise> => {
+    await ensureAetherAutomationTargetLane("track", target);
     await waitForTrackAutomationHandle("start");
     const before = readAutomationPointPanelRows("Aether track automation points");
 
-    dragTrackAutomationHandle("start", 0.28);
+    dragTrackAutomationHandle("start", startValue);
     await nextFrame();
     const afterStartDrag = readAutomationPointPanelRows("Aether track automation points");
 
-    dragTrackAutomationHandle("mid", 0.73);
+    dragTrackAutomationHandle("mid", midValue);
     await nextFrame();
     const afterMidDrag = readAutomationPointPanelRows("Aether track automation points");
 
-    dragTrackAutomationHandle("end", 0.39);
+    dragTrackAutomationHandle("end", endValue);
     await nextFrame();
     const afterEndDrag = readAutomationPointPanelRows("Aether track automation points");
 
-    const state: DevAetherTrackAutomationDragExerciseState = {
+    return {
+      target,
       before,
       afterStartDrag,
       afterMidDrag,
@@ -1864,8 +1926,6 @@ export function installBeatDevHooks() {
       },
       pointPanelText: readPanelState("Aether track automation points").text,
     };
-    writeAetherTrackAutomationDragExerciseMarker(state);
-    return state;
   };
 
   async function exerciseAutomationPointEditor(
@@ -1876,12 +1936,7 @@ export function installBeatDevHooks() {
   ): Promise<DevAutomationPointEditorExercise> {
     await openAetherAutomationFixtureEditor(editor);
     const pointPanelLabel = aetherAutomationPointEditorLabel(editor);
-    if (target !== "macro.1") {
-      clickAetherAutomationTarget(editor, target);
-      await nextFrame();
-      clickPanelButtonByText(aetherAutomationLanePanelLabel(editor), "Add lane");
-      await nextFrame();
-    }
+    await ensureAetherAutomationTargetLane(editor, target);
     const before = readAutomationPointPanelRows(pointPanelLabel);
     const curveBefore = readAutomationCurveControlLabel(editor);
     await chooseAutomationCurve(editor, "Smoothstep");
@@ -3060,6 +3115,14 @@ function aetherAutomationTargetButtonLabel(editor: DevAetherAutomationPointEdito
 
 function clickAetherAutomationTarget(editor: DevAetherAutomationPointEditor, target: MidiAutomationTarget) {
   clickPanelButton(aetherAutomationLanePanelLabel(editor), aetherAutomationTargetButtonLabel(editor, target));
+}
+
+async function ensureAetherAutomationTargetLane(editor: DevAetherAutomationPointEditor, target: MidiAutomationTarget) {
+  if (target === "macro.1") return;
+  clickAetherAutomationTarget(editor, target);
+  await nextFrame();
+  clickPanelButtonByText(aetherAutomationLanePanelLabel(editor), "Add lane");
+  await nextFrame();
 }
 
 function readAutomationPointPanelRows(panelLabel: string): DevAutomationPointSnapshot[] {

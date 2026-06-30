@@ -497,6 +497,17 @@ try {
     "browser fixture automation point coverage should include non-macro direct Aether target lanes",
   );
   assert.ok(
+    devHooksSource.includes("ensureAetherAutomationTargetLane")
+      && devHooksSource.includes("filterCutoff")
+      && devHooksSource.includes('exerciseAetherNoteAutomationDragLane("filter.cutoff"')
+      && devHooksSource.includes('exerciseAetherSegmentAutomationDragLane("filter.cutoff"')
+      && devHooksSource.includes('exerciseAetherTrackAutomationDragLane("filter.cutoff"')
+      && devHooksSource.includes("beatAetherNoteAutomationDragExercise")
+      && devHooksSource.includes("beatAetherSegmentAutomationDragExercise")
+      && devHooksSource.includes("beatAetherTrackAutomationDragExercise"),
+    "browser fixture automation drag coverage should include non-macro direct Aether target lanes",
+  );
+  assert.ok(
     synthEditorSource.includes('aria-label="Performance controls"')
       && synthEditorSource.includes('aria-label="Performance source readouts"')
       && synthEditorSource.includes('label="Voices"')
