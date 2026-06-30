@@ -104,6 +104,40 @@ try {
     "note point insertion should use note-local beats and keep points sorted",
   );
   assert.equal(insertedNotePoint[0].automation[0].points[2].curve, "smoothstep", "inserted note points should inherit lane curve metadata");
+  const copiedNotePoints = noteAutomation.copyMidiNoteAutomationPoints(insertedNotePoint, 0, "macro.1", [2, 1, 1, 99]);
+  assert.deepEqual(
+    copiedNotePoints,
+    {
+      target: "macro.1",
+      spanBeats: 0.25,
+      points: [
+        { beatOffset: 0, value: 0.65, curve: "smoothstep" },
+        { beatOffset: 0.25, value: 0.77, curve: "smoothstep" },
+      ],
+    },
+    "note automation point copy should normalize selected point timing and keep curve metadata",
+  );
+  const pastedNotePoints = noteAutomation.pasteMidiNoteAutomationPoints(insertedNotePoint, [1], copiedNotePoints, 1.25);
+  assert.deepEqual(
+    pastedNotePoints[1].automation[0].points.map((point) => point.beat),
+    [4, 5, 5.25, 5.5, 6],
+    "note automation point paste should preserve copied spacing inside each selected note",
+  );
+  assert.deepEqual(
+    pastedNotePoints[1].automation[0].points.map((point) => point.value),
+    [0.2, 0.65, 0.65, 0.77, 0.92],
+    "note automation point paste should preserve copied values",
+  );
+  assert.deepEqual(
+    pastedNotePoints[1].automation[0].points.map((point) => point.curve),
+    ["smoothstep", "smoothstep", "smoothstep", "smoothstep", "smoothstep"],
+    "note automation point paste should preserve copied and existing curve metadata",
+  );
+  assert.equal(
+    noteAutomation.copyMidiNoteAutomationPoints(insertedNotePoint, 0, "pitch", [0]),
+    null,
+    "pitch curve editing should stay out of parameter automation point copy/paste",
+  );
   const movedNotePoint = noteAutomation.updateMidiNoteAutomationPoint(insertedNotePoint, [0], "macro.1", 2, 0.9, 0.81);
   assert.deepEqual(
     movedNotePoint[0].automation[0].points.map((point) => point.beat),
@@ -225,6 +259,35 @@ try {
     "segment point insertion should use segment-local beats and sort points",
   );
   assert.equal(insertedSegmentPoint.automation[0].points[1].curve, "smoothstep", "inserted segment points should inherit lane curve metadata");
+  const copiedSegmentPoints = arrangementAutomation.copySegmentAutomationPoints(insertedSegmentPoint, "macro.1", [2, 1, 1, 99]);
+  assert.deepEqual(
+    copiedSegmentPoints,
+    {
+      target: "macro.1",
+      spanBeats: 1,
+      points: [
+        { beatOffset: 0, value: 0.61, curve: "smoothstep" },
+        { beatOffset: 1, value: 0.55, curve: "smoothstep" },
+      ],
+    },
+    "segment automation point copy should use segment-local spacing and keep curve metadata",
+  );
+  const pastedSegmentPoints = arrangementAutomation.pasteSegmentAutomationPoints(insertedSegmentPoint, copiedSegmentPoints, 2.5);
+  assert.deepEqual(
+    pastedSegmentPoints.automation[0].points.map((point) => point.beat),
+    [0, 1, 2, 2.5, 3.5, 4],
+    "segment automation point paste should preserve copied spacing inside the segment",
+  );
+  assert.deepEqual(
+    pastedSegmentPoints.automation[0].points.map((point) => point.value),
+    [0.2, 0.61, 0.55, 0.61, 0.55, 0.9],
+    "segment automation point paste should preserve copied values",
+  );
+  assert.deepEqual(
+    pastedSegmentPoints.automation[0].points.map((point) => point.curve),
+    ["smoothstep", "smoothstep", "smoothstep", "smoothstep", "smoothstep", "smoothstep"],
+    "segment automation point paste should preserve copied and existing curve metadata",
+  );
   const movedSegmentPoint = arrangementAutomation.updateSegmentAutomationPoint(insertedSegmentPoint, "macro.1", 1, 3.5, 0.73);
   assert.deepEqual(
     movedSegmentPoint.automation[0].points.map((point) => point.beat),
@@ -350,6 +413,35 @@ try {
     "track point insertion should use project-timeline beats and sort points",
   );
   assert.equal(insertedTrackPoint.automation[0].points[1].curve, "easeIn", "inserted track points should inherit lane curve metadata");
+  const copiedTrackPoints = arrangementAutomation.copyTrackAutomationPoints(insertedTrackPoint, "filter.cutoff", [2, 1, 1, 99]);
+  assert.deepEqual(
+    copiedTrackPoints,
+    {
+      target: "filter.cutoff",
+      spanBeats: 20,
+      points: [
+        { beatOffset: 0, value: 0.66, curve: "easeIn" },
+        { beatOffset: 20, value: 0.44, curve: "easeIn" },
+      ],
+    },
+    "track automation point copy should use project-time spacing and keep curve metadata",
+  );
+  const pastedTrackPoints = arrangementAutomation.pasteTrackAutomationPoints(insertedTrackPoint, copiedTrackPoints, 64, 40);
+  assert.deepEqual(
+    pastedTrackPoints.automation[0].points.map((point) => point.beat),
+    [0, 12, 32, 40, 60, 64],
+    "track automation point paste should preserve copied spacing on the project timeline",
+  );
+  assert.deepEqual(
+    pastedTrackPoints.automation[0].points.map((point) => point.value),
+    [0.12, 0.66, 0.44, 0.66, 0.44, 0.88],
+    "track automation point paste should preserve copied values",
+  );
+  assert.deepEqual(
+    pastedTrackPoints.automation[0].points.map((point) => point.curve),
+    ["easeIn", "easeIn", "easeIn", "easeIn", "easeIn", "easeIn"],
+    "track automation point paste should preserve copied and existing curve metadata",
+  );
   const movedTrackPoint = arrangementAutomation.updateTrackAutomationPoint(insertedTrackPoint, "filter.cutoff", 64, 1, 48, 0.74);
   assert.deepEqual(
     movedTrackPoint.automation[0].points.map((point) => point.beat),

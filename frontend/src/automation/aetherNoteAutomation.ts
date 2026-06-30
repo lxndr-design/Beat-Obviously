@@ -16,6 +16,12 @@ export interface AetherNoteAutomationTargetMeta {
   step: number;
 }
 
+export interface AetherNoteAutomationPointClipboard {
+  target: MidiAutomationTarget;
+  points: Array<{ beatOffset: number; value: number; curve?: AutomationCurve }>;
+  spanBeats: number;
+}
+
 export const AETHER_NOTE_AUTOMATION_TARGETS: AetherNoteAutomationTargetMeta[] = [
   { target: "pitch", label: "Pitch", group: "Pitch", defaultValue: 0, min: -12, max: 12, step: 0.01 },
   { target: "osc.a.position", label: "Wave A", group: "Wavemap", defaultValue: 0.5, min: 0, max: 1, step: 0.01 },
@@ -246,6 +252,31 @@ export function snapMidiNoteAutomationPointValues(
   );
 }
 
+export function copyMidiNoteAutomationPoints(
+  notes: MidiNote[],
+  noteIndex: number,
+  target: MidiAutomationTarget,
+  pointIndices: number[],
+): AetherNoteAutomationPointClipboard | null {
+  if (target === "pitch") return null;
+  const note = notes[noteIndex];
+  const lane = note?.automation?.find((candidate) => candidate.target === target);
+  if (!note || !lane) return null;
+  return copyAutomationPoints(lane, pointIndices, note.startBeat);
+}
+
+export function pasteMidiNoteAutomationPoints(
+  notes: MidiNote[],
+  indices: number[],
+  clipboard: AetherNoteAutomationPointClipboard | null | undefined,
+  localAnchorBeat: number,
+): MidiNote[] {
+  if (!clipboard || clipboard.target === "pitch" || clipboard.points.length === 0) return notes;
+  return mutateSelectedNoteAutomationLanes(notes, indices, clipboard.target, (note, lane) =>
+    pasteAutomationPoints(lane, clipboard.target, clipboard.points, note.startBeat + clampLocalBeat(localAnchorBeat, note), note.startBeat, note.lengthBeats)
+  );
+}
+
 export function offsetMidiNoteAutomation(
   automation: MidiAutomationLane[] | undefined,
   beatDelta: number,
@@ -442,6 +473,47 @@ function snapAutomationLaneValues(
   };
 }
 
+function copyAutomationPoints(
+  lane: MidiAutomationLane,
+  pointIndices: number[],
+  originBeat: number,
+): AetherNoteAutomationPointClipboard | null {
+  const uniqueIndices = normalizedPointIndices(pointIndices, lane.points.length);
+  if (uniqueIndices.length === 0) return null;
+  const selected = uniqueIndices.map((index) => lane.points[index]).filter(Boolean);
+  if (selected.length === 0) return null;
+  const anchorBeat = Math.min(...selected.map((point) => point.beat - originBeat));
+  const maxBeat = Math.max(...selected.map((point) => point.beat - originBeat));
+  return {
+    target: lane.target,
+    spanBeats: Math.max(0, maxBeat - anchorBeat),
+    points: selected.map((point) => ({
+      beatOffset: point.beat - originBeat - anchorBeat,
+      value: point.value,
+      ...(point.curve ? { curve: point.curve } : {}),
+    })),
+  };
+}
+
+function pasteAutomationPoints(
+  lane: MidiAutomationLane,
+  target: MidiAutomationTarget,
+  points: AetherNoteAutomationPointClipboard["points"],
+  anchorBeat: number,
+  originBeat: number,
+  lengthBeats: number,
+): MidiAutomationLane {
+  const pasted = points.map((point) => automationPoint(
+    originBeat + clamp(beatRelativeToOrigin(anchorBeat, originBeat) + point.beatOffset, 0, Math.max(0.001, lengthBeats)),
+    clampTargetValue(target, point.value),
+    point.curve,
+  ));
+  return {
+    ...lane,
+    points: normalizeAutomationPoints([...lane.points, ...pasted]),
+  };
+}
+
 function normalizeAutomationPoints(points: MidiAutomationLane["points"]): MidiAutomationLane["points"] {
   return points
     .map((point) => ({ ...point }))
@@ -476,6 +548,10 @@ function clampLocalBeat(value: number, note: MidiNote): number {
   return Math.max(0, Math.min(Math.max(0.001, note.lengthBeats), Number.isFinite(value) ? value : 0));
 }
 
+function beatRelativeToOrigin(beat: number, originBeat: number): number {
+  return Number.isFinite(beat) ? beat - originBeat : 0;
+}
+
 function clampTargetValue(target: MidiAutomationTarget, value: number): number {
   const meta = aetherNoteAutomationTargetMeta(target);
   return clamp(value, meta.min, meta.max);
@@ -495,6 +571,12 @@ function clamp(value: number, min: number, max: number): number {
 function average(values: number[], fallback: number): number {
   if (values.length === 0) return fallback;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function normalizedPointIndices(indices: number[], pointCount: number): number[] {
+  return Array.from(new Set(indices))
+    .filter((index) => Number.isInteger(index) && index >= 0 && index < pointCount)
+    .sort((a, b) => a - b);
 }
 
 function formatSigned(value: number): string {

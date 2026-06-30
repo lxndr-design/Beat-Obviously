@@ -19,6 +19,12 @@ type AetherArrangementAutomationTargetMeta = Omit<AetherNoteAutomationTargetMeta
   target: AetherArrangementAutomationTarget;
 };
 
+export interface AetherArrangementAutomationPointClipboard {
+  target: AetherArrangementAutomationTarget;
+  points: Array<{ beatOffset: number; value: number; curve?: AutomationCurve }>;
+  spanBeats: number;
+}
+
 export const AETHER_ARRANGEMENT_AUTOMATION_TARGETS = AETHER_NOTE_AUTOMATION_TARGETS
   .filter((meta) => meta.target !== "pitch") as AetherArrangementAutomationTargetMeta[];
 
@@ -151,6 +157,26 @@ export function snapSegmentAutomationPointValues(
 ): Segment {
   if (!segment.automation?.some((lane) => lane.target === target)) return segment;
   return mutateSegmentAutomationLane(segment, target, (lane) => snapAutomationLaneValues(lane, target));
+}
+
+export function copySegmentAutomationPoints(
+  segment: Segment,
+  target: AetherArrangementAutomationTarget,
+  pointIndices: number[],
+): AetherArrangementAutomationPointClipboard | null {
+  const lane = segment.automation?.find((candidate) => candidate.target === target);
+  return lane ? copyAutomationPoints(lane, pointIndices) : null;
+}
+
+export function pasteSegmentAutomationPoints(
+  segment: Segment,
+  clipboard: AetherArrangementAutomationPointClipboard | null | undefined,
+  anchorBeat: number,
+): Segment {
+  if (!clipboard || clipboard.points.length === 0) return segment;
+  return mutateSegmentAutomationLane(segment, clipboard.target, (lane) =>
+    pasteAutomationPoints(lane, clipboard.target, clipboard.points, anchorBeat, segment.lengthBeats)
+  );
 }
 
 export function segmentAutomationSummary(segment: Segment | undefined, target: AetherArrangementAutomationTarget): string {
@@ -312,6 +338,27 @@ export function snapTrackAutomationPointValues(
 ): Track {
   if (!track.automation?.some((lane) => lane.target === target)) return track;
   return mutateTrackAutomationLane(track, target, undefined, (lane) => snapAutomationLaneValues(lane, target));
+}
+
+export function copyTrackAutomationPoints(
+  track: Track,
+  target: AetherArrangementAutomationTarget,
+  pointIndices: number[],
+): AetherArrangementAutomationPointClipboard | null {
+  const lane = track.automation?.find((candidate) => candidate.target === target);
+  return lane ? copyAutomationPoints(lane, pointIndices) : null;
+}
+
+export function pasteTrackAutomationPoints(
+  track: Track,
+  clipboard: AetherArrangementAutomationPointClipboard | null | undefined,
+  projectLengthBeats: number,
+  anchorBeat: number,
+): Track {
+  if (!clipboard || clipboard.points.length === 0) return track;
+  return mutateTrackAutomationLane(track, clipboard.target, projectLengthBeats, (lane) =>
+    pasteAutomationPoints(lane, clipboard.target, clipboard.points, anchorBeat, projectLengthBeats)
+  );
 }
 
 export function trackAutomationSummary(track: Track | undefined, target: AetherArrangementAutomationTarget): string {
@@ -556,6 +603,45 @@ function snapAutomationLaneValues(
   };
 }
 
+function copyAutomationPoints(
+  lane: MidiAutomationLane,
+  pointIndices: number[],
+): AetherArrangementAutomationPointClipboard | null {
+  const uniqueIndices = normalizedPointIndices(pointIndices, lane.points.length);
+  if (uniqueIndices.length === 0) return null;
+  const selected = uniqueIndices.map((index) => lane.points[index]).filter(Boolean);
+  if (selected.length === 0) return null;
+  const anchorBeat = Math.min(...selected.map((point) => point.beat));
+  const maxBeat = Math.max(...selected.map((point) => point.beat));
+  return {
+    target: lane.target as AetherArrangementAutomationTarget,
+    spanBeats: Math.max(0, maxBeat - anchorBeat),
+    points: selected.map((point) => ({
+      beatOffset: point.beat - anchorBeat,
+      value: point.value,
+      ...(point.curve ? { curve: point.curve } : {}),
+    })),
+  };
+}
+
+function pasteAutomationPoints(
+  lane: MidiAutomationLane,
+  target: AetherArrangementAutomationTarget,
+  points: AetherArrangementAutomationPointClipboard["points"],
+  anchorBeat: number,
+  lengthBeats: number,
+): MidiAutomationLane {
+  const pasted = points.map((point) => automationPoint(
+    clampBeat(anchorBeat + point.beatOffset, lengthBeats),
+    clampTargetValue(target, point.value),
+    point.curve,
+  ));
+  return {
+    ...lane,
+    points: normalizeAutomationPoints([...lane.points, ...pasted]),
+  };
+}
+
 function normalizeAutomationPoints(points: MidiAutomationLane["points"]): MidiAutomationLane["points"] {
   return points
     .map((point) => ({ ...point }))
@@ -593,4 +679,10 @@ function snapTargetValue(target: AetherArrangementAutomationTarget, value: numbe
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
+}
+
+function normalizedPointIndices(indices: number[], pointCount: number): number[] {
+  return Array.from(new Set(indices))
+    .filter((index) => Number.isInteger(index) && index >= 0 && index < pointCount)
+    .sort((a, b) => a - b);
 }
