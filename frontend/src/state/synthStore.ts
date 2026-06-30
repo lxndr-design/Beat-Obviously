@@ -1246,6 +1246,21 @@ export interface SynthMacroConflictSummary {
   label: string;
 }
 
+export type SynthMacroAtAGlanceTone = "idle" | "active" | "conflict";
+
+export interface SynthMacroAtAGlanceState {
+  id: MacroId;
+  tone: SynthMacroAtAGlanceTone;
+  assignmentCount: number;
+  conflictCount: number;
+  assignmentBadge: string;
+  conflictBadge: string;
+  outputBadge: string;
+  rangeBadge: string;
+  targetBadge: string;
+  detail: string;
+}
+
 export interface SynthMacroConflictDetail {
   target: ModulationTargetId;
   targetLabel: string;
@@ -1290,6 +1305,39 @@ export function macroConflictSummaryForId(draft: SynthDraftPatch, id: MacroId): 
   return {
     count: details.length,
     label: `${visibleSummaries}${suffix}`,
+  };
+}
+
+export function macroAtAGlanceStateForId(draft: SynthDraftPatch, id: MacroId): SynthMacroAtAGlanceState {
+  const lane = macroLaneStateForId(draft, id);
+  const conflict = macroConflictSummaryForId(draft, id);
+  const tone: SynthMacroAtAGlanceTone = conflict.count > 0 ? "conflict" : lane.assignmentCount > 0 ? "active" : "idle";
+  const visibleTargets = lane.targetLabels.slice(0, 2).join(", ");
+  const targetSuffix = lane.targetLabels.length > 2 ? ` +${lane.targetLabels.length - 2}` : "";
+  const assignmentBadge = lane.assignmentCount === 0
+    ? "0 routes"
+    : `${lane.assignmentCount} route${lane.assignmentCount === 1 ? "" : "s"}`;
+  const conflictBadge = conflict.count === 0
+    ? "No conflicts"
+    : `Conflict ${conflict.count}`;
+  const outputBadge = `Out ${Math.round(lane.outputValue * 100)}%`;
+  const rangeBadge = `${Math.round(lane.rangeStart * 100)}-${Math.round(lane.rangeEnd * 100)}%`;
+  const targetBadge = visibleTargets ? `${visibleTargets}${targetSuffix}` : "No targets";
+  return {
+    id,
+    tone,
+    assignmentCount: lane.assignmentCount,
+    conflictCount: conflict.count,
+    assignmentBadge,
+    conflictBadge,
+    outputBadge,
+    rangeBadge,
+    targetBadge,
+    detail: conflict.count > 0
+      ? conflict.label
+      : lane.assignmentCount > 0
+        ? targetBadge
+        : "No active macro routes",
   };
 }
 

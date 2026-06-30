@@ -181,6 +181,18 @@ try {
     count: 1,
     label: "Filter Cutoff with Amp Env",
   });
+  assert.deepEqual(synthStore.macroAtAGlanceStateForId(draft, "macro.1"), {
+    id: "macro.1",
+    tone: "conflict",
+    assignmentCount: 1,
+    conflictCount: 1,
+    assignmentBadge: "1 route",
+    conflictBadge: "Conflict 1",
+    outputBadge: "Out 35%",
+    rangeBadge: "20-80%",
+    targetBadge: "Filter Cutoff",
+    detail: "Filter Cutoff with Amp Env",
+  });
   assert.deepEqual(synthStore.macroConflictDetailsForId(draft, "macro.1"), [
     {
       target: "filter.cutoff",
@@ -193,6 +205,18 @@ try {
   assert.deepEqual(synthStore.macroConflictSummaryForId(draft, "macro.2"), {
     count: 0,
     label: "",
+  });
+  assert.deepEqual(synthStore.macroAtAGlanceStateForId(draft, "macro.2"), {
+    id: "macro.2",
+    tone: "idle",
+    assignmentCount: 0,
+    conflictCount: 0,
+    assignmentBadge: "0 routes",
+    conflictBadge: "No conflicts",
+    outputBadge: "Out 0%",
+    rangeBadge: "0-100%",
+    targetBadge: "No targets",
+    detail: "No active macro routes",
   });
   assert.deepEqual(synthStore.macroConflictDetailsForId(draft, "macro.2"), []);
   assert.equal(draft.metadata.wavemaps["user.custom"].schemaVersion, 1);

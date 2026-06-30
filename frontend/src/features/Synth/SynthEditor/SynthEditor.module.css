@@ -578,6 +578,42 @@ section.shell {
   white-space: nowrap;
 }
 
+.macroStateBadges {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 3px;
+  min-width: 0;
+  color: color-mix(in srgb, var(--color-fg) 74%, transparent);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.macroStateBadges span {
+  min-width: 0;
+  overflow: hidden;
+  padding: 2px 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-fg) 14%, transparent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.macroStateBadges[data-state="active"] span:first-child {
+  background: color-mix(in srgb, var(--color-fg) 24%, transparent);
+  color: var(--color-fg);
+}
+
+.macroStateBadges[data-state="conflict"] span:nth-child(2) {
+  background: var(--interaction-mesh-current);
+  color: var(--color-fg);
+}
+
+.macroStateBadges[data-state="idle"] span {
+  background: transparent;
+  color: color-mix(in srgb, var(--color-fg) 52%, transparent);
+}
+
 .macroConflict {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

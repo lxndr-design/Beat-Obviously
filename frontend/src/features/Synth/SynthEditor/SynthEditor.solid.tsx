@@ -31,6 +31,7 @@ import {
   getEnvelopeCurveParam,
   getNumberParam,
   macroAssignmentsForId,
+  macroAtAGlanceStateForId,
   macroConflictDetailsForId,
   macroConflictSummaryForId,
   macroDefinitionForId,
@@ -836,6 +837,7 @@ export function SynthEditor(props: SynthEditorProps) {
                   const conflict = () => macroConflictSummaryForId(draft(), id);
                   const conflictDetails = () => macroConflictDetailsForId(draft(), id);
                   const macroLane = () => macroLaneStateForId(draft(), id);
+                  const macroState = () => macroAtAGlanceStateForId(draft(), id);
                   const assignmentLabel = () => assignments().length === 0
                     ? "No assignments"
                     : assignments()
@@ -887,6 +889,16 @@ export function SynthEditor(props: SynthEditorProps) {
                           <span>{macroLane().curve}</span>
                           <span>{macroLaneTargets()}</span>
                         </div>
+                      </div>
+                      <div
+                        class={styles.macroStateBadges}
+                        data-state={macroState().tone}
+                        title={macroState().detail}
+                        aria-label={`${definition().label} macro state: ${macroState().detail}`}
+                      >
+                        <span>{macroState().assignmentBadge}</span>
+                        <span>{macroState().conflictBadge}</span>
+                        <span>{macroState().outputBadge}</span>
                       </div>
                       <div
                         class={styles.macroAssignment}
