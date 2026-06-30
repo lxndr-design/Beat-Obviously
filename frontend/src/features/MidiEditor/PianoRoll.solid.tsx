@@ -2,9 +2,11 @@ import { For, createEffect, createMemo, createSignal, onCleanup, type JSX } from
 import { Portal } from "solid-js/web";
 import {
   AETHER_NOTE_AUTOMATION_TARGETS,
+  type AetherNoteAutomationPointClipboard,
   aetherNoteAutomationTargetLabel,
   aetherNoteAutomationTargetMeta,
   clearMidiNoteAutomationTarget,
+  copyMidiNoteAutomationPoints,
   denormalizeAetherNoteAutomationValue,
   formatAetherNoteAutomationValue,
   insertMidiNoteAutomationPoint,
@@ -12,6 +14,7 @@ import {
   midiNoteHasAutomationTarget,
   normalizeAetherNoteAutomationValue,
   offsetMidiNoteAutomation,
+  pasteMidiNoteAutomationPoints,
   quantizeMidiNoteAutomationPoints,
   removeMidiNoteAutomationPoint,
   selectedMidiNoteAutomationCurve,
@@ -131,6 +134,7 @@ export function PianoRoll(props: PianoRollProps) {
   const [curvePointer, setCurvePointer] = createSignal<{ x: number; y: number } | null>(null);
   const [draggedAutomationEdge, setDraggedAutomationEdge] = createSignal<"start" | "mid" | "end" | null>(null);
   const [automationCurveSelectOpen, setAutomationCurveSelectOpen] = createSignal(false);
+  const [automationPointClipboard, setAutomationPointClipboard] = createSignal<AetherNoteAutomationPointClipboard | null>(null);
   const lastDrawnLengthRef = createRef(DEFAULT_NOTE_LENGTH_BEATS);
   const lastPointerTargetRef = createRef<PasteTarget | null>(null);
   const historyRef = createRef<MidiNote[][]>([]);
@@ -894,6 +898,20 @@ export function PianoRoll(props: PianoRollProps) {
   function snapAutomationPointValuesForSelection() {
     if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
     commitChange(snapMidiNoteAutomationPointValues(props.notes, selected(), activeAutomationTarget()));
+  }
+
+  function copyAutomationPointsForSelection() {
+    if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
+    const pointIndices = selectedAutomationPoints().map((_, index) => index);
+    if (pointIndices.length === 0) return;
+    setAutomationPointClipboard(copyMidiNoteAutomationPoints(props.notes, selected()[0], activeAutomationTarget(), pointIndices));
+  }
+
+  function pasteAutomationPointsForSelection() {
+    if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
+    const clipboard = automationPointClipboard();
+    if (!clipboard || clipboard.target !== activeAutomationTarget()) return;
+    commitChange(pasteMidiNoteAutomationPoints(props.notes, selected(), clipboard, nextAutomationPointBeat()));
   }
 
   function setAutomationPointBeat(pointIndex: number, rawBeat: string) {
@@ -1666,6 +1684,20 @@ export function PianoRoll(props: PianoRollProps) {
                       onClick={snapAutomationPointValuesForSelection}
                     >
                       Snap values
+                    </Button>
+                    <Button
+                      size="xs"
+                      disabled={selected().length === 0 || activeAutomationTarget() === "pitch" || selectedAutomationPoints().length === 0}
+                      onClick={copyAutomationPointsForSelection}
+                    >
+                      Copy
+                    </Button>
+                    <Button
+                      size="xs"
+                      disabled={selected().length === 0 || activeAutomationTarget() === "pitch" || automationPointClipboard()?.target !== activeAutomationTarget()}
+                      onClick={pasteAutomationPointsForSelection}
+                    >
+                      Paste
                     </Button>
                     <Button
                       size="xs"

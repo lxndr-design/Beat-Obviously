@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -31,6 +31,9 @@ try {
   const noteAutomation = await import(pathToFileURL(join(outDir, "automation/aetherNoteAutomation.js")));
   const arrangementAutomation = await import(pathToFileURL(join(outDir, "automation/aetherArrangementAutomation.js")));
   const automationConflicts = await import(pathToFileURL(join(outDir, "automation/aetherAutomationConflicts.js")));
+  const pianoRollSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.solid.tsx"), "utf8");
+  const segmentEditorSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx"), "utf8");
+  const trackDetailsSource = readFileSync(join(repoRoot, "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx"), "utf8");
 
   assert.equal(runner.snapBeat(1.12, 0.25), 1, "snapBeat should snap to nearest grid");
   assert.equal(runner.snapBeat(1.13, 0.25), 1.25, "snapBeat should round upward past the midpoint");
@@ -137,6 +140,10 @@ try {
     noteAutomation.copyMidiNoteAutomationPoints(insertedNotePoint, 0, "pitch", [0]),
     null,
     "pitch curve editing should stay out of parameter automation point copy/paste",
+  );
+  assert.ok(
+    pianoRollSource.includes("copyMidiNoteAutomationPoints") && pianoRollSource.includes("pasteMidiNoteAutomationPoints"),
+    "piano roll visible automation point toolbar should stay wired to note copy/paste helpers",
   );
   const movedNotePoint = noteAutomation.updateMidiNoteAutomationPoint(insertedNotePoint, [0], "macro.1", 2, 0.9, 0.81);
   assert.deepEqual(
@@ -287,6 +294,10 @@ try {
     pastedSegmentPoints.automation[0].points.map((point) => point.curve),
     ["smoothstep", "smoothstep", "smoothstep", "smoothstep", "smoothstep", "smoothstep"],
     "segment automation point paste should preserve copied and existing curve metadata",
+  );
+  assert.ok(
+    segmentEditorSource.includes("copySegmentAutomationPoints") && segmentEditorSource.includes("pasteSegmentAutomationPoints"),
+    "segment editor visible automation point toolbar should stay wired to segment copy/paste helpers",
   );
   const movedSegmentPoint = arrangementAutomation.updateSegmentAutomationPoint(insertedSegmentPoint, "macro.1", 1, 3.5, 0.73);
   assert.deepEqual(
@@ -441,6 +452,10 @@ try {
     pastedTrackPoints.automation[0].points.map((point) => point.curve),
     ["easeIn", "easeIn", "easeIn", "easeIn", "easeIn", "easeIn"],
     "track automation point paste should preserve copied and existing curve metadata",
+  );
+  assert.ok(
+    trackDetailsSource.includes("copyTrackAutomationPoints") && trackDetailsSource.includes("pasteTrackAutomationPoints"),
+    "track details visible automation point toolbar should stay wired to track copy/paste helpers",
   );
   const movedTrackPoint = arrangementAutomation.updateTrackAutomationPoint(insertedTrackPoint, "filter.cutoff", 64, 1, 48, 0.74);
   assert.deepEqual(

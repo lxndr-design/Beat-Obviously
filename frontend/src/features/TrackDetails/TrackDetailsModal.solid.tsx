@@ -1,12 +1,15 @@
 import { For, createMemo, createSignal, Show } from "solid-js";
 import {
   AETHER_ARRANGEMENT_AUTOMATION_TARGETS,
+  type AetherArrangementAutomationPointClipboard,
   type AetherArrangementAutomationTarget,
   aetherArrangementAutomationTargetLabel,
   aetherArrangementAutomationTargetMeta,
   clearTrackAutomationTarget,
+  copyTrackAutomationPoints,
   formatAetherArrangementAutomationValue,
   insertTrackAutomationPoint,
+  pasteTrackAutomationPoints,
   quantizeTrackAutomationPoints,
   removeTrackAutomationPoint,
   setTrackAutomationTargetCurve,
@@ -43,6 +46,7 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
   const [automationCurveOpen, setAutomationCurveOpen] = createSignal(false);
   const [activeAutomationTarget, setActiveAutomationTarget] = createSignal<AetherArrangementAutomationTarget>("macro.1");
   const [draggedAutomationEdge, setDraggedAutomationEdge] = createSignal<"start" | "mid" | "end" | null>(null);
+  const [automationPointClipboard, setAutomationPointClipboard] = createSignal<AetherArrangementAutomationPointClipboard | null>(null);
   const activeAutomationMeta = createMemo(() => aetherArrangementAutomationTargetMeta(activeAutomationTarget()));
   const automationRange = createMemo(() => trackAutomationValueRange(track(), activeAutomationTarget()));
   const activeAutomationCurve = createMemo(() => trackAutomationCurve(track(), activeAutomationTarget()));
@@ -161,6 +165,21 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
     const current = track();
     if (!current) return;
     updateTrackAutomation(snapTrackAutomationPointValues(current, activeAutomationTarget()));
+  }
+
+  function copyTrackAutomationLanePoints() {
+    const current = track();
+    if (!current) return;
+    const pointIndices = activeAutomationPoints().map((_, index) => index);
+    if (pointIndices.length === 0) return;
+    setAutomationPointClipboard(copyTrackAutomationPoints(current, activeAutomationTarget(), pointIndices));
+  }
+
+  function pasteTrackAutomationLanePoints() {
+    const current = track();
+    const clipboard = automationPointClipboard();
+    if (!current || !clipboard || clipboard.target !== activeAutomationTarget()) return;
+    updateTrackAutomation(pasteTrackAutomationPoints(current, clipboard, projectLengthBeats(), projectLengthBeats() / 2));
   }
 
   function setTrackAutomationPointBeat(index: number, rawBeat: string) {
@@ -414,6 +433,16 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
                       </Button>
                       <Button size="xs" disabled={activeAutomationPoints().length === 0} onClick={snapTrackAutomationLaneValues}>
                         Snap values
+                      </Button>
+                      <Button size="xs" disabled={activeAutomationPoints().length === 0} onClick={copyTrackAutomationLanePoints}>
+                        Copy
+                      </Button>
+                      <Button
+                        size="xs"
+                        disabled={automationPointClipboard()?.target !== activeAutomationTarget()}
+                        onClick={pasteTrackAutomationLanePoints}
+                      >
+                        Paste
                       </Button>
                       <Button size="xs" onClick={addTrackAutomationPoint}>Add point</Button>
                     </div>

@@ -3,13 +3,16 @@ import { DRUM_MAX_STEPS, type GeneratedDrumBeat } from "../../ai/drumBeatGenerat
 import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import {
   AETHER_ARRANGEMENT_AUTOMATION_TARGETS,
+  type AetherArrangementAutomationPointClipboard,
   type AetherArrangementAutomationTarget,
   aetherArrangementAutomationTargetLabel,
   aetherArrangementAutomationTargetMeta,
   clearSegmentAutomationTarget,
   clipSegmentAutomation,
+  copySegmentAutomationPoints,
   formatAetherArrangementAutomationValue,
   insertSegmentAutomationPoint,
+  pasteSegmentAutomationPoints,
   quantizeSegmentAutomationPoints,
   removeSegmentAutomationPoint,
   segmentAutomationCurve,
@@ -78,6 +81,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const [segmentAutomationCurveOpen, setSegmentAutomationCurveOpen] = createSignal(false);
   const [activeSegmentAutomationTarget, setActiveSegmentAutomationTarget] = createSignal<AetherArrangementAutomationTarget>("macro.1");
   const [draggedSegmentAutomationEdge, setDraggedSegmentAutomationEdge] = createSignal<"start" | "mid" | "end" | null>(null);
+  const [segmentAutomationPointClipboard, setSegmentAutomationPointClipboard] = createSignal<AetherArrangementAutomationPointClipboard | null>(null);
   const [midiPreviewBeat, setMidiPreviewBeat] = createSignal<number | null>(null);
   const [drumTrainingSessionId, setDrumTrainingSessionId] = createSignal<string | null>(null);
   let previewCtx: AudioContext | null = null;
@@ -257,6 +261,21 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
     const currentDraft = draft();
     if (!currentDraft) return;
     setDraftSegment(snapSegmentAutomationPointValues(currentDraft, activeSegmentAutomationTarget()));
+  }
+
+  function copySegmentAutomationLanePoints() {
+    const currentDraft = draft();
+    if (!currentDraft) return;
+    const pointIndices = activeSegmentAutomationPoints().map((_, index) => index);
+    if (pointIndices.length === 0) return;
+    setSegmentAutomationPointClipboard(copySegmentAutomationPoints(currentDraft, activeSegmentAutomationTarget(), pointIndices));
+  }
+
+  function pasteSegmentAutomationLanePoints() {
+    const currentDraft = draft();
+    const clipboard = segmentAutomationPointClipboard();
+    if (!currentDraft || !clipboard || clipboard.target !== activeSegmentAutomationTarget()) return;
+    setDraftSegment(pasteSegmentAutomationPoints(currentDraft, clipboard, currentDraft.lengthBeats / 2));
   }
 
   function setSegmentAutomationPointBeat(index: number, rawBeat: string) {
@@ -681,6 +700,16 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                     </Button>
                     <Button size="xs" disabled={activeSegmentAutomationPoints().length === 0} onClick={snapSegmentAutomationLaneValues}>
                       Snap values
+                    </Button>
+                    <Button size="xs" disabled={activeSegmentAutomationPoints().length === 0} onClick={copySegmentAutomationLanePoints}>
+                      Copy
+                    </Button>
+                    <Button
+                      size="xs"
+                      disabled={segmentAutomationPointClipboard()?.target !== activeSegmentAutomationTarget()}
+                      onClick={pasteSegmentAutomationLanePoints}
+                    >
+                      Paste
                     </Button>
                     <Button size="xs" onClick={addSegmentAutomationPoint}>Add point</Button>
                   </div>
