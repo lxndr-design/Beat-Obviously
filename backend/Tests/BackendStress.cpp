@@ -9802,6 +9802,74 @@ namespace
         return ok;
     }
 
+    bool stressAudioEngineMaxUnisonAetherDeterministicNullExport()
+    {
+        auto project = makeMaxUnisonAetherProject();
+        project.id = "max-unison-aether-null-export";
+        project.name = "Max Unison Aether Null Export";
+        project.lengthBeats = 1.5;
+
+        auto& instrument = project.instruments.front();
+        instrument.aether.noise.enabled = false;
+        instrument.aether.noise.level = 0.0f;
+        instrument.aether.oscA.randomPhase = 0.0f;
+        instrument.aether.oscB.randomPhase = 0.0f;
+
+        constexpr int samples = 16000;
+        constexpr int blockSize = 257;
+        constexpr double sampleRate = 44100.0;
+
+        auto liveA = renderOfflineChunks(project, samples, blockSize, sampleRate);
+        auto liveB = renderOfflineChunks(project, samples, blockSize, sampleRate);
+        const auto liveNull = bufferResidualStats(liveA, liveB, samples);
+
+        auto exportFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-max-unison-aether-null-export.wav");
+        if (exportFile.existsAsFile())
+            exportFile.deleteFile();
+
+        juce::String error;
+        if (!beat::AudioEngine::renderProjectToWav(project, exportFile, sampleRate, blockSize, 2, &error, {}, 32))
+        {
+            std::cerr << "Max-unison Aether deterministic null export error: " << error << "\n";
+            return false;
+        }
+
+        auto exported = readWavPrefix(exportFile, samples);
+        exportFile.deleteFile();
+        const auto exportNull = bufferResidualStats(liveA, exported, samples);
+        const double exportResidualRatio = exportNull.sourceEnergy > 0.0
+            ? exportNull.residualEnergy / exportNull.sourceEnergy
+            : std::numeric_limits<double>::infinity();
+
+        const bool ok = liveNull.ok
+            && exportNull.ok
+            && liveNull.sourceEnergy > 0.0001
+            && liveNull.residualEnergy <= 0.000000000001
+            && liveNull.maxAbsDiff <= 0.0000001f
+            && exportNull.sourceEnergy > 0.0001
+            && exportNull.maxAbsDiff <= 0.0000005f
+            && exportNull.meanAbsDiff <= 0.00000008
+            && exportResidualRatio <= 0.00000000001;
+
+        if (!ok)
+        {
+            std::cerr << "Max-unison Aether deterministic null export failed"
+                      << " liveOk=" << liveNull.ok
+                      << " liveEnergy=" << liveNull.sourceEnergy
+                      << " liveResidual=" << liveNull.residualEnergy
+                      << " liveMaxDiff=" << liveNull.maxAbsDiff
+                      << " exportOk=" << exportNull.ok
+                      << " exportEnergy=" << exportNull.sourceEnergy
+                      << " exportResidual=" << exportNull.residualEnergy
+                      << " exportResidualRatio=" << exportResidualRatio
+                      << " exportMaxDiff=" << exportNull.maxAbsDiff
+                      << " exportMeanDiff=" << exportNull.meanAbsDiff
+                      << "\n";
+        }
+
+        return ok;
+    }
+
     bool stressWavetableOscillator()
     {
         static_assert(beat::params::patchSchemaVersion == 1);
@@ -12437,6 +12505,11 @@ int main()
     if (!stressAudioEngineAetherDeterministicNullExport())
     {
         std::cerr << "Audio engine Aether deterministic null export stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineMaxUnisonAetherDeterministicNullExport())
+    {
+        std::cerr << "Audio engine max-unison Aether deterministic null export stress failed\n";
         return 1;
     }
     if (!stressAudioEngineVariableBlockSizes())
