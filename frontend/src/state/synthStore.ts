@@ -82,6 +82,8 @@ export type SynthParameterId =
   | "filter.keytrack"
   | "filter.resonance"
   | "filter.drive"
+  | "aether.runtimeWarp"
+  | "aether.runtimeWarpMode"
   | "amp.level"
   | "amp.pan"
   | "maxVoices"
@@ -915,6 +917,8 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "filter.keytrack": 0,
   "filter.resonance": 0.1,
   "filter.drive": 0,
+  "aether.runtimeWarp": 0,
+  "aether.runtimeWarpMode": "shape",
   "amp.level": 0.8,
   "amp.pan": 0,
   maxVoices: 16,
@@ -1001,6 +1005,8 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "filter.keytrack": "Filter Keytrack",
   "filter.resonance": "Filter Res",
   "filter.drive": "Filter Drive",
+  "aether.runtimeWarp": "Aether Runtime Warp",
+  "aether.runtimeWarpMode": "Aether Runtime Warp Mode",
   "amp.level": "Amp Level",
   "amp.pan": "Amp Pan",
   maxVoices: "Max Voices",
@@ -1589,6 +1595,10 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         level: 0,
         color: 0.5,
       },
+      runtimeWarp: clamp01(getNumberParam(draft, "aether.runtimeWarp")),
+      runtimeWarpMode: isWavetableWarpMode(draft.parameters["aether.runtimeWarpMode"])
+        ? draft.parameters["aether.runtimeWarpMode"]
+        : "shape",
     },
     lfoWaveform: lfoWaveformFromDraft(draft),
     lfoRateHz: getNumberParam(draft, "lfo.1.rate"),
@@ -1765,6 +1775,8 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["filter.resonance"] = instrument.knobs.resonance;
   draft.parameters["filter.drive"] = instrument.knobs.drive;
   draft.parameters["filter.type"] = instrument.filterType ?? "lowpass";
+  draft.parameters["aether.runtimeWarp"] = instrument.aether?.runtimeWarp ?? 0;
+  draft.parameters["aether.runtimeWarpMode"] = instrument.aether?.runtimeWarpMode ?? "shape";
   draft.parameters["amp.level"] = 0.8;
   draft.parameters["env.1.attack"] = instrument.envelope.attackMs / 1000;
   draft.parameters["env.1.attackCurve"] = instrument.envelope.attackCurve ?? "linear";

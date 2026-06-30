@@ -228,6 +228,8 @@ namespace beat
             AetherOscillator aetherOscB;
             AetherSub aetherSub;
             AetherNoise aetherNoise;
+            float aetherRuntimeWarp { 0.0f };
+            int aetherRuntimeWarpMode { 0 };
         };
 
         void setParams(const Params& p);
@@ -295,6 +297,7 @@ namespace beat
         RealtimeRamp pitchFrequencyRamp;
         int activeWavetableUnison { 1 };
         VoiceStats::RenderWorkBlock currentBlockWork;
+        DriveStage::State aetherRuntimeWarpState;
         DriveStage::State driveState;
         FilterStage::State filterState;
         float previousRawEnvelope { 0.0f };

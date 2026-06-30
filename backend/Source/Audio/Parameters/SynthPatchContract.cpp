@@ -108,6 +108,14 @@ namespace beat
             return 0;
         }
 
+        int synthRuntimeWarpModeForId(const juce::String& id)
+        {
+            if (id == "fold") return 1;
+            if (id == "pinch") return 2;
+            if (id == "mirror") return 3;
+            return 0;
+        }
+
         float applyMacroCurve(float value, const juce::String& curve)
         {
             const float x = juce::jlimit(0.0f, 1.0f, value);
@@ -413,6 +421,8 @@ namespace beat
         instrument.aether.oscB.wavetable.unison = instrument.wavetableUnison;
         instrument.aether.oscB.wavetable.detuneCents = instrument.wavetableDetuneCents;
         instrument.aether.oscB.wavetable.blend = instrument.wavetableBlend;
+        instrument.aether.runtimeWarp = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.runtimeWarp", 0.0));
+        instrument.aether.runtimeWarpMode = synthRuntimeWarpModeForId(synthStringParam(params, "aether.runtimeWarpMode", "shape"));
 
         const bool filterEnabled = synthNumberParam(params, "filter.enabled", 1.0) >= 0.5;
         instrument.filterType = parseSynthFilterType(synthStringParam(params, "filter.type", "lowpass"));

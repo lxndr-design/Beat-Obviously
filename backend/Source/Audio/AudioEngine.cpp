@@ -1792,6 +1792,8 @@ namespace beat
             instrument.aether.noise.level,
             instrument.aether.noise.color,
         };
+        params.aetherRuntimeWarp = juce::jlimit(0.0f, 1.0f, instrument.aether.runtimeWarp);
+        params.aetherRuntimeWarpMode = juce::jlimit(0, 3, instrument.aether.runtimeWarpMode);
 
         instrumentSynth->setNoteStealingEnabled(allocation.noteStealing);
         for (int i = 0; i < allocation.voiceCount; ++i)

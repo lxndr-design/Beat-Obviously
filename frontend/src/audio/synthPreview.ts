@@ -670,6 +670,37 @@ function renderRelevantInstrumentState(instrument: Instrument) {
   };
 }
 
+function runtimeWarpSample(input: number, amount: number, mode: WavetableConfig["warpMode"] = "shape"): number {
+  const drive = clamp01(amount);
+  if (drive <= 0.0001) return input;
+  const x = clamp(input, -1, 1);
+  if (mode === "fold") {
+    const gain = 1 + drive * 5.5;
+    const folded = Math.asin(Math.sin(x * gain)) / (Math.PI / 2);
+    return clamp(x + (folded - x) * (0.35 + drive * 0.65), -1, 1);
+  }
+  if (mode === "pinch") {
+    const shaped = Math.sign(x) * Math.pow(Math.abs(x), 1 + drive * 3.2);
+    return clamp(x + (shaped - x) * (0.4 + drive * 0.6), -1, 1);
+  }
+  if (mode === "mirror") {
+    const mirrored = Math.sin(x * Math.PI * (1 + drive * 2.2)) * (1 - Math.abs(x) * drive * 0.35);
+    return clamp(x + (mirrored - x) * (0.32 + drive * 0.68), -1, 1);
+  }
+  const gain = 1 + drive * 8;
+  return clamp(Math.tanh(x * gain) / Math.tanh(gain), -1, 1);
+}
+
+function applyRuntimeWarpStereo(instrument: Instrument, left: number, right: number): { left: number; right: number } {
+  const amount = clamp01(instrument.aether?.runtimeWarp ?? 0);
+  if (amount <= 0.0001) return { left, right };
+  const mode = instrument.aether?.runtimeWarpMode ?? "shape";
+  return {
+    left: runtimeWarpSample(left, amount, mode),
+    right: runtimeWarpSample(right, amount, mode),
+  };
+}
+
 function quantizeKeyNumber(value: number, step: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value / step) * step;
@@ -755,8 +786,9 @@ function renderInstrumentStereoSample(
   const resonance = clamp01(instrument.knobs.resonance + modulationTargetOffset(modulation, "filter.resonance"));
   const drive = clamp01(instrument.knobs.drive + modulationTargetOffset(modulation, "filter.drive"));
   const raw = aetherStackStereoSample(instrument, phaseState, sampleRate, frequency, mode, modulation);
-  let left = raw.left;
-  let right = raw.right;
+  const warped = applyRuntimeWarpStereo(instrument, raw.left, raw.right);
+  let left = warped.left;
+  let right = warped.right;
 
   if (drive > 0) {
     const amount = 1 + drive * 10;
@@ -877,7 +909,8 @@ function aetherStackSample(
   }
 
   if (levelSum <= 0) return 0;
-  return clamp(sum / Math.max(0.35, levelSum), -1, 1);
+  const sample = clamp(sum / Math.max(0.35, levelSum), -1, 1);
+  return runtimeWarpSample(sample, config.runtimeWarp ?? 0, config.runtimeWarpMode ?? "shape");
 }
 
 function aetherStackStereoSample(

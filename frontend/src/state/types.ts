@@ -388,6 +388,10 @@ export interface AetherSynthConfig {
   oscB: AetherOscillatorConfig;
   sub: AetherSubConfig;
   noise: AetherNoiseConfig;
+  /** 0..1 opt-in runtime nonlinear warp applied after Aether oscillator mixing. */
+  runtimeWarp?: number;
+  /** Runtime warp curve. Reuses table-generation warp labels for UI continuity. */
+  runtimeWarpMode?: WavetableWarpMode;
 }
 
 export type SynthPatchParameterValue = boolean | number | string;

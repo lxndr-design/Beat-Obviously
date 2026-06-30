@@ -6148,6 +6148,8 @@ namespace
         instrument.aether.noise.enabled = true;
         instrument.aether.noise.level = 0.06f;
         instrument.aether.noise.color = 0.81f;
+        instrument.aether.runtimeWarp = 0.63f;
+        instrument.aether.runtimeWarpMode = 1;
 
         const auto beforeEnergy = bufferEnergy(renderOfflineBlock(project, 16000));
 
@@ -6222,6 +6224,8 @@ namespace
                 && loadedInstrument.aether.noise.enabled
                 && near(loadedInstrument.aether.noise.level, 0.06f)
                 && near(loadedInstrument.aether.noise.color, 0.81f)
+                && near(loadedInstrument.aether.runtimeWarp, 0.63f)
+                && loadedInstrument.aether.runtimeWarpMode == 1
                 && loadedInstrument.effects.front().id == instrument.effects.front().id;
         }
 
@@ -9617,6 +9621,62 @@ namespace
         return ok;
     }
 
+    bool stressAudioEngineAetherRuntimeWarp()
+    {
+        auto baseProject = makeDenseAetherProject();
+        auto warpedProject = baseProject;
+        auto& baseInstrument = baseProject.instruments.front();
+        auto& warpedInstrument = warpedProject.instruments.front();
+
+        baseInstrument.aether.noise.enabled = false;
+        baseInstrument.aether.noise.level = 0.0f;
+        baseInstrument.aether.oscA.randomPhase = 0.0f;
+        baseInstrument.aether.oscB.randomPhase = 0.0f;
+        baseInstrument.aether.runtimeWarp = 0.0f;
+        baseInstrument.aether.runtimeWarpMode = 0;
+
+        warpedInstrument.aether.noise.enabled = false;
+        warpedInstrument.aether.noise.level = 0.0f;
+        warpedInstrument.aether.oscA.randomPhase = 0.0f;
+        warpedInstrument.aether.oscB.randomPhase = 0.0f;
+        warpedInstrument.aether.runtimeWarp = 0.82f;
+        warpedInstrument.aether.runtimeWarpMode = 1;
+
+        const auto base = renderOfflineBlock(baseProject, 18000);
+        const auto warped = renderOfflineBlock(warpedProject, 18000);
+        const double baseEnergy = bufferEnergy(base);
+        const double warpedEnergy = bufferEnergy(warped);
+        double diff = 0.0;
+        float peak = 0.0f;
+        const int channels = juce::jmin(base.getNumChannels(), warped.getNumChannels());
+        const int samples = juce::jmin(base.getNumSamples(), warped.getNumSamples());
+        for (int channel = 0; channel < channels; ++channel)
+        {
+            for (int i = 0; i < samples; ++i)
+            {
+                const auto warpedSample = warped.getSample(channel, i);
+                diff += std::abs((double) base.getSample(channel, i) - (double) warpedSample);
+                peak = juce::jmax(peak, std::abs(warpedSample));
+            }
+        }
+        const double meanDiff = diff / (double) juce::jmax(1, channels * samples);
+        const bool ok = std::isfinite(baseEnergy)
+            && std::isfinite(warpedEnergy)
+            && baseEnergy > 0.001
+            && warpedEnergy > 0.001
+            && meanDiff > 0.0004
+            && peak > 0.001f
+            && peak <= 1.0f;
+        if (!ok)
+        {
+            std::cerr << "Aether runtime warp stress failed baseEnergy=" << baseEnergy
+                      << " warpedEnergy=" << warpedEnergy
+                      << " meanDiff=" << meanDiff
+                      << " peak=" << peak << "\n";
+        }
+        return ok;
+    }
+
     bool stressAudioEngineMaxUnisonAetherPolyphony()
     {
         beat::AudioEngine engine;
@@ -12665,6 +12725,11 @@ int main()
     if (!stressAudioEngineDenseAetherRoute())
     {
         std::cerr << "Audio engine dense Aether route stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineAetherRuntimeWarp())
+    {
+        std::cerr << "Audio engine Aether runtime warp stress failed\n";
         return 1;
     }
     if (!stressAudioEngineMaxUnisonAetherPolyphony())

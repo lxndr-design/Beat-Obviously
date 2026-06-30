@@ -184,6 +184,8 @@ namespace beat
             AetherOscillator oscB;
             AetherSub sub;
             AetherNoise noise;
+            float runtimeWarp { 0.0f };
+            int runtimeWarpMode { 0 };
         };
 
         struct DynamicModTarget

@@ -1854,6 +1854,8 @@ export function defaultAetherSynthConfig() {
       level: 0.08,
       color: 0.45,
     },
+    runtimeWarp: 0,
+    runtimeWarpMode: "shape",
   } satisfies Instrument["aether"];
 }
 

@@ -107,6 +107,7 @@ Current implementation focus:
    - `[x]` Add deterministic full/transient/sustain/manual imported-audio selection windows, native IPC support, source-range metadata, and Solid import mode controls.
    - `[x]` Add visual/manual range picker polish for imported audio.
    - `[x]` Add deeper analysis display controls with source span, RMS, peak, zero-crossing, roughness, asymmetry, centroid, and dominant harmonic summaries.
+   - `[x]` Add opt-in runtime nonlinear Aether stack warp with shape/fold/pinch/mirror curves, browser preview proof, native repository roundtrip, and native rendered-output stress.
 3. `[~]` Visible Aether automation lanes.
    - `[x]` Add first visible piano-roll note automation lane selector/badges for pitch, wavemap, filter, amp, and macro targets.
    - `[x]` Add selected-note start/end value editing for visible piano-roll Aether lanes.

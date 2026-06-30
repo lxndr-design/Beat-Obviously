@@ -14,6 +14,72 @@
 
 namespace beat
 {
+    namespace
+    {
+        float runtimeWarpShape(float input, float amount, int mode) noexcept
+        {
+            const float drive = VoiceMath::clamp01(amount);
+            if (drive <= 0.0001f)
+                return input;
+
+            const float x = juce::jlimit(-1.0f, 1.0f, input);
+            if (mode == 1)
+            {
+                const float gain = 1.0f + drive * 5.5f;
+                const float folded = std::asin(std::sin(x * gain)) / juce::MathConstants<float>::halfPi;
+                return juce::jlimit(-1.0f, 1.0f, x + (folded - x) * (0.35f + drive * 0.65f));
+            }
+            if (mode == 2)
+            {
+                const float shaped = (x < 0.0f ? -1.0f : 1.0f) * std::pow(std::abs(x), 1.0f + drive * 3.2f);
+                return juce::jlimit(-1.0f, 1.0f, x + (shaped - x) * (0.4f + drive * 0.6f));
+            }
+            if (mode == 3)
+            {
+                const float mirrored = std::sin(x * juce::MathConstants<float>::pi * (1.0f + drive * 2.2f))
+                    * (1.0f - std::abs(x) * drive * 0.35f);
+                return juce::jlimit(-1.0f, 1.0f, x + (mirrored - x) * (0.32f + drive * 0.68f));
+            }
+
+            const float gain = 1.0f + drive * 8.0f;
+            return juce::jlimit(-1.0f, 1.0f, std::tanh(x * gain) / std::tanh(gain));
+        }
+
+        float runtimeWarpMonoOversampled(DriveStage::State& state, float sample, float amount, int mode) noexcept
+        {
+            constexpr float downsampleAlpha = 0.72f;
+            const float midpoint = 0.5f * (state.previousInput.left + sample);
+            const float downsampled = 0.5f * (
+                runtimeWarpShape(midpoint, amount, mode)
+                + runtimeWarpShape(sample, amount, mode));
+
+            state.downsample.left = DriveStage::denormalSafe(state.downsample.left
+                + downsampleAlpha * (downsampled - state.downsample.left));
+            state.previousInput.left = sample;
+            return state.downsample.left;
+        }
+
+        DriveStage::StereoFrame processRuntimeWarpOversampled(
+            DriveStage::State& state,
+            DriveStage::StereoFrame sample,
+            float amount,
+            int mode) noexcept
+        {
+            DriveStage::State rightState;
+            rightState.previousInput.left = state.previousInput.right;
+            rightState.downsample.left = state.downsample.right;
+
+            const DriveStage::StereoFrame processed {
+                runtimeWarpMonoOversampled(state, sample.left, amount, mode),
+                runtimeWarpMonoOversampled(rightState, sample.right, amount, mode),
+            };
+
+            state.previousInput.right = rightState.previousInput.left;
+            state.downsample.right = rightState.downsample.left;
+            return processed;
+        }
+    }
+
     VoiceStats::WavetableCache InstrumentVoice::getWavetableCacheStats() noexcept
     {
         return WavetableVoiceCache::stats();
@@ -274,6 +340,7 @@ namespace beat
                 1.0);
         phaseDelta = baseFrequencyHz / sampleRate;
         pitchFrequencyRamp.reset((float) baseFrequencyHz);
+        aetherRuntimeWarpState.reset();
         driveState.reset();
         previousRawEnvelope = 0.0f;
         previousRawEnv2Envelope = 0.0f;
@@ -466,6 +533,21 @@ namespace beat
             }
             float left = raw.left;
             float right = raw.right;
+
+            if (params.hasAether && params.aetherRuntimeWarp > 0.0001f)
+            {
+                const auto warped = processRuntimeWarpOversampled(
+                    aetherRuntimeWarpState,
+                    { left, right },
+                    params.aetherRuntimeWarp,
+                    params.aetherRuntimeWarpMode);
+                left = warped.left;
+                right = warped.right;
+            }
+            else
+            {
+                aetherRuntimeWarpState.reset({ left, right });
+            }
 
             // Drive (soft clipping)
             const float drive = VoiceMath::clamp01(params.drive01 + (useDynamicModulation && cachedDynamicTargets.filterDrive

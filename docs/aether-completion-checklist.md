@@ -16,10 +16,9 @@ Status legend:
 - `[x]` Continue thinning `InstrumentVoice`.
   - Done: envelope shaper, LFO helper, dynamic-modulation helpers, oscillator helpers, Aether table-stack renderer, filter stage, drive stage, wavetable cache/table ownership, wavetable oscillator-bank rendering, wavetable unison planning, Aether pan/pitch cache helpers, voice math helpers, render-stat types, per-block render-work assembly, note-automation inbox/types/runtime state, realtime ramp state, realtime parameter mapper/application, active-ramp bookkeeping, and voice allocation.
   - Remaining: none for the current extraction plan; keep direct backend stress for any future extraction.
-- `[~]` Heavier nonlinear warp experiments.
-  - Done: added the bounded table-generation `mirror` warp mode alongside `shape`, `fold`, and `pinch` across Solid controls, browser preview, native table generation, IPC/persistence parsing, cache keys, and verifier/stress coverage.
-  - Remaining: keep true runtime nonlinear warp experiments gated until the oversampling strategy is extended to any runtime warp stage.
-  - Proof: synth verifier proves the mirror mode changes browser preview output; backend stress proves mirror tables differ from the unwarped baseline while staying bounded.
+- `[x]` Heavier nonlinear warp experiments.
+  - Done: added the bounded table-generation `mirror` warp mode alongside `shape`, `fold`, and `pinch` across Solid controls, browser preview, native table generation, IPC/persistence parsing, cache keys, and verifier/stress coverage; added opt-in `aether.runtimeWarp` and `aether.runtimeWarpMode` runtime nonlinear Aether stack processing with shape/fold/pinch/mirror curves before filter drive.
+  - Proof: synth verifier proves the mirror mode changes browser preview output and proves runtime Aether warp changes output preview while staying bounded; backend stress proves mirror tables differ from the unwarped baseline, native repository roundtrip preserves runtime warp fields, and native rendered Aether output changes with bounded peak when runtime warp is enabled.
 
 ## 2. Modulation, Macros, And Note Automation
 

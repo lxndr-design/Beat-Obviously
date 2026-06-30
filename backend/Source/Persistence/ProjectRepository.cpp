@@ -335,6 +335,8 @@ namespace beat
             config.noise.enabled = false;
             config.noise.level = 0.08f;
             config.noise.color = 0.45f;
+            config.runtimeWarp = 0.0f;
+            config.runtimeWarpMode = 0;
             return config;
         }
 
@@ -356,6 +358,8 @@ namespace beat
             noise->setProperty("level", aether.noise.level);
             noise->setProperty("color", aether.noise.color);
             o->setProperty("noise", juce::var(noise.get()));
+            o->setProperty("runtimeWarp", aether.runtimeWarp);
+            o->setProperty("runtimeWarpMode", aether.runtimeWarpMode);
             return juce::var(o.get());
         }
 
@@ -386,6 +390,8 @@ namespace beat
                 config.noise.level = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("level", config.noise.level));
                 config.noise.color = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("color", config.noise.color));
             }
+            config.runtimeWarp = juce::jlimit(0.0f, 1.0f, (float) (double) aetherVar.getProperty("runtimeWarp", config.runtimeWarp));
+            config.runtimeWarpMode = juce::jlimit(0, 3, (int) aetherVar.getProperty("runtimeWarpMode", config.runtimeWarpMode));
             return config;
         }
 

@@ -85,6 +85,8 @@ The wavemap-level `interpolation` field controls how Beat generates intermediate
 | `filter.keytrack` | normalized | `0..1` | `0` | Filter cutoff follows played pitch; `1` tracks one cutoff octave per pitch octave around middle C. |
 | `filter.resonance` | normalized | `0..1` | `0.1` | Maps to Q internally. |
 | `filter.drive` | normalized | `0..1` | `0` | Optional nonlinear drive. |
+| `aether.runtimeWarp` | normalized | `0..1` | `0` | Opt-in runtime nonlinear Aether stack warp, applied after oscillator/sub/noise mixing and before filter drive. |
+| `aether.runtimeWarpMode` | enum | `shape`, `fold`, `pinch`, `mirror` | `shape` | Runtime warp curve. Uses the same labels as table-generation warp modes but is processed as a separate oversampled voice stage. |
 
 ## Amp Parameters
 

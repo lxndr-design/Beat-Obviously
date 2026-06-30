@@ -1204,6 +1204,34 @@ try {
   assert.ok(diffPinch > 0.002, `expected pinch warp mode to change preview, got ${diffPinch}`);
   assert.ok(diffMirror > 0.002, `expected mirror warp mode to change preview, got ${diffMirror}`);
 
+  const runtimeWarpDraft = synthStore.normalizeSynthDraftPatch({
+    name: "Runtime Warp Probe",
+    parameters: {
+      "aether.runtimeWarp": 0.76,
+      "aether.runtimeWarpMode": "fold",
+      "filter.drive": 0,
+      "osc.a.randomPhase": 0,
+      "osc.b.enabled": true,
+      "osc.b.level": 0.45,
+      "osc.b.randomPhase": 0,
+    },
+  });
+  const runtimeWarpPatch = synthStore.synthDraftToInstrumentPatch(runtimeWarpDraft);
+  assert.equal(runtimeWarpPatch.aether.runtimeWarp, 0.76);
+  assert.equal(runtimeWarpPatch.aether.runtimeWarpMode, "fold");
+  const runtimeWarpBase = synthPreview.renderAetherOutputPreviewSamples({
+    ...patch,
+    aether: { ...patch.aether, runtimeWarp: 0, runtimeWarpMode: "shape" },
+  }, 256, "mix");
+  const runtimeWarpFold = synthPreview.renderAetherOutputPreviewSamples({
+    ...patch,
+    aether: { ...patch.aether, runtimeWarp: 0.76, runtimeWarpMode: "fold" },
+  }, 256, "mix");
+  const runtimeWarpDiff = runtimeWarpBase.reduce((sum, sample, index) => sum + Math.abs(sample - runtimeWarpFold[index]), 0) / runtimeWarpBase.length;
+  const runtimeWarpPeak = Math.max(...runtimeWarpFold.map((sample) => Math.abs(sample)));
+  assert.ok(runtimeWarpDiff > 0.01, `expected runtime warp to change Aether output preview, got ${runtimeWarpDiff}`);
+  assert.ok(runtimeWarpPeak <= 1, `expected runtime warp preview to stay bounded, got ${runtimeWarpPeak}`);
+
   const customDraft = synthStore.normalizeSynthDraftPatch({
     name: "Custom Table Probe",
     parameters: {

@@ -1554,6 +1554,12 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
           options={FILTER_TYPES}
           onChange={(value) => setParameter("filter.type", value)}
         />
+        <ShapeButtonSet
+          label="Runtime Warp"
+          value={String(draft().parameters["aether.runtimeWarpMode"] ?? "shape")}
+          options={AETHER_RUNTIME_WARP_MODES}
+          onChange={(value) => setParameter("aether.runtimeWarpMode", value)}
+        />
         <Knob
           size="sm"
           label="Cutoff"
@@ -1572,6 +1578,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
           ["filter.resonance", "Res", 0.1, false],
           ["filter.keytrack", "Key", 0, false],
           ["filter.drive", "Drive", 0, false],
+          ["aether.runtimeWarp", "Warp", 0, false],
           ["amp.level", "Level", 0.8, false],
           ["amp.pan", "Pan", 0, true],
           ["env.1.attack", "Attack", 0.005, false],
@@ -2026,6 +2033,13 @@ const MODULATABLE_PARAMETER_IDS = new Set<string>([
   "amp.level",
   "amp.pan",
 ]);
+
+const AETHER_RUNTIME_WARP_MODES = [
+  ["shape", "Shape", "Shape", "ph:waveform"],
+  ["fold", "Fold", "Fold", "ph:intersect-three"],
+  ["pinch", "Pinch", "Pinch", "ph:arrows-in-line-horizontal"],
+  ["mirror", "Mirror", "Mirror", "ph:diamonds-four"],
+] as const;
 
 function modulationPropsForTarget(draft: SynthDraftPatch, id: SynthParameterId) {
   if (!MODULATABLE_PARAMETER_IDS.has(id)) return {};
