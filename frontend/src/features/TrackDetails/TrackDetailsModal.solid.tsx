@@ -21,6 +21,10 @@ import {
   updateTrackAutomationPoint,
   upsertTrackAutomationTarget,
 } from "../../automation/aetherArrangementAutomation";
+import {
+  denormalizeAetherNoteAutomationValue,
+  normalizeAetherNoteAutomationValue,
+} from "../../automation/aetherNoteAutomation";
 import { AUTOMATION_CURVES, automationCurveLabel } from "../../automation/curves";
 import { Button, FloatingSelect, Modal, NumberInput, TextInput, Toggle } from "../../solid-ui";
 import { useProjectStore, useUiStore } from "../../state/store";
@@ -38,6 +42,7 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
   const track = createMemo(() => tracks().find((candidate) => candidate.id === props.trackId));
   const [automationCurveOpen, setAutomationCurveOpen] = createSignal(false);
   const [activeAutomationTarget, setActiveAutomationTarget] = createSignal<AetherArrangementAutomationTarget>("macro.1");
+  const [draggedAutomationEdge, setDraggedAutomationEdge] = createSignal<"start" | "mid" | "end" | null>(null);
   const activeAutomationMeta = createMemo(() => aetherArrangementAutomationTargetMeta(activeAutomationTarget()));
   const automationRange = createMemo(() => trackAutomationValueRange(track(), activeAutomationTarget()));
   const activeAutomationCurve = createMemo(() => trackAutomationCurve(track(), activeAutomationTarget()));
@@ -81,6 +86,13 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
     const current = track();
     if (!current) return;
     const value = Number(rawValue);
+    if (!Number.isFinite(value)) return;
+    setTrackAutomationValue(edge, value);
+  }
+
+  function setTrackAutomationValue(edge: "start" | "mid" | "end", value: number) {
+    const current = track();
+    if (!current || !Number.isFinite(value)) return;
     const range = trackAutomationValueRange(current, activeAutomationTarget());
     updateTrackAutomation(setTrackAutomationTargetValues(
       current,
@@ -90,6 +102,35 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
       edge === "end" ? value : range.endValue,
       edge === "mid" ? value : range.midValue,
     ));
+  }
+
+  function startTrackAutomationHandleDrag(edge: "start" | "mid" | "end", event: PointerEvent) {
+    if (!track()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setDraggedAutomationEdge(edge);
+    const target = event.currentTarget as HTMLElement;
+    try {
+      target.setPointerCapture(event.pointerId);
+    } catch {
+      // Synthetic verifier events may not create an active browser pointer capture.
+    }
+    updateTrackAutomationHandleDrag(edge, event);
+  }
+
+  function updateTrackAutomationHandleDrag(edge: "start" | "mid" | "end", event: PointerEvent) {
+    if (!track()) return;
+    const element = event.currentTarget as HTMLElement;
+    const rect = element.parentElement?.getBoundingClientRect();
+    if (!rect || rect.width <= 0) return;
+    const value = denormalizeAetherNoteAutomationValue(activeAutomationTarget(), (event.clientX - rect.left) / rect.width);
+    setTrackAutomationValue(edge, value);
+  }
+
+  function stopTrackAutomationHandleDrag(edge: "start" | "mid" | "end", event: PointerEvent) {
+    if (draggedAutomationEdge() !== edge) return;
+    updateTrackAutomationHandleDrag(edge, event);
+    setDraggedAutomationEdge(null);
   }
 
   function addTrackAutomationPoint() {
@@ -306,6 +347,63 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
                     />
                     <span>{formatAetherArrangementAutomationValue(activeAutomationTarget(), automationRange().endValue)}</span>
                   </label>
+                </div>
+                <div class={styles.automationHandleRail} aria-label="Drag track automation values">
+                  <span class={styles.automationHandleLine} aria-hidden="true" />
+                  <button
+                    type="button"
+                    classList={{
+                      [styles.automationHandleButton]: true,
+                      [styles.automationHandleButtonActive]: draggedAutomationEdge() === "start",
+                    }}
+                    style={{
+                      left: `${normalizeAetherNoteAutomationValue(activeAutomationTarget(), automationRange().startValue) * 100}%`,
+                    }}
+                    data-aether-track-automation-handle="start"
+                    aria-label={`Drag start ${aetherArrangementAutomationTargetLabel(activeAutomationTarget())} value`}
+                    onPointerDown={(event) => startTrackAutomationHandleDrag("start", event)}
+                    onPointerMove={(event) => draggedAutomationEdge() === "start" && updateTrackAutomationHandleDrag("start", event)}
+                    onPointerUp={(event) => stopTrackAutomationHandleDrag("start", event)}
+                    onPointerCancel={() => setDraggedAutomationEdge(null)}
+                  >
+                    S
+                  </button>
+                  <button
+                    type="button"
+                    classList={{
+                      [styles.automationHandleButton]: true,
+                      [styles.automationHandleButtonActive]: draggedAutomationEdge() === "mid",
+                    }}
+                    style={{
+                      left: `${normalizeAetherNoteAutomationValue(activeAutomationTarget(), automationRange().midValue) * 100}%`,
+                    }}
+                    data-aether-track-automation-handle="mid"
+                    aria-label={`Drag midpoint ${aetherArrangementAutomationTargetLabel(activeAutomationTarget())} value`}
+                    onPointerDown={(event) => startTrackAutomationHandleDrag("mid", event)}
+                    onPointerMove={(event) => draggedAutomationEdge() === "mid" && updateTrackAutomationHandleDrag("mid", event)}
+                    onPointerUp={(event) => stopTrackAutomationHandleDrag("mid", event)}
+                    onPointerCancel={() => setDraggedAutomationEdge(null)}
+                  >
+                    M
+                  </button>
+                  <button
+                    type="button"
+                    classList={{
+                      [styles.automationHandleButton]: true,
+                      [styles.automationHandleButtonActive]: draggedAutomationEdge() === "end",
+                    }}
+                    style={{
+                      left: `${normalizeAetherNoteAutomationValue(activeAutomationTarget(), automationRange().endValue) * 100}%`,
+                    }}
+                    data-aether-track-automation-handle="end"
+                    aria-label={`Drag end ${aetherArrangementAutomationTargetLabel(activeAutomationTarget())} value`}
+                    onPointerDown={(event) => startTrackAutomationHandleDrag("end", event)}
+                    onPointerMove={(event) => draggedAutomationEdge() === "end" && updateTrackAutomationHandleDrag("end", event)}
+                    onPointerUp={(event) => stopTrackAutomationHandleDrag("end", event)}
+                    onPointerCancel={() => setDraggedAutomationEdge(null)}
+                  >
+                    E
+                  </button>
                 </div>
                 <div class={styles.automationPointEditor} aria-label="Aether track automation points">
                   <div class={styles.automationPointHeader}>

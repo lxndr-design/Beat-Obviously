@@ -114,6 +114,7 @@ declare global {
       exerciseAetherArrangementAutomationDragFlow: () => Promise<DevAetherArrangementAutomationDragExerciseState>;
       exerciseAetherNoteAutomationDragFlow: () => Promise<DevAetherNoteAutomationDragExerciseState>;
       exerciseAetherSegmentAutomationDragFlow: () => Promise<DevAetherSegmentAutomationDragExerciseState>;
+      exerciseAetherTrackAutomationDragFlow: () => Promise<DevAetherTrackAutomationDragExerciseState>;
     };
   }
 }
@@ -216,6 +217,25 @@ interface DevAetherSegmentAutomationDragExerciseState {
     start: DevAetherSegmentAutomationHandleState;
     mid: DevAetherSegmentAutomationHandleState;
     end: DevAetherSegmentAutomationHandleState;
+  };
+  pointPanelText: string;
+}
+
+interface DevAetherTrackAutomationHandleState {
+  exists: boolean;
+  label: string | null;
+  left: string | null;
+}
+
+interface DevAetherTrackAutomationDragExerciseState {
+  before: DevAutomationPointSnapshot[];
+  afterStartDrag: DevAutomationPointSnapshot[];
+  afterMidDrag: DevAutomationPointSnapshot[];
+  afterEndDrag: DevAutomationPointSnapshot[];
+  handles: {
+    start: DevAetherTrackAutomationHandleState;
+    mid: DevAetherTrackAutomationHandleState;
+    end: DevAetherTrackAutomationHandleState;
   };
   pointPanelText: string;
 }
@@ -1110,6 +1130,40 @@ export function installBeatDevHooks() {
     return state;
   };
 
+  const exerciseAetherTrackAutomationDragFlow = async (): Promise<DevAetherTrackAutomationDragExerciseState> => {
+    installAetherAutomationFixture();
+    await openAetherAutomationFixtureEditor("track");
+    await waitForTrackAutomationHandle("start");
+    const before = readAutomationPointPanelRows("Aether track automation points");
+
+    dragTrackAutomationHandle("start", 0.28);
+    await nextFrame();
+    const afterStartDrag = readAutomationPointPanelRows("Aether track automation points");
+
+    dragTrackAutomationHandle("mid", 0.73);
+    await nextFrame();
+    const afterMidDrag = readAutomationPointPanelRows("Aether track automation points");
+
+    dragTrackAutomationHandle("end", 0.39);
+    await nextFrame();
+    const afterEndDrag = readAutomationPointPanelRows("Aether track automation points");
+
+    const state: DevAetherTrackAutomationDragExerciseState = {
+      before,
+      afterStartDrag,
+      afterMidDrag,
+      afterEndDrag,
+      handles: {
+        start: readTrackAutomationHandleState("start"),
+        mid: readTrackAutomationHandleState("mid"),
+        end: readTrackAutomationHandleState("end"),
+      },
+      pointPanelText: readPanelState("Aether track automation points").text,
+    };
+    writeAetherTrackAutomationDragExerciseMarker(state);
+    return state;
+  };
+
   async function exerciseAutomationPointEditor(
     editor: DevAetherAutomationPointEditor,
     beat: number,
@@ -1198,6 +1252,7 @@ export function installBeatDevHooks() {
     exerciseAetherArrangementAutomationDragFlow,
     exerciseAetherNoteAutomationDragFlow,
     exerciseAetherSegmentAutomationDragFlow,
+    exerciseAetherTrackAutomationDragFlow,
   };
 
   document.addEventListener("beat:install-decent-sampler-fixture", (event) => {
@@ -1266,6 +1321,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-segment-automation-drag") {
     window.setTimeout(() => {
       void exerciseAetherSegmentAutomationDragFlow();
+    }, 0);
+  } else if (fixture === "aether-track-automation-drag") {
+    window.setTimeout(() => {
+      void exerciseAetherTrackAutomationDragFlow();
     }, 0);
   }
 }
@@ -1408,6 +1467,52 @@ function dragSegmentAutomationHandle(edge: "start" | "mid" | "end", normalizedVa
     button: 0,
     buttons: 1,
     pointerId: 29,
+    pointerType: "mouse",
+    clientX: handleRect.left + handleRect.width / 2,
+    clientY: handleRect.top + handleRect.height / 2,
+  };
+  const targetX = railRect.left + railRect.width * clamped;
+  const targetY = railRect.top + railRect.height / 2;
+  handle.dispatchEvent(new PointerEvent("pointerdown", pointerInit));
+  handle.dispatchEvent(new PointerEvent("pointermove", {
+    ...pointerInit,
+    clientX: targetX,
+    clientY: targetY,
+  }));
+  handle.dispatchEvent(new PointerEvent("pointerup", {
+    ...pointerInit,
+    buttons: 0,
+    clientX: targetX,
+    clientY: targetY,
+  }));
+}
+
+function findTrackAutomationHandle(edge: "start" | "mid" | "end"): HTMLButtonElement | null {
+  return document.querySelector<HTMLButtonElement>(`[data-aether-track-automation-handle="${edge}"]`);
+}
+
+function readTrackAutomationHandleState(edge: "start" | "mid" | "end"): DevAetherTrackAutomationHandleState {
+  const handle = findTrackAutomationHandle(edge);
+  return {
+    exists: Boolean(handle),
+    label: handle?.getAttribute("aria-label") ?? null,
+    left: handle?.style.left || null,
+  };
+}
+
+function dragTrackAutomationHandle(edge: "start" | "mid" | "end", normalizedValue: number) {
+  const handle = findTrackAutomationHandle(edge);
+  const rail = handle?.parentElement;
+  const handleRect = handle?.getBoundingClientRect();
+  const railRect = rail?.getBoundingClientRect();
+  if (!handle || !railRect || !handleRect || railRect.width <= 0) return;
+  const clamped = Math.max(0, Math.min(1, Number.isFinite(normalizedValue) ? normalizedValue : 0));
+  const pointerInit = {
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+    buttons: 1,
+    pointerId: 31,
     pointerType: "mouse",
     clientX: handleRect.left + handleRect.width / 2,
     clientY: handleRect.top + handleRect.height / 2,
@@ -1760,6 +1865,10 @@ function writeAetherSegmentAutomationDragExerciseMarker(state: DevAetherSegmentA
   document.documentElement.dataset.beatAetherSegmentAutomationDragExercise = JSON.stringify(state);
 }
 
+function writeAetherTrackAutomationDragExerciseMarker(state: DevAetherTrackAutomationDragExerciseState) {
+  document.documentElement.dataset.beatAetherTrackAutomationDragExercise = JSON.stringify(state);
+}
+
 function writeAetherMacroFixtureMarker(state = readMacroFixtureDomState("Brightness")) {
   document.documentElement.dataset.beatAetherMacroFixture = JSON.stringify(state);
 }
@@ -1827,6 +1936,13 @@ async function waitForSegmentAutomationHandle(edge: "start" | "mid" | "end") {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     await nextFrame();
     if (findSegmentAutomationHandle(edge)) return;
+  }
+}
+
+async function waitForTrackAutomationHandle(edge: "start" | "mid" | "end") {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await nextFrame();
+    if (findTrackAutomationHandle(edge)) return;
   }
 }
 
