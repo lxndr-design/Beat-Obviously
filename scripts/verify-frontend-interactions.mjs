@@ -523,8 +523,12 @@ try {
     devHooksSource.includes("exerciseAetherOscillatorEditorFlow")
       && devHooksSource.includes("setKnobValueInRegion")
       && devHooksSource.includes("beatAetherOscillatorExercise")
+      && devHooksSource.includes("afterDisable")
+      && devHooksSource.includes("afterReenable")
+      && devHooksSource.includes("oscBHasWavetableControls")
+      && devHooksSource.includes("Disable Oscillator B")
       && devHooksSource.includes('fixture === "aether-oscillator"'),
-    "browser fixture coverage should exercise Aether oscillator and voice-stack editing",
+    "browser fixture coverage should exercise Aether oscillator, disabled-row, and voice-stack editing",
   );
   assert.ok(
     synthEditorSource.includes('aria-label="Aether instrument effects"')

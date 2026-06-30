@@ -335,6 +335,9 @@ interface DevAetherOscillatorSnapshot {
   oscBWarpMode: string | null;
   oscBLevel: number | null;
   oscBPan: number | null;
+  oscBRowText: string;
+  oscBHasWavetableControls: boolean;
+  oscBPowerButtonLabel: string | null;
   unisonEnabled: boolean;
   unisonVoices: number | null;
   unisonDetune: number | null;
@@ -349,6 +352,8 @@ interface DevAetherOscillatorExerciseState {
   instrumentId: string | null;
   before: DevAetherOscillatorSnapshot;
   afterEdit: DevAetherOscillatorSnapshot;
+  afterDisable: DevAetherOscillatorSnapshot;
+  afterReenable: DevAetherOscillatorSnapshot;
 }
 
 interface DevAetherFxRackSnapshot {
@@ -920,10 +925,18 @@ export function installBeatDevHooks() {
     await setKnobValueInRegion("Voice stack row", "Blend", "0.64");
     await setKnobValueInRegion("Voice stack row", "Spread", "0.79");
     await nextFrame();
+    const afterEdit = readAetherOscillatorSnapshot();
+    clickPanelButton("Oscillator B row", "Disable Oscillator B");
+    await nextFrame();
+    const afterDisable = readAetherOscillatorSnapshot();
+    clickPanelButton("Oscillator B row", "Enable Oscillator B");
+    await nextFrame();
     const state: DevAetherOscillatorExerciseState = {
       instrumentId: useSynthStore.getState().boundInstrumentId,
       before,
-      afterEdit: readAetherOscillatorSnapshot(),
+      afterEdit,
+      afterDisable,
+      afterReenable: readAetherOscillatorSnapshot(),
     };
     writeAetherOscillatorExerciseMarker(state);
     return state;
@@ -2255,6 +2268,8 @@ function readAetherPerformanceSnapshot(): DevAetherPerformanceSnapshot {
 function readAetherOscillatorSnapshot(): DevAetherOscillatorSnapshot {
   const draft = useSynthStore.getState().draft;
   const panel = findElementByAriaLabel("Oscillator");
+  const oscBRow = findElementByAriaLabel("Oscillator B row", panel);
+  const oscBPowerButton = oscBRow?.querySelector<HTMLButtonElement>('button[aria-label$="Oscillator B"]') ?? null;
   const readNumber = (id: SynthParameterId) => {
     const value = draft.parameters[id];
     return typeof value === "number" ? value : null;
@@ -2278,6 +2293,9 @@ function readAetherOscillatorSnapshot(): DevAetherOscillatorSnapshot {
     oscBWarpMode: readString("osc.b.warpMode"),
     oscBLevel: readNumber("osc.b.level"),
     oscBPan: readNumber("osc.b.pan"),
+    oscBRowText: normalizeText(oscBRow?.textContent ?? ""),
+    oscBHasWavetableControls: Boolean(findElementByAriaLabel("Wavetable", oscBRow)),
+    oscBPowerButtonLabel: oscBPowerButton?.getAttribute("aria-label") ?? null,
     unisonEnabled: draft.parameters["unison.enabled"] === true,
     unisonVoices: readNumber("unison.voices"),
     unisonDetune: readNumber("unison.detune"),
