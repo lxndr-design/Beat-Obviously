@@ -130,6 +130,7 @@ declare global {
       openAetherAutomationFixtureEditor: (editor: DevAetherAutomationEditor) => Promise<DevAetherAutomationFixtureState>;
       readAetherAutomationFixtureState: () => DevAetherAutomationFixtureState;
       exerciseAetherAutomationPointEditorFlow: () => Promise<DevAetherAutomationPointExerciseState>;
+      exerciseAetherDirectAutomationPointEditorFlow: () => Promise<DevAetherDirectAutomationPointExerciseState>;
       exerciseAetherArrangementAutomationDragFlow: () => Promise<DevAetherArrangementAutomationDragExerciseState>;
       exerciseAetherNoteAutomationDragFlow: () => Promise<DevAetherNoteAutomationDragExerciseState>;
       exerciseAetherSegmentAutomationDragFlow: () => Promise<DevAetherSegmentAutomationDragExerciseState>;
@@ -188,6 +189,13 @@ interface DevAutomationPointEditorExercise {
 }
 
 interface DevAetherAutomationPointExerciseState {
+  track: DevAutomationPointEditorExercise;
+  segment: DevAutomationPointEditorExercise;
+  note: DevAutomationPointEditorExercise;
+}
+
+interface DevAetherDirectAutomationPointExerciseState {
+  target: MidiAutomationTarget;
   track: DevAutomationPointEditorExercise;
   segment: DevAutomationPointEditorExercise;
   note: DevAutomationPointEditorExercise;
@@ -1628,6 +1636,19 @@ export function installBeatDevHooks() {
     return state;
   };
 
+  const exerciseAetherDirectAutomationPointEditorFlow = async (): Promise<DevAetherDirectAutomationPointExerciseState> => {
+    installAetherAutomationFixture();
+    const target: MidiAutomationTarget = "filter.cutoff";
+    const state: DevAetherDirectAutomationPointExerciseState = {
+      target,
+      track: await exerciseAutomationPointEditor("track", 18.625, 0.71, target),
+      segment: await exerciseAutomationPointEditor("segment", 4.625, 0.72, target),
+      note: await exerciseAutomationPointEditor("note", 1.625, 0.73, target),
+    };
+    writeAetherDirectAutomationPointExerciseMarker(state);
+    return state;
+  };
+
   const exerciseAetherArrangementAutomationDragFlow = async (): Promise<DevAetherArrangementAutomationDragExerciseState> => {
     installAetherAutomationFixture();
     await openAetherAutomationFixtureEditor("arrangement");
@@ -1758,9 +1779,16 @@ export function installBeatDevHooks() {
     editor: DevAetherAutomationPointEditor,
     beat: number,
     value: number,
+    target: MidiAutomationTarget = "macro.1",
   ): Promise<DevAutomationPointEditorExercise> {
     await openAetherAutomationFixtureEditor(editor);
     const pointPanelLabel = aetherAutomationPointEditorLabel(editor);
+    if (target !== "macro.1") {
+      clickAetherAutomationTarget(editor, target);
+      await nextFrame();
+      clickPanelButtonByText(aetherAutomationLanePanelLabel(editor), "Add lane");
+      await nextFrame();
+    }
     const before = readAutomationPointPanelRows(pointPanelLabel);
     clickPanelButtonByText(pointPanelLabel, "Add point");
     await nextFrame();
@@ -1862,6 +1890,7 @@ export function installBeatDevHooks() {
     openAetherAutomationFixtureEditor,
     readAetherAutomationFixtureState,
     exerciseAetherAutomationPointEditorFlow,
+    exerciseAetherDirectAutomationPointEditorFlow,
     exerciseAetherArrangementAutomationDragFlow,
     exerciseAetherNoteAutomationDragFlow,
     exerciseAetherSegmentAutomationDragFlow,
@@ -1946,6 +1975,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-automation-points") {
     window.setTimeout(() => {
       void exerciseAetherAutomationPointEditorFlow();
+    }, 0);
+  } else if (fixture === "aether-direct-automation-points") {
+    window.setTimeout(() => {
+      void exerciseAetherDirectAutomationPointEditorFlow();
     }, 0);
   } else if (fixture === "aether-arrangement-automation-drag") {
     window.setTimeout(() => {
@@ -2724,6 +2757,10 @@ function writeAetherAutomationPointExerciseMarker(state: DevAetherAutomationPoin
   document.documentElement.dataset.beatAetherAutomationPointExercise = JSON.stringify(state);
 }
 
+function writeAetherDirectAutomationPointExerciseMarker(state: DevAetherDirectAutomationPointExerciseState) {
+  document.documentElement.dataset.beatAetherDirectAutomationPointExercise = JSON.stringify(state);
+}
+
 function writeAetherArrangementAutomationDragExerciseMarker(state: DevAetherArrangementAutomationDragExerciseState) {
   document.documentElement.dataset.beatAetherArrangementAutomationDragExercise = JSON.stringify(state);
 }
@@ -2859,6 +2896,29 @@ function aetherAutomationPointEditorLabel(editor: DevAetherAutomationPointEditor
   if (editor === "track") return "Aether track automation points";
   if (editor === "segment") return "Aether segment automation points";
   return "Aether note automation points";
+}
+
+function aetherAutomationLanePanelLabel(editor: DevAetherAutomationPointEditor): string {
+  if (editor === "track") return "Aether track automation lanes";
+  if (editor === "segment") return "Aether segment automation lanes";
+  return "Aether note automation lanes";
+}
+
+function aetherAutomationTargetButtonLabel(editor: DevAetherAutomationPointEditor, target: MidiAutomationTarget): string {
+  const label = target === "filter.cutoff"
+    ? "Cutoff"
+    : target === "amp.pan"
+      ? "Pan"
+      : target === "macro.1"
+        ? "Macro 1"
+        : String(target);
+  if (editor === "track") return `${label} track automation lane`;
+  if (editor === "segment") return `${label} segment automation lane`;
+  return `${label} automation lane`;
+}
+
+function clickAetherAutomationTarget(editor: DevAetherAutomationPointEditor, target: MidiAutomationTarget) {
+  clickPanelButton(aetherAutomationLanePanelLabel(editor), aetherAutomationTargetButtonLabel(editor, target));
 }
 
 function readAutomationPointPanelRows(panelLabel: string): DevAutomationPointSnapshot[] {

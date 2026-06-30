@@ -482,6 +482,14 @@ try {
     "browser fixture automation point editor flow should select a multi-row point subset before Copy/Paste toolbar clicks",
   );
   assert.ok(
+    devHooksSource.includes("exerciseAetherDirectAutomationPointEditorFlow")
+      && devHooksSource.includes('const target: MidiAutomationTarget = "filter.cutoff"')
+      && devHooksSource.includes("clickAetherAutomationTarget")
+      && devHooksSource.includes("beatAetherDirectAutomationPointExercise")
+      && devHooksSource.includes('fixture === "aether-direct-automation-points"'),
+    "browser fixture automation point coverage should include non-macro direct Aether target lanes",
+  );
+  assert.ok(
     synthEditorSource.includes('aria-label="Performance controls"')
       && synthEditorSource.includes('aria-label="Performance source readouts"')
       && synthEditorSource.includes('label="Voices"')
