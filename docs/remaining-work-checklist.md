@@ -245,11 +245,12 @@ Current implementation focus:
 - `[~]` Heavier nonlinear warp experiments.
   - Done: bounded table-generation `mirror` warp mode across editor/browser/native/persistence/test surfaces; opt-in runtime warp mode/amount across editor, browser preview, native render, persistence, browser fixture coverage, and deterministic native null-export stress.
   - Remaining: runtime warp oversampling/performance strategy for heavier nonlinear settings.
-- `[~]` Browser preview parity for live macro route changes.
+- `[x]` Browser preview parity for live macro route changes.
+  - Done: synth verifier covers dynamic macro-route offsets, confirms macro routes stay live instead of baking into base preview values, and renders distinct audio for full-amount, edited-amount, and disabled macro routes.
 - `[x]` Project/document roundtrip fixtures for macro route state.
 - `[~]` Visible macro lanes and macro conflict display.
   - Done: first visible macro-card conflict summaries for overlapping modulation targets.
-  - Remaining: visible macro automation lanes, browser live-preview parity, and deeper precedence/conflict feedback.
+  - Remaining: visible macro automation lanes and deeper precedence/conflict feedback.
 - `[~]` Modulation matrix semantic cleanup: per-target ranges, conflict clarity, disabled routes, source-specific editing.
 - `[x]` Deeper envelope visual editing with ADSR drag handles, direct rail curve controls, loop state, and assignment feedback.
 - `[x]` Performance/expression UX for mod wheel, pitch bend, velocity, keytracking, mono/legato, glide, and voice caps.

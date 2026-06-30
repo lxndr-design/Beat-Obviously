@@ -1883,9 +1883,35 @@ try {
   const macroLiveOffsets = synthPreview.modulationAtTime(macroLivePreview, 0.25, 1).targetOffsets;
   assert.ok(Math.abs((macroLivePreview.ampLevel ?? 0) - 0.18) < 0.000001, "macro routes should not be baked into browser preview base amp level");
   assert.ok(Math.abs((macroLiveOffsets["amp.level"] ?? 0) - 0.72) < 0.000001, "macro routes should remain live dynamic preview offsets");
+  const macroLiveRouteEditDraft = synthStore.normalizeSynthDraftPatch({
+    ...macroLivePreviewDraft,
+    modulation: [
+      { id: "macro_note_level", source: "macro.1", target: "amp.level", amount: 0.28, bipolar: false, enabled: true },
+    ],
+  });
+  const macroLiveRouteDisabledDraft = synthStore.normalizeSynthDraftPatch({
+    ...macroLivePreviewDraft,
+    modulation: [
+      { id: "macro_note_level", source: "macro.1", target: "amp.level", amount: 0.72, bipolar: false, enabled: false },
+    ],
+  });
+  const macroLiveRouteEditPreview = synthStore.synthDraftToPreviewInstrument(macroLiveRouteEditDraft);
+  const macroLiveRouteDisabledPreview = synthStore.synthDraftToPreviewInstrument(macroLiveRouteDisabledDraft);
+  const macroLiveRouteEditOffsets = synthPreview.modulationAtTime(macroLiveRouteEditPreview, 0.25, 1).targetOffsets;
+  const macroLiveRouteDisabledOffsets = synthPreview.modulationAtTime(macroLiveRouteDisabledPreview, 0.25, 1).targetOffsets;
+  assert.ok(Math.abs((macroLiveRouteEditOffsets["amp.level"] ?? 0) - 0.28) < 0.000001, "edited macro route amount should update browser preview offsets live");
+  assert.ok(Math.abs((macroLiveRouteDisabledOffsets["amp.level"] ?? 0)) < 0.000001, "disabled macro route should stop contributing to browser preview offsets");
   const macroBaseSamples = new Float32Array(12000);
+  const macroLiveSamples = new Float32Array(12000);
+  const macroLiveRouteEditSamples = new Float32Array(12000);
+  const macroLiveRouteDisabledSamples = new Float32Array(12000);
   const macroAutomatedSamples = new Float32Array(12000);
   synthPreview.renderInstrumentSamples(macroNoteAutomationPreview, macroBaseSamples, 48000, synthPreview.previewFrequency(macroNoteAutomationPreview), "audio", true);
+  synthPreview.renderInstrumentSamples(macroLivePreview, macroLiveSamples, 48000, synthPreview.previewFrequency(macroLivePreview), "audio", true);
+  synthPreview.renderInstrumentSamples(macroLiveRouteEditPreview, macroLiveRouteEditSamples, 48000, synthPreview.previewFrequency(macroLiveRouteEditPreview), "audio", true);
+  synthPreview.renderInstrumentSamples(macroLiveRouteDisabledPreview, macroLiveRouteDisabledSamples, 48000, synthPreview.previewFrequency(macroLiveRouteDisabledPreview), "audio", true);
+  assert.ok(bufferRms(macroLiveSamples) > bufferRms(macroLiveRouteEditSamples) * 1.25, "live macro route amount edits should audibly change browser preview renders");
+  assert.ok(bufferRms(macroLiveRouteEditSamples) > bufferRms(macroLiveRouteDisabledSamples) * 1.25, "disabling a live macro route should audibly change browser preview renders");
   synthPreview.renderInstrumentSamples(
     macroNoteAutomationPreview,
     macroAutomatedSamples,
