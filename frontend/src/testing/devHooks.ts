@@ -165,6 +165,8 @@ interface DevAutomationPointEditorExercise {
   afterEdit: DevAutomationPointSnapshot[];
   afterQuantize: DevAutomationPointSnapshot[];
   afterSnap: DevAutomationPointSnapshot[];
+  afterCopy: DevAutomationPointSnapshot[];
+  afterPaste: DevAutomationPointSnapshot[];
   pointPanelText: string;
 }
 
@@ -1296,6 +1298,12 @@ export function installBeatDevHooks() {
     clickPanelButtonByText(pointPanelLabel, "Snap values");
     await nextFrame();
     const afterSnap = readAutomationPointPanelRows(pointPanelLabel);
+    clickPanelButtonByText(pointPanelLabel, "Copy");
+    await nextFrame();
+    const afterCopy = readAutomationPointPanelRows(pointPanelLabel);
+    clickPanelButtonByText(pointPanelLabel, "Paste");
+    await nextFrame();
+    const afterPaste = readAutomationPointPanelRows(pointPanelLabel);
     return {
       editor,
       before,
@@ -1303,6 +1311,8 @@ export function installBeatDevHooks() {
       afterEdit,
       afterQuantize,
       afterSnap,
+      afterCopy,
+      afterPaste,
       pointPanelText: readPanelState(pointPanelLabel).text,
     };
   }

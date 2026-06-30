@@ -34,6 +34,7 @@ try {
   const pianoRollSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.solid.tsx"), "utf8");
   const segmentEditorSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx"), "utf8");
   const trackDetailsSource = readFileSync(join(repoRoot, "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx"), "utf8");
+  const devHooksSource = readFileSync(join(repoRoot, "frontend/src/testing/devHooks.ts"), "utf8");
 
   assert.equal(runner.snapBeat(1.12, 0.25), 1, "snapBeat should snap to nearest grid");
   assert.equal(runner.snapBeat(1.13, 0.25), 1.25, "snapBeat should round upward past the midpoint");
@@ -456,6 +457,12 @@ try {
   assert.ok(
     trackDetailsSource.includes("copyTrackAutomationPoints") && trackDetailsSource.includes("pasteTrackAutomationPoints"),
     "track details visible automation point toolbar should stay wired to track copy/paste helpers",
+  );
+  assert.ok(
+    devHooksSource.includes('clickPanelButtonByText(pointPanelLabel, "Copy")')
+      && devHooksSource.includes('clickPanelButtonByText(pointPanelLabel, "Paste")')
+      && devHooksSource.includes("afterPaste"),
+    "browser fixture automation point editor flow should exercise Copy/Paste toolbar clicks",
   );
   const movedTrackPoint = arrangementAutomation.updateTrackAutomationPoint(insertedTrackPoint, "filter.cutoff", 64, 1, 48, 0.74);
   assert.deepEqual(
