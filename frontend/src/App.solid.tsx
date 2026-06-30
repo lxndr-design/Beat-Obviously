@@ -13,6 +13,7 @@ import { preloadInstrumentSample } from "./audio/synthPreview";
 import { installGlobalHotkeys } from "./hotkeys/hotkeys";
 import { isNative, onEvent, send } from "./ipc/bridge";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore, useTransportStore, useUiStore } from "./state/store";
+import { useSynthStore } from "./state/synthStore";
 import { useExportStore } from "./state/exportStore";
 import { useComponentStore } from "./state/components";
 import { listAudioFiles, listComponents, listInstruments, pruneBlankUntitledProjects, saveAudioFiles, saveComponents, saveInstruments } from "./persistence/dexie";
@@ -396,6 +397,20 @@ export function App() {
           void openRecentDocument(event.path).catch((error) => {
             void appAlert(error instanceof Error ? error.message : "Open project failed.");
           });
+          break;
+        case "synth.expressionActivity":
+          if (event.active) {
+            useSynthStore.getState().setInstrumentExpressionActivity(event.instrumentId, {
+              source: event.source,
+              activeNotes: event.activeNotes,
+              pitchBendSemitones: event.pitchBendSemitones,
+              velocity: event.velocity,
+              keytrack: event.keytrack,
+              modWheel: event.modWheel,
+            });
+          } else {
+            useSynthStore.getState().clearInstrumentExpressionActivity(event.instrumentId);
+          }
           break;
         case "project.exportProgress":
           useExportStore.getState().setJob(event);

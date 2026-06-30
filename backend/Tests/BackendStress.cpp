@@ -1061,6 +1061,63 @@ namespace
         return project;
     }
 
+    bool stressAudioEngineNativeMidiExpressionActivity()
+    {
+        auto project = makeDenseAetherProject();
+        project.tracks.front().recordArmed = true;
+        project.tracks.front().inputMonitoring = true;
+        project.tracks.front().segments.clear();
+
+        beat::AudioEngine engine;
+        std::vector<beat::AudioEngine::SynthExpressionActivity> updates;
+        engine.onSynthExpressionActivity = [&](const beat::AudioEngine::SynthExpressionActivity& activity) {
+            updates.push_back(activity);
+        };
+        engine.prepareForOffline(48000.0, 128, 2);
+        engine.applyProject(project);
+
+        if (!engine.injectMidiInputForTesting(juce::MidiMessage::noteOn(1, 64, (juce::uint8) 100)))
+            return false;
+        if (updates.empty())
+            return false;
+        const auto first = updates.back();
+        if (first.instrumentId != "dense-aether"
+            || !first.active
+            || first.activeNotes != 1
+            || !near(first.velocity, 100.0f / 127.0f, 0.0002f)
+            || !near(first.keytrack, 64.0f / 127.0f, 0.0002f))
+            return false;
+
+        engine.injectMidiInputForTesting(juce::MidiMessage::noteOn(1, 76, (juce::uint8) 80));
+        const auto second = updates.back();
+        if (!second.active
+            || second.activeNotes != 2
+            || !near(second.velocity, ((100.0f / 127.0f) + (80.0f / 127.0f)) * 0.5f, 0.0002f))
+            return false;
+
+        engine.injectMidiInputForTesting(juce::MidiMessage::pitchWheel(1, 12288));
+        if (!near(updates.back().pitchBendSemitones, 1.0f, 0.0002f))
+            return false;
+
+        engine.injectMidiInputForTesting(juce::MidiMessage::controllerEvent(1, 1, 96));
+        if (!near(updates.back().modWheel, 96.0f / 127.0f, 0.0002f))
+            return false;
+
+        engine.injectMidiInputForTesting(juce::MidiMessage::noteOff(1, 64));
+        engine.injectMidiInputForTesting(juce::MidiMessage::noteOff(1, 76));
+        if (!updates.back().active || updates.back().activeNotes != 0)
+            return false;
+
+        engine.injectMidiInputForTesting(juce::MidiMessage::pitchWheel(1, 8192));
+        engine.injectMidiInputForTesting(juce::MidiMessage::controllerEvent(1, 1, 0));
+        const auto cleared = updates.back();
+        return cleared.instrumentId == "dense-aether"
+            && !cleared.active
+            && cleared.activeNotes == 0
+            && near(cleared.pitchBendSemitones, 0.0f, 0.0002f)
+            && near(cleared.modWheel, 0.0f, 0.0002f);
+    }
+
     bool stressFftAnalyzer()
     {
         const std::array blockSizes { 127, 256, 480, 511, 960, 1000 };
@@ -12565,6 +12622,11 @@ int main()
     if (!stressAudioEngineAetherMonoVoiceLimit())
     {
         std::cerr << "Audio engine Aether mono voice-limit stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineNativeMidiExpressionActivity())
+    {
+        std::cerr << "Audio engine native MIDI expression activity stress failed\n";
         return 1;
     }
     if (!stressAudioEngineDenseAetherLiveExportParity())

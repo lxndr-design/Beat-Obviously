@@ -94,6 +94,7 @@ namespace beat::ipc
         constexpr const char* EV_ANALYZER_SPECTRUM = "analyzer.spectrum";
         constexpr const char* EV_RENDER_TIMING    = "engine.renderTiming";
         constexpr const char* EV_DEVICE_CHANGED   = "audio.deviceChanged";
+        constexpr const char* EV_SYNTH_EXPRESSION_ACTIVITY = "synth.expressionActivity";
         constexpr const char* EV_TRAINING_STATUS  = "training.status";
         constexpr const char* EV_EXPORT_PROGRESS  = "project.exportProgress";
         constexpr const char* EV_LOG              = "log";

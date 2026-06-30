@@ -51,7 +51,8 @@ namespace beat
      *   - state shared between threads is std::atomic or guarded by
      *     ScopedLock with a tiny critical section
      */
-    class AudioEngine : public juce::AudioIODeviceCallback
+    class AudioEngine : public juce::AudioIODeviceCallback,
+                        private juce::MidiInputCallback
     {
     public:
         using RenderProgressCallback = std::function<bool(double progress,
@@ -166,6 +167,20 @@ namespace beat
 
         bool pullTrackMeterSnapshots(std::vector<TrackMeterSnapshot>& out);
 
+        struct SynthExpressionActivity
+        {
+            Id instrumentId;
+            bool active { false };
+            int activeNotes { 0 };
+            float pitchBendSemitones { 0.0f };
+            float velocity { 0.0f };
+            float keytrack { 0.0f };
+            float modWheel { 0.0f };
+        };
+
+        std::function<void(const SynthExpressionActivity&)> onSynthExpressionActivity;
+        bool injectMidiInputForTesting(const juce::MidiMessage& message);
+
         struct RenderTimingSnapshot
         {
             uint64_t sequence { 0 };
@@ -242,6 +257,7 @@ namespace beat
                                               const juce::AudioIODeviceCallbackContext&) override;
         void audioDeviceAboutToStart(juce::AudioIODevice* device) override;
         void audioDeviceStopped() override;
+        void handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message) override;
 
     private:
         std::unique_ptr<juce::AudioDeviceManager> device;
@@ -355,6 +371,20 @@ namespace beat
             float value { 0.0f };
             int sampleOffset { 0 };
             int rampSamples { 0 };
+        };
+
+        struct MonitoredMidiExpressionTarget
+        {
+            Id trackId;
+            Id instrumentId;
+        };
+
+        struct ActiveMidiExpressionNote
+        {
+            int channel { 1 };
+            int note { 60 };
+            float velocity { 0.0f };
+            float keytrack { 0.0f };
         };
 
         struct InstrumentRenderState
@@ -538,6 +568,11 @@ namespace beat
         std::vector<InstrumentRenderState> instrumentRenderStates;
         std::vector<InstrumentRenderState> groupRenderStates;
         std::vector<InstrumentRenderState> returnRenderStates;
+        std::vector<MonitoredMidiExpressionTarget> monitoredMidiExpressionTargets;
+        std::map<Id, std::vector<ActiveMidiExpressionNote>> activeMidiExpressionNotes;
+        std::map<Id, float> midiExpressionPitchBend;
+        std::map<Id, float> midiExpressionModWheel;
+        std::vector<juce::String> enabledMidiInputIdentifiers;
         std::vector<TrackMeterState> trackMeterStates;
         TrackMeterState masterMeterState { "master" };
         MasterLoudnessMeterState masterLoudnessMeterState;
@@ -631,6 +666,12 @@ namespace beat
                                                      juce::MidiBuffer& midi,
                                                      std::string_view instrumentId,
                                                      int numSamples) noexcept;
+        void refreshMidiInputCallbacks();
+        void removeMidiInputCallbacks() noexcept;
+        bool handleMidiExpressionMessage(const juce::MidiMessage& message);
+        void clearNativeMidiExpressionStateLocked(const std::vector<Id>& retainedInstrumentIds);
+        SynthExpressionActivity midiExpressionSnapshotLocked(const Id& instrumentId) const;
+        void publishMidiExpressionActivity(const SynthExpressionActivity& activity) const;
         static int countActiveSynthVoices(juce::Synthesiser& targetSynth) noexcept;
         bool applyRealtimeParameterToSynth(juce::Synthesiser& targetSynth,
                                            std::string_view parameterId,

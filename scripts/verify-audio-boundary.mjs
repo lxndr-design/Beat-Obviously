@@ -46,6 +46,8 @@ const schemaPath = join(frontendSrc, "ipc", "schema.ts");
 const bridgePath = join(frontendSrc, "ipc", "bridge.ts");
 const backendSchemaPath = join(repoRoot, "backend", "Source", "Ipc", "Schema.h");
 const messageBridgePath = join(repoRoot, "backend", "Source", "Ipc", "MessageBridge.cpp");
+const audioEngineHeaderPath = join(repoRoot, "backend", "Source", "Audio", "AudioEngine.h");
+const audioEnginePath = join(repoRoot, "backend", "Source", "Audio", "AudioEngine.cpp");
 
 for (const requiredPath of [
   appPath,
@@ -58,8 +60,29 @@ for (const requiredPath of [
   bridgePath,
   backendSchemaPath,
   messageBridgePath,
+  audioEngineHeaderPath,
+  audioEnginePath,
 ]) {
   if (!existsSync(requiredPath)) fail(`Missing audio boundary file: ${rel(requiredPath)}`);
+}
+
+if (existsSync(audioEngineHeaderPath)) {
+  const source = read(audioEngineHeaderPath);
+  if (!source.includes("private juce::MidiInputCallback")
+      || !source.includes("SynthExpressionActivity")
+      || !source.includes("injectMidiInputForTesting")) {
+    fail("AudioEngine must expose native MIDI expression activity and a test injection hook.");
+  }
+}
+
+if (existsSync(audioEnginePath)) {
+  const source = read(audioEnginePath);
+  if (!source.includes("addMidiInputDeviceCallback")
+      || !source.includes("handleIncomingMidiMessage")
+      || !source.includes("handleMidiExpressionMessage")
+      || !source.includes("onSynthExpressionActivity")) {
+    fail("AudioEngine must register native MIDI input callbacks and publish synth expression activity.");
+  }
 }
 
 if (existsSync(appPath)) {
@@ -69,6 +92,11 @@ if (existsSync(appPath)) {
   }
   if (!source.includes("<LiveMidiExpressionInput />")) {
     fail("App must mount the live MIDI expression input bridge next to timeline playback.");
+  }
+  if (!source.includes('case "synth.expressionActivity"')
+      || !source.includes("setInstrumentExpressionActivity(event.instrumentId")
+      || !source.includes("clearInstrumentExpressionActivity(event.instrumentId")) {
+    fail("App must route native synth.expressionActivity events into the synth expression store.");
   }
 }
 
@@ -143,6 +171,11 @@ if (existsSync(schemaPath)) {
   if (!source.includes('kind: "instrument.renderPreview"') || !source.includes("includeAudio?: boolean")) {
     fail("Frontend IPC schema must keep native instrument.renderPreview with includeAudio support.");
   }
+  if (!source.includes('kind: "synth.expressionActivity"')
+      || !source.includes('source: "midi"')
+      || !source.includes("pitchBendSemitones")) {
+    fail("Frontend IPC schema must expose native MIDI synth expression activity events.");
+  }
 }
 
 if (existsSync(bridgePath)) {
@@ -156,6 +189,9 @@ if (existsSync(backendSchemaPath)) {
   const source = read(backendSchemaPath);
   if (!source.includes("INSTRUMENT_RENDER_PREVIEW")) {
     fail("Backend IPC schema must expose INSTRUMENT_RENDER_PREVIEW.");
+  }
+  if (!source.includes("EV_SYNTH_EXPRESSION_ACTIVITY")) {
+    fail("Backend IPC schema must expose EV_SYNTH_EXPRESSION_ACTIVITY.");
   }
 }
 
@@ -174,6 +210,11 @@ if (existsSync(messageBridgePath)) {
       || !source.includes("lane.trackId = t.id;")
       || !source.includes("lane.instrumentId = t.instrumentId;")) {
     fail("Backend bridge must map frontend track.automation lanes into native project automation with track and instrument ids.");
+  }
+  if (!source.includes("engine.onSynthExpressionActivity")
+      || !source.includes("EV_SYNTH_EXPRESSION_ACTIVITY")
+      || !source.includes('o->setProperty("source", "midi")')) {
+    fail("Backend bridge must emit native MIDI synth expression activity events.");
   }
 }
 

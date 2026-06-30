@@ -205,6 +205,13 @@ namespace beat
             return nullptr;
         }
 
+        bool isMidiExpressionInstrument(const InstrumentDefinition& instrument) noexcept
+        {
+            return instrument.hasAether
+                || instrument.kind == "synth"
+                || instrument.kind == "wavetable";
+        }
+
         std::vector<TrackEffect> composeRouteEffects(const InstrumentDefinition* instrument,
                                                      const std::vector<TrackEffect>& trackEffects)
         {
@@ -496,6 +503,7 @@ namespace beat
         }
 
         device->addAudioCallback(this);
+        refreshMidiInputCallbacks();
         if (error != nullptr)
             *error = {};
         return true;
@@ -606,6 +614,7 @@ namespace beat
 
         if (error != nullptr)
             *error = {};
+        refreshMidiInputCallbacks();
         return true;
     }
 
@@ -937,6 +946,7 @@ namespace beat
     {
         if (device != nullptr)
         {
+            removeMidiInputCallbacks();
             device->removeAudioCallback(this);
             device->closeAudioDevice();
             device.reset();
@@ -956,7 +966,6 @@ namespace beat
             {
                 monitorInput = true;
                 monitorGainDb = track.recordGainDb;
-                break;
             }
         }
         setInputMonitoringEnabled(monitorInput, monitorGainDb);
@@ -1188,6 +1197,169 @@ namespace beat
     bool AudioEngine::isInputMonitoringEnabled() const noexcept
     {
         return inputMonitoringEnabled.load(std::memory_order_acquire);
+    }
+
+    bool AudioEngine::injectMidiInputForTesting(const juce::MidiMessage& message)
+    {
+        return handleMidiExpressionMessage(message);
+    }
+
+    void AudioEngine::refreshMidiInputCallbacks()
+    {
+        if (device == nullptr)
+            return;
+
+        removeMidiInputCallbacks();
+        const auto inputs = juce::MidiInput::getAvailableDevices();
+        enabledMidiInputIdentifiers.reserve((size_t) inputs.size());
+        for (const auto& input : inputs)
+        {
+            if (input.identifier.isEmpty())
+                continue;
+            device->setMidiInputDeviceEnabled(input.identifier, true);
+            device->addMidiInputDeviceCallback(input.identifier, this);
+            enabledMidiInputIdentifiers.push_back(input.identifier);
+        }
+    }
+
+    void AudioEngine::removeMidiInputCallbacks() noexcept
+    {
+        if (device == nullptr)
+            return;
+
+        for (const auto& identifier : enabledMidiInputIdentifiers)
+            device->removeMidiInputDeviceCallback(identifier, this);
+        enabledMidiInputIdentifiers.clear();
+    }
+
+    bool AudioEngine::handleMidiExpressionMessage(const juce::MidiMessage& message)
+    {
+        std::vector<SynthExpressionActivity> updates;
+        {
+            const juce::ScopedLock lock(sampleLock);
+            if (monitoredMidiExpressionTargets.empty())
+                return false;
+
+            updates.reserve(monitoredMidiExpressionTargets.size());
+            for (const auto& target : monitoredMidiExpressionTargets)
+            {
+                auto& notes = activeMidiExpressionNotes[target.instrumentId];
+                if (message.isNoteOn())
+                {
+                    const int channel = message.getChannel();
+                    const int noteNumber = message.getNoteNumber();
+                    auto found = std::find_if(notes.begin(), notes.end(), [&](const ActiveMidiExpressionNote& note) {
+                        return note.channel == channel && note.note == noteNumber;
+                    });
+                    const ActiveMidiExpressionNote next {
+                        channel,
+                        noteNumber,
+                        juce::jlimit(0.0f, 1.0f, message.getFloatVelocity()),
+                        juce::jlimit(0.0f, 1.0f, (float) noteNumber / 127.0f),
+                    };
+                    if (found != notes.end())
+                        *found = next;
+                    else
+                        notes.push_back(next);
+                }
+                else if (message.isNoteOff())
+                {
+                    const int channel = message.getChannel();
+                    const int noteNumber = message.getNoteNumber();
+                    notes.erase(std::remove_if(notes.begin(), notes.end(), [&](const ActiveMidiExpressionNote& note) {
+                        return note.channel == channel && note.note == noteNumber;
+                    }), notes.end());
+                }
+                else if (message.isPitchWheel())
+                {
+                    const auto normalized = juce::jlimit(
+                        -1.0f,
+                        1.0f,
+                        ((float) message.getPitchWheelValue() - 8192.0f) / 8192.0f);
+                    midiExpressionPitchBend[target.instrumentId] = normalized * 2.0f;
+                }
+                else if (message.isController() && message.getControllerNumber() == 1)
+                {
+                    midiExpressionModWheel[target.instrumentId] = juce::jlimit(
+                        0.0f,
+                        1.0f,
+                        (float) message.getControllerValue() / 127.0f);
+                }
+                else
+                {
+                    continue;
+                }
+                updates.push_back(midiExpressionSnapshotLocked(target.instrumentId));
+            }
+        }
+
+        for (const auto& update : updates)
+            publishMidiExpressionActivity(update);
+        return !updates.empty();
+    }
+
+    void AudioEngine::clearNativeMidiExpressionStateLocked(const std::vector<Id>& retainedInstrumentIds)
+    {
+        const auto isRetained = [&](const Id& instrumentId) {
+            return std::find(retainedInstrumentIds.begin(), retainedInstrumentIds.end(), instrumentId)
+                != retainedInstrumentIds.end();
+        };
+
+        for (auto it = activeMidiExpressionNotes.begin(); it != activeMidiExpressionNotes.end();)
+        {
+            if (isRetained(it->first))
+                ++it;
+            else
+                it = activeMidiExpressionNotes.erase(it);
+        }
+        for (auto it = midiExpressionPitchBend.begin(); it != midiExpressionPitchBend.end();)
+        {
+            if (isRetained(it->first))
+                ++it;
+            else
+                it = midiExpressionPitchBend.erase(it);
+        }
+        for (auto it = midiExpressionModWheel.begin(); it != midiExpressionModWheel.end();)
+        {
+            if (isRetained(it->first))
+                ++it;
+            else
+                it = midiExpressionModWheel.erase(it);
+        }
+    }
+
+    AudioEngine::SynthExpressionActivity AudioEngine::midiExpressionSnapshotLocked(const Id& instrumentId) const
+    {
+        SynthExpressionActivity activity;
+        activity.instrumentId = instrumentId;
+        if (const auto found = activeMidiExpressionNotes.find(instrumentId); found != activeMidiExpressionNotes.end())
+        {
+            activity.activeNotes = (int) found->second.size();
+            for (const auto& note : found->second)
+            {
+                activity.velocity += note.velocity;
+                activity.keytrack += note.keytrack;
+            }
+            if (activity.activeNotes > 0)
+            {
+                activity.velocity /= (float) activity.activeNotes;
+                activity.keytrack /= (float) activity.activeNotes;
+            }
+        }
+        if (const auto found = midiExpressionPitchBend.find(instrumentId); found != midiExpressionPitchBend.end())
+            activity.pitchBendSemitones = found->second;
+        if (const auto found = midiExpressionModWheel.find(instrumentId); found != midiExpressionModWheel.end())
+            activity.modWheel = found->second;
+        activity.active = activity.activeNotes > 0
+            || std::abs(activity.pitchBendSemitones) > 0.001f
+            || activity.modWheel > 0.001f;
+        return activity;
+    }
+
+    void AudioEngine::publishMidiExpressionActivity(const SynthExpressionActivity& activity) const
+    {
+        if (onSynthExpressionActivity)
+            onSynthExpressionActivity(activity);
     }
 
     void AudioEngine::stopAllNotes(bool allowTailOff)
@@ -1775,6 +1947,8 @@ namespace beat
         nextReturnStates.reserve(project.returnBuses.size());
         std::vector<TrackMeterState> nextMeterStates;
         nextMeterStates.reserve(project.tracks.size());
+        std::vector<MonitoredMidiExpressionTarget> nextMidiExpressionTargets;
+        std::vector<Id> retainedMidiExpressionInstrumentIds;
         for (const auto& track : project.tracks)
         {
             if (track.id.isNotEmpty())
@@ -1813,6 +1987,24 @@ namespace beat
                 const auto foundInstrument = instrumentById.find(track.instrumentId);
                 if (foundInstrument != instrumentById.end())
                     routeInstrument = foundInstrument->second;
+            }
+
+            if ((track.kind == TrackKind::Midi || track.kind == TrackKind::Mixed)
+                && (track.recordArmed || track.inputMonitoring)
+                && routeInstrument != nullptr
+                && isMidiExpressionInstrument(*routeInstrument))
+            {
+                const bool duplicate = std::any_of(
+                    nextMidiExpressionTargets.begin(),
+                    nextMidiExpressionTargets.end(),
+                    [&](const MonitoredMidiExpressionTarget& target) {
+                        return target.instrumentId == track.instrumentId;
+                    });
+                if (!duplicate)
+                {
+                    nextMidiExpressionTargets.push_back({ track.id, track.instrumentId });
+                    retainedMidiExpressionInstrumentIds.push_back(track.instrumentId);
+                }
             }
 
             route.effects = composeRouteEffects(routeInstrument, track.effects);
@@ -1866,6 +2058,8 @@ namespace beat
         blockRouteParameterEvents.clear();
         realtimeParameterChanges.clear();
         defaultNoteAutomationContextCount = 0;
+        monitoredMidiExpressionTargets = std::move(nextMidiExpressionTargets);
+        clearNativeMidiExpressionStateLocked(retainedMidiExpressionInstrumentIds);
         synth.allNotesOff(0, false);
         for (auto& route : returnRenderStates)
             route.returnBuffer.clear();
@@ -3723,6 +3917,11 @@ namespace beat
     }
 
     void AudioEngine::audioDeviceStopped() {}
+
+    void AudioEngine::handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage& message)
+    {
+        handleMidiExpressionMessage(message);
+    }
 
     void AudioEngine::audioDeviceIOCallbackWithContext(const float* const* inputChannels, int numInputChannels,
                                                        float* const* outputChannels, int numOutChannels,

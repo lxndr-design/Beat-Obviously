@@ -441,6 +441,17 @@ export type InboundEvent =
       routeDelayEffectSamples: number;
     }
   | { kind: "audio.deviceChanged"; deviceName: string; sampleRate: number }
+  | {
+      kind: "synth.expressionActivity";
+      instrumentId: Id;
+      source: "midi";
+      active: boolean;
+      activeNotes: number;
+      pitchBendSemitones: number;
+      velocity: number;
+      keytrack: number;
+      modWheel: number;
+    }
   | (ProjectExportJobStatus & { kind: "project.exportProgress" })
   | { kind: "training.status"; task: "drums" | "instruments" | "midi"; status: "started" | "finished" | "failed"; signalCount: number; message?: string; exitCode?: number }
   | { kind: "native.menuCommand"; command: "newProject" | "openProject" | "saveProject" | "importAudio" | "exportWav" | "preferences" }

@@ -250,7 +250,8 @@ Current implementation focus:
   - Remaining: visible macro automation lanes, browser live-preview parity, and deeper precedence/conflict feedback.
 - `[~]` Modulation matrix semantic cleanup: per-target ranges, conflict clarity, disabled routes, source-specific editing.
 - `[x]` Deeper envelope visual editing with ADSR drag handles, direct rail curve controls, loop state, and assignment feedback.
-- `[~]` Performance/expression UX for mod wheel, pitch bend, velocity, keytracking, mono/legato, glide, and voice caps.
+- `[x]` Performance/expression UX for mod wheel, pitch bend, velocity, keytracking, mono/legato, glide, and voice caps.
+  - Done: browser timeline, browser Web MIDI, and native JUCE MIDI input all publish into the same synth expression activity contract for Aether/compatible synth instruments.
 - `[~]` Reduce one-off controls inside synth surfaces and continue moving controls to Solid UI kit primitives.
 
 ## Sampler And Plugin Import Layer

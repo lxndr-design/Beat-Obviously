@@ -2306,6 +2306,18 @@ namespace beat
             o->setProperty("repetition", ev.repetition);
             emit(ipc::kind::EV_SEGMENT_TRIGGER, juce::var(o.get()));
         };
+        engine.onSynthExpressionActivity = [this](const AudioEngine::SynthExpressionActivity& activity) {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("instrumentId", activity.instrumentId);
+            o->setProperty("source", "midi");
+            o->setProperty("active", activity.active);
+            o->setProperty("activeNotes", activity.activeNotes);
+            o->setProperty("pitchBendSemitones", activity.pitchBendSemitones);
+            o->setProperty("velocity", activity.velocity);
+            o->setProperty("keytrack", activity.keytrack);
+            o->setProperty("modWheel", activity.modWheel);
+            emit(ipc::kind::EV_SYNTH_EXPRESSION_ACTIVITY, juce::var(o.get()));
+        };
         startTimerHz(30);
     }
 
@@ -2321,6 +2333,7 @@ namespace beat
         stopTimer();
         engine.onPositionChanged = nullptr;
         engine.onSegmentTriggered = nullptr;
+        engine.onSynthExpressionActivity = nullptr;
     }
 
     void MessageBridge::joinFinishedExportThreadIfNeeded()
