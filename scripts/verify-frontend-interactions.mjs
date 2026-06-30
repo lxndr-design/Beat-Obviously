@@ -474,9 +474,10 @@ try {
     devHooksSource.includes('clickPanelButtonByText(pointPanelLabel, "Copy")')
       && devHooksSource.includes('clickPanelButtonByText(pointPanelLabel, "Paste")')
       && devHooksSource.includes("setAutomationPointSelection")
+      && devHooksSource.includes("lastSelectablePointIndex")
       && devHooksSource.includes("selectedPointCount")
       && devHooksSource.includes("afterPaste"),
-    "browser fixture automation point editor flow should select a point subset before Copy/Paste toolbar clicks",
+    "browser fixture automation point editor flow should select a multi-row point subset before Copy/Paste toolbar clicks",
   );
   const movedTrackPoint = arrangementAutomation.updateTrackAutomationPoint(insertedTrackPoint, "filter.cutoff", 64, 1, 48, 0.74);
   assert.deepEqual(

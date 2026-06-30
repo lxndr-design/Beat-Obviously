@@ -1300,7 +1300,11 @@ export function installBeatDevHooks() {
     clickPanelButtonByText(pointPanelLabel, "Snap values");
     await nextFrame();
     const afterSnap = readAutomationPointPanelRows(pointPanelLabel);
-    setAutomationPointSelection(pointPanelLabel, Math.min(1, Math.max(0, afterSnap.length - 1)), true);
+    const lastSelectablePointIndex = Math.max(0, afterSnap.length - 1);
+    setAutomationPointSelection(pointPanelLabel, 0, true);
+    if (lastSelectablePointIndex > 0) {
+      setAutomationPointSelection(pointPanelLabel, lastSelectablePointIndex, true);
+    }
     await nextFrame();
     const afterSelect = readAutomationPointPanelRows(pointPanelLabel);
     clickPanelButtonByText(pointPanelLabel, "Copy");
