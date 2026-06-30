@@ -225,7 +225,8 @@ Current implementation focus:
 - `[ ]` Batch stem export naming policy.
 - `[ ]` All-track stems export helper if repeated single-track export is not enough.
 - `[ ]` Export preset serialization in preferences.
-- `[ ]` Null-test or bounded-difference checks where deterministic parity is expected.
+- `[~]` Null-test or bounded-difference checks where deterministic parity is expected.
+  - Done: Aether deterministic null-export stress covers dense, max-unison, mono-legato/glide, and group/return routed families with repeated live-render and 32-bit export-prefix residual thresholds.
 - `[ ]` Export formats beyond PCM WAV after render path stability is fully locked.
 
 ## Project Health And Recovery
@@ -310,7 +311,8 @@ Current implementation focus:
 
 - `[~]` Browser-level flow coverage for broader synth editing, wavemap import/draw, automation lanes, arrangement editing, export, relink, backup restore, and project health repairs.
   - Done: true browser fixture smoke covers Aether track, segment, and selected-note Macro 1 automation lane entrypoints with seeded project data and rendered controls.
-- `[ ]` Null-test style live/offline comparisons where deterministic output is expected.
+- `[~]` Null-test style live/offline comparisons where deterministic output is expected.
+  - Done: Aether deterministic null-export stress covers dense, max-unison, mono-legato/glide, and group/return routed families with repeated live-render and 32-bit export-prefix residual thresholds.
 - `[ ]` Crossfade parity stress.
 - `[ ]` Automation-heavy parity stress beyond the current dense Aether parity path.
 - `[ ]` Group/send stem export stress.

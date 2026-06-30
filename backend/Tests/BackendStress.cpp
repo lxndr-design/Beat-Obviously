@@ -9997,6 +9997,64 @@ namespace
             48000.0);
     }
 
+    bool stressAudioEngineRoutedAetherDeterministicNullExport()
+    {
+        auto project = makeDenseAetherProject();
+        project.id = "routed-aether-null-export";
+        project.name = "Routed Aether Null Export";
+        project.lengthBeats = 1.75;
+
+        auto& instrument = project.instruments.front();
+        instrument.aether.noise.enabled = false;
+        instrument.aether.noise.level = 0.0f;
+        instrument.aether.oscA.randomPhase = 0.0f;
+        instrument.aether.oscB.randomPhase = 0.0f;
+
+        auto& track = project.tracks.front();
+        track.parentTrackId = "aether-group";
+        beat::TrackSend send;
+        send.busId = "aether-return";
+        send.gainDb = -8.0f;
+        send.pan = 0.16f;
+        send.enabled = true;
+        track.sends.push_back(send);
+
+        beat::Track group;
+        group.id = "aether-group";
+        group.name = "Aether Group";
+        group.kind = beat::TrackKind::Group;
+        group.gainDb = -2.5f;
+        group.pan = -0.12f;
+        beat::TrackEffect groupLowpass;
+        groupLowpass.id = "aether-group-lowpass";
+        groupLowpass.kind = beat::TrackEffectKind::Lowpass;
+        groupLowpass.params.push_back({ "cutoffHz", 8800.0f });
+        groupLowpass.params.push_back({ "resonance", 4.0f });
+        group.effects.push_back(std::move(groupLowpass));
+        project.tracks.push_back(std::move(group));
+
+        beat::ReturnBus bus;
+        bus.id = "aether-return";
+        bus.name = "Aether Return";
+        bus.gainDb = -7.0f;
+        bus.pan = 0.24f;
+        beat::TrackEffect returnSaturator;
+        returnSaturator.id = "aether-return-saturator";
+        returnSaturator.kind = beat::TrackEffectKind::Saturator;
+        returnSaturator.params.push_back({ "drive", 8.0f });
+        returnSaturator.params.push_back({ "mix", 24.0f });
+        bus.effects.push_back(std::move(returnSaturator));
+        project.returnBuses.push_back(std::move(bus));
+
+        return stressAudioEngineAetherDeterministicNullExportFamily(
+            project,
+            "Routed Aether",
+            "BeatBackendStress-routed-aether-null-export.wav",
+            18000,
+            211,
+            44100.0);
+    }
+
     bool stressWavetableOscillator()
     {
         static_assert(beat::params::patchSchemaVersion == 1);
@@ -12647,6 +12705,11 @@ int main()
     if (!stressAudioEngineMonoLegatoAetherDeterministicNullExport())
     {
         std::cerr << "Audio engine mono-legato Aether deterministic null export stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineRoutedAetherDeterministicNullExport())
+    {
+        std::cerr << "Audio engine routed Aether deterministic null export stress failed\n";
         return 1;
     }
     if (!stressAudioEngineVariableBlockSizes())

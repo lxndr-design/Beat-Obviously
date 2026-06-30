@@ -164,7 +164,7 @@ Checklist:
 - `[ ]` Add parity tests for dense overlapping automation, rapid tempo/speed changes, and high-polyphony Aether patches.
 - `[x]` Add sample-rate matrix tests: 44.1k, 48k, 96k.
 - `[x]` Add denormal protection and stress tests for long tails near silence.
-- `[ ]` Add null-test style comparisons for live/offline paths where deterministic output is expected.
+- `[~]` Add null-test style comparisons for live/offline paths where deterministic output is expected. Dense Aether, max-unison Aether, mono-legato/glide Aether, and routed group/return-bus Aether families now compare repeated live-style renders plus 32-bit offline export prefixes with bounded residual thresholds.
 - `[x]` Add master-limiter/headroom policy before playback/export.
 
 Done when:
