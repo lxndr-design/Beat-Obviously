@@ -8,6 +8,7 @@ import {
   useSynthStore,
   type SynthDraftPatch,
   type SynthModulationRoute,
+  type SynthParameterId,
 } from "../state/synthStore";
 import { createSynthPresetRecord, type SynthPresetRecord } from "../state/synthPresets";
 import {
@@ -39,6 +40,8 @@ const DEV_AETHER_MACRO_INSTRUMENT_ID_MARKER = "Aether macro browser dev fixture"
 const DEV_AETHER_WAVEMAP_INSTRUMENT_ID = "dev-aether-wavemap-editor-host";
 const DEV_AETHER_WAVEMAP_INSTRUMENT_ID_MARKER = "Aether wavemap editor dev fixture";
 const DEV_AETHER_WAVEMAP_ID = "user.browser-wavemap";
+const DEV_AETHER_ENVELOPE_INSTRUMENT_ID = "dev-aether-envelope-host";
+const DEV_AETHER_ENVELOPE_INSTRUMENT_ID_MARKER = "Aether envelope editor dev fixture";
 const DEV_AETHER_AUTOMATION_INSTRUMENT_ID_MARKER = "Aether automation dev fixture";
 const DEV_AETHER_AUTOMATION_TRACK_ID = "dev-aether-automation-track";
 const DEV_AETHER_AUTOMATION_SEGMENT_ID = "dev-aether-automation-segment";
@@ -97,6 +100,7 @@ declare global {
       exerciseAetherWavemapEditorFlow: () => Promise<DevAetherWavemapEditorFixtureState>;
       exerciseAetherWavemapPointerDrawFlow: () => Promise<DevAetherWavemapPointerDrawExerciseState>;
       exerciseAetherWavemapImportFlow: () => Promise<DevAetherWavemapImportExerciseState>;
+      exerciseAetherEnvelopeHandleFlow: () => Promise<DevAetherEnvelopeHandleExerciseState>;
       exerciseAetherPresetLibraryFavoriteFlow: () => Promise<{
         installed: DevAetherPresetLibraryFixtureState;
         filtered: DevAetherPresetLibraryFixtureState;
@@ -302,6 +306,27 @@ interface DevAetherWavemapEditorFixtureState {
     manual: boolean;
     smooth: boolean;
   };
+}
+
+interface DevAetherEnvelopeSnapshot {
+  attack: number;
+  decay: number;
+  sustain: number;
+  release: number;
+  cardText: string;
+  handleLabels: {
+    attack: string | null;
+    decaySustain: string | null;
+    release: string | null;
+  };
+}
+
+interface DevAetherEnvelopeHandleExerciseState {
+  instrumentId: string | null;
+  before: DevAetherEnvelopeSnapshot;
+  afterAttackDrag: DevAetherEnvelopeSnapshot;
+  afterDecaySustainDrag: DevAetherEnvelopeSnapshot;
+  afterReleaseDrag: DevAetherEnvelopeSnapshot;
 }
 
 interface DevAetherWavemapFrameSnapshot {
@@ -895,6 +920,71 @@ export function installBeatDevHooks() {
     return state;
   };
 
+  const installAetherEnvelopeFixtureBase = async () => {
+    const instrumentStore = useInstrumentStore.getState();
+    for (const instrument of instrumentStore.instruments) {
+      if ((instrument.id === DEV_AETHER_ENVELOPE_INSTRUMENT_ID || instrument.source?.label === DEV_AETHER_ENVELOPE_INSTRUMENT_ID_MARKER) && instrument.userCreated) {
+        instrumentStore.removeInstrument(instrument.id);
+      }
+    }
+
+    const baseDraft = createDefaultSynthDraft();
+    const patch: SynthDraftPatch = {
+      ...baseDraft,
+      name: "Envelope Browser Host",
+      parameters: {
+        ...baseDraft.parameters,
+        "env.1.attack": 0.08,
+        "env.1.decay": 0.28,
+        "env.1.sustain": 0.62,
+        "env.1.release": 0.46,
+        "env.1.attackCurve": "exp",
+        "env.1.decayCurve": "s-curve",
+        "env.1.releaseCurve": "log",
+      },
+      metadata: {
+        ...baseDraft.metadata,
+        tags: [...new Set([...baseDraft.metadata.tags, "dev", "envelope-browser"])],
+      },
+    };
+
+    const nextInstrumentId = instrumentStore.addInstrument({
+      ...synthDraftToInstrumentPatch(patch),
+      id: DEV_AETHER_ENVELOPE_INSTRUMENT_ID,
+      name: patch.name,
+      source: { kind: "created", label: DEV_AETHER_ENVELOPE_INSTRUMENT_ID_MARKER },
+      userCreated: true,
+    });
+    useSynthStore.getState().bindInstrument(nextInstrumentId);
+    useSynthStore.getState().setDraft(patch);
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
+    await waitForEnvelopeHandle("env.1", "attack");
+    return { instrumentId: nextInstrumentId };
+  };
+
+  const exerciseAetherEnvelopeHandleFlow = async (): Promise<DevAetherEnvelopeHandleExerciseState> => {
+    await installAetherEnvelopeFixtureBase();
+    const before = readAetherEnvelopeSnapshot("env.1");
+    dragEnvelopeHandle("env.1", "attack", 0.18, 0.08);
+    await nextFrame();
+    const afterAttackDrag = readAetherEnvelopeSnapshot("env.1");
+    dragEnvelopeHandle("env.1", "decay-sustain", 0.42, 0.74);
+    await nextFrame();
+    const afterDecaySustainDrag = readAetherEnvelopeSnapshot("env.1");
+    dragEnvelopeHandle("env.1", "release", 0.68, 0.96);
+    await nextFrame();
+    const afterReleaseDrag = readAetherEnvelopeSnapshot("env.1");
+    const state: DevAetherEnvelopeHandleExerciseState = {
+      instrumentId: useSynthStore.getState().boundInstrumentId,
+      before,
+      afterAttackDrag,
+      afterDecaySustainDrag,
+      afterReleaseDrag,
+    };
+    writeAetherEnvelopeHandleExerciseMarker(state);
+    return state;
+  };
+
   const installAetherAutomationFixture = () => {
     const instrumentStore = useInstrumentStore.getState();
     for (const instrument of instrumentStore.instruments) {
@@ -1244,6 +1334,7 @@ export function installBeatDevHooks() {
     exerciseAetherWavemapEditorFlow,
     exerciseAetherWavemapPointerDrawFlow,
     exerciseAetherWavemapImportFlow,
+    exerciseAetherEnvelopeHandleFlow,
     exerciseAetherPresetLibraryFavoriteFlow,
     installAetherAutomationFixture,
     openAetherAutomationFixtureEditor,
@@ -1300,6 +1391,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-wavemap-import") {
     window.setTimeout(() => {
       void exerciseAetherWavemapImportFlow();
+    }, 0);
+  } else if (fixture === "aether-envelope-handles") {
+    window.setTimeout(() => {
+      void exerciseAetherEnvelopeHandleFlow();
     }, 0);
   } else if (fixture === "aether-automation") {
     window.setTimeout(() => {
@@ -1889,6 +1984,64 @@ function writeAetherWavemapImportExerciseMarker(state: DevAetherWavemapImportExe
   document.documentElement.dataset.beatAetherWavemapImportExercise = JSON.stringify(state);
 }
 
+function writeAetherEnvelopeHandleExerciseMarker(state: DevAetherEnvelopeHandleExerciseState) {
+  document.documentElement.dataset.beatAetherEnvelopeHandleExercise = JSON.stringify(state);
+}
+
+function findEnvelopeHandle(source: "env.1" | "env.2", kind: "attack" | "decay-sustain" | "release"): HTMLButtonElement | null {
+  return document.querySelector<HTMLButtonElement>(`[data-aether-envelope-editor="${source}"] [data-aether-envelope-handle="${kind}"]`);
+}
+
+function readAetherEnvelopeSnapshot(source: "env.1" | "env.2"): DevAetherEnvelopeSnapshot {
+  const draft = useSynthStore.getState().draft;
+  const read = (suffix: "attack" | "decay" | "sustain" | "release") => Number(draft.parameters[`${source}.${suffix}` as SynthParameterId] ?? 0);
+  const card = document.querySelector<HTMLElement>(`[data-aether-envelope-editor="${source}"]`);
+  return {
+    attack: read("attack"),
+    decay: read("decay"),
+    sustain: read("sustain"),
+    release: read("release"),
+    cardText: normalizeText(card?.textContent ?? ""),
+    handleLabels: {
+      attack: findEnvelopeHandle(source, "attack")?.getAttribute("aria-label") ?? null,
+      decaySustain: findEnvelopeHandle(source, "decay-sustain")?.getAttribute("aria-label") ?? null,
+      release: findEnvelopeHandle(source, "release")?.getAttribute("aria-label") ?? null,
+    },
+  };
+}
+
+function dragEnvelopeHandle(source: "env.1" | "env.2", kind: "attack" | "decay-sustain" | "release", xRatio: number, yRatio: number) {
+  const handle = findEnvelopeHandle(source, kind);
+  const rail = handle?.parentElement?.querySelector<SVGSVGElement>("svg");
+  const handleRect = handle?.getBoundingClientRect();
+  const railRect = rail?.getBoundingClientRect();
+  if (!handle || !railRect || !handleRect || railRect.width <= 0 || railRect.height <= 0) return;
+  const pointerInit = {
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+    buttons: 1,
+    pointerId: 37,
+    pointerType: "mouse",
+    clientX: handleRect.left + handleRect.width / 2,
+    clientY: handleRect.top + handleRect.height / 2,
+  };
+  const targetX = railRect.left + railRect.width * Math.max(0, Math.min(1, xRatio));
+  const targetY = railRect.top + railRect.height * Math.max(0, Math.min(1, yRatio));
+  handle.dispatchEvent(new PointerEvent("pointerdown", pointerInit));
+  handle.dispatchEvent(new PointerEvent("pointermove", {
+    ...pointerInit,
+    clientX: targetX,
+    clientY: targetY,
+  }));
+  handle.dispatchEvent(new PointerEvent("pointerup", {
+    ...pointerInit,
+    buttons: 0,
+    clientX: targetX,
+    clientY: targetY,
+  }));
+}
+
 function aetherAutomationPointEditorLabel(editor: DevAetherAutomationPointEditor): string {
   if (editor === "track") return "Aether track automation points";
   if (editor === "segment") return "Aether segment automation points";
@@ -1943,6 +2096,13 @@ async function waitForTrackAutomationHandle(edge: "start" | "mid" | "end") {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     await nextFrame();
     if (findTrackAutomationHandle(edge)) return;
+  }
+}
+
+async function waitForEnvelopeHandle(source: "env.1" | "env.2", kind: "attack" | "decay-sustain" | "release") {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await nextFrame();
+    if (findEnvelopeHandle(source, kind)) return;
   }
 }
 

@@ -1455,15 +1455,17 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
                 <div
                   class={styles.envelopeCard}
                   data-synth-source-editor={source}
+                  data-aether-envelope-editor={source}
                   data-active={props.focusedSourceTarget === source ? "true" : "false"}
                 >
                   <div class={styles.envelopeCardHeader}>
                     <strong>{envelope().label}</strong>
                     <span>{envelope().mode}</span>
                   </div>
-                  <svg class={styles.envelopeShape} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                    <polyline points={envelopePolyline(envelope().points)} />
-                  </svg>
+                  <EnvelopeHandleEditor
+                    source={source}
+                    onChange={setNumericParameter}
+                  />
                   <div class={styles.envelopeCardMeta}>
                     <span>{envelope().timingLabel}</span>
                     <span>{envelope().sustainLabel}</span>
@@ -1560,6 +1562,111 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
         </Button>
       </div>
     </section>
+  );
+}
+
+function EnvelopeHandleEditor(props: {
+  source: "env.1" | "env.2";
+  onChange: (id: SynthParameterId, value: number) => void;
+}) {
+  let railRef: SVGSVGElement | undefined;
+  const [draggedHandle, setDraggedHandle] = createSignal<"attack" | "decay-sustain" | "release" | null>(null);
+  const draft = createStoreSelector(useSynthStore, (state) => state.draft);
+  const envelope = createMemo(() => synthEnvelopeEditorSummary(draft(), props.source));
+  const attack = createMemo(() => getNumberParam(draft(), `${props.source}.attack` as SynthParameterId));
+  const decay = createMemo(() => getNumberParam(draft(), `${props.source}.decay` as SynthParameterId));
+  const sustain = createMemo(() => getNumberParam(draft(), `${props.source}.sustain` as SynthParameterId));
+  const release = createMemo(() => getNumberParam(draft(), `${props.source}.release` as SynthParameterId));
+
+  const attackPoint = createMemo(() => envelope().points[1] ?? { x: 0, y: 0 });
+  const decayPoint = createMemo(() => envelope().points[2] ?? { x: 50, y: 50 });
+  const releasePoint = createMemo(() => envelope().points[4] ?? { x: 100, y: 100 });
+
+  function updateHandle(kind: "attack" | "decay-sustain" | "release", event: PointerEvent) {
+    const rail = railRef;
+    const rect = rail?.getBoundingClientRect();
+    if (!rail || !rect || rect.width <= 0 || rect.height <= 0) return;
+    const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
+    const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
+    if (kind === "attack") {
+      props.onChange(`${props.source}.attack` as SynthParameterId, snapEnvelopeSeconds(x * 5));
+    } else if (kind === "decay-sustain") {
+      props.onChange(`${props.source}.decay` as SynthParameterId, snapEnvelopeSeconds(x * 5));
+      props.onChange(`${props.source}.sustain` as SynthParameterId, snap01(1 - y));
+    } else {
+      props.onChange(`${props.source}.release` as SynthParameterId, snapEnvelopeSeconds(x * 5));
+    }
+  }
+
+  function startHandleDrag(kind: "attack" | "decay-sustain" | "release", event: PointerEvent) {
+    event.preventDefault();
+    if (event.currentTarget instanceof HTMLElement) {
+      try {
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+      } catch {
+        // Synthetic fixture events do not always create an active pointer capture.
+      }
+    }
+    setDraggedHandle(kind);
+    updateHandle(kind, event);
+  }
+
+  function moveHandleDrag(kind: "attack" | "decay-sustain" | "release", event: PointerEvent) {
+    if (draggedHandle() !== kind) return;
+    updateHandle(kind, event);
+  }
+
+  function stopHandleDrag(kind: "attack" | "decay-sustain" | "release", event: PointerEvent) {
+    if (draggedHandle() !== kind) return;
+    updateHandle(kind, event);
+    setDraggedHandle(null);
+  }
+
+  return (
+    <div class={styles.envelopeHandleEditor} aria-label={`${envelope().label} direct envelope editor`}>
+      <svg
+        ref={railRef}
+        class={styles.envelopeHandleRail}
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <polyline points={envelopePolyline(envelope().points)} />
+      </svg>
+      <button
+        type="button"
+        class={styles.envelopeHandle}
+        style={{ left: `${attackPoint().x}%`, top: `${attackPoint().y}%` }}
+        data-aether-envelope-handle="attack"
+        aria-label={`${envelope().label} attack ${formatSeconds(attack())}`}
+        onPointerDown={(event) => startHandleDrag("attack", event)}
+        onPointerMove={(event) => moveHandleDrag("attack", event)}
+        onPointerUp={(event) => stopHandleDrag("attack", event)}
+        onPointerCancel={() => setDraggedHandle(null)}
+      />
+      <button
+        type="button"
+        class={styles.envelopeHandle}
+        style={{ left: `${decayPoint().x}%`, top: `${decayPoint().y}%` }}
+        data-aether-envelope-handle="decay-sustain"
+        aria-label={`${envelope().label} decay ${formatSeconds(decay())} sustain ${Math.round(sustain() * 100)}%`}
+        onPointerDown={(event) => startHandleDrag("decay-sustain", event)}
+        onPointerMove={(event) => moveHandleDrag("decay-sustain", event)}
+        onPointerUp={(event) => stopHandleDrag("decay-sustain", event)}
+        onPointerCancel={() => setDraggedHandle(null)}
+      />
+      <button
+        type="button"
+        class={styles.envelopeHandle}
+        style={{ left: `${releasePoint().x}%`, top: `${releasePoint().y}%` }}
+        data-aether-envelope-handle="release"
+        aria-label={`${envelope().label} release ${formatSeconds(release())}`}
+        onPointerDown={(event) => startHandleDrag("release", event)}
+        onPointerMove={(event) => moveHandleDrag("release", event)}
+        onPointerUp={(event) => stopHandleDrag("release", event)}
+        onPointerCancel={() => setDraggedHandle(null)}
+      />
+    </div>
   );
 }
 
@@ -1744,6 +1851,19 @@ function formatSeconds(value: number): string {
 
 function envelopePolyline(points: Array<{ x: number; y: number }>): string {
   return points.map((point) => `${point.x},${point.y}`).join(" ");
+}
+
+function snapEnvelopeSeconds(value: number): number {
+  return Math.round(clamp(value, 0, 30) * 1000) / 1000;
+}
+
+function snap01(value: number): number {
+  return Math.round(clamp(value, 0, 1) * 100) / 100;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
 }
 
 const MODULATABLE_PARAMETER_IDS = new Set<string>([
