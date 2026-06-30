@@ -191,6 +191,7 @@ interface DevAutomationPointEditorExercise {
   afterCopy: DevAutomationPointSnapshot[];
   afterPaste: DevAutomationPointSnapshot[];
   afterRemove: DevAutomationPointSnapshot[];
+  afterClear: DevAutomationPointSnapshot[];
   selectedPointCount: number;
   pointPanelText: string;
 }
@@ -1908,6 +1909,9 @@ export function installBeatDevHooks() {
     clickLastAutomationPointRemove(pointPanelLabel);
     await nextFrame();
     const afterRemove = readAutomationPointPanelRows(pointPanelLabel);
+    clickPanelButtonByText(aetherAutomationLanePanelLabel(editor), "Clear");
+    await nextFrame();
+    const afterClear = readAutomationPointPanelRows(pointPanelLabel);
     return {
       editor,
       target,
@@ -1922,6 +1926,7 @@ export function installBeatDevHooks() {
       afterCopy,
       afterPaste,
       afterRemove,
+      afterClear,
       selectedPointCount: readAutomationPointSelectionCount(pointPanelLabel),
       pointPanelText: readPanelState(pointPanelLabel).text,
     };

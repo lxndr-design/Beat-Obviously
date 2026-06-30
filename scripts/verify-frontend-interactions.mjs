@@ -479,12 +479,14 @@ try {
       && devHooksSource.includes("chooseAutomationCurve")
       && devHooksSource.includes("curveBefore")
       && devHooksSource.includes("curveAfter")
+      && devHooksSource.includes('clickPanelButtonByText(aetherAutomationLanePanelLabel(editor), "Clear")')
       && devHooksSource.includes("setAutomationPointSelection")
       && devHooksSource.includes("lastSelectablePointIndex")
       && devHooksSource.includes("selectedPointCount")
       && devHooksSource.includes("afterPaste")
-      && devHooksSource.includes("afterRemove"),
-    "browser fixture automation point editor flow should select curve state and a multi-row point subset before Copy/Paste and Remove clicks",
+      && devHooksSource.includes("afterRemove")
+      && devHooksSource.includes("afterClear"),
+    "browser fixture automation point editor flow should select curve state, copy/paste/remove points, and clear the visible lane",
   );
   assert.ok(
     devHooksSource.includes("exerciseAetherDirectAutomationPointEditorFlow")
