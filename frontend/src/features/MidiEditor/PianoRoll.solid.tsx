@@ -943,7 +943,11 @@ export function PianoRoll(props: PianoRollProps) {
       automationDragHistoryPushedRef.current = true;
     }
     const target = event.currentTarget as HTMLElement;
-    target.setPointerCapture(event.pointerId);
+    try {
+      target.setPointerCapture(event.pointerId);
+    } catch {
+      // Synthetic verifier events may not create an active browser pointer capture.
+    }
     updateAutomationPointDrag(edge, event);
   }
 
@@ -1603,6 +1607,7 @@ export function PianoRoll(props: PianoRollProps) {
                     left: `${normalizeAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().startValue) * 100}%`,
                   }}
                   disabled={selected().length === 0}
+                  data-aether-note-automation-handle="start"
                   aria-label={`Drag start ${aetherNoteAutomationTargetLabel(activeAutomationTarget())} value`}
                   onPointerDown={(event) => startAutomationPointDrag("start", event)}
                   onPointerMove={(event) => draggedAutomationEdge() === "start" && updateAutomationPointDrag("start", event)}
@@ -1618,6 +1623,7 @@ export function PianoRoll(props: PianoRollProps) {
                     left: `${normalizeAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().midValue) * 100}%`,
                   }}
                   disabled={selected().length === 0}
+                  data-aether-note-automation-handle="mid"
                   aria-label={`Drag midpoint ${aetherNoteAutomationTargetLabel(activeAutomationTarget())} value`}
                   onPointerDown={(event) => startAutomationPointDrag("mid", event)}
                   onPointerMove={(event) => draggedAutomationEdge() === "mid" && updateAutomationPointDrag("mid", event)}
@@ -1633,6 +1639,7 @@ export function PianoRoll(props: PianoRollProps) {
                     left: `${normalizeAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().endValue) * 100}%`,
                   }}
                   disabled={selected().length === 0}
+                  data-aether-note-automation-handle="end"
                   aria-label={`Drag end ${aetherNoteAutomationTargetLabel(activeAutomationTarget())} value`}
                   onPointerDown={(event) => startAutomationPointDrag("end", event)}
                   onPointerMove={(event) => draggedAutomationEdge() === "end" && updateAutomationPointDrag("end", event)}
