@@ -96,6 +96,7 @@ declare global {
       exerciseAetherMacroAssignmentEditorFlow: () => Promise<DevAetherMacroAssignmentExerciseState>;
       exerciseAetherWavemapEditorFlow: () => Promise<DevAetherWavemapEditorFixtureState>;
       exerciseAetherWavemapPointerDrawFlow: () => Promise<DevAetherWavemapPointerDrawExerciseState>;
+      exerciseAetherWavemapImportFlow: () => Promise<DevAetherWavemapImportExerciseState>;
       exerciseAetherPresetLibraryFavoriteFlow: () => Promise<{
         installed: DevAetherPresetLibraryFixtureState;
         filtered: DevAetherPresetLibraryFixtureState;
@@ -272,6 +273,27 @@ interface DevAetherWavemapPointerDrawExerciseState {
     label: string | null;
     pathChanged: boolean;
   };
+}
+
+interface DevAetherWavemapSourceSnapshot {
+  sourceKind: string | null;
+  sourceLabel: string | null;
+  audioFileId: string | null;
+  sampleRate: number | null;
+  channelCount: number | null;
+  bitDepth: number | null;
+  sourceSampleCount: number | null;
+  sourceStartSample: number | null;
+  sourceEndSample: number | null;
+  frameCount: number;
+}
+
+interface DevAetherWavemapImportExerciseState {
+  before: DevAetherWavemapSourceSnapshot;
+  afterImport: DevAetherWavemapSourceSnapshot;
+  editor: DevAetherWavemapEditorFixtureState;
+  firstFrame: DevAetherWavemapFrameSnapshot;
+  manualRangeText: string;
 }
 
 let installed = false;
@@ -790,6 +812,29 @@ export function installBeatDevHooks() {
     return state;
   };
 
+  const exerciseAetherWavemapImportFlow = async (): Promise<DevAetherWavemapImportExerciseState> => {
+    await installAetherWavemapEditorFixtureBase();
+    clickPanelButton("Oscillator A wavemap frames", "Manual audio resynthesis window");
+    await nextFrame();
+    setNumberInputInPanel("Manual audio resynthesis range", "Start", "18");
+    setNumberInputInPanel("Manual audio resynthesis range", "End", "72");
+    await nextFrame();
+
+    const before = readAetherWavemapSourceSnapshot();
+    window.__beatDevAudioImportQueue = [createDevWavemapAudioFile()];
+    clickPanelButtonByText("Oscillator A wavemap frames", "Import Audio");
+    await waitForAetherWavemapSourceKind("imported-audio");
+    const state: DevAetherWavemapImportExerciseState = {
+      before,
+      afterImport: readAetherWavemapSourceSnapshot(),
+      editor: readAetherWavemapEditorFixtureState(),
+      firstFrame: readAetherWavemapFirstFrameSnapshot(),
+      manualRangeText: normalizeText(findElementByAriaLabel("Manual audio resynthesis range")?.textContent ?? ""),
+    };
+    writeAetherWavemapImportExerciseMarker(state);
+    return state;
+  };
+
   const installAetherAutomationFixture = () => {
     const instrumentStore = useInstrumentStore.getState();
     for (const instrument of instrumentStore.instruments) {
@@ -1036,6 +1081,7 @@ export function installBeatDevHooks() {
     exerciseAetherMacroAssignmentEditorFlow,
     exerciseAetherWavemapEditorFlow,
     exerciseAetherWavemapPointerDrawFlow,
+    exerciseAetherWavemapImportFlow,
     exerciseAetherPresetLibraryFavoriteFlow,
     installAetherAutomationFixture,
     openAetherAutomationFixtureEditor,
@@ -1085,6 +1131,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-wavemap-pointer-draw") {
     window.setTimeout(() => {
       void exerciseAetherWavemapPointerDrawFlow();
+    }, 0);
+  } else if (fixture === "aether-wavemap-import") {
+    window.setTimeout(() => {
+      void exerciseAetherWavemapImportFlow();
     }, 0);
   } else if (fixture === "aether-automation") {
     window.setTimeout(() => {
@@ -1301,6 +1351,28 @@ function readAetherWavemapFirstFrameSnapshot(): DevAetherWavemapFrameSnapshot {
   };
 }
 
+function readAetherWavemapSourceSnapshot(): DevAetherWavemapSourceSnapshot {
+  const table = readAetherWavemapFixtureTable();
+  const source = table?.source;
+  return {
+    sourceKind: source?.kind ?? null,
+    sourceLabel: source?.label ?? null,
+    audioFileId: source?.audioFileId ?? null,
+    sampleRate: source?.sampleRate ?? null,
+    channelCount: source?.channelCount ?? null,
+    bitDepth: source?.bitDepth ?? null,
+    sourceSampleCount: source?.sourceSampleCount ?? null,
+    sourceStartSample: source?.sourceStartSample ?? null,
+    sourceEndSample: source?.sourceEndSample ?? null,
+    frameCount: table?.frames.length ?? 0,
+  };
+}
+
+function readAetherWavemapFixtureTable() {
+  const draft = useSynthStore.getState().draft;
+  return draft.metadata.wavemaps?.[DEV_AETHER_WAVEMAP_ID] ?? draft.metadata.customWavetables?.[DEV_AETHER_WAVEMAP_ID] ?? null;
+}
+
 function findFirstWavemapDrawSurface(): SVGSVGElement | null {
   const editor = findElementByAriaLabel("Oscillator A wavemap frames");
   return Array.from(editor?.querySelectorAll<SVGSVGElement>('svg[aria-label="Draw waveform"]') ?? [])[0] ?? null;
@@ -1486,6 +1558,10 @@ function writeAetherWavemapPointerDrawExerciseMarker(state: DevAetherWavemapPoin
   document.documentElement.dataset.beatAetherWavemapPointerDrawExercise = JSON.stringify(state);
 }
 
+function writeAetherWavemapImportExerciseMarker(state: DevAetherWavemapImportExerciseState) {
+  document.documentElement.dataset.beatAetherWavemapImportExercise = JSON.stringify(state);
+}
+
 function aetherAutomationPointEditorLabel(editor: DevAetherAutomationPointEditor): string {
   if (editor === "track") return "Aether track automation points";
   if (editor === "segment") return "Aether segment automation points";
@@ -1519,6 +1595,13 @@ async function waitForArrangementAutomationLane() {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     await nextFrame();
     if (document.querySelector("[data-aether-arrangement-automation]")) return;
+  }
+}
+
+async function waitForAetherWavemapSourceKind(kind: string) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    await nextFrame();
+    if (readAetherWavemapSourceSnapshot().sourceKind === kind) return;
   }
 }
 
@@ -1588,6 +1671,68 @@ function createBrowserWavemapFixture() {
       },
     })),
   };
+}
+
+function createDevWavemapAudioFile() {
+  const sampleRate = 44_100;
+  const durationSeconds = 0.42;
+  const sampleCount = Math.floor(sampleRate * durationSeconds);
+  const samples = new Float32Array(sampleCount);
+  for (let index = 0; index < sampleCount; index += 1) {
+    const t = index / sampleRate;
+    const sweep = 180 + 720 * (index / Math.max(1, sampleCount - 1));
+    samples[index] = Math.max(-1, Math.min(1,
+      0.54 * Math.sin(2 * Math.PI * sweep * t)
+      + 0.22 * Math.sin(2 * Math.PI * 2.01 * sweep * t + 0.4)
+      + 0.08 * Math.sin(2 * Math.PI * 5.2 * sweep * t + 1.2),
+    ));
+  }
+  return {
+    id: "dev-aether-import-audio",
+    name: "dev-aether-import.wav",
+    path: wavSamplesToDataUrl(samples, sampleRate),
+    durationSeconds,
+    sampleRate,
+    bitDepth: 16,
+    sizeBytes: 44 + sampleCount * 2,
+    importedAt: 1_700_000_512_000,
+  };
+}
+
+function wavSamplesToDataUrl(samples: Float32Array, sampleRate: number): string {
+  const bytesPerSample = 2;
+  const dataBytes = samples.length * bytesPerSample;
+  const buffer = new ArrayBuffer(44 + dataBytes);
+  const view = new DataView(buffer);
+  writeAscii(view, 0, "RIFF");
+  view.setUint32(4, 36 + dataBytes, true);
+  writeAscii(view, 8, "WAVE");
+  writeAscii(view, 12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * bytesPerSample, true);
+  view.setUint16(32, bytesPerSample, true);
+  view.setUint16(34, 16, true);
+  writeAscii(view, 36, "data");
+  view.setUint32(40, dataBytes, true);
+  for (let index = 0; index < samples.length; index += 1) {
+    const sample = Math.max(-1, Math.min(1, samples[index] ?? 0));
+    view.setInt16(44 + index * 2, Math.round(sample * 32767), true);
+  }
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  for (let index = 0; index < bytes.length; index += 1) {
+    binary += String.fromCharCode(bytes[index] ?? 0);
+  }
+  return `data:audio/wav;base64,${btoa(binary)}`;
+}
+
+function writeAscii(view: DataView, offset: number, value: string) {
+  for (let index = 0; index < value.length; index += 1) {
+    view.setUint8(offset + index, value.charCodeAt(index));
+  }
 }
 
 function createAetherPresetLibraryFixtureRecord({

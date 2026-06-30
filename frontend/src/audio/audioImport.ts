@@ -7,7 +7,16 @@ import {
   SUPPORTED_AUDIO_IMPORT_LABEL,
 } from "./audioFormats";
 
+declare global {
+  interface Window {
+    __beatDevAudioImportQueue?: AudioFile[];
+  }
+}
+
 export async function importAudioFile(pathHint?: string): Promise<AudioFile | null> {
+  if (import.meta.env.DEV && !isNative() && window.__beatDevAudioImportQueue?.length) {
+    return window.__beatDevAudioImportQueue.shift() ?? null;
+  }
   const resp = await send({ kind: "audio.import", pathHint });
   if (resp.file) return resp.file;
   if (isNative()) return null;
