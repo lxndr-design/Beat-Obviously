@@ -95,6 +95,7 @@ declare global {
       readAetherMacroFixtureState: () => DevAetherMacroFixtureState;
       exerciseAetherMacroAssignmentEditorFlow: () => Promise<DevAetherMacroAssignmentExerciseState>;
       exerciseAetherWavemapEditorFlow: () => Promise<DevAetherWavemapEditorFixtureState>;
+      exerciseAetherWavemapPointerDrawFlow: () => Promise<DevAetherWavemapPointerDrawExerciseState>;
       exerciseAetherPresetLibraryFavoriteFlow: () => Promise<{
         installed: DevAetherPresetLibraryFixtureState;
         filtered: DevAetherPresetLibraryFixtureState;
@@ -239,6 +240,37 @@ interface DevAetherWavemapEditorFixtureState {
     additive: boolean;
     manual: boolean;
     smooth: boolean;
+  };
+}
+
+interface DevAetherWavemapFrameSnapshot {
+  brightness: number | null;
+  even: number | null;
+  fold: number | null;
+  formant: number | null;
+  notch: number | null;
+  skew: number | null;
+  tilt: number | null;
+  focus: number | null;
+  phase: number | null;
+  partials: number[];
+  analysis: {
+    rms: number | null;
+    peak: number | null;
+    zeroCrossRate: number | null;
+    roughness: number | null;
+    spectralCentroid: number | null;
+  };
+}
+
+interface DevAetherWavemapPointerDrawExerciseState {
+  before: DevAetherWavemapFrameSnapshot;
+  afterDraw: DevAetherWavemapFrameSnapshot;
+  editor: DevAetherWavemapEditorFixtureState;
+  drawSurface: {
+    exists: boolean;
+    label: string | null;
+    pathChanged: boolean;
   };
 }
 
@@ -666,7 +698,7 @@ export function installBeatDevHooks() {
     return state;
   };
 
-  const exerciseAetherWavemapEditorFlow = async (): Promise<DevAetherWavemapEditorFixtureState> => {
+  const installAetherWavemapEditorFixtureBase = async () => {
     const instrumentStore = useInstrumentStore.getState();
     for (const instrument of instrumentStore.instruments) {
       if ((instrument.id === DEV_AETHER_WAVEMAP_INSTRUMENT_ID || instrument.source?.label === DEV_AETHER_WAVEMAP_INSTRUMENT_ID_MARKER) && instrument.userCreated) {
@@ -710,7 +742,11 @@ export function installBeatDevHooks() {
     useSynthStore.getState().setDraft(patch);
     useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
     await waitForEditorPanel("Oscillator A wavemap frames");
+    return { instrumentId: nextInstrumentId };
+  };
 
+  const exerciseAetherWavemapEditorFlow = async (): Promise<DevAetherWavemapEditorFixtureState> => {
+    await installAetherWavemapEditorFixtureBase();
     clickPanelButton("Oscillator A wavemap frames", "Details wavemap analysis");
     clickPanelButton("Oscillator A wavemap frames", "Additive wavemap editing");
     clickPanelButton("Oscillator A wavemap frames", "Manual audio resynthesis window");
@@ -724,6 +760,33 @@ export function installBeatDevHooks() {
     await nextFrame();
     const state = readAetherWavemapEditorFixtureState();
     writeAetherWavemapEditorFixtureMarker(state);
+    return state;
+  };
+
+  const exerciseAetherWavemapPointerDrawFlow = async (): Promise<DevAetherWavemapPointerDrawExerciseState> => {
+    await installAetherWavemapEditorFixtureBase();
+    clickPanelButton("Oscillator A wavemap frames", "Freehand wavemap editing");
+    await nextFrame();
+
+    const before = readAetherWavemapFirstFrameSnapshot();
+    const pathBefore = readFirstWavemapDrawPath();
+    const drawSurface = findFirstWavemapDrawSurface();
+    dragFirstWavemapDrawSurface();
+    await nextFrame();
+
+    const afterDraw = readAetherWavemapFirstFrameSnapshot();
+    const pathAfter = readFirstWavemapDrawPath();
+    const state: DevAetherWavemapPointerDrawExerciseState = {
+      before,
+      afterDraw,
+      editor: readAetherWavemapEditorFixtureState(),
+      drawSurface: {
+        exists: Boolean(drawSurface),
+        label: drawSurface?.getAttribute("aria-label") ?? null,
+        pathChanged: Boolean(pathBefore && pathAfter && pathBefore !== pathAfter),
+      },
+    };
+    writeAetherWavemapPointerDrawExerciseMarker(state);
     return state;
   };
 
@@ -972,6 +1035,7 @@ export function installBeatDevHooks() {
     readAetherMacroFixtureState,
     exerciseAetherMacroAssignmentEditorFlow,
     exerciseAetherWavemapEditorFlow,
+    exerciseAetherWavemapPointerDrawFlow,
     exerciseAetherPresetLibraryFavoriteFlow,
     installAetherAutomationFixture,
     openAetherAutomationFixtureEditor,
@@ -1017,6 +1081,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-wavemap-editor") {
     window.setTimeout(() => {
       void exerciseAetherWavemapEditorFlow();
+    }, 0);
+  } else if (fixture === "aether-wavemap-pointer-draw") {
+    window.setTimeout(() => {
+      void exerciseAetherWavemapPointerDrawFlow();
     }, 0);
   } else if (fixture === "aether-automation") {
     window.setTimeout(() => {
@@ -1207,6 +1275,76 @@ function readAetherWavemapEditorFixtureState(): DevAetherWavemapEditorFixtureSta
   };
 }
 
+function readAetherWavemapFirstFrameSnapshot(): DevAetherWavemapFrameSnapshot {
+  const draft = useSynthStore.getState().draft;
+  const table = draft.metadata.wavemaps?.[DEV_AETHER_WAVEMAP_ID] ?? draft.metadata.customWavetables?.[DEV_AETHER_WAVEMAP_ID] ?? null;
+  const frame = table?.frames?.[0] ?? null;
+  const analysis = frame?.analysis;
+  return {
+    brightness: frame?.brightness ?? null,
+    even: frame?.even ?? null,
+    fold: frame?.fold ?? null,
+    formant: frame?.formant ?? null,
+    notch: frame?.notch ?? null,
+    skew: frame?.skew ?? null,
+    tilt: frame?.tilt ?? null,
+    focus: frame?.focus ?? null,
+    phase: frame?.phase ?? null,
+    partials: frame?.partials?.slice(0, 8) ?? [],
+    analysis: {
+      rms: analysis?.rms ?? null,
+      peak: analysis?.peak ?? null,
+      zeroCrossRate: analysis?.zeroCrossRate ?? null,
+      roughness: analysis?.roughness ?? null,
+      spectralCentroid: analysis?.spectralCentroid ?? null,
+    },
+  };
+}
+
+function findFirstWavemapDrawSurface(): SVGSVGElement | null {
+  const editor = findElementByAriaLabel("Oscillator A wavemap frames");
+  return Array.from(editor?.querySelectorAll<SVGSVGElement>('svg[aria-label="Draw waveform"]') ?? [])[0] ?? null;
+}
+
+function readFirstWavemapDrawPath(): string | null {
+  return findFirstWavemapDrawSurface()?.querySelector<SVGPathElement>("path")?.getAttribute("d") ?? null;
+}
+
+function dragFirstWavemapDrawSurface() {
+  const surface = findFirstWavemapDrawSurface();
+  const rect = surface?.getBoundingClientRect();
+  if (!surface || !rect || rect.width <= 0 || rect.height <= 0) return;
+  const point = (xRatio: number, yRatio: number) => ({
+    clientX: rect.left + rect.width * xRatio,
+    clientY: rect.top + rect.height * yRatio,
+  });
+  const pointerBase = {
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+    buttons: 1,
+    pointerId: 11,
+    pointerType: "mouse",
+  };
+  surface.dispatchEvent(new PointerEvent("pointerdown", {
+    ...pointerBase,
+    ...point(0.12, 0.82),
+  }));
+  surface.dispatchEvent(new PointerEvent("pointermove", {
+    ...pointerBase,
+    ...point(0.38, 0.24),
+  }));
+  surface.dispatchEvent(new PointerEvent("pointermove", {
+    ...pointerBase,
+    ...point(0.74, 0.68),
+  }));
+  surface.dispatchEvent(new PointerEvent("pointerup", {
+    ...pointerBase,
+    buttons: 0,
+    ...point(0.74, 0.68),
+  }));
+}
+
 function findElementByAriaLabel(label: string, root: ParentNode | null = document): HTMLElement | null {
   return Array.from(root?.querySelectorAll<HTMLElement>("[aria-label]") ?? [])
     .find((candidate) => candidate.getAttribute("aria-label") === label) ?? null;
@@ -1342,6 +1480,10 @@ function writeAetherMacroAssignmentExerciseMarker(state: DevAetherMacroAssignmen
 
 function writeAetherWavemapEditorFixtureMarker(state = readAetherWavemapEditorFixtureState()) {
   document.documentElement.dataset.beatAetherWavemapEditorFixture = JSON.stringify(state);
+}
+
+function writeAetherWavemapPointerDrawExerciseMarker(state: DevAetherWavemapPointerDrawExerciseState) {
+  document.documentElement.dataset.beatAetherWavemapPointerDrawExercise = JSON.stringify(state);
 }
 
 function aetherAutomationPointEditorLabel(editor: DevAetherAutomationPointEditor): string {

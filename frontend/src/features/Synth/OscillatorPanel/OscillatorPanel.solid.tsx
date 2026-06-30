@@ -674,7 +674,11 @@ function MiniWaveform(props: { samples: number[]; disabled?: boolean; onDrawSamp
       aria-label={props.onDrawSamples && !props.disabled ? "Draw waveform" : undefined}
       onPointerDown={(event) => {
         if (!props.onDrawSamples || props.disabled) return;
-        event.currentTarget.setPointerCapture(event.pointerId);
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {
+          // Synthetic verifier events may not create an active browser pointer capture.
+        }
         setWorkingSamples(props.samples.slice());
         setLastDrawPoint(null);
         updateFromPointer(event);

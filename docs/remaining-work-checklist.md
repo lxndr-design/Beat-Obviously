@@ -29,6 +29,7 @@ Current implementation focus:
    - Done: Synth Editor macro browser fixture coverage for visible assignment lanes and overlapping-route conflict rows.
    - Done: Aether automation point-editor browser fixture coverage for Add Point, field editing, Quantize, and Snap Values across note, segment, and track Macro 1 lanes.
    - Done: Aether wavemap editor browser fixture coverage for Details analysis, Additive mode, Odd partials, Manual range, and Smooth interpolation.
+   - Done: Aether wavemap Freehand pointer-draw browser fixture coverage, including changed frame data and changed rendered waveform path.
    - Done: Synth Editor macro assignment fixture coverage for Modulation Matrix Add route, source selection, target menu selection, strength edit, and enable/disable controls.
    - Done: arrangement-view Aether automation drag fixture coverage for free point dragging and shift-snap point dragging.
    - Add browser-level flow coverage for broader synth editing, wavemap import/draw, arrangement editing, export, relink, backup restore, and Project Health repairs.
