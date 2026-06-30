@@ -35,6 +35,7 @@ try {
   const segmentEditorSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx"), "utf8");
   const trackDetailsSource = readFileSync(join(repoRoot, "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx"), "utf8");
   const synthEditorSource = readFileSync(join(repoRoot, "frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx"), "utf8");
+  const oscillatorPanelSource = readFileSync(join(repoRoot, "frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx"), "utf8");
   const devHooksSource = readFileSync(join(repoRoot, "frontend/src/testing/devHooks.ts"), "utf8");
 
   assert.equal(runner.snapBeat(1.12, 0.25), 1, "snapBeat should snap to nearest grid");
@@ -501,6 +502,21 @@ try {
       && devHooksSource.includes("beatAetherLfoExercise")
       && devHooksSource.includes('fixture === "aether-lfo"'),
     "browser fixture coverage should exercise Aether LFO control editing",
+  );
+  assert.ok(
+    oscillatorPanelSource.includes('aria-label="Oscillator"')
+      && oscillatorPanelSource.includes('aria-label={`${label()} row`}')
+      && oscillatorPanelSource.includes('aria-label="Wavetable"')
+      && oscillatorPanelSource.includes('aria-label="Warp mode"')
+      && oscillatorPanelSource.includes('aria-label="Voice stack row"'),
+    "Aether Oscillator panel should expose row-scoped controls for browser coverage",
+  );
+  assert.ok(
+    devHooksSource.includes("exerciseAetherOscillatorEditorFlow")
+      && devHooksSource.includes("setKnobValueInRegion")
+      && devHooksSource.includes("beatAetherOscillatorExercise")
+      && devHooksSource.includes('fixture === "aether-oscillator"'),
+    "browser fixture coverage should exercise Aether oscillator and voice-stack editing",
   );
   assert.ok(
     synthEditorSource.includes('aria-label="Amp and filter"')

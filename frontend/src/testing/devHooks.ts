@@ -35,6 +35,8 @@ const DEV_MIXED_ERA_AETHER_FX_INSTRUMENT_ID = "dev-mixed-era-aether-fx-host";
 const DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID = "dev-aether-preset-library-favorite";
 const DEV_AETHER_PRESET_LIBRARY_PLAIN_ID = "dev-aether-preset-library-plain";
 const DEV_AETHER_PRESET_LIBRARY_INSTRUMENT_ID = "dev-aether-preset-library-host";
+const DEV_AETHER_OSCILLATOR_INSTRUMENT_ID = "dev-aether-oscillator-host";
+const DEV_AETHER_OSCILLATOR_INSTRUMENT_ID_MARKER = "Aether oscillator editor dev fixture";
 const DEV_AETHER_MACRO_INSTRUMENT_ID = "dev-aether-macro-host";
 const DEV_AETHER_MACRO_INSTRUMENT_ID_MARKER = "Aether macro browser dev fixture";
 const DEV_AETHER_WAVEMAP_INSTRUMENT_ID = "dev-aether-wavemap-editor-host";
@@ -102,6 +104,7 @@ declare global {
         instrumentId: string;
       }>;
       readAetherMacroFixtureState: () => DevAetherMacroFixtureState;
+      exerciseAetherOscillatorEditorFlow: () => Promise<DevAetherOscillatorExerciseState>;
       exerciseAetherMacroAssignmentEditorFlow: () => Promise<DevAetherMacroAssignmentExerciseState>;
       exerciseAetherWavemapEditorFlow: () => Promise<DevAetherWavemapEditorFixtureState>;
       exerciseAetherWavemapPointerDrawFlow: () => Promise<DevAetherWavemapPointerDrawExerciseState>;
@@ -304,6 +307,37 @@ interface DevAetherMacroAssignmentExerciseState {
   macroAfterEdit: DevAetherMacroFixtureState;
   macroAfterDisable: DevAetherMacroFixtureState;
   matrixText: string;
+}
+
+interface DevAetherOscillatorSnapshot {
+  instrumentId: string | null;
+  oscAEnabled: boolean;
+  oscAWavetable: string | null;
+  oscAWarpMode: string | null;
+  oscAPosition: number | null;
+  oscAWarp: number | null;
+  oscALevel: number | null;
+  oscAPan: number | null;
+  oscAFine: number | null;
+  oscBEnabled: boolean;
+  oscBWavetable: string | null;
+  oscBWarpMode: string | null;
+  oscBLevel: number | null;
+  oscBPan: number | null;
+  unisonEnabled: boolean;
+  unisonVoices: number | null;
+  unisonDetune: number | null;
+  unisonBlend: number | null;
+  unisonSpread: number | null;
+  mono: boolean;
+  legato: boolean;
+  panelText: string;
+}
+
+interface DevAetherOscillatorExerciseState {
+  instrumentId: string | null;
+  before: DevAetherOscillatorSnapshot;
+  afterEdit: DevAetherOscillatorSnapshot;
 }
 
 interface DevAetherWavemapEditorFixtureState {
@@ -773,6 +807,96 @@ export function installBeatDevHooks() {
     await waitForPresetFavorite(DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID, false);
     const toggled = await readAetherPresetLibraryFixtureState();
     return { installed, filtered, selected, toggled };
+  };
+
+  const installAetherOscillatorFixtureBase = async () => {
+    const instrumentStore = useInstrumentStore.getState();
+    for (const instrument of instrumentStore.instruments) {
+      if ((instrument.id === DEV_AETHER_OSCILLATOR_INSTRUMENT_ID || instrument.source?.label === DEV_AETHER_OSCILLATOR_INSTRUMENT_ID_MARKER) && instrument.userCreated) {
+        instrumentStore.removeInstrument(instrument.id);
+      }
+    }
+
+    const baseDraft = createDefaultSynthDraft();
+    const patch: SynthDraftPatch = {
+      ...baseDraft,
+      name: "Oscillator Browser Host",
+      parameters: {
+        ...baseDraft.parameters,
+        "osc.a.enabled": true,
+        "osc.a.wavetable": "basic.saw",
+        "osc.a.warpMode": "shape",
+        "osc.a.position": 0.12,
+        "osc.a.warp": 0.2,
+        "osc.a.level": 0.8,
+        "osc.a.pan": 0,
+        "osc.a.fine": 0,
+        "osc.b.enabled": false,
+        "osc.b.wavetable": "basic.square",
+        "osc.b.warpMode": "shape",
+        "osc.b.level": 0.6,
+        "osc.b.pan": 0,
+        "unison.enabled": false,
+        "unison.voices": 1,
+        "unison.detune": 0.12,
+        "unison.blend": 0.75,
+        "unison.spread": 0.5,
+        "mono.enabled": false,
+        "legato.enabled": false,
+      },
+      metadata: {
+        ...baseDraft.metadata,
+        tags: [...new Set([...baseDraft.metadata.tags, "dev", "oscillator-browser"])],
+      },
+    };
+
+    const nextInstrumentId = instrumentStore.addInstrument({
+      ...synthDraftToInstrumentPatch(patch),
+      id: DEV_AETHER_OSCILLATOR_INSTRUMENT_ID,
+      name: patch.name,
+      source: { kind: "created", label: DEV_AETHER_OSCILLATOR_INSTRUMENT_ID_MARKER },
+      userCreated: true,
+    });
+    useSynthStore.getState().bindInstrument(nextInstrumentId);
+    useSynthStore.getState().setDraft(patch);
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
+    await waitForEditorPanel("Oscillator");
+    return { instrumentId: nextInstrumentId };
+  };
+
+  const exerciseAetherOscillatorEditorFlow = async (): Promise<DevAetherOscillatorExerciseState> => {
+    await installAetherOscillatorFixtureBase();
+    const before = readAetherOscillatorSnapshot();
+    clickRadioInRegion("Oscillator A row", "Wavetable", "Triangle");
+    clickRadioInRegion("Oscillator A row", "Warp mode", "Mirror warp mode");
+    await setKnobValueInRegion("Oscillator A row", "Position", "0.33");
+    await setKnobValueInRegion("Oscillator A row", "Warp", "0.58");
+    await setKnobValueInRegion("Oscillator A row", "Level", "0.67");
+    await setKnobValueInRegion("Oscillator A row", "Pan", "-0.24");
+    await setKnobValueInRegion("Oscillator A row", "Fine", "14");
+    clickPanelButton("Oscillator B row", "Enable Oscillator B");
+    await nextFrame();
+    clickRadioInRegion("Oscillator B row", "Wavetable", "Pulse");
+    clickRadioInRegion("Oscillator B row", "Warp mode", "Fold warp mode");
+    await setKnobValueInRegion("Oscillator B row", "Level", "0.41");
+    await setKnobValueInRegion("Oscillator B row", "Pan", "0.28");
+    clickPanelButton("Voice stack row", "Enable mono voice mode");
+    await nextFrame();
+    clickPanelButton("Voice stack row", "Enable legato retune mode");
+    clickPanelButton("Voice stack row", "Enable voice stack");
+    await nextFrame();
+    await setKnobValueInRegion("Voice stack row", "Voices", "5");
+    await setKnobValueInRegion("Voice stack row", "Detune", "0.23");
+    await setKnobValueInRegion("Voice stack row", "Blend", "0.64");
+    await setKnobValueInRegion("Voice stack row", "Spread", "0.79");
+    await nextFrame();
+    const state: DevAetherOscillatorExerciseState = {
+      instrumentId: useSynthStore.getState().boundInstrumentId,
+      before,
+      afterEdit: readAetherOscillatorSnapshot(),
+    };
+    writeAetherOscillatorExerciseMarker(state);
+    return state;
   };
 
   const installAetherMacroFixture = async () => {
@@ -1632,6 +1756,7 @@ export function installBeatDevHooks() {
     readAetherPresetLibraryFixtureState,
     installAetherMacroFixture,
     readAetherMacroFixtureState,
+    exerciseAetherOscillatorEditorFlow,
     exerciseAetherMacroAssignmentEditorFlow,
     exerciseAetherWavemapEditorFlow,
     exerciseAetherWavemapPointerDrawFlow,
@@ -1676,6 +1801,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-preset-library") {
     window.setTimeout(() => {
       void installAetherPresetLibraryFixture();
+    }, 0);
+  } else if (fixture === "aether-oscillator") {
+    window.setTimeout(() => {
+      void exerciseAetherOscillatorEditorFlow();
     }, 0);
   } else if (fixture === "aether-macro") {
     window.setTimeout(() => {
@@ -1994,6 +2123,43 @@ function readAetherPerformanceSnapshot(): DevAetherPerformanceSnapshot {
   };
 }
 
+function readAetherOscillatorSnapshot(): DevAetherOscillatorSnapshot {
+  const draft = useSynthStore.getState().draft;
+  const panel = findElementByAriaLabel("Oscillator");
+  const readNumber = (id: SynthParameterId) => {
+    const value = draft.parameters[id];
+    return typeof value === "number" ? value : null;
+  };
+  const readString = (id: SynthParameterId) => {
+    const value = draft.parameters[id];
+    return typeof value === "string" ? value : null;
+  };
+  return {
+    instrumentId: useSynthStore.getState().boundInstrumentId,
+    oscAEnabled: draft.parameters["osc.a.enabled"] === true,
+    oscAWavetable: readString("osc.a.wavetable"),
+    oscAWarpMode: readString("osc.a.warpMode"),
+    oscAPosition: readNumber("osc.a.position"),
+    oscAWarp: readNumber("osc.a.warp"),
+    oscALevel: readNumber("osc.a.level"),
+    oscAPan: readNumber("osc.a.pan"),
+    oscAFine: readNumber("osc.a.fine"),
+    oscBEnabled: draft.parameters["osc.b.enabled"] === true,
+    oscBWavetable: readString("osc.b.wavetable"),
+    oscBWarpMode: readString("osc.b.warpMode"),
+    oscBLevel: readNumber("osc.b.level"),
+    oscBPan: readNumber("osc.b.pan"),
+    unisonEnabled: draft.parameters["unison.enabled"] === true,
+    unisonVoices: readNumber("unison.voices"),
+    unisonDetune: readNumber("unison.detune"),
+    unisonBlend: readNumber("unison.blend"),
+    unisonSpread: readNumber("unison.spread"),
+    mono: draft.parameters["mono.enabled"] === true,
+    legato: draft.parameters["legato.enabled"] === true,
+    panelText: normalizeText(panel?.textContent ?? ""),
+  };
+}
+
 function readAetherLfoSnapshot(lfo: 1 | 2): DevAetherLfoSnapshot {
   const draft = useSynthStore.getState().draft;
   const prefix = `lfo.${lfo}` as const;
@@ -2268,9 +2434,32 @@ function clickRadioInPanel(panelLabel: string, groupLabel: string, optionLabel: 
   button?.click();
 }
 
+function clickRadioInRegion(regionLabel: string, groupLabel: string, optionLabel: string) {
+  const region = findElementByAriaLabel(regionLabel);
+  const group = findElementByAriaLabel(groupLabel, region);
+  const button = Array.from(group?.querySelectorAll<HTMLButtonElement>('button[role="radio"]') ?? [])
+    .find((candidate) => candidate.getAttribute("aria-label") === optionLabel);
+  button?.click();
+}
+
 async function setKnobValueInPanel(panelLabel: string, knobLabel: string, value: string) {
   const panel = findElementByAriaLabel(panelLabel);
   const button = Array.from(panel?.querySelectorAll<HTMLButtonElement>("button") ?? [])
+    .find((candidate) => candidate.getAttribute("aria-label") === `Edit ${knobLabel}`);
+  const frame = button?.parentElement;
+  button?.click();
+  await nextFrame();
+  const input = frame?.querySelector<HTMLInputElement>("input");
+  if (!input) return;
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  input.dispatchEvent(new Event("blur", { bubbles: true }));
+}
+
+async function setKnobValueInRegion(regionLabel: string, knobLabel: string, value: string) {
+  const region = findElementByAriaLabel(regionLabel);
+  const button = Array.from(region?.querySelectorAll<HTMLButtonElement>("button") ?? [])
     .find((candidate) => candidate.getAttribute("aria-label") === `Edit ${knobLabel}`);
   const frame = button?.parentElement;
   button?.click();
@@ -2404,6 +2593,10 @@ function writeAetherMacroFixtureMarker(state = readMacroFixtureDomState("Brightn
 
 function writeAetherMacroAssignmentExerciseMarker(state: DevAetherMacroAssignmentExerciseState) {
   document.documentElement.dataset.beatAetherMacroAssignmentExercise = JSON.stringify(state);
+}
+
+function writeAetherOscillatorExerciseMarker(state: DevAetherOscillatorExerciseState) {
+  document.documentElement.dataset.beatAetherOscillatorExercise = JSON.stringify(state);
 }
 
 function writeAetherWavemapEditorFixtureMarker(state = readAetherWavemapEditorFixtureState()) {
