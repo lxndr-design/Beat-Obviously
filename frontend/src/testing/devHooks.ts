@@ -42,6 +42,8 @@ const DEV_AETHER_WAVEMAP_INSTRUMENT_ID_MARKER = "Aether wavemap editor dev fixtu
 const DEV_AETHER_WAVEMAP_ID = "user.browser-wavemap";
 const DEV_AETHER_ENVELOPE_INSTRUMENT_ID = "dev-aether-envelope-host";
 const DEV_AETHER_ENVELOPE_INSTRUMENT_ID_MARKER = "Aether envelope editor dev fixture";
+const DEV_AETHER_AMP_FILTER_INSTRUMENT_ID = "dev-aether-amp-filter-host";
+const DEV_AETHER_AMP_FILTER_INSTRUMENT_ID_MARKER = "Aether amp/filter editor dev fixture";
 const DEV_AETHER_LFO_INSTRUMENT_ID = "dev-aether-lfo-host";
 const DEV_AETHER_LFO_INSTRUMENT_ID_MARKER = "Aether LFO editor dev fixture";
 const DEV_AETHER_PERFORMANCE_INSTRUMENT_ID = "dev-aether-performance-host";
@@ -105,6 +107,7 @@ declare global {
       exerciseAetherWavemapPointerDrawFlow: () => Promise<DevAetherWavemapPointerDrawExerciseState>;
       exerciseAetherWavemapImportFlow: () => Promise<DevAetherWavemapImportExerciseState>;
       exerciseAetherEnvelopeHandleFlow: () => Promise<DevAetherEnvelopeHandleExerciseState>;
+      exerciseAetherAmpFilterEditorFlow: () => Promise<DevAetherAmpFilterExerciseState>;
       exerciseAetherLfoEditorFlow: () => Promise<DevAetherLfoExerciseState>;
       exerciseAetherPerformanceEditorFlow: () => Promise<DevAetherPerformanceExerciseState>;
       exerciseAetherPresetLibraryFavoriteFlow: () => Promise<{
@@ -371,6 +374,27 @@ interface DevAetherLfoExerciseState {
   instrumentId: string | null;
   before: DevAetherLfoSnapshot;
   afterEdit: DevAetherLfoSnapshot;
+}
+
+interface DevAetherAmpFilterSnapshot {
+  instrumentId: string | null;
+  filterEnabled: boolean;
+  filterType: string | null;
+  cutoff: number | null;
+  resonance: number | null;
+  keytrack: number | null;
+  drive: number | null;
+  ampLevel: number | null;
+  ampPan: number | null;
+  env1Loop: boolean;
+  env2Loop: boolean;
+  panelText: string;
+}
+
+interface DevAetherAmpFilterExerciseState {
+  instrumentId: string | null;
+  before: DevAetherAmpFilterSnapshot;
+  afterEdit: DevAetherAmpFilterSnapshot;
 }
 
 interface DevAetherPerformanceSnapshot {
@@ -1055,6 +1079,73 @@ export function installBeatDevHooks() {
     return state;
   };
 
+  const installAetherAmpFilterFixtureBase = async () => {
+    const instrumentStore = useInstrumentStore.getState();
+    for (const instrument of instrumentStore.instruments) {
+      if ((instrument.id === DEV_AETHER_AMP_FILTER_INSTRUMENT_ID || instrument.source?.label === DEV_AETHER_AMP_FILTER_INSTRUMENT_ID_MARKER) && instrument.userCreated) {
+        instrumentStore.removeInstrument(instrument.id);
+      }
+    }
+
+    const baseDraft = createDefaultSynthDraft();
+    const patch: SynthDraftPatch = {
+      ...baseDraft,
+      name: "Amp Filter Browser Host",
+      parameters: {
+        ...baseDraft.parameters,
+        "filter.enabled": true,
+        "filter.type": "lowpass",
+        "filter.cutoff": 4200,
+        "filter.resonance": 0.14,
+        "filter.keytrack": 0.18,
+        "filter.drive": 0.08,
+        "amp.level": 0.72,
+        "amp.pan": 0,
+        "env.1.loop": false,
+        "env.2.loop": false,
+      },
+      metadata: {
+        ...baseDraft.metadata,
+        tags: [...new Set([...baseDraft.metadata.tags, "dev", "amp-filter-browser"])],
+      },
+    };
+
+    const nextInstrumentId = instrumentStore.addInstrument({
+      ...synthDraftToInstrumentPatch(patch),
+      id: DEV_AETHER_AMP_FILTER_INSTRUMENT_ID,
+      name: patch.name,
+      source: { kind: "created", label: DEV_AETHER_AMP_FILTER_INSTRUMENT_ID_MARKER },
+      userCreated: true,
+    });
+    useSynthStore.getState().bindInstrument(nextInstrumentId);
+    useSynthStore.getState().setDraft(patch);
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
+    await waitForEditorPanel("Amp and filter");
+    return { instrumentId: nextInstrumentId };
+  };
+
+  const exerciseAetherAmpFilterEditorFlow = async (): Promise<DevAetherAmpFilterExerciseState> => {
+    await installAetherAmpFilterFixtureBase();
+    const before = readAetherAmpFilterSnapshot();
+    clickRadioInPanel("Amp and filter", "Filter", "Highpass");
+    await setKnobValueInPanel("Amp and filter", "Cutoff", "8600");
+    await setKnobValueInPanel("Amp and filter", "Res", "0.47");
+    await setKnobValueInPanel("Amp and filter", "Key", "0.61");
+    await setKnobValueInPanel("Amp and filter", "Drive", "0.29");
+    await setKnobValueInPanel("Amp and filter", "Level", "0.66");
+    await setKnobValueInPanel("Amp and filter", "Pan", "-0.32");
+    clickPanelButtonByText("Amp and filter", "Env 1 Loop");
+    clickPanelButtonByText("Amp and filter", "Env 2 Loop");
+    await nextFrame();
+    const state: DevAetherAmpFilterExerciseState = {
+      instrumentId: useSynthStore.getState().boundInstrumentId,
+      before,
+      afterEdit: readAetherAmpFilterSnapshot(),
+    };
+    writeAetherAmpFilterExerciseMarker(state);
+    return state;
+  };
+
   const installAetherLfoFixtureBase = async () => {
     const instrumentStore = useInstrumentStore.getState();
     for (const instrument of instrumentStore.instruments) {
@@ -1546,6 +1637,7 @@ export function installBeatDevHooks() {
     exerciseAetherWavemapPointerDrawFlow,
     exerciseAetherWavemapImportFlow,
     exerciseAetherEnvelopeHandleFlow,
+    exerciseAetherAmpFilterEditorFlow,
     exerciseAetherLfoEditorFlow,
     exerciseAetherPerformanceEditorFlow,
     exerciseAetherPresetLibraryFavoriteFlow,
@@ -1608,6 +1700,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-envelope-handles") {
     window.setTimeout(() => {
       void exerciseAetherEnvelopeHandleFlow();
+    }, 0);
+  } else if (fixture === "aether-amp-filter") {
+    window.setTimeout(() => {
+      void exerciseAetherAmpFilterEditorFlow();
     }, 0);
   } else if (fixture === "aether-lfo") {
     window.setTimeout(() => {
@@ -1924,6 +2020,29 @@ function readAetherLfoSnapshot(lfo: 1 | 2): DevAetherLfoSnapshot {
     retrigger: draft.parameters[`${prefix}.retrigger` as SynthParameterId] !== false,
     oneShot: draft.parameters[`${prefix}.oneShot` as SynthParameterId] === true,
     laneText: normalizeText(lane?.textContent ?? ""),
+    panelText: normalizeText(panel?.textContent ?? ""),
+  };
+}
+
+function readAetherAmpFilterSnapshot(): DevAetherAmpFilterSnapshot {
+  const draft = useSynthStore.getState().draft;
+  const panel = findElementByAriaLabel("Amp and filter");
+  const readNumber = (id: SynthParameterId) => {
+    const value = draft.parameters[id];
+    return typeof value === "number" ? value : null;
+  };
+  return {
+    instrumentId: useSynthStore.getState().boundInstrumentId,
+    filterEnabled: draft.parameters["filter.enabled"] === true,
+    filterType: typeof draft.parameters["filter.type"] === "string" ? String(draft.parameters["filter.type"]) : null,
+    cutoff: readNumber("filter.cutoff"),
+    resonance: readNumber("filter.resonance"),
+    keytrack: readNumber("filter.keytrack"),
+    drive: readNumber("filter.drive"),
+    ampLevel: readNumber("amp.level"),
+    ampPan: readNumber("amp.pan"),
+    env1Loop: draft.parameters["env.1.loop"] === true,
+    env2Loop: draft.parameters["env.2.loop"] === true,
     panelText: normalizeText(panel?.textContent ?? ""),
   };
 }
@@ -2301,6 +2420,10 @@ function writeAetherWavemapImportExerciseMarker(state: DevAetherWavemapImportExe
 
 function writeAetherEnvelopeHandleExerciseMarker(state: DevAetherEnvelopeHandleExerciseState) {
   document.documentElement.dataset.beatAetherEnvelopeHandleExercise = JSON.stringify(state);
+}
+
+function writeAetherAmpFilterExerciseMarker(state: DevAetherAmpFilterExerciseState) {
+  document.documentElement.dataset.beatAetherAmpFilterExercise = JSON.stringify(state);
 }
 
 function writeAetherLfoExerciseMarker(state: DevAetherLfoExerciseState) {

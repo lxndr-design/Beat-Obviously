@@ -503,6 +503,20 @@ try {
     "browser fixture coverage should exercise Aether LFO control editing",
   );
   assert.ok(
+    synthEditorSource.includes('aria-label="Amp and filter"')
+      && synthEditorSource.includes('label="Filter"')
+      && synthEditorSource.includes('label="Cutoff"')
+      && synthEditorSource.includes('Env 1 Loop')
+      && synthEditorSource.includes('Env 2 Loop'),
+    "Aether Synth Editor should expose Amp/Filter controls for browser coverage",
+  );
+  assert.ok(
+    devHooksSource.includes("exerciseAetherAmpFilterEditorFlow")
+      && devHooksSource.includes("beatAetherAmpFilterExercise")
+      && devHooksSource.includes('fixture === "aether-amp-filter"'),
+    "browser fixture coverage should exercise Aether Amp/Filter control editing",
+  );
+  assert.ok(
     devHooksSource.includes("exerciseAetherPerformanceEditorFlow")
       && devHooksSource.includes("setSwitchInPanel")
       && devHooksSource.includes("beatAetherPerformanceExercise")
