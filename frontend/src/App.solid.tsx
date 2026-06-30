@@ -91,6 +91,13 @@ export function App() {
     void import("./testing/devHooks").then(({ installBeatDevHooks }) => installBeatDevHooks());
   });
 
+  onMount(() => {
+    if (!import.meta.env.DEV) return;
+    const openArrangement = () => setShowHome(false);
+    document.addEventListener("beat:dev-open-arrangement", openArrangement);
+    onCleanup(() => document.removeEventListener("beat:dev-open-arrangement", openArrangement));
+  });
+
   function closeHome() {
     setShowHome(false);
   }

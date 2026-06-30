@@ -30,6 +30,7 @@ Current implementation focus:
    - Done: Aether automation point-editor browser fixture coverage for Add Point, field editing, Quantize, and Snap Values across note, segment, and track Macro 1 lanes.
    - Done: Aether wavemap editor browser fixture coverage for Details analysis, Additive mode, Odd partials, Manual range, and Smooth interpolation.
    - Done: Synth Editor macro assignment fixture coverage for Modulation Matrix Add route, source selection, target menu selection, strength edit, and enable/disable controls.
+   - Done: arrangement-view Aether automation drag fixture coverage for free point dragging and shift-snap point dragging.
    - Add browser-level flow coverage for broader synth editing, wavemap import/draw, arrangement editing, export, relink, backup restore, and Project Health repairs.
    - Add visible hover, selected, disabled, loading, and migrated-framework smoke coverage on critical screens.
 2. `[~]` Automation editing completion.
@@ -39,6 +40,7 @@ Current implementation focus:
    - Done: point-level add, move, delete helper coverage exists for Aether note, segment, and track lanes.
    - Done: visible note, segment, and track Aether point editors expose point beat/value editing plus add/remove controls.
    - Done: visible note, segment, and track Aether point editors expose quantize and value snapping controls with pure interaction verifier coverage.
+   - Done: arrangement-view Aether automation point drag is covered in a true browser fixture, including free movement and shift snapping.
    - Done: native IPC maps frontend `track.automation` lanes into backend project automation with track and instrument IDs, and dense Aether live/export stress covers a track-scoped multi-point Aether lane.
    - Add multi-select, copy/paste, and broader drag/browser interaction parity coverage.
    - Define project vs track vs segment vs note vs live-write conflict rules and surface invalid automation warnings.
