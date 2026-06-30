@@ -179,7 +179,10 @@ interface DevAutomationPointSnapshot {
 
 interface DevAutomationPointEditorExercise {
   editor: DevAetherAutomationPointEditor;
+  target: MidiAutomationTarget;
   before: DevAutomationPointSnapshot[];
+  curveBefore: string | null;
+  curveAfter: string | null;
   afterAdd: DevAutomationPointSnapshot[];
   afterEdit: DevAutomationPointSnapshot[];
   afterQuantize: DevAutomationPointSnapshot[];
@@ -1873,6 +1876,9 @@ export function installBeatDevHooks() {
       await nextFrame();
     }
     const before = readAutomationPointPanelRows(pointPanelLabel);
+    const curveBefore = readAutomationCurveControlLabel(editor);
+    await chooseAutomationCurve(editor, "Smoothstep");
+    const curveAfter = readAutomationCurveControlLabel(editor);
     clickPanelButtonByText(pointPanelLabel, "Add point");
     await nextFrame();
     const afterAdd = readAutomationPointPanelRows(pointPanelLabel);
@@ -1904,7 +1910,10 @@ export function installBeatDevHooks() {
     const afterRemove = readAutomationPointPanelRows(pointPanelLabel);
     return {
       editor,
+      target,
       before,
+      curveBefore,
+      curveAfter,
       afterAdd,
       afterEdit,
       afterQuantize,
@@ -3054,6 +3063,38 @@ function readAutomationPointPanelRows(panelLabel: string): DevAutomationPointSna
       curve: null,
     };
   });
+}
+
+function readAutomationCurveControlLabel(editor: DevAetherAutomationPointEditor): string | null {
+  const triggerLabel = editor === "track"
+    ? "Aether track automation curve"
+    : editor === "segment"
+      ? "Aether segment automation curve"
+      : "Aether note automation curve";
+  const panel = findElementByAriaLabel(aetherAutomationLanePanelLabel(editor));
+  const trigger = findElementByAriaLabel(triggerLabel, panel);
+  return normalizeText(trigger?.textContent ?? "") || null;
+}
+
+async function chooseAutomationCurve(editor: DevAetherAutomationPointEditor, optionLabel: string) {
+  const triggerLabel = editor === "track"
+    ? "Aether track automation curve"
+    : editor === "segment"
+      ? "Aether segment automation curve"
+      : "Aether note automation curve";
+  const panel = findElementByAriaLabel(aetherAutomationLanePanelLabel(editor));
+  const trigger = findElementByAriaLabel(triggerLabel, panel) as HTMLButtonElement | null;
+  trigger?.click();
+  await nextFrame();
+  const listboxes = Array.from(document.querySelectorAll<HTMLElement>('[role="listbox"]'));
+  const listbox = listboxes[listboxes.length - 1] ?? null;
+  const option = Array.from(listbox?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? [])
+    .find((candidate) => normalizeText(candidate.textContent ?? "") === optionLabel);
+  option?.click();
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await nextFrame();
+    if (readAutomationCurveControlLabel(editor) === optionLabel) return;
+  }
 }
 
 async function waitForEditorPanel(label: string) {
