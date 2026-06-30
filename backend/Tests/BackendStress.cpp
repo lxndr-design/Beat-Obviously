@@ -973,6 +973,94 @@ namespace
         return project;
     }
 
+    beat::Project makeMonoLegatoAetherProject()
+    {
+        auto project = makeMaxUnisonAetherProject();
+        project.id = "mono-legato-aether-project";
+        project.name = "Mono Legato Aether Expression";
+        project.bpm = 126.0;
+        project.lengthBeats = 2.75;
+
+        auto& instrument = project.instruments.front();
+        instrument.id = "mono-legato-aether";
+        instrument.mono = true;
+        instrument.legato = true;
+        instrument.maxVoices = 6;
+        instrument.glideMs = 185.0f;
+        instrument.ampLevel = 0.5f;
+        instrument.releaseMs = 120.0f;
+        instrument.dynamicModulation.ampLevel.velocity = 0.18f;
+        instrument.dynamicModulation.ampLevel.velocityBipolar = false;
+        instrument.dynamicModulation.filterCutoff.keytrack = 0.14f;
+        instrument.dynamicModulation.filterCutoff.keytrackBipolar = false;
+        instrument.dynamicModulation.oscAPosition.macro1 = 0.2f;
+        instrument.dynamicModulation.oscBPan.macro2 = 0.18f;
+        instrument.macroValues = { 0.35f, 0.62f, 0.0f, 0.0f };
+        instrument.aether.oscA.wavetable.unison = 3;
+        instrument.aether.oscA.wavetable.detuneCents = 5.0f;
+        instrument.aether.oscB.wavetable.unison = 2;
+        instrument.aether.oscB.wavetable.detuneCents = 4.0f;
+        instrument.aether.sub.level = 0.04f;
+        instrument.aether.noise.enabled = false;
+        instrument.aether.noise.level = 0.0f;
+        instrument.aether.oscA.randomPhase = 0.0f;
+        instrument.aether.oscB.randomPhase = 0.0f;
+
+        auto& track = project.tracks.front();
+        track.id = "mono-legato-aether-track";
+        track.name = "Mono Legato Aether";
+        track.instrumentId = instrument.id;
+        track.gainDb = -8.0f;
+
+        auto& segment = track.segments.front();
+        segment.id = "mono-legato-aether-segment";
+        segment.trackId = track.id;
+        segment.instrumentId = instrument.id;
+        segment.lengthBeats = project.lengthBeats;
+        segment.notes.clear();
+        segment.automation.clear();
+
+        constexpr std::array<int, 8> pitches { 52, 59, 64, 67, 71, 69, 62, 55 };
+        constexpr std::array<double, 8> starts { 0.0, 0.24, 0.52, 0.82, 1.12, 1.46, 1.78, 2.08 };
+        for (size_t i = 0; i < pitches.size(); ++i)
+        {
+            beat::MidiNote note;
+            note.instrumentId = instrument.id;
+            note.pitch = pitches[i];
+            note.velocity = 74 + (int) ((i * 7) % 38);
+            note.startBeat = starts[i];
+            note.lengthBeats = 0.46;
+            note.connectToIndex = i + 1 < pitches.size() ? (int) i + 1 : -1;
+            segment.notes.push_back(std::move(note));
+        }
+
+        beat::MidiAutomationLane positionLane;
+        positionLane.target = "osc.a.position";
+        positionLane.points.push_back({ 0.0, 0.22f });
+        positionLane.points.push_back({ 1.35, 0.76f, beat::AutomationCurve::Smoothstep });
+        positionLane.points.push_back({ project.lengthBeats, 0.44f });
+        segment.automation.push_back(std::move(positionLane));
+
+        beat::MidiAutomationLane ampLane;
+        ampLane.target = "amp.level";
+        ampLane.points.push_back({ 0.0, 0.42f });
+        ampLane.points.push_back({ 1.25, 0.72f, beat::AutomationCurve::EaseIn });
+        ampLane.points.push_back({ project.lengthBeats, 0.5f });
+        segment.automation.push_back(std::move(ampLane));
+
+        project.automation.clear();
+        beat::ProjectAutomationLane macroLane;
+        macroLane.trackId = track.id;
+        macroLane.instrumentId = instrument.id;
+        macroLane.target = "macro.1";
+        macroLane.points.push_back({ 0.0, 0.25f });
+        macroLane.points.push_back({ 1.0, 0.82f, beat::AutomationCurve::Quadratic });
+        macroLane.points.push_back({ project.lengthBeats, 0.38f });
+        project.automation.push_back(std::move(macroLane));
+
+        return project;
+    }
+
     bool stressFftAnalyzer()
     {
         const std::array blockSizes { 127, 256, 480, 511, 960, 1000 };
@@ -9734,35 +9822,25 @@ namespace
         return ok;
     }
 
-    bool stressAudioEngineAetherDeterministicNullExport()
+    bool stressAudioEngineAetherDeterministicNullExportFamily(beat::Project project,
+                                                              const char* label,
+                                                              const char* tempFileName,
+                                                              int samples,
+                                                              int blockSize,
+                                                              double sampleRate)
     {
-        auto project = makeDenseAetherProject();
-        project.id = "deterministic-aether-null-export";
-        project.name = "Deterministic Aether Null Export";
-        project.lengthBeats = 1.25;
-
-        auto& instrument = project.instruments.front();
-        instrument.aether.noise.enabled = false;
-        instrument.aether.noise.level = 0.0f;
-        instrument.aether.oscA.randomPhase = 0.0f;
-        instrument.aether.oscB.randomPhase = 0.0f;
-
-        constexpr int samples = 18000;
-        constexpr int blockSize = 257;
-        constexpr double sampleRate = 44100.0;
-
         auto liveA = renderOfflineChunks(project, samples, blockSize, sampleRate);
         auto liveB = renderOfflineChunks(project, samples, blockSize, sampleRate);
         const auto liveNull = bufferResidualStats(liveA, liveB, samples);
 
-        auto exportFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-aether-null-export.wav");
+        auto exportFile = juce::File("/private/tmp").getChildFile(tempFileName);
         if (exportFile.existsAsFile())
             exportFile.deleteFile();
 
         juce::String error;
         if (!beat::AudioEngine::renderProjectToWav(project, exportFile, sampleRate, blockSize, 2, &error, {}, 32))
         {
-            std::cerr << "Aether deterministic null export error: " << error << "\n";
+            std::cerr << label << " deterministic null export error: " << error << "\n";
             return false;
         }
 
@@ -9785,7 +9863,7 @@ namespace
 
         if (!ok)
         {
-            std::cerr << "Aether deterministic null export failed"
+            std::cerr << label << " deterministic null export failed"
                       << " liveOk=" << liveNull.ok
                       << " liveEnergy=" << liveNull.sourceEnergy
                       << " liveResidual=" << liveNull.residualEnergy
@@ -9802,6 +9880,28 @@ namespace
         return ok;
     }
 
+    bool stressAudioEngineAetherDeterministicNullExport()
+    {
+        auto project = makeDenseAetherProject();
+        project.id = "deterministic-aether-null-export";
+        project.name = "Deterministic Aether Null Export";
+        project.lengthBeats = 1.25;
+
+        auto& instrument = project.instruments.front();
+        instrument.aether.noise.enabled = false;
+        instrument.aether.noise.level = 0.0f;
+        instrument.aether.oscA.randomPhase = 0.0f;
+        instrument.aether.oscB.randomPhase = 0.0f;
+
+        return stressAudioEngineAetherDeterministicNullExportFamily(
+            project,
+            "Aether",
+            "BeatBackendStress-aether-null-export.wav",
+            18000,
+            257,
+            44100.0);
+    }
+
     bool stressAudioEngineMaxUnisonAetherDeterministicNullExport()
     {
         auto project = makeMaxUnisonAetherProject();
@@ -9815,59 +9915,29 @@ namespace
         instrument.aether.oscA.randomPhase = 0.0f;
         instrument.aether.oscB.randomPhase = 0.0f;
 
-        constexpr int samples = 16000;
-        constexpr int blockSize = 257;
-        constexpr double sampleRate = 44100.0;
+        return stressAudioEngineAetherDeterministicNullExportFamily(
+            project,
+            "Max-unison Aether",
+            "BeatBackendStress-max-unison-aether-null-export.wav",
+            16000,
+            257,
+            44100.0);
+    }
 
-        auto liveA = renderOfflineChunks(project, samples, blockSize, sampleRate);
-        auto liveB = renderOfflineChunks(project, samples, blockSize, sampleRate);
-        const auto liveNull = bufferResidualStats(liveA, liveB, samples);
+    bool stressAudioEngineMonoLegatoAetherDeterministicNullExport()
+    {
+        auto project = makeMonoLegatoAetherProject();
+        project.id = "mono-legato-aether-null-export";
+        project.name = "Mono Legato Aether Null Export";
+        project.lengthBeats = 2.5;
 
-        auto exportFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-max-unison-aether-null-export.wav");
-        if (exportFile.existsAsFile())
-            exportFile.deleteFile();
-
-        juce::String error;
-        if (!beat::AudioEngine::renderProjectToWav(project, exportFile, sampleRate, blockSize, 2, &error, {}, 32))
-        {
-            std::cerr << "Max-unison Aether deterministic null export error: " << error << "\n";
-            return false;
-        }
-
-        auto exported = readWavPrefix(exportFile, samples);
-        exportFile.deleteFile();
-        const auto exportNull = bufferResidualStats(liveA, exported, samples);
-        const double exportResidualRatio = exportNull.sourceEnergy > 0.0
-            ? exportNull.residualEnergy / exportNull.sourceEnergy
-            : std::numeric_limits<double>::infinity();
-
-        const bool ok = liveNull.ok
-            && exportNull.ok
-            && liveNull.sourceEnergy > 0.0001
-            && liveNull.residualEnergy <= 0.000000000001
-            && liveNull.maxAbsDiff <= 0.0000001f
-            && exportNull.sourceEnergy > 0.0001
-            && exportNull.maxAbsDiff <= 0.0000005f
-            && exportNull.meanAbsDiff <= 0.00000008
-            && exportResidualRatio <= 0.00000000001;
-
-        if (!ok)
-        {
-            std::cerr << "Max-unison Aether deterministic null export failed"
-                      << " liveOk=" << liveNull.ok
-                      << " liveEnergy=" << liveNull.sourceEnergy
-                      << " liveResidual=" << liveNull.residualEnergy
-                      << " liveMaxDiff=" << liveNull.maxAbsDiff
-                      << " exportOk=" << exportNull.ok
-                      << " exportEnergy=" << exportNull.sourceEnergy
-                      << " exportResidual=" << exportNull.residualEnergy
-                      << " exportResidualRatio=" << exportResidualRatio
-                      << " exportMaxDiff=" << exportNull.maxAbsDiff
-                      << " exportMeanDiff=" << exportNull.meanAbsDiff
-                      << "\n";
-        }
-
-        return ok;
+        return stressAudioEngineAetherDeterministicNullExportFamily(
+            project,
+            "Mono-legato Aether",
+            "BeatBackendStress-mono-legato-aether-null-export.wav",
+            20000,
+            193,
+            48000.0);
     }
 
     bool stressWavetableOscillator()
@@ -12510,6 +12580,11 @@ int main()
     if (!stressAudioEngineMaxUnisonAetherDeterministicNullExport())
     {
         std::cerr << "Audio engine max-unison Aether deterministic null export stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineMonoLegatoAetherDeterministicNullExport())
+    {
+        std::cerr << "Audio engine mono-legato Aether deterministic null export stress failed\n";
         return 1;
     }
     if (!stressAudioEngineVariableBlockSizes())
