@@ -184,6 +184,7 @@ interface DevAutomationPointEditorExercise {
   afterSelect: DevAutomationPointSnapshot[];
   afterCopy: DevAutomationPointSnapshot[];
   afterPaste: DevAutomationPointSnapshot[];
+  afterRemove: DevAutomationPointSnapshot[];
   selectedPointCount: number;
   pointPanelText: string;
 }
@@ -1829,6 +1830,9 @@ export function installBeatDevHooks() {
     clickPanelButtonByText(pointPanelLabel, "Paste");
     await nextFrame();
     const afterPaste = readAutomationPointPanelRows(pointPanelLabel);
+    clickLastAutomationPointRemove(pointPanelLabel);
+    await nextFrame();
+    const afterRemove = readAutomationPointPanelRows(pointPanelLabel);
     return {
       editor,
       before,
@@ -1839,6 +1843,7 @@ export function installBeatDevHooks() {
       afterSelect,
       afterCopy,
       afterPaste,
+      afterRemove,
       selectedPointCount: readAutomationPointSelectionCount(pointPanelLabel),
       pointPanelText: readPanelState(pointPanelLabel).text,
     };
@@ -2703,6 +2708,15 @@ function readAutomationPointSelectionCount(panelLabel: string): number {
   return Array.from(panel?.querySelectorAll<HTMLInputElement>('[class*="automationPointRow"] input[type="checkbox"]') ?? [])
     .filter((input) => input.checked)
     .length;
+}
+
+function clickLastAutomationPointRemove(panelLabel: string) {
+  const panel = document.querySelector<HTMLElement>(`[aria-label="${panelLabel}"]`);
+  const rows = Array.from(panel?.querySelectorAll<HTMLElement>('[class*="automationPointRow"]') ?? []);
+  const row = rows[rows.length - 1];
+  const button = Array.from(row?.querySelectorAll<HTMLButtonElement>("button") ?? [])
+    .find((candidate) => normalizeText(candidate.textContent ?? "") === "Remove");
+  button?.click();
 }
 
 function findFieldSelect(label: string): HTMLSelectElement | null {

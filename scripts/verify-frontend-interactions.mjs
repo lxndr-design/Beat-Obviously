@@ -475,11 +475,13 @@ try {
   assert.ok(
     devHooksSource.includes('clickPanelButtonByText(pointPanelLabel, "Copy")')
       && devHooksSource.includes('clickPanelButtonByText(pointPanelLabel, "Paste")')
+      && devHooksSource.includes("clickLastAutomationPointRemove")
       && devHooksSource.includes("setAutomationPointSelection")
       && devHooksSource.includes("lastSelectablePointIndex")
       && devHooksSource.includes("selectedPointCount")
-      && devHooksSource.includes("afterPaste"),
-    "browser fixture automation point editor flow should select a multi-row point subset before Copy/Paste toolbar clicks",
+      && devHooksSource.includes("afterPaste")
+      && devHooksSource.includes("afterRemove"),
+    "browser fixture automation point editor flow should select a multi-row point subset before Copy/Paste and Remove clicks",
   );
   assert.ok(
     devHooksSource.includes("exerciseAetherDirectAutomationPointEditorFlow")
