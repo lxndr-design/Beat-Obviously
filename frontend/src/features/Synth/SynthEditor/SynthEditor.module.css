@@ -333,6 +333,13 @@ section.shell {
   color: color-mix(in srgb, var(--color-fg) 78%, transparent);
 }
 
+.expressionSummaryItem[data-live="true"],
+.performanceReadout[data-live="true"] {
+  border-color: color-mix(in srgb, var(--interaction-playback-accent) 72%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interaction-playback-accent) 38%, transparent);
+  color: color-mix(in srgb, var(--interaction-playback-accent) 86%, var(--color-fg));
+}
+
 .expressionSummaryItem span,
 .expressionSummaryItem strong,
 .expressionSummaryItem small,

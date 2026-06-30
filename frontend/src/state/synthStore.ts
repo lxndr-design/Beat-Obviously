@@ -214,6 +214,20 @@ export interface SynthExpressionSummaryItem {
   value: string;
   detail: string;
   active: boolean;
+  live?: boolean;
+}
+
+export interface SynthExpressionActivity {
+  source: "preview" | "midi" | "playback";
+  activeNotes?: number;
+  pitchBendSemitones?: number;
+  velocity?: number;
+  keytrack?: number;
+  modWheel?: number;
+}
+
+export interface SynthInstrumentExpressionActivity extends SynthExpressionActivity {
+  updatedAt: number;
 }
 
 export interface SynthEnvelopeShapePoint {
@@ -269,6 +283,7 @@ interface SynthStoreState {
   draft: SynthDraftPatch;
   boundInstrumentId: string | null;
   selectedOscillator: OscillatorKey;
+  expressionActivityByInstrument: Record<string, SynthInstrumentExpressionActivity>;
   bindInstrument: (instrumentId: string | null) => void;
   setSelectedOscillator: (id: OscillatorKey) => void;
   setDraft: (patch: SynthDraftPatch | SynthPatchSnapshot) => void;
@@ -284,6 +299,8 @@ interface SynthStoreState {
   updateModulationRoute: (id: string, patch: Partial<SynthModulationRoute>) => void;
   addModulationRoute: (route?: Partial<SynthModulationRoute>) => void;
   removeModulationRoute: (id: string) => void;
+  setInstrumentExpressionActivity: (instrumentId: string, activity: SynthExpressionActivity) => void;
+  clearInstrumentExpressionActivity: (instrumentId?: string) => void;
 }
 
 export const FACTORY_WAVETABLES: Array<{ id: WavetableId; label: string }> = [
@@ -1398,7 +1415,7 @@ export function synthEnvelopeEditorSummary(draft: SynthDraftPatch, source: "env.
   };
 }
 
-export function synthExpressionSummary(draft: SynthDraftPatch): SynthExpressionSummaryItem[] {
+export function synthExpressionSummary(draft: SynthDraftPatch, activity?: SynthExpressionActivity | null): SynthExpressionSummaryItem[] {
   const maxVoices = Math.max(1, Math.round(getNumberParam(draft, "maxVoices")));
   const mono = getBooleanParam(draft, "mono.enabled");
   const legato = getBooleanParam(draft, "legato.enabled");
@@ -1407,14 +1424,23 @@ export function synthExpressionSummary(draft: SynthDraftPatch): SynthExpressionS
   const keytrack = modulationSummaryForSource(draft, "keytrack");
   const modWheel = modulationSummaryForSource(draft, "modWheel");
   const filterKeytrack = clamp01(getNumberParam(draft, "filter.keytrack"));
+  const liveSource = activity ? expressionActivitySourceLabel(activity.source) : "";
+  const liveVelocity = activity?.velocity != null ? clamp01(activity.velocity) : null;
+  const liveKeytrack = activity?.keytrack != null ? clamp01(activity.keytrack) : null;
+  const liveModWheel = activity?.modWheel != null ? clamp01(activity.modWheel) : null;
+  const livePitchBend = activity?.pitchBendSemitones != null && Number.isFinite(activity.pitchBendSemitones)
+    ? activity.pitchBendSemitones
+    : null;
+  const activeNotes = activity?.activeNotes != null ? Math.max(0, Math.round(activity.activeNotes)) : 0;
 
   return [
     {
       id: "voices",
       label: "Voices",
-      value: mono ? "Mono" : `${maxVoices} poly`,
-      detail: mono ? "Single active voice" : `Steals above ${maxVoices}`,
-      active: mono || maxVoices < 16,
+      value: activeNotes > 0 ? `${activeNotes} live` : mono ? "Mono" : `${maxVoices} poly`,
+      detail: activeNotes > 0 ? liveSource : mono ? "Single active voice" : `Steals above ${maxVoices}`,
+      active: activeNotes > 0 || mono || maxVoices < 16,
+      ...(activeNotes > 0 ? { live: true } : {}),
     },
     {
       id: "legato",
@@ -1426,32 +1452,47 @@ export function synthExpressionSummary(draft: SynthDraftPatch): SynthExpressionS
     {
       id: "pitch-bend",
       label: "Pitch Bend",
-      value: "+/-2 st",
-      detail: "Runtime MIDI bend",
+      value: livePitchBend == null ? "+/-2 st" : `${formatSignedAmount(livePitchBend)} st`,
+      detail: livePitchBend == null ? "Runtime MIDI bend" : liveSource,
       active: true,
+      ...(livePitchBend != null ? { live: true } : {}),
     },
     {
       id: "velocity",
       label: "Velocity",
-      value: velocity.count > 0 ? velocity.label : "Available",
-      detail: velocity.count > 0 ? `${velocity.count} routed` : "No routes",
-      active: velocity.count > 0,
+      value: liveVelocity == null ? velocity.count > 0 ? velocity.label : "Available" : `${Math.round(liveVelocity * 100)}%`,
+      detail: liveVelocity == null ? velocity.count > 0 ? `${velocity.count} routed` : "No routes" : velocity.count > 0 ? `${velocity.count} routed live` : liveSource,
+      active: liveVelocity != null || velocity.count > 0,
+      ...(liveVelocity != null ? { live: true } : {}),
     },
     {
       id: "keytrack",
       label: "Keytrack",
-      value: keytrack.count > 0 ? keytrack.label : `${Math.round(filterKeytrack * 100)}% filter`,
-      detail: keytrack.count > 0 ? `${keytrack.count} routed` : "Filter cutoff tracking",
-      active: keytrack.count > 0 || filterKeytrack > 0,
+      value: liveKeytrack == null ? keytrack.count > 0 ? keytrack.label : `${Math.round(filterKeytrack * 100)}% filter` : `${Math.round(liveKeytrack * 100)}%`,
+      detail: liveKeytrack == null ? keytrack.count > 0 ? `${keytrack.count} routed` : "Filter cutoff tracking" : keytrack.count > 0 ? `${keytrack.count} routed live` : liveSource,
+      active: liveKeytrack != null || keytrack.count > 0 || filterKeytrack > 0,
+      ...(liveKeytrack != null ? { live: true } : {}),
     },
     {
       id: "mod-wheel",
       label: "Mod Wheel",
-      value: modWheel.count > 0 ? modWheel.label : "Available",
-      detail: modWheel.count > 0 ? `${modWheel.count} routed` : "No routes",
-      active: modWheel.count > 0,
+      value: liveModWheel == null ? modWheel.count > 0 ? modWheel.label : "Available" : `${Math.round(liveModWheel * 100)}%`,
+      detail: liveModWheel == null ? modWheel.count > 0 ? `${modWheel.count} routed` : "No routes" : modWheel.count > 0 ? `${modWheel.count} routed live` : liveSource,
+      active: liveModWheel != null || modWheel.count > 0,
+      ...(liveModWheel != null ? { live: true } : {}),
     },
   ];
+}
+
+function expressionActivitySourceLabel(source: SynthExpressionActivity["source"]): string {
+  if (source === "midi") return "Live MIDI input";
+  if (source === "playback") return "Timeline playback";
+  return "Audition preview";
+}
+
+function formatSignedAmount(value: number): string {
+  const fixed = Math.abs(value) >= 1 ? value.toFixed(1) : value.toFixed(2);
+  return value > 0 ? `+${fixed}` : fixed;
 }
 
 export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Instrument> {
@@ -1770,10 +1811,25 @@ export const useSynthStore = create<SynthStoreState>((set) => ({
   draft: createDefaultSynthDraft(),
   boundInstrumentId: null,
   selectedOscillator: "a",
+  expressionActivityByInstrument: {},
   bindInstrument: (instrumentId) => set({ boundInstrumentId: instrumentId }),
   setSelectedOscillator: (id) => set({ selectedOscillator: id }),
   setDraft: (draft) => set({ draft: normalizeSynthDraftPatch(draft) }),
   resetDraft: () => set({ draft: createDefaultSynthDraft(), selectedOscillator: "a" }),
+  setInstrumentExpressionActivity: (instrumentId, activity) =>
+    set((state) => ({
+      expressionActivityByInstrument: {
+        ...state.expressionActivityByInstrument,
+        [instrumentId]: { ...activity, updatedAt: Date.now() },
+      },
+    })),
+  clearInstrumentExpressionActivity: (instrumentId) =>
+    set((state) => {
+      if (!instrumentId) return { expressionActivityByInstrument: {} };
+      const next = { ...state.expressionActivityByInstrument };
+      delete next[instrumentId];
+      return { expressionActivityByInstrument: next };
+    }),
   setWavemap: (definition) =>
     set((state) => {
       const nextDefinition = normalizeCustomWavetable(definition);

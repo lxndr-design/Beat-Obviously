@@ -49,6 +49,7 @@ import {
   type ModulationSourceId,
   type ModulationTargetId,
   type SynthDraftPatch,
+  type SynthExpressionActivity,
   type SynthModulationSourceEditorTarget,
   type SynthParameterId,
 } from "../../../state/synthStore";
@@ -120,6 +121,7 @@ export interface SynthEditorProps {
 export function SynthEditor(props: SynthEditorProps) {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const boundInstrumentId = createStoreSelector(useSynthStore, (state) => state.boundInstrumentId);
+  const liveExpressionActivities = createStoreSelector(useSynthStore, (state) => state.expressionActivityByInstrument);
   const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
   const bindInstrument = useSynthStore.getState().bindInstrument;
   const setDraft = useSynthStore.getState().setDraft;
@@ -212,6 +214,13 @@ export function SynthEditor(props: SynthEditorProps) {
   const [auditioning, setAuditioning] = createSignal(false);
   const [auditionSnapshot, setAuditionSnapshot] = createSignal<AnalyzerSnapshot>(createEmptyAnalyzerSnapshot());
   const [focusedSourceTarget, setFocusedSourceTarget] = createSignal<SynthModulationSourceEditorTarget | null>(null);
+  const [expressionActivity, setExpressionActivity] = createSignal<SynthExpressionActivity | null>(null);
+  const effectiveExpressionActivity = createMemo(() => {
+    const localActivity = expressionActivity();
+    if (localActivity) return localActivity;
+    const id = boundInstrumentId();
+    return id ? liveExpressionActivities()[id] ?? null : null;
+  });
 
   createEffect(() => {
     const id = props.instrumentId;
@@ -268,6 +277,7 @@ export function SynthEditor(props: SynthEditorProps) {
     gain = null;
     stopAuditionAnalyzer();
     setAuditioning(false);
+    setExpressionActivity(null);
     if (!currentAudition) return;
 
     try {
@@ -304,6 +314,14 @@ export function SynthEditor(props: SynthEditorProps) {
     const instrument = synthDraftToPreviewInstrument(draft());
     const bpm = useProjectStore.getState().project.bpm;
     const frequency = previewFrequency(instrument);
+    setExpressionActivity({
+      source: "preview",
+      activeNotes: 1,
+      pitchBendSemitones: 0,
+      velocity: 1,
+      keytrack: keytrackFromFrequency(frequency),
+      modWheel: 0,
+    });
     let handle: AuditionHandle | null = null;
     let seededAnalyzer = false;
     const finishAudition = (node: AudioNode) => {
@@ -313,6 +331,7 @@ export function SynthEditor(props: SynthEditorProps) {
       gain = null;
       stopAuditionAnalyzer();
       setAuditioning(false);
+      setExpressionActivity(null);
       try {
         node.disconnect();
         gainNode?.disconnect();
@@ -744,11 +763,12 @@ export function SynthEditor(props: SynthEditorProps) {
                 </Show>
               </div>
               <div class={styles.expressionSummary} aria-label="Aether expression and performance summary">
-                <For each={synthExpressionSummary(draft())}>
+                <For each={synthExpressionSummary(draft(), effectiveExpressionActivity())}>
                   {(item) => (
                     <div
                       class={styles.expressionSummaryItem}
                       data-active={item.active ? "true" : "false"}
+                      data-live={item.live ? "true" : "false"}
                       data-mesh-variant={meshTintVariantFor(item.id)}
                       title={`${item.label}: ${item.value} - ${item.detail}`}
                     >
@@ -913,7 +933,7 @@ export function SynthEditor(props: SynthEditorProps) {
         <InstrumentFxRack />
 
         <div class={styles.bottomGrid}>
-          <PerformancePanel focusedSourceTarget={focusedSourceTarget()} />
+          <PerformancePanel focusedSourceTarget={focusedSourceTarget()} expressionActivity={effectiveExpressionActivity()} />
           <AmpFilterPanel focusedSourceTarget={focusedSourceTarget()} />
           <ModulationMatrix onFocusSource={focusModulationSourceEditor} />
         </div>
@@ -1341,11 +1361,14 @@ function LfoLane(props: { lfo: 1 | 2; focused?: boolean }) {
   );
 }
 
-function PerformancePanel(props: { focusedSourceTarget?: SynthModulationSourceEditorTarget | null }) {
+function PerformancePanel(props: {
+  focusedSourceTarget?: SynthModulationSourceEditorTarget | null;
+  expressionActivity?: SynthExpressionActivity | null;
+}) {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
-  const summary = createMemo(() => synthExpressionSummary(draft()));
+  const summary = createMemo(() => synthExpressionSummary(draft(), props.expressionActivity ?? null));
   const routedSummary = createMemo(() => summary().filter((item) => (
     item.id === "pitch-bend" || item.id === "velocity" || item.id === "keytrack" || item.id === "mod-wheel"
   )));
@@ -1401,6 +1424,7 @@ function PerformancePanel(props: { focusedSourceTarget?: SynthModulationSourceEd
               <div
                 class={styles.performanceReadout}
                 data-active={item.active ? "true" : "false"}
+                data-live={item.live ? "true" : "false"}
                 data-mesh-variant={meshTintVariantFor(item.id)}
                 title={`${item.label}: ${item.value} - ${item.detail}`}
               >
@@ -1916,6 +1940,12 @@ function snapEnvelopeSeconds(value: number): number {
 
 function snap01(value: number): number {
   return Math.round(clamp(value, 0, 1) * 100) / 100;
+}
+
+function keytrackFromFrequency(frequency: number): number {
+  if (!Number.isFinite(frequency) || frequency <= 0) return 0;
+  const midiNote = 69 + 12 * Math.log2(frequency / 440);
+  return clamp(midiNote / 127, 0, 1);
 }
 
 function midpoint(a: { x: number; y: number }, b: { x: number; y: number }): { x: number; y: number } {

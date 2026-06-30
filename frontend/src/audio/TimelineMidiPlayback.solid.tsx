@@ -1,6 +1,7 @@
 import { createEffect, onCleanup, untrack } from "solid-js";
 import { createStoreSelector } from "../solid-utils/store";
 import { useInstrumentStore, useProjectStore, useTransportStore, useUiStore } from "../state/store";
+import { useSynthStore } from "../state/synthStore";
 import { expandTrackSegments, isTrackAudible } from "../state/selectors";
 import { isNative } from "../ipc/bridge";
 import { getTimelineAudioContext, scheduleTimelineMidiNote, stopTimelineAudio } from "./timelineAudio";
@@ -34,6 +35,8 @@ export function TimelineMidiPlayback() {
   const project = createStoreSelector(useProjectStore, (s) => s.project);
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
   const scheduled = new Set<string>();
+  const expressionTimers = new Set<number>();
+  const activeExpressionNotes = new Map<string, Map<string, { velocity: number; keytrack: number }>>();
   let raf: number | null = null;
   let lastPlaying = false;
   let lastPosition = positionBeat();
@@ -49,6 +52,7 @@ export function TimelineMidiPlayback() {
       if (raf) cancelAnimationFrame(raf);
       raf = null;
       scheduled.clear();
+      clearExpressionPlaybackState();
       lastPlaying = false;
       lastPosition = currentPosition;
       stopTimelineAudio();
@@ -57,6 +61,7 @@ export function TimelineMidiPlayback() {
 
     if (!lastPlaying || currentPosition < lastPosition) {
       scheduled.clear();
+      clearExpressionPlaybackState();
       stopTimelineAudio();
     }
     lastPlaying = true;
@@ -87,6 +92,7 @@ export function TimelineMidiPlayback() {
 
       if (currentBeat < lastPosition || currentBeat > lengthBeats - 0.01) {
         scheduled.clear();
+        clearExpressionPlaybackState();
       }
       lastPosition = currentBeat;
 
@@ -135,6 +141,14 @@ export function TimelineMidiPlayback() {
                   bpm,
                 );
                 scheduled.add(key);
+                scheduleExpressionActivity(
+                  instrument,
+                  key,
+                  velocity,
+                  DEFAULT_DRUM_MIDI_PITCH,
+                  delayS,
+                  Math.max(0.05, Math.min(0.18, stepLengthBeats / beatsPerSecond)),
+                );
                 useUiStore.getState().triggerSegmentPlayback(seg.id);
                 trackPeak = Math.max(trackPeak, velocity / 127);
               }
@@ -168,6 +182,7 @@ export function TimelineMidiPlayback() {
               bpm,
             );
             scheduled.add(key);
+            scheduleExpressionActivity(instrument, key, noteWithGain.velocity, noteWithGain.pitch, delayS, durationS);
             useUiStore.getState().triggerSegmentPlayback(seg.id);
             trackPeak = Math.max(trackPeak, noteWithGain.velocity / 127);
           });
@@ -197,10 +212,91 @@ export function TimelineMidiPlayback() {
 
   onCleanup(() => {
     if (raf) cancelAnimationFrame(raf);
+    clearExpressionPlaybackState();
     stopTimelineAudio();
   });
 
+  function scheduleExpressionActivity(
+    instrument: Instrument,
+    key: string,
+    velocity: number,
+    midiPitch: number,
+    delayS: number,
+    durationS: number,
+  ) {
+    if (!isAetherExpressionInstrument(instrument)) return;
+    const instrumentId = instrument.id;
+    const startTimer = window.setTimeout(() => {
+      expressionTimers.delete(startTimer);
+      const notes = activeExpressionNotes.get(instrumentId) ?? new Map<string, { velocity: number; keytrack: number }>();
+      notes.set(key, {
+        velocity: clamp01(velocity / 127),
+        keytrack: keytrackFromMidiPitch(midiPitch),
+      });
+      activeExpressionNotes.set(instrumentId, notes);
+      publishExpressionActivity(instrumentId);
+      const stopTimer = window.setTimeout(() => {
+        expressionTimers.delete(stopTimer);
+        const currentNotes = activeExpressionNotes.get(instrumentId);
+        currentNotes?.delete(key);
+        if (currentNotes && currentNotes.size > 0) {
+          publishExpressionActivity(instrumentId);
+        } else {
+          activeExpressionNotes.delete(instrumentId);
+          useSynthStore.getState().clearInstrumentExpressionActivity(instrumentId);
+        }
+      }, Math.max(1, Math.ceil(durationS * 1000)));
+      expressionTimers.add(stopTimer);
+    }, Math.max(0, Math.ceil(delayS * 1000)));
+    expressionTimers.add(startTimer);
+  }
+
+  function publishExpressionActivity(instrumentId: string) {
+    const notes = activeExpressionNotes.get(instrumentId);
+    if (!notes || notes.size === 0) {
+      useSynthStore.getState().clearInstrumentExpressionActivity(instrumentId);
+      return;
+    }
+    let velocity = 0;
+    let keytrack = 0;
+    for (const note of notes.values()) {
+      velocity += note.velocity;
+      keytrack += note.keytrack;
+    }
+    const activeNotes = notes.size;
+    useSynthStore.getState().setInstrumentExpressionActivity(instrumentId, {
+      source: "playback",
+      activeNotes,
+      pitchBendSemitones: 0,
+      velocity: velocity / activeNotes,
+      keytrack: keytrack / activeNotes,
+      modWheel: 0,
+    });
+  }
+
+  function clearExpressionPlaybackState() {
+    for (const timer of expressionTimers) window.clearTimeout(timer);
+    expressionTimers.clear();
+    for (const instrumentId of activeExpressionNotes.keys()) {
+      useSynthStore.getState().clearInstrumentExpressionActivity(instrumentId);
+    }
+    activeExpressionNotes.clear();
+  }
+
   return null;
+}
+
+function isAetherExpressionInstrument(instrument: Instrument): boolean {
+  return instrument.kind === "synth" || instrument.kind === "wavetable" || Boolean(instrument.synthPatch);
+}
+
+function keytrackFromMidiPitch(midiPitch: number): number {
+  return clamp01(midiPitch / 127);
+}
+
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
 }
 
 function transposeNote(note: MidiNote, transpose: number): MidiNote {

@@ -289,6 +289,39 @@ try {
       active: true,
     },
   ]);
+  assert.deepEqual(
+    synthStore.synthExpressionSummary(draft, {
+      source: "playback",
+      activeNotes: 2,
+      pitchBendSemitones: -1.25,
+      velocity: 0.78,
+      keytrack: 0.64,
+      modWheel: 0.33,
+    }).filter((item) => item.live).map((item) => ({
+      id: item.id,
+      value: item.value,
+      detail: item.detail,
+    })),
+    [
+      { id: "voices", value: "2 live", detail: "Timeline playback" },
+      { id: "pitch-bend", value: "-1.3 st", detail: "Timeline playback" },
+      { id: "velocity", value: "78%", detail: "1 routed live" },
+      { id: "keytrack", value: "64%", detail: "1 routed live" },
+      { id: "mod-wheel", value: "33%", detail: "1 routed live" },
+    ],
+  );
+  const liveStore = synthStore.useSynthStore;
+  liveStore.getState().setInstrumentExpressionActivity("inst-a", {
+    source: "playback",
+    activeNotes: 3,
+    velocity: 0.5,
+    keytrack: 0.4,
+  });
+  assert.equal(liveStore.getState().expressionActivityByInstrument["inst-a"].activeNotes, 3);
+  assert.equal(liveStore.getState().expressionActivityByInstrument["inst-a"].source, "playback");
+  assert.equal(typeof liveStore.getState().expressionActivityByInstrument["inst-a"].updatedAt, "number");
+  liveStore.getState().clearInstrumentExpressionActivity("inst-a");
+  assert.equal(liveStore.getState().expressionActivityByInstrument["inst-a"], undefined);
   const fineRoute = draft.modulation.find((route) => route.target === "osc.a.fine");
   assert.ok(fineRoute, "expected fine modulation route fixture");
   assert.deepEqual(synthStore.modulationRouteDisplay(draft, fineRoute), {

@@ -60,8 +60,9 @@ Status legend:
   - Remaining: none for the current envelope visual-editing plan; add continuous/tension curves only if the envelope schema expands.
   - Proof: interaction tests for handle movement, patch roundtrip, browser preview, and native render stress; true browser fixture coverage now exercises Env 1 handle dragging and rail curve cycling through real pointer/click events, recording changed attack/decay/sustain/release values and changed attack/decay/release curve values.
 - `[~]` Performance/expression UX.
-  - Done: filter keytracking, keytrack routing, mod wheel routing, runtime pitch bend, linked-note glide, max voice caps, note stealing, mono voice caps, legato retune, Aether patch/editor glide editing, a dedicated editable Performance panel for voices/mono/legato/glide, and editor-visible expression/performance readouts for pitch bend, velocity, keytrack, and mod wheel.
-  - Remaining: realtime controller feedback while MIDI input/playback is active.
+  - Done: filter keytracking, keytrack routing, mod wheel routing, runtime pitch bend, linked-note glide, max voice caps, note stealing, mono voice caps, legato retune, Aether patch/editor glide editing, a dedicated editable Performance panel for voices/mono/legato/glide, editor-visible expression/performance readouts for pitch bend, velocity, keytrack, and mod wheel, live expression activity state per instrument, browser timeline-playback note activity feedback, and audition-preview feedback with live readout styling.
+  - Remaining: connect the same expression activity channel to real external MIDI input events once the MIDI-device input bridge is active.
+  - Proof: synth verifier covers static/live expression summary formatting and instrument activity publish/clear state; non-native verification covers the Solid editor, timeline playback scheduler, design-system styling, typecheck, synth verifier, and production build.
 
 ## 5. Aether FX And Presets
 
