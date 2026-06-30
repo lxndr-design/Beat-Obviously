@@ -569,6 +569,14 @@ try {
       && devHooksSource.includes('fixture === "aether-performance"'),
     "browser fixture coverage should exercise Aether Performance control editing",
   );
+  assert.ok(
+    synthEditorSource.includes("onRestoreInitPreset")
+      && synthEditorSource.includes("Restore Init")
+      && devHooksSource.includes("exerciseAetherPresetRestoreInitFlow")
+      && devHooksSource.includes("beatAetherPresetRestoreInitExercise")
+      && devHooksSource.includes('fixture === "aether-preset-restore-init"'),
+    "browser fixture coverage should exercise Restore Init through the live Aether preset controls",
+  );
   const movedTrackPoint = arrangementAutomation.updateTrackAutomationPoint(insertedTrackPoint, "filter.cutoff", 64, 1, 48, 0.74);
   assert.deepEqual(
     movedTrackPoint.automation[0].points.map((point) => point.beat),

@@ -122,6 +122,7 @@ declare global {
         selected: DevAetherPresetLibraryFixtureState;
         toggled: DevAetherPresetLibraryFixtureState;
       }>;
+      exerciseAetherPresetRestoreInitFlow: () => Promise<DevAetherPresetRestoreInitExerciseState>;
       installAetherAutomationFixture: () => {
         trackId: string;
         segmentId: string;
@@ -288,6 +289,16 @@ interface DevAetherPresetLibraryFixtureState {
   selectedFavoriteToggleText: string | null;
   auditionButtonText: string | null;
   auditionButtonDisabled: boolean | null;
+  draftName: string;
+  filterCutoff: number | null;
+  oscAPosition: number | null;
+  instrumentEffectCount: number;
+}
+
+interface DevAetherPresetRestoreInitExerciseState {
+  installed: DevAetherPresetLibraryFixtureState;
+  loaded: DevAetherPresetLibraryFixtureState;
+  restored: DevAetherPresetLibraryFixtureState;
 }
 
 interface DevAetherMacroFixtureState {
@@ -804,6 +815,7 @@ export function installBeatDevHooks() {
   };
 
   const readAetherPresetLibraryFixtureState = async (): Promise<DevAetherPresetLibraryFixtureState> => {
+    const draft = useSynthStore.getState().draft;
     const favoriteRecord = await db.synthPresets.get(DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID);
     const plainRecord = await db.synthPresets.get(DEV_AETHER_PRESET_LIBRARY_PLAIN_ID);
     const presetSelect = findFieldSelect("Preset");
@@ -825,6 +837,10 @@ export function installBeatDevHooks() {
       selectedFavoriteToggleText: normalizeText(findButton("Toggle selected Aether preset favorite")?.textContent ?? "") || null,
       auditionButtonText: normalizeText(findButton("Audition selected Aether preset")?.textContent ?? "") || null,
       auditionButtonDisabled: findButton("Audition selected Aether preset")?.disabled ?? null,
+      draftName: draft.name,
+      filterCutoff: typeof draft.parameters["filter.cutoff"] === "number" ? draft.parameters["filter.cutoff"] : null,
+      oscAPosition: typeof draft.parameters["osc.a.position"] === "number" ? draft.parameters["osc.a.position"] : null,
+      instrumentEffectCount: draft.effects.filters.length,
     };
   };
 
@@ -843,6 +859,20 @@ export function installBeatDevHooks() {
     await waitForPresetFavorite(DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID, false);
     const toggled = await readAetherPresetLibraryFixtureState();
     return { installed, filtered, selected, toggled };
+  };
+
+  const exerciseAetherPresetRestoreInitFlow = async (): Promise<DevAetherPresetRestoreInitExerciseState> => {
+    await installAetherPresetLibraryFixture();
+    const installed = await readAetherPresetLibraryFixtureState();
+    setFieldSelectValue("Preset", `${USER_PRESET_PREFIX}${DEV_AETHER_PRESET_LIBRARY_PLAIN_ID}`);
+    await nextFrame();
+    const loaded = await readAetherPresetLibraryFixtureState();
+    clickButton("Restore Init");
+    await nextFrame();
+    const restored = await readAetherPresetLibraryFixtureState();
+    const state: DevAetherPresetRestoreInitExerciseState = { installed, loaded, restored };
+    writeAetherPresetRestoreInitExerciseMarker(state);
+    return state;
   };
 
   const installAetherOscillatorFixtureBase = async () => {
@@ -1904,6 +1934,7 @@ export function installBeatDevHooks() {
     exerciseAetherLfoEditorFlow,
     exerciseAetherPerformanceEditorFlow,
     exerciseAetherPresetLibraryFavoriteFlow,
+    exerciseAetherPresetRestoreInitFlow,
     installAetherAutomationFixture,
     openAetherAutomationFixtureEditor,
     readAetherAutomationFixtureState,
@@ -1940,6 +1971,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-preset-library") {
     window.setTimeout(() => {
       void installAetherPresetLibraryFixture();
+    }, 0);
+  } else if (fixture === "aether-preset-restore-init") {
+    window.setTimeout(() => {
+      void exerciseAetherPresetRestoreInitFlow();
     }, 0);
   } else if (fixture === "aether-oscillator") {
     window.setTimeout(() => {
@@ -2851,6 +2886,10 @@ function writeAetherLfoExerciseMarker(state: DevAetherLfoExerciseState) {
 
 function writeAetherPerformanceExerciseMarker(state: DevAetherPerformanceExerciseState) {
   document.documentElement.dataset.beatAetherPerformanceExercise = JSON.stringify(state);
+}
+
+function writeAetherPresetRestoreInitExerciseMarker(state: DevAetherPresetRestoreInitExerciseState) {
+  document.documentElement.dataset.beatAetherPresetRestoreInitExercise = JSON.stringify(state);
 }
 
 function findEnvelopeHandle(source: "env.1" | "env.2", kind: "attack" | "decay-sustain" | "release"): HTMLButtonElement | null {
