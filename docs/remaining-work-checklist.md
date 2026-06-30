@@ -312,9 +312,9 @@ Current implementation focus:
 ## Verification Still Needed
 
 - `[~]` Browser-level flow coverage for broader synth editing, wavemap import/draw, automation lanes, arrangement editing, export, relink, backup restore, and project health repairs.
-  - Done: true browser fixture smoke covers Aether track, segment, and selected-note Macro 1 automation lane entrypoints with seeded project data and rendered controls.
+  - Done: true browser fixture smoke covers Aether track, segment, and selected-note Macro 1 automation lane entrypoints with seeded project data and rendered controls; 22-flow Aether fixture sweep covers current synth editing, preset restore/save-delete, macro assignment, wavemap editor, wavemap pointer draw/import, envelope handles, amp/filter, LFO, performance, note/segment/track automation entrypoints, point editors, direct point editing, arrangement dragging, and note/segment/track handle dragging.
 - `[~]` Null-test style live/offline comparisons where deterministic output is expected.
-  - Done: Aether deterministic null-export stress covers dense, max-unison, mono-legato/glide, and group/return routed families with repeated live-render and 32-bit export-prefix residual thresholds.
+  - Done: Aether deterministic null-export stress covers dense, max-unison, runtime-warp, mono-legato/glide, group/return routed, and FX-heavy instrument/track-effect families with repeated live-render and 32-bit export-prefix residual thresholds.
 - `[ ]` Crossfade parity stress.
 - `[ ]` Automation-heavy parity stress beyond the current dense Aether parity path.
 - `[ ]` Group/send stem export stress.

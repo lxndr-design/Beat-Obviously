@@ -10139,6 +10139,76 @@ namespace
             44100.0);
     }
 
+    bool stressAudioEngineFxHeavyAetherDeterministicNullExport()
+    {
+        auto project = makeDenseAetherProject();
+        project.id = "fx-heavy-aether-null-export";
+        project.name = "FX Heavy Aether Null Export";
+        project.lengthBeats = 1.75;
+
+        auto& instrument = project.instruments.front();
+        instrument.aether.noise.enabled = false;
+        instrument.aether.noise.level = 0.0f;
+        instrument.aether.oscA.randomPhase = 0.0f;
+        instrument.aether.oscB.randomPhase = 0.0f;
+
+        beat::TrackEffect instrumentDistortion;
+        instrumentDistortion.id = "fx-heavy-aether-instrument-distortion";
+        instrumentDistortion.kind = beat::TrackEffectKind::Distortion;
+        instrumentDistortion.params.push_back({ "drive", 13.0f });
+        instrumentDistortion.params.push_back({ "tone", 58.0f });
+        instrumentDistortion.params.push_back({ "mix", 42.0f });
+        instrument.effects.push_back(std::move(instrumentDistortion));
+
+        beat::TrackEffect instrumentChorus;
+        instrumentChorus.id = "fx-heavy-aether-instrument-chorus";
+        instrumentChorus.kind = beat::TrackEffectKind::Chorus;
+        instrumentChorus.params.push_back({ "rateHz", 0.65f });
+        instrumentChorus.params.push_back({ "depthMs", 7.0f });
+        instrumentChorus.params.push_back({ "delayMs", 9.0f });
+        instrumentChorus.params.push_back({ "feedback", 9.0f });
+        instrumentChorus.params.push_back({ "mix", 26.0f });
+        instrument.effects.push_back(std::move(instrumentChorus));
+
+        auto& track = project.tracks.front();
+
+        beat::TrackEffect trackCompressor;
+        trackCompressor.id = "fx-heavy-aether-track-compressor";
+        trackCompressor.kind = beat::TrackEffectKind::Compressor;
+        trackCompressor.params.push_back({ "thresholdDb", -18.0f });
+        trackCompressor.params.push_back({ "ratio", 3.0f });
+        trackCompressor.params.push_back({ "attackMs", 8.0f });
+        trackCompressor.params.push_back({ "releaseMs", 90.0f });
+        trackCompressor.params.push_back({ "makeupDb", 1.5f });
+        track.effects.push_back(std::move(trackCompressor));
+
+        beat::TrackEffect trackPhaser;
+        trackPhaser.id = "fx-heavy-aether-track-phaser";
+        trackPhaser.kind = beat::TrackEffectKind::Phaser;
+        trackPhaser.params.push_back({ "rateHz", 0.38f });
+        trackPhaser.params.push_back({ "centerHz", 880.0f });
+        trackPhaser.params.push_back({ "depthOct", 1.3f });
+        trackPhaser.params.push_back({ "feedback", 18.0f });
+        trackPhaser.params.push_back({ "mix", 24.0f });
+        track.effects.push_back(std::move(trackPhaser));
+
+        beat::TrackEffect trackDelay;
+        trackDelay.id = "fx-heavy-aether-track-delay";
+        trackDelay.kind = beat::TrackEffectKind::Delay;
+        trackDelay.params.push_back({ "timeMs", 36.0f });
+        trackDelay.params.push_back({ "feedback", 14.0f });
+        trackDelay.params.push_back({ "mix", 18.0f });
+        track.effects.push_back(std::move(trackDelay));
+
+        return stressAudioEngineAetherDeterministicNullExportFamily(
+            project,
+            "FX-heavy Aether",
+            "BeatBackendStress-fx-heavy-aether-null-export.wav",
+            19000,
+            229,
+            44100.0);
+    }
+
     bool stressWavetableOscillator()
     {
         static_assert(beat::params::patchSchemaVersion == 1);
@@ -12804,6 +12874,11 @@ int main()
     if (!stressAudioEngineRoutedAetherDeterministicNullExport())
     {
         std::cerr << "Audio engine routed Aether deterministic null export stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineFxHeavyAetherDeterministicNullExport())
+    {
+        std::cerr << "Audio engine FX-heavy Aether deterministic null export stress failed\n";
         return 1;
     }
     if (!stressAudioEngineVariableBlockSizes())
