@@ -146,6 +146,10 @@ try {
     pianoRollSource.includes("copyMidiNoteAutomationPoints") && pianoRollSource.includes("pasteMidiNoteAutomationPoints"),
     "piano roll visible automation point toolbar should stay wired to note copy/paste helpers",
   );
+  assert.ok(
+    pianoRollSource.includes("selectedAutomationPointIndices") && pianoRollSource.includes("Select automation point"),
+    "piano roll visible automation point panel should expose selectable point subsets",
+  );
   const movedNotePoint = noteAutomation.updateMidiNoteAutomationPoint(insertedNotePoint, [0], "macro.1", 2, 0.9, 0.81);
   assert.deepEqual(
     movedNotePoint[0].automation[0].points.map((point) => point.beat),
@@ -299,6 +303,10 @@ try {
   assert.ok(
     segmentEditorSource.includes("copySegmentAutomationPoints") && segmentEditorSource.includes("pasteSegmentAutomationPoints"),
     "segment editor visible automation point toolbar should stay wired to segment copy/paste helpers",
+  );
+  assert.ok(
+    segmentEditorSource.includes("selectedSegmentAutomationPointIndices") && segmentEditorSource.includes("Select segment automation point"),
+    "segment editor visible automation point panel should expose selectable point subsets",
   );
   const movedSegmentPoint = arrangementAutomation.updateSegmentAutomationPoint(insertedSegmentPoint, "macro.1", 1, 3.5, 0.73);
   assert.deepEqual(
@@ -459,10 +467,16 @@ try {
     "track details visible automation point toolbar should stay wired to track copy/paste helpers",
   );
   assert.ok(
+    trackDetailsSource.includes("selectedAutomationPointIndices") && trackDetailsSource.includes("Select track automation point"),
+    "track details visible automation point panel should expose selectable point subsets",
+  );
+  assert.ok(
     devHooksSource.includes('clickPanelButtonByText(pointPanelLabel, "Copy")')
       && devHooksSource.includes('clickPanelButtonByText(pointPanelLabel, "Paste")')
+      && devHooksSource.includes("setAutomationPointSelection")
+      && devHooksSource.includes("selectedPointCount")
       && devHooksSource.includes("afterPaste"),
-    "browser fixture automation point editor flow should exercise Copy/Paste toolbar clicks",
+    "browser fixture automation point editor flow should select a point subset before Copy/Paste toolbar clicks",
   );
   const movedTrackPoint = arrangementAutomation.updateTrackAutomationPoint(insertedTrackPoint, "filter.cutoff", 64, 1, 48, 0.74);
   assert.deepEqual(

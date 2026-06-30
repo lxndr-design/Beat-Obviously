@@ -82,6 +82,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const [activeSegmentAutomationTarget, setActiveSegmentAutomationTarget] = createSignal<AetherArrangementAutomationTarget>("macro.1");
   const [draggedSegmentAutomationEdge, setDraggedSegmentAutomationEdge] = createSignal<"start" | "mid" | "end" | null>(null);
   const [segmentAutomationPointClipboard, setSegmentAutomationPointClipboard] = createSignal<AetherArrangementAutomationPointClipboard | null>(null);
+  const [selectedSegmentAutomationPointIndices, setSelectedSegmentAutomationPointIndices] = createSignal<number[]>([]);
   const [midiPreviewBeat, setMidiPreviewBeat] = createSignal<number | null>(null);
   const [drumTrainingSessionId, setDrumTrainingSessionId] = createSignal<string | null>(null);
   let previewCtx: AudioContext | null = null;
@@ -111,6 +112,13 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const activeSegmentAutomationPoints = createMemo(() =>
     draft()?.automation?.find((lane) => lane.target === activeSegmentAutomationTarget())?.points ?? []
   );
+  const activeSelectedSegmentAutomationPointIndices = createMemo(() =>
+    selectedSegmentAutomationPointIndices().filter((index) => index >= 0 && index < activeSegmentAutomationPoints().length)
+  );
+  createEffect(() => {
+    activeSegmentAutomationTarget();
+    setSelectedSegmentAutomationPointIndices([]);
+  });
   const segmentAutomationCurveOptions = AUTOMATION_CURVES.map((curve) => ({ value: curve, label: automationCurveLabel(curve) }));
   const previewMidiNotes = createMemo(() => midiNotes().map((note) => ({
     ...note,
@@ -266,7 +274,9 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   function copySegmentAutomationLanePoints() {
     const currentDraft = draft();
     if (!currentDraft) return;
-    const pointIndices = activeSegmentAutomationPoints().map((_, index) => index);
+    const pointIndices = activeSelectedSegmentAutomationPointIndices().length > 0
+      ? activeSelectedSegmentAutomationPointIndices()
+      : activeSegmentAutomationPoints().map((_, index) => index);
     if (pointIndices.length === 0) return;
     setSegmentAutomationPointClipboard(copySegmentAutomationPoints(currentDraft, activeSegmentAutomationTarget(), pointIndices));
   }
@@ -310,6 +320,17 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
     const currentDraft = draft();
     if (!currentDraft) return;
     setDraftSegment(removeSegmentAutomationPoint(currentDraft, activeSegmentAutomationTarget(), index));
+    setSelectedSegmentAutomationPointIndices((indices) => indices
+      .filter((pointIndex) => pointIndex !== index)
+      .map((pointIndex) => pointIndex > index ? pointIndex - 1 : pointIndex));
+  }
+
+  function toggleSegmentAutomationPointSelection(index: number) {
+    setSelectedSegmentAutomationPointIndices((indices) =>
+      indices.includes(index)
+        ? indices.filter((pointIndex) => pointIndex !== index)
+        : [...indices, index].sort((a, b) => a - b)
+    );
   }
 
   function updateDrumRows(rows: DrumRow[]) {
@@ -716,7 +737,23 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                 </div>
                 <For each={activeSegmentAutomationPoints()}>
                   {(point, index) => (
-                    <div class={styles.automationPointRow}>
+                    <div
+                      classList={{
+                        [styles.automationPointRow]: true,
+                        [styles.automationPointRowSelected]: activeSelectedSegmentAutomationPointIndices().includes(index()),
+                      }}
+                    >
+                      <input
+                        class={styles.automationPointSelect}
+                        type="checkbox"
+                        checked={activeSelectedSegmentAutomationPointIndices().includes(index())}
+                        readOnly
+                        aria-label={`Select segment automation point ${index() + 1}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          toggleSegmentAutomationPointSelection(index());
+                        }}
+                      />
                       <span class={styles.automationPointIndex}>{index() + 1}</span>
                       <label>
                         <span>Beat</span>

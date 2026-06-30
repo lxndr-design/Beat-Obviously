@@ -165,8 +165,10 @@ interface DevAutomationPointEditorExercise {
   afterEdit: DevAutomationPointSnapshot[];
   afterQuantize: DevAutomationPointSnapshot[];
   afterSnap: DevAutomationPointSnapshot[];
+  afterSelect: DevAutomationPointSnapshot[];
   afterCopy: DevAutomationPointSnapshot[];
   afterPaste: DevAutomationPointSnapshot[];
+  selectedPointCount: number;
   pointPanelText: string;
 }
 
@@ -1298,6 +1300,9 @@ export function installBeatDevHooks() {
     clickPanelButtonByText(pointPanelLabel, "Snap values");
     await nextFrame();
     const afterSnap = readAutomationPointPanelRows(pointPanelLabel);
+    setAutomationPointSelection(pointPanelLabel, Math.min(1, Math.max(0, afterSnap.length - 1)), true);
+    await nextFrame();
+    const afterSelect = readAutomationPointPanelRows(pointPanelLabel);
     clickPanelButtonByText(pointPanelLabel, "Copy");
     await nextFrame();
     const afterCopy = readAutomationPointPanelRows(pointPanelLabel);
@@ -1311,8 +1316,10 @@ export function installBeatDevHooks() {
       afterEdit,
       afterQuantize,
       afterSnap,
+      afterSelect,
       afterCopy,
       afterPaste,
+      selectedPointCount: readAutomationPointSelectionCount(pointPanelLabel),
       pointPanelText: readPanelState(pointPanelLabel).text,
     };
   }
@@ -1907,6 +1914,22 @@ function setLastAutomationPointField(panelLabel: string, fieldLabel: "Beat" | "V
   input.value = value;
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function setAutomationPointSelection(panelLabel: string, rowIndex: number, selected: boolean) {
+  const panel = document.querySelector<HTMLElement>(`[aria-label="${panelLabel}"]`);
+  const rows = Array.from(panel?.querySelectorAll<HTMLElement>('[class*="automationPointRow"]') ?? []);
+  const row = rows[rowIndex];
+  const checkbox = row?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+  if (!checkbox || checkbox.checked === selected) return;
+  checkbox.click();
+}
+
+function readAutomationPointSelectionCount(panelLabel: string): number {
+  const panel = document.querySelector<HTMLElement>(`[aria-label="${panelLabel}"]`);
+  return Array.from(panel?.querySelectorAll<HTMLInputElement>('[class*="automationPointRow"] input[type="checkbox"]') ?? [])
+    .filter((input) => input.checked)
+    .length;
 }
 
 function findFieldSelect(label: string): HTMLSelectElement | null {

@@ -585,11 +585,22 @@
 }
 
 .automationPointRow {
-  grid-template-columns: 18px minmax(88px, 1fr) minmax(88px, 1fr) 46px auto;
+  grid-template-columns: 16px 18px minmax(88px, 1fr) minmax(88px, 1fr) 46px auto;
   gap: 4px;
   min-height: 24px;
   border-top: 1px solid color-mix(in srgb, var(--color-fg) 24%, transparent);
   color: color-mix(in srgb, var(--color-fg) 78%, transparent);
+}
+
+.automationPointRowSelected {
+  background: color-mix(in srgb, var(--color-fg) 8%, transparent);
+}
+
+.automationPointSelect {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  accent-color: var(--color-fg);
 }
 
 .automationPointRow label {
@@ -609,7 +620,7 @@
   white-space: nowrap;
 }
 
-.automationPointRow input {
+.automationPointRow label input {
   width: 100%;
   min-width: 0;
   height: 20px;

@@ -135,6 +135,7 @@ export function PianoRoll(props: PianoRollProps) {
   const [draggedAutomationEdge, setDraggedAutomationEdge] = createSignal<"start" | "mid" | "end" | null>(null);
   const [automationCurveSelectOpen, setAutomationCurveSelectOpen] = createSignal(false);
   const [automationPointClipboard, setAutomationPointClipboard] = createSignal<AetherNoteAutomationPointClipboard | null>(null);
+  const [selectedAutomationPointIndices, setSelectedAutomationPointIndices] = createSignal<number[]>([]);
   const lastDrawnLengthRef = createRef(DEFAULT_NOTE_LENGTH_BEATS);
   const lastPointerTargetRef = createRef<PasteTarget | null>(null);
   const historyRef = createRef<MidiNote[][]>([]);
@@ -224,6 +225,14 @@ export function PianoRoll(props: PianoRollProps) {
       beat: Math.max(0, point.beat - firstSelectedNote.startBeat),
       value: point.value,
     }));
+  });
+  const activeSelectedAutomationPointIndices = createMemo(() =>
+    selectedAutomationPointIndices().filter((index) => index >= 0 && index < selectedAutomationPoints().length)
+  );
+  createEffect(() => {
+    activeAutomationTarget();
+    selected().join(",");
+    setSelectedAutomationPointIndices([]);
   });
   const selectedAutomationPointLength = createMemo(() => {
     const firstSelectedNote = selected().map((index) => props.notes[index]).find(Boolean) as MidiNote | undefined;
@@ -902,7 +911,9 @@ export function PianoRoll(props: PianoRollProps) {
 
   function copyAutomationPointsForSelection() {
     if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
-    const pointIndices = selectedAutomationPoints().map((_, index) => index);
+    const pointIndices = activeSelectedAutomationPointIndices().length > 0
+      ? activeSelectedAutomationPointIndices()
+      : selectedAutomationPoints().map((_, index) => index);
     if (pointIndices.length === 0) return;
     setAutomationPointClipboard(copyMidiNoteAutomationPoints(props.notes, selected()[0], activeAutomationTarget(), pointIndices));
   }
@@ -949,6 +960,17 @@ export function PianoRoll(props: PianoRollProps) {
   function deleteAutomationPoint(pointIndex: number) {
     if (selected().length === 0 || activeAutomationTarget() === "pitch") return;
     commitChange(removeMidiNoteAutomationPoint(props.notes, selected(), activeAutomationTarget(), pointIndex));
+    setSelectedAutomationPointIndices((indices) => indices
+      .filter((index) => index !== pointIndex)
+      .map((index) => index > pointIndex ? index - 1 : index));
+  }
+
+  function toggleAutomationPointSelection(pointIndex: number) {
+    setSelectedAutomationPointIndices((indices) =>
+      indices.includes(pointIndex)
+        ? indices.filter((index) => index !== pointIndex)
+        : [...indices, pointIndex].sort((a, b) => a - b)
+    );
   }
 
   function startAutomationPointDrag(edge: "start" | "mid" | "end", event: PointerEvent) {
@@ -1710,7 +1732,23 @@ export function PianoRoll(props: PianoRollProps) {
                 </div>
                 <For each={selectedAutomationPoints()}>
                   {(point, index) => (
-                    <div class={styles.automationPointRow}>
+                    <div
+                      classList={{
+                        [styles.automationPointRow]: true,
+                        [styles.automationPointRowSelected]: activeSelectedAutomationPointIndices().includes(index()),
+                      }}
+                    >
+                      <input
+                        class={styles.automationPointSelect}
+                        type="checkbox"
+                        checked={activeSelectedAutomationPointIndices().includes(index())}
+                        readOnly
+                        aria-label={`Select automation point ${index() + 1}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          toggleAutomationPointSelection(index());
+                        }}
+                      />
                       <span class={styles.automationPointIndex}>{index() + 1}</span>
                       <label>
                         <span>Beat</span>

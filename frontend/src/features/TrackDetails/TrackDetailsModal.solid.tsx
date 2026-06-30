@@ -1,4 +1,4 @@
-import { For, createMemo, createSignal, Show } from "solid-js";
+import { For, createEffect, createMemo, createSignal, Show } from "solid-js";
 import {
   AETHER_ARRANGEMENT_AUTOMATION_TARGETS,
   type AetherArrangementAutomationPointClipboard,
@@ -47,6 +47,7 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
   const [activeAutomationTarget, setActiveAutomationTarget] = createSignal<AetherArrangementAutomationTarget>("macro.1");
   const [draggedAutomationEdge, setDraggedAutomationEdge] = createSignal<"start" | "mid" | "end" | null>(null);
   const [automationPointClipboard, setAutomationPointClipboard] = createSignal<AetherArrangementAutomationPointClipboard | null>(null);
+  const [selectedAutomationPointIndices, setSelectedAutomationPointIndices] = createSignal<number[]>([]);
   const activeAutomationMeta = createMemo(() => aetherArrangementAutomationTargetMeta(activeAutomationTarget()));
   const automationRange = createMemo(() => trackAutomationValueRange(track(), activeAutomationTarget()));
   const activeAutomationCurve = createMemo(() => trackAutomationCurve(track(), activeAutomationTarget()));
@@ -54,6 +55,13 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
   const activeAutomationPoints = createMemo(() =>
     track()?.automation?.find((lane) => lane.target === activeAutomationTarget())?.points ?? []
   );
+  const activeSelectedAutomationPointIndices = createMemo(() =>
+    selectedAutomationPointIndices().filter((index) => index >= 0 && index < activeAutomationPoints().length)
+  );
+  createEffect(() => {
+    activeAutomationTarget();
+    setSelectedAutomationPointIndices([]);
+  });
   const automationCurveOptions = AUTOMATION_CURVES.map((curve) => ({ value: curve, label: automationCurveLabel(curve) }));
 
   function close() {
@@ -170,7 +178,9 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
   function copyTrackAutomationLanePoints() {
     const current = track();
     if (!current) return;
-    const pointIndices = activeAutomationPoints().map((_, index) => index);
+    const pointIndices = activeSelectedAutomationPointIndices().length > 0
+      ? activeSelectedAutomationPointIndices()
+      : activeAutomationPoints().map((_, index) => index);
     if (pointIndices.length === 0) return;
     setAutomationPointClipboard(copyTrackAutomationPoints(current, activeAutomationTarget(), pointIndices));
   }
@@ -216,6 +226,17 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
     const current = track();
     if (!current) return;
     updateTrackAutomation(removeTrackAutomationPoint(current, activeAutomationTarget(), index));
+    setSelectedAutomationPointIndices((indices) => indices
+      .filter((pointIndex) => pointIndex !== index)
+      .map((pointIndex) => pointIndex > index ? pointIndex - 1 : pointIndex));
+  }
+
+  function toggleTrackAutomationPointSelection(index: number) {
+    setSelectedAutomationPointIndices((indices) =>
+      indices.includes(index)
+        ? indices.filter((pointIndex) => pointIndex !== index)
+        : [...indices, index].sort((a, b) => a - b)
+    );
   }
 
   return (
@@ -449,7 +470,23 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
                   </div>
                   <For each={activeAutomationPoints()}>
                     {(point, index) => (
-                      <div class={styles.automationPointRow}>
+                      <div
+                        classList={{
+                          [styles.automationPointRow]: true,
+                          [styles.automationPointRowSelected]: activeSelectedAutomationPointIndices().includes(index()),
+                        }}
+                      >
+                        <input
+                          class={styles.automationPointSelect}
+                          type="checkbox"
+                          checked={activeSelectedAutomationPointIndices().includes(index())}
+                          readOnly
+                          aria-label={`Select track automation point ${index() + 1}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleTrackAutomationPointSelection(index());
+                          }}
+                        />
                         <span class={styles.automationPointIndex}>{index() + 1}</span>
                         <label>
                           <span>Beat</span>
