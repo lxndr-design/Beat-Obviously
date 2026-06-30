@@ -34,7 +34,7 @@ Current implementation focus:
    - Done: Aether selected-note Macro 1 automation handle-drag browser fixture coverage for start/mid/end values through real pointer events.
    - Done: Aether Segment Editor Macro 1 automation handle-drag browser fixture coverage for start/mid/end values through real pointer events.
    - Done: Aether Track Details Macro 1 automation handle-drag browser fixture coverage for start/mid/end values through real pointer events.
-   - Done: Aether Synth Editor Env 1 direct ADSR handle-drag browser fixture coverage for attack, decay/sustain, and release through real pointer events.
+   - Done: Aether Synth Editor Env 1 direct ADSR handle-drag and rail curve-cycle browser fixture coverage for attack, decay/sustain, release, and curve shapes through real pointer/click events.
    - Done: Synth Editor macro assignment fixture coverage for Modulation Matrix Add route, source selection, target menu selection, strength edit, and enable/disable controls.
    - Done: arrangement-view Aether automation drag fixture coverage for free point dragging and shift-snap point dragging.
    - Add browser-level flow coverage for broader synth editing, wavemap import/draw, arrangement editing, export, relink, backup restore, and Project Health repairs.
@@ -67,7 +67,7 @@ Current implementation focus:
    - Run a real AU/VST3 plugin-host feasibility pass after the protected adapter layer is stable.
 6. `[~]` Aether synth maturity.
    - Finish macro live-preview parity, visible macro lanes, deeper macro conflict/precedence display, and modulation matrix semantic cleanup.
-   - Improve richer envelope curve-shape editing, expression-source feedback, and remaining one-off synth controls.
+   - Improve expression-source feedback and remaining one-off synth controls; envelope visual editing is complete for the current schema.
    - Curate named Aether instrument/effect preset library UX beyond local Save As lists.
 7. `[~]` Generation and musical intelligence.
    - Measure Aether-aware instrument generation against the current Aether schema.
@@ -247,7 +247,7 @@ Current implementation focus:
   - Done: first visible macro-card conflict summaries for overlapping modulation targets.
   - Remaining: visible macro automation lanes, browser live-preview parity, and deeper precedence/conflict feedback.
 - `[~]` Modulation matrix semantic cleanup: per-target ranges, conflict clarity, disabled routes, source-specific editing.
-- `[~]` Deeper envelope visual editing with better loop/curve handles and assignment feedback.
+- `[x]` Deeper envelope visual editing with ADSR drag handles, direct rail curve controls, loop state, and assignment feedback.
 - `[~]` Performance/expression UX for mod wheel, pitch bend, velocity, keytracking, mono/legato, glide, and voice caps.
 - `[~]` Reduce one-off controls inside synth surfaces and continue moving controls to Solid UI kit primitives.
 

@@ -313,10 +313,18 @@ interface DevAetherEnvelopeSnapshot {
   decay: number;
   sustain: number;
   release: number;
+  attackCurve: string;
+  decayCurve: string;
+  releaseCurve: string;
   cardText: string;
   handleLabels: {
     attack: string | null;
     decaySustain: string | null;
+    release: string | null;
+  };
+  curveLabels: {
+    attack: string | null;
+    decay: string | null;
     release: string | null;
   };
 }
@@ -327,6 +335,7 @@ interface DevAetherEnvelopeHandleExerciseState {
   afterAttackDrag: DevAetherEnvelopeSnapshot;
   afterDecaySustainDrag: DevAetherEnvelopeSnapshot;
   afterReleaseDrag: DevAetherEnvelopeSnapshot;
+  afterCurveCycle: DevAetherEnvelopeSnapshot;
 }
 
 interface DevAetherWavemapFrameSnapshot {
@@ -974,12 +983,18 @@ export function installBeatDevHooks() {
     dragEnvelopeHandle("env.1", "release", 0.68, 0.96);
     await nextFrame();
     const afterReleaseDrag = readAetherEnvelopeSnapshot("env.1");
+    clickEnvelopeCurve("env.1", "attack");
+    clickEnvelopeCurve("env.1", "decay");
+    clickEnvelopeCurve("env.1", "release");
+    await nextFrame();
+    const afterCurveCycle = readAetherEnvelopeSnapshot("env.1");
     const state: DevAetherEnvelopeHandleExerciseState = {
       instrumentId: useSynthStore.getState().boundInstrumentId,
       before,
       afterAttackDrag,
       afterDecaySustainDrag,
       afterReleaseDrag,
+      afterCurveCycle,
     };
     writeAetherEnvelopeHandleExerciseMarker(state);
     return state;
@@ -1992,22 +2007,39 @@ function findEnvelopeHandle(source: "env.1" | "env.2", kind: "attack" | "decay-s
   return document.querySelector<HTMLButtonElement>(`[data-aether-envelope-editor="${source}"] [data-aether-envelope-handle="${kind}"]`);
 }
 
+function findEnvelopeCurveButton(source: "env.1" | "env.2", segment: "attack" | "decay" | "release"): HTMLButtonElement | null {
+  return document.querySelector<HTMLButtonElement>(`[data-aether-envelope-editor="${source}"] [data-aether-envelope-curve="${segment}"]`);
+}
+
 function readAetherEnvelopeSnapshot(source: "env.1" | "env.2"): DevAetherEnvelopeSnapshot {
   const draft = useSynthStore.getState().draft;
   const read = (suffix: "attack" | "decay" | "sustain" | "release") => Number(draft.parameters[`${source}.${suffix}` as SynthParameterId] ?? 0);
+  const readCurve = (suffix: "attackCurve" | "decayCurve" | "releaseCurve") => String(draft.parameters[`${source}.${suffix}` as SynthParameterId] ?? "");
   const card = document.querySelector<HTMLElement>(`[data-aether-envelope-editor="${source}"]`);
   return {
     attack: read("attack"),
     decay: read("decay"),
     sustain: read("sustain"),
     release: read("release"),
+    attackCurve: readCurve("attackCurve"),
+    decayCurve: readCurve("decayCurve"),
+    releaseCurve: readCurve("releaseCurve"),
     cardText: normalizeText(card?.textContent ?? ""),
     handleLabels: {
       attack: findEnvelopeHandle(source, "attack")?.getAttribute("aria-label") ?? null,
       decaySustain: findEnvelopeHandle(source, "decay-sustain")?.getAttribute("aria-label") ?? null,
       release: findEnvelopeHandle(source, "release")?.getAttribute("aria-label") ?? null,
     },
+    curveLabels: {
+      attack: findEnvelopeCurveButton(source, "attack")?.getAttribute("aria-label") ?? null,
+      decay: findEnvelopeCurveButton(source, "decay")?.getAttribute("aria-label") ?? null,
+      release: findEnvelopeCurveButton(source, "release")?.getAttribute("aria-label") ?? null,
+    },
   };
+}
+
+function clickEnvelopeCurve(source: "env.1" | "env.2", segment: "attack" | "decay" | "release") {
+  findEnvelopeCurveButton(source, segment)?.click();
 }
 
 function dragEnvelopeHandle(source: "env.1" | "env.2", kind: "attack" | "decay-sustain" | "release", xRatio: number, yRatio: number) {

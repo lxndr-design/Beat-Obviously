@@ -64,7 +64,7 @@ import {
 import { ANALYZER_BAND_COUNT, useAnalyzerStore, type AnalyzerSnapshot } from "../../../state/analyzerStore";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../../state/store";
 import { INSTRUMENT_ICON_OPTIONS, instrumentIconLabel } from "../../../state/instrumentIcons";
-import type { TrackEffect } from "../../../state/types";
+import type { EnvelopeCurve, TrackEffect } from "../../../state/types";
 import { AnalyzerPanel } from "../AnalyzerPanel/AnalyzerPanel.solid";
 import { ModulationMatrix } from "../ModulationMatrix/ModulationMatrix.solid";
 import { OscillatorPanel } from "../OscillatorPanel/OscillatorPanel.solid";
@@ -1465,6 +1465,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
                   <EnvelopeHandleEditor
                     source={source}
                     onChange={setNumericParameter}
+                    onSetCurve={setParameter}
                   />
                   <div class={styles.envelopeCardMeta}>
                     <span>{envelope().timingLabel}</span>
@@ -1568,6 +1569,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
 function EnvelopeHandleEditor(props: {
   source: "env.1" | "env.2";
   onChange: (id: SynthParameterId, value: number) => void;
+  onSetCurve: (id: SynthParameterId, value: EnvelopeCurve) => void;
 }) {
   let railRef: SVGSVGElement | undefined;
   const [draggedHandle, setDraggedHandle] = createSignal<"attack" | "decay-sustain" | "release" | null>(null);
@@ -1577,10 +1579,18 @@ function EnvelopeHandleEditor(props: {
   const decay = createMemo(() => getNumberParam(draft(), `${props.source}.decay` as SynthParameterId));
   const sustain = createMemo(() => getNumberParam(draft(), `${props.source}.sustain` as SynthParameterId));
   const release = createMemo(() => getNumberParam(draft(), `${props.source}.release` as SynthParameterId));
+  const attackCurve = createMemo(() => getEnvelopeCurveParam(draft(), `${props.source}.attackCurve` as SynthParameterId));
+  const decayCurve = createMemo(() => getEnvelopeCurveParam(draft(), `${props.source}.decayCurve` as SynthParameterId));
+  const releaseCurve = createMemo(() => getEnvelopeCurveParam(draft(), `${props.source}.releaseCurve` as SynthParameterId));
 
+  const startPoint = createMemo(() => envelope().points[0] ?? { x: 0, y: 100 });
   const attackPoint = createMemo(() => envelope().points[1] ?? { x: 0, y: 0 });
   const decayPoint = createMemo(() => envelope().points[2] ?? { x: 50, y: 50 });
+  const holdPoint = createMemo(() => envelope().points[3] ?? decayPoint());
   const releasePoint = createMemo(() => envelope().points[4] ?? { x: 100, y: 100 });
+  const attackCurvePoint = createMemo(() => midpoint(startPoint(), attackPoint()));
+  const decayCurvePoint = createMemo(() => midpoint(attackPoint(), decayPoint()));
+  const releaseCurvePoint = createMemo(() => midpoint(holdPoint(), releasePoint()));
 
   function updateHandle(kind: "attack" | "decay-sustain" | "release", event: PointerEvent) {
     const rail = railRef;
@@ -1620,6 +1630,11 @@ function EnvelopeHandleEditor(props: {
     if (draggedHandle() !== kind) return;
     updateHandle(kind, event);
     setDraggedHandle(null);
+  }
+
+  function cycleCurve(segment: "attack" | "decay" | "release") {
+    const id = `${props.source}.${segment}Curve` as SynthParameterId;
+    props.onSetCurve(id, nextEnvelopeCurve(getEnvelopeCurveParam(draft(), id)));
   }
 
   return (
@@ -1666,7 +1681,49 @@ function EnvelopeHandleEditor(props: {
         onPointerUp={(event) => stopHandleDrag("release", event)}
         onPointerCancel={() => setDraggedHandle(null)}
       />
+      <EnvelopeCurveButton
+        segment="attack"
+        label={`${envelope().label} attack curve`}
+        value={attackCurve()}
+        point={attackCurvePoint()}
+        onClick={() => cycleCurve("attack")}
+      />
+      <EnvelopeCurveButton
+        segment="decay"
+        label={`${envelope().label} decay curve`}
+        value={decayCurve()}
+        point={decayCurvePoint()}
+        onClick={() => cycleCurve("decay")}
+      />
+      <EnvelopeCurveButton
+        segment="release"
+        label={`${envelope().label} release curve`}
+        value={releaseCurve()}
+        point={releaseCurvePoint()}
+        onClick={() => cycleCurve("release")}
+      />
     </div>
+  );
+}
+
+function EnvelopeCurveButton(props: {
+  segment: "attack" | "decay" | "release";
+  label: string;
+  value: EnvelopeCurve;
+  point: { x: number; y: number };
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      class={styles.envelopeCurveButton}
+      style={{ left: `${props.point.x}%`, top: `${props.point.y}%` }}
+      data-aether-envelope-curve={props.segment}
+      aria-label={`${props.label}: ${props.value}`}
+      onClick={props.onClick}
+    >
+      {envelopeCurveShortLabel(props.value)}
+    </button>
   );
 }
 
@@ -1861,10 +1918,30 @@ function snap01(value: number): number {
   return Math.round(clamp(value, 0, 1) * 100) / 100;
 }
 
+function midpoint(a: { x: number; y: number }, b: { x: number; y: number }): { x: number; y: number } {
+  return {
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2,
+  };
+}
+
+function nextEnvelopeCurve(value: EnvelopeCurve): EnvelopeCurve {
+  const index = ENVELOPE_CURVE_VALUES.indexOf(value);
+  return ENVELOPE_CURVE_VALUES[(index + 1) % ENVELOPE_CURVE_VALUES.length] ?? "linear";
+}
+
+function envelopeCurveShortLabel(value: EnvelopeCurve): string {
+  if (value === "s-curve") return "S";
+  if (value === "linear") return "Lin";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
 }
+
+const ENVELOPE_CURVE_VALUES: EnvelopeCurve[] = ["linear", "exp", "log", "s-curve"];
 
 const MODULATABLE_PARAMETER_IDS = new Set<string>([
   "filter.cutoff",
