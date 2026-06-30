@@ -38,6 +38,8 @@ function lineEntries(source) {
 
 const appPath = join(frontendSrc, "App.solid.tsx");
 const timelinePath = join(frontendSrc, "audio", "TimelineMidiPlayback.solid.tsx");
+const liveMidiExpressionInputPath = join(frontendSrc, "audio", "LiveMidiExpressionInput.solid.tsx");
+const liveMidiExpressionPath = join(frontendSrc, "audio", "liveMidiExpression.ts");
 const transportActionsPath = join(frontendSrc, "audio", "transportActions.ts");
 const wavemapResynthesisPath = join(frontendSrc, "audio", "wavemapResynthesis.ts");
 const schemaPath = join(frontendSrc, "ipc", "schema.ts");
@@ -48,6 +50,8 @@ const messageBridgePath = join(repoRoot, "backend", "Source", "Ipc", "MessageBri
 for (const requiredPath of [
   appPath,
   timelinePath,
+  liveMidiExpressionInputPath,
+  liveMidiExpressionPath,
   transportActionsPath,
   wavemapResynthesisPath,
   schemaPath,
@@ -58,6 +62,16 @@ for (const requiredPath of [
   if (!existsSync(requiredPath)) fail(`Missing audio boundary file: ${rel(requiredPath)}`);
 }
 
+if (existsSync(appPath)) {
+  const source = read(appPath);
+  if (!source.includes('import { LiveMidiExpressionInput } from "./audio/LiveMidiExpressionInput.solid";')) {
+    fail("App must import the live MIDI expression input bridge.");
+  }
+  if (!source.includes("<LiveMidiExpressionInput />")) {
+    fail("App must mount the live MIDI expression input bridge next to timeline playback.");
+  }
+}
+
 if (existsSync(timelinePath)) {
   const source = read(timelinePath);
   if (!source.includes('import { isNative } from "../ipc/bridge";')) {
@@ -65,6 +79,32 @@ if (existsSync(timelinePath)) {
   }
   if (!/export function TimelineMidiPlayback\(\)\s*\{\s*if \(isNative\(\)\) return null;/.test(source)) {
     fail("Timeline MIDI browser fallback must be disabled immediately in native mode.");
+  }
+}
+
+if (existsSync(liveMidiExpressionInputPath)) {
+  const source = read(liveMidiExpressionInputPath);
+  if (!source.includes('import { isNative } from "../ipc/bridge";')) {
+    fail("Live MIDI expression input must import isNative.");
+  }
+  if (!/export function LiveMidiExpressionInput\(\)\s*\{\s*if \(isNative\(\)\) return null;/.test(source)) {
+    fail("Live MIDI expression input must be disabled immediately in native mode.");
+  }
+  if (!source.includes("requestMIDIAccess")) {
+    fail("Live MIDI expression input must use the browser Web MIDI bridge.");
+  }
+  if (!source.includes('source: "midi"')) {
+    fail("Live MIDI expression input must publish synth expression activity as MIDI source.");
+  }
+}
+
+if (existsSync(liveMidiExpressionPath)) {
+  const source = read(liveMidiExpressionPath);
+  if (!source.includes("parseLiveMidiExpressionMessage")) {
+    fail("Live MIDI expression parser must stay testable outside the Solid component.");
+  }
+  if (!source.includes("createLiveMidiExpressionTracker")) {
+    fail("Live MIDI expression tracker must stay testable outside the Solid component.");
   }
 }
 

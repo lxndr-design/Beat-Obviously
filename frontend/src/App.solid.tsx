@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { appAlert, appConfirm, Block } from "./solid-ui";
 import { TimelineMidiPlayback } from "./audio/TimelineMidiPlayback.solid";
+import { LiveMidiExpressionInput } from "./audio/LiveMidiExpressionInput.solid";
 import { startAnalyzerClient } from "./audio/analyzerClient";
 import { RenderTimingPanel } from "./features/Debug/RenderTimingPanel.solid";
 import { ExportJobPanel } from "./features/Debug/ExportJobPanel.solid";
@@ -458,6 +459,7 @@ export function App() {
       >
         <Visualizer />
         <TimelineMidiPlayback />
+        <LiveMidiExpressionInput />
         <TrainingAutoRunner />
         <RenderTimingPanel />
         <ExportJobPanel />

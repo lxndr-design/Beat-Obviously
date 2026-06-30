@@ -20,6 +20,7 @@ try {
       join(repoRoot, "frontend/src/state/effectPresets.ts"),
       join(repoRoot, "frontend/src/state/synthPresets.ts"),
       join(repoRoot, "frontend/src/audio/synthPreview.ts"),
+      join(repoRoot, "frontend/src/audio/liveMidiExpression.ts"),
       join(repoRoot, "frontend/src/ai/aiService.ts"),
       "--bundle",
       "--format=esm",
@@ -34,6 +35,7 @@ try {
   const effectPresets = await import(pathToFileURL(join(outDir, "state/effectPresets.js")));
   const synthPresets = await import(pathToFileURL(join(outDir, "state/synthPresets.js")));
   const synthPreview = await import(pathToFileURL(join(outDir, "audio/synthPreview.js")));
+  const liveMidiExpression = await import(pathToFileURL(join(outDir, "audio/liveMidiExpression.js")));
   const aiService = await import(pathToFileURL(join(outDir, "ai/aiService.js")));
 
   const draft = synthStore.normalizeSynthDraftPatch({
@@ -346,6 +348,34 @@ try {
   assert.equal(typeof liveStore.getState().expressionActivityByInstrument["inst-a"].updatedAt, "number");
   liveStore.getState().clearInstrumentExpressionActivity("inst-a");
   assert.equal(liveStore.getState().expressionActivityByInstrument["inst-a"], undefined);
+  assert.deepEqual(
+    liveMidiExpression.parseLiveMidiExpressionMessage([0x90, 64, 100]),
+    { kind: "noteOn", channel: 0, note: 64, velocity: 100 / 127 },
+    "live MIDI parser should expose note-on velocity for Aether expression feedback",
+  );
+  assert.deepEqual(
+    liveMidiExpression.parseLiveMidiExpressionMessage([0x90, 64, 0]),
+    { kind: "noteOff", channel: 0, note: 64 },
+    "live MIDI parser should treat note-on velocity zero as note-off",
+  );
+  const midiExpressionTracker = liveMidiExpression.createLiveMidiExpressionTracker();
+  const firstMidiNote = midiExpressionTracker.applyData([0x90, 64, 100]);
+  assert.equal(firstMidiNote.activeNotes, 1);
+  assert.ok(Math.abs(firstMidiNote.velocity - 100 / 127) < 0.0001);
+  assert.ok(Math.abs(firstMidiNote.keytrack - 64 / 127) < 0.0001);
+  const secondMidiNote = midiExpressionTracker.applyData([0x90, 76, 80]);
+  assert.equal(secondMidiNote.activeNotes, 2);
+  assert.ok(Math.abs(secondMidiNote.velocity - ((100 / 127) + (80 / 127)) / 2) < 0.0001);
+  const bentMidi = midiExpressionTracker.applyData([0xe0, 0, 96]);
+  assert.ok(Math.abs(bentMidi.pitchBendSemitones - 1) < 0.0001);
+  const modWheelMidi = midiExpressionTracker.applyData([0xb0, 1, 96]);
+  assert.ok(Math.abs(modWheelMidi.modWheel - 96 / 127) < 0.0001);
+  midiExpressionTracker.applyData([0x80, 64, 0]);
+  const oneRemainingMidiNote = midiExpressionTracker.applyData([0x80, 76, 0]);
+  assert.equal(oneRemainingMidiNote.activeNotes, 0);
+  assert.ok(Math.abs(oneRemainingMidiNote.pitchBendSemitones - 1) < 0.0001);
+  midiExpressionTracker.applyData([0xe0, 0, 64]);
+  assert.equal(midiExpressionTracker.applyData([0xb0, 1, 0]), null);
   const fineRoute = draft.modulation.find((route) => route.target === "osc.a.fine");
   assert.ok(fineRoute, "expected fine modulation route fixture");
   assert.deepEqual(synthStore.modulationRouteDisplay(draft, fineRoute), {
