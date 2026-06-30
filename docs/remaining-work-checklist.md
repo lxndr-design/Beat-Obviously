@@ -31,9 +31,9 @@ Current implementation focus:
    - Done: Aether wavemap editor browser fixture coverage for Details analysis, Additive mode, Odd partials, Manual range, and Smooth interpolation.
    - Done: Aether wavemap Freehand pointer-draw browser fixture coverage, including changed frame data and changed rendered waveform path.
    - Done: Aether wavemap Import Audio browser fixture coverage, including deterministic browser audio, imported source provenance, manual range preservation, and generated frame analysis.
-   - Done: Aether selected-note Macro 1 and Filter Cutoff automation handle-drag browser fixture coverage for start/mid/end values through real pointer events.
-   - Done: Aether Segment Editor Macro 1 and Filter Cutoff automation handle-drag browser fixture coverage for start/mid/end values through real pointer events.
-   - Done: Aether Track Details Macro 1 and Filter Cutoff automation handle-drag browser fixture coverage for start/mid/end values through real pointer events.
+   - Done: Aether selected-note Macro 1 and Filter Cutoff automation handle-drag true browser fixture coverage for start/mid/end values through real pointer events.
+   - Done: Aether Segment Editor Macro 1 and Filter Cutoff automation handle-drag true browser fixture coverage for start/mid/end values through real pointer events.
+   - Done: Aether Track Details Macro 1 and Filter Cutoff automation handle-drag true browser fixture coverage for start/mid/end values through real pointer events.
    - Done: Aether Synth Editor Env 1 direct ADSR handle-drag and rail curve-cycle browser fixture coverage for attack, decay/sustain, release, and curve shapes through real pointer/click events.
    - Done: Synth Editor macro assignment fixture coverage for Modulation Matrix Add route, source selection, target menu selection, strength edit, and enable/disable controls.
    - Done: arrangement-view Aether automation drag fixture coverage for free point dragging and shift-snap point dragging.
@@ -47,9 +47,9 @@ Current implementation focus:
    - Done: visible note, segment, and track Aether point editors expose point beat/value editing plus add/remove controls.
    - Done: visible note, segment, and track Aether point editors expose quantize and value snapping controls with pure interaction verifier coverage.
    - Done: arrangement-view Aether automation point drag is covered in a true browser fixture, including free movement and shift snapping.
-   - Done: selected-note Aether automation value handles are covered in a true browser fixture for Macro 1 and Filter Cutoff start/mid/end drag edits.
-   - Done: Segment Editor Aether automation value handles are covered in a true browser fixture for Macro 1 and Filter Cutoff start/mid/end drag edits.
-   - Done: Track Details Aether automation value handles are covered in a true browser fixture for Macro 1 and Filter Cutoff start/mid/end drag edits.
+   - Done: selected-note Aether automation value handles are covered in true browser fixture smoke for Macro 1 and Filter Cutoff start/mid/end drag edits, with changed fixture marker values.
+   - Done: Segment Editor Aether automation value handles are covered in true browser fixture smoke for Macro 1 and Filter Cutoff start/mid/end drag edits, with changed fixture marker values.
+   - Done: Track Details Aether automation value handles are covered in true browser fixture smoke for Macro 1 and Filter Cutoff start/mid/end drag edits, with changed fixture marker values.
    - Done: native IPC maps frontend `track.automation` lanes into backend project automation with track and instrument IDs, and dense Aether live/export stress covers a track-scoped multi-point Aether lane.
    - Add multi-select, copy/paste, and broader drag/browser interaction parity coverage.
    - Define project vs track vs segment vs note vs live-write conflict rules and surface invalid automation warnings.
