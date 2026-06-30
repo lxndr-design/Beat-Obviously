@@ -56,7 +56,9 @@ namespace beat::WavetableVoiceCache
                 ? WavetableWarpMode::Fold
                 : config.warpMode == 2
                     ? WavetableWarpMode::Pinch
-                    : WavetableWarpMode::Shape;
+                    : config.warpMode == 3
+                        ? WavetableWarpMode::Mirror
+                        : WavetableWarpMode::Shape;
             if (config.custom || config.bank == 5)
                 return WavetableFactory::createCustom(factoryCustomFrames(config), config.warp, warpMode, config.smoothInterpolation, config.morph);
 
@@ -70,7 +72,7 @@ namespace beat::WavetableVoiceCache
             key << "bank=" << config.bank
                 << "|custom=" << (custom ? 1 : 0)
                 << "|warp=" << juce::String(juce::jlimit(0.0f, 1.0f, config.warp), 4)
-                << "|warpMode=" << juce::jlimit(0, 2, config.warpMode)
+                << "|warpMode=" << juce::jlimit(0, 3, config.warpMode)
                 << "|smooth=" << (config.smoothInterpolation ? 1 : 0)
                 << "|morph=" << juce::String(juce::jlimit(0.0f, 1.0f, config.morph), 4);
             if (custom)

@@ -2421,7 +2421,7 @@ function applyWavetableToDraft(
 }
 
 function isWavetableWarpMode(value: unknown): value is WavetableWarpMode {
-  return value === "shape" || value === "fold" || value === "pinch";
+  return value === "shape" || value === "fold" || value === "pinch" || value === "mirror";
 }
 
 function routeAmount(draft: SynthDraftPatch, source: ModulationSourceId, target: ModulationTargetId): number {

@@ -1269,6 +1269,7 @@ function sanitizeCustomFrame(frame: CustomWavetableFrame): CustomWavetableFrame 
 function warpModeIntensity(warp: number, warpMode: WavetableConfig["warpMode"] = "shape"): number {
   if (warpMode === "fold") return clamp01(warp) * 1.35;
   if (warpMode === "pinch") return Math.pow(clamp01(warp), 0.72);
+  if (warpMode === "mirror") return Math.pow(clamp01(warp), 1.12) * 1.48;
   return clamp01(warp);
 }
 
@@ -1297,9 +1298,12 @@ function customWavetableHarmonicAmplitude(frame: CustomWavetableFrame, harmonic:
   const notchCut = Math.max(0.08, 1 - notchPeak * notch * (0.58 + focus * 0.28));
   const folded = warpMode === "fold" ? Math.abs(Math.sin(harmonic * 0.62 + frame.phase)) * shapedWarp * 0.24 : 0;
   const pinched = warpMode === "pinch" ? Math.exp(-Math.pow((harmonic - (2 + brightness * 8)) / 2.4, 2)) * shapedWarp * 0.28 : 0;
+  const mirrored = warpMode === "mirror"
+    ? (0.16 + (harmonic % 2 === 0 ? 0.18 : 0.04)) * shapedWarp * (0.75 + Math.abs(Math.sin(harmonic * 0.38 + frame.phase * Math.PI)) * 0.45) / Math.sqrt(harmonic)
+    : 0;
   const drawnPartial = harmonic <= CUSTOM_WAVETABLE_PARTIAL_COUNT ? clamp01(frame.partials?.[harmonic - 1] ?? 0) : 0;
   const motion = 1 + Math.sin(harmonic * 1.7 + frame.phase * Math.PI) * fold * 0.28;
-  return Math.max(0, (parity * rolloff * motion * skewBias * tiltBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + formantPeak * formant * (0.42 + focus * 0.28) + drawnPartial * (0.08 + brightness * 0.34)) * notchCut + folded + pinched);
+  return Math.max(0, (parity * rolloff * motion * skewBias * tiltBias / Math.sqrt(harmonic) + foldPeak * fold * 0.35 + formantPeak * formant * (0.42 + focus * 0.28) + drawnPartial * (0.08 + brightness * 0.34)) * notchCut + folded + pinched + mirrored);
 }
 
 function customWavetableHarmonicPhase(frame: CustomWavetableFrame, harmonic: number, warp: number, warpMode: WavetableConfig["warpMode"] = "shape"): number {
@@ -1311,6 +1315,8 @@ function customWavetableHarmonicPhase(frame: CustomWavetableFrame, harmonic: num
     ? Math.sin(harmonic * 0.73) * shapedWarp * 0.45
     : warpMode === "pinch"
       ? Math.cos(harmonic * 0.29) * shapedWarp * 0.24
+      : warpMode === "mirror"
+        ? Math.sin(harmonic * 0.19 + frame.phase * Math.PI) * (harmonic % 2 === 0 ? 1 : -1) * shapedWarp * 0.38
       : 0;
   return frame.phase * harmonic * 0.28
     + Math.sin(harmonic * 0.41 + skew * 0.55) * clamp01(frame.fold + shapedWarp * 0.25) * 0.55
@@ -1331,21 +1337,24 @@ function wavetableHarmonicAmplitude(
   const shapedWarp = warpModeIntensity(warp, warpMode);
   const folded = warpMode === "fold" ? Math.abs(Math.sin(harmonic * 0.58 + frame * 4)) * shapedWarp * 0.22 / Math.sqrt(harmonic) : 0;
   const pinched = warpMode === "pinch" ? Math.exp(-Math.pow((harmonic - (2 + frame * 10)) / (1.8 + shapedWarp * 3), 2)) * shapedWarp * 0.34 : 0;
+  const mirrored = warpMode === "mirror"
+    ? (0.13 + (harmonic % 2 === 0 ? 0.21 : 0.03)) * shapedWarp * (0.7 + Math.abs(Math.sin(harmonic * 0.36 + frame * Math.PI)) * 0.5) / Math.sqrt(harmonic)
+    : 0;
   switch (bank) {
     case "glass":
-      return Math.exp(-harmonic * (0.045 + frame * 0.025)) * (odd ? 1 : 0.22 + shapedWarp * 0.45) * (1 + Math.sin(harmonic * 1.7 + frame * 5) * 0.18) + folded + pinched;
+      return Math.exp(-harmonic * (0.045 + frame * 0.025)) * (odd ? 1 : 0.22 + shapedWarp * 0.45) * (1 + Math.sin(harmonic * 1.7 + frame * 5) * 0.18) + folded + pinched + mirrored;
     case "vocal": {
       const formantA = Math.exp(-Math.pow((harmonic - (3 + frame * 9)) / (1.4 + shapedWarp * 3), 2));
       const formantB = Math.exp(-Math.pow((harmonic - (11 + frame * 18)) / (2.5 + shapedWarp * 6), 2));
-      return (formantA * 1.4 + formantB * 0.9 + (odd ? 0.08 : 0.03)) / Math.sqrt(harmonic) + folded + pinched;
+      return (formantA * 1.4 + formantB * 0.9 + (odd ? 0.08 : 0.03)) / Math.sqrt(harmonic) + folded + pinched + mirrored;
     }
     case "organ":
-      return [1, 0, 0.55, 0.22, 0.38, 0, 0.18, 0.1][(harmonic - 1) % 8] * Math.exp(-frame * harmonic * 0.01) + (shapedWarp * 0.08) / harmonic + folded + pinched;
+      return [1, 0, 0.55, 0.22, 0.38, 0, 0.18, 0.1][(harmonic - 1) % 8] * Math.exp(-frame * harmonic * 0.01) + (shapedWarp * 0.08) / harmonic + folded + pinched + mirrored;
     case "fm":
-      return Math.abs(Math.sin(harmonic * (0.45 + frame * 0.9))) * Math.exp(-harmonic * (0.028 + (1 - shapedWarp) * 0.028)) / Math.sqrt(harmonic) + folded + pinched;
+      return Math.abs(Math.sin(harmonic * (0.45 + frame * 0.9))) * Math.exp(-harmonic * (0.028 + (1 - shapedWarp) * 0.028)) / Math.sqrt(harmonic) + folded + pinched + mirrored;
     case "aether":
     default:
-      return Math.exp(-harmonic * (0.022 + frame * 0.04)) * (odd ? 1 : frame * 0.8 + shapedWarp * 0.35) / Math.sqrt(harmonic) + folded + pinched;
+      return Math.exp(-harmonic * (0.022 + frame * 0.04)) * (odd ? 1 : frame * 0.8 + shapedWarp * 0.35) / Math.sqrt(harmonic) + folded + pinched + mirrored;
   }
 }
 
@@ -1354,6 +1363,8 @@ function wavetableHarmonicPhase(bank: NonNullable<Instrument["wavetable"]>["bank
     ? Math.sin(harmonic * 0.47 + frame * Math.PI) * warpModeIntensity(warp, warpMode) * 0.55
     : warpMode === "pinch"
       ? Math.cos(harmonic * 0.33 + frame) * warpModeIntensity(warp, warpMode) * 0.3
+      : warpMode === "mirror"
+        ? Math.sin(harmonic * 0.24 + frame * Math.PI) * (harmonic % 2 === 0 ? 1 : -1) * warpModeIntensity(warp, warpMode) * 0.42
       : 0;
   if (bank === "fm" || bank === "glass") return Math.sin(harmonic * 0.37 + frame * Math.PI) * 0.8 + modePhase;
   if (bank === "vocal") return frame * harmonic * 0.08 + modePhase;

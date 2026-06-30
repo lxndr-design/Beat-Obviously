@@ -1431,9 +1431,10 @@ namespace beat
                 const auto mode = value.toString();
                 if (mode == "fold") return 1;
                 if (mode == "pinch") return 2;
+                if (mode == "mirror") return 3;
                 return 0;
             }
-            return juce::jlimit(0, 2, (int) value);
+            return juce::jlimit(0, 3, (int) value);
         }
 
         int parseSubWaveform(const juce::var& value)

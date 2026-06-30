@@ -16,8 +16,10 @@ Status legend:
 - `[x]` Continue thinning `InstrumentVoice`.
   - Done: envelope shaper, LFO helper, dynamic-modulation helpers, oscillator helpers, Aether table-stack renderer, filter stage, drive stage, wavetable cache/table ownership, wavetable oscillator-bank rendering, wavetable unison planning, Aether pan/pitch cache helpers, voice math helpers, render-stat types, per-block render-work assembly, note-automation inbox/types/runtime state, realtime ramp state, realtime parameter mapper/application, active-ramp bookkeeping, and voice allocation.
   - Remaining: none for the current extraction plan; keep direct backend stress for any future extraction.
-- `[ ]` Add heavier nonlinear warp experiments only after the oversampling strategy is extended to any runtime warp stage.
-  - Proof: backend stress showing bounded work counters, continuity across block boundaries, and dense Aether route stability.
+- `[~]` Heavier nonlinear warp experiments.
+  - Done: added the bounded table-generation `mirror` warp mode alongside `shape`, `fold`, and `pinch` across Solid controls, browser preview, native table generation, IPC/persistence parsing, cache keys, and verifier/stress coverage.
+  - Remaining: keep true runtime nonlinear warp experiments gated until the oversampling strategy is extended to any runtime warp stage.
+  - Proof: synth verifier proves the mirror mode changes browser preview output; backend stress proves mirror tables differ from the unwarped baseline while staying bounded.
 
 ## 2. Modulation, Macros, And Note Automation
 

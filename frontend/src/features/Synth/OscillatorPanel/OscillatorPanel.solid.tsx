@@ -70,6 +70,7 @@ const WARP_MODE_OPTIONS: Array<{ value: WavetableWarpMode; label: string; icon: 
   { value: "shape", label: "Shape", icon: "ph:waveform" },
   { value: "fold", label: "Fold", icon: "ph:intersect-three" },
   { value: "pinch", label: "Pinch", icon: "ph:arrows-in-line-horizontal" },
+  { value: "mirror", label: "Mirror", icon: "ph:diamonds-four" },
 ];
 
 const RESYNTHESIS_MODE_OPTIONS: Array<{ value: WavemapAudioSelectionMode; label: string }> = [
@@ -208,7 +209,7 @@ function OscillatorRow(props: {
   const selectedWavetable = createMemo(() => getStringParam(draft(), wavetableId()) as WavetableId);
   const selectedWarpMode = createMemo(() => {
     const mode = getStringParam(draft(), warpModeId());
-    return mode === "fold" || mode === "pinch" ? mode : "shape";
+    return mode === "fold" || mode === "pinch" || mode === "mirror" ? mode : "shape";
   });
   const customTableId = createMemo(() => selectedWavetable().startsWith("user.") ? selectedWavetable() : DEFAULT_CUSTOM_WAVETABLE_ID);
   const customTable = createMemo(() => draft().metadata.wavemaps?.[customTableId()] ?? draft().metadata.customWavetables?.[customTableId()] ?? createDefaultCustomWavetable(customTableId()));

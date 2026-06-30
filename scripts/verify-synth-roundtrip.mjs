@@ -1094,10 +1094,20 @@ try {
       oscA: { ...patch.aether.oscA, wavetable: { ...patch.aether.oscA.wavetable, warp: 0.8, warpMode: "pinch" } },
     },
   }, 256, "a");
+  const warpMirror = synthPreview.renderWavetablePreviewSamples({
+    ...patch,
+    wavetable: { ...patch.wavetable, warp: 0.8, warpMode: "mirror" },
+    aether: {
+      ...patch.aether,
+      oscA: { ...patch.aether.oscA, wavetable: { ...patch.aether.oscA.wavetable, warp: 0.8, warpMode: "mirror" } },
+    },
+  }, 256, "a");
   const diffFold = warpShape.reduce((sum, sample, index) => sum + Math.abs(sample - warpFold[index]), 0) / warpShape.length;
   const diffPinch = warpShape.reduce((sum, sample, index) => sum + Math.abs(sample - warpPinch[index]), 0) / warpShape.length;
+  const diffMirror = warpShape.reduce((sum, sample, index) => sum + Math.abs(sample - warpMirror[index]), 0) / warpShape.length;
   assert.ok(diffFold > 0.002, `expected fold warp mode to change preview, got ${diffFold}`);
   assert.ok(diffPinch > 0.002, `expected pinch warp mode to change preview, got ${diffPinch}`);
+  assert.ok(diffMirror > 0.002, `expected mirror warp mode to change preview, got ${diffMirror}`);
 
   const customDraft = synthStore.normalizeSynthDraftPatch({
     name: "Custom Table Probe",

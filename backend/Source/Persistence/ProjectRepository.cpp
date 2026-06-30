@@ -257,7 +257,7 @@ namespace beat
             fallback.custom = (bool) wavetableVar.getProperty("custom", fallback.custom);
             fallback.position = juce::jlimit(0.0f, 1.0f, (float) (double) wavetableVar.getProperty("position", fallback.position));
             fallback.warp = juce::jlimit(0.0f, 1.0f, (float) (double) wavetableVar.getProperty("warp", fallback.warp));
-            fallback.warpMode = juce::jlimit(0, 2, (int) wavetableVar.getProperty("warpMode", fallback.warpMode));
+            fallback.warpMode = juce::jlimit(0, 3, (int) wavetableVar.getProperty("warpMode", fallback.warpMode));
             fallback.smoothInterpolation = (bool) wavetableVar.getProperty("smoothInterpolation", fallback.smoothInterpolation);
             fallback.morph = juce::jlimit(0.0f, 1.0f, (float) (double) wavetableVar.getProperty("morph", fallback.morph));
             fallback.unison = juce::jlimit(1, 8, (int) wavetableVar.getProperty("unison", fallback.unison));
@@ -968,7 +968,7 @@ namespace beat
                     instrument.wavetableBank = juce::jlimit(0, 8, (int) iv.getProperty("wavetableBank", instrument.wavetableBank));
                     instrument.wavetablePosition = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("wavetablePosition", instrument.wavetablePosition));
                     instrument.wavetableWarp = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("wavetableWarp", instrument.wavetableWarp));
-                    instrument.wavetableWarpMode = juce::jlimit(0, 2, (int) iv.getProperty("wavetableWarpMode", instrument.wavetableWarpMode));
+                    instrument.wavetableWarpMode = juce::jlimit(0, 3, (int) iv.getProperty("wavetableWarpMode", instrument.wavetableWarpMode));
                     instrument.wavetableUnison = juce::jlimit(1, 8, (int) iv.getProperty("wavetableUnison", instrument.wavetableUnison));
                     instrument.wavetableDetuneCents = juce::jlimit(0.0f, 100.0f, (float) (double) iv.getProperty("wavetableDetuneCents", instrument.wavetableDetuneCents));
                     instrument.wavetableBlend = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("wavetableBlend", instrument.wavetableBlend));

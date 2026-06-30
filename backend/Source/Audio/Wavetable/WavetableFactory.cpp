@@ -77,6 +77,7 @@ namespace beat
             {
                 case WavetableWarpMode::Fold: return clamped * 1.35f;
                 case WavetableWarpMode::Pinch: return std::pow(clamped, 0.72f);
+                case WavetableWarpMode::Mirror: return std::pow(clamped, 1.12f) * 1.48f;
                 case WavetableWarpMode::Shape:
                 default: return clamped;
             }
@@ -92,6 +93,12 @@ namespace beat
                 const float width = 1.8f + shapedWarp * 3.0f;
                 return std::exp(-std::pow(((float) harmonic - (2.0f + frame * 10.0f)) / width, 2.0f)) * shapedWarp * 0.34f;
             }
+            if (mode == WavetableWarpMode::Mirror)
+            {
+                const float parity = (harmonic % 2) == 0 ? 0.21f : 0.03f;
+                const float motion = 0.7f + std::abs(std::sin((float) harmonic * 0.36f + frame * juce::MathConstants<float>::pi)) * 0.5f;
+                return (0.13f + parity) * shapedWarp * motion / std::sqrt((float) harmonic);
+            }
             return 0.0f;
         }
 
@@ -102,6 +109,8 @@ namespace beat
                 return std::sin((float) harmonic * 0.47f + frame * juce::MathConstants<float>::pi) * shapedWarp * 0.55f;
             if (mode == WavetableWarpMode::Pinch)
                 return std::cos((float) harmonic * 0.33f + frame) * shapedWarp * 0.3f;
+            if (mode == WavetableWarpMode::Mirror)
+                return std::sin((float) harmonic * 0.24f + frame * juce::MathConstants<float>::pi) * ((harmonic % 2) == 0 ? 1.0f : -1.0f) * shapedWarp * 0.42f;
             return 0.0f;
         }
 

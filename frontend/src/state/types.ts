@@ -12,7 +12,7 @@ export type DrumSpeed = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type TrackKind = "audio" | "midi" | "mixed" | "group";
 
-export type WavetableWarpMode = "shape" | "fold" | "pinch";
+export type WavetableWarpMode = "shape" | "fold" | "pinch" | "mirror";
 
 export type MidiAutomationTarget =
   | "pitch"

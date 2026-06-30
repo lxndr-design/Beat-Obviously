@@ -9856,14 +9856,17 @@ namespace
             const auto shape = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::Shape, 8, 2048);
             const auto fold = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::Fold, 8, 2048);
             const auto pinch = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::Pinch, 8, 2048);
+            const auto mirror = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::Mirror, 8, 2048);
             double foldDiff = 0.0;
             double pinchDiff = 0.0;
+            double mirrorDiff = 0.0;
             for (int i = 0; i < 2048; i += 8)
             {
                 foldDiff += std::abs(shape.getSample(7, i) - fold.getSample(7, i));
                 pinchDiff += std::abs(shape.getSample(7, i) - pinch.getSample(7, i));
+                mirrorDiff += std::abs(shape.getSample(7, i) - mirror.getSample(7, i));
             }
-            if (foldDiff <= 0.01 || pinchDiff <= 0.01)
+            if (foldDiff <= 0.01 || pinchDiff <= 0.01 || mirrorDiff <= 0.01)
                 return false;
         }
 

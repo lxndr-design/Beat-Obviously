@@ -18,7 +18,8 @@ namespace beat
     {
         Shape,
         Fold,
-        Pinch
+        Pinch,
+        Mirror
     };
 
     class WavetableFactory

@@ -337,6 +337,7 @@ namespace beat
     {
         if (id == "fold") return 1;
         if (id == "pinch") return 2;
+        if (id == "mirror") return 3;
         return 0;
     }
 
