@@ -556,16 +556,23 @@ try {
   assert.ok(
     synthEditorSource.includes('aria-label="Amp and filter"')
       && synthEditorSource.includes('label="Filter"')
+      && synthEditorSource.includes('label="Runtime Warp"')
       && synthEditorSource.includes('label="Cutoff"')
+      && synthEditorSource.includes('"aether.runtimeWarp"')
+      && synthEditorSource.includes('"aether.runtimeWarpMode"')
       && synthEditorSource.includes('Env 1 Loop')
       && synthEditorSource.includes('Env 2 Loop'),
     "Aether Synth Editor should expose Amp/Filter controls for browser coverage",
   );
   assert.ok(
     devHooksSource.includes("exerciseAetherAmpFilterEditorFlow")
+      && devHooksSource.includes("runtimeWarp")
+      && devHooksSource.includes("runtimeWarpMode")
+      && devHooksSource.includes('clickRadioInPanel("Amp and filter", "Runtime Warp", "Fold")')
+      && devHooksSource.includes('setKnobValueInPanel("Amp and filter", "Warp", "0.64")')
       && devHooksSource.includes("beatAetherAmpFilterExercise")
       && devHooksSource.includes('fixture === "aether-amp-filter"'),
-    "browser fixture coverage should exercise Aether Amp/Filter control editing",
+    "browser fixture coverage should exercise Aether Amp/Filter and runtime warp control editing",
   );
   assert.ok(
     devHooksSource.includes("exerciseAetherPerformanceEditorFlow")

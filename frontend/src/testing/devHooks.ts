@@ -481,6 +481,8 @@ interface DevAetherAmpFilterSnapshot {
   resonance: number | null;
   keytrack: number | null;
   drive: number | null;
+  runtimeWarp: number | null;
+  runtimeWarpMode: string | null;
   ampLevel: number | null;
   ampPan: number | null;
   env1Loop: boolean;
@@ -1409,6 +1411,8 @@ export function installBeatDevHooks() {
         "filter.resonance": 0.14,
         "filter.keytrack": 0.18,
         "filter.drive": 0.08,
+        "aether.runtimeWarp": 0.12,
+        "aether.runtimeWarpMode": "shape",
         "amp.level": 0.72,
         "amp.pan": 0,
         "env.1.loop": false,
@@ -1442,6 +1446,8 @@ export function installBeatDevHooks() {
     await setKnobValueInPanel("Amp and filter", "Res", "0.47");
     await setKnobValueInPanel("Amp and filter", "Key", "0.61");
     await setKnobValueInPanel("Amp and filter", "Drive", "0.29");
+    clickRadioInPanel("Amp and filter", "Runtime Warp", "Fold");
+    await setKnobValueInPanel("Amp and filter", "Warp", "0.64");
     await setKnobValueInPanel("Amp and filter", "Level", "0.66");
     await setKnobValueInPanel("Amp and filter", "Pan", "-0.32");
     clickPanelButtonByText("Amp and filter", "Env 1 Loop");
@@ -2464,6 +2470,8 @@ function readAetherAmpFilterSnapshot(): DevAetherAmpFilterSnapshot {
     resonance: readNumber("filter.resonance"),
     keytrack: readNumber("filter.keytrack"),
     drive: readNumber("filter.drive"),
+    runtimeWarp: readNumber("aether.runtimeWarp"),
+    runtimeWarpMode: typeof draft.parameters["aether.runtimeWarpMode"] === "string" ? String(draft.parameters["aether.runtimeWarpMode"]) : null,
     ampLevel: readNumber("amp.level"),
     ampPan: readNumber("amp.pan"),
     env1Loop: draft.parameters["env.1.loop"] === true,
