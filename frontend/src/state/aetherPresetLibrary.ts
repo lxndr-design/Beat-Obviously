@@ -25,6 +25,15 @@ export interface AetherPresetLibraryFilters {
   sort?: AetherPresetLibrarySort;
 }
 
+export interface AetherPresetLibraryStats {
+  total: number;
+  favorites: number;
+  factory: number;
+  userPresets: number;
+  userInstruments: number;
+  categories: number;
+}
+
 export function buildAetherPresetLibraryEntries(
   userPresets: SynthPresetRecord[],
   userInstruments: Instrument[],
@@ -61,6 +70,17 @@ export function sortAetherPresetLibraryEntries(
 
 export function aetherPresetLibraryCategories(entries: AetherPresetLibraryEntry[]): string[] {
   return Array.from(new Set(entries.map((entry) => entry.category).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+}
+
+export function aetherPresetLibraryStats(entries: AetherPresetLibraryEntry[]): AetherPresetLibraryStats {
+  return {
+    total: entries.length,
+    favorites: entries.filter((entry) => entry.favorite).length,
+    factory: entries.filter((entry) => entry.source === "factory").length,
+    userPresets: entries.filter((entry) => entry.source === "user-preset").length,
+    userInstruments: entries.filter((entry) => entry.source === "user-instrument").length,
+    categories: aetherPresetLibraryCategories(entries).length,
+  };
 }
 
 function factoryPresetEntry(preset: SynthFactoryPresetRecord): AetherPresetLibraryEntry {

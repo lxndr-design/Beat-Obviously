@@ -255,8 +255,11 @@ interface DevAetherPresetLibraryFixtureState {
   optionLabels: string[];
   enabledOptionLabels: string[];
   selectedInfoText: string;
+  presetStatsText: string;
   favoritesFilterText: string | null;
   selectedFavoriteToggleText: string | null;
+  auditionButtonText: string | null;
+  auditionButtonDisabled: boolean | null;
 }
 
 interface DevAetherMacroFixtureState {
@@ -674,8 +677,11 @@ export function installBeatDevHooks() {
       optionLabels: options.map((option) => option.label),
       enabledOptionLabels: options.filter((option) => !option.disabled && option.value).map((option) => option.label),
       selectedInfoText: normalizeText(document.querySelector<HTMLElement>('[aria-label="Selected Aether preset details"]')?.textContent ?? ""),
+      presetStatsText: normalizeText(document.querySelector<HTMLElement>('[aria-label="Aether preset library summary"]')?.textContent ?? ""),
       favoritesFilterText: normalizeText(findButton("Toggle preset favorites filter")?.textContent ?? "") || null,
       selectedFavoriteToggleText: normalizeText(findButton("Toggle selected Aether preset favorite")?.textContent ?? "") || null,
+      auditionButtonText: normalizeText(findButton("Audition selected Aether preset")?.textContent ?? "") || null,
+      auditionButtonDisabled: findButton("Audition selected Aether preset")?.disabled ?? null,
     };
   };
 

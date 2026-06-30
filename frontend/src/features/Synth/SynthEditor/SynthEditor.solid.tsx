@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { previewFrequency, renderedInstrumentBuffer } from "../../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../../audio/synthWorkletPreview";
-import { appPrompt, Button, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, TextInput, Toggle } from "../../../solid-ui";
+import { appPrompt, Button, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, Tag, TextInput, Toggle } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import {
   createTrackEffect,
@@ -17,6 +17,7 @@ import {
 import { createAetherEffectPresetRecord, type AetherEffectPresetRecord } from "../../../state/effectPresets";
 import {
   aetherPresetLibraryCategories,
+  aetherPresetLibraryStats,
   buildAetherPresetLibraryEntries,
   filterAetherPresetLibraryEntries,
   type AetherPresetLibraryEntry,
@@ -38,6 +39,7 @@ import {
   modulationSourceEditorTarget,
   modulationSummaryForSource,
   modulationSummaryForTarget,
+  normalizeSynthDraftPatch,
   synthEnvelopeEditorSummary,
   synthExpressionSummary,
   synthDraftFromInstrument,
@@ -151,12 +153,14 @@ export function SynthEditor(props: SynthEditorProps) {
   const [presetFavoritesOnly, setPresetFavoritesOnly] = createSignal(false);
   const presetLibraryEntries = createMemo(() => buildAetherPresetLibraryEntries(presets(), userInstrumentPresets()));
   const presetLibraryCategories = createMemo(() => aetherPresetLibraryCategories(presetLibraryEntries()));
+  const presetLibraryStats = createMemo(() => aetherPresetLibraryStats(presetLibraryEntries()));
   const visiblePresetLibraryEntries = createMemo(() => filterAetherPresetLibraryEntries(presetLibraryEntries(), {
     search: presetSearch(),
     category: presetCategory(),
     favoritesOnly: presetFavoritesOnly(),
     sort: presetSort(),
   }));
+  const selectedPresetPatch = createMemo(() => patchForPresetValue(selectedPresetId()));
   const selectedUserPreset = createMemo(() => {
     if (!selectedPresetId().startsWith(USER_PRESET_PREFIX)) return null;
     const id = selectedPresetId().slice(USER_PRESET_PREFIX.length);
@@ -301,17 +305,17 @@ export function SynthEditor(props: SynthEditorProps) {
     }
   }
 
-  async function onAudition() {
+  async function onAudition(options: { patch?: SynthDraftPatch | null; restart?: boolean } = {}) {
     if (auditioning()) {
       stopAudition();
-      return;
+      if (!options.restart) return;
     }
 
     stopAudition();
     const ctx = getAudioContext();
     if (ctx.state === "suspended") void ctx.resume().catch(() => undefined);
 
-    const instrument = synthDraftToPreviewInstrument(draft());
+    const instrument = synthDraftToPreviewInstrument(options.patch ?? draft());
     const bpm = useProjectStore.getState().project.bpm;
     const frequency = previewFrequency(instrument);
     setExpressionActivity({
@@ -493,16 +497,7 @@ export function SynthEditor(props: SynthEditorProps) {
 
   function onLoadPreset(value: string) {
     setSelectedPresetId(value);
-    const factoryId = value.startsWith(FACTORY_PRESET_PREFIX) ? value.slice(FACTORY_PRESET_PREFIX.length) : "";
-    const userId = value.startsWith(USER_PRESET_PREFIX) ? value.slice(USER_PRESET_PREFIX.length) : "";
-    const userInstrumentId = value.startsWith(USER_INSTRUMENT_PRESET_PREFIX) ? value.slice(USER_INSTRUMENT_PRESET_PREFIX.length) : "";
-    const patch = factoryId
-      ? FACTORY_SYNTH_PRESETS.find((candidate) => candidate.id === factoryId)?.patch
-      : userId
-        ? presets().find((candidate) => candidate.id === userId)?.patch
-        : userInstrumentId
-          ? synthDraftFromInstrument(synthInstruments().find((candidate) => candidate.id === userInstrumentId)!)
-          : undefined;
+    const patch = patchForPresetValue(value);
     if (!patch) return;
     didAutoBind = true;
     setDraft({
@@ -511,10 +506,31 @@ export function SynthEditor(props: SynthEditorProps) {
     });
   }
 
+  function patchForPresetValue(value: string): SynthDraftPatch | null {
+    const factoryId = value.startsWith(FACTORY_PRESET_PREFIX) ? value.slice(FACTORY_PRESET_PREFIX.length) : "";
+    const userId = value.startsWith(USER_PRESET_PREFIX) ? value.slice(USER_PRESET_PREFIX.length) : "";
+    const userInstrumentId = value.startsWith(USER_INSTRUMENT_PRESET_PREFIX) ? value.slice(USER_INSTRUMENT_PRESET_PREFIX.length) : "";
+    if (factoryId) {
+      const patch = FACTORY_SYNTH_PRESETS.find((candidate) => candidate.id === factoryId)?.patch;
+      return patch ? normalizeSynthDraftPatch(patch) : null;
+    }
+    if (userId) {
+      const patch = presets().find((candidate) => candidate.id === userId)?.patch;
+      return patch ? normalizeSynthDraftPatch(patch) : null;
+    }
+    if (!userInstrumentId) return null;
+    const instrument = synthInstruments().find((candidate) => candidate.id === userInstrumentId);
+    return instrument ? synthDraftFromInstrument(instrument) : null;
+  }
+
   function presetOptionValue(entry: AetherPresetLibraryEntry): string {
     if (entry.source === "factory") return `${FACTORY_PRESET_PREFIX}${entry.id}`;
     if (entry.source === "user-preset") return `${USER_PRESET_PREFIX}${entry.id}`;
     return `${USER_INSTRUMENT_PRESET_PREFIX}${entry.id}`;
+  }
+
+  function presetOptionLabel(entry: AetherPresetLibraryEntry): string {
+    return entry.favorite ? `${entry.name} (Favorite)` : entry.name;
   }
 
   async function onDeletePreset() {
@@ -677,8 +693,14 @@ export function SynthEditor(props: SynthEditorProps) {
                   aria-label="Toggle preset favorites filter"
                   onClick={() => setPresetFavoritesOnly((value) => !value)}
                 >
-                  Favorites
+                  Favorites ({presetLibraryStats().favorites})
                 </Button>
+              </div>
+              <div class={styles.presetStats} aria-label="Aether preset library summary">
+                <Tag>{presetLibraryStats().total} presets</Tag>
+                <Tag tone={presetLibraryStats().favorites === 0 ? "zero" : "default"}>{presetLibraryStats().favorites} favorites</Tag>
+                <Tag>{visiblePresetLibraryEntries().length} shown</Tag>
+                <Tag>{presetLibraryStats().categories} categories</Tag>
               </div>
               <div class={styles.presetRow}>
                 <label class={styles.presetSelect}>
@@ -697,7 +719,7 @@ export function SynthEditor(props: SynthEditorProps) {
                         <For each={visibleFactoryPresetEntries()}>
                           {(entry) => (
                             <option value={presetOptionValue(entry)}>
-                              {entry.name}
+                              {presetOptionLabel(entry)}
                             </option>
                           )}
                         </For>
@@ -708,7 +730,7 @@ export function SynthEditor(props: SynthEditorProps) {
                         <For each={visibleUserPresetEntries()}>
                           {(entry) => (
                             <option value={presetOptionValue(entry)}>
-                              {entry.name}
+                              {presetOptionLabel(entry)}
                             </option>
                           )}
                         </For>
@@ -719,7 +741,7 @@ export function SynthEditor(props: SynthEditorProps) {
                         <For each={visibleUserInstrumentEntries()}>
                           {(entry) => (
                             <option value={presetOptionValue(entry)}>
-                              {entry.name}
+                              {presetOptionLabel(entry)}
                             </option>
                           )}
                         </For>
@@ -727,6 +749,16 @@ export function SynthEditor(props: SynthEditorProps) {
                     </Show>
                   </select>
                 </label>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={!selectedPresetPatch()}
+                  selected={auditioning() && Boolean(selectedPresetPatch())}
+                  aria-label="Audition selected Aether preset"
+                  onClick={() => void onAudition({ patch: selectedPresetPatch(), restart: true })}
+                >
+                  Audition
+                </Button>
                 <Show when={selectedPresetId().startsWith(USER_PRESET_PREFIX)}>
                   <Button
                     size="sm"

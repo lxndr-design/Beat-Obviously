@@ -493,6 +493,14 @@ try {
     }],
   );
   const presetCategories = aetherPresetLibrary.aetherPresetLibraryCategories(presetLibraryEntries);
+  assert.deepEqual(aetherPresetLibrary.aetherPresetLibraryStats(presetLibraryEntries), {
+    total: synthStore.FACTORY_SYNTH_PRESETS.length + 2,
+    favorites: 1,
+    factory: synthStore.FACTORY_SYNTH_PRESETS.length,
+    userPresets: 1,
+    userInstruments: 1,
+    categories: presetCategories.length,
+  });
   assert.ok(presetCategories.includes("Lead"), "factory preset categories should be searchable facets");
   assert.ok(presetCategories.includes("Glass"), "user instrument tags should become searchable category facets");
   const leadPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { category: "Lead" });
