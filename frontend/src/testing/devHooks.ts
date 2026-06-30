@@ -35,6 +35,7 @@ const DEV_MIXED_ERA_AETHER_FX_INSTRUMENT_ID = "dev-mixed-era-aether-fx-host";
 const DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID = "dev-aether-preset-library-favorite";
 const DEV_AETHER_PRESET_LIBRARY_PLAIN_ID = "dev-aether-preset-library-plain";
 const DEV_AETHER_PRESET_LIBRARY_INSTRUMENT_ID = "dev-aether-preset-library-host";
+const DEV_AETHER_PRESET_SAVE_DELETE_NAME = "Browser Saved Lead";
 const DEV_AETHER_OSCILLATOR_INSTRUMENT_ID = "dev-aether-oscillator-host";
 const DEV_AETHER_OSCILLATOR_INSTRUMENT_ID_MARKER = "Aether oscillator editor dev fixture";
 const DEV_AETHER_FX_RACK_INSTRUMENT_ID = "dev-aether-fx-rack-host";
@@ -123,6 +124,7 @@ declare global {
         toggled: DevAetherPresetLibraryFixtureState;
       }>;
       exerciseAetherPresetRestoreInitFlow: () => Promise<DevAetherPresetRestoreInitExerciseState>;
+      exerciseAetherPresetSaveDeleteFlow: () => Promise<DevAetherPresetSaveDeleteExerciseState>;
       installAetherAutomationFixture: () => {
         trackId: string;
         segmentId: string;
@@ -299,6 +301,16 @@ interface DevAetherPresetRestoreInitExerciseState {
   installed: DevAetherPresetLibraryFixtureState;
   loaded: DevAetherPresetLibraryFixtureState;
   restored: DevAetherPresetLibraryFixtureState;
+}
+
+interface DevAetherPresetSaveDeleteExerciseState {
+  installed: DevAetherPresetLibraryFixtureState;
+  afterSave: DevAetherPresetLibraryFixtureState;
+  afterDelete: DevAetherPresetLibraryFixtureState;
+  savedPresetId: string | null;
+  savedPresetName: string;
+  savedRecordExistedAfterSave: boolean;
+  savedRecordExistsAfterDelete: boolean;
 }
 
 interface DevAetherMacroFixtureState {
@@ -770,7 +782,9 @@ export function installBeatDevHooks() {
     const instrumentStore = useInstrumentStore.getState();
     const existingInstrument = instrumentStore.instruments.find((instrument) => instrument.id === DEV_AETHER_PRESET_LIBRARY_INSTRUMENT_ID);
     if (existingInstrument?.userCreated) instrumentStore.removeInstrument(existingInstrument.id);
+    const staleSaveDeleteRecords = (await db.synthPresets.where("name").equals(DEV_AETHER_PRESET_SAVE_DELETE_NAME).toArray()).map((record) => record.id);
     await db.synthPresets.bulkDelete([DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID, DEV_AETHER_PRESET_LIBRARY_PLAIN_ID]);
+    if (staleSaveDeleteRecords.length > 0) await db.synthPresets.bulkDelete(staleSaveDeleteRecords);
     await db.synthPresets.bulkPut([
       createAetherPresetLibraryFixtureRecord({
         id: DEV_AETHER_PRESET_LIBRARY_FAVORITE_ID,
@@ -872,6 +886,31 @@ export function installBeatDevHooks() {
     const restored = await readAetherPresetLibraryFixtureState();
     const state: DevAetherPresetRestoreInitExerciseState = { installed, loaded, restored };
     writeAetherPresetRestoreInitExerciseMarker(state);
+    return state;
+  };
+
+  const exerciseAetherPresetSaveDeleteFlow = async (): Promise<DevAetherPresetSaveDeleteExerciseState> => {
+    await installAetherPresetLibraryFixture();
+    const installed = await readAetherPresetLibraryFixtureState();
+    clickButton("Save As");
+    await completePromptDialog("Preset name", DEV_AETHER_PRESET_SAVE_DELETE_NAME);
+    await waitForPresetOption(DEV_AETHER_PRESET_SAVE_DELETE_NAME);
+    const savedRecord = await waitForSynthPresetNamed(DEV_AETHER_PRESET_SAVE_DELETE_NAME);
+    const afterSave = await readAetherPresetLibraryFixtureState();
+    clickButton("Delete");
+    if (savedRecord) await waitForSynthPresetDeleted(savedRecord.id);
+    await nextFrame();
+    const afterDelete = await readAetherPresetLibraryFixtureState();
+    const state: DevAetherPresetSaveDeleteExerciseState = {
+      installed,
+      afterSave,
+      afterDelete,
+      savedPresetId: savedRecord?.id ?? null,
+      savedPresetName: DEV_AETHER_PRESET_SAVE_DELETE_NAME,
+      savedRecordExistedAfterSave: Boolean(savedRecord),
+      savedRecordExistsAfterDelete: savedRecord ? Boolean(await db.synthPresets.get(savedRecord.id)) : true,
+    };
+    writeAetherPresetSaveDeleteExerciseMarker(state);
     return state;
   };
 
@@ -1935,6 +1974,7 @@ export function installBeatDevHooks() {
     exerciseAetherPerformanceEditorFlow,
     exerciseAetherPresetLibraryFavoriteFlow,
     exerciseAetherPresetRestoreInitFlow,
+    exerciseAetherPresetSaveDeleteFlow,
     installAetherAutomationFixture,
     openAetherAutomationFixtureEditor,
     readAetherAutomationFixtureState,
@@ -1975,6 +2015,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-preset-restore-init") {
     window.setTimeout(() => {
       void exerciseAetherPresetRestoreInitFlow();
+    }, 0);
+  } else if (fixture === "aether-preset-save-delete") {
+    window.setTimeout(() => {
+      void exerciseAetherPresetSaveDeleteFlow();
     }, 0);
   } else if (fixture === "aether-oscillator") {
     window.setTimeout(() => {
@@ -2892,6 +2936,10 @@ function writeAetherPresetRestoreInitExerciseMarker(state: DevAetherPresetRestor
   document.documentElement.dataset.beatAetherPresetRestoreInitExercise = JSON.stringify(state);
 }
 
+function writeAetherPresetSaveDeleteExerciseMarker(state: DevAetherPresetSaveDeleteExerciseState) {
+  document.documentElement.dataset.beatAetherPresetSaveDeleteExercise = JSON.stringify(state);
+}
+
 function findEnvelopeHandle(source: "env.1" | "env.2", kind: "attack" | "decay-sustain" | "release"): HTMLButtonElement | null {
   return document.querySelector<HTMLButtonElement>(`[data-aether-envelope-editor="${source}"] [data-aether-envelope-handle="${kind}"]`);
 }
@@ -3076,6 +3124,34 @@ async function waitForPresetFavorite(id: string, favorite: boolean) {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     await nextFrame();
     if ((await db.synthPresets.get(id))?.favorite === favorite) return;
+  }
+}
+
+async function waitForSynthPresetNamed(name: string): Promise<SynthPresetRecord | null> {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await nextFrame();
+    const record = await db.synthPresets.where("name").equals(name).first();
+    if (record) return record;
+  }
+  return null;
+}
+
+async function waitForSynthPresetDeleted(id: string) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await nextFrame();
+    if (!await db.synthPresets.get(id)) return;
+  }
+}
+
+async function completePromptDialog(label: string, value: string) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await nextFrame();
+    const input = document.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
+    if (!input) continue;
+    input.value = value;
+    input.dispatchEvent(new InputEvent("input", { bubbles: true, data: value, inputType: "insertText" }));
+    clickButton("Done");
+    return;
   }
 }
 

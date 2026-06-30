@@ -577,6 +577,17 @@ try {
       && devHooksSource.includes('fixture === "aether-preset-restore-init"'),
     "browser fixture coverage should exercise Restore Init through the live Aether preset controls",
   );
+  assert.ok(
+    synthEditorSource.includes("onSaveAsPreset")
+      && synthEditorSource.includes("onDeletePreset")
+      && synthEditorSource.includes("Save As")
+      && synthEditorSource.includes("Delete")
+      && devHooksSource.includes("exerciseAetherPresetSaveDeleteFlow")
+      && devHooksSource.includes("completePromptDialog")
+      && devHooksSource.includes("beatAetherPresetSaveDeleteExercise")
+      && devHooksSource.includes('fixture === "aether-preset-save-delete"'),
+    "browser fixture coverage should exercise Save As/Delete through the live Aether preset controls and app dialog",
+  );
   const movedTrackPoint = arrangementAutomation.updateTrackAutomationPoint(insertedTrackPoint, "filter.cutoff", 64, 1, 48, 0.74);
   assert.deepEqual(
     movedTrackPoint.automation[0].points.map((point) => point.beat),
