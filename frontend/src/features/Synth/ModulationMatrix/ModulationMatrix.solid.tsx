@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
-import { Button, HoverInfo, Icon, Toggle } from "../../../solid-ui";
+import { Button, HoverInfo, Icon, Select, Toggle } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import {
   MODULATION_SOURCE_LABELS,
@@ -156,8 +156,9 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                   />
                 </div>
                 <div class={styles.sourceCell}>
-                  <select
-                    class={`ds-select ${styles.routeSelect} ${styles.sourceSelect}`}
+                  <Select
+                    layout="bare"
+                    selectClassName={`${styles.routeSelect} ${styles.sourceSelect}`}
                     value={route.source}
                     aria-label={`Route ${routeNumber()} source`}
                     onChange={(event) => {
@@ -176,7 +177,7 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                         </option>
                       )}
                     </For>
-                  </select>
+                  </Select>
                   <button
                     type="button"
                     class={styles.sourceAffordance}

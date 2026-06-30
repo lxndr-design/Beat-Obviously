@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { previewFrequency, renderedInstrumentBuffer } from "../../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../../audio/synthWorkletPreview";
-import { appPrompt, Button, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, Tag, TextInput, Toggle } from "../../../solid-ui";
+import { appPrompt, Button, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, Select, Tag, TextInput, Toggle } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import {
   createTrackEffect,
@@ -659,33 +659,31 @@ export function SynthEditor(props: SynthEditorProps) {
                   placeholder="Preset name, tag, source"
                   onInput={(event) => setPresetSearch(event.currentTarget.value)}
                 />
-                <label class={styles.presetCategory}>
-                  <span class="ds-field-label">Category</span>
-                  <select
-                    class="ds-select"
-                    value={presetCategory()}
-                    onChange={(event) => setPresetCategory(event.currentTarget.value)}
-                  >
-                    <option value="">All</option>
-                    <For each={presetLibraryCategories()}>
-                      {(category) => <option value={category}>{category}</option>}
-                    </For>
-                  </select>
-                </label>
-                <label class={styles.presetSort}>
-                  <span class="ds-field-label">Sort</span>
-                  <select
-                    class="ds-select"
-                    value={presetSort()}
-                    onChange={(event) => setPresetSort(event.currentTarget.value as AetherPresetLibrarySort)}
-                  >
-                    <option value="source">Source</option>
-                    <option value="name">Name</option>
-                    <option value="category">Category</option>
-                    <option value="complexity">Complexity</option>
-                    <option value="favorite">Favorites</option>
-                  </select>
-                </label>
+                <Select
+                  label="Category"
+                  layout="bare"
+                  className={styles.presetCategory}
+                  value={presetCategory()}
+                  onChange={(event) => setPresetCategory(event.currentTarget.value)}
+                >
+                  <option value="">All</option>
+                  <For each={presetLibraryCategories()}>
+                    {(category) => <option value={category}>{category}</option>}
+                  </For>
+                </Select>
+                <Select
+                  label="Sort"
+                  layout="bare"
+                  className={styles.presetSort}
+                  value={presetSort()}
+                  onChange={(event) => setPresetSort(event.currentTarget.value as AetherPresetLibrarySort)}
+                >
+                  <option value="source">Source</option>
+                  <option value="name">Name</option>
+                  <option value="category">Category</option>
+                  <option value="complexity">Complexity</option>
+                  <option value="favorite">Favorites</option>
+                </Select>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -703,52 +701,51 @@ export function SynthEditor(props: SynthEditorProps) {
                 <Tag>{presetLibraryStats().categories} categories</Tag>
               </div>
               <div class={styles.presetRow}>
-                <label class={styles.presetSelect}>
-                  <span class="ds-field-label">Preset</span>
-                  <select
-                    class="ds-select"
-                    value={selectedPresetId()}
-                    onChange={(event) => onLoadPreset(event.currentTarget.value)}
-                  >
-                    <option value="">None</option>
-                    <Show when={visiblePresetLibraryEntries().length === 0}>
-                      <option value="" disabled>No presets match</option>
-                    </Show>
-                    <Show when={visibleFactoryPresetEntries().length > 0}>
-                      <optgroup label="Factory">
-                        <For each={visibleFactoryPresetEntries()}>
-                          {(entry) => (
-                            <option value={presetOptionValue(entry)}>
-                              {presetOptionLabel(entry)}
-                            </option>
-                          )}
-                        </For>
-                      </optgroup>
-                    </Show>
-                    <Show when={visibleUserPresetEntries().length > 0}>
-                      <optgroup label="User Presets">
-                        <For each={visibleUserPresetEntries()}>
-                          {(entry) => (
-                            <option value={presetOptionValue(entry)}>
-                              {presetOptionLabel(entry)}
-                            </option>
-                          )}
-                        </For>
-                      </optgroup>
-                    </Show>
-                    <Show when={visibleUserInstrumentEntries().length > 0}>
-                      <optgroup label="User Instruments">
-                        <For each={visibleUserInstrumentEntries()}>
-                          {(entry) => (
-                            <option value={presetOptionValue(entry)}>
-                              {presetOptionLabel(entry)}
-                            </option>
-                          )}
-                        </For>
-                      </optgroup>
-                    </Show>
-                  </select>
-                </label>
+                <Select
+                  label="Preset"
+                  layout="bare"
+                  className={styles.presetSelect}
+                  value={selectedPresetId()}
+                  onChange={(event) => onLoadPreset(event.currentTarget.value)}
+                >
+                  <option value="">None</option>
+                  <Show when={visiblePresetLibraryEntries().length === 0}>
+                    <option value="" disabled>No presets match</option>
+                  </Show>
+                  <Show when={visibleFactoryPresetEntries().length > 0}>
+                    <optgroup label="Factory">
+                      <For each={visibleFactoryPresetEntries()}>
+                        {(entry) => (
+                          <option value={presetOptionValue(entry)}>
+                            {presetOptionLabel(entry)}
+                          </option>
+                        )}
+                      </For>
+                    </optgroup>
+                  </Show>
+                  <Show when={visibleUserPresetEntries().length > 0}>
+                    <optgroup label="User Presets">
+                      <For each={visibleUserPresetEntries()}>
+                        {(entry) => (
+                          <option value={presetOptionValue(entry)}>
+                            {presetOptionLabel(entry)}
+                          </option>
+                        )}
+                      </For>
+                    </optgroup>
+                  </Show>
+                  <Show when={visibleUserInstrumentEntries().length > 0}>
+                    <optgroup label="User Instruments">
+                      <For each={visibleUserInstrumentEntries()}>
+                        {(entry) => (
+                          <option value={presetOptionValue(entry)}>
+                            {presetOptionLabel(entry)}
+                          </option>
+                        )}
+                      </For>
+                    </optgroup>
+                  </Show>
+                </Select>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -942,8 +939,9 @@ export function SynthEditor(props: SynthEditorProps) {
                           onInput={(event) => updateMacroDefinition(id, { max: Number(event.currentTarget.value) })}
                         />
                       </div>
-                      <select
-                        class={`ds-select ${styles.macroCurveSelect}`}
+                      <Select
+                        layout="bare"
+                        selectClassName={styles.macroCurveSelect}
                         value={definition().curve}
                         aria-label={`${definition().label} response curve`}
                         onInput={(event) => updateMacroDefinition(id, { curve: event.currentTarget.value as MacroCurve })}
@@ -952,7 +950,7 @@ export function SynthEditor(props: SynthEditorProps) {
                         <option value="ease-in">Ease In</option>
                         <option value="ease-out">Ease Out</option>
                         <option value="s-curve">S-Curve</option>
-                      </select>
+                      </Select>
                       <div class={styles.macroOutput}>{Math.round(macroOutputValue(draft(), id) * 100)}%</div>
                     </div>
                   );
@@ -1099,8 +1097,9 @@ function InstrumentFxRack() {
         <div class="ds-panel-title">Instrument FX</div>
         <div class="ds-panel-actions">
           <Show when={effectPresets().length > 0}>
-            <select
-              class={`ds-select ${styles.fxPresetSelect}`}
+            <Select
+              layout="bare"
+              selectClassName={styles.fxPresetSelect}
               aria-label="Load instrument FX preset"
               value={selectedEffectPresetId()}
               onChange={(event) => loadEffectPreset(event.currentTarget.value)}
@@ -1109,7 +1108,7 @@ function InstrumentFxRack() {
               <For each={effectPresets()}>
                 {(preset) => <option value={preset.id}>{preset.name}</option>}
               </For>
-            </select>
+            </Select>
           </Show>
           <Button size="xs" variant="ghost" onClick={() => void saveEffectPreset()}>
             Save FX
@@ -1119,8 +1118,9 @@ function InstrumentFxRack() {
               Delete FX
             </Button>
           </Show>
-          <select
-            class={`ds-select ${styles.fxAddSelect}`}
+          <Select
+            layout="bare"
+            selectClassName={styles.fxAddSelect}
             aria-label="Add instrument effect"
             value=""
             onChange={(event) => {
@@ -1134,7 +1134,7 @@ function InstrumentFxRack() {
             <For each={EFFECT_OPTIONS}>
               {(option) => <option value={option.value}>{option.label}</option>}
             </For>
-          </select>
+          </Select>
         </div>
       </header>
       <div class={`ds-panel-body ${styles.fxBody}`}>

@@ -146,6 +146,7 @@ Use shared Solid components before styling feature-local controls.
 | `RadioGroup` | Mutually exclusive modes | selected, disabled |
 | `RowItem` | Library/browser list rows | compact/media density, drag/icon/meta/action slots |
 | `SectionRibbon` | Sidebar/panel headers | expanded/collapsed, count, actions |
+| `Select` | Native dropdown fields | stacked, inline, bare, disabled |
 | `Tag` | Compact tinted metadata labels and counters | numeric/text content, inherited context |
 | `TextInput` | Text fields | stacked, inline, bare, unit |
 | `Toggle` | Binary settings | on, off, disabled |

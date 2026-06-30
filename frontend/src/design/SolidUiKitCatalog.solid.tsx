@@ -14,6 +14,7 @@ import { NumberInputDemo } from "../solid-ui/NumberInput/NumberInput.demo.solid"
 import { RadioGroupDemo } from "../solid-ui/RadioGroup/RadioGroup.demo.solid";
 import { RowItemDemo } from "../solid-ui/RowItem/RowItem.demo.solid";
 import { SectionRibbonDemo } from "../solid-ui/SectionRibbon/SectionRibbon.demo.solid";
+import { SelectDemo } from "../solid-ui/Select/Select.demo.solid";
 import { TagDemo } from "../solid-ui/Tag/Tag.demo.solid";
 import { TextInputDemo } from "../solid-ui/TextInput/TextInput.demo.solid";
 import { ToggleDemo } from "../solid-ui/Toggle/Toggle.demo.solid";
@@ -28,6 +29,7 @@ export function SolidUiKitCatalog() {
       <RowItemDemo />
       <SectionRibbonDemo />
       <TextInputDemo />
+      <SelectDemo />
       <NumberInputDemo />
       <KnobDemo />
       <ToggleDemo />
