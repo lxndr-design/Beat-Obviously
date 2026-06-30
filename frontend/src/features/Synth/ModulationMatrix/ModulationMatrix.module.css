@@ -215,22 +215,11 @@
 }
 
 .strengthSlider {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 32px;
-  align-items: center;
-  gap: 6px;
+  width: 150px;
   min-width: 0;
 }
 
-.strengthSlider input {
-  width: 100%;
-  min-width: 0;
-  height: 18px;
-  margin: 0;
-  accent-color: var(--color-fg);
-}
-
-.strengthSlider > span {
+.strengthReadout {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 4px;
@@ -243,15 +232,15 @@
   white-space: nowrap;
 }
 
-.strengthSlider > span span {
+.strengthReadout span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.strengthSlider > span span:nth-child(2),
-.strengthSlider > span span:nth-child(3) {
+.strengthReadout span:nth-child(2),
+.strengthReadout span:nth-child(3) {
   color: color-mix(in srgb, currentColor 68%, transparent);
 }
 

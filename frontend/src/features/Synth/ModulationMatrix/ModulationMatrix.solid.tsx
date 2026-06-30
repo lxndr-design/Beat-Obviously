@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
-import { Button, HoverInfo, Icon, Select, Toggle } from "../../../solid-ui";
+import { Button, HoverInfo, Icon, Select, Slider, Toggle } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import {
   MODULATION_SOURCE_LABELS,
@@ -218,22 +218,24 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                     <Icon name="ph:plug" size={12} decorative />
                   </Button>
                 </HoverInfo>
-                <label class={styles.strengthSlider} aria-label="Strength">
-                  <input
-                    type="range"
-                    min={-1}
-                    max={1}
-                    step={0.01}
-                    value={route.amount}
-                    aria-label={`Route ${routeNumber()} strength`}
-                    onChange={(event) => updateRoute(route.id, { amount: Number(event.currentTarget.value) })}
-                  />
-                  <span>
-                    <span>{display().amountLabel}</span>
-                    <span>{display().rangeLabel}</span>
-                    <span>{display().stateLabel}</span>
-                  </span>
-                </label>
+                <Slider
+                  layout="bare"
+                  className={styles.strengthSlider}
+                  readoutClassName={styles.strengthReadout}
+                  value={route.amount}
+                  min={-1}
+                  max={1}
+                  step={0.01}
+                  ariaLabel={`Route ${routeNumber()} strength`}
+                  onChange={(amount) => updateRoute(route.id, { amount })}
+                  readout={
+                    <>
+                      <span>{display().amountLabel}</span>
+                      <span>{display().rangeLabel}</span>
+                      <span>{display().stateLabel}</span>
+                    </>
+                  }
+                />
                 <div class={styles.modeCell}>
                   <Show
                     when={route.source === "lfo.1" || route.source === "lfo.2"}

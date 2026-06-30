@@ -6,6 +6,7 @@ export * from "./RowItem";
 export * from "./SectionRibbon";
 export * from "./TextInput";
 export * from "./Select";
+export * from "./Slider";
 export * from "./NumberInput";
 export * from "./Toggle";
 export * from "./Knob";

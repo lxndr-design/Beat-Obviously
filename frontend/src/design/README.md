@@ -147,6 +147,7 @@ Use shared Solid components before styling feature-local controls.
 | `RowItem` | Library/browser list rows | compact/media density, drag/icon/meta/action slots |
 | `SectionRibbon` | Sidebar/panel headers | expanded/collapsed, count, actions |
 | `Select` | Native dropdown fields | stacked, inline, bare, disabled |
+| `Slider` | Native range controls | stacked, inline, bare, readout, disabled |
 | `Tag` | Compact tinted metadata labels and counters | numeric/text content, inherited context |
 | `TextInput` | Text fields | stacked, inline, bare, unit |
 | `Toggle` | Binary settings | on, off, disabled |
