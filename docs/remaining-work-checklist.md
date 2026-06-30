@@ -243,7 +243,7 @@ Current implementation focus:
 ## Aether Synth
 
 - `[~]` Heavier nonlinear warp experiments.
-  - Done: bounded table-generation `mirror` warp mode across editor/browser/native/persistence/test surfaces; opt-in runtime warp mode/amount across editor, browser preview, native render, persistence, and browser fixture coverage.
+  - Done: bounded table-generation `mirror` warp mode across editor/browser/native/persistence/test surfaces; opt-in runtime warp mode/amount across editor, browser preview, native render, persistence, browser fixture coverage, and deterministic native null-export stress.
   - Remaining: runtime warp oversampling/performance strategy for heavier nonlinear settings.
 - `[~]` Browser preview parity for live macro route changes.
 - `[x]` Project/document roundtrip fixtures for macro route state.

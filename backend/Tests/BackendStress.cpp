@@ -10041,6 +10041,30 @@ namespace
             44100.0);
     }
 
+    bool stressAudioEngineRuntimeWarpAetherDeterministicNullExport()
+    {
+        auto project = makeDenseAetherProject();
+        project.id = "runtime-warp-aether-null-export";
+        project.name = "Runtime Warp Aether Null Export";
+        project.lengthBeats = 1.5;
+
+        auto& instrument = project.instruments.front();
+        instrument.aether.noise.enabled = false;
+        instrument.aether.noise.level = 0.0f;
+        instrument.aether.oscA.randomPhase = 0.0f;
+        instrument.aether.oscB.randomPhase = 0.0f;
+        instrument.aether.runtimeWarp = 0.78f;
+        instrument.aether.runtimeWarpMode = 3;
+
+        return stressAudioEngineAetherDeterministicNullExportFamily(
+            project,
+            "Runtime-warp Aether",
+            "BeatBackendStress-runtime-warp-aether-null-export.wav",
+            18000,
+            257,
+            44100.0);
+    }
+
     bool stressAudioEngineMonoLegatoAetherDeterministicNullExport()
     {
         auto project = makeMonoLegatoAetherProject();
@@ -12765,6 +12789,11 @@ int main()
     if (!stressAudioEngineMaxUnisonAetherDeterministicNullExport())
     {
         std::cerr << "Audio engine max-unison Aether deterministic null export stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineRuntimeWarpAetherDeterministicNullExport())
+    {
+        std::cerr << "Audio engine runtime-warp Aether deterministic null export stress failed\n";
         return 1;
     }
     if (!stressAudioEngineMonoLegatoAetherDeterministicNullExport())
