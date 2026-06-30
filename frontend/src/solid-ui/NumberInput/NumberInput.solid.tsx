@@ -8,7 +8,10 @@ export interface NumberInputProps {
   step?: number;
   unit?: string;
   label?: string;
-  layout?: "stacked" | "inline";
+  layout?: "stacked" | "inline" | "bare";
+  ariaLabel?: string;
+  className?: string;
+  inputClassName?: string;
   commitOnChange?: boolean;
   maxLength?: number;
   onChange: (v: number) => void;
@@ -55,15 +58,23 @@ export function NumberInput(props: NumberInputProps) {
   }
 
   return (
-    <label class={`${styles.wrap} ${props.layout === "inline" ? styles.inline : ""}`}>
+    <label
+      class={[
+        styles.wrap,
+        props.layout === "inline" && styles.inline,
+        props.layout === "bare" && styles.bare,
+        props.className,
+      ].filter(Boolean).join(" ")}
+    >
       <Show when={props.label}>
         <span class={styles.label}>{props.label}</span>
       </Show>
       <span class={styles.fieldFrame}>
         <input
-          class={styles.input}
+          class={[styles.input, props.inputClassName].filter(Boolean).join(" ")}
           type="text"
-          inputMode="numeric"
+          inputMode="decimal"
+          aria-label={props.ariaLabel ?? props.label}
           maxLength={props.maxLength}
           value={text()}
           onInput={(event) => updateText(event.currentTarget.value)}

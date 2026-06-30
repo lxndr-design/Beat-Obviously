@@ -918,25 +918,27 @@ export function SynthEditor(props: SynthEditorProps) {
                         </div>
                       </Show>
                       <div class={styles.macroMetaRow}>
-                        <TextInput
+                        <NumberInput
                           layout="bare"
-                          type="number"
-                          min="0"
-                          max="1"
-                          step="0.01"
-                          aria-label={`${definition().label} minimum`}
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          maxLength={4}
+                          commitOnChange
+                          ariaLabel={`${definition().label} minimum`}
                           value={definition().min}
-                          onInput={(event) => updateMacroDefinition(id, { min: Number(event.currentTarget.value) })}
+                          onChange={(min) => updateMacroDefinition(id, { min })}
                         />
-                        <TextInput
+                        <NumberInput
                           layout="bare"
-                          type="number"
-                          min="0"
-                          max="1"
-                          step="0.01"
-                          aria-label={`${definition().label} maximum`}
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          maxLength={4}
+                          commitOnChange
+                          ariaLabel={`${definition().label} maximum`}
                           value={definition().max}
-                          onInput={(event) => updateMacroDefinition(id, { max: Number(event.currentTarget.value) })}
+                          onChange={(max) => updateMacroDefinition(id, { max })}
                         />
                       </div>
                       <Select
