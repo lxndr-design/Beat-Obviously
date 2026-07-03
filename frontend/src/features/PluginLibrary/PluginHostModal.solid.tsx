@@ -219,7 +219,7 @@ function DecentSamplerHost(props: { plugin: PluginAdapter }) {
     });
   });
 
-  const pluginUiControlDetails = createMemo(() => (plugin() as PluginAdapter & { uiControlDetails?: DecentSamplerUiControl[] }).uiControlDetails ?? []);
+  const pluginUiControlDetails = createMemo(() => plugin().uiControlDetails ?? []);
   const uiControlDetails = createMemo(() => preset()?.uiControlDetails ?? pluginUiControlDetails());
   const uiWidth = createMemo(() => preset()?.uiWidth ?? plugin().uiWidth ?? 0);
   const uiHeight = createMemo(() => preset()?.uiHeight ?? plugin().uiHeight ?? 0);

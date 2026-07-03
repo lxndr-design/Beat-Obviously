@@ -12,7 +12,7 @@ export interface ModalProps {
   headerActions?: JSX.Element;
   closeOnScrimClick?: boolean;
   closeOnEscape?: boolean;
-  width?: "sm" | "md" | "lg" | "full";
+  width?: "sm" | "md" | "lg" | "editor" | "full";
   scopeId?: string;
   dirty?: boolean;
   onClose: () => void;

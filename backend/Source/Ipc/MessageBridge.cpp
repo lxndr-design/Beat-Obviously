@@ -7,6 +7,7 @@
 #include "../Audio/Recording/RecordingSessionPlanner.h"
 #include "../Audio/Rendering/TrackBouncePlanner.h"
 #include "../Audio/Sampler/DecentSamplerImporter.h"
+#include "../Persistence/AudioFileLibraryActions.h"
 #include "../Persistence/ProjectAssetPackage.h"
 #include "../Persistence/ProjectDocumentBackup.h"
 #include "../Persistence/ProjectIntegrityVerifier.h"
@@ -106,6 +107,28 @@ namespace beat
                 case TrackKind::Audio:
                 default: return "audio";
             }
+        }
+
+        juce::String safeExportFileStem(const juce::String& name, int index)
+        {
+            auto clean = name.retainCharacters("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -_").trim();
+            if (clean.isEmpty())
+                clean = "Track " + juce::String(index + 1);
+            return clean;
+        }
+
+        juce::File uniqueStemExportFile(const juce::File& folder,
+                                        const juce::String& requestedName,
+                                        int index,
+                                        juce::StringArray& usedNames)
+        {
+            const auto baseName = safeExportFileStem(requestedName, index);
+            auto candidateName = baseName;
+            int suffix = 2;
+            while (usedNames.contains(candidateName, true))
+                candidateName = baseName + " " + juce::String(suffix++);
+            usedNames.add(candidateName);
+            return folder.getChildFile(candidateName).withFileExtension(".wav");
         }
 
         juce::var makeAudioFileAssetVar(const AudioFileAsset& audioFile,
@@ -770,15 +793,6 @@ namespace beat
             return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
                 .getChildFile("Beat")
                 .getChildFile("Audio Files");
-        }
-
-        bool fileLivesInsideDirectory(const juce::File& file, const juce::File& directory)
-        {
-            auto filePath = file.getFullPathName().replaceCharacter('\\', '/');
-            auto directoryPath = directory.getFullPathName().replaceCharacter('\\', '/');
-            if (!directoryPath.endsWithChar('/'))
-                directoryPath += "/";
-            return filePath.startsWithIgnoreCase(directoryPath);
         }
 
         juce::File uniqueAudioLibraryFile(const juce::File& source)
@@ -1566,6 +1580,7 @@ namespace beat
             plugin.uiImageDataUrl = pluginVar.getProperty("uiImageDataUrl", "").toString();
             plugin.uiWidth = (int) pluginVar.getProperty("uiWidth", 0);
             plugin.uiHeight = (int) pluginVar.getProperty("uiHeight", 0);
+            plugin.uiControlDetails = pluginVar.getProperty("uiControlDetails", {});
             plugin.sampleCount = (int) pluginVar.getProperty("sampleCount", 0);
             plugin.uiControlCount = (int) pluginVar.getProperty("uiControlCount", 0);
             plugin.factory = (bool) pluginVar.getProperty("factory", false);
@@ -2121,6 +2136,7 @@ namespace beat
                     instrument.maxVoices = juce::jlimit(1, 32, (int) instrumentVar.getProperty("maxVoices", instrument.maxVoices));
                     instrument.mono = (bool) instrumentVar.getProperty("mono", instrument.mono);
                     instrument.legato = (bool) instrumentVar.getProperty("legato", instrument.legato);
+                    instrument.taxonomy = instrumentVar.getProperty("taxonomy", {});
 
                     if (auto* filters = instrumentVar.getProperty("effects", {}).getProperty("filters", {}).getArray())
                     {
@@ -3106,11 +3122,13 @@ namespace beat
 
         if (kind == PROJECT_EXPORT_WAV_ASYNC
             || kind == PROJECT_EXPORT_TRACK_WAV_ASYNC
-            || kind == PROJECT_EXPORT_RANGE_WAV_ASYNC)
+            || kind == PROJECT_EXPORT_RANGE_WAV_ASYNC
+            || kind == PROJECT_EXPORT_ALL_TRACK_WAVS_ASYNC)
         {
             const bool exportTrack = kind == PROJECT_EXPORT_TRACK_WAV_ASYNC;
             const bool exportRange = kind == PROJECT_EXPORT_RANGE_WAV_ASYNC;
-            const juce::String exportType = exportTrack ? "track" : (exportRange ? "range" : "project");
+            const bool exportAllStems = kind == PROJECT_EXPORT_ALL_TRACK_WAVS_ASYNC;
+            const juce::String exportType = exportAllStems ? "stems" : (exportTrack ? "track" : (exportRange ? "range" : "project"));
 
             joinFinishedExportThreadIfNeeded();
             {
@@ -3128,16 +3146,21 @@ namespace beat
             auto start = pathHint.isNotEmpty()
                 ? juce::File(pathHint)
                 : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-                    .getChildFile(exportTrack ? "Beat Track Export.wav"
-                                              : (exportRange ? "Beat Range Export.wav" : "Beat Export.wav"));
+                    .getChildFile(exportAllStems ? "Beat Stems"
+                                                 : (exportTrack ? "Beat Track Export.wav"
+                                                                : (exportRange ? "Beat Range Export.wav" : "Beat Export.wav")));
 
-            juce::FileChooser chooser(exportTrack ? "Export Track WAV"
-                                                  : (exportRange ? "Export Range WAV" : "Export WAV"),
+            juce::FileChooser chooser(exportAllStems ? "Export All Track Stems"
+                                                     : (exportTrack ? "Export Track WAV"
+                                                                    : (exportRange ? "Export Range WAV" : "Export WAV")),
                                       start,
                                       "*.wav",
                                       true);
             juce::DynamicObject::Ptr response = new juce::DynamicObject();
-            if (!chooser.browseForFileToSave(true))
+            const bool choseDestination = exportAllStems
+                ? chooser.browseForDirectory()
+                : chooser.browseForFileToSave(true);
+            if (!choseDestination)
             {
                 response->setProperty("started", false);
                 response->setProperty("job", exportJobStatusVar(nullptr));
@@ -3145,7 +3168,7 @@ namespace beat
             }
 
             auto file = chooser.getResult();
-            if (!file.hasFileExtension(".wav"))
+            if (!exportAllStems && !file.hasFileExtension(".wav"))
                 file = file.withFileExtension(".wav");
 
             const auto projectPayload = payload.getProperty("project", {});
@@ -3179,6 +3202,31 @@ namespace beat
                 response->setProperty("job", exportJobStatusVar(nullptr));
                 return juce::var(response.get());
             }
+            std::vector<Track> stemTracks;
+            if (exportAllStems)
+            {
+                for (const auto& track : project.tracks)
+                {
+                    if (track.kind != TrackKind::Group)
+                        stemTracks.push_back(track);
+                }
+
+                if (stemTracks.empty())
+                {
+                    response->setProperty("started", false);
+                    response->setProperty("error", "There are no renderable tracks to export as stems.");
+                    response->setProperty("job", exportJobStatusVar(nullptr));
+                    return juce::var(response.get());
+                }
+
+                if (!file.exists() && !file.createDirectory())
+                {
+                    response->setProperty("started", false);
+                    response->setProperty("error", "Could not create stem export folder.");
+                    response->setProperty("job", exportJobStatusVar(nullptr));
+                    return juce::var(response.get());
+                }
+            }
 
             const auto startBeat = static_cast<Beats>(payload.getProperty("startBeat", 0.0));
             const auto endBeat = static_cast<Beats>(payload.getProperty("endBeat", 0.0));
@@ -3209,11 +3257,13 @@ namespace beat
                                         job,
                                         exportTrack,
                                         exportRange,
+                                        exportAllStems,
                                         trackId,
                                         startBeat,
                                         endBeat,
                                         includeTail,
                                         renderOptions,
+                                        stemTracks = std::move(stemTracks),
                                         project = std::move(project),
                                         file]() mutable
             {
@@ -3240,7 +3290,65 @@ namespace beat
                 };
 
                 bool exported = false;
-                if (exportTrack)
+                if (exportAllStems)
+                {
+                    juce::StringArray usedStemNames;
+                    const int trackCount = (int) stemTracks.size();
+                    bool ok = trackCount > 0;
+                    job->totalSamples.store(trackCount, std::memory_order_release);
+
+                    for (int i = 0; ok && i < trackCount; ++i)
+                    {
+                        if (job->cancel.load(std::memory_order_acquire))
+                        {
+                            error = "Export cancelled.";
+                            ok = false;
+                            break;
+                        }
+
+                        const auto track = stemTracks[(size_t) i];
+                        const auto stemFile = uniqueStemExportFile(file, track.name, i, usedStemNames);
+                        const double batchBase = trackCount > 0 ? (double) i / (double) trackCount : 0.0;
+                        const double batchSpan = trackCount > 0 ? 1.0 / (double) trackCount : 1.0;
+                        juce::String trackError;
+                        const auto trackProgress = [this, job, &lastEmitMs, batchBase, batchSpan, i, trackCount](
+                                                        double progressValue,
+                                                        juce::int64,
+                                                        juce::int64)
+                        {
+                            const auto mappedProgress = juce::jlimit(0.0, 1.0, batchBase + batchSpan * progressValue);
+                            job->progress.store(mappedProgress, std::memory_order_release);
+                            job->samplesWritten.store(i, std::memory_order_release);
+                            job->totalSamples.store(trackCount, std::memory_order_release);
+
+                            const auto now = juce::Time::currentTimeMillis();
+                            if (now - lastEmitMs >= 100 || mappedProgress >= 1.0 || mappedProgress <= 0.0)
+                            {
+                                lastEmitMs = now;
+                                emit(ipc::kind::EV_EXPORT_PROGRESS, exportJobStatusVar(job));
+                            }
+
+                            return !job->cancel.load(std::memory_order_acquire);
+                        };
+
+                        ok = AudioEngine::renderTrackToWav(project,
+                                                           track.id,
+                                                           stemFile,
+                                                           renderOptions.sampleRate,
+                                                           renderOptions.blockSize,
+                                                           renderOptions.channels,
+                                                           &trackError,
+                                                           trackProgress,
+                                                           renderOptions.bitDepth);
+                        if (!ok)
+                            error = track.name + ": " + trackError;
+                        else
+                            job->samplesWritten.store(i + 1, std::memory_order_release);
+                    }
+
+                    exported = ok;
+                }
+                else if (exportTrack)
                 {
                     exported = AudioEngine::renderTrackToWav(std::move(project),
                                                              trackId,
@@ -4072,56 +4180,24 @@ namespace beat
         if (kind == AUDIO_DELETE)
         {
             juce::DynamicObject::Ptr response = new juce::DynamicObject();
-            juce::StringArray deletedIds;
-            juce::StringArray failedIds;
-            juce::StringArray failedPaths;
             const bool deleteFiles = (bool) payload.getProperty("deleteFiles", true);
-            const auto audioLibrary = audioLibraryDirectory();
+            juce::StringArray idsToDelete;
 
             if (auto* ids = payload.getProperty("ids", {}).getArray())
             {
                 for (const auto& idVar : *ids)
                 {
                     const auto id = idVar.toString();
-                    if (id.isEmpty())
-                        continue;
-
-                    juce::String path;
-                    {
-                        Statement lookup(database, "SELECT path FROM audio_files WHERE id = ?");
-                        lookup.bind(1, id);
-                        if (lookup.step())
-                            path = lookup.columnText(0);
-                    }
-
-                    if (path.isEmpty())
-                    {
-                        failedIds.addIfNotAlreadyThere(id);
-                        continue;
-                    }
-
-                    const juce::File file(path);
-                    if (deleteFiles
-                        && file.existsAsFile()
-                        && fileLivesInsideDirectory(file, audioLibrary)
-                        && !file.deleteFile())
-                    {
-                        failedIds.addIfNotAlreadyThere(id);
-                        failedPaths.addIfNotAlreadyThere(path);
-                        continue;
-                    }
-
-                    Statement remove(database, "DELETE FROM audio_files WHERE id = ?");
-                    remove.bind(1, id);
-                    remove.step();
-                    deletedIds.addIfNotAlreadyThere(id);
+                    if (id.isNotEmpty())
+                        idsToDelete.addIfNotAlreadyThere(id);
                 }
             }
 
-            response->setProperty("deletedIds", makeStringArrayVar(deletedIds));
-            response->setProperty("failedIds", makeStringArrayVar(failedIds));
-            response->setProperty("failedPaths", makeStringArrayVar(failedPaths));
-            if (!failedIds.isEmpty())
+            const auto result = deleteAudioFileLibraryEntries(database, idsToDelete, deleteFiles, audioLibraryDirectory());
+            response->setProperty("deletedIds", makeStringArrayVar(result.deletedIds));
+            response->setProperty("failedIds", makeStringArrayVar(result.failedIds));
+            response->setProperty("failedPaths", makeStringArrayVar(result.failedPaths));
+            if (!result.failedIds.isEmpty())
                 response->setProperty("error", "Some audio files could not be deleted.");
             return juce::var(response.get());
         }
@@ -4242,7 +4318,7 @@ namespace beat
         {
             juce::DynamicObject::Ptr o = new juce::DynamicObject();
             o->setProperty("pong", true);
-            o->setProperty("backendVersion", "0.1.0");
+            o->setProperty("backendVersion", "0.2.0");
             return juce::var(o.get());
         }
 

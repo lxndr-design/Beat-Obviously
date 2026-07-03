@@ -8,6 +8,7 @@ export interface AnalyzerPanelProps {
   scope?: "master" | "synth";
   snapshotOverride?: AnalyzerSnapshot;
   wavetable?: number[];
+  waveformLabel?: string;
   playing?: boolean;
   onTogglePlayback?: () => void;
 }
@@ -43,33 +44,35 @@ export function AnalyzerPanel(props: { state: Accessor<AnalyzerPanelProps> }) {
           </Show>
         </div>
       </header>
-      <div class={`ds-panel-body ${styles.body} ${wavetablePath() ? "" : styles.bodyCompact}`}>
+      <div class={`ds-panel-body ${styles.body} ${wavetablePath() ? styles.bodyWaveform : styles.bodyCompact}`}>
         <div class={styles.meters}>
           <Meter label="RMS" value={snapshot().rms} />
           <Meter label="Peak" value={snapshot().peak} />
         </div>
         <Show when={wavetablePath()}>
           <div class={styles.wavetable} aria-label="Wavetable visualizer">
-            <span class={styles.scopeLabel}>Wavetable</span>
+            <span class={styles.scopeLabel}>{props.state().waveformLabel ?? "Final waveform"}</span>
             <svg class={styles.wavetableSvg} viewBox="0 0 100 48" preserveAspectRatio="none" aria-hidden="true">
               <line class={styles.zeroLine} x1="0" y1="24" x2="100" y2="24" />
               <path class={styles.wavetablePath} d={wavetablePath()} />
             </svg>
           </div>
         </Show>
-        <div class={styles.spectrum} aria-label={hasSpectrum() ? "Spectrum bands" : "Spectrum placeholder"}>
-          <span class={styles.scopeLabel}>Spectrum</span>
-          <div class={styles.spectrumBands}>
-            <For each={bands()}>
-              {(band) => (
-                <span
-                  class={styles.band}
-                  style={{ height: `${Math.max(2, Math.round(clamp01(band) * 100))}%` }}
-                />
-              )}
-            </For>
+        <Show when={!wavetablePath()}>
+          <div class={styles.spectrum} aria-label={hasSpectrum() ? "Spectrum bands" : "Spectrum placeholder"}>
+            <span class={styles.scopeLabel}>Spectrum</span>
+            <div class={styles.spectrumBands}>
+              <For each={bands()}>
+                {(band) => (
+                  <span
+                    class={styles.band}
+                    style={{ height: `${Math.max(2, Math.round(clamp01(band) * 100))}%` }}
+                  />
+                )}
+              </For>
+            </div>
           </div>
-        </div>
+        </Show>
       </div>
     </section>
   );

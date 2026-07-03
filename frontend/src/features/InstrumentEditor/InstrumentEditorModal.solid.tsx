@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { appAlert, useModalStack } from "../../solid-ui";
-import { Modal, Button, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, TextInput } from "../../solid-ui";
+import { Modal, Button, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, Slider, TextInput } from "../../solid-ui";
 import { ai, type GeneratedInstrument } from "../../ai/aiService";
 import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
@@ -10,6 +10,7 @@ import {
   saveInstrumentGenerationFeedback,
   updateInstrumentGenerationFeedback,
 } from "../../persistence/dexie";
+import { INSTRUMENT_TAXONOMY_OPTIONS, taxonomyAssignmentForInstrumentId } from "../../state/instrumentTaxonomy";
 import { characterizeInstrument, defaultAetherSynthConfig, defaultWavetableConfig, snapshotInstrument, useAudioFileStore, useInstrumentStore, useUiStore } from "../../state/store";
 import { INSTRUMENT_ICON_OPTIONS, instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
 import type { Instrument, InstrumentSnapshot, WavetableWarpMode } from "../../state/types";
@@ -65,6 +66,7 @@ export function InstrumentEditorModal(props: Props) {
 
   const [draft, setDraft] = createSignal<Instrument | undefined>(source() ? structuredClone(source()!) : undefined, { equals: false });
   const [typeOpen, setTypeOpen] = createSignal(false);
+  const [taxonomyOpen, setTaxonomyOpen] = createSignal(false);
   const [iconOpen, setIconOpen] = createSignal(false);
   const [recording, setRecording] = createSignal(false);
   const [aiPrompt, setAiPrompt] = createSignal("");
@@ -89,7 +91,7 @@ export function InstrumentEditorModal(props: Props) {
   const editorKind = () => props.editorKind ?? "instrument";
   const dirty = createMemo(() => Boolean(draft() && source() && JSON.stringify(draft()) !== JSON.stringify(source())));
   const samplerEditorMode = createMemo(() => editorKind() === "samplerInstrument");
-  const showOscillator = createMemo(() => Boolean(draft() && !samplerEditorMode() && (draft()!.kind === "synth" || draft()!.kind === "hybrid")));
+  const showOscillator = createMemo(() => Boolean(draft() && !samplerEditorMode() && draft()!.kind === "hybrid"));
   const showWavetable = createMemo(() => Boolean(draft() && !samplerEditorMode() && draft()!.kind === "wavetable"));
   const showModulation = createMemo(() => showOscillator() || showWavetable());
   const showSamples = createMemo(() => Boolean(draft() && (samplerEditorMode() || draft()!.kind === "sampler" || draft()!.kind === "hybrid")));
@@ -179,7 +181,7 @@ export function InstrumentEditorModal(props: Props) {
       const generated = await ai.generateInstrument({
         prompt,
         current: currentDraft,
-        targetKind: currentDraft.kind,
+        targetKind: currentDraft.kind === "synth" ? "wavetable" : currentDraft.kind,
         variationSeed: Date.now() + Math.floor(Math.random() * 100000),
         instruments: instruments(),
         audioFiles: audioFiles(),
@@ -335,9 +337,11 @@ export function InstrumentEditorModal(props: Props) {
                 <Show when={iconOpen()}>
                   <div class={styles.iconMenu} role="menu" aria-label="Instrument icons">
                     <For each={INSTRUMENT_ICON_OPTIONS}>{(option) => (
-                      <button
-                        type="button"
-                        class={`${styles.iconOption} ${instrumentIcon(currentDraft()) === option.icon ? styles.iconOptionSelected : ""}`}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        selected={instrumentIcon(currentDraft()) === option.icon}
+                        className={styles.iconOption}
                         title={`${option.label} - ${option.tags.join(", ")}`}
                         onClick={() => {
                           setDraft({ ...currentDraft(), icon: option.icon });
@@ -347,7 +351,7 @@ export function InstrumentEditorModal(props: Props) {
                       >
                         <Icon name={option.icon} size={16} decorative />
                         <span>{option.label}</span>
-                      </button>
+                      </Button>
                     )}</For>
                   </div>
                 </Show>
@@ -364,12 +368,24 @@ export function InstrumentEditorModal(props: Props) {
                     { value: "hybrid", label: "Layered Sample" },
                   ]
                 : [
-                    { value: "synth", label: "Synth" },
                     { value: "wavetable", label: "Aether WT" },
                   ]}
               open={typeOpen()}
               onOpenChange={setTypeOpen}
               onChange={(kind) => setDraft(instrumentWithKind(currentDraft(), kind as Instrument["kind"]))}
+            />
+            <FloatingSelect
+              label="Structure"
+              layout="inline"
+              value={currentDraft().taxonomy?.instrumentId ?? ""}
+              ariaLabel="Instrument library structure"
+              options={INSTRUMENT_TAXONOMY_OPTIONS}
+              open={taxonomyOpen()}
+              onOpenChange={setTaxonomyOpen}
+              onChange={(value) => {
+                const nextTaxonomy = taxonomyAssignmentForInstrumentId(value);
+                setDraft({ ...currentDraft(), taxonomy: nextTaxonomy });
+              }}
             />
             <div class={styles.generateRow}>
               <TextInput
@@ -1067,10 +1083,10 @@ function sourceLabel(instrument: Instrument, edited = false): string {
 }
 
 function instrumentWithKind(instrument: Instrument, kind: Instrument["kind"]): Instrument {
-  if (kind === "wavetable") {
+  if (kind === "wavetable" || kind === "synth") {
     const next = {
       ...instrument,
-      kind,
+      kind: "wavetable" as const,
       waveform: "wavetable" as const,
       wavetable: instrument.wavetable ?? defaultWavetableConfig(),
       aether: instrument.aether ?? defaultAetherSynthConfig(),
@@ -1115,7 +1131,7 @@ function markEdited(instrument: Instrument): Instrument {
 }
 
 function applyInstrumentPatch(instrument: Instrument, patch: Partial<Instrument>): Instrument {
-  return {
+  const next = {
     ...instrument,
     ...patch,
     envelope: patch.envelope ? { ...instrument.envelope, ...patch.envelope } : instrument.envelope,
@@ -1127,6 +1143,8 @@ function applyInstrumentPatch(instrument: Instrument, patch: Partial<Instrument>
     source: patch.source ?? instrument.source,
     descriptors: characterizeInstrument({ ...instrument, ...patch, knobs: patch.knobs ? { ...instrument.knobs, ...patch.knobs } : instrument.knobs }),
   };
+  if (next.kind === "synth" && next.waveform !== "sample") return instrumentWithKind(next, "wavetable");
+  return next;
 }
 
 function revertInstrument(instrument: Instrument): Instrument {
@@ -1274,22 +1292,18 @@ function GlideSlider({ value, onChange }: GlideSliderProps) {
   const clamped = Math.max(0, Math.min(500, value));
 
   return (
-    <label class={styles.glideSlider}>
-      <span class={styles.glideHeader}>
-        <span class={styles.glideLabel}>Glide</span>
-        <span class={styles.glideValue}>{Math.round(clamped)} ms</span>
-      </span>
-      <input
-        class={styles.glideRange}
-        type="range"
-        min={0}
-        max={500}
-        step={1}
-        value={clamped}
-        aria-label="Glide"
-        onInput={(e) => onChange(Number(e.currentTarget.value))}
-      />
-    </label>
+    <Slider
+      className={styles.glideSlider}
+      inputClassName={styles.glideRange}
+      readoutClassName={styles.glideValue}
+      label="Glide"
+      value={clamped}
+      min={0}
+      max={500}
+      step={1}
+      readout={`${Math.round(clamped)} ms`}
+      onChange={onChange}
+    />
   );
 }
 
@@ -1306,18 +1320,19 @@ function LfoShapePicker({ value, onChange }: LfoShapePickerProps) {
       <div class={styles.lfoShapeButtons} role="radiogroup" aria-label="LFO shape">
         <For each={LFO_WAVEFORMS}>{(option) => (
           <HoverInfo content={option.label}>
-            <button
-              type="button"
+            <Button
+              iconOnly
+              size="md"
+              variant="ghost"
+              selected={value === option.value}
               role="radio"
               aria-checked={value === option.value}
               aria-label={option.label}
-              class={`${styles.lfoShapeButton} ${
-                value === option.value ? styles.lfoShapeButtonActive : ""
-              }`}
+              className={styles.lfoShapeButton}
               onClick={() => onChange(option.value)}
             >
               <Icon name={option.icon} size={16} decorative />
-            </button>
+            </Button>
           </HoverInfo>
         )}</For>
       </div>

@@ -79,8 +79,8 @@ export const LocalAiService: AiService = {
     const knob = (n: number) => ((seed >> n) & 0xff) / 255;
     return {
       name: prompt.slice(0, 24).trim() || "AI Instrument",
-      kind: "synth",
-      waveform: ["sine", "saw", "square", "triangle"][seed % 4] as Instrument["waveform"],
+      kind: "wavetable",
+      waveform: "wavetable",
       knobs: { cutoff: knob(0), resonance: knob(8), drive: knob(16), color: knob(24) },
       envelope: {
         attackMs: 2 + (seed & 0x3f),
@@ -237,7 +237,7 @@ function buildInstrumentPrompt(opts: GenerateInstrumentOptions): string {
     likedExamples: positive ?? [],
     dislikedExamples: negative ?? [],
     ranges: {
-      kind: ["synth", "wavetable", "sampler", "hybrid"],
+      kind: ["wavetable", "sampler", "hybrid"],
       waveform: ["sine", "saw", "square", "triangle", "noise", "sample", "wavetable"],
       envelope: {
         attackMs: "0..5000",
@@ -334,7 +334,8 @@ function sanitizeInstrumentPatch(value: unknown, opts: GenerateInstrumentOptions
     ? record.sampleUrl
     : undefined;
   const targetKind = opts.targetKind ?? opts.current.kind;
-  const kind = isInstrumentKind(record.kind) ? record.kind : sampleUrl ? "sampler" : targetKind;
+  const rawKind = isInstrumentKind(record.kind) ? record.kind : sampleUrl ? "sampler" : targetKind;
+  const kind = rawKind === "synth" ? "wavetable" : rawKind;
   const waveform = isWaveform(record.waveform)
     ? record.waveform
     : kind === "sampler" ? "sample" : kind === "wavetable" ? "wavetable" : opts.current.waveform;
@@ -491,13 +492,15 @@ function generateLocalInstrumentPatch(opts: GenerateInstrumentOptions): Partial<
     ? "sampler"
     : targetKind === "hybrid"
     ? "hybrid"
+    : lane.kind === "synth"
+    ? "wavetable"
     : lane.kind === "wavetable"
     ? "wavetable"
     : lane.kind === "hybrid"
     ? "hybrid"
     : sample
     ? "sampler"
-    : "synth";
+    : "wavetable";
   const longMotion = lane.motion === "evolving" || lane.motion === "swarm";
   const percussive = lane.motion === "pluck" || lane.motion === "strike";
   const noisy = lane.color === "noise" || lane.color === "metal";
@@ -596,7 +599,7 @@ function instrumentDivergenceLane(seed: number, prompt: string): InstrumentDiver
     vocal: "vocal",
     analog: "organ",
   };
-  const kind = pick(["synth", "wavetable", "wavetable", "hybrid"] as const);
+  const kind = pick(["wavetable", "wavetable", "wavetable", "hybrid"] as const);
   const waveform = pick(["sine", "saw", "square", "triangle", "noise"] as const);
   return {
     namePrefix: pick(["Prism", "Bent", "Wide", "Dust", "Glass", "Phase", "Volt", "Bloom", "Rift", "Flux"]),

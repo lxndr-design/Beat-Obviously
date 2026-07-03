@@ -20,6 +20,7 @@ export function pluginFromDecentSamplerPreset(
     uiImageDataUrl: preset.uiImageDataUrl,
     uiWidth: preset.uiWidth,
     uiHeight: preset.uiHeight,
+    uiControlDetails: preset.uiControlDetails ?? [],
     sampleCount: preset.samples.length,
     uiControlCount: preset.uiControls?.length ?? 0,
     defaultEditorKind: editorKind,

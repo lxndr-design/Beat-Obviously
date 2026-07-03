@@ -213,36 +213,36 @@
 }
 
 .noteAuditioned {
-  border-color: color-mix(in srgb, var(--interaction-playback-accent) 80%, var(--color-fg));
+  border-color: var(--color-fg);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--interaction-playback-accent) 64%, transparent),
-    0 0 16px color-mix(in srgb, var(--interaction-playback-accent) 42%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--color-fg) 64%, transparent),
+    0 0 16px color-mix(in srgb, var(--color-fg) 42%, transparent);
 }
 
 .noteAuditioned::before {
-  background: color-mix(in srgb, var(--interaction-playback-accent) 28%, transparent);
+  background: color-mix(in srgb, var(--color-fg) 28%, transparent);
   opacity: 1;
 }
 
 .noteAuditioned::after {
-  background: var(--interaction-playback-accent);
+  background: var(--color-fg);
   opacity: 1;
 }
 
 .notePlaying {
-  border-color: color-mix(in srgb, var(--interaction-playback-accent) 88%, var(--color-fg));
+  border-color: var(--color-fg);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--interaction-playback-accent) 62%, transparent),
-    0 0 14px color-mix(in srgb, var(--interaction-playback-accent) 40%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--color-fg) 62%, transparent),
+    0 0 14px color-mix(in srgb, var(--color-fg) 40%, transparent);
 }
 
 .notePlaying::before {
-  background: color-mix(in srgb, var(--interaction-playback-accent) 34%, transparent);
+  background: color-mix(in srgb, var(--color-fg) 34%, transparent);
   opacity: 1;
 }
 
 .notePlaying::after {
-  background: var(--interaction-playback-accent);
+  background: var(--color-fg);
   opacity: 1;
 }
 
@@ -270,8 +270,8 @@
   top: 2px;
   z-index: 2;
   height: 2px;
-  background: var(--interaction-playback-accent);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--interaction-playback-accent) 54%, transparent);
+  background: var(--color-fg);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-fg) 54%, transparent);
   pointer-events: none;
 }
 
@@ -448,7 +448,7 @@
 }
 
 .automationEffectiveBadge[data-tone="conflict"] span:first-child {
-  color: color-mix(in srgb, var(--interaction-playback-accent) 82%, var(--color-fg));
+  color: var(--color-fg);
 }
 
 .automationTargets {
@@ -546,7 +546,7 @@
 .automationPointHandle:hover,
 .automationPointHandleActive {
   background: var(--interaction-hover-bg);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--interaction-playback-accent) 32%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-fg) 32%, transparent);
 }
 
 .automationPointHandle:disabled {

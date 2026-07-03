@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { ActionFooter, Button, HoverInfo, Icon, MarqueeText } from "../../solid-ui";
 import { useComponentStore, type BeatComponent, type DrumComponent, type MidiComponent } from "../../state/components";
-import { normalizeDrumCell } from "../../state/drumSteps";
+import { drumPatternDurationBeats, drumPatternDurationSeconds, normalizeDrumCell } from "../../state/drumSteps";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";
 import type { Instrument } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
@@ -44,17 +44,17 @@ export function PatternsPage() {
     setPlayingId(null);
   }
 
-  function playPreview(component: BeatComponent, speed = previewSpeed()) {
+  function playPreview(component: BeatComponent, playbackRate = previewSpeed()) {
     stopProgress(false);
     stopComponentPlayback(playback);
-    startProgress(component, speed);
+    startProgress(component, playbackRate);
     playback = playComponentPreview(component, instruments(), bpm(), () => {
       stopProgress(false);
       playback = null;
       setPlayingId(null);
-      if (loopPreview()) playPreview(component, speed);
+      if (loopPreview()) playPreview(component, playbackRate);
       else setPreviewProgress(1);
-    }, speed, 0);
+    }, playbackRate, 0);
     setPlayingId(component.id);
   }
 
@@ -66,9 +66,9 @@ export function PatternsPage() {
     if (reset) setPreviewProgress(0);
   }
 
-  function startProgress(component: BeatComponent, speed = previewSpeed()) {
+  function startProgress(component: BeatComponent, playbackRate = previewSpeed()) {
     const started = performance.now();
-    const durationMs = Math.max(120, (patternDurationSeconds(component, bpm()) / speed) * 1000);
+    const durationMs = Math.max(120, patternDurationSeconds(component, bpm(), playbackRate) * 1000);
     setPreviewProgress(0);
     const tick = () => {
       const raw = Math.min(1, (performance.now() - started) / durationMs);
@@ -417,7 +417,7 @@ function editorLabel(component: BeatComponent): string {
 
 function componentLength(component: BeatComponent): string {
   const beats = component.kind === "drum"
-    ? component.lengthBeats / Math.max(1, component.speed)
+    ? drumPatternDurationBeats(component.lengthBeats)
     : component.lengthBeats;
   return `${formatNumber(beats)} beats`;
 }
@@ -431,9 +431,11 @@ function componentItemCount(component: BeatComponent): string {
   return `${count} note${count === 1 ? "" : "s"}`;
 }
 
-function patternDurationSeconds(component: BeatComponent, bpm: number): number {
+function patternDurationSeconds(component: BeatComponent, bpm: number, playbackRate = 1): number {
   const secondsPerBeat = 60 / Math.max(1, bpm);
-  return Math.max(0.1, (component.kind === "drum" ? component.lengthBeats / component.speed : component.lengthBeats) * secondsPerBeat);
+  return component.kind === "drum"
+    ? drumPatternDurationSeconds(component.lengthBeats, bpm, playbackRate)
+    : Math.max(0.1, (component.lengthBeats * secondsPerBeat) / Math.max(0.25, playbackRate));
 }
 
 function patternReferenceIssue(component: BeatComponent, instruments: Instrument[]): string | null {

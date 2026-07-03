@@ -1,16 +1,18 @@
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
-import { ActionFooter, Button, HoverInfo, Icon, MarqueeText } from "../../solid-ui";
+import { ActionFooter, Button, FloatingSelect, HoverInfo, Icon, MarqueeText } from "../../solid-ui";
 import {
   cachedInstrumentSampleBuffer,
   createInstrumentSampleBufferSource,
   createInstrumentBufferSource,
   instrumentSampleUrls,
   preloadInstrumentSample,
+  preloadInstrumentSampleUrl,
   previewFrequency,
   renderedInstrumentBuffer,
 } from "../../audio/synthPreview";
 import { isNative, send } from "../../ipc/bridge";
 import type { AudioRenderAnalysis, AudioWaveformSummary } from "../../ipc/schema";
+import { INSTRUMENT_TAXONOMY_OPTIONS, taxonomyAssignmentForInstrumentId } from "../../state/instrumentTaxonomy";
 import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, useProjectStore } from "../../state/store";
 import type { Instrument, InstrumentSet } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
@@ -43,11 +45,13 @@ export function InstrumentsPage() {
   const sets = createStoreSelector(useInstrumentStore, (state) => state.instrumentSets);
   const loading = createStoreSelector(useInstrumentStore, (state) => state.loading);
   const projectBpm = createStoreSelector(useProjectStore, (state) => state.project.bpm);
+  const updateInstrument = useInstrumentStore.getState().updateInstrument;
   const [activeId, setActiveId] = createSignal<string | null>(null);
   const [playingId, setPlayingId] = createSignal<string | null>(null);
   const [loopPreview, setLoopPreview] = createSignal(false);
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal("");
+  const [taxonomyOpen, setTaxonomyOpen] = createSignal(false);
   const [samplePreviewIndex, setSamplePreviewIndex] = createSignal<Record<string, number>>({}, { equals: false });
   const [previewProgress, setPreviewProgress] = createSignal(0);
   const [scrubbing, setScrubbing] = createSignal(false);
@@ -88,6 +92,11 @@ export function InstrumentsPage() {
     setActiveId(visibleInstruments()[0]?.id ?? null);
   });
 
+  createEffect(() => {
+    activeId();
+    setTaxonomyOpen(false);
+  });
+
   onCleanup(() => stopPreview());
 
   createEffect(() => {
@@ -100,18 +109,19 @@ export function InstrumentsPage() {
 
     if (sampleUrl) {
       const ctx = getPreviewContext(previewContextRef);
-      void loadSampleWaveform(ctx, instrument, sampleUrl, sampleZoneForUrl(instrument, sampleUrl, 112))
+      void loadSampleWaveform(ctx, sampleUrl, sampleZoneForUrl(instrument, sampleUrl, 112))
         .then((waveform) => {
           if (requestRef.current !== requestId) return;
           setRenderState({ waveform, analysis: null, loading: false });
         })
         .catch((error) => {
           if (requestRef.current !== requestId) return;
+          const fallbackWaveform = renderedFallbackWaveform(previewContextRef, instrument, projectBpm());
           setRenderState({
-            waveform: null,
+            waveform: fallbackWaveform,
             analysis: null,
             loading: false,
-            error: error instanceof Error ? error.message : "Sample preview unavailable.",
+            error: fallbackWaveform ? undefined : error instanceof Error ? error.message : "Sample preview unavailable.",
           });
         });
       return;
@@ -131,7 +141,7 @@ export function InstrumentsPage() {
         if (requestRef.current !== requestId) return;
         const fallbackWaveform = response.waveform && response.waveform.left.upper.length > 0
           ? null
-          : synthFallbackWaveform(previewContextRef, instrument, projectBpm());
+          : renderedFallbackWaveform(previewContextRef, instrument, projectBpm());
         setRenderState({
           waveform: response.waveform && response.waveform.left.upper.length > 0 ? response.waveform : fallbackWaveform,
           analysis: response.analysis ?? null,
@@ -449,6 +459,22 @@ export function InstrumentsPage() {
                 </Button>
               </HoverInfo>
             </div>
+            <div class={styles.taxonomyRow}>
+              <FloatingSelect
+                className={styles.taxonomySelect}
+                label="Structure"
+                layout="inline"
+                value={activeInstrument()!.taxonomy?.instrumentId ?? ""}
+                ariaLabel="Instrument library structure"
+                options={INSTRUMENT_TAXONOMY_OPTIONS}
+                open={taxonomyOpen()}
+                onOpenChange={setTaxonomyOpen}
+                onChange={(value) => {
+                  const nextTaxonomy = taxonomyAssignmentForInstrumentId(value);
+                  updateInstrument(activeInstrument()!.id, { taxonomy: nextTaxonomy });
+                }}
+              />
+            </div>
             <dl class={styles.details}>
               <Info label="Engine" value={formatEngine(activeInstrument()!)} />
               <Info label="Source" value={activeInstrument()!.source?.label ?? "Made in Beat"} />
@@ -567,13 +593,13 @@ function instrumentReferenceState(instrument: Instrument): {
 
   if (sampleUrls.some((path) => sampleReferenceState(path).tone === "warning")) {
     return {
-      label: "External",
-      detail: "External sample reference",
-      title: "External Sample Reference",
-      body: "One or more samples live outside the Beat library. Keep those files in place.",
-      icon: "ph:warning",
-      tone: "warning",
-      className: "referenceWarning",
+      label: "Library",
+      detail: "Beat library sample",
+      title: "Library Sample",
+      body: "This sampler instrument uses sample assets registered in Beat's library.",
+      icon: "ph:folder-simple",
+      tone: "neutral",
+      className: "referenceManaged",
     };
   }
 
@@ -591,9 +617,9 @@ function instrumentReferenceState(instrument: Instrument): {
 
   if (sampleUrls.length > 0) {
     return {
-      label: "Managed",
-      detail: "Managed sample reference",
-      title: "Managed Samples",
+      label: "Library",
+      detail: "Beat library sample",
+      title: "Library Samples",
       body: "Samples are referenced from the Beat library.",
       icon: "ph:folder-simple",
       tone: "neutral",
@@ -602,9 +628,9 @@ function instrumentReferenceState(instrument: Instrument): {
   }
 
   return {
-    label: instrument.source?.kind === "factory" ? "Factory" : "Internal",
+    label: instrument.source?.kind === "factory" ? "Factory" : instrument.source?.kind === "plugin" ? "Plugin" : "Library",
     detail: instrument.source?.label ?? "Generated in Beat",
-    title: "Internal Instrument",
+    title: "Library Instrument",
     body: "This instrument renders from stored synth settings.",
     icon: "ph:piano-keys",
     tone: "neutral",
@@ -616,8 +642,8 @@ function sampleReferenceState(path: string): { label: string; tone: InstrumentRe
   const trimmed = path.trim();
   if (!trimmed) return { label: "Missing", tone: "danger", className: "referenceDanger" };
   if (trimmed.startsWith("data:")) return { label: "Embedded", tone: "neutral", className: "referenceManaged" };
-  if (trimmed.includes("/Beat/Audio Files/")) return { label: "Managed", tone: "neutral", className: "referenceManaged" };
-  if (trimmed.startsWith("/") || /^https?:/i.test(trimmed)) return { label: "External", tone: "warning", className: "referenceWarning" };
+  if (trimmed.includes("/Beat/Audio Files/")) return { label: "Library", tone: "neutral", className: "referenceManaged" };
+  if (trimmed.startsWith("/") || /^https?:/i.test(trimmed)) return { label: "Library", tone: "neutral", className: "referenceManaged" };
   return { label: "Asset", tone: "neutral", className: "referenceManaged" };
 }
 
@@ -1210,19 +1236,24 @@ function audioBufferWaveform(buffer: AudioBuffer, bucketCount: number): AudioWav
 
 async function loadSampleWaveform(
   ctx: AudioContext,
-  instrument: Instrument,
   sampleUrl: string,
   zone?: NonNullable<Instrument["sampleMap"]>[number],
 ): Promise<AudioWaveformSummary> {
   const hasZoneSlice = Boolean(zone && (zone.startSample || zone.endSample));
   if (!hasZoneSlice && isNative() && sampleUrl.startsWith("/")) {
     const response = await send({ kind: "audio.waveform", path: sampleUrl, bucketCount: 128 });
-    if (response.waveform) return response.waveform;
+    if (isUsableWaveform(response.waveform)) return response.waveform;
   }
-  await preloadInstrumentSample(ctx, instrument);
+  const fileWaveform = await sampleFileWaveform(sampleUrl, zone, 128).catch(() => null);
+  if (fileWaveform) return fileWaveform;
+  await preloadInstrumentSampleUrl(ctx, sampleUrl);
   const buffer = cachedInstrumentSampleBuffer(sampleUrl);
   if (!buffer) throw new Error("Sample waveform unavailable.");
   return audioBufferWaveform(sliceAudioBuffer(buffer, zone?.startSample, zone?.endSample), 128);
+}
+
+function isUsableWaveform(waveform: AudioWaveformSummary | null | undefined): waveform is AudioWaveformSummary {
+  return Boolean(waveform && waveform.left.upper.length > 0 && waveform.right.upper.length > 0);
 }
 
 function sampleZoneForUrl(instrument: Instrument, sampleUrl: string, velocity = 127) {
@@ -1230,6 +1261,119 @@ function sampleZoneForUrl(instrument: Instrument, sampleUrl: string, velocity = 
     .filter((zone) => zone.path === sampleUrl)
     .find((zone) => velocity >= zone.loVel && velocity <= zone.hiVel)
     ?? (instrument.sampleMap ?? []).find((zone) => zone.path === sampleUrl);
+}
+
+async function sampleFileWaveform(
+  sampleUrl: string,
+  zone: NonNullable<Instrument["sampleMap"]>[number] | undefined,
+  bucketCount: number,
+): Promise<AudioWaveformSummary | null> {
+  if (sampleUrl.startsWith("data:")) return null;
+  const response = await fetch(sampleUrl);
+  if (!response.ok) return null;
+  return wavArrayBufferWaveform(await response.arrayBuffer(), zone?.startSample, zone?.endSample, bucketCount);
+}
+
+function wavArrayBufferWaveform(
+  buffer: ArrayBuffer,
+  startSample = 0,
+  endSample = 0,
+  bucketCount = 128,
+): AudioWaveformSummary | null {
+  const view = new DataView(buffer);
+  if (readAscii(view, 0, 4) !== "RIFF" || readAscii(view, 8, 4) !== "WAVE") return null;
+
+  let offset = 12;
+  let format = 0;
+  let channelCount = 0;
+  let sampleRate = 0;
+  let bitsPerSample = 0;
+  let blockAlign = 0;
+  let dataOffset = 0;
+  let dataSize = 0;
+
+  while (offset + 8 <= view.byteLength) {
+    const id = readAscii(view, offset, 4);
+    const size = view.getUint32(offset + 4, true);
+    const bodyOffset = offset + 8;
+    if (id === "fmt " && bodyOffset + 16 <= view.byteLength) {
+      format = view.getUint16(bodyOffset, true);
+      channelCount = view.getUint16(bodyOffset + 2, true);
+      sampleRate = view.getUint32(bodyOffset + 4, true);
+      blockAlign = view.getUint16(bodyOffset + 12, true);
+      bitsPerSample = view.getUint16(bodyOffset + 14, true);
+    } else if (id === "data") {
+      dataOffset = bodyOffset;
+      dataSize = Math.min(size, Math.max(0, view.byteLength - bodyOffset));
+      break;
+    }
+    offset = bodyOffset + size + (size % 2);
+  }
+
+  if (!dataOffset || !dataSize || !channelCount || !sampleRate || !blockAlign || !bitsPerSample) return null;
+  if (format !== 1 && format !== 3) return null;
+
+  const totalFrames = Math.floor(dataSize / blockAlign);
+  if (totalFrames <= 0) return null;
+  const start = Math.max(0, Math.min(totalFrames - 1, Math.floor(startSample || 0)));
+  const end = endSample > start + 1
+    ? Math.max(start + 2, Math.min(totalFrames, Math.floor(endSample)))
+    : totalFrames;
+  const frameCount = Math.max(1, end - start);
+  const safeBucketCount = Math.max(1, Math.min(bucketCount, frameCount));
+  const leftUpper = new Array<number>(safeBucketCount).fill(0);
+  const leftLower = new Array<number>(safeBucketCount).fill(0);
+  const rightUpper = new Array<number>(safeBucketCount).fill(0);
+  const rightLower = new Array<number>(safeBucketCount).fill(0);
+
+  for (let i = 0; i < frameCount; i++) {
+    const frameIndex = start + i;
+    const bucket = Math.min(safeBucketCount - 1, Math.floor((i / frameCount) * safeBucketCount));
+    const left = readWavSample(view, dataOffset + frameIndex * blockAlign, bitsPerSample, format);
+    const rightOffset = dataOffset + frameIndex * blockAlign + Math.floor(bitsPerSample / 8);
+    const right = channelCount > 1 ? readWavSample(view, rightOffset, bitsPerSample, format) : left;
+    leftUpper[bucket] = Math.max(leftUpper[bucket], left);
+    leftLower[bucket] = Math.min(leftLower[bucket], left);
+    rightUpper[bucket] = Math.max(rightUpper[bucket], right);
+    rightLower[bucket] = Math.min(rightLower[bucket], right);
+  }
+
+  return {
+    left: { upper: leftUpper, lower: leftLower },
+    right: { upper: rightUpper, lower: rightLower },
+    sampleRate,
+    durationSeconds: frameCount / sampleRate,
+    lengthInSamples: frameCount,
+    channelCount,
+    bucketCount: safeBucketCount,
+  };
+}
+
+function readWavSample(view: DataView, byteOffset: number, bitsPerSample: number, format: number): number {
+  if (byteOffset < 0 || byteOffset >= view.byteLength) return 0;
+  if (format === 3 && bitsPerSample === 32 && byteOffset + 4 <= view.byteLength) {
+    return clampAudioSample(view.getFloat32(byteOffset, true));
+  }
+  if (bitsPerSample === 8) return ((view.getUint8(byteOffset) - 128) / 128);
+  if (bitsPerSample === 16 && byteOffset + 2 <= view.byteLength) return view.getInt16(byteOffset, true) / 32768;
+  if (bitsPerSample === 24 && byteOffset + 3 <= view.byteLength) {
+    const value = view.getUint8(byteOffset) | (view.getUint8(byteOffset + 1) << 8) | (view.getUint8(byteOffset + 2) << 16);
+    return ((value & 0x800000) ? value | 0xff000000 : value) / 8388608;
+  }
+  if (bitsPerSample === 32 && byteOffset + 4 <= view.byteLength) return view.getInt32(byteOffset, true) / 2147483648;
+  return 0;
+}
+
+function clampAudioSample(value: number): number {
+  return Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0;
+}
+
+function readAscii(view: DataView, offset: number, length: number): string {
+  let text = "";
+  for (let i = 0; i < length && offset + i < view.byteLength; i++) {
+    text += String.fromCharCode(view.getUint8(offset + i));
+  }
+  return text;
 }
 
 function sliceAudioBuffer(buffer: AudioBuffer, startSample = 0, endSample = 0): AudioBuffer {
@@ -1249,8 +1393,7 @@ function sliceAudioBuffer(buffer: AudioBuffer, startSample = 0, endSample = 0): 
   return sliced;
 }
 
-function synthFallbackWaveform(ref: RefValue<AudioContext | null>, instrument: Instrument, bpm = 120): AudioWaveformSummary | null {
-  if (!isSustainedPreview(instrument)) return null;
+function renderedFallbackWaveform(ref: RefValue<AudioContext | null>, instrument: Instrument, bpm = 120): AudioWaveformSummary | null {
   try {
     const ctx = getPreviewContext(ref);
     return audioBufferWaveform(renderedInstrumentBuffer(ctx, instrument, PREVIEW_SECONDS, previewFrequency(instrument), undefined, bpm), 128);

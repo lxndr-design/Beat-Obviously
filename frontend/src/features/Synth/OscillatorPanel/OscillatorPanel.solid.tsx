@@ -1,8 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { importAudioFile } from "../../../audio/audioImport";
 import { renderAetherOutputPreviewSamples } from "../../../audio/synthPreview";
-import { resynthesizeAudioFileToWavemap } from "../../../audio/wavemapResynthesis";
-import { appAlert, Button, HoverInfo, Icon, Knob, NumberInput } from "../../../solid-ui";
+import { Button, HoverInfo, Icon, Knob } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import type { CustomWavetableFrame, WavemapDefinition, WavetableWarpMode } from "../../../state/types";
 import {
@@ -12,7 +10,6 @@ import {
   FACTORY_WAVETABLES,
   constrainWavemapFramePosition,
   createDefaultCustomWavetable,
-  createHarmonicPartialPreset,
   deriveWavemapFrameFromDrawnWaveform,
   drawHarmonicPartialLine,
   evolveWavemapFrames,
@@ -20,15 +17,11 @@ import {
   getNumberParam,
   getStringParam,
   modulationSummaryForTarget,
-  normalizeWavemapManualRange,
   normalizeWavemapFrames,
-  smoothHarmonicPartials,
   summarizeWavemapAnalysis,
   synthDraftToPreviewInstrument,
-  tiltHarmonicPartials,
   useSynthStore,
   type WavemapAudioSelectionMode,
-  type HarmonicPartialPreset,
   type ModulationTargetId,
   type OscillatorKey,
   type SynthDraftPatch,
@@ -37,15 +30,19 @@ import {
 } from "../../../state/synthStore";
 import styles from "./OscillatorPanel.module.css";
 
-const OSC_PARAMS: Array<{
-  suffix: "position" | "warp" | "level" | "pan" | "octave" | "semitone" | "fine" | "phase" | "randomPhase";
+type OscParamSuffix = "position" | "warp" | "level" | "pan" | "octave" | "semitone" | "fine" | "phase" | "randomPhase";
+
+interface OscParamDefinition {
+  suffix: OscParamSuffix;
   label: string;
   min: number;
   max: number;
   step: number;
   defaultValue: number;
   bipolar?: boolean;
-}> = [
+}
+
+const OSC_PARAMS: OscParamDefinition[] = [
   { suffix: "position", label: "Position", min: 0, max: 1, step: 0.01, defaultValue: 0 },
   { suffix: "warp", label: "Warp", min: 0, max: 1, step: 0.01, defaultValue: 0.2 },
   { suffix: "level", label: "Level", min: 0, max: 1, step: 0.01, defaultValue: 0.8 },
@@ -55,6 +52,15 @@ const OSC_PARAMS: Array<{
   { suffix: "fine", label: "Fine", min: -100, max: 100, step: 1, defaultValue: 0, bipolar: true },
   { suffix: "phase", label: "Phase", min: 0, max: 1, step: 0.01, defaultValue: 0 },
   { suffix: "randomPhase", label: "Random", min: 0, max: 1, step: 0.01, defaultValue: 0.25 },
+];
+
+const OSC_PARAM_BY_SUFFIX = Object.fromEntries(OSC_PARAMS.map((param) => [param.suffix, param])) as Record<OscParamSuffix, OscParamDefinition>;
+
+const OSC_PARAM_GROUPS: Array<{ label: string; suffixes: OscParamSuffix[] }> = [
+  { label: "Warp Mode", suffixes: ["position", "warp"] },
+  { label: "Pitch", suffixes: ["octave", "semitone", "fine"] },
+  { label: "Phase", suffixes: ["phase", "randomPhase"] },
+  { label: "Mix", suffixes: ["pan", "level"] },
 ];
 
 const WAVETABLE_ICONS: Record<WavetableId, string> = {
@@ -80,80 +86,40 @@ const RESYNTHESIS_MODE_OPTIONS: Array<{ value: WavemapAudioSelectionMode; label:
   { value: "manual", label: "Manual" },
 ];
 
-type WavemapAnalysisView = "compact" | "details";
 type WavemapEditMode = "freehand" | "additive";
-
-const WAVEMAP_ANALYSIS_VIEW_OPTIONS: Array<{ value: WavemapAnalysisView; label: string }> = [
-  { value: "compact", label: "Compact" },
-  { value: "details", label: "Details" },
-];
-
-const WAVEMAP_EDIT_MODE_OPTIONS: Array<{ value: WavemapEditMode; label: string }> = [
-  { value: "freehand", label: "Freehand" },
-  { value: "additive", label: "Additive" },
-];
+type WavemapAnalysisView = "compact" | "details";
 
 export function OscillatorPanel() {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
-  const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const previewInstrument = createMemo(() => synthDraftToPreviewInstrument(draft()));
-  const unisonEnabled = createMemo(() => getBooleanParam(draft(), "unison.enabled"));
-  const monoEnabled = createMemo(() => getBooleanParam(draft(), "mono.enabled"));
-  const legatoEnabled = createMemo(() => getBooleanParam(draft(), "legato.enabled"));
-  const unisonWaveform = createMemo(() => renderAetherOutputPreviewSamples(previewInstrument(), 160, "mix"));
 
   return (
-    <section class={styles.panel} aria-label="Oscillator">
-      <div class={styles.body}>
+    <section class={`ds-panel ${styles.panel}`} aria-label="Oscillator">
+      <header class="ds-panel-header">
+        <div class="ds-panel-title">Oscillators</div>
+      </header>
+      <div class={`ds-panel-body ${styles.body}`}>
         <OscillatorRow oscillator="a" previewInstrument={previewInstrument()} />
         <OscillatorRow oscillator="b" previewInstrument={previewInstrument()} />
-        <div class={`${styles.row} ${unisonEnabled() ? "" : styles.disabledRow}`} aria-label="Voice stack row">
+        <div class={styles.row} aria-label="Voice stack row">
           <div class="ds-section-header">
             <div class="ds-section-title">Voice Stack</div>
-            <div class={styles.sectionActions}>
-              <Button
-                size="xs"
-                selected={monoEnabled()}
-                aria-label={`${monoEnabled() ? "Disable" : "Enable"} mono voice mode`}
-                onClick={() => setBooleanParameter("mono.enabled", !monoEnabled())}
-              >
-                Mono
-              </Button>
-              <Button
-                size="xs"
-                selected={legatoEnabled()}
-                disabled={!monoEnabled()}
-                aria-label={`${legatoEnabled() ? "Disable" : "Enable"} legato retune mode`}
-                onClick={() => setBooleanParameter("legato.enabled", !legatoEnabled())}
-              >
-                Legato
-              </Button>
-              <Button
-                iconOnly
-                size="xs"
-                selected={unisonEnabled()}
-                aria-label={`${unisonEnabled() ? "Disable" : "Enable"} voice stack`}
-                onClick={() => setBooleanParameter("unison.enabled", !unisonEnabled())}
-              >
-                <Icon name={unisonEnabled() ? "ph:power-fill" : "ph:power"} size={12} decorative />
-              </Button>
-            </div>
           </div>
-          <div class={styles.rowMain}>
+          <div class={`${styles.rowMain} ${styles.voiceStackMain}`}>
             <div class={`${styles.settingsPane} ${styles.unisonSettingsPane}`}>
               <div class={styles.unisonBody}>
-                <div class={`${styles.rowKnobs} ${styles.unisonKnobs}`}>
+                <div class={styles.voiceStackControls}>
+                  <div class={styles.voiceStackKnobGroup}>
                   <For each={[
                     ["unison.voices", "Voices", 1, 16, 1, 1],
                     ["unison.detune", "Detune", 0, 1, 0.01, 0.12],
                     ["unison.blend", "Blend", 0, 1, 0.01, 0.75],
-                    ["unison.spread", "Spread", 0, 1, 0.01, 0.5],
-                    ["maxVoices", "Max", 1, 32, 1, 16],
                   ] as Array<[SynthParameterId, string, number, number, number, number]>}>
                     {([id, label, min, max, step, defaultValue]) => (
                       <Knob
                         size="sm"
+                        className={styles.voiceStackKnob}
                         label={label}
                         value={getNumberParam(draft(), id)}
                         min={min}
@@ -168,16 +134,34 @@ export function OscillatorPanel() {
                       />
                     )}
                   </For>
+                  </div>
+                  <div class={styles.voiceStackKnobGroup}>
+                  <For each={[
+                    ["unison.spread", "Spread", 0, 1, 0.01, 0.5],
+                    ["maxVoices", "Max", 1, 32, 1, 16],
+                  ] as Array<[SynthParameterId, string, number, number, number, number]>}>
+                    {([id, label, min, max, step, defaultValue]) => (
+                      <Knob
+                        size="sm"
+                        className={styles.voiceStackKnob}
+                        label={label}
+                        value={getNumberParam(draft(), id)}
+                        min={min}
+                        max={max}
+                        step={step}
+                        defaultValue={defaultValue}
+                        {...modulationPropsForTarget(draft(), id)}
+                        pickTargetId={MODULATABLE_TARGETS.has(id) ? id : undefined}
+                        formatValue={id === "unison.voices" || id === "maxVoices" ? (value) => Math.round(value).toString() : formatPercent}
+                        parseValue={id === "unison.voices" || id === "maxVoices" ? undefined : parsePercent}
+                        onChange={(value) => setNumericParameter(id, value)}
+                      />
+                    )}
+                  </For>
+                  </div>
                 </div>
               </div>
             </div>
-            <WaveformPreview
-              label="Voice stack waveform"
-              samples={unisonWaveform()}
-              disabled={!unisonEnabled()}
-              voices={Math.round(getNumberParam(draft(), "unison.voices"))}
-              spread={getNumberParam(draft(), "unison.spread")}
-            />
           </div>
         </div>
       </div>
@@ -196,12 +180,10 @@ function OscillatorRow(props: {
   const setWavemap = useSynthStore.getState().setWavemap;
   const updateCustomWavetableFrame = useSynthStore.getState().updateCustomWavetableFrame;
   const updateWavemapMetadata = useSynthStore.getState().updateWavemapMetadata;
-  const [resynthesizing, setResynthesizing] = createSignal(false);
   const [resynthesisMode, setResynthesisMode] = createSignal<WavemapAudioSelectionMode>("full");
-  const [analysisView, setAnalysisView] = createSignal<WavemapAnalysisView>("compact");
-  const [editMode, setEditMode] = createSignal<WavemapEditMode>("freehand");
-  const [manualStartPercent, setManualStartPercent] = createSignal(0);
-  const [manualEndPercent, setManualEndPercent] = createSignal(100);
+  const [analysisView, setAnalysisView] = createSignal<WavemapAnalysisView>("details");
+  const [customEditorOpen, setCustomEditorOpen] = createSignal(true);
+  const editMode = () => "additive" as WavemapEditMode;
   const enabledId = createMemo(() => oscParam(props.oscillator, "enabled"));
   const enabled = createMemo(() => getBooleanParam(draft(), enabledId()));
   const wavetableId = createMemo(() => oscParam(props.oscillator, "wavetable"));
@@ -213,29 +195,8 @@ function OscillatorRow(props: {
   });
   const customTableId = createMemo(() => selectedWavetable().startsWith("user.") ? selectedWavetable() : DEFAULT_CUSTOM_WAVETABLE_ID);
   const customTable = createMemo(() => draft().metadata.wavemaps?.[customTableId()] ?? draft().metadata.customWavetables?.[customTableId()] ?? createDefaultCustomWavetable(customTableId()));
-  const manualRange = createMemo(() => normalizeWavemapManualRange(manualStartPercent(), manualEndPercent()));
   const label = createMemo(() => `Oscillator ${props.oscillator.toUpperCase()}`);
   const waveform = createMemo(() => renderAetherOutputPreviewSamples(props.previewInstrument, 160, props.oscillator));
-
-  async function importAudioWavemap() {
-    if (resynthesizing()) return;
-    setResynthesizing(true);
-    try {
-      const audioFile = await importAudioFile();
-      if (!audioFile) return;
-      const range = manualRange();
-      const wavemap = await resynthesizeAudioFileToWavemap(audioFile, customTableId(), undefined, {
-        mode: resynthesisMode(),
-        ...(resynthesisMode() === "manual" ? { startRatio: range.startRatio, endRatio: range.endRatio } : {}),
-      });
-      setWavemap(wavemap);
-      setParameter(wavetableId(), wavemap.id as WavetableId);
-    } catch (error) {
-      await appAlert(error instanceof Error ? error.message : "Audio wavemap import failed.");
-    } finally {
-      setResynthesizing(false);
-    }
-  }
 
   function replaceCurrentWavemap(next: WavemapDefinition) {
     setWavemap(next);
@@ -244,174 +205,81 @@ function OscillatorRow(props: {
 
   return (
     <div class={`${styles.row} ${enabled() ? "" : styles.disabledRow}`} aria-label={`${label()} row`}>
-      <div class="ds-section-header">
+      <div class={`ds-section-header ${styles.oscillatorHeader}`}>
+        <Button
+          iconOnly
+          size="xs"
+          className={styles.oscillatorPowerButton}
+          selected={enabled()}
+          aria-label={`${enabled() ? "Disable" : "Enable"} ${label()}`}
+          onClick={() => setBooleanParameter(enabledId(), !enabled())}
+        >
+          <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={12} decorative />
+        </Button>
         <div class="ds-section-title">{label()}</div>
-        <div class={styles.sectionActions}>
-          <Button
-            iconOnly
-            size="xs"
-            selected={enabled()}
-            aria-label={`${enabled() ? "Disable" : "Enable"} ${label()}`}
-            onClick={() => setBooleanParameter(enabledId(), !enabled())}
-          >
-            <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={12} decorative />
-          </Button>
-        </div>
+        <Show when={enabled()}>
+          <div class={styles.headerWavetable}>
+            <WavetableShapeButtons
+              compact
+              value={selectedWavetable()}
+              onChange={(value) => setParameter(wavetableId(), value)}
+            />
+            <span>{selectedWavetableLabel(selectedWavetable())}</span>
+          </div>
+        </Show>
       </div>
       <Show when={enabled()}>
         <div class={styles.rowMain}>
+          <WaveformPreview label={`${label()} local oscillator preview`} samples={waveform()} disabled={!enabled()} />
           <div class={styles.settingsPane}>
             <div class={styles.rowBody}>
-              <WavetableShapeButtons
-                value={selectedWavetable()}
-                onChange={(value) => setParameter(wavetableId(), value)}
-              />
-              <WarpModeButtons
-                value={selectedWarpMode()}
-                onChange={(value) => setParameter(warpModeId(), value)}
-              />
-              <div class={styles.rowKnobs}>
-                <For each={OSC_PARAMS}>
-                  {(param) => {
-                    const id = oscParam(props.oscillator, param.suffix);
-                    return (
-                      <Knob
-                        size="sm"
-                        label={param.label}
-                        value={getNumberParam(draft(), id)}
-                        min={param.min}
-                        max={param.max}
-                        step={param.step}
-                        defaultValue={param.defaultValue}
-                        bipolar={param.bipolar}
-                        {...modulationPropsForTarget(draft(), id)}
-                        pickTargetId={MODULATABLE_TARGETS.has(id) ? id : undefined}
-                        formatValue={formatValue(param.suffix)}
-                        parseValue={param.suffix === "position" || param.suffix === "warp" || param.suffix === "level" || param.suffix === "pan" ? parsePercent : undefined}
-                        onChange={(value) => setNumericParameter(id, value)}
-                      />
-                    );
-                  }}
+              <div class={styles.oscillatorControlGroups}>
+                <For each={OSC_PARAM_GROUPS}>
+                  {(group) => (
+                    <OscillatorParamGroup
+                      label={group.label}
+                      suffixes={group.suffixes}
+                      oscillator={props.oscillator}
+                      draft={draft()}
+                      warpModeValue={group.label === "Warp Mode" ? selectedWarpMode() : undefined}
+                      onWarpModeChange={group.label === "Warp Mode" ? (value) => setParameter(warpModeId(), value) : undefined}
+                      onChange={setNumericParameter}
+                    />
+                  )}
                 </For>
               </div>
             </div>
-            <Show when={selectedWavetable().startsWith("user.")}>
-              <div class={styles.customEditor} aria-label={`${label()} wavemap frames`}>
-                <div class="ds-section-header">
-                  <div class="ds-section-title">{customTable().name} Wavemap</div>
-                  <div class={styles.wavemapMeta}>
-                    <span>{customTable().source.label ?? sourceLabel(customTable().source.kind)}</span>
-                    <span class={styles.wavemapMetaWide}>{sourceAnalysisLabel(customTable())}</span>
-                    <Knob
-                      size="sm"
-                      label="Morph"
-                      value={customTable().morph}
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      defaultValue={0}
-                      formatValue={formatPercent}
-                      parseValue={parsePercent}
-                      onChange={(morph) => updateWavemapMetadata(customTable().id, { morph })}
-                    />
-                    <div class={styles.analysisModes} role="radiogroup" aria-label="Wavemap analysis display">
-                      <For each={WAVEMAP_ANALYSIS_VIEW_OPTIONS}>
-                        {(option) => (
-                          <Button
-                            size="xs"
-                            selected={analysisView() === option.value}
-                            aria-label={`${option.label} wavemap analysis`}
-                            onClick={() => setAnalysisView(option.value)}
-                          >
-                            {option.label}
-                          </Button>
-                        )}
-                      </For>
-                    </div>
-                    <div class={styles.editModes} role="radiogroup" aria-label="Wavemap edit mode">
-                      <For each={WAVEMAP_EDIT_MODE_OPTIONS}>
-                        {(option) => (
-                          <Button
-                            size="xs"
-                            selected={editMode() === option.value}
-                            aria-label={`${option.label} wavemap editing`}
-                            onClick={() => setEditMode(option.value)}
-                          >
-                            {option.label}
-                          </Button>
-                        )}
-                      </For>
-                    </div>
-                    <div class={styles.resynthesisModes} role="radiogroup" aria-label="Audio resynthesis window">
-                      <For each={RESYNTHESIS_MODE_OPTIONS}>
-                        {(option) => (
-                          <Button
-                            size="xs"
-                            selected={resynthesisMode() === option.value}
-                            aria-label={`${option.label} audio resynthesis window`}
-                            onClick={() => setResynthesisMode(option.value)}
-                          >
-                            {option.label}
-                          </Button>
-                        )}
-                      </For>
-                    </div>
-                    <Show when={resynthesisMode() === "manual"}>
-                      <div class={styles.manualRangeControl} aria-label="Manual audio resynthesis range">
-                        <div class={styles.manualRangeStrip} aria-hidden="true">
-                          <span
-                            style={{
-                              left: `${manualRange().startPercent}%`,
-                              width: `${Math.max(1, manualRange().endPercent - manualRange().startPercent)}%`,
-                            }}
-                          />
-                        </div>
-                        <NumberInput
-                          label="Start"
-                          value={manualStartPercent()}
-                          min={0}
-                          max={100}
-                          step={1}
-                          unit="%"
-                          layout="inline"
-                          commitOnChange
-                          onChange={setManualStartPercent}
-                        />
-                        <NumberInput
-                          label="End"
-                          value={manualEndPercent()}
-                          min={0}
-                          max={100}
-                          step={1}
-                          unit="%"
-                          layout="inline"
-                          commitOnChange
-                          onChange={setManualEndPercent}
-                        />
-                        <span class={styles.manualRangeReadout}>
-                          {manualRange().startPercent}-{manualRange().endPercent}%
-                        </span>
-                      </div>
-                    </Show>
-                    <Button
-                      size="xs"
-                      disabled={resynthesizing()}
-                      onClick={() => void importAudioWavemap()}
-                    >
-                      {resynthesizing() ? "Analyzing" : "Import Audio"}
-                    </Button>
-                    <Button
-                      size="xs"
-                      onClick={() => replaceCurrentWavemap(normalizeWavemapFrames(customTable()))}
-                    >
-                      Normalize
-                    </Button>
-                    <Button
-                      size="xs"
-                      onClick={() => replaceCurrentWavemap(evolveWavemapFrames(customTable()))}
-                    >
-                      Evolve
-                    </Button>
+          </div>
+          <Show when={selectedWavetable().startsWith("user.")}>
+            <div class={styles.customEditor} aria-label={`${label()} wavemap frames`}>
+              <div class={`ds-section-header ${styles.customEditorHeader}`}>
+                <div class="ds-section-title">{label()} - Custom Waveform Settings</div>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  aria-expanded={customEditorOpen()}
+                  onClick={() => setCustomEditorOpen((open) => !open)}
+                >
+                  {customEditorOpen() ? "Hide" : "Show"}
+                </Button>
+              </div>
+              <Show when={customEditorOpen()}>
+                <div class={styles.wavemapToolbar}>
+                  <div class={styles.resynthesisModes} role="radiogroup" aria-label="Audio resynthesis window">
+                    <For each={RESYNTHESIS_MODE_OPTIONS}>
+                      {(option) => (
+                        <Button
+                          size="xs"
+                          selected={resynthesisMode() === option.value}
+                          aria-label={`${option.label} audio resynthesis window`}
+                          onClick={() => setResynthesisMode(option.value)}
+                        >
+                          {option.label}
+                        </Button>
+                      )}
+                    </For>
+                  </div>
+                  <div class={styles.interpolationModes} role="radiogroup" aria-label="Wavemap interpolation">
                     <Button
                       size="xs"
                       selected={customTable().interpolation === "linear"}
@@ -426,7 +294,43 @@ function OscillatorRow(props: {
                     >
                       Smooth
                     </Button>
+                    <Knob
+                      size="sm"
+                      className={styles.toolbarMorphKnob}
+                      label="Morph"
+                      value={customTable().morph}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      defaultValue={0}
+                      formatValue={formatPercent}
+                      parseValue={parsePercent}
+                      onChange={(morph) => updateWavemapMetadata(customTable().id, { morph })}
+                    />
                   </div>
+                  <div class={styles.wavemapActionGroup}>
+                    <Button
+                      size="xs"
+                      onClick={() => replaceCurrentWavemap(normalizeWavemapFrames(customTable()))}
+                    >
+                      Normalize Audio
+                    </Button>
+                    <Button
+                      size="xs"
+                      onClick={() => replaceCurrentWavemap(evolveWavemapFrames(customTable()))}
+                    >
+                      Evolve
+                    </Button>
+                  </div>
+                  <Button
+                    size="xs"
+                    className={styles.analysisToggleButton}
+                    selected={analysisView() === "details"}
+                    aria-label={`${analysisView() === "details" ? "Hide" : "Show"} wavemap analysis`}
+                    onClick={() => setAnalysisView(analysisView() === "details" ? "compact" : "details")}
+                  >
+                    {analysisView() === "details" ? "Hide Analysis" : "Show Analysis"}
+                  </Button>
                 </div>
                 <Show when={analysisView() === "details"}>
                   <WavemapAnalysisDetails table={customTable()} />
@@ -434,160 +338,26 @@ function OscillatorRow(props: {
                 <div class={styles.customFrames}>
                   <For each={customTable().frames}>
                     {(frame, index) => (
-                      <div class={styles.customFrame}>
-                        <div class={styles.frameLabel}>
-                          {frame.label ?? CUSTOM_WAVETABLE_FRAME_LABELS[index()] ?? index() + 1}
-                          <span>{Math.round((frame.position ?? index() / 3) * 100)}</span>
-                        </div>
-                        <div class={styles.frameConstraint}>
-                          {scanConstraintLabel(customTable(), index())}
-                        </div>
-                        <MiniWaveform
-                          samples={renderCustomFramePreview(frame)}
-                          disabled={editMode() !== "freehand"}
-                          onDrawSamples={(samples) =>
-                            updateCustomWavetableFrame(customTable().id, index(), deriveWavemapFrameFromDrawnWaveform(frame, samples))
-                          }
-                        />
-                        <div class={styles.frameAnalysis}>{frameAnalysisLabel(frame)}</div>
-                        <Knob
-                          size="sm"
-                          label="Scan"
-                          value={frame.position ?? index() / Math.max(1, customTable().frames.length - 1)}
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          defaultValue={index() / Math.max(1, customTable().frames.length - 1)}
-                          formatValue={formatPercent}
-                          parseValue={parsePercent}
-                          onChange={(position) => updateCustomWavetableFrame(customTable().id, index(), {
-                            position: constrainWavemapFramePosition(customTable(), index(), position),
-                          })}
-                        />
-                        <HarmonicDraw
-                          partials={frame.partials}
-                          mode={editMode()}
-                          onChange={(partials) => updateCustomWavetableFrame(customTable().id, index(), { partials })}
-                        />
-                        <Knob
-                          size="sm"
-                          label="Bright"
-                          value={frame.brightness}
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          defaultValue={createDefaultCustomWavetable(customTable().id).frames[index()]?.brightness ?? 0.5}
-                          formatValue={formatPercent}
-                          parseValue={parsePercent}
-                          onChange={(brightness) => updateCustomWavetableFrame(customTable().id, index(), { brightness })}
-                        />
-                        <Knob
-                          size="sm"
-                          label="Even"
-                          value={frame.even}
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          defaultValue={createDefaultCustomWavetable(customTable().id).frames[index()]?.even ?? 0.2}
-                          formatValue={formatPercent}
-                          parseValue={parsePercent}
-                          onChange={(even) => updateCustomWavetableFrame(customTable().id, index(), { even })}
-                        />
-                        <Knob
-                          size="sm"
-                          label="Fold"
-                          value={frame.fold}
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          defaultValue={createDefaultCustomWavetable(customTable().id).frames[index()]?.fold ?? 0.1}
-                          formatValue={formatPercent}
-                          parseValue={parsePercent}
-                          onChange={(fold) => updateCustomWavetableFrame(customTable().id, index(), { fold })}
-                        />
-                        <Knob
-                          size="sm"
-                          label="Formant"
-                          value={frame.formant}
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          defaultValue={createDefaultCustomWavetable(customTable().id).frames[index()]?.formant ?? 0.12}
-                          formatValue={formatPercent}
-                          parseValue={parsePercent}
-                          onChange={(formant) => updateCustomWavetableFrame(customTable().id, index(), { formant })}
-                        />
-                        <Knob
-                          size="sm"
-                          label="Notch"
-                          value={frame.notch}
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          defaultValue={createDefaultCustomWavetable(customTable().id).frames[index()]?.notch ?? 0.08}
-                          formatValue={formatPercent}
-                          parseValue={parsePercent}
-                          onChange={(notch) => updateCustomWavetableFrame(customTable().id, index(), { notch })}
-                        />
-                        <Knob
-                          size="sm"
-                          label="Skew"
-                          value={frame.skew}
-                          min={-1}
-                          max={1}
-                          step={0.01}
-                          defaultValue={createDefaultCustomWavetable(customTable().id).frames[index()]?.skew ?? 0}
-                          bipolar
-                          formatValue={(value) => `${Math.round(value * 100)}`}
-                          parseValue={parsePercent}
-                          onChange={(skew) => updateCustomWavetableFrame(customTable().id, index(), { skew })}
-                        />
-                        <Knob
-                          size="sm"
-                          label="Tilt"
-                          value={frame.tilt}
-                          min={-1}
-                          max={1}
-                          step={0.01}
-                          defaultValue={createDefaultCustomWavetable(customTable().id).frames[index()]?.tilt ?? 0}
-                          bipolar
-                          formatValue={(value) => `${Math.round(value * 100)}`}
-                          parseValue={parsePercent}
-                          onChange={(tilt) => updateCustomWavetableFrame(customTable().id, index(), { tilt })}
-                        />
-                        <Knob
-                          size="sm"
-                          label="Focus"
-                          value={frame.focus}
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          defaultValue={createDefaultCustomWavetable(customTable().id).frames[index()]?.focus ?? 0.35}
-                          formatValue={formatPercent}
-                          parseValue={parsePercent}
-                          onChange={(focus) => updateCustomWavetableFrame(customTable().id, index(), { focus })}
-                        />
-                        <Knob
-                          size="sm"
-                          label="Phase"
-                          value={frame.phase}
-                          min={-1}
-                          max={1}
-                          step={0.01}
-                          defaultValue={createDefaultCustomWavetable(customTable().id).frames[index()]?.phase ?? 0}
-                          bipolar
-                          formatValue={(value) => `${Math.round(value * 100)}`}
-                          parseValue={parsePercent}
-                          onChange={(phase) => updateCustomWavetableFrame(customTable().id, index(), { phase })}
-                        />
-                      </div>
+                      <CustomWavetableFrameCard
+                        table={customTable()}
+                        frame={frame}
+                        index={index()}
+                        editMode={editMode()}
+                        onDrawSamples={(samples) =>
+                          updateCustomWavetableFrame(customTable().id, index(), deriveWavemapFrameFromDrawnWaveform(frame, samples))
+                        }
+                        onUpdate={(patch) => updateCustomWavetableFrame(customTable().id, index(), patch)}
+                      />
                     )}
                   </For>
                 </div>
-              </div>
-            </Show>
-          </div>
-          <WaveformPreview label={`${label()} Waveform`} samples={waveform()} disabled={!enabled()} />
+                <div class={styles.wavemapSourceRow}>
+                  <span>{sourceLabel(customTable().source.kind)}: {customTable().source.label ?? "Custom wavemap"}</span>
+                  <span>{sourceAnalysisLabel(customTable())}</span>
+                </div>
+              </Show>
+            </div>
+          </Show>
         </div>
       </Show>
     </div>
@@ -600,7 +370,6 @@ function WavemapAnalysisDetails(props: { table: WavemapDefinition }) {
   return (
     <div class={styles.analysisDetails} aria-label="Wavemap analysis details">
       <div class={styles.analysisHeader}>
-        <strong>Analysis Details</strong>
         <span>Frames {summary().analyzedFrameCount}/{summary().frameCount}</span>
         <span>RMS {formatAnalysisPercent(summary().averageRms)}</span>
         <span>Peak {formatAnalysisPercent(summary().peak)}</span>
@@ -705,6 +474,224 @@ function MiniWaveform(props: { samples: number[]; disabled?: boolean; onDrawSamp
   );
 }
 
+function OscillatorParamGroup(props: {
+  label: string;
+  suffixes: OscParamSuffix[];
+  oscillator: OscillatorKey;
+  draft: SynthDraftPatch;
+  warpModeValue?: WavetableWarpMode;
+  onWarpModeChange?: (value: WavetableWarpMode) => void;
+  onChange: (id: SynthParameterId, value: number) => void;
+}) {
+  return (
+    <div class={`${styles.oscillatorControlGroup} ${props.warpModeValue ? styles.warpControlGroup : ""}`} aria-label={`${props.label} controls`}>
+      <div class={styles.oscillatorControlGroupTitle}>{props.label}</div>
+      <Show when={props.warpModeValue && props.onWarpModeChange ? true : false}>
+        <WarpModeButtons
+          value={props.warpModeValue ?? "shape"}
+          onChange={props.onWarpModeChange ?? (() => undefined)}
+        />
+      </Show>
+      <div class={styles.oscillatorControlGroupKnobs}>
+        <For each={props.suffixes}>
+          {(suffix) => (
+            <OscillatorParamKnob
+              param={OSC_PARAM_BY_SUFFIX[suffix]}
+              oscillator={props.oscillator}
+              draft={props.draft}
+              showModulation={!props.warpModeValue}
+              onChange={props.onChange}
+            />
+          )}
+        </For>
+      </div>
+    </div>
+  );
+}
+
+function OscillatorParamKnob(props: {
+  param: OscParamDefinition;
+  oscillator: OscillatorKey;
+  draft: SynthDraftPatch;
+  showModulation?: boolean;
+  onChange: (id: SynthParameterId, value: number) => void;
+}) {
+  const id = createMemo(() => oscParam(props.oscillator, props.param.suffix));
+  const acceptsPercentParse = () => (
+    props.param.suffix === "position"
+    || props.param.suffix === "warp"
+    || props.param.suffix === "level"
+    || props.param.suffix === "pan"
+  );
+
+  return (
+    <Knob
+      size="sm"
+      label={props.param.label}
+      value={getNumberParam(props.draft, id())}
+      min={props.param.min}
+      max={props.param.max}
+      step={props.param.step}
+      defaultValue={props.param.defaultValue}
+      bipolar={props.param.bipolar}
+      {...(props.showModulation === false ? {} : modulationPropsForTarget(props.draft, id()))}
+      pickTargetId={props.showModulation === false ? undefined : (MODULATABLE_TARGETS.has(id()) ? id() : undefined)}
+      formatValue={formatValue(props.param.suffix)}
+      parseValue={acceptsPercentParse() ? parsePercent : undefined}
+      onChange={(value) => props.onChange(id(), value)}
+    />
+  );
+}
+
+function CustomWavetableFrameCard(props: {
+  table: WavemapDefinition;
+  frame: CustomWavetableFrame;
+  index: number;
+  editMode: WavemapEditMode;
+  onDrawSamples: (samples: number[]) => void;
+  onUpdate: (patch: Partial<CustomWavetableFrame>) => void;
+}) {
+  const defaultFrame = createMemo(() => createDefaultCustomWavetable(props.table.id).frames[props.index]);
+  const defaultPosition = () => props.index / Math.max(1, props.table.frames.length - 1);
+  const frameLabel = () => props.frame.label ?? CUSTOM_WAVETABLE_FRAME_LABELS[props.index] ?? props.index + 1;
+  const framePosition = () => props.frame.position ?? defaultPosition();
+  const scanMin = createMemo(() => constrainWavemapFramePosition(props.table, props.index, 0));
+  const scanMax = createMemo(() => constrainWavemapFramePosition(props.table, props.index, 1));
+  const scanLocked = createMemo(() => props.index === 0 || props.index === props.table.frames.length - 1 || scanMin() >= scanMax());
+
+  return (
+    <div class={styles.customFrame}>
+      <div class={styles.frameLabel}>
+        {frameLabel()}
+      </div>
+      <div class={styles.frameBody}>
+        <div class={styles.frameScanBlock} aria-label={`${frameLabel()} frame scan controls`}>
+          <div class={styles.frameScanLabel}>Frame/Scan</div>
+          <MiniWaveform
+            samples={renderCustomFramePreview(props.frame)}
+            disabled={props.editMode !== "freehand"}
+            onDrawSamples={props.onDrawSamples}
+          />
+        </div>
+        <div class={styles.harmonicsBlock} aria-label={`${frameLabel()} harmonic controls`}>
+          <HarmonicDraw
+            partials={props.frame.partials}
+            mode={props.editMode}
+            onChange={(partials) => props.onUpdate({ partials })}
+          />
+          <div class={styles.frameKnobRowThree}>
+            <FrameKnob
+              label="Scan"
+              value={framePosition()}
+              min={scanMin()}
+              max={scanMax()}
+              defaultValue={defaultPosition()}
+              disabled={scanLocked()}
+              formatValue={() => scanKnobLabel(props.table, props.index, framePosition())}
+              onChange={(position) => props.onUpdate({
+                position: constrainWavemapFramePosition(props.table, props.index, position),
+              })}
+            />
+            <FrameKnob
+              label="Bright"
+              value={props.frame.brightness}
+              defaultValue={defaultFrame()?.brightness ?? 0.5}
+              onChange={(brightness) => props.onUpdate({ brightness })}
+            />
+            <FrameKnob
+              label="Even"
+              value={props.frame.even}
+              defaultValue={defaultFrame()?.even ?? 0.2}
+              onChange={(even) => props.onUpdate({ even })}
+            />
+          </div>
+        </div>
+        <div class={styles.frameKnobBox} aria-label={`${frameLabel()} spectral shape controls`}>
+          <div class={styles.frameKnobRowFour}>
+            <FrameKnob
+              label="Fold"
+              value={props.frame.fold}
+              defaultValue={defaultFrame()?.fold ?? 0.1}
+              onChange={(fold) => props.onUpdate({ fold })}
+            />
+            <FrameKnob
+              label="Formant"
+              value={props.frame.formant}
+              defaultValue={defaultFrame()?.formant ?? 0.12}
+              onChange={(formant) => props.onUpdate({ formant })}
+            />
+            <FrameKnob
+              label="Notch"
+              value={props.frame.notch}
+              defaultValue={defaultFrame()?.notch ?? 0.08}
+              onChange={(notch) => props.onUpdate({ notch })}
+            />
+            <FrameKnob
+              label="Focus"
+              value={props.frame.focus}
+              defaultValue={defaultFrame()?.focus ?? 0.35}
+              onChange={(focus) => props.onUpdate({ focus })}
+            />
+          </div>
+        </div>
+        <div class={styles.frameKnobRowThree} aria-label={`${frameLabel()} phase balance controls`}>
+            <FrameKnob
+              label="Skew"
+              value={props.frame.skew}
+              defaultValue={defaultFrame()?.skew ?? 0}
+              bipolar
+              onChange={(skew) => props.onUpdate({ skew })}
+            />
+            <FrameKnob
+              label="Tilt"
+              value={props.frame.tilt}
+              defaultValue={defaultFrame()?.tilt ?? 0}
+              bipolar
+              onChange={(tilt) => props.onUpdate({ tilt })}
+            />
+            <FrameKnob
+              label="Phase"
+              value={props.frame.phase}
+              defaultValue={defaultFrame()?.phase ?? 0}
+              bipolar
+              onChange={(phase) => props.onUpdate({ phase })}
+            />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FrameKnob(props: {
+  label: string;
+  value: number;
+  defaultValue: number;
+  min?: number;
+  max?: number;
+  disabled?: boolean;
+  bipolar?: boolean;
+  formatValue?: (value: number) => string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <Knob
+      size="sm"
+      className={styles.frameKnob}
+      label={props.label}
+      value={props.value}
+      min={props.min ?? (props.bipolar ? -1 : 0)}
+      max={props.max ?? 1}
+      step={0.01}
+      defaultValue={props.defaultValue}
+      bipolar={props.bipolar}
+      disabled={props.disabled}
+      formatValue={props.formatValue ?? ((value) => `${Math.round(value * 100)}`)}
+      parseValue={parsePercent}
+      onChange={props.onChange}
+    />
+  );
+}
+
 function WaveformPreview(props: {
   label: string;
   samples: number[];
@@ -738,65 +725,83 @@ function WaveformPreview(props: {
   );
 }
 
-function WavetableShapeButtons(props: { value: WavetableId; onChange: (value: WavetableId) => void }) {
-  const selected = createMemo(() => FACTORY_WAVETABLES.find((table) => table.id === props.value));
+function selectedWavetableLabel(value: WavetableId): string {
+  if (isCustomWavetableId(value)) return "Custom";
+  return FACTORY_WAVETABLES.find((table) => table.id === value)?.label ?? value;
+}
+
+function WavetableShapeButtons(props: { value: WavetableId; onChange: (value: WavetableId) => void; compact?: boolean }) {
+  const selected = createMemo(() => FACTORY_WAVETABLES.find((table) => wavetableButtonSelected(table.id, props.value)));
 
   return (
-    <div class={styles.wavetableControl}>
+    <div class={styles.wavetableControl} data-compact={props.compact ? "true" : "false"}>
       <div class={styles.wavetableButtons} role="radiogroup" aria-label="Wavetable">
         <For each={FACTORY_WAVETABLES}>
           {(table) => {
-            const active = () => table.id === props.value;
+            const active = () => wavetableButtonSelected(table.id, props.value);
             return (
               <HoverInfo content={table.label}>
-                <button
-                  type="button"
+                <Button
+                  iconOnly
+                  size="xs"
+                  variant="ghost"
+                  selected={active()}
                   role="radio"
                   aria-checked={active()}
                   aria-label={table.label}
-                  class={`${styles.wavetableButton} ${active() ? styles.wavetableButtonActive : ""}`}
+                  className={styles.wavetableButton}
                   onClick={() => props.onChange(table.id)}
                 >
                   <Icon name={WAVETABLE_ICONS[table.id] ?? "ph:waveform"} size={12} decorative />
-                </button>
+                </Button>
               </HoverInfo>
             );
           }}
         </For>
       </div>
-      <span class={styles.wavetableSelectedLabel}>{selected()?.label ?? props.value}</span>
-      <span class={styles.wavetableControlLabel}>Wavetable</span>
+      <Show when={!props.compact}>
+        <span class={styles.wavetableSelectedLabel}>{selected()?.label ?? props.value}</span>
+        <span class={styles.wavetableControlLabel}>Wavetable</span>
+      </Show>
     </div>
   );
 }
 
+function isCustomWavetableId(value: WavetableId): boolean {
+  return value.startsWith("user.");
+}
+
+function wavetableButtonSelected(buttonId: WavetableId, value: WavetableId): boolean {
+  return buttonId === value || (buttonId === DEFAULT_CUSTOM_WAVETABLE_ID && isCustomWavetableId(value));
+}
+
 function WarpModeButtons(props: { value: WavetableWarpMode; onChange: (value: WavetableWarpMode) => void }) {
-  const selected = createMemo(() => WARP_MODE_OPTIONS.find((option) => option.value === props.value) ?? WARP_MODE_OPTIONS[0]);
   return (
-    <div class={styles.wavetableControl}>
+    <div class={styles.wavetableControl} data-compact="true">
       <div class={styles.wavetableButtons} role="radiogroup" aria-label="Warp mode">
         <For each={WARP_MODE_OPTIONS}>
           {(option) => {
             const active = () => option.value === props.value;
             return (
               <HoverInfo content={option.label}>
-                <button
-                  type="button"
+                <Button
+                  iconOnly
+                  size="xs"
+                  variant="ghost"
+                  selected={active()}
                   role="radio"
                   aria-checked={active()}
                   aria-label={`${option.label} warp mode`}
-                  class={`${styles.wavetableButton} ${active() ? styles.wavetableButtonActive : ""}`}
+                  className={styles.wavetableButton}
                   onClick={() => props.onChange(option.value)}
                 >
                   <Icon name={option.icon} size={12} decorative />
-                </button>
+                </Button>
               </HoverInfo>
             );
           }}
         </For>
       </div>
-      <span class={styles.wavetableSelectedLabel}>{selected().label}</span>
-      <span class={styles.wavetableControlLabel}>Warp Mode</span>
     </div>
   );
 }
@@ -840,14 +845,10 @@ function sourceAnalysisLabel(table: WavemapDefinition): string {
   return parts.length ? parts.join(" · ") : sourceLabel(source.kind);
 }
 
-function frameAnalysisLabel(frame: CustomWavetableFrame): string {
-  const analysis = frame.analysis;
-  if (!analysis) return "Analysis pending";
-  const harmonic = analysis.dominantHarmonic > 0 ? `H${Math.round(analysis.dominantHarmonic)}` : "H-";
-  const rms = Math.round(analysis.rms * 100);
-  const peak = Math.round(analysis.peak * 100);
-  const centroid = analysis.spectralCentroid > 0 ? `C${analysis.spectralCentroid.toFixed(1)}` : "C-";
-  return `${harmonic} · ${centroid} · RMS ${rms} · PK ${peak}`;
+function scanKnobLabel(table: WavemapDefinition, index: number, position: number): string {
+  if (index === 0) return "Start";
+  if (index === table.frames.length - 1) return "End";
+  return `${Math.round(position * 100)}%`;
 }
 
 function formatSamples(count?: number): string {
@@ -915,7 +916,6 @@ function HarmonicDraw(props: { partials?: number[]; mode: WavemapEditMode; onCha
   };
 
   return (
-    <>
     <div
       class={`${styles.harmonicDraw} ${props.mode === "additive" ? "" : styles.harmonicDrawLocked}`}
       aria-label="Harmonic partials"
@@ -940,41 +940,7 @@ function HarmonicDraw(props: { partials?: number[]; mode: WavemapEditMode; onCha
         )}
       </For>
     </div>
-    <div class={styles.harmonicTools} aria-label="Harmonic partial tools">
-      <For each={[
-        ["fundamental", "Fund"],
-        ["odd", "Odd"],
-        ["even", "Even"],
-      ] as Array<[HarmonicPartialPreset, string]>}>
-        {([preset, label]) => (
-          <Button size="xs" onClick={() => props.onChange(createHarmonicPartialPreset(preset))}>
-            {label}
-          </Button>
-        )}
-      </For>
-      <Button size="xs" onClick={() => props.onChange(tiltHarmonicPartials(bins(), -0.42))}>
-        Low
-      </Button>
-      <Button size="xs" onClick={() => props.onChange(tiltHarmonicPartials(bins(), 0.42))}>
-        High
-      </Button>
-      <Button size="xs" onClick={() => props.onChange(smoothHarmonicPartials(bins(), 0.85))}>
-        Smooth
-      </Button>
-      <Button size="xs" onClick={() => props.onChange(Array.from({ length: CUSTOM_WAVETABLE_PARTIAL_COUNT }, () => 0))}>
-        Clear
-      </Button>
-    </div>
-    </>
   );
-}
-
-function scanConstraintLabel(table: WavemapDefinition, index: number): string {
-  if (index === 0) return "Anchor 0%";
-  if (index === table.frames.length - 1) return "Anchor 100%";
-  const minimum = Math.round(constrainWavemapFramePosition(table, index, 0) * 100);
-  const maximum = Math.round(constrainWavemapFramePosition(table, index, 1) * 100);
-  return `Scan ${minimum}-${maximum}%`;
 }
 
 function customFrameAmplitude(frame: CustomWavetableFrame, harmonic: number): number {

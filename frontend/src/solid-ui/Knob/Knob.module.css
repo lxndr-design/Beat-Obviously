@@ -1,16 +1,32 @@
 .knob {
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  justify-items: center;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   user-select: none;
 }
 
 .dial {
+  order: 1;
   cursor: ns-resize;
   width: var(--knob-size-md);
   height: var(--knob-size-md);
+  outline: 0;
+}
+
+.knob[data-disabled="true"] {
+  opacity: 0.45;
+}
+
+.knob[data-disabled="true"] .dial,
+.knob[data-disabled="true"] .value {
+  cursor: default;
+}
+
+.dial:focus-visible {
+  box-shadow: var(--interaction-focus-ring);
 }
 
 .size-sm .dial { width: var(--knob-size-sm); height: var(--knob-size-sm); }
@@ -40,16 +56,18 @@
 /* The value readout is a button-as-text — no styling, just editable. */
 .value,
 .editValue {
+  order: 2;
   font-family: var(--font-family-mono);
   font-size: var(--font-size-ui);
-  color: var(--color-fg);
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
   background: transparent;
   border: 0;
   padding: 0;
   text-align: center;
   min-height: var(--space-2);
   cursor: text;
-  width: 64px;
+  width: auto;
+  min-width: 28px;
 }
 
 .value:hover {
@@ -62,14 +80,18 @@
 }
 
 .label {
+  order: 0;
+  min-height: 12px;
   font-size: var(--font-size-ui);
-  line-height: 1.1;
+  line-height: 1;
+  text-align: center;
   text-transform: none;
   letter-spacing: 0;
   font-weight: var(--font-weight-medium);
 }
 
 .modulation {
+  order: 3;
   display: inline-grid;
   grid-template-columns: 10px minmax(0, 52px);
   align-items: center;

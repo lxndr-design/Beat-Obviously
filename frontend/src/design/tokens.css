@@ -46,9 +46,10 @@
 
 :root {
   /* === Colors =========================================================
-   * Only black and white. The opacities below are reserved for gridlines
-   * *inside* objects (tracks, segments, timeline). They MUST NOT appear
-   * on buttons, borders, text, or any standalone surface.
+   * Monochrome only: black, white, and grayscale derived from those values.
+   * The opacities below are reserved for gridlines *inside* objects
+   * (tracks, segments, timeline). They MUST NOT appear on buttons, borders,
+   * text, or any standalone surface unless routed through the shared tokens.
    */
   --color-bg: #000000;
   --color-fg: #ffffff;
@@ -58,19 +59,18 @@
   /* Modal/overlay scrim — only legitimate semi-transparent value */
   --color-scrim: rgba(0, 0, 0, 0.6);
 
-  /* Light green — the ONE chromatic exception. Used for text selection only. */
-  --color-highlight: #a8ff8c;
+  /* Text selection stays monochrome. No chromatic UI exceptions. */
+  --color-highlight: #ffffff;
   --color-highlight-fg: #000000;
 
-  /* Aether bridge icon mesh — chromatic product mark, not general UI chrome. */
-  --aether-bridge-red: #ff2d2d;
-  --aether-bridge-orange: #ff8a18;
-  --aether-bridge-cyan: #00d5ff;
-  --aether-bridge-warm: #ff5a1f;
-  --aether-bridge-deep-red: #1b0603;
-  --aether-bridge-deep-orange: #381006;
-  --aether-bridge-deep-cyan: #05313d;
-  --interaction-playback-accent: #00f5ff;
+  /* Monochrome state tokens. Do not introduce hue here. */
+  --aether-bridge-tone-strong: color-mix(in srgb, var(--color-fg) 72%, transparent);
+  --aether-bridge-tone-mid: color-mix(in srgb, var(--color-fg) 48%, transparent);
+  --aether-bridge-tone-soft: color-mix(in srgb, var(--color-fg) 34%, transparent);
+  --aether-bridge-tone-warm: color-mix(in srgb, var(--color-fg) 56%, transparent);
+  --aether-bridge-depth-low: color-mix(in srgb, var(--color-fg) 9%, var(--color-bg));
+  --aether-bridge-depth-mid: color-mix(in srgb, var(--color-fg) 14%, var(--color-bg));
+  --aether-bridge-depth-high: color-mix(in srgb, var(--color-fg) 20%, var(--color-bg));
 
   /* Off-white for foreground-active surfaces and high-contrast controls.
    * List rows use --surface-hover so scanning does not flash full white. */
@@ -237,6 +237,7 @@
   --width-modal-sm: 384px;
   --width-modal-md: 640px;
   --width-modal-lg: 960px;
+  --width-modal-editor: 1200px;
 
   --height-topbar: 48px;          /* 6 * 8 — fits 32px controls + 8px gutter */
   --height-transport: 64px;       /* 8 * 8 (deprecated — transport now in topbar) */

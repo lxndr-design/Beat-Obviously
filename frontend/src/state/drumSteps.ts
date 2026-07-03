@@ -52,6 +52,19 @@ export function drumTimingOffsetBeats(step: number, stepLengthBeats: number, swi
   return swingOffset + (lean / 100) * stepLengthBeats;
 }
 
+export function drumPatternDurationBeats(lengthBeats: number): number {
+  return Math.max(0.25, Number.isFinite(lengthBeats) ? lengthBeats : 0.25);
+}
+
+export function drumStepLengthBeats(lengthBeats: number, stepCount: number): number {
+  return drumPatternDurationBeats(lengthBeats) / Math.max(1, stepCount);
+}
+
+export function drumPatternDurationSeconds(lengthBeats: number, bpm: number, playbackRate = 1): number {
+  const secondsPerBeat = 60 / Math.max(1, bpm);
+  return Math.max(0.05, (drumPatternDurationBeats(lengthBeats) * secondsPerBeat) / Math.max(0.25, playbackRate));
+}
+
 export function effectiveDrumVelocity(cell: DrumCell): number {
   return cell.velocity ?? DEFAULT_DRUM_VELOCITY;
 }

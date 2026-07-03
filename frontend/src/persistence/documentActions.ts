@@ -6,10 +6,10 @@ import { createEmptyProject, useDocumentStore, useProjectStore, useTransportStor
 import { saveProject } from "./dexie";
 import { applyBeatDocument, beatDocumentFingerprint, buildCurrentBeatDocument, buildCurrentBeatDocumentFingerprint, replaceBeatDocumentAssetPath } from "./beatDocument";
 
-export async function saveCurrentDocument(options: { saveAs?: boolean } = {}): Promise<"saved" | "cancelled"> {
+export async function saveCurrentDocument(options: { saveAs?: boolean; force?: boolean } = {}): Promise<"saved" | "cancelled"> {
   const documentState = useDocumentStore.getState();
   if (!documentState.documentOpen) return "cancelled";
-  if (!documentState.dirty && !options.saveAs && documentState.currentFilePath) {
+  if (!documentState.dirty && !options.saveAs && !options.force && documentState.currentFilePath) {
     return "saved";
   }
 

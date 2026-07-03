@@ -2,7 +2,14 @@ import { createSignal, For, onCleanup, Show } from "solid-js";
 import { Button, Icon, RowItem, SectionRibbon, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { appPrompt } from "../../solid-ui";
 import { createInstrumentBufferSource, noteFrequency, preloadInstrumentSample } from "../../audio/synthPreview";
-import { DEFAULT_DRUM_MIDI_PITCH, DEFAULT_DRUM_VELOCITY, drumTimingOffsetBeats, normalizeDrumCell } from "../../state/drumSteps";
+import {
+  DEFAULT_DRUM_MIDI_PITCH,
+  DEFAULT_DRUM_VELOCITY,
+  drumPatternDurationBeats,
+  drumStepLengthBeats,
+  drumTimingOffsetBeats,
+  normalizeDrumCell,
+} from "../../state/drumSteps";
 import { useComponentStore, type BeatComponent } from "../../state/components";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";
 import type { Instrument, MidiNote } from "../../state/types";
@@ -178,12 +185,12 @@ export function playComponentPreview(
 
   const previewSpeed = Math.max(0.25, Math.min(4, speedMultiplier));
   const secondsPerBeat = (60 / Math.max(1, bpm)) / previewSpeed;
-  const durationBeats = component.kind === "drum" ? component.lengthBeats / component.speed : component.lengthBeats;
+  const durationBeats = component.kind === "drum" ? drumPatternDurationBeats(component.lengthBeats) : component.lengthBeats;
   const durationSeconds = Math.max(0.1, durationBeats * secondsPerBeat);
   const now = ctx.currentTime;
 
   if (component.kind === "drum") {
-    const stepLengthBeats = durationBeats / Math.max(1, component.stepCount);
+    const stepLengthBeats = drumStepLengthBeats(component.lengthBeats, component.stepCount);
     for (const row of component.rows) {
       const instrument = instruments.find((i) => i.id === row.instrumentId) ?? instruments[0] ?? fallbackInstrument;
       if (instrument.sampleUrl) {
@@ -305,7 +312,7 @@ function getComponentPreviewCtx(): AudioContext {
 
 function componentPlaybackLength(component: BeatComponent): string {
   const beats = component.kind === "drum"
-    ? component.lengthBeats / Math.max(1, component.speed)
+    ? drumPatternDurationBeats(component.lengthBeats)
     : component.lengthBeats;
   return Number.isInteger(beats) ? `${beats}` : beats.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }

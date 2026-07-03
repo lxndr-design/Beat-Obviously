@@ -9,6 +9,7 @@
 #include "../Source/Audio/InstrumentVoice.h"
 #include "../Source/Audio/Modulation/DynamicModulation.h"
 #include "../Source/Audio/Modulation/Lfo.h"
+#include "../Source/Audio/Nodemap/NodemapGraph.h"
 #include "../Source/Audio/Oscillator/AetherTableStackRenderer.h"
 #include "../Source/Audio/Oscillator/BasicOscillator.h"
 #include "../Source/Audio/Parameters/ParameterIds.h"
@@ -29,11 +30,14 @@
 #include "../Source/Persistence/ProjectAssetPackage.h"
 #include "../Source/Persistence/ProjectDocumentBackup.h"
 #include "../Source/Persistence/ProjectIntegrityVerifier.h"
+#include "../Source/Persistence/AudioFileLibraryActions.h"
 #include "../Source/Persistence/Database.h"
 #include "../Source/Persistence/ProjectRepository.h"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -326,6 +330,298 @@ namespace
         }
 
         return true;
+    }
+
+    bool stressNodemapNativeGraphContract()
+    {
+        using namespace beat::Nodemap;
+
+        for (const auto kind : {
+                 NodeKind::InstrumentOut, NodeKind::Oscillator, NodeKind::ExistingInstrument, NodeKind::Noise,
+                 NodeKind::OscillatorMerge, NodeKind::Mixer, NodeKind::Gain, NodeKind::Filter, NodeKind::Envelope, NodeKind::Lfo,
+                 NodeKind::Constant, NodeKind::CvScale, NodeKind::Velocity, NodeKind::Keytrack, NodeKind::ModWheel,
+                 NodeKind::Macro, NodeKind::Random, NodeKind::Unison, NodeKind::Shaper, NodeKind::Distortion,
+                 NodeKind::Delay, NodeKind::Chorus, NodeKind::Reverb, NodeKind::Phaser, NodeKind::Flanger,
+                 NodeKind::Compressor, NodeKind::Bitcrush,
+             })
+        {
+            const auto asText = nodeKindToString(kind);
+            if (nodeKindFromString(asText) != kind)
+                return false;
+            const auto& definition = definitionFor(kind);
+            if (definition.ports.empty())
+                return false;
+            if (kind == NodeKind::InstrumentOut && definition.category != NodeCategory::Output)
+                return false;
+        }
+
+        auto graph = makeBasicOscillatorGraph();
+        graph.nodes.push_back({ "node-extra-out", NodeKind::InstrumentOut, "Bad Out", 800, 240, {} });
+        graph.nodes.push_back({ "node-noise", NodeKind::Noise, "Noise", 100, 300, {} });
+        graph.nodes.push_back({ "node-lfo", NodeKind::Lfo, "LFO", 100, 420, {} });
+        graph.cables.push_back({ "self-cable", "node-osc", "audio-out", "node-osc", "level", 1.0f });
+        graph.cables.push_back({ "wrong-signal", "node-lfo", "cv-out", "node-out", "audio-in", 1.0f });
+        graph.cables.push_back({ "missing-port", "node-noise", "not-real", "node-out", "audio-in", 1.0f });
+        graph.cables.push_back({ "missing-node", "node-missing", "audio-out", "node-out", "audio-in", 1.0f });
+        graph.cables.push_back({ "multi-input", "node-noise", "audio-out", "node-out", "audio-in", 0.25f });
+        graph.cables.push_back({ "duplicate-edge", "node-noise", "audio-out", "node-out", "audio-in", 0.5f });
+
+        const auto result = validateAndNormalize(graph);
+        const auto outputCount = std::count_if(result.graph.nodes.begin(), result.graph.nodes.end(), [](const Node& node) {
+            return node.kind == NodeKind::InstrumentOut;
+        });
+        const bool hasDuplicateOutputIssue = std::any_of(result.issues.begin(), result.issues.end(), [](const Issue& issue) {
+            return issue.id == "duplicate-output";
+        });
+        const bool hasWrongSignalIssue = std::any_of(result.issues.begin(), result.issues.end(), [](const Issue& issue) {
+            return issue.id == "wrong-signal";
+        });
+        const bool hasSelfCableIssue = std::any_of(result.issues.begin(), result.issues.end(), [](const Issue& issue) {
+            return issue.id == "self-cable";
+        });
+        const auto routedAudioCables = std::count_if(result.graph.cables.begin(), result.graph.cables.end(), [](const Cable& cable) {
+            return cable.toNodeId == "node-out" && cable.toPortId == "audio-in";
+        });
+
+        auto frontendGraph = makeOutputOnlyGraph();
+        frontendGraph.nodes.push_back({ "frontend-osc-a", NodeKind::Oscillator, "Frontend Osc A", 100, 120, { { "level", 0.35f } } });
+        frontendGraph.nodes.push_back({ "frontend-osc-b", NodeKind::Oscillator, "Frontend Osc B", 100, 300, { { "level", 0.25f } } });
+        frontendGraph.nodes.push_back({ "frontend-merge", NodeKind::OscillatorMerge, "Oscillator Merge", 320, 210, { { "levelA", 1.0f }, { "levelB", 0.7f } } });
+        frontendGraph.nodes.push_back({ "frontend-filter", NodeKind::Filter, "Frontend Filter", 520, 210, { { "cutoff", 8400.0f }, { "resonance", 0.18f }, { "drive", 0.04f } } });
+        frontendGraph.nodes.push_back({ "frontend-gain", NodeKind::Gain, "Frontend Volume", 720, 210, { { "level", 0.65f }, { "pan", 0.0f } } });
+        frontendGraph.nodes.push_back({ "frontend-env", NodeKind::Envelope, "Envelope", 320, 420, { { "attack", 0.005f }, { "decay", 0.12f }, { "sustain", 0.2f } } });
+        frontendGraph.nodes.push_back({ "frontend-lfo", NodeKind::Lfo, "LFO", 520, 420, { { "rate", 3.0f }, { "amount", 0.2f } } });
+        frontendGraph.cables.push_back({ "frontend-a-merge", "frontend-osc-a", "audio-out", "frontend-merge", "osc-a", 1.0f });
+        frontendGraph.cables.push_back({ "frontend-b-merge", "frontend-osc-b", "audio-out", "frontend-merge", "osc-b", 1.0f });
+        frontendGraph.cables.push_back({ "frontend-merge-filter", "frontend-merge", "audio-out", "frontend-filter", "audio-in", 1.0f });
+        frontendGraph.cables.push_back({ "frontend-lfo-filter", "frontend-lfo", "cv-out", "frontend-filter", "cutoff-cv", 0.2f });
+        frontendGraph.cables.push_back({ "frontend-filter-gain", "frontend-filter", "audio-out", "frontend-gain", "audio-in", 1.0f });
+        frontendGraph.cables.push_back({ "frontend-env-gain", "frontend-env", "cv-out", "frontend-gain", "level-cv", 0.2f });
+        frontendGraph.cables.push_back({ "frontend-gain-out", "frontend-gain", "audio-out", "node-out", "audio-in", 1.0f });
+
+        const auto frontendValidation = validateAndNormalize(frontendGraph);
+        const auto frontendRender = renderOneNote(frontendGraph, { 48000.0, 4096, 69, 0.8f });
+        const bool keptFrontendPorts = std::any_of(frontendValidation.graph.cables.begin(), frontendValidation.graph.cables.end(), [](const Cable& cable) {
+            return cable.toPortId == "cutoff-cv";
+        }) && std::any_of(frontendValidation.graph.cables.begin(), frontendValidation.graph.cables.end(), [](const Cable& cable) {
+            return cable.toPortId == "level-cv";
+        }) && std::any_of(frontendValidation.graph.nodes.begin(), frontendValidation.graph.nodes.end(), [](const Node& node) {
+            return node.kind == NodeKind::OscillatorMerge;
+        });
+
+        return result.valid
+            && result.hasOutput
+            && outputCount == 1
+            && routedAudioCables == 2
+            && hasDuplicateOutputIssue
+            && hasWrongSignalIssue
+            && hasSelfCableIssue
+            && frontendValidation.valid
+            && frontendValidation.hasAudioPathToOutput
+            && keptFrontendPorts
+            && !frontendRender.silent
+            && frontendRender.finiteSamples == 8192;
+    }
+
+    bool stressNodemapNativeAuditionAndCycles()
+    {
+        using namespace beat::Nodemap;
+
+        const auto silent = renderOneNote(makeOutputOnlyGraph(), { 48000.0, 2048, 60, 0.8f });
+        if (!silent.silent || silent.peak != 0.0f || silent.finiteSamples != 0)
+            return false;
+
+        const auto audible = renderOneNote(makeBasicOscillatorGraph(), { 48000.0, 4096, 64, 0.8f });
+        if (audible.silent || audible.peak <= 0.01f || audible.rms <= 0.001f || audible.finiteSamples != 8192)
+            return false;
+
+        auto cycle = makeOutputOnlyGraph();
+        cycle.nodes.push_back({ "cycle-a", NodeKind::Mixer, "Cycle A", 100, 100, {} });
+        cycle.nodes.push_back({ "cycle-b", NodeKind::Mixer, "Cycle B", 300, 100, {} });
+        cycle.nodes.push_back({ "cycle-source", NodeKind::Oscillator, "Source", 100, 260, {} });
+        cycle.cables.push_back({ "source-a", "cycle-source", "audio-out", "cycle-a", "in-1", 1.0f });
+        cycle.cables.push_back({ "a-b", "cycle-a", "audio-out", "cycle-b", "in-1", 1.0f });
+        cycle.cables.push_back({ "b-a", "cycle-b", "audio-out", "cycle-a", "in-2", 1.0f });
+        cycle.cables.push_back({ "a-out", "cycle-a", "audio-out", "node-out", "audio-in", 1.0f });
+
+        const auto validation = validateAndNormalize(cycle);
+        if (!validation.hasCycle || !validation.valid)
+            return false;
+        const auto cyclicRender = renderOneNote(cycle, { 48000.0, 2048, 60, 0.75f });
+        return cyclicRender.finiteSamples == 4096
+            && std::isfinite(cyclicRender.rms)
+            && cyclicRender.peak <= 1.0f;
+    }
+
+    bool stressNodemapNativeEffectsAndTemplates()
+    {
+        using namespace beat::Nodemap;
+
+        auto graph = makeBasicOscillatorGraph();
+        graph.nodes.push_back({ "env", NodeKind::Envelope, "Envelope", 120, 480, { { "attack", 0.005f }, { "decay", 0.08f }, { "sustain", 0.25f } } });
+        graph.nodes.push_back({ "lfo", NodeKind::Lfo, "LFO", 250, 480, { { "rate", 4.0f }, { "depth", 0.1f } } });
+        graph.nodes.push_back({ "constant", NodeKind::Constant, "Constant", 380, 480, { { "value", 0.2f } } });
+        graph.nodes.push_back({ "scale", NodeKind::CvScale, "Scale", 510, 480, { { "amount", -0.5f }, { "offset", 0.05f }, { "clamp", 1.0f } } });
+        graph.nodes.push_back({ "velocity", NodeKind::Velocity, "Velocity", 640, 480, {} });
+        graph.nodes.push_back({ "keytrack", NodeKind::Keytrack, "Keytrack", 770, 480, {} });
+        graph.nodes.push_back({ "mod", NodeKind::ModWheel, "Mod", 900, 480, {} });
+        graph.nodes.push_back({ "macro", NodeKind::Macro, "Macro", 1030, 480, {} });
+        graph.nodes.push_back({ "random", NodeKind::Random, "Random", 1160, 480, {} });
+        graph.nodes.push_back({ "filter", NodeKind::Filter, "Filter", 480, 240, { { "cutoff", 0.7f }, { "resonance", 0.2f } } });
+        graph.nodes.push_back({ "unison", NodeKind::Unison, "Unison", 620, 240, { { "voices", 6.0f } } });
+        graph.nodes.push_back({ "shaper", NodeKind::Shaper, "Shaper", 760, 240, { { "drive", 0.2f } } });
+        graph.nodes.push_back({ "distortion", NodeKind::Distortion, "Distortion", 900, 240, { { "drive", 0.1f } } });
+        graph.nodes.push_back({ "delay", NodeKind::Delay, "Delay", 1040, 240, {} });
+        graph.nodes.push_back({ "chorus", NodeKind::Chorus, "Chorus", 1180, 240, {} });
+        graph.nodes.push_back({ "reverb", NodeKind::Reverb, "Reverb", 1320, 240, {} });
+        graph.nodes.push_back({ "phaser", NodeKind::Phaser, "Phaser", 1460, 240, {} });
+        graph.nodes.push_back({ "flanger", NodeKind::Flanger, "Flanger", 1600, 240, {} });
+        graph.nodes.push_back({ "compressor", NodeKind::Compressor, "Compressor", 1740, 240, {} });
+        graph.nodes.push_back({ "bitcrush", NodeKind::Bitcrush, "Bitcrush", 1880, 240, {} });
+        graph.cables.clear();
+        graph.cables.push_back({ "osc-filter", "node-osc", "audio-out", "filter", "audio-in", 1.0f });
+        graph.cables.push_back({ "constant-scale", "constant", "cv-out", "scale", "cv-in", 1.0f });
+        graph.cables.push_back({ "scale-filter", "scale", "cv-out", "filter", "cutoff", 0.25f });
+        graph.cables.push_back({ "env-osc", "env", "cv-out", "node-osc", "level", 0.08f });
+        graph.cables.push_back({ "lfo-filter", "lfo", "cv-out", "filter", "resonance", 0.05f });
+        graph.cables.push_back({ "velocity-filter", "velocity", "cv-out", "filter", "drive", 0.05f });
+        graph.cables.push_back({ "filter-unison", "filter", "audio-out", "unison", "audio-in", 1.0f });
+        graph.cables.push_back({ "key-unison", "keytrack", "cv-out", "unison", "detune", 0.04f });
+        graph.cables.push_back({ "mod-unison", "mod", "cv-out", "unison", "spread", 0.04f });
+        graph.cables.push_back({ "macro-unison", "macro", "cv-out", "unison", "voices", 0.02f });
+        graph.cables.push_back({ "unison-shaper", "unison", "audio-out", "shaper", "audio-in", 1.0f });
+        graph.cables.push_back({ "random-shaper", "random", "cv-out", "shaper", "drive", 0.02f });
+        graph.cables.push_back({ "shaper-dist", "shaper", "audio-out", "distortion", "audio-in", 1.0f });
+        graph.cables.push_back({ "dist-delay", "distortion", "audio-out", "delay", "audio-in", 1.0f });
+        graph.cables.push_back({ "delay-chorus", "delay", "audio-out", "chorus", "audio-in", 1.0f });
+        graph.cables.push_back({ "chorus-reverb", "chorus", "audio-out", "reverb", "audio-in", 1.0f });
+        graph.cables.push_back({ "reverb-phaser", "reverb", "audio-out", "phaser", "audio-in", 1.0f });
+        graph.cables.push_back({ "phaser-flanger", "phaser", "audio-out", "flanger", "audio-in", 1.0f });
+        graph.cables.push_back({ "flanger-compressor", "flanger", "audio-out", "compressor", "audio-in", 1.0f });
+        graph.cables.push_back({ "compressor-bitcrush", "compressor", "audio-out", "bitcrush", "audio-in", 1.0f });
+        graph.cables.push_back({ "bitcrush-out", "bitcrush", "audio-out", "node-out", "audio-in", 1.0f });
+
+        const auto render = renderOneNote(graph, { 48000.0, 4096, 61, 0.82f, 0.48f, 0.37f, 0.63f });
+        if (render.silent || render.peak <= 0.01f || render.peak > 1.0f || render.finiteSamples != 8192)
+            return false;
+
+        for (const auto templateId : { "basic-oscillator", "filtered-mono", "moving-texture", "snare-hit", "tom-hit", "crash-hit" })
+        {
+            const auto proof = makeProofTemplate(templateId);
+            const auto proofValidation = validateAndNormalize(proof);
+            const auto proofRender = renderOneNote(proof, { 48000.0, 2048, 60, 0.8f });
+            if (!proofValidation.valid || !proofValidation.hasAudioPathToOutput || proofRender.silent || proofRender.finiteSamples != 4096)
+                return false;
+        }
+
+        return true;
+    }
+
+    bool stressNodemapNativeLargeGraphTiming()
+    {
+        using namespace beat::Nodemap;
+
+        const auto graph = makeLargeStressGraph(100, 300);
+        const auto start = std::chrono::steady_clock::now();
+        ValidationResult validation;
+        for (int i = 0; i < 30; ++i)
+            validation = validateAndNormalize(graph);
+        const auto validateMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+        if (!validation.valid || !validation.hasAudioPathToOutput || graph.nodes.size() < 100 || graph.cables.size() < 300 || validateMs > 1500.0)
+            return false;
+
+        const auto renderStart = std::chrono::steady_clock::now();
+        const auto render = renderOneNote(graph, { 48000.0, 4096, 60, 0.8f });
+        const auto renderMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - renderStart).count();
+        return !render.silent
+            && render.peak > 0.0001f
+            && render.peak <= 1.0f
+            && render.finiteSamples == 8192
+            && renderMs < 1500.0;
+    }
+
+    bool stressProjectRepositoryNodemapInstrumentRoundtrip()
+    {
+        using namespace beat::Nodemap;
+
+        const auto root = juce::File("/private/tmp")
+            .getChildFile("BeatBackendStress-nodemap-instrument-repository-" + juce::Uuid().toString());
+        const auto dbFile = root.getChildFile("projects.sqlite");
+        if (!root.createDirectory())
+            return false;
+
+        beat::Project project;
+        project.id = "nodemap-repository-project";
+        project.name = "Nodemap Repository Project";
+        project.bpm = 126.0;
+        project.lengthBeats = 4.0;
+
+        beat::InstrumentDefinition instrument;
+        instrument.id = "native-nodemap";
+        instrument.kind = "nodemap";
+        instrument.nodeGraph = makeProofTemplate("moving-texture");
+        project.instruments.push_back(instrument);
+
+        for (int i = 0; i < 2; ++i)
+        {
+            beat::Track track;
+            track.id = "nodemap-track-" + juce::String(i + 1);
+            track.name = "Nodemap Track " + juce::String(i + 1);
+            track.kind = beat::TrackKind::Midi;
+            track.instrumentId = instrument.id;
+            project.tracks.push_back(std::move(track));
+        }
+
+        beat::Database db(dbFile);
+        beat::ProjectRepository repo(db);
+        repo.save(project);
+        const auto loaded = repo.load(project.id);
+
+        bool ok = loaded.has_value()
+            && loaded->instruments.size() == 1
+            && loaded->instruments.front().nodeGraph.has_value()
+            && loaded->tracks.size() == 2
+            && loaded->tracks[0].instrumentId == instrument.id
+            && loaded->tracks[1].instrumentId == instrument.id;
+
+        float beforeRms = 0.0f;
+        float afterRms = 0.0f;
+        bool deterministicParity = false;
+        if (ok)
+        {
+            const auto& loadedGraph = *loaded->instruments.front().nodeGraph;
+            const auto validation = validateAndNormalize(loadedGraph);
+            const auto renderA = renderOneNote(loadedGraph, { 48000.0, 4096, 62, 0.8f });
+            const auto renderB = renderOneNote(loadedGraph, { 48000.0, 4096, 62, 0.8f });
+            beforeRms = renderA.rms;
+            deterministicParity = renderA.finiteSamples == renderB.finiteSamples
+                && near(renderA.rms, renderB.rms, 0.000001f)
+                && near(renderA.peak, renderB.peak, 0.000001f);
+
+            auto edited = loadedGraph;
+            for (auto& node : edited.nodes)
+            {
+                if (node.kind == NodeKind::Oscillator)
+                    node.params["level"] = 0.18f;
+            }
+            afterRms = renderOneNote(edited, { 48000.0, 4096, 62, 0.8f }).rms;
+
+            ok = validation.valid
+                && validation.hasAudioPathToOutput
+                && !renderA.silent
+                && deterministicParity
+                && std::abs(beforeRms - afterRms) > 0.0001f;
+        }
+
+        root.deleteRecursively();
+        if (!ok)
+        {
+            std::cerr << "Nodemap repository roundtrip failed loaded=" << loaded.has_value()
+                      << " beforeRms=" << beforeRms
+                      << " afterRms=" << afterRms
+                      << " parity=" << deterministicParity << "\n";
+        }
+        return ok;
     }
 
     bool stressVoiceRenderWorkBlock()
@@ -3146,6 +3442,54 @@ namespace
         return project;
     }
 
+    beat::Project makeNodemapOfflineProject()
+    {
+        beat::Project project;
+        project.id = "native-nodemap-offline-project";
+        project.name = "Native Nodemap Offline";
+        project.bpm = 124.0;
+        project.lengthBeats = 1.0;
+
+        beat::InstrumentDefinition instrument;
+        instrument.id = "native-nodemap-synth";
+        instrument.kind = "nodemap";
+        instrument.maxVoices = 8;
+        instrument.nodeGraph = beat::Nodemap::makeProofTemplate("filtered-mono");
+        project.instruments.push_back(instrument);
+
+        auto makeTrack = [&](const juce::String& id, int pitch, double startBeat, float pan)
+        {
+            beat::Track track;
+            track.id = id;
+            track.name = "Nodemap " + id;
+            track.kind = beat::TrackKind::Midi;
+            track.instrumentId = instrument.id;
+            track.pan = pan;
+
+            beat::Segment segment;
+            segment.id = id + "-segment";
+            segment.trackId = track.id;
+            segment.kind = beat::SegmentPayloadKind::Midi;
+            segment.instrumentId = instrument.id;
+            segment.startBeat = 0.0;
+            segment.lengthBeats = 1.0;
+
+            beat::MidiNote note;
+            note.instrumentId = instrument.id;
+            note.pitch = pitch;
+            note.velocity = 108;
+            note.startBeat = startBeat;
+            note.lengthBeats = 0.35;
+            segment.notes.push_back(note);
+            track.segments.push_back(segment);
+            return track;
+        };
+
+        project.tracks.push_back(makeTrack("native-nodemap-track-a", 60, 0.0, -0.25f));
+        project.tracks.push_back(makeTrack("native-nodemap-track-b", 67, 0.25, 0.25f));
+        return project;
+    }
+
     bool stressAudioEngineTrackMeters()
     {
         beat::AudioEngine engine;
@@ -5064,11 +5408,13 @@ namespace
         const auto projectFile = root.getChildFile("Portable Project.beat");
         const auto audioFile = sourceFolder.getChildFile("Loop Source.wav");
         const auto sampleFile = sourceFolder.getChildFile("Snare Hit.wav");
+        const auto pluginFile = sourceFolder.getChildFile("Kit Plugin.dspreset");
 
         if (!root.createDirectory()
             || !sourceFolder.createDirectory()
             || !audioFile.replaceWithText("audio-fixture")
-            || !sampleFile.replaceWithText("sample-fixture"))
+            || !sampleFile.replaceWithText("sample-fixture")
+            || !pluginFile.replaceWithText("plugin-fixture"))
         {
             std::cerr << "Could not create project asset packaging fixture at "
                       << root.getFullPathName() << "\n";
@@ -5110,6 +5456,45 @@ namespace
         instrument->setProperty("sampleUrl", sampleFile.getFullPathName());
         instrument->setProperty("sampleUrls", sampleUrls);
         instrument->setProperty("sampleMap", sampleMap);
+        juce::Array<juce::var> sampleIds;
+        sampleIds.add("audio-1");
+        instrument->setProperty("sampleIds", sampleIds);
+
+        juce::DynamicObject::Ptr plugin = new juce::DynamicObject();
+        plugin->setProperty("id", "plugin-1");
+        plugin->setProperty("name", "Kit Plugin");
+        plugin->setProperty("format", "decent-sampler");
+        plugin->setProperty("sourcePath", pluginFile.getFullPathName());
+        plugin->setProperty("sourceFileName", pluginFile.getFileName());
+
+        juce::DynamicObject::Ptr audioPayload = new juce::DynamicObject();
+        audioPayload->setProperty("kind", "audio");
+        audioPayload->setProperty("audioFileId", "audio-1");
+        audioPayload->setProperty("gainDb", -1.0);
+
+        juce::DynamicObject::Ptr segment = new juce::DynamicObject();
+        segment->setProperty("id", "segment-audio-1");
+        segment->setProperty("trackId", "track-audio-1");
+        segment->setProperty("name", "Audio Clip");
+        segment->setProperty("payload", juce::var(audioPayload.get()));
+
+        juce::Array<juce::var> segments;
+        segments.add(juce::var(segment.get()));
+
+        juce::DynamicObject::Ptr track = new juce::DynamicObject();
+        track->setProperty("id", "track-audio-1");
+        track->setProperty("name", "Audio Track");
+        track->setProperty("kind", "audio");
+        track->setProperty("audioFileId", "audio-1");
+        track->setProperty("segments", segments);
+
+        juce::Array<juce::var> tracks;
+        tracks.add(juce::var(track.get()));
+
+        juce::DynamicObject::Ptr project = new juce::DynamicObject();
+        project->setProperty("id", "project-asset-packaging");
+        project->setProperty("name", "Asset Packaging");
+        project->setProperty("tracks", tracks);
 
         const auto makeAsset = [](const juce::String& id,
                                   const juce::String& kind,
@@ -5128,17 +5513,22 @@ namespace
         juce::Array<juce::var> assets;
         assets.add(makeAsset("audio-asset", "audio", audioFile.getFullPathName(), "external"));
         assets.add(makeAsset("sample-asset", "sample", sampleFile.getFullPathName(), "external"));
+        assets.add(makeAsset("plugin-asset", "plugin", pluginFile.getFullPathName(), "plugin"));
         assets.add(makeAsset("factory-asset", "sample", "/samples/factory.wav", "bundled"));
 
         juce::Array<juce::var> audioFiles;
         audioFiles.add(juce::var(audio.get()));
         juce::Array<juce::var> instruments;
         instruments.add(juce::var(instrument.get()));
+        juce::Array<juce::var> plugins;
+        plugins.add(juce::var(plugin.get()));
 
         juce::DynamicObject::Ptr documentObject = new juce::DynamicObject();
         documentObject->setProperty("schemaVersion", 1);
+        documentObject->setProperty("project", juce::var(project.get()));
         documentObject->setProperty("audioFiles", audioFiles);
         documentObject->setProperty("instruments", instruments);
+        documentObject->setProperty("plugins", plugins);
         documentObject->setProperty("assets", assets);
         juce::var document(documentObject.get());
 
@@ -5146,15 +5536,30 @@ namespace
         const bool manifestChanged = beat::rebuildDocumentAssetManifest(repairDocument);
         const auto repairedAssets = repairDocument.getProperty("assets", {});
         const auto* repairedAssetArray = repairedAssets.getArray();
-        bool manifestRepairOk = manifestChanged && repairedAssetArray != nullptr && repairedAssetArray->size() == 2;
+        bool manifestRepairOk = manifestChanged && repairedAssetArray != nullptr && repairedAssetArray->size() == 3;
         if (manifestRepairOk)
         {
             const auto audioAsset = repairedAssetArray->getReference(0);
-            const auto sampleAsset = repairedAssetArray->getReference(1);
+            const auto pluginAsset = repairedAssetArray->getReference(1);
+            const auto sampleAsset = repairedAssetArray->getReference(2);
+            const auto* audioRefs = audioAsset.getProperty("references", {}).getArray();
+            const auto* pluginRefs = pluginAsset.getProperty("references", {}).getArray();
             const auto* sampleRefs = sampleAsset.getProperty("references", {}).getArray();
             manifestRepairOk =
                 audioAsset.getProperty("kind", {}).toString() == "audio"
                 && audioAsset.getProperty("path", {}).toString() == audioFile.getFullPathName()
+                && audioRefs != nullptr
+                && audioRefs->size() == 4
+                && audioRefs->contains("audioFile:audio-1")
+                && audioRefs->contains("track:track-audio-1:audioFileId")
+                && audioRefs->contains("track:track-audio-1:segment:segment-audio-1:audioFileId")
+                && audioRefs->contains("instrument:sample-inst:sampleIds:0")
+                && pluginAsset.getProperty("kind", {}).toString() == "plugin"
+                && pluginAsset.getProperty("path", {}).toString() == pluginFile.getFullPathName()
+                && pluginAsset.getProperty("policy", {}).toString() == "plugin"
+                && pluginRefs != nullptr
+                && pluginRefs->size() == 1
+                && pluginRefs->contains("plugin:plugin-1:sourcePath")
                 && sampleAsset.getProperty("kind", {}).toString() == "sample"
                 && sampleAsset.getProperty("path", {}).toString() == sampleFile.getFullPathName()
                 && sampleRefs != nullptr
@@ -5178,20 +5583,26 @@ namespace
         const auto packagedSampleUrl = document.getProperty("instruments", {})[0].getProperty("sampleUrls", {})[0].toString();
         const auto packagedZone = document.getProperty("instruments", {})[0].getProperty("sampleMap", {})[0];
         const auto packagedZonePath = packagedZone.getProperty("path", {}).toString();
-        const auto packagedBundledAssetPath = document.getProperty("assets", {})[2].getProperty("path", {}).toString();
+        const auto packagedPluginPath = document.getProperty("plugins", {})[0].getProperty("sourcePath", {}).toString();
+        const auto packagedPluginAssetPath = document.getProperty("assets", {})[2].getProperty("path", {}).toString();
+        const auto packagedBundledAssetPath = document.getProperty("assets", {})[3].getProperty("path", {}).toString();
 
         const bool relativePathsOk = packagedAudioPath.startsWith("./")
             && packagedSamplePath.startsWith("./")
             && packagedSampleUrl == packagedSamplePath
             && packagedZonePath == packagedSamplePath
+            && packagedPluginPath == pluginFile.getFullPathName()
+            && packagedPluginAssetPath == pluginFile.getFullPathName()
             && packagedBundledAssetPath == "/samples/factory.wav";
 
         const auto copiedAudio = projectFile.getParentDirectory().getChildFile(packagedAudioPath);
         const auto copiedSample = projectFile.getParentDirectory().getChildFile(packagedSamplePath);
+        const auto pluginSidecarFolder = beat::projectSidecarFolderFor(projectFile).getChildFile("plugins");
         const bool copiedOk = copiedAudio.existsAsFile()
             && copiedSample.existsAsFile()
             && copiedAudio.loadFileAsString() == "audio-fixture"
-            && copiedSample.loadFileAsString() == "sample-fixture";
+            && copiedSample.loadFileAsString() == "sample-fixture"
+            && !pluginSidecarFolder.exists();
 
         beat::resolveDocumentAssetPaths(document, projectFile);
         const auto resolvedAudioPath = document.getProperty("audioFiles", {})[0].getProperty("path", {}).toString();
@@ -5583,6 +5994,150 @@ namespace
             return false;
         }
 
+        auto badSendDocument = juce::JSON::parse(juce::JSON::toString(document));
+        if (auto* badSendProject = badSendDocument.getProperty("project", {}).getDynamicObject())
+        {
+            juce::DynamicObject::Ptr returnBus = new juce::DynamicObject();
+            returnBus->setProperty("id", "return-1");
+            returnBus->setProperty("name", "Return 1");
+            returnBus->setProperty("gainDb", 0.0);
+            returnBus->setProperty("pan", 0.0);
+            returnBus->setProperty("mute", false);
+            juce::DynamicObject::Ptr returnEffects = new juce::DynamicObject();
+            returnEffects->setProperty("filters", juce::Array<juce::var> {});
+            returnBus->setProperty("effects", juce::var(returnEffects.get()));
+            juce::Array<juce::var> returnBuses;
+            returnBuses.add(juce::var(returnBus.get()));
+            badSendProject->setProperty("returnBuses", returnBuses);
+
+            if (auto* badSendTracks = badSendProject->getProperty("tracks").getArray())
+            {
+                if (!badSendTracks->isEmpty())
+                {
+                    auto firstTrack = badSendTracks->getReference(0);
+                    if (auto* firstTrackObject = firstTrack.getDynamicObject())
+                    {
+                        const auto makeSend = [](const juce::String& busId, double gainDb, double pan)
+                        {
+                            juce::DynamicObject::Ptr send = new juce::DynamicObject();
+                            send->setProperty("busId", busId);
+                            send->setProperty("gainDb", gainDb);
+                            send->setProperty("pan", pan);
+                            send->setProperty("enabled", true);
+                            return juce::var(send.get());
+                        };
+
+                        juce::Array<juce::var> sends;
+                        sends.add(makeSend("missing-return", -12.0, 0.0));
+                        sends.add(makeSend("return-1", -9.0, 0.0));
+                        sends.add(makeSend("return-1", 48.0, 2.0));
+                        firstTrackObject->setProperty("sends", sends);
+                    }
+                }
+            }
+        }
+        const auto badSendReport = beat::verifyProjectDocumentIntegrity(badSendDocument, projectFile);
+        const bool badSendOk = reportContainsIssueCode(badSendReport,
+                                                       "track.send.bus.missing",
+                                                       beat::ProjectIntegritySeverity::Error)
+            && reportContainsIssueCode(badSendReport,
+                                       "track.send.bus.duplicate",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badSendReport,
+                                       "track.send.gain.invalid",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badSendReport,
+                                       "track.send.pan.invalid",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && beat::hasFatalProjectDocumentIntegrityErrors(badSendReport);
+        if (!badSendOk)
+        {
+            std::cerr << "Bad return-send routing was not reported by integrity verifier errors="
+                      << badSendReport.errorCount()
+                      << " warnings=" << badSendReport.warningCount() << "\n";
+            root.deleteRecursively();
+            return false;
+        }
+
+        auto invalidSendsDocument = juce::JSON::parse(juce::JSON::toString(document));
+        if (auto* invalidSendsProject = invalidSendsDocument.getProperty("project", {}).getDynamicObject())
+        {
+            if (auto* invalidSendsTracks = invalidSendsProject->getProperty("tracks").getArray())
+            {
+                if (!invalidSendsTracks->isEmpty())
+                {
+                    auto firstTrack = invalidSendsTracks->getReference(0);
+                    if (auto* firstTrackObject = firstTrack.getDynamicObject())
+                        firstTrackObject->setProperty("sends", "invalid");
+                }
+            }
+        }
+        const auto invalidSendsReport = beat::verifyProjectDocumentIntegrity(invalidSendsDocument, projectFile);
+        if (!reportContainsIssueCode(invalidSendsReport,
+                                     "track.sends.invalid",
+                                     beat::ProjectIntegritySeverity::Error))
+        {
+            std::cerr << "Invalid track sends were not reported by integrity verifier\n";
+            root.deleteRecursively();
+            return false;
+        }
+
+        auto badFreezeDocument = juce::JSON::parse(juce::JSON::toString(document));
+        if (auto* badFreezeProject = badFreezeDocument.getProperty("project", {}).getDynamicObject())
+        {
+            if (auto* badFreezeTracks = badFreezeProject->getProperty("tracks").getArray())
+            {
+                if (!badFreezeTracks->isEmpty())
+                {
+                    auto firstTrack = badFreezeTracks->getReference(0);
+                    if (auto* firstTrackObject = firstTrack.getDynamicObject())
+                    {
+                        firstTrackObject->setProperty("audioFileId", "missing-freeze-audio");
+                        juce::DynamicObject::Ptr freezeSource = new juce::DynamicObject();
+                        freezeSource->setProperty("sourceTrackId", "missing-freeze-source");
+                        freezeSource->setProperty("audioFileId", "different-missing-freeze-audio");
+                        freezeSource->setProperty("segmentId", "missing-freeze-segment");
+                        freezeSource->setProperty("sourceMute", false);
+                        freezeSource->setProperty("sourceSolo", false);
+                        firstTrackObject->setProperty("freezeSource", juce::var(freezeSource.get()));
+                    }
+
+                    juce::DynamicObject::Ptr invalidFreezeTrack = new juce::DynamicObject();
+                    invalidFreezeTrack->setProperty("id", "invalid-freeze-track");
+                    invalidFreezeTrack->setProperty("name", "Invalid Freeze Track");
+                    invalidFreezeTrack->setProperty("kind", "audio");
+                    invalidFreezeTrack->setProperty("segments", juce::Array<juce::var> {});
+                    invalidFreezeTrack->setProperty("freezeSource", "invalid");
+                    badFreezeTracks->add(juce::var(invalidFreezeTrack.get()));
+                }
+            }
+        }
+        const auto badFreezeReport = beat::verifyProjectDocumentIntegrity(badFreezeDocument, projectFile);
+        const bool badFreezeOk = reportContainsIssueCode(badFreezeReport,
+                                                         "track.freezeSource.source.missing",
+                                                         beat::ProjectIntegritySeverity::Error)
+            && reportContainsIssueCode(badFreezeReport,
+                                       "track.freezeSource.audio.missing",
+                                       beat::ProjectIntegritySeverity::Error)
+            && reportContainsIssueCode(badFreezeReport,
+                                       "track.freezeSource.audio.mismatch",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badFreezeReport,
+                                       "track.freezeSource.segment.missing",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badFreezeReport,
+                                       "track.freezeSource.invalid",
+                                       beat::ProjectIntegritySeverity::Error)
+            && beat::hasFatalProjectDocumentIntegrityErrors(badFreezeReport);
+        if (!badFreezeOk)
+        {
+            std::cerr << "Bad frozen bounce metadata was not reported by integrity verifier errors="
+                      << badFreezeReport.errorCount()
+                      << " warnings=" << badFreezeReport.warningCount() << "\n";
+            root.deleteRecursively();
+            return false;
+        }
+
         auto audioTimingDocument = juce::JSON::parse(juce::JSON::toString(document));
         auto audioTimingFiles = audioTimingDocument.getProperty("audioFiles", {});
         if (auto* audioTimingFileArray = audioTimingFiles.getArray())
@@ -5770,6 +6325,111 @@ namespace
             std::cerr << "Sidecar orphan report failed with errors="
                       << orphanReport.errorCount()
                       << " warnings=" << orphanReport.warningCount() << "\n";
+        }
+
+        root.deleteRecursively();
+        return ok;
+    }
+
+    bool stressAudioFileLibraryDeletePolicy()
+    {
+        const auto root = juce::File("/private/tmp")
+            .getChildFile("BeatBackendStress-audio-delete-" + juce::Uuid().toString());
+        const auto dbFile = root.getChildFile("audio-delete.sqlite");
+        const auto managedLibrary = root.getChildFile("Managed Audio");
+        const auto externalFolder = root.getChildFile("External Audio");
+        const auto managedDeleteFile = managedLibrary.getChildFile("Managed Delete.wav");
+        const auto managedKeepFile = managedLibrary.getChildFile("Managed Keep.wav");
+        const auto externalFile = externalFolder.getChildFile("External.wav");
+
+        if (!managedLibrary.createDirectory()
+            || !externalFolder.createDirectory()
+            || !managedDeleteFile.replaceWithText("managed-delete")
+            || !managedKeepFile.replaceWithText("managed-keep")
+            || !externalFile.replaceWithText("external"))
+        {
+            std::cerr << "Could not create audio delete fixture at "
+                      << root.getFullPathName() << "\n";
+            root.deleteRecursively();
+            return false;
+        }
+
+        beat::Database db(dbFile);
+        {
+            beat::Statement stmt(db, R"sql(
+                INSERT INTO audio_files(id, name, path, duration_s, sample_rate, bit_depth, size_bytes, imported_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?)
+            )sql");
+            stmt.bind(1, "managed-delete");
+            stmt.bind(2, "Managed Delete");
+            stmt.bind(3, managedDeleteFile.getFullPathName());
+            stmt.bind(4, 1.0);
+            stmt.bind(5, 48000);
+            stmt.bind(6, 24);
+            stmt.bind(7, (double) managedDeleteFile.getSize());
+            stmt.bind(8, 1000.0);
+            stmt.bind(9, "external-delete");
+            stmt.bind(10, "External Delete");
+            stmt.bind(11, externalFile.getFullPathName());
+            stmt.bind(12, 1.0);
+            stmt.bind(13, 48000);
+            stmt.bind(14, 24);
+            stmt.bind(15, (double) externalFile.getSize());
+            stmt.bind(16, 1000.0);
+            stmt.bind(17, "managed-keep");
+            stmt.bind(18, "Managed Keep");
+            stmt.bind(19, managedKeepFile.getFullPathName());
+            stmt.bind(20, 1.0);
+            stmt.bind(21, 48000);
+            stmt.bind(22, 24);
+            stmt.bind(23, (double) managedKeepFile.getSize());
+            stmt.bind(24, 1000.0);
+            stmt.step();
+        }
+
+        juce::StringArray deleteIds;
+        deleteIds.add("managed-delete");
+        deleteIds.add("external-delete");
+        deleteIds.add("missing-delete");
+        const auto deleteResult = beat::deleteAudioFileLibraryEntries(db, deleteIds, true, managedLibrary);
+
+        juce::StringArray removeOnlyIds;
+        removeOnlyIds.add("managed-keep");
+        const auto removeOnlyResult = beat::deleteAudioFileLibraryEntries(db, removeOnlyIds, false, managedLibrary);
+
+        int remainingRows = -1;
+        {
+            beat::Statement count(db, "SELECT COUNT(*) FROM audio_files");
+            if (count.step())
+                remainingRows = count.columnInt(0);
+        }
+
+        const bool ok = deleteResult.deletedIds.size() == 2
+            && deleteResult.deletedIds.contains("managed-delete")
+            && deleteResult.deletedIds.contains("external-delete")
+            && deleteResult.failedIds.size() == 1
+            && deleteResult.failedIds.contains("missing-delete")
+            && deleteResult.failedPaths.isEmpty()
+            && removeOnlyResult.deletedIds.size() == 1
+            && removeOnlyResult.deletedIds.contains("managed-keep")
+            && removeOnlyResult.failedIds.isEmpty()
+            && !managedDeleteFile.existsAsFile()
+            && externalFile.existsAsFile()
+            && managedKeepFile.existsAsFile()
+            && remainingRows == 0;
+
+        if (!ok)
+        {
+            std::cerr << "Audio file delete policy stress failed"
+                      << " deleted=" << deleteResult.deletedIds.joinIntoString(",")
+                      << " failed=" << deleteResult.failedIds.joinIntoString(",")
+                      << " failedPaths=" << deleteResult.failedPaths.joinIntoString(",")
+                      << " removeOnly=" << removeOnlyResult.deletedIds.joinIntoString(",")
+                      << " managedDeleteExists=" << managedDeleteFile.existsAsFile()
+                      << " managedKeepExists=" << managedKeepFile.existsAsFile()
+                      << " externalExists=" << externalFile.existsAsFile()
+                      << " rows=" << remainingRows
+                      << "\n";
         }
 
         root.deleteRecursively();
@@ -7649,6 +8309,62 @@ namespace
         return liveEnergy > 0.0001
             && maxAbsDiff <= 0.00008f
             && meanAbsDiff <= 0.00002;
+    }
+
+    bool stressAudioEngineNodemapLiveExportParity()
+    {
+        auto project = makeNodemapOfflineProject();
+        constexpr int samples = 12000;
+        constexpr int blockSize = 257;
+        auto live = renderOfflineChunks(project, samples, blockSize);
+        const double liveEnergy = bufferEnergy(live);
+
+        if (!std::isfinite(liveEnergy) || liveEnergy <= 0.0001)
+        {
+            std::cerr << "Native Nodemap live render was silent or invalid energy=" << liveEnergy << "\n";
+            return false;
+        }
+
+        auto exportFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-nodemap-live-export-parity.wav");
+        if (exportFile.existsAsFile())
+            exportFile.deleteFile();
+
+        juce::String error;
+        if (!beat::AudioEngine::renderProjectToWav(project, exportFile, 44100.0, blockSize, 2, &error))
+        {
+            std::cerr << "Native Nodemap export error: " << error << "\n";
+            return false;
+        }
+
+        auto exported = readWavPrefix(exportFile, samples);
+        exportFile.deleteFile();
+        if (exported.getNumChannels() != live.getNumChannels() || exported.getNumSamples() < samples)
+            return false;
+
+        double sumAbsDiff = 0.0;
+        float maxAbsDiff = 0.0f;
+        for (int ch = 0; ch < live.getNumChannels(); ++ch)
+        {
+            for (int i = 0; i < samples; ++i)
+            {
+                const float liveSample = live.getSample(ch, i);
+                const float exportSample = exported.getSample(ch, i);
+                if (!std::isfinite(liveSample) || !std::isfinite(exportSample))
+                    return false;
+
+                const float diff = std::abs(liveSample - exportSample);
+                maxAbsDiff = std::max(maxAbsDiff, diff);
+                sumAbsDiff += diff;
+            }
+        }
+
+        const double meanAbsDiff = sumAbsDiff / (double) (live.getNumChannels() * samples);
+        const bool ok = maxAbsDiff <= 0.00008f && meanAbsDiff <= 0.00002;
+        if (!ok)
+            std::cerr << "Native Nodemap live/export parity failed energy=" << liveEnergy
+                      << " maxAbsDiff=" << maxAbsDiff
+                      << " meanAbsDiff=" << meanAbsDiff << "\n";
+        return ok;
     }
 
     bool stressAudioEngineInstrumentEffectLiveExportParity()
@@ -12168,6 +12884,39 @@ int main()
     }
     std::cerr << "realtime: done\n";
 
+    std::cerr << "nodemap: start\n";
+    if (!stressNodemapNativeGraphContract())
+    {
+        std::cerr << "Nodemap native graph contract stress failed\n";
+        return 1;
+    }
+    if (!stressNodemapNativeAuditionAndCycles())
+    {
+        std::cerr << "Nodemap native audition/cycle stress failed\n";
+        return 1;
+    }
+    if (!stressNodemapNativeEffectsAndTemplates())
+    {
+        std::cerr << "Nodemap native effects/templates stress failed\n";
+        return 1;
+    }
+    if (!stressNodemapNativeLargeGraphTiming())
+    {
+        std::cerr << "Nodemap native large graph timing stress failed\n";
+        return 1;
+    }
+    if (!stressProjectRepositoryNodemapInstrumentRoundtrip())
+    {
+        std::cerr << "Nodemap repository roundtrip stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineNodemapLiveExportParity())
+    {
+        std::cerr << "Nodemap live/export parity stress failed\n";
+        return 1;
+    }
+    std::cerr << "nodemap: done\n";
+
     std::cerr << "wavetable: start\n";
     if (!stressWavetableOscillator())
     {
@@ -12382,6 +13131,11 @@ int main()
     if (!stressProjectAssetSidecarPackaging())
     {
         std::cerr << "Project asset sidecar packaging stress failed\n";
+        return 1;
+    }
+    if (!stressAudioFileLibraryDeletePolicy())
+    {
+        std::cerr << "Audio file library delete policy stress failed\n";
         return 1;
     }
     if (!stressProjectIntegrityVerifier())

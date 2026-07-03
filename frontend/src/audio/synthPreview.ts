@@ -68,11 +68,68 @@ const sampleRoundRobinIndex = new Map<string, number>();
 const renderedInstrumentBufferCache = new Map<string, AudioBuffer>();
 const unisonVoicePlanCache = new Map<string, UnisonVoicePlan>();
 const oscillatorRateCache = new Map<string, number>();
+let browserPreviewAudioContext: AudioContext | null = null;
 
 const MAX_RENDERED_INSTRUMENT_BUFFERS = 32;
 const MAX_UNISON_VOICE_PLANS = 96;
 const MAX_OSCILLATOR_RATE_ENTRIES = 128;
 const CUSTOM_WAVETABLE_PARTIAL_COUNT = 16;
+
+export interface InstrumentPreviewAuditionHandle {
+  stop: () => void;
+}
+
+export function startInstrumentPreviewAudition(
+  instrument: Instrument,
+  durationS = 1.8,
+  gainValue = 0.24,
+  bpm = 120,
+  velocity = 104,
+  onEnded?: () => void,
+): InstrumentPreviewAuditionHandle {
+  const ctx = getBrowserPreviewAudioContext();
+  if (ctx.state === "suspended") void ctx.resume().catch(() => undefined);
+  const source = createInstrumentBufferSource(ctx, instrument, durationS, previewFrequency(instrument), undefined, velocity, bpm);
+  const gain = ctx.createGain();
+  let stopped = false;
+
+  gain.gain.value = gainValue;
+  const cleanup = () => {
+    try {
+      source.disconnect();
+      gain.disconnect();
+    } catch {
+      // Nodes may already be disconnected after stop/end.
+    }
+  };
+
+  source.connect(gain).connect(ctx.destination);
+  source.onended = () => {
+    cleanup();
+    onEnded?.();
+  };
+  source.start();
+
+  return {
+    stop: () => {
+      if (stopped) return;
+      stopped = true;
+      try {
+        source.stop();
+      } catch {
+        // Source can already be stopped.
+      }
+      cleanup();
+    },
+  };
+}
+
+function getBrowserPreviewAudioContext(): AudioContext {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const Ctor = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
+  if (!browserPreviewAudioContext || browserPreviewAudioContext.state === "closed") browserPreviewAudioContext = new Ctor();
+  return browserPreviewAudioContext;
+}
 
 interface SamplePlaybackTarget {
   url: string;
@@ -324,6 +381,58 @@ export function renderedInstrumentBuffer(
   return buffer;
 }
 
+export interface InstrumentOutputWaveformPreview {
+  peaks: number[];
+  peak: number;
+}
+
+export function renderInstrumentOutputWaveformPreview(
+  instrument: Instrument,
+  bucketCount = 96,
+  durationS = 1.1,
+  bpm = 120,
+  velocity = 104,
+): InstrumentOutputWaveformPreview {
+  const safeBucketCount = Math.max(8, Math.min(256, Math.round(bucketCount)));
+  const sampleRate = 48000;
+  const sampleCount = Math.max(safeBucketCount, Math.ceil(sampleRate * Math.max(0.05, durationS)));
+  const left = new Float32Array(sampleCount);
+  const right = new Float32Array(sampleCount);
+
+  renderInstrumentStereoSamples(
+    instrument,
+    left,
+    right,
+    sampleRate,
+    previewFrequency(instrument),
+    "audio",
+    true,
+    undefined,
+    undefined,
+    undefined,
+    bpm,
+    velocity,
+  );
+
+  let peak = 0;
+  const rawPeaks = Array.from({ length: safeBucketCount }, (_, bucket) => {
+    const start = Math.floor((bucket / safeBucketCount) * sampleCount);
+    const end = Math.max(start + 1, Math.floor(((bucket + 1) / safeBucketCount) * sampleCount));
+    let bucketPeak = 0;
+    for (let sample = start; sample < end; sample += 1) {
+      bucketPeak = Math.max(bucketPeak, Math.abs(left[sample] ?? 0), Math.abs(right[sample] ?? 0));
+    }
+    peak = Math.max(peak, bucketPeak);
+    return bucketPeak;
+  });
+
+  const normalizer = peak > 0.00001 ? peak : 1;
+  return {
+    peaks: rawPeaks.map((value) => clamp01(value / normalizer)),
+    peak,
+  };
+}
+
 export function renderWavetablePreviewSamples(instrument: Instrument, sampleCount = 160, oscillator: "a" | "b" = "a"): number[] {
   const config = instrument.aether
     ? oscillator === "b"
@@ -433,27 +542,29 @@ export function createInstrumentCurveBufferSource(
 
 export async function preloadInstrumentSample(ctx: AudioContext, instrument: Instrument): Promise<void> {
   const urls = instrumentSampleUrls(instrument);
-  await Promise.all(urls.map(async (url) => {
-    if (sampleBufferCache.has(url)) return;
-    const pending = sampleLoadPromises.get(url);
-    if (pending) {
-      await pending;
-      return;
-    }
-    const loadPromise = (async () => {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`Failed to load sample: ${url}`);
-      const data = await response.arrayBuffer();
-      const buffer = await ctx.decodeAudioData(data.slice(0));
-      sampleBufferCache.set(url, buffer);
-    })();
-    sampleLoadPromises.set(url, loadPromise);
-    try {
-      await loadPromise;
-    } finally {
-      sampleLoadPromises.delete(url);
-    }
-  }));
+  await Promise.all(urls.map((url) => preloadInstrumentSampleUrl(ctx, url)));
+}
+
+export async function preloadInstrumentSampleUrl(ctx: AudioContext, url: string): Promise<void> {
+  if (sampleBufferCache.has(url)) return;
+  const pending = sampleLoadPromises.get(url);
+  if (pending) {
+    await pending;
+    return;
+  }
+  const loadPromise = (async () => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to load sample: ${url}`);
+    const data = await response.arrayBuffer();
+    const buffer = await ctx.decodeAudioData(data.slice(0));
+    sampleBufferCache.set(url, buffer);
+  })();
+  sampleLoadPromises.set(url, loadPromise);
+  try {
+    await loadPromise;
+  } finally {
+    sampleLoadPromises.delete(url);
+  }
 }
 
 export function primaryInstrumentSampleUrl(instrument: Instrument): string | undefined {

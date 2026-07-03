@@ -1,5 +1,5 @@
 import { createMemo, For, type Accessor } from "solid-js";
-import { HoverInfo, Icon } from "../../solid-ui";
+import { Button, HoverInfo, Icon } from "../../solid-ui";
 import type { Instrument } from "../../state/types";
 import styles from "./WaveformPicker.module.css";
 
@@ -44,16 +44,19 @@ function WaveformPickerRuntime(props: { state: Accessor<WaveformPickerProps> }) 
         <For each={opts()}>
           {(option) => (
             <HoverInfo content={option.label}>
-              <button
-                type="button"
+              <Button
+                iconOnly
+                size="md"
+                variant="ghost"
+                selected={props.state().value === option.value}
                 role="radio"
                 aria-checked={props.state().value === option.value}
                 aria-label={option.label}
-                class={`${styles.btn} ${props.state().value === option.value ? styles.active : ""}`}
+                className={styles.btn}
                 onClick={() => props.state().onChange(option.value)}
               >
                 <Icon name={option.icon} size={16} decorative />
-              </button>
+              </Button>
             </HoverInfo>
           )}
         </For>

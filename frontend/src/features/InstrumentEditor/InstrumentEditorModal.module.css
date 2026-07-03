@@ -32,7 +32,7 @@
 
 .identityStack {
   display: grid;
-  grid-template-rows: repeat(3, 32px);
+  grid-template-rows: repeat(4, 32px);
   gap: 6px;
   min-width: 0;
 }
@@ -104,28 +104,8 @@
   width: 48px;
   min-height: 48px;
   padding: 4px 2px;
-  border: 0;
   border-right: var(--border-fg);
   border-bottom: var(--border-fg);
-  background: transparent;
-  color: var(--color-fg);
-  cursor: pointer;
-  transition: var(--interaction-transition);
-}
-
-.iconOption:hover {
-  background: var(--interaction-hover-bg);
-  color: var(--color-fg);
-}
-
-.iconOptionSelected {
-  background: var(--interaction-active-bg);
-  color: var(--interaction-active-fg);
-}
-
-.iconOptionSelected:hover {
-  background: var(--interaction-active-hover-bg);
-  color: var(--interaction-active-fg);
 }
 
 .iconOption span {
@@ -399,9 +379,7 @@
 }
 
 .glideSlider {
-  display: flex;
-  flex-direction: column;
-  justify-content: end;
+  align-self: end;
   gap: 8px;
   min-width: 0;
 }
@@ -430,50 +408,7 @@
 }
 
 .glideRange {
-  width: 100%;
   height: 20px;
-  margin: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--color-fg);
-  appearance: none;
-  cursor: pointer;
-}
-
-.glideRange:focus {
-  outline: 0;
-}
-
-.glideRange:focus-visible {
-  box-shadow: 0 0 0 1px var(--border-fg-color);
-}
-
-.glideRange::-webkit-slider-runnable-track {
-  height: 1px;
-  background: var(--color-fg);
-}
-
-.glideRange::-webkit-slider-thumb {
-  width: 6px;
-  height: 18px;
-  margin-top: -8px;
-  border: 0;
-  background: var(--color-fg);
-  appearance: none;
-}
-
-.glideRange::-moz-range-track {
-  height: 1px;
-  border: 0;
-  background: var(--color-fg);
-}
-
-.glideRange::-moz-range-thumb {
-  width: 6px;
-  height: 18px;
-  border: 0;
-  border-radius: 0;
-  background: var(--color-fg);
 }
 
 .lfoShapeControl {
@@ -499,39 +434,18 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 0;
   border-right: var(--border-fg);
-  background: var(--color-bg);
-  color: var(--color-fg);
-  cursor: pointer;
-  transition: var(--interaction-transition);
 }
 
 .lfoShapeButton:last-child {
   border-right: 0;
 }
 
-.lfoShapeButton:hover:not(.lfoShapeButtonActive),
-.lfoShapeButton:focus-visible:not(.lfoShapeButtonActive) {
-  background: var(--interaction-hover-bg);
-  color: var(--color-fg);
-}
-
-.lfoShapeButtonActive {
-  background: var(--interaction-active-bg);
-  color: var(--interaction-active-fg);
-}
-
-.lfoShapeButtonActive:hover,
-.lfoShapeButtonActive:focus-visible {
-  background: var(--interaction-active-hover-bg);
-}
-
 .lfoShapeLabel {
   font-size: var(--font-size-ui);
   line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-uppercase);
+  text-transform: none;
+  letter-spacing: 0;
   font-weight: var(--font-weight-medium);
   text-align: center;
 }

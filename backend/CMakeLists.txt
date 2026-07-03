@@ -27,6 +27,8 @@ target_sources(Beat PRIVATE
     Source/Audio/Envelope/EnvelopeShaper.h
     Source/Audio/InstrumentVoice.cpp
     Source/Audio/InstrumentVoice.h
+    Source/Audio/Nodemap/NodemapGraph.cpp
+    Source/Audio/Nodemap/NodemapGraph.h
     Source/Audio/Filter/DriveStage.h
     Source/Audio/Filter/FilterMath.h
     Source/Audio/Filter/FilterStage.h
@@ -89,6 +91,8 @@ target_sources(Beat PRIVATE
 
     Source/Persistence/Database.cpp
     Source/Persistence/Database.h
+    Source/Persistence/AudioFileLibraryActions.cpp
+    Source/Persistence/AudioFileLibraryActions.h
     Source/Persistence/ProjectRepository.cpp
     Source/Persistence/ProjectRepository.h
     Source/Persistence/InstrumentRepository.cpp
@@ -155,6 +159,8 @@ add_executable(BeatBackendStress
     Source/Audio/Effects/TrackEffectDefaults.h
     Source/Audio/InstrumentVoice.cpp
     Source/Audio/InstrumentVoice.h
+    Source/Audio/Nodemap/NodemapGraph.cpp
+    Source/Audio/Nodemap/NodemapGraph.h
     Source/Audio/Filter/DriveStage.h
     Source/Audio/Filter/FilterMath.h
     Source/Audio/Filter/FilterStage.h
@@ -220,6 +226,8 @@ add_executable(BeatBackendStress
     Source/Persistence/ProjectIntegrityVerifier.h
     Source/Persistence/Database.cpp
     Source/Persistence/Database.h
+    Source/Persistence/AudioFileLibraryActions.cpp
+    Source/Persistence/AudioFileLibraryActions.h
     Source/Persistence/ProjectRepository.cpp
     Source/Persistence/ProjectRepository.h
 )

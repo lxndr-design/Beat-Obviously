@@ -49,6 +49,20 @@ try {
   assert.equal(migrated.project.tracks[0].inputChannelCount, 1, "track input channel count should clamp to at least one channel");
   assert.equal(migrated.project.tracks[0].recordGainDb, 24, "track record gain should clamp to the supported range");
   assert.deepEqual(
+    migrated.project.tracks[0].freezeSource,
+    {
+      sourceTrackId: "track-source",
+      sourceTrackName: "Source Track",
+      audioFileId: "audio-kick",
+      segmentId: "seg-midi",
+      createdAt: 1780600000100,
+      sourceMute: false,
+      sourceSolo: true,
+      sourceParentTrackId: "group-a",
+    },
+    "track freeze metadata should survive document migration",
+  );
+  assert.deepEqual(
     migrated.project.recordingInput,
     {
       inputDeviceId: "builtin-input",
@@ -130,6 +144,87 @@ try {
     "user.scan",
     "Aether oscillator custom wavemap references should roundtrip",
   );
+  const migratedEmptyNodemap = migrated.instruments?.find((instrument) => instrument.id === "inst-nodemap-empty");
+  assert.equal(migratedEmptyNodemap?.nodeGraph?.nodes.length, 1, "empty Nodemap graph should roundtrip with only Instrument Out");
+  assert.equal(migratedEmptyNodemap?.nodeGraph?.cables.length, 0, "empty Nodemap graph should preserve silent no-cable state");
+  const migratedComplexNodemap = migrated.instruments?.find((instrument) => instrument.id === "inst-nodemap-complex");
+  assert.deepEqual(
+    migratedComplexNodemap?.nodeGraph?.nodes.map((node) => node.kind),
+    ["oscillator", "noise", "mixer", "filter", "gain", "shaper", "delay", "chorus", "lfo", "envelope", "constant", "output"],
+    "complex Nodemap node kinds should roundtrip in order",
+  );
+  assert.deepEqual(
+    migratedComplexNodemap?.nodeGraph?.cables.map((cable) => [cable.fromNodeId, cable.fromPortId, cable.toNodeId, cable.toPortId]),
+    [
+      ["node-osc", "audio-out", "node-mixer", "in-1"],
+      ["node-noise", "audio-out", "node-mixer", "in-2"],
+      ["node-mixer", "audio-out", "node-filter", "audio-in"],
+      ["node-filter", "audio-out", "node-gain", "audio-in"],
+      ["node-gain", "audio-out", "node-shaper", "audio-in"],
+      ["node-shaper", "audio-out", "node-delay", "audio-in"],
+      ["node-delay", "audio-out", "node-chorus", "audio-in"],
+      ["node-chorus", "audio-out", "node-output", "audio-in"],
+      ["node-lfo", "cv-out", "node-filter", "cutoff-cv"],
+      ["node-env", "cv-out", "node-gain", "level-cv"],
+      ["node-constant", "cv-out", "node-gain", "pan-cv"],
+    ],
+    "complex Nodemap cables should roundtrip exactly",
+  );
+  assert.equal(migratedComplexNodemap?.aether?.noise.enabled, true, "Nodemap noise source compile output should roundtrip");
+  assert.equal(migratedComplexNodemap?.synthPatch?.modulation?.[0]?.id, "node_lfo_filter", "Nodemap CV route ids should roundtrip");
+  assert.equal(migratedComplexNodemap?.effects?.filters?.[2]?.kind, "chorus", "Nodemap compiled effect chain should roundtrip");
+  const migratedCyclicNodemap = migrated.instruments?.find((instrument) => instrument.id === "inst-nodemap-cyclic");
+  assert.deepEqual(
+    migratedCyclicNodemap?.nodeGraph?.cables.map((cable) => [cable.id, cable.fromNodeId, cable.toNodeId]),
+    [
+      ["cycle-source-a", "cycle-osc", "cycle-a"],
+      ["cycle-a-b", "cycle-a", "cycle-b"],
+      ["cycle-b-a", "cycle-b", "cycle-a"],
+      ["cycle-b-output", "cycle-b", "cycle-output"],
+    ],
+    "cyclic Nodemap persistence should preserve valid audio-cycle cables",
+  );
+  const migratedRepairedNodemap = migrated.instruments?.find((instrument) => instrument.id === "inst-nodemap-repair");
+  assert.deepEqual(
+    migratedRepairedNodemap?.nodeGraph?.nodes.map((node) => [node.id, node.kind]),
+    [
+      ["repair-osc", "oscillator"],
+      ["repair-output-a", "output"],
+    ],
+    "malformed Nodemap migration should prune unknown nodes and duplicate outputs",
+  );
+  assert.deepEqual(
+    migratedRepairedNodemap?.nodeGraph?.cables.map((cable) => cable.id),
+    ["repair-valid"],
+    "malformed Nodemap migration should prune stale, duplicate, self, and wrong-signal cables",
+  );
+  const migratedMissingOutputNodemap = migrated.instruments?.find((instrument) => instrument.id === "inst-nodemap-missing-output");
+  assert.deepEqual(
+    migratedMissingOutputNodemap?.nodeGraph?.nodes.map((node) => node.kind),
+    ["oscillator", "output"],
+    "missing-output Nodemap migration should add the required Instrument Out node",
+  );
+  assert.deepEqual(
+    migratedMissingOutputNodemap?.nodeGraph?.cables,
+    [],
+    "missing-output Nodemap migration should remove stale cables that cannot target the repaired output",
+  );
+  const migratedFutureNodemap = migrated.instruments?.find((instrument) => instrument.id === "inst-nodemap-future-schema");
+  assert.equal(migratedFutureNodemap?.nodeGraph?.schemaVersion, 1, "future Nodemap graph schemas should downgrade to the current schema");
+  assert.deepEqual(
+    migratedFutureNodemap?.nodeGraph?.nodes.map((node) => [node.id, node.kind]),
+    [
+      ["future-osc", "oscillator"],
+      ["future-filter", "filter"],
+      ["future-output", "output"],
+    ],
+    "future Nodemap graph migration should preserve known compatible nodes and prune future-only node kinds",
+  );
+  assert.deepEqual(
+    migratedFutureNodemap?.nodeGraph?.cables.map((cable) => cable.id),
+    ["future-osc-filter", "future-filter-output"],
+    "future Nodemap graph migration should preserve valid compatible cables and prune future-only cable references",
+  );
   assert.equal(migrated.instrumentSets?.[0].name, "User Imports");
   assert.equal(migrated.audioFiles?.[0].sampleRate, 48000);
   assert.equal(migrated.components?.[0].kind, "drum");
@@ -149,6 +244,11 @@ try {
     migrated.assets.find((asset) => asset.kind === "sample")?.references,
     ["instrument:inst-plugin:sampleUrls:0", "instrument:inst-plugin:sampleMap:0"],
     "sample asset references should merge duplicate sample URL and zone references",
+  );
+  assert.deepEqual(
+    migrated.assets.find((asset) => asset.kind === "audio")?.references,
+    ["audioFile:audio-kick", "track:track-a:audioFileId", "track:track-a:segment:seg-audio:audioFileId", "instrument:inst-plugin:sampleIds:0"],
+    "audio asset references should include library registration, track binding, segment payload usage, and instrument sample-id usage",
   );
 
   const savedAtOnlyChanged = structuredClone(migrated);
@@ -223,6 +323,22 @@ try {
     "document dirty fingerprint should include legacy-only custom wavemap edits",
   );
 
+  const changedNodemapNode = structuredClone(migrated);
+  changedNodemapNode.instruments.find((instrument) => instrument.id === "inst-nodemap-complex").nodeGraph.nodes[0].x += 24;
+  assert.notEqual(
+    beatDocumentFingerprint(migrated),
+    beatDocumentFingerprint(changedNodemapNode),
+    "document dirty fingerprint should include Nodemap node position edits",
+  );
+
+  const changedNodemapCable = structuredClone(migrated);
+  changedNodemapCable.instruments.find((instrument) => instrument.id === "inst-nodemap-complex").nodeGraph.cables.pop();
+  assert.notEqual(
+    beatDocumentFingerprint(migrated),
+    beatDocumentFingerprint(changedNodemapCable),
+    "document dirty fingerprint should include Nodemap cable edits",
+  );
+
   const relinked = replaceBeatDocumentAssetPath(migrated, "/Samples/Kick.wav", "/Relinked/Kick.wav");
   assert.equal(relinked.audioFiles[0].path, "/Relinked/Kick.wav", "relink should update audio library paths");
   assert.deepEqual(relinked.instruments[0].sampleUrls, ["/Relinked/Kick.wav"], "relink should update instrument sample URL lists");
@@ -245,6 +361,11 @@ try {
     relinked.assets.find((asset) => asset.kind === "sample")?.references,
     ["instrument:inst-plugin:sampleUrls:0", "instrument:inst-plugin:sampleMap:0"],
     "relink should preserve merged sample asset references",
+  );
+  assert.deepEqual(
+    relinked.assets.find((asset) => asset.kind === "audio")?.references,
+    ["audioFile:audio-kick", "track:track-a:audioFileId", "track:track-a:segment:seg-audio:audioFileId", "instrument:inst-plugin:sampleIds:0"],
+    "relink should preserve track/segment/instrument-aware audio references",
   );
 
   assert.throws(
@@ -294,6 +415,7 @@ function makeRepresentativeDocument() {
           name: "Plugin Track",
           kind: "midi",
           instrumentId: "inst-plugin",
+          audioFileId: "audio-kick",
           gainDb: 99,
           pan: -4,
           mute: false,
@@ -305,6 +427,16 @@ function makeRepresentativeDocument() {
           inputChannelCount: -2,
           recordGainDb: 99,
           rowHeight: "normal",
+          freezeSource: {
+            sourceTrackId: "track-source",
+            sourceTrackName: "Source Track",
+            audioFileId: "audio-kick",
+            segmentId: "seg-midi",
+            createdAt: 1780600000100,
+            sourceMute: false,
+            sourceSolo: true,
+            sourceParentTrackId: "group-a",
+          },
           automation: [
             {
               target: "filter.cutoff",
@@ -390,6 +522,22 @@ function makeRepresentativeDocument() {
                 ],
               },
             },
+            {
+              id: "seg-audio",
+              trackId: "track-a",
+              name: "Kick Audio",
+              startBeat: 16,
+              lengthBeats: 2,
+              fadeInBeats: 0,
+              fadeOutBeats: 0,
+              repeats: 0,
+              layer: 0,
+              payload: {
+                kind: "audio",
+                audioFileId: "audio-kick",
+                gainDb: -1.5,
+              },
+            },
           ],
         },
       ],
@@ -438,6 +586,12 @@ function makeRepresentativeDocument() {
         userCreated: true,
       },
       makeAetherPresetInstrument(),
+      makeEmptyNodemapInstrument(),
+      makeComplexNodemapInstrument(),
+      makeCyclicNodemapInstrument(),
+      makeMalformedNodemapInstrument(),
+      makeMissingOutputNodemapInstrument(),
+      makeFutureSchemaNodemapInstrument(),
     ],
     instrumentSets: [{ id: "set-user-imports", name: "User Imports", collapsed: false }],
     audioFiles: [
@@ -742,4 +896,342 @@ function makeAetherPresetInstrument() {
     },
     userCreated: true,
   };
+}
+
+function makeEmptyNodemapInstrument() {
+  return {
+    id: "inst-nodemap-empty",
+    name: "Empty Nodemap",
+    icon: "ph:graph",
+    kind: "wavetable",
+    envelope: { attackMs: 5, decayMs: 120, sustain: 0.7, releaseMs: 240 },
+    knobs: { cutoff: 1, resonance: 0, drive: 0, color: 0 },
+    filterType: "lowpass",
+    waveform: "wavetable",
+    wavetable: { bank: "aether", position: 0, warp: 0.2, warpMode: "shape", unison: 1, detuneCents: 0, blend: 0 },
+    aether: {
+      oscA: {
+        enabled: false,
+        level: 0,
+        pan: 0,
+        waveform: "wavetable",
+        octave: 0,
+        semitone: 0,
+        fineCents: 0,
+        phase: 0,
+        randomPhase: 0,
+        wavetable: { bank: "aether", position: 0, warp: 0.2, warpMode: "shape", unison: 1, detuneCents: 0, blend: 0 },
+      },
+      oscB: {
+        enabled: false,
+        level: 0,
+        pan: 0,
+        waveform: "wavetable",
+        octave: 0,
+        semitone: 0,
+        fineCents: 0,
+        phase: 0,
+        randomPhase: 0,
+        wavetable: { bank: "aether", position: 0, warp: 0.2, warpMode: "shape", unison: 1, detuneCents: 0, blend: 0 },
+      },
+      sub: { enabled: false, level: 0, octave: -1, waveform: "sine" },
+      noise: { enabled: false, level: 0, color: 0.5 },
+      runtimeWarp: 0,
+      runtimeWarpMode: "shape",
+    },
+    synthPatch: {
+      schemaVersion: 1,
+      instrumentType: "wavetable-synth",
+      namespace: "synth",
+      name: "Empty Nodemap",
+      parameters: {
+        "osc.a.enabled": false,
+        "osc.b.enabled": false,
+        "amp.level": 0,
+      },
+      modulation: [],
+      effects: { filters: [] },
+      metadata: { createdBy: "Beat", tags: ["nodemap"], icon: "ph:graph" },
+    },
+    nodeGraph: {
+      schemaVersion: 1,
+      nodes: [nodeFixture("node-output-empty", "output", "Instrument Out", 760, 320, ["audio-in"], [])],
+      cables: [],
+    },
+    sampleIds: [],
+    setId: "set-user-imports",
+    source: {
+      kind: "generated",
+      label: "Nodemap empty fixture",
+      importedAt: 1780600000300,
+    },
+    userCreated: true,
+  };
+}
+
+function makeComplexNodemapInstrument() {
+  const wavetable = { bank: "aether", position: 0.28, warp: 0.24, warpMode: "fold", unison: 1, detuneCents: 0, blend: 0 };
+  const effects = {
+    filters: [
+      { id: "node-fx-node-shaper", kind: "saturator", bypassed: false, params: { drive: 73, mix: 62 } },
+      { id: "node-fx-node-delay", kind: "delay", bypassed: false, params: { timeMs: 370, feedback: 41, mix: 29 } },
+      { id: "node-fx-node-chorus", kind: "chorus", bypassed: false, params: { rateHz: 1.25, depthMs: 13, delayMs: 12, feedback: 8, mix: 33 } },
+    ],
+  };
+  return {
+    id: "inst-nodemap-complex",
+    name: "Complex Nodemap",
+    icon: "ph:graph",
+    kind: "wavetable",
+    envelope: { attackMs: 30, decayMs: 160, sustain: 0.78, releaseMs: 280 },
+    knobs: { cutoff: 0.44, resonance: 0.22, drive: 0.08, color: 0.28 },
+    filterType: "lowpass",
+    waveform: "wavetable",
+    wavetable,
+    aether: {
+      oscA: {
+        enabled: true,
+        level: 0.82,
+        pan: 0,
+        waveform: "wavetable",
+        octave: 0,
+        semitone: 0,
+        fineCents: 0,
+        phase: 0,
+        randomPhase: 0.1,
+        wavetable,
+      },
+      oscB: {
+        enabled: false,
+        level: 0,
+        pan: 0,
+        waveform: "wavetable",
+        octave: 0,
+        semitone: 0,
+        fineCents: 0,
+        phase: 0,
+        randomPhase: 0,
+        wavetable,
+      },
+      sub: { enabled: false, level: 0, octave: -1, waveform: "sine" },
+      noise: { enabled: true, level: 0.44, color: 0.72 },
+      runtimeWarp: 0,
+      runtimeWarpMode: "shape",
+    },
+    ampLevel: 0.63,
+    ampPan: -0.42,
+    synthPatch: {
+      schemaVersion: 1,
+      instrumentType: "wavetable-synth",
+      namespace: "synth",
+      name: "Complex Nodemap",
+      parameters: {
+        "osc.a.enabled": true,
+        "osc.a.wavetable": "basic.saw",
+        "osc.a.level": 0.82,
+        "osc.b.enabled": false,
+        "filter.enabled": true,
+        "filter.type": "lowpass",
+        "filter.cutoff": 5800,
+        "filter.resonance": 0.34,
+        "filter.drive": 0.18,
+        "amp.level": 0.63,
+        "amp.pan": -0.42,
+        "env.1.attack": 0.03,
+        "env.1.decay": 0.16,
+        "env.1.sustain": 0.78,
+        "env.1.release": 0.28,
+        "lfo.1.enabled": true,
+        "lfo.1.shape": "sine",
+        "lfo.1.rate": 1.25,
+      },
+      modulation: [
+        { id: "node_lfo_filter", source: "lfo.1", target: "filter.cutoff", amount: -0.37, bipolar: true, enabled: true },
+        { id: "node_env_gain", source: "env.1", target: "amp.level", amount: 0.25, bipolar: false, enabled: true },
+      ],
+      effects,
+      metadata: { createdBy: "Beat", tags: ["nodemap", "fixture"], icon: "ph:graph" },
+    },
+    effects,
+    nodeGraph: {
+      schemaVersion: 1,
+      nodes: [
+        nodeFixture("node-osc", "oscillator", "Oscillator", 80, 120, ["pitch", "level-cv"], ["audio-out"], { waveform: "saw", level: 0.82, octave: 0, fine: 0 }),
+        nodeFixture("node-noise", "noise", "Noise", 80, 320, ["level-cv"], ["audio-out"], { level: 0.44, color: 0.72 }),
+        nodeFixture("node-mixer", "mixer", "Mixer", 320, 200, ["in-1", "in-2", "in-3"], ["audio-out"], { level1: 1, level2: 0.55, level3: 0.25 }),
+        nodeFixture("node-filter", "filter", "Filter", 560, 200, ["audio-in", "cutoff-cv"], ["audio-out"], { type: "lowpass", cutoff: 5800, resonance: 0.34, drive: 0.18 }),
+        nodeFixture("node-gain", "gain", "Volume", 800, 200, ["audio-in", "level-cv", "pan-cv"], ["audio-out"], { level: 0.63, pan: -0.42 }),
+        nodeFixture("node-shaper", "shaper", "Shaper", 1040, 200, ["audio-in"], ["audio-out"], { drive: 0.73, mix: 0.62 }),
+        nodeFixture("node-delay", "delay", "Delay", 1280, 200, ["audio-in"], ["audio-out"], { time: 0.37, feedback: 0.41, mix: 0.29 }),
+        nodeFixture("node-chorus", "chorus", "Chorus", 1520, 200, ["audio-in"], ["audio-out"], { rate: 1.25, depth: 0.52, mix: 0.33 }),
+        nodeFixture("node-lfo", "lfo", "LFO", 560, 480, [], ["cv-out"], { shape: "sine", rate: 1.25, amount: -0.37 }),
+        nodeFixture("node-env", "envelope", "Envelope", 800, 480, [], ["cv-out"], { attack: 0.03, decay: 0.16, sustain: 0.78, release: 0.28 }),
+        nodeFixture("node-constant", "constant", "Constant", 1040, 480, [], ["cv-out"], { value: -0.42 }),
+        nodeFixture("node-output", "output", "Instrument Out", 1760, 240, ["audio-in"], []),
+      ],
+      cables: [
+        cableFixture("cable-osc-mixer", "node-osc", "audio-out", "node-mixer", "in-1"),
+        cableFixture("cable-noise-mixer", "node-noise", "audio-out", "node-mixer", "in-2"),
+        cableFixture("cable-mixer-filter", "node-mixer", "audio-out", "node-filter", "audio-in"),
+        cableFixture("cable-filter-gain", "node-filter", "audio-out", "node-gain", "audio-in"),
+        cableFixture("cable-gain-shaper", "node-gain", "audio-out", "node-shaper", "audio-in"),
+        cableFixture("cable-shaper-delay", "node-shaper", "audio-out", "node-delay", "audio-in"),
+        cableFixture("cable-delay-chorus", "node-delay", "audio-out", "node-chorus", "audio-in"),
+        cableFixture("cable-chorus-output", "node-chorus", "audio-out", "node-output", "audio-in"),
+        cableFixture("cable-lfo-filter", "node-lfo", "cv-out", "node-filter", "cutoff-cv"),
+        cableFixture("cable-env-gain", "node-env", "cv-out", "node-gain", "level-cv"),
+        cableFixture("cable-constant-gain", "node-constant", "cv-out", "node-gain", "pan-cv"),
+      ],
+    },
+    sampleIds: [],
+    setId: "set-user-imports",
+    source: {
+      kind: "generated",
+      label: "Nodemap complex fixture",
+      importedAt: 1780600000400,
+    },
+    userCreated: true,
+  };
+}
+
+function makeCyclicNodemapInstrument() {
+  const instrument = makeEmptyNodemapInstrument();
+  return {
+    ...instrument,
+    id: "inst-nodemap-cyclic",
+    name: "Cyclic Nodemap",
+    synthPatch: { ...instrument.synthPatch, name: "Cyclic Nodemap" },
+    nodeGraph: {
+      schemaVersion: 1,
+      nodes: [
+        nodeFixture("cycle-osc", "oscillator", "Cycle Oscillator", 80, 260, ["pitch", "level-cv"], ["audio-out"], { waveform: "saw", level: 0.8 }),
+        nodeFixture("cycle-a", "mixer", "Cycle A", 320, 160, ["in-1", "in-2", "in-3"], ["audio-out"], { level1: 1, level2: 0.5, level3: 0.25 }),
+        nodeFixture("cycle-b", "mixer", "Cycle B", 560, 160, ["in-1", "in-2", "in-3"], ["audio-out"], { level1: 1, level2: 0.5, level3: 0.25 }),
+        nodeFixture("cycle-output", "output", "Instrument Out", 820, 190, ["audio-in"], []),
+      ],
+      cables: [
+        cableFixture("cycle-source-a", "cycle-osc", "audio-out", "cycle-a", "in-1"),
+        cableFixture("cycle-a-b", "cycle-a", "audio-out", "cycle-b", "in-1"),
+        cableFixture("cycle-b-a", "cycle-b", "audio-out", "cycle-a", "in-2"),
+        cableFixture("cycle-b-output", "cycle-b", "audio-out", "cycle-output", "audio-in"),
+      ],
+    },
+  };
+}
+
+function makeMalformedNodemapInstrument() {
+  const instrument = makeEmptyNodemapInstrument();
+  return {
+    ...instrument,
+    id: "inst-nodemap-repair",
+    name: "Malformed Nodemap",
+    synthPatch: { ...instrument.synthPatch, name: "Malformed Nodemap" },
+    nodeGraph: {
+      schemaVersion: 1,
+      nodes: [
+        nodeFixture("repair-osc", "oscillator", "Repair Oscillator", 80, 160, ["pitch", "level-cv"], ["audio-out"], { waveform: "square", level: 0.5 }),
+        nodeFixture("repair-unknown", "unknown-node", "Unknown", 320, 160, ["audio-in"], ["audio-out"]),
+        nodeFixture("repair-output-a", "output", "Instrument Out", 560, 160, ["audio-in"], []),
+        nodeFixture("repair-output-b", "output", "Extra Output", 560, 360, ["audio-in"], []),
+      ],
+      cables: [
+        cableFixture("repair-valid", "repair-osc", "audio-out", "repair-output-a", "audio-in"),
+        cableFixture("repair-duplicate", "repair-osc", "audio-out", "repair-output-a", "audio-in"),
+        cableFixture("repair-self", "repair-osc", "audio-out", "repair-osc", "pitch"),
+        cableFixture("repair-missing-port", "repair-osc", "audio-out", "repair-output-a", "missing-input"),
+        cableFixture("repair-unknown-node", "repair-unknown", "audio-out", "repair-output-a", "audio-in"),
+        cableFixture("repair-removed-output", "repair-osc", "audio-out", "repair-output-b", "audio-in"),
+      ],
+    },
+  };
+}
+
+function makeMissingOutputNodemapInstrument() {
+  const instrument = makeEmptyNodemapInstrument();
+  return {
+    ...instrument,
+    id: "inst-nodemap-missing-output",
+    name: "Missing Output Nodemap",
+    synthPatch: { ...instrument.synthPatch, name: "Missing Output Nodemap" },
+    nodeGraph: {
+      schemaVersion: 1,
+      nodes: [
+        nodeFixture("missing-output-osc", "oscillator", "No Output Oscillator", 80, 160, ["pitch", "level-cv"], ["audio-out"], { waveform: "saw", level: 0.6 }),
+      ],
+      cables: [
+        cableFixture("missing-output-stale", "missing-output-osc", "audio-out", "missing-output-node", "audio-in"),
+      ],
+    },
+  };
+}
+
+function makeFutureSchemaNodemapInstrument() {
+  const instrument = makeEmptyNodemapInstrument();
+  return {
+    ...instrument,
+    id: "inst-nodemap-future-schema",
+    name: "Future Schema Nodemap",
+    synthPatch: { ...instrument.synthPatch, name: "Future Schema Nodemap" },
+    nodeGraph: {
+      schemaVersion: 2,
+      futureMigrationHint: "schema-v2-keeps-compatible-subgraph",
+      nodes: [
+        {
+          ...nodeFixture("future-osc", "oscillator", "Future Oscillator", 80, 160, ["pitch", "level-cv"], ["audio-out"], { waveform: "triangle", level: 0.7 }),
+          futureOnlyDisplayMode: "folded",
+        },
+        nodeFixture("future-filter", "filter", "Future Filter", 340, 160, ["audio-in", "cutoff-cv"], ["audio-out"], { mode: "lowpass", cutoff: 5400 }),
+        nodeFixture("future-spectral", "spectral-warp", "Future Spectral Warp", 580, 320, ["audio-in"], ["audio-out"], { warp: 0.62 }),
+        nodeFixture("future-output", "output", "Instrument Out", 820, 160, ["audio-in"], []),
+      ],
+      cables: [
+        cableFixture("future-osc-filter", "future-osc", "audio-out", "future-filter", "audio-in"),
+        cableFixture("future-filter-output", "future-filter", "audio-out", "future-output", "audio-in"),
+        cableFixture("future-unknown-filter", "future-spectral", "audio-out", "future-filter", "audio-in"),
+      ],
+    },
+  };
+}
+
+function nodeFixture(id, kind, label, x, y, inputIds, outputIds, parameters = {}) {
+  return {
+    id,
+    kind,
+    label,
+    x,
+    y,
+    inputs: inputIds.map((portId) => ({
+      id: portId,
+      label: portLabel(portId),
+      kind: "input",
+      signal: portSignal(portId),
+    })),
+    outputs: outputIds.map((portId) => ({
+      id: portId,
+      label: portLabel(portId),
+      kind: "output",
+      signal: portSignal(portId),
+    })),
+    parameters,
+  };
+}
+
+function cableFixture(id, fromNodeId, fromPortId, toNodeId, toPortId) {
+  return { id, fromNodeId, fromPortId, toNodeId, toPortId };
+}
+
+function portSignal(portId) {
+  return portId === "cv-out" || portId.endsWith("-cv") || portId === "pitch" || portId === "cutoff-cv" || portId === "pan-cv"
+    ? "control"
+    : "audio";
+}
+
+function portLabel(portId) {
+  if (portId === "audio-in" || portId === "audio-out") return "Audio";
+  if (portId === "cv-out") return "CV";
+  if (portId === "level-cv") return "Level";
+  if (portId === "cutoff-cv") return "Cutoff";
+  if (portId === "pan-cv") return "Pan";
+  if (portId === "pitch") return "Pitch";
+  return portId.replace(/-/g, " ");
 }

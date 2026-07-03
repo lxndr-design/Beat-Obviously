@@ -34,12 +34,394 @@ try {
   const pianoRollSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.solid.tsx"), "utf8");
   const segmentEditorSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx"), "utf8");
   const trackDetailsSource = readFileSync(join(repoRoot, "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx"), "utf8");
+  const trackHeaderSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackHeader.solid.tsx"), "utf8");
+  const homeHubSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/HomeHub.solid.tsx"), "utf8");
+  const audioFilesSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx"), "utf8");
+  const assetReferenceGraphSource = readFileSync(join(repoRoot, "frontend/src/persistence/assetReferenceGraph.ts"), "utf8");
+  const documentActionsSource = readFileSync(join(repoRoot, "frontend/src/persistence/documentActions.ts"), "utf8");
+  const appMenuSource = readFileSync(join(repoRoot, "frontend/src/features/TopBar/AppMenuButton.solid.tsx"), "utf8");
+  const sidebarSource = readFileSync(join(repoRoot, "frontend/src/features/Sidebar/Sidebar.solid.tsx"), "utf8");
+  const editorHostSource = readFileSync(join(repoRoot, "frontend/src/features/EditorHost/EditorHost.solid.tsx"), "utf8");
+  const mixerPanelSource = readFileSync(join(repoRoot, "frontend/src/features/Mixer/MixerPanel.solid.tsx"), "utf8");
+  const storeSource = readFileSync(join(repoRoot, "frontend/src/state/store.ts"), "utf8");
+  const typesSource = readFileSync(join(repoRoot, "frontend/src/state/types.ts"), "utf8");
+  const taxonomySource = readFileSync(join(repoRoot, "frontend/src/state/instrumentTaxonomy.ts"), "utf8");
+  const exportReviewSource = readFileSync(join(repoRoot, "frontend/src/features/ExportReview/ExportReviewModal.solid.tsx"), "utf8");
+  const exportActionsSource = readFileSync(join(repoRoot, "frontend/src/features/ExportReview/exportActions.ts"), "utf8");
+  const exportStoreSource = readFileSync(join(repoRoot, "frontend/src/state/exportStore.ts"), "utf8");
+  const projectHealthSource = readFileSync(join(repoRoot, "frontend/src/features/ProjectHealth/ProjectHealthModal.solid.tsx"), "utf8");
+  const projectIntegritySource = readFileSync(join(repoRoot, "backend/Source/Persistence/ProjectIntegrityVerifier.cpp"), "utf8");
+  const nodeEditorSource = readFileSync(join(repoRoot, "frontend/src/features/NodeInstrumentEditor/NodeInstrumentEditor.solid.tsx"), "utf8");
+  const nodeCanvasSource = readFileSync(join(repoRoot, "frontend/src/features/NodeInstrumentEditor/NodeCanvas.solid.tsx"), "utf8");
+  const nodeEditorCss = readFileSync(join(repoRoot, "frontend/src/features/NodeInstrumentEditor/NodeInstrumentEditor.module.css"), "utf8");
+  const nodeGraphSource = readFileSync(join(repoRoot, "frontend/src/features/NodeInstrumentEditor/nodeGraph.ts"), "utf8");
+  const synthPreviewSource = readFileSync(join(repoRoot, "frontend/src/audio/synthPreview.ts"), "utf8");
   const synthEditorSource = readFileSync(join(repoRoot, "frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx"), "utf8");
   const oscillatorPanelSource = readFileSync(join(repoRoot, "frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx"), "utf8");
+  const patternsPageSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/PatternsPage.solid.tsx"), "utf8");
+  const instrumentsPageSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/InstrumentsPage.solid.tsx"), "utf8");
+  const instrumentEditorSource = readFileSync(join(repoRoot, "frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx"), "utf8");
+  const componentLibrarySource = readFileSync(join(repoRoot, "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx"), "utf8");
+  const drumSequencerSource = readFileSync(join(repoRoot, "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx"), "utf8");
   const devHooksSource = readFileSync(join(repoRoot, "frontend/src/testing/devHooks.ts"), "utf8");
 
   assert.equal(runner.snapBeat(1.12, 0.25), 1, "snapBeat should snap to nearest grid");
   assert.equal(runner.snapBeat(1.13, 0.25), 1.25, "snapBeat should round upward past the midpoint");
+  assert.ok(
+    trackHeaderSource.includes("leftPeak") && trackHeaderSource.includes("rightPeak"),
+    "track headers should render stereo channel meters instead of aggregate-only peak/RMS rows",
+  );
+  assert.ok(
+    taxonomySource.includes("INSTRUMENT_TAXONOMY_OPTIONS")
+      && taxonomySource.includes("primary_category_id")
+      && taxonomySource.includes("taxonomyAssignmentForInstrumentId")
+      && taxonomySource.includes("Unassigned"),
+    "instrument taxonomy should expose canonical dropdown options with an unassigned state",
+  );
+  assert.ok(
+    typesSource.includes("InstrumentTaxonomyAssignment")
+      && typesSource.includes("taxonomy?: InstrumentTaxonomyAssignment"),
+    "instrument types should persist the canonical library taxonomy assignment",
+  );
+  assert.ok(
+    storeSource.includes("normalizeInstrumentTaxonomy")
+      && storeSource.includes('instrumentId: "wavetable_synth"')
+      && storeSource.includes('instrumentId: "sampler"'),
+    "instrument store should normalize taxonomy and seed Aether/sampler defaults",
+  );
+  assert.ok(
+    instrumentsPageSource.includes('label="Structure"')
+      && instrumentsPageSource.includes("taxonomyAssignmentForInstrumentId")
+      && instrumentsPageSource.includes("updateInstrument(activeInstrument()!.id, { taxonomy: nextTaxonomy })"),
+    "instrument organizer preview should expose editable structure before advanced details",
+  );
+  assert.ok(
+    instrumentEditorSource.includes('label="Structure"')
+      && instrumentEditorSource.includes("setDraft({ ...currentDraft(), taxonomy: nextTaxonomy })"),
+    "instrument creation/editor modal should expose the same library structure selector",
+  );
+  assert.ok(
+    trackHeaderSource.includes('data-meter-channel="left"') && trackHeaderSource.includes('data-meter-channel="right"'),
+    "track header meter lanes should expose stable left/right channel markers",
+  );
+  assert.ok(
+    !patternsPageSource.includes("lengthBeats / component.speed")
+      && !componentLibrarySource.includes("component.lengthBeats / component.speed")
+      && !drumSequencerSource.includes("props.lengthBeats / props.speed"),
+    "drum grid density must not shorten pattern preview or beat-editor playback",
+  );
+  assert.ok(
+    drumSequencerSource.includes('label="Grid"') && drumSequencerSource.includes('ariaLabel="Drum grid density"'),
+    "beat editor should label drum speed as grid density, not playback speed",
+  );
+  assert.ok(
+    drumSequencerSource.includes("Math.min(1.5, source.buffer.duration / source.playbackRate.value)")
+      && !drumSequencerSource.includes("Math.min(1.5, maxDuration, source.buffer.duration"),
+    "beat editor drum samples should be allowed to ring instead of being clipped to the step preview length",
+  );
+  assert.ok(
+    !instrumentsPageSource.includes('label: "External"')
+      && !instrumentsPageSource.includes('label: "Internal"')
+      && !instrumentsPageSource.includes("External Sample Reference")
+      && instrumentsPageSource.includes('label: "Library"')
+      && instrumentsPageSource.includes("renderedFallbackWaveform")
+      && instrumentsPageSource.includes("isUsableWaveform(response.waveform)")
+      && instrumentsPageSource.includes("waveform.left.upper.length > 0")
+      && instrumentsPageSource.includes("wavArrayBufferWaveform")
+      && instrumentsPageSource.includes("preloadInstrumentSampleUrl(ctx, sampleUrl)"),
+    "Instruments page should use Beat library wording, reject empty native waveform buckets, decode WAV/sample previews, and keep a rendered waveform fallback for sample previews",
+  );
+  assert.ok(
+    sidebarSource.includes('openEditor({ kind: "mixer" })')
+      && editorHostSource.includes("MixerPanel")
+      && typesSource.includes('{ kind: "mixer" }'),
+    "sidebar and editor host should expose the singleton mixer surface",
+  );
+  assert.ok(
+    mixerPanelSource.includes("data-mixer-panel")
+      && mixerPanelSource.includes("data-mixer-strip")
+      && mixerPanelSource.includes('data-meter-channel="left"')
+      && mixerPanelSource.includes('data-meter-channel="right"')
+      && mixerPanelSource.includes("updateTrack({ gainDb")
+      && mixerPanelSource.includes("updateTrack({ pan")
+      && mixerPanelSource.includes("parentTrackId")
+      && mixerPanelSource.includes("wouldCreateGroupCycle")
+      && mixerPanelSource.includes("openTrackEffects")
+      && mixerPanelSource.includes("bounceTrackInPlace")
+      && mixerPanelSource.includes("unfreezeBouncedTrack")
+      && mixerPanelSource.includes("updateMasterChain")
+      && mixerPanelSource.includes("formatRouteLatency"),
+    "mixer panel should provide channel strips with stereo meters, fader, pan, cycle-safe output routing, inserts, freeze/unfreeze entrypoints, latency summary, and master gain wiring",
+  );
+  assert.ok(
+    mixerPanelSource.includes("Add Return")
+      && mixerPanelSource.includes("data-mixer-return")
+      && mixerPanelSource.includes("data-mixer-send")
+      && mixerPanelSource.includes("upsertTrackSend")
+      && mixerPanelSource.includes("addReturnBusEffect")
+      && mixerPanelSource.includes("removeReturnBus"),
+    "mixer panel should expose return-bus creation, return strips, send enable/level/pan controls, return inserts, and return removal",
+  );
+  assert.ok(
+    mixerPanelSource.includes("data-mixer-inserts")
+      && mixerPanelSource.includes("data-mixer-insert")
+      && mixerPanelSource.includes("updateTrackEffect")
+      && mixerPanelSource.includes("removeTrackEffect")
+      && mixerPanelSource.includes("moveTrackEffect")
+      && mixerPanelSource.includes("updateReturnBusEffect")
+      && mixerPanelSource.includes("removeReturnBusEffect")
+      && mixerPanelSource.includes("moveReturnBusEffect")
+      && mixerPanelSource.includes("formatEffectLatency"),
+    "mixer panel should expose compact insert bypass, remove, reorder, and latency controls for track and return inserts",
+  );
+  assert.ok(
+    storeSource.includes("updateMasterChain")
+      && storeSource.includes("Object.assign(s.project.masterChain, patch)"),
+    "project store should expose a focused master-chain patch action for mixer controls",
+  );
+  assert.ok(
+    storeSource.includes("upsertTrackSend")
+      && storeSource.includes("removeTrackSend")
+      && storeSource.includes("addReturnBus")
+      && storeSource.includes("updateReturnBus")
+      && storeSource.includes("removeReturnBus")
+      && storeSource.includes("addReturnBusEffect"),
+    "project store should expose focused return-bus and send editing actions for the mixer",
+  );
+  assert.ok(
+    storeSource.includes("updateTrackEffect")
+      && storeSource.includes("removeTrackEffect")
+      && storeSource.includes("moveTrackEffect")
+      && storeSource.includes("updateReturnBusEffect")
+      && storeSource.includes("removeReturnBusEffect")
+      && storeSource.includes("moveReturnBusEffect")
+      && storeSource.includes("moveArrayItem"),
+    "project store should expose focused insert bypass/remove/reorder actions for track and return mixer strips",
+  );
+  assert.ok(
+    !homeHubSource.includes("ProjectAssetsPage") && !homeHubSource.includes("Project Assets"),
+    "Home hub should not expose the removed Project Assets one-off page",
+  );
+  assert.ok(
+    assetReferenceGraphSource.includes("track:${track.id}:segment:${segment.id}:audioFileId")
+      && assetReferenceGraphSource.includes("instrument:${instrument.id}:sampleIds:${index}")
+      && assetReferenceGraphSource.includes("buildProjectAssetReferenceRows"),
+    "shared asset reference graph should remain available for document repair, packaging, and health flows",
+  );
+  assert.ok(
+    documentActionsSource.includes("force?: boolean")
+      && documentActionsSource.includes("!options.force")
+      && documentActionsSource.includes("setMissingAssets")
+      && documentActionsSource.includes("setIntegrityReport"),
+    "document save/open flows should retain forced save support and missing-asset/integrity state updates after removing the one-off page",
+  );
+  assert.ok(
+    documentActionsSource.includes("relinkMissingAssetsBeforeOpen")
+      && documentActionsSource.includes("formatMissingAssetRelinkPrompt")
+      && documentActionsSource.includes("lastPathHint")
+      && documentActionsSource.includes("unresolved.push(asset)")
+      && documentActionsSource.includes("replaceBeatDocumentAssetPath(nextDocument, asset.path, result.path)"),
+    "document open/recent/restore flows should offer sequential missing-asset relink and preserve unresolved missing assets",
+  );
+  assert.ok(
+    audioFilesSource.includes("removeSelectedEntries")
+      && audioFilesSource.includes("Delete Files")
+      && audioFilesSource.includes("deleteFiles: true")
+      && audioFilesSource.includes("Files on disk will not be deleted")
+      && audioFilesSource.includes("selectedReferencedAudioFiles")
+      && audioFilesSource.includes("audioFileIdUsedByProject")
+      && audioFilesSource.includes("audioFileIdUsedByInstrument")
+      && audioFilesSource.includes("instrument.sampleIds.includes(fileId)")
+      && audioFilesSource.includes("tracks, segments, or instruments")
+      && audioFilesSource.includes("Deleting audio files from disk is only available in the native app."),
+    "Audio Files page should separate non-destructive library removal from native-only destructive disk deletion and block referenced track/segment/instrument audio IDs",
+  );
+  assert.ok(
+    projectIntegritySource.includes("track.send.bus.missing")
+      && projectIntegritySource.includes("track.send.bus.duplicate")
+      && projectIntegritySource.includes("track.sends.invalid")
+      && projectIntegritySource.includes("returnBuses.invalid")
+      && projectIntegritySource.includes("track.freezeSource.source.missing")
+      && projectIntegritySource.includes("track.freezeSource.audio.missing")
+      && projectHealthSource.includes('code.startsWith("track.send.")')
+      && projectHealthSource.includes('code.startsWith("track.freezeSource.")')
+      && projectHealthSource.includes('code.startsWith("returnBuses.")'),
+    "Project Health should classify backend return-bus/send/freeze routing integrity checks into the routing/stale-id category",
+  );
+  assert.ok(
+    exportReviewSource.includes("FACTORY_EXPORT_PRESETS") && exportReviewSource.includes("runProjectExport"),
+    "export review modal should expose factory presets and launch the shared export runner",
+  );
+  assert.ok(
+    exportReviewSource.includes("Project Health")
+      && exportReviewSource.includes("validateBeforeExport")
+      && exportReviewSource.includes("exportValidationBlocksExport"),
+    "export review modal should expose pre-export Project Health validation state",
+  );
+  assert.ok(
+    exportActionsSource.includes("validateCurrentProjectBeforeExport")
+      && exportActionsSource.includes("project.inspectDocument")
+      && exportActionsSource.includes("exportValidationBlocksExport"),
+    "shared export runner should run Project Health validation before export IPC",
+  );
+  assert.ok(
+    exportActionsSource.includes("bounceTrackInPlace")
+      && exportActionsSource.includes("project.bounceTrackWav")
+      && exportActionsSource.includes("freezeSource")
+      && exportActionsSource.includes("nextSource.mute = true")
+      && exportActionsSource.includes("result.track")
+      && exportActionsSource.includes("result.audioFile")
+      && exportActionsSource.includes("setSelectedTracks([bouncedTrack.id])"),
+    "shared export actions should expose a freeze/bounce path that mutes the source, appends the returned track/asset, and records freeze metadata",
+  );
+  assert.ok(
+    exportActionsSource.includes("unfreezeBouncedTrack")
+      && exportActionsSource.includes("sourceMute")
+      && exportActionsSource.includes("sourceSolo")
+      && exportActionsSource.includes("removeFile(freezeSource.audioFileId)")
+      && exportActionsSource.includes("setSelectedTracks([freezeSource.sourceTrackId])"),
+    "shared export actions should expose reversible unfreeze that restores source mute/solo and removes the generated bounce asset",
+  );
+  assert.ok(
+    exportReviewSource.includes("clearRecentDestinations")
+      && exportReviewSource.includes("removeRecentDestination")
+      && exportReviewSource.includes("revealExportDestination")
+      && exportReviewSource.includes("recentExportFolder")
+      && exportReviewSource.includes("Default Folder"),
+    "export review modal should expose recent destination reveal/remove/clear actions and a default folder derived from destination history",
+  );
+  assert.ok(
+    exportStoreSource.includes("EXPORT_PREFERENCES_KEY")
+      && exportStoreSource.includes("loadExportPreferences")
+      && exportStoreSource.includes("persistExportPreferences")
+      && exportStoreSource.includes("validateBeforeExport")
+      && exportStoreSource.includes("normalizeRecentDestinations"),
+    "export store should persist recent destinations and validate-before-export preference",
+  );
+  assert.ok(
+    exportReviewSource.includes("renderableStemCount")
+      && exportReviewSource.includes("All Stems")
+      && exportActionsSource.includes('mode === "stems"')
+      && exportActionsSource.includes("project.exportAllTrackWavsAsync"),
+    "export review should expose all-stems readiness and launch the native batch-stem IPC",
+  );
+  assert.ok(
+    exportReviewSource.includes("savePresetAs")
+      && exportReviewSource.includes("updateUserPreset")
+      && exportReviewSource.includes("deleteUserPreset")
+      && exportReviewSource.includes("Include effect tail"),
+    "export review should expose custom export preset save, edit, tail, and delete controls",
+  );
+  assert.ok(
+    exportReviewSource.includes("Post-Export Analysis")
+      && exportReviewSource.includes("True Peak")
+      && exportReviewSource.includes("Clipping")
+      && exportReviewSource.includes("Correlation"),
+    "export review should expose post-export analysis metrics when render analysis is available",
+  );
+  assert.ok(
+    exportActionsSource.includes("revealExportDestination")
+      && exportActionsSource.includes("project.revealFile")
+      && exportActionsSource.includes("View in Folder is only available in the native app."),
+    "export destination reveal should reuse the native project reveal IPC",
+  );
+  assert.ok(
+    appMenuSource.includes("onExportReview") && appMenuSource.includes("setSelectedPresetId"),
+    "app menu export entries should select an export preset and open export review",
+  );
+  assert.ok(
+    sidebarSource.includes('openEditor({ kind: "exportReview" })') && !sidebarSource.includes("project.exportWav"),
+    "sidebar export button should open export review instead of bypassing it with direct IPC",
+  );
+  assert.ok(
+    nodeEditorSource.includes("NODE_BROWSER_GROUPS")
+      && nodeEditorSource.includes("NODE_GRAPH_TEMPLATES")
+      && nodeGraphSource.includes('nodeKinds: ["oscillator", "noise", "instrument"]')
+      && !nodeGraphSource.includes('nodeKinds: ["output"]')
+      && nodeEditorSource.includes("auditionGraph")
+      && nodeEditorSource.includes("undoGraph")
+      && nodeEditorSource.includes("redoGraph")
+      && nodeEditorSource.includes("NodeDetails")
+      && nodeEditorSource.includes("analyzeInstrumentNodeGraph"),
+    "Nodemap editor should expose grouped node browsing, templates, play, undo, details, and warning analysis without output creation",
+  );
+  assert.ok(
+    nodeCanvasSource.includes("createContextMenu")
+      && nodeCanvasSource.includes('node.kind === "output"')
+      && nodeCanvasSource.includes("Delete node")
+      && nodeCanvasSource.includes("animateMotion")
+      && nodeCanvasSource.includes("cableEnd"),
+    "Nodemap canvas should protect Instrument Out, support right-click delete, and render visible animated connection endpoints",
+  );
+  assert.ok(
+    nodeCanvasSource.includes("isDirectRun")
+      && nodeCanvasSource.includes("L ${x2} ${y2}")
+      && !nodeCanvasSource.includes("Math.max(72, Math.abs(x2 - x1)"),
+    "Nodemap cable paths should use direct horizontal runs and avoid over-handled cubic folds",
+  );
+  assert.ok(
+    nodeCanvasSource.includes("[data-node-port-dot]")
+      && nodeCanvasSource.includes("measuredPortAnchor")
+      && nodeCanvasSource.includes("portAnchorKey")
+      && nodeCanvasSource.includes("offsetX")
+      && nodeCanvasSource.includes("offsetY")
+      && nodeCanvasSource.includes("requestAnimationFrame"),
+    "Nodemap cable anchors should measure visible port circles after layout instead of relying only on hardcoded row math",
+  );
+  assert.ok(
+    nodeEditorSource.includes("function ParameterControl(props: ParameterControlProps)")
+      && !nodeEditorSource.includes("function ParameterControl({"),
+    "Nodemap parameter controls should keep Solid props reactive so knob edits update the selected node",
+  );
+  assert.ok(
+    nodeEditorSource.includes("InstrumentOutWaveform")
+      && nodeEditorSource.includes("renderInstrumentOutputWaveformPreview")
+      && nodeEditorSource.includes("stripNodeGraphLayout")
+      && nodeEditorSource.includes("data-output-active")
+      && synthPreviewSource.includes("export function renderInstrumentOutputWaveformPreview")
+      && synthPreviewSource.includes("renderInstrumentStereoSamples("),
+    "Nodemap editor should show a header Instrument Out waveform preview backed by the shared synth preview renderer and avoid rerendering on layout-only node drags",
+  );
+  assert.ok(
+    nodeCanvasSource.includes("customLabel")
+      && nodeCanvasSource.includes("definition.label")
+      && nodeCanvasSource.includes("nodeCustomName"),
+    "Nodemap node cards should keep the canonical node type as the title and show renamed node labels as a second line",
+  );
+  assert.ok(
+    nodeCanvasSource.includes("nodePortRowCount")
+      && nodeCanvasSource.includes("nodeMinHeight")
+      && nodeCanvasSource.includes("data-port-rows")
+      && !nodeEditorCss.includes("min-height: 126px"),
+    "Nodemap node cards should reduce height for single-port nodes instead of using the old fixed 126px minimum",
+  );
+  assert.ok(
+    nodeEditorSource.includes("portDetailGroupTitle")
+      && nodeEditorSource.includes("portSignalIcon")
+      && nodeEditorSource.includes("ph:arrow-square-in")
+      && nodeEditorSource.includes("ph:arrow-square-out"),
+    "Nodemap inspector input/output sections and port labels should pair text with monochrome icons",
+  );
+  assert.ok(
+    nodeGraphSource.includes('lfo: {\n    label: "LFO",\n    icon: "ph:wave-sine"')
+      && nodeGraphSource.includes('envelope: {\n    label: "Envelope",\n    icon: "ph:chart-line"')
+      && nodeGraphSource.includes('velocity: {\n    label: "Velocity",\n    icon: "ph:pulse"')
+      && nodeGraphSource.includes('random: {\n    label: "Random CV",\n    icon: "ph:shooting-star"')
+      && nodeGraphSource.includes('cvScale: {\n    label: "CV Scale",\n    icon: "ph:arrows-in-line-horizontal"')
+      && nodeGraphSource.includes('filter: {\n    label: "Filter",\n    icon: "ph:sparkle"')
+      && nodeGraphSource.includes('reverb: {\n    label: "Reverb",\n    icon: "ph:sparkle"')
+      && nodeGraphSource.includes('bitcrush: {\n    label: "Bitcrush",\n    icon: "ph:sparkle"'),
+    "Nodemap modulation nodes should use semantic waveform/control icons while effect nodes share the neutral effect icon",
+  );
+  assert.ok(
+    devHooksSource.includes("exerciseNodeInstrumentEditorFlow")
+      && devHooksSource.includes('fixture === "node-interactions"')
+      && devHooksSource.includes("dragNodePortCable")
+      && devHooksSource.includes("readNodeGraphWarnings")
+      && devHooksSource.includes('clickButton("Save")')
+      && devHooksSource.includes('clickButton("Play")'),
+    "Nodemap dev hooks should exercise node creation, cable dragging, warnings, parameter editing, undo/redo, play, and save",
+  );
 
   assert.ok(
     noteAutomation.AETHER_NOTE_AUTOMATION_TARGETS.some((meta) => meta.target === "macro.1"),
@@ -508,11 +890,15 @@ try {
     "browser fixture automation drag coverage should include non-macro direct Aether target lanes",
   );
   assert.ok(
-    synthEditorSource.includes('aria-label="Performance controls"')
-      && synthEditorSource.includes('aria-label="Performance source readouts"')
-      && synthEditorSource.includes('label="Voices"')
-      && synthEditorSource.includes('label="Glide"'),
-    "Aether Synth Editor should expose Performance controls and source readouts for browser coverage",
+    synthEditorSource.includes("Instrument Details - Aether Engine")
+      && synthEditorSource.includes('aria-label="Aether output preview"')
+      && synthEditorSource.includes('label="Name"')
+      && synthEditorSource.includes('label="Category"')
+      && synthEditorSource.includes('label="Instrument"')
+      && synthEditorSource.includes("expressionSummaryInfo")
+      && synthEditorSource.includes('aria-label="Aether expression and performance summary"')
+      && !synthEditorSource.includes('aria-label="Change instrument icon"'),
+    "Aether Synth Editor should expose instrument details, taxonomy, preview, and expression summary for browser coverage",
   );
   assert.ok(
     synthEditorSource.includes('aria-label="LFO"')
@@ -551,8 +937,9 @@ try {
   assert.ok(
     synthEditorSource.includes('aria-label="Aether instrument effects"')
       && synthEditorSource.includes('aria-label="Add instrument effect"')
-      && synthEditorSource.includes('aria-label="Selected Aether FX preset details"')
-      && synthEditorSource.includes("Move ${EFFECT_LABELS[effect.kind]} earlier")
+      && synthEditorSource.includes('aria-label="Current Aether FX chain"')
+      && synthEditorSource.includes("Drag ${EFFECT_LABELS[effect.kind]} to reorder")
+      && synthEditorSource.includes("Bypass")
       && synthEditorSource.includes("Remove ${EFFECT_LABELS[effect.kind]}"),
     "Aether Synth Editor should expose Instrument FX controls for browser coverage",
   );
@@ -564,15 +951,19 @@ try {
       && devHooksSource.includes('fixture === "aether-fx-rack"'),
     "browser fixture coverage should exercise Aether Instrument FX rack editing",
   );
-  assert.ok(
-    synthEditorSource.includes('aria-label="Amp and filter"')
-      && synthEditorSource.includes('label="Filter"')
-      && synthEditorSource.includes('label="Runtime Warp"')
-      && synthEditorSource.includes('label="Cutoff"')
-      && synthEditorSource.includes('"aether.runtimeWarp"')
-      && synthEditorSource.includes('"aether.runtimeWarpMode"')
-      && synthEditorSource.includes('Env 1 Loop')
-      && synthEditorSource.includes('Env 2 Loop'),
+		assert.ok(
+			synthEditorSource.includes('aria-label="Amp and filter"')
+				&& synthEditorSource.includes('label="Filter"')
+				&& synthEditorSource.includes('label="Runtime Warp"')
+				&& synthEditorSource.includes('label="Cutoff"')
+				&& synthEditorSource.includes("EnvelopeCurveSegmentedControl")
+				&& synthEditorSource.includes("envelopeTimingRow")
+				&& !synthEditorSource.includes("EnvelopeCurveButton")
+				&& synthEditorSource.includes('"aether.runtimeWarp"')
+				&& synthEditorSource.includes('"aether.runtimeWarpMode"')
+				&& synthEditorSource.includes('["env.1", "env.2"] as const')
+      && synthEditorSource.includes('label="Level"')
+      && synthEditorSource.includes('label="Pan"'),
     "Aether Synth Editor should expose Amp/Filter controls for browser coverage",
   );
   assert.ok(
@@ -593,23 +984,18 @@ try {
     "browser fixture coverage should exercise Aether Performance control editing",
   );
   assert.ok(
-    synthEditorSource.includes("onRestoreInitPreset")
-      && synthEditorSource.includes("Restore Init")
-      && devHooksSource.includes("exerciseAetherPresetRestoreInitFlow")
-      && devHooksSource.includes("beatAetherPresetRestoreInitExercise")
-      && devHooksSource.includes('fixture === "aether-preset-restore-init"'),
-    "browser fixture coverage should exercise Restore Init through the live Aether preset controls",
+    synthEditorSource.includes("Import Preset")
+      && synthEditorSource.includes("Instrument Details - Aether Engine")
+      && synthEditorSource.includes("onAudition")
+      && synthEditorSource.includes("onSaveInstrument"),
+    "browser fixture coverage should track current Aether import, audition, and save controls",
   );
   assert.ok(
-    synthEditorSource.includes("onSaveAsPreset")
-      && synthEditorSource.includes("onDeletePreset")
-      && synthEditorSource.includes("Save As")
-      && synthEditorSource.includes("Delete")
-      && devHooksSource.includes("exerciseAetherPresetSaveDeleteFlow")
-      && devHooksSource.includes("completePromptDialog")
-      && devHooksSource.includes("beatAetherPresetSaveDeleteExercise")
-      && devHooksSource.includes('fixture === "aether-preset-save-delete"'),
-    "browser fixture coverage should exercise Save As/Delete through the live Aether preset controls and app dialog",
+    synthEditorSource.includes("Cancel")
+      && synthEditorSource.includes("Save")
+      && synthEditorSource.includes("className={styles.footerButton}")
+      && synthEditorSource.includes("variant=\"primary\""),
+    "Aether Synth Editor should expose current footer cancel/save actions",
   );
   const movedTrackPoint = arrangementAutomation.updateTrackAutomationPoint(insertedTrackPoint, "filter.cutoff", 64, 1, 48, 0.74);
   assert.deepEqual(
@@ -1164,6 +1550,9 @@ try {
         kind: "synth",
         format: "decent-sampler",
         instrumentMode: "fallback-aether",
+        uiControlDetails: [
+          { kind: "labeled-knob", label: "Tone", x: 19, y: 80, width: 108, height: 108, bindings: [{ type: "effect", level: "instrument", parameter: "FX_FILTER_FREQUENCY" }] },
+        ],
         capabilities: [{ id: "bad", kind: "instrument", label: "Create Aether", realtime: true, offline: true, fallbackMode: "aether" }],
       }),
     ],
@@ -1174,6 +1563,7 @@ try {
   assert.equal(hydratedPlugins[0].instrumentMode, "live-instrument", "DecentSampler plugins should use Beat sampler instruments, not Aether fallback");
   assert.equal(hydratedPlugins[0].capabilities[0].realtime, true, "DecentSampler packages should advertise realtime Beat sampler compatibility");
   assert.equal(hydratedPlugins[0].capabilities[0].fallbackMode, "pass-through", "DecentSampler capabilities should not retain Aether fallback");
+  assert.equal(hydratedPlugins[0].uiControlDetails?.[0]?.x, 19, "DecentSampler plugin hydration should preserve authored UI control coordinates");
 
   const migratedStalePlugins = runner.previewPluginHydrationAdapters({
     factory: [],

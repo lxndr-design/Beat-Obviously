@@ -158,37 +158,19 @@
 }
 
 .targetOption {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   width: 100%;
   min-height: 28px;
   padding: 0 8px;
-  border: 0;
   border-bottom: var(--border-fg);
-  background: var(--color-bg);
-  color: var(--color-fg);
   font-size: var(--font-size-ui);
   text-align: left;
-  cursor: pointer;
-  transition: var(--interaction-transition);
 }
 
 .targetOption:last-child {
   border-bottom: 0;
-}
-
-.targetOption:hover {
-  background: var(--interaction-hover-bg);
-  color: var(--color-fg);
-}
-
-.targetOptionSelected {
-  background: var(--interaction-active-bg);
-  color: var(--interaction-active-fg);
-}
-
-.targetOptionSelected:hover {
-  background: var(--interaction-active-hover-bg);
-  color: var(--interaction-active-fg);
 }
 
 .targetLabel {
@@ -263,34 +245,14 @@
   width: 28px;
   height: 28px;
   border: var(--border-fg);
-  background: var(--color-bg);
-  color: var(--color-fg);
   font-size: var(--font-size-ui);
   font-weight: var(--font-weight-medium);
   text-transform: uppercase;
 }
 
-.modeButton {
-  cursor: pointer;
-  transition: var(--interaction-transition);
-}
-
-.modeButton:hover {
-  background: var(--interaction-hover-bg);
-  color: var(--color-fg);
-}
-
-.modeButtonActive {
-  background: var(--interaction-active-bg);
-  color: var(--interaction-active-fg);
-}
-
-.modeButtonActive:hover {
-  background: var(--interaction-active-hover-bg);
-  color: var(--interaction-active-fg);
-}
-
 .modeStatic {
+  background: var(--color-bg);
+  color: var(--color-fg);
   opacity: 0.62;
 }
 

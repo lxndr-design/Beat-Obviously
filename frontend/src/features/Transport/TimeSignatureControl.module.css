@@ -11,25 +11,11 @@
   min-width: 56px;
   height: 32px;
   padding: 0 var(--space-1);
-  background: var(--color-bg);
-  color: var(--color-fg);
   border: var(--border-fg);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-ui);
   line-height: 1;
   white-space: nowrap;
-  cursor: pointer;
-  transition: var(--interaction-transition);
-}
-
-.button:hover {
-  background: var(--interaction-hover-bg);
-  color: var(--color-fg);
-}
-
-.button:active {
-  background: var(--interaction-pressed-bg);
-  transform: var(--interaction-press-transform);
 }
 
 .dropdown {
@@ -52,26 +38,13 @@
 }
 
 .dropItem {
+  justify-content: flex-start;
   height: 24px;
   padding: 0 var(--space-1);
-  background: transparent;
-  color: var(--color-fg);
-  border: 0;
   font-family: var(--font-family-mono);
   font-size: var(--font-size-ui);
   line-height: 1;
   text-align: left;
-  cursor: pointer;
-  transition: var(--interaction-transition);
-}
-
-.dropItem:hover {
-  background: var(--interaction-hover-bg);
-  color: var(--color-fg);
-}
-
-.dropItem:active {
-  background: var(--interaction-pressed-bg);
 }
 
 .dropSep {

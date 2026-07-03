@@ -1,8 +1,10 @@
 import type { BeatProjectAsset, BeatProjectAssetKind, BeatProjectAssetPolicy, BeatProjectDocument } from "../ipc/schema";
+import { normalizeInstrumentNodeGraph } from "../features/NodeInstrumentEditor/nodeGraph";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore, usePluginStore, useProjectStore } from "../state/store";
 import { useComponentStore } from "../state/components";
 import { saveAudioFiles, saveComponents, saveInstruments, saveProject } from "./dexie";
-import type { Project, Track } from "../state/types";
+import type { Instrument, Project, Track } from "../state/types";
+import { assetPolicy, buildAssetManifest, stableAssetId } from "./assetReferenceGraph";
 
 const CURRENT_SCHEMA_VERSION = 1;
 
@@ -23,7 +25,12 @@ export function buildCurrentBeatDocument(): BeatProjectDocument {
       .filter((component) => !component.factory)
       .map((component) => structuredClone(component)),
     plugins,
-    assets: buildAssetManifest({ instruments, audioFiles, plugins }),
+    assets: buildAssetManifest({
+      instruments,
+      audioFiles,
+      plugins,
+      project: useProjectStore.getState().project,
+    }),
   };
 }
 
@@ -60,6 +67,7 @@ export function replaceBeatDocumentAssetPath(document: BeatProjectDocument, from
     instruments: next.instruments ?? [],
     audioFiles: next.audioFiles ?? [],
     plugins: next.plugins ?? [],
+    project: next.project,
   });
   return next;
 }
@@ -69,7 +77,7 @@ export function migrateBeatDocument(input: unknown): BeatProjectDocument {
   const schemaVersion = Number(input.schemaVersion);
   if (schemaVersion !== CURRENT_SCHEMA_VERSION) throw new Error(`Unsupported Beat project schema: ${schemaVersion || "unknown"}.`);
   const project = sanitizeProject(input.project);
-  const instruments = Array.isArray(input.instruments) ? structuredClone(input.instruments) : [];
+  const instruments = Array.isArray(input.instruments) ? structuredClone(input.instruments).map(sanitizeInstrument) : [];
   const audioFiles = Array.isArray(input.audioFiles) ? structuredClone(input.audioFiles) : [];
   const plugins = Array.isArray(input.plugins) ? structuredClone(input.plugins) : [];
   return {
@@ -83,8 +91,19 @@ export function migrateBeatDocument(input: unknown): BeatProjectDocument {
     plugins,
     assets: Array.isArray(input.assets)
       ? sanitizeAssetManifest(input.assets)
-      : buildAssetManifest({ instruments, audioFiles, plugins }),
+      : buildAssetManifest({ instruments, audioFiles, plugins, project }),
   };
+}
+
+function sanitizeInstrument(value: unknown): Instrument {
+  const instrument = value as Instrument;
+  if (instrument && typeof instrument === "object" && instrument.nodeGraph) {
+    return {
+      ...instrument,
+      nodeGraph: normalizeInstrumentNodeGraph(instrument.nodeGraph, instrument),
+    };
+  }
+  return instrument;
 }
 
 export async function applyBeatDocument(
@@ -121,54 +140,7 @@ export async function applyBeatDocument(
   }
 }
 
-export function buildAssetManifest(input: Pick<BeatProjectDocument, "instruments" | "audioFiles" | "plugins">): BeatProjectAsset[] {
-  const assets = new Map<string, BeatProjectAsset>();
-  const addAsset = (
-    kind: BeatProjectAssetKind,
-    path: unknown,
-    reference: string,
-    name?: string,
-  ) => {
-    if (typeof path !== "string" || !path.trim()) return;
-    const normalizedPath = path.trim();
-    if (isEphemeralAssetPath(normalizedPath)) return;
-    const key = `${kind}:${normalizedPath}`;
-    const existing = assets.get(key);
-    if (existing) {
-      if (!existing.references.includes(reference)) existing.references.push(reference);
-      return;
-    }
-    assets.set(key, {
-      id: stableAssetId(kind, normalizedPath),
-      kind,
-      path: normalizedPath,
-      name,
-      policy: assetPolicy(normalizedPath, kind),
-      references: [reference],
-    });
-  };
-
-  for (const file of input.audioFiles ?? []) {
-    addAsset("audio", file.path, `audioFile:${file.id}`, file.name);
-  }
-  for (const instrument of input.instruments ?? []) {
-    addAsset("sample", instrument.sampleUrl, `instrument:${instrument.id}:sampleUrl`, instrument.name);
-    instrument.sampleUrls?.forEach((url, index) => {
-      addAsset("sample", url, `instrument:${instrument.id}:sampleUrls:${index}`, instrument.name);
-    });
-    instrument.sampleMap?.forEach((zone, index) => {
-      addAsset("sample", zone.path, `instrument:${instrument.id}:sampleMap:${index}`, zone.name ?? instrument.name);
-    });
-  }
-  for (const plugin of input.plugins ?? []) {
-    addAsset("plugin", plugin.sourcePath ?? plugin.sourceFileName, `plugin:${plugin.id}:sourcePath`, plugin.name);
-  }
-
-  return Array.from(assets.values()).sort((a, b) => (
-    a.kind.localeCompare(b.kind)
-    || a.path.localeCompare(b.path)
-  ));
-}
+export { buildAssetManifest };
 
 function sanitizeProject(value: unknown): Project {
   if (!isObject(value)) throw new Error("Beat project is missing project data.");
@@ -304,25 +276,6 @@ function sanitizeAssetKind(value: unknown): BeatProjectAssetKind | null {
 
 function sanitizeAssetPolicy(value: unknown): BeatProjectAssetPolicy | null {
   return value === "bundled" || value === "external" || value === "plugin" ? value : null;
-}
-
-function assetPolicy(path: string, kind: BeatProjectAssetKind): BeatProjectAssetPolicy {
-  if (kind === "plugin") return "plugin";
-  return path.startsWith("/samples/") ? "bundled" : "external";
-}
-
-function isEphemeralAssetPath(path: string): boolean {
-  return path.startsWith("blob:") || path.startsWith("data:");
-}
-
-function stableAssetId(kind: BeatProjectAssetKind, path: string): string {
-  let hash = 2166136261;
-  const input = `${kind}:${path}`;
-  for (let i = 0; i < input.length; i++) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `asset-${kind}-${(hash >>> 0).toString(36)}`;
 }
 
 function stableStringify(value: unknown): string {

@@ -17,6 +17,7 @@ export interface TopBarProps {
   onSave: () => void;
   onSaveAs: () => void;
   onExport: () => void;
+  onExportReview: () => void;
   onExportRange: () => void;
   onExportTrack: () => void;
   onRecover: () => void;

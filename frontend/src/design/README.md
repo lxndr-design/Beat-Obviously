@@ -19,25 +19,28 @@ every demo must be included by `frontend/src/design/SolidUiKitCatalog.solid.tsx`
 
 ### Color
 
-Default UI is black and white:
+The product palette is monochrome only: black, white, and grayscale values
+derived from black or white. Do not introduce hue in product UI.
 
 - `--color-bg`: black
 - `--color-fg`: white
 - `--color-bg-inverse`: white
 - `--color-fg-inverse`: black
 
-Allowed exceptions:
+Allowed grayscale-only supporting tokens:
 
-- `--color-highlight` for text selection only.
-- `--color-scrim` for modal and unsaved-state overlays.
+- `--color-highlight` for text selection only. It must remain white/black.
+- `--color-scrim` for modal and unsaved-state overlays. It must remain black
+  with alpha.
 - `--color-fg-hover` for hover on surfaces that are already foreground-filled.
-- `--interaction-playback-accent` for active playback feedback only.
+  It must remain grayscale.
 - `--grid-line-*` and `--surface-*` for dense editor internals, browser rows,
-  waveform grids, timeline subdivisions, and secondary data marks.
+  waveform grids, timeline subdivisions, and secondary data marks. They must be
+  grayscale values derived from `--color-bg` / `--color-fg`.
 
-Do not introduce hue. If a feature needs status, use copy, iconography, position,
-or monochrome emphasis before adding a token. Playback is the only chromatic
-product feedback state.
+If a feature needs status, use copy, iconography, position, shape, opacity,
+weight, or monochrome emphasis. Playback feedback, warning states, previews,
+plugin marks, node cables, and generated assets must also stay grayscale.
 
 ### Typography
 
@@ -212,7 +215,8 @@ engineers and designers.
 - Hover/click feedback uses `--interaction-*` tokens instead of direct surface
   hover/selected backgrounds.
 - Non-Phosphor icon names are not used in source.
-- Shared component CSS does not introduce new hex colors outside design files.
+- Design tokens and component/feature CSS do not introduce hue; raw color
+  literals must be black, white, or grayscale only.
 - Legacy JSX files under `frontend/src` are either Solid-suffixed or removed.
 
 The verifier is intentionally conservative. If it flags a legitimate new pattern,

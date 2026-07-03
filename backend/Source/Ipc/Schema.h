@@ -43,6 +43,7 @@ namespace beat::ipc
         constexpr const char* PROJECT_EXPORT_WAV_ASYNC = "project.exportWavAsync";
         constexpr const char* PROJECT_EXPORT_TRACK_WAV_ASYNC = "project.exportTrackWavAsync";
         constexpr const char* PROJECT_EXPORT_RANGE_WAV_ASYNC = "project.exportRangeWavAsync";
+        constexpr const char* PROJECT_EXPORT_ALL_TRACK_WAVS_ASYNC = "project.exportAllTrackWavsAsync";
         constexpr const char* PROJECT_EXPORT_CANCEL = "project.exportCancel";
         constexpr const char* PROJECT_EXPORT_STATUS = "project.exportStatus";
         constexpr const char* ENGINE_APPLY_PROJECT = "engine.applyProject";

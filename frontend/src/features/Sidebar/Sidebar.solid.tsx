@@ -1,10 +1,9 @@
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import { appAlert } from "../../solid-ui";
-import { isNative, send } from "../../ipc/bridge";
 import { saveCurrentDocument } from "../../persistence/documentActions";
 import { createStoreSelector } from "../../solid-utils/store";
 import { createContextMenu, HoverInfo, Icon, type ContextMenuItem } from "../../solid-ui";
-import { useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore, useUiStore, useViewStore } from "../../state/store";
+import { useDocumentStore, useUiStore, useViewStore } from "../../state/store";
 import { InstrumentLibraryPanel } from "../InstrumentLibrary/InstrumentLibraryPanel.solid";
 import { AudioFileLibraryPanel } from "../AudioFiles/AudioFileLibraryPanel.solid";
 import { ComponentLibraryPanel } from "../ComponentLibrary/ComponentLibraryPanel.solid";
@@ -24,9 +23,6 @@ const PANELS: Array<{ id: SidebarPanel; label: string; icon?: string; activeIcon
 
 export function Sidebar() {
   const width = createStoreSelector(useViewStore, (state) => state.sidebarWidth);
-  const project = createStoreSelector(useProjectStore, (state) => state.project);
-  const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
-  const audioFiles = createStoreSelector(useAudioFileStore, (state) => state.files);
   const dirty = createStoreSelector(useDocumentStore, (state) => state.dirty);
   const documentOpen = createStoreSelector(useDocumentStore, (state) => state.documentOpen);
   const [dragging, setDragging] = createSignal(false);
@@ -68,23 +64,6 @@ export function Sidebar() {
       // eslint-disable-next-line no-console
       console.error("[Beat] Save failed", error);
       await appAlert("Save failed.");
-    }
-  }
-
-  async function onExport() {
-    try {
-      const result = await send({ kind: "project.exportWav", project: project(), instruments: instruments(), audioFiles: audioFiles() });
-      if (result.error) {
-        await appAlert(result.error);
-      } else if (!result.path) {
-        return;
-      } else if (!isNative()) {
-        await appAlert("WAV export ready.");
-      }
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error("[Beat] Export failed", error);
-      await appAlert("Export failed.");
     }
   }
 
@@ -131,8 +110,23 @@ export function Sidebar() {
             {saveMenu.menu()}
           </span>
           <HoverInfo content="Export WAV" placement="right">
-            <button type="button" class={styles.railButton} onClick={() => void onExport()} aria-label="Export WAV">
+            <button
+              type="button"
+              class={styles.railButton}
+              onClick={() => useUiStore.getState().openEditor({ kind: "exportReview" })}
+              aria-label="Export WAV"
+            >
               <Icon name="ph:export" size={16} decorative />
+            </button>
+          </HoverInfo>
+          <HoverInfo content="Mixer" placement="right">
+            <button
+              type="button"
+              class={styles.railButton}
+              onClick={() => useUiStore.getState().openEditor({ kind: "mixer" })}
+              aria-label="Mixer"
+            >
+              <Icon name="ph:sliders-horizontal" size={16} decorative />
             </button>
           </HoverInfo>
           <HoverInfo content="Settings" placement="right">

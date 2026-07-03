@@ -21,3 +21,4 @@ export * from "./ActionFooter";
 export * from "./MarqueeText";
 export * from "./DitheredImage";
 export * from "./meshTint";
+export * from "./AppLogo";

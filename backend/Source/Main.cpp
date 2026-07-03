@@ -55,10 +55,12 @@ namespace
         {
             auto r = getLocalBounds().toFloat();
             auto fg = highlighted || down ? juce::Colours::black : juce::Colours::white;
-            auto bg = highlighted || down ? juce::Colours::white : juce::Colours::black;
 
-            g.setColour(bg);
-            g.fillRect(r);
+            if (highlighted || down)
+            {
+                g.setColour(juce::Colours::white);
+                g.fillRect(r);
+            }
             g.setColour(fg);
 
             const auto c = r.getCentre();
@@ -153,17 +155,6 @@ namespace
             g.fillAll(juce::Colours::black);
             g.setColour(juce::Colours::white.withAlpha(0.55f));
             g.drawLine(0.0f, static_cast<float>(h - 1), static_cast<float>(w), static_cast<float>(h - 1), 1.0f);
-
-            g.setColour(juce::Colours::white);
-            g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
-            g.drawFittedText(
-                window.getName(),
-                titleSpaceX,
-                0,
-                titleSpaceW,
-                h,
-                juce::Justification::centred,
-                1);
         }
     };
 
@@ -235,7 +226,7 @@ public:
     BeatApp() = default;
 
     const juce::String getApplicationName() override       { return "Beat"; }
-    const juce::String getApplicationVersion() override    { return "0.1.0"; }
+    const juce::String getApplicationVersion() override    { return "0.2.0"; }
     bool moreThanOneInstanceAllowed() override             { return false; }
 
     void initialise(const juce::String& commandLine) override

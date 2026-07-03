@@ -11,6 +11,8 @@ import { TimeSignatureControl } from "../Transport/TimeSignatureControl.solid";
 import {
   DEFAULT_DRUM_MIDI_PITCH,
   DEFAULT_DRUM_VELOCITY,
+  drumPatternDurationSeconds,
+  drumStepLengthBeats,
   drumTimingOffsetBeats,
   effectiveDrumVelocity,
   formatFrequency,
@@ -278,7 +280,7 @@ export function DrumSequencer(props: Props) {
   }
 
   function scheduleStep(step: number, atTimeS: number, stepSeconds: number) {
-    const stepLengthBeats = (props.lengthBeats / props.speed) / Math.max(1, props.stepCount);
+    const stepLengthBeats = drumStepLengthBeats(props.lengthBeats, props.stepCount);
     const beatsPerSecond = props.bpm / 60;
     for (const row of rowsRef.current) {
       const cell = normalizeDrumCell(row.steps[step]);
@@ -303,7 +305,7 @@ export function DrumSequencer(props: Props) {
     const ctx = getCtx();
     const source = createInstrumentBufferSource(ctx, instrument, 0.2, frequencyHz, undefined, velocity, props.bpm);
     const duration = source.buffer
-      ? Math.max(0.05, Math.min(1.5, maxDuration, source.buffer.duration / source.playbackRate.value))
+      ? Math.max(0.05, Math.min(1.5, source.buffer.duration / source.playbackRate.value))
       : maxDuration;
     const gain = ctx.createGain();
     const peak = (Math.max(0, Math.min(127, velocity)) / 127) * 0.28;
@@ -334,9 +336,9 @@ export function DrumSequencer(props: Props) {
 
     const ctx = getCtx();
     const tick = () => {
-      const phraseSeconds = Math.max(0.05, ((props.lengthBeats / props.speed) * 60) / Math.max(1, props.bpm));
+      const phraseSeconds = drumPatternDurationSeconds(props.lengthBeats, props.bpm);
       const stepSeconds = Math.max(0.005, phraseSeconds / Math.max(1, props.stepCount));
-      const stepLengthBeats = (props.lengthBeats / props.speed) / Math.max(1, props.stepCount);
+      const stepLengthBeats = drumStepLengthBeats(props.lengthBeats, props.stepCount);
       const beatsPerSecond = props.bpm / 60;
       const now = ctx.currentTime;
       const elapsed = Math.max(0, now - loopStartTimeRef.current);
@@ -990,8 +992,8 @@ export function DrumSequencer(props: Props) {
 
       <div class={styles.transportRow}>
         <RadioGroup
-          label="Speed"
-          ariaLabel="Drum speed"
+          label="Grid"
+          ariaLabel="Drum grid density"
           value={props.speed}
           options={DRUM_SPEEDS.map((option) => ({ value: option, label: String(option) }))}
           onChange={changeSpeed}

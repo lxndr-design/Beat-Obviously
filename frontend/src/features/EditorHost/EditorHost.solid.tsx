@@ -4,7 +4,9 @@ import { createStoreSelector } from "../../solid-utils/store";
 import { useInstrumentStore, useUiStore } from "../../state/store";
 import { ComponentEditorModal } from "../ComponentLibrary/ComponentEditorModal.solid";
 import { EqAutomationModal } from "../EqAutomation/EqAutomationModal.solid";
+import { ExportReviewModal } from "../ExportReview/ExportReviewModal.solid";
 import { InstrumentEditorModal } from "../InstrumentEditor/InstrumentEditorModal.solid";
+import { MixerPanel } from "../Mixer/MixerPanel.solid";
 import { NodeInstrumentEditor } from "../NodeInstrumentEditor/NodeInstrumentEditor.solid";
 import { PluginHostModal } from "../PluginLibrary/PluginHostModal.solid";
 import { PreferencesModal } from "../Preferences/PreferencesModal.solid";
@@ -40,7 +42,7 @@ export function EditorHost() {
                 <Modal
                   open
                   title={instrument()?.name ?? "Synth"}
-                  width="full"
+                  width="editor"
                   scopeId={`synth-editor-${editor.instrumentId}`}
                   flushBody
                   onClose={() => closeEditor({ kind: "synthInstrument", instrumentId: editor.instrumentId })}
@@ -58,7 +60,7 @@ export function EditorHost() {
                 <Modal
                   open
                   title="Synth"
-                  width="full"
+                  width="editor"
                   scopeId="synth-editor"
                   flushBody
                   onClose={() => closeEditor({ kind: "synth" })}
@@ -76,6 +78,21 @@ export function EditorHost() {
               return <PluginHostModal pluginId={editor.pluginId} />;
             case "eq":
               return <EqAutomationModal />;
+            case "mixer":
+              return (
+                <Modal
+                  open
+                  title="Mixer"
+                  width="full"
+                  scopeId="mixer"
+                  flushBody
+                  onClose={() => closeEditor({ kind: "mixer" })}
+                >
+                  <MixerPanel />
+                </Modal>
+              );
+            case "exportReview":
+              return <ExportReviewModal />;
             case "projectHealth":
               return <ProjectHealthModal />;
             case "preferences":

@@ -9,8 +9,8 @@
 }
 
 .playing {
-  fill: var(--interaction-playback-accent);
-  stroke: color-mix(in srgb, var(--color-bg) 68%, var(--interaction-playback-accent));
+  fill: var(--color-fg);
+  stroke: color-mix(in srgb, var(--color-bg) 68%, var(--color-fg));
   stroke-width: 0.08;
   filter: drop-shadow(0 0 0.18px var(--color-bg));
 }

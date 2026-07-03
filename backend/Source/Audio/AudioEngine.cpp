@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <utility>
 
 namespace beat
 {
@@ -17,6 +18,89 @@ namespace beat
         {
             bool appliesToNote(int) override    { return true; }
             bool appliesToChannel(int) override { return true; }
+        };
+
+        class NodemapVoice final : public juce::SynthesiserVoice
+        {
+        public:
+            bool canPlaySound(juce::SynthesiserSound*) override { return true; }
+
+            void setGraph(Nodemap::Graph graphToUse)
+            {
+                graph = std::move(graphToUse);
+            }
+
+            void prepare(double sr)
+            {
+                sampleRate = sr > 0.0 ? sr : 44100.0;
+            }
+
+            void startNote(int midiNoteNumber,
+                           float velocity,
+                           juce::SynthesiserSound*,
+                           int) override
+            {
+                Nodemap::AuditionOptions options;
+                options.sampleRate = sampleRate;
+                options.sampleCount = juce::jmax(1, (int) std::round(sampleRate * 2.0));
+                options.midiNote = midiNoteNumber;
+                options.velocity = juce::jlimit(0.0f, 1.0f, velocity);
+                options.keytrack = juce::jlimit(0.0f, 1.0f, (float) midiNoteNumber / 127.0f);
+                options.randomSeed = (juce::uint32) (0x2a17b4c3u ^ (juce::uint32) midiNoteNumber);
+                rendered = Nodemap::renderOneNote(graph, options);
+                cursor = 0;
+                active = !rendered.silent && !rendered.left.empty() && !rendered.right.empty();
+                if (!active)
+                    clearCurrentNote();
+            }
+
+            void stopNote(float, bool allowTailOff) override
+            {
+                if (!allowTailOff)
+                {
+                    active = false;
+                    clearCurrentNote();
+                }
+            }
+
+            void pitchWheelMoved(int) override {}
+            void controllerMoved(int, int) override {}
+
+            void renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
+                                 int startSample,
+                                 int numSamples) override
+            {
+                if (!active)
+                    return;
+
+                const int channelCount = outputBuffer.getNumChannels();
+                for (int i = 0; i < numSamples; ++i)
+                {
+                    if (cursor >= rendered.left.size())
+                    {
+                        active = false;
+                        clearCurrentNote();
+                        return;
+                    }
+
+                    const auto left = rendered.left[cursor];
+                    const auto right = cursor < rendered.right.size() ? rendered.right[cursor] : left;
+                    if (channelCount > 0)
+                        outputBuffer.addSample(0, startSample + i, left);
+                    if (channelCount > 1)
+                        outputBuffer.addSample(1, startSample + i, right);
+                    for (int channel = 2; channel < channelCount; ++channel)
+                        outputBuffer.addSample(channel, startSample + i, 0.5f * (left + right));
+                    ++cursor;
+                }
+            }
+
+        private:
+            Nodemap::Graph graph { Nodemap::makeOutputOnlyGraph() };
+            Nodemap::AuditionResult rendered;
+            double sampleRate { 44100.0 };
+            size_t cursor { 0 };
+            bool active { false };
         };
 
         struct StereoPanGains
@@ -1612,6 +1696,21 @@ namespace beat
     {
         auto instrumentSynth = std::make_unique<juce::Synthesiser>();
         instrumentSynth->addSound(new PassSound());
+
+        if (instrument.nodeGraph)
+        {
+            const auto allocation = VoiceAllocation::policyFor(instrument.maxVoices, instrument.mono, instrument.legato);
+            instrumentSynth->setNoteStealingEnabled(allocation.noteStealing);
+            for (int i = 0; i < allocation.voiceCount; ++i)
+            {
+                auto* voice = new NodemapVoice();
+                voice->prepare(sampleRate);
+                voice->setGraph(*instrument.nodeGraph);
+                instrumentSynth->addVoice(voice);
+            }
+            instrumentSynth->setCurrentPlaybackSampleRate(sampleRate);
+            return instrumentSynth;
+        }
 
         InstrumentVoice::Params params;
         const auto copyWavetable = [](const InstrumentDefinition::WavetableConfig& source)

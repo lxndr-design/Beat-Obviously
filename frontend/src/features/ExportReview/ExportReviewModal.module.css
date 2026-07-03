@@ -1,0 +1,263 @@
+.panel {
+  display: grid;
+  gap: 10px;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: var(--border-fg);
+}
+
+.summary > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 7px;
+  border-right: var(--border-fg);
+}
+
+.summary > div:last-child {
+  border-right: 0;
+}
+
+.label {
+  color: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.summary strong,
+.pathRow strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-ui);
+  line-height: 1.15;
+}
+
+.section {
+  display: grid;
+  gap: 6px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+  border-bottom: var(--border-fg);
+}
+
+.sectionHeader h3 {
+  margin: 0;
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+}
+
+.sectionHeader span {
+  color: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
+  font-size: var(--font-size-ui);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.presetGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.presetButton {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+  min-height: 58px;
+  padding: 7px;
+  color: var(--color-fg);
+  background: var(--color-bg);
+  border: var(--border-fg);
+  text-align: left;
+  cursor: pointer;
+  transition: var(--interaction-transition);
+}
+
+.presetButton:hover {
+  background: var(--interaction-hover-bg);
+}
+
+.presetButtonActive {
+  background: var(--interaction-selected-bg);
+}
+
+.presetButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.presetButton strong,
+.presetButton span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presetButton strong {
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+}
+
+.presetButton span {
+  color: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
+  font-size: var(--font-size-ui);
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.tailControl {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+.analysisGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: var(--border-fg);
+}
+
+.metric {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 7px;
+  border-right: var(--border-fg);
+  border-bottom: var(--border-fg);
+}
+
+.metric:nth-child(3n) {
+  border-right: 0;
+}
+
+.metric:nth-last-child(-n + 3) {
+  border-bottom: 0;
+}
+
+.metric strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-ui);
+  line-height: 1.15;
+}
+
+.pathList {
+  display: grid;
+  border: var(--border-fg);
+}
+
+.pathRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 7px;
+  border-bottom: var(--border-fg);
+}
+
+.pathRow:last-child {
+  border-bottom: 0;
+}
+
+.pathText {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.pathActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stateBanner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 7px;
+  align-items: start;
+  padding: 7px;
+  border: var(--border-fg);
+}
+
+.stateBanner strong,
+.stateBanner span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stateBanner span {
+  color: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
+}
+
+@media (max-width: 760px) {
+  .summary,
+  .controls,
+  .presetGrid,
+  .analysisGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric,
+  .metric:nth-child(3n),
+  .metric:nth-last-child(-n + 3) {
+    border-right: 0;
+    border-bottom: var(--border-fg);
+  }
+
+  .metric:last-child {
+    border-bottom: 0;
+  }
+
+  .summary > div {
+    border-right: 0;
+    border-bottom: var(--border-fg);
+  }
+
+  .summary > div:last-child {
+    border-bottom: 0;
+  }
+
+  .pathRow {
+    grid-template-columns: 1fr;
+  }
+
+  .pathActions {
+    justify-content: flex-start;
+  }
+
+  .headerActions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}

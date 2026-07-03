@@ -5,7 +5,7 @@
   --node-cable-control-start: color-mix(in srgb, var(--color-fg) 20%, transparent);
   --node-cable-control-end: color-mix(in srgb, var(--color-fg) 54%, transparent);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   background: var(--color-bg);
@@ -15,14 +15,15 @@
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(190px, 0.7fr) minmax(0, 2fr) auto;
+  grid-template-columns: minmax(360px, 1fr) auto;
   align-items: stretch;
   min-height: 46px;
   border-bottom: var(--border-soft);
 }
 
 .identity {
-  display: flex;
+  display: grid;
+  grid-template-columns: 24px minmax(116px, max-content) minmax(160px, 360px);
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
@@ -46,7 +47,7 @@
   line-height: 1;
 }
 
-.identity div {
+.identityText {
   display: grid;
   gap: 1px;
   min-width: 0;
@@ -60,24 +61,117 @@
   white-space: nowrap;
 }
 
-.identity span,
-.inspectorHint {
+.identity span {
   color: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
   font-size: var(--font-size-hint);
 }
 
-.nodePalette {
-  display: flex;
+.outputWaveform {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-1);
   min-width: 0;
-  padding: var(--space-2);
-  overflow-x: auto;
+  height: 28px;
+  padding: 0 var(--space-1);
+  border: var(--border-soft);
+  background: color-mix(in srgb, var(--color-fg) 4%, var(--color-bg));
+}
+
+.outputWaveform svg {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  display: block;
+}
+
+.outputWaveformFill {
+  fill: color-mix(in srgb, var(--color-fg) 10%, transparent);
+}
+
+.outputWaveformTrace,
+.outputWaveformFlatline {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-fg) 72%, transparent);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.outputWaveformFlatline {
+  stroke: color-mix(in srgb, var(--color-fg) 24%, transparent);
+  stroke-dasharray: 3 4;
+}
+
+.outputWaveform span {
+  color: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-hint);
+  line-height: 1;
+}
+
+.outputWaveform[data-output-active="false"] {
+  opacity: 0.62;
+}
+
+.nodeBrowser {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  overflow: auto;
   border-right: var(--border-soft);
+  background: color-mix(in srgb, var(--color-fg) 3%, var(--color-bg));
+}
+
+.browserSection {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2);
+  border-bottom: var(--border-soft);
+}
+
+.browserSection h3 {
+  margin: 0;
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+}
+
+.templateList,
+.nodePalette {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.templateButton {
+  display: grid;
+  justify-content: stretch;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-1);
+  border: var(--border-soft);
+  text-align: left;
+}
+
+.templateButton strong,
+.templateButton span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.templateButton strong {
+  font-weight: var(--font-weight-medium);
+}
+
+.templateButton span {
+  color: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
+  font-size: var(--font-size-hint);
 }
 
 .nodePalette button {
-  flex: 0 0 auto;
+  width: 100%;
 }
 
 .nodePaletteButton,
@@ -94,6 +188,11 @@
   cursor: pointer;
   font: inherit;
   font-weight: var(--font-weight-medium);
+}
+
+.nodePaletteButton {
+  justify-content: flex-start;
+  padding-inline: var(--space-1);
 }
 
 .nodePaletteButton span {
@@ -139,6 +238,13 @@
   background-size: 28px 28px, 28px 28px, 100% 100%, auto;
 }
 
+.workspace {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr) 270px;
+  min-height: 0;
+  border-bottom: var(--border-soft);
+}
+
 .solidHost {
   display: contents;
 }
@@ -166,6 +272,12 @@
   pointer-events: stroke;
 }
 
+.cableGuide {
+  fill: none;
+  stroke: transparent;
+  pointer-events: none;
+}
+
 .cable[data-signal="control"],
 .draftCable[data-signal="control"] {
   stroke: url("#node-cable-control");
@@ -176,41 +288,105 @@
   opacity: 0.74;
 }
 
+.cableEnd {
+  fill: var(--color-bg);
+  stroke: var(--color-fg);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+.cableEnd[data-signal="control"] {
+  fill: color-mix(in srgb, var(--color-fg) 24%, var(--color-bg));
+}
+
+.cablePulse {
+  fill: var(--color-fg);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--color-fg) 44%, transparent));
+  opacity: 0.82;
+  pointer-events: none;
+}
+
+.cablePulse[data-signal="control"] {
+  opacity: 0.56;
+}
+
 .cableHitArea {
   fill: none;
   stroke: transparent;
   stroke-linecap: round;
-  stroke-width: 12;
+  stroke-width: 16;
   pointer-events: stroke;
+}
+
+.cableGroup:hover .cable,
+.cableGroup[data-selected="true"] .cable {
+  stroke-width: 3;
+}
+
+.cableGroup:hover .cableEnd,
+.cableGroup[data-selected="true"] .cableEnd {
+  fill: var(--color-fg);
+}
+
+.cableGroup[data-selected="true"] .cableHitArea {
+  stroke: color-mix(in srgb, var(--color-fg) 10%, transparent);
 }
 
 .node {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   display: grid;
   grid-template-rows: 38px auto;
   width: var(--node-width);
-  min-height: 126px;
   border: var(--border-soft);
   background: color-mix(in srgb, var(--color-bg) 86%, var(--color-fg));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-bg) 70%, transparent);
   user-select: none;
 }
 
+.outputNode {
+  border-color: color-mix(in srgb, var(--color-fg) 70%, var(--color-bg));
+}
+
 .selectedNode {
+  z-index: 6;
   border-color: var(--color-fg);
   background: color-mix(in srgb, var(--color-fg) 12%, var(--color-bg));
+  box-shadow:
+    inset 0 0 0 1px var(--color-fg),
+    0 0 0 1px var(--color-fg);
 }
 
 .nodeHeader {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 24px;
+  grid-template-columns: 26px minmax(0, 1fr) 26px;
   align-items: center;
   gap: var(--space-1);
   min-width: 0;
-  padding: var(--space-1) var(--space-2);
+  padding: 6px;
   cursor: grab;
   border-bottom: var(--border-soft);
+}
+
+.nodeTitle {
+  display: grid;
+  align-content: center;
+  gap: 1px;
+  min-width: 0;
+}
+
+.nodeTitle strong {
+  line-height: 1.05;
+}
+
+.nodeCustomName {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
+  font-size: var(--font-size-hint);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nodeHeader:active {
@@ -220,8 +396,8 @@
 .nodeIcon {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   background: var(--color-fg);
   color: var(--color-bg);
 }
@@ -229,25 +405,17 @@
 .removeNode {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  color: color-mix(in srgb, var(--color-fg) 76%, var(--color-bg));
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.removeNode:hover {
-  color: var(--color-fg);
-  background: var(--interaction-hover-bg);
 }
 
 .portGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-2);
+  gap: 6px;
+  padding: 12px 6px;
+  overflow: visible;
 }
 
 .portColumn {
@@ -262,13 +430,15 @@
 }
 
 .port {
+  position: relative;
+  z-index: 5;
   display: flex;
   align-items: center;
-  gap: var(--space-1);
-  max-width: 92px;
-  min-height: 22px;
+  gap: 6px;
+  width: 100%;
+  min-height: 24px;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
   color: var(--color-fg);
   background: transparent;
   border: 0;
@@ -282,6 +452,23 @@
   text-align: right;
 }
 
+.port[data-connection-state="compatible"] {
+  color: var(--color-fg);
+}
+
+.port[data-connection-state="compatible"] .portDot {
+  background: var(--color-fg);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-fg) 16%, transparent);
+}
+
+.port[data-connection-state="incompatible"] {
+  opacity: 0.32;
+}
+
+.port[data-connection-state="origin"] .portDot {
+  background: color-mix(in srgb, var(--color-fg) 42%, var(--color-bg));
+}
+
 .port span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -290,15 +477,23 @@
 
 .portDot {
   flex: 0 0 auto;
-  width: 10px;
-  height: 10px;
+  width: 15px;
+  height: 15px;
   border: var(--border-fg);
   border-radius: 999px;
   background: var(--color-bg);
 }
 
+.port[data-kind="input"] .portDot {
+  margin-left: -14px;
+}
+
+.port[data-kind="output"] .portDot {
+  margin-right: -14px;
+}
+
 .portDot[data-signal="control"] {
-  border-radius: 2px;
+  border-radius: 999px;
   background: color-mix(in srgb, var(--color-fg) 24%, var(--color-bg));
 }
 
@@ -306,18 +501,25 @@
   background: var(--color-fg);
 }
 
-.inspector {
+.details {
   display: grid;
-  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 2fr);
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 78px;
-  padding: var(--space-2) var(--space-3);
-  border-top: var(--border-soft);
-  background: color-mix(in srgb, var(--color-fg) 5%, var(--color-bg));
+  align-content: start;
+  gap: 0;
+  min-width: 0;
+  overflow: auto;
+  border-left: var(--border-soft);
+  background: color-mix(in srgb, var(--color-fg) 4%, var(--color-bg));
 }
 
-.inspectorTitle {
+.detailsSection {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2);
+  border-bottom: var(--border-soft);
+}
+
+.nodeDetailTitle {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
@@ -325,14 +527,161 @@
   min-width: 0;
 }
 
-.parameterGrid {
+.detailsSection h3,
+.detailsSection p {
+  margin: 0;
+}
+
+.detailsSection h3 {
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+}
+
+.detailsSection p {
+  color: color-mix(in srgb, var(--color-fg) 68%, var(--color-bg));
+  line-height: 1.35;
+}
+
+.detailTextField {
+  grid-template-columns: 46px minmax(0, 1fr);
+}
+
+.connectionSummary {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: var(--space-2);
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 4px 8px;
+  margin: 0;
+}
+
+.connectionSummary dt {
+  color: color-mix(in srgb, var(--color-fg) 62%, var(--color-bg));
+  font-weight: var(--font-weight-medium);
+}
+
+.connectionSummary dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portDetails,
+.portDetailGroup,
+.portDetailRow {
+  display: grid;
   min-width: 0;
 }
 
-.selectField,
+.portDetails {
+  gap: var(--space-2);
+}
+
+.portDetailGroup {
+  gap: var(--space-1);
+}
+
+.portDetailGroupTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  color: color-mix(in srgb, var(--color-fg) 72%, var(--color-bg));
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+}
+
+.portDetailGroupTitle svg {
+  flex: 0 0 auto;
+}
+
+.portDetailRow {
+  gap: 4px;
+  padding: 6px 0;
+  border-top: var(--border-soft);
+}
+
+.portDetailHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.portDetailHeader svg {
+  flex: 0 0 auto;
+  color: color-mix(in srgb, var(--color-fg) 74%, var(--color-bg));
+}
+
+.portDetailBody {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.portDetailRow strong,
+.portDetailRow span,
+.portDetailRow small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.portDetailRow strong {
+  font-weight: var(--font-weight-medium);
+}
+
+.portDetailRow span,
+.portDetailRow small {
+  color: color-mix(in srgb, var(--color-fg) 66%, var(--color-bg));
+  line-height: 1.3;
+}
+
+.portDetailRow ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portDetailRow li {
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--color-fg) 78%, var(--color-bg));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.issueList {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.issueList li {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-1);
+  color: color-mix(in srgb, var(--color-fg) 76%, var(--color-bg));
+  line-height: 1.25;
+}
+
+.sideParameterGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
+  align-items: start;
+  gap: var(--space-2) var(--space-1);
+  min-width: 0;
+}
+
+.parameterKnob {
+  width: 100%;
+}
+
 .booleanField,
 .textField,
 .numberField {
@@ -343,7 +692,6 @@
   min-width: 0;
 }
 
-.selectField span,
 .booleanField span,
 .textField span,
 .numberField span {
@@ -353,7 +701,6 @@
   white-space: nowrap;
 }
 
-.selectField select,
 .textField input,
 .numberField input {
   min-width: 0;
@@ -362,6 +709,10 @@
   background: var(--color-bg);
   border: var(--border-fg);
   font: inherit;
+}
+
+.selectField {
+  min-width: 0;
 }
 
 .numberField {

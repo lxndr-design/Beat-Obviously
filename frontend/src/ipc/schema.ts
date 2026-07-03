@@ -9,6 +9,8 @@
 import type {
   AudioFile,
   Beats,
+  DecentSamplerUiBinding,
+  DecentSamplerUiControl,
   EqAutomationPoint,
   Id,
   Instrument,
@@ -149,7 +151,7 @@ export interface ProjectExportJobStatus {
   finished: boolean;
   ok: boolean;
   jobId?: string;
-  type?: "project" | "track" | "range";
+  type?: "project" | "track" | "range" | "stems";
   path: string;
   progress: number;
   samplesWritten?: number;
@@ -219,25 +221,7 @@ export interface DecentSamplerImportSample {
   endSample?: number;
 }
 
-export interface DecentSamplerUiBinding {
-  type?: string;
-  level?: string;
-  parameter?: string;
-  position?: number;
-}
-
-export interface DecentSamplerUiControl {
-  kind: string;
-  label: string;
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-  minValue?: number;
-  maxValue?: number;
-  value?: number;
-  bindings?: DecentSamplerUiBinding[];
-}
+export type { DecentSamplerUiBinding, DecentSamplerUiControl };
 
 export interface DecentSamplerEffect {
   type: string;
@@ -299,6 +283,7 @@ export type OutboundRequest =
   | { kind: "project.exportWavAsync"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; options?: ProjectExportOptions }
   | { kind: "project.exportTrackWavAsync"; project: Project; trackId: Id; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; options?: ProjectExportOptions }
   | { kind: "project.exportRangeWavAsync"; project: Project; startBeat: Beats; endBeat: Beats; includeTail?: boolean; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; options?: ProjectExportOptions }
+  | { kind: "project.exportAllTrackWavsAsync"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; options?: ProjectExportOptions }
   | { kind: "project.exportCancel" }
   | { kind: "project.exportStatus" }
   // Tracks / segments — the audio engine reflects these into its model -----
@@ -358,6 +343,7 @@ export type ResponseFor<R extends OutboundRequest> =
   R extends { kind: "project.exportWavAsync" } ? { started: boolean; job: ProjectExportJobStatus; error?: string } :
   R extends { kind: "project.exportTrackWavAsync" } ? { started: boolean; job: ProjectExportJobStatus; error?: string } :
   R extends { kind: "project.exportRangeWavAsync" } ? { started: boolean; job: ProjectExportJobStatus; error?: string } :
+  R extends { kind: "project.exportAllTrackWavsAsync" } ? { started: boolean; job: ProjectExportJobStatus; error?: string } :
   R extends { kind: "project.exportCancel" } ? ProjectExportJobStatus :
   R extends { kind: "project.exportStatus" } ? ProjectExportJobStatus :
   R extends { kind: "instrument.list" }? { instruments: Instrument[] } :

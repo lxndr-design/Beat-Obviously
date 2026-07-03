@@ -23,8 +23,8 @@ export function TrackHeader(props: Props) {
   const [editingName, setEditingName] = createSignal(false);
   const [dropPosition, setDropPosition] = createSignal<"above" | "below" | null>(null);
   const duplicateTrack = duplicateTrackAction;
-  const meterPeak = createMemo(() => clamp01(meter()?.peak ?? 0));
-  const meterRms = createMemo(() => clamp01(meter()?.rms ?? 0));
+  const leftMeterPeak = createMemo(() => clamp01(meter()?.leftPeak ?? meter()?.peak ?? 0));
+  const rightMeterPeak = createMemo(() => clamp01(meter()?.rightPeak ?? meter()?.peak ?? 0));
   const gainBadge = createMemo(() => formatGainBadge(track()?.gainDb ?? 0));
   const panBadge = createMemo(() => formatPanBadge(track()?.pan ?? 0));
 
@@ -226,12 +226,12 @@ export function TrackHeader(props: Props) {
                 </button>
               </HoverInfo>
             </div>
-            <div class={styles.meter} aria-hidden="true">
-              <span class={styles.meterLane}>
-                <span class={styles.meterFill} style={{ transform: `scaleX(${meterPeak()})` }} />
+            <div class={styles.meter} aria-label="Stereo track meter" role="group">
+              <span class={styles.meterLane} data-meter-channel="left">
+                <span class={styles.meterFill} style={{ transform: `scaleX(${leftMeterPeak()})` }} />
               </span>
-              <span class={styles.meterLane}>
-                <span class={styles.meterFill} style={{ transform: `scaleX(${meterRms()})` }} />
+              <span class={styles.meterLane} data-meter-channel="right">
+                <span class={styles.meterFill} style={{ transform: `scaleX(${rightMeterPeak()})` }} />
               </span>
             </div>
             <Show when={gainBadge() || panBadge() || current().recordArmed || current().inputMonitoring}>

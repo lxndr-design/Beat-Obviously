@@ -14,6 +14,7 @@ export interface NumberInputProps {
   inputClassName?: string;
   commitOnChange?: boolean;
   maxLength?: number;
+  disabled?: boolean;
   onChange: (v: number) => void;
 }
 
@@ -27,6 +28,7 @@ export function NumberInput(props: NumberInputProps) {
   });
 
   function commit(raw: string) {
+    if (props.disabled) return;
     const parsed = parseFloat(raw);
     if (Number.isNaN(parsed)) {
       setText(String(props.value));
@@ -38,6 +40,7 @@ export function NumberInput(props: NumberInputProps) {
   }
 
   function updateText(raw: string) {
+    if (props.disabled) return;
     setText(raw);
     if (!props.commitOnChange) return;
     const parsed = parseFloat(raw);
@@ -46,6 +49,7 @@ export function NumberInput(props: NumberInputProps) {
   }
 
   function onKeyDown(event: KeyboardEvent) {
+    if (props.disabled) return;
     if (event.key === "ArrowUp") {
       event.preventDefault();
       commit(String(props.value + (event.shiftKey ? (props.step ?? 1) * 10 : props.step ?? 1)));
@@ -76,6 +80,7 @@ export function NumberInput(props: NumberInputProps) {
           inputMode="decimal"
           aria-label={props.ariaLabel ?? props.label}
           maxLength={props.maxLength}
+          disabled={props.disabled}
           value={text()}
           onInput={(event) => updateText(event.currentTarget.value)}
           onFocus={() => setEditing(true)}

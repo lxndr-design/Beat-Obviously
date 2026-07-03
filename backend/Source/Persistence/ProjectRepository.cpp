@@ -54,6 +54,7 @@ namespace beat
             o->setProperty("associatedInstrumentId", plugin.associatedInstrumentId);
             o->setProperty("uiWidth", plugin.uiWidth);
             o->setProperty("uiHeight", plugin.uiHeight);
+            o->setProperty("uiControlDetails", plugin.uiControlDetails);
             o->setProperty("sampleCount", plugin.sampleCount);
             o->setProperty("uiControlCount", plugin.uiControlCount);
             o->setProperty("factory", plugin.factory);
@@ -753,6 +754,113 @@ namespace beat
             return juce::var(o.get());
         }
 
+        juce::String nodemapString(std::string_view value)
+        {
+            return juce::String(value.data(), value.size());
+        }
+
+        juce::var nodemapNodeToVar(const Nodemap::Node& node)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("id", nodemapString(node.id));
+            o->setProperty("kind", nodemapString(Nodemap::nodeKindToString(node.kind)));
+            o->setProperty("label", nodemapString(node.label));
+            o->setProperty("x", node.x);
+            o->setProperty("y", node.y);
+
+            juce::DynamicObject::Ptr params = new juce::DynamicObject();
+            for (const auto& [key, value] : node.params)
+                params->setProperty(juce::Identifier(nodemapString(key)), value);
+            o->setProperty("params", juce::var(params.get()));
+            return juce::var(o.get());
+        }
+
+        juce::var nodemapCableToVar(const Nodemap::Cable& cable)
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("id", nodemapString(cable.id));
+            o->setProperty("fromNodeId", nodemapString(cable.fromNodeId));
+            o->setProperty("fromPortId", nodemapString(cable.fromPortId));
+            o->setProperty("toNodeId", nodemapString(cable.toNodeId));
+            o->setProperty("toPortId", nodemapString(cable.toPortId));
+            o->setProperty("amount", cable.amount);
+            return juce::var(o.get());
+        }
+
+        juce::var nodemapGraphToVar(const Nodemap::Graph& graph)
+        {
+            const auto normalized = Nodemap::validateAndNormalize(graph).graph;
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("schemaVersion", normalized.schemaVersion);
+
+            juce::Array<juce::var> nodes;
+            for (const auto& node : normalized.nodes)
+                nodes.add(nodemapNodeToVar(node));
+            o->setProperty("nodes", nodes);
+
+            juce::Array<juce::var> cables;
+            for (const auto& cable : normalized.cables)
+                cables.add(nodemapCableToVar(cable));
+            o->setProperty("cables", cables);
+            return juce::var(o.get());
+        }
+
+        std::optional<Nodemap::Graph> nodemapGraphFromVar(const juce::var& graphVar)
+        {
+            if (!graphVar.isObject())
+                return std::nullopt;
+
+            Nodemap::Graph graph;
+            graph.schemaVersion = juce::jmax(1, (int) graphVar.getProperty("schemaVersion", 1));
+
+            if (auto* nodes = graphVar.getProperty("nodes", {}).getArray())
+            {
+                for (const auto& nv : *nodes)
+                {
+                    if (!nv.isObject())
+                        continue;
+                    const auto kind = Nodemap::nodeKindFromString(nv.getProperty("kind", "oscillator").toString().toStdString());
+                    if (!kind)
+                        continue;
+
+                    Nodemap::Node node;
+                    node.id = nv.getProperty("id", "").toString().toStdString();
+                    node.kind = *kind;
+                    node.label = nv.getProperty("label", juce::String(Nodemap::definitionFor(*kind).label)).toString().toStdString();
+                    node.x = (double) nv.getProperty("x", 0.0);
+                    node.y = (double) nv.getProperty("y", 0.0);
+
+                    const auto paramsVar = nv.getProperty("params", {});
+                    if (auto* params = paramsVar.getDynamicObject())
+                    {
+                        const auto& properties = params->getProperties();
+                        for (int i = 0; i < properties.size(); ++i)
+                            node.params[properties.getName(i).toString().toStdString()] = (float) (double) properties.getValueAt(i);
+                    }
+                    graph.nodes.push_back(std::move(node));
+                }
+            }
+
+            if (auto* cables = graphVar.getProperty("cables", {}).getArray())
+            {
+                for (const auto& cv : *cables)
+                {
+                    if (!cv.isObject())
+                        continue;
+                    Nodemap::Cable cable;
+                    cable.id = cv.getProperty("id", "").toString().toStdString();
+                    cable.fromNodeId = cv.getProperty("fromNodeId", "").toString().toStdString();
+                    cable.fromPortId = cv.getProperty("fromPortId", "").toString().toStdString();
+                    cable.toNodeId = cv.getProperty("toNodeId", "").toString().toStdString();
+                    cable.toPortId = cv.getProperty("toPortId", "").toString().toStdString();
+                    cable.amount = juce::jlimit(-16.0f, 16.0f, (float) (double) cv.getProperty("amount", 1.0));
+                    graph.cables.push_back(std::move(cable));
+                }
+            }
+
+            return Nodemap::validateAndNormalize(graph).graph;
+        }
+
         juce::var instrumentToVar(const InstrumentDefinition& instrument)
         {
             juce::DynamicObject::Ptr o = new juce::DynamicObject();
@@ -828,6 +936,10 @@ namespace beat
             o->setProperty("hasAether", instrument.hasAether);
             if (instrument.hasAether)
                 o->setProperty("aether", aetherConfigToVar(instrument.aether));
+            if (instrument.nodeGraph)
+                o->setProperty("nodeGraph", nodemapGraphToVar(*instrument.nodeGraph));
+            if (!instrument.taxonomy.isVoid())
+                o->setProperty("taxonomy", instrument.taxonomy);
 
             juce::Array<juce::var> effectArr;
             for (const auto& effect : instrument.effects)
@@ -1011,6 +1123,7 @@ namespace beat
                             instrument.macroValues[(size_t) i] = juce::jlimit(0.0f, 1.0f, (float) (double) macroValues->getReference(i));
                     }
                     instrument.dynamicModulation = dynamicModulationFromVar(iv.getProperty("dynamicModulation", {}), instrument.dynamicModulation);
+                    instrument.taxonomy = iv.getProperty("taxonomy", {});
                     instrument.hasAether = (bool) iv.getProperty("hasAether", instrument.hasAether);
                     InstrumentDefinition::WavetableConfig globalWavetable;
                     globalWavetable.bank = instrument.wavetableBank;
@@ -1026,6 +1139,7 @@ namespace beat
                         instrument.hasAether = true;
                         instrument.aether = aetherConfigFromVar(aether, globalWavetable);
                     }
+                    instrument.nodeGraph = nodemapGraphFromVar(iv.getProperty("nodeGraph", {}));
 
                     if (auto* filters = iv.getProperty("effects", {}).getProperty("filters", {}).getArray())
                     {
@@ -1118,6 +1232,7 @@ namespace beat
                     plugin.associatedInstrumentId = pv.getProperty("associatedInstrumentId", "").toString();
                     plugin.uiWidth = (int) pv.getProperty("uiWidth", 0);
                     plugin.uiHeight = (int) pv.getProperty("uiHeight", 0);
+                    plugin.uiControlDetails = pv.getProperty("uiControlDetails", {});
                     plugin.sampleCount = (int) pv.getProperty("sampleCount", 0);
                     plugin.uiControlCount = (int) pv.getProperty("uiControlCount", 0);
                     plugin.factory = (bool) pv.getProperty("factory", false);

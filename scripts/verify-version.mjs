@@ -52,6 +52,48 @@ const backendCmake = readText(backendCmakePath);
 if (!/VERSION\s+\$\{BEAT_VERSION\}/.test(backendCmake))
   fail(`${rel(backendCmakePath)} juce_add_gui_app() must use VERSION \${BEAT_VERSION}`);
 
+const nativeMainPath = join(repoRoot, "backend", "Source", "Main.cpp");
+const nativeMain = readText(nativeMainPath);
+assertVersion(
+  "backend/Source/Main.cpp application",
+  nativeMainPath,
+  nativeMain.match(/getApplicationVersion\(\)\s+override\s+\{\s+return\s+"([^"]+)"/)?.[1],
+  version,
+);
+
+const messageBridgePath = join(repoRoot, "backend", "Source", "Ipc", "MessageBridge.cpp");
+const messageBridge = readText(messageBridgePath);
+assertVersion(
+  "backend ping backendVersion",
+  messageBridgePath,
+  messageBridge.match(/backendVersion",\s*"([^"]+)"/)?.[1],
+  version,
+);
+
+const storePath = join(repoRoot, "frontend", "src", "state", "store.ts");
+const storeSource = readText(storePath);
+assertVersion(
+  "Aether Bridge Host adapter",
+  storePath,
+  storeSource.match(/name:\s*"Aether Bridge Host"[\s\S]*?version:\s*"([^"]+)"/)?.[1],
+  version,
+);
+
+const appPlistPath = join(repoRoot, "Beat.app", "Contents", "Info.plist");
+const appPlist = readText(appPlistPath);
+assertVersion(
+  "Beat.app CFBundleShortVersionString",
+  appPlistPath,
+  appPlist.match(/<key>CFBundleShortVersionString<\/key>\s*<string>([^<]+)<\/string>/)?.[1],
+  version,
+);
+assertVersion(
+  "Beat.app CFBundleVersion",
+  appPlistPath,
+  appPlist.match(/<key>CFBundleVersion<\/key>\s*<string>([^<]+)<\/string>/)?.[1],
+  version,
+);
+
 if (failures.length > 0) {
   console.error("Version verifier failed:");
   for (const failure of failures) console.error(`- ${failure}`);

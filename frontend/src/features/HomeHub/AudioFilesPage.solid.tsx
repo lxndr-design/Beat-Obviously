@@ -4,8 +4,9 @@ import { ActionFooter, Button, HoverInfo, Icon, MarqueeText } from "../../solid-
 import { importAudioFiles } from "../../audio/audioImport";
 import { isNative, send } from "../../ipc/bridge";
 import type { AudioWaveformSummary } from "../../ipc/schema";
-import { useAudioFileStore, useInstrumentStore, useProjectStore } from "../../state/store";
-import type { AudioFile, Instrument } from "../../state/types";
+import { buildCurrentBeatDocumentFingerprint } from "../../persistence/beatDocument";
+import { useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore } from "../../state/store";
+import type { AudioFile, Instrument, Track } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { AssetPageShell, AssetStateMessage } from "./AssetPageShell.solid";
 import styles from "./AudioFilesPage.module.css";
@@ -50,6 +51,7 @@ export function AudioFilesPage() {
   let previewRef: { ctx: AudioContext; source: AudioBufferSourceNode } | null = null;
   let progressFrame: number | null = null;
   let playbackBarRef: HTMLDivElement | undefined;
+  const nativeAvailable = isNative();
   const progressRef: { current: { startTime: number; duration: number; direction: PreviewDirection; loop: boolean } } = { current: {
     startTime: 0,
     duration: 1,
@@ -174,15 +176,38 @@ export function AudioFilesPage() {
     });
   }
 
-  async function deleteSelected() {
+  async function removeSelectedEntries() {
     if (selectedIds().size === 0) return;
-    if (!await appConfirm(`Delete ${selectedIds().size} audio file${selectedIds().size === 1 ? "" : "s"} from the Beat library?`)) return;
+    const referenced = selectedReferencedAudioFiles(files(), selectedIds(), tracks(), instruments());
+    if (referenced.length > 0) {
+      await appAlert(`Remove blocked. ${referenced.length} selected audio entr${referenced.length === 1 ? "y is" : "ies are"} still used by tracks, segments, or instruments.`);
+      return;
+    }
+    if (!await appConfirm(`Remove ${selectedIds().size} unused audio entr${selectedIds().size === 1 ? "y" : "ies"} from the Beat library? Files on disk will not be deleted.`)) return;
+    stopPreview();
+    selectedIds().forEach((id) => removeFile(id));
+    useDocumentStore.getState().markDirty(buildCurrentBeatDocumentFingerprint());
+    setSelectedIds(new Set<string>());
+    setSelectMode(false);
+  }
+
+  async function deleteSelectedFiles() {
+    if (selectedIds().size === 0) return;
+    const referenced = selectedReferencedAudioFiles(files(), selectedIds(), tracks(), instruments());
+    if (referenced.length > 0) {
+      await appAlert(`Delete blocked. ${referenced.length} selected audio entr${referenced.length === 1 ? "y is" : "ies are"} still used by tracks, segments, or instruments.`);
+      return;
+    }
+    if (!nativeAvailable) {
+      await appAlert("Deleting audio files from disk is only available in the native app.");
+      return;
+    }
+    if (!await appConfirm(`Delete ${selectedIds().size} unused audio file${selectedIds().size === 1 ? "" : "s"} from disk and remove from the Beat library? This cannot be undone.`)) return;
     stopPreview();
     const response = await send({ kind: "audio.delete", ids: [...selectedIds()], deleteFiles: true });
     response.deletedIds.forEach((id) => removeFile(id));
-    if (response.failedIds.length > 0) {
-      await appAlert(response.error ?? "Some audio files could not be deleted.");
-    }
+    if (response.deletedIds.length > 0) useDocumentStore.getState().markDirty(buildCurrentBeatDocumentFingerprint());
+    if (response.failedIds.length > 0) await appAlert(response.error ?? "Some audio files could not be deleted.");
     setSelectedIds(new Set<string>());
     setSelectMode(false);
   }
@@ -377,10 +402,16 @@ export function AudioFilesPage() {
             <Icon name="ph:plus" size={14} decorative />
             Import Audio
           </Button>
-          <HoverInfo content="Delete selected audio files">
-            <Button variant="danger" disabled={selectedCount() === 0} onClick={deleteSelected} aria-label="Delete selected audio files">
+          <HoverInfo content="Remove selected unused entries from the Beat library without deleting files">
+            <Button disabled={selectedCount() === 0} onClick={removeSelectedEntries} aria-label="Remove selected audio entries">
+              <Icon name="ph:minus" size={14} decorative />
+              Remove Entry
+            </Button>
+          </HoverInfo>
+          <HoverInfo content="Delete selected unused files from disk and remove them from the library">
+            <Button variant="danger" disabled={selectedCount() === 0 || !nativeAvailable} onClick={deleteSelectedFiles} aria-label="Delete selected audio files from disk">
               <Icon name="ph:trash" size={14} decorative />
-              Delete
+              Delete Files
             </Button>
           </HoverInfo>
         </div>
@@ -1259,13 +1290,36 @@ function formatPlaybackResolution(file: AudioFile) {
   return `${sampleRate} / ${bitDepth}`;
 }
 
-function formatUsage(fileId: string, tracks: ReturnType<typeof useProjectStore.getState>["project"]["tracks"]) {
+function formatUsage(fileId: string, tracks: Track[]) {
   const count = tracks.reduce((sum, track) => (
-    sum + track.segments.filter((segment) => (
+    sum
+    + (track.audioFileId === fileId ? 1 : 0)
+    + track.segments.filter((segment) => (
       (segment.payload.kind === "audio" || segment.payload.kind === "mixed") && segment.payload.audioFileId === fileId
     )).length
   ), 0);
-  return count > 0 ? `${count} segment${count === 1 ? "" : "s"}` : "No open project";
+  return count > 0 ? `${count} project reference${count === 1 ? "" : "s"}` : "No open project";
+}
+
+function selectedReferencedAudioFiles(files: AudioFile[], selectedIds: Set<string>, tracks: Track[], instruments: Instrument[]) {
+  return files.filter((file) => selectedIds.has(file.id) && (
+    audioFileIdUsedByProject(file.id, tracks)
+    || audioFileIdUsedByInstrument(file.id, instruments)
+  ));
+}
+
+function audioFileIdUsedByProject(fileId: string, tracks: Track[]) {
+  return tracks.some((track) => (
+    track.audioFileId === fileId
+    || track.segments.some((segment) => (
+      (segment.payload.kind === "audio" || segment.payload.kind === "mixed")
+      && segment.payload.audioFileId === fileId
+    ))
+  ));
+}
+
+function audioFileIdUsedByInstrument(fileId: string, instruments: Instrument[]) {
+  return instruments.some((instrument) => instrument.sampleIds.includes(fileId));
 }
 
 function formatInstrumentUsage(file: AudioFile, instruments: Instrument[]) {

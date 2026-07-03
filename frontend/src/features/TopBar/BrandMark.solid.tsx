@@ -1,10 +1,10 @@
-import { Icon } from "../../solid-ui";
+import { AppLogo } from "../../solid-ui";
 import styles from "./BrandMark.module.css";
 
 export function BrandMark() {
   return (
     <div class={`${styles.mark} brandMark`} aria-label="Beat">
-      <Icon name="ph:music-note" size={16} decorative />
+      <AppLogo class={styles.logo} />
     </div>
   );
 }

@@ -13,6 +13,9 @@ export interface AetherPresetLibraryEntry {
   name: string;
   description: string;
   tags: string[];
+  family: string;
+  role: string;
+  auditionNote: string;
   favorite: boolean;
   routeCount: number;
   effectCount: number;
@@ -92,6 +95,9 @@ function factoryPresetEntry(preset: SynthFactoryPresetRecord): AetherPresetLibra
     name: preset.name,
     description: preset.description,
     tags: preset.tags.filter((tag) => tag !== "factory"),
+    family: preset.family,
+    role: preset.role,
+    auditionNote: preset.auditionNote,
     favorite: false,
     routeCount: preset.patch.modulation.length,
     effectCount: preset.patch.effects?.filters.length ?? 0,
@@ -110,6 +116,9 @@ function userPresetEntry(preset: SynthPresetRecord): AetherPresetLibraryEntry {
     name: preset.name,
     description: `${routeCount} routes / ${effectCount} instrument FX`,
     tags,
+    family: categoryFromTags(tags, "User"),
+    role: tags.find((tag) => tag !== "aether") ?? "user preset",
+    auditionNote: "User preset; audition from the saved instrument context.",
     favorite: preset.favorite,
     routeCount,
     effectCount,
@@ -129,6 +138,9 @@ function userInstrumentEntry(instrument: Instrument): AetherPresetLibraryEntry {
     name: instrument.name,
     description: `${routeCount} routes / ${effectCount} instrument FX`,
     tags,
+    family: categoryFromTags(tags, instrument.kind === "wavetable" ? "Wavetable" : "Synth"),
+    role: tags.find((tag) => tag !== "aether") ?? instrument.kind,
+    auditionNote: "User instrument; audition against its saved source and current project context.",
     favorite: false,
     routeCount,
     effectCount,
@@ -176,6 +188,9 @@ function searchablePresetText(entry: AetherPresetLibraryEntry): string {
     entry.name,
     entry.sourceLabel,
     entry.category,
+    entry.family,
+    entry.role,
+    entry.auditionNote,
     entry.description,
     ...entry.tags,
   ].join(" "));

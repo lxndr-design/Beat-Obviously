@@ -26,11 +26,44 @@ try {
   execFileSync(
     esbuild,
     [
+      join(repoRoot, "frontend/src/state/components.ts"),
+      "--bundle",
+      "--format=esm",
+      "--platform=node",
+      `--outfile=${join(outDir, "components.js")}`,
+    ],
+    { stdio: "inherit" },
+  );
+  execFileSync(
+    esbuild,
+    [
       join(repoRoot, "frontend/src/features/Tracks/geometry.ts"),
       "--bundle",
       "--format=esm",
       "--platform=node",
       `--outfile=${join(outDir, "geometry.js")}`,
+    ],
+    { stdio: "inherit" },
+  );
+  execFileSync(
+    esbuild,
+    [
+      join(repoRoot, "frontend/src/audio/synthPreview.ts"),
+      "--bundle",
+      "--format=esm",
+      "--platform=node",
+      `--outfile=${join(outDir, "synthPreview.js")}`,
+    ],
+    { stdio: "inherit" },
+  );
+  execFileSync(
+    esbuild,
+    [
+      join(repoRoot, "frontend/src/state/drumSteps.ts"),
+      "--bundle",
+      "--format=esm",
+      "--platform=node",
+      `--outfile=${join(outDir, "drumSteps.js")}`,
     ],
     { stdio: "inherit" },
   );
@@ -56,13 +89,376 @@ try {
     ],
     { stdio: "inherit" },
   );
+  execFileSync(
+    esbuild,
+    [
+      join(repoRoot, "frontend/src/state/exportStore.ts"),
+      "--bundle",
+      "--format=esm",
+      "--platform=node",
+      `--outfile=${join(outDir, "exportStore.js")}`,
+    ],
+    { stdio: "inherit" },
+  );
+  execFileSync(
+    esbuild,
+    [
+      join(repoRoot, "frontend/src/persistence/assetReferenceGraph.ts"),
+      "--bundle",
+      "--format=esm",
+      "--platform=node",
+      `--outfile=${join(outDir, "assetReferenceGraph.js")}`,
+    ],
+    { stdio: "inherit" },
+  );
 
   const store = await import(pathToFileURL(join(outDir, "store.js")));
+  const components = await import(pathToFileURL(join(outDir, "components.js")));
   const geometry = await import(pathToFileURL(join(outDir, "geometry.js")));
+  const synthPreview = await import(pathToFileURL(join(outDir, "synthPreview.js")));
+  const drumSteps = await import(pathToFileURL(join(outDir, "drumSteps.js")));
   const trackEffects = await import(pathToFileURL(join(outDir, "trackEffects.js")));
   const curves = await import(pathToFileURL(join(outDir, "curves.js")));
+  const exportStore = await import(pathToFileURL(join(outDir, "exportStore.js")));
+  const assetReferenceGraph = await import(pathToFileURL(join(outDir, "assetReferenceGraph.js")));
   const projectStore = store.useProjectStore.getState();
   projectStore.loadProject(store.createEmptyProject());
+  const mixerTrackId = store.useProjectStore.getState().project.tracks[0].id;
+  const trackEffectA = store.useProjectStore.getState().addTrackEffect(mixerTrackId, "reverb");
+  const trackEffectB = store.useProjectStore.getState().addTrackEffect(mixerTrackId, "delay");
+  store.useProjectStore.getState().updateTrackEffect(mixerTrackId, trackEffectA, { bypassed: true });
+  store.useProjectStore.getState().moveTrackEffect(mixerTrackId, trackEffectB, -1);
+  let mixerTrack = store.useProjectStore.getState().project.tracks[0];
+  assert.equal(mixerTrack.effects.filters[0].id, trackEffectB, "mixer store should reorder track inserts");
+  assert.equal(mixerTrack.effects.filters.find((effect) => effect.id === trackEffectA).bypassed, true, "mixer store should update track insert bypass");
+  store.useProjectStore.getState().removeTrackEffect(mixerTrackId, trackEffectA);
+  mixerTrack = store.useProjectStore.getState().project.tracks[0];
+  assert.equal(mixerTrack.effects.filters.some((effect) => effect.id === trackEffectA), false, "mixer store should remove track inserts");
+  const returnBusId = store.useProjectStore.getState().addReturnBus("Delay Return");
+  store.useProjectStore.getState().upsertTrackSend(mixerTrackId, returnBusId, { enabled: true, gainDb: -9, pan: 0.25 });
+  store.useProjectStore.getState().updateReturnBus(returnBusId, { gainDb: -3, pan: -0.2, mute: true });
+  const returnEffectId = store.useProjectStore.getState().addReturnBusEffect(returnBusId, "delay");
+  const returnEffectB = store.useProjectStore.getState().addReturnBusEffect(returnBusId, "chorus");
+  store.useProjectStore.getState().updateReturnBusEffect(returnBusId, returnEffectId, { bypassed: true });
+  store.useProjectStore.getState().moveReturnBusEffect(returnBusId, returnEffectB, -1);
+  const mixerProject = store.useProjectStore.getState().project;
+  assert.equal(mixerProject.returnBuses.length, 1, "mixer store should create return buses");
+  assert.equal(mixerProject.returnBuses[0].name, "Delay Return", "mixer store should preserve return bus names");
+  assert.equal(mixerProject.returnBuses[0].gainDb, -3, "mixer store should update return bus level");
+  assert.equal(mixerProject.returnBuses[0].pan, -0.2, "mixer store should update return bus pan");
+  assert.equal(mixerProject.returnBuses[0].mute, true, "mixer store should update return bus mute");
+  assert.equal(mixerProject.returnBuses[0].effects.filters[0].id, returnEffectB, "mixer store should reorder return bus inserts");
+  assert.equal(mixerProject.returnBuses[0].effects.filters.find((effect) => effect.id === returnEffectId).bypassed, true, "mixer store should update return bus insert bypass");
+  store.useProjectStore.getState().removeReturnBusEffect(returnBusId, returnEffectId);
+  assert.equal(store.useProjectStore.getState().project.returnBuses[0].effects.filters.some((effect) => effect.id === returnEffectId), false, "mixer store should remove return bus inserts");
+  assert.equal(mixerProject.tracks[0].sends?.[0]?.busId, returnBusId, "mixer store should create track sends to return buses");
+  assert.equal(mixerProject.tracks[0].sends?.[0]?.gainDb, -9, "mixer store should update send gain");
+  assert.equal(mixerProject.tracks[0].sends?.[0]?.pan, 0.25, "mixer store should update send pan");
+  store.useProjectStore.getState().removeReturnBus(returnBusId);
+  assert.equal(store.useProjectStore.getState().project.returnBuses.length, 0, "removing a return bus should remove it from the project");
+  assert.equal(store.useProjectStore.getState().project.tracks[0].sends?.length ?? 0, 0, "removing a return bus should remove dependent track sends");
+
+  const assetManifest = assetReferenceGraph.buildAssetManifest({
+    audioFiles: [{ id: "audio-a", name: "Loop.wav", path: "/Users/alex/Loop.wav", durationSeconds: 1, sampleRate: 44100 }],
+    instruments: [{
+      id: "sampler-a",
+      name: "Sampler A",
+      kind: "sampler",
+      sampleIds: ["audio-a"],
+      sampleUrl: "/Users/alex/Snare.wav",
+      sampleUrls: ["/Users/alex/Snare.wav", "/samples/Bundled Hat.wav"],
+      sampleMap: [{ id: "zone-a", name: "Kick Zone", path: "/Users/alex/Kick.wav", rootNote: 36, loNote: 36, hiNote: 36, loVel: 1, hiVel: 127 }],
+    }],
+    plugins: [{ id: "plugin-a", name: "DS Pack", sourcePath: "/Users/alex/Pack.dspreset" }],
+    project: {
+      tracks: [{
+        id: "track-a",
+        audioFileId: "audio-a",
+        segments: [{ id: "segment-a", payload: { kind: "audio", audioFileId: "audio-a" } }],
+      }],
+    },
+  });
+  assert.equal(assetManifest.length, 5, "asset manifest should de-duplicate repeated sample references");
+  assert.deepEqual(
+    assetManifest.find((asset) => asset.path === "/Users/alex/Loop.wav").references,
+    ["audioFile:audio-a", "track:track-a:audioFileId", "track:track-a:segment:segment-a:audioFileId", "instrument:sampler-a:sampleIds:0"],
+    "asset manifest should expose audio library, track, segment, and instrument sample-id references for safe cleanup decisions",
+  );
+  assert.equal(
+    assetManifest.find((asset) => asset.path === "/Users/alex/Snare.wav").references.length,
+    2,
+    "asset manifest should preserve multiple references to the same sample path",
+  );
+  const assetRows = assetReferenceGraph.buildProjectAssetReferenceRows({ assets: assetManifest }, [
+    { id: "missing-snare", kind: "sample", path: "/Users/alex/Snare.wav", policy: "external", references: [] },
+  ]);
+  assert.equal(assetRows[0].path, "/Users/alex/Snare.wav", "missing project assets should sort to the top of the asset browser");
+  assert.equal(assetRows[0].state, "missing", "asset rows should expose missing state");
+  assert.equal(assetRows.find((asset) => asset.path === "/samples/Bundled Hat.wav").managed, true, "asset rows should expose bundled/managed state");
+  assert.equal(assetRows.find((asset) => asset.path === "/Users/alex/Pack.dspreset").state, "plugin", "plugin package assets should keep plugin state");
+
+  assert.ok(exportStore.FACTORY_EXPORT_PRESETS.length >= 5, "export review should expose factory presets");
+  assert.ok(
+    exportStore.FACTORY_EXPORT_PRESETS.some((preset) => preset.target === "project")
+      && exportStore.FACTORY_EXPORT_PRESETS.some((preset) => preset.target === "range")
+      && exportStore.FACTORY_EXPORT_PRESETS.some((preset) => preset.target === "track")
+      && exportStore.FACTORY_EXPORT_PRESETS.some((preset) => preset.target === "stems"),
+    "export presets should cover full project, review range, selected stem, and all-stems targets",
+  );
+  assert.deepEqual(
+    exportStore.normalizeExportOptions({ sampleRate: 123, bitDepth: 99, channels: 9, blockSize: 7 }),
+    { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512 },
+    "export option normalization should reject unsupported render settings",
+  );
+  assert.deepEqual(
+    exportStore.normalizeExportOptions({ sampleRate: 44100, bitDepth: 16, channels: 1, blockSize: 1024 }),
+    { sampleRate: 44100, bitDepth: 16, channels: 1, blockSize: 1024 },
+    "export option normalization should preserve supported preset settings",
+  );
+  assert.equal(
+    exportStore.exportPresetById("full-mix-review", "range").target,
+    "range",
+    "export preset resolver should not apply project presets to range exports",
+  );
+  const exportState = exportStore.useExportStore.getState();
+  exportState.setSelectedPresetId("selected-stem");
+  assert.equal(exportStore.useExportStore.getState().selectedPresetId, "selected-stem");
+  exportState.setSelectedPresetId("missing");
+  assert.equal(exportStore.useExportStore.getState().selectedPresetId, "full-mix-review");
+  const customExportPresetId = exportState.saveUserPreset("Archive Mono", {
+    ...exportStore.FACTORY_EXPORT_PRESETS[0],
+    options: { sampleRate: 44100, bitDepth: 16, channels: 1, blockSize: 1024 },
+  });
+  assert.equal(exportStore.useExportStore.getState().selectedPresetId, customExportPresetId);
+  assert.equal(exportStore.exportPresetById(customExportPresetId, "project").options.channels, 1);
+  exportStore.useExportStore.getState().updateUserPreset(customExportPresetId, {
+    options: { sampleRate: 96000, bitDepth: 32, channels: 2, blockSize: 2048 },
+    includeTail: false,
+  });
+  assert.deepEqual(
+    exportStore.exportPresetById(customExportPresetId, "project").options,
+    { sampleRate: 96000, bitDepth: 32, channels: 2, blockSize: 2048 },
+    "custom export presets should support editable render settings",
+  );
+  assert.equal(exportStore.exportPresetById(customExportPresetId, "project").includeTail, false);
+  exportStore.useExportStore.getState().deleteUserPreset(customExportPresetId);
+  assert.equal(
+    exportStore.useExportStore.getState().userPresets.some((preset) => preset.id === customExportPresetId),
+    false,
+    "custom export presets should be deletable",
+  );
+  exportState.setJob({ active: false, finished: true, ok: true, type: "project", path: "/tmp/a.wav", progress: 1 });
+  exportState.setJob({ active: false, finished: true, ok: true, type: "project", path: "/tmp/b.wav", progress: 1 });
+  exportState.setJob({ active: false, finished: true, ok: true, type: "project", path: "/tmp/a.wav", progress: 1 });
+  assert.deepEqual(
+    exportStore.useExportStore.getState().recentDestinations.slice(0, 2),
+    ["/tmp/a.wav", "/tmp/b.wav"],
+    "export jobs should maintain de-duplicated recent destination history",
+  );
+  assert.equal(
+    exportStore.recentExportFolder(exportStore.useExportStore.getState().recentDestinations),
+    "/tmp",
+    "export history should derive the default export folder from the most recent destination",
+  );
+  exportState.removeRecentDestination("/tmp/b.wav");
+  assert.deepEqual(
+    exportStore.useExportStore.getState().recentDestinations,
+    ["/tmp/a.wav"],
+    "export history should support removing a single recent destination",
+  );
+  exportState.addRecentDestination("/tmp/c.wav");
+  exportState.clearRecentDestinations();
+  assert.deepEqual(
+    exportStore.useExportStore.getState().recentDestinations,
+    [],
+    "export history should support clearing all recent destinations",
+  );
+  const cleanExportValidation = exportStore.exportValidationStatusFromReport(
+    { ok: true, errorCount: 0, warningCount: 0, issues: [] },
+    [],
+    1000,
+  );
+  assert.equal(cleanExportValidation.state, "passed", "clean Project Health reports should allow export");
+  assert.equal(exportStore.exportValidationBlocksExport(cleanExportValidation), false);
+  const warningExportValidation = exportStore.exportValidationStatusFromReport(
+    { ok: true, errorCount: 0, warningCount: 2, issues: [] },
+    [],
+    1000,
+  );
+  assert.equal(warningExportValidation.state, "warning", "Project Health warnings should be visible but non-blocking");
+  assert.equal(exportStore.exportValidationBlocksExport(warningExportValidation), false);
+  const blockedExportValidation = exportStore.exportValidationStatusFromReport(
+    { ok: false, errorCount: 1, warningCount: 3, issues: [] },
+    [{ id: "asset-1", kind: "audio", path: "/missing.wav", policy: "external", references: ["segment-a"] }],
+    1000,
+  );
+  assert.equal(blockedExportValidation.state, "blocked", "Project Health errors or missing media should block export");
+  assert.equal(blockedExportValidation.missingAssetCount, 1);
+  assert.equal(exportStore.exportValidationBlocksExport(blockedExportValidation), true);
+  const failedExportValidation = exportStore.failedExportValidationStatus("Project Health scan failed.", 1000);
+  assert.equal(failedExportValidation.state, "failed", "Project Health scan failures should block export");
+  assert.equal(exportStore.exportValidationBlocksExport(failedExportValidation), true);
+
+  store.useInstrumentStore.getState().seedSystemInstruments();
+  const legacySynthProbeId = store.useInstrumentStore.getState().addInstrument({
+    name: "Legacy Synth Creation Probe",
+    kind: "synth",
+    waveform: "saw",
+    userCreated: true,
+  });
+  const legacySynthProbe = store.useInstrumentStore.getState().instruments.find((candidate) => candidate.id === legacySynthProbeId);
+  assert.ok(legacySynthProbe, "legacy synth creation probe should be inserted");
+  assert.equal(legacySynthProbe.kind, "wavetable", "new legacy synth creation should normalize to Aether wavetable");
+  assert.equal(legacySynthProbe.waveform, "wavetable", "new legacy synth creation should use wavetable playback");
+  assert.ok(legacySynthProbe.aether, "new legacy synth creation should include Aether settings");
+
+  const seededInstruments = store.useInstrumentStore.getState().instruments;
+  const breakcoreAetherInstrumentNames = [
+    "Breakcore Kick (Aether)",
+    "Breakcore Snare (Aether)",
+    "Breakcore Ghost Snare (Aether)",
+    "Breakcore Closed Hat (Aether)",
+    "Breakcore Open Hat (Aether)",
+    "Breakcore Crash Ride (Aether)",
+    "Breakcore Pitched Snare (Aether)",
+    "Breakcore Noise Burst (Aether)",
+    "Breakcore Clap Layer (Aether)",
+    "Breakcore Metal Hit (Aether)",
+    "Breakcore Rim Click (Aether)",
+    "Breakcore Fast Roll Snare (Aether)",
+  ];
+  for (const name of breakcoreAetherInstrumentNames) {
+    const instrument = seededInstruments.find((candidate) => candidate.name === name);
+    assert.ok(instrument, `expected seeded factory instrument ${name}`);
+    assert.equal(instrument.kind, "wavetable", `${name} should use the Aether wavetable instrument path`);
+    assert.ok(instrument.aether, `${name} should include Aether oscillator settings`);
+    assert.ok(instrument.descriptors?.includes("aether"), `${name} should be tagged as an Aether factory preset`);
+    const samples = new Float32Array(2048);
+    synthPreview.renderInstrumentSamples(instrument, samples, 44100, 110, "visual", true, undefined, undefined, undefined, 180, 110);
+    let peak = 0;
+    let sumSquares = 0;
+    for (const sample of samples) {
+      assert.ok(Number.isFinite(sample), `${name} rendered a non-finite sample`);
+      peak = Math.max(peak, Math.abs(sample));
+      sumSquares += sample * sample;
+    }
+    const rms = Math.sqrt(sumSquares / samples.length);
+    assert.ok(peak > 0.0005, `${name} should render non-silent audio`);
+    assert.ok(rms > 0.0001, `${name} should have measurable rendered energy`);
+    assert.ok(peak <= 1.0001, `${name} should stay inside normalized preview range`);
+  }
+  const sampledPearlCymbalNames = ["Pearl Crash 2", "Pearl Ride 2", "Pearl Splash", "Pearl Splash 2"];
+  for (const name of sampledPearlCymbalNames) {
+    const instrument = seededInstruments.find((candidate) => candidate.name === name);
+    assert.ok(instrument, `expected seeded sampled cymbal instrument ${name}`);
+    assert.equal(instrument.kind, "sampler", `${name} should use the sample instrument path`);
+    assert.ok(instrument.sampleUrl?.includes("/samples/pearl-master-studio/"), `${name} should reference the Pearl sample library`);
+  }
+
+  const factoryInstrumentNames = [
+    "Pearl Kick",
+    "Pearl Snare",
+    "Pearl Closed Hat",
+    "Pearl Open Hat",
+    "Pearl Ride",
+    "Pearl Crash",
+    "Pearl Crash 2",
+    "Pearl Ride 2",
+    "Pearl Splash",
+    "Pearl Splash 2",
+    "Pearl High Tom",
+    "LM-2 Kick",
+    "LM-2 Snare",
+    "LM-2 Closed Hat",
+    "LM-2 Open Hat",
+    "LM-2 Clap",
+    "Sub Kick (Synth)",
+    "TR-505 Rim",
+    "TR-505 Clap",
+    "TR-505 Cowbell Low",
+    "TR-505 Cowbell High",
+    "TR-505 Low Conga",
+    "TR-505 High Conga",
+    "CR-78 Tambourine",
+    ...breakcoreAetherInstrumentNames,
+  ];
+  components.useComponentStore.getState().seedDefaultDrumLoops(
+    factoryInstrumentNames.map((name, index) => ({ id: `factory-inst-${index}`, name })),
+  );
+  const factoryLoops = components.useComponentStore.getState().components.filter((component) => component.factory && component.kind === "drum");
+  assert.deepEqual(
+    factoryLoops.map((component) => component.name),
+    [
+      "Basic Hip-Hop / Boom Bap",
+      "Rock Backbeat",
+      "House / Four-on-the-Floor",
+      "Reggaeton / Dembow",
+      "Drum & Bass",
+      "Breakcore Amen Skeleton",
+      "Hyperactive Snare-Chop Breakcore",
+      "Glitch Breakcore / IDM Break",
+      "Venetian Snares-Style 7/8 Breakcore",
+      "Blast Breakcore / Maximum Density",
+      "Trap Half-Time",
+      "Funk Shuffle",
+      "Latin Cumbia",
+      "Afrobeat / Afropop-Inspired",
+    ],
+    "factory drum loops should expose the remade framework set",
+  );
+  assert.equal(
+    factoryLoops.every((component) => component.speed === 4),
+    true,
+    "factory drum loops should use sixteenth-note grid density",
+  );
+  assert.equal(
+    factoryLoops.every((component) =>
+      component.name === "Venetian Snares-Style 7/8 Breakcore"
+        ? component.stepCount === 14 && component.lengthBeats === 14
+        : component.stepCount === 16 && component.lengthBeats === 16,
+    ),
+    true,
+    "factory drum loops should be one-bar frameworks, with Venetian Snares using a 14-step 7/8 bar",
+  );
+  assert.equal(drumSteps.drumPatternDurationBeats(16), 16, "drum pattern duration should not be divided by grid density");
+  assert.equal(drumSteps.drumStepLengthBeats(16, 16), 1, "sixteen-step drum patterns should preserve their full beat length");
+  assert.equal(drumSteps.drumPatternDurationSeconds(16, 120, 2), 4, "preview playback rate should be separate from grid density");
+
+  const onSteps = (loopName, rowName, occurrence = 0) => {
+    const loop = factoryLoops.find((component) => component.name === loopName);
+    assert.ok(loop, `expected factory loop ${loopName}`);
+    const row = loop.rows.filter((candidate) => candidate.name === rowName)[occurrence];
+    assert.ok(row, `expected ${loopName} row ${rowName}`);
+    return row.steps
+      .map((step, index) => {
+        const on = typeof step === "object" && step ? step.on : Boolean(step);
+        return on ? index + 1 : null;
+      })
+      .filter(Boolean);
+  };
+  const rowNames = (loopName) => {
+    const loop = factoryLoops.find((component) => component.name === loopName);
+    assert.ok(loop, `expected factory loop ${loopName}`);
+    return loop.rows.map((row) => row.name);
+  };
+  const sampleCymbalNames = ["Pearl Crash 2", "Pearl Crash", "Pearl Ride 2", "Pearl Ride", "Pearl Splash", "LM-2 Crash", "LM-2 Ride", "TR-505 Crash", "TR-505 Ride"];
+  assert.deepEqual(onSteps("Basic Hip-Hop / Boom Bap", "Pearl Kick"), [1, 4, 7, 9, 14], "boom bap kick framework should match the reference grid");
+  assert.deepEqual(onSteps("Basic Hip-Hop / Boom Bap", "Pearl Snare", 1), [4, 6, 11, 15], "boom bap ghost snare framework should match the reference grid");
+  assert.deepEqual(onSteps("House / Four-on-the-Floor", "LM-2 Kick"), [1, 5, 9, 13], "house kick framework should stay four-on-the-floor");
+  assert.deepEqual(onSteps("Drum & Bass", "Pearl Closed Hat"), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], "drum and bass hats should run sixteenths");
+  assert.deepEqual(onSteps("Breakcore Amen Skeleton", "Breakcore Snare (Aether)"), [3, 5, 8, 10, 13, 16], "amen skeleton snare should carry the extra breakbeat attacks");
+  assert.deepEqual(onSteps("Hyperactive Snare-Chop Breakcore", "Breakcore Snare (Aether)"), [2, 4, 5, 7, 8, 10, 13, 14, 16], "hyperactive breakcore should make the snare the lead rhythm");
+  assert.deepEqual(onSteps("Glitch Breakcore / IDM Break", "Breakcore Noise Burst (Aether)"), [4, 8, 11, 16], "glitch breakcore should keep sliced noise bursts on the edit points");
+  assert.deepEqual(onSteps("Venetian Snares-Style 7/8 Breakcore", "Breakcore Kick (Aether)"), [1, 3, 7, 9, 12], "venetian-style breakcore should preserve the 14-step lurch");
+  assert.deepEqual(onSteps("Blast Breakcore / Maximum Density", "Breakcore Kick (Aether)"), [1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, 15], "blast breakcore should keep the maximum-density kick grid");
+  assert.deepEqual(onSteps("Afrobeat / Afropop-Inspired", "CR-78 Tambourine"), [1, 2, 4, 5, 7, 9, 10, 12, 13, 15], "afrobeat shaker should use the interlocking reference pattern");
+  assert.equal(rowNames("Breakcore Amen Skeleton").includes("Breakcore Crash Ride (Aether)"), false, "breakcore amen should not use the rough Aether crash/ride when sampled cymbals are available");
+  assert.equal(rowNames("Venetian Snares-Style 7/8 Breakcore").includes("Breakcore Crash Ride (Aether)"), false, "7/8 breakcore should not use the rough Aether crash/ride when sampled cymbals are available");
+  assert.ok(rowNames("Breakcore Amen Skeleton").some((name) => sampleCymbalNames.includes(name)), "breakcore amen should bind crash/ride rows to a sampled cymbal instrument");
+  assert.ok(rowNames("Venetian Snares-Style 7/8 Breakcore").some((name) => sampleCymbalNames.includes(name)), "7/8 breakcore should bind crash/ride rows to a sampled cymbal instrument");
+  const openHatRows = factoryLoops.flatMap((component) => component.rows.map((row) => row.name).filter((name) => /open hat/i.test(name)));
+  assert.ok(openHatRows.length > 0, "factory loops should include sampled open-hat rows");
+  assert.equal(openHatRows.some((name) => /aether/i.test(name)), false, "factory open-hat rows should avoid the rough Aether open-hat patch");
 
   const trackA = store.useProjectStore.getState().project.tracks[0].id;
   const trackB = projectStore.addTrack({ name: "Target" });

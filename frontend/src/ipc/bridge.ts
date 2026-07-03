@@ -135,6 +135,7 @@ async function mockResponse<R extends OutboundRequest>(
     case "project.exportWavAsync":
     case "project.exportTrackWavAsync":
     case "project.exportRangeWavAsync":
+    case "project.exportAllTrackWavsAsync":
       return {
         started: true,
         job: {
@@ -142,8 +143,14 @@ async function mockResponse<R extends OutboundRequest>(
           finished: true,
           ok: true,
           jobId: "mock-export",
-          type: req.kind === "project.exportTrackWavAsync" ? "track" : req.kind === "project.exportRangeWavAsync" ? "range" : "project",
-          path: "/tmp/mock-export.wav",
+          type: req.kind === "project.exportTrackWavAsync"
+            ? "track"
+            : req.kind === "project.exportRangeWavAsync"
+              ? "range"
+              : req.kind === "project.exportAllTrackWavsAsync"
+                ? "stems"
+                : "project",
+          path: req.kind === "project.exportAllTrackWavsAsync" ? "/tmp/mock-stems" : "/tmp/mock-export.wav",
           progress: 1,
           samplesWritten: 1,
           totalSamples: 1,

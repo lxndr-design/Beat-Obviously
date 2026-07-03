@@ -2,7 +2,10 @@
 
 #include <juce_core/juce_core.h>
 #include <array>
+#include <optional>
 #include <vector>
+
+#include "Nodemap/NodemapGraph.h"
 
 namespace beat
 {
@@ -322,6 +325,8 @@ namespace beat
         DynamicModulation dynamicModulation;
         bool hasAether { false };
         AetherConfig aether;
+        std::optional<Nodemap::Graph> nodeGraph;
+        juce::var taxonomy;
         std::vector<TrackEffect> effects;
         juce::StringArray sampleUrls;
         std::vector<SampleZone> sampleZones;
@@ -379,6 +384,7 @@ namespace beat
         Id associatedInstrumentId;
         int uiWidth { 0 };
         int uiHeight { 0 };
+        juce::var uiControlDetails;
         int sampleCount { 0 };
         int uiControlCount { 0 };
         bool factory { false };

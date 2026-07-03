@@ -1,7 +1,7 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { previewFrequency, renderedInstrumentBuffer } from "../../../audio/synthPreview";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { previewFrequency, renderAetherOutputPreviewSamples, renderedInstrumentBuffer } from "../../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../../audio/synthWorkletPreview";
-import { appPrompt, Button, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, Select, Tag, TextInput, Toggle } from "../../../solid-ui";
+import { Button, FloatingSelect, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, Select, Slider, TextInput } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import {
   createTrackEffect,
@@ -13,34 +13,19 @@ import {
   formatEffectTail,
   normalizeTrackEffectChain,
   type EffectKind,
+  type EffectParamSpec,
 } from "../../../state/effects";
-import { createAetherEffectPresetRecord, type AetherEffectPresetRecord } from "../../../state/effectPresets";
 import {
-  aetherPresetLibraryCategories,
-  aetherPresetLibraryStats,
-  buildAetherPresetLibraryEntries,
-  filterAetherPresetLibraryEntries,
-  type AetherPresetLibraryEntry,
-  type AetherPresetLibrarySort,
-} from "../../../state/aetherPresetLibrary";
-import {
-  createDefaultSynthDraft,
-  FACTORY_SYNTH_PRESETS,
   MACRO_IDS,
-  MODULATION_TARGET_LABELS,
   getEnvelopeCurveParam,
   getNumberParam,
   macroAssignmentsForId,
-  macroAtAGlanceStateForId,
   macroConflictDetailsForId,
   macroConflictSummaryForId,
   macroDefinitionForId,
-  macroLaneStateForId,
-  macroOutputValue,
   modulationSourceEditorTarget,
   modulationSummaryForSource,
   modulationSummaryForTarget,
-  normalizeSynthDraftPatch,
   synthEnvelopeEditorSummary,
   synthExpressionSummary,
   synthDraftFromInstrument,
@@ -56,29 +41,21 @@ import {
   type SynthModulationSourceEditorTarget,
   type SynthParameterId,
 } from "../../../state/synthStore";
-import { createSynthPresetRecord, type SynthPresetRecord } from "../../../state/synthPresets";
-import {
-  deleteAetherEffectPreset,
-  deleteSynthPreset,
-  listAetherEffectPresets,
-  listSynthPresets,
-  saveAetherEffectPreset,
-  saveSynthPreset,
-} from "../../../persistence/dexie";
 import { ANALYZER_BAND_COUNT, useAnalyzerStore, type AnalyzerSnapshot } from "../../../state/analyzerStore";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../../state/store";
-import { INSTRUMENT_ICON_OPTIONS, instrumentIconLabel } from "../../../state/instrumentIcons";
+import {
+  firstInstrumentTaxonomyIdForCategory,
+  INSTRUMENT_TAXONOMY_CATEGORY_OPTIONS,
+  instrumentTaxonomyOptionsForCategory,
+  taxonomyAssignmentForInstrumentId,
+} from "../../../state/instrumentTaxonomy";
 import type { EnvelopeCurve, TrackEffect } from "../../../state/types";
-import { AnalyzerPanel } from "../AnalyzerPanel/AnalyzerPanel.solid";
 import { ModulationMatrix } from "../ModulationMatrix/ModulationMatrix.solid";
 import { OscillatorPanel } from "../OscillatorPanel/OscillatorPanel.solid";
 import styles from "./SynthEditor.module.css";
 
 const AUDITION_SECONDS = 1.4;
 const ANALYZER_BANDS = ANALYZER_BAND_COUNT;
-const FACTORY_PRESET_PREFIX = "factory:";
-const USER_PRESET_PREFIX = "user:";
-const USER_INSTRUMENT_PRESET_PREFIX = "instrument:";
 const FILTER_TYPES = [
   ["lowpass", "LP", "Lowpass", "ph:wave-sine"],
   ["highpass", "HP", "Highpass", "ph:wave-triangle"],
@@ -110,13 +87,6 @@ interface AuditionHandle {
   stop: (when?: number) => void;
 }
 
-interface PresetLibraryInfo {
-  source: string;
-  name: string;
-  description: string;
-  tags: string[];
-}
-
 export interface SynthEditorProps {
   instrumentId?: string;
 }
@@ -129,13 +99,10 @@ export function SynthEditor(props: SynthEditorProps) {
   const bindInstrument = useSynthStore.getState().bindInstrument;
   const setDraft = useSynthStore.getState().setDraft;
   const setName = useSynthStore.getState().setName;
-  const setNumericParameter = useSynthStore.getState().setNumericParameter;
-  const updateMacroDefinition = useSynthStore.getState().updateMacroDefinition;
   const addInstrument = useInstrumentStore.getState().addInstrument;
   const updateInstrument = useInstrumentStore.getState().updateInstrument;
   const closeEditor = useUiStore.getState().closeEditor;
   const synthInstruments = createMemo(() => instruments().filter((instrument) => instrument.kind === "synth" || instrument.kind === "wavetable"));
-  const userInstrumentPresets = createMemo(() => synthInstruments().filter((instrument) => instrument.userCreated && Boolean(instrument.synthPatch)));
 
   let didAutoBind = false;
   let audioCtx: AudioContext | null = null;
@@ -146,78 +113,9 @@ export function SynthEditor(props: SynthEditorProps) {
   let bodyRef: HTMLDivElement | undefined;
   let focusedSourceTimer: number | null = null;
 
-  const [presets, setPresets] = createSignal<SynthPresetRecord[]>([]);
-  const [selectedPresetId, setSelectedPresetId] = createSignal("");
-  const [presetSearch, setPresetSearch] = createSignal("");
-  const [presetCategory, setPresetCategory] = createSignal("");
-  const [presetSort, setPresetSort] = createSignal<AetherPresetLibrarySort>("source");
-  const [presetFavoritesOnly, setPresetFavoritesOnly] = createSignal(false);
-  const presetLibraryEntries = createMemo(() => buildAetherPresetLibraryEntries(presets(), userInstrumentPresets()));
-  const presetLibraryCategories = createMemo(() => aetherPresetLibraryCategories(presetLibraryEntries()));
-  const presetLibraryStats = createMemo(() => aetherPresetLibraryStats(presetLibraryEntries()));
-  const visiblePresetLibraryEntries = createMemo(() => filterAetherPresetLibraryEntries(presetLibraryEntries(), {
-    search: presetSearch(),
-    category: presetCategory(),
-    favoritesOnly: presetFavoritesOnly(),
-    sort: presetSort(),
-  }));
-  const selectedPresetPatch = createMemo(() => patchForPresetValue(selectedPresetId()));
-  const selectedUserPreset = createMemo(() => {
-    if (!selectedPresetId().startsWith(USER_PRESET_PREFIX)) return null;
-    const id = selectedPresetId().slice(USER_PRESET_PREFIX.length);
-    return presets().find((candidate) => candidate.id === id) ?? null;
-  });
-  const visibleFactoryPresetEntries = createMemo(() => visiblePresetLibraryEntries().filter((entry) => entry.source === "factory"));
-  const visibleUserPresetEntries = createMemo(() => visiblePresetLibraryEntries().filter((entry) => entry.source === "user-preset"));
-  const visibleUserInstrumentEntries = createMemo(() => visiblePresetLibraryEntries().filter((entry) => entry.source === "user-instrument"));
-  const selectedPresetInfo = createMemo<PresetLibraryInfo>(() => {
-    const id = selectedPresetId();
-    if (id.startsWith(FACTORY_PRESET_PREFIX)) {
-      const presetId = id.slice(FACTORY_PRESET_PREFIX.length);
-      const preset = FACTORY_SYNTH_PRESETS.find((candidate) => candidate.id === presetId);
-      if (preset) {
-        return {
-          source: `Factory / ${preset.category}`,
-          name: preset.name,
-          description: preset.description,
-          tags: preset.tags.filter((tag) => tag !== "factory"),
-        };
-      }
-    }
-    if (id.startsWith(USER_PRESET_PREFIX)) {
-      const presetId = id.slice(USER_PRESET_PREFIX.length);
-      const preset = presets().find((candidate) => candidate.id === presetId);
-      if (preset) {
-        return {
-          source: preset.favorite ? "User preset / Favorite" : "User preset",
-          name: preset.name,
-          description: `${preset.patch.modulation.length} routes / ${preset.patch.effects?.filters.length ?? 0} instrument FX`,
-          tags: preset.tags,
-        };
-      }
-    }
-    if (id.startsWith(USER_INSTRUMENT_PRESET_PREFIX)) {
-      const instrumentId = id.slice(USER_INSTRUMENT_PRESET_PREFIX.length);
-      const instrument = userInstrumentPresets().find((candidate) => candidate.id === instrumentId);
-      if (instrument?.synthPatch) {
-        return {
-          source: "User instrument",
-          name: instrument.name,
-          description: `${instrument.synthPatch.modulation.length} routes / ${instrument.synthPatch.effects?.filters.length ?? 0} instrument FX`,
-          tags: instrument.synthPatch.metadata.tags,
-        };
-      }
-    }
-    return {
-      source: "Current draft",
-      name: draft().name,
-      description: `${draft().modulation.length} routes / ${draft().effects.filters.length} instrument FX`,
-      tags: draft().metadata.tags,
-    };
-  });
-  const [iconOpen, setIconOpen] = createSignal(false);
+  const [taxonomyTypeOpen, setTaxonomyTypeOpen] = createSignal(false);
+  const [taxonomyNameOpen, setTaxonomyNameOpen] = createSignal(false);
   const [auditioning, setAuditioning] = createSignal(false);
-  const [auditionSnapshot, setAuditionSnapshot] = createSignal<AnalyzerSnapshot>(createEmptyAnalyzerSnapshot());
   const [focusedSourceTarget, setFocusedSourceTarget] = createSignal<SynthModulationSourceEditorTarget | null>(null);
   const [expressionActivity, setExpressionActivity] = createSignal<SynthExpressionActivity | null>(null);
   const effectiveExpressionActivity = createMemo(() => {
@@ -226,6 +124,7 @@ export function SynthEditor(props: SynthEditorProps) {
     const id = boundInstrumentId();
     return id ? liveExpressionActivities()[id] ?? null : null;
   });
+  const analyzerWaveform = createMemo(() => renderAetherOutputPreviewSamples(synthDraftToPreviewInstrument(draft()), 320, "mix"));
 
   createEffect(() => {
     const id = props.instrumentId;
@@ -245,21 +144,11 @@ export function SynthEditor(props: SynthEditorProps) {
     setDraft(synthDraftFromInstrument(first));
   });
 
-  onMount(() => {
-    void refreshPresets();
-  });
-
   onCleanup(() => {
     if (focusedSourceTimer != null) window.clearTimeout(focusedSourceTimer);
     stopAudition();
     closeAudioContext();
   });
-
-  async function refreshPresets() {
-    const nextPresets = await listSynthPresets();
-    setPresets(nextPresets);
-    return nextPresets;
-  }
 
   function getAudioContext(): AudioContext {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -427,7 +316,6 @@ export function SynthEditor(props: SynthEditorProps) {
       analyzerFrame = null;
     }
     if (clear) {
-      setAuditionSnapshot(createEmptyAnalyzerSnapshot());
       useAnalyzerStore.getState().clearSynth();
     }
   }
@@ -450,7 +338,6 @@ export function SynthEditor(props: SynthEditorProps) {
       bands: snapshot.bands.slice(0, ANALYZER_BANDS),
       updatedAt: Date.now(),
     };
-    setAuditionSnapshot(next);
     useAnalyzerStore.getState().setSynthSnapshot(next);
   }
 
@@ -469,20 +356,6 @@ export function SynthEditor(props: SynthEditorProps) {
       bindInstrument(id);
     }
 
-    if (patch.synthPatch) {
-      const presetId = `instrument:${id}`;
-      const existingPreset = presets().find((preset) => preset.id === presetId);
-      await saveSynthPreset(createSynthPresetRecord({
-        id: presetId,
-        name: patch.name ?? draft().name,
-        patch: patch.synthPatch,
-        tags: patch.synthPatch.metadata?.tags ?? [],
-        existing: existingPreset,
-      }));
-      await refreshPresets();
-      setSelectedPresetId(`${USER_PRESET_PREFIX}${presetId}`);
-    }
-
     return id;
   }
 
@@ -496,92 +369,23 @@ export function SynthEditor(props: SynthEditorProps) {
     else closeEditor({ kind: "synth" });
   }
 
-  function onLoadPreset(value: string) {
-    setSelectedPresetId(value);
-    const patch = patchForPresetValue(value);
-    if (!patch) return;
-    didAutoBind = true;
-    setDraft({
-      ...patch,
-      name: boundInstrumentId() ? draft().name : patch.name,
-    });
-  }
-
-  function patchForPresetValue(value: string): SynthDraftPatch | null {
-    const factoryId = value.startsWith(FACTORY_PRESET_PREFIX) ? value.slice(FACTORY_PRESET_PREFIX.length) : "";
-    const userId = value.startsWith(USER_PRESET_PREFIX) ? value.slice(USER_PRESET_PREFIX.length) : "";
-    const userInstrumentId = value.startsWith(USER_INSTRUMENT_PRESET_PREFIX) ? value.slice(USER_INSTRUMENT_PRESET_PREFIX.length) : "";
-    if (factoryId) {
-      const patch = FACTORY_SYNTH_PRESETS.find((candidate) => candidate.id === factoryId)?.patch;
-      return patch ? normalizeSynthDraftPatch(patch) : null;
-    }
-    if (userId) {
-      const patch = presets().find((candidate) => candidate.id === userId)?.patch;
-      return patch ? normalizeSynthDraftPatch(patch) : null;
-    }
-    if (!userInstrumentId) return null;
-    const instrument = synthInstruments().find((candidate) => candidate.id === userInstrumentId);
-    return instrument ? synthDraftFromInstrument(instrument) : null;
-  }
-
-  function presetOptionValue(entry: AetherPresetLibraryEntry): string {
-    if (entry.source === "factory") return `${FACTORY_PRESET_PREFIX}${entry.id}`;
-    if (entry.source === "user-preset") return `${USER_PRESET_PREFIX}${entry.id}`;
-    return `${USER_INSTRUMENT_PRESET_PREFIX}${entry.id}`;
-  }
-
-  function presetOptionLabel(entry: AetherPresetLibraryEntry): string {
-    return entry.favorite ? `${entry.name} (Favorite)` : entry.name;
-  }
-
-  async function onDeletePreset() {
-    if (!selectedPresetId().startsWith(USER_PRESET_PREFIX)) return;
-    await deleteSynthPreset(selectedPresetId().slice(USER_PRESET_PREFIX.length));
-    setSelectedPresetId("");
-    await refreshPresets();
-  }
-
-  async function onSaveAsPreset() {
-    const name = await appPrompt("Preset name", draft().name || "Aether Preset", "Save Preset");
-    if (!name?.trim()) return;
-    const record = createSynthPresetRecord({
-      name,
-      patch: synthDraftToInstrumentPatch(draft()).synthPatch ?? draft(),
-      tags: draft().metadata.tags,
-    });
-    await saveSynthPreset(record);
-    await refreshPresets();
-    setSelectedPresetId(`${USER_PRESET_PREFIX}${record.id}`);
-  }
-
-  async function onTogglePresetFavorite() {
-    const preset = selectedUserPreset();
-    if (!preset) return;
-    const next = { ...preset, favorite: !preset.favorite, updatedAt: Date.now() };
-    await saveSynthPreset(next);
-    await refreshPresets();
-    setSelectedPresetId(`${USER_PRESET_PREFIX}${next.id}`);
-  }
-
-  function onRestoreInitPreset() {
-    didAutoBind = true;
-    const initPreset = FACTORY_SYNTH_PRESETS.find((preset) => preset.id === "factory.init")?.patch ?? createDefaultSynthDraft();
-    setDraft({
-      ...initPreset,
-      name: boundInstrumentId() ? draft().name : initPreset.name,
-    });
-    setSelectedPresetId(`${FACTORY_PRESET_PREFIX}factory.init`);
-  }
-
-  function setInstrumentIcon(icon: string) {
+  function setInstrumentTaxonomyById(instrumentId: string) {
+    const taxonomy = taxonomyAssignmentForInstrumentId(instrumentId);
+    if (!taxonomy) return;
     setDraft({
       ...draft(),
+      taxonomy,
       metadata: {
         ...draft().metadata,
-        icon,
+        icon: iconForInstrumentTaxonomy(taxonomy.categoryId),
       },
     });
-    setIconOpen(false);
+  }
+
+  function setInstrumentTaxonomyType(categoryId: string) {
+    const firstInstrumentId = firstInstrumentTaxonomyIdForCategory(categoryId);
+    if (!firstInstrumentId) return;
+    setInstrumentTaxonomyById(firstInstrumentId);
   }
 
   function focusModulationSourceEditor(source: ModulationSourceId) {
@@ -603,15 +407,24 @@ export function SynthEditor(props: SynthEditorProps) {
   }
 
   return (
-    <section class={`ds-editor-shell ds-fill ${styles.shell}`} aria-label="Synth editor">
+    <div class={`ds-editor-shell ds-fill ${styles.shell}`} role="region" aria-label="Aether engine">
       <div ref={bodyRef} class={`ds-editor-body ds-scroll ${styles.body}`}>
-        <div class={styles.utilityGrid}>
-          <section class="ds-panel" aria-label="Synth identity">
-            <header class="ds-panel-header">
-              <div class="ds-panel-title">Instrument</div>
-            </header>
-            <div class={`ds-panel-body ${styles.identityBody}`}>
-              <div class={styles.nameIconRow}>
+        <section
+          class={`ds-panel ${focusedSourceTarget() === "performance" ? styles.sourceFocus : ""}`}
+          aria-label="Synth identity"
+          data-synth-source-editor="performance"
+        >
+          <header class="ds-panel-header">
+            <div class="ds-panel-title">Instrument Details - Aether Engine</div>
+          </header>
+          <div class={`ds-panel-body ${styles.identityBody}`}>
+            <InstrumentOutputPreview
+              samples={analyzerWaveform()}
+              playing={auditioning()}
+              onToggle={() => void onAudition()}
+            />
+            <div class={styles.identityFields}>
+              <div class={styles.nameRow}>
                 <TextInput
                   className={styles.nameField}
                   label="Name"
@@ -619,178 +432,33 @@ export function SynthEditor(props: SynthEditorProps) {
                   value={draft().name}
                   onInput={(event) => setName(event.currentTarget.value)}
                 />
-                <div class={styles.iconPicker}>
-                  <HoverInfo content={instrumentIconLabel(draft().metadata.icon)}>
-                    <Button
-                      iconOnly
-                      size="md"
-                      className={styles.iconPickerButton}
-                      aria-label="Change instrument icon"
-                      onClick={() => setIconOpen((open) => !open)}
-                    >
-                      <Icon name={draft().metadata.icon ?? "ph:cube"} size={16} decorative />
-                    </Button>
-                  </HoverInfo>
-                  <Show when={iconOpen()}>
-                    <div class={styles.iconMenu} role="menu" aria-label="Instrument icons">
-                      <For each={INSTRUMENT_ICON_OPTIONS}>
-                        {(option) => (
-                          <button
-                            type="button"
-                            class={`${styles.iconOption} ${draft().metadata.icon === option.icon ? styles.iconOptionSelected : ""}`}
-                            title={`${option.label} - ${option.tags.join(", ")}`}
-                            onClick={() => setInstrumentIcon(option.icon)}
-                            role="menuitem"
-                          >
-                            <Icon name={option.icon} size={16} decorative />
-                            <span>{option.label}</span>
-                          </button>
-                        )}
-                      </For>
-                    </div>
-                  </Show>
-                </div>
               </div>
-              <div class={styles.presetTools}>
-                <TextInput
-                  label="Search"
-                  layout="inline"
-                  className={styles.presetSearch}
-                  value={presetSearch()}
-                  placeholder="Preset name, tag, source"
-                  onInput={(event) => setPresetSearch(event.currentTarget.value)}
-                />
-                <Select
+              <Button size="xs" variant="ghost" className={styles.importPresetButton}>
+                Import Preset
+              </Button>
+              <div class={styles.taxonomyControls}>
+                <FloatingSelect
                   label="Category"
-                  layout="bare"
-                  className={styles.presetCategory}
-                  value={presetCategory()}
-                  onChange={(event) => setPresetCategory(event.currentTarget.value)}
-                >
-                  <option value="">All</option>
-                  <For each={presetLibraryCategories()}>
-                    {(category) => <option value={category}>{category}</option>}
-                  </For>
-                </Select>
-                <Select
-                  label="Sort"
-                  layout="bare"
-                  className={styles.presetSort}
-                  value={presetSort()}
-                  onChange={(event) => setPresetSort(event.currentTarget.value as AetherPresetLibrarySort)}
-                >
-                  <option value="source">Source</option>
-                  <option value="name">Name</option>
-                  <option value="category">Category</option>
-                  <option value="complexity">Complexity</option>
-                  <option value="favorite">Favorites</option>
-                </Select>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  selected={presetFavoritesOnly()}
-                  aria-label="Toggle preset favorites filter"
-                  onClick={() => setPresetFavoritesOnly((value) => !value)}
-                >
-                  Favorites ({presetLibraryStats().favorites})
-                </Button>
-              </div>
-              <div class={styles.presetStats} aria-label="Aether preset library summary">
-                <Tag>{presetLibraryStats().total} presets</Tag>
-                <Tag tone={presetLibraryStats().favorites === 0 ? "zero" : "default"}>{presetLibraryStats().favorites} favorites</Tag>
-                <Tag>{visiblePresetLibraryEntries().length} shown</Tag>
-                <Tag>{presetLibraryStats().categories} categories</Tag>
-              </div>
-              <div class={styles.presetRow}>
-                <Select
-                  label="Preset"
-                  layout="bare"
-                  className={styles.presetSelect}
-                  value={selectedPresetId()}
-                  onChange={(event) => onLoadPreset(event.currentTarget.value)}
-                >
-                  <option value="">None</option>
-                  <Show when={visiblePresetLibraryEntries().length === 0}>
-                    <option value="" disabled>No presets match</option>
-                  </Show>
-                  <Show when={visibleFactoryPresetEntries().length > 0}>
-                    <optgroup label="Factory">
-                      <For each={visibleFactoryPresetEntries()}>
-                        {(entry) => (
-                          <option value={presetOptionValue(entry)}>
-                            {presetOptionLabel(entry)}
-                          </option>
-                        )}
-                      </For>
-                    </optgroup>
-                  </Show>
-                  <Show when={visibleUserPresetEntries().length > 0}>
-                    <optgroup label="User Presets">
-                      <For each={visibleUserPresetEntries()}>
-                        {(entry) => (
-                          <option value={presetOptionValue(entry)}>
-                            {presetOptionLabel(entry)}
-                          </option>
-                        )}
-                      </For>
-                    </optgroup>
-                  </Show>
-                  <Show when={visibleUserInstrumentEntries().length > 0}>
-                    <optgroup label="User Instruments">
-                      <For each={visibleUserInstrumentEntries()}>
-                        {(entry) => (
-                          <option value={presetOptionValue(entry)}>
-                            {presetOptionLabel(entry)}
-                          </option>
-                        )}
-                      </For>
-                    </optgroup>
-                  </Show>
-                </Select>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={!selectedPresetPatch()}
-                  selected={auditioning() && Boolean(selectedPresetPatch())}
-                  aria-label="Audition selected Aether preset"
-                  onClick={() => void onAudition({ patch: selectedPresetPatch(), restart: true })}
-                >
-                  Audition
-                </Button>
-                <Show when={selectedPresetId().startsWith(USER_PRESET_PREFIX)}>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    selected={selectedUserPreset()?.favorite === true}
-                    aria-label="Toggle selected Aether preset favorite"
-                    onClick={() => void onTogglePresetFavorite()}
-                  >
-                    {selectedUserPreset()?.favorite ? "Favorited" : "Favorite"}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={onDeletePreset}>
-                    Delete
-                  </Button>
-                </Show>
-                <Button size="sm" variant="ghost" onClick={() => void onSaveAsPreset()}>
-                  Save As
-                </Button>
-                <Button size="sm" variant="ghost" onClick={onRestoreInitPreset}>
-                  Restore Init
-                </Button>
-              </div>
-              <div class={styles.presetInfo} aria-label="Selected Aether preset details">
-                <div class={styles.presetInfoHeader}>
-                  <span>{selectedPresetInfo().source}</span>
-                  <strong>{selectedPresetInfo().name}</strong>
-                </div>
-                <p>{selectedPresetInfo().description}</p>
-                <Show when={selectedPresetInfo().tags.length > 0}>
-                  <div class={styles.presetTags}>
-                    <For each={selectedPresetInfo().tags}>
-                      {(tag) => <span>{tag}</span>}
-                    </For>
-                  </div>
-                </Show>
+                  layout="inline"
+                  className={styles.taxonomySelect}
+                  value={draft().taxonomy?.categoryId ?? "synth_electronic"}
+                  ariaLabel="Category"
+                  options={INSTRUMENT_TAXONOMY_CATEGORY_OPTIONS}
+                  open={taxonomyTypeOpen()}
+                  onOpenChange={setTaxonomyTypeOpen}
+                  onChange={setInstrumentTaxonomyType}
+                />
+                <FloatingSelect
+                  label="Instrument"
+                  layout="inline"
+                  className={styles.taxonomySelect}
+                  value={draft().taxonomy?.instrumentId ?? "wavetable_synth"}
+                  ariaLabel="Instrument"
+                  options={instrumentTaxonomyOptionsForCategory(draft().taxonomy?.categoryId ?? "synth_electronic")}
+                  open={taxonomyNameOpen()}
+                  onOpenChange={setTaxonomyNameOpen}
+                  onChange={setInstrumentTaxonomyById}
+                />
               </div>
               <div class={styles.expressionSummary} aria-label="Aether expression and performance summary">
                 <For each={synthExpressionSummary(draft(), effectiveExpressionActivity())}>
@@ -802,7 +470,19 @@ export function SynthEditor(props: SynthEditorProps) {
                       data-mesh-variant={meshTintVariantFor(item.id)}
                       title={`${item.label}: ${item.value} - ${item.detail}`}
                     >
-                      <span>{item.label}</span>
+                      <span class={styles.expressionSummaryLabel}>
+                        {item.label}
+                        <HoverInfo content={item.detail}>
+                          <span
+                            class={styles.expressionSummaryInfo}
+                            aria-label={`${item.label} description`}
+                            role="img"
+                            tabIndex={0}
+                          >
+                            i
+                          </span>
+                        </HoverInfo>
+                      </span>
                       <strong>{item.value}</strong>
                       <small>{item.detail}</small>
                     </div>
@@ -810,175 +490,19 @@ export function SynthEditor(props: SynthEditorProps) {
                 </For>
               </div>
             </div>
-          </section>
-          <AnalyzerPanel
-            state={() => ({
-              scope: "synth",
-              snapshotOverride: auditionSnapshot(),
-              playing: auditioning(),
-              onTogglePlayback: () => void onAudition(),
-            })}
-          />
-        </div>
+          </div>
+        </section>
 
         <OscillatorPanel />
 
-        <div class={styles.sourceGrid}>
-          <LfoPanel focusedSourceTarget={focusedSourceTarget()} />
-          <section class={`ds-panel ${styles.macroPanel}`} aria-label="Macros">
-            <header class="ds-panel-header">
-              <div class="ds-panel-title">Macro Controls</div>
-            </header>
-            <div class={`ds-panel-body ${styles.macros}`}>
-              <For each={MACRO_IDS}>
-                {(id, index) => {
-                  const definition = () => macroDefinitionForId(draft(), id);
-                  const assignments = () => macroAssignmentsForId(draft(), id);
-                  const conflict = () => macroConflictSummaryForId(draft(), id);
-                  const conflictDetails = () => macroConflictDetailsForId(draft(), id);
-                  const macroLane = () => macroLaneStateForId(draft(), id);
-                  const macroState = () => macroAtAGlanceStateForId(draft(), id);
-                  const assignmentLabel = () => assignments().length === 0
-                    ? "No assignments"
-                    : assignments()
-                        .slice(0, 2)
-                        .map((route) => MODULATION_TARGET_LABELS[route.target] ?? route.target)
-                        .join(", ");
-                  const macroLaneStyle = () => {
-                    const lane = macroLane();
-                    const start = Math.round(lane.rangeStart * 100);
-                    const end = Math.round(lane.rangeEnd * 100);
-                    const left = Math.min(start, end);
-                    const width = Math.max(1, Math.abs(end - start));
-                    return `--macro-range-left:${left}%; --macro-range-width:${width}%; --macro-output:${Math.round(lane.outputValue * 100)}%;`;
-                  };
-                  const macroLaneTargets = () => macroLane().targetLabels.slice(0, 2).join(", ") || "No routed targets";
-                  return (
-                    <div
-                      class={`${styles.macroCard} ${focusedSourceTarget() === id ? styles.sourceFocus : ""}`}
-                      data-synth-source-editor={id}
-                      aria-label={`${definition().label} macro control`}
-                    >
-                      <TextInput
-                        data-synth-source-focus
-                        layout="bare"
-                        aria-label={`Macro ${index() + 1} name`}
-                        value={definition().label}
-                        onInput={(event) => updateMacroDefinition(id, { label: event.currentTarget.value })}
-                      />
-                      <Knob
-                        size="sm"
-                        label={`M${index() + 1}`}
-                        value={getNumberParam(draft(), id)}
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        defaultValue={0}
-                        {...modulationPropsForSource(draft(), id)}
-                        pickSourceId={id}
-                        formatValue={formatPercent}
-                        onChange={(value) => setNumericParameter(id, value)}
-                      />
-                      <div class={styles.macroLane} style={macroLaneStyle()} aria-label={`${definition().label} macro lane`}>
-                        <div class={styles.macroLaneTrack} aria-hidden="true">
-                          <span class={styles.macroLaneRange} />
-                          <span class={styles.macroLaneOutput} />
-                        </div>
-                        <div class={styles.macroLaneMeta}>
-                          <span>{Math.round(macroLane().rangeStart * 100)}-{Math.round(macroLane().rangeEnd * 100)}%</span>
-                          <span>{macroLane().curve}</span>
-                          <span>{macroLaneTargets()}</span>
-                        </div>
-                      </div>
-                      <div
-                        class={styles.macroStateBadges}
-                        data-state={macroState().tone}
-                        title={macroState().detail}
-                        aria-label={`${definition().label} macro state: ${macroState().detail}`}
-                      >
-                        <span>{macroState().assignmentBadge}</span>
-                        <span>{macroState().conflictBadge}</span>
-                        <span>{macroState().outputBadge}</span>
-                      </div>
-                      <div
-                        class={styles.macroAssignment}
-                        title={assignmentLabel()}
-                        aria-label={`${definition().label} macro assignments`}
-                      >
-                        <span>{assignmentLabel()}</span>
-                        <Show when={assignments().length > 2}>
-                          <span>+{assignments().length - 2}</span>
-                        </Show>
-                      </div>
-                      <Show when={conflict().count > 0}>
-                        <div
-                          class={styles.macroConflict}
-                          title={conflict().label}
-                          aria-label={`${definition().label} macro conflict`}
-                        >
-                          <span>Conflict</span>
-                          <span>{conflict().label}</span>
-                          <For each={conflictDetails().slice(0, 2)}>
-                            {(detail) => (
-                              <div class={styles.macroConflictDetail} aria-label={`${detail.targetLabel} macro conflict detail`}>
-                                <span>{detail.targetLabel}</span>
-                                <span>{detail.competingSources.slice(0, 2).join(", ")}</span>
-                                <span>Summed</span>
-                              </div>
-                            )}
-                          </For>
-                        </div>
-                      </Show>
-                      <div class={styles.macroMetaRow}>
-                        <NumberInput
-                          layout="bare"
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          maxLength={4}
-                          commitOnChange
-                          ariaLabel={`${definition().label} minimum`}
-                          value={definition().min}
-                          onChange={(min) => updateMacroDefinition(id, { min })}
-                        />
-                        <NumberInput
-                          layout="bare"
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          maxLength={4}
-                          commitOnChange
-                          ariaLabel={`${definition().label} maximum`}
-                          value={definition().max}
-                          onChange={(max) => updateMacroDefinition(id, { max })}
-                        />
-                      </div>
-                      <Select
-                        layout="bare"
-                        selectClassName={styles.macroCurveSelect}
-                        value={definition().curve}
-                        aria-label={`${definition().label} response curve`}
-                        onInput={(event) => updateMacroDefinition(id, { curve: event.currentTarget.value as MacroCurve })}
-                      >
-                        <option value="linear">Linear</option>
-                        <option value="ease-in">Ease In</option>
-                        <option value="ease-out">Ease Out</option>
-                        <option value="s-curve">S-Curve</option>
-                      </Select>
-                      <div class={styles.macroOutput}>{Math.round(macroOutputValue(draft(), id) * 100)}%</div>
-                    </div>
-                  );
-                }}
-              </For>
-            </div>
-          </section>
-        </div>
+        <LfoPanel focusedSourceTarget={focusedSourceTarget()} />
 
         <InstrumentFxRack />
 
-        <div class={styles.bottomGrid}>
-          <PerformancePanel focusedSourceTarget={focusedSourceTarget()} expressionActivity={effectiveExpressionActivity()} />
-          <AmpFilterPanel focusedSourceTarget={focusedSourceTarget()} />
+        <AmpFilterPanel focusedSourceTarget={focusedSourceTarget()} />
+
+        <div class={styles.macroModGrid}>
+          <MacroControlsPanel focusedSourceTarget={focusedSourceTarget()} />
           <ModulationMatrix onFocusSource={focusModulationSourceEditor} />
         </div>
       </div>
@@ -995,7 +519,34 @@ export function SynthEditor(props: SynthEditorProps) {
           Save
         </Button>
       </footer>
-    </section>
+    </div>
+  );
+}
+
+function InstrumentOutputPreview(props: {
+  samples: number[];
+  playing: boolean;
+  onToggle: () => void;
+}) {
+  const path = createMemo(() => makeOutputPreviewPath(props.samples));
+  return (
+    <div class={styles.identityPreview} aria-label="Aether output preview">
+      <svg class={styles.identityPreviewSvg} viewBox="0 0 100 48" preserveAspectRatio="none" aria-hidden="true">
+        <line class={styles.identityPreviewZero} x1="0" y1="24" x2="100" y2="24" />
+        <Show when={path()}>
+          <path class={styles.identityPreviewPath} d={path()} />
+        </Show>
+      </svg>
+      <div class={styles.identityPreviewActions}>
+        <Button size="xs" variant="ghost" selected={props.playing} onClick={props.onToggle}>
+          <Icon name={props.playing ? "ph:pause-fill" : "ph:play-fill"} size={12} decorative />
+          {props.playing ? "Pause" : "Play"}
+        </Button>
+        <Button size="xs" variant="ghost">
+          Loop
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -1003,35 +554,8 @@ function InstrumentFxRack() {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setDraft = useSynthStore.getState().setDraft;
   const effects = createMemo(() => draft().effects.filters);
-  const [effectPresets, setEffectPresets] = createSignal<AetherEffectPresetRecord[]>([]);
-  const [selectedEffectPresetId, setSelectedEffectPresetId] = createSignal("");
-  const selectedEffectPresetInfo = createMemo<PresetLibraryInfo>(() => {
-    const preset = effectPresets().find((candidate) => candidate.id === selectedEffectPresetId());
-    if (preset) {
-      return {
-        source: `User FX / ${preset.category}`,
-        name: preset.name,
-        description: preset.description,
-        tags: preset.tags,
-      };
-    }
-    return {
-      source: "Current FX chain",
-      name: draft().name ? `${draft().name} FX` : "Unsaved FX",
-      description: describeEffectChain(effects()),
-      tags: effects().length > 0 ? ["draft"] : [],
-    };
-  });
-
-  onMount(() => {
-    void refreshEffectPresets();
-  });
-
-  async function refreshEffectPresets() {
-    const nextPresets = await listAetherEffectPresets();
-    setEffectPresets(nextPresets);
-    return nextPresets;
-  }
+  const [draggedEffectId, setDraggedEffectId] = createSignal<string | null>(null);
+  const [dragOverEffectId, setDragOverEffectId] = createSignal<string | null>(null);
 
   function updateEffects(filters: TrackEffect[]) {
     setDraft({
@@ -1059,79 +583,76 @@ function InstrumentFxRack() {
     });
   }
 
-  function moveEffect(effectId: string, direction: -1 | 1) {
+  function reorderEffect(dragId: string, targetId: string, insertAfter: boolean) {
+    if (dragId === targetId) return;
     const current = effects();
-    const index = current.findIndex((effect) => effect.id === effectId);
-    const nextIndex = index + direction;
-    if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return;
+    const dragIndex = current.findIndex((effect) => effect.id === dragId);
+    const targetIndex = current.findIndex((effect) => effect.id === targetId);
+    if (dragIndex < 0 || targetIndex < 0) return;
     const next = current.slice();
-    const [item] = next.splice(index, 1);
-    next.splice(nextIndex, 0, item);
+    const [item] = next.splice(dragIndex, 1);
+    let insertIndex = targetIndex + (insertAfter ? 1 : 0);
+    if (dragIndex < insertIndex) insertIndex -= 1;
+    next.splice(Math.max(0, Math.min(next.length, insertIndex)), 0, item);
     updateEffects(next);
+  }
+
+  function startEffectDrag(effectId: string, event: DragEvent) {
+    setDraggedEffectId(effectId);
+    event.dataTransfer?.setData("text/plain", effectId);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  }
+
+  function effectDropTargetFromPoint(x: number, y: number): string | null {
+    const target = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-effect-id]");
+    return target?.dataset.effectId ?? null;
+  }
+
+  function startEffectPointerDrag(effectId: string, event: PointerEvent) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    setDraggedEffectId(effectId);
+    const move = (moveEvent: PointerEvent) => {
+      const targetId = effectDropTargetFromPoint(moveEvent.clientX, moveEvent.clientY);
+      setDragOverEffectId(targetId && targetId !== effectId ? targetId : null);
+    };
+    const up = (upEvent: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      const targetId = effectDropTargetFromPoint(upEvent.clientX, upEvent.clientY);
+      setDraggedEffectId(null);
+      setDragOverEffectId(null);
+      if (!targetId || targetId === effectId) return;
+      const target = document.querySelector<HTMLElement>(`[data-effect-id="${targetId}"]`);
+      const rect = target?.getBoundingClientRect();
+      reorderEffect(effectId, targetId, rect ? upEvent.clientX > rect.left + rect.width / 2 : false);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up, { once: true });
+  }
+
+  function dropEffectOn(effectId: string, event: DragEvent) {
+    event.preventDefault();
+    const dragId = draggedEffectId() ?? event.dataTransfer?.getData("text/plain");
+    setDraggedEffectId(null);
+    setDragOverEffectId(null);
+    if (!dragId) return;
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    reorderEffect(dragId, effectId, event.clientX > rect.left + rect.width / 2);
   }
 
   function removeEffect(effectId: string) {
     updateEffects(effects().filter((effect) => effect.id !== effectId));
   }
 
-  function loadEffectPreset(id: string) {
-    setSelectedEffectPresetId(id);
-    const preset = effectPresets().find((candidate) => candidate.id === id);
-    if (!preset) return;
-    setDraft({
-      ...draft(),
-      effects: normalizeTrackEffectChain(preset.chain),
-    });
-  }
-
-  async function saveEffectPreset() {
-    const name = await appPrompt("FX preset name", draft().name ? `${draft().name} FX` : "Aether FX", "Save FX Preset");
-    if (!name?.trim()) return;
-    const record = createAetherEffectPresetRecord({
-      name,
-      chain: draft().effects,
-      tags: ["aether", "instrument-fx"],
-    });
-    await saveAetherEffectPreset(record);
-    await refreshEffectPresets();
-    setSelectedEffectPresetId(record.id);
-  }
-
-  async function deleteEffectPreset() {
-    const id = selectedEffectPresetId();
-    if (!id) return;
-    await deleteAetherEffectPreset(id);
-    setSelectedEffectPresetId("");
-    await refreshEffectPresets();
-  }
-
   return (
     <section class={`ds-panel ${styles.fxPanel}`} aria-label="Aether instrument effects">
       <header class="ds-panel-header">
         <div class="ds-panel-title">Instrument FX</div>
-        <div class="ds-panel-actions">
-          <Show when={effectPresets().length > 0}>
-            <Select
-              layout="bare"
-              selectClassName={styles.fxPresetSelect}
-              aria-label="Load instrument FX preset"
-              value={selectedEffectPresetId()}
-              onChange={(event) => loadEffectPreset(event.currentTarget.value)}
-            >
-              <option value="">FX preset</option>
-              <For each={effectPresets()}>
-                {(preset) => <option value={preset.id}>{preset.name}</option>}
-              </For>
-            </Select>
-          </Show>
-          <Button size="xs" variant="ghost" onClick={() => void saveEffectPreset()}>
-            Save FX
-          </Button>
-          <Show when={selectedEffectPresetId()}>
-            <Button size="xs" variant="ghost" onClick={() => void deleteEffectPreset()}>
-              Delete FX
-            </Button>
-          </Show>
+      </header>
+      <div class={`ds-panel-body ${styles.fxBody}`}>
+        <div class={styles.fxChainSummary} aria-label="Current Aether FX chain">
+          <span>Current chain: {describeEffectChain(effects())}</span>
           <Select
             layout="bare"
             selectClassName={styles.fxAddSelect}
@@ -1144,68 +665,68 @@ function InstrumentFxRack() {
               event.currentTarget.value = "";
             }}
           >
-            <option value="">Add effect</option>
+            <option value="">Add FX</option>
             <For each={EFFECT_OPTIONS}>
               {(option) => <option value={option.value}>{option.label}</option>}
             </For>
           </Select>
         </div>
-      </header>
-      <div class={`ds-panel-body ${styles.fxBody}`}>
-        <div class={`${styles.presetInfo} ${styles.fxPresetInfo}`} aria-label="Selected Aether FX preset details">
-          <div class={styles.presetInfoHeader}>
-            <span>{selectedEffectPresetInfo().source}</span>
-            <strong>{selectedEffectPresetInfo().name}</strong>
-          </div>
-          <p>{selectedEffectPresetInfo().description}</p>
-          <Show when={selectedEffectPresetInfo().tags.length > 0}>
-            <div class={styles.presetTags}>
-              <For each={selectedEffectPresetInfo().tags}>
-                {(tag) => <span>{tag}</span>}
-              </For>
-            </div>
-          </Show>
-        </div>
         <Show when={effects().length > 0} fallback={<div class={styles.fxEmpty}>No instrument FX. Output goes directly to the track chain.</div>}>
           <div class={styles.fxChain}>
             <For each={effects()}>
-              {(effect, index) => (
-                <article class={`${styles.fxBlock} ${effect.bypassed ? styles.fxBlockBypassed : ""}`}>
+              {(effect) => (
+                <article
+                  class={`${styles.fxBlock} ${effect.bypassed ? styles.fxBlockBypassed : ""}`}
+                  data-effect-id={effect.id}
+                  data-dragging={draggedEffectId() === effect.id ? "true" : "false"}
+                  data-drag-over={dragOverEffectId() === effect.id ? "true" : "false"}
+                  onDragOver={(event) => {
+                    if (!draggedEffectId() || draggedEffectId() === effect.id) return;
+                    event.preventDefault();
+                    setDragOverEffectId(effect.id);
+                    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverEffectId() === effect.id) setDragOverEffectId(null);
+                  }}
+                  onDrop={(event) => dropEffectOn(effect.id, event)}
+                >
                   <div class={styles.fxHeader}>
+                    <button
+                      type="button"
+                      class={styles.fxDragHandle}
+                      draggable
+                      aria-label={`Drag ${EFFECT_LABELS[effect.kind]} to reorder`}
+                      title="Drag to reorder"
+                      onPointerDown={(event) => startEffectPointerDrag(effect.id, event)}
+                      onDragStart={(event) => startEffectDrag(effect.id, event)}
+                      onDragEnd={() => {
+                        setDraggedEffectId(null);
+                        setDragOverEffectId(null);
+                      }}
+                    >
+                      <Icon name="ph:dots-six-vertical" size={14} decorative />
+                    </button>
+                    <Button
+                      iconOnly
+                      size="xs"
+                      className={styles.fxPowerButton}
+                      selected={!effect.bypassed}
+                      aria-label={`${effect.bypassed ? "Enable" : "Bypass"} ${EFFECT_LABELS[effect.kind]}`}
+                      onClick={() => patchEffect(effect.id, { bypassed: !effect.bypassed })}
+                    >
+                      <Icon name="ph:power" size={14} decorative />
+                    </Button>
                     <div class={styles.fxTitleBlock}>
-                      <div class={styles.fxTitle}>{EFFECT_LABELS[effect.kind]}</div>
-                      <div class={styles.fxBadges}>
-                        <span>{formatEffectLatency(effect)}</span>
-                        <span>{formatEffectTail(effect)}</span>
+                      <div class={styles.fxTitleLine}>
+                        <span class={styles.fxTitle}>{EFFECT_LABELS[effect.kind]}</span>
+                        <span class={styles.fxBadges}>
+                          <span>{formatEffectLatency(effect)}</span>
+                          <span>{formatEffectTail(effect)}</span>
+                        </span>
                       </div>
                     </div>
                     <div class={styles.fxActions}>
-                      <HoverInfo content="Move left">
-                        <Button
-                          iconOnly
-                          size="xs"
-                          disabled={index() === 0}
-                          aria-label={`Move ${EFFECT_LABELS[effect.kind]} earlier`}
-                          onClick={() => moveEffect(effect.id, -1)}
-                        >
-                          <Icon name="ph:caret-left" size={12} decorative />
-                        </Button>
-                      </HoverInfo>
-                      <HoverInfo content="Move right">
-                        <Button
-                          iconOnly
-                          size="xs"
-                          disabled={index() === effects().length - 1}
-                          aria-label={`Move ${EFFECT_LABELS[effect.kind]} later`}
-                          onClick={() => moveEffect(effect.id, 1)}
-                        >
-                          <Icon name="ph:caret-right" size={12} decorative />
-                        </Button>
-                      </HoverInfo>
-                      <Toggle
-                        checked={!effect.bypassed}
-                        onChange={(enabled) => patchEffect(effect.id, { bypassed: !enabled })}
-                      />
                       <HoverInfo content="Remove effect">
                         <Button
                           iconOnly
@@ -1221,14 +742,9 @@ function InstrumentFxRack() {
                   <div class={styles.fxParams}>
                     <For each={EFFECT_PARAM_SPECS[effect.kind]}>
                       {(param) => (
-                        <NumberInput
-                          label={param.label}
+                        <EffectParamControl
+                          param={param}
                           value={effect.params[param.key] ?? EFFECT_DEFAULT_PARAMS[effect.kind][param.key] ?? param.min}
-                          min={param.min}
-                          max={param.max}
-                          step={param.step}
-                          unit={param.unit}
-                          layout="inline"
                           onChange={(value) => patchParam(effect, param.key, value)}
                         />
                       )}
@@ -1242,6 +758,153 @@ function InstrumentFxRack() {
       </div>
     </section>
   );
+}
+
+function MacroControlsPanel(props: { focusedSourceTarget?: SynthModulationSourceEditorTarget | null }) {
+  const draft = createStoreSelector(useSynthStore, (state) => state.draft);
+  const setNumericParameter = useSynthStore.getState().setNumericParameter;
+  const updateMacroDefinition = useSynthStore.getState().updateMacroDefinition;
+
+  return (
+    <section class={`ds-panel ${styles.macroPanel}`} aria-label="Macros">
+      <header class="ds-panel-header">
+        <div class="ds-panel-title">Macro Controls</div>
+      </header>
+      <div class={`ds-panel-body ${styles.macros}`}>
+        <For each={MACRO_IDS}>
+          {(id, index) => {
+            const definition = () => macroDefinitionForId(draft(), id);
+            const assignments = () => macroAssignmentsForId(draft(), id);
+            const disabled = () => assignments().length === 0;
+            const conflict = () => macroConflictSummaryForId(draft(), id);
+            const conflictDetails = () => macroConflictDetailsForId(draft(), id);
+            return (
+              <div
+                class={`${styles.macroCard} ${props.focusedSourceTarget === id ? styles.sourceFocus : ""}`}
+                data-synth-source-editor={id}
+                data-disabled={disabled() ? "true" : "false"}
+                aria-disabled={disabled() ? "true" : "false"}
+                aria-label={`${definition().label} macro control`}
+              >
+                <TextInput
+                  data-synth-source-focus
+                  layout="bare"
+                  aria-label={`Macro ${index() + 1} name`}
+                  value={definition().label}
+                  disabled={disabled()}
+                  onInput={(event) => updateMacroDefinition(id, { label: event.currentTarget.value })}
+                />
+                <Knob
+                  className={styles.macroKnob}
+                  size="sm"
+                  label={`M${index() + 1}`}
+                  value={getNumberParam(draft(), id)}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  defaultValue={0}
+                  disabled={disabled()}
+                  {...modulationPropsForSource(draft(), id)}
+                  pickSourceId={disabled() ? undefined : id}
+                  formatValue={formatPercent}
+                  onChange={(value) => setNumericParameter(id, value)}
+                />
+                <Show when={conflict().count > 0}>
+                  <div
+                    class={styles.macroConflict}
+                    title={conflict().label}
+                    aria-label={`${definition().label} macro conflict`}
+                  >
+                    <span>Conflict</span>
+                    <span>{conflict().label}</span>
+                    <For each={conflictDetails().slice(0, 2)}>
+                      {(detail) => (
+                        <div class={styles.macroConflictDetail} aria-label={`${detail.targetLabel} macro conflict detail`}>
+                          <span>{detail.targetLabel}</span>
+                          <span>{detail.competingSources.slice(0, 2).join(", ")}</span>
+                          <span>Summed</span>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+                <Select
+                  layout="bare"
+                  selectClassName={styles.macroCurveSelect}
+                  value={definition().curve}
+                  disabled={disabled()}
+                  aria-label={`${definition().label} response curve`}
+                  onInput={(event) => updateMacroDefinition(id, { curve: event.currentTarget.value as MacroCurve })}
+                >
+                  <option value="linear">Linear</option>
+                  <option value="ease-in">Ease In</option>
+                  <option value="ease-out">Ease Out</option>
+                  <option value="s-curve">S-Curve</option>
+                </Select>
+              </div>
+            );
+          }}
+        </For>
+      </div>
+    </section>
+  );
+}
+
+function EffectParamControl(props: {
+  param: EffectParamSpec;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const param = () => props.param;
+  const value = () => props.value;
+  const readout = () => formatEffectParamReadout(value(), param());
+
+  return (
+    <Show
+      when={effectParamUsesSlider(param())}
+      fallback={(
+        <NumberInput
+          label={param().label}
+          value={value()}
+          min={param().min}
+          max={param().max}
+          step={param().step}
+          unit={param().unit}
+          layout="inline"
+          className={styles.fxNumberInput}
+          onChange={props.onChange}
+        />
+      )}
+    >
+      <Slider
+        className={styles.fxSlider}
+        label={param().label}
+        value={value()}
+        min={param().min}
+        max={param().max}
+        step={param().step}
+        layout="inline"
+        inputClassName={styles.fxSliderInput}
+        readoutClassName={styles.fxSliderReadout}
+        readout={<span>{readout()}</span>}
+        onChange={props.onChange}
+      />
+    </Show>
+  );
+}
+
+function effectParamUsesSlider(param: EffectParamSpec): boolean {
+  if (param.unit === "%") return true;
+  if (param.key === "depthMs" && param.max <= 25) return true;
+  if (param.key === "delayMs" && param.max <= 35) return true;
+  if (param.key === "depthOct") return true;
+  if (param.key === "makeupDb" || param.key === "trimDb") return true;
+  return false;
+}
+
+function formatEffectParamReadout(value: number, param: EffectParamSpec): string {
+  const rounded = Math.abs(param.step) >= 1 ? Math.round(value) : Number(value.toFixed(2));
+  return param.unit ? `${rounded} ${param.unit}` : `${rounded}`;
 }
 
 function describeEffectChain(effects: TrackEffect[]): string {
@@ -1297,20 +960,31 @@ function LfoLane(props: { lfo: 1 | 2; focused?: boolean }) {
       data-synth-source-editor={`lfo.${props.lfo}`}
     >
       <header class={styles.lfoLaneHeader}>
-        <div class={styles.lfoLaneTitle}>LFO {props.lfo}</div>
-        <div class="ds-panel-actions">
+        <div class={styles.lfoHeaderLeft}>
           <Button
             iconOnly
             size="xs"
-            selected={sync()}
-            aria-label={`${sync() ? "Disable" : "Enable"} LFO ${props.lfo} tempo sync`}
-            onClick={() => setBooleanParameter(syncId, !sync())}
+            className={styles.lfoHeaderButton}
+            selected={enabled()}
+            aria-label={`${enabled() ? "Disable" : "Enable"} LFO ${props.lfo}`}
+            onClick={() => setBooleanParameter(enabledId, !enabled())}
           >
-            <Icon name={sync() ? "ph:clock-countdown-fill" : "ph:clock-countdown"} size={12} decorative />
+            <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={12} decorative />
           </Button>
+          <div class={styles.lfoLaneTitle}>LFO {props.lfo}</div>
+          <SegmentedIconStrip
+            ariaLabel={`LFO ${props.lfo} Shape`}
+            value={String(draft().parameters[shapeId])}
+            options={LFO_SHAPES}
+            onChange={(value) => setParameter(shapeId, value)}
+          />
+          <span class={styles.lfoHeaderValue}>{selectedOptionLabel(LFO_SHAPES, String(draft().parameters[shapeId]))}</span>
+        </div>
+        <div class={styles.lfoHeaderActions}>
           <Button
             iconOnly
             size="xs"
+            className={styles.lfoHeaderButton}
             selected={oneShot()}
             aria-label={`${oneShot() ? "Disable" : "Enable"} LFO ${props.lfo} one-shot`}
             onClick={() => setBooleanParameter(oneShotId, !oneShot())}
@@ -1320,170 +994,135 @@ function LfoLane(props: { lfo: 1 | 2; focused?: boolean }) {
           <Button
             iconOnly
             size="xs"
+            className={styles.lfoHeaderButton}
             selected={retrigger()}
             aria-label={`${retrigger() ? "Disable" : "Enable"} LFO ${props.lfo} retrigger`}
             onClick={() => setBooleanParameter(retriggerId, !retrigger())}
           >
             <Icon name={retrigger() ? "ph:arrow-counter-clockwise-fill" : "ph:arrow-counter-clockwise"} size={12} decorative />
           </Button>
-          <Button
-            iconOnly
-            size="xs"
-            selected={enabled()}
-            aria-label={`${enabled() ? "Disable" : "Enable"} LFO ${props.lfo}`}
-            onClick={() => setBooleanParameter(enabledId, !enabled())}
-          >
-            <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={12} decorative />
-          </Button>
         </div>
       </header>
       <div class={styles.lfoControls}>
-        <ShapeButtonSet
-          label={`LFO ${props.lfo} Shape`}
-          value={String(draft().parameters[shapeId])}
-          options={LFO_SHAPES}
-          onChange={(value) => setParameter(shapeId, value)}
-        />
-        <Show
-          when={sync()}
-          fallback={
-            <Knob
-              size="sm"
-              label="Rate"
-              value={getNumberParam(draft(), rateId)}
-              min={0.05}
-              max={50}
-              step={0.01}
-              unit="Hz"
-              defaultValue={1}
-              formatValue={(value) => `${value < 10 ? value.toFixed(2) : value.toFixed(1)}`}
-              pickSourceId={`lfo.${props.lfo}` as ModulationSourceId}
-              onChange={(value) => setNumericParameter(rateId, value)}
+        <div class={styles.lfoSyncBlock}>
+          <Button
+            size="xs"
+            className={styles.lfoSyncButton}
+            selected={sync()}
+            aria-label={`${sync() ? "Disable" : "Enable"} LFO ${props.lfo} tempo sync`}
+            onClick={() => setBooleanParameter(syncId, !sync())}
+          >
+            Sync
+          </Button>
+          <Show
+            when={sync()}
+            fallback={
+              <Knob
+                size="sm"
+                label="Rate"
+                value={getNumberParam(draft(), rateId)}
+                min={0.05}
+                max={50}
+                step={0.01}
+                unit="Hz"
+                defaultValue={1}
+                formatValue={(value) => `${value < 10 ? value.toFixed(2) : value.toFixed(1)}`}
+                pickSourceId={`lfo.${props.lfo}` as ModulationSourceId}
+                onChange={(value) => setNumericParameter(rateId, value)}
+              />
+            }
+          >
+            <SegmentedIconStrip
+              ariaLabel={`LFO ${props.lfo} Sync Rate`}
+              value={String(draft().parameters[syncedRateId] ?? (props.lfo === 1 ? "1/4" : "1/2"))}
+              options={LFO_SYNC_RATES}
+              onChange={(value) => setParameter(syncedRateId, value)}
             />
-          }
-        >
-          <ShapeButtonSet
-            label={`LFO ${props.lfo} Sync Rate`}
-            value={String(draft().parameters[syncedRateId] ?? (props.lfo === 1 ? "1/4" : "1/2"))}
-            options={LFO_SYNC_RATES}
-            onChange={(value) => setParameter(syncedRateId, value)}
+            <span class={styles.lfoSyncValue}>{String(draft().parameters[syncedRateId] ?? (props.lfo === 1 ? "1/4" : "1/2"))}</span>
+          </Show>
+        </div>
+        <div class={styles.lfoKnobBlock}>
+          <Knob
+            size="sm"
+            label="Phase"
+            value={getNumberParam(draft(), phaseId)}
+            min={0}
+            max={1}
+            step={0.01}
+            defaultValue={0}
+            formatValue={(value) => `${Math.round(value * 360)} deg`}
+            onChange={(value) => setNumericParameter(phaseId, value)}
           />
-        </Show>
-        <Knob
-          size="sm"
-          label="Phase"
-          value={getNumberParam(draft(), phaseId)}
-          min={0}
-          max={1}
-          step={0.01}
-          defaultValue={0}
-          formatValue={(value) => `${Math.round(value * 360)} deg`}
-          onChange={(value) => setNumericParameter(phaseId, value)}
-        />
-        <Knob
-          size="sm"
-          label="Smooth"
-          value={getNumberParam(draft(), smoothingId)}
-          min={0}
-          max={1}
-          step={0.01}
-          defaultValue={0}
-          formatValue={formatPercent}
-          onChange={(value) => setNumericParameter(smoothingId, value)}
-        />
-        <Knob
-          size="sm"
-          label="Random"
-          value={getNumberParam(draft(), randomPhaseId)}
-          min={0}
-          max={1}
-          step={0.01}
-          defaultValue={0}
-          formatValue={formatPercent}
-          onChange={(value) => setNumericParameter(randomPhaseId, value)}
-        />
+          <Knob
+            size="sm"
+            label="Smooth"
+            value={getNumberParam(draft(), smoothingId)}
+            min={0}
+            max={1}
+            step={0.01}
+            defaultValue={0}
+            formatValue={formatPercent}
+            onChange={(value) => setNumericParameter(smoothingId, value)}
+          />
+          <Knob
+            size="sm"
+            label="Random"
+            value={getNumberParam(draft(), randomPhaseId)}
+            min={0}
+            max={1}
+            step={0.01}
+            defaultValue={0}
+            formatValue={formatPercent}
+            onChange={(value) => setNumericParameter(randomPhaseId, value)}
+          />
+        </div>
       </div>
     </div>
   );
 }
 
-function PerformancePanel(props: {
-  focusedSourceTarget?: SynthModulationSourceEditorTarget | null;
-  expressionActivity?: SynthExpressionActivity | null;
+function SegmentedIconStrip(props: {
+  ariaLabel: string;
+  value: string;
+  options: ReadonlyArray<readonly [string, string, string] | readonly [string, string, string, string]>;
+  onChange: (value: string) => void;
 }) {
-  const draft = createStoreSelector(useSynthStore, (state) => state.draft);
-  const setNumericParameter = useSynthStore.getState().setNumericParameter;
-  const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
-  const summary = createMemo(() => synthExpressionSummary(draft(), props.expressionActivity ?? null));
-  const routedSummary = createMemo(() => summary().filter((item) => (
-    item.id === "pitch-bend" || item.id === "velocity" || item.id === "keytrack" || item.id === "mod-wheel"
-  )));
-  const mono = createMemo(() => draft().parameters["mono.enabled"] === true);
-  const legato = createMemo(() => draft().parameters["legato.enabled"] === true);
-
   return (
-    <section
-      class={`ds-panel ${props.focusedSourceTarget === "performance" ? styles.sourceFocus : ""}`}
-      aria-label="Performance controls"
-      data-synth-source-editor="performance"
-    >
-      <header class="ds-panel-header">
-        <div class="ds-panel-title">Performance</div>
-      </header>
-      <div class={`ds-panel-body ${styles.performanceBody}`}>
-        <div class={styles.performanceControls}>
-          <NumberInput
-            label="Voices"
-            layout="inline"
-            value={getNumberParam(draft(), "maxVoices")}
-            min={1}
-            max={32}
-            step={1}
-            maxLength={2}
-            onChange={(value) => setNumericParameter("maxVoices", value)}
-          />
-          <NumberInput
-            label="Glide"
-            layout="inline"
-            value={getNumberParam(draft(), "glide.ms")}
-            min={0}
-            max={5000}
-            step={1}
-            unit="ms"
-            maxLength={4}
-            onChange={(value) => setNumericParameter("glide.ms", value)}
-          />
-          <Toggle
-            label="Mono"
-            checked={mono()}
-            onChange={(value) => setBooleanParameter("mono.enabled", value)}
-          />
-          <Toggle
-            label="Legato"
-            checked={legato()}
-            onChange={(value) => setBooleanParameter("legato.enabled", value)}
-          />
-        </div>
-        <div class={styles.performanceReadouts} aria-label="Performance source readouts">
-          <For each={routedSummary()}>
-            {(item) => (
-              <div
-                class={styles.performanceReadout}
-                data-active={item.active ? "true" : "false"}
-                data-live={item.live ? "true" : "false"}
-                data-mesh-variant={meshTintVariantFor(item.id)}
-                title={`${item.label}: ${item.value} - ${item.detail}`}
+    <div class={styles.segmentedIconStrip} role="radiogroup" aria-label={props.ariaLabel}>
+      <For each={props.options}>
+        {(option) => {
+          const [optionValue, shortLabel, fullLabelOrIcon, maybeIcon] = option;
+          const fullLabel = maybeIcon ? fullLabelOrIcon : shortLabel;
+          const icon = maybeIcon ?? fullLabelOrIcon;
+          const active = () => props.value === optionValue;
+          return (
+            <HoverInfo content={fullLabel}>
+              <Button
+                iconOnly
+                size="xs"
+                variant="ghost"
+                selected={active()}
+                role="radio"
+                aria-checked={active()}
+                aria-label={fullLabel}
+                className={styles.segmentedIconButton}
+                onClick={() => props.onChange(optionValue)}
               >
-                <span>{item.label}</span>
-                <strong>{item.value}</strong>
-                <small>{item.detail}</small>
-              </div>
-            )}
-          </For>
-        </div>
-      </div>
-    </section>
+                <Icon name={icon} size={14} decorative />
+              </Button>
+            </HoverInfo>
+          );
+        }}
+      </For>
+    </div>
   );
+}
+
+function selectedOptionLabel(
+  options: ReadonlyArray<readonly [string, string, string] | readonly [string, string, string, string]>,
+  value: string,
+): string {
+  return options.find((option) => option[0] === value)?.[1] ?? value;
 }
 
 function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEditorTarget | null }) {
@@ -1493,8 +1132,6 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   const setParameter = useSynthStore.getState().setParameter;
   const filterType = createMemo(() => String(draft().parameters["filter.type"]));
   const filterEnabled = createMemo(() => draft().parameters["filter.enabled"] === true);
-  const env1Loop = createMemo(() => draft().parameters["env.1.loop"] === true);
-  const env2Loop = createMemo(() => draft().parameters["env.2.loop"] === true);
 
   return (
     <section
@@ -1503,7 +1140,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
       data-synth-source-editor={props.focusedSourceTarget === "env.1" || props.focusedSourceTarget === "env.2" ? props.focusedSourceTarget : undefined}
     >
       <header class="ds-panel-header">
-        <div class="ds-panel-title">Amp / Filter</div>
+        <div class="ds-panel-title">Envelopes</div>
         <div class="ds-panel-actions">
           <Button
             iconOnly
@@ -1516,140 +1153,220 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
           </Button>
         </div>
       </header>
-      <div class={`ds-panel-body ${styles.controlGrid}`}>
+      <div class={`ds-panel-body ${styles.ampFilterBody}`}>
         <div class={styles.envelopeCards}>
           <For each={["env.1", "env.2"] as const}>
-            {(source) => {
-              const envelope = () => synthEnvelopeEditorSummary(draft(), source);
-              return (
-                <div
-                  class={styles.envelopeCard}
-                  data-synth-source-editor={source}
-                  data-aether-envelope-editor={source}
-                  data-active={props.focusedSourceTarget === source ? "true" : "false"}
-                >
-                  <div class={styles.envelopeCardHeader}>
-                    <strong>{envelope().label}</strong>
-                    <span>{envelope().mode}</span>
-                  </div>
-                  <EnvelopeHandleEditor
-                    source={source}
-                    onChange={setNumericParameter}
-                    onSetCurve={setParameter}
-                  />
-                  <div class={styles.envelopeCardMeta}>
-                    <span>{envelope().timingLabel}</span>
-                    <span>{envelope().sustainLabel}</span>
-                    <span>{envelope().curveLabel}</span>
-                    <span>{envelope().assignmentLabel}</span>
-                  </div>
-                </div>
-              );
-            }}
+            {(source) => (
+              <EnvelopeEditorCard
+                source={source}
+                active={props.focusedSourceTarget === source}
+                onChange={setNumericParameter}
+                onSetCurve={setParameter}
+              />
+            )}
           </For>
         </div>
-        <ShapeButtonSet
-          label="Filter"
-          value={filterType()}
-          options={FILTER_TYPES}
-          onChange={(value) => setParameter("filter.type", value)}
-        />
-        <ShapeButtonSet
-          label="Runtime Warp"
-          value={String(draft().parameters["aether.runtimeWarpMode"] ?? "shape")}
-          options={AETHER_RUNTIME_WARP_MODES}
-          onChange={(value) => setParameter("aether.runtimeWarpMode", value)}
-        />
-        <Knob
-          size="sm"
-          label="Cutoff"
-          value={getNumberParam(draft(), "filter.cutoff")}
-          min={20}
-          max={20000}
-          step={10}
-          unit="Hz"
-          defaultValue={18000}
-          {...modulationPropsForTarget(draft(), "filter.cutoff")}
-          pickTargetId="filter.cutoff"
-          formatValue={(value) => Math.round(value).toString()}
-          onChange={(value) => setNumericParameter("filter.cutoff", value)}
-        />
-        <For each={[
-          ["filter.resonance", "Res", 0.1, false],
-          ["filter.keytrack", "Key", 0, false],
-          ["filter.drive", "Drive", 0, false],
-          ["aether.runtimeWarp", "Warp", 0, false],
-          ["amp.level", "Level", 0.8, false],
-          ["amp.pan", "Pan", 0, true],
-          ["env.1.attack", "Attack", 0.005, false],
-          ["env.1.decay", "Decay", 0.15, false],
-          ["env.1.sustain", "Sustain", 0.8, false],
-          ["env.1.release", "Release", 0.25, false],
-          ["env.2.attack", "Mod Atk", 0.01, false],
-          ["env.2.decay", "Mod Dec", 0.3, false],
-          ["env.2.sustain", "Mod Sus", 0, false],
-          ["env.2.release", "Mod Rel", 0.2, false],
-        ] as Array<[SynthParameterId, string, number, boolean]>}>
-          {([id, label, defaultValue, bipolar]) => (
+        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`}>
+          <div class={styles.ampFilterGroupTitle}>Filter</div>
+          <div class={styles.ampFilterShapeRow}>
+            <ShapeButtonSet
+              label="Filter"
+              value={filterType()}
+              options={FILTER_TYPES}
+              onChange={(value) => setParameter("filter.type", value)}
+            />
+          </div>
+          <div class={styles.knobCluster}>
             <Knob
               size="sm"
-              label={label}
-              value={getNumberParam(draft(), id)}
-              min={bipolar ? -1 : 0}
-              max={id.startsWith("env.") && !id.endsWith("sustain") ? 30 : 1}
-              step={id.startsWith("env.") && !id.endsWith("sustain") ? 0.001 : 0.01}
-              defaultValue={defaultValue}
-              bipolar={bipolar}
-              {...modulationPropsForTarget(draft(), id)}
-              pickTargetId={MODULATABLE_PARAMETER_IDS.has(id) ? id : undefined}
-              formatValue={id.startsWith("env.") && !id.endsWith("sustain") ? formatSeconds : formatPercent}
-              onChange={(value) => setNumericParameter(id, value)}
+              label="Cutoff"
+              value={getNumberParam(draft(), "filter.cutoff")}
+              min={20}
+              max={20000}
+              step={10}
+              unit="Hz"
+              defaultValue={18000}
+              {...modulationPropsForTarget(draft(), "filter.cutoff")}
+              pickTargetId="filter.cutoff"
+              formatValue={(value) => Math.round(value).toString()}
+              onChange={(value) => setNumericParameter("filter.cutoff", value)}
             />
-          )}
-        </For>
-        <For each={[
-          ["env.1.attackCurve", "Atk Curve"],
-          ["env.1.decayCurve", "Dec Curve"],
-          ["env.1.releaseCurve", "Rel Curve"],
-          ["env.2.attackCurve", "Mod Atk"],
-          ["env.2.decayCurve", "Mod Dec"],
-          ["env.2.releaseCurve", "Mod Rel"],
-        ] as Array<[SynthParameterId, string]>}>
-          {([id, label]) => (
+            <For each={[
+              ["filter.resonance", "Res", 0.1, false],
+              ["filter.keytrack", "Key", 0, false],
+              ["filter.drive", "Drive", 0, false],
+            ] as Array<[SynthParameterId, string, number, boolean]>}>
+              {([id, label, defaultValue, bipolar]) => (
+                <SynthParameterKnob
+                  id={id}
+                  label={label}
+                  defaultValue={defaultValue}
+                  bipolar={bipolar}
+                  onChange={setNumericParameter}
+                />
+              )}
+            </For>
+          </div>
+        </div>
+        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`}>
+          <div class={styles.ampFilterGroupTitle}>Warp</div>
+          <div class={styles.ampFilterShapeRow}>
             <ShapeButtonSet
-              label={label}
-              value={getEnvelopeCurveParam(draft(), id)}
-              options={ENVELOPE_CURVES}
-              onChange={(value) => setParameter(id, value)}
+              label="Runtime Warp"
+              value={String(draft().parameters["aether.runtimeWarpMode"] ?? "shape")}
+              options={AETHER_RUNTIME_WARP_MODES}
+              onChange={(value) => setParameter("aether.runtimeWarpMode", value)}
             />
-          )}
-        </For>
-        <Button
-          size="sm"
-          selected={env1Loop()}
-          onClick={() => setBooleanParameter("env.1.loop", !env1Loop())}
-        >
-          Env 1 Loop
-        </Button>
-        <Button
-          size="sm"
-          selected={env2Loop()}
-          onClick={() => setBooleanParameter("env.2.loop", !env2Loop())}
-        >
-          Env 2 Loop
-        </Button>
+          </div>
+          <div class={styles.knobCluster}>
+            <SynthParameterKnob
+              id="aether.runtimeWarp"
+              label="Warp"
+              defaultValue={0}
+              onChange={setNumericParameter}
+            />
+          </div>
+        </div>
+        <div class={`${styles.ampFilterGroup} ${styles.ampFilterAmpGroup}`}>
+          <div class={styles.ampFilterGroupTitle}>Amp</div>
+          <div class={styles.knobCluster}>
+            <SynthParameterKnob
+              id="amp.level"
+              label="Level"
+              defaultValue={0.8}
+              onChange={setNumericParameter}
+            />
+            <SynthParameterKnob
+              id="amp.pan"
+              label="Pan"
+              defaultValue={0}
+              bipolar
+              onChange={setNumericParameter}
+            />
+          </div>
+        </div>
       </div>
     </section>
+  );
+}
+
+function SynthParameterKnob(props: {
+  id: SynthParameterId;
+  label: string;
+  defaultValue: number;
+  bipolar?: boolean;
+  onChange: (id: SynthParameterId, value: number) => void;
+}) {
+  const draft = createStoreSelector(useSynthStore, (state) => state.draft);
+  const isEnvelopeTime = createMemo(() => props.id.startsWith("env.") && !props.id.endsWith("sustain"));
+  return (
+    <Knob
+      size="sm"
+      label={props.label}
+      value={getNumberParam(draft(), props.id)}
+      min={props.bipolar ? -1 : 0}
+      max={isEnvelopeTime() ? 30 : 1}
+      step={isEnvelopeTime() ? 0.001 : 0.01}
+      defaultValue={props.defaultValue}
+      bipolar={props.bipolar}
+      {...modulationPropsForTarget(draft(), props.id)}
+      pickTargetId={MODULATABLE_PARAMETER_IDS.has(props.id) ? props.id : undefined}
+      formatValue={isEnvelopeTime() ? formatSeconds : formatPercent}
+      onChange={(value) => props.onChange(props.id, value)}
+    />
+  );
+}
+
+function EnvelopeEditorCard(props: {
+  source: "env.1" | "env.2";
+  active: boolean;
+  onChange: (id: SynthParameterId, value: number) => void;
+  onSetCurve: (id: SynthParameterId, value: EnvelopeCurve) => void;
+}) {
+  const draft = createStoreSelector(useSynthStore, (state) => state.draft);
+  const envelope = createMemo(() => synthEnvelopeEditorSummary(draft(), props.source));
+
+  return (
+    <div
+      class={styles.envelopeCard}
+      data-synth-source-editor={props.source}
+      data-aether-envelope-editor={props.source}
+      data-active={props.active ? "true" : "false"}
+    >
+      <div class={styles.envelopeCardHeader}>
+        <strong>{envelope().label}</strong>
+      </div>
+      <EnvelopeHandleEditor
+        source={props.source}
+        onChange={props.onChange}
+      />
+      <div class={styles.envelopeTimingRow}>
+        <span>Atk {formatSeconds(getNumberParam(draft(), `${props.source}.attack` as SynthParameterId))}</span>
+        <span>Dec {formatSeconds(getNumberParam(draft(), `${props.source}.decay` as SynthParameterId))}</span>
+        <span>Rel {formatSeconds(getNumberParam(draft(), `${props.source}.release` as SynthParameterId))}</span>
+        <span>S {formatPercent(getNumberParam(draft(), `${props.source}.sustain` as SynthParameterId))}</span>
+      </div>
+      <div class={styles.envelopeEditorControls}>
+        <div class={styles.envelopeKnobs}>
+          <Knob
+            size="sm"
+            label="Cutoff"
+            value={getNumberParam(draft(), "filter.cutoff")}
+            min={20}
+            max={20000}
+            step={10}
+            unit="Hz"
+            defaultValue={18000}
+            formatValue={(value) => Math.round(value).toString()}
+            onChange={(value) => props.onChange("filter.cutoff", value)}
+          />
+          <For each={[
+            ["filter.resonance", "Res", 0.1],
+            ["filter.keytrack", "Key", 0],
+            ["filter.drive", "Drive", 0],
+          ] as Array<[SynthParameterId, string, number]>}>
+            {([id, label, defaultValue]) => (
+              <Knob
+                size="sm"
+                label={label}
+                value={getNumberParam(draft(), id)}
+                min={0}
+                max={1}
+                step={0.01}
+                defaultValue={defaultValue}
+                formatValue={formatPercent}
+                onChange={(value) => props.onChange(id, value)}
+              />
+            )}
+          </For>
+        </div>
+        <div class={styles.envelopeCurves}>
+          <For each={[
+            [`${props.source}.attackCurve` as SynthParameterId, "Atk"],
+            [`${props.source}.decayCurve` as SynthParameterId, "Dec"],
+            [`${props.source}.releaseCurve` as SynthParameterId, "Rel"],
+          ] as Array<[SynthParameterId, string]>}>
+            {([id, label]) => (
+              <EnvelopeCurveSegmentedControl
+                label={label}
+                value={getEnvelopeCurveParam(draft(), id)}
+                onChange={(value) => props.onSetCurve(id, value as EnvelopeCurve)}
+              />
+            )}
+          </For>
+        </div>
+      </div>
+    </div>
   );
 }
 
 function EnvelopeHandleEditor(props: {
   source: "env.1" | "env.2";
   onChange: (id: SynthParameterId, value: number) => void;
-  onSetCurve: (id: SynthParameterId, value: EnvelopeCurve) => void;
 }) {
   let railRef: SVGSVGElement | undefined;
-  const [draggedHandle, setDraggedHandle] = createSignal<"attack" | "decay-sustain" | "release" | null>(null);
+  type EnvelopeDragHandle = "attack" | "decay-sustain" | "release";
+  const [draggedHandle, setDraggedHandle] = createSignal<EnvelopeDragHandle | null>(null);
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const envelope = createMemo(() => synthEnvelopeEditorSummary(draft(), props.source));
   const attack = createMemo(() => getNumberParam(draft(), `${props.source}.attack` as SynthParameterId));
@@ -1660,32 +1377,35 @@ function EnvelopeHandleEditor(props: {
   const decayCurve = createMemo(() => getEnvelopeCurveParam(draft(), `${props.source}.decayCurve` as SynthParameterId));
   const releaseCurve = createMemo(() => getEnvelopeCurveParam(draft(), `${props.source}.releaseCurve` as SynthParameterId));
 
-  const startPoint = createMemo(() => envelope().points[0] ?? { x: 0, y: 100 });
   const attackPoint = createMemo(() => envelope().points[1] ?? { x: 0, y: 0 });
   const decayPoint = createMemo(() => envelope().points[2] ?? { x: 50, y: 50 });
   const holdPoint = createMemo(() => envelope().points[3] ?? decayPoint());
-  const releasePoint = createMemo(() => envelope().points[4] ?? { x: 100, y: 100 });
-  const attackCurvePoint = createMemo(() => midpoint(startPoint(), attackPoint()));
-  const decayCurvePoint = createMemo(() => midpoint(attackPoint(), decayPoint()));
-  const releaseCurvePoint = createMemo(() => midpoint(holdPoint(), releasePoint()));
-
-  function updateHandle(kind: "attack" | "decay-sustain" | "release", event: PointerEvent) {
+  function updateHandle(kind: EnvelopeDragHandle, event: PointerEvent) {
     const rail = railRef;
     const rect = rail?.getBoundingClientRect();
     if (!rail || !rect || rect.width <= 0 || rect.height <= 0) return;
     const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
     const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
+    const attackRatio = clamp(attackPoint().x / 100, 0.01, 0.92);
+    const decayRatio = clamp(decayPoint().x / 100, attackRatio + 0.01, 0.96);
+    const holdSeconds = 0.22;
     if (kind === "attack") {
-      props.onChange(`${props.source}.attack` as SynthParameterId, snapEnvelopeSeconds(x * 5));
+      const fixedTail = Math.max(0.03, decay()) + holdSeconds + Math.max(0.03, release());
+      const nextX = clamp(x, 0.01, decayRatio - 0.01);
+      props.onChange(`${props.source}.attack` as SynthParameterId, snapEnvelopeSeconds((nextX / Math.max(0.03, 1 - nextX)) * fixedTail));
     } else if (kind === "decay-sustain") {
-      props.onChange(`${props.source}.decay` as SynthParameterId, snapEnvelopeSeconds(x * 5));
+      const fixedTail = holdSeconds + Math.max(0.03, release());
+      const nextX = clamp(x, attackRatio + 0.01, 0.96);
+      props.onChange(`${props.source}.decay` as SynthParameterId, snapEnvelopeSeconds(Math.max(0.001, (nextX / Math.max(0.03, 1 - nextX)) * fixedTail - Math.max(0.03, attack()))));
       props.onChange(`${props.source}.sustain` as SynthParameterId, snap01(1 - y));
-    } else {
-      props.onChange(`${props.source}.release` as SynthParameterId, snapEnvelopeSeconds(x * 5));
+    } else if (kind === "release") {
+      const fixedHead = Math.max(0.03, attack()) + Math.max(0.03, decay()) + holdSeconds;
+      const nextX = clamp(x, decayRatio + 0.01, 0.99);
+      props.onChange(`${props.source}.release` as SynthParameterId, snapEnvelopeSeconds(Math.max(0.001, fixedHead * ((1 - nextX) / Math.max(0.03, nextX)))));
     }
   }
 
-  function startHandleDrag(kind: "attack" | "decay-sustain" | "release", event: PointerEvent) {
+  function startHandleDrag(kind: EnvelopeDragHandle, event: PointerEvent) {
     event.preventDefault();
     if (event.currentTarget instanceof HTMLElement) {
       try {
@@ -1698,20 +1418,15 @@ function EnvelopeHandleEditor(props: {
     updateHandle(kind, event);
   }
 
-  function moveHandleDrag(kind: "attack" | "decay-sustain" | "release", event: PointerEvent) {
+  function moveHandleDrag(kind: EnvelopeDragHandle, event: PointerEvent) {
     if (draggedHandle() !== kind) return;
     updateHandle(kind, event);
   }
 
-  function stopHandleDrag(kind: "attack" | "decay-sustain" | "release", event: PointerEvent) {
+  function stopHandleDrag(kind: EnvelopeDragHandle, event: PointerEvent) {
     if (draggedHandle() !== kind) return;
     updateHandle(kind, event);
     setDraggedHandle(null);
-  }
-
-  function cycleCurve(segment: "attack" | "decay" | "release") {
-    const id = `${props.source}.${segment}Curve` as SynthParameterId;
-    props.onSetCurve(id, nextEnvelopeCurve(getEnvelopeCurveParam(draft(), id)));
   }
 
   return (
@@ -1723,7 +1438,11 @@ function EnvelopeHandleEditor(props: {
         preserveAspectRatio="none"
         aria-hidden="true"
       >
-        <polyline points={envelopePolyline(envelope().points)} />
+        <path d={envelopeCurvePath(envelope().points, {
+          attack: attackCurve(),
+          decay: decayCurve(),
+          release: releaseCurve(),
+        })} />
       </svg>
       <button
         type="button"
@@ -1750,7 +1469,7 @@ function EnvelopeHandleEditor(props: {
       <button
         type="button"
         class={styles.envelopeHandle}
-        style={{ left: `${releasePoint().x}%`, top: `${releasePoint().y}%` }}
+        style={{ left: `${holdPoint().x}%`, top: `${holdPoint().y}%` }}
         data-aether-envelope-handle="release"
         aria-label={`${envelope().label} release ${formatSeconds(release())}`}
         onPointerDown={(event) => startHandleDrag("release", event)}
@@ -1758,49 +1477,45 @@ function EnvelopeHandleEditor(props: {
         onPointerUp={(event) => stopHandleDrag("release", event)}
         onPointerCancel={() => setDraggedHandle(null)}
       />
-      <EnvelopeCurveButton
-        segment="attack"
-        label={`${envelope().label} attack curve`}
-        value={attackCurve()}
-        point={attackCurvePoint()}
-        onClick={() => cycleCurve("attack")}
-      />
-      <EnvelopeCurveButton
-        segment="decay"
-        label={`${envelope().label} decay curve`}
-        value={decayCurve()}
-        point={decayCurvePoint()}
-        onClick={() => cycleCurve("decay")}
-      />
-      <EnvelopeCurveButton
-        segment="release"
-        label={`${envelope().label} release curve`}
-        value={releaseCurve()}
-        point={releaseCurvePoint()}
-        onClick={() => cycleCurve("release")}
-      />
     </div>
   );
 }
 
-function EnvelopeCurveButton(props: {
-  segment: "attack" | "decay" | "release";
+function EnvelopeCurveSegmentedControl(props: {
   label: string;
   value: EnvelopeCurve;
-  point: { x: number; y: number };
-  onClick: () => void;
+  onChange: (value: EnvelopeCurve) => void;
 }) {
   return (
-    <button
-      type="button"
-      class={styles.envelopeCurveButton}
-      style={{ left: `${props.point.x}%`, top: `${props.point.y}%` }}
-      data-aether-envelope-curve={props.segment}
-      aria-label={`${props.label}: ${props.value}`}
-      onClick={props.onClick}
-    >
-      {envelopeCurveShortLabel(props.value)}
-    </button>
+    <div class={styles.envelopeCurveControl}>
+      <span class={styles.envelopeCurveLabel}>{props.label}</span>
+      <div class={styles.shapeButtons} role="radiogroup" aria-label={`${props.label} curve`}>
+        <For each={ENVELOPE_CURVES}>
+          {(option) => {
+            const [value, , fullLabel, icon] = option;
+            const active = () => props.value === value;
+            return (
+              <HoverInfo content={fullLabel}>
+                <Button
+                  iconOnly
+                  size="xs"
+                  variant="ghost"
+                  selected={active()}
+                  role="radio"
+                  aria-checked={active()}
+                  aria-label={fullLabel}
+                  className={styles.shapeButton}
+                  onClick={() => props.onChange(value)}
+                >
+                  <Icon name={icon} size={14} decorative />
+                </Button>
+              </HoverInfo>
+            );
+          }}
+        </For>
+      </div>
+      <span class={styles.envelopeCurveValue}>{envelopeCurveDisplayLabel(props.value)}</span>
+    </div>
   );
 }
 
@@ -1823,16 +1538,19 @@ function ShapeButtonSet(props: {
             const active = () => props.value === optionValue;
             return (
               <HoverInfo content={fullLabel}>
-                <button
-                  type="button"
+                <Button
+                  iconOnly
+                  size="xs"
+                  variant="ghost"
+                  selected={active()}
                   role="radio"
                   aria-checked={active()}
                   aria-label={fullLabel}
-                  class={`${styles.shapeButton} ${active() ? styles.shapeButtonActive : ""}`}
+                  className={styles.shapeButton}
                   onClick={() => props.onChange(optionValue)}
                 >
                   <Icon name={icon} size={14} decorative />
-                </button>
+                </Button>
               </HoverInfo>
             );
           }}
@@ -1890,6 +1608,16 @@ function mixStereoToMono(left: Float32Array, right: Float32Array): Float32Array 
   const mono = new Float32Array(length);
   for (let i = 0; i < length; i += 1) mono[i] = (left[i] + right[i]) * 0.5;
   return mono;
+}
+
+function makeOutputPreviewPath(samples: number[]): string {
+  if (samples.length <= 1) return "";
+  const last = samples.length - 1;
+  return samples.map((sample, index) => {
+    const x = (index / last) * 100;
+    const y = 24 - clamp(sample, -1, 1) * 18;
+    return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+  }).join(" ");
 }
 
 function makeFftBands(samples: Float32Array): number[] {
@@ -1983,8 +1711,47 @@ function formatSeconds(value: number): string {
   return value < 1 ? `${Math.round(value * 1000)}ms` : `${value.toFixed(2)}s`;
 }
 
-function envelopePolyline(points: Array<{ x: number; y: number }>): string {
-  return points.map((point) => `${point.x},${point.y}`).join(" ");
+function envelopeCurvePath(
+  points: Array<{ x: number; y: number }>,
+  curves: { attack: EnvelopeCurve; decay: EnvelopeCurve; release: EnvelopeCurve },
+): string {
+  const start = points[0] ?? { x: 0, y: 100 };
+  const attack = points[1] ?? { x: 0, y: 0 };
+  const decay = points[2] ?? { x: 50, y: 50 };
+  const hold = points[3] ?? decay;
+  const release = points[4] ?? { x: 100, y: 100 };
+  const path: string[] = [`M ${start.x.toFixed(2)} ${start.y.toFixed(2)}`];
+
+  appendEnvelopeSegment(path, start, attack, curves.attack);
+  appendEnvelopeSegment(path, attack, decay, curves.decay);
+  appendEnvelopeSegment(path, decay, hold, "linear");
+  appendEnvelopeSegment(path, hold, release, curves.release);
+  return path.join(" ");
+}
+
+function appendEnvelopeSegment(
+  path: string[],
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  curve: EnvelopeCurve,
+) {
+  const distance = Math.hypot(to.x - from.x, to.y - from.y);
+  const steps = Math.max(2, Math.min(18, Math.ceil(distance / 5)));
+  for (let step = 1; step <= steps; step += 1) {
+    const progress = step / steps;
+    const shaped = applyEnvelopeCurve(progress, curve);
+    const x = from.x + (to.x - from.x) * progress;
+    const y = from.y + (to.y - from.y) * shaped;
+    path.push(`L ${x.toFixed(2)} ${y.toFixed(2)}`);
+  }
+}
+
+function applyEnvelopeCurve(value: number, curve: EnvelopeCurve): number {
+  const x = clamp(value, 0, 1);
+  if (curve === "exp") return x * x;
+  if (curve === "log") return 1 - (1 - x) * (1 - x);
+  if (curve === "s-curve") return x * x * (3 - 2 * x);
+  return x;
 }
 
 function snapEnvelopeSeconds(value: number): number {
@@ -2001,30 +1768,47 @@ function keytrackFromFrequency(frequency: number): number {
   return clamp(midiNote / 127, 0, 1);
 }
 
-function midpoint(a: { x: number; y: number }, b: { x: number; y: number }): { x: number; y: number } {
-  return {
-    x: (a.x + b.x) / 2,
-    y: (a.y + b.y) / 2,
-  };
+function iconForInstrumentTaxonomy(categoryId: string): string {
+  switch (categoryId) {
+    case "strings":
+      return "ph:music-notes";
+    case "brass":
+      return "ph:speaker-high";
+    case "woodwinds":
+      return "ph:wind";
+    case "percussion":
+    case "drum_machines_grooveboxes":
+      return "ph:music-notes";
+    case "keyboards":
+      return "ph:piano-keys";
+    case "guitars_fretted":
+      return "ph:guitar";
+    case "bass":
+      return "ph:wave-sine";
+    case "voice":
+    case "choir":
+      return "ph:microphone";
+    case "samplers":
+      return "ph:piano-keys";
+    case "sound_design_foley":
+    case "hybrid_processed":
+      return "ph:waveform";
+    default:
+      return "ph:cube";
+  }
 }
 
-function nextEnvelopeCurve(value: EnvelopeCurve): EnvelopeCurve {
-  const index = ENVELOPE_CURVE_VALUES.indexOf(value);
-  return ENVELOPE_CURVE_VALUES[(index + 1) % ENVELOPE_CURVE_VALUES.length] ?? "linear";
-}
-
-function envelopeCurveShortLabel(value: EnvelopeCurve): string {
+function envelopeCurveDisplayLabel(value: EnvelopeCurve): string {
   if (value === "s-curve") return "S";
-  if (value === "linear") return "Lin";
-  return value.charAt(0).toUpperCase() + value.slice(1);
+  if (value === "linear") return "Line";
+  if (value === "exp") return "Exp";
+  return "Log";
 }
 
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
 }
-
-const ENVELOPE_CURVE_VALUES: EnvelopeCurve[] = ["linear", "exp", "log", "s-curve"];
 
 const MODULATABLE_PARAMETER_IDS = new Set<string>([
   "filter.cutoff",

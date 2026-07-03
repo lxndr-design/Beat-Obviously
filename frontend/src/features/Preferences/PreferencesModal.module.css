@@ -21,44 +21,15 @@
   min-width: 0;
   min-height: 32px;
   border-right: var(--border-fg);
-  background: var(--color-bg);
-  color: var(--color-fg);
-  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   font-weight: var(--font-weight-bold);
   line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-uppercase);
-  transition: var(--interaction-transition);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .tabButton:last-child {
   border-right: 0;
-}
-
-.tabButton:hover {
-  background: var(--interaction-hover-bg);
-  color: var(--color-fg);
-}
-
-.tabButton:active {
-  background: var(--interaction-pressed-bg);
-  transform: var(--interaction-press-transform);
-}
-
-.tabButtonActive {
-  background: var(--interaction-active-bg);
-  color: var(--interaction-active-fg);
-}
-
-.tabButtonActive:hover {
-  background: var(--interaction-active-hover-bg);
-  color: var(--interaction-active-fg);
-}
-
-.tabButtonActive:active {
-  background: var(--interaction-active-hover-bg);
-  color: var(--interaction-active-fg);
 }
 
 .tabContent {

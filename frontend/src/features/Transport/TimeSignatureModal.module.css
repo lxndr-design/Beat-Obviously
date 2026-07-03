@@ -19,12 +19,6 @@
 }
 
 .select {
-  height: 32px;
-  padding: 0 var(--space-1);
-  background: var(--color-bg);
-  color: var(--color-fg);
-  border: var(--border-fg);
-  font-family: var(--font-family-base);
   font-size: var(--font-size-1);
 }
 
@@ -45,36 +39,7 @@
   align-items: center;
   justify-content: center;
   aspect-ratio: 1;
-  background: var(--color-bg);
-  color: var(--color-fg);
   border: var(--border-fg);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-1);
-  cursor: pointer;
-  transition: var(--interaction-transition);
-}
-
-.beatCell:hover {
-  background: var(--interaction-hover-bg);
-  color: var(--color-fg);
-}
-
-.beatCell:active {
-  background: var(--interaction-pressed-bg);
-  transform: var(--interaction-press-transform);
-}
-
-.beatActive {
-  background: var(--interaction-active-bg);
-  color: var(--interaction-active-fg);
-}
-/* Active cell + hover → off-white tint (already-white surface). */
-.beatActive:hover {
-  background: var(--interaction-active-hover-bg);
-  color: var(--interaction-active-fg);
-}
-
-.beatActive:active {
-  background: var(--interaction-active-hover-bg);
-  color: var(--interaction-active-fg);
 }

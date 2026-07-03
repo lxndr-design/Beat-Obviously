@@ -478,12 +478,23 @@ try {
     new Set(synthStore.FACTORY_SYNTH_PRESETS.map((preset) => preset.id)).size,
     synthStore.FACTORY_SYNTH_PRESETS.length,
   );
+  const requiredPresetFamilies = ["Bass", "Keys", "Lead", "Pad", "Percussion", "Pluck", "Template", "Texture", "Wavetable"];
+  const presetFamilies = new Set(synthStore.FACTORY_SYNTH_PRESETS.map((preset) => preset.family));
+  for (const family of requiredPresetFamilies) {
+    assert.ok(presetFamilies.has(family), `expected factory Aether preset family ${family}`);
+  }
   for (const preset of synthStore.FACTORY_SYNTH_PRESETS) {
     assert.equal(preset.patch.name, preset.name);
     assert.equal(typeof preset.category, "string", `expected factory preset ${preset.id} to expose a category`);
     assert.ok(preset.category.trim().length > 0, `expected factory preset ${preset.id} to expose a category`);
     assert.equal(typeof preset.description, "string", `expected factory preset ${preset.id} to expose a description`);
     assert.ok(preset.description.trim().length > 0, `expected factory preset ${preset.id} to expose a description`);
+    assert.equal(typeof preset.family, "string", `expected factory preset ${preset.id} to expose a family`);
+    assert.ok(preset.family.trim().length > 0, `expected factory preset ${preset.id} to expose a family`);
+    assert.equal(typeof preset.role, "string", `expected factory preset ${preset.id} to expose a role`);
+    assert.ok(preset.role.trim().length > 0, `expected factory preset ${preset.id} to expose a role`);
+    assert.equal(typeof preset.auditionNote, "string", `expected factory preset ${preset.id} to expose an audition note`);
+    assert.ok(preset.auditionNote.trim().length > 0, `expected factory preset ${preset.id} to expose an audition note`);
     assert.deepEqual(synthStore.normalizeSynthDraftPatch(JSON.parse(JSON.stringify(preset.patch))), preset.patch);
     const presetPreview = synthStore.synthDraftToPreviewInstrument(preset.patch);
     const presetSamples = new Float32Array(12000);

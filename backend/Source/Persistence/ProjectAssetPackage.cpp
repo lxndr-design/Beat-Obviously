@@ -231,6 +231,12 @@ namespace beat
             juce::StringArray references;
         };
 
+        struct AudioManifestFile
+        {
+            juce::String path;
+            juce::String name;
+        };
+
         void addManifestAsset(std::map<std::string, ManifestAsset>& assets,
                               const juce::String& kind,
                               const juce::String& path,
@@ -384,17 +390,68 @@ namespace beat
     juce::var buildDocumentAssetManifest(const juce::var& document)
     {
         std::map<std::string, ManifestAsset> assets;
+        std::map<std::string, AudioManifestFile> audioFilesById;
 
         if (auto* audioFiles = document.getProperty("audioFiles", {}).getArray())
         {
             for (const auto& audioFile : *audioFiles)
             {
                 const auto id = audioFile.getProperty("id", {}).toString();
+                const auto path = audioFile.getProperty("path", {}).toString();
+                const auto name = audioFile.getProperty("name", {}).toString();
+                if (id.isNotEmpty())
+                    audioFilesById[id.toStdString()] = { path, name };
                 addManifestAsset(assets,
                                  "audio",
-                                 audioFile.getProperty("path", {}).toString(),
+                                 path,
                                  id.isNotEmpty() ? "audioFile:" + id : "audioFile",
-                                 audioFile.getProperty("name", {}).toString());
+                                 name);
+            }
+        }
+
+        if (auto* tracks = document.getProperty("project", {}).getProperty("tracks", {}).getArray())
+        {
+            for (const auto& track : *tracks)
+            {
+                const auto trackId = track.getProperty("id", {}).toString();
+                const auto trackReference = trackId.isNotEmpty() ? "track:" + trackId : "track";
+                const auto trackAudioFileId = track.getProperty("audioFileId", {}).toString();
+                if (trackAudioFileId.isNotEmpty())
+                {
+                    const auto found = audioFilesById.find(trackAudioFileId.toStdString());
+                    if (found != audioFilesById.end())
+                        addManifestAsset(assets,
+                                         "audio",
+                                         found->second.path,
+                                         trackReference + ":audioFileId",
+                                         found->second.name);
+                }
+
+                if (auto* segments = track.getProperty("segments", {}).getArray())
+                {
+                    for (const auto& segment : *segments)
+                    {
+                        const auto payload = segment.getProperty("payload", {});
+                        const auto payloadKind = payload.getProperty("kind", {}).toString();
+                        if (payloadKind != "audio" && payloadKind != "mixed")
+                            continue;
+
+                        const auto segmentAudioFileId = payload.getProperty("audioFileId", {}).toString();
+                        const auto found = audioFilesById.find(segmentAudioFileId.toStdString());
+                        if (found == audioFilesById.end())
+                            continue;
+
+                        const auto segmentId = segment.getProperty("id", {}).toString();
+                        const auto segmentReference = segmentId.isNotEmpty()
+                            ? trackReference + ":segment:" + segmentId + ":audioFileId"
+                            : trackReference + ":segment:audioFileId";
+                        addManifestAsset(assets,
+                                         "audio",
+                                         found->second.path,
+                                         segmentReference,
+                                         found->second.name);
+                    }
+                }
             }
         }
 
@@ -405,6 +462,23 @@ namespace beat
                 const auto instrumentId = instrument.getProperty("id", {}).toString();
                 const auto instrumentName = instrument.getProperty("name", {}).toString();
                 const auto referenceBase = instrumentId.isNotEmpty() ? "instrument:" + instrumentId : "instrument";
+
+                if (auto* sampleIds = instrument.getProperty("sampleIds", {}).getArray())
+                {
+                    for (int i = 0; i < sampleIds->size(); ++i)
+                    {
+                        const auto audioFileId = sampleIds->getReference(i).toString();
+                        const auto found = audioFilesById.find(audioFileId.toStdString());
+                        if (found != audioFilesById.end())
+                        {
+                            addManifestAsset(assets,
+                                             "audio",
+                                             found->second.path,
+                                             referenceBase + ":sampleIds:" + juce::String(i),
+                                             found->second.name);
+                        }
+                    }
+                }
 
                 addManifestAsset(assets,
                                  "sample",

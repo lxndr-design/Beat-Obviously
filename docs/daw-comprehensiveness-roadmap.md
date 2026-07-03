@@ -12,6 +12,32 @@ Target framing:
 - Target state: `100%` for Beat’s intended v1 DAW scope, not “all features every commercial DAW has.”
 - Non-goal: true third-party AU/VST hosting in this pass. Plugin intent and adapter metadata should remain safe placeholders until a dedicated crash-isolated host exists.
 
+## Current Closeout Buckets
+
+These are the remaining product-level workflows that keep Beat from feeling like a release-grade DAW, even though much of the backend is already present.
+
+1. **Mixer and channel strips**
+   - Track strips need fader, pan, stereo meter, mute, solo, arm, sends, inserts, input, output, group routing, and latency display in one coherent surface.
+   - Current foundation: track headers consume the stereo meter fields (`leftPeak`/`rightPeak`) with aggregate mono fallback, and the global Mixer modal now exposes track channel strips with meters, fader, pan, mute, solo, arm, input monitoring, cycle-safe group output assignment, send enable/level/pan, insert creation, insert bypass/remove/reorder, per-strip and per-insert latency display, freeze/unfreeze for non-group tracks with reversible `freezeSource` metadata, return-bus creation/editing, return insert bypass/remove/reorder, send/insert counts, and master input/output gain. Project Health/native integrity verification now catches malformed sends, missing return-bus targets, duplicate sends, out-of-range send gain/pan, and stale frozen-bounce metadata.
+2. **Routing UI**
+   - Return buses, group/folder routing, parent assignment, send levels, freeze/bounce, reversible unfreeze metadata, and route-health warnings need visible workflows.
+3. **Asset and package management**
+   - Audio/instrument/project assets need relink, replace, reveal, delete, copy into project, remove unused, reference counts, missing media repair, and one-click project packaging.
+4. **Export review and presets**
+   - Export needs user-facing presets for full mix, review range, selected stem, all stems, sample rate, bit depth, channel count, tail policy, destination history, progress/cancel, and post-export analysis.
+   - Current foundation: factory export presets, user custom export preset serialization/edit/delete, bounded option normalization, mode-safe preset resolution, persisted recent destination tracking, visible default export folder derivation, persisted validate-before-export preference, post-export metric review, and a visible Export Review modal are wired into existing full-mix, review-range, selected-stem, and native all-stems batch export calls.
+   - Remaining: batch stem naming polish and export analysis browser smoke/parity review.
+5. **Sampler keymap editing**
+   - Sampler instruments need key/velocity zones, root-note helpers, sample trim, loop/crossfade loops, round-robin, choke, exclusive groups, and missing-zone repair UI.
+6. **Nodemap modular synth**
+   - Nodemap is its own modular synth engine surface, not an Aether UI skin. Native graph schema/evaluation, one-note audition, DAW playback/export, and persistence now exist independently from the temporary frontend Aether compile bridge.
+   - Current foundation: protected `Instrument Out`, multi-cable ports, grouped node browser, six proof templates, warnings, persistence, migration/repair, JS compile/preview verification, broad graph semantics, native render timing, linked instance references, live/export WAV parity, and in-app browser replay for create/connect/edit/undo/redo/audition/apply.
+   - Remaining: broader save/open browser smoke, realtime allocation/polish hardening, and user-facing node descriptions.
+7. **Project Health repair flows**
+   - Health reports need deterministic repair actions, validate-before-export, backup restore polish, stale metadata fixes, copied-sidecar cleanup, and clear recovery messaging.
+8. **Broad browser/runtime proof**
+   - Critical editing surfaces need browser/runtime proof for arrangement editing, recording, mixer/routing, asset relink/package, export, Project Health repairs, and migration-era UI states.
+
 ## Definition Of 100%
 
 Beat reaches v1 DAW comprehensiveness when these workflows are complete end to end:
@@ -21,11 +47,12 @@ Beat reaches v1 DAW comprehensiveness when these workflows are complete end to e
 3. **Record audio** with armed tracks, input device/channel selection, monitoring, count-in, latency calibration, take commit/rollback, and take management.
 4. **Edit MIDI and drums** with reliable piano roll and drum grid workflows, velocity/pitch/automation editing, reusable components/patterns, and browser-level interaction confidence.
 5. **Manage assets** from Home and in-project libraries: audio files, instruments, patterns/components, DecentSampler imports, missing-file relink, deletion, and reference warnings.
-6. **Automate sound over time** with visible lanes for track, effect, segment, note, project, and instrument targets, clear conflict rules, curve editing, and parity between live playback/export.
-7. **Mix and route** with track effects, sends/returns, group routing UI, master chain, meters, bus semantics, freeze/bounce, stems, and predictable latency handling.
-8. **Export with confidence** using full mix, range/review-loop, selected track/stem, format presets, progress/cancel, analysis, and previous-file preservation.
-9. **Inspect and repair project health** without hidden state: assets, backups, sidecars, stale IDs, missing files, and deterministic repairs.
-10. **Verify the product** through backend stress, pure interaction tests, document roundtrips, design-system checks, and browser smoke for the workflows that can break silently.
+6. **Build Nodemap instruments** as standalone modular synth patches with protected output, meaningful nodes, one-note audition, linked instance edits, native render/export support, and tested save/open behavior.
+7. **Automate sound over time** with visible lanes for track, effect, segment, note, project, and instrument targets, clear conflict rules, curve editing, and parity between live playback/export.
+8. **Mix and route** with track effects, sends/returns, group routing UI, master chain, meters, bus semantics, freeze/bounce, stems, and predictable latency handling.
+9. **Export with confidence** using full mix, range/review-loop, selected track/stem, format presets, progress/cancel, analysis, and previous-file preservation.
+10. **Inspect and repair project health** without hidden state: assets, backups, sidecars, stale IDs, missing files, and deterministic repairs.
+11. **Verify the product** through backend stress, pure interaction tests, document roundtrips, design-system checks, and browser smoke for the workflows that can break silently.
 
 ## Execution Model
 
@@ -191,14 +218,20 @@ Current assets:
 Build:
 
 - Mixer panel or expandable mixer view.
+  - Current foundation: global Mixer modal opens from the rail and renders channel strips for tracks plus the master output strip.
 - Track channel strips: meter, fader, pan, mute, solo, arm, input, output/group, sends, inserts.
+  - Current foundation: strip controls edit persisted track gain, pan, mute, solo, record arm, input monitoring, cycle-safe parent group output, send enable/level/pan, insert creation, insert bypass/remove/reorder, and route/insert latency display.
 - Return bus UI: create bus, route sends, mute/solo, effects, level.
+  - Current foundation: mixer creates/removes return buses, edits return level/pan/mute, adds return inserts, bypasses/removes/reorders return inserts, and routes track sends into return buses. Return solo is not in the native model yet.
 - Group/folder track UI: create group, assign parent, collapse/expand, group effects/sends.
 - Freeze/bounce UI:
   - Freeze selected track.
+    - Current foundation: Mixer exposes Freeze for non-group tracks, mutes the source track, appends the rendered audio track, records `freezeSource`, and selects the frozen bounce.
   - Bounce in place.
+    - Current foundation: native `project.bounceTrackWav` returns the audio asset and bounced track used by the Mixer freeze flow.
   - Export selected track stem.
   - Reversible unfreeze metadata.
+    - Current foundation: Mixer exposes Unfreeze for frozen bounce tracks, restores source mute/solo state, removes the generated bounce asset/track, and selects the source track.
   - Clear parent-routing policy in UI.
 - Latency reporting per track/effect route.
 - Master section: input gain, compressor, EQ, output gain, limiter, loudness/peak readouts.
@@ -207,6 +240,7 @@ Backend/model:
 
 - Persist mixer state and grouping UI metadata.
 - Add group/return/freeze project-health validation.
+  - Current foundation: return/send route health is native-verified and backend-stress-covered for malformed send arrays, missing return-bus targets, duplicate sends, and invalid send gain/pan. Frozen-bounce metadata health is native-verified, backend-stress-covered, and document-roundtrip-covered for `freezeSource`.
 - Add stem/freeze parity checks for group and send scenarios.
 
 Acceptance:
@@ -222,6 +256,7 @@ Purpose: make Beat projects portable and libraries manageable.
 Current assets:
 
 - Home hub, audio/instrument/pattern pages, audio metadata/waveform analysis, DecentSampler import, project asset manifest, sidecar packaging, missing asset relink, Project Health, recent projects, backups, and sidecar cleanup exist.
+- Current foundation: the shared frontend asset reference graph builds de-duped audio/sample/plugin manifests with reference counts for document repair, packaging, and health flows. Persisted document manifests, relink rebuilds, native manifest repair, and sidecar packaging stress now preserve track/segment/instrument sample-id-aware audio references. The unfinished Home Project Assets browser was removed from the visible app until it can be redesigned as a proper asset-management surface.
 
 Build:
 
@@ -229,14 +264,19 @@ Build:
 - Instrument actions: duplicate, version, reveal source, repair missing samples, inspect sample zones.
 - Explicit velocity/key/round-robin/choke editor for sampler instruments.
 - Project asset browser: all assets used by current project, external vs bundled state, missing/unused/managed indicators.
+  - Current foundation: shared reference rows can describe current project dependencies with kind, path, track/segment/instrument sample-id-aware reference count, policy/state, and affected references, but the visible browser is deferred.
 - One-click package project assets for portability.
+  - Current foundation: Save & Package forces the native save/package pass even when the document is already clean, so external assets are copied into the project sidecar folder before integrity verification.
 - Copy-on-save policy surfaced in document UI.
 - Safer delete flows with reference counts and affected tracks/segments.
+  - Current foundation: Clean Sidecar confirms before deleting unused copied sidecar files, stores the native cleanup report, and refreshes the asset scan. Audio Files splits unused library-entry removal from native-only disk deletion and blocks both paths for referenced track/segment/instrument audio IDs. Backend stress covers the native destructive delete policy: managed library files can be physically deleted, external files are preserved, remove-entry mode leaves disk files intact, and missing IDs are reported.
 
 Backend/model:
 
 - Asset reference graph helper shared by Project Health and UI.
+  - Current foundation: frontend manifest/reference helper is shared by document save/migration and future asset-management UI, including audio library, track, segment, and instrument sample-id references. Native manifest repair mirrors those references, while native integrity verification still owns filesystem existence checks.
 - Deterministic asset package/relink tests for audio files, sample URLs, sample maps, plugin adapters, and component references.
+  - Current foundation: backend stress covers audio/sample sidecar packaging, plugin package manifest references, track/segment/instrument sample-id-aware audio references, and destructive audio delete policy; document roundtrip covers relink manifest rebuilds, and frontend interaction verification covers sequential missing-asset relink source wiring. Native chooser-level missing-asset relink harnesses remain.
 
 Acceptance:
 
@@ -261,6 +301,7 @@ Build:
   - Bounce Selection.
 - Format presets: 44.1/48/96 kHz, 16/24/32-bit, mono/stereo, tail include/exclude.
 - Export destination defaults and recent export folder.
+  - Current foundation: completed exports persist recent destinations, Export Review can reveal/remove/clear recent export paths, and the default export folder is displayed from the most recent destination.
 - Post-export review panel: duration, sample rate, bit depth, peak, true peak, RMS, LUFS, clipping, DC offset, correlation.
 - Cancel/failed/success states in one consistent export job panel.
 - Batch stem export naming policy.
@@ -269,6 +310,7 @@ Backend/model:
 
 - Add all-track stems export helper if not built from repeated single-track calls.
 - Add export preset serialization in preferences.
+  - Current foundation: custom export presets, recent destinations, and validate-before-export preference persist locally.
 - Add null-test or bounded-difference checks where deterministic parity is expected.
 
 Acceptance:
@@ -297,6 +339,7 @@ Build:
 - Backup browser improvements: preview metadata, restore copy vs replace, reveal backup.
 - Current document path and backup status visible in top/app menu.
 - “Validate project before export” option, default on.
+  - Current foundation: shared export runner preflights Project Health with `project.inspectDocument`, blocks export on integrity errors or missing media, allows warning-only exports, stores validation state, and surfaces status in Export Review.
 - Crash/restart recovery story from last local autosave vs last saved document.
 
 Backend/model:

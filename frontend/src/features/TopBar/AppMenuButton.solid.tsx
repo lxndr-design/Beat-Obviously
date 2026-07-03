@@ -2,6 +2,7 @@ import { type Accessor } from "solid-js";
 import { appAlert, appConfirm } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { createContextMenu, type ContextMenuItem } from "../../solid-ui";
+import { useExportStore } from "../../state/exportStore";
 import { useDocumentStore, useTransportStore, useUiStore } from "../../state/store";
 import { BrandMark } from "./BrandMark.solid";
 import styles from "./AppMenuButton.module.css";
@@ -13,6 +14,7 @@ export interface AppMenuButtonProps {
   onSave: () => void;
   onSaveAs: () => void;
   onExport: () => void;
+  onExportReview?: () => void;
   onExportRange?: () => void;
   onExportTrack?: () => void;
   onRecover?: () => void;
@@ -48,24 +50,43 @@ export function AppMenuButton(props: { props: Accessor<AppMenuButtonProps> }) {
         onSelect: callbacks.onSave,
       },
       {
-        label: "Export As...",
+        label: "Export...",
         icon: "ph:export",
         disabled: disableFileStateActions,
         submenu: disableFileStateActions ? undefined : [
-          { label: "Full Mix WAV", icon: "ph:waveform", onSelect: callbacks.onExport },
+          {
+            label: "Review & Export",
+            icon: "ph:sliders-horizontal",
+            onSelect: callbacks.onExportReview ?? callbacks.onExport,
+          },
+          {
+            label: "Full Mix WAV",
+            icon: "ph:waveform",
+            separatorBefore: true,
+            onSelect: () => {
+              useExportStore.getState().setSelectedPresetId("full-mix-review");
+              (callbacks.onExportReview ?? callbacks.onExport)();
+            },
+          },
           {
             label: "Review Range WAV",
             icon: "ph:arrows-in-line-horizontal",
             disabled: !hasReviewRange || !callbacks.onExportRange,
             hint: hasReviewRange ? undefined : "Set loop",
-            onSelect: callbacks.onExportRange,
+            onSelect: () => {
+              useExportStore.getState().setSelectedPresetId("review-range");
+              (callbacks.onExportReview ?? callbacks.onExportRange)?.();
+            },
           },
           {
             label: "Selected Track WAV",
             icon: "ph:git-branch",
             disabled: selectedTrackCount() !== 1 || !callbacks.onExportTrack,
             hint: selectedTrackCount() === 1 ? undefined : "Select 1",
-            onSelect: callbacks.onExportTrack,
+            onSelect: () => {
+              useExportStore.getState().setSelectedPresetId("selected-stem");
+              (callbacks.onExportReview ?? callbacks.onExportTrack)?.();
+            },
           },
         ],
       },

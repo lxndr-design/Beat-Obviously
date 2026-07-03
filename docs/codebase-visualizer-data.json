@@ -1,0 +1,2246 @@
+{
+  "generatedAt": "2026-07-01T17:54:24.893Z",
+  "root": "beat",
+  "sourceRoots": [
+    "frontend/src",
+    "backend/Source",
+    "scripts"
+  ],
+  "totals": {
+    "files": 301,
+    "components": 28,
+    "edges": 156,
+    "staticEdges": 120,
+    "runtimeEdges": 36
+  },
+  "components": [
+    {
+      "id": "Native App Shell",
+      "label": "Native App Shell",
+      "layer": "1. Native shell",
+      "files": [
+        "backend/Source/Main.cpp",
+        "backend/Source/MainComponent.cpp",
+        "backend/Source/MainComponent.h"
+      ],
+      "importsOut": 1,
+      "importsIn": 0
+    },
+    {
+      "id": "Solid App Shell",
+      "label": "Solid App Shell",
+      "layer": "2. Solid shell",
+      "files": [
+        "frontend/src/App.solid.tsx",
+        "frontend/src/main.solid.tsx"
+      ],
+      "importsOut": 35,
+      "importsIn": 1
+    },
+    {
+      "id": "Navigation + Top Bar",
+      "label": "Navigation + Top Bar",
+      "layer": "2. Solid shell",
+      "files": [
+        "frontend/src/features/Sidebar/Sidebar.solid.tsx",
+        "frontend/src/features/TopBar/AppMenuButton.solid.tsx",
+        "frontend/src/features/TopBar/BrandMark.solid.tsx",
+        "frontend/src/features/TopBar/InlineNumber.solid.tsx",
+        "frontend/src/features/TopBar/TopBar.solid.tsx"
+      ],
+      "importsOut": 23,
+      "importsIn": 4
+    },
+    {
+      "id": "Editor Host",
+      "label": "Editor Host",
+      "layer": "2. Solid shell",
+      "files": [
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx"
+      ],
+      "importsOut": 21,
+      "importsIn": 2
+    },
+    {
+      "id": "Design System",
+      "label": "Design System",
+      "layer": "2. Solid shell",
+      "files": [
+        "frontend/src/design/SolidUiKitCatalog.solid.tsx",
+        "frontend/src/solid-ui/ActionFooter/ActionFooter.demo.solid.tsx",
+        "frontend/src/solid-ui/ActionFooter/ActionFooter.solid.tsx",
+        "frontend/src/solid-ui/ActionFooter/index.ts",
+        "frontend/src/solid-ui/AppDialog/AppDialog.demo.solid.tsx",
+        "frontend/src/solid-ui/AppDialog/AppDialog.solid.tsx",
+        "frontend/src/solid-ui/AppDialog/index.ts",
+        "frontend/src/solid-ui/AppDialog/state.ts",
+        "frontend/src/solid-ui/AppLogo/AppLogo.demo.solid.tsx",
+        "frontend/src/solid-ui/AppLogo/AppLogo.solid.tsx",
+        "frontend/src/solid-ui/AppLogo/index.ts",
+        "frontend/src/solid-ui/Block/Block.demo.solid.tsx",
+        "frontend/src/solid-ui/Block/Block.solid.tsx",
+        "frontend/src/solid-ui/Block/index.ts",
+        "frontend/src/solid-ui/Button/Button.demo.solid.tsx",
+        "frontend/src/solid-ui/Button/Button.solid.tsx",
+        "frontend/src/solid-ui/Button/index.ts",
+        "frontend/src/solid-ui/ContextMenu/ContextMenu.demo.solid.tsx",
+        "frontend/src/solid-ui/ContextMenu/ContextMenu.solid.tsx",
+        "frontend/src/solid-ui/ContextMenu/index.ts",
+        "frontend/src/solid-ui/DitheredImage/DitheredImage.demo.solid.tsx",
+        "frontend/src/solid-ui/DitheredImage/DitheredImage.solid.tsx",
+        "frontend/src/solid-ui/DitheredImage/index.ts",
+        "frontend/src/solid-ui/FloatingLayer.solid.tsx",
+        "frontend/src/solid-ui/FloatingSelect/FloatingSelect.demo.solid.tsx",
+        "frontend/src/solid-ui/FloatingSelect/FloatingSelect.solid.tsx",
+        "frontend/src/solid-ui/FloatingSelect/index.ts",
+        "frontend/src/solid-ui/HoverInfo/HoverInfo.demo.solid.tsx",
+        "frontend/src/solid-ui/HoverInfo/HoverInfo.solid.tsx",
+        "frontend/src/solid-ui/HoverInfo/index.ts",
+        "frontend/src/solid-ui/Icon/Icon.demo.solid.tsx",
+        "frontend/src/solid-ui/Icon/Icon.solid.tsx",
+        "frontend/src/solid-ui/Icon/index.ts",
+        "frontend/src/solid-ui/Icon/phIconSubset.ts",
+        "frontend/src/solid-ui/Knob/Knob.demo.solid.tsx",
+        "frontend/src/solid-ui/Knob/Knob.solid.tsx",
+        "frontend/src/solid-ui/Knob/index.ts",
+        "frontend/src/solid-ui/MarqueeText/MarqueeText.demo.solid.tsx",
+        "frontend/src/solid-ui/MarqueeText/MarqueeText.solid.tsx",
+        "frontend/src/solid-ui/MarqueeText/index.ts",
+        "frontend/src/solid-ui/Modal/Modal.demo.solid.tsx",
+        "frontend/src/solid-ui/Modal/Modal.solid.tsx",
+        "frontend/src/solid-ui/Modal/ModalStackOverlay.solid.tsx",
+        "frontend/src/solid-ui/Modal/index.ts",
+        "frontend/src/solid-ui/Modal/modalStack.ts",
+        "frontend/src/solid-ui/NumberInput/NumberInput.demo.solid.tsx",
+        "frontend/src/solid-ui/NumberInput/NumberInput.solid.tsx",
+        "frontend/src/solid-ui/NumberInput/index.ts",
+        "frontend/src/solid-ui/RadioGroup/RadioGroup.demo.solid.tsx",
+        "frontend/src/solid-ui/RadioGroup/RadioGroup.solid.tsx",
+        "frontend/src/solid-ui/RadioGroup/index.ts",
+        "frontend/src/solid-ui/RowItem/RowItem.demo.solid.tsx",
+        "frontend/src/solid-ui/RowItem/RowItem.solid.tsx",
+        "frontend/src/solid-ui/RowItem/index.ts",
+        "frontend/src/solid-ui/SectionRibbon/SectionRibbon.demo.solid.tsx",
+        "frontend/src/solid-ui/SectionRibbon/SectionRibbon.solid.tsx",
+        "frontend/src/solid-ui/SectionRibbon/index.ts",
+        "frontend/src/solid-ui/Select/Select.demo.solid.tsx",
+        "frontend/src/solid-ui/Select/Select.solid.tsx",
+        "frontend/src/solid-ui/Select/index.ts",
+        "frontend/src/solid-ui/Slider/Slider.demo.solid.tsx",
+        "frontend/src/solid-ui/Slider/Slider.solid.tsx",
+        "frontend/src/solid-ui/Slider/index.ts",
+        "frontend/src/solid-ui/Tag/Tag.demo.solid.tsx",
+        "frontend/src/solid-ui/Tag/Tag.solid.tsx",
+        "frontend/src/solid-ui/Tag/index.ts",
+        "frontend/src/solid-ui/TextInput/TextInput.demo.solid.tsx",
+        "frontend/src/solid-ui/TextInput/TextInput.solid.tsx",
+        "frontend/src/solid-ui/TextInput/index.ts",
+        "frontend/src/solid-ui/Toggle/Toggle.demo.solid.tsx",
+        "frontend/src/solid-ui/Toggle/Toggle.solid.tsx",
+        "frontend/src/solid-ui/Toggle/index.ts",
+        "frontend/src/solid-ui/index.ts",
+        "frontend/src/solid-ui/meshTint.ts"
+      ],
+      "importsOut": 1,
+      "importsIn": 76
+    },
+    {
+      "id": "Home + Project Health",
+      "label": "Home + Project Health",
+      "layer": "2. Solid shell",
+      "files": [
+        "frontend/src/features/HomeHub/AssetPageShell.solid.tsx",
+        "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx",
+        "frontend/src/features/HomeHub/HomeHub.solid.tsx",
+        "frontend/src/features/HomeHub/InstrumentsPage.solid.tsx",
+        "frontend/src/features/HomeHub/PatternsPage.solid.tsx",
+        "frontend/src/features/HomeHub/ProjectAssetsPage.solid.tsx",
+        "frontend/src/features/Preferences/PreferencesModal.solid.tsx",
+        "frontend/src/features/ProjectHealth/ProjectHealthModal.solid.tsx",
+        "frontend/src/features/Startup/StartupSplash.solid.tsx"
+      ],
+      "importsOut": 55,
+      "importsIn": 5
+    },
+    {
+      "id": "Arrangement Surface",
+      "label": "Arrangement Surface",
+      "layer": "3. Feature surfaces",
+      "files": [
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx",
+        "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx",
+        "frontend/src/features/TrackEffects/TrackEffectsPanel.solid.tsx",
+        "frontend/src/features/Tracks/Playhead.solid.tsx",
+        "frontend/src/features/Tracks/Segment.solid.tsx",
+        "frontend/src/features/Tracks/SegmentDrumPreview.solid.tsx",
+        "frontend/src/features/Tracks/SegmentMidiPreview.solid.tsx",
+        "frontend/src/features/Tracks/SegmentWaveform.solid.tsx",
+        "frontend/src/features/Tracks/Timeline.solid.tsx",
+        "frontend/src/features/Tracks/TrackEffectRows.solid.tsx",
+        "frontend/src/features/Tracks/TrackHeader.solid.tsx",
+        "frontend/src/features/Tracks/TrackLane.solid.tsx",
+        "frontend/src/features/Tracks/TrackList.solid.tsx",
+        "frontend/src/features/Tracks/arrangementActions.ts",
+        "frontend/src/features/Tracks/arrangementAutomationLane.ts",
+        "frontend/src/features/Tracks/geometry.ts",
+        "frontend/src/features/Tracks/segmentMath.ts",
+        "frontend/src/features/Transport/TimeSignatureControl.solid.tsx"
+      ],
+      "importsOut": 85,
+      "importsIn": 10
+    },
+    {
+      "id": "MIDI + Drum Editing",
+      "label": "MIDI + Drum Editing",
+      "layer": "3. Feature surfaces",
+      "files": [
+        "frontend/src/features/ComponentLibrary/ComponentEditorModal.solid.tsx",
+        "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx",
+        "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx",
+        "frontend/src/features/MidiEditor/MidiTransport.solid.tsx",
+        "frontend/src/features/MidiEditor/PianoRoll.solid.tsx"
+      ],
+      "importsOut": 39,
+      "importsIn": 7
+    },
+    {
+      "id": "Synth / Aether Editor",
+      "label": "Synth / Aether Editor",
+      "layer": "3. Feature surfaces",
+      "files": [
+        "frontend/src/automation/aetherArrangementAutomation.ts",
+        "frontend/src/automation/aetherAutomationConflicts.ts",
+        "frontend/src/automation/aetherNoteAutomation.ts",
+        "frontend/src/automation/curves.ts",
+        "frontend/src/automation/trackEffects.ts",
+        "frontend/src/features/Eq/EqGraph.solid.tsx",
+        "frontend/src/features/Eq/MasterEqPanel.solid.tsx",
+        "frontend/src/features/EqAutomation/EqAutomationModal.solid.tsx",
+        "frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx",
+        "frontend/src/features/InstrumentEditor/InstrumentWaveformPreview.solid.tsx",
+        "frontend/src/features/InstrumentEditor/WaveformPicker.solid.tsx",
+        "frontend/src/features/InstrumentEditor/instrumentEditorRouting.ts",
+        "frontend/src/features/Synth/AnalyzerPanel/AnalyzerPanel.solid.tsx",
+        "frontend/src/features/Synth/ModulationMatrix/ModulationMatrix.solid.tsx",
+        "frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx",
+        "frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx"
+      ],
+      "importsOut": 64,
+      "importsIn": 20
+    },
+    {
+      "id": "Nodemap Editor",
+      "label": "Nodemap Editor",
+      "layer": "3. Feature surfaces",
+      "files": [
+        "frontend/src/features/NodeInstrumentEditor/NodeCanvas.solid.tsx",
+        "frontend/src/features/NodeInstrumentEditor/NodeInstrumentEditor.solid.tsx",
+        "frontend/src/features/NodeInstrumentEditor/nodeGraph.ts"
+      ],
+      "importsOut": 9,
+      "importsIn": 6
+    },
+    {
+      "id": "Mixer / Export / Visualizer",
+      "label": "Mixer / Export / Visualizer",
+      "layer": "3. Feature surfaces",
+      "files": [
+        "frontend/src/features/Debug/ExportJobPanel.solid.tsx",
+        "frontend/src/features/Debug/RenderTimingPanel.solid.tsx",
+        "frontend/src/features/ExportReview/ExportReviewModal.solid.tsx",
+        "frontend/src/features/ExportReview/exportActions.ts",
+        "frontend/src/features/Mixer/MixerPanel.solid.tsx",
+        "frontend/src/features/Visualizer/Visualizer.solid.tsx",
+        "frontend/src/features/Visualizer/visualizerApi.ts"
+      ],
+      "importsOut": 23,
+      "importsIn": 7
+    },
+    {
+      "id": "Asset Libraries + Plugins",
+      "label": "Asset Libraries + Plugins",
+      "layer": "3. Feature surfaces",
+      "files": [
+        "frontend/src/features/AudioFiles/AudioFileLibraryPanel.solid.tsx",
+        "frontend/src/features/InstrumentLibrary/ImportInstrumentModal.solid.tsx",
+        "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx",
+        "frontend/src/features/InstrumentLibrary/MergeInstrumentModal.solid.tsx",
+        "frontend/src/features/InstrumentLibrary/decentSamplerInstrument.ts",
+        "frontend/src/features/PluginLibrary/DecentSamplerLibraryPanel.solid.tsx",
+        "frontend/src/features/PluginLibrary/PluginHostModal.solid.tsx",
+        "frontend/src/features/PluginLibrary/PluginImportModal.solid.tsx",
+        "frontend/src/features/PluginLibrary/PluginLibraryPanel.solid.tsx",
+        "frontend/src/features/PluginLibrary/decentSamplerPluginAdapter.ts"
+      ],
+      "importsOut": 57,
+      "importsIn": 10
+    },
+    {
+      "id": "AI + Training Generation",
+      "label": "AI + Training Generation",
+      "layer": "3. Feature surfaces",
+      "files": [
+        "frontend/src/ai/aiService.ts",
+        "frontend/src/ai/drumBeatGenerator.ts",
+        "frontend/src/ai/trainingRunner.ts",
+        "frontend/src/features/Training/TrainingAutoRunner.solid.tsx"
+      ],
+      "importsOut": 7,
+      "importsIn": 14
+    },
+    {
+      "id": "Browser Audio Runtime",
+      "label": "Browser Audio Runtime",
+      "layer": "3. Feature surfaces",
+      "files": [
+        "frontend/src/audio/LiveMidiExpressionInput.solid.tsx",
+        "frontend/src/audio/TimelineMidiPlayback.solid.tsx",
+        "frontend/src/audio/analyzerClient.ts",
+        "frontend/src/audio/audioFormats.ts",
+        "frontend/src/audio/audioImport.ts",
+        "frontend/src/audio/liveMidiExpression.ts",
+        "frontend/src/audio/synthPreview.ts",
+        "frontend/src/audio/synthWorkletPreview.ts",
+        "frontend/src/audio/timelineAudio.ts",
+        "frontend/src/audio/transportActions.ts",
+        "frontend/src/audio/wavemapResynthesis.ts"
+      ],
+      "importsOut": 27,
+      "importsIn": 36
+    },
+    {
+      "id": "Frontend State Stores",
+      "label": "Frontend State Stores",
+      "layer": "4. Frontend data + IPC",
+      "files": [
+        "frontend/src/state/aetherPresetLibrary.ts",
+        "frontend/src/state/analyzerStore.ts",
+        "frontend/src/state/clipboard.ts",
+        "frontend/src/state/components.ts",
+        "frontend/src/state/drumSteps.ts",
+        "frontend/src/state/effectPresets.ts",
+        "frontend/src/state/effects.ts",
+        "frontend/src/state/exportStore.ts",
+        "frontend/src/state/instrumentIcons.ts",
+        "frontend/src/state/instrumentLibraryGuards.ts",
+        "frontend/src/state/selectors.ts",
+        "frontend/src/state/store.ts",
+        "frontend/src/state/synthPresets.ts",
+        "frontend/src/state/synthStore.ts",
+        "frontend/src/state/temporal.ts",
+        "frontend/src/state/types.ts"
+      ],
+      "importsOut": 3,
+      "importsIn": 187
+    },
+    {
+      "id": "Frontend Persistence",
+      "label": "Frontend Persistence",
+      "layer": "4. Frontend data + IPC",
+      "files": [
+        "frontend/src/persistence/assetReferenceGraph.ts",
+        "frontend/src/persistence/beatDocument.ts",
+        "frontend/src/persistence/dexie.ts",
+        "frontend/src/persistence/documentActions.ts"
+      ],
+      "importsOut": 20,
+      "importsIn": 23
+    },
+    {
+      "id": "Frontend IPC",
+      "label": "Frontend IPC",
+      "layer": "4. Frontend data + IPC",
+      "files": [
+        "frontend/src/ipc/bridge.ts",
+        "frontend/src/ipc/schema.ts"
+      ],
+      "importsOut": 3,
+      "importsIn": 43
+    },
+    {
+      "id": "Native IPC",
+      "label": "Native IPC",
+      "layer": "5. Native backend",
+      "files": [
+        "backend/Source/Ipc/MessageBridge.cpp",
+        "backend/Source/Ipc/MessageBridge.h",
+        "backend/Source/Ipc/Schema.h"
+      ],
+      "importsOut": 21,
+      "importsIn": 1
+    },
+    {
+      "id": "Backend Audio Engine",
+      "label": "Backend Audio Engine",
+      "layer": "5. Native backend",
+      "files": [
+        "backend/Source/Audio/AudioEngine.cpp",
+        "backend/Source/Audio/AudioEngine.h",
+        "backend/Source/Audio/InstrumentVoice.cpp",
+        "backend/Source/Audio/InstrumentVoice.h",
+        "backend/Source/Audio/Sequencer.cpp",
+        "backend/Source/Audio/Sequencer.h",
+        "backend/Source/Audio/TrackModel.cpp",
+        "backend/Source/Audio/TrackModel.h",
+        "backend/Source/Audio/VoiceAllocation.h"
+      ],
+      "importsOut": 3,
+      "importsIn": 13
+    },
+    {
+      "id": "Aether / Wavetable DSP",
+      "label": "Aether / Wavetable DSP",
+      "layer": "5. Native backend",
+      "files": [
+        "backend/Source/Audio/Envelope/EnvelopeShaper.h",
+        "backend/Source/Audio/Filter/DriveStage.h",
+        "backend/Source/Audio/Filter/FilterMath.h",
+        "backend/Source/Audio/Filter/FilterStage.h",
+        "backend/Source/Audio/Modulation/DynamicModulation.h",
+        "backend/Source/Audio/Modulation/Lfo.h",
+        "backend/Source/Audio/Oscillator/AetherTableStackRenderer.h",
+        "backend/Source/Audio/Oscillator/BasicOscillator.h",
+        "backend/Source/Audio/Oscillator/VoiceAetherCache.h",
+        "backend/Source/Audio/Oscillator/VoiceMath.h",
+        "backend/Source/Audio/Oscillator/VoiceRenderStats.cpp",
+        "backend/Source/Audio/Oscillator/VoiceRenderStats.h",
+        "backend/Source/Audio/Oscillator/VoiceStats.h",
+        "backend/Source/Audio/Parameters/ParameterIds.h",
+        "backend/Source/Audio/Parameters/SynthPatchContract.cpp",
+        "backend/Source/Audio/Parameters/SynthPatchContract.h",
+        "backend/Source/Audio/Realtime/FixedObjectPool.h",
+        "backend/Source/Audio/Realtime/RealtimeParameterQueue.h",
+        "backend/Source/Audio/Realtime/RealtimeRamp.h",
+        "backend/Source/Audio/Realtime/SpscRingBuffer.h",
+        "backend/Source/Audio/Realtime/VoiceAutomationInbox.cpp",
+        "backend/Source/Audio/Realtime/VoiceAutomationInbox.h",
+        "backend/Source/Audio/Realtime/VoiceNoteAutomation.h",
+        "backend/Source/Audio/Realtime/VoiceNoteAutomationState.h",
+        "backend/Source/Audio/Realtime/VoiceRealtimeParams.h",
+        "backend/Source/Audio/Realtime/VoiceRealtimeRampState.h",
+        "backend/Source/Audio/Wavetable/Wavetable.cpp",
+        "backend/Source/Audio/Wavetable/Wavetable.h",
+        "backend/Source/Audio/Wavetable/WavetableFactory.cpp",
+        "backend/Source/Audio/Wavetable/WavetableFactory.h",
+        "backend/Source/Audio/Wavetable/WavetableOscillator.cpp",
+        "backend/Source/Audio/Wavetable/WavetableOscillator.h",
+        "backend/Source/Audio/Wavetable/WavetableOscillatorBank.h",
+        "backend/Source/Audio/Wavetable/WavetableUnisonPlan.h",
+        "backend/Source/Audio/Wavetable/WavetableVoiceCache.cpp",
+        "backend/Source/Audio/Wavetable/WavetableVoiceCache.h"
+      ],
+      "importsOut": 2,
+      "importsIn": 2
+    },
+    {
+      "id": "Audio FX + Mastering",
+      "label": "Audio FX + Mastering",
+      "layer": "5. Native backend",
+      "files": [
+        "backend/Source/Audio/Effects/Bitcrush.cpp",
+        "backend/Source/Audio/Effects/Bitcrush.h",
+        "backend/Source/Audio/Effects/MasterEq.cpp",
+        "backend/Source/Audio/Effects/MasterEq.h",
+        "backend/Source/Audio/Effects/MasterLimiter.cpp",
+        "backend/Source/Audio/Effects/MasterLimiter.h",
+        "backend/Source/Audio/Effects/TrackEffectDefaults.cpp",
+        "backend/Source/Audio/Effects/TrackEffectDefaults.h"
+      ],
+      "importsOut": 2,
+      "importsIn": 3
+    },
+    {
+      "id": "Sampler + DecentSampler",
+      "label": "Sampler + DecentSampler",
+      "layer": "5. Native backend",
+      "files": [
+        "backend/Source/Audio/Sampler/DecentSamplerImporter.cpp",
+        "backend/Source/Audio/Sampler/DecentSamplerImporter.h"
+      ],
+      "importsOut": 0,
+      "importsIn": 3
+    },
+    {
+      "id": "Recording",
+      "label": "Recording",
+      "layer": "5. Native backend",
+      "files": [
+        "backend/Source/Audio/Recording/RecordingCalibration.cpp",
+        "backend/Source/Audio/Recording/RecordingCalibration.h",
+        "backend/Source/Audio/Recording/RecordingCapture.cpp",
+        "backend/Source/Audio/Recording/RecordingCapture.h",
+        "backend/Source/Audio/Recording/RecordingPlanner.cpp",
+        "backend/Source/Audio/Recording/RecordingPlanner.h",
+        "backend/Source/Audio/Recording/RecordingSessionPlanner.cpp",
+        "backend/Source/Audio/Recording/RecordingSessionPlanner.h"
+      ],
+      "importsOut": 3,
+      "importsIn": 3
+    },
+    {
+      "id": "Rendering + Bounce",
+      "label": "Rendering + Bounce",
+      "layer": "5. Native backend",
+      "files": [
+        "backend/Source/Audio/Rendering/TrackBouncePlanner.cpp",
+        "backend/Source/Audio/Rendering/TrackBouncePlanner.h"
+      ],
+      "importsOut": 2,
+      "importsIn": 2
+    },
+    {
+      "id": "Audio Analysis",
+      "label": "Audio Analysis",
+      "layer": "5. Native backend",
+      "files": [
+        "backend/Source/Audio/Analysis/AudioFileAnalyzer.cpp",
+        "backend/Source/Audio/Analysis/AudioFileAnalyzer.h",
+        "backend/Source/Audio/Analysis/FftAnalyzer.cpp",
+        "backend/Source/Audio/Analysis/FftAnalyzer.h"
+      ],
+      "importsOut": 0,
+      "importsIn": 2
+    },
+    {
+      "id": "Project Persistence + SQLite",
+      "label": "Project Persistence + SQLite",
+      "layer": "5. Native backend",
+      "files": [
+        "backend/Source/Persistence/AudioFileLibraryActions.cpp",
+        "backend/Source/Persistence/AudioFileLibraryActions.h",
+        "backend/Source/Persistence/Database.cpp",
+        "backend/Source/Persistence/Database.h",
+        "backend/Source/Persistence/InstrumentRepository.cpp",
+        "backend/Source/Persistence/InstrumentRepository.h",
+        "backend/Source/Persistence/ProjectAssetPackage.cpp",
+        "backend/Source/Persistence/ProjectAssetPackage.h",
+        "backend/Source/Persistence/ProjectDocumentBackup.cpp",
+        "backend/Source/Persistence/ProjectDocumentBackup.h",
+        "backend/Source/Persistence/ProjectIntegrityVerifier.cpp",
+        "backend/Source/Persistence/ProjectIntegrityVerifier.h",
+        "backend/Source/Persistence/ProjectRepository.cpp",
+        "backend/Source/Persistence/ProjectRepository.h"
+      ],
+      "importsOut": 3,
+      "importsIn": 8
+    },
+    {
+      "id": "Verification Scripts",
+      "label": "Verification Scripts",
+      "layer": "6. Verification + utilities",
+      "files": [
+        "scripts/audit-aether-presets.mjs",
+        "scripts/audit-generation-diversity.mjs",
+        "scripts/benchmark-dense-midi.mjs",
+        "scripts/generate-app-icon.mjs",
+        "scripts/generate-codebase-visualizer.mjs",
+        "scripts/generate-icon-subset.mjs",
+        "scripts/verify-audio-boundary.mjs",
+        "scripts/verify-daw-core.mjs",
+        "scripts/verify-design-system.mjs",
+        "scripts/verify-document-roundtrip.mjs",
+        "scripts/verify-drum-generation.mjs",
+        "scripts/verify-frontend-interactions.mjs",
+        "scripts/verify-native-document-registration.mjs",
+        "scripts/verify-native-toolchain.mjs",
+        "scripts/verify-node-instrument-editor.mjs",
+        "scripts/verify-synth-roundtrip.mjs",
+        "scripts/verify-track-interactions.mjs",
+        "scripts/verify-version.mjs"
+      ],
+      "importsOut": 5,
+      "importsIn": 0
+    },
+    {
+      "id": "Utilities + Test Hooks",
+      "label": "Utilities + Test Hooks",
+      "layer": "6. Verification + utilities",
+      "files": [
+        "frontend/src/hotkeys/contextualHotkeys.ts",
+        "frontend/src/hotkeys/hotkeys.ts",
+        "frontend/src/solid-utils/contextualHotkeys.solid.ts",
+        "frontend/src/solid-utils/store.ts",
+        "frontend/src/testing/devHooks.ts",
+        "frontend/src/testing/interactionRunner.ts",
+        "frontend/src/vite-env.d.ts"
+      ],
+      "importsOut": 24,
+      "importsIn": 50
+    }
+  ],
+  "edges": [
+    {
+      "from": "Native App Shell",
+      "to": "Solid App Shell",
+      "kind": "runtime host",
+      "count": 1,
+      "examples": [
+        "JUCE MainComponent hosts the web UI."
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Navigation + Top Bar",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/App.solid.tsx -> frontend/src/features/TopBar/TopBar.solid.tsx",
+        "frontend/src/App.solid.tsx -> frontend/src/features/Sidebar/Sidebar.solid.tsx"
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Navigation + Top Bar",
+      "kind": "runtime render",
+      "count": 1,
+      "examples": [
+        "App shell renders navigation and command surfaces."
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Editor Host",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/App.solid.tsx -> frontend/src/features/EditorHost/EditorHost.solid.tsx"
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Editor Host",
+      "kind": "runtime render",
+      "count": 1,
+      "examples": [
+        "App shell routes the active editor surface."
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Design System",
+      "kind": "static import",
+      "count": 3,
+      "examples": [
+        "frontend/src/App.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/App.solid.tsx -> frontend/src/solid-ui/AppDialog/index.ts",
+        "frontend/src/App.solid.tsx -> frontend/src/solid-ui/Modal/index.ts"
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Home + Project Health",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/App.solid.tsx -> frontend/src/features/Startup/StartupSplash.solid.tsx",
+        "frontend/src/App.solid.tsx -> frontend/src/features/HomeHub/HomeHub.solid.tsx"
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Home + Project Health",
+      "kind": "runtime render",
+      "count": 1,
+      "examples": [
+        "Startup/home/project health surfaces attach to the shell."
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Arrangement Surface",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/App.solid.tsx -> frontend/src/features/Tracks/TrackList.solid.tsx"
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Synth / Aether Editor",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/App.solid.tsx -> frontend/src/features/Eq/MasterEqPanel.solid.tsx"
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Mixer / Export / Visualizer",
+      "kind": "static import",
+      "count": 4,
+      "examples": [
+        "frontend/src/App.solid.tsx -> frontend/src/features/Debug/RenderTimingPanel.solid.tsx",
+        "frontend/src/App.solid.tsx -> frontend/src/features/Debug/ExportJobPanel.solid.tsx",
+        "frontend/src/App.solid.tsx -> frontend/src/features/ExportReview/exportActions.ts",
+        "frontend/src/App.solid.tsx -> frontend/src/features/Visualizer/Visualizer.solid.tsx"
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "AI + Training Generation",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/App.solid.tsx -> frontend/src/features/Training/TrainingAutoRunner.solid.tsx"
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Browser Audio Runtime",
+      "kind": "static import",
+      "count": 6,
+      "examples": [
+        "frontend/src/App.solid.tsx -> frontend/src/audio/TimelineMidiPlayback.solid.tsx",
+        "frontend/src/App.solid.tsx -> frontend/src/audio/LiveMidiExpressionInput.solid.tsx",
+        "frontend/src/App.solid.tsx -> frontend/src/audio/analyzerClient.ts",
+        "frontend/src/App.solid.tsx -> frontend/src/audio/timelineAudio.ts",
+        "frontend/src/App.solid.tsx -> frontend/src/audio/audioImport.ts",
+        "frontend/src/App.solid.tsx -> frontend/src/audio/synthPreview.ts"
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 4,
+      "examples": [
+        "frontend/src/App.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/App.solid.tsx -> frontend/src/state/synthStore.ts",
+        "frontend/src/App.solid.tsx -> frontend/src/state/exportStore.ts",
+        "frontend/src/App.solid.tsx -> frontend/src/state/components.ts"
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Frontend Persistence",
+      "kind": "static import",
+      "count": 3,
+      "examples": [
+        "frontend/src/App.solid.tsx -> frontend/src/persistence/dexie.ts",
+        "frontend/src/App.solid.tsx -> frontend/src/persistence/documentActions.ts",
+        "frontend/src/App.solid.tsx -> frontend/src/persistence/beatDocument.ts"
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Frontend IPC",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/App.solid.tsx -> frontend/src/ipc/bridge.ts"
+      ]
+    },
+    {
+      "from": "Solid App Shell",
+      "to": "Utilities + Test Hooks",
+      "kind": "static import",
+      "count": 3,
+      "examples": [
+        "frontend/src/App.solid.tsx -> frontend/src/hotkeys/hotkeys.ts",
+        "frontend/src/App.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/App.solid.tsx -> frontend/src/testing/devHooks.ts"
+      ]
+    },
+    {
+      "from": "Navigation + Top Bar",
+      "to": "Design System",
+      "kind": "static import",
+      "count": 6,
+      "examples": [
+        "frontend/src/features/Sidebar/Sidebar.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/Sidebar/Sidebar.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/TopBar/AppMenuButton.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/TopBar/AppMenuButton.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/TopBar/BrandMark.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/TopBar/TopBar.solid.tsx -> frontend/src/solid-ui/index.ts"
+      ]
+    },
+    {
+      "from": "Navigation + Top Bar",
+      "to": "Arrangement Surface",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/TopBar/TopBar.solid.tsx -> frontend/src/features/Transport/TimeSignatureControl.solid.tsx"
+      ]
+    },
+    {
+      "from": "Navigation + Top Bar",
+      "to": "MIDI + Drum Editing",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/Sidebar/Sidebar.solid.tsx -> frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx"
+      ]
+    },
+    {
+      "from": "Navigation + Top Bar",
+      "to": "Asset Libraries + Plugins",
+      "kind": "static import",
+      "count": 4,
+      "examples": [
+        "frontend/src/features/Sidebar/Sidebar.solid.tsx -> frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx",
+        "frontend/src/features/Sidebar/Sidebar.solid.tsx -> frontend/src/features/AudioFiles/AudioFileLibraryPanel.solid.tsx",
+        "frontend/src/features/Sidebar/Sidebar.solid.tsx -> frontend/src/features/PluginLibrary/PluginLibraryPanel.solid.tsx",
+        "frontend/src/features/Sidebar/Sidebar.solid.tsx -> frontend/src/features/PluginLibrary/DecentSamplerLibraryPanel.solid.tsx"
+      ]
+    },
+    {
+      "from": "Navigation + Top Bar",
+      "to": "Asset Libraries + Plugins",
+      "kind": "runtime route",
+      "count": 1,
+      "examples": [
+        "Rail and menu actions expose library panes."
+      ]
+    },
+    {
+      "from": "Navigation + Top Bar",
+      "to": "Browser Audio Runtime",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/TopBar/TopBar.solid.tsx -> frontend/src/audio/transportActions.ts"
+      ]
+    },
+    {
+      "from": "Navigation + Top Bar",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 4,
+      "examples": [
+        "frontend/src/features/Sidebar/Sidebar.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/TopBar/AppMenuButton.solid.tsx -> frontend/src/state/exportStore.ts",
+        "frontend/src/features/TopBar/AppMenuButton.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/TopBar/TopBar.solid.tsx -> frontend/src/state/store.ts"
+      ]
+    },
+    {
+      "from": "Navigation + Top Bar",
+      "to": "Frontend Persistence",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/Sidebar/Sidebar.solid.tsx -> frontend/src/persistence/documentActions.ts"
+      ]
+    },
+    {
+      "from": "Navigation + Top Bar",
+      "to": "Frontend IPC",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/TopBar/TopBar.solid.tsx -> frontend/src/ipc/bridge.ts"
+      ]
+    },
+    {
+      "from": "Navigation + Top Bar",
+      "to": "Utilities + Test Hooks",
+      "kind": "static import",
+      "count": 3,
+      "examples": [
+        "frontend/src/features/Sidebar/Sidebar.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/TopBar/AppMenuButton.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/TopBar/TopBar.solid.tsx -> frontend/src/solid-utils/store.ts"
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "Design System",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/solid-ui/index.ts"
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "Home + Project Health",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/features/Preferences/PreferencesModal.solid.tsx",
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/features/ProjectHealth/ProjectHealthModal.solid.tsx"
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "Arrangement Surface",
+      "kind": "static import",
+      "count": 3,
+      "examples": [
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx",
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx",
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/features/TrackEffects/TrackEffectsPanel.solid.tsx"
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "Arrangement Surface",
+      "kind": "runtime route",
+      "count": 1,
+      "examples": [
+        "Arrangement is one of the primary editor surfaces."
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "MIDI + Drum Editing",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/features/ComponentLibrary/ComponentEditorModal.solid.tsx"
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "MIDI + Drum Editing",
+      "kind": "runtime route",
+      "count": 1,
+      "examples": [
+        "MIDI and drum editing are editor surfaces."
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "Synth / Aether Editor",
+      "kind": "static import",
+      "count": 3,
+      "examples": [
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/features/EqAutomation/EqAutomationModal.solid.tsx",
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx",
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx"
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "Synth / Aether Editor",
+      "kind": "runtime route",
+      "count": 1,
+      "examples": [
+        "Aether synth editing is an editor surface."
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "Nodemap Editor",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/features/NodeInstrumentEditor/NodeInstrumentEditor.solid.tsx"
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "Nodemap Editor",
+      "kind": "runtime route",
+      "count": 1,
+      "examples": [
+        "Nodemap is an editor surface."
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "Mixer / Export / Visualizer",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/features/ExportReview/ExportReviewModal.solid.tsx",
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/features/Mixer/MixerPanel.solid.tsx"
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "Mixer / Export / Visualizer",
+      "kind": "runtime route",
+      "count": 1,
+      "examples": [
+        "Mixer, export, and visualizer are editor/modal surfaces."
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "Asset Libraries + Plugins",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/features/PluginLibrary/PluginHostModal.solid.tsx"
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/state/store.ts"
+      ]
+    },
+    {
+      "from": "Editor Host",
+      "to": "Utilities + Test Hooks",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/EditorHost/EditorHost.solid.tsx -> frontend/src/solid-utils/store.ts"
+      ]
+    },
+    {
+      "from": "Design System",
+      "to": "Utilities + Test Hooks",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/solid-ui/Modal/ModalStackOverlay.solid.tsx -> frontend/src/solid-utils/store.ts"
+      ]
+    },
+    {
+      "from": "Home + Project Health",
+      "to": "Navigation + Top Bar",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/HomeHub/HomeHub.solid.tsx -> frontend/src/features/TopBar/AppMenuButton.solid.tsx"
+      ]
+    },
+    {
+      "from": "Home + Project Health",
+      "to": "Design System",
+      "kind": "static import",
+      "count": 11,
+      "examples": [
+        "frontend/src/features/HomeHub/AssetPageShell.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/HomeHub/HomeHub.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/HomeHub/HomeHub.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/HomeHub/InstrumentsPage.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/HomeHub/PatternsPage.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/HomeHub/ProjectAssetsPage.solid.tsx -> frontend/src/solid-ui/index.ts"
+      ]
+    },
+    {
+      "from": "Home + Project Health",
+      "to": "MIDI + Drum Editing",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/HomeHub/PatternsPage.solid.tsx -> frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx"
+      ]
+    },
+    {
+      "from": "Home + Project Health",
+      "to": "AI + Training Generation",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/features/Preferences/PreferencesModal.solid.tsx -> frontend/src/ai/aiService.ts",
+        "frontend/src/features/Preferences/PreferencesModal.solid.tsx -> frontend/src/ai/trainingRunner.ts"
+      ]
+    },
+    {
+      "from": "Home + Project Health",
+      "to": "Browser Audio Runtime",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx -> frontend/src/audio/audioImport.ts",
+        "frontend/src/features/HomeHub/InstrumentsPage.solid.tsx -> frontend/src/audio/synthPreview.ts"
+      ]
+    },
+    {
+      "from": "Home + Project Health",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 13,
+      "examples": [
+        "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx -> frontend/src/state/types.ts",
+        "frontend/src/features/HomeHub/HomeHub.solid.tsx -> frontend/src/state/components.ts",
+        "frontend/src/features/HomeHub/HomeHub.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/HomeHub/InstrumentsPage.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/HomeHub/InstrumentsPage.solid.tsx -> frontend/src/state/types.ts",
+        "frontend/src/features/HomeHub/PatternsPage.solid.tsx -> frontend/src/state/components.ts",
+        "frontend/src/features/HomeHub/PatternsPage.solid.tsx -> frontend/src/state/drumSteps.ts"
+      ]
+    },
+    {
+      "from": "Home + Project Health",
+      "to": "Frontend Persistence",
+      "kind": "static import",
+      "count": 7,
+      "examples": [
+        "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx -> frontend/src/persistence/beatDocument.ts",
+        "frontend/src/features/HomeHub/HomeHub.solid.tsx -> frontend/src/persistence/assetReferenceGraph.ts",
+        "frontend/src/features/HomeHub/ProjectAssetsPage.solid.tsx -> frontend/src/persistence/beatDocument.ts",
+        "frontend/src/features/HomeHub/ProjectAssetsPage.solid.tsx -> frontend/src/persistence/documentActions.ts",
+        "frontend/src/features/HomeHub/ProjectAssetsPage.solid.tsx -> frontend/src/persistence/assetReferenceGraph.ts",
+        "frontend/src/features/Preferences/PreferencesModal.solid.tsx -> frontend/src/persistence/dexie.ts",
+        "frontend/src/features/ProjectHealth/ProjectHealthModal.solid.tsx -> frontend/src/persistence/beatDocument.ts"
+      ]
+    },
+    {
+      "from": "Home + Project Health",
+      "to": "Frontend IPC",
+      "kind": "static import",
+      "count": 11,
+      "examples": [
+        "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx -> frontend/src/ipc/bridge.ts",
+        "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx -> frontend/src/ipc/schema.ts",
+        "frontend/src/features/HomeHub/HomeHub.solid.tsx -> frontend/src/ipc/schema.ts",
+        "frontend/src/features/HomeHub/InstrumentsPage.solid.tsx -> frontend/src/ipc/bridge.ts",
+        "frontend/src/features/HomeHub/InstrumentsPage.solid.tsx -> frontend/src/ipc/schema.ts",
+        "frontend/src/features/HomeHub/ProjectAssetsPage.solid.tsx -> frontend/src/ipc/schema.ts",
+        "frontend/src/features/HomeHub/ProjectAssetsPage.solid.tsx -> frontend/src/ipc/bridge.ts",
+        "frontend/src/features/Preferences/PreferencesModal.solid.tsx -> frontend/src/ipc/bridge.ts"
+      ]
+    },
+    {
+      "from": "Home + Project Health",
+      "to": "Utilities + Test Hooks",
+      "kind": "static import",
+      "count": 7,
+      "examples": [
+        "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/HomeHub/HomeHub.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/HomeHub/InstrumentsPage.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/HomeHub/PatternsPage.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/HomeHub/ProjectAssetsPage.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/Preferences/PreferencesModal.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/ProjectHealth/ProjectHealthModal.solid.tsx -> frontend/src/solid-utils/store.ts"
+      ]
+    },
+    {
+      "from": "Arrangement Surface",
+      "to": "Design System",
+      "kind": "static import",
+      "count": 13,
+      "examples": [
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/TrackEffects/TrackEffectsPanel.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/Tracks/Segment.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/Tracks/Segment.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/Tracks/TrackEffectRows.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/Tracks/TrackHeader.solid.tsx -> frontend/src/solid-ui/index.ts"
+      ]
+    },
+    {
+      "from": "Arrangement Surface",
+      "to": "MIDI + Drum Editing",
+      "kind": "static import",
+      "count": 3,
+      "examples": [
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/features/DrumEditor/DrumSequencer.solid.tsx",
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/features/MidiEditor/PianoRoll.solid.tsx",
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/features/MidiEditor/MidiTransport.solid.tsx"
+      ]
+    },
+    {
+      "from": "Arrangement Surface",
+      "to": "Synth / Aether Editor",
+      "kind": "static import",
+      "count": 10,
+      "examples": [
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/automation/aetherArrangementAutomation.ts",
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/automation/aetherNoteAutomation.ts",
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/automation/curves.ts",
+        "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx -> frontend/src/automation/aetherArrangementAutomation.ts",
+        "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx -> frontend/src/automation/aetherNoteAutomation.ts",
+        "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx -> frontend/src/automation/curves.ts",
+        "frontend/src/features/Tracks/TrackEffectRows.solid.tsx -> frontend/src/automation/trackEffects.ts",
+        "frontend/src/features/Tracks/TrackEffectRows.solid.tsx -> frontend/src/automation/curves.ts"
+      ]
+    },
+    {
+      "from": "Arrangement Surface",
+      "to": "Asset Libraries + Plugins",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/features/Tracks/Segment.solid.tsx -> frontend/src/features/PluginLibrary/decentSamplerPluginAdapter.ts",
+        "frontend/src/features/Tracks/TrackLane.solid.tsx -> frontend/src/features/PluginLibrary/decentSamplerPluginAdapter.ts"
+      ]
+    },
+    {
+      "from": "Arrangement Surface",
+      "to": "AI + Training Generation",
+      "kind": "static import",
+      "count": 3,
+      "examples": [
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/ai/drumBeatGenerator.ts",
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/ai/trainingRunner.ts",
+        "frontend/src/features/Tracks/Segment.solid.tsx -> frontend/src/ai/trainingRunner.ts"
+      ]
+    },
+    {
+      "from": "Arrangement Surface",
+      "to": "Browser Audio Runtime",
+      "kind": "static import",
+      "count": 6,
+      "examples": [
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/audio/audioFormats.ts",
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/audio/audioImport.ts",
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/audio/synthPreview.ts",
+        "frontend/src/features/Tracks/TrackLane.solid.tsx -> frontend/src/audio/audioFormats.ts",
+        "frontend/src/features/Tracks/TrackLane.solid.tsx -> frontend/src/audio/audioImport.ts",
+        "frontend/src/features/Tracks/TrackLane.solid.tsx -> frontend/src/audio/transportActions.ts"
+      ]
+    },
+    {
+      "from": "Arrangement Surface",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 34,
+      "examples": [
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/state/selectors.ts",
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/state/types.ts",
+        "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx -> frontend/src/state/types.ts",
+        "frontend/src/features/TrackEffects/TrackEffectsPanel.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/TrackEffects/TrackEffectsPanel.solid.tsx -> frontend/src/state/effects.ts",
+        "frontend/src/features/TrackEffects/TrackEffectsPanel.solid.tsx -> frontend/src/state/types.ts"
+      ]
+    },
+    {
+      "from": "Arrangement Surface",
+      "to": "Frontend State Stores",
+      "kind": "state",
+      "count": 1,
+      "examples": [
+        "Tracks, lanes, segments, transport, and selection use project state."
+      ]
+    },
+    {
+      "from": "Arrangement Surface",
+      "to": "Frontend Persistence",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/persistence/dexie.ts",
+        "frontend/src/features/Tracks/Segment.solid.tsx -> frontend/src/persistence/dexie.ts"
+      ]
+    },
+    {
+      "from": "Arrangement Surface",
+      "to": "Frontend IPC",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/Tracks/Timeline.solid.tsx -> frontend/src/ipc/bridge.ts"
+      ]
+    },
+    {
+      "from": "Arrangement Surface",
+      "to": "Utilities + Test Hooks",
+      "kind": "static import",
+      "count": 10,
+      "examples": [
+        "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/TrackEffects/TrackEffectsPanel.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/Tracks/Playhead.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/Tracks/Segment.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/Tracks/Timeline.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/Tracks/TrackEffectRows.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/Tracks/TrackHeader.solid.tsx -> frontend/src/solid-utils/store.ts"
+      ]
+    },
+    {
+      "from": "MIDI + Drum Editing",
+      "to": "Design System",
+      "kind": "static import",
+      "count": 7,
+      "examples": [
+        "frontend/src/features/ComponentLibrary/ComponentEditorModal.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/ComponentLibrary/ComponentEditorModal.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/MidiEditor/MidiTransport.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/MidiEditor/PianoRoll.solid.tsx -> frontend/src/solid-ui/index.ts"
+      ]
+    },
+    {
+      "from": "MIDI + Drum Editing",
+      "to": "Arrangement Surface",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx -> frontend/src/features/Transport/TimeSignatureControl.solid.tsx"
+      ]
+    },
+    {
+      "from": "MIDI + Drum Editing",
+      "to": "Synth / Aether Editor",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/features/MidiEditor/PianoRoll.solid.tsx -> frontend/src/automation/aetherNoteAutomation.ts",
+        "frontend/src/features/MidiEditor/PianoRoll.solid.tsx -> frontend/src/automation/curves.ts"
+      ]
+    },
+    {
+      "from": "MIDI + Drum Editing",
+      "to": "AI + Training Generation",
+      "kind": "static import",
+      "count": 4,
+      "examples": [
+        "frontend/src/features/ComponentLibrary/ComponentEditorModal.solid.tsx -> frontend/src/ai/drumBeatGenerator.ts",
+        "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx -> frontend/src/ai/aiService.ts",
+        "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx -> frontend/src/ai/drumBeatGenerator.ts",
+        "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx -> frontend/src/ai/trainingRunner.ts"
+      ]
+    },
+    {
+      "from": "MIDI + Drum Editing",
+      "to": "Browser Audio Runtime",
+      "kind": "static import",
+      "count": 5,
+      "examples": [
+        "frontend/src/features/ComponentLibrary/ComponentEditorModal.solid.tsx -> frontend/src/audio/synthPreview.ts",
+        "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx -> frontend/src/audio/synthPreview.ts",
+        "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx -> frontend/src/audio/synthPreview.ts",
+        "frontend/src/features/MidiEditor/MidiTransport.solid.tsx -> frontend/src/audio/synthPreview.ts",
+        "frontend/src/features/MidiEditor/MidiTransport.solid.tsx -> frontend/src/audio/synthWorkletPreview.ts"
+      ]
+    },
+    {
+      "from": "MIDI + Drum Editing",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 12,
+      "examples": [
+        "frontend/src/features/ComponentLibrary/ComponentEditorModal.solid.tsx -> frontend/src/state/components.ts",
+        "frontend/src/features/ComponentLibrary/ComponentEditorModal.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/ComponentLibrary/ComponentEditorModal.solid.tsx -> frontend/src/state/types.ts",
+        "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx -> frontend/src/state/drumSteps.ts",
+        "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx -> frontend/src/state/components.ts",
+        "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx -> frontend/src/state/types.ts",
+        "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx -> frontend/src/state/drumSteps.ts"
+      ]
+    },
+    {
+      "from": "MIDI + Drum Editing",
+      "to": "Frontend State Stores",
+      "kind": "state",
+      "count": 1,
+      "examples": [
+        "MIDI/drum edits update the project/component state."
+      ]
+    },
+    {
+      "from": "MIDI + Drum Editing",
+      "to": "Frontend Persistence",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx -> frontend/src/persistence/dexie.ts"
+      ]
+    },
+    {
+      "from": "MIDI + Drum Editing",
+      "to": "Utilities + Test Hooks",
+      "kind": "static import",
+      "count": 6,
+      "examples": [
+        "frontend/src/features/ComponentLibrary/ComponentEditorModal.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx -> frontend/src/solid-utils/contextualHotkeys.solid.ts",
+        "frontend/src/features/MidiEditor/MidiTransport.solid.tsx -> frontend/src/hotkeys/contextualHotkeys.ts",
+        "frontend/src/features/MidiEditor/PianoRoll.solid.tsx -> frontend/src/solid-utils/contextualHotkeys.solid.ts",
+        "frontend/src/features/MidiEditor/PianoRoll.solid.tsx -> frontend/src/solid-utils/store.ts"
+      ]
+    },
+    {
+      "from": "Synth / Aether Editor",
+      "to": "Design System",
+      "kind": "static import",
+      "count": 11,
+      "examples": [
+        "frontend/src/features/Eq/MasterEqPanel.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/Eq/MasterEqPanel.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/EqAutomation/EqAutomationModal.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/InstrumentEditor/InstrumentWaveformPreview.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/InstrumentEditor/WaveformPicker.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/Synth/AnalyzerPanel/AnalyzerPanel.solid.tsx -> frontend/src/solid-ui/index.ts"
+      ]
+    },
+    {
+      "from": "Synth / Aether Editor",
+      "to": "AI + Training Generation",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx -> frontend/src/ai/aiService.ts",
+        "frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx -> frontend/src/ai/trainingRunner.ts"
+      ]
+    },
+    {
+      "from": "Synth / Aether Editor",
+      "to": "Browser Audio Runtime",
+      "kind": "static import",
+      "count": 8,
+      "examples": [
+        "frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx -> frontend/src/audio/audioFormats.ts",
+        "frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx -> frontend/src/audio/audioImport.ts",
+        "frontend/src/features/InstrumentEditor/InstrumentWaveformPreview.solid.tsx -> frontend/src/audio/synthPreview.ts",
+        "frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx -> frontend/src/audio/audioImport.ts",
+        "frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx -> frontend/src/audio/synthPreview.ts",
+        "frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx -> frontend/src/audio/wavemapResynthesis.ts",
+        "frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx -> frontend/src/audio/synthPreview.ts",
+        "frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx -> frontend/src/audio/synthWorkletPreview.ts"
+      ]
+    },
+    {
+      "from": "Synth / Aether Editor",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 30,
+      "examples": [
+        "frontend/src/automation/aetherArrangementAutomation.ts -> frontend/src/state/types.ts",
+        "frontend/src/automation/aetherAutomationConflicts.ts -> frontend/src/state/types.ts",
+        "frontend/src/automation/aetherNoteAutomation.ts -> frontend/src/state/types.ts",
+        "frontend/src/automation/curves.ts -> frontend/src/state/types.ts",
+        "frontend/src/automation/trackEffects.ts -> frontend/src/state/types.ts",
+        "frontend/src/features/Eq/EqGraph.solid.tsx -> frontend/src/state/types.ts",
+        "frontend/src/features/Eq/MasterEqPanel.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/Eq/MasterEqPanel.solid.tsx -> frontend/src/state/types.ts"
+      ]
+    },
+    {
+      "from": "Synth / Aether Editor",
+      "to": "Frontend State Stores",
+      "kind": "state",
+      "count": 1,
+      "examples": [
+        "Synth controls update instrument and synth stores."
+      ]
+    },
+    {
+      "from": "Synth / Aether Editor",
+      "to": "Frontend Persistence",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx -> frontend/src/persistence/dexie.ts",
+        "frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx -> frontend/src/persistence/dexie.ts"
+      ]
+    },
+    {
+      "from": "Synth / Aether Editor",
+      "to": "Frontend IPC",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/features/Eq/MasterEqPanel.solid.tsx -> frontend/src/ipc/bridge.ts",
+        "frontend/src/features/EqAutomation/EqAutomationModal.solid.tsx -> frontend/src/ipc/bridge.ts"
+      ]
+    },
+    {
+      "from": "Synth / Aether Editor",
+      "to": "Utilities + Test Hooks",
+      "kind": "static import",
+      "count": 8,
+      "examples": [
+        "frontend/src/features/Eq/MasterEqPanel.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/EqAutomation/EqAutomationModal.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/InstrumentEditor/InstrumentWaveformPreview.solid.tsx -> frontend/src/hotkeys/contextualHotkeys.ts",
+        "frontend/src/features/Synth/AnalyzerPanel/AnalyzerPanel.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/Synth/ModulationMatrix/ModulationMatrix.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx -> frontend/src/solid-utils/store.ts"
+      ]
+    },
+    {
+      "from": "Nodemap Editor",
+      "to": "Design System",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/features/NodeInstrumentEditor/NodeCanvas.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/NodeInstrumentEditor/NodeInstrumentEditor.solid.tsx -> frontend/src/solid-ui/index.ts"
+      ]
+    },
+    {
+      "from": "Nodemap Editor",
+      "to": "Browser Audio Runtime",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/NodeInstrumentEditor/NodeInstrumentEditor.solid.tsx -> frontend/src/audio/synthPreview.ts"
+      ]
+    },
+    {
+      "from": "Nodemap Editor",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 5,
+      "examples": [
+        "frontend/src/features/NodeInstrumentEditor/NodeCanvas.solid.tsx -> frontend/src/state/types.ts",
+        "frontend/src/features/NodeInstrumentEditor/NodeInstrumentEditor.solid.tsx -> frontend/src/state/types.ts",
+        "frontend/src/features/NodeInstrumentEditor/nodeGraph.ts -> frontend/src/state/types.ts",
+        "frontend/src/features/NodeInstrumentEditor/nodeGraph.ts -> frontend/src/state/effects.ts",
+        "frontend/src/features/NodeInstrumentEditor/nodeGraph.ts -> frontend/src/state/synthStore.ts"
+      ]
+    },
+    {
+      "from": "Nodemap Editor",
+      "to": "Frontend State Stores",
+      "kind": "state",
+      "count": 1,
+      "examples": [
+        "Nodemap graphs are stored with instrument state."
+      ]
+    },
+    {
+      "from": "Mixer / Export / Visualizer",
+      "to": "Design System",
+      "kind": "static import",
+      "count": 4,
+      "examples": [
+        "frontend/src/features/Debug/ExportJobPanel.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/Debug/RenderTimingPanel.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/ExportReview/ExportReviewModal.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/Mixer/MixerPanel.solid.tsx -> frontend/src/solid-ui/index.ts"
+      ]
+    },
+    {
+      "from": "Mixer / Export / Visualizer",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 12,
+      "examples": [
+        "frontend/src/features/Debug/ExportJobPanel.solid.tsx -> frontend/src/state/exportStore.ts",
+        "frontend/src/features/Debug/RenderTimingPanel.solid.tsx -> frontend/src/state/analyzerStore.ts",
+        "frontend/src/features/ExportReview/ExportReviewModal.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/ExportReview/ExportReviewModal.solid.tsx -> frontend/src/state/exportStore.ts",
+        "frontend/src/features/ExportReview/exportActions.ts -> frontend/src/state/store.ts",
+        "frontend/src/features/ExportReview/exportActions.ts -> frontend/src/state/types.ts",
+        "frontend/src/features/ExportReview/exportActions.ts -> frontend/src/state/exportStore.ts",
+        "frontend/src/features/Mixer/MixerPanel.solid.tsx -> frontend/src/state/analyzerStore.ts"
+      ]
+    },
+    {
+      "from": "Mixer / Export / Visualizer",
+      "to": "Frontend Persistence",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/ExportReview/exportActions.ts -> frontend/src/persistence/beatDocument.ts"
+      ]
+    },
+    {
+      "from": "Mixer / Export / Visualizer",
+      "to": "Frontend IPC",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/features/Debug/ExportJobPanel.solid.tsx -> frontend/src/ipc/bridge.ts",
+        "frontend/src/features/ExportReview/exportActions.ts -> frontend/src/ipc/bridge.ts"
+      ]
+    },
+    {
+      "from": "Mixer / Export / Visualizer",
+      "to": "Utilities + Test Hooks",
+      "kind": "static import",
+      "count": 4,
+      "examples": [
+        "frontend/src/features/Debug/ExportJobPanel.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/Debug/RenderTimingPanel.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/ExportReview/ExportReviewModal.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/Mixer/MixerPanel.solid.tsx -> frontend/src/solid-utils/store.ts"
+      ]
+    },
+    {
+      "from": "Asset Libraries + Plugins",
+      "to": "Design System",
+      "kind": "static import",
+      "count": 13,
+      "examples": [
+        "frontend/src/features/AudioFiles/AudioFileLibraryPanel.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/AudioFiles/AudioFileLibraryPanel.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/InstrumentLibrary/ImportInstrumentModal.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/InstrumentLibrary/ImportInstrumentModal.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/InstrumentLibrary/MergeInstrumentModal.solid.tsx -> frontend/src/solid-ui/index.ts",
+        "frontend/src/features/PluginLibrary/DecentSamplerLibraryPanel.solid.tsx -> frontend/src/solid-ui/index.ts"
+      ]
+    },
+    {
+      "from": "Asset Libraries + Plugins",
+      "to": "Synth / Aether Editor",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx -> frontend/src/features/InstrumentEditor/instrumentEditorRouting.ts",
+        "frontend/src/features/InstrumentLibrary/MergeInstrumentModal.solid.tsx -> frontend/src/features/InstrumentEditor/instrumentEditorRouting.ts"
+      ]
+    },
+    {
+      "from": "Asset Libraries + Plugins",
+      "to": "Nodemap Editor",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx -> frontend/src/features/NodeInstrumentEditor/nodeGraph.ts"
+      ]
+    },
+    {
+      "from": "Asset Libraries + Plugins",
+      "to": "Browser Audio Runtime",
+      "kind": "static import",
+      "count": 5,
+      "examples": [
+        "frontend/src/features/AudioFiles/AudioFileLibraryPanel.solid.tsx -> frontend/src/audio/audioFormats.ts",
+        "frontend/src/features/AudioFiles/AudioFileLibraryPanel.solid.tsx -> frontend/src/audio/audioImport.ts",
+        "frontend/src/features/InstrumentLibrary/ImportInstrumentModal.solid.tsx -> frontend/src/audio/audioImport.ts",
+        "frontend/src/features/InstrumentLibrary/ImportInstrumentModal.solid.tsx -> frontend/src/audio/audioFormats.ts",
+        "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx -> frontend/src/audio/synthPreview.ts"
+      ]
+    },
+    {
+      "from": "Asset Libraries + Plugins",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 22,
+      "examples": [
+        "frontend/src/features/AudioFiles/AudioFileLibraryPanel.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/AudioFiles/AudioFileLibraryPanel.solid.tsx -> frontend/src/state/types.ts",
+        "frontend/src/features/InstrumentLibrary/ImportInstrumentModal.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/InstrumentLibrary/ImportInstrumentModal.solid.tsx -> frontend/src/state/types.ts",
+        "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx -> frontend/src/state/instrumentIcons.ts",
+        "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx -> frontend/src/state/synthStore.ts",
+        "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx -> frontend/src/state/types.ts"
+      ]
+    },
+    {
+      "from": "Asset Libraries + Plugins",
+      "to": "Frontend State Stores",
+      "kind": "state",
+      "count": 1,
+      "examples": [
+        "Libraries mutate instruments, audio assets, components, and plugins."
+      ]
+    },
+    {
+      "from": "Asset Libraries + Plugins",
+      "to": "Frontend IPC",
+      "kind": "static import",
+      "count": 7,
+      "examples": [
+        "frontend/src/features/InstrumentLibrary/ImportInstrumentModal.solid.tsx -> frontend/src/ipc/bridge.ts",
+        "frontend/src/features/InstrumentLibrary/ImportInstrumentModal.solid.tsx -> frontend/src/ipc/schema.ts",
+        "frontend/src/features/InstrumentLibrary/decentSamplerInstrument.ts -> frontend/src/ipc/schema.ts",
+        "frontend/src/features/PluginLibrary/PluginHostModal.solid.tsx -> frontend/src/ipc/bridge.ts",
+        "frontend/src/features/PluginLibrary/PluginHostModal.solid.tsx -> frontend/src/ipc/schema.ts",
+        "frontend/src/features/PluginLibrary/PluginImportModal.solid.tsx -> frontend/src/ipc/bridge.ts",
+        "frontend/src/features/PluginLibrary/decentSamplerPluginAdapter.ts -> frontend/src/ipc/schema.ts"
+      ]
+    },
+    {
+      "from": "Asset Libraries + Plugins",
+      "to": "Utilities + Test Hooks",
+      "kind": "static import",
+      "count": 6,
+      "examples": [
+        "frontend/src/features/AudioFiles/AudioFileLibraryPanel.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/InstrumentLibrary/MergeInstrumentModal.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/PluginLibrary/DecentSamplerLibraryPanel.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/PluginLibrary/PluginHostModal.solid.tsx -> frontend/src/solid-utils/store.ts",
+        "frontend/src/features/PluginLibrary/PluginLibraryPanel.solid.tsx -> frontend/src/solid-utils/store.ts"
+      ]
+    },
+    {
+      "from": "AI + Training Generation",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 4,
+      "examples": [
+        "frontend/src/ai/aiService.ts -> frontend/src/state/types.ts",
+        "frontend/src/ai/aiService.ts -> frontend/src/state/synthStore.ts",
+        "frontend/src/ai/drumBeatGenerator.ts -> frontend/src/state/drumSteps.ts",
+        "frontend/src/ai/drumBeatGenerator.ts -> frontend/src/state/types.ts"
+      ]
+    },
+    {
+      "from": "AI + Training Generation",
+      "to": "Frontend Persistence",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/ai/trainingRunner.ts -> frontend/src/persistence/dexie.ts"
+      ]
+    },
+    {
+      "from": "AI + Training Generation",
+      "to": "Frontend IPC",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/ai/trainingRunner.ts -> frontend/src/ipc/bridge.ts",
+        "frontend/src/features/Training/TrainingAutoRunner.solid.tsx -> frontend/src/ipc/bridge.ts"
+      ]
+    },
+    {
+      "from": "Browser Audio Runtime",
+      "to": "Design System",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/audio/audioImport.ts -> frontend/src/solid-ui/index.ts"
+      ]
+    },
+    {
+      "from": "Browser Audio Runtime",
+      "to": "Synth / Aether Editor",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/audio/synthPreview.ts -> frontend/src/automation/curves.ts"
+      ]
+    },
+    {
+      "from": "Browser Audio Runtime",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 17,
+      "examples": [
+        "frontend/src/audio/LiveMidiExpressionInput.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/audio/LiveMidiExpressionInput.solid.tsx -> frontend/src/state/synthStore.ts",
+        "frontend/src/audio/LiveMidiExpressionInput.solid.tsx -> frontend/src/state/types.ts",
+        "frontend/src/audio/TimelineMidiPlayback.solid.tsx -> frontend/src/state/store.ts",
+        "frontend/src/audio/TimelineMidiPlayback.solid.tsx -> frontend/src/state/synthStore.ts",
+        "frontend/src/audio/TimelineMidiPlayback.solid.tsx -> frontend/src/state/selectors.ts",
+        "frontend/src/audio/TimelineMidiPlayback.solid.tsx -> frontend/src/state/analyzerStore.ts",
+        "frontend/src/audio/TimelineMidiPlayback.solid.tsx -> frontend/src/state/types.ts"
+      ]
+    },
+    {
+      "from": "Browser Audio Runtime",
+      "to": "Frontend IPC",
+      "kind": "static import",
+      "count": 6,
+      "examples": [
+        "frontend/src/audio/LiveMidiExpressionInput.solid.tsx -> frontend/src/ipc/bridge.ts",
+        "frontend/src/audio/TimelineMidiPlayback.solid.tsx -> frontend/src/ipc/bridge.ts",
+        "frontend/src/audio/analyzerClient.ts -> frontend/src/ipc/bridge.ts",
+        "frontend/src/audio/audioImport.ts -> frontend/src/ipc/bridge.ts",
+        "frontend/src/audio/transportActions.ts -> frontend/src/ipc/bridge.ts",
+        "frontend/src/audio/wavemapResynthesis.ts -> frontend/src/ipc/bridge.ts"
+      ]
+    },
+    {
+      "from": "Browser Audio Runtime",
+      "to": "Frontend IPC",
+      "kind": "native request",
+      "count": 1,
+      "examples": [
+        "Browser preview and analysis call native-backed services when available."
+      ]
+    },
+    {
+      "from": "Browser Audio Runtime",
+      "to": "Utilities + Test Hooks",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/audio/TimelineMidiPlayback.solid.tsx -> frontend/src/solid-utils/store.ts"
+      ]
+    },
+    {
+      "from": "Frontend State Stores",
+      "to": "Frontend Persistence",
+      "kind": "serialize",
+      "count": 1,
+      "examples": [
+        "Project and asset state serialize through the Beat document layer."
+      ]
+    },
+    {
+      "from": "Frontend State Stores",
+      "to": "Frontend IPC",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/state/exportStore.ts -> frontend/src/ipc/schema.ts",
+        "frontend/src/state/store.ts -> frontend/src/ipc/schema.ts"
+      ]
+    },
+    {
+      "from": "Frontend Persistence",
+      "to": "Design System",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/persistence/documentActions.ts -> frontend/src/solid-ui/index.ts"
+      ]
+    },
+    {
+      "from": "Frontend Persistence",
+      "to": "Nodemap Editor",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/persistence/beatDocument.ts -> frontend/src/features/NodeInstrumentEditor/nodeGraph.ts"
+      ]
+    },
+    {
+      "from": "Frontend Persistence",
+      "to": "AI + Training Generation",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/persistence/dexie.ts -> frontend/src/ai/aiService.ts",
+        "frontend/src/persistence/dexie.ts -> frontend/src/ai/drumBeatGenerator.ts"
+      ]
+    },
+    {
+      "from": "Frontend Persistence",
+      "to": "Browser Audio Runtime",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/persistence/documentActions.ts -> frontend/src/audio/timelineAudio.ts"
+      ]
+    },
+    {
+      "from": "Frontend Persistence",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 10,
+      "examples": [
+        "frontend/src/persistence/assetReferenceGraph.ts -> frontend/src/state/types.ts",
+        "frontend/src/persistence/beatDocument.ts -> frontend/src/state/store.ts",
+        "frontend/src/persistence/beatDocument.ts -> frontend/src/state/components.ts",
+        "frontend/src/persistence/beatDocument.ts -> frontend/src/state/types.ts",
+        "frontend/src/persistence/dexie.ts -> frontend/src/state/components.ts",
+        "frontend/src/persistence/dexie.ts -> frontend/src/state/effectPresets.ts",
+        "frontend/src/persistence/dexie.ts -> frontend/src/state/instrumentLibraryGuards.ts",
+        "frontend/src/persistence/dexie.ts -> frontend/src/state/synthPresets.ts"
+      ]
+    },
+    {
+      "from": "Frontend Persistence",
+      "to": "Frontend IPC",
+      "kind": "static import",
+      "count": 4,
+      "examples": [
+        "frontend/src/persistence/assetReferenceGraph.ts -> frontend/src/ipc/schema.ts",
+        "frontend/src/persistence/beatDocument.ts -> frontend/src/ipc/schema.ts",
+        "frontend/src/persistence/documentActions.ts -> frontend/src/ipc/schema.ts",
+        "frontend/src/persistence/documentActions.ts -> frontend/src/ipc/bridge.ts"
+      ]
+    },
+    {
+      "from": "Frontend Persistence",
+      "to": "Frontend IPC",
+      "kind": "native request",
+      "count": 1,
+      "examples": [
+        "Document actions and native-backed persistence cross the bridge."
+      ]
+    },
+    {
+      "from": "Frontend IPC",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/ipc/schema.ts -> frontend/src/state/types.ts",
+        "frontend/src/ipc/schema.ts -> frontend/src/state/components.ts"
+      ]
+    },
+    {
+      "from": "Frontend IPC",
+      "to": "Native IPC",
+      "kind": "IPC boundary",
+      "count": 1,
+      "examples": [
+        "TypeScript bridge sends requests into MessageBridge."
+      ]
+    },
+    {
+      "from": "Native IPC",
+      "to": "Backend Audio Engine",
+      "kind": "static include",
+      "count": 1,
+      "examples": [
+        "backend/Source/Ipc/MessageBridge.h -> backend/Source/Audio/AudioEngine.h"
+      ]
+    },
+    {
+      "from": "Native IPC",
+      "to": "Backend Audio Engine",
+      "kind": "command",
+      "count": 1,
+      "examples": [
+        "MessageBridge forwards audio/session commands to AudioEngine."
+      ]
+    },
+    {
+      "from": "Native IPC",
+      "to": "Aether / Wavetable DSP",
+      "kind": "static include",
+      "count": 1,
+      "examples": [
+        "backend/Source/Ipc/MessageBridge.cpp -> backend/Source/Audio/Parameters/SynthPatchContract.h"
+      ]
+    },
+    {
+      "from": "Native IPC",
+      "to": "Audio FX + Mastering",
+      "kind": "static include",
+      "count": 1,
+      "examples": [
+        "backend/Source/Ipc/MessageBridge.cpp -> backend/Source/Audio/Effects/TrackEffectDefaults.h"
+      ]
+    },
+    {
+      "from": "Native IPC",
+      "to": "Sampler + DecentSampler",
+      "kind": "static include",
+      "count": 1,
+      "examples": [
+        "backend/Source/Ipc/MessageBridge.cpp -> backend/Source/Audio/Sampler/DecentSamplerImporter.h"
+      ]
+    },
+    {
+      "from": "Native IPC",
+      "to": "Sampler + DecentSampler",
+      "kind": "command",
+      "count": 1,
+      "examples": [
+        "MessageBridge exposes DS import/parse flows."
+      ]
+    },
+    {
+      "from": "Native IPC",
+      "to": "Recording",
+      "kind": "static include",
+      "count": 2,
+      "examples": [
+        "backend/Source/Ipc/MessageBridge.cpp -> backend/Source/Audio/Recording/RecordingPlanner.h",
+        "backend/Source/Ipc/MessageBridge.cpp -> backend/Source/Audio/Recording/RecordingSessionPlanner.h"
+      ]
+    },
+    {
+      "from": "Native IPC",
+      "to": "Recording",
+      "kind": "command",
+      "count": 1,
+      "examples": [
+        "MessageBridge exposes recording device/session commands."
+      ]
+    },
+    {
+      "from": "Native IPC",
+      "to": "Rendering + Bounce",
+      "kind": "static include",
+      "count": 1,
+      "examples": [
+        "backend/Source/Ipc/MessageBridge.cpp -> backend/Source/Audio/Rendering/TrackBouncePlanner.h"
+      ]
+    },
+    {
+      "from": "Native IPC",
+      "to": "Rendering + Bounce",
+      "kind": "command",
+      "count": 1,
+      "examples": [
+        "MessageBridge exposes render/export commands."
+      ]
+    },
+    {
+      "from": "Native IPC",
+      "to": "Audio Analysis",
+      "kind": "static include",
+      "count": 1,
+      "examples": [
+        "backend/Source/Ipc/MessageBridge.cpp -> backend/Source/Audio/Analysis/AudioFileAnalyzer.h"
+      ]
+    },
+    {
+      "from": "Native IPC",
+      "to": "Audio Analysis",
+      "kind": "command",
+      "count": 1,
+      "examples": [
+        "MessageBridge exposes waveform/FFT analysis."
+      ]
+    },
+    {
+      "from": "Native IPC",
+      "to": "Project Persistence + SQLite",
+      "kind": "static include",
+      "count": 7,
+      "examples": [
+        "backend/Source/Ipc/MessageBridge.cpp -> backend/Source/Persistence/AudioFileLibraryActions.h",
+        "backend/Source/Ipc/MessageBridge.cpp -> backend/Source/Persistence/ProjectAssetPackage.h",
+        "backend/Source/Ipc/MessageBridge.cpp -> backend/Source/Persistence/ProjectDocumentBackup.h",
+        "backend/Source/Ipc/MessageBridge.cpp -> backend/Source/Persistence/ProjectIntegrityVerifier.h",
+        "backend/Source/Ipc/MessageBridge.h -> backend/Source/Persistence/Database.h",
+        "backend/Source/Ipc/MessageBridge.h -> backend/Source/Persistence/ProjectRepository.h",
+        "backend/Source/Ipc/MessageBridge.h -> backend/Source/Persistence/InstrumentRepository.h"
+      ]
+    },
+    {
+      "from": "Native IPC",
+      "to": "Project Persistence + SQLite",
+      "kind": "command",
+      "count": 1,
+      "examples": [
+        "MessageBridge forwards project and repository commands."
+      ]
+    },
+    {
+      "from": "Backend Audio Engine",
+      "to": "Aether / Wavetable DSP",
+      "kind": "audio render",
+      "count": 1,
+      "examples": [
+        "Instrument voices render Aether/wavetable oscillators."
+      ]
+    },
+    {
+      "from": "Backend Audio Engine",
+      "to": "Audio FX + Mastering",
+      "kind": "audio render",
+      "count": 1,
+      "examples": [
+        "Track effects, master EQ, and limiter sit on the render path."
+      ]
+    },
+    {
+      "from": "Backend Audio Engine",
+      "to": "Sampler + DecentSampler",
+      "kind": "audio render",
+      "count": 1,
+      "examples": [
+        "Sampler instruments play parsed DecentSampler/sample zones."
+      ]
+    },
+    {
+      "from": "Aether / Wavetable DSP",
+      "to": "Backend Audio Engine",
+      "kind": "static include",
+      "count": 2,
+      "examples": [
+        "backend/Source/Audio/Parameters/SynthPatchContract.h -> backend/Source/Audio/TrackModel.h",
+        "backend/Source/Audio/Wavetable/WavetableVoiceCache.h -> backend/Source/Audio/InstrumentVoice.h"
+      ]
+    },
+    {
+      "from": "Audio FX + Mastering",
+      "to": "Backend Audio Engine",
+      "kind": "static include",
+      "count": 2,
+      "examples": [
+        "backend/Source/Audio/Effects/MasterEq.h -> backend/Source/Audio/TrackModel.h",
+        "backend/Source/Audio/Effects/TrackEffectDefaults.h -> backend/Source/Audio/TrackModel.h"
+      ]
+    },
+    {
+      "from": "Recording",
+      "to": "Backend Audio Engine",
+      "kind": "static include",
+      "count": 2,
+      "examples": [
+        "backend/Source/Audio/Recording/RecordingPlanner.h -> backend/Source/Audio/TrackModel.h",
+        "backend/Source/Audio/Recording/RecordingSessionPlanner.h -> backend/Source/Audio/TrackModel.h"
+      ]
+    },
+    {
+      "from": "Recording",
+      "to": "Backend Audio Engine",
+      "kind": "capture",
+      "count": 1,
+      "examples": [
+        "Recording capture and planner coordinate with audio device timing."
+      ]
+    },
+    {
+      "from": "Rendering + Bounce",
+      "to": "Backend Audio Engine",
+      "kind": "static include",
+      "count": 1,
+      "examples": [
+        "backend/Source/Audio/Rendering/TrackBouncePlanner.h -> backend/Source/Audio/TrackModel.h"
+      ]
+    },
+    {
+      "from": "Rendering + Bounce",
+      "to": "Backend Audio Engine",
+      "kind": "offline render",
+      "count": 1,
+      "examples": [
+        "Bounce/export renders through the engine path."
+      ]
+    },
+    {
+      "from": "Project Persistence + SQLite",
+      "to": "Frontend Persistence",
+      "kind": "roundtrip",
+      "count": 1,
+      "examples": [
+        "Native project rows preserve frontend Beat documents."
+      ]
+    },
+    {
+      "from": "Project Persistence + SQLite",
+      "to": "Backend Audio Engine",
+      "kind": "static include",
+      "count": 1,
+      "examples": [
+        "backend/Source/Persistence/ProjectRepository.h -> backend/Source/Audio/TrackModel.h"
+      ]
+    },
+    {
+      "from": "Project Persistence + SQLite",
+      "to": "Audio FX + Mastering",
+      "kind": "static include",
+      "count": 1,
+      "examples": [
+        "backend/Source/Persistence/ProjectRepository.cpp -> backend/Source/Audio/Effects/TrackEffectDefaults.h"
+      ]
+    },
+    {
+      "from": "Verification Scripts",
+      "to": "Design System",
+      "kind": "verify",
+      "count": 1,
+      "examples": [
+        "Design-system verifier checks shared UI primitives and tokens."
+      ]
+    },
+    {
+      "from": "Verification Scripts",
+      "to": "Arrangement Surface",
+      "kind": "verify",
+      "count": 1,
+      "examples": [
+        "Track interaction verifier covers drag, resize, drops, and selection."
+      ]
+    },
+    {
+      "from": "Verification Scripts",
+      "to": "Nodemap Editor",
+      "kind": "verify",
+      "count": 1,
+      "examples": [
+        "Nodemap verifier checks graph editor behavior."
+      ]
+    },
+    {
+      "from": "Verification Scripts",
+      "to": "Frontend Persistence",
+      "kind": "verify",
+      "count": 1,
+      "examples": [
+        "Document verifier checks save/open roundtrips."
+      ]
+    },
+    {
+      "from": "Verification Scripts",
+      "to": "Backend Audio Engine",
+      "kind": "verify",
+      "count": 1,
+      "examples": [
+        "Native stress exercises audio/backend behavior."
+      ]
+    },
+    {
+      "from": "Utilities + Test Hooks",
+      "to": "Design System",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/hotkeys/contextualHotkeys.ts -> frontend/src/solid-ui/index.ts",
+        "frontend/src/hotkeys/hotkeys.ts -> frontend/src/solid-ui/index.ts"
+      ]
+    },
+    {
+      "from": "Utilities + Test Hooks",
+      "to": "Arrangement Surface",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/testing/interactionRunner.ts -> frontend/src/features/Tracks/geometry.ts",
+        "frontend/src/testing/interactionRunner.ts -> frontend/src/features/Tracks/arrangementActions.ts"
+      ]
+    },
+    {
+      "from": "Utilities + Test Hooks",
+      "to": "Nodemap Editor",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/testing/devHooks.ts -> frontend/src/features/NodeInstrumentEditor/nodeGraph.ts"
+      ]
+    },
+    {
+      "from": "Utilities + Test Hooks",
+      "to": "Asset Libraries + Plugins",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/testing/interactionRunner.ts -> frontend/src/features/InstrumentLibrary/decentSamplerInstrument.ts",
+        "frontend/src/testing/interactionRunner.ts -> frontend/src/features/PluginLibrary/decentSamplerPluginAdapter.ts"
+      ]
+    },
+    {
+      "from": "Utilities + Test Hooks",
+      "to": "Browser Audio Runtime",
+      "kind": "static import",
+      "count": 1,
+      "examples": [
+        "frontend/src/hotkeys/hotkeys.ts -> frontend/src/audio/transportActions.ts"
+      ]
+    },
+    {
+      "from": "Utilities + Test Hooks",
+      "to": "Frontend State Stores",
+      "kind": "static import",
+      "count": 12,
+      "examples": [
+        "frontend/src/hotkeys/hotkeys.ts -> frontend/src/state/store.ts",
+        "frontend/src/hotkeys/hotkeys.ts -> frontend/src/state/clipboard.ts",
+        "frontend/src/testing/devHooks.ts -> frontend/src/state/effectPresets.ts",
+        "frontend/src/testing/devHooks.ts -> frontend/src/state/synthStore.ts",
+        "frontend/src/testing/devHooks.ts -> frontend/src/state/synthPresets.ts",
+        "frontend/src/testing/devHooks.ts -> frontend/src/state/store.ts",
+        "frontend/src/testing/devHooks.ts -> frontend/src/state/types.ts",
+        "frontend/src/testing/interactionRunner.ts -> frontend/src/state/effectPresets.ts"
+      ]
+    },
+    {
+      "from": "Utilities + Test Hooks",
+      "to": "Frontend Persistence",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/hotkeys/hotkeys.ts -> frontend/src/persistence/documentActions.ts",
+        "frontend/src/testing/devHooks.ts -> frontend/src/persistence/dexie.ts"
+      ]
+    },
+    {
+      "from": "Utilities + Test Hooks",
+      "to": "Frontend IPC",
+      "kind": "static import",
+      "count": 2,
+      "examples": [
+        "frontend/src/testing/devHooks.ts -> frontend/src/ipc/schema.ts",
+        "frontend/src/testing/interactionRunner.ts -> frontend/src/ipc/schema.ts"
+      ]
+    }
+  ]
+}

@@ -178,6 +178,11 @@
   overflow: hidden;
 }
 
+.recentLogo {
+  width: 40px;
+  height: 40px;
+}
+
 .recentRemove {
   position: absolute;
   top: 6px;

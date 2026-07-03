@@ -8,6 +8,24 @@ Status legend:
 - `[~]` partially done; usable but not final.
 - `[ ]` not done or only placeholder-level.
 
+## Current Closeout Focus
+
+- `[x]` Preset quality and subjective auditioning.
+  - Done: built named default families for bass, lead, pad, pluck, keys, drum, percussion/noise, cinematic texture, transition FX, and breakcore/drum-synth use cases.
+  - Done: render-checked every factory preset for finite, non-silent, non-clipped output with `npm run audit:aether-presets`.
+  - Done: added `docs/aether-factory-preset-audition-log.md` with per-preset family, role, render metrics, and release audition target notes.
+  - Done: `npm run audit:aether-presets` now enforces required family coverage, non-placeholder descriptions/audition notes, non-init family-specific macro labels, macro route assignments, finite/non-silent/non-clipped render output, and explicit threshold reporting.
+  - Keep generated/default instruments on the Aether wavetable path; sampler and DecentSampler instruments remain source-backed exceptions.
+- `[x]` Better default instrument families.
+  - Done: expanded factory Aether coverage from 9 to 17 render-audited presets across 10 families.
+  - Done: added musically distinct Aether starting points for synthetic kick, snare, closed hat, detuned bass, acid mono line, hollow lead, warm string pad, and transition FX.
+  - Done: factory preset metadata now carries category, family, role, tags, description, audition note, modulation complexity, macro layout, and instrument FX complexity.
+  - Done: non-init factory presets now get family-specific macro labels and default macro route assignments instead of generic Cut/Res/Drive/Shape-style defaults.
+- `[x]` Editor rough-edge cleanup.
+  - Done: current Aether fast-editing scope is migrated onto shared Solid UI kit controls where applicable, including shared Select, Slider, and compact NumberInput variants.
+  - Done: preset audition, Save As/Delete, favorite, Restore Init, macro assignment, wavemap edit/import, FX rack, envelope handles, amp/filter, LFO, performance, and automation surfaces are covered by the current Aether browser fixture sweep.
+  - Done: source scan/design-system verifier coverage guards against raw one-off controls reappearing under the current Aether synth feature.
+
 ## 1. Runtime Synth Engine
 
 - `[x]` Native wavetable oscillator, cached frame selection, interpolation, shared table cache, unison planning, and basic factory tables.
@@ -81,6 +99,10 @@ Status legend:
 
 - `[x]` Solid synth editor shell with analyzer, oscillator, modulation, LFO, macro, and filter controls.
 - `[x]` Browser/native preview paths for current core Aether parameters.
+- `[~]` Aether editor layout conventions.
+  - `Instrument Details - Aether Engine` is the outer/root identity header for the editor. It should be bold, unencapsulated, and should not use a nested ribbon/header container.
+  - Section labels such as `Oscillators`, `LFO`, `Instrument FX`, and `Envelopes` are standard section headers/ribbons and should use the shared bordered section treatment.
+  - Do not wrap root identity rows in section chrome for visual consistency; that adds extra nesting and makes the editor drift away from the intended diagram.
 - `[x]` Fast editing workflow.
   - Done: added a shared Solid `Select` primitive with catalog/demo coverage and migrated the Aether preset library filters, preset chooser, macro curve chooser, FX preset/add-effect controls, and Modulation Matrix source chooser off direct one-off native select markup; added a shared Solid `Slider` primitive with catalog/demo coverage and migrated Modulation Matrix route strength off its one-off range markup while preserving amount/range/state readouts; extended shared `NumberInput` for compact bare/aria-labelled fields and migrated Aether macro min/max range fields off one-off text-number inputs; added typed macro at-a-glance state summaries and compact macro-card status badges for assignment count, conflict count, and output value; true browser fixture sweep now covers preset restore/save-delete, oscillator, FX rack, macro summary, macro assignment, wavemap editor, wavemap pointer draw, wavemap import, envelope handles, amp/filter, LFO, performance, and automation surfaces through the live editor.
   - Remaining: none for the current Aether fast-editing scope; add new shared primitives and preview coverage alongside future synth surfaces.

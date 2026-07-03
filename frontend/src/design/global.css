@@ -9,7 +9,7 @@
 @import "./forms.css";
 @import "./animations.css";
 
-/* Light-green text-selection — the single chromatic exception. */
+/* Monochrome text selection. */
 ::selection {
   background: var(--color-highlight);
   color: var(--color-highlight-fg);

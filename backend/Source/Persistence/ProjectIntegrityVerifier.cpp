@@ -98,6 +98,16 @@ namespace beat
             bool group { false };
         };
 
+        struct TrackFreezeRef
+        {
+            juce::String trackId;
+            juce::String sourceTrackId;
+            juce::String audioFileId;
+            juce::String segmentId;
+            juce::String path;
+            juce::String trackAudioFileId;
+        };
+
         struct AudioFileMetadata
         {
             juce::String id;
@@ -420,6 +430,34 @@ namespace beat
             }
 
             const double bpm = doubleProperty(projectVar, "bpm", 120.0);
+            juce::StringArray returnBusIds;
+            const auto returnBusesVar = projectVar.getProperty("returnBuses", {});
+            if (const auto* returnBuses = arrayOf(returnBusesVar))
+            {
+                for (int busIndex = 0; busIndex < returnBuses->size(); ++busIndex)
+                {
+                    const auto& bus = returnBuses->getReference(busIndex);
+                    const auto busPath = "project.returnBuses[" + juce::String(busIndex) + "]";
+                    verifyUniqueId(report,
+                                   returnBusIds,
+                                   stringProperty(bus, "id"),
+                                   "returnBus",
+                                   busPath);
+                    verifyEffectList(report,
+                                     bus.getProperty("effects", {}),
+                                     pluginIds,
+                                     propertyPath(busPath, "effects"));
+                }
+            }
+            else if (!returnBusesVar.isVoid())
+            {
+                addIssue(report,
+                         ProjectIntegritySeverity::Error,
+                         "returnBuses.invalid",
+                         "Project return buses are not an array.",
+                         "project.returnBuses");
+            }
+
             const auto recordingInput = projectVar.getProperty("recordingInput", {});
             if (recordingInput.isObject())
             {
@@ -466,6 +504,7 @@ namespace beat
             juce::StringArray trackIds;
             juce::StringArray segmentIds;
             std::vector<TrackParentRef> trackParentRefs;
+            std::vector<TrackFreezeRef> trackFreezeRefs;
             for (int trackIndex = 0; trackIndex < tracks->size(); ++trackIndex)
             {
                 const auto& track = tracks->getReference(trackIndex);
@@ -512,6 +551,129 @@ namespace beat
                              "track.instrument.missing",
                              "Track references an instrument not stored in this document: " + trackInstrumentId,
                              propertyPath(trackPath, "instrumentId"));
+                }
+
+                const auto freezeSourceVar = track.getProperty("freezeSource", {});
+                if (freezeSourceVar.isObject())
+                {
+                    const auto freezePath = propertyPath(trackPath, "freezeSource");
+                    const auto sourceTrackId = stringProperty(freezeSourceVar, "sourceTrackId");
+                    const auto freezeAudioFileId = stringProperty(freezeSourceVar, "audioFileId");
+                    const auto freezeSegmentId = stringProperty(freezeSourceVar, "segmentId");
+                    trackFreezeRefs.push_back({
+                        trackId,
+                        sourceTrackId,
+                        freezeAudioFileId,
+                        freezeSegmentId,
+                        freezePath,
+                        stringProperty(track, "audioFileId"),
+                    });
+
+                    if (sourceTrackId.isEmpty())
+                    {
+                        addIssue(report,
+                                 ProjectIntegritySeverity::Error,
+                                 "track.freezeSource.source.empty",
+                                 "Frozen bounce metadata has no source track target.",
+                                 propertyPath(freezePath, "sourceTrackId"));
+                    }
+                    else if (sourceTrackId == trackId)
+                    {
+                        addIssue(report,
+                                 ProjectIntegritySeverity::Error,
+                                 "track.freezeSource.source.self",
+                                 "Frozen bounce metadata points back to the bounced track.",
+                                 propertyPath(freezePath, "sourceTrackId"));
+                    }
+
+                    if (freezeAudioFileId.isEmpty())
+                    {
+                        addIssue(report,
+                                 ProjectIntegritySeverity::Error,
+                                 "track.freezeSource.audio.empty",
+                                 "Frozen bounce metadata has no rendered audio asset.",
+                                 propertyPath(freezePath, "audioFileId"));
+                    }
+                    else if (stringProperty(track, "audioFileId").isNotEmpty()
+                             && freezeAudioFileId != stringProperty(track, "audioFileId"))
+                    {
+                        addIssue(report,
+                                 ProjectIntegritySeverity::Warning,
+                                 "track.freezeSource.audio.mismatch",
+                                 "Frozen bounce metadata audio does not match the bounced track audio.",
+                                 propertyPath(freezePath, "audioFileId"));
+                    }
+                }
+                else if (!freezeSourceVar.isVoid())
+                {
+                    addIssue(report,
+                             ProjectIntegritySeverity::Error,
+                             "track.freezeSource.invalid",
+                             "Track freeze metadata is not an object.",
+                             propertyPath(trackPath, "freezeSource"));
+                }
+
+                const auto sendsVar = track.getProperty("sends", {});
+                if (const auto* sends = arrayOf(sendsVar))
+                {
+                    juce::StringArray sendBusIds;
+                    for (int sendIndex = 0; sendIndex < sends->size(); ++sendIndex)
+                    {
+                        const auto& send = sends->getReference(sendIndex);
+                        const auto sendPath = propertyPath(trackPath, "sends[" + juce::String(sendIndex) + "]");
+                        const auto busId = stringProperty(send, "busId");
+                        if (busId.isEmpty())
+                        {
+                            addIssue(report,
+                                     ProjectIntegritySeverity::Error,
+                                     "track.send.bus.empty",
+                                     "Track send has no return bus target.",
+                                     propertyPath(sendPath, "busId"));
+                        }
+                        else if (!returnBusIds.contains(busId))
+                        {
+                            addIssue(report,
+                                     ProjectIntegritySeverity::Error,
+                                     "track.send.bus.missing",
+                                     "Track send references a missing return bus: " + busId,
+                                     propertyPath(sendPath, "busId"));
+                        }
+                        else if (sendBusIds.contains(busId))
+                        {
+                            addIssue(report,
+                                     ProjectIntegritySeverity::Warning,
+                                     "track.send.bus.duplicate",
+                                     "Track has multiple sends to the same return bus: " + busId,
+                                     sendPath);
+                        }
+                        sendBusIds.addIfNotAlreadyThere(busId);
+
+                        if (doubleProperty(send, "gainDb", -96.0) < -120.0 || doubleProperty(send, "gainDb", -96.0) > 24.0)
+                        {
+                            addIssue(report,
+                                     ProjectIntegritySeverity::Warning,
+                                     "track.send.gain.invalid",
+                                     "Track send gain is outside the supported range and will be clamped.",
+                                     propertyPath(sendPath, "gainDb"));
+                        }
+
+                        if (doubleProperty(send, "pan", 0.0) < -1.0 || doubleProperty(send, "pan", 0.0) > 1.0)
+                        {
+                            addIssue(report,
+                                     ProjectIntegritySeverity::Warning,
+                                     "track.send.pan.invalid",
+                                     "Track send pan is outside the supported range and will be clamped.",
+                                     propertyPath(sendPath, "pan"));
+                        }
+                    }
+                }
+                else if (!sendsVar.isVoid())
+                {
+                    addIssue(report,
+                             ProjectIntegritySeverity::Error,
+                             "track.sends.invalid",
+                             "Track sends are not an array.",
+                             propertyPath(trackPath, "sends"));
                 }
 
                 const auto effectsVar = track.getProperty("effects", {});
@@ -685,6 +847,37 @@ namespace beat
             {
                 if (trackRef.id.isNotEmpty() && tracksById.find(trackRef.id) == tracksById.end())
                     tracksById.emplace(trackRef.id, trackRef);
+            }
+
+            for (const auto& freezeRef : trackFreezeRefs)
+            {
+                if (freezeRef.sourceTrackId.isNotEmpty()
+                    && tracksById.find(freezeRef.sourceTrackId) == tracksById.end())
+                {
+                    addIssue(report,
+                             ProjectIntegritySeverity::Error,
+                             "track.freezeSource.source.missing",
+                             "Frozen bounce source track is missing: " + freezeRef.sourceTrackId,
+                             propertyPath(freezeRef.path, "sourceTrackId"));
+                }
+
+                if (freezeRef.audioFileId.isNotEmpty() && !audioFileIds.contains(freezeRef.audioFileId))
+                {
+                    addIssue(report,
+                             ProjectIntegritySeverity::Error,
+                             "track.freezeSource.audio.missing",
+                             "Frozen bounce audio asset is missing: " + freezeRef.audioFileId,
+                             propertyPath(freezeRef.path, "audioFileId"));
+                }
+
+                if (freezeRef.segmentId.isNotEmpty() && !segmentIds.contains(freezeRef.segmentId))
+                {
+                    addIssue(report,
+                             ProjectIntegritySeverity::Warning,
+                             "track.freezeSource.segment.missing",
+                             "Frozen bounce segment metadata points to a missing segment: " + freezeRef.segmentId,
+                             propertyPath(freezeRef.path, "segmentId"));
+                }
             }
 
             for (const auto& trackRef : trackParentRefs)

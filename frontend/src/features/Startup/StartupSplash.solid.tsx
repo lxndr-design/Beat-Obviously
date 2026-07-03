@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show, type Accessor } from "solid-js";
-import { Icon } from "../../solid-ui";
+import { AppLogo } from "../../solid-ui";
 import styles from "./StartupSplash.module.css";
 
 export interface StartupStage {
@@ -33,7 +33,7 @@ export function StartupSplash(props: { props: Accessor<StartupSplashProps> }) {
       <div class={styles.scrim} role="status" aria-live="polite" aria-label={`Starting Beat. ${activeStage()}.`}>
         <section class={styles.panel} style={{ "--startup-progress": `${progress()}%` }}>
           <div class={styles.mark} aria-hidden="true">
-            <Icon name="ph:music-note" size={16} decorative />
+            <AppLogo class={styles.markGlyph} />
           </div>
           <div class={styles.copy}>
             <h1>Beat</h1>

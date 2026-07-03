@@ -7,6 +7,7 @@ import { RenderTimingPanel } from "./features/Debug/RenderTimingPanel.solid";
 import { ExportJobPanel } from "./features/Debug/ExportJobPanel.solid";
 import { TrainingAutoRunner } from "./features/Training/TrainingAutoRunner.solid";
 import { StartupSplash, STARTUP_MINIMUM_VISIBLE_MS, type StartupStage } from "./features/Startup/StartupSplash.solid";
+import { runProjectExport } from "./features/ExportReview/exportActions";
 import { getTimelineAudioContext, stopTimelineAudio } from "./audio/timelineAudio";
 import { importAudioFiles } from "./audio/audioImport";
 import { preloadInstrumentSample } from "./audio/synthPreview";
@@ -90,7 +91,11 @@ export function App() {
 
   onMount(() => {
     if (!import.meta.env.DEV) return;
-    void import("./testing/devHooks").then(({ installBeatDevHooks }) => installBeatDevHooks());
+    void import("./testing/devHooks")
+      .then(({ installBeatDevHooks }) => installBeatDevHooks())
+      .catch((error) => {
+        console.error("[Beat dev hooks] install failed", error);
+      });
   });
 
   onMount(() => {
@@ -436,7 +441,7 @@ export function App() {
     onRemoveRecent: (path: string) => void removeRecentFromHome(path).catch((error) => appAlert(error instanceof Error ? error.message : "Remove recent failed.")),
     onSave: () => void saveFromMenu(false),
     onSaveAs: () => void saveFromMenu(true),
-    onExport: () => void exportCurrentWav().catch((error) => appAlert(error instanceof Error ? error.message : "Export failed.")),
+    onExport: () => useUiStore.getState().openEditor({ kind: "exportReview" }),
     onRecover: () => undefined,
     onHealth: () => useUiStore.getState().openEditor({ kind: "projectHealth" }),
     onSettings: () => useUiStore.getState().openEditor({ kind: "preferences" }),
@@ -448,9 +453,10 @@ export function App() {
     onOpen: () => void openFromHome().catch((error) => appAlert(error instanceof Error ? error.message : "Open failed.")),
     onSave: () => void saveFromMenu(false),
     onSaveAs: () => void saveFromMenu(true),
-    onExport: () => void exportCurrentWav().catch((error) => appAlert(error instanceof Error ? error.message : "Export failed.")),
-    onExportRange: () => void exportCurrentWav("range").catch((error) => appAlert(error instanceof Error ? error.message : "Range export failed.")),
-    onExportTrack: () => void exportCurrentWav("track").catch((error) => appAlert(error instanceof Error ? error.message : "Track export failed.")),
+    onExport: () => void runProjectExport().catch((error) => appAlert(error instanceof Error ? error.message : "Export failed.")),
+    onExportReview: () => useUiStore.getState().openEditor({ kind: "exportReview" }),
+    onExportRange: () => void runProjectExport("range").catch((error) => appAlert(error instanceof Error ? error.message : "Range export failed.")),
+    onExportTrack: () => void runProjectExport("track").catch((error) => appAlert(error instanceof Error ? error.message : "Track export failed.")),
     onRecover: () => void recoverFromMenu(),
     onHealth: () => useUiStore.getState().openEditor({ kind: "projectHealth" }),
     onSettings: () => useUiStore.getState().openEditor({ kind: "preferences" }),
@@ -537,7 +543,7 @@ async function handleNativeMenuCommand(command: "newProject" | "openProject" | "
       return;
     }
     case "exportWav":
-      await exportCurrentWav();
+      await runProjectExport();
       return;
     case "preferences":
       useUiStore.getState().openEditor({ kind: "preferences" });
@@ -563,78 +569,4 @@ async function recoverFromMenu() {
     console.error("[Beat] Backup recovery failed", error);
     await appAlert(error instanceof Error ? error.message : "Backup recovery failed.");
   }
-}
-
-type ExportMode = "project" | "range" | "track";
-
-async function exportCurrentWav(mode: ExportMode = "project") {
-  const request = {
-    project: useProjectStore.getState().project,
-    instruments: useInstrumentStore.getState().instruments,
-    audioFiles: useAudioFileStore.getState().files,
-  };
-  const range = useTransportStore.getState().loopRange;
-  const selectedTrackIds = useUiStore.getState().selectedTrackIds;
-  if (isNative()) {
-    if (mode === "range") {
-      if (range.endBeat <= range.startBeat) throw new Error("Set a review loop range before exporting a range.");
-      const result = await send({
-        kind: "project.exportRangeWavAsync",
-        ...request,
-        startBeat: range.startBeat,
-        endBeat: range.endBeat,
-        includeTail: true,
-      });
-      useExportStore.getState().setJob(result.job);
-      if (result.error) throw new Error(result.error);
-      return;
-    }
-    if (mode === "track") {
-      if (selectedTrackIds.length !== 1) throw new Error("Select exactly one track before exporting a stem.");
-      const result = await send({
-        kind: "project.exportTrackWavAsync",
-        ...request,
-        trackId: selectedTrackIds[0],
-      });
-      useExportStore.getState().setJob(result.job);
-      if (result.error) throw new Error(result.error);
-      return;
-    }
-    const result = await send({
-      kind: "project.exportWavAsync",
-      ...request,
-    });
-    useExportStore.getState().setJob(result.job);
-    if (result.error) throw new Error(result.error);
-    return;
-  }
-
-  if (mode === "range") {
-    if (range.endBeat <= range.startBeat) throw new Error("Set a review loop range before exporting a range.");
-    const result = await send({
-      kind: "project.exportRangeWav",
-      ...request,
-      startBeat: range.startBeat,
-      endBeat: range.endBeat,
-      includeTail: true,
-    });
-    if (result.error) throw new Error(result.error);
-    return;
-  }
-  if (mode === "track") {
-    if (selectedTrackIds.length !== 1) throw new Error("Select exactly one track before exporting a stem.");
-    const result = await send({
-      kind: "project.exportTrackWav",
-      ...request,
-      trackId: selectedTrackIds[0],
-    });
-    if (result.error) throw new Error(result.error);
-    return;
-  }
-
-  const result = await send({
-    kind: "project.exportWav",
-    ...request,
-  });
-  if (result.error) throw new Error(result.error);
 }

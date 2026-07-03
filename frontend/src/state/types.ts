@@ -163,6 +163,17 @@ export interface TrackSend {
   enabled: boolean;
 }
 
+export interface TrackFreezeSource {
+  sourceTrackId: Id;
+  sourceTrackName?: string;
+  audioFileId: Id;
+  segmentId?: Id;
+  createdAt: number;
+  sourceMute: boolean;
+  sourceSolo: boolean;
+  sourceParentTrackId?: Id;
+}
+
 export interface ReturnBus {
   id: Id;
   name: string;
@@ -195,6 +206,8 @@ export interface Track {
   recordGainDb: number;
   /** Color is not exposed in this design system — kept here for future themes. */
   sends?: TrackSend[];
+  /** Present on bounced/frozen audio tracks so the original source can be restored. */
+  freezeSource?: TrackFreezeSource;
   /** Track-level Aether/instrument parameter automation, stored on the project timeline. */
   automation?: MidiAutomationLane[];
   effects: TrackEffectChain;
@@ -302,6 +315,8 @@ export interface Instrument {
   sampleMap?: InstrumentSampleZone[];
   /** Sidebar grouping bucket for instrument library organization. */
   setId?: Id;
+  /** Canonical library taxonomy assignment for search and organization. */
+  taxonomy?: InstrumentTaxonomyAssignment;
   /** Where this instrument came from. Kept even after edits. */
   source?: InstrumentSource;
   /** Lightweight local sound descriptors used by beat/instrument generation. */
@@ -492,6 +507,7 @@ export interface SynthPatchSnapshot {
   instrumentType: "wavetable-synth";
   namespace: "synth";
   name: string;
+  taxonomy?: InstrumentTaxonomyAssignment;
   parameters: Record<string, SynthPatchParameterValue>;
   modulation: SynthPatchModulationRoute[];
   /** Instrument-owned FX inserted before track FX. Older patches omit this. */
@@ -508,13 +524,32 @@ export interface SynthPatchSnapshot {
 }
 
 export type InstrumentNodeKind =
+  | "instrument"
   | "oscillator"
+  | "oscillatorMerge"
   | "noise"
   | "mixer"
   | "filter"
   | "gain"
+  | "unison"
+  | "constant"
+  | "cvScale"
+  | "velocity"
+  | "keytrack"
+  | "modWheel"
+  | "macro"
+  | "random"
   | "lfo"
   | "envelope"
+  | "shaper"
+  | "distortion"
+  | "delay"
+  | "chorus"
+  | "reverb"
+  | "phaser"
+  | "flanger"
+  | "compressor"
+  | "bitcrush"
   | "output";
 
 export type InstrumentNodePortKind = "input" | "output";
@@ -526,6 +561,8 @@ export interface InstrumentNodePort {
   label: string;
   kind: InstrumentNodePortKind;
   signal: InstrumentNodeSignalKind;
+  /** Inputs default to one incoming cable unless this is explicitly true. Outputs may always fan out. */
+  acceptsMultiple?: boolean;
 }
 
 export interface InstrumentNode {
@@ -564,12 +601,37 @@ export interface InstrumentSource {
   fallbackEngine?: "aether";
 }
 
+export interface InstrumentTaxonomyAssignment {
+  categoryId: string;
+  instrumentId: string;
+}
+
 export type PluginKind = "synth" | "effect" | "renderer" | "utility";
 export type PluginFormat = "native" | "vst3" | "audio-unit" | "bridge" | "decent-sampler";
 export type PluginInstallState = "available" | "installed" | "missing" | "blocked";
 export type PluginCapabilityKind = "instrument" | "effect" | "renderer" | "utility";
 export type PluginFallbackMode = "aether" | "rendered-audio" | "pass-through";
 export type PluginEditorKind = "midi" | "drum";
+
+export interface DecentSamplerUiBinding {
+  type?: string;
+  level?: string;
+  parameter?: string;
+  position?: number;
+}
+
+export interface DecentSamplerUiControl {
+  kind: string;
+  label: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  minValue?: number;
+  maxValue?: number;
+  value?: number;
+  bindings?: DecentSamplerUiBinding[];
+}
 
 export interface PluginCapability {
   id: Id;
@@ -599,6 +661,7 @@ export interface PluginAdapter {
   uiImageDataUrl?: string;
   uiWidth?: number;
   uiHeight?: number;
+  uiControlDetails?: DecentSamplerUiControl[];
   associatedInstrumentId?: Id;
   defaultEditorKind?: PluginEditorKind;
   sampleCount?: number;
@@ -660,6 +723,7 @@ export interface InstrumentSnapshot {
   sampleUrl?: string;
   sampleUrls?: string[];
   sampleMap?: InstrumentSampleZone[];
+  taxonomy?: InstrumentTaxonomyAssignment;
   parentIds?: Id[];
   descriptors?: string[];
 }
@@ -802,6 +866,8 @@ export interface UiState {
     | { kind: "component"; componentId: Id }
     | { kind: "plugin"; pluginId: Id }
     | { kind: "eq" }
+    | { kind: "mixer" }
+    | { kind: "exportReview" }
     | { kind: "projectHealth" }
     | { kind: "preferences" }
   >;

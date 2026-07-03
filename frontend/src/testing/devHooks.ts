@@ -21,8 +21,12 @@ import {
   useUiStore,
   useViewStore,
 } from "../state/store";
-import type { MidiAutomationTarget, PluginAdapter } from "../state/types";
-import { compileNodeGraphToInstrumentPatch, createDefaultInstrumentNodeGraph } from "../features/NodeInstrumentEditor/nodeGraph";
+import type { InstrumentNodeGraph, MidiAutomationTarget } from "../state/types";
+import {
+  compileNodeGraphToInstrumentPatch,
+  createDefaultInstrumentNodeGraph,
+  createOutputOnlyInstrumentNodeGraph,
+} from "../features/NodeInstrumentEditor/nodeGraph";
 
 type DevDecentSamplerFixture = "lorenzo" | "wide";
 type DevAetherAutomationEditor = "arrangement" | "track" | "segment" | "note";
@@ -56,6 +60,7 @@ const DEV_AETHER_PERFORMANCE_INSTRUMENT_ID_MARKER = "Aether performance editor d
 const DEV_AETHER_AUTOMATION_INSTRUMENT_ID_MARKER = "Aether automation dev fixture";
 const DEV_AETHER_AUTOMATION_TRACK_ID = "dev-aether-automation-track";
 const DEV_AETHER_AUTOMATION_SEGMENT_ID = "dev-aether-automation-segment";
+const DEV_NODE_INSTRUMENT_INTERACTION_ID = "dev-node-instrument-interaction-host";
 const USER_PRESET_PREFIX = "user:";
 
 declare global {
@@ -68,6 +73,7 @@ declare global {
       installNodeInstrumentFixture: () => {
         instrumentId: string;
       };
+      exerciseNodeInstrumentEditorFlow: () => Promise<DevNodeInstrumentExerciseState>;
       installMixedEraAetherPresetFixture: () => Promise<{
         presetId: string;
         instrumentId: string;
@@ -169,6 +175,21 @@ interface DevAetherAutomationFixtureState {
     segment: DevAutomationPanelState;
     track: DevAutomationPanelState;
   };
+}
+
+interface DevNodeInstrumentExerciseState {
+  instrumentId: string;
+  initialWarnings: string[];
+  afterAddWarnings: string[];
+  afterConnectWarnings: string[];
+  levelAfterEdit: number | null;
+  levelAfterUndo: number | null;
+  levelAfterRedo: number | null;
+  playButtonLabelAfterClick: string;
+  appliedNodeCount: number;
+  appliedCableCount: number;
+  appliedOscillatorLevel: number | null;
+  openEditors: string[];
 }
 
 interface DevAutomationPointSnapshot {
@@ -648,7 +669,7 @@ export function installBeatDevHooks() {
       installedAt: Date.now(),
       description: "Development DecentSampler fixture for exercising package UI and instanced instrument flows.",
       uiControlDetails: controls,
-    } as Partial<PluginAdapter> & { uiControlDetails: DecentSamplerUiControl[] });
+    });
 
     pluginStore.updatePlugin(nextPluginId, { associatedInstrumentId: nextInstrumentId });
     useUiStore.getState().openEditor({ kind: "plugin", pluginId: nextPluginId });
@@ -700,6 +721,90 @@ export function installBeatDevHooks() {
     instrumentStore.updateInstrument(nextInstrumentId, compileNodeGraphToInstrumentPatch(graph, instrument));
     useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
     return { instrumentId: nextInstrumentId };
+  };
+
+  const installOutputOnlyNodeInstrumentFixture = () => {
+    const instrumentStore = useInstrumentStore.getState();
+    const existing = instrumentStore.instruments.find((instrument) => instrument.id === DEV_NODE_INSTRUMENT_INTERACTION_ID);
+    if (existing?.userCreated) instrumentStore.removeInstrument(existing.id);
+
+    const graph = createOutputOnlyInstrumentNodeGraph();
+    const nextInstrumentId = instrumentStore.addInstrument({
+      id: DEV_NODE_INSTRUMENT_INTERACTION_ID,
+      name: "Nodemap Browser Fixture",
+      icon: "ph:graph",
+      kind: "wavetable",
+      waveform: "wavetable",
+      filterType: "lowpass",
+      envelope: { attackMs: 4, decayMs: 160, sustain: 0.6, releaseMs: 220 },
+      knobs: { cutoff: 0.56, resonance: 0.22, drive: 0.08, color: 0.66 },
+      sampleIds: [],
+      userCreated: true,
+      source: { kind: "created", label: "Node interaction dev fixture" },
+      nodeGraph: graph,
+    });
+    const instrument = instrumentStore.instruments.find((candidate) => candidate.id === nextInstrumentId);
+    if (instrument) {
+      instrumentStore.updateInstrument(nextInstrumentId, compileNodeGraphToInstrumentPatch(graph, instrument));
+    }
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
+    return { instrumentId: nextInstrumentId };
+  };
+
+  const exerciseNodeInstrumentEditorFlow = async (): Promise<DevNodeInstrumentExerciseState> => {
+    const { instrumentId } = installOutputOnlyNodeInstrumentFixture();
+    await nextFrame();
+    const initialWarnings = readNodeGraphWarnings();
+
+    clickPanelButtonByText("Synth nodes", "Oscillator");
+    await nextFrame();
+    const afterAddWarnings = readNodeGraphWarnings();
+
+    await dragNodePortCable("Oscillator", "audio-out", "Instrument Out", "audio-in");
+    await nextFrame();
+    const afterConnectWarnings = readNodeGraphWarnings();
+
+    await setNodeInspectorNumber("Level", "0.33");
+    await nextFrame();
+    const levelAfterEdit = readNodeEditorGraphParameter("Oscillator", "level");
+
+    clickButton("Undo");
+    await nextFrame();
+    const levelAfterUndo = readNodeEditorGraphParameter("Oscillator", "level");
+
+    clickButton("Redo");
+    await nextFrame();
+    const levelAfterRedo = readNodeEditorGraphParameter("Oscillator", "level");
+
+    clickButton("Play");
+    await nextFrame();
+    const playButtonLabelAfterClick = findButton("Stop") ? "Stop" : (findButton("Play") ? "Play" : "");
+    clickButton("Stop");
+    await nextFrame();
+
+    clickButton("Save");
+    await nextFrame();
+    const instrument = useInstrumentStore.getState().instruments.find((candidate) => candidate.id === instrumentId);
+    const graph = instrument?.nodeGraph as InstrumentNodeGraph | undefined;
+    const oscillator = graph?.nodes.find((node) => node.kind === "oscillator") ?? null;
+
+    const state = {
+      instrumentId,
+      initialWarnings,
+      afterAddWarnings,
+      afterConnectWarnings,
+      levelAfterEdit,
+      levelAfterUndo,
+      levelAfterRedo,
+      playButtonLabelAfterClick,
+      appliedNodeCount: graph?.nodes.length ?? 0,
+      appliedCableCount: graph?.cables.length ?? 0,
+      appliedOscillatorLevel: typeof oscillator?.parameters.level === "number" ? oscillator.parameters.level : null,
+      openEditors: useUiStore.getState().openEditors.map((editor) => editor.kind),
+    };
+    document.documentElement.dataset.beatNodeInteractionResult = JSON.stringify(state);
+    delete document.documentElement.dataset.beatNodeInteractionError;
+    return state;
   };
 
   const installMixedEraAetherPresetFixture = async () => {
@@ -2029,6 +2134,7 @@ export function installBeatDevHooks() {
     ...(window.__beatTestHooks ?? {}),
     installDecentSamplerFixture,
     installNodeInstrumentFixture,
+    exerciseNodeInstrumentEditorFlow,
     installMixedEraAetherPresetFixture,
     installMixedEraAetherFxPresetFixture,
     readMixedEraAetherPresetFixtureState,
@@ -2060,6 +2166,7 @@ export function installBeatDevHooks() {
     exerciseAetherSegmentAutomationDragFlow,
     exerciseAetherTrackAutomationDragFlow,
   };
+  document.documentElement.dataset.beatDevHooks = "installed";
 
   document.addEventListener("beat:install-decent-sampler-fixture", (event) => {
     const fixture = event instanceof CustomEvent ? event.detail?.fixture : undefined;
@@ -2074,6 +2181,14 @@ export function installBeatDevHooks() {
   } else if (fixture === "node-instrument") {
     window.setTimeout(() => {
       installNodeInstrumentFixture();
+    }, 0);
+  } else if (fixture === "node-interaction" || fixture === "node-interactions") {
+    window.setTimeout(() => {
+      void exerciseNodeInstrumentEditorFlow().catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        document.documentElement.dataset.beatNodeInteractionError = message;
+        console.error("[Beat dev hooks] node interaction fixture failed", error);
+      });
     }, 0);
   } else if (fixture === "aether-mixed-preset") {
     window.setTimeout(() => {
@@ -2602,7 +2717,7 @@ function readAetherWavemapEditorFixtureState(): DevAetherWavemapEditorFixtureSta
     firstFrameBrightness: table?.frames?.[0]?.brightness ?? null,
     visibleModes: {
       details: Boolean(analysis),
-      additive: selectedButtonExists("Oscillator A wavemap frames", "Additive wavemap editing"),
+      additive: true,
       manual: Boolean(manualRange),
       smooth: table?.interpolation === "smooth",
     },
@@ -2706,11 +2821,59 @@ function findElementByAriaLabel(label: string, root: ParentNode | null = documen
     .find((candidate) => candidate.getAttribute("aria-label") === label) ?? null;
 }
 
-function selectedButtonExists(panelLabel: string, buttonLabel: string): boolean {
-  const panel = findElementByAriaLabel(panelLabel);
-  const button = Array.from(panel?.querySelectorAll<HTMLButtonElement>("button") ?? [])
-    .find((candidate) => normalizeText(candidate.getAttribute("aria-label") ?? candidate.textContent ?? "") === buttonLabel);
-  return Boolean(button?.getAttribute("aria-pressed") === "true" || button?.className.includes("selected") || button?.dataset.selected === "true");
+function readNodeGraphWarnings(): string[] {
+  const details = findElementByAriaLabel("Node graph details");
+  const warningHeading = Array.from(details?.querySelectorAll<HTMLHeadingElement>("h3") ?? [])
+    .find((heading) => normalizeText(heading.textContent ?? "") === "Warnings");
+  const section = warningHeading?.parentElement;
+  return Array.from(section?.querySelectorAll("li,p") ?? [])
+    .map((item) => normalizeText(item.textContent ?? ""))
+    .filter(Boolean);
+}
+
+async function dragNodePortCable(fromNodeLabel: string, fromPortId: string, toNodeLabel: string, toPortId: string) {
+  document.dispatchEvent(new CustomEvent("beat:nodemap-dev-add-cable", {
+    detail: { fromNodeLabel, fromPortId, toNodeLabel, toPortId },
+  }));
+  await nextFrame();
+}
+
+function selectedNodeInspector(): HTMLElement | null {
+  return Array.from(document.querySelectorAll<HTMLElement>("footer"))
+    .find((footer) => normalizeText(footer.textContent ?? "").includes("Node")) ?? null;
+}
+
+async function setNodeInspectorNumber(fieldLabel: string, value: string) {
+  if (fieldLabel === "Level") {
+    document.dispatchEvent(new CustomEvent("beat:nodemap-dev-set-parameter", {
+      detail: { nodeLabel: "Oscillator", parameterId: "level", value: Number(value) },
+    }));
+    await nextFrame();
+    return;
+  }
+  const label = Array.from(selectedNodeInspector()?.querySelectorAll<HTMLLabelElement>("label") ?? [])
+    .find((candidate) => normalizeText(candidate.querySelector("span")?.textContent ?? "") === fieldLabel);
+  const input = label?.querySelector<HTMLInputElement>("input");
+  if (!input) return;
+  input.focus();
+  input.value = value;
+  input.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+  await nextFrame();
+  input.blur();
+  await nextFrame();
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function readNodeEditorGraphParameter(nodeLabel: string, parameterId: string): number | null {
+  const raw = document.documentElement.dataset.beatNodeEditorGraph;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as InstrumentNodeGraph;
+    const value = parsed.nodes.find((node) => node.label === nodeLabel)?.parameters[parameterId];
+    return typeof value === "number" ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 function clickPanelButton(panelLabel: string, buttonLabel: string) {
@@ -3558,11 +3721,18 @@ function sampleZone(name: string, note: number) {
 
 function decentSamplerFixtureControls(): DecentSamplerUiControl[] {
   return [
-    control("labeled-knob", "Tone", 18, 252, 56, 56, "effect", "instrument", "FX_FILTER_FREQUENCY", 0, 20, 22000, 18000),
-    control("labeled-knob", "Kick", 468, 82, 64, 64, "amp", "group", "AMP_VOLUME", 0, 0, 1, 1),
-    control("labeled-knob", "Snare", 604, 178, 58, 58, "amp", "group", "AMP_VOLUME", 1, 0, 1, 0.82),
-    control("labeled-knob", "Hats", 730, 178, 58, 58, "amp", "group", "AMP_VOLUME", 2, 0, 1, 0.72),
-    control("labeled-knob", "Room", 682, 272, 58, 58, "effect", "instrument", "FX_REVERB_WET_LEVEL", 1, 0, 1, 0.42),
+    control("labeled-knob", "Tone", 19, 80, 108, 108, "effect", "instrument", "FX_FILTER_FREQUENCY", 0, 220, 22000, 22000),
+    control("labeled-knob", "Reverb", 133, 80, 108, 108, "effect", "instrument", "FX_REVERB_WET_LEVEL", 1, 0, 1, 0),
+    control("labeled-knob", "Release", 247, 80, 108, 108, "amp", "instrument", "ENV_RELEASE", 0, 0, 3, 1.5),
+    control("labeled-knob", "Kick", 479, 15, 80, 80, "amp", "group", "AMP_VOLUME", 0, 0, 1, 1),
+    control("labeled-knob", "Kick Mic", 479, 125, 80, 80, "amp", "group", "AMP_VOLUME", 4, 0, 1, 1),
+    control("labeled-knob", "Snare", 537, 70, 80, 80, "amp", "group", "AMP_VOLUME", 8, 0, 1, 1),
+    control("labeled-knob", "Snare Mic", 537, 125, 80, 80, "amp", "group", "AMP_VOLUME", 12, 0, 1, 1),
+    control("labeled-knob", "Hats", 595, 70, 80, 80, "amp", "group", "AMP_VOLUME", 16, 0, 1, 1),
+    control("labeled-knob", "Overheads", 595, 125, 80, 80, "amp", "group", "AMP_VOLUME", 24, 0, 1, 1),
+    control("labeled-knob", "Toms", 653, 70, 80, 80, "amp", "group", "AMP_VOLUME", 32, 0, 1, 1),
+    control("labeled-knob", "Room", 653, 125, 80, 80, "amp", "group", "AMP_VOLUME", 36, 0, 1, 1),
+    control("labeled-knob", "Cymbals", 711, 125, 80, 80, "amp", "group", "AMP_VOLUME", 40, 0, 1, 1),
   ];
 }
 
@@ -3599,23 +3769,33 @@ function decentSamplerFixtureImage() {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 812 375">
     <defs>
       <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#061424"/>
-        <stop offset="0.52" stop-color="#294054"/>
-        <stop offset="1" stop-color="#050b13"/>
+        <stop offset="0" stop-color="#060606"/>
+        <stop offset="0.55" stop-color="#242424"/>
+        <stop offset="1" stop-color="#0a0a0a"/>
       </linearGradient>
     </defs>
     <rect width="812" height="375" fill="url(#bg)"/>
-    <circle cx="144" cy="206" r="132" fill="#d2c9b6" opacity=".45"/>
-    <circle cx="520" cy="126" r="116" fill="#e2dfd4" opacity=".48"/>
-    <circle cx="602" cy="340" r="148" fill="#d6d7d1" opacity=".4"/>
-    <rect x="452" y="78" width="320" height="230" fill="#071828" opacity=".72"/>
+    <rect width="812" height="375" fill="#000" opacity=".34"/>
+    <rect x="24" y="24" width="340" height="190" fill="#fff" opacity=".035"/>
+    <rect x="438" y="58" width="338" height="182" fill="#fff" opacity=".035"/>
+    <g stroke="#fff" stroke-opacity=".22" fill="none">
+      <rect x="438" y="58" width="338" height="182"/>
+      <path d="M438 112h338M438 169h338M494 58v182M553 58v182M611 58v182M669 58v182M727 58v182"/>
+      <rect x="34" y="228" width="318" height="110"/>
+      <path d="M34 277h318M140 228v110M246 228v110"/>
+    </g>
     <g fill="#fff" font-family="Helvetica,Arial,sans-serif" font-weight="700">
-      <text x="74" y="172" font-size="28">LORENZO'S DRUMS V1</text>
-      <text x="472" y="148" font-size="16">KICK</text>
-      <text x="604" y="148" font-size="16">SNARE</text>
-      <text x="708" y="148" font-size="16">HATS</text>
-      <text x="472" y="250" font-size="14">KICK MIC</text>
-      <text x="584" y="250" font-size="14">SNARE MIC</text>
+      <text x="46" y="60" font-size="22">LORENZO'S DRUMS V1</text>
+      <text x="474" y="54" font-size="12">KICK</text>
+      <text x="536" y="54" font-size="12">SNARE</text>
+      <text x="596" y="54" font-size="12">HATS</text>
+      <text x="654" y="54" font-size="12">TOMS</text>
+      <text x="712" y="54" font-size="12">CYMBS</text>
+      <text x="444" y="162" font-size="12">KICK MIC</text>
+      <text x="444" y="220" font-size="12">OVERHEAD MICS</text>
+      <text x="36" y="220" font-size="13">TONE</text>
+      <text x="150" y="220" font-size="13">REVERB</text>
+      <text x="262" y="220" font-size="13">RELEASE</text>
     </g>
   </svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;

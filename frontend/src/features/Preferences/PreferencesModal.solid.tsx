@@ -200,16 +200,17 @@ export function PreferencesModal() {
         <div class={styles.tabs} role="tablist" aria-label="Preferences sections">
           <For each={PREFERENCE_TABS}>
             {(tab) => (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                selected={activeTab() === tab.id}
                 role="tab"
                 aria-selected={activeTab() === tab.id}
-                class={`${styles.tabButton} ${activeTab() === tab.id ? styles.tabButtonActive : ""}`}
+                className={styles.tabButton}
                 onClick={() => selectTab(tab.id)}
               >
                 <Icon name={tab.icon} size={14} decorative />
                 {tab.label}
-              </button>
+              </Button>
             )}
           </For>
         </div>

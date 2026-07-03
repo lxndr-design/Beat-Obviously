@@ -10,3 +10,8 @@
   color: var(--color-fg);
   flex-shrink: 0;
 }
+
+.logo {
+  width: 18px;
+  height: 18px;
+}

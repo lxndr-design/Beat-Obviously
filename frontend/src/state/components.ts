@@ -129,7 +129,6 @@ function makeFactoryDrumLoops(instruments: Instrument[]): DrumComponent[] {
   const pearlOpenHat = pick("Pearl Open Hat", "Open Hat", "LM-2 Open Hat");
   const pearlRide = pick("Pearl Ride", "LM-2 Ride", "TR-505 Ride");
   const pearlCrash = pick("Pearl Crash", "LM-2 Crash", "TR-505 Crash");
-  const pearlHighTom = pick("Pearl High Tom", "TR-505 High Tom");
   const lmKick = pick("LM-2 Kick", "Pearl Kick", "Sub Kick (Synth)");
   const lmSnare = pick("LM-2 Snare", "Pearl Snare", "Snap Snare");
   const lmHat = pick("LM-2 Closed Hat", "Pearl Closed Hat", "Closed Hat");
@@ -142,13 +141,15 @@ function makeFactoryDrumLoops(instruments: Instrument[]): DrumComponent[] {
   const trCowbellHigh = pick("TR-505 Cowbell High");
   const trLowConga = pick("TR-505 Low Conga");
   const trHighConga = pick("TR-505 High Conga");
-  const trTimbal = pick("TR-505 Timbal");
-  const trLowTom = pick("TR-505 Low Tom", "Pearl Low Tom");
-  const trMidTom = pick("TR-505 Mid Tom", "Pearl Mid Tom");
-  const trHighTom = pick("TR-505 High Tom", "Pearl High Tom");
   const crTamb = pick("CR-78 Tambourine", "LM-2 Closed Hat", "Pearl Closed Hat");
-  const crGuiro = pick("CR-78 Guiro", "TR-505 Rim");
-  const triangle = pick("Triangle", "Triangle Perc", "TR-505 Cowbell High");
+  const bcKick = pick("Breakcore Kick (Aether)", "Breakcore Kick (Synth)", "Sub Kick (Synth)", "Pearl Kick");
+  const bcSnare = pick("Breakcore Snare (Aether)", "Breakcore Snare (Synth)", "Pearl Snare", "LM-2 Snare");
+  const bcGhostSnare = pick("Breakcore Ghost Snare (Aether)", "Breakcore Ghost Snare (Synth)", "Pearl Snare", "LM-2 Snare");
+  const bcHat = pick("Breakcore Closed Hat (Aether)", "Breakcore Closed Hat (Synth)", "Pearl Closed Hat", "LM-2 Closed Hat");
+  const bcCrashRide = pick("Pearl Crash 2", "Pearl Crash", "Pearl Ride 2", "Pearl Ride", "Pearl Splash", "LM-2 Crash", "LM-2 Ride", "TR-505 Crash", "TR-505 Ride", "Breakcore Crash Ride (Aether)", "Breakcore Crash Ride (Synth)");
+  const bcPitchedSnare = pick("Breakcore Pitched Snare (Aether)", "Breakcore Pitched Snare (Synth)", "Pearl Snare", "LM-2 Snare");
+  const bcNoiseBurst = pick("Breakcore Noise Burst (Aether)", "Breakcore Noise Burst (Synth)", "CR-78 Cymbal", "TR-505 Crash");
+  const bcRimClick = pick("Breakcore Rim Click (Aether)", "Breakcore Rim Click (Synth)", "TR-505 Rim", "TR-505 Cowbell Low");
 
   const loop = ({
     name,
@@ -182,151 +183,160 @@ function makeFactoryDrumLoops(instruments: Instrument[]): DrumComponent[] {
 
   return [
     loop({
-      name: "Rock Backbeat",
-      rows: [
-        row(pearlKick, "Kick", [hit(1, 122), hit(7, 78, -6), hit(9, 118), hit(15, 92, 8)]),
-        row(pearlSnare, "Snare", [hit(5, 124), hit(8, 42, -12), hit(12, 38, 9), hit(13, 126)]),
-        row(pearlHat, "Hat", alternating([1, 3, 5, 7, 9, 11, 13, 15], 82, 64, 4)),
-        row(pearlCrash, "Crash", [hit(1, 112)]),
-      ],
-    }),
-    loop({
-      name: "Four on the Floor",
-      swingPercent: 52,
-      rows: [
-        row(lmKick, "Kick", [hit(1, 124), hit(5, 118), hit(9, 122), hit(13, 118)]),
-        row(lmClap, "Clap", [hit(5, 116), hit(13, 118)]),
-        row(lmOpenHat, "Open Hat", [hit(3, 92, 8), hit(7, 94, 8), hit(11, 92, 8), hit(15, 94, 8)]),
-        row(lmHat, "Closed Hat", alternating([1, 3, 5, 7, 9, 11, 13, 15], 58, 48, 5)),
-      ],
-    }),
-    loop({
-      name: "Reggae One Drop",
-      swingPercent: 58,
-      rows: [
-        row(pearlKick, "Kick", [hit(9, 118, 6)]),
-        row(rim ?? pearlSnare, "Rim", [hit(5, 82, 10), hit(9, 116, 8), hit(13, 82, 10)]),
-        row(pearlHat, "Hat", [hit(3, 62, 12), hit(7, 72, 12), hit(11, 64, 12), hit(15, 74, 12)]),
-        row(crTamb, "Tambourine", [hit(7, 48, 14), hit(15, 52, 14)]),
-      ],
-    }),
-    loop({
-      name: "Dembow",
-      swingPercent: 54,
-      rows: [
-        row(lmKick, "Kick", [hit(1, 124), hit(4, 96, -8), hit(7, 116), hit(11, 108, 7), hit(14, 82, 10)]),
-        row(rim ?? trClap ?? lmSnare, "Rim", [hit(5, 118), hit(9, 92, -5), hit(13, 122)]),
-        row(trClap, "Clap", [hit(5, 92), hit(13, 94)]),
-        row(lmHat, "Hat", alternating([3, 7, 11, 15], 68, 58, 8)),
-      ],
-    }),
-    loop({
-      name: "Amen-Style Break",
+      name: "Basic Hip-Hop / Boom Bap",
       swingPercent: 56,
       rows: [
-        row(pearlKick, "Kick", [hit(1, 124), hit(4, 98, -8), hit(7, 112), hit(11, 104, 8)]),
-        row(pearlSnare, "Snare", [hit(5, 126), hit(10, 94, -7), hit(13, 120), hit(16, 78, 9)]),
-        row(pearlHat, "Hat", [
-          hit(1, 74),
-          hit(3, 58, 5),
-          hit(4, 64, -6),
-          hit(5, 78),
-          hit(7, 56, 8),
-          hit(9, 70),
-          hit(11, 56, 8),
-          hit(12, 62, -5),
-          hit(13, 82),
-          hit(15, 58, 6),
-        ]),
-        row(pearlRide, "Ride", [hit(1, 42), hit(9, 40)]),
+        row(pearlKick, "Kick", [hit(1, 124, 0, 32.7), hit(4, 82, 8, 32.7), hit(7, 94, -4, 32.7), hit(9, 122, 0, 32.7), hit(14, 86, 6, 32.7)]),
+        row(pearlSnare, "Snare", [hit(5, 124, 0, 73.4), hit(13, 126, 0, 73.4)]),
+        row(pearlHat, "Closed Hat", alternating([1, 3, 5, 7, 9, 11, 13, 15], 72, 58, 7)),
+        row(pearlOpenHat, "Open Hat", [hit(8, 62, 9, 233.0), hit(16, 64, 10, 233.0)]),
+        row(pearlSnare, "Ghost Snare", [hit(4, 46, 10, 73.4), hit(6, 42, -8, 73.4), hit(11, 48, 8, 73.4), hit(15, 44, 10, 73.4)]),
       ],
     }),
     loop({
-      name: "Breakcore Cut",
-      speed: 4,
-      stepCount: 32,
-      lengthBeats: 16,
-      swingPercent: 53,
+      name: "Rock Backbeat",
+      swingPercent: 51,
       rows: [
-        row(pearlKick, "Kick", [hit(1, 126), hit(4, 88, -10), hit(7, 112), hit(8, 76, 12), hit(11, 116), hit(15, 96), hit(19, 118), hit(23, 86, -8), hit(27, 122), hit(31, 92, 8)], 32),
-        row(pearlSnare, "Snare", [hit(3, 84, 8, 246.94), hit(5, 124), hit(10, 98, -12, 220), hit(13, 118), hit(16, 78, 10), hit(21, 126), hit(26, 92, -8, 261.63), hit(29, 114), hit(32, 86, 8)], 32),
-        row(pearlHat, "Hat", alternating([1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, 17, 18, 20, 21, 22, 23, 25, 26, 27, 29, 30, 31], 72, 52, 5), 32),
-        row(pearlHighTom, "High Tom", [hit(8, 78, -6, 392), hit(24, 82, 6, 440)], 32),
+        row(pearlKick, "Kick", [hit(1, 124, 0, 32.7), hit(7, 96, -4, 32.7), hit(9, 122, 0, 32.7), hit(11, 82, 5, 32.7), hit(15, 92, 6, 32.7)]),
+        row(pearlSnare, "Snare", [hit(5, 126, 0, 73.4), hit(13, 126, 0, 73.4)]),
+        row(pearlHat, "Closed Hat", alternating([1, 3, 5, 7, 9, 11, 13, 15], 78, 62, 4)),
+        row(pearlCrash, "Crash", [hit(1, 108, 0, 277.0)]),
+        row(pearlSnare, "Ghost Snare", [hit(8, 42, 8, 73.4), hit(12, 40, -8, 73.4), hit(16, 44, 8, 73.4)]),
+      ],
+    }),
+    loop({
+      name: "House / Four-on-the-Floor",
+      swingPercent: 50,
+      rows: [
+        row(lmKick, "Kick", [hit(1, 124, 0, 32.7), hit(5, 122, 0, 32.7), hit(9, 124, 0, 32.7), hit(13, 122, 0, 32.7)]),
+        row(lmClap ?? lmSnare, "Clap / Snare", [hit(5, 120, 0, 73.4), hit(13, 122, 0, 73.4)]),
+        row(lmHat, "Closed Hat", alternating([1, 3, 5, 7, 9, 11, 13, 15], 66, 54, 4)),
+        row(lmOpenHat, "Open Hat", [hit(3, 96, 0, 233.0), hit(7, 94, 0, 233.0), hit(11, 96, 0, 233.0), hit(15, 94, 0, 233.0)]),
+        row(rim ?? trCowbellLow, "Perc / Rim", [hit(2, 54, 4, 196.0), hit(8, 58, 6, 196.0), hit(10, 54, 4, 196.0), hit(16, 58, 6, 196.0)]),
+      ],
+    }),
+    loop({
+      name: "Reggaeton / Dembow",
+      swingPercent: 54,
+      rows: [
+        row(lmKick, "Kick", [hit(1, 124, 0, 32.7), hit(4, 94, -5, 32.7), hit(7, 118, 0, 32.7), hit(11, 108, 6, 32.7), hit(14, 86, 8, 32.7)]),
+        row(rim ?? trClap ?? lmSnare, "Rim / Snare", [hit(5, 120, 0, 73.4), hit(9, 84, -4, 73.4), hit(13, 122, 0, 73.4)]),
+        row(trClap, "Clap", [hit(5, 82, 0, 73.4), hit(13, 84, 0, 73.4)]),
+        row(lmHat, "Closed Hat", alternating([1, 3, 5, 7, 9, 11, 13, 15], 62, 50, 7)),
+        row(lmOpenHat, "Open Hat", [hit(8, 56, 8, 233.0), hit(16, 58, 8, 233.0)]),
+      ],
+    }),
+    loop({
+      name: "Drum & Bass",
+      swingPercent: 52,
+      rows: [
+        row(pearlKick, "Kick", [hit(1, 124, 0, 32.7), hit(9, 122, 0, 32.7), hit(12, 90, 7, 32.7)]),
+        row(pearlSnare, "Snare", [hit(5, 126, 0, 73.4), hit(13, 126, 0, 73.4)]),
+        row(pearlHat, "Closed Hat", alternating([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], 70, 54, 3)),
+        row(pearlRide ?? pearlCrash, "Ride / Crash", [hit(1, 104, 0, 277.0), hit(7, 82, 0, 277.0), hit(9, 98, 0, 277.0), hit(15, 80, 0, 277.0)]),
+        row(pearlSnare, "Ghost Snare", [hit(3, 46, 6, 73.4), hit(6, 42, -6, 73.4), hit(11, 48, 6, 73.4), hit(15, 44, 8, 73.4)]),
+      ],
+    }),
+    loop({
+      name: "Breakcore Amen Skeleton",
+      swingPercent: 54,
+      rows: [
+        row(bcKick, "Breakcore Kick (Aether)", [hit(1, 126, 0, 32.7), hit(4, 88, 7, 32.7), hit(7, 116, 0, 32.7), hit(9, 124, 0, 32.7), hit(14, 92, 6, 32.7)]),
+        row(bcSnare, "Breakcore Snare (Aether)", [hit(3, 82, 5, 73.4), hit(5, 126, 0, 73.4), hit(8, 44, 7, 73.4), hit(10, 92, -5, 73.4), hit(13, 124, 0, 73.4), hit(16, 84, 8, 73.4)]),
+        row(bcGhostSnare, "Breakcore Ghost Snare (Aether)", [hit(2, 38, 6, 73.4), hit(4, 42, 8, 73.4), hit(6, 40, -6, 73.4), hit(10, 42, 6, 73.4), hit(12, 40, 7, 73.4), hit(14, 42, 5, 73.4)]),
+        row(bcHat, "Breakcore Closed Hat (Aether)", alternating([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], 70, 52, 3)),
+        row(bcCrashRide, "Crash / Ride", [hit(1, 104, 0, 277.0), hit(7, 82, 0, 277.0), hit(9, 96, 0, 277.0), hit(15, 80, 0, 277.0)]),
+      ],
+    }),
+    loop({
+      name: "Hyperactive Snare-Chop Breakcore",
+      swingPercent: 51,
+      rows: [
+        row(bcKick, "Breakcore Kick (Aether)", [hit(1, 126, 0, 32.7), hit(3, 88, -5, 32.7), hit(7, 110, 0, 32.7), hit(9, 120, 0, 32.7), hit(10, 88, 5, 32.7), hit(15, 106, 0, 32.7)]),
+        row(bcSnare, "Breakcore Snare (Aether)", [hit(2, 92, 5, 73.4), hit(4, 96, 7, 73.4), hit(5, 126, 0, 73.4), hit(7, 106, 0, 73.4), hit(8, 100, 7, 73.4), hit(10, 92, -5, 73.4), hit(13, 124, 0, 73.4), hit(14, 98, 5, 73.4), hit(16, 94, 8, 73.4)]),
+        row(bcPitchedSnare, "Breakcore Pitched Snare (Aether)", [hit(6, 78, -4, 87.3), hit(11, 84, 0, 87.3), hit(15, 54, -6, 87.3), hit(16, 50, 8, 87.3)]),
+        row(bcGhostSnare, "Breakcore Ghost Snare (Aether)", [hit(1, 36, 0, 73.4), hit(3, 38, 6, 73.4), hit(6, 40, -6, 73.4), hit(8, 40, 7, 73.4), hit(9, 38, 0, 73.4), hit(12, 42, 8, 73.4), hit(15, 42, 6, 73.4)]),
+        row(bcHat, "Breakcore Closed Hat (Aether)", alternating([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], 70, 52, 3)),
+      ],
+    }),
+    loop({
+      name: "Glitch Breakcore / IDM Break",
+      swingPercent: 50,
+      rows: [
+        row(bcKick, "Breakcore Kick (Aether)", [hit(1, 124, 0, 32.7), hit(4, 58, 8, 32.7), hit(6, 96, -5, 32.7), hit(9, 122, 0, 32.7), hit(11, 92, 0, 32.7), hit(15, 56, -8, 32.7)]),
+        row(bcSnare, "Breakcore Snare (Aether)", [hit(3, 76, 4, 73.4), hit(5, 126, 0, 73.4), hit(8, 56, 8, 73.4), hit(10, 88, -5, 73.4), hit(12, 82, 6, 73.4), hit(13, 124, 0, 73.4), hit(16, 56, 8, 73.4)]),
+        row(bcRimClick, "Breakcore Rim Click (Aether)", [hit(1, 58, 0, 196.0), hit(4, 62, 7, 196.0), hit(6, 56, -5, 196.0), hit(9, 58, 0, 196.0), hit(11, 62, 0, 196.0), hit(14, 56, 5, 196.0), hit(16, 62, 7, 196.0)]),
+        row(bcHat, "Breakcore Closed Hat (Aether)", alternating([1, 2, 4, 5, 7, 8, 10, 11, 13, 14, 16], 70, 50, 4)),
+        row(bcNoiseBurst, "Breakcore Noise Burst (Aether)", [hit(4, 54, 7, 261.6), hit(8, 58, 7, 261.6), hit(11, 62, 0, 261.6), hit(16, 58, 8, 261.6)]),
+      ],
+    }),
+    loop({
+      name: "Venetian Snares-Style 7/8 Breakcore",
+      lengthBeats: 14,
+      stepCount: 14,
+      swingPercent: 50,
+      rows: [
+        row(bcKick, "Breakcore Kick (Aether)", [hit(1, 126, 0, 32.7), hit(3, 88, 0, 32.7), hit(7, 110, 0, 32.7), hit(9, 124, 0, 32.7), hit(12, 88, 6, 32.7)], 14),
+        row(bcSnare, "Breakcore Snare (Aether)", [hit(4, 88, 7, 73.4), hit(5, 126, 0, 73.4), hit(8, 44, 7, 73.4), hit(10, 92, -5, 73.4), hit(13, 124, 0, 73.4)], 14),
+        row(bcGhostSnare, "Breakcore Ghost Snare (Aether)", [hit(2, 38, 5, 73.4), hit(6, 40, -5, 73.4), hit(9, 38, 0, 73.4), hit(11, 42, 0, 73.4), hit(14, 42, 7, 73.4)], 14),
+        row(bcHat, "Breakcore Closed Hat (Aether)", alternating([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], 70, 52, 3), 14),
+        row(bcCrashRide, "Crash / Ride", [hit(1, 104, 0, 277.0), hit(7, 84, 0, 277.0), hit(9, 98, 0, 277.0), hit(14, 82, 6, 277.0)], 14),
+      ],
+    }),
+    loop({
+      name: "Blast Breakcore / Maximum Density",
+      swingPercent: 50,
+      rows: [
+        row(bcKick, "Breakcore Kick (Aether)", [hit(1, 126, 0, 32.7), hit(2, 104, 0, 32.7), hit(4, 98, 6, 32.7), hit(5, 122, 0, 32.7), hit(6, 102, 0, 32.7), hit(8, 98, 6, 32.7), hit(9, 124, 0, 32.7), hit(10, 104, 0, 32.7), hit(12, 98, 6, 32.7), hit(13, 122, 0, 32.7), hit(14, 104, 0, 32.7), hit(15, 108, 0, 32.7)]),
+        row(bcSnare, "Breakcore Snare (Aether)", [hit(2, 92, 0, 73.4), hit(3, 100, 0, 73.4), hit(4, 98, 6, 73.4), hit(6, 92, 0, 73.4), hit(7, 100, 0, 73.4), hit(8, 98, 6, 73.4), hit(10, 92, 0, 73.4), hit(11, 100, 0, 73.4), hit(12, 98, 6, 73.4), hit(14, 92, 0, 73.4), hit(15, 100, 0, 73.4), hit(16, 50, 8, 73.4)]),
+        row(bcPitchedSnare, "Breakcore Pitched Snare (Aether)", [hit(5, 78, 0, 87.3), hit(8, 76, 6, 87.3), hit(11, 80, 0, 87.3), hit(14, 76, 0, 87.3), hit(16, 50, 8, 87.3)]),
+        row(bcHat, "Breakcore Closed Hat (Aether)", alternating([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], 72, 54, 2)),
+        row(bcNoiseBurst, "Breakcore Noise Burst (Aether)", [hit(1, 106, 0, 277.0), hit(4, 82, 6, 277.0), hit(7, 88, 0, 277.0), hit(9, 104, 0, 277.0), hit(12, 82, 6, 277.0), hit(15, 88, 0, 277.0)]),
       ],
     }),
     loop({
       name: "Trap Half-Time",
-      speed: 4,
-      stepCount: 32,
-      lengthBeats: 16,
       swingPercent: 57,
       defaultPitchHz: 130.81,
       rows: [
-        row(subKick, "Sub Kick", [hit(1, 124), hit(6, 84, -10, 123.47), hit(11, 114, 8, 146.83), hit(16, 72, 12, 110), hit(19, 120, -6), hit(25, 94, 8, 98), hit(29, 118)], 32),
-        row(lmSnare, "Snare", [hit(9, 124), hit(25, 126), hit(31, 58, 12)], 32),
-        row(lmHat, "Hat Roll", [
-          hit(1, 62),
-          hit(3, 48, 9),
-          hit(5, 54),
-          hit(7, 46, 8),
-          hit(11, 52),
-          hit(13, 48),
-          hit(15, 42, -9, 493.88),
-          hit(16, 36, -12, 523.25),
-          hit(17, 68),
-          hit(19, 48, 8),
-          hit(21, 58),
-          hit(23, 44, 8),
-          hit(27, 52),
-          hit(29, 46),
-          hit(30, 40, -12, 587.33),
-          hit(31, 38, -8, 659.25),
-        ], 32),
-        row(trClap, "Clap", [hit(9, 66), hit(25, 68)], 32),
+        row(subKick, "Sub Kick", [hit(1, 124, 0, 32.7), hit(6, 78, -8, 36.71), hit(11, 116, 7, 43.65), hit(15, 88, 8, 32.7)]),
+        row(lmSnare, "Snare", [hit(9, 126, 0, 73.4)]),
+        row(lmHat, "Closed Hat", [hit(1, 62, 0, 185.0), hit(3, 48, 8, 185.0), hit(5, 54, 0, 185.0), hit(7, 46, 8, 185.0), hit(10, 52, -5, 185.0), hit(12, 46, 7, 185.0), hit(13, 62, 0, 185.0), hit(15, 44, -8, 246.94), hit(16, 38, 10, 261.63)]),
+        row(trClap, "Clap", [hit(9, 72, 0, 73.4)]),
+        row(lmSnare, "Ghost Snare", [hit(16, 42, 8, 73.4)]),
       ],
     }),
     loop({
       name: "Funk Shuffle",
       swingPercent: 62,
       rows: [
-        row(pearlKick, "Kick", [hit(1, 122), hit(4, 74, -9), hit(7, 102, 8), hit(11, 92, -5), hit(15, 108, 9)]),
-        row(pearlSnare, "Snare", [hit(5, 122), hit(8, 44, 10), hit(12, 52, -8), hit(13, 118), hit(16, 46, 10)]),
-        row(pearlHat, "Hat", alternating([1, 3, 5, 7, 9, 11, 13, 15], 76, 54, 12)),
-        row(pearlOpenHat, "Open Hat", [hit(15, 64, 14)]),
+        row(pearlKick, "Kick", [hit(1, 122, 0, 32.7), hit(4, 72, -9, 32.7), hit(7, 104, 8, 32.7), hit(11, 92, -5, 32.7), hit(15, 110, 9, 32.7)]),
+        row(pearlSnare, "Snare", [hit(5, 124, 0, 73.4), hit(13, 120, 0, 73.4)]),
+        row(pearlHat, "Closed Hat", alternating([1, 3, 5, 7, 9, 11, 13, 15], 76, 54, 12)),
+        row(pearlOpenHat, "Open Hat", [hit(15, 64, 14, 233.0)]),
+        row(pearlSnare, "Ghost Snare", [hit(8, 44, 10, 73.4), hit(12, 52, -8, 73.4), hit(16, 46, 10, 73.4)]),
       ],
     }),
     loop({
       name: "Latin Cumbia",
       swingPercent: 54,
       rows: [
-        row(lmKick, "Kick", [hit(1, 116), hit(7, 96), hit(9, 112), hit(15, 92)]),
-        row(trClap, "Clap", [hit(5, 108), hit(13, 110)]),
-        row(trLowConga, "Low Conga", [hit(3, 78, 6, 196), hit(11, 76, 6, 196)]),
+        row(lmKick, "Kick", [hit(1, 118, 0, 32.7), hit(7, 96, 0, 32.7), hit(9, 114, 0, 32.7), hit(15, 92, 0, 32.7)]),
+        row(trClap, "Clap", [hit(5, 110, 0, 73.4), hit(13, 112, 0, 73.4)]),
+        row(trLowConga, "Low Conga", [hit(3, 78, 6, 196.0), hit(11, 76, 6, 196.0)]),
         row(trHighConga, "High Conga", [hit(4, 70, -8, 293.66), hit(8, 66, 8, 329.63), hit(12, 72, -8, 293.66), hit(16, 62, 8, 329.63)]),
-        row(trCowbellHigh, "Cowbell", [hit(3, 64), hit(7, 68), hit(11, 62), hit(15, 70)]),
+        row(trCowbellHigh, "Cowbell", [hit(3, 64, 0, 783.99), hit(7, 68, 0, 783.99), hit(11, 62, 0, 783.99), hit(15, 70, 0, 783.99)]),
       ],
     }),
     loop({
-      name: "Minimal Electro",
-      swingPercent: 51,
-      rows: [
-        row(lmKick, "Kick", [hit(1, 116), hit(9, 108), hit(12, 66, -6)]),
-        row(lmSnare, "Snare", [hit(5, 102), hit(13, 108)]),
-        row(crTamb, "Tambourine", alternating([1, 3, 5, 7, 9, 11, 13, 15], 58, 44, 4)),
-        row(crGuiro, "Guiro", [hit(4, 48, 10), hit(8, 52, 10), hit(12, 48, 10), hit(16, 52, 10)]),
-        row(trCowbellLow, "Cowbell Low", [hit(7, 58, -8, 261.63), hit(15, 64, 8, 293.66)]),
-      ],
-    }),
-    loop({
-      name: "Percussion Fill",
+      name: "Afrobeat / Afropop-Inspired",
       swingPercent: 55,
       rows: [
-        row(trLowTom, "Low Tom", [hit(1, 90, 0, 174.61), hit(9, 86, 0, 196)]),
-        row(trMidTom, "Mid Tom", [hit(5, 80, -8, 246.94), hit(13, 82, 8, 261.63)]),
-        row(trHighTom, "High Tom", [hit(7, 76, -8, 329.63), hit(8, 68, 10, 349.23), hit(15, 78, -8, 392), hit(16, 70, 10, 440)]),
-        row(trTimbal, "Timbal", [hit(4, 58, 10), hit(12, 62, 10)]),
-        row(trCowbellHigh, "Cowbell High", [hit(3, 54), hit(11, 58)]),
-        row(triangle, "Triangle", [hit(1, 42, 0, 880), hit(9, 44, 0, 987.77)]),
+        row(lmKick, "Kick", [hit(1, 122, 0, 32.7), hit(6, 84, 4, 32.7), hit(9, 118, 0, 32.7), hit(15, 86, 6, 32.7)]),
+        row(trClap ?? lmSnare, "Snare / Clap", [hit(5, 116, 0, 73.4), hit(13, 118, 0, 73.4)]),
+        row(lmHat, "Closed Hat", alternating([1, 3, 5, 7, 9, 11, 13, 15], 66, 52, 5)),
+        row(crTamb, "Shaker", [hit(1, 60, 0, 277.0), hit(2, 54, 3, 277.0), hit(4, 58, 5, 277.0), hit(5, 62, 0, 277.0), hit(7, 56, 4, 277.0), hit(9, 62, 0, 277.0), hit(10, 54, 3, 277.0), hit(12, 58, 5, 277.0), hit(13, 62, 0, 277.0), hit(15, 56, 4, 277.0)]),
+        row(trCowbellHigh, "High Perc", [hit(3, 66, 0, 220.0), hit(6, 60, -5, 220.0), hit(11, 66, 0, 220.0), hit(14, 60, -5, 220.0)]),
       ],
     }),
   ];

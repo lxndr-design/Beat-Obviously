@@ -40,6 +40,13 @@
   color: var(--color-fg);
 }
 
+.markGlyph {
+  display: block;
+  width: 18px;
+  height: 18px;
+  color: currentColor;
+}
+
 .copy {
   grid-area: copy;
   min-width: 0;

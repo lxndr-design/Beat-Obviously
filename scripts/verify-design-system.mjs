@@ -15,6 +15,24 @@ const tsconfigPath = join(repoRoot, "frontend", "tsconfig.json");
 const viteConfigPath = join(repoRoot, "frontend", "vite.config.ts");
 const appDialogPath = join(frontendSrc, "solid-ui", "AppDialog", "AppDialog.solid.tsx");
 const phIconSubsetPath = join(frontendSrc, "solid-ui", "Icon", "phIconSubset.ts");
+const nodeInstrumentEditorPath = join(frontendSrc, "features", "NodeInstrumentEditor", "NodeInstrumentEditor.solid.tsx");
+const nodeCanvasPath = join(frontendSrc, "features", "NodeInstrumentEditor", "NodeCanvas.solid.tsx");
+const synthEditorPath = join(frontendSrc, "features", "Synth", "SynthEditor", "SynthEditor.solid.tsx");
+const synthEditorCssPath = join(frontendSrc, "features", "Synth", "SynthEditor", "SynthEditor.module.css");
+const instrumentEditorPath = join(frontendSrc, "features", "InstrumentEditor", "InstrumentEditorModal.solid.tsx");
+const instrumentEditorCssPath = join(frontendSrc, "features", "InstrumentEditor", "InstrumentEditorModal.module.css");
+const waveformPickerPath = join(frontendSrc, "features", "InstrumentEditor", "WaveformPicker.solid.tsx");
+const waveformPickerCssPath = join(frontendSrc, "features", "InstrumentEditor", "WaveformPicker.module.css");
+const knobPath = join(frontendSrc, "solid-ui", "Knob", "Knob.solid.tsx");
+const preferencesPath = join(frontendSrc, "features", "Preferences", "PreferencesModal.solid.tsx");
+const preferencesCssPath = join(frontendSrc, "features", "Preferences", "PreferencesModal.module.css");
+const oscillatorPanelPath = join(frontendSrc, "features", "Synth", "OscillatorPanel", "OscillatorPanel.solid.tsx");
+const oscillatorPanelCssPath = join(frontendSrc, "features", "Synth", "OscillatorPanel", "OscillatorPanel.module.css");
+const modulationMatrixPath = join(frontendSrc, "features", "Synth", "ModulationMatrix", "ModulationMatrix.solid.tsx");
+const modulationMatrixCssPath = join(frontendSrc, "features", "Synth", "ModulationMatrix", "ModulationMatrix.module.css");
+const timeSignatureControlPath = join(frontendSrc, "features", "Transport", "TimeSignatureControl.solid.tsx");
+const timeSignatureControlCssPath = join(frontendSrc, "features", "Transport", "TimeSignatureControl.module.css");
+const timeSignatureModalCssPath = join(frontendSrc, "features", "Transport", "TimeSignatureModal.module.css");
 
 const failures = [];
 const usedPhIconNames = new Map();
@@ -71,6 +89,40 @@ function isAllowed(allowlist, file, line, value) {
     if (entry.line && !entry.line.test(line)) return false;
     return true;
   });
+}
+
+function parseHexColor(value) {
+  const hex = value.slice(1);
+  if (hex.length === 3 || hex.length === 4) {
+    const [r, g, b] = hex.slice(0, 3).split("").map((char) => parseInt(`${char}${char}`, 16));
+    return { r, g, b };
+  }
+  if (hex.length === 6 || hex.length === 8) {
+    return {
+      r: parseInt(hex.slice(0, 2), 16),
+      g: parseInt(hex.slice(2, 4), 16),
+      b: parseInt(hex.slice(4, 6), 16),
+    };
+  }
+  return null;
+}
+
+function isGrayscaleRgb(r, g, b) {
+  return Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b) && r === g && g === b;
+}
+
+function isAllowedMonochromeLiteral(value) {
+  const trimmed = value.trim();
+  if (trimmed === "transparent") return true;
+  if (trimmed.startsWith("#")) {
+    const color = parseHexColor(trimmed);
+    return Boolean(color && isGrayscaleRgb(color.r, color.g, color.b));
+  }
+  const rgb = trimmed.match(/^rgba?\(\s*([0-9.]+)\s*,\s*([0-9.]+)\s*,\s*([0-9.]+)(?:\s*,\s*(?:[0-9.]+|var\([^)]*\)))?\s*\)$/i);
+  if (rgb) return isGrayscaleRgb(Number(rgb[1]), Number(rgb[2]), Number(rgb[3]));
+  const hsl = trimmed.match(/^hsla?\(\s*([0-9.]+)(?:deg)?\s*,\s*([0-9.]+)%\s*,\s*([0-9.]+)%(?:\s*,\s*(?:[0-9.]+|var\([^)]*\)))?\s*\)$/i);
+  if (hsl) return Number(hsl[2]) === 0;
+  return false;
 }
 
 function checkInteractionTokens(file, source) {
@@ -201,11 +253,20 @@ for (const file of sharedCssFiles) {
 
 const tokenSource = existsSync(tokensPath) ? readFileSync(tokensPath, "utf8") : "";
 const designTokens = new Set([...tokenSource.matchAll(/--[A-Za-z0-9_-]+(?=\s*:)/g)].map((match) => match[0]));
+const tokenRawColorPattern = /#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)/g;
 if (!tokenSource) {
   fail("Missing frontend/src/design/tokens.css");
 }
 if (tokenSource.includes("--transition-invert")) {
   fail("frontend/src/design/tokens.css must not restore the removed --transition-invert token.");
+}
+for (const { line, lineNumber } of lineEntries(tokenSource)) {
+  for (const match of line.matchAll(tokenRawColorPattern)) {
+    const value = match[0];
+    if (!isAllowedMonochromeLiteral(value)) {
+      fail(`Non-monochrome color literal in design tokens ${location(tokensPath, lineNumber)}: ${value}`);
+    }
+  }
 }
 
 const tsconfigSource = existsSync(tsconfigPath) ? readFileSync(tsconfigPath, "utf8") : "";
@@ -249,6 +310,104 @@ if (viteConfigSource.includes("@vitejs/plugin-react") || viteConfigSource.includ
 const appDialogSource = existsSync(appDialogPath) ? readFileSync(appDialogPath, "utf8") : "";
 if (appDialogSource.includes('layout="bare"')) {
   fail("AppDialog prompts must use a framed TextInput; bare prompt fields collapse inside stacked modals.");
+}
+
+const nodeInstrumentEditorSource = existsSync(nodeInstrumentEditorPath) ? readFileSync(nodeInstrumentEditorPath, "utf8") : "";
+if (nodeInstrumentEditorSource.includes("<select")) {
+  fail("Nodemap editor parameter selects must use the shared Select primitive.");
+}
+if (nodeInstrumentEditorSource.includes("<button")) {
+  fail("Nodemap editor shell/browser actions must use the shared Button primitive.");
+}
+
+const nodeCanvasSource = existsSync(nodeCanvasPath) ? readFileSync(nodeCanvasPath, "utf8") : "";
+if (!nodeCanvasSource.includes("className={styles.removeNode}")) {
+  fail("Nodemap delete affordance should stay on the shared Button primitive with the removeNode class.");
+}
+for (const match of nodeCanvasSource.matchAll(/<button\b[\s\S]*?>/g)) {
+  const tag = match[0];
+  if (!tag.includes("data-node-port") && !tag.includes("styles.port")) {
+    fail(`Nodemap canvas raw buttons are only allowed for geometric port hit-targets in ${rel(nodeCanvasPath)}.`);
+  }
+}
+
+const synthEditorSource = existsSync(synthEditorPath) ? readFileSync(synthEditorPath, "utf8") : "";
+if (synthEditorSource.includes("styles.iconOptionSelected") || synthEditorSource.includes("styles.shapeButtonActive")) {
+  fail("Aether icon and shape picker active states must use shared Button selected state.");
+}
+if (!synthEditorSource.includes("function EffectParamControl") || !synthEditorSource.includes("<Slider")) {
+  fail("Aether Instrument FX continuous parameters should use the shared Slider primitive.");
+}
+const synthEditorCssSource = existsSync(synthEditorCssPath) ? readFileSync(synthEditorCssPath, "utf8") : "";
+if (/\.iconOptionSelected\b|\.shapeButtonActive\b/.test(synthEditorCssSource)) {
+  fail("Aether icon and shape picker active CSS must not fork shared Button selected styling.");
+}
+if (!synthEditorCssSource.includes("repeat(3, minmax(0, 1fr))")) {
+  fail("Aether Instrument FX cards should cap at three columns on wide layouts.");
+}
+
+const instrumentEditorSource = existsSync(instrumentEditorPath) ? readFileSync(instrumentEditorPath, "utf8") : "";
+if (
+  instrumentEditorSource.includes("styles.iconOptionSelected") ||
+  instrumentEditorSource.includes("styles.lfoShapeButtonActive")
+) {
+  fail("Instrument editor icon and LFO picker active states must use shared Button selected state.");
+}
+if (instrumentEditorSource.includes('type="range"')) {
+  fail("Instrument editor sliders must use the shared Slider primitive.");
+}
+const instrumentEditorCssSource = existsSync(instrumentEditorCssPath) ? readFileSync(instrumentEditorCssPath, "utf8") : "";
+if (/\.iconOptionSelected\b|\.lfoShapeButtonActive\b/.test(instrumentEditorCssSource)) {
+  fail("Instrument editor icon and LFO picker active CSS must not fork shared Button selected styling.");
+}
+
+const waveformPickerSource = existsSync(waveformPickerPath) ? readFileSync(waveformPickerPath, "utf8") : "";
+if (waveformPickerSource.includes("styles.active")) {
+  fail("Waveform picker active state must use shared Button selected state.");
+}
+const waveformPickerCssSource = existsSync(waveformPickerCssPath) ? readFileSync(waveformPickerCssPath, "utf8") : "";
+if (/\.active\b/.test(waveformPickerCssSource)) {
+  fail("Waveform picker active CSS must not fork shared Button selected styling.");
+}
+
+const knobSource = existsSync(knobPath) ? readFileSync(knobPath, "utf8") : "";
+if (!knobSource.includes("onDialKeyDown") || !knobSource.includes("aria-valuetext")) {
+  fail("Shared Knob must keep keyboard slider support and aria-valuetext.");
+}
+
+const preferencesSource = existsSync(preferencesPath) ? readFileSync(preferencesPath, "utf8") : "";
+const preferencesCssSource = existsSync(preferencesCssPath) ? readFileSync(preferencesCssPath, "utf8") : "";
+if (preferencesSource.includes("tabButtonActive") || /\.tabButtonActive\b/.test(preferencesCssSource)) {
+  fail("Preferences tabs must use shared Button selected state.");
+}
+
+const oscillatorPanelSource = existsSync(oscillatorPanelPath) ? readFileSync(oscillatorPanelPath, "utf8") : "";
+const oscillatorPanelCssSource = existsSync(oscillatorPanelCssPath) ? readFileSync(oscillatorPanelCssPath, "utf8") : "";
+if (oscillatorPanelSource.includes("wavetableButtonActive") || /\.wavetableButtonActive\b/.test(oscillatorPanelCssSource)) {
+  fail("Aether oscillator wavetable/warp buttons must use shared Button selected state.");
+}
+
+const modulationMatrixSource = existsSync(modulationMatrixPath) ? readFileSync(modulationMatrixPath, "utf8") : "";
+const modulationMatrixCssSource = existsSync(modulationMatrixCssPath) ? readFileSync(modulationMatrixCssPath, "utf8") : "";
+if (
+  modulationMatrixSource.includes("modeButtonActive") ||
+  modulationMatrixSource.includes("targetOptionSelected") ||
+  /\.modeButtonActive\b|\.targetOptionSelected\b/.test(modulationMatrixCssSource)
+) {
+  fail("Modulation Matrix mode/target active states must use shared Button selected state.");
+}
+
+const timeSignatureControlSource = existsSync(timeSignatureControlPath) ? readFileSync(timeSignatureControlPath, "utf8") : "";
+const timeSignatureControlCssSource = existsSync(timeSignatureControlCssPath) ? readFileSync(timeSignatureControlCssPath, "utf8") : "";
+const timeSignatureModalCssSource = existsSync(timeSignatureModalCssPath) ? readFileSync(timeSignatureModalCssPath, "utf8") : "";
+if (timeSignatureControlSource.includes("<select")) {
+  fail("Time signature controls must use shared Select.");
+}
+if (timeSignatureControlSource.includes("beatActive") || /\.beatActive\b/.test(timeSignatureModalCssSource)) {
+  fail("Time signature beat cells must use shared Button selected state.");
+}
+if (/\.dropItem:hover\b|\.button:hover\b/.test(timeSignatureControlCssSource)) {
+  fail("Time signature dropdown/trigger hover should come from shared Button.");
 }
 
 // Existing feature-local exceptions are narrow: canvas/SVG fallbacks, mask alpha,

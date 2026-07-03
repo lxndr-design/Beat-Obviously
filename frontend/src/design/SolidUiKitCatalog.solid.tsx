@@ -8,6 +8,7 @@ import { IconDemo } from "../solid-ui/Icon/Icon.demo.solid";
 import { KnobDemo } from "../solid-ui/Knob/Knob.demo.solid";
 import { ActionFooterDemo } from "../solid-ui/ActionFooter/ActionFooter.demo.solid";
 import { AppDialogDemo } from "../solid-ui/AppDialog/AppDialog.demo.solid";
+import { AppLogoDemo } from "../solid-ui/AppLogo/AppLogo.demo.solid";
 import { MarqueeTextDemo } from "../solid-ui/MarqueeText/MarqueeText.demo.solid";
 import { ModalDemo } from "../solid-ui/Modal/Modal.demo.solid";
 import { NumberInputDemo } from "../solid-ui/NumberInput/NumberInput.demo.solid";
@@ -25,6 +26,7 @@ export function SolidUiKitCatalog() {
     <main>
       <ButtonDemo />
       <BlockDemo />
+      <AppLogoDemo />
       <IconDemo />
       <TagDemo />
       <RowItemDemo />

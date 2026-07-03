@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import type { RecentProjectEntry } from "../../ipc/schema";
 import { appConfirm } from "../../solid-ui";
-import { Button, HoverInfo, Icon } from "../../solid-ui";
+import { AppLogo, Button, HoverInfo, Icon } from "../../solid-ui";
 import { useComponentStore } from "../../state/components";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
@@ -229,7 +229,7 @@ function RecentProjectCard(props: {
   return (
     <button type="button" class={styles.recentCard} onClick={props.onOpen} title={props.project.path}>
       <span class={styles.recentArt}>
-        <Icon name="ph:music-note" size={40} decorative />
+        <AppLogo class={styles.recentLogo} />
         <HoverInfo content="Remove from recent">
           <span
             role="button"

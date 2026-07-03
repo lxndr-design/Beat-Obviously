@@ -135,7 +135,7 @@
 }
 
 .automationEffectiveBadge[data-tone="conflict"] span:first-child {
-  color: color-mix(in srgb, var(--interaction-playback-accent) 82%, var(--color-fg));
+  color: color-mix(in srgb, var(--color-fg) 82%, var(--color-fg));
 }
 
 .automationTargets {
@@ -228,7 +228,7 @@
 .automationHandleButton:hover,
 .automationHandleButtonActive {
   background: var(--interaction-hover-bg);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--interaction-playback-accent) 28%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-fg) 28%, transparent);
 }
 
 .automationPointEditor {

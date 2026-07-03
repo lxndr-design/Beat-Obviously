@@ -20,6 +20,7 @@ export interface KnobProps {
   modulationLabel?: string;
   pickTargetId?: string;
   pickSourceId?: string;
+  disabled?: boolean;
   onChange: (value: number) => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
@@ -56,7 +57,7 @@ export function Knob(allProps: KnobProps) {
   }
 
   function handlePointerDown(event: PointerEvent) {
-    if (editing() !== null) return;
+    if (props.disabled || editing() !== null) return;
     event.preventDefault();
     (event.currentTarget as Element).setPointerCapture(event.pointerId);
     startY = event.clientY;
@@ -89,6 +90,7 @@ export function Knob(allProps: KnobProps) {
   });
 
   function onValueKeyDown(event: KeyboardEvent) {
+    if (props.disabled) return;
     if (event.key === "Enter") {
       commit((event.currentTarget as HTMLInputElement).value);
     } else if (event.key === "Escape") {
@@ -100,11 +102,45 @@ export function Knob(allProps: KnobProps) {
     }
   }
 
+  function nudge(direction: number, multiplier = 1) {
+    props.onChange(clamp(props.value + direction * step() * multiplier, props.min, props.max));
+  }
+
+  function onDialKeyDown(event: KeyboardEvent) {
+    if (props.disabled) return;
+    if (event.key === "ArrowUp" || event.key === "ArrowRight") {
+      event.preventDefault();
+      nudge(1, event.shiftKey ? 10 : 1);
+    } else if (event.key === "ArrowDown" || event.key === "ArrowLeft") {
+      event.preventDefault();
+      nudge(-1, event.shiftKey ? 10 : 1);
+    } else if (event.key === "PageUp") {
+      event.preventDefault();
+      nudge(1, 10);
+    } else if (event.key === "PageDown") {
+      event.preventDefault();
+      nudge(-1, 10);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      props.onChange(props.min);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      props.onChange(props.max);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      setEditing(formatValue()(props.value));
+    } else if (event.key === "Backspace" && props.defaultValue !== undefined) {
+      event.preventDefault();
+      props.onChange(baseline());
+    }
+  }
+
   return (
     <div
       class={className()}
       data-synth-target-id={props.pickTargetId}
       data-synth-source-id={props.pickSourceId}
+      data-disabled={props.disabled ? "true" : "false"}
     >
       <Show when={hasModulation()}>
         <div class={styles.modulation} aria-label={`${props.label ?? "Value"} modulation ${modulationText()}`}>
@@ -114,13 +150,20 @@ export function Knob(allProps: KnobProps) {
       </Show>
       <div
         class={styles.dial}
+        data-knob-dial
         onPointerDown={handlePointerDown}
         role="slider"
         aria-valuemin={props.min}
         aria-valuemax={props.max}
         aria-valuenow={props.value}
+        aria-valuetext={`${formatValue()(props.value)}${props.unit ? ` ${props.unit}` : ""}`}
         aria-label={props.label}
-        tabIndex={0}
+        aria-disabled={props.disabled ? "true" : "false"}
+        tabIndex={props.disabled ? -1 : 0}
+        onKeyDown={onDialKeyDown}
+        onDblClick={() => {
+          if (!props.disabled && props.defaultValue !== undefined) props.onChange(baseline());
+        }}
       >
         <svg viewBox="-50 -50 100 100" class={styles.svg}>
           <circle class={styles.ring} cx="0" cy="0" r="44" />
@@ -148,7 +191,11 @@ export function Knob(allProps: KnobProps) {
           <button
             type="button"
             class={styles.value}
-            onClick={() => setEditing(formatValue()(props.value))}
+            data-knob-value
+            disabled={props.disabled}
+            onClick={() => {
+              if (!props.disabled) setEditing(formatValue()(props.value));
+            }}
             aria-label={`Edit ${props.label ?? "value"}`}
           >
             {formatValue()(props.value)}
@@ -159,6 +206,7 @@ export function Knob(allProps: KnobProps) {
         <input
           autofocus
           class={styles.editValue}
+          data-knob-value
           value={editing() ?? ""}
           onBlur={(event) => commit(event.currentTarget.value)}
           onKeyDown={onValueKeyDown}
@@ -166,7 +214,7 @@ export function Knob(allProps: KnobProps) {
       </Show>
 
       <Show when={props.label}>
-        <div class={styles.label}>{props.label}</div>
+        <div class={styles.label} data-knob-label>{props.label}</div>
       </Show>
     </div>
   );

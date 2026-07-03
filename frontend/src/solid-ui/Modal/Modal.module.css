@@ -22,6 +22,7 @@
 .width-sm   { width: var(--width-modal-sm); }
 .width-md   { width: var(--width-modal-md); }
 .width-lg   { width: var(--width-modal-lg); }
+.width-editor { width: min(calc(100vw - var(--space-8)), var(--width-modal-editor)); height: calc(100vh - var(--space-8)); }
 .width-full { width: calc(100vw - var(--space-8)); height: calc(100vh - var(--space-8)); }
 
 .header {

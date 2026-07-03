@@ -10,6 +10,37 @@
   gap: 6px;
   align-content: start;
   min-width: 0;
+  padding: 6px;
+}
+
+.panel :global(.ds-section-header) {
+  min-height: 28px;
+  padding: 0 6px;
+}
+
+.oscillatorHeader {
+  display: flex;
+  align-items: stretch;
+  padding-left: 0 !important;
+  gap: 0 !important;
+}
+
+.oscillatorHeader :global(.ds-section-title) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 8px 0 6px;
+}
+
+.oscillatorPowerButton {
+  width: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  margin: 0;
+  border-right: var(--border-soft);
 }
 
 .row {
@@ -29,23 +60,18 @@
 .rowMain {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-columns: 238px minmax(0, 1fr);
   align-items: stretch;
   min-width: 0;
 }
 
-.rowMain::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 66.666%;
-  z-index: 1;
-  border-right: var(--border-fg);
-  pointer-events: none;
+.voiceStackMain {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .settingsPane {
+  display: grid;
+  align-content: start;
   min-width: 0;
 }
 
@@ -55,16 +81,18 @@
 
 .rowBody {
   display: grid;
-  grid-template-columns: 156px 88px minmax(0, 1fr);
-  gap: 6px;
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
   min-width: 0;
-  padding: 6px;
+  padding: 6px 6px 6px 8px;
 }
 
 .unisonBody {
   display: grid;
+  justify-content: center;
   align-items: center;
+  min-height: 118px;
   min-width: 0;
   padding: 6px;
 }
@@ -72,63 +100,232 @@
 .rowKnobs {
   display: grid;
   grid-template-columns: repeat(5, minmax(58px, 1fr));
-  gap: 6px;
-  align-items: end;
+  column-gap: 6px;
+  row-gap: 6px;
+  align-items: center;
+  align-content: center;
   min-width: 0;
+  padding: 0 4px;
 }
 
 .unisonKnobs {
   grid-template-columns: repeat(5, minmax(52px, 1fr));
 }
 
-.wavetableControl {
-  display: grid;
-  justify-items: start;
-  align-content: end;
-  gap: 3px;
-  width: 156px;
+.voiceStackControls {
+  display: inline-grid;
+  grid-template-columns: max-content max-content;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
-.wavetableButtons {
-  display: inline-flex;
-  min-height: 26px;
+.voiceStackKnobGroup {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 56px;
+  align-items: start;
+  justify-content: center;
+  gap: 2px;
+  padding: 7px 8px;
   border: var(--border-fg);
+}
+
+.voiceStackKnob {
+  display: grid !important;
+  grid-template-rows: auto 34px auto;
+  justify-items: center;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.voiceStackKnob [data-knob-label] {
+  grid-row: 1;
+  order: -1;
+  min-height: 12px;
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-regular);
+  line-height: 1;
+  text-align: center;
+}
+
+.voiceStackKnob [data-knob-dial] {
+  grid-row: 2;
+  width: 32px !important;
+  height: 32px !important;
+}
+
+.voiceStackKnob [data-knob-value] {
+  grid-row: 3;
+  width: auto;
+  min-width: 28px;
+  min-height: 12px;
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.oscillatorControlGroups {
+  display: grid;
+  grid-template-columns: minmax(230px, 250px) minmax(142px, 170px) minmax(106px, 128px) minmax(106px, 128px);
+  gap: 6px;
+  align-content: start;
+  justify-content: start;
+  min-width: 0;
+}
+
+.oscillatorControlGroup {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 3px;
+  min-width: 0;
+  padding: 5px 6px;
+  border: var(--border-soft);
+  background: var(--surface-subtle);
+}
+
+.warpControlGroup {
+  grid-template-rows: minmax(54px, auto);
+  grid-template-columns: max-content repeat(2, 50px);
+  align-items: stretch;
+  column-gap: 10px;
+  padding: 5px 8px;
+}
+
+.warpControlGroup .oscillatorControlGroupTitle {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+  padding-top: 1px;
+}
+
+.warpControlGroup .wavetableControl {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: end;
+}
+
+.warpControlGroup .oscillatorControlGroupKnobs {
+  grid-column: 2 / -1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 50px);
+  gap: 10px;
+  align-items: start;
+}
+
+.oscillatorControlGroupTitle {
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--color-fg) 72%, transparent);
+  font-size: var(--font-size-hint);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oscillatorControlGroupKnobs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
+  gap: 4px;
+  align-items: start;
+  min-width: 0;
+}
+
+.oscillatorControlGroup :global(.knob) {
+  display: grid !important;
+  grid-template-rows: auto 34px auto;
+  justify-items: center;
+  align-items: center;
+  gap: 1px;
+}
+
+.oscillatorControlGroup :global(.knob .label) {
+  grid-row: 1;
+  order: -1;
+  min-height: 12px;
+  text-align: center;
+}
+
+.oscillatorControlGroup :global(.knob [data-knob-dial]) {
+  grid-row: 2;
+}
+
+.oscillatorControlGroup :global(.knob .value),
+.oscillatorControlGroup :global(.knob .editValue) {
+  grid-row: 3;
+  width: auto;
+  min-width: 26px;
+  min-height: 12px;
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.oscillatorControlGroup :global(.knob .label) {
+  line-height: 1;
+}
+
+.wavetableControl {
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wavetableControl[data-compact="true"] {
+  display: block;
+  width: auto;
+}
+
+.wavetableButtons {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 24px;
+  width: max-content;
+  min-height: 24px;
+  border: var(--border-soft);
+}
+
+.wavetableControl[data-compact="true"] .wavetableButtons {
+  grid-auto-columns: 20px;
+  min-height: 20px;
 }
 
 .wavetableButton {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 24px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  min-width: 24px !important;
+  max-width: 24px !important;
+  max-height: 24px !important;
+  box-sizing: border-box;
+  flex: 0 0 24px;
   padding: 0;
-  border: 0;
-  border-right: var(--border-fg);
-  background: var(--color-bg);
-  color: var(--color-fg);
-  cursor: pointer;
-  transition: var(--interaction-transition);
+  border-right: var(--border-soft);
+}
+
+.wavetableControl[data-compact="true"] .wavetableButton {
+  width: 20px !important;
+  height: 20px !important;
+  min-height: 20px !important;
+  min-width: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  flex: 0 0 20px;
 }
 
 .wavetableButton:last-child {
   border-right: 0;
-}
-
-.wavetableButton:hover:not(.wavetableButtonActive),
-.wavetableButton:focus-visible:not(.wavetableButtonActive) {
-  background: var(--interaction-hover-bg);
-  color: var(--color-fg);
-}
-
-.wavetableButtonActive {
-  background: var(--interaction-active-bg);
-  color: var(--interaction-active-fg);
-}
-
-.wavetableButtonActive:hover,
-.wavetableButtonActive:focus-visible {
-  background: var(--interaction-active-hover-bg);
 }
 
 .wavetableSelectedLabel,
@@ -137,7 +334,7 @@
   overflow: hidden;
   font-size: var(--font-size-ui);
   line-height: 1;
-  text-align: center;
+  text-align: left;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
@@ -158,8 +355,40 @@
 }
 
 .customEditor {
+  grid-column: 1 / -1;
   min-width: 0;
   border-top: var(--border-fg);
+}
+
+.customEditorHeader {
+  padding: 0 6px !important;
+}
+
+.customEditorHeader :global(.ds-section-title) {
+  font-size: var(--font-size-ui-lg);
+  font-weight: var(--font-weight-medium);
+}
+
+.customEditorHeader button {
+  margin-left: auto;
+}
+
+.headerWavetable {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-left: 0;
+}
+
+.headerWavetable > span {
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wavemapMeta {
@@ -177,6 +406,75 @@
   color: color-mix(in srgb, var(--color-fg) 72%, transparent);
 }
 
+.wavemapToolbar {
+  display: grid;
+  grid-template-columns: max-content max-content max-content 1fr max-content;
+  align-items: center;
+  column-gap: 12px;
+  min-width: 0;
+  padding: 6px;
+  border-top: var(--border-soft);
+}
+
+.wavemapToolbar button {
+  border: var(--border-soft);
+}
+
+.interpolationModes {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+}
+
+.toolbarMorphKnob {
+  display: inline-grid !important;
+  grid-template-columns: auto auto auto;
+  grid-template-areas: "label dial value";
+  align-items: center;
+  column-gap: 4px;
+  margin-left: 8px;
+}
+
+.toolbarMorphKnob :global(.label) {
+  grid-area: label;
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-regular);
+}
+
+.toolbarMorphKnob :global(.dial) {
+  grid-area: dial;
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.toolbarMorphKnob :global(.value),
+.toolbarMorphKnob :global(.editValue) {
+  grid-area: value;
+  width: 24px;
+  min-height: 12px;
+  font-size: var(--font-size-ui);
+}
+
+.wavemapSourceRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 6px 6px;
+  color: color-mix(in srgb, var(--color-fg) 64%, transparent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.wavemapSourceRow span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .wavemapMeta span {
   max-width: 112px;
   overflow: hidden;
@@ -191,21 +489,25 @@
 .resynthesisModes {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 0;
   min-width: 0;
+}
+
+.wavemapActionGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+}
+
+.analysisToggleButton {
+  justify-self: end;
 }
 
 .analysisModes {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  min-width: 0;
-}
-
-.editModes {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
+  gap: 0;
   min-width: 0;
 }
 
@@ -248,20 +550,20 @@
 
 .analysisDetails {
   display: grid;
-  gap: 4px;
   min-width: 0;
-  padding: 6px;
-  border-top: var(--border-fg);
+  margin: 0 6px 6px;
+  padding: 0;
+  border: var(--border-soft);
 }
 
 .analysisHeader,
 .analysisFrameRow {
   display: grid;
-  grid-template-columns: minmax(72px, 1fr) repeat(8, minmax(42px, auto)) minmax(76px, auto);
+  grid-template-columns: minmax(160px, 2fr) repeat(8, minmax(64px, 1fr)) minmax(80px, 1fr);
   align-items: center;
   gap: 4px;
   min-width: 0;
-  padding: 4px 6px;
+  padding: 6px 8px;
   color: color-mix(in srgb, var(--color-fg) 72%, transparent);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-hint);
@@ -269,7 +571,7 @@
 }
 
 .analysisHeader {
-  background: var(--interaction-hover-bg);
+  background: transparent;
 }
 
 .analysisHeader strong,
@@ -284,12 +586,12 @@
 
 .analysisFrameRows {
   display: grid;
-  gap: 3px;
+  gap: 0;
   min-width: 0;
 }
 
 .analysisFrameRow {
-  border: var(--border-fg);
+  border-top: var(--border-soft);
 }
 
 .analysisFrameRow span,
@@ -307,64 +609,136 @@
 .customFrames {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
+  gap: 6px;
   padding: 6px;
 }
 
 .customFrame {
   display: grid;
-  grid-template-columns: repeat(2, minmax(42px, 1fr));
-  column-gap: 4px;
-  row-gap: 3px;
-  align-items: end;
+  grid-template-rows: auto 1fr;
+  gap: 0;
+  align-items: stretch;
   min-width: 0;
-  padding: 0 4px 6px;
+  padding: 0 6px 6px;
   border: var(--border-fg);
 }
 
 .frameLabel {
-  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 22px;
-  margin: 0 -4px;
+  min-height: 24px;
+  margin: 0 -6px;
   border-bottom: var(--border-fg);
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-ui);
+  font-size: var(--font-size-ui-lg);
   line-height: 1;
   text-align: center;
 }
 
-.frameLabel span {
-  margin-left: auto;
-  color: color-mix(in srgb, var(--color-fg) 52%, transparent);
+.frameBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+  padding-top: 6px;
 }
 
-.frameConstraint {
-  grid-column: 1 / -1;
+.frameScanBlock {
+  display: grid;
+  grid-template-rows: auto minmax(52px, 1fr);
+  gap: 4px;
   min-width: 0;
-  margin: -3px -4px 0;
-  padding: 3px 4px;
-  border-bottom: var(--border-fg);
-  color: color-mix(in srgb, var(--color-fg) 52%, transparent);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-hint);
+  padding: 7px;
+  border: var(--border-fg);
+}
+
+.frameScanLabel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 18px;
+  color: color-mix(in srgb, var(--color-fg) 82%, transparent);
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
   line-height: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-align: center;
+}
+
+.harmonicsBlock {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.frameKnobBox {
+  display: grid;
+  min-width: 0;
+  padding: 6px;
+  border: var(--border-fg);
+}
+
+.frameScanLabel {
+  text-align: center;
+}
+
+.frameKnobRowThree,
+.frameKnobRowFour {
+  display: grid;
+  align-items: start;
+  min-width: 0;
+}
+
+.frameKnobRowThree {
+  grid-template-columns: repeat(3, minmax(42px, 1fr));
+  column-gap: 10px;
+}
+
+.frameKnobRowFour {
+  grid-template-columns: repeat(4, minmax(38px, 1fr));
+  column-gap: 6px;
+}
+
+.frameKnob {
+  display: grid !important;
+  grid-template-rows: auto 34px auto;
+  justify-items: center;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.frameKnob [data-knob-label] {
+  grid-row: 1;
+  order: -1;
+  min-height: 12px;
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  text-align: center;
+}
+
+.frameKnob [data-knob-dial] {
+  grid-row: 2;
+  width: 32px !important;
+  height: 32px !important;
+}
+
+.frameKnob [data-knob-value] {
+  grid-row: 3;
+  width: auto;
+  min-width: 28px;
+  min-height: 12px;
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+  font-size: var(--font-size-ui);
+  line-height: 1;
 }
 
 .frameWaveform {
-  grid-column: 1 / -1;
   display: block;
   width: 100%;
-  height: 42px;
+  height: 56px;
   min-width: 0;
-  margin: 0 -4px;
-  width: calc(100% + 8px);
-  border-bottom: var(--border-fg);
   touch-action: none;
   cursor: crosshair;
 }
@@ -383,32 +757,15 @@
   vector-effect: non-scaling-stroke;
 }
 
-.frameAnalysis {
-  grid-column: 1 / -1;
-  min-width: 0;
-  margin: -1px -4px 0;
-  padding: 3px 4px;
-  border-bottom: var(--border-fg);
-  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-hint);
-  line-height: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .harmonicDraw {
-  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(16, minmax(0, 1fr));
   align-items: end;
   gap: 1px;
-  height: 30px;
+  height: 44px;
   min-width: 0;
-  margin: -1px -4px 0;
-  padding: 3px 4px;
-  border-bottom: var(--border-fg);
+  padding: 3px;
+  border: var(--border-fg);
   touch-action: none;
   cursor: crosshair;
 }
@@ -433,17 +790,6 @@
   background: color-mix(in srgb, var(--color-fg) 78%, transparent);
 }
 
-.harmonicTools {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  margin: -1px -4px 1px;
-  padding: 3px 4px;
-  border-bottom: var(--border-fg);
-}
-
 .customFrame :global(.knob) {
   gap: 1px;
   padding: 0;
@@ -456,12 +802,13 @@
 
 .previewPane {
   display: grid;
-  grid-template-rows: minmax(96px, 160px);
-  align-content: start;
-  align-self: start;
+  grid-template-rows: minmax(70px, 1fr);
+  align-content: stretch;
+  align-self: stretch;
   min-width: 0;
   padding: 6px;
   overflow: hidden;
+  border-right: var(--border-fg);
 }
 
 .previewPaneDisabled {
@@ -472,10 +819,14 @@
 .previewSvg {
   display: block;
   width: 100%;
-  height: 160px;
-  max-height: 160px;
-  min-height: 96px;
-  border: var(--border-fg);
+  height: 100%;
+  max-height: 96px;
+  min-height: 70px;
+  border: var(--border-soft);
+}
+
+.panel :global(.ds-button) {
+  min-height: 24px;
 }
 
 .zeroLine {
@@ -487,10 +838,10 @@
 .previewPath {
   fill: none;
   stroke: var(--color-fg);
-  stroke-width: 1.35;
+  stroke-width: 1;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--color-fg) 45%, transparent));
+  filter: none;
   vector-effect: non-scaling-stroke;
 }
 
@@ -534,5 +885,9 @@
   .customFrames,
   .customFrame {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .oscillatorControlGroups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

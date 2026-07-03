@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { Portal } from "solid-js/web";
-import { Button, HoverInfo, Icon, NumberInput } from "../../solid-ui";
+import { Button, HoverInfo, Icon, NumberInput, Select } from "../../solid-ui";
 import type { TimeSignature } from "../../state/types";
 import styles from "./TimeSignatureControl.module.css";
 import modalFrameStyles from "../../solid-ui/Modal/Modal.module.css";
@@ -24,24 +24,24 @@ export function TimeSignatureControl(props: TimeSignatureControlProps) {
   return (
     <div class={styles.wrap}>
       <HoverInfo content={ariaLabel()}>
-        <button
-          type="button"
-          class={styles.button}
+        <Button
+          variant="ghost"
+          className={styles.button}
           onClick={() => setMenuOpen((open) => !open)}
           aria-label={ariaLabel()}
           aria-expanded={menuOpen()}
         >
           {props.value.num}/{props.value.denom}
           <Icon name={props.direction === "up" ? "ph:caret-up" : "ph:caret-down"} size={16} decorative />
-        </button>
+        </Button>
       </HoverInfo>
       <Show when={menuOpen()}>
         <div class={`${styles.dropdown} ${props.direction === "up" ? styles.dropUp : ""}`} role="menu">
           <For each={TS_PRESETS}>
             {(preset) => (
-              <button
-                type="button"
-                class={styles.dropItem}
+              <Button
+                variant="ghost"
+                className={styles.dropItem}
                 onClick={() => {
                   const [num, denom] = preset.split("/").map(Number);
                   props.onChange({ num, denom, boldBeats: [1] });
@@ -49,20 +49,20 @@ export function TimeSignatureControl(props: TimeSignatureControlProps) {
                 }}
               >
                 {preset}
-              </button>
+              </Button>
             )}
           </For>
           <div class={styles.dropSep} />
-          <button
-            type="button"
-            class={styles.dropItem}
+          <Button
+            variant="ghost"
+            className={styles.dropItem}
             onClick={() => {
               setMenuOpen(false);
               setModalOpen(true);
             }}
           >
             Custom...
-          </button>
+          </Button>
         </div>
       </Show>
       <Show when={modalOpen()}>
@@ -141,33 +141,35 @@ function TimeSignatureModal(props: {
                 step={1}
                 onChange={setNum}
               />
-              <label class={timeSignatureModalStyles.field}>
-                <span class={timeSignatureModalStyles.label}>Note value</span>
-                <select
-                  class={timeSignatureModalStyles.select}
-                  value={String(denom())}
-                  onChange={(event) => setDenom(Number(event.currentTarget.value))}
-                >
+              <Select
+                className={timeSignatureModalStyles.field}
+                selectClassName={timeSignatureModalStyles.select}
+                label="Note value"
+                value={String(denom())}
+                onChange={(event) => setDenom(Number(event.currentTarget.value))}
+              >
                   <For each={DENOMS}>
                     {(value) => <option value={String(value)}>1/{value}</option>}
                   </For>
-                </select>
-              </label>
+              </Select>
             </div>
             <div class={timeSignatureModalStyles.boldSection}>
               <span class={timeSignatureModalStyles.label}>Bold ticks (per bar)</span>
               <div class={timeSignatureModalStyles.beatGrid}>
                 <For each={Array.from({ length: num() }, (_, index) => index + 1)}>
                   {(beat) => (
-                    <button
-                      type="button"
-                      class={`${timeSignatureModalStyles.beatCell} ${bold().includes(beat) ? timeSignatureModalStyles.beatActive : ""}`}
+                    <Button
+                      iconOnly
+                      size="md"
+                      variant="ghost"
+                      selected={bold().includes(beat)}
+                      className={timeSignatureModalStyles.beatCell}
                       onClick={() => toggleBold(beat)}
                       aria-pressed={bold().includes(beat)}
                       aria-label={`Beat ${beat}`}
                     >
                       {beat}
-                    </button>
+                    </Button>
                   )}
                 </For>
               </div>

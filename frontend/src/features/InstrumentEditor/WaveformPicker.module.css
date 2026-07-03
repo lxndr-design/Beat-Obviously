@@ -18,12 +18,7 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: var(--color-bg);
-  color: var(--color-fg);
-  border: 0;
   border-right: var(--border-fg);
-  cursor: pointer;
-  transition: var(--interaction-transition);
   padding: 0;
 }
 
@@ -31,25 +26,11 @@
   border-right: 0;
 }
 
-.btn:hover:not(.active) {
-  background: var(--interaction-hover-bg);
-  color: var(--color-fg);
-}
-
-/* Selected cell — filled. Hover dims to off-white per the active-surface rule. */
-.active {
-  background: var(--interaction-active-bg);
-  color: var(--interaction-active-fg);
-}
-.active:hover {
-  background: var(--interaction-active-hover-bg);
-}
-
 .selectedLabel {
   font-size: var(--font-size-ui);
   line-height: 1.1;
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-uppercase);
+  text-transform: none;
+  letter-spacing: 0;
   font-weight: var(--font-weight-medium);
   text-align: center;
 }

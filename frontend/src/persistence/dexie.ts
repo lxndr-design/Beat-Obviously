@@ -3,6 +3,7 @@ import type { GeneratedInstrument, GenerateInstrumentOptions } from "../ai/aiSer
 import type { DrumGenre, GeneratedDrumBeat, GenerateDrumBeatOptions } from "../ai/drumBeatGenerator";
 import type { BeatComponent } from "../state/components";
 import { normalizeAetherEffectPresetRecord, type AetherEffectPresetRecord } from "../state/effectPresets";
+import { pruneDevFixtureInstruments } from "../state/instrumentLibraryGuards";
 import { normalizeSynthPresetRecord, type SynthPresetRecord } from "../state/synthPresets";
 import type { AudioFile, Instrument, InstrumentSet, MidiNote, Project, Segment } from "../state/types";
 
@@ -231,10 +232,11 @@ function isBlankUntitledProject(project: Project): boolean {
 }
 
 export async function saveInstruments(instruments: Instrument[], sets: InstrumentSet[]) {
+  const persistedInstruments = pruneDevFixtureInstruments(instruments);
   await db.transaction("rw", db.instruments, db.instrumentSets, async () => {
     await db.instruments.clear();
     await db.instrumentSets.clear();
-    if (instruments.length > 0) await db.instruments.bulkPut(instruments);
+    if (persistedInstruments.length > 0) await db.instruments.bulkPut(persistedInstruments);
     if (sets.length > 0) await db.instrumentSets.bulkPut(sets);
   });
 }
@@ -244,7 +246,11 @@ export async function listInstruments(): Promise<{ instruments: Instrument[]; se
     db.instruments.toArray(),
     db.instrumentSets.toArray(),
   ]);
-  return { instruments, sets };
+  const filteredInstruments = pruneDevFixtureInstruments(instruments);
+  if (filteredInstruments.length !== instruments.length) {
+    await saveInstruments(filteredInstruments, sets);
+  }
+  return { instruments: filteredInstruments, sets };
 }
 
 export async function saveSynthPreset(record: SynthPresetRecord) {

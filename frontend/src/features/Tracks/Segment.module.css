@@ -329,11 +329,11 @@
 }
 
 .segment.playing {
-  background: var(--interaction-playback-accent);
-  border-color: color-mix(in srgb, var(--interaction-playback-accent) 80%, var(--color-fg));
+  background: var(--color-fg);
+  border-color: var(--color-fg);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--interaction-playback-accent) 70%, transparent),
-    0 0 18px color-mix(in srgb, var(--interaction-playback-accent) 42%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--color-fg) 70%, transparent),
+    0 0 18px color-mix(in srgb, var(--color-fg) 42%, transparent),
     inset 0 0 18px color-mix(in srgb, var(--color-fg) 28%, transparent);
   animation: segment-playback-pulse var(--duration-playback-pulse) var(--ease-out);
 }
@@ -341,11 +341,11 @@
 .segment.playing:hover,
 .segment.playing.selected,
 .segment.playing.editing {
-  background: var(--interaction-playback-accent);
+  background: var(--color-fg);
 }
 
 .segment.playing .labelStrip {
-  background: color-mix(in srgb, var(--interaction-playback-accent) 82%, var(--color-bg));
+  background: color-mix(in srgb, var(--color-fg) 82%, var(--color-bg));
   color: var(--color-bg);
   border-bottom-color: color-mix(in srgb, var(--color-bg) 55%, transparent);
 }

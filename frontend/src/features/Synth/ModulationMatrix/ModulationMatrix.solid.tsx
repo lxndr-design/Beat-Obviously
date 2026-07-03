@@ -242,15 +242,17 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                     fallback={<span class={styles.modeStatic} aria-label="Polarity only applies to LFO routes">-</span>}
                   >
                     <HoverInfo content={route.bipolar ? "LFO swings below and above the target value." : "LFO only pushes the target upward."}>
-                      <button
-                        type="button"
-                        class={`${styles.modeButton} ${route.bipolar ? styles.modeButtonActive : ""}`}
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        selected={route.bipolar}
+                        className={styles.modeButton}
                         aria-pressed={route.bipolar}
                         aria-label="Toggle bipolar LFO modulation"
                         onClick={() => updateRoute(route.id, { bipolar: !route.bipolar })}
                       >
                         {route.bipolar ? "+/-" : "+"}
-                      </button>
+                      </Button>
                     </HoverInfo>
                   </Show>
                 </div>
@@ -392,19 +394,20 @@ function TargetSelect(props: {
               {(target) => {
                 const parts = targetLabelParts(target);
                 return (
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    selected={target === props.value}
                     role="option"
                     aria-selected={target === props.value}
                     data-modulation-target-option={target}
-                    class={`${styles.targetOption} ${target === props.value ? styles.targetOptionSelected : ""}`}
+                    className={styles.targetOption}
                     onClick={() => {
                       props.onChange(target);
                       setOpen(false);
                     }}
                   >
                     <TargetLabel prefix={parts.prefix} name={parts.name} />
-                  </button>
+                  </Button>
                 );
               }}
             </For>

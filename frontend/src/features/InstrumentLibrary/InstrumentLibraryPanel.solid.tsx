@@ -16,7 +16,7 @@ import { createStoreSelector } from "../../solid-utils/store";
 import { MergeInstrumentModal } from "./MergeInstrumentModal.solid";
 import { decentSamplerPluginForInstrument } from "../PluginLibrary/decentSamplerPluginAdapter";
 import { editorRequestForInstrument } from "../InstrumentEditor/instrumentEditorRouting";
-import { compileNodeGraphToInstrumentPatch, createOutputOnlyInstrumentNodeGraph } from "../NodeInstrumentEditor/nodeGraph";
+import { compileNodeGraphToInstrumentPatch, createStarterInstrumentNodeGraph } from "../NodeInstrumentEditor/nodeGraph";
 import styles from "./InstrumentLibraryPanel.module.css";
 
 const KIND_HINT: Record<string, string> = {
@@ -148,20 +148,31 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
     });
     const instrument = useInstrumentStore.getState().instruments.find((candidate) => candidate.id === id);
     if (!instrument) return;
-    const graph = createOutputOnlyInstrumentNodeGraph();
+    const graph = createStarterInstrumentNodeGraph(instrument);
     useInstrumentStore.getState().updateInstrument(id, compileNodeGraphToInstrumentPatch(graph, instrument));
     useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: id });
   }
 
   function createBasicSynth() {
+    const defaultDraft = createDefaultSynthDraft();
+    const namedDraft: SynthDraftPatch = {
+      ...structuredClone(defaultDraft),
+      name: "Basic Aether",
+      metadata: {
+        ...structuredClone(defaultDraft.metadata),
+        icon: "ph:wave-sine",
+        tags: [...new Set([...defaultDraft.metadata.tags, "basic", "aether"])],
+      },
+    };
     const id = useInstrumentStore.getState().addInstrument({
-      name: "Basic Synth",
+      ...synthDraftToInstrumentPatch(namedDraft),
+      name: namedDraft.name,
       icon: "ph:wave-sine",
-      kind: "synth",
-      waveform: "saw",
       source: { kind: "created", label: "Made in Beat" },
       userCreated: true,
     });
+    useSynthStore.getState().bindInstrument(id);
+    useSynthStore.getState().setDraft(namedDraft);
     useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: id });
   }
 

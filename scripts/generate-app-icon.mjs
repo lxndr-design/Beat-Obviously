@@ -7,12 +7,13 @@ const ICNS_OUT = resolve("backend/Assets/BeatIcon.icns");
 const SIZE = 1024;
 const SCALE = 3;
 const HI = SIZE * SCALE;
+const SOURCE_VIEWBOX = 64;
+const ICON_INSET = 138;
+const ICON_SIZE = SIZE - ICON_INSET * 2;
+const LOGO_PATH = "M51.24,33.92c-1.91-5.61-6.94-8.96-13.47-8.96-3.83,0-7.89,1.17-11.74,3.39-.91,.53-1.78,1.11-2.62,1.72v-14.69h6.72c.35,0,.67-.17,.87-.46L40.81,1.67c.49-.7-.02-1.67-.87-1.67h-20.89c-3.92,0-7.09,3.17-7.09,7.09v43.4l.03,.02c.04,1.56,.28,3.08,.77,4.53,1.91,5.61,6.94,8.96,13.47,8.96,3.83,0,7.89-1.17,11.74-3.39,10.47-6.04,16.3-17.76,13.27-26.68ZM39.52,44.93c-1.63,3.14-4.35,5.72-7.46,7.06-2.17,.93-4.38,1.21-6.22,.77-2.27-.54-2.53-1.62-2.65-2.07-.43-1.73,.07-4.28,1.29-6.65,1.62-3.14,4.34-5.71,7.46-7.06,2.17-.93,4.38-1.2,6.22-.76,2.27,.54,2.53,1.62,2.65,2.07,.43,1.74-.07,4.29-1.29,6.65Z";
+
 const alphaPixels = new Uint8Array(HI * HI);
 const lumaPixels = new Uint8Array(HI * HI);
-
-function px(v) {
-  return Math.round(v * SCALE);
-}
 
 function put(index, value) {
   alphaPixels[index] = 255;
@@ -20,50 +21,34 @@ function put(index, value) {
 }
 
 function fillRect(x, y, w, h, value = 255) {
-  const x0 = Math.max(0, px(x));
-  const y0 = Math.max(0, px(y));
-  const x1 = Math.min(HI, px(x + w));
-  const y1 = Math.min(HI, px(y + h));
+  const x0 = Math.max(0, Math.round(x * SCALE));
+  const y0 = Math.max(0, Math.round(y * SCALE));
+  const x1 = Math.min(HI, Math.round((x + w) * SCALE));
+  const y1 = Math.min(HI, Math.round((y + h) * SCALE));
   for (let yy = y0; yy < y1; yy += 1) {
     const row = yy * HI;
     for (let xx = x0; xx < x1; xx += 1) put(row + xx, value);
   }
 }
 
-function fillEllipse(cx, cy, rx, ry, rotateDeg, value = 0) {
-  const angle = (rotateDeg * Math.PI) / 180;
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const pad = Math.max(rx, ry);
-  const x0 = Math.max(0, px(cx - pad));
-  const y0 = Math.max(0, px(cy - pad));
-  const x1 = Math.min(HI, px(cx + pad));
-  const y1 = Math.min(HI, px(cy + pad));
-
-  for (let yy = y0; yy < y1; yy += 1) {
-    const y = yy / SCALE - cy;
-    const row = yy * HI;
-    for (let xx = x0; xx < x1; xx += 1) {
-      const x = xx / SCALE - cx;
-      const xr = x * cos + y * sin;
-      const yr = -x * sin + y * cos;
-      if ((xr * xr) / (rx * rx) + (yr * yr) / (ry * ry) <= 1) put(row + xx, value);
-    }
-  }
-}
-
-function fillPolygon(points, value = 0) {
-  const scaled = points.map(([x, y]) => [px(x), px(y)]);
-  const minY = Math.max(0, Math.min(...scaled.map(([, y]) => y)));
-  const maxY = Math.min(HI - 1, Math.max(...scaled.map(([, y]) => y)));
+function fillContoursEvenOdd(contours, value = 255) {
+  const scaledContours = contours.map((contour) => contour.map(([x, y]) => [
+    Math.round((ICON_INSET + (x / SOURCE_VIEWBOX) * ICON_SIZE) * SCALE),
+    Math.round((ICON_INSET + (y / SOURCE_VIEWBOX) * ICON_SIZE) * SCALE),
+  ]));
+  const allY = scaledContours.flat().map(([, y]) => y);
+  const minY = Math.max(0, Math.min(...allY));
+  const maxY = Math.min(HI - 1, Math.max(...allY));
 
   for (let y = minY; y <= maxY; y += 1) {
     const intersections = [];
-    for (let i = 0; i < scaled.length; i += 1) {
-      const [x1, y1] = scaled[i];
-      const [x2, y2] = scaled[(i + 1) % scaled.length];
-      if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) {
-        intersections.push(x1 + ((y - y1) * (x2 - x1)) / (y2 - y1));
+    for (const contour of scaledContours) {
+      for (let i = 0; i < contour.length; i += 1) {
+        const [x1, y1] = contour[i];
+        const [x2, y2] = contour[(i + 1) % contour.length];
+        if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) {
+          intersections.push(x1 + ((y - y1) * (x2 - x1)) / (y2 - y1));
+        }
       }
     }
     intersections.sort((a, b) => a - b);
@@ -76,25 +61,99 @@ function fillPolygon(points, value = 0) {
   }
 }
 
-function t(x, y) {
-  const noteScale = 0.75;
-  return [512 + (x - 512) * noteScale, 512 + (y - 512) * noteScale];
+function parsePath(path) {
+  const tokens = path.match(/[a-zA-Z]|-?\d*\.?\d+(?:e[-+]?\d+)?/gi) ?? [];
+  const contours = [];
+  let command = "";
+  let cursor = [0, 0];
+  let start = [0, 0];
+  let contour = [];
+  let index = 0;
+
+  const isCommand = (token) => /^[a-zA-Z]$/.test(token);
+  const number = () => Number(tokens[index++]);
+  const closeContour = () => {
+    if (contour.length > 1) contours.push(contour);
+    contour = [];
+  };
+  const moveTo = (x, y) => {
+    closeContour();
+    cursor = [x, y];
+    start = [x, y];
+    contour.push(cursor);
+  };
+  const lineTo = (x, y) => {
+    cursor = [x, y];
+    contour.push(cursor);
+  };
+
+  while (index < tokens.length) {
+    if (isCommand(tokens[index])) command = tokens[index++];
+    switch (command) {
+      case "M":
+        moveTo(number(), number());
+        command = "L";
+        break;
+      case "m":
+        moveTo(cursor[0] + number(), cursor[1] + number());
+        command = "l";
+        break;
+      case "L":
+        while (index < tokens.length && !isCommand(tokens[index])) lineTo(number(), number());
+        break;
+      case "l":
+        while (index < tokens.length && !isCommand(tokens[index])) lineTo(cursor[0] + number(), cursor[1] + number());
+        break;
+      case "H":
+        while (index < tokens.length && !isCommand(tokens[index])) lineTo(number(), cursor[1]);
+        break;
+      case "h":
+        while (index < tokens.length && !isCommand(tokens[index])) lineTo(cursor[0] + number(), cursor[1]);
+        break;
+      case "V":
+        while (index < tokens.length && !isCommand(tokens[index])) lineTo(cursor[0], number());
+        break;
+      case "v":
+        while (index < tokens.length && !isCommand(tokens[index])) lineTo(cursor[0], cursor[1] + number());
+        break;
+      case "C":
+      case "c":
+        while (index < tokens.length && !isCommand(tokens[index])) {
+          const relative = command === "c";
+          const x0 = cursor[0];
+          const y0 = cursor[1];
+          const x1 = number() + (relative ? x0 : 0);
+          const y1 = number() + (relative ? y0 : 0);
+          const x2 = number() + (relative ? x0 : 0);
+          const y2 = number() + (relative ? y0 : 0);
+          const x3 = number() + (relative ? x0 : 0);
+          const y3 = number() + (relative ? y0 : 0);
+          for (let step = 1; step <= 24; step += 1) {
+            const t = step / 24;
+            const mt = 1 - t;
+            lineTo(
+              mt * mt * mt * x0 + 3 * mt * mt * t * x1 + 3 * mt * t * t * x2 + t * t * t * x3,
+              mt * mt * mt * y0 + 3 * mt * mt * t * y1 + 3 * mt * t * t * y2 + t * t * t * y3,
+            );
+          }
+        }
+        break;
+      case "Z":
+      case "z":
+        lineTo(start[0], start[1]);
+        closeContour();
+        break;
+      default:
+        throw new Error(`Unsupported SVG path command: ${command}`);
+    }
+  }
+  closeContour();
+  return contours;
 }
 
-// Match the in-app BrandMark: hard white square, black musical note.
-fillRect(128, 128, 768, 768, 255);
-fillRect(...t(470, 248), 68 * 0.75, 430 * 0.75, 0);
-fillPolygon([
-  t(470, 248),
-  t(764, 300),
-  t(746, 386),
-  t(538, 348),
-  t(538, 464),
-  t(470, 464),
-]);
-fillEllipse(...t(374, 694), 122 * 0.75, 78 * 0.75, -24, 0);
-fillEllipse(...t(374, 694), 54 * 0.75, 30 * 0.75, -24, 255);
-fillRect(...t(456, 616), 82 * 0.75, 70 * 0.75, 255);
+// Dock/process icon: black square with the supplied Beat mark in white.
+fillRect(0, 0, SIZE, SIZE, 0);
+fillContoursEvenOdd(parsePath(LOGO_PATH), 255);
 
 const image = Buffer.alloc((SIZE * 4 + 1) * SIZE);
 for (let y = 0; y < SIZE; y += 1) {

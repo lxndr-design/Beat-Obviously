@@ -570,7 +570,16 @@ function classifyIssue(issue: BeatProjectIntegrityIssue): TrustCategoryId {
   const code = issue.code;
 
   if (code === "asset.sidecar.orphan") return "sidecars";
-  if (code === "segment.trackId.mismatch" || code.includes(".id.") || code.startsWith("track.parent.")) return "stale-ids";
+  if (
+    code === "segment.trackId.mismatch"
+    || code.includes(".id.")
+    || code.startsWith("track.parent.")
+    || code.startsWith("track.freezeSource.")
+    || code.startsWith("track.send.")
+    || code.startsWith("track.sends.")
+    || code.startsWith("returnBuses.")
+    || code.startsWith("returnBus.")
+  ) return "stale-ids";
   if (code.startsWith("recording.") || code.startsWith("track.recording.") || code === "track.monitoring.unarmed") return "recording-input";
   if (
     code === "asset.missing"
