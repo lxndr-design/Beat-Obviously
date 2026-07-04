@@ -71,6 +71,12 @@ See [frontend/src/design/README.md](frontend/src/design/README.md). Short versio
 
 ## Roadmap (post-v1)
 
+- [Changelog](CHANGELOG.md) — user-visible change history and known gaps.
+- [User guide](docs/user-guide.html) — sidebar-based guide for projects, tracks,
+  instruments, Aether, Nodemap, editing, recording, export, preferences, and
+  health workflows.
+- [Plugin help](docs/plugin-help.html) — compatibility matrix, DecentSampler
+  workflow, and adapter-development guidance.
 - [DAW comprehensiveness roadmap](docs/daw-comprehensiveness-roadmap.md) — focused pass plan for moving Beat from prototype DAW coverage to v1-complete DAW workflows.
 - [Remaining work checklist](docs/remaining-work-checklist.md) — consolidated open-item checklist used for implementation order and closeout.
 - [DAW parallel execution plan](docs/daw-parallel-execution-plan.md) — worker split, file locks, serial contracts, and verification gates for the comprehensiveness pass.

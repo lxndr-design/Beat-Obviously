@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beat User Guide</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #000;
+        --fg: #fff;
+        --muted: rgba(255, 255, 255, 0.62);
+        --quiet: rgba(255, 255, 255, 0.36);
+        --line: rgba(255, 255, 255, 0.5);
+        --line-soft: rgba(255, 255, 255, 0.28);
+        --panel: rgba(255, 255, 255, 0.055);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Akzidenz Grotesk Next", "Helvetica Neue", Arial, sans-serif;
+        font-size: 15px;
+        line-height: 1.45;
+      }
+
+      a { color: inherit; }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      nav {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow: auto;
+        border-right: 1px solid var(--line);
+        padding: 20px 16px;
+        background: #000;
+      }
+
+      nav h1 {
+        margin: 0 0 20px;
+        font-size: 22px;
+        line-height: 1;
+      }
+
+      nav a {
+        display: block;
+        padding: 7px 0;
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      nav a:hover { color: var(--fg); }
+
+      main {
+        max-width: 1120px;
+        padding: 28px 36px 72px;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 24px;
+        padding-bottom: 18px;
+      }
+
+      h2 {
+        border-top: 1px solid var(--line);
+        margin: 34px 0 12px;
+        padding-top: 18px;
+        font-size: 24px;
+      }
+
+      h3 {
+        margin: 22px 0 8px;
+        font-size: 18px;
+      }
+
+      p, li { color: var(--muted); }
+      strong { color: var(--fg); }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .card {
+        border: 1px solid var(--line-soft);
+        padding: 12px;
+        background: var(--panel);
+      }
+
+      .meta {
+        color: var(--quiet);
+        font-size: 13px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 12px 0 18px;
+      }
+
+      th, td {
+        border: 1px solid var(--line-soft);
+        padding: 9px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th { color: var(--fg); }
+      code {
+        color: var(--fg);
+        background: rgba(255, 255, 255, 0.08);
+        padding: 1px 4px;
+      }
+
+      @media (max-width: 860px) {
+        .shell { grid-template-columns: 1fr; }
+        nav {
+          position: static;
+          height: auto;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        main { padding: 24px 18px 56px; }
+        .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <nav aria-label="User guide contents">
+        <h1>Beat Guide</h1>
+        <a href="#overview">Overview</a>
+        <a href="#projects">Projects</a>
+        <a href="#tracks">Tracks and Timeline</a>
+        <a href="#instruments">Instruments</a>
+        <a href="#aether">Aether Engine</a>
+        <a href="#nodemap">Nodemap Engine</a>
+        <a href="#midi-drums">MIDI and Drum Editing</a>
+        <a href="#audio-recording">Audio Recording</a>
+        <a href="#plugins">Plugins and DS</a>
+        <a href="#export">Export</a>
+        <a href="#preferences">Preferences</a>
+        <a href="#health">Project Health</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+      </nav>
+
+      <main>
+        <header>
+          <h1>Beat User Guide</h1>
+          <p>
+            Beat is a compact DAW with a native JUCE audio engine and Solid UI.
+            This guide describes the product workflows as they exist now, not a
+            marketing target.
+          </p>
+          <p class="meta">Version target: 0.2.0 pre-1.0, updated 2026-07-04.</p>
+        </header>
+
+        <section id="overview">
+          <h2>Overview</h2>
+          <div class="grid">
+            <div class="card">
+              <h3>Native Core</h3>
+              <p>
+                The C++ backend owns real-time audio, transport, sequencing,
+                sampler playback, Aether rendering, Nodemap evaluation, file
+                I/O, and project health verification.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Solid UI</h3>
+              <p>
+                The UI owns the timeline, editors, browsers, preferences,
+                export review, plugin package views, and instrument editing.
+                It uses the shared Solid UI kit and monochrome design tokens.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="projects">
+          <h2>Projects</h2>
+          <p>
+            A new project starts in memory. Beat should only create or overwrite
+            a project file when the user explicitly saves. Recent projects,
+            backups, and health checks are part of the document workflow.
+          </p>
+          <table>
+            <tr><th>Action</th><th>Expected Behavior</th></tr>
+            <tr><td>New Project</td><td>Creates an unsaved session. It should not silently write a file.</td></tr>
+            <tr><td>Save</td><td>If no file exists yet, ask for a destination. Existing files save in place.</td></tr>
+            <tr><td>Save As</td><td>Writes a new project file and keeps the current session pointed at it.</td></tr>
+            <tr><td>Open</td><td>Loads tracks, instruments, plugins, audio references, automation, and project metadata.</td></tr>
+          </table>
+        </section>
+
+        <section id="tracks">
+          <h2>Tracks and Timeline</h2>
+          <p>
+            Tracks can hold audio, MIDI, drum, mixed, or group content. Segment
+            editing is free by default; holding Shift applies the current snap
+            behavior.
+          </p>
+          <ul>
+            <li>Drag instruments, DS packages, components, or audio into tracks to create segments.</li>
+            <li>Drag segments freely; hold Shift to snap to the visible grid.</li>
+            <li>Resize and fade handles follow the same free-by-default, Shift-to-snap rule.</li>
+            <li>Track headers expose mute, solo, arm, input monitoring, volume, and meter display.</li>
+            <li>Playback highlights active segments and note previews through monochrome emphasis.</li>
+          </ul>
+        </section>
+
+        <section id="instruments">
+          <h2>Instruments</h2>
+          <p>
+            Beat instruments are library items that can be dragged onto tracks.
+            Current engine families are Aether, Nodemap, Sampler, and
+            DecentSampler compatibility instruments.
+          </p>
+          <table>
+            <tr><th>Engine</th><th>Use For</th><th>Editor</th></tr>
+            <tr><td>Aether</td><td>Wavetable synth patches, pads, keys, basses, bells, and designed tones.</td><td>Aether editor.</td></tr>
+            <tr><td>Nodemap</td><td>Modular synth patches built from visual nodes and cables.</td><td>Nodemap editor.</td></tr>
+            <tr><td>Sampler</td><td>One-shot or mapped sample instruments.</td><td>Sampler/keymap editor work is still maturing.</td></tr>
+            <tr><td>DecentSampler</td><td>Imported `.dspreset` or ZIP packages converted to Beat sampler bridges.</td><td>Package UI wrapper plus MIDI/drum editor mode.</td></tr>
+          </table>
+        </section>
+
+        <section id="aether">
+          <h2>Aether Engine</h2>
+          <p>
+            Aether is Beat's native wavetable synth. It is the default path for
+            Beat-created synth instruments.
+          </p>
+          <h3>Top Details</h3>
+          <ul>
+            <li><strong>Name</strong>: patch name shown in the instrument library.</li>
+            <li><strong>Category</strong> and <strong>Instrument</strong>: taxonomy fields used for organizing the library.</li>
+            <li><strong>Voices</strong>: maximum polyphony before note stealing.</li>
+            <li><strong>Legato</strong>: retunes held mono notes instead of retriggering fully.</li>
+            <li><strong>Pitch Bend</strong>: MIDI bend range in semitones.</li>
+            <li><strong>Velocity, Key Track, Mod Wheel</strong>: expression sources and routing state.</li>
+          </ul>
+          <h3>Core Blocks</h3>
+          <table>
+            <tr><th>Block</th><th>Purpose</th></tr>
+            <tr><td>Oscillators</td><td>Oscillator A/B source, shape, wavetable position, warp, pitch, phase, pan, and level.</td></tr>
+            <tr><td>Custom Wave Settings</td><td>Frame A/B/C/D scan, harmonics, spectral shape, phase, analysis, normalize, evolve, and morph controls.</td></tr>
+            <tr><td>Voice Stack</td><td>Unison/stack controls such as voices, detune, blend, spread, max voices, mono, and legato.</td></tr>
+            <tr><td>LFO</td><td>Low-frequency modulation source with shape, sync timing, one-shot, retrigger, phase, smooth, and random controls.</td></tr>
+            <tr><td>Instrument FX</td><td>Ordered patch-level effects. These are part of the instrument, before track effects.</td></tr>
+            <tr><td>Envelopes</td><td>Amp/filter envelope and modulation envelope, plus filter, warp, and amp shaping controls.</td></tr>
+            <tr><td>Macro Controls</td><td>Four named controls for performance mapping and patch-level expression.</td></tr>
+            <tr><td>Modulation Matrix</td><td>Explicit source-to-target routes with strength and polarity.</td></tr>
+          </table>
+        </section>
+
+        <section id="nodemap">
+          <h2>Nodemap Engine</h2>
+          <p>
+            Nodemap is a separate modular synth engine. It is not an Aether skin.
+            A graph can be silent; sound only exists when audio reaches the
+            protected <strong>Instrument Out</strong> node.
+          </p>
+          <ul>
+            <li>Every Nodemap has exactly one Instrument Out node.</li>
+            <li>Users cannot create or delete Instrument Out.</li>
+            <li>Audio ports connect to audio ports; control ports connect to compatible parameter inputs.</li>
+            <li>Multiple outputs can feed a compatible input only when that port explicitly supports it.</li>
+            <li>Disconnected nodes are allowed, but warnings explain that they do not affect sound.</li>
+            <li>Spacebar audition inside the Nodemap modal previews the instrument, not the global transport.</li>
+          </ul>
+          <h3>Common Node Groups</h3>
+          <table>
+            <tr><th>Group</th><th>Examples</th><th>Role</th></tr>
+            <tr><td>Sources</td><td>Oscillator, Noise, Instrument</td><td>Create or import audio signals.</td></tr>
+            <tr><td>Modulators</td><td>Envelope, LFO</td><td>Create control signals for pitch, level, pan, cutoff, and other inputs.</td></tr>
+            <tr><td>Routing</td><td>Mixer, Splitter</td><td>Combine, branch, or balance signals.</td></tr>
+            <tr><td>Processors</td><td>Filter, Shaper, Volume</td><td>Change the sound before it reaches Instrument Out.</td></tr>
+            <tr><td>Output</td><td>Instrument Out</td><td>The single final audio endpoint.</td></tr>
+          </table>
+        </section>
+
+        <section id="midi-drums">
+          <h2>MIDI and Drum Editing</h2>
+          <p>
+            MIDI segments open in the piano roll. Drum segments open in the drum
+            sequencer. Components/patterns are reusable musical blocks that can
+            be previewed and dragged back to the arrangement.
+          </p>
+          <ul>
+            <li>MIDI notes should support create, drag, resize, select, copy, paste, delete, and context menu edits.</li>
+            <li>Beat patterns use segment speed consistently between list preview, editor preview, and arrangement playback.</li>
+            <li>Drum rows bind to real instruments where possible, not generic framework labels.</li>
+            <li>MIDI and drum segment previews in the track body should reflect note/hit placement, not placeholder bars.</li>
+          </ul>
+        </section>
+
+        <section id="audio-recording">
+          <h2>Audio Recording</h2>
+          <p>
+            Recording is built around track arm/input monitoring plus an audio
+            recording modal for device selection, record/stop, waveform review,
+            playback, and basic crop before committing a take.
+          </p>
+          <table>
+            <tr><th>Control</th><th>Meaning</th></tr>
+            <tr><td>Device</td><td>Input device selected from the native audio device list.</td></tr>
+            <tr><td>Record / Stop</td><td>Starts and stops capture for the armed track or recording modal.</td></tr>
+            <tr><td>Waveform</td><td>Visual review of the captured take.</td></tr>
+            <tr><td>Crop</td><td>Non-destructive trim range before committing to the arrangement.</td></tr>
+          </table>
+        </section>
+
+        <section id="plugins">
+          <h2>Plugins and DecentSampler</h2>
+          <p>
+            See <a href="plugin-help.html">Plugin Help</a> for compatibility,
+            import steps, and adapter-development guidance.
+          </p>
+          <p>
+            The current supported plugin-style path is DecentSampler import.
+            AU/VST3 binary hosting is not a live v1 feature yet.
+          </p>
+        </section>
+
+        <section id="export">
+          <h2>Export</h2>
+          <p>
+            Export Review collects mode, destination, format, sample rate, bit
+            depth, channel count, tail policy, and project-health validation
+            before rendering.
+          </p>
+          <ul>
+            <li><strong>Full Mix</strong>: render the project mix.</li>
+            <li><strong>Review Range</strong>: render the selected loop/range.</li>
+            <li><strong>Selected Stem</strong>: render one selected track/stem.</li>
+            <li><strong>All Stems</strong>: render each renderable track as a batch.</li>
+          </ul>
+        </section>
+
+        <section id="preferences">
+          <h2>Preferences</h2>
+          <p>
+            Preferences are grouped by left-side navigation. Expected groups are
+            Audio, Files, Theme, AI, and advanced/system settings as needed.
+          </p>
+          <table>
+            <tr><th>Tab</th><th>Settings</th></tr>
+            <tr><td>Audio</td><td>Input/output devices, sample rate, buffer size, latency, input monitoring defaults.</td></tr>
+            <tr><td>Files</td><td>Asset copy policy, recents, backups, restore, startup behavior.</td></tr>
+            <tr><td>Theme</td><td>Grid density, timeline emphasis, contrast level, monochrome display behavior.</td></tr>
+            <tr><td>AI</td><td>Local generation behavior, training runner options, generated content defaults.</td></tr>
+          </table>
+        </section>
+
+        <section id="health">
+          <h2>Project Health</h2>
+          <p>
+            Project Health validates missing files, broken references, malformed
+            sends, stale freeze metadata, plugin adapter links, and export
+            blockers. Export should validate health before writing output unless
+            the user explicitly disables that preference.
+          </p>
+        </section>
+
+        <section id="troubleshooting">
+          <h2>Troubleshooting</h2>
+          <table>
+            <tr><th>Symptom</th><th>First Check</th></tr>
+            <tr><td>No DS sound</td><td>Confirm the DecentSampler adapter has an associated Beat sampler instrument.</td></tr>
+            <tr><td>Aether hit sounds sustained</td><td>Check amp envelope release/legato/mono and whether the patch has transient/noise content.</td></tr>
+            <tr><td>Segment drag snaps too much</td><td>Release Shift; free drag is the default.</td></tr>
+            <tr><td>Export blocked</td><td>Open Project Health and resolve errors or missing media.</td></tr>
+            <tr><td>Spacebar plays the wrong thing</td><td>Focus should stay inside the active modal; this is a bug if global transport wins.</td></tr>
+          </table>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

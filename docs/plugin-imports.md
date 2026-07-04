@@ -6,6 +6,35 @@ metadata preservation first. A package may later be rendered or converted into
 native Beat assets, but import itself should not pretend that a third-party
 runtime is already running in the audio callback.
 
+For user-facing plugin help, compatibility status, and adapter-development
+guidance, see `docs/plugin-help.html`.
+
+## Compatibility matrix
+
+| Format | Status | Supported behavior | Unsupported behavior |
+| --- | --- | --- | --- |
+| DecentSampler `.dspreset` | Supported in the native app | XML parsing, sample-zone import, UI metadata preservation, Beat sampler bridge, MIDI/drum editor mode | Official DecentSampler runtime hosting |
+| DecentSampler `.zip` | Supported in the native app | Safe extraction, preset discovery, sample registration, package wrapper, associated instrument creation | Browser-only full extraction |
+| Beat native Aether | Supported | Wavetable patch editing, modulation, instrument FX, audition, live/export rendering | External binary plugin loading |
+| Beat native Nodemap | Supported and maturing | Protected Instrument Out, modular nodes, cables, audition, persistence, live/export path | Public third-party node authoring SDK |
+| AU `.component` | Placeholder metadata only | Future intent can be represented in project data | Live execution, scanning, UI hosting, audio callback processing |
+| VST3 `.vst3` | Placeholder metadata only | Future intent can be represented in project data | Live execution, scanning, UI hosting, audio callback processing |
+
+## Adapter development checklist
+
+Until Beat has a public plugin SDK, new plugin work should be a safe adapter
+around serializable data:
+
+- Choose an adapter `format` and `kind`.
+- Parse/import package metadata without executing third-party code.
+- Copy or register all referenced assets into Beat-managed storage.
+- Create or link an associated Beat instrument when the adapter plays notes.
+- Declare capabilities, realtime/offline support, latency, and fallback mode.
+- Add project-health checks for missing files, missing associated instruments,
+  unsupported runtime modes, and stale references.
+- Add verifier or backend stress coverage for import, save/open, live playback,
+  and export.
+
 ## Decent Sampler baseline
 
 Decent Sampler packs are the first adapter target.
