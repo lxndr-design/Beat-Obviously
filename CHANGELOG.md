@@ -30,6 +30,8 @@ All notable Beat changes are tracked here. Dates use local project dates.
   package adapters rather than falling back to generic synth editing.
 - Restyled the static user guide and plugin help pages to use Beat's compact
   monochrome app surface rather than generic article styling.
+- Compiled user-guide, plugin-help, compatibility, how-to, and version-history
+  material into one app-styled documentation webpage.
 
 ### Fixed
 

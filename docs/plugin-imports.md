@@ -6,8 +6,8 @@ metadata preservation first. A package may later be rendered or converted into
 native Beat assets, but import itself should not pretend that a third-party
 runtime is already running in the audio callback.
 
-For user-facing plugin help, compatibility status, and adapter-development
-guidance, see `docs/plugin-help.html`.
+For user-facing plugin help, compatibility status, adapter-development
+guidance, and version history, see `docs/index.html#plugins`.
 
 ## Compatibility matrix
 
