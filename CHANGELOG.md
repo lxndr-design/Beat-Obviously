@@ -28,6 +28,8 @@ All notable Beat changes are tracked here. Dates use local project dates.
   library workflows as part of the Solid UI closeout.
 - Updated plugin adapter handling so DecentSampler imports remain sampler-backed
   package adapters rather than falling back to generic synth editing.
+- Restyled the static user guide and plugin help pages to use Beat's compact
+  monochrome app surface rather than generic article styling.
 
 ### Fixed
 
