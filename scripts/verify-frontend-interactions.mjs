@@ -90,10 +90,13 @@ try {
     "instrument store should normalize taxonomy and seed Aether/sampler defaults",
   );
   assert.ok(
-    instrumentsPageSource.includes('label="Structure"')
+    instrumentsPageSource.includes('label="Category"')
+      && instrumentsPageSource.includes('label="Instrument"')
+      && instrumentsPageSource.includes("firstInstrumentTaxonomyIdForCategory")
       && instrumentsPageSource.includes("taxonomyAssignmentForInstrumentId")
-      && instrumentsPageSource.includes("updateInstrument(activeInstrument()!.id, { taxonomy: nextTaxonomy })"),
-    "instrument organizer preview should expose editable structure before advanced details",
+      && instrumentsPageSource.includes("updateInstrument(activeInstrument()!.id, { taxonomy: instrumentId ? taxonomyAssignmentForInstrumentId(instrumentId) : undefined })")
+      && instrumentsPageSource.includes("updateInstrument(activeInstrument()!.id, { taxonomy: value ? taxonomyAssignmentForInstrumentId(value) : undefined })"),
+    "instrument organizer preview should expose editable category and instrument taxonomy before advanced details",
   );
   assert.ok(
     instrumentEditorSource.includes('label="Structure"')
@@ -105,10 +108,12 @@ try {
     "track header meter lanes should expose stable left/right channel markers",
   );
   assert.ok(
-    !patternsPageSource.includes("lengthBeats / component.speed")
-      && !componentLibrarySource.includes("component.lengthBeats / component.speed")
-      && !drumSequencerSource.includes("props.lengthBeats / props.speed"),
-    "drum grid density must not shorten pattern preview or beat-editor playback",
+    patternsPageSource.includes("drumPlaybackDurationSeconds(component.lengthBeats, bpm, component.speed, playbackRate)")
+      && componentLibrarySource.includes("drumPlaybackDurationBeats(component.lengthBeats, component.speed)")
+      && componentLibrarySource.includes("drumPlaybackStepLengthBeats(component.lengthBeats, component.stepCount, component.speed)")
+      && drumSequencerSource.includes("drumPlaybackDurationSeconds(props.lengthBeats, props.bpm, props.speed)")
+      && drumSequencerSource.includes("drumPlaybackStepLengthBeats(props.lengthBeats, props.stepCount, props.speed)"),
+    "beat editor, component preview, and pattern preview should use effective drum playback length",
   );
   assert.ok(
     drumSequencerSource.includes('label="Grid"') && drumSequencerSource.includes('ariaLabel="Drum grid density"'),
@@ -287,8 +292,10 @@ try {
       && exportReviewSource.includes("removeRecentDestination")
       && exportReviewSource.includes("revealExportDestination")
       && exportReviewSource.includes("recentExportFolder")
-      && exportReviewSource.includes("Default Folder"),
-    "export review modal should expose recent destination reveal/remove/clear actions and a default folder derived from destination history",
+      && exportReviewSource.includes("chooseDestinationFolder")
+      && exportReviewSource.includes("Selected folder")
+      && exportReviewSource.includes("Choose Folder"),
+    "export review modal should expose recent destination reveal/remove/clear actions and a folder chooser derived from destination history",
   );
   assert.ok(
     exportStoreSource.includes("EXPORT_PREFERENCES_KEY")
@@ -300,15 +307,17 @@ try {
   );
   assert.ok(
     exportReviewSource.includes("renderableStemCount")
-      && exportReviewSource.includes("All Stems")
+      && exportStoreSource.includes("All Stems")
+      && exportStoreSource.includes('target: "stems"')
       && exportActionsSource.includes('mode === "stems"')
       && exportActionsSource.includes("project.exportAllTrackWavsAsync"),
     "export review should expose all-stems readiness and launch the native batch-stem IPC",
   );
   assert.ok(
     exportReviewSource.includes("savePresetAs")
-      && exportReviewSource.includes("updateUserPreset")
-      && exportReviewSource.includes("deleteUserPreset")
+      && exportStoreSource.includes("updateUserPreset")
+      && exportReviewSource.includes("deletePreset")
+      && exportStoreSource.includes("deleteUserPreset")
       && exportReviewSource.includes("Include effect tail"),
     "export review should expose custom export preset save, edit, tail, and delete controls",
   );
@@ -407,8 +416,11 @@ try {
       && nodeGraphSource.includes('envelope: {\n    label: "Envelope",\n    icon: "ph:chart-line"')
       && nodeGraphSource.includes('velocity: {\n    label: "Velocity",\n    icon: "ph:pulse"')
       && nodeGraphSource.includes('random: {\n    label: "Random CV",\n    icon: "ph:shooting-star"')
-      && nodeGraphSource.includes('cvScale: {\n    label: "CV Scale",\n    icon: "ph:arrows-in-line-horizontal"')
+      && nodeGraphSource.includes('cvScale: {\n    label: "CV Processor",\n    icon: "ph:arrows-in-line-horizontal"')
+      && nodeGraphSource.includes('wavetableLfo: {\n    label: "Wavetable LFO",\n    icon: "ph:wave-sine"')
+      && nodeGraphSource.includes('panWidth: {\n    label: "Pan / Width",\n    icon: "ph:arrows-in-line-horizontal"')
       && nodeGraphSource.includes('filter: {\n    label: "Filter",\n    icon: "ph:sparkle"')
+      && nodeGraphSource.includes('drive: {\n    label: "Drive",\n    icon: "ph:sparkle"')
       && nodeGraphSource.includes('reverb: {\n    label: "Reverb",\n    icon: "ph:sparkle"')
       && nodeGraphSource.includes('bitcrush: {\n    label: "Bitcrush",\n    icon: "ph:sparkle"'),
     "Nodemap modulation nodes should use semantic waveform/control icons while effect nodes share the neutral effect icon",
@@ -890,7 +902,7 @@ try {
     "browser fixture automation drag coverage should include non-macro direct Aether target lanes",
   );
   assert.ok(
-    synthEditorSource.includes("Instrument Details - Aether Engine")
+    editorHostSource.includes("Instrument - Aether Engine")
       && synthEditorSource.includes('aria-label="Aether output preview"')
       && synthEditorSource.includes('label="Name"')
       && synthEditorSource.includes('label="Category"')
@@ -902,8 +914,8 @@ try {
   );
   assert.ok(
     synthEditorSource.includes('aria-label="LFO"')
-      && synthEditorSource.includes('label={`LFO ${props.lfo} Shape`}')
-      && synthEditorSource.includes('label={`LFO ${props.lfo} Sync Rate`}')
+      && synthEditorSource.includes('ariaLabel={`LFO ${props.lfo} Shape`}')
+      && synthEditorSource.includes('ariaLabel={`LFO ${props.lfo} Sync Rate`}')
       && synthEditorSource.includes('label="Smooth"')
       && synthEditorSource.includes('label="Random"'),
     "Aether Synth Editor should expose LFO shape, sync-rate, and smoothing/random controls for browser coverage",
@@ -985,7 +997,7 @@ try {
   );
   assert.ok(
     synthEditorSource.includes("Import Preset")
-      && synthEditorSource.includes("Instrument Details - Aether Engine")
+      && editorHostSource.includes("Instrument - Aether Engine")
       && synthEditorSource.includes("onAudition")
       && synthEditorSource.includes("onSaveInstrument"),
     "browser fixture coverage should track current Aether import, audition, and save controls",

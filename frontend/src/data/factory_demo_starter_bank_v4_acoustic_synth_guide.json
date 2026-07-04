@@ -1,0 +1,5102 @@
+{
+  "bankName": "Factory Demo Starter Bank v4 - Bass Crunch Vocal Acoustic-Synth Guide",
+  "schemaVersion": "0.4-guide",
+  "purpose": "Human-readable implementation guide for factory-style presets. This is not intended to be a direct synth preset import format. v4 includes v3 bass/crunch/vocal coverage plus violin, piano, and xylophone-style synthetic acoustic demo patches.",
+  "standardizedRanges": {
+    "knobs": "0..100 unless otherwise stated",
+    "pan": "-100..100",
+    "finePitch": "cents",
+    "envelopeTimes": "milliseconds",
+    "modulationMatrixAmount": "-100..100",
+    "customWavetableFrameParams": {
+      "scan_bright_even_fold_formant_notch_focus": "0..100",
+      "skew_tilt_phase": "-100..100"
+    }
+  },
+  "availableOscillatorModes": {
+    "basic": {
+      "shapes": [
+        "sine",
+        "triangle",
+        "square",
+        "saw",
+        "pulse"
+      ]
+    },
+    "custom_wavetable": {
+      "description": "Either oscillator can have its own independent A/B/C/D frame set when set to custom mode.",
+      "frames": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ]
+    }
+  },
+  "availableLfoShapes": [
+    "sine",
+    "triangle",
+    "square",
+    "saw"
+  ],
+  "availableFxTypes": [
+    "Reverb / Room",
+    "Delay",
+    "Chorus",
+    "Phaser",
+    "Flanger",
+    "Compressor",
+    "Low-pass",
+    "High-pass",
+    "Saturator",
+    "Distortion",
+    "Bitcrush",
+    "Plugin"
+  ],
+  "modulationMatrixConventions": {
+    "sourcesMayInclude": [
+      "ampEnv",
+      "modEnv",
+      "lfo1",
+      "lfo2",
+      "velocity",
+      "aftertouch",
+      "modWheel",
+      "macro.motion",
+      "macro.color",
+      "macro.shape",
+      "macro.space"
+    ],
+    "targetNaming": "Descriptive dot paths are used here for readability. Map these to internal parameter IDs during implementation.",
+    "amountRange": "-100..100"
+  },
+  "patches": [
+    {
+      "name": "Carbon Poly",
+      "category": "Poly Keys",
+      "intent": "Warm modern polysynth keys with mild wavetable animation, pulse support, chorus width, and playable macro brightness.",
+      "playMode": {
+        "polyphony": 8,
+        "mono": false,
+        "legato": false,
+        "glideMs": 0
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "custom_wavetable",
+          "customWavetable": {
+            "name": "Carbon Soft Saw",
+            "character": "soft saw to folded nasal saw",
+            "source": "manual",
+            "frameMode": "full",
+            "interpolation": "smooth",
+            "morph": 34,
+            "normalizeAudio": true,
+            "evolve": false,
+            "frames": {
+              "A": {
+                "scan": 0,
+                "bright": 28,
+                "even": 12,
+                "fold": 4,
+                "formant": 8,
+                "notch": 2,
+                "focus": 16,
+                "skew": -12,
+                "tilt": -18,
+                "phase": 0
+              },
+              "B": {
+                "scan": 33,
+                "bright": 45,
+                "even": 24,
+                "fold": 10,
+                "formant": 14,
+                "notch": 5,
+                "focus": 28,
+                "skew": -5,
+                "tilt": -8,
+                "phase": 8
+              },
+              "C": {
+                "scan": 67,
+                "bright": 62,
+                "even": 34,
+                "fold": 22,
+                "formant": 22,
+                "notch": 10,
+                "focus": 42,
+                "skew": 4,
+                "tilt": 4,
+                "phase": -6
+              },
+              "D": {
+                "scan": 100,
+                "bright": 76,
+                "even": 42,
+                "fold": 34,
+                "formant": 28,
+                "notch": 14,
+                "focus": 56,
+                "skew": 14,
+                "tilt": 12,
+                "phase": 16
+              }
+            }
+          },
+          "position": 28,
+          "warpMode": "shape",
+          "warp": 18,
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": -4,
+          "phase": 0,
+          "random": 15,
+          "pan": 0,
+          "level": 74
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "pulse",
+          "position": 42,
+          "warpMode": "shape",
+          "warp": 10,
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": 3,
+          "phase": 0,
+          "random": 18,
+          "pan": 0,
+          "level": 36
+        }
+      },
+      "voiceStack": {
+        "enabled": true,
+        "voices": 3,
+        "detune": 8,
+        "blend": 45,
+        "spread": 35,
+        "max": 8
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP24",
+        "cutoffHz": 7500,
+        "resonance": 12,
+        "drive": 8,
+        "keytrack": 35
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 12,
+          "decayMs": 550,
+          "sustain": 62,
+          "releaseMs": 420
+        },
+        "modEnv": {
+          "attackMs": 0,
+          "decayMs": 900,
+          "sustain": 0,
+          "releaseMs": 250
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "triangle",
+          "sync": true,
+          "phase": 0,
+          "smooth": 20,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": true,
+          "rate": "1/2"
+        },
+        "lfo2": {
+          "enabled": false,
+          "shape": "sine",
+          "sync": true,
+          "phase": 0,
+          "smooth": 0,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": true,
+          "rate": "1/4"
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Motion",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "color",
+          "label": "Brightness",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "shape",
+          "label": "Wavetable",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "space",
+          "label": "Space",
+          "default": 0,
+          "range": "0..100"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.cutoffHz",
+          "amount": 22,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "amp.level",
+          "amount": 25,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "filter.cutoffHz",
+          "amount": 18,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "oscA.position",
+          "amount": 7,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "oscB.position",
+          "amount": 9,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "filter.cutoffHz",
+          "amount": 34,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "oscA.warp",
+          "amount": 18,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscA.position",
+          "amount": 45,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.motion",
+          "target": "lfo1.depth",
+          "amount": 35,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Delay.mix",
+          "amount": 24,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Reverb / Room.mix",
+          "amount": 26,
+          "range": "-100..100",
+          "curve": "linear"
+        }
+      ],
+      "fxChain": [
+        {
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 80,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Saturator",
+          "params": {
+            "drive": 10,
+            "tone": 50,
+            "mix": 42
+          }
+        },
+        {
+          "type": "Chorus",
+          "params": {
+            "rate": 18,
+            "depth": 28,
+            "feedback": 8,
+            "width": 70,
+            "mix": 22
+          }
+        },
+        {
+          "type": "Delay",
+          "params": {
+            "timeLeft": "1/8D",
+            "timeRight": "1/4",
+            "feedback": 18,
+            "filter": 55,
+            "mix": 12
+          }
+        },
+        {
+          "type": "Reverb / Room",
+          "params": {
+            "size": 42,
+            "decay": 36,
+            "preDelay": 18,
+            "tone": 48,
+            "mix": 14
+          }
+        }
+      ]
+    },
+    {
+      "name": "Glass Runner",
+      "category": "Arp Pluck",
+      "intent": "Bright digital pluck for arpeggios, with velocity-sensitive warp and delay space.",
+      "playMode": {
+        "polyphony": 8,
+        "mono": false,
+        "legato": false,
+        "glideMs": 0
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "custom_wavetable",
+          "customWavetable": {
+            "name": "Glass Partial Stack",
+            "character": "sine core to bell-like digital partials",
+            "source": "manual",
+            "frameMode": "full",
+            "interpolation": "smooth",
+            "morph": 28,
+            "normalizeAudio": true,
+            "evolve": false,
+            "frames": {
+              "A": {
+                "scan": 0,
+                "bright": 18,
+                "even": 4,
+                "fold": 0,
+                "formant": 4,
+                "notch": 0,
+                "focus": 10,
+                "skew": 0,
+                "tilt": -10,
+                "phase": 0
+              },
+              "B": {
+                "scan": 33,
+                "bright": 40,
+                "even": 20,
+                "fold": 8,
+                "formant": 12,
+                "notch": 4,
+                "focus": 30,
+                "skew": -4,
+                "tilt": 2,
+                "phase": 6
+              },
+              "C": {
+                "scan": 67,
+                "bright": 70,
+                "even": 46,
+                "fold": 28,
+                "formant": 18,
+                "notch": 12,
+                "focus": 58,
+                "skew": 8,
+                "tilt": 12,
+                "phase": -10
+              },
+              "D": {
+                "scan": 100,
+                "bright": 88,
+                "even": 72,
+                "fold": 40,
+                "formant": 28,
+                "notch": 20,
+                "focus": 75,
+                "skew": 18,
+                "tilt": 20,
+                "phase": 22
+              }
+            }
+          },
+          "position": 18,
+          "warpMode": "fold",
+          "warp": 26,
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "random": 0,
+          "pan": 0,
+          "level": 80
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "triangle",
+          "position": 50,
+          "warpMode": "shape",
+          "warp": 0,
+          "octave": 1,
+          "semitone": 0,
+          "fineCents": 7,
+          "phase": 0,
+          "random": 0,
+          "pan": 0,
+          "level": 18
+        }
+      },
+      "voiceStack": {
+        "enabled": true,
+        "voices": 2,
+        "detune": 4,
+        "blend": 35,
+        "spread": 20,
+        "max": 4
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP12",
+        "cutoffHz": 3200,
+        "resonance": 24,
+        "drive": 4,
+        "keytrack": 50
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 0,
+          "decayMs": 240,
+          "sustain": 0,
+          "releaseMs": 130
+        },
+        "modEnv": {
+          "attackMs": 0,
+          "decayMs": 190,
+          "sustain": 0,
+          "releaseMs": 90
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "sine",
+          "sync": true,
+          "phase": 0,
+          "smooth": 10,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false,
+          "rate": "1/8"
+        },
+        "lfo2": {
+          "enabled": false,
+          "shape": "sine",
+          "sync": true,
+          "phase": 0,
+          "smooth": 0,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": true,
+          "rate": "1/4"
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Pan Drift",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "color",
+          "label": "Glass",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "shape",
+          "label": "Strike",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "space",
+          "label": "Echo",
+          "default": 0,
+          "range": "0..100"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.cutoffHz",
+          "amount": 48,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "oscA.warp",
+          "amount": 18,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "filter.cutoffHz",
+          "amount": 30,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "amp.level",
+          "amount": 28,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "amp.pan",
+          "amount": 12,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "filter.cutoffHz",
+          "amount": 40,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscA.warp",
+          "amount": 35,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscA.position",
+          "amount": 30,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.motion",
+          "target": "lfo1.depth",
+          "amount": 30,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Delay.feedback",
+          "amount": 24,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Reverb / Room.mix",
+          "amount": 20,
+          "range": "-100..100",
+          "curve": "linear"
+        }
+      ],
+      "fxChain": [
+        {
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 120,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Bitcrush",
+          "params": {
+            "bits": 14,
+            "rate": 85,
+            "tone": 62,
+            "mix": 8
+          }
+        },
+        {
+          "type": "Delay",
+          "params": {
+            "timeLeft": "1/8",
+            "timeRight": "1/8D",
+            "feedback": 28,
+            "filter": 62,
+            "mix": 20
+          }
+        },
+        {
+          "type": "Reverb / Room",
+          "params": {
+            "size": 56,
+            "decay": 44,
+            "preDelay": 8,
+            "tone": 60,
+            "mix": 12
+          }
+        },
+        {
+          "type": "Compressor",
+          "params": {
+            "threshold": 38,
+            "ratio": 20,
+            "attack": 35,
+            "release": 42,
+            "makeup": 10,
+            "mix": 65
+          }
+        }
+      ]
+    },
+    {
+      "name": "Velvet Choir Pad",
+      "category": "Pad",
+      "intent": "Slow, wide, formant-like pad using independent custom frames on both oscillators.",
+      "playMode": {
+        "polyphony": 12,
+        "mono": false,
+        "legato": false,
+        "glideMs": 0
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "custom_wavetable",
+          "customWavetable": {
+            "name": "Velvet Vowels A",
+            "character": "rounded saw through ah/oh formant frames",
+            "source": "manual",
+            "frameMode": "full",
+            "interpolation": "smooth",
+            "morph": 62,
+            "normalizeAudio": true,
+            "evolve": true,
+            "frames": {
+              "A": {
+                "scan": 0,
+                "bright": 26,
+                "even": 18,
+                "fold": 2,
+                "formant": 20,
+                "notch": 4,
+                "focus": 22,
+                "skew": -8,
+                "tilt": -14,
+                "phase": 0
+              },
+              "B": {
+                "scan": 33,
+                "bright": 42,
+                "even": 28,
+                "fold": 6,
+                "formant": 48,
+                "notch": 12,
+                "focus": 46,
+                "skew": -4,
+                "tilt": -2,
+                "phase": 6
+              },
+              "C": {
+                "scan": 67,
+                "bright": 52,
+                "even": 34,
+                "fold": 10,
+                "formant": 64,
+                "notch": 18,
+                "focus": 58,
+                "skew": 6,
+                "tilt": 8,
+                "phase": -8
+              },
+              "D": {
+                "scan": 100,
+                "bright": 66,
+                "even": 48,
+                "fold": 14,
+                "formant": 72,
+                "notch": 22,
+                "focus": 68,
+                "skew": 12,
+                "tilt": 16,
+                "phase": 18
+              }
+            }
+          },
+          "position": 45,
+          "warpMode": "formant",
+          "warp": 34,
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": -6,
+          "phase": 0,
+          "random": 35,
+          "pan": 0,
+          "level": 70
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "custom_wavetable",
+          "customWavetable": {
+            "name": "Velvet Vowels B",
+            "character": "lower supporting vowel layer with darker tilt",
+            "source": "manual",
+            "frameMode": "full",
+            "interpolation": "smooth",
+            "morph": 58,
+            "normalizeAudio": true,
+            "evolve": true,
+            "frames": {
+              "A": {
+                "scan": 0,
+                "bright": 18,
+                "even": 12,
+                "fold": 0,
+                "formant": 18,
+                "notch": 4,
+                "focus": 18,
+                "skew": -14,
+                "tilt": -28,
+                "phase": 0
+              },
+              "B": {
+                "scan": 33,
+                "bright": 32,
+                "even": 20,
+                "fold": 4,
+                "formant": 42,
+                "notch": 10,
+                "focus": 38,
+                "skew": -8,
+                "tilt": -12,
+                "phase": 8
+              },
+              "C": {
+                "scan": 67,
+                "bright": 44,
+                "even": 28,
+                "fold": 8,
+                "formant": 58,
+                "notch": 16,
+                "focus": 52,
+                "skew": 4,
+                "tilt": -2,
+                "phase": -8
+              },
+              "D": {
+                "scan": 100,
+                "bright": 56,
+                "even": 36,
+                "fold": 12,
+                "formant": 68,
+                "notch": 20,
+                "focus": 62,
+                "skew": 12,
+                "tilt": 8,
+                "phase": 16
+              }
+            }
+          },
+          "position": 32,
+          "warpMode": "formant",
+          "warp": 24,
+          "octave": -1,
+          "semitone": 0,
+          "fineCents": 5,
+          "phase": 0,
+          "random": 45,
+          "pan": 0,
+          "level": 42
+        }
+      },
+      "voiceStack": {
+        "enabled": true,
+        "voices": 6,
+        "detune": 14,
+        "blend": 70,
+        "spread": 75,
+        "max": 12
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP12",
+        "cutoffHz": 4800,
+        "resonance": 8,
+        "drive": 5,
+        "keytrack": 20
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 1800,
+          "decayMs": 3500,
+          "sustain": 78,
+          "releaseMs": 4200
+        },
+        "modEnv": {
+          "attackMs": 2500,
+          "decayMs": 5000,
+          "sustain": 45,
+          "releaseMs": 3000
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "triangle",
+          "sync": false,
+          "phase": 0,
+          "smooth": 60,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false,
+          "rateHz": 0.06
+        },
+        "lfo2": {
+          "enabled": true,
+          "shape": "sine",
+          "sync": false,
+          "phase": 90,
+          "smooth": 70,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false,
+          "rateHz": 0.09
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Drift",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "color",
+          "label": "Open",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "shape",
+          "label": "Vowel",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "space",
+          "label": "Bloom",
+          "default": 0,
+          "range": "0..100"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "oscA.position",
+          "amount": 18,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "oscB.position",
+          "amount": -12,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo2",
+          "target": "filter.cutoffHz",
+          "amount": 16,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo2",
+          "target": "amp.pan",
+          "amount": 20,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "oscA.warp",
+          "amount": 22,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.cutoffHz",
+          "amount": 14,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "aftertouch",
+          "target": "filter.cutoffHz",
+          "amount": 25,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.motion",
+          "target": "lfo1.depth",
+          "amount": 45,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "filter.cutoffHz",
+          "amount": 35,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscA.position",
+          "amount": 50,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Reverb / Room.mix",
+          "amount": 32,
+          "range": "-100..100",
+          "curve": "linear"
+        }
+      ],
+      "fxChain": [
+        {
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 90,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Chorus",
+          "params": {
+            "rate": 10,
+            "depth": 45,
+            "feedback": 5,
+            "width": 90,
+            "mix": 30
+          }
+        },
+        {
+          "type": "Phaser",
+          "params": {
+            "rate": 6,
+            "depth": 24,
+            "feedback": 12,
+            "mix": 12
+          }
+        },
+        {
+          "type": "Reverb / Room",
+          "params": {
+            "size": 88,
+            "decay": 78,
+            "preDelay": 35,
+            "tone": 52,
+            "mix": 32
+          }
+        },
+        {
+          "type": "Low-pass",
+          "params": {
+            "cutoffHz": 12000,
+            "resonance": 0,
+            "mix": 100
+          }
+        }
+      ]
+    },
+    {
+      "name": "Factory Reese",
+      "category": "Bass",
+      "intent": "Detuned mono bass with moving filter, distortion, and controlled stereo mids.",
+      "playMode": {
+        "polyphony": 1,
+        "mono": true,
+        "legato": true,
+        "glideMs": 45
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "saw",
+          "position": 52,
+          "warpMode": "fold",
+          "warp": 22,
+          "octave": -1,
+          "semitone": 0,
+          "fineCents": -8,
+          "phase": 0,
+          "random": 20,
+          "pan": 0,
+          "level": 70
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "saw",
+          "position": 50,
+          "warpMode": "shape",
+          "warp": 12,
+          "octave": -1,
+          "semitone": 0,
+          "fineCents": 9,
+          "phase": 0,
+          "random": 25,
+          "pan": 0,
+          "level": 65
+        }
+      },
+      "voiceStack": {
+        "enabled": true,
+        "voices": 5,
+        "detune": 18,
+        "blend": 80,
+        "spread": 55,
+        "max": 8
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP24",
+        "cutoffHz": 1100,
+        "resonance": 18,
+        "drive": 28,
+        "keytrack": 10
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 2,
+          "decayMs": 350,
+          "sustain": 88,
+          "releaseMs": 90
+        },
+        "modEnv": {
+          "attackMs": 0,
+          "decayMs": 260,
+          "sustain": 20,
+          "releaseMs": 80
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "triangle",
+          "sync": true,
+          "phase": 0,
+          "smooth": 25,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": true,
+          "rate": "1/4"
+        },
+        "lfo2": {
+          "enabled": true,
+          "shape": "sine",
+          "sync": true,
+          "phase": 90,
+          "smooth": 40,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false,
+          "rate": "1/2"
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Rate",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "color",
+          "label": "Grind",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "shape",
+          "label": "Bend",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "space",
+          "label": "Width",
+          "default": 0,
+          "range": "0..100"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "filter.cutoffHz",
+          "amount": 24,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "oscA.position",
+          "amount": 8,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo2",
+          "target": "amp.pan",
+          "amount": 10,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.cutoffHz",
+          "amount": 18,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "fx.Distortion.drive",
+          "amount": 28,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "filter.drive",
+          "amount": 20,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.motion",
+          "target": "lfo1.rate",
+          "amount": 30,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscA.warp",
+          "amount": 40,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "voiceStack.spread",
+          "amount": 25,
+          "range": "-100..100",
+          "curve": "linear"
+        }
+      ],
+      "fxChain": [
+        {
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 28,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Distortion",
+          "params": {
+            "drive": 24,
+            "tone": 45,
+            "clip": 52,
+            "mix": 55
+          }
+        },
+        {
+          "type": "Low-pass",
+          "params": {
+            "cutoffHz": 5000,
+            "resonance": 8,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Phaser",
+          "params": {
+            "rate": 8,
+            "depth": 35,
+            "feedback": 18,
+            "mix": 25
+          }
+        },
+        {
+          "type": "Compressor",
+          "params": {
+            "threshold": 44,
+            "ratio": 50,
+            "attack": 45,
+            "release": 45,
+            "makeup": 8,
+            "mix": 80
+          }
+        }
+      ]
+    },
+    {
+      "name": "Laser Brass Lead",
+      "category": "Lead",
+      "intent": "Sharp mono synth-brass lead with filter snap, pulse body, and performance vibrato.",
+      "playMode": {
+        "polyphony": 1,
+        "mono": true,
+        "legato": true,
+        "glideMs": 65
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "saw",
+          "position": 35,
+          "warpMode": "bend",
+          "warp": 38,
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "random": 0,
+          "pan": 0,
+          "level": 78
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "pulse",
+          "position": 30,
+          "warpMode": "shape",
+          "warp": 10,
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": -5,
+          "phase": 0,
+          "random": 5,
+          "pan": 0,
+          "level": 38
+        }
+      },
+      "voiceStack": {
+        "enabled": true,
+        "voices": 2,
+        "detune": 6,
+        "blend": 35,
+        "spread": 20,
+        "max": 4
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP24",
+        "cutoffHz": 2400,
+        "resonance": 28,
+        "drive": 18,
+        "keytrack": 35
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 0,
+          "decayMs": 420,
+          "sustain": 74,
+          "releaseMs": 110
+        },
+        "modEnv": {
+          "attackMs": 0,
+          "decayMs": 280,
+          "sustain": 0,
+          "releaseMs": 80
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "sine",
+          "sync": false,
+          "phase": 0,
+          "smooth": 35,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false,
+          "rateHz": 5.5
+        },
+        "lfo2": {
+          "enabled": false,
+          "shape": "sine",
+          "sync": true,
+          "phase": 0,
+          "smooth": 0,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": true,
+          "rate": "1/4"
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Vibrato",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "color",
+          "label": "Brass",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "shape",
+          "label": "Sync Bend",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "space",
+          "label": "Echo",
+          "default": 0,
+          "range": "0..100"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.cutoffHz",
+          "amount": 42,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "oscA.warp",
+          "amount": 20,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "global.pitchFine",
+          "amount": 5,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "aftertouch",
+          "target": "lfo1.depth",
+          "amount": 25,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "modWheel",
+          "target": "filter.cutoffHz",
+          "amount": 35,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.motion",
+          "target": "lfo1.depth",
+          "amount": 40,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "filter.cutoffHz",
+          "amount": 45,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "filter.resonance",
+          "amount": 15,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscA.warp",
+          "amount": 45,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Delay.mix",
+          "amount": 30,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Reverb / Room.mix",
+          "amount": 20,
+          "range": "-100..100",
+          "curve": "linear"
+        }
+      ],
+      "fxChain": [
+        {
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 120,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Saturator",
+          "params": {
+            "drive": 16,
+            "tone": 55,
+            "mix": 50
+          }
+        },
+        {
+          "type": "Delay",
+          "params": {
+            "timeLeft": "1/8D",
+            "timeRight": "1/4",
+            "feedback": 24,
+            "filter": 58,
+            "mix": 16
+          }
+        },
+        {
+          "type": "Reverb / Room",
+          "params": {
+            "size": 38,
+            "decay": 32,
+            "preDelay": 14,
+            "tone": 50,
+            "mix": 11
+          }
+        }
+      ]
+    },
+    {
+      "name": "Frozen Bell Stack",
+      "category": "Bell",
+      "intent": "Icy mallet/bell hybrid using custom harmonic frames and a clean sine support oscillator.",
+      "playMode": {
+        "polyphony": 10,
+        "mono": false,
+        "legato": false,
+        "glideMs": 0
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "custom_wavetable",
+          "customWavetable": {
+            "name": "Frozen Harmonics",
+            "character": "sine to inharmonic digital bell frames",
+            "source": "manual",
+            "frameMode": "full",
+            "interpolation": "smooth",
+            "morph": 42,
+            "normalizeAudio": true,
+            "evolve": false,
+            "frames": {
+              "A": {
+                "scan": 0,
+                "bright": 14,
+                "even": 2,
+                "fold": 0,
+                "formant": 2,
+                "notch": 0,
+                "focus": 8,
+                "skew": 0,
+                "tilt": -18,
+                "phase": 0
+              },
+              "B": {
+                "scan": 33,
+                "bright": 36,
+                "even": 18,
+                "fold": 12,
+                "formant": 8,
+                "notch": 2,
+                "focus": 26,
+                "skew": -4,
+                "tilt": 2,
+                "phase": 5
+              },
+              "C": {
+                "scan": 67,
+                "bright": 68,
+                "even": 36,
+                "fold": 34,
+                "formant": 18,
+                "notch": 8,
+                "focus": 54,
+                "skew": 8,
+                "tilt": 16,
+                "phase": -12
+              },
+              "D": {
+                "scan": 100,
+                "bright": 82,
+                "even": 62,
+                "fold": 48,
+                "formant": 26,
+                "notch": 18,
+                "focus": 74,
+                "skew": 20,
+                "tilt": 28,
+                "phase": 24
+              }
+            }
+          },
+          "position": 62,
+          "warpMode": "fold",
+          "warp": 30,
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "random": 0,
+          "pan": 0,
+          "level": 76
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "sine",
+          "position": 50,
+          "warpMode": "shape",
+          "warp": 0,
+          "octave": 1,
+          "semitone": 7,
+          "fineCents": 14,
+          "phase": 0,
+          "random": 0,
+          "pan": 0,
+          "level": 30
+        }
+      },
+      "voiceStack": {
+        "enabled": true,
+        "voices": 3,
+        "detune": 5,
+        "blend": 45,
+        "spread": 65,
+        "max": 6
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP12",
+        "cutoffHz": 8500,
+        "resonance": 6,
+        "drive": 0,
+        "keytrack": 70
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 0,
+          "decayMs": 1400,
+          "sustain": 0,
+          "releaseMs": 1800
+        },
+        "modEnv": {
+          "attackMs": 0,
+          "decayMs": 520,
+          "sustain": 0,
+          "releaseMs": 300
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "sine",
+          "sync": true,
+          "phase": 0,
+          "smooth": 50,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false,
+          "rate": "1/2"
+        },
+        "lfo2": {
+          "enabled": false,
+          "shape": "sine",
+          "sync": true,
+          "phase": 0,
+          "smooth": 0,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": true,
+          "rate": "1/4"
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Drift",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "color",
+          "label": "Ice",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "shape",
+          "label": "Partial",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "space",
+          "label": "Shine",
+          "default": 0,
+          "range": "0..100"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "oscA.warp",
+          "amount": 34,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "oscA.position",
+          "amount": 18,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "oscA.warp",
+          "amount": 22,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "amp.level",
+          "amount": 35,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "amp.pan",
+          "amount": 18,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.motion",
+          "target": "lfo1.depth",
+          "amount": 35,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "oscA.warp",
+          "amount": 40,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscA.position",
+          "amount": 45,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Reverb / Room.mix",
+          "amount": 40,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Delay.feedback",
+          "amount": 20,
+          "range": "-100..100",
+          "curve": "linear"
+        }
+      ],
+      "fxChain": [
+        {
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 160,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Bitcrush",
+          "params": {
+            "bits": 13,
+            "rate": 80,
+            "tone": 60,
+            "mix": 7
+          }
+        },
+        {
+          "type": "Delay",
+          "params": {
+            "timeLeft": "1/4",
+            "timeRight": "1/8D",
+            "feedback": 34,
+            "filter": 68,
+            "mix": 20
+          }
+        },
+        {
+          "type": "Reverb / Room",
+          "params": {
+            "size": 82,
+            "decay": 62,
+            "preDelay": 28,
+            "tone": 65,
+            "mix": 24
+          }
+        },
+        {
+          "type": "Compressor",
+          "params": {
+            "threshold": 45,
+            "ratio": 18,
+            "attack": 30,
+            "release": 55,
+            "makeup": 6,
+            "mix": 50
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analog Dust Pad",
+      "category": "Lo-Fi Pad",
+      "intent": "Tape-worn vintage pad with pitch drift, chorus, and softened high end using custom lo-fi frames.",
+      "playMode": {
+        "polyphony": 10,
+        "mono": false,
+        "legato": false,
+        "glideMs": 0
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "custom_wavetable",
+          "customWavetable": {
+            "name": "Analog Dust Table",
+            "character": "dark softened saw/triangle frames",
+            "source": "manual",
+            "frameMode": "full",
+            "interpolation": "smooth",
+            "morph": 48,
+            "normalizeAudio": true,
+            "evolve": false,
+            "frames": {
+              "A": {
+                "scan": 0,
+                "bright": 22,
+                "even": 12,
+                "fold": 3,
+                "formant": 6,
+                "notch": 2,
+                "focus": 14,
+                "skew": -20,
+                "tilt": -28,
+                "phase": 0
+              },
+              "B": {
+                "scan": 33,
+                "bright": 34,
+                "even": 18,
+                "fold": 6,
+                "formant": 12,
+                "notch": 3,
+                "focus": 22,
+                "skew": -12,
+                "tilt": -16,
+                "phase": 5
+              },
+              "C": {
+                "scan": 67,
+                "bright": 46,
+                "even": 24,
+                "fold": 11,
+                "formant": 16,
+                "notch": 5,
+                "focus": 30,
+                "skew": -4,
+                "tilt": -6,
+                "phase": -5
+              },
+              "D": {
+                "scan": 100,
+                "bright": 54,
+                "even": 32,
+                "fold": 18,
+                "formant": 22,
+                "notch": 8,
+                "focus": 40,
+                "skew": 6,
+                "tilt": 4,
+                "phase": 10
+              }
+            }
+          },
+          "position": 22,
+          "warpMode": "shape",
+          "warp": 12,
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": -7,
+          "phase": 0,
+          "random": 45,
+          "pan": 0,
+          "level": 72
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "pulse",
+          "position": 58,
+          "warpMode": "shape",
+          "warp": 8,
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 6,
+          "phase": 0,
+          "random": 50,
+          "pan": 0,
+          "level": 46
+        }
+      },
+      "voiceStack": {
+        "enabled": true,
+        "voices": 4,
+        "detune": 10,
+        "blend": 55,
+        "spread": 60,
+        "max": 8
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP12",
+        "cutoffHz": 2800,
+        "resonance": 9,
+        "drive": 12,
+        "keytrack": 20
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 950,
+          "decayMs": 2200,
+          "sustain": 70,
+          "releaseMs": 2800
+        },
+        "modEnv": {
+          "attackMs": 1400,
+          "decayMs": 3000,
+          "sustain": 35,
+          "releaseMs": 2000
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "sine",
+          "sync": false,
+          "phase": 0,
+          "smooth": 70,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false,
+          "rateHz": 0.35
+        },
+        "lfo2": {
+          "enabled": true,
+          "shape": "square",
+          "sync": false,
+          "phase": 0,
+          "smooth": 80,
+          "random": 60,
+          "oneShot": false,
+          "retrigger": false,
+          "rateHz": 0.18
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Wobble",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "color",
+          "label": "Age",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "shape",
+          "label": "Pulse",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "space",
+          "label": "Room",
+          "default": 0,
+          "range": "0..100"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "global.pitchFine",
+          "amount": 4,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo2",
+          "target": "filter.cutoffHz",
+          "amount": 12,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo2",
+          "target": "oscB.position",
+          "amount": 15,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.cutoffHz",
+          "amount": 10,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.motion",
+          "target": "global.pitchFineModDepth",
+          "amount": 30,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "filter.cutoffHz",
+          "amount": -25,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "fx.Saturator.drive",
+          "amount": 22,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscB.position",
+          "amount": 35,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Reverb / Room.mix",
+          "amount": 35,
+          "range": "-100..100",
+          "curve": "linear"
+        }
+      ],
+      "fxChain": [
+        {
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 90,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Saturator",
+          "params": {
+            "drive": 12,
+            "tone": 38,
+            "mix": 55
+          }
+        },
+        {
+          "type": "Chorus",
+          "params": {
+            "rate": 12,
+            "depth": 35,
+            "feedback": 10,
+            "width": 75,
+            "mix": 24
+          }
+        },
+        {
+          "type": "Low-pass",
+          "params": {
+            "cutoffHz": 9500,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Reverb / Room",
+          "params": {
+            "size": 52,
+            "decay": 48,
+            "preDelay": 25,
+            "tone": 40,
+            "mix": 18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Neon Chord Stab",
+      "category": "Chord Stab",
+      "intent": "Short house/garage-style chord stab with filter snap, pulse color, and tight room/delay FX.",
+      "playMode": {
+        "polyphony": 8,
+        "mono": false,
+        "legato": false,
+        "glideMs": 0
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "saw",
+          "position": 40,
+          "warpMode": "bend",
+          "warp": 20,
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "random": 10,
+          "pan": 0,
+          "level": 70
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "pulse",
+          "position": 36,
+          "warpMode": "shape",
+          "warp": 12,
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": -8,
+          "phase": 0,
+          "random": 15,
+          "pan": 0,
+          "level": 45
+        }
+      },
+      "voiceStack": {
+        "enabled": true,
+        "voices": 4,
+        "detune": 12,
+        "blend": 65,
+        "spread": 70,
+        "max": 8
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP24",
+        "cutoffHz": 1800,
+        "resonance": 20,
+        "drive": 14,
+        "keytrack": 25
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 0,
+          "decayMs": 320,
+          "sustain": 18,
+          "releaseMs": 170
+        },
+        "modEnv": {
+          "attackMs": 0,
+          "decayMs": 260,
+          "sustain": 0,
+          "releaseMs": 100
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "saw",
+          "sync": true,
+          "phase": 0,
+          "smooth": 15,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": true,
+          "rate": "1/4"
+        },
+        "lfo2": {
+          "enabled": false,
+          "shape": "sine",
+          "sync": true,
+          "phase": 0,
+          "smooth": 0,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": true,
+          "rate": "1/4"
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Pump",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "color",
+          "label": "Open",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "shape",
+          "label": "Pulse",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "space",
+          "label": "Throw",
+          "default": 0,
+          "range": "0..100"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.cutoffHz",
+          "amount": 45,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "filter.cutoffHz",
+          "amount": 22,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "amp.level",
+          "amount": -18,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "filter.cutoffHz",
+          "amount": -10,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.motion",
+          "target": "lfo1.depth",
+          "amount": 50,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "filter.cutoffHz",
+          "amount": 50,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscA.warp",
+          "amount": 30,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscB.position",
+          "amount": 30,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Delay.mix",
+          "amount": 30,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Reverb / Room.mix",
+          "amount": 20,
+          "range": "-100..100",
+          "curve": "linear"
+        }
+      ],
+      "fxChain": [
+        {
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 110,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Saturator",
+          "params": {
+            "drive": 18,
+            "tone": 52,
+            "mix": 45
+          }
+        },
+        {
+          "type": "Chorus",
+          "params": {
+            "rate": 16,
+            "depth": 20,
+            "feedback": 5,
+            "width": 65,
+            "mix": 18
+          }
+        },
+        {
+          "type": "Delay",
+          "params": {
+            "timeLeft": "1/8D",
+            "timeRight": "1/4",
+            "feedback": 20,
+            "filter": 60,
+            "mix": 12
+          }
+        },
+        {
+          "type": "Reverb / Room",
+          "params": {
+            "size": 36,
+            "decay": 28,
+            "preDelay": 10,
+            "tone": 50,
+            "mix": 9
+          }
+        },
+        {
+          "type": "Compressor",
+          "params": {
+            "threshold": 42,
+            "ratio": 30,
+            "attack": 40,
+            "release": 38,
+            "makeup": 8,
+            "mix": 65
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sub Anchor",
+      "category": "Sub Bass",
+      "intent": "Clean mono sub bass with subtle harmonic edge and optional short pitch transient.",
+      "playMode": {
+        "polyphony": 1,
+        "mono": true,
+        "legato": true,
+        "glideMs": 25
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "sine",
+          "position": 50,
+          "warpMode": "shape",
+          "warp": 8,
+          "octave": -2,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "random": 0,
+          "pan": 0,
+          "level": 90
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "triangle",
+          "position": 50,
+          "warpMode": "shape",
+          "warp": 0,
+          "octave": -1,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "random": 0,
+          "pan": 0,
+          "level": 18
+        }
+      },
+      "voiceStack": {
+        "enabled": false,
+        "voices": 1,
+        "detune": 0,
+        "blend": 0,
+        "spread": 0,
+        "max": 1
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP24",
+        "cutoffHz": 900,
+        "resonance": 4,
+        "drive": 10,
+        "keytrack": 15
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 4,
+          "decayMs": 180,
+          "sustain": 100,
+          "releaseMs": 80
+        },
+        "modEnv": {
+          "attackMs": 0,
+          "decayMs": 120,
+          "sustain": 0,
+          "releaseMs": 50
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": false,
+          "shape": "sine",
+          "sync": true,
+          "phase": 0,
+          "smooth": 0,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": true,
+          "rate": "1/4"
+        },
+        "lfo2": {
+          "enabled": false,
+          "shape": "sine",
+          "sync": true,
+          "phase": 0,
+          "smooth": 0,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": true,
+          "rate": "1/4"
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Glide",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "color",
+          "label": "Edge",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "shape",
+          "label": "Overtone",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "space",
+          "label": "None",
+          "default": 0,
+          "range": "0..100"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "global.pitchSemitones",
+          "amount": 7,
+          "range": "-100..100",
+          "curve": "linear",
+          "note": "Short pitch drop/transient; omit if global pitch target is unavailable."
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.cutoffHz",
+          "amount": 12,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "amp.level",
+          "amount": 15,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.motion",
+          "target": "playMode.glideMs",
+          "amount": 40,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "fx.Saturator.drive",
+          "amount": 35,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscB.level",
+          "amount": 35,
+          "range": "-100..100",
+          "curve": "linear"
+        }
+      ],
+      "fxChain": [
+        {
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 25,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Saturator",
+          "params": {
+            "drive": 8,
+            "tone": 40,
+            "mix": 35
+          }
+        },
+        {
+          "type": "Low-pass",
+          "params": {
+            "cutoffHz": 5000,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Compressor",
+          "params": {
+            "threshold": 40,
+            "ratio": 36,
+            "attack": 55,
+            "release": 42,
+            "makeup": 8,
+            "mix": 80
+          }
+        }
+      ]
+    },
+    {
+      "name": "Scanner Drone",
+      "category": "Atmosphere",
+      "intent": "Slow evolving drone with independent custom wavetable scanning, phaser/flanger motion, delay, and large room reverb.",
+      "playMode": {
+        "polyphony": 6,
+        "mono": false,
+        "legato": false,
+        "glideMs": 0
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "custom_wavetable",
+          "customWavetable": {
+            "name": "Scanner Metal A",
+            "character": "dark triangle to metallic noisy harmonic frames",
+            "source": "manual",
+            "frameMode": "full",
+            "interpolation": "smooth",
+            "morph": 70,
+            "normalizeAudio": true,
+            "evolve": true,
+            "frames": {
+              "A": {
+                "scan": 0,
+                "bright": 20,
+                "even": 10,
+                "fold": 5,
+                "formant": 8,
+                "notch": 4,
+                "focus": 16,
+                "skew": -16,
+                "tilt": -24,
+                "phase": 0
+              },
+              "B": {
+                "scan": 33,
+                "bright": 42,
+                "even": 36,
+                "fold": 18,
+                "formant": 24,
+                "notch": 12,
+                "focus": 40,
+                "skew": -6,
+                "tilt": -4,
+                "phase": 12
+              },
+              "C": {
+                "scan": 67,
+                "bright": 72,
+                "even": 50,
+                "fold": 48,
+                "formant": 38,
+                "notch": 20,
+                "focus": 70,
+                "skew": 10,
+                "tilt": 16,
+                "phase": -18
+              },
+              "D": {
+                "scan": 100,
+                "bright": 90,
+                "even": 76,
+                "fold": 64,
+                "formant": 52,
+                "notch": 34,
+                "focus": 86,
+                "skew": 24,
+                "tilt": 30,
+                "phase": 28
+              }
+            }
+          },
+          "position": 0,
+          "warpMode": "formant",
+          "warp": 25,
+          "octave": -1,
+          "semitone": 0,
+          "fineCents": -3,
+          "phase": 0,
+          "random": 60,
+          "pan": 0,
+          "level": 70
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "custom_wavetable",
+          "customWavetable": {
+            "name": "Scanner Air B",
+            "character": "airy upper drone table with high even harmonics",
+            "source": "manual",
+            "frameMode": "full",
+            "interpolation": "smooth",
+            "morph": 74,
+            "normalizeAudio": true,
+            "evolve": true,
+            "frames": {
+              "A": {
+                "scan": 0,
+                "bright": 24,
+                "even": 16,
+                "fold": 4,
+                "formant": 8,
+                "notch": 2,
+                "focus": 18,
+                "skew": -10,
+                "tilt": -20,
+                "phase": 0
+              },
+              "B": {
+                "scan": 33,
+                "bright": 48,
+                "even": 38,
+                "fold": 14,
+                "formant": 16,
+                "notch": 8,
+                "focus": 42,
+                "skew": -2,
+                "tilt": -4,
+                "phase": 10
+              },
+              "C": {
+                "scan": 67,
+                "bright": 76,
+                "even": 62,
+                "fold": 36,
+                "formant": 30,
+                "notch": 18,
+                "focus": 68,
+                "skew": 12,
+                "tilt": 18,
+                "phase": -14
+              },
+              "D": {
+                "scan": 100,
+                "bright": 94,
+                "even": 84,
+                "fold": 58,
+                "formant": 46,
+                "notch": 30,
+                "focus": 88,
+                "skew": 28,
+                "tilt": 34,
+                "phase": 28
+              }
+            }
+          },
+          "position": 55,
+          "warpMode": "fold",
+          "warp": 18,
+          "octave": 0,
+          "semitone": 12,
+          "fineCents": 11,
+          "phase": 0,
+          "random": 60,
+          "pan": 0,
+          "level": 35
+        }
+      },
+      "voiceStack": {
+        "enabled": true,
+        "voices": 6,
+        "detune": 20,
+        "blend": 85,
+        "spread": 90,
+        "max": 12
+      },
+      "filter": {
+        "enabled": true,
+        "type": "BP12",
+        "cutoffHz": 1600,
+        "resonance": 35,
+        "drive": 16,
+        "keytrack": 0
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 3500,
+          "decayMs": 5000,
+          "sustain": 85,
+          "releaseMs": 6000
+        },
+        "modEnv": {
+          "attackMs": 4000,
+          "decayMs": 6000,
+          "sustain": 40,
+          "releaseMs": 5000
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "triangle",
+          "sync": false,
+          "phase": 0,
+          "smooth": 80,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false,
+          "rateHz": 0.03
+        },
+        "lfo2": {
+          "enabled": true,
+          "shape": "square",
+          "sync": false,
+          "phase": 0,
+          "smooth": 85,
+          "random": 70,
+          "oneShot": false,
+          "retrigger": false,
+          "rateHz": 0.07
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Scan",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "color",
+          "label": "Resonance",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "shape",
+          "label": "Fold",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "space",
+          "label": "Depth",
+          "default": 0,
+          "range": "0..100"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "oscA.position",
+          "amount": 45,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "oscA.warp",
+          "amount": 18,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo2",
+          "target": "filter.cutoffHz",
+          "amount": 30,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo2",
+          "target": "amp.pan",
+          "amount": 28,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.resonance",
+          "amount": 12,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "aftertouch",
+          "target": "filter.cutoffHz",
+          "amount": 35,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.motion",
+          "target": "oscA.positionModDepth",
+          "amount": 50,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.motion",
+          "target": "lfo1.rateHz",
+          "amount": 25,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "filter.cutoffHz",
+          "amount": 45,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "filter.resonance",
+          "amount": 20,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscA.warp",
+          "amount": 45,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Delay.mix",
+          "amount": 25,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Reverb / Room.mix",
+          "amount": 35,
+          "range": "-100..100",
+          "curve": "linear"
+        }
+      ],
+      "fxChain": [
+        {
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 120,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Phaser",
+          "params": {
+            "rate": 5,
+            "depth": 40,
+            "feedback": 20,
+            "mix": 20
+          }
+        },
+        {
+          "type": "Flanger",
+          "params": {
+            "rate": 4,
+            "depth": 24,
+            "feedback": 18,
+            "mix": 14
+          }
+        },
+        {
+          "type": "Delay",
+          "params": {
+            "timeLeft": "1/2",
+            "timeRight": "3/4",
+            "feedback": 36,
+            "filter": 44,
+            "mix": 20
+          }
+        },
+        {
+          "type": "Reverb / Room",
+          "params": {
+            "size": 96,
+            "decay": 88,
+            "preDelay": 45,
+            "tone": 48,
+            "mix": 38
+          }
+        },
+        {
+          "type": "Low-pass",
+          "params": {
+            "cutoffHz": 11000,
+            "resonance": 0,
+            "mix": 100
+          }
+        }
+      ]
+    },
+    {
+      "name": "Concrete Reese",
+      "category": "Bass / Crunch",
+      "intent": "Wide distorted mid-bass with moving wavetable grit and compressed weight.",
+      "playMode": {
+        "polyphony": 1,
+        "mono": true,
+        "legato": true,
+        "glideMs": 38
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "saw",
+          "position": 50,
+          "warpMode": "fold",
+          "warp": 32,
+          "octave": -1,
+          "semitone": 0,
+          "fineCents": -10,
+          "phase": 0,
+          "random": 20,
+          "pan": 0,
+          "level": 72
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "custom_wavetable",
+          "customWavetable": {
+            "name": "Concrete Grit Table",
+            "character": "saw-like bass frames moving from dense midrange into folded abrasive harmonics",
+            "source": "manual",
+            "frameMode": "full",
+            "interpolation": "smooth",
+            "morph": 42,
+            "normalizeAudio": true,
+            "evolve": false,
+            "frames": {
+              "A": {
+                "scan": 0,
+                "bright": 34,
+                "even": 18,
+                "fold": 18,
+                "formant": 8,
+                "notch": 6,
+                "focus": 18,
+                "skew": -8,
+                "tilt": -18,
+                "phase": 0
+              },
+              "B": {
+                "scan": 33,
+                "bright": 58,
+                "even": 34,
+                "fold": 38,
+                "formant": 16,
+                "notch": 16,
+                "focus": 34,
+                "skew": 4,
+                "tilt": -4,
+                "phase": 10
+              },
+              "C": {
+                "scan": 67,
+                "bright": 78,
+                "even": 56,
+                "fold": 62,
+                "formant": 30,
+                "notch": 24,
+                "focus": 56,
+                "skew": 14,
+                "tilt": 8,
+                "phase": -12
+              },
+              "D": {
+                "scan": 100,
+                "bright": 92,
+                "even": 72,
+                "fold": 82,
+                "formant": 42,
+                "notch": 36,
+                "focus": 74,
+                "skew": 28,
+                "tilt": 20,
+                "phase": 22
+              }
+            }
+          },
+          "position": 44,
+          "warpMode": "shape",
+          "warp": 28,
+          "octave": -1,
+          "semitone": 0,
+          "fineCents": 11,
+          "phase": 0,
+          "random": 25,
+          "pan": 0,
+          "level": 62
+        }
+      },
+      "voiceStack": {
+        "enabled": true,
+        "voices": 6,
+        "detune": 20,
+        "blend": 82,
+        "spread": 58,
+        "max": 12
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP24",
+        "cutoffHz": 980,
+        "resonance": 22,
+        "drive": 34,
+        "keytrack": 8
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 2,
+          "decayMs": 280,
+          "sustain": 88,
+          "releaseMs": 90
+        },
+        "modEnv": {
+          "attackMs": 0,
+          "decayMs": 360,
+          "sustain": 12,
+          "releaseMs": 80
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "triangle",
+          "sync": true,
+          "phase": 0,
+          "smooth": 28,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": true,
+          "rate": "1/4"
+        },
+        "lfo2": {
+          "enabled": true,
+          "shape": "sine",
+          "sync": true,
+          "phase": 90,
+          "smooth": 45,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false,
+          "rate": "1/2"
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Rate",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "color",
+          "label": "Grind",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "shape",
+          "label": "Bite",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "space",
+          "label": "Width",
+          "default": 0,
+          "range": "0..100"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "filter.cutoffHz",
+          "amount": 26,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "oscB.position",
+          "amount": 18,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.cutoffHz",
+          "amount": 20,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "fx.Distortion.drive",
+          "amount": 32,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.motion",
+          "target": "lfo1.rate",
+          "amount": 25,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscB.warp",
+          "amount": 35,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "voiceStack.spread",
+          "amount": 24,
+          "range": "-100..100",
+          "curve": "linear"
+        }
+      ],
+      "fxChain": [
+        {
+          "order": 1,
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 32,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "order": 2,
+          "type": "Saturator",
+          "params": {
+            "drive": 24,
+            "tone": 42,
+            "mix": 58
+          }
+        },
+        {
+          "order": 3,
+          "type": "Distortion",
+          "params": {
+            "drive": 34,
+            "tone": 48,
+            "clip": 68,
+            "mix": 62
+          }
+        },
+        {
+          "order": 4,
+          "type": "Low-pass",
+          "params": {
+            "cutoffHz": 5200,
+            "resonance": 8,
+            "mix": 100
+          }
+        },
+        {
+          "order": 5,
+          "type": "Compressor",
+          "params": {
+            "threshold": 42,
+            "ratio": 62,
+            "attack": 38,
+            "release": 44,
+            "makeup": 10,
+            "mix": 84
+          }
+        }
+      ],
+      "implementationNotes": [
+        "Use mono/legato/glide behavior for bassline playability.",
+        "For implementation, consider forcing low-frequency output mono or keeping spread narrower below the sub range."
+      ]
+    },
+    {
+      "name": "Bit Jaw",
+      "category": "Crunch Lead",
+      "intent": "Aggressive bitcrushed lead/bass patch for hard hooks and glitch riffs.",
+      "playMode": {
+        "polyphony": 1,
+        "mono": true,
+        "legato": true,
+        "glideMs": 55
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "pulse",
+          "position": 28,
+          "warpMode": "shape",
+          "warp": 36,
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": -5,
+          "phase": 0,
+          "random": 5,
+          "pan": 0,
+          "level": 78
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "saw",
+          "position": 50,
+          "warpMode": "fold",
+          "warp": 44,
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": 4,
+          "phase": 0,
+          "random": 8,
+          "pan": 0,
+          "level": 42
+        }
+      },
+      "voiceStack": {
+        "enabled": true,
+        "voices": 3,
+        "detune": 10,
+        "blend": 55,
+        "spread": 35,
+        "max": 8
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP24",
+        "cutoffHz": 2200,
+        "resonance": 30,
+        "drive": 24,
+        "keytrack": 28
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 0,
+          "decayMs": 240,
+          "sustain": 68,
+          "releaseMs": 110
+        },
+        "modEnv": {
+          "attackMs": 0,
+          "decayMs": 190,
+          "sustain": 0,
+          "releaseMs": 75
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "sine",
+          "sync": false,
+          "rateHz": 5.8,
+          "phase": 0,
+          "smooth": 35,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false
+        },
+        "lfo2": {
+          "enabled": true,
+          "shape": "square",
+          "sync": true,
+          "rate": "1/8",
+          "phase": 0,
+          "smooth": 10,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": true
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Vibe",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "color",
+          "label": "Crush",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "shape",
+          "label": "Jaw",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "space",
+          "label": "Echo",
+          "default": 0,
+          "range": "0..100"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.cutoffHz",
+          "amount": 46,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "global.pitchFine",
+          "amount": 5,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo2",
+          "target": "oscA.position",
+          "amount": 14,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "fx.Bitcrush.bits",
+          "amount": -28,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "fx.Distortion.drive",
+          "amount": 34,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscA.warp",
+          "amount": 32,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Delay.mix",
+          "amount": 28,
+          "range": "-100..100",
+          "curve": "linear"
+        }
+      ],
+      "fxChain": [
+        {
+          "order": 1,
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 95,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "order": 2,
+          "type": "Distortion",
+          "params": {
+            "drive": 38,
+            "tone": 58,
+            "clip": 72,
+            "mix": 68
+          }
+        },
+        {
+          "order": 3,
+          "type": "Bitcrush",
+          "params": {
+            "bits": 8,
+            "sampleRate": 38,
+            "jitter": 12,
+            "mix": 42
+          }
+        },
+        {
+          "order": 4,
+          "type": "Flanger",
+          "params": {
+            "rate": 16,
+            "depth": 28,
+            "feedback": 22,
+            "mix": 18
+          }
+        },
+        {
+          "order": 5,
+          "type": "Delay",
+          "params": {
+            "time": "1/8D",
+            "feedback": 22,
+            "mix": 14
+          }
+        }
+      ],
+      "implementationNotes": [
+        "The macro.color modulation reduces bit depth while increasing distortion drive, so higher macro values should feel more broken and aggressive.",
+        "The patch can work as either a lead or upper bass; transpose down one octave for heavier bass demos."
+      ]
+    },
+    {
+      "name": "Vowel Choir",
+      "category": "Vocal Pad",
+      "intent": "Slow morphing synthetic choir pad using ABCD frames as vowel-like positions.",
+      "playMode": {
+        "polyphony": 10,
+        "mono": false,
+        "legato": false,
+        "glideMs": 0
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "custom_wavetable",
+          "customWavetable": {
+            "name": "OO AH EH EE Choir Table",
+            "character": "four vowel-like frames designed for slow oscillator position scanning",
+            "source": "manual",
+            "frameMode": "full",
+            "interpolation": "smooth",
+            "morph": 72,
+            "normalizeAudio": true,
+            "evolve": true,
+            "frames": {
+              "A": {
+                "vowelHint": "OO",
+                "scan": 0,
+                "bright": 22,
+                "even": 18,
+                "fold": 6,
+                "formant": 18,
+                "notch": 8,
+                "focus": 62,
+                "skew": -14,
+                "tilt": -28,
+                "phase": 0
+              },
+              "B": {
+                "vowelHint": "AH",
+                "scan": 33,
+                "bright": 38,
+                "even": 28,
+                "fold": 10,
+                "formant": 36,
+                "notch": 12,
+                "focus": 42,
+                "skew": -4,
+                "tilt": -10,
+                "phase": 8
+              },
+              "C": {
+                "vowelHint": "EH",
+                "scan": 67,
+                "bright": 58,
+                "even": 42,
+                "fold": 12,
+                "formant": 56,
+                "notch": 22,
+                "focus": 58,
+                "skew": 8,
+                "tilt": 4,
+                "phase": -6
+              },
+              "D": {
+                "vowelHint": "EE",
+                "scan": 100,
+                "bright": 78,
+                "even": 58,
+                "fold": 16,
+                "formant": 78,
+                "notch": 32,
+                "focus": 78,
+                "skew": 16,
+                "tilt": 22,
+                "phase": 16
+              }
+            }
+          },
+          "position": 30,
+          "warpMode": "formant",
+          "warp": 48,
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": -6,
+          "phase": 0,
+          "random": 40,
+          "pan": 0,
+          "level": 74
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "triangle",
+          "position": 50,
+          "warpMode": "shape",
+          "warp": 8,
+          "octave": 0,
+          "semitone": -12,
+          "fineCents": 4,
+          "phase": 0,
+          "random": 45,
+          "pan": 0,
+          "level": 36
+        }
+      },
+      "voiceStack": {
+        "enabled": true,
+        "voices": 5,
+        "detune": 12,
+        "blend": 68,
+        "spread": 78,
+        "max": 12
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP12",
+        "cutoffHz": 4200,
+        "resonance": 10,
+        "drive": 4,
+        "keytrack": 22
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 1600,
+          "decayMs": 2800,
+          "sustain": 82,
+          "releaseMs": 4200
+        },
+        "modEnv": {
+          "attackMs": 2200,
+          "decayMs": 4200,
+          "sustain": 55,
+          "releaseMs": 3000
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "triangle",
+          "sync": false,
+          "rateHz": 0.07,
+          "phase": 0,
+          "smooth": 80,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false
+        },
+        "lfo2": {
+          "enabled": true,
+          "shape": "sine",
+          "sync": false,
+          "rateHz": 0.11,
+          "phase": 90,
+          "smooth": 70,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Drift",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "color",
+          "label": "Throat",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "shape",
+          "label": "Vowel",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "space",
+          "label": "Hall",
+          "default": 0,
+          "range": "0..100"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "oscA.position",
+          "amount": 42,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo2",
+          "target": "filter.cutoffHz",
+          "amount": 14,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "oscA.warp",
+          "amount": 18,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "aftertouch",
+          "target": "filter.cutoffHz",
+          "amount": 28,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscA.position",
+          "amount": 55,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "oscA.warp",
+          "amount": 30,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Reverb / Room.mix",
+          "amount": 34,
+          "range": "-100..100",
+          "curve": "linear"
+        }
+      ],
+      "fxChain": [
+        {
+          "order": 1,
+          "type": "Chorus",
+          "params": {
+            "rate": 8,
+            "depth": 42,
+            "feedback": 8,
+            "mix": 30
+          }
+        },
+        {
+          "order": 2,
+          "type": "Low-pass",
+          "params": {
+            "cutoffHz": 9000,
+            "resonance": 4,
+            "mix": 100
+          }
+        },
+        {
+          "order": 3,
+          "type": "Reverb / Room",
+          "params": {
+            "size": 82,
+            "decay": 74,
+            "damping": 48,
+            "mix": 34
+          }
+        },
+        {
+          "order": 4,
+          "type": "Compressor",
+          "params": {
+            "threshold": 50,
+            "ratio": 28,
+            "attack": 58,
+            "release": 52,
+            "makeup": 4,
+            "mix": 55
+          }
+        }
+      ],
+      "implementationNotes": [
+        "ABCD frames are intended as synthetic vowel anchors rather than realistic sample vowels.",
+        "The slow LFO position scan is the main vocal movement source; macro.shape should manually sweep the vowel position."
+      ]
+    },
+    {
+      "name": "Talk Pluck",
+      "category": "Vocal Pluck",
+      "intent": "Short talking pluck where the mod envelope scans across vowel-like wavetable frames.",
+      "playMode": {
+        "polyphony": 6,
+        "mono": false,
+        "legato": false,
+        "glideMs": 0
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "custom_wavetable",
+          "customWavetable": {
+            "name": "WA AH YAH EE Talk Table",
+            "character": "short vowel movement for plucks and talking synth gestures",
+            "source": "manual",
+            "frameMode": "transient",
+            "interpolation": "smooth",
+            "morph": 55,
+            "normalizeAudio": true,
+            "evolve": false,
+            "frames": {
+              "A": {
+                "vowelHint": "WA",
+                "scan": 0,
+                "bright": 28,
+                "even": 16,
+                "fold": 8,
+                "formant": 20,
+                "notch": 8,
+                "focus": 36,
+                "skew": -20,
+                "tilt": -20,
+                "phase": 0
+              },
+              "B": {
+                "vowelHint": "AH",
+                "scan": 33,
+                "bright": 50,
+                "even": 32,
+                "fold": 16,
+                "formant": 44,
+                "notch": 16,
+                "focus": 52,
+                "skew": -4,
+                "tilt": -4,
+                "phase": 8
+              },
+              "C": {
+                "vowelHint": "YAH",
+                "scan": 67,
+                "bright": 74,
+                "even": 48,
+                "fold": 20,
+                "formant": 68,
+                "notch": 28,
+                "focus": 68,
+                "skew": 12,
+                "tilt": 12,
+                "phase": -8
+              },
+              "D": {
+                "vowelHint": "EE",
+                "scan": 100,
+                "bright": 88,
+                "even": 62,
+                "fold": 24,
+                "formant": 86,
+                "notch": 36,
+                "focus": 84,
+                "skew": 20,
+                "tilt": 24,
+                "phase": 18
+              }
+            }
+          },
+          "position": 8,
+          "warpMode": "formant",
+          "warp": 62,
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "random": 5,
+          "pan": 0,
+          "level": 82
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "pulse",
+          "position": 34,
+          "warpMode": "shape",
+          "warp": 18,
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": -6,
+          "phase": 0,
+          "random": 10,
+          "pan": 0,
+          "level": 24
+        }
+      },
+      "voiceStack": {
+        "enabled": false,
+        "voices": 1,
+        "detune": 0,
+        "blend": 0,
+        "spread": 0,
+        "max": 1
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP24",
+        "cutoffHz": 2600,
+        "resonance": 34,
+        "drive": 12,
+        "keytrack": 42
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 0,
+          "decayMs": 330,
+          "sustain": 0,
+          "releaseMs": 180
+        },
+        "modEnv": {
+          "attackMs": 0,
+          "decayMs": 260,
+          "sustain": 0,
+          "releaseMs": 110
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "saw",
+          "sync": true,
+          "rate": "1/8",
+          "phase": 0,
+          "smooth": 22,
+          "random": 0,
+          "oneShot": true,
+          "retrigger": true
+        },
+        "lfo2": {
+          "enabled": false,
+          "shape": "sine",
+          "sync": true,
+          "phase": 0,
+          "smooth": 0,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": true,
+          "rate": "1/4"
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Chatter",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "color",
+          "label": "Nasal",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "shape",
+          "label": "Vowel",
+          "default": 0,
+          "range": "0..100"
+        },
+        {
+          "slot": "space",
+          "label": "Echo",
+          "default": 0,
+          "range": "0..100"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "oscA.position",
+          "amount": 68,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.cutoffHz",
+          "amount": 42,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "oscA.warp",
+          "amount": 24,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "oscA.position",
+          "amount": 18,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscA.position",
+          "amount": 60,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "filter.resonance",
+          "amount": 22,
+          "range": "-100..100",
+          "curve": "linear"
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Delay.mix",
+          "amount": 30,
+          "range": "-100..100",
+          "curve": "linear"
+        }
+      ],
+      "fxChain": [
+        {
+          "order": 1,
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 110,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "order": 2,
+          "type": "Saturator",
+          "params": {
+            "drive": 12,
+            "tone": 54,
+            "mix": 38
+          }
+        },
+        {
+          "order": 3,
+          "type": "Delay",
+          "params": {
+            "time": "1/8",
+            "feedback": 28,
+            "mix": 18
+          }
+        },
+        {
+          "order": 4,
+          "type": "Reverb / Room",
+          "params": {
+            "size": 48,
+            "decay": 36,
+            "damping": 45,
+            "mix": 14
+          }
+        }
+      ],
+      "implementationNotes": [
+        "The mod envelope should quickly sweep oscA.position across A/B/C/D to create a talking attack.",
+        "oneShot LFO 1 can add a second repeatable mini-scan when retriggered per note."
+      ]
+    },
+    {
+      "name": "Resin Violin Lead",
+      "category": "Synth String",
+      "intent": "Violin-inspired sustained lead using a bowed/string-like custom wavetable, slow attack, vibrato, and expressive macro/aftertouch control. It is meant as a stylized synth string, not a realistic sampled violin.",
+      "playMode": {
+        "polyphony": 1,
+        "mono": true,
+        "legato": true,
+        "glideMs": 18
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "custom_wavetable",
+          "customWavetable": {
+            "name": "Bowed Rosin Table",
+            "character": "warm bowed body through brighter rosin-edge frames for violin-like nasal motion",
+            "source": "manual",
+            "frameMode": "full",
+            "interpolation": "smooth",
+            "morph": 62,
+            "normalizeAudio": true,
+            "evolve": true,
+            "frames": {
+              "A": {
+                "hint": "warm string body",
+                "scan": 0,
+                "bright": 24,
+                "even": 18,
+                "fold": 4,
+                "formant": 14,
+                "notch": 4,
+                "focus": 34,
+                "skew": -12,
+                "tilt": -24,
+                "phase": 0
+              },
+              "B": {
+                "hint": "bowed saw body",
+                "scan": 33,
+                "bright": 42,
+                "even": 30,
+                "fold": 8,
+                "formant": 24,
+                "notch": 10,
+                "focus": 46,
+                "skew": -4,
+                "tilt": -8,
+                "phase": 8
+              },
+              "C": {
+                "hint": "hollow string overtone",
+                "scan": 67,
+                "bright": 62,
+                "even": 44,
+                "fold": 14,
+                "formant": 36,
+                "notch": 22,
+                "focus": 58,
+                "skew": 8,
+                "tilt": 6,
+                "phase": -8
+              },
+              "D": {
+                "hint": "rosin edge / bite",
+                "scan": 100,
+                "bright": 78,
+                "even": 58,
+                "fold": 22,
+                "formant": 48,
+                "notch": 34,
+                "focus": 70,
+                "skew": 18,
+                "tilt": 18,
+                "phase": 18
+              }
+            }
+          },
+          "position": 36,
+          "warpMode": "formant",
+          "warp": 22,
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": -4,
+          "phase": 0,
+          "random": 28,
+          "pan": 0,
+          "level": 76
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "saw",
+          "position": 50,
+          "warpMode": "shape",
+          "warp": 10,
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 7,
+          "phase": 0,
+          "random": 22,
+          "pan": 0,
+          "level": 24
+        }
+      },
+      "voiceStack": {
+        "enabled": true,
+        "voices": 2,
+        "detune": 6,
+        "blend": 32,
+        "spread": 18,
+        "max": 4
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP12",
+        "cutoffHz": 3600,
+        "resonance": 16,
+        "drive": 6,
+        "keytrack": 35
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 120,
+          "decayMs": 650,
+          "sustain": 82,
+          "releaseMs": 520
+        },
+        "modEnv": {
+          "attackMs": 80,
+          "decayMs": 900,
+          "sustain": 35,
+          "releaseMs": 300
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "sine",
+          "sync": false,
+          "rateHz": 5.2,
+          "phase": 0,
+          "smooth": 55,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false
+        },
+        "lfo2": {
+          "enabled": true,
+          "shape": "triangle",
+          "sync": false,
+          "rateHz": 0.12,
+          "phase": 90,
+          "smooth": 75,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Vibrato"
+        },
+        {
+          "slot": "color",
+          "label": "Rosin"
+        },
+        {
+          "slot": "shape",
+          "label": "Bow"
+        },
+        {
+          "slot": "space",
+          "label": "Room"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "global.pitchFine",
+          "amount": 4,
+          "purpose": "main violin-style vibrato"
+        },
+        {
+          "enabled": true,
+          "source": "lfo2",
+          "target": "oscA.position",
+          "amount": 12,
+          "purpose": "slow bow/timbre drift"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.cutoffHz",
+          "amount": 12,
+          "purpose": "slight opening after note onset"
+        },
+        {
+          "enabled": true,
+          "source": "modWheel",
+          "target": "lfo1.amount",
+          "amount": 35,
+          "purpose": "performable vibrato depth"
+        },
+        {
+          "enabled": true,
+          "source": "aftertouch",
+          "target": "filter.cutoffHz",
+          "amount": 24,
+          "purpose": "bow pressure brightness"
+        },
+        {
+          "enabled": true,
+          "source": "aftertouch",
+          "target": "amp.level",
+          "amount": 12,
+          "purpose": "bow pressure loudness"
+        },
+        {
+          "enabled": true,
+          "source": "macro.motion",
+          "target": "lfo1.amount",
+          "amount": 30
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "filter.cutoffHz",
+          "amount": 35
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "oscA.warp",
+          "amount": 18
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscA.position",
+          "amount": 45
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Reverb / Room.mix",
+          "amount": 25
+        }
+      ],
+      "fxChain": [
+        {
+          "type": "Saturator",
+          "params": {
+            "drive": 6,
+            "tone": 54,
+            "mix": 24
+          }
+        },
+        {
+          "type": "Low-pass",
+          "params": {
+            "cutoffHz": 8200,
+            "resonance": 2,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Chorus",
+          "params": {
+            "rate": 9,
+            "depth": 18,
+            "feedback": 4,
+            "mix": 12
+          }
+        },
+        {
+          "type": "Reverb / Room",
+          "params": {
+            "size": 62,
+            "decay": 46,
+            "damping": 42,
+            "mix": 22
+          }
+        },
+        {
+          "type": "Compressor",
+          "params": {
+            "threshold": 52,
+            "ratio": 22,
+            "attack": 48,
+            "release": 50,
+            "makeup": 2,
+            "mix": 45
+          }
+        }
+      ],
+      "implementationNotes": [
+        "This patch uses vibrato, legato, and slow timbre movement to suggest a bowed string. Without a noise source, body resonator, or physical-modeling bow interaction, it should be presented as synth violin/string lead rather than realistic violin.",
+        "For better realism later, add a noise/bow source, a keytracked resonator/comb filter, and per-oscillator envelopes."
+      ]
+    },
+    {
+      "name": "Block Felt Piano",
+      "category": "Keys / Synth Piano",
+      "intent": "Soft piano-like key patch for Minecraft-style ambient music: dark body, short bright attack, long decay, and roomy reverb. This is a synthetic approximation, not a sampled piano.",
+      "playMode": {
+        "polyphony": 12,
+        "mono": false,
+        "legato": false,
+        "glideMs": 0
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "triangle",
+          "position": 50,
+          "warpMode": "shape",
+          "warp": 8,
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "random": 8,
+          "pan": 0,
+          "level": 72
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "custom_wavetable",
+          "customWavetable": {
+            "name": "Soft Harmonic Hammer Table",
+            "character": "dark body to thin bright attack frame, intended for fast envelope scanning at note onset",
+            "source": "manual",
+            "frameMode": "piano_harmonic",
+            "interpolation": "smooth",
+            "morph": 45,
+            "normalizeAudio": true,
+            "evolve": false,
+            "frames": {
+              "A": {
+                "hint": "dark rounded body",
+                "scan": 0,
+                "bright": 16,
+                "even": 12,
+                "fold": 0,
+                "formant": 4,
+                "notch": 2,
+                "focus": 28,
+                "skew": -8,
+                "tilt": -28,
+                "phase": 0
+              },
+              "B": {
+                "hint": "soft hammer harmonic",
+                "scan": 33,
+                "bright": 36,
+                "even": 22,
+                "fold": 4,
+                "formant": 8,
+                "notch": 6,
+                "focus": 38,
+                "skew": -2,
+                "tilt": -12,
+                "phase": 6
+              },
+              "C": {
+                "hint": "bell/string overtone",
+                "scan": 67,
+                "bright": 55,
+                "even": 34,
+                "fold": 8,
+                "formant": 12,
+                "notch": 10,
+                "focus": 48,
+                "skew": 6,
+                "tilt": 4,
+                "phase": -5
+              },
+              "D": {
+                "hint": "thin attack sparkle",
+                "scan": 100,
+                "bright": 72,
+                "even": 48,
+                "fold": 12,
+                "formant": 18,
+                "notch": 16,
+                "focus": 60,
+                "skew": 14,
+                "tilt": 18,
+                "phase": 12
+              }
+            }
+          },
+          "position": 10,
+          "warpMode": "shape",
+          "warp": 14,
+          "octave": 1,
+          "semitone": 0,
+          "fineCents": 3,
+          "phase": 0,
+          "random": 10,
+          "pan": 0,
+          "level": 28
+        }
+      },
+      "voiceStack": {
+        "enabled": false
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP12",
+        "cutoffHz": 6200,
+        "resonance": 6,
+        "drive": 2,
+        "keytrack": 42
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 3,
+          "decayMs": 2400,
+          "sustain": 0,
+          "releaseMs": 850
+        },
+        "modEnv": {
+          "attackMs": 0,
+          "decayMs": 180,
+          "sustain": 0,
+          "releaseMs": 80
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": true,
+          "shape": "sine",
+          "sync": false,
+          "rateHz": 0.12,
+          "phase": 0,
+          "smooth": 80,
+          "random": 0,
+          "oneShot": false,
+          "retrigger": false
+        },
+        "lfo2": {
+          "enabled": false
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Drift"
+        },
+        {
+          "slot": "color",
+          "label": "Felt"
+        },
+        {
+          "slot": "shape",
+          "label": "Hammer"
+        },
+        {
+          "slot": "space",
+          "label": "Room"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "oscB.position",
+          "amount": 48,
+          "purpose": "start brighter and quickly settle into darker body"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.cutoffHz",
+          "amount": 26,
+          "purpose": "bright attack into mellow decay"
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "amp.level",
+          "amount": 32,
+          "purpose": "normal piano-like dynamic range"
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "filter.cutoffHz",
+          "amount": 24,
+          "purpose": "harder notes become brighter"
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "oscB.level",
+          "amount": 22,
+          "purpose": "harder notes get more attack/hammer partials"
+        },
+        {
+          "enabled": true,
+          "source": "lfo1",
+          "target": "global.pitchFine",
+          "amount": 2,
+          "purpose": "subtle imperfect pitch drift"
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "filter.cutoffHz",
+          "amount": -28
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscB.position",
+          "amount": 42
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Reverb / Room.mix",
+          "amount": 35
+        }
+      ],
+      "fxChain": [
+        {
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 70,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Chorus",
+          "params": {
+            "rate": 6,
+            "depth": 12,
+            "feedback": 0,
+            "mix": 8
+          }
+        },
+        {
+          "type": "Low-pass",
+          "params": {
+            "cutoffHz": 9000,
+            "resonance": 2,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Reverb / Room",
+          "params": {
+            "size": 78,
+            "decay": 68,
+            "damping": 58,
+            "mix": 28
+          }
+        },
+        {
+          "type": "Compressor",
+          "params": {
+            "threshold": 48,
+            "ratio": 24,
+            "attack": 55,
+            "release": 52,
+            "makeup": 2,
+            "mix": 42
+          }
+        }
+      ],
+      "implementationNotes": [
+        "The fake-piano identity comes from fast envelope scanning of a bright oscillator into a darker body, plus velocity to brightness and attack amount.",
+        "A real piano still benefits from samples or physical modeling, but this is useful for stylized, soft, ambient, or Minecraft-like piano cues."
+      ]
+    },
+    {
+      "name": "Toy Xylophone",
+      "category": "Mallet",
+      "intent": "Synthetic xylophone / wooden mallet patch with short decay, harmonic attack table, velocity brightness, and small room ambience.",
+      "playMode": {
+        "polyphony": 10,
+        "mono": false,
+        "legato": false,
+        "glideMs": 0
+      },
+      "oscillators": {
+        "oscA": {
+          "enabled": true,
+          "mode": "basic",
+          "shape": "sine",
+          "position": 50,
+          "warpMode": "shape",
+          "warp": 6,
+          "octave": 1,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "random": 0,
+          "pan": 0,
+          "level": 70
+        },
+        "oscB": {
+          "enabled": true,
+          "mode": "custom_wavetable",
+          "customWavetable": {
+            "name": "Wood Bar Harmonics Table",
+            "character": "short bright mallet/bar harmonics moving from rounded body to clicky upper partials",
+            "source": "manual",
+            "frameMode": "mallet_harmonic",
+            "interpolation": "smooth",
+            "morph": 48,
+            "normalizeAudio": true,
+            "evolve": false,
+            "frames": {
+              "A": {
+                "hint": "rounded wooden bar body",
+                "scan": 0,
+                "bright": 24,
+                "even": 10,
+                "fold": 0,
+                "formant": 6,
+                "notch": 4,
+                "focus": 34,
+                "skew": -10,
+                "tilt": -22,
+                "phase": 0
+              },
+              "B": {
+                "hint": "hollow mallet tone",
+                "scan": 33,
+                "bright": 46,
+                "even": 24,
+                "fold": 4,
+                "formant": 12,
+                "notch": 12,
+                "focus": 46,
+                "skew": -2,
+                "tilt": -4,
+                "phase": 6
+              },
+              "C": {
+                "hint": "harder wooden strike",
+                "scan": 67,
+                "bright": 68,
+                "even": 38,
+                "fold": 12,
+                "formant": 18,
+                "notch": 20,
+                "focus": 60,
+                "skew": 8,
+                "tilt": 10,
+                "phase": -6
+              },
+              "D": {
+                "hint": "clicky bright transient",
+                "scan": 100,
+                "bright": 88,
+                "even": 54,
+                "fold": 20,
+                "formant": 28,
+                "notch": 28,
+                "focus": 76,
+                "skew": 18,
+                "tilt": 28,
+                "phase": 14
+              }
+            }
+          },
+          "position": 22,
+          "warpMode": "shape",
+          "warp": 20,
+          "octave": 2,
+          "semitone": 7,
+          "fineCents": -8,
+          "phase": 0,
+          "random": 0,
+          "pan": 0,
+          "level": 38
+        }
+      },
+      "voiceStack": {
+        "enabled": false
+      },
+      "filter": {
+        "enabled": true,
+        "type": "LP12",
+        "cutoffHz": 7800,
+        "resonance": 8,
+        "drive": 2,
+        "keytrack": 65
+      },
+      "envelopes": {
+        "ampEnv": {
+          "attackMs": 0,
+          "decayMs": 760,
+          "sustain": 0,
+          "releaseMs": 220
+        },
+        "modEnv": {
+          "attackMs": 0,
+          "decayMs": 95,
+          "sustain": 0,
+          "releaseMs": 40
+        }
+      },
+      "lfos": {
+        "lfo1": {
+          "enabled": false
+        },
+        "lfo2": {
+          "enabled": false
+        }
+      },
+      "macros": [
+        {
+          "slot": "motion",
+          "label": "Bounce"
+        },
+        {
+          "slot": "color",
+          "label": "Wood"
+        },
+        {
+          "slot": "shape",
+          "label": "Strike"
+        },
+        {
+          "slot": "space",
+          "label": "Room"
+        }
+      ],
+      "modulationMatrix": [
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "oscB.position",
+          "amount": 56,
+          "purpose": "brief bright transient, then lower body frame"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "filter.cutoffHz",
+          "amount": 18,
+          "purpose": "clicky attack brightness"
+        },
+        {
+          "enabled": true,
+          "source": "modEnv",
+          "target": "global.pitch",
+          "amount": 3,
+          "unit": "semitones",
+          "purpose": "tiny mallet pitch knock"
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "amp.level",
+          "amount": 30
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "filter.cutoffHz",
+          "amount": 22
+        },
+        {
+          "enabled": true,
+          "source": "velocity",
+          "target": "oscB.level",
+          "amount": 26
+        },
+        {
+          "enabled": true,
+          "source": "macro.color",
+          "target": "filter.cutoffHz",
+          "amount": 34
+        },
+        {
+          "enabled": true,
+          "source": "macro.shape",
+          "target": "oscB.position",
+          "amount": 50
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Reverb / Room.mix",
+          "amount": 24
+        },
+        {
+          "enabled": true,
+          "source": "macro.space",
+          "target": "fx.Delay.mix",
+          "amount": 18
+        }
+      ],
+      "fxChain": [
+        {
+          "type": "High-pass",
+          "params": {
+            "cutoffHz": 130,
+            "resonance": 0,
+            "mix": 100
+          }
+        },
+        {
+          "type": "Saturator",
+          "params": {
+            "drive": 8,
+            "tone": 58,
+            "mix": 20
+          }
+        },
+        {
+          "type": "Delay",
+          "params": {
+            "time": "1/8",
+            "feedback": 16,
+            "mix": 8
+          }
+        },
+        {
+          "type": "Reverb / Room",
+          "params": {
+            "size": 45,
+            "decay": 34,
+            "damping": 46,
+            "mix": 16
+          }
+        },
+        {
+          "type": "Compressor",
+          "params": {
+            "threshold": 50,
+            "ratio": 24,
+            "attack": 35,
+            "release": 46,
+            "makeup": 2,
+            "mix": 38
+          }
+        }
+      ],
+      "implementationNotes": [
+        "The xylophone patch relies on short amp decay, bright transient scanning, high keytrack, and velocity to attack brightness.",
+        "For more realistic mallets later, add per-oscillator envelopes or a small click/noise transient source."
+      ]
+    }
+  ],
+  "expansionNotes": {
+    "addedInV3": [
+      "Concrete Reese - wide distorted mid-bass",
+      "Bit Jaw - bitcrushed crunch lead/bass",
+      "Vowel Choir - sustained vocal/formant pad",
+      "Talk Pluck - short talking formant pluck"
+    ],
+    "implementationNotes": [
+      "Bass and crunchy patches use only available FX: High-pass, Low-pass, Saturator, Distortion, Bitcrush, Flanger, Delay, Compressor.",
+      "Vocal patches treat custom wavetable frames A/B/C/D as vowel-like positions and use the modulation matrix to scan oscillator position.",
+      "The JSON uses descriptive target paths for implementation mapping; it is not a direct preset import schema.",
+      "The v4 acoustic-style patches are intentionally synthetic approximations. They use wavetable/frame scanning, envelope-controlled brightness, velocity modulation, and room/chorus processing rather than samples.",
+      "For stronger acoustic realism later, prioritize per-oscillator amp envelopes, a noise/click transient source, keytracked resonator/comb filtering, and velocity curves."
+    ],
+    "optionalFutureFeatures": [
+      {
+        "feature": "clean sub path or mono-low-band routing",
+        "benefit": "Lets heavy bass patches distort and widen mids while preserving a stable mono sub."
+      },
+      {
+        "feature": "dedicated vowel/formant filter",
+        "benefit": "Makes vocal patches easier and more predictable than shaping formants only inside the custom wavetable frames."
+      },
+      {
+        "feature": "noise/breath source",
+        "benefit": "Adds realism and transient detail for choir, talkbox, wind, pluck, and vocal-like patches."
+      }
+    ],
+    "addedInV4": [
+      "Resin Violin Lead - stylized bowed string/violin lead",
+      "Block Felt Piano - soft synthetic felt-piano approximation",
+      "Toy Xylophone - synthetic wooden mallet/xylophone patch"
+    ]
+  },
+  "patchSummary": {
+    "totalPatchCount": 17,
+    "categories": {
+      "Poly Keys": 1,
+      "Arp Pluck": 1,
+      "Pad": 1,
+      "Bass": 1,
+      "Lead": 1,
+      "Bell": 1,
+      "Lo-Fi Pad": 1,
+      "Chord Stab": 1,
+      "Sub Bass": 1,
+      "Atmosphere": 1,
+      "Bass / Crunch": 1,
+      "Crunch Lead": 1,
+      "Vocal Pad": 1,
+      "Vocal Pluck": 1,
+      "Synth String": 1,
+      "Keys / Synth Piano": 1,
+      "Mallet": 1
+    }
+  }
+}

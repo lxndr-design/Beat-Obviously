@@ -230,7 +230,7 @@
 }
 
 .drumMatrixRow {
-  display: grid;
+  position: relative;
   min-height: 24px;
   border-bottom: var(--border-soft);
 }
@@ -260,15 +260,11 @@
 }
 
 .drumMatrixCell {
-  position: relative;
-  min-width: 0;
-  width: var(--pattern-step-width);
-  border-left: 1px solid color-mix(in srgb, var(--color-fg) 24%, transparent);
-  border-right: 1px solid color-mix(in srgb, var(--color-fg) 22%, transparent);
-}
-
-.drumMatrixCell:last-child {
-  border-right: 0;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  transform: translateX(-50%);
 }
 
 .drumMatrixCellOn::before {

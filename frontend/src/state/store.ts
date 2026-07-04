@@ -184,6 +184,7 @@ export type FileAssetPolicy = "reference" | "copy" | "ask";
 export type MemoryCachePreset = "conservative" | "balanced" | "performance";
 export type StartupProjectBehavior = "home" | "restore-last" | "new-project";
 export type AudioLatencyMode = "reported" | "low" | "balanced" | "safe";
+export type ThemeContrastLevel = "low" | "normal" | "high";
 
 interface SettingsSnapshot {
   resizeSnapSeconds: number;
@@ -192,6 +193,7 @@ interface SettingsSnapshot {
   midiSmartGrid: boolean;
   timelineSubdivision: 2 | 4 | 8 | 16;
   midiSubdivision: 2 | 4 | 8 | 16;
+  themeContrastLevel: ThemeContrastLevel;
   preferredAudioTypeName: string;
   preferredInputDeviceName: string;
   preferredOutputDeviceName: string;
@@ -216,6 +218,7 @@ const DEFAULT_SETTINGS: SettingsSnapshot = {
   midiSmartGrid: true,
   timelineSubdivision: 4,
   midiSubdivision: 4,
+  themeContrastLevel: "normal",
   preferredAudioTypeName: "",
   preferredInputDeviceName: "",
   preferredOutputDeviceName: "",
@@ -257,6 +260,7 @@ function normalizeSettingsSnapshot(value: unknown): SettingsSnapshot {
     midiSmartGrid: source.midiSmartGrid ?? DEFAULT_SETTINGS.midiSmartGrid,
     timelineSubdivision: normalizeSubdivision(source.timelineSubdivision, DEFAULT_SETTINGS.timelineSubdivision),
     midiSubdivision: normalizeSubdivision(source.midiSubdivision, DEFAULT_SETTINGS.midiSubdivision),
+    themeContrastLevel: normalizeThemeContrastLevel(source.themeContrastLevel),
     preferredAudioTypeName: normalizeString(source.preferredAudioTypeName),
     preferredInputDeviceName: normalizeString(source.preferredInputDeviceName),
     preferredOutputDeviceName: normalizeString(source.preferredOutputDeviceName),
@@ -297,6 +301,10 @@ function normalizeMemoryCachePreset(value: MemoryCachePreset | undefined): Memor
 
 function normalizeStartupProjectBehavior(value: StartupProjectBehavior | undefined): StartupProjectBehavior {
   return value === "home" || value === "restore-last" || value === "new-project" ? value : DEFAULT_SETTINGS.startupProjectBehavior;
+}
+
+function normalizeThemeContrastLevel(value: ThemeContrastLevel | undefined): ThemeContrastLevel {
+  return value === "low" || value === "normal" || value === "high" ? value : DEFAULT_SETTINGS.themeContrastLevel;
 }
 
 function normalizeSampleRate(value: number | undefined): number {
@@ -1256,6 +1264,7 @@ interface SettingsSlice {
   midiSmartGrid: boolean;
   timelineSubdivision: 2 | 4 | 8 | 16;
   midiSubdivision: 2 | 4 | 8 | 16;
+  themeContrastLevel: ThemeContrastLevel;
   preferredAudioTypeName: string;
   preferredInputDeviceName: string;
   preferredOutputDeviceName: string;
@@ -1277,6 +1286,7 @@ interface SettingsSlice {
   setMidiSmartGrid: (enabled: boolean) => void;
   setTimelineSubdivision: (subdivision: 2 | 4 | 8 | 16) => void;
   setMidiSubdivision: (subdivision: 2 | 4 | 8 | 16) => void;
+  setThemeContrastLevel: (level: ThemeContrastLevel) => void;
   setPreferredInputDevice: (typeName: string, deviceName: string) => void;
   setPreferredOutputDevice: (typeName: string, deviceName: string) => void;
   setPreferredSampleRate: (sampleRate: number) => void;
@@ -1322,6 +1332,11 @@ export const useSettingsStore = create<SettingsSlice>()((set) => ({
   setMidiSubdivision: (midiSubdivision) => {
     writeSettingsPatch({ midiSubdivision });
     set({ midiSubdivision });
+  },
+  setThemeContrastLevel: (themeContrastLevel) => {
+    const normalized = normalizeThemeContrastLevel(themeContrastLevel);
+    writeSettingsPatch({ themeContrastLevel: normalized });
+    set({ themeContrastLevel: normalized });
   },
   setPreferredInputDevice: (preferredAudioTypeName, preferredInputDeviceName) => {
     writeSettingsPatch({ preferredAudioTypeName, preferredInputDeviceName });
@@ -1400,6 +1415,7 @@ interface DocumentSlice {
   cleanupReport: ProjectSidecarCleanupReport | null;
   lastBackupPath: string | null;
   markDirty: (currentFingerprint?: string) => void;
+  markUnsavedNewDocument: () => void;
   markSaved: (path?: string | null, savedFingerprint?: string) => void;
   closeDocument: () => void;
   setCurrentFilePath: (path: string | null) => void;
@@ -1433,6 +1449,14 @@ export const useDocumentStore = create<DocumentSlice>()((set) => ({
         ? currentFingerprint !== state.savedFingerprint
         : true,
     })),
+  markUnsavedNewDocument: () =>
+    set({
+      currentFilePath: null,
+      documentOpen: true,
+      dirty: true,
+      savedFingerprint: null,
+      lastBackupPath: null,
+    }),
   markSaved: (path, savedFingerprint) =>
     set((state) => ({
       documentOpen: true,
@@ -1884,7 +1908,7 @@ function defaultInstrumentSets(): InstrumentSet[] {
 function defaultInstrument(): Instrument {
   return {
     id: nanoid(),
-    name: "New Instrument",
+    name: "Aether Patch 1",
     icon: "ph:cube",
     kind: "wavetable",
     envelope: { attackMs: 5, decayMs: 100, sustain: 0.7, releaseMs: 200 },
@@ -2092,6 +2116,7 @@ function defaultInstrumentForPatch(patch?: Partial<Instrument>): Instrument {
   const { wavetable: _wavetable, aether: _aether, synthPatch: _synthPatch, ...sampleBase } = base;
   return {
     ...sampleBase,
+    name: "Instrument 1",
     icon: "ph:waveform",
     kind: "sampler",
     waveform: "sample",
@@ -2112,6 +2137,29 @@ function aetherizeCreatedInstrumentPatch(patch: Partial<Instrument> = {}): Parti
     source: patch.source ?? { kind: "created", label: "Made in Beat / Aether" },
     descriptors: Array.from(new Set([...(patch.descriptors ?? []), "aether", "wavetable"])).slice(0, 10),
   };
+}
+
+function uniqueInstrumentName(
+  requestedName: string | undefined,
+  instruments: Pick<Instrument, "id" | "name">[],
+  currentId?: Id,
+): string {
+  const normalizedName = requestedName?.trim() || "Instrument 1";
+  const existing = new Set(
+    instruments
+      .filter((instrument) => instrument.id !== currentId)
+      .map((instrument) => instrument.name.trim().toLowerCase()),
+  );
+  if (!existing.has(normalizedName.toLowerCase())) return normalizedName;
+
+  const match = normalizedName.match(/^(.*?)(?:\s+(\d+))?$/);
+  const base = match?.[1]?.trim() || normalizedName;
+  const start = match?.[2] ? Number.parseInt(match[2], 10) : 1;
+  for (let index = Math.max(1, start); index < 10000; index += 1) {
+    const name = `${base} ${index}`;
+    if (!existing.has(name.toLowerCase())) return name;
+  }
+  return `${base} ${Date.now()}`;
 }
 
 function isDecentSamplerInstancedInstrument(
@@ -2236,7 +2284,8 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
       const id = requestedId && !get().instruments.some((instrument) => instrument.id === requestedId)
         ? requestedId
         : nanoid();
-      const i = normalizeInstrument({ ...defaultInstrumentForPatch(normalizedPatch), ...normalizedPatch, id });
+      let i = normalizeInstrument({ ...defaultInstrumentForPatch(normalizedPatch), ...normalizedPatch, id });
+      i = { ...i, name: uniqueInstrumentName(i.name, get().instruments, i.id) };
       set((s) => {
         s.instruments.push(i);
       });
@@ -2253,7 +2302,11 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
       set((s) => {
         const i = s.instruments.find((x) => x.id === id);
         if (i) {
-          Object.assign(i, aetherizeCreatedInstrumentPatch({ ...i, ...patch }));
+          const nextPatch = aetherizeCreatedInstrumentPatch({ ...i, ...patch });
+          if (typeof nextPatch.name === "string") {
+            nextPatch.name = uniqueInstrumentName(nextPatch.name, s.instruments, id);
+          }
+          Object.assign(i, nextPatch);
           i.descriptors = characterizeInstrument(i);
         }
       }),
@@ -2263,7 +2316,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
       const copy: Instrument = {
         ...structuredClone(src),
         id: nanoid(),
-        name: `${src.name} copy`,
+        name: uniqueInstrumentName(`${src.name} copy`, get().instruments),
         userCreated: true,
         setId: src.setId ?? USER_INSTRUMENT_SET_ID,
         source: { kind: "derived", label: `Derived from ${src.name}`, edited: false },
@@ -2346,111 +2399,6 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
           source,
           userCreated: false,
         });
-
-      const aetherDrum = (
-        name: string,
-        waveform: NonNullable<Instrument["aether"]>["oscA"]["waveform"],
-        envelope: Instrument["envelope"],
-        knobs: Instrument["knobs"],
-        options: {
-          filterType?: Instrument["filterType"];
-          octave?: number;
-          semitone?: number;
-          detuneCents?: number;
-          subOscLevel?: number;
-          ampLevel?: number;
-          descriptors?: string[];
-          bank?: NonNullable<Instrument["wavetable"]>["bank"];
-          position?: number;
-          warp?: number;
-          warpMode?: NonNullable<Instrument["wavetable"]>["warpMode"];
-          unison?: number;
-          blend?: number;
-          oscB?: Partial<NonNullable<Instrument["aether"]>["oscB"]>;
-          noise?: Partial<NonNullable<Instrument["aether"]>["noise"]>;
-          runtimeWarp?: number;
-          runtimeWarpMode?: NonNullable<Instrument["aether"]>["runtimeWarpMode"];
-        } = {},
-      ): Instrument => {
-        const wavetable = {
-          ...defaultWavetableConfig(),
-          bank: options.bank ?? "aether",
-          position: options.position ?? 0.35,
-          warp: options.warp ?? 0.2,
-          warpMode: options.warpMode ?? "shape",
-          unison: options.unison ?? 1,
-          detuneCents: Math.abs(options.detuneCents ?? 0),
-          blend: options.blend ?? 0.5,
-        } satisfies NonNullable<Instrument["wavetable"]>;
-        const oscBWaveform = options.oscB?.waveform ?? "wavetable";
-        const oscBWavetable = options.oscB?.wavetable ?? {
-          ...wavetable,
-          bank: options.bank === "fm" ? "glass" : "fm",
-          position: 0.28,
-          warp: 0.34,
-          detuneCents: Math.max(5, wavetable.detuneCents),
-        };
-        return withOriginal({
-          id: nanoid(),
-          name,
-          icon: "ph:waveform",
-          kind: "wavetable",
-          envelope,
-          knobs,
-          filterType: options.filterType,
-          waveform: "wavetable",
-          wavetable,
-          aether: {
-            oscA: {
-              enabled: true,
-              level: 0.82,
-              pan: 0,
-              waveform,
-              octave: options.octave ?? 0,
-              semitone: options.semitone ?? 0,
-              fineCents: options.detuneCents ?? 0,
-              phase: 0,
-              randomPhase: waveform === "noise" ? 1 : 0.08,
-              wavetable,
-            },
-            oscB: {
-              enabled: options.oscB?.enabled ?? false,
-              level: options.oscB?.level ?? 0.28,
-              pan: options.oscB?.pan ?? 0,
-              waveform: oscBWaveform,
-              octave: options.oscB?.octave ?? (options.octave ?? 0),
-              semitone: options.oscB?.semitone ?? 7,
-              fineCents: options.oscB?.fineCents ?? -9,
-              phase: options.oscB?.phase ?? 0.25,
-              randomPhase: options.oscB?.randomPhase ?? 0.22,
-              wavetable: oscBWavetable,
-            },
-            sub: {
-              enabled: (options.subOscLevel ?? 0) > 0,
-              level: options.subOscLevel ?? 0,
-              octave: -1,
-              waveform: waveform === "triangle" ? "triangle" : "sine",
-            },
-            noise: {
-              enabled: options.noise?.enabled ?? waveform === "noise",
-              level: options.noise?.level ?? (waveform === "noise" ? 0.32 : 0.06),
-              color: options.noise?.color ?? knobs.color,
-            },
-            runtimeWarp: options.runtimeWarp ?? Math.min(0.72, knobs.drive * 0.7),
-            runtimeWarpMode: options.runtimeWarpMode ?? "fold",
-          },
-          octave: options.octave ?? 0,
-          detuneCents: options.detuneCents ?? 0,
-          subOscLevel: 0,
-          glideMs: 0,
-          ampLevel: options.ampLevel ?? 1,
-          sampleIds: [],
-          setId: FACTORY_DRUM_SET_ID,
-          source: beatSource,
-          descriptors: options.descriptors,
-          userCreated: false,
-        });
-      };
 
       const tr505Source: Instrument["source"] = {
         kind: "factory",
@@ -2580,90 +2528,6 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         sampler("Suspended Cymbal", "/samples/vsco-ce/suspended-cymbal.wav", vscoSource, { cutoff: 0.9, resonance: 0.1, drive: 0, color: 0.7 }, ORCHESTRA_SET_ID, { attackMs: 1, decayMs: 500, sustain: 0, releaseMs: 800 }),
         sampler("Flute Staccato", "/samples/vsco-ce/flute-c5.wav", vscoSource, { cutoff: 0.82, resonance: 0.1, drive: 0, color: 0.65 }, ORCHESTRA_SET_ID, { attackMs: 3, decayMs: 140, sustain: 0.35, releaseMs: 160 }),
         sampler("Violin Pizzicato", "/samples/vsco-ce/violin-pizz-c5.wav", vscoSource, { cutoff: 0.78, resonance: 0.12, drive: 0.02, color: 0.62 }, ORCHESTRA_SET_ID, { attackMs: 1, decayMs: 160, sustain: 0, releaseMs: 220 }),
-        aetherDrum(
-          "Breakcore Kick (Aether)",
-          "sine",
-          { attackMs: 1, decayMs: 220, sustain: 0, releaseMs: 55, decayCurve: "exp" },
-          { cutoff: 0.2, resonance: 0.12, drive: 0.72, color: 0.16 },
-          { filterType: "lowpass", octave: -2, subOscLevel: 0.55, bank: "aether", position: 0.08, warp: 0.16, runtimeWarp: 0.58, descriptors: ["drum", "kick", "breakcore", "driven", "low", "aether"] },
-        ),
-        aetherDrum(
-          "Breakcore Snare (Aether)",
-          "triangle",
-          { attackMs: 1, decayMs: 135, sustain: 0, releaseMs: 70, decayCurve: "exp" },
-          { cutoff: 0.74, resonance: 0.34, drive: 0.38, color: 0.7 },
-          { filterType: "bandpass", octave: -1, bank: "fm", position: 0.42, warp: 0.44, oscB: { enabled: true, waveform: "noise", level: 0.18 }, noise: { enabled: true, level: 0.2, color: 0.72 }, descriptors: ["drum", "snare", "breakcore", "bright", "dry", "aether"] },
-        ),
-        aetherDrum(
-          "Breakcore Ghost Snare (Aether)",
-          "noise",
-          { attackMs: 2, decayMs: 75, sustain: 0, releaseMs: 35, decayCurve: "exp" },
-          { cutoff: 0.62, resonance: 0.28, drive: 0.08, color: 0.42 },
-          { filterType: "highpass", octave: -1, ampLevel: 0.55, bank: "fm", position: 0.2, warp: 0.28, noise: { enabled: true, level: 0.42, color: 0.45 }, descriptors: ["drum", "snare", "ghost", "breakcore", "short", "aether"] },
-        ),
-        aetherDrum(
-          "Breakcore Closed Hat (Aether)",
-          "noise",
-          { attackMs: 1, decayMs: 45, sustain: 0, releaseMs: 15, decayCurve: "exp" },
-          { cutoff: 0.9, resonance: 0.22, drive: 0.08, color: 0.78 },
-          { filterType: "highpass", octave: 2, ampLevel: 0.7, bank: "glass", position: 0.62, warp: 0.18, noise: { enabled: true, level: 0.36, color: 0.84 }, descriptors: ["drum", "closed-hat", "hat", "breakcore", "bright", "aether"] },
-        ),
-        aetherDrum(
-          "Breakcore Open Hat (Aether)",
-          "noise",
-          { attackMs: 1, decayMs: 380, sustain: 0, releaseMs: 145, decayCurve: "exp" },
-          { cutoff: 0.86, resonance: 0.35, drive: 0.16, color: 0.82 },
-          { filterType: "highpass", octave: 2, ampLevel: 0.78, bank: "glass", position: 0.7, warp: 0.24, noise: { enabled: true, level: 0.5, color: 0.86 }, descriptors: ["drum", "open-hat", "hat", "breakcore", "bright", "aether"] },
-        ),
-        aetherDrum(
-          "Breakcore Crash Ride (Aether)",
-          "noise",
-          { attackMs: 2, decayMs: 1350, sustain: 0, releaseMs: 900, decayCurve: "log" },
-          { cutoff: 0.82, resonance: 0.24, drive: 0.18, color: 0.86 },
-          { filterType: "highpass", octave: 2, ampLevel: 0.82, bank: "glass", position: 0.78, warp: 0.38, oscB: { enabled: true, waveform: "wavetable", level: 0.24, semitone: 12 }, noise: { enabled: true, level: 0.46, color: 0.9 }, descriptors: ["drum", "cymbal", "crash", "ride", "breakcore", "aether"] },
-        ),
-        aetherDrum(
-          "Breakcore Pitched Snare (Aether)",
-          "triangle",
-          { attackMs: 1, decayMs: 115, sustain: 0, releaseMs: 45, decayCurve: "exp" },
-          { cutoff: 0.68, resonance: 0.48, drive: 0.52, color: 0.58 },
-          { filterType: "bandpass", octave: -1, detuneCents: 7, bank: "fm", position: 0.55, warp: 0.52, oscB: { enabled: true, waveform: "square", level: 0.2, semitone: 7 }, descriptors: ["drum", "snare", "pitched", "breakcore", "fill", "aether"] },
-        ),
-        aetherDrum(
-          "Breakcore Noise Burst (Aether)",
-          "noise",
-          { attackMs: 0, decayMs: 68, sustain: 0, releaseMs: 18, decayCurve: "exp" },
-          { cutoff: 0.7, resonance: 0.62, drive: 0.46, color: 0.92 },
-          { filterType: "bandpass", octave: 1, bank: "fm", position: 0.82, warp: 0.68, runtimeWarp: 0.6, noise: { enabled: true, level: 0.56, color: 0.95 }, descriptors: ["drum", "noise", "glitch", "breakcore", "percussion", "aether"] },
-        ),
-        aetherDrum(
-          "Breakcore Clap Layer (Aether)",
-          "noise",
-          { attackMs: 1, decayMs: 245, sustain: 0, releaseMs: 90, decayCurve: "s-curve" },
-          { cutoff: 0.72, resonance: 0.26, drive: 0.28, color: 0.66 },
-          { filterType: "highpass", octave: -1, bank: "fm", position: 0.34, warp: 0.36, oscB: { enabled: true, waveform: "noise", level: 0.16, pan: 0.2 }, noise: { enabled: true, level: 0.34, color: 0.68 }, descriptors: ["drum", "clap", "snare", "breakcore", "wide", "aether"] },
-        ),
-        aetherDrum(
-          "Breakcore Metal Hit (Aether)",
-          "square",
-          { attackMs: 1, decayMs: 760, sustain: 0, releaseMs: 420, decayCurve: "log" },
-          { cutoff: 0.72, resonance: 0.68, drive: 0.62, color: 0.88 },
-          { filterType: "bandpass", octave: 1, detuneCents: 19, bank: "fm", position: 0.88, warp: 0.74, oscB: { enabled: true, waveform: "wavetable", level: 0.36, semitone: 6, fineCents: 17 }, runtimeWarp: 0.7, descriptors: ["drum", "cymbal", "metal", "crash", "breakcore", "aether"] },
-        ),
-        aetherDrum(
-          "Breakcore Rim Click (Aether)",
-          "square",
-          { attackMs: 0, decayMs: 32, sustain: 0, releaseMs: 10, decayCurve: "exp" },
-          { cutoff: 0.72, resonance: 0.5, drive: 0.14, color: 0.52 },
-          { filterType: "bandpass", octave: 2, ampLevel: 0.72, bank: "fm", position: 0.44, warp: 0.28, descriptors: ["drum", "rim", "click", "breakcore", "percussion", "aether"] },
-        ),
-        aetherDrum(
-          "Breakcore Fast Roll Snare (Aether)",
-          "triangle",
-          { attackMs: 1, decayMs: 55, sustain: 0, releaseMs: 25, decayCurve: "exp" },
-          { cutoff: 0.64, resonance: 0.42, drive: 0.5, color: 0.62 },
-          { filterType: "bandpass", octave: -1, detuneCents: -9, ampLevel: 0.84, bank: "fm", position: 0.5, warp: 0.48, oscB: { enabled: true, waveform: "square", level: 0.16, semitone: 12 }, descriptors: ["drum", "snare", "roll", "pitched", "breakcore", "aether"] },
-        ),
         withOriginal({
           id: nanoid(),
           name: "Sub Kick (Synth)",
@@ -2721,28 +2585,54 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
           userCreated: false,
         }),
       ];
+      const deprecatedBreakcoreAetherInstrumentNames = new Set([
+        "Breakcore Kick (Aether)",
+        "Breakcore Snare (Aether)",
+        "Breakcore Ghost Snare (Aether)",
+        "Breakcore Closed Hat (Aether)",
+        "Breakcore Open Hat (Aether)",
+        "Breakcore Crash Ride (Aether)",
+        "Breakcore Pitched Snare (Aether)",
+        "Breakcore Noise Burst (Aether)",
+        "Breakcore Clap Layer (Aether)",
+        "Breakcore Metal Hit (Aether)",
+        "Breakcore Rim Click (Aether)",
+        "Breakcore Fast Roll Snare (Aether)",
+        "Breakcore Kick (Synth)",
+        "Breakcore Snare (Synth)",
+        "Breakcore Ghost Snare (Synth)",
+        "Breakcore Closed Hat (Synth)",
+        "Breakcore Open Hat (Synth)",
+        "Breakcore Crash Ride (Synth)",
+        "Breakcore Pitched Snare (Synth)",
+        "Breakcore Noise Burst (Synth)",
+        "Breakcore Clap Layer (Synth)",
+        "Breakcore Metal Hit (Synth)",
+        "Breakcore Rim Click (Synth)",
+        "Breakcore Fast Roll Snare (Synth)",
+      ]);
+      const isDeprecatedBreakcoreAetherInstrument = (instrument: Instrument) =>
+        deprecatedBreakcoreAetherInstrumentNames.has(instrument.name)
+        || (
+          instrument.userCreated !== true
+          && instrument.descriptors?.includes("breakcore") === true
+          && instrument.descriptors?.includes("aether") === true
+        );
+      const canonicalSeeds = seeds.map((instrument) => {
+        const normalized = normalizeInstrument(instrument);
+        return { ...normalized, original: snapshotInstrument(normalized) };
+      });
+      const activeSeeds = canonicalSeeds.filter((instrument) => !isDeprecatedBreakcoreAetherInstrument(instrument));
       set((s) => {
         s.instrumentSets = normalizeInstrumentSets(s.instrumentSets);
-        const seedByName = new Map(seeds.map((instrument) => [instrument.name, instrument]));
-        const breakcoreAetherNameMigrations = new Map([
-          ["Breakcore Kick (Synth)", "Breakcore Kick (Aether)"],
-          ["Breakcore Snare (Synth)", "Breakcore Snare (Aether)"],
-          ["Breakcore Ghost Snare (Synth)", "Breakcore Ghost Snare (Aether)"],
-          ["Breakcore Closed Hat (Synth)", "Breakcore Closed Hat (Aether)"],
-          ["Breakcore Open Hat (Synth)", "Breakcore Open Hat (Aether)"],
-          ["Breakcore Crash Ride (Synth)", "Breakcore Crash Ride (Aether)"],
-          ["Breakcore Pitched Snare (Synth)", "Breakcore Pitched Snare (Aether)"],
-          ["Breakcore Noise Burst (Synth)", "Breakcore Noise Burst (Aether)"],
-          ["Breakcore Clap Layer (Synth)", "Breakcore Clap Layer (Aether)"],
-          ["Breakcore Metal Hit (Synth)", "Breakcore Metal Hit (Aether)"],
-          ["Breakcore Rim Click (Synth)", "Breakcore Rim Click (Aether)"],
-          ["Breakcore Fast Roll Snare (Synth)", "Breakcore Fast Roll Snare (Aether)"],
-        ]);
+        s.instruments = s.instruments
+          .map((instrument) => normalizeInstrument(instrument))
+          .filter((instrument) => instrument.userCreated || !isDeprecatedBreakcoreAetherInstrument(instrument));
+        const seedByName = new Map(activeSeeds.map((instrument) => [instrument.name, instrument]));
         for (const instrument of s.instruments) {
           if (instrument.userCreated) continue;
-          const migratedName = breakcoreAetherNameMigrations.get(instrument.name);
-          const replacement = migratedName ? seedByName.get(migratedName) : seedByName.get(instrument.name);
-          if (replacement && (migratedName || instrument.descriptors?.includes("breakcore"))) {
+          const replacement = seedByName.get(instrument.name);
+          if (replacement && instrument.descriptors?.includes("breakcore")) {
             const existingId = instrument.id;
             Object.assign(instrument, structuredClone(replacement), { id: existingId });
           }
@@ -2752,7 +2642,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
             .filter((instrument) => !instrument.userCreated)
             .map((instrument) => instrument.sampleUrl ?? instrument.name),
         );
-        const missingSeeds = seeds.filter((instrument) => !existingKeys.has(instrument.sampleUrl ?? instrument.name));
+        const missingSeeds = activeSeeds.filter((instrument) => !existingKeys.has(instrument.sampleUrl ?? instrument.name));
         for (const instrument of s.instruments) {
           if (!instrument.userCreated && instrument.name === "808 Bass Kick" && instrument.kind === "synth") {
             instrument.name = "Sub Kick (Synth)";

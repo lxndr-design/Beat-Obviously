@@ -3,7 +3,7 @@ import { nextUndoRequiresConfirmation, redo, undo, useProjectStore, useTransport
 import { clipboardStore } from "../state/clipboard";
 import { pauseTransport, playTransport, stopTransport } from "../audio/transportActions";
 import { saveCurrentDocument } from "../persistence/documentActions";
-import { appConfirm } from "../solid-ui";
+import { appConfirm, useModalStack } from "../solid-ui";
 
 /**
  * Hotkey registry.
@@ -139,6 +139,40 @@ const BINDINGS: HotkeyBinding[] = [
   },
 ];
 
+function isTextEntryTarget(target: HTMLElement | null): boolean {
+  return Boolean(
+    target &&
+      (target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable)
+  );
+}
+
+function isNativeKeyboardControlTarget(target: HTMLElement | null): boolean {
+  return Boolean(
+    target &&
+      (isTextEntryTarget(target) ||
+        target.tagName === "BUTTON" ||
+        target.tagName === "SELECT" ||
+        target.closest("button, select, [role='button'], [role='menuitem'], [data-native-keyboard-control]"))
+  );
+}
+
+function hasActiveModalScope(): boolean {
+  return (
+    useModalStack.getState().stack.length > 0 ||
+    Boolean(document.querySelector("[role='dialog'][aria-modal='true']"))
+  );
+}
+
+function isKnownGlobalHotkey(combo: string): boolean {
+  return (
+    combo === "backspace" ||
+    combo === "delete" ||
+    BINDINGS.some((binding) => binding.combo === combo)
+  );
+}
+
 export function listHotkeys(): HotkeyBinding[] {
   return BINDINGS;
 }
@@ -147,15 +181,20 @@ export function installGlobalHotkeys() {
   function onKey(e: KeyboardEvent) {
     // Ignore when typing in an input.
     const target = e.target as HTMLElement | null;
-    if (
-      target &&
-      (target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable)
-    ) {
+    if (isTextEntryTarget(target)) {
       return;
     }
     const combo = comboFromEvent(e);
+    if (hasActiveModalScope()) {
+      if (!isNativeKeyboardControlTarget(target) && useContextualHotkeyStore.getState().run(combo)) {
+        e.preventDefault();
+        return;
+      }
+      if (!isNativeKeyboardControlTarget(target) && isKnownGlobalHotkey(combo)) {
+        e.preventDefault();
+      }
+      return;
+    }
     if ((combo === "meta+z" || combo === "shift+meta+z") && useUiStore.getState().openEditors.length > 0) {
       e.preventDefault();
       return;

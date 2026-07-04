@@ -38,19 +38,20 @@ export function EditorHost() {
               );
             case "synthInstrument": {
               const instrument = () => instruments().find((candidate) => candidate.id === editor.instrumentId) ?? null;
+              const scopeId = `synth-editor-${editor.instrumentId}`;
               return (
                 <Modal
                   open
-                  title={instrument()?.name ?? "Synth"}
+                  title={instrument()?.nodeGraph ? instrument()?.name ?? "Nodemap" : "Instrument - Aether Engine"}
                   width="editor"
-                  scopeId={`synth-editor-${editor.instrumentId}`}
+                  scopeId={scopeId}
                   flushBody
                   onClose={() => closeEditor({ kind: "synthInstrument", instrumentId: editor.instrumentId })}
                 >
                   {instrument()?.nodeGraph ? (
                     <NodeInstrumentEditor instrument={instrument()} updateInstrument={updateInstrument} />
                   ) : (
-                    <SynthEditor instrumentId={editor.instrumentId} />
+                    <SynthEditor instrumentId={editor.instrumentId} hotkeyScopeId={scopeId} />
                   )}
                 </Modal>
               );
@@ -59,13 +60,13 @@ export function EditorHost() {
               return (
                 <Modal
                   open
-                  title="Synth"
+                  title="Instrument - Aether Engine"
                   width="editor"
                   scopeId="synth-editor"
                   flushBody
                   onClose={() => closeEditor({ kind: "synth" })}
                 >
-                  <SynthEditor />
+                  <SynthEditor hotkeyScopeId="synth-editor" />
                 </Modal>
               );
             case "track":

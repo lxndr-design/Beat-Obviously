@@ -15,6 +15,7 @@ import type {
   WavetableConfig,
   WavetableWarpMode,
 } from "./types";
+import factoryAetherGuide from "../data/factory_demo_starter_bank_v4_acoustic_synth_guide.json";
 import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
@@ -87,6 +88,9 @@ export type SynthParameterId =
   | "filter.drive"
   | "aether.runtimeWarp"
   | "aether.runtimeWarpMode"
+  | "aether.noise.enabled"
+  | "aether.noise.level"
+  | "aether.noise.color"
   | "amp.level"
   | "amp.pan"
   | "maxVoices"
@@ -166,10 +170,12 @@ const DEFAULT_MACROS: Record<MacroId, SynthMacroDefinition> = {
 
 export type ModulationTargetId =
   | "osc.a.position"
+  | "osc.a.warp"
   | "osc.a.fine"
   | "osc.a.level"
   | "osc.a.pan"
   | "osc.b.position"
+  | "osc.b.warp"
   | "osc.b.fine"
   | "osc.b.level"
   | "osc.b.pan"
@@ -926,6 +932,9 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "filter.drive": 0,
   "aether.runtimeWarp": 0,
   "aether.runtimeWarpMode": "shape",
+  "aether.noise.enabled": false,
+  "aether.noise.level": 0,
+  "aether.noise.color": 0.5,
   "amp.level": 0.8,
   "amp.pan": 0,
   maxVoices: 16,
@@ -1014,6 +1023,9 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "filter.drive": "Filter Drive",
   "aether.runtimeWarp": "Aether Runtime Warp",
   "aether.runtimeWarpMode": "Aether Runtime Warp Mode",
+  "aether.noise.enabled": "Aether Noise Enabled",
+  "aether.noise.level": "Aether Noise Level",
+  "aether.noise.color": "Aether Noise Color",
   "amp.level": "Amp Level",
   "amp.pan": "Amp Pan",
   maxVoices: "Max Voices",
@@ -1080,10 +1092,12 @@ export const MODULATION_SOURCE_LABELS: Record<ModulationSourceId, string> = {
 
 export const MODULATION_TARGET_LABELS: Record<ModulationTargetId, string> = {
   "osc.a.position": "OSC A Pos",
+  "osc.a.warp": "OSC A Warp",
   "osc.a.fine": "OSC A Fine",
   "osc.a.level": "OSC A Level",
   "osc.a.pan": "OSC A Pan",
   "osc.b.position": "OSC B Pos",
+  "osc.b.warp": "OSC B Warp",
   "osc.b.fine": "OSC B Fine",
   "osc.b.level": "OSC B Level",
   "osc.b.pan": "OSC B Pan",
@@ -1190,8 +1204,6 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
     },
   };
 }
-
-export const FACTORY_SYNTH_PRESETS: SynthFactoryPresetRecord[] = createFactorySynthPresets();
 
 export function getNumberParam(draft: SynthDraftPatch, id: SynthParameterId): number {
   const value = draft.parameters[id];
@@ -1401,7 +1413,7 @@ export function modulationSourceAffordance(draft: SynthDraftPatch, source: Modul
       : `${formatDecimal(getNumberParam(draft, `${source}.rate` as SynthParameterId), 2)} Hz`;
     return {
       source,
-      label: source === "lfo.1" ? "Edit LFO 1" : "Edit LFO 2",
+      label: source === "lfo.1" ? "LFO 1" : "LFO 2",
       detail: `${enabled ? "On" : "Off"} · ${shape} · ${rate}`,
       editor: "lfo",
     };
@@ -1413,7 +1425,7 @@ export function modulationSourceAffordance(draft: SynthDraftPatch, source: Modul
     const releaseCurve = getEnvelopeCurveParam(draft, `${source}.releaseCurve` as SynthParameterId);
     return {
       source,
-      label: source === "env.1" ? "Edit Env 1" : "Edit Env 2",
+      label: source === "env.1" ? "Amp Env" : "Mod Env",
       detail: `${loop ? "Loop" : "One-shot"} · A ${attackCurve} · R ${releaseCurve}`,
       editor: "envelope",
     };
@@ -1422,9 +1434,10 @@ export function modulationSourceAffordance(draft: SynthDraftPatch, source: Modul
   if (source.startsWith("macro.")) {
     const id = source as MacroId;
     const definition = macroDefinitionForId(draft, id);
+    const macroNumber = id.split(".")[1] ?? "";
     return {
       source,
-      label: `Edit ${definition.label}`,
+      label: `${definition.label} / M${macroNumber}`,
       detail: `${Math.round(definition.min * 100)}-${Math.round(definition.max * 100)}% · ${definition.curve}`,
       editor: "macro",
     };
@@ -1601,9 +1614,9 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         waveform: "sine",
       },
       noise: {
-        enabled: false,
-        level: 0,
-        color: 0.5,
+        enabled: getBooleanParam(draft, "aether.noise.enabled"),
+        level: clamp01(getNumberParam(draft, "aether.noise.level")),
+        color: clamp01(getNumberParam(draft, "aether.noise.color")),
       },
       runtimeWarp: clamp01(getNumberParam(draft, "aether.runtimeWarp")),
       runtimeWarpMode: isWavetableWarpMode(draft.parameters["aether.runtimeWarpMode"])
@@ -1790,6 +1803,9 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["filter.type"] = instrument.filterType ?? "lowpass";
   draft.parameters["aether.runtimeWarp"] = instrument.aether?.runtimeWarp ?? 0;
   draft.parameters["aether.runtimeWarpMode"] = instrument.aether?.runtimeWarpMode ?? "shape";
+  draft.parameters["aether.noise.enabled"] = instrument.aether?.noise.enabled ?? false;
+  draft.parameters["aether.noise.level"] = instrument.aether?.noise.level ?? 0;
+  draft.parameters["aether.noise.color"] = instrument.aether?.noise.color ?? 0.5;
   draft.parameters["amp.level"] = 0.8;
   draft.parameters["env.1.attack"] = instrument.envelope.attackMs / 1000;
   draft.parameters["env.1.attackCurve"] = instrument.envelope.attackCurve ?? "linear";
@@ -2179,7 +2195,743 @@ function normalizeCustomWavetables(value: unknown, includeDefaults = true): Reco
   return next;
 }
 
+type FactoryGuideEffect = {
+  type?: string;
+  params?: Record<string, unknown>;
+};
+
+type FactoryGuideFrame = {
+  scan?: number;
+  bright?: number;
+  even?: number;
+  fold?: number;
+  formant?: number;
+  notch?: number;
+  focus?: number;
+  skew?: number;
+  tilt?: number;
+  phase?: number;
+};
+
+type FactoryGuideCustomWavetable = {
+  name?: string;
+  interpolation?: string;
+  morph?: number;
+  source?: string;
+  frames?: Record<string, FactoryGuideFrame>;
+};
+
+type FactoryGuideOscillator = {
+  enabled?: boolean;
+  mode?: string;
+  shape?: string;
+  customWavetable?: FactoryGuideCustomWavetable;
+  position?: number;
+  warpMode?: string;
+  warp?: number;
+  octave?: number;
+  semitone?: number;
+  fineCents?: number;
+  phase?: number;
+  random?: number;
+  pan?: number;
+  level?: number;
+};
+
+type FactoryGuidePatch = {
+  name: string;
+  category: string;
+  intent?: string;
+  playMode?: {
+    polyphony?: number;
+    mono?: boolean;
+    legato?: boolean;
+    glideMs?: number;
+  };
+  oscillators?: {
+    oscA?: FactoryGuideOscillator;
+    oscB?: FactoryGuideOscillator;
+  };
+  voiceStack?: {
+    enabled?: boolean;
+    voices?: number;
+    detune?: number;
+    blend?: number;
+    spread?: number;
+    max?: number;
+  };
+  filter?: {
+    enabled?: boolean;
+    type?: string;
+    cutoffHz?: number;
+    resonance?: number;
+    drive?: number;
+    keytrack?: number;
+  };
+  envelopes?: {
+    ampEnv?: FactoryGuideEnvelope;
+    modEnv?: FactoryGuideEnvelope;
+  };
+  lfos?: {
+    lfo1?: FactoryGuideLfo;
+    lfo2?: FactoryGuideLfo;
+  };
+  macros?: FactoryGuideMacro[];
+  modulationMatrix?: FactoryGuideModulationRoute[];
+  fxChain?: FactoryGuideEffect[];
+};
+
+type FactoryGuideEnvelope = {
+  attackMs?: number;
+  decayMs?: number;
+  sustain?: number;
+  releaseMs?: number;
+  attackCurve?: string;
+  decayCurve?: string;
+  releaseCurve?: string;
+};
+
+type FactoryGuideLfo = {
+  enabled?: boolean;
+  shape?: string;
+  sync?: boolean;
+  rateHz?: number;
+  rate?: string;
+  phase?: number;
+  smooth?: number;
+  random?: number;
+  oneShot?: boolean;
+  retrigger?: boolean;
+  bipolar?: boolean;
+};
+
+type FactoryGuideMacro = {
+  slot?: string;
+  label?: string;
+  default?: number;
+};
+
+type FactoryGuideModulationRoute = {
+  enabled?: boolean;
+  source?: string;
+  target?: string;
+  amount?: number;
+  polarity?: string;
+};
+
+const FACTORY_GUIDE_CATEGORY_TAXONOMY: Record<string, string> = {
+  "Poly Keys": "poly_synth",
+  "Arp Pluck": "arpeggiator",
+  Pad: "pad_synth",
+  Bass: "reese_bass",
+  Lead: "lead_synth",
+  Bell: "music_box",
+  "Lo-Fi Pad": "pad_synth",
+  "Chord Stab": "poly_synth",
+  "Sub Bass": "sub_bass",
+  Atmosphere: "atmospheres",
+  "Bass / Crunch": "reese_bass",
+  "Crunch Lead": "lead_synth",
+  "Vocal Pad": "vocal_pad",
+  "Vocal Pluck": "vocal_fx",
+  "Synth String": "electric_violin",
+  "Keys / Synth Piano": "felt_piano",
+  Mallet: "toy_xylophone",
+};
+
+const FACTORY_GUIDE_MACRO_IDS: Record<string, MacroId> = {
+  motion: "macro.1",
+  color: "macro.2",
+  shape: "macro.3",
+  space: "macro.4",
+};
+
+const FACTORY_GUIDE_MOD_SOURCES: Record<string, ModulationSourceId> = {
+  ampEnv: "env.1",
+  modEnv: "env.2",
+  lfo1: "lfo.1",
+  lfo2: "lfo.2",
+  velocity: "velocity",
+  keytrack: "keytrack",
+  modWheel: "modWheel",
+  aftertouch: "modWheel",
+  "macro.motion": "macro.1",
+  "macro.color": "macro.2",
+  "macro.shape": "macro.3",
+  "macro.space": "macro.4",
+  motion: "macro.1",
+  color: "macro.2",
+  shape: "macro.3",
+  space: "macro.4",
+};
+
+const FACTORY_GUIDE_MOD_TARGETS: Record<string, ModulationTargetId> = {
+  "oscA.position": "osc.a.position",
+  "oscA.warp": "osc.a.warp",
+  "oscA.fine": "osc.a.fine",
+  "oscA.level": "osc.a.level",
+  "oscA.pan": "osc.a.pan",
+  "oscB.position": "osc.b.position",
+  "oscB.warp": "osc.b.warp",
+  "oscB.fine": "osc.b.fine",
+  "oscB.level": "osc.b.level",
+  "oscB.pan": "osc.b.pan",
+  "osc.a.position": "osc.a.position",
+  "osc.a.warp": "osc.a.warp",
+  "osc.a.fine": "osc.a.fine",
+  "osc.a.level": "osc.a.level",
+  "osc.a.pan": "osc.a.pan",
+  "osc.b.position": "osc.b.position",
+  "osc.b.warp": "osc.b.warp",
+  "osc.b.fine": "osc.b.fine",
+  "osc.b.level": "osc.b.level",
+  "osc.b.pan": "osc.b.pan",
+  "global.pitch": "osc.a.fine",
+  "global.pitchFine": "osc.a.fine",
+  "lfo1.depth": "osc.a.position",
+  "lfo2.depth": "osc.b.position",
+  "filter.cutoffHz": "filter.cutoff",
+  "filter.cutoff": "filter.cutoff",
+  "filter.resonance": "filter.resonance",
+  "filter.drive": "filter.drive",
+  "amp.level": "amp.level",
+  "amp.pan": "amp.pan",
+  "voice.detune": "unison.detune",
+  "voice.spread": "unison.spread",
+  "unison.detune": "unison.detune",
+  "unison.spread": "unison.spread",
+  "fx.Delay.mix": "amp.pan",
+  "fx.Reverb / Room.mix": "unison.spread",
+  "fx.Chorus.mix": "unison.spread",
+};
+
+function createFactorySynthPresetsFromGuide(): SynthFactoryPresetRecord[] {
+  const guide = factoryAetherGuide as { patches?: FactoryGuidePatch[] };
+  return (guide.patches ?? [])
+    .filter((patch) => patch.name && patch.category)
+    .map(createFactorySynthPresetFromGuide);
+}
+
+function createFactorySynthPresetFromGuide(patch: FactoryGuidePatch): SynthFactoryPresetRecord {
+  const id = `factory.${slugFactoryGuideName(patch.name)}`;
+  const customWavetables: Record<string, CustomWavetableDefinition> = {};
+  const parameters: Partial<Record<SynthParameterId, SynthParameterValue>> = {};
+  applyFactoryGuideOscillator(parameters, customWavetables, id, "a", patch.oscillators?.oscA);
+  applyFactoryGuideOscillator(parameters, customWavetables, id, "b", patch.oscillators?.oscB);
+  applyFactoryGuideVoice(parameters, patch);
+  applyFactoryGuideFilter(parameters, patch.filter);
+  applyFactoryGuideEnvelope(parameters, "env.1", patch.envelopes?.ampEnv);
+  applyFactoryGuideEnvelope(parameters, "env.2", patch.envelopes?.modEnv);
+  applyFactoryGuideLfo(parameters, "lfo.1", patch.lfos?.lfo1);
+  applyFactoryGuideLfo(parameters, "lfo.2", patch.lfos?.lfo2);
+
+  const macros = guideMacros(patch.macros);
+  for (const macro of patch.macros ?? []) {
+    const id = macro.slot ? FACTORY_GUIDE_MACRO_IDS[macro.slot] : undefined;
+    if (id) parameters[id] = guidePercent(macro.default, 0);
+  }
+
+  const importedModulation = (patch.modulationMatrix ?? [])
+    .map((route, index) => guideModulationRoute(`${id}.mod.${index + 1}`, route))
+    .filter((route): route is SynthModulationRoute => route !== null);
+  const modulation = [...importedModulation, ...guideFallbackMacroRoutes(id, patch.category, importedModulation)];
+  const effects = { filters: guideEffects(id, patch.fxChain) };
+  const taxonomy = taxonomyAssignmentForInstrumentId(FACTORY_GUIDE_CATEGORY_TAXONOMY[patch.category] ?? "wavetable_synth");
+  const tags = ["factory", "aether", "guide", patch.category.toLowerCase().replaceAll(" ", "-").replaceAll("/", "-")];
+  const normalized = normalizeSynthDraftPatch({
+    name: patch.name,
+    taxonomy,
+    parameters,
+    modulation,
+    effects,
+    metadata: {
+      createdBy: "Beat",
+      tags,
+      icon: "ph:cube",
+      macros,
+      wavemaps: customWavetables,
+      customWavetables,
+    },
+  } as Partial<SynthDraftPatch>);
+  tuneFactoryGuidePreset(patch.name, normalized);
+
+  return {
+    id,
+    name: patch.name,
+    patch: normalized,
+    tags,
+    category: patch.category,
+    description: patch.intent ?? `${patch.name} Aether factory patch.`,
+    family: patch.category,
+    role: patch.category.toLowerCase(),
+    auditionNote: `${patch.category} patch built from the v4 Aether factory guide.`,
+  };
+}
+
+function tuneFactoryGuidePreset(name: string, patch: SynthDraftPatch) {
+  const p = patch.parameters;
+  const set = (id: SynthParameterId, value: SynthParameterValue) => {
+    p[id] = value;
+  };
+  const setEffectMix = (kind: TrackEffect["kind"], mix: number) => {
+    const effect = patch.effects?.filters.find((candidate) => candidate.kind === kind);
+    if (effect) effect.params.mix = mix;
+  };
+
+  switch (name) {
+    case "Block Felt Piano":
+      set("osc.a.level", 0.76);
+      set("osc.b.position", 0.06);
+      set("osc.b.level", 0.34);
+      set("filter.cutoff", 6400);
+      set("filter.keytrack", 0.55);
+      set("env.1.attack", 0.001);
+      set("env.1.decay", 0.58);
+      set("env.1.decayCurve", "exp");
+      set("env.1.sustain", 0);
+      set("env.1.release", 0.11);
+      set("env.1.releaseCurve", "exp");
+      set("env.2.decay", 0.08);
+      set("aether.noise.enabled", true);
+      set("aether.noise.level", 0.045);
+      set("aether.noise.color", 0.38);
+      set("lfo.1.enabled", false);
+      patch.modulation = patch.modulation.filter((route) => route.source !== "lfo.1");
+      set("amp.level", 0.82);
+      setEffectMix("chorus", 2);
+      setEffectMix("reverb", 8);
+      break;
+    case "Toy Xylophone":
+      set("osc.a.level", 0.76);
+      set("osc.b.position", 0.18);
+      set("osc.b.level", 0.34);
+      set("filter.cutoff", 11800);
+      set("filter.keytrack", 0.78);
+      set("env.1.attack", 0.001);
+      set("env.1.decay", 0.24);
+      set("env.1.decayCurve", "exp");
+      set("env.1.sustain", 0);
+      set("env.1.release", 0.045);
+      set("env.1.releaseCurve", "exp");
+      set("env.2.decay", 0.045);
+      set("aether.noise.enabled", true);
+      set("aether.noise.level", 0.035);
+      set("aether.noise.color", 0.72);
+      set("amp.level", 0.86);
+      setEffectMix("delay", 0);
+      setEffectMix("reverb", 5);
+      break;
+    case "Frozen Bell Stack":
+      set("osc.a.position", 0.7);
+      set("osc.a.warp", 0.22);
+      set("osc.a.level", 0.84);
+      set("osc.b.level", 0.18);
+      set("filter.cutoff", 11200);
+      set("env.1.attack", 0.001);
+      set("env.1.decay", 0.62);
+      set("env.1.decayCurve", "exp");
+      set("env.1.sustain", 0);
+      set("env.1.release", 0.18);
+      set("env.1.releaseCurve", "exp");
+      set("env.2.decay", 0.12);
+      set("aether.noise.enabled", true);
+      set("aether.noise.level", 0.02);
+      set("aether.noise.color", 0.6);
+      set("lfo.1.enabled", false);
+      set("amp.level", 0.78);
+      patch.modulation = patch.modulation.filter((route) => route.source !== "lfo.1");
+      setEffectMix("delay", 0);
+      setEffectMix("reverb", 8);
+      break;
+    case "Resin Violin Lead":
+      set("osc.a.position", 0.48);
+      set("osc.a.warp", 0.18);
+      set("osc.a.level", 0.82);
+      set("osc.b.fine", 3);
+      set("osc.b.level", 0.34);
+      set("filter.cutoff", 4300);
+      set("filter.resonance", 0.22);
+      set("filter.drive", 0.1);
+      set("filter.keytrack", 0.46);
+      set("env.1.attack", 0.08);
+      set("env.1.decay", 0.48);
+      set("env.1.sustain", 0.86);
+      set("env.1.release", 0.42);
+      set("env.2.attack", 0.04);
+      set("env.2.decay", 0.58);
+      set("env.2.sustain", 0.24);
+      set("lfo.1.enabled", true);
+      set("lfo.1.rate", 5.7);
+      set("lfo.1.smoothing", 0.22);
+      set("lfo.2.enabled", true);
+      set("lfo.2.rate", 0.18);
+      set("amp.level", 0.74);
+      setEffectMix("chorus", 7);
+      setEffectMix("reverb", 16);
+      break;
+    case "Velvet Choir Pad":
+      set("osc.a.level", 0.78);
+      set("osc.b.level", 0.56);
+      set("filter.cutoff", 7600);
+      set("filter.keytrack", 0.28);
+      set("env.1.attack", 1.05);
+      set("env.1.decay", 2.4);
+      set("env.1.sustain", 0.86);
+      set("env.1.release", 3.2);
+      set("env.2.attack", 1.2);
+      set("env.2.sustain", 0.58);
+      set("amp.level", 0.76);
+      setEffectMix("chorus", 22);
+      setEffectMix("reverb", 24);
+      break;
+    default:
+      break;
+  }
+}
+
+function guideMacros(macros: FactoryGuideMacro[] | undefined): Record<MacroId, SynthMacroDefinition> {
+  const next = cloneDefaultMacros();
+  for (const macro of macros ?? []) {
+    const id = macro.slot ? FACTORY_GUIDE_MACRO_IDS[macro.slot] : undefined;
+    if (!id || typeof macro.label !== "string" || !macro.label.trim()) continue;
+    next[id] = { ...next[id], label: macro.label.trim().slice(0, 24) };
+  }
+  return next;
+}
+
+function guideFallbackMacroRoutes(
+  presetId: string,
+  category: string,
+  imported: SynthModulationRoute[],
+): SynthModulationRoute[] {
+  const present = new Set(imported.filter((route) => route.source.startsWith("macro.")).map((route) => route.source as MacroId));
+  const defaults = guideFallbackMacroTargets(category);
+  return MACRO_IDS
+    .filter((source) => !present.has(source))
+    .map((source, index) => {
+      const fallback = defaults[source];
+      return {
+        id: `${presetId}.macro.fallback.${index + 1}`,
+        source,
+        target: fallback.target,
+        amount: fallback.amount,
+        bipolar: fallback.bipolar,
+        enabled: true,
+      };
+    });
+}
+
+function guideFallbackMacroTargets(category: string): Record<MacroId, { target: ModulationTargetId; amount: number; bipolar: boolean }> {
+  if (category === "Pad" || category === "Vocal Pad" || category === "Atmosphere" || category === "Lo-Fi Pad") {
+    return {
+      "macro.1": { target: "osc.a.position", amount: 0.14, bipolar: true },
+      "macro.2": { target: "filter.cutoff", amount: 0.16, bipolar: false },
+      "macro.3": { target: "unison.spread", amount: 0.18, bipolar: false },
+      "macro.4": { target: "amp.pan", amount: 0.1, bipolar: true },
+    };
+  }
+  if (category === "Bass" || category === "Bass / Crunch" || category === "Sub Bass") {
+    return {
+      "macro.1": { target: "osc.b.level", amount: 0.16, bipolar: false },
+      "macro.2": { target: "filter.cutoff", amount: 0.14, bipolar: true },
+      "macro.3": { target: "filter.drive", amount: 0.18, bipolar: false },
+      "macro.4": { target: "osc.a.fine", amount: 0.05, bipolar: true },
+    };
+  }
+  if (category === "Bell" || category === "Mallet" || category === "Keys / Synth Piano" || category === "Arp Pluck") {
+    return {
+      "macro.1": { target: "amp.level", amount: 0.12, bipolar: false },
+      "macro.2": { target: "filter.cutoff", amount: 0.16, bipolar: false },
+      "macro.3": { target: "osc.a.warp", amount: 0.14, bipolar: true },
+      "macro.4": { target: "unison.spread", amount: 0.12, bipolar: false },
+    };
+  }
+  return {
+    "macro.1": { target: "osc.a.position", amount: 0.14, bipolar: true },
+    "macro.2": { target: "filter.cutoff", amount: 0.16, bipolar: false },
+    "macro.3": { target: "osc.a.warp", amount: 0.14, bipolar: true },
+    "macro.4": { target: "amp.pan", amount: 0.08, bipolar: true },
+  };
+}
+
+function applyFactoryGuideOscillator(
+  parameters: Partial<Record<SynthParameterId, SynthParameterValue>>,
+  customWavetables: Record<string, CustomWavetableDefinition>,
+  presetId: string,
+  key: OscillatorKey,
+  oscillator: FactoryGuideOscillator | undefined,
+) {
+  const prefix = `osc.${key}` as const;
+  if (!oscillator) return;
+  parameters[`${prefix}.enabled`] = oscillator.enabled !== false;
+  parameters[`${prefix}.position`] = guidePercent(oscillator.position, 0);
+  parameters[`${prefix}.warp`] = guidePercent(oscillator.warp, 0);
+  parameters[`${prefix}.warpMode`] = guideWarpMode(oscillator.warpMode);
+  parameters[`${prefix}.octave`] = guideNumber(oscillator.octave, 0);
+  parameters[`${prefix}.semitone`] = guideNumber(oscillator.semitone, 0);
+  parameters[`${prefix}.fine`] = guideNumber(oscillator.fineCents, 0);
+  parameters[`${prefix}.phase`] = guidePercent(oscillator.phase, 0);
+  parameters[`${prefix}.randomPhase`] = guidePercent(oscillator.random, 0);
+  parameters[`${prefix}.pan`] = guideBipolarPercent(oscillator.pan, 0);
+  parameters[`${prefix}.level`] = guidePercent(oscillator.level, key === "a" ? 80 : 0);
+
+  if (oscillator.mode === "custom_wavetable") {
+    const custom = guideCustomWavetable(`${presetId}.${key}`, oscillator.customWavetable);
+    customWavetables[custom.id] = custom;
+    parameters[`${prefix}.wavetable`] = custom.id;
+    return;
+  }
+  parameters[`${prefix}.wavetable`] = guideBasicWavetable(oscillator.shape);
+}
+
+function applyFactoryGuideVoice(parameters: Partial<Record<SynthParameterId, SynthParameterValue>>, patch: FactoryGuidePatch) {
+  const playMode = patch.playMode ?? {};
+  const voiceStack = patch.voiceStack ?? {};
+  parameters.maxVoices = Math.max(1, Math.round(guideNumber(playMode.polyphony ?? voiceStack.max, 8)));
+  parameters["mono.enabled"] = playMode.mono === true;
+  parameters["legato.enabled"] = playMode.legato === true;
+  parameters["glide.ms"] = guideNumber(playMode.glideMs, 0);
+  parameters["unison.enabled"] = voiceStack.enabled === true;
+  parameters["unison.voices"] = Math.max(1, Math.round(guideNumber(voiceStack.voices, 1)));
+  parameters["unison.detune"] = guidePercent(voiceStack.detune, 0);
+  parameters["unison.blend"] = guidePercent(voiceStack.blend, 0);
+  parameters["unison.spread"] = guidePercent(voiceStack.spread, 0);
+}
+
+function applyFactoryGuideFilter(parameters: Partial<Record<SynthParameterId, SynthParameterValue>>, filter: FactoryGuidePatch["filter"]) {
+  if (!filter) return;
+  parameters["filter.enabled"] = filter.enabled !== false;
+  parameters["filter.type"] = guideFilterType(filter.type);
+  parameters["filter.cutoff"] = guideNumber(filter.cutoffHz, 18000);
+  parameters["filter.resonance"] = guidePercent(filter.resonance, 0);
+  parameters["filter.drive"] = guidePercent(filter.drive, 0);
+  parameters["filter.keytrack"] = guidePercent(filter.keytrack, 0);
+}
+
+function applyFactoryGuideEnvelope(
+  parameters: Partial<Record<SynthParameterId, SynthParameterValue>>,
+  prefix: "env.1" | "env.2",
+  envelope: FactoryGuideEnvelope | undefined,
+) {
+  if (!envelope) return;
+  parameters[`${prefix}.attack`] = guideNumber(envelope.attackMs, 10) / 1000;
+  parameters[`${prefix}.decay`] = guideNumber(envelope.decayMs, 180) / 1000;
+  parameters[`${prefix}.sustain`] = guidePercent(envelope.sustain, 70);
+  parameters[`${prefix}.release`] = guideNumber(envelope.releaseMs, 180) / 1000;
+  parameters[`${prefix}.attackCurve`] = guideEnvelopeCurve(envelope.attackCurve);
+  parameters[`${prefix}.decayCurve`] = guideEnvelopeCurve(envelope.decayCurve);
+  parameters[`${prefix}.releaseCurve`] = guideEnvelopeCurve(envelope.releaseCurve);
+}
+
+function applyFactoryGuideLfo(
+  parameters: Partial<Record<SynthParameterId, SynthParameterValue>>,
+  prefix: "lfo.1" | "lfo.2",
+  lfo: FactoryGuideLfo | undefined,
+) {
+  if (!lfo) return;
+  parameters[`${prefix}.enabled`] = lfo.enabled === true;
+  parameters[`${prefix}.shape`] = guideLfoShape(lfo.shape);
+  parameters[`${prefix}.sync`] = lfo.sync === true;
+  parameters[`${prefix}.rate`] = guideNumber(lfo.rateHz, 1);
+  parameters[`${prefix}.syncedRate`] = typeof lfo.rate === "string" ? lfo.rate : "1/4";
+  parameters[`${prefix}.phase`] = guidePercent(lfo.phase, 0);
+  parameters[`${prefix}.smoothing`] = guidePercent(lfo.smooth, 0);
+  parameters[`${prefix}.randomPhase`] = guidePercent(lfo.random, 0);
+  parameters[`${prefix}.oneShot`] = lfo.oneShot === true;
+  parameters[`${prefix}.retrigger`] = lfo.retrigger !== false;
+  parameters[`${prefix}.bipolar`] = lfo.bipolar !== false;
+}
+
+function guideModulationRoute(id: string, route: FactoryGuideModulationRoute): SynthModulationRoute | null {
+  const source = route.source ? FACTORY_GUIDE_MOD_SOURCES[route.source] : undefined;
+  const target = route.target ? FACTORY_GUIDE_MOD_TARGETS[route.target] : undefined;
+  if (!source || !target) return null;
+  const amount = guideBipolarPercent(route.amount, 0);
+  return {
+    id,
+    source,
+    target,
+    amount,
+    bipolar: route.polarity === "bipolar" || amount < 0,
+    enabled: route.enabled !== false,
+  };
+}
+
+function guideEffects(presetId: string, effects: FactoryGuideEffect[] | undefined): TrackEffect[] {
+  return (effects ?? [])
+    .map((effect, index) => guideEffect(`${presetId}.fx.${index + 1}`, effect))
+    .filter((effect): effect is TrackEffect => effect !== null);
+}
+
+function guideEffect(id: string, effect: FactoryGuideEffect): TrackEffect | null {
+  const kind = guideEffectKind(effect.type);
+  if (!kind) return null;
+  return {
+    id,
+    kind,
+    bypassed: false,
+    params: guideEffectParams(kind, effect.params ?? {}),
+  };
+}
+
+function guideEffectKind(type: string | undefined): TrackEffect["kind"] | null {
+  const normalized = String(type ?? "").toLowerCase().replaceAll(" ", "").replaceAll("-", "").replaceAll("/", "");
+  if (normalized === "reverbroom" || normalized === "reverb") return "reverb";
+  if (normalized === "delay") return "delay";
+  if (normalized === "chorus") return "chorus";
+  if (normalized === "phaser") return "phaser";
+  if (normalized === "flanger") return "flanger";
+  if (normalized === "compressor") return "compressor";
+  if (normalized === "lowpass") return "lowpass";
+  if (normalized === "highpass") return "highpass";
+  if (normalized === "saturator") return "saturator";
+  if (normalized === "distortion") return "distortion";
+  if (normalized === "bitcrush") return "bitcrush";
+  return null;
+}
+
+function guideEffectParams(kind: TrackEffect["kind"], params: Record<string, unknown>): Record<string, number> {
+  const pct = (key: string, fallback = 0) => guidePercent(params[key], fallback);
+  const num = (key: string, fallback = 0) => guideNumber(params[key], fallback);
+  switch (kind) {
+    case "highpass":
+    case "lowpass":
+      return { cutoffHz: num("cutoffHz", kind === "highpass" ? 40 : 12000), resonance: pct("resonance", 0) * 100 };
+    case "saturator":
+    case "distortion":
+      return { drive: pct("drive", 20) * 100, tone: pct("tone", 50) * 100, mix: pct("mix", 100) * 100 };
+    case "bitcrush":
+      return { bits: num("bits", 10), rate: pct("rate", 50) * 100, mix: pct("mix", 100) * 100 };
+    case "delay":
+      return { timeMs: guideDelayMs(params.time ?? params.timeMs ?? params.timeLeft, 250), feedback: pct("feedback", 20) * 100, mix: pct("mix", 18) * 100 };
+    case "reverb":
+      return { roomSize: pct("size", 45) * 100, damping: pct("damping", 45) * 100, mix: pct("mix", 20) * 100 };
+    case "chorus":
+      return { rateHz: num("rateHz", 0.25), depthMs: num("depthMs", 8), delayMs: num("delayMs", 12), feedback: pct("feedback", 4) * 100, mix: pct("mix", 22) * 100 };
+    case "phaser":
+      return { rateHz: num("rateHz", 0.28), centerHz: num("centerHz", 900), depthOctaves: num("depthOctaves", 1.8), feedback: pct("feedback", 25) * 100, mix: pct("mix", 30) * 100 };
+    case "flanger":
+      return { rateHz: num("rateHz", 0.2), depthMs: num("depthMs", 2.4), delayMs: num("delayMs", 2.8), feedback: pct("feedback", 28) * 100, mix: pct("mix", 22) * 100 };
+    case "compressor":
+      return { thresholdDb: -Math.abs(num("thresholdDb", num("threshold", 24))), ratio: Math.max(1, num("ratio", 4)), attackMs: num("attackMs", num("attack", 10)), releaseMs: num("releaseMs", num("release", 120)), makeupDb: num("makeupDb", num("makeup", 0)), mix: pct("mix", 85) * 100 };
+    default:
+      return {};
+  }
+}
+
+function guideCustomWavetable(id: string, custom: FactoryGuideCustomWavetable | undefined): CustomWavetableDefinition {
+  const frameEntries = Object.entries(custom?.frames ?? {}) as Array<[string, FactoryGuideFrame]>;
+  const fallbackFrames: Array<[string, FactoryGuideFrame]> = [["A", {}], ["B", {}], ["C", {}], ["D", {}]];
+  const frames = (frameEntries.length > 0 ? frameEntries : fallbackFrames)
+    .slice(0, 4)
+    .map(([label, frame], index) => guideCustomWavetableFrame(`${id}.frame.${label}`, label, frame, index));
+  return normalizeCustomWavetable({
+    schemaVersion: 1,
+    id: `user.${slugFactoryGuideName(id)}`,
+    name: custom?.name ?? id,
+    kind: "harmonic-sketch",
+    interpolation: custom?.interpolation === "linear" ? "linear" : "smooth",
+    morph: guidePercent(custom?.morph, 0),
+    source: {
+      kind: "generated",
+      label: custom?.source ?? "Factory guide",
+      createdAt: Date.now(),
+    },
+    frames,
+  });
+}
+
+function guideCustomWavetableFrame(id: string, label: string, frame: FactoryGuideFrame, index: number): CustomWavetableFrame {
+  return {
+    id,
+    label,
+    position: index / 3,
+    brightness: guidePercent(frame.bright, 35),
+    even: guidePercent(frame.even, 35),
+    fold: guidePercent(frame.fold, 0),
+    formant: guidePercent(frame.formant, 0),
+    notch: guidePercent(frame.notch, 0),
+    skew: guideBipolarPercent(frame.skew, 0),
+    tilt: guideBipolarPercent(frame.tilt, 0),
+    focus: guidePercent(frame.focus, 0),
+    phase: guideBipolarPercent(frame.phase, 0),
+  };
+}
+
+function guideBasicWavetable(shape: string | undefined): WavetableId {
+  if (shape === "saw") return "basic.saw";
+  if (shape === "square") return "basic.square";
+  if (shape === "triangle") return "basic.triangle";
+  if (shape === "pulse") return "basic.pulse";
+  return "basic.sine";
+}
+
+function guideWarpMode(value: string | undefined): WavetableWarpMode {
+  if (value === "fold") return "fold";
+  if (value === "mirror") return "mirror";
+  if (value === "pinch" || value === "formant") return "pinch";
+  return "shape";
+}
+
+function guideFilterType(value: string | undefined): string {
+  const normalized = String(value ?? "").toLowerCase();
+  if (normalized.includes("hp") || normalized.includes("high")) return "highpass";
+  if (normalized.includes("bp") || normalized.includes("band")) return "bandpass";
+  return "lowpass";
+}
+
+function guideEnvelopeCurve(value: string | undefined): EnvelopeCurve {
+  if (value === "exp" || value === "log" || value === "s-curve") return value;
+  return "linear";
+}
+
+function guideLfoShape(value: string | undefined): string {
+  if (value === "triangle" || value === "square" || value === "saw") return value;
+  return "sine";
+}
+
+function guideNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function guidePercent(value: unknown, fallbackPercent: number): number {
+  return Math.max(0, Math.min(1, guideNumber(value, fallbackPercent) / 100));
+}
+
+function guideBipolarPercent(value: unknown, fallbackPercent: number): number {
+  return Math.max(-1, Math.min(1, guideNumber(value, fallbackPercent) / 100));
+}
+
+function guideDelayMs(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return fallback;
+  const rates: Record<string, number> = {
+    "1/32": 62.5,
+    "1/16": 125,
+    "1/8": 250,
+    "1/8D": 375,
+    "1/4": 500,
+    "1/4D": 750,
+    "1/2": 1000,
+    "3/4": 1500,
+    "1/1": 2000,
+  };
+  return rates[value] ?? fallback;
+}
+
+function slugFactoryGuideName(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replaceAll("&", "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
+  const guidedPresets = createFactorySynthPresetsFromGuide();
+  if (guidedPresets.length > 0) return guidedPresets;
+
   const custom = createDefaultCustomWavetable();
   const effect = (id: string, kind: TrackEffect["kind"], params: Record<string, number>): TrackEffect => ({
     id,
@@ -2254,7 +3006,14 @@ function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
     parameters: Partial<Record<SynthParameterId, SynthParameterValue>>,
     modulation: SynthModulationRoute[] = createDefaultSynthDraft().modulation,
     customWavetable: CustomWavetableDefinition = custom,
-    closeout: { family?: string; role?: string; auditionNote?: string; effects?: TrackEffectChain; macros?: Record<MacroId, SynthMacroDefinition> } = {},
+    closeout: {
+      family?: string;
+      role?: string;
+      auditionNote?: string;
+      effects?: TrackEffectChain;
+      macros?: Record<MacroId, SynthMacroDefinition>;
+      taxonomyId?: string;
+    } = {},
   ): SynthFactoryPresetRecord => ({
     id,
     name,
@@ -2266,6 +3025,7 @@ function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
     auditionNote: closeout.auditionNote ?? `Audition ${name} in the ${category.toLowerCase()} register before release.`,
     patch: normalizeSynthDraftPatch({
       name,
+      taxonomy: closeout.taxonomyId ? taxonomyAssignmentForInstrumentId(closeout.taxonomyId) : undefined,
       parameters,
       modulation: [...modulation, ...macroRoutes(id, category)],
       effects: closeout.effects,
@@ -2277,6 +3037,8 @@ function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
       },
     } as unknown as Partial<SynthDraftPatch>),
   });
+  const pct = (value: number) => value / 100;
+  const ms = (value: number) => value / 1000;
 
   return [
     preset(
@@ -2290,6 +3052,465 @@ function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
       custom,
       { family: "Template", role: "init patch", auditionNote: "Neutral-design baseline for building a patch, not a finished musical preset." },
     ),
+    preset("factory.carbon-poly", "Carbon Poly", ["factory", "demo", "poly", "keys"], "Keys", "Warm modern polysynth keys with subtle wavetable motion and controlled stereo width.", {
+      "osc.a.wavetable": DEFAULT_CUSTOM_WAVETABLE_ID,
+      "osc.a.position": pct(24),
+      "osc.a.warp": pct(18),
+      "osc.a.warpMode": "shape",
+      "osc.a.level": pct(72),
+      "osc.b.enabled": true,
+      "osc.b.wavetable": "basic.pulse",
+      "osc.b.position": pct(38),
+      "osc.b.fine": -4,
+      "osc.b.level": pct(42),
+      "unison.enabled": true,
+      "unison.voices": 6,
+      "unison.detune": pct(14),
+      "unison.blend": pct(70),
+      "unison.spread": pct(62),
+      "filter.type": "lowpass",
+      "filter.cutoff": 7500,
+      "filter.resonance": pct(12),
+      "filter.drive": pct(8),
+      "filter.keytrack": pct(35),
+      "env.1.attack": ms(12),
+      "env.1.decay": ms(550),
+      "env.1.sustain": pct(62),
+      "env.1.release": ms(420),
+      "env.2.attack": 0,
+      "env.2.decay": ms(900),
+      "env.2.sustain": 0,
+      "env.2.release": ms(250),
+      "lfo.1.enabled": true,
+      "lfo.1.shape": "triangle",
+      "lfo.1.sync": true,
+      "lfo.1.syncedRate": "1/2",
+      "lfo.1.smoothing": pct(20),
+      "amp.level": pct(74),
+    }, [
+      { id: "carbon_poly_lfo_scan", source: "lfo.1", target: "osc.a.position", amount: 0.12, bipolar: true, enabled: true },
+      { id: "carbon_poly_env_filter", source: "env.2", target: "filter.cutoff", amount: 0.18, bipolar: false, enabled: true },
+      { id: "carbon_poly_velocity", source: "velocity", target: "amp.level", amount: 0.12, bipolar: false, enabled: true },
+    ], custom, {
+      family: "Poly Keys",
+      role: "warm polysynth keys",
+      taxonomyId: "poly_synth",
+      auditionNote: "Audition medium chords around C3-C5; it should feel warm, playable, and lightly animated.",
+      effects: { filters: [effect("factory.carbon-poly.chorus", "chorus", { rateHz: 0.25, depthMs: 6, delayMs: 12, feedback: 2, mix: 18 })] },
+    }),
+    preset("factory.glass-runner", "Glass Runner", ["factory", "demo", "pluck", "arp"], "Pluck", "Bright digital pluck for arpeggios and short melodic sequences.", {
+      "osc.a.wavetable": DEFAULT_CUSTOM_WAVETABLE_ID,
+      "osc.a.position": pct(58),
+      "osc.a.warp": pct(36),
+      "osc.a.warpMode": "pinch",
+      "osc.a.level": pct(82),
+      "osc.b.enabled": true,
+      "osc.b.wavetable": "basic.triangle",
+      "osc.b.octave": 1,
+      "osc.b.level": pct(28),
+      "filter.type": "lowpass",
+      "filter.cutoff": 3200,
+      "filter.resonance": pct(24),
+      "filter.drive": pct(4),
+      "filter.keytrack": pct(50),
+      "env.1.attack": 0,
+      "env.1.decay": ms(240),
+      "env.1.sustain": 0,
+      "env.1.release": ms(130),
+      "env.2.attack": 0,
+      "env.2.decay": ms(190),
+      "env.2.sustain": 0,
+      "env.2.release": ms(90),
+      "lfo.1.enabled": true,
+      "lfo.1.shape": "sine",
+      "lfo.1.sync": true,
+      "lfo.1.syncedRate": "1/8",
+      "lfo.1.smoothing": pct(10),
+      "amp.level": pct(72),
+    }, [
+      { id: "glass_runner_env_filter", source: "env.2", target: "filter.cutoff", amount: 0.38, bipolar: false, enabled: true },
+      { id: "glass_runner_lfo_level", source: "lfo.1", target: "osc.b.level", amount: 0.1, bipolar: true, enabled: true },
+    ], custom, {
+      family: "Arp Pluck",
+      role: "digital arpeggio pluck",
+      taxonomyId: "wavetable_synth",
+      auditionNote: "Audition fast sixteenth arpeggios around C4; attack should be crisp without a harsh click.",
+      effects: { filters: [effect("factory.glass-runner.delay", "delay", { timeMs: 185, feedback: 24, mix: 14 })] },
+    }),
+    preset("factory.velvet-choir-pad", "Velvet Choir Pad", ["factory", "demo", "pad", "choir"], "Pad", "Wide evolving formant pad with slow modulation and aftertouch-style expression.", {
+      "osc.a.wavetable": DEFAULT_CUSTOM_WAVETABLE_ID,
+      "osc.a.position": pct(42),
+      "osc.a.warp": pct(34),
+      "osc.a.warpMode": "mirror",
+      "osc.a.level": pct(64),
+      "osc.b.enabled": true,
+      "osc.b.wavetable": "basic.saw",
+      "osc.b.octave": 1,
+      "osc.b.fine": 7,
+      "osc.b.level": pct(36),
+      "unison.enabled": true,
+      "unison.voices": 8,
+      "unison.detune": pct(16),
+      "unison.blend": pct(76),
+      "unison.spread": pct(86),
+      "filter.type": "lowpass",
+      "filter.cutoff": 4800,
+      "filter.resonance": pct(8),
+      "filter.drive": pct(5),
+      "filter.keytrack": pct(20),
+      "env.1.attack": ms(1800),
+      "env.1.decay": ms(3500),
+      "env.1.sustain": pct(78),
+      "env.1.release": ms(4200),
+      "env.2.attack": ms(2500),
+      "env.2.decay": ms(5000),
+      "env.2.sustain": pct(45),
+      "env.2.release": ms(3000),
+      "lfo.1.enabled": true,
+      "lfo.1.shape": "triangle",
+      "lfo.1.sync": false,
+      "lfo.1.rate": 0.06,
+      "lfo.1.smoothing": pct(60),
+      "lfo.2.enabled": true,
+      "lfo.2.shape": "sine",
+      "lfo.2.sync": false,
+      "lfo.2.rate": 0.09,
+      "lfo.2.smoothing": pct(70),
+      "lfo.2.phase": 0.25,
+      "amp.level": pct(58),
+    }, [
+      { id: "velvet_choir_lfo_a", source: "lfo.1", target: "osc.a.position", amount: 0.2, bipolar: true, enabled: true },
+      { id: "velvet_choir_lfo_b", source: "lfo.2", target: "osc.b.pan", amount: 0.14, bipolar: true, enabled: true },
+      { id: "velvet_choir_env_filter", source: "env.2", target: "filter.cutoff", amount: 0.12, bipolar: false, enabled: true },
+    ], custom, {
+      family: "Pad",
+      role: "choir-like pad",
+      taxonomyId: "pad_synth",
+      auditionNote: "Audition slow triads and suspended chords; it should swell smoothly and avoid brittle highs.",
+      effects: { filters: [effect("factory.velvet-choir-pad.chorus", "chorus", { rateHz: 0.18, depthMs: 9, delayMs: 18, feedback: 3, mix: 24 }), effect("factory.velvet-choir-pad.room", "reverb", { roomSize: 56, damping: 42, mix: 18 })] },
+    }),
+    preset("factory.factory-reese", "Factory Reese", ["factory", "demo", "bass", "reese"], "Bass", "Detuned mono bass with moving filter, distortion, and controlled stereo pressure.", {
+      "osc.a.wavetable": "basic.saw",
+      "osc.a.octave": -1,
+      "osc.a.position": pct(36),
+      "osc.a.warp": pct(28),
+      "osc.a.level": pct(78),
+      "osc.b.enabled": true,
+      "osc.b.wavetable": "basic.saw",
+      "osc.b.octave": -1,
+      "osc.b.fine": -16,
+      "osc.b.level": pct(64),
+      "unison.enabled": true,
+      "unison.voices": 3,
+      "unison.detune": pct(18),
+      "unison.blend": pct(72),
+      "unison.spread": pct(52),
+      "filter.type": "lowpass",
+      "filter.cutoff": 1100,
+      "filter.resonance": pct(18),
+      "filter.drive": pct(28),
+      "filter.keytrack": pct(10),
+      "env.1.attack": ms(2),
+      "env.1.decay": ms(350),
+      "env.1.sustain": pct(88),
+      "env.1.release": ms(90),
+      "env.2.attack": 0,
+      "env.2.decay": ms(260),
+      "env.2.sustain": pct(20),
+      "env.2.release": ms(80),
+      "lfo.1.enabled": true,
+      "lfo.1.shape": "triangle",
+      "lfo.1.sync": true,
+      "lfo.1.syncedRate": "1/4",
+      "lfo.1.smoothing": pct(25),
+      "lfo.2.enabled": true,
+      "lfo.2.shape": "sine",
+      "lfo.2.sync": true,
+      "lfo.2.syncedRate": "1/2",
+      "lfo.2.smoothing": pct(40),
+      "lfo.2.phase": 0.25,
+      "amp.level": pct(72),
+      "mono.enabled": true,
+      "glide.ms": 38,
+    }, [
+      { id: "factory_reese_lfo_filter", source: "lfo.1", target: "filter.cutoff", amount: 0.18, bipolar: true, enabled: true },
+      { id: "factory_reese_lfo_pan", source: "lfo.2", target: "amp.pan", amount: 0.1, bipolar: true, enabled: true },
+      { id: "factory_reese_env_drive", source: "env.2", target: "filter.drive", amount: 0.16, bipolar: false, enabled: true },
+    ], custom, {
+      family: "Bass",
+      role: "detuned reese bass",
+      taxonomyId: "reese_bass",
+      auditionNote: "Audition sustained low notes around C1-C2; the bass should move without losing the center.",
+      effects: { filters: [effect("factory.factory-reese.sat", "saturator", { drive: 18, mix: 68 }), effect("factory.factory-reese.hp", "highpass", { cutoffHz: 32, resonance: 0 })] },
+    }),
+    preset("factory.laser-brass-lead", "Laser Brass Lead", ["factory", "demo", "lead", "brass"], "Lead", "Sharp mono synth-brass lead with expressive filter movement and vibrato control.", {
+      "osc.a.wavetable": "basic.saw",
+      "osc.a.position": pct(44),
+      "osc.a.warp": pct(32),
+      "osc.a.level": pct(78),
+      "osc.b.enabled": true,
+      "osc.b.wavetable": "basic.pulse",
+      "osc.b.semitone": 7,
+      "osc.b.fine": -6,
+      "osc.b.level": pct(36),
+      "unison.enabled": true,
+      "unison.voices": 2,
+      "unison.detune": pct(8),
+      "filter.type": "lowpass",
+      "filter.cutoff": 2400,
+      "filter.resonance": pct(28),
+      "filter.drive": pct(18),
+      "filter.keytrack": pct(35),
+      "env.1.attack": 0,
+      "env.1.decay": ms(420),
+      "env.1.sustain": pct(74),
+      "env.1.release": ms(110),
+      "env.2.attack": 0,
+      "env.2.decay": ms(280),
+      "env.2.sustain": 0,
+      "env.2.release": ms(80),
+      "lfo.1.enabled": true,
+      "lfo.1.shape": "sine",
+      "lfo.1.sync": false,
+      "lfo.1.rate": 5.5,
+      "lfo.1.smoothing": pct(35),
+      "amp.level": pct(70),
+      "mono.enabled": true,
+      "legato.enabled": true,
+      "glide.ms": 42,
+    }, [
+      { id: "laser_brass_env_filter", source: "env.2", target: "filter.cutoff", amount: 0.34, bipolar: false, enabled: true },
+      { id: "laser_brass_lfo_pitch", source: "lfo.1", target: "osc.a.fine", amount: 0.04, bipolar: true, enabled: true },
+      { id: "laser_brass_modwheel", source: "modWheel", target: "filter.resonance", amount: 0.18, bipolar: false, enabled: true },
+    ], custom, {
+      family: "Lead",
+      role: "mono synth brass lead",
+      taxonomyId: "lead_synth",
+      auditionNote: "Audition single-note hooks around C4-C5; the filter should bark without collapsing into harshness.",
+      effects: { filters: [effect("factory.laser-brass-lead.delay", "delay", { timeMs: 225, feedback: 18, mix: 10 })] },
+    }),
+    preset("factory.frozen-bell-stack", "Frozen Bell Stack", ["factory", "demo", "bell", "keys"], "Keys", "Icy mallet and music-box hybrid with shimmer and velocity-sensitive brightness.", {
+      "osc.a.wavetable": DEFAULT_CUSTOM_WAVETABLE_ID,
+      "osc.a.position": pct(76),
+      "osc.a.warp": pct(26),
+      "osc.a.warpMode": "pinch",
+      "osc.a.level": pct(70),
+      "osc.b.enabled": true,
+      "osc.b.wavetable": "basic.sine",
+      "osc.b.octave": 1,
+      "osc.b.semitone": 7,
+      "osc.b.level": pct(34),
+      "filter.type": "lowpass",
+      "filter.cutoff": 8500,
+      "filter.resonance": pct(6),
+      "filter.drive": 0,
+      "filter.keytrack": pct(70),
+      "env.1.attack": 0,
+      "env.1.decay": ms(1400),
+      "env.1.sustain": 0,
+      "env.1.release": ms(1800),
+      "env.2.attack": 0,
+      "env.2.decay": ms(520),
+      "env.2.sustain": 0,
+      "env.2.release": ms(300),
+      "lfo.1.enabled": true,
+      "lfo.1.shape": "sine",
+      "lfo.1.sync": true,
+      "lfo.1.syncedRate": "1/2",
+      "lfo.1.smoothing": pct(50),
+      "amp.level": pct(62),
+    }, [
+      { id: "frozen_bell_velocity", source: "velocity", target: "filter.cutoff", amount: 0.22, bipolar: false, enabled: true },
+      { id: "frozen_bell_lfo_pan", source: "lfo.1", target: "amp.pan", amount: 0.1, bipolar: true, enabled: true },
+    ], custom, {
+      family: "Bell",
+      role: "icy bell keys",
+      taxonomyId: "wavetable_synth",
+      auditionNote: "Audition sparse notes and high-register intervals; it should shimmer without turning into noise.",
+      effects: { filters: [effect("factory.frozen-bell-stack.room", "reverb", { roomSize: 62, damping: 34, mix: 22 })] },
+    }),
+    preset("factory.analog-dust-pad", "Analog Dust Pad", ["factory", "demo", "pad", "lo-fi"], "Pad", "Tape-worn vintage pad with pitch drift, chorus, and softened highs.", {
+      "osc.a.wavetable": DEFAULT_CUSTOM_WAVETABLE_ID,
+      "osc.a.position": pct(18),
+      "osc.a.warp": pct(22),
+      "osc.a.warpMode": "mirror",
+      "osc.a.level": pct(62),
+      "osc.b.enabled": true,
+      "osc.b.wavetable": "basic.pulse",
+      "osc.b.fine": 9,
+      "osc.b.level": pct(3),
+      "unison.enabled": true,
+      "unison.voices": 5,
+      "unison.detune": pct(18),
+      "unison.blend": pct(78),
+      "unison.spread": pct(74),
+      "filter.type": "lowpass",
+      "filter.cutoff": 2800,
+      "filter.resonance": pct(9),
+      "filter.drive": pct(12),
+      "filter.keytrack": pct(20),
+      "env.1.attack": ms(950),
+      "env.1.decay": ms(2200),
+      "env.1.sustain": pct(70),
+      "env.1.release": ms(2800),
+      "env.2.attack": ms(1400),
+      "env.2.decay": ms(3000),
+      "env.2.sustain": pct(35),
+      "env.2.release": ms(2000),
+      "lfo.1.enabled": true,
+      "lfo.1.shape": "sine",
+      "lfo.1.sync": false,
+      "lfo.1.rate": 0.35,
+      "lfo.1.smoothing": pct(70),
+      "lfo.2.enabled": true,
+      "lfo.2.shape": "square",
+      "lfo.2.sync": false,
+      "lfo.2.rate": 0.18,
+      "lfo.2.smoothing": pct(80),
+      "lfo.2.randomPhase": pct(60),
+      "amp.level": pct(58),
+    }, [
+      { id: "analog_dust_lfo_pitch", source: "lfo.1", target: "osc.a.fine", amount: 0.06, bipolar: true, enabled: true },
+      { id: "analog_dust_lfo_scan", source: "lfo.2", target: "osc.a.position", amount: 0.18, bipolar: true, enabled: true },
+      { id: "analog_dust_env_filter", source: "env.2", target: "filter.cutoff", amount: 0.12, bipolar: false, enabled: true },
+    ], custom, {
+      family: "Lo-Fi Pad",
+      role: "vintage pad",
+      taxonomyId: "pad_synth",
+      auditionNote: "Audition sustained minor chords; the drift should read as worn tape rather than tuning failure.",
+      effects: { filters: [effect("factory.analog-dust-pad.chorus", "chorus", { rateHz: 0.22, depthMs: 10, delayMs: 16, feedback: 2, mix: 22 }), effect("factory.analog-dust-pad.lowpass", "lowpass", { cutoffHz: 7200, resonance: 0 })] },
+    }),
+    preset("factory.neon-chord-stab", "Neon Chord Stab", ["factory", "demo", "keys", "stab"], "Keys", "Short house and garage-style chord stab with filter snap and rhythmic movement.", {
+      "osc.a.wavetable": "basic.saw",
+      "osc.a.position": pct(46),
+      "osc.a.warp": pct(28),
+      "osc.a.level": pct(74),
+      "osc.b.enabled": true,
+      "osc.b.wavetable": "basic.pulse",
+      "osc.b.semitone": 7,
+      "osc.b.level": pct(32),
+      "unison.enabled": true,
+      "unison.voices": 4,
+      "unison.detune": pct(12),
+      "unison.blend": pct(62),
+      "unison.spread": pct(64),
+      "filter.type": "lowpass",
+      "filter.cutoff": 1800,
+      "filter.resonance": pct(20),
+      "filter.drive": pct(14),
+      "filter.keytrack": pct(25),
+      "env.1.attack": 0,
+      "env.1.decay": ms(320),
+      "env.1.sustain": pct(18),
+      "env.1.release": ms(170),
+      "env.2.attack": 0,
+      "env.2.decay": ms(260),
+      "env.2.sustain": 0,
+      "env.2.release": ms(100),
+      "lfo.1.enabled": true,
+      "lfo.1.shape": "saw",
+      "lfo.1.sync": true,
+      "lfo.1.syncedRate": "1/4",
+      "lfo.1.smoothing": pct(15),
+      "amp.level": pct(66),
+    }, [
+      { id: "neon_stab_env_filter", source: "env.2", target: "filter.cutoff", amount: 0.42, bipolar: false, enabled: true },
+      { id: "neon_stab_lfo_pan", source: "lfo.1", target: "amp.pan", amount: 0.1, bipolar: true, enabled: true },
+    ], custom, {
+      family: "Chord Stab",
+      role: "house chord stab",
+      taxonomyId: "poly_synth",
+      auditionNote: "Audition short chord hits around C3-C4; it should be punchy, bright, and not overly sustained.",
+      effects: { filters: [effect("factory.neon-chord-stab.delay", "delay", { timeMs: 250, feedback: 18, mix: 12 })] },
+    }),
+    preset("factory.sub-anchor", "Sub Anchor", ["factory", "demo", "bass", "sub"], "Bass", "Clean mono sub bass with subtle harmonic edge and a short pitch transient.", {
+      "osc.a.wavetable": "basic.sine",
+      "osc.a.octave": -2,
+      "osc.a.level": pct(92),
+      "osc.b.enabled": true,
+      "osc.b.wavetable": "basic.triangle",
+      "osc.b.octave": -1,
+      "osc.b.level": pct(24),
+      "filter.type": "lowpass",
+      "filter.cutoff": 900,
+      "filter.resonance": pct(4),
+      "filter.drive": pct(10),
+      "filter.keytrack": pct(15),
+      "env.1.attack": ms(4),
+      "env.1.decay": ms(180),
+      "env.1.sustain": 1,
+      "env.1.release": ms(80),
+      "env.2.attack": 0,
+      "env.2.decay": ms(120),
+      "env.2.sustain": 0,
+      "env.2.release": ms(50),
+      "lfo.1.enabled": false,
+      "lfo.2.enabled": false,
+      "amp.level": pct(82),
+      "mono.enabled": true,
+      "glide.ms": 18,
+    }, [
+      { id: "sub_anchor_env_pitch", source: "env.2", target: "osc.a.fine", amount: 0.18, bipolar: false, enabled: true },
+      { id: "sub_anchor_velocity", source: "velocity", target: "amp.level", amount: 0.1, bipolar: false, enabled: true },
+    ], custom, {
+      family: "Sub Bass",
+      role: "clean mono sub",
+      taxonomyId: "sub_bass",
+      auditionNote: "Audition simple C1 bass notes; it should stay clean, centered, and usable under drums.",
+      effects: { filters: [effect("factory.sub-anchor.comp", "compressor", { thresholdDb: -20, ratio: 4, attackMs: 12, releaseMs: 120, makeupDb: 1, mix: 86 })] },
+    }),
+    preset("factory.scanner-drone", "Scanner Drone", ["factory", "demo", "texture", "drone"], "Texture", "Slow evolving drone with wavetable scanning, resonant filtering, and granular-style motion.", {
+      "osc.a.wavetable": DEFAULT_CUSTOM_WAVETABLE_ID,
+      "osc.a.position": pct(64),
+      "osc.a.warp": pct(52),
+      "osc.a.warpMode": "mirror",
+      "osc.a.level": pct(58),
+      "osc.b.enabled": true,
+      "osc.b.wavetable": "basic.saw",
+      "osc.b.octave": -1,
+      "osc.b.fine": 11,
+      "osc.b.level": pct(32),
+      "unison.enabled": true,
+      "unison.voices": 7,
+      "unison.detune": pct(22),
+      "unison.blend": pct(74),
+      "unison.spread": pct(90),
+      "filter.type": "bandpass",
+      "filter.cutoff": 1600,
+      "filter.resonance": pct(35),
+      "filter.drive": pct(16),
+      "filter.keytrack": 0,
+      "env.1.attack": ms(650),
+      "env.1.decay": ms(3800),
+      "env.1.sustain": pct(85),
+      "env.1.release": ms(4200),
+      "env.2.attack": ms(900),
+      "env.2.decay": ms(4500),
+      "env.2.sustain": pct(40),
+      "env.2.release": ms(3800),
+      "lfo.1.enabled": true,
+      "lfo.1.shape": "triangle",
+      "lfo.1.sync": false,
+      "lfo.1.rate": 0.03,
+      "lfo.1.smoothing": pct(80),
+      "lfo.2.enabled": true,
+      "lfo.2.shape": "square",
+      "lfo.2.sync": false,
+      "lfo.2.rate": 0.07,
+      "lfo.2.smoothing": pct(85),
+      "lfo.2.randomPhase": pct(70),
+      "amp.level": pct(68),
+    }, [
+      { id: "scanner_drone_lfo_scan", source: "lfo.1", target: "osc.a.position", amount: 0.34, bipolar: true, enabled: true },
+      { id: "scanner_drone_lfo_filter", source: "lfo.2", target: "filter.cutoff", amount: 0.22, bipolar: true, enabled: true },
+      { id: "scanner_drone_env_space", source: "env.2", target: "unison.spread", amount: 0.1, bipolar: false, enabled: true },
+    ], custom, {
+      family: "Atmosphere",
+      role: "slow scanning drone",
+      taxonomyId: "wavetable_synth",
+      auditionNote: "Audition long held notes; the patch should evolve slowly without pulsing like an obvious LFO.",
+      effects: { filters: [effect("factory.scanner-drone.flanger", "flanger", { rateHz: 0.08, depthMs: 3.2, delayMs: 4.5, feedback: 18, mix: 16 }), effect("factory.scanner-drone.room", "reverb", { roomSize: 70, damping: 38, mix: 24 })] },
+    }),
     preset("factory.custom-table", "Custom Wavetable", ["factory", "wavetable"], "Wavetable", "Animated custom wavemap patch with envelope-filter movement.", {
       "osc.a.wavetable": DEFAULT_CUSTOM_WAVETABLE_ID,
       "osc.a.position": 0.35,
@@ -2474,93 +3695,6 @@ function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
       { id: "perc_env_filter", source: "env.1", target: "filter.cutoff", amount: 0.34, bipolar: false, enabled: true },
       { id: "perc_velocity_drive", source: "velocity", target: "filter.drive", amount: 0.18, bipolar: false, enabled: true },
     ], custom, { family: "Percussion", role: "metallic synthetic hit", auditionNote: "Audition as sixteenth-note accents and one-shot hits; should be sharp without turning into broadband noise." }),
-    preset("factory.aether-kick", "Aether Kick", ["factory", "drum", "kick"], "Drum", "Tight synthetic kick with a short driven body for factory beat loops.", {
-      "osc.a.wavetable": "basic.sine",
-      "osc.a.octave": -2,
-      "osc.a.position": 0.08,
-      "osc.a.warp": 0.2,
-      "osc.a.level": 0.92,
-      "osc.b.enabled": true,
-      "osc.b.wavetable": "basic.triangle",
-      "osc.b.octave": -1,
-      "osc.b.level": 0.22,
-      "filter.cutoff": 1180,
-      "filter.resonance": 0.08,
-      "filter.drive": 0.42,
-      "aether.runtimeWarp": 0.2,
-      "aether.runtimeWarpMode": "shape",
-      "env.1.attack": 0.001,
-      "env.1.decay": 0.22,
-      "env.1.sustain": 0.02,
-      "env.1.release": 0.08,
-      "amp.level": 0.86,
-    }, [
-      { id: "kick_env_pitch", source: "env.1", target: "osc.a.fine", amount: 0.34, bipolar: false, enabled: true },
-      { id: "kick_env_drive", source: "env.1", target: "filter.drive", amount: 0.18, bipolar: false, enabled: true },
-    ], custom, {
-      family: "Drum",
-      role: "synthetic kick",
-      auditionNote: "Audition around C1-C2 in quarter-note and break patterns; should punch without a long tail.",
-      effects: { filters: [effect("factory.aether-kick.comp", "compressor", { thresholdDb: -18, ratio: 5, attackMs: 4, releaseMs: 90, makeupDb: 2, mix: 90 })] },
-    }),
-    preset("factory.aether-snare", "Aether Snare", ["factory", "drum", "snare"], "Drum", "Noise-and-tone snare layer for factory hip-hop, house, and breakcore loops.", {
-      "osc.a.wavetable": "basic.triangle",
-      "osc.a.octave": -1,
-      "osc.a.position": 0.38,
-      "osc.a.warp": 0.44,
-      "osc.a.warpMode": "fold",
-      "osc.a.level": 0.78,
-      "osc.b.enabled": true,
-      "osc.b.wavetable": "basic.pulse",
-      "osc.b.position": 0.62,
-      "osc.b.semitone": 7,
-      "osc.b.level": 0.3,
-      "filter.type": "bandpass",
-      "filter.cutoff": 3900,
-      "filter.resonance": 0.46,
-      "filter.drive": 0.36,
-      "aether.runtimeWarp": 0.32,
-      "aether.runtimeWarpMode": "fold",
-      "env.1.attack": 0.001,
-      "env.1.decay": 0.14,
-      "env.1.sustain": 0.04,
-      "env.1.release": 0.07,
-      "amp.level": 0.76,
-    }, [
-      { id: "snare_env_filter", source: "env.1", target: "filter.cutoff", amount: 0.28, bipolar: false, enabled: true },
-      { id: "snare_velocity_drive", source: "velocity", target: "filter.drive", amount: 0.2, bipolar: false, enabled: true },
-    ], custom, {
-      family: "Drum",
-      role: "synthetic snare",
-      auditionNote: "Audition on beats 2 and 4 plus ghost notes; body should stay audible under fast hats.",
-      effects: { filters: [effect("factory.aether-snare.sat", "saturator", { drive: 24, mix: 78 }), effect("factory.aether-snare.room", "reverb", { roomSize: 24, damping: 58, mix: 10 })] },
-    }),
-    preset("factory.aether-closed-hat", "Aether Closed Hat", ["factory", "drum", "hat"], "Drum", "Short high-register hat made from pinched pulse harmonics.", {
-      "osc.a.wavetable": "basic.pulse",
-      "osc.a.octave": 2,
-      "osc.a.position": 0.88,
-      "osc.a.warp": 0.62,
-      "osc.a.warpMode": "pinch",
-      "osc.a.level": 0.62,
-      "osc.b.enabled": true,
-      "osc.b.wavetable": "basic.square",
-      "osc.b.octave": 2,
-      "osc.b.semitone": 7,
-      "osc.b.fine": -11,
-      "osc.b.level": 0.2,
-      "filter.type": "highpass",
-      "filter.cutoff": 7200,
-      "filter.resonance": 0.18,
-      "filter.drive": 0.08,
-      "env.1.attack": 0.001,
-      "env.1.decay": 0.045,
-      "env.1.sustain": 0,
-      "env.1.release": 0.018,
-      "amp.level": 0.62,
-    }, [
-      { id: "hat_velocity_level", source: "velocity", target: "amp.level", amount: 0.26, bipolar: false, enabled: true },
-      { id: "hat_lfo_position", source: "lfo.1", target: "osc.a.position", amount: 0.08, bipolar: true, enabled: true },
-    ], custom, { family: "Drum", role: "closed hat", auditionNote: "Audition sixteenth-note hats at 120-180 BPM; transient should read without a ringing pitch." }),
     preset("factory.reese-bass", "Reese Bass", ["factory", "bass", "dnb"], "Bass", "Detuned dual-oscillator bass for drum and bass and breakcore foundations.", {
       "osc.a.wavetable": "basic.saw",
       "osc.a.octave": -1,
@@ -2722,6 +3856,8 @@ function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
     }),
   ];
 }
+
+export const FACTORY_SYNTH_PRESETS: SynthFactoryPresetRecord[] = createFactorySynthPresets();
 
 export function normalizeCustomWavetable(value: Partial<CustomWavetableDefinition>): CustomWavetableDefinition {
   const id = typeof value.id === "string" && value.id.startsWith("user.") ? value.id : DEFAULT_CUSTOM_WAVETABLE_ID;

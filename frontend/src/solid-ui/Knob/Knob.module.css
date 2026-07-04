@@ -6,6 +6,28 @@
   align-items: center;
   gap: 2px;
   user-select: none;
+  touch-action: none;
+  cursor: ns-resize;
+}
+
+.pickAnchor {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  z-index: 2;
+  display: inline-flex;
+  width: 12px;
+  height: 12px;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in srgb, var(--color-fg) 66%, transparent);
+  opacity: 0;
+  pointer-events: auto;
+}
+
+.knob:hover .pickAnchor,
+:global(body[data-synth-pick-mode]) .pickAnchor {
+  opacity: 1;
 }
 
 .dial {
@@ -101,6 +123,14 @@
   font-family: var(--font-family-mono);
   font-size: var(--font-size-hint);
   line-height: 1;
+}
+
+.modulationIcon {
+  display: inline-flex;
+  width: 10px;
+  height: 10px;
+  align-items: center;
+  justify-content: center;
 }
 
 .modulationLabel {

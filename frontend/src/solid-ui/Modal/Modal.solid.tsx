@@ -1,6 +1,7 @@
 import { createEffect, createUniqueId, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Icon } from "../Icon";
+import { useModalStack } from "./modalStack";
 import styles from "./Modal.module.css";
 
 export interface ModalProps {
@@ -25,6 +26,13 @@ export function Modal(allProps: ModalProps) {
   const autoId = createUniqueId();
   const id = () => props.scopeId ?? autoId;
   const width = () => props.width ?? "md";
+
+  createEffect(() => {
+    if (!props.open) return;
+    const modalId = id();
+    useModalStack.getState().push(modalId);
+    onCleanup(() => useModalStack.getState().pop(modalId));
+  });
 
   createEffect(() => {
     if (!props.open || !props.closeOnEscape) return;

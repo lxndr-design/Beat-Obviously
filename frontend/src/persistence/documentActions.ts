@@ -175,7 +175,7 @@ export async function createNewDocument(): Promise<boolean> {
   }
   stopPlaybackForDocumentSwitch();
   useProjectStore.getState().loadProject(createEmptyProject());
-  useDocumentStore.getState().markSaved(null, buildCurrentBeatDocumentFingerprint());
+  useDocumentStore.getState().markUnsavedNewDocument();
   useDocumentStore.getState().setMissingAssets([]);
   useDocumentStore.getState().setIntegrityReport(null);
   useDocumentStore.getState().setCleanupReport(null);

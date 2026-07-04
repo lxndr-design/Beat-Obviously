@@ -9,6 +9,13 @@ import type {
   InstrumentNodePort,
 } from "../../state/types";
 import {
+  firstInstrumentTaxonomyIdForCategory,
+  INSTRUMENT_TAXONOMY_CATEGORY_OPTIONS,
+  instrumentTaxonomyOptionsForCategory,
+  normalizeInstrumentTaxonomy,
+  taxonomyAssignmentForInstrumentId,
+} from "../../state/instrumentTaxonomy";
+import {
   analyzeInstrumentNodeGraph,
   cableIsValid,
   compileNodeGraphToInstrumentPatch,
@@ -30,7 +37,7 @@ import {
   type InstrumentOutputWaveformPreview,
   type InstrumentPreviewAuditionHandle,
 } from "../../audio/synthPreview";
-import { Button, Icon, Knob, Select, TextInput, Toggle } from "../../solid-ui";
+import { Button, FloatingSelect, Icon, Knob, Select, TextInput, Toggle } from "../../solid-ui";
 import styles from "./NodeInstrumentEditor.module.css";
 
 const NODE_WIDTH = 206;
@@ -87,6 +94,8 @@ function NodeInstrumentEditorView({ props }: NodeInstrumentEditorInternalProps) 
   const [undoStack, setUndoStack] = createSignal<InstrumentNodeGraph[]>([], { equals: false });
   const [redoStack, setRedoStack] = createSignal<InstrumentNodeGraph[]>([], { equals: false });
   const [auditioning, setAuditioning] = createSignal(false);
+  const [taxonomyCategoryOpen, setTaxonomyCategoryOpen] = createSignal(false);
+  const [taxonomyInstrumentOpen, setTaxonomyInstrumentOpen] = createSignal(false);
   let auditionHandle: InstrumentPreviewAuditionHandle | null = null;
 
   const selectedNode = createMemo(() => {
@@ -96,6 +105,12 @@ function NodeInstrumentEditorView({ props }: NodeInstrumentEditorInternalProps) 
   });
   const outputNode = createMemo(() => graph().nodes.find((node) => node.kind === "output") ?? null);
   const graphIssues = createMemo(() => analyzeInstrumentNodeGraph(graph()));
+  const instrumentTaxonomy = createMemo(() => {
+    const instrument = props().instrument;
+    return instrument
+      ? normalizeInstrumentTaxonomy(instrument) ?? taxonomyAssignmentForInstrumentId("modular_synth")
+      : taxonomyAssignmentForInstrumentId("modular_synth");
+  });
   const audioGraphSnapshot = createMemo((previous?: { key: string; graph: InstrumentNodeGraph }) => {
     const nextGraph = stripNodeGraphLayout(graph());
     const key = JSON.stringify(nextGraph);
@@ -227,6 +242,24 @@ function NodeInstrumentEditorView({ props }: NodeInstrumentEditorInternalProps) 
     };
     window.addEventListener("keydown", onKeyDown);
     onCleanup(() => window.removeEventListener("keydown", onKeyDown));
+  });
+
+  createEffect(() => {
+    if (!props().instrument) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return;
+      const target = event.target as HTMLElement | null;
+      if (target && shouldKeepNativeTextUndo(target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.shiftKey) {
+        redoGraph();
+      } else {
+        undoGraph();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    onCleanup(() => window.removeEventListener("keydown", onKeyDown, { capture: true }));
   });
 
   onCleanup(() => {
@@ -490,6 +523,25 @@ function NodeInstrumentEditorView({ props }: NodeInstrumentEditorInternalProps) 
     setDirty(false);
   }
 
+  function updateInstrumentName(name: string) {
+    const instrument = props().instrument;
+    if (!instrument) return;
+    props().updateInstrument(instrument.id, { name });
+  }
+
+  function setInstrumentTaxonomyById(instrumentId: string) {
+    const instrument = props().instrument;
+    const taxonomy = taxonomyAssignmentForInstrumentId(instrumentId);
+    if (!instrument || !taxonomy) return;
+    props().updateInstrument(instrument.id, { taxonomy });
+  }
+
+  function setInstrumentTaxonomyCategory(categoryId: string) {
+    const firstInstrumentId = firstInstrumentTaxonomyIdForCategory(categoryId);
+    if (!firstInstrumentId) return;
+    setInstrumentTaxonomyById(firstInstrumentId);
+  }
+
   return (
     <Show when={props().instrument} fallback={<div class={styles.empty}>Instrument not found.</div>}>
       {(instrument) => (
@@ -503,23 +555,36 @@ function NodeInstrumentEditorView({ props }: NodeInstrumentEditorInternalProps) 
                 <strong>Nodemap</strong>
                 <span>{dirty() ? "Unsaved graph" : "Graph saved"}</span>
               </div>
+              <TextInput
+                className={styles.identityField}
+                label="Name"
+                layout="inline"
+                value={instrument().name}
+                onInput={(event) => updateInstrumentName(event.currentTarget.value)}
+              />
+              <FloatingSelect
+                label="Category"
+                layout="inline"
+                className={styles.identitySelect}
+                value={instrumentTaxonomy()?.categoryId ?? "synth_electronic"}
+                ariaLabel="Nodemap instrument category"
+                options={INSTRUMENT_TAXONOMY_CATEGORY_OPTIONS}
+                open={taxonomyCategoryOpen()}
+                onOpenChange={setTaxonomyCategoryOpen}
+                onChange={setInstrumentTaxonomyCategory}
+              />
+              <FloatingSelect
+                label="Instrument"
+                layout="inline"
+                className={styles.identitySelect}
+                value={instrumentTaxonomy()?.instrumentId ?? "modular_synth"}
+                ariaLabel="Nodemap instrument taxonomy"
+                options={instrumentTaxonomyOptionsForCategory(instrumentTaxonomy()?.categoryId ?? "synth_electronic")}
+                open={taxonomyInstrumentOpen()}
+                onOpenChange={setTaxonomyInstrumentOpen}
+                onChange={setInstrumentTaxonomyById}
+              />
               <InstrumentOutWaveform waveform={outputWaveform()} />
-            </div>
-            <div class={styles.toolbarActions}>
-              <Button size="sm" class={styles.nodeActionButton} disabled={undoStack().length === 0} onClick={undoGraph}>
-                <Icon name="ph:arrow-counter-clockwise" size={14} decorative />
-                Undo
-              </Button>
-              <Button size="sm" class={styles.nodeActionButton} disabled={redoStack().length === 0} onClick={redoGraph}>
-                Redo
-              </Button>
-              <Button size="sm" class={styles.nodeActionButton} onClick={auditionGraph}>
-                <Icon name={auditioning() ? "ph:stop-fill" : "ph:play-fill"} size={14} decorative />
-                {auditioning() ? "Stop" : "Play"}
-              </Button>
-              <Button size="sm" variant="primary" class={`${styles.nodeActionButton} ${styles.primaryActionButton}`} onClick={saveGraph}>
-                Save
-              </Button>
             </div>
           </header>
 
@@ -541,6 +606,20 @@ function NodeInstrumentEditorView({ props }: NodeInstrumentEditorInternalProps) 
               onParameterChange={updateParameter}
             />
           </div>
+
+          <footer class={`ds-action-footer ${styles.instrumentFooter}`}>
+            <div class={styles.footerLeft}>
+              <Button className={styles.footerButton} variant="ghost" selected={auditioning()} onClick={auditionGraph}>
+                <Icon name={auditioning() ? "ph:stop-fill" : "ph:play-fill"} size={12} decorative />
+                {auditioning() ? "Stop" : "Audition"}
+              </Button>
+            </div>
+            <div class={styles.footerRight}>
+              <Button className={styles.footerButton} variant="primary" onClick={saveGraph}>
+                Save
+              </Button>
+            </div>
+          </footer>
         </section>
       )}
     </Show>
@@ -584,6 +663,11 @@ function outputWaveformFill(points: string[]) {
   if (points.length === 0) return "";
   const center = points.map((point) => `${point.split(",")[0]},14`);
   return [...center, ...points.slice().reverse()].join(" ");
+}
+
+function shouldKeepNativeTextUndo(target: HTMLElement): boolean {
+  if (target.isContentEditable) return true;
+  return target.closest("input, textarea, select, [contenteditable='true']") !== null;
 }
 
 function stripNodeGraphLayout(source: InstrumentNodeGraph): InstrumentNodeGraph {

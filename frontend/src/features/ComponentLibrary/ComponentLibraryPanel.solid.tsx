@@ -5,8 +5,8 @@ import { createInstrumentBufferSource, noteFrequency, preloadInstrumentSample } 
 import {
   DEFAULT_DRUM_MIDI_PITCH,
   DEFAULT_DRUM_VELOCITY,
-  drumPatternDurationBeats,
-  drumStepLengthBeats,
+  drumPlaybackDurationBeats,
+  drumPlaybackStepLengthBeats,
   drumTimingOffsetBeats,
   normalizeDrumCell,
 } from "../../state/drumSteps";
@@ -185,12 +185,12 @@ export function playComponentPreview(
 
   const previewSpeed = Math.max(0.25, Math.min(4, speedMultiplier));
   const secondsPerBeat = (60 / Math.max(1, bpm)) / previewSpeed;
-  const durationBeats = component.kind === "drum" ? drumPatternDurationBeats(component.lengthBeats) : component.lengthBeats;
+  const durationBeats = component.kind === "drum" ? drumPlaybackDurationBeats(component.lengthBeats, component.speed) : component.lengthBeats;
   const durationSeconds = Math.max(0.1, durationBeats * secondsPerBeat);
   const now = ctx.currentTime;
 
   if (component.kind === "drum") {
-    const stepLengthBeats = drumStepLengthBeats(component.lengthBeats, component.stepCount);
+    const stepLengthBeats = drumPlaybackStepLengthBeats(component.lengthBeats, component.stepCount, component.speed);
     for (const row of component.rows) {
       const instrument = instruments.find((i) => i.id === row.instrumentId) ?? instruments[0] ?? fallbackInstrument;
       if (instrument.sampleUrl) {
@@ -312,7 +312,7 @@ function getComponentPreviewCtx(): AudioContext {
 
 function componentPlaybackLength(component: BeatComponent): string {
   const beats = component.kind === "drum"
-    ? drumPatternDurationBeats(component.lengthBeats)
+    ? drumPlaybackDurationBeats(component.lengthBeats, component.speed)
     : component.lengthBeats;
   return Number.isInteger(beats) ? `${beats}` : beats.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }

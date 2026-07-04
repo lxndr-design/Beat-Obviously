@@ -39,13 +39,22 @@ export function SegmentMidiPreview(props: Props) {
         <For each={notes()}>
           {(note) => {
             const bounds = pitchBounds();
+            const sourceOffset = props.segment.sourceStartBeat ?? 0;
+            const localStart = note.startBeat - sourceOffset;
+            const localEnd = localStart + note.lengthBeats;
+            if (localEnd <= 0 || localStart >= viewLength()) return null;
+            const visibleStart = Math.max(0, localStart);
+            const visibleEnd = Math.min(viewLength(), localEnd);
             const y = (1 - (note.pitch - bounds.min) / bounds.range) * 100;
+            const velocity = Math.max(0, Math.min(127, note.velocity ?? 96));
+            const height = 2.2 + (velocity / 127) * 2.2;
             return (
               <rect
-                x={note.startBeat}
-                y={Math.max(0, Math.min(98, y - 2))}
-                width={Math.max(0, Math.min(viewLength() - note.startBeat, Math.max(0.04, note.lengthBeats)))}
-                height={3}
+                x={visibleStart}
+                y={Math.max(0, Math.min(98, y - height * 0.5))}
+                width={Math.max(0.04, visibleEnd - visibleStart)}
+                height={height}
+                opacity={0.52 + velocity / 270}
                 class={`${styles.note} ${props.playing ? styles.playing : ""}`}
               />
             );

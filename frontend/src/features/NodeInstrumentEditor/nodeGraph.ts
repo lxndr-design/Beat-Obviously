@@ -37,7 +37,16 @@ export interface NodeGraphIssue {
   nodeId?: string;
 }
 
-export type NodeBrowserGroupId = "synth" | "effects" | "modulation" | "utility";
+export type NodeBrowserGroupId =
+  | "sound_sources_audio_out"
+  | "audio_mixer_router_layering"
+  | "audio_tone_filter_drive"
+  | "audio_dynamics_level"
+  | "audio_time_space_motion_fx"
+  | "sole_cv_out_modulation_sources"
+  | "cv_processors_in_out"
+  | "gate_trigger_event_utilities"
+  | "debug_meter_output";
 
 export interface NodeBrowserGroup {
   id: NodeBrowserGroupId;
@@ -74,9 +83,9 @@ const AUDIO_OUT: InstrumentNodePort = { id: "audio-out", label: "Audio", kind: "
 
 export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
   instrument: {
-    label: "Instrument",
+    label: "Instrument / Patch Layer",
     icon: "ph:piano-keys",
-    description: "Uses the existing instrument patch as a sound source, then lets the graph reshape it before Instrument Out.",
+    description: "Loads an existing instrument patch as an audio layer. Pitch, level, and performance CV can reshape it before Instrument Out.",
     inputs: [
       { id: "pitch", label: "Pitch", kind: "input", signal: "control" },
       { id: "level-cv", label: "Level", kind: "input", signal: "control" },
@@ -199,6 +208,35 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
     ],
     defaults: { level1: 1, level2: 0.55, level3: 0.25 },
   },
+  panWidth: {
+    label: "Pan / Width",
+    icon: "ph:arrows-in-line-horizontal",
+    description: "Positions audio in the stereo field and controls width. Compiles to Aether pan/width style routing where available.",
+    inputs: [
+      AUDIO_IN,
+      { id: "pan-cv", label: "Pan", kind: "input", signal: "control" },
+      { id: "width-cv", label: "Width", kind: "input", signal: "control" },
+    ],
+    outputs: [AUDIO_OUT],
+    parameters: [
+      { id: "pan", label: "Pan", kind: "number", min: -1, max: 1, step: 0.01 },
+      { id: "width", label: "Width", kind: "number", min: 0, max: 2, step: 0.01 },
+      {
+        id: "mode",
+        label: "Mode",
+        kind: "select",
+        options: [
+          { value: "pan", label: "Pan" },
+          { value: "balance", label: "Balance" },
+          { value: "width", label: "Width Only" },
+        ],
+      },
+      { id: "monoBelow", label: "Mono Below", kind: "number", min: 0, max: 500, step: 1, unit: "Hz" },
+      { id: "panCvAmount", label: "Pan CV", kind: "number", min: -1, max: 1, step: 0.01 },
+      { id: "widthCvAmount", label: "Width CV", kind: "number", min: -1, max: 1, step: 0.01 },
+    ],
+    defaults: { pan: 0, width: 1, mode: "pan", monoBelow: 0, panCvAmount: 1, widthCvAmount: 1 },
+  },
   filter: {
     label: "Filter",
     icon: "ph:sparkle",
@@ -231,9 +269,9 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
     defaults: { type: "lowpass", cutoff: 8400, resonance: 0.18, drive: 0.06, cutoffCvAmount: 1, resonanceCvAmount: 1, driveCvAmount: 1 },
   },
   gain: {
-    label: "Volume",
+    label: "Gain / VCA",
     icon: "ph:sparkle",
-    description: "Final gain and pan stage. Level and Pan can be modulated by CV.",
+    description: "Controls audio level, usually from an envelope, velocity, macro, or LFO. Level and pan can be modulated by CV.",
     inputs: [
       AUDIO_IN,
       { id: "level-cv", label: "Level", kind: "input", signal: "control" },
@@ -249,7 +287,7 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
     defaults: { level: 0.8, pan: 0, levelCvAmount: 1, panCvAmount: 1 },
   },
   unison: {
-    label: "Unison",
+    label: "Unison / Voice Stack",
     icon: "ph:sparkle",
     description: "Audio passthrough that enables multiple Aether voices with detune and stereo spread. Detune and Spread accept CV.",
     inputs: [
@@ -277,7 +315,7 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
     defaults: { value: 0.5 },
   },
   cvScale: {
-    label: "CV Scale",
+    label: "CV Processor",
     icon: "ph:arrows-in-line-horizontal",
     description: "Scales, inverts, offsets, or clamps a CV route before it reaches a target input.",
     inputs: [{ id: "cv-in", label: "CV", kind: "input", signal: "control" }],
@@ -288,6 +326,65 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
       { id: "clamp", label: "Clamp", kind: "boolean" },
     ],
     defaults: { amount: 1, offset: 0, clamp: true },
+  },
+  cvCombiner: {
+    label: "CV Combiner",
+    icon: "ph:intersect-three",
+    description: "Combines two or more CV signals before one destination. Use it for macro plus velocity, envelope plus LFO, or random plus keytrack.",
+    inputs: [
+      { id: "cv-a", label: "CV A", kind: "input", signal: "control" },
+      { id: "cv-b", label: "CV B", kind: "input", signal: "control" },
+      { id: "cv-c", label: "CV C", kind: "input", signal: "control" },
+    ],
+    outputs: [{ id: "cv-out", label: "CV", kind: "output", signal: "control" }],
+    parameters: [
+      {
+        id: "operation",
+        label: "Operation",
+        kind: "select",
+        options: [
+          { value: "add", label: "Add" },
+          { value: "subtract", label: "Subtract" },
+          { value: "multiply", label: "Multiply" },
+          { value: "average", label: "Average" },
+          { value: "min", label: "Min" },
+          { value: "max", label: "Max" },
+        ],
+      },
+      { id: "weightA", label: "Weight A", kind: "number", min: -2, max: 2, step: 0.01 },
+      { id: "weightB", label: "Weight B", kind: "number", min: -2, max: 2, step: 0.01 },
+      { id: "weightC", label: "Weight C", kind: "number", min: -2, max: 2, step: 0.01 },
+      { id: "offset", label: "Offset", kind: "number", min: -1, max: 1, step: 0.01 },
+      { id: "clamp", label: "Clamp", kind: "boolean" },
+    ],
+    defaults: { operation: "add", weightA: 1, weightB: 1, weightC: 1, offset: 0, clamp: true },
+  },
+  gateTrigger: {
+    label: "Gate / Trigger",
+    icon: "ph:metronome",
+    description: "Timing utility for trigger/gate style control. In the current engine it uses control cables and is ready for a dedicated gate signal pass.",
+    inputs: [
+      { id: "gate-in", label: "Gate", kind: "input", signal: "control" },
+      { id: "trigger-in", label: "Trigger", kind: "input", signal: "control" },
+    ],
+    outputs: [{ id: "gate-out", label: "Gate", kind: "output", signal: "control" }],
+    parameters: [
+      {
+        id: "mode",
+        label: "Mode",
+        kind: "select",
+        options: [
+          { value: "gate-to-trigger", label: "Gate To Trigger" },
+          { value: "trigger-to-gate", label: "Trigger To Gate" },
+          { value: "delay", label: "Delay" },
+          { value: "invert", label: "Invert" },
+        ],
+      },
+      { id: "length", label: "Length", kind: "number", min: 0.001, max: 2, step: 0.001, unit: "s" },
+      { id: "delay", label: "Delay", kind: "number", min: 0, max: 10, step: 0.001, unit: "s" },
+      { id: "invert", label: "Invert", kind: "boolean" },
+    ],
+    defaults: { mode: "gate-to-trigger", length: 0.01, delay: 0, invert: false },
   },
   velocity: {
     label: "Velocity",
@@ -321,6 +418,32 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
       { id: "amount", label: "Amount", kind: "number", min: -1, max: 1, step: 0.01 },
     ],
     defaults: { amount: 0.3 },
+  },
+  midiControl: {
+    label: "MIDI Control",
+    icon: "ph:wave-triangle",
+    description: "Converts a MIDI performance control into CV. Use mod wheel, aftertouch, expression, pitch bend, or a specific CC.",
+    inputs: [],
+    outputs: [{ id: "cv-out", label: "CV", kind: "output", signal: "control" }],
+    parameters: [
+      {
+        id: "source",
+        label: "Source",
+        kind: "select",
+        options: [
+          { value: "modWheel", label: "Mod Wheel" },
+          { value: "aftertouch", label: "Aftertouch" },
+          { value: "pitchBend", label: "Pitch Bend" },
+          { value: "expression", label: "Expression" },
+          { value: "cc", label: "MIDI CC" },
+        ],
+      },
+      { id: "cc", label: "CC", kind: "number", min: 0, max: 127, step: 1 },
+      { id: "amount", label: "Amount", kind: "number", min: -1, max: 1, step: 0.01 },
+      { id: "smoothing", label: "Smoothing", kind: "number", min: 0, max: 500, step: 1, unit: "ms" },
+      { id: "invert", label: "Invert", kind: "boolean" },
+    ],
+    defaults: { source: "modWheel", cc: 1, amount: 0.3, smoothing: 10, invert: false },
   },
   macro: {
     label: "Macro",
@@ -380,6 +503,34 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
     ],
     defaults: { shape: "sine", rate: 1, amount: 0.25 },
   },
+  wavetableLfo: {
+    label: "Wavetable LFO",
+    icon: "ph:wave-sine",
+    description: "Uses a basic or custom wavetable shape as a CV source instead of an audio oscillator.",
+    inputs: [
+      { id: "reset", label: "Reset", kind: "input", signal: "control" },
+      { id: "position-cv", label: "Position", kind: "input", signal: "control" },
+    ],
+    outputs: [{ id: "cv-out", label: "CV", kind: "output", signal: "control" }],
+    parameters: [
+      {
+        id: "shape",
+        label: "Shape",
+        kind: "select",
+        options: [
+          { value: "sine", label: "Sine" },
+          { value: "triangle", label: "Triangle" },
+          { value: "saw", label: "Saw" },
+          { value: "square", label: "Square" },
+        ],
+      },
+      { id: "rate", label: "Rate", kind: "number", min: 0.01, max: 50, step: 0.01, unit: "Hz" },
+      { id: "amount", label: "Amount", kind: "number", min: -1, max: 1, step: 0.01 },
+      { id: "phase", label: "Phase", kind: "number", min: 0, max: 1, step: 0.01 },
+      { id: "position", label: "Position", kind: "number", min: 0, max: 1, step: 0.01 },
+    ],
+    defaults: { shape: "sine", rate: 1, amount: 0.25, phase: 0, position: 0 },
+  },
   envelope: {
     label: "Envelope",
     icon: "ph:chart-line",
@@ -405,6 +556,74 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
       { id: "mix", label: "Mix", kind: "number", min: 0, max: 1, step: 0.01 },
     ],
     defaults: { drive: 0.2, mix: 0.5 },
+  },
+  drive: {
+    label: "Drive",
+    icon: "ph:sparkle",
+    description: "Harmonic color from subtle saturation to aggressive clipping. Drive, tone, and mix accept CV.",
+    inputs: [
+      AUDIO_IN,
+      { id: "drive-cv", label: "Drive", kind: "input", signal: "control" },
+      { id: "tone-cv", label: "Tone", kind: "input", signal: "control" },
+      { id: "mix-cv", label: "Mix", kind: "input", signal: "control" },
+    ],
+    outputs: [AUDIO_OUT],
+    parameters: [
+      {
+        id: "mode",
+        label: "Mode",
+        kind: "select",
+        options: [
+          { value: "saturator", label: "Saturator" },
+          { value: "overdrive", label: "Overdrive" },
+          { value: "wavefolder", label: "Wavefolder" },
+          { value: "clipper", label: "Clipper" },
+          { value: "distortion", label: "Distortion" },
+        ],
+      },
+      { id: "drive", label: "Drive", kind: "number", min: 0, max: 1, step: 0.01 },
+      { id: "tone", label: "Tone", kind: "number", min: 0, max: 1, step: 0.01 },
+      { id: "bias", label: "Bias", kind: "number", min: -1, max: 1, step: 0.01 },
+      { id: "mix", label: "Mix", kind: "number", min: 0, max: 1, step: 0.01 },
+      { id: "driveCvAmount", label: "Drive CV", kind: "number", min: -1, max: 1, step: 0.01 },
+      { id: "toneCvAmount", label: "Tone CV", kind: "number", min: -1, max: 1, step: 0.01 },
+      { id: "mixCvAmount", label: "Mix CV", kind: "number", min: -1, max: 1, step: 0.01 },
+    ],
+    defaults: { mode: "saturator", drive: 0.25, tone: 0.5, bias: 0, mix: 0.4, driveCvAmount: 1, toneCvAmount: 1, mixCvAmount: 1 },
+  },
+  resonator: {
+    label: "Resonator",
+    icon: "ph:sparkle",
+    description: "Adds tuned ringing for body, string, bar, or chamber resonance. Currently compiles to a fixed resonant tone stage.",
+    inputs: [
+      AUDIO_IN,
+      { id: "pitch-cv", label: "Pitch", kind: "input", signal: "control" },
+      { id: "decay-cv", label: "Decay", kind: "input", signal: "control" },
+      { id: "mix-cv", label: "Mix", kind: "input", signal: "control" },
+    ],
+    outputs: [AUDIO_OUT],
+    parameters: [
+      {
+        id: "mode",
+        label: "Mode",
+        kind: "select",
+        options: [
+          { value: "comb", label: "Comb" },
+          { value: "string", label: "String" },
+          { value: "bar", label: "Bar" },
+          { value: "body", label: "Body" },
+        ],
+      },
+      { id: "frequency", label: "Frequency", kind: "number", min: 20, max: 20000, step: 1, unit: "Hz" },
+      { id: "decay", label: "Decay", kind: "number", min: 0.01, max: 20, step: 0.01, unit: "s" },
+      { id: "feedback", label: "Feedback", kind: "number", min: 0, max: 0.99, step: 0.01 },
+      { id: "damping", label: "Damping", kind: "number", min: 0, max: 1, step: 0.01 },
+      { id: "mix", label: "Mix", kind: "number", min: 0, max: 1, step: 0.01 },
+      { id: "pitchCvAmount", label: "Pitch CV", kind: "number", min: -1, max: 1, step: 0.01 },
+      { id: "decayCvAmount", label: "Decay CV", kind: "number", min: -1, max: 1, step: 0.01 },
+      { id: "mixCvAmount", label: "Mix CV", kind: "number", min: -1, max: 1, step: 0.01 },
+    ],
+    defaults: { mode: "comb", frequency: 440, decay: 1.2, feedback: 0.38, damping: 0.45, mix: 0.35, pitchCvAmount: 1, decayCvAmount: 1, mixCvAmount: 1 },
   },
   distortion: {
     label: "Distortion",
@@ -518,6 +737,30 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
     ],
     defaults: { bits: 8, rate: 0.5, mix: 0.35 },
   },
+  meterScope: {
+    label: "Meter / Scope",
+    icon: "ph:waveform",
+    description: "Displays audio level or waveform while passing audio through unchanged. Use it to debug silent or clipped graphs.",
+    inputs: [AUDIO_IN],
+    outputs: [AUDIO_OUT],
+    parameters: [
+      {
+        id: "mode",
+        label: "Mode",
+        kind: "select",
+        options: [
+          { value: "level", label: "Level" },
+          { value: "waveform", label: "Waveform" },
+          { value: "spectrum", label: "Spectrum" },
+          { value: "cv", label: "CV" },
+        ],
+      },
+      { id: "peakHold", label: "Peak Hold", kind: "boolean" },
+      { id: "rms", label: "RMS", kind: "boolean" },
+      { id: "timeWindow", label: "Window", kind: "number", min: 0.01, max: 10, step: 0.01, unit: "s" },
+    ],
+    defaults: { mode: "level", peakHold: true, rms: true, timeWindow: 1 },
+  },
   output: {
     label: "Instrument Out",
     icon: "ph:waveform",
@@ -531,37 +774,49 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
 
 export const NODE_BROWSER_GROUPS: NodeBrowserGroup[] = [
   {
-    id: "synth",
-    label: "Synth",
+    id: "sound_sources_audio_out",
+    label: "Sound Sources / Audio Out",
     nodeKinds: ["oscillator", "noise", "instrument"],
   },
   {
-    id: "effects",
-    label: "Effects",
-    nodeKinds: [
-      "filter",
-      "gain",
-      "unison",
-      "shaper",
-      "distortion",
-      "delay",
-      "chorus",
-      "reverb",
-      "phaser",
-      "flanger",
-      "compressor",
-      "bitcrush",
-    ],
+    id: "audio_mixer_router_layering",
+    label: "Mix / Route / Layer Audio",
+    nodeKinds: ["mixer", "panWidth", "unison"],
   },
   {
-    id: "modulation",
-    label: "Modulation",
-    nodeKinds: ["lfo", "envelope", "velocity", "keytrack", "modWheel", "macro", "random", "constant", "cvScale"],
+    id: "audio_tone_filter_drive",
+    label: "Tone, Filter, Drive, Resonance",
+    nodeKinds: ["filter", "drive", "bitcrush", "resonator"],
   },
   {
-    id: "utility",
-    label: "Utility",
-    nodeKinds: ["oscillatorMerge", "mixer"],
+    id: "audio_dynamics_level",
+    label: "Level and Dynamics",
+    nodeKinds: ["gain", "compressor"],
+  },
+  {
+    id: "audio_time_space_motion_fx",
+    label: "Time, Space, and Modulation FX",
+    nodeKinds: ["delay", "chorus", "reverb", "phaser", "flanger"],
+  },
+  {
+    id: "sole_cv_out_modulation_sources",
+    label: "CV Sources / Modulation Generators",
+    nodeKinds: ["lfo", "wavetableLfo", "envelope", "velocity", "keytrack", "midiControl", "macro", "random", "constant"],
+  },
+  {
+    id: "cv_processors_in_out",
+    label: "CV Processors / Modulation Utilities",
+    nodeKinds: ["cvScale", "cvCombiner"],
+  },
+  {
+    id: "gate_trigger_event_utilities",
+    label: "Gate, Trigger, and Event Utilities",
+    nodeKinds: ["gateTrigger"],
+  },
+  {
+    id: "debug_meter_output",
+    label: "Debug, Metering, and Output",
+    nodeKinds: ["meterScope"],
   },
 ];
 
@@ -1044,12 +1299,16 @@ export function compileNodeGraphToInstrumentPatch(graph: InstrumentNodeGraph, in
   }
 
   const gain = audibleNodes.find((node) => node.kind === "gain");
+  const panWidth = audibleNodes.find((node) => node.kind === "panWidth");
   if (gain) {
     draft.parameters["amp.level"] = numericParameter(gain, "level", 0.8);
     draft.parameters["amp.pan"] = numericParameter(gain, "pan", 0);
   } else if (oscillators.length === 0 && !noiseSource && !instrumentSource) {
     draft.parameters["amp.level"] = 0;
     draft.parameters["amp.pan"] = 0;
+  }
+  if (panWidth) {
+    draft.parameters["amp.pan"] = clamp(numericParameter(panWidth, "pan", 0), -1, 1);
   }
 
   const unison = audibleNodes.find((node) => node.kind === "unison");
@@ -1070,7 +1329,7 @@ export function compileNodeGraphToInstrumentPatch(graph: InstrumentNodeGraph, in
     draft.parameters["env.1.release"] = numericParameter(envelope, "release", 0.28);
   }
 
-  const lfo = controlNodes.find((node) => node.kind === "lfo");
+  const lfo = controlNodes.find((node) => node.kind === "lfo" || node.kind === "wavetableLfo");
   if (lfo) {
     draft.parameters["lfo.1.enabled"] = true;
     draft.parameters["lfo.1.shape"] = String(lfo.parameters.shape ?? "sine");
@@ -1247,6 +1506,15 @@ function applyControlCablesToDraft(
       }
       continue;
     }
+    if (source.kind === "cvCombiner") {
+      for (const inputCable of controlInputCables(graph, source.id)) {
+        const inputSource = nodeById.get(inputCable.fromNodeId);
+        if (!inputSource) continue;
+        const transform = multiplyCvTransform(cvCombinerTransformForInput(source, inputCable.toPortId), targetAmount);
+        applyControlSourceToDraft(draft, nodeRoutes, inputSource, targetId, inputCable, transform, cable);
+      }
+      continue;
+    }
 
     applyControlSourceToDraft(draft, nodeRoutes, source, targetId, cable, { amount: targetAmount, offset: 0, clamp: false });
   }
@@ -1267,7 +1535,7 @@ function applyControlSourceToDraft(
   transform: CvTransform,
   outputCable?: InstrumentNodeCable,
 ) {
-  if (source.kind === "constant" || source.kind === "random") {
+  if (source.kind === "constant" || source.kind === "random" || source.kind === "gateTrigger") {
     applyConstantCvToDraft(draft, targetId, transformedCvValue(staticCvValueForNode(source), transform));
     return;
   }
@@ -1280,7 +1548,7 @@ function applyControlSourceToDraft(
     source: sourceId,
     target: targetId,
     amount: clamp(modulationAmountForNode(source, targetId) * transform.amount, -1, 1),
-    bipolar: source.kind === "lfo" || targetId.endsWith(".pan") || targetId.endsWith(".fine"),
+    bipolar: source.kind === "lfo" || source.kind === "wavetableLfo" || targetId.endsWith(".pan") || targetId.endsWith(".fine"),
     enabled: true,
   });
 }
@@ -1294,6 +1562,15 @@ interface CvTransform {
 function cvTransformForNode(node: InstrumentNode): CvTransform {
   return {
     amount: clamp(numericParameter(node, "amount", 1), -1, 1),
+    offset: clamp(numericParameter(node, "offset", 0), -1, 1),
+    clamp: node.parameters.clamp !== false,
+  };
+}
+
+function cvCombinerTransformForInput(node: InstrumentNode, portId: string): CvTransform {
+  const weightId = portId === "cv-b" ? "weightB" : portId === "cv-c" ? "weightC" : "weightA";
+  return {
+    amount: clamp(numericParameter(node, weightId, 1), -2, 2),
     offset: clamp(numericParameter(node, "offset", 0), -1, 1),
     clamp: node.parameters.clamp !== false,
   };
@@ -1318,9 +1595,17 @@ function targetCvAmount(node: InstrumentNode, portId: string): number {
   if ((node.kind === "oscillator" || node.kind === "instrument" || node.kind === "gain") && portId === "pan-cv") {
     return clamp(numericParameter(node, "panCvAmount", 1), -1, 1);
   }
+  if (node.kind === "panWidth" && portId === "pan-cv") return clamp(numericParameter(node, "panCvAmount", 1), -1, 1);
+  if (node.kind === "panWidth" && portId === "width-cv") return clamp(numericParameter(node, "widthCvAmount", 1), -1, 1);
   if (node.kind === "filter" && portId === "cutoff-cv") return clamp(numericParameter(node, "cutoffCvAmount", 1), -1, 1);
   if (node.kind === "filter" && portId === "resonance-cv") return clamp(numericParameter(node, "resonanceCvAmount", 1), -1, 1);
   if (node.kind === "filter" && portId === "drive-cv") return clamp(numericParameter(node, "driveCvAmount", 1), -1, 1);
+  if (node.kind === "drive" && portId === "drive-cv") return clamp(numericParameter(node, "driveCvAmount", 1), -1, 1);
+  if (node.kind === "drive" && portId === "tone-cv") return clamp(numericParameter(node, "toneCvAmount", 1), -1, 1);
+  if (node.kind === "drive" && portId === "mix-cv") return clamp(numericParameter(node, "mixCvAmount", 1), -1, 1);
+  if (node.kind === "resonator" && portId === "pitch-cv") return clamp(numericParameter(node, "pitchCvAmount", 1), -1, 1);
+  if (node.kind === "resonator" && portId === "decay-cv") return clamp(numericParameter(node, "decayCvAmount", 1), -1, 1);
+  if (node.kind === "resonator" && portId === "mix-cv") return clamp(numericParameter(node, "mixCvAmount", 1), -1, 1);
   if (node.kind === "gain" && portId === "pan-cv") return clamp(numericParameter(node, "panCvAmount", 1), -1, 1);
   if (node.kind === "unison" && portId === "detune-cv") return clamp(numericParameter(node, "detuneCvAmount", 1), -1, 1);
   if (node.kind === "unison" && portId === "spread-cv") return clamp(numericParameter(node, "spreadCvAmount", 1), -1, 1);
@@ -1342,11 +1627,11 @@ function controlInputCables(graph: InstrumentNodeGraph, nodeId: string): Instrum
 }
 
 function modulationSourceForNode(node: InstrumentNode): ModulationSourceId | null {
-  if (node.kind === "lfo") return "lfo.1";
+  if (node.kind === "lfo" || node.kind === "wavetableLfo") return "lfo.1";
   if (node.kind === "envelope") return "env.1";
   if (node.kind === "velocity") return "velocity";
   if (node.kind === "keytrack") return "keytrack";
-  if (node.kind === "modWheel") return "modWheel";
+  if (node.kind === "modWheel" || node.kind === "midiControl") return "modWheel";
   if (node.kind === "macro") return macroSourceForNode(node);
   return null;
 }
@@ -1376,19 +1661,20 @@ function modulationTargetForInput(
   if (node.kind === "filter" && portId === "drive-cv") return "filter.drive";
   if (node.kind === "gain" && portId === "level-cv") return "amp.level";
   if (node.kind === "gain" && portId === "pan-cv") return "amp.pan";
+  if (node.kind === "panWidth" && portId === "pan-cv") return "amp.pan";
   if (node.kind === "unison" && portId === "detune-cv") return "unison.detune";
   if (node.kind === "unison" && portId === "spread-cv") return "unison.spread";
   return null;
 }
 
 function modulationAmountForNode(node: InstrumentNode, target: ModulationTargetId): number {
-  const amount = node.kind === "lfo"
+  const amount = node.kind === "lfo" || node.kind === "wavetableLfo"
     ? numericParameter(node, "amount", 0.25)
     : node.kind === "velocity"
       ? numericParameter(node, "amount", 0.35)
       : node.kind === "keytrack"
         ? numericParameter(node, "amount", 0.25)
-        : node.kind === "modWheel"
+        : node.kind === "modWheel" || node.kind === "midiControl"
           ? numericParameter(node, "amount", 0.3)
           : node.kind === "macro"
             ? numericParameter(node, "amount", 0.25)
@@ -1400,6 +1686,7 @@ function modulationAmountForNode(node: InstrumentNode, target: ModulationTargetI
 
 function staticCvValueForNode(node: InstrumentNode): number {
   if (node.kind === "constant") return numericParameter(node, "value", 0.5);
+  if (node.kind === "gateTrigger") return node.parameters.invert === true ? -1 : 1;
   if (node.kind === "random") {
     const seed = Math.round(numericParameter(node, "seed", 1));
     const amount = clamp(numericParameter(node, "amount", 0.5), -1, 1);
@@ -1455,6 +1742,25 @@ function compileNodeEffectChain(graph: InstrumentNodeGraph, audibleNodes: Instru
         },
       });
     }
+    if (node.kind === "drive") {
+      const mode = String(node.parameters.mode ?? "saturator");
+      effects.push({
+        id: `node-fx-${node.id}`,
+        kind: mode === "distortion" || mode === "clipper" ? "distortion" : "saturator",
+        bypassed: false,
+        params: mode === "distortion" || mode === "clipper"
+          ? {
+              drive: percentParameter(node, "drive", 0.25),
+              shape: percentParameter(node, "tone", 0.5),
+              trimDb: Math.round(clamp(numericParameter(node, "bias", 0), -1, 1) * 12),
+              mix: percentParameter(node, "mix", 0.4),
+            }
+          : {
+              drive: percentParameter(node, "drive", 0.25),
+              mix: percentParameter(node, "mix", 0.4),
+            },
+      });
+    }
     if (node.kind === "distortion") {
       effects.push({
         id: `node-fx-${node.id}`,
@@ -1465,6 +1771,20 @@ function compileNodeEffectChain(graph: InstrumentNodeGraph, audibleNodes: Instru
           shape: percentParameter(node, "shape", 0.35),
           trimDb: numericParameter(node, "trim", 6),
           mix: percentParameter(node, "mix", 0.45),
+        },
+      });
+    }
+    if (node.kind === "resonator") {
+      effects.push({
+        id: `node-fx-${node.id}`,
+        kind: "phaser",
+        bypassed: false,
+        params: {
+          rateHz: 0.01,
+          centerHz: numericParameter(node, "frequency", 440),
+          depthOct: clamp(numericParameter(node, "decay", 1.2) / 4, 0.1, 4),
+          feedback: percentParameter(node, "feedback", 0.38),
+          mix: percentParameter(node, "mix", 0.35),
         },
       });
     }

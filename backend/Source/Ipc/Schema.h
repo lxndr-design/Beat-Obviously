@@ -30,6 +30,7 @@ namespace beat::ipc
         constexpr const char* PROJECT_RECENT_LIST = "project.recentList";
         constexpr const char* PROJECT_RECENT_REMOVE = "project.recentRemove";
         constexpr const char* PROJECT_REVEAL_FILE = "project.revealFile";
+        constexpr const char* PROJECT_CHOOSE_EXPORT_FOLDER = "project.chooseExportFolder";
         constexpr const char* PROJECT_INSPECT_DOCUMENT = "project.inspectDocument";
         constexpr const char* PROJECT_REPAIR_DOCUMENT = "project.repairDocument";
         constexpr const char* PROJECT_LIST_BACKUPS = "project.listBackups";

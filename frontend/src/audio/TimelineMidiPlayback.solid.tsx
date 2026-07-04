@@ -7,7 +7,13 @@ import { isNative } from "../ipc/bridge";
 import { getTimelineAudioContext, scheduleTimelineMidiNote, stopTimelineAudio } from "./timelineAudio";
 import { useAnalyzerStore } from "../state/analyzerStore";
 import type { Instrument, MidiNote } from "../state/types";
-import { DEFAULT_DRUM_MIDI_PITCH, DEFAULT_DRUM_VELOCITY, drumTimingOffsetBeats, normalizeDrumCell } from "../state/drumSteps";
+import {
+  DEFAULT_DRUM_MIDI_PITCH,
+  DEFAULT_DRUM_VELOCITY,
+  drumPlaybackStepLengthBeats,
+  drumTimingOffsetBeats,
+  normalizeDrumCell,
+} from "../state/drumSteps";
 
 const LOOKAHEAD_SECONDS = 0.12;
 
@@ -108,8 +114,7 @@ export function TimelineMidiPlayback() {
           if (!seg || seg.muted) continue;
           if (seg.payload.kind === "drum") {
             const payloadSpeed = seg.payload.speed ?? 1;
-            const effectiveLengthBeats = seg.lengthBeats / payloadSpeed;
-            const stepLengthBeats = effectiveLengthBeats / Math.max(1, seg.payload.stepCount);
+            const stepLengthBeats = drumPlaybackStepLengthBeats(seg.lengthBeats, seg.payload.stepCount, payloadSpeed);
             for (const row of seg.payload.rows) {
               const instrument =
                 currentInstruments.find((candidate) => candidate.id === row.instrumentId) ??

@@ -42,6 +42,7 @@ const liveMidiExpressionInputPath = join(frontendSrc, "audio", "LiveMidiExpressi
 const liveMidiExpressionPath = join(frontendSrc, "audio", "liveMidiExpression.ts");
 const transportActionsPath = join(frontendSrc, "audio", "transportActions.ts");
 const wavemapResynthesisPath = join(frontendSrc, "audio", "wavemapResynthesis.ts");
+const audioRecordingModalPath = join(frontendSrc, "features", "Tracks", "AudioRecordingModal.solid.tsx");
 const schemaPath = join(frontendSrc, "ipc", "schema.ts");
 const bridgePath = join(frontendSrc, "ipc", "bridge.ts");
 const backendSchemaPath = join(repoRoot, "backend", "Source", "Ipc", "Schema.h");
@@ -56,6 +57,7 @@ for (const requiredPath of [
   liveMidiExpressionPath,
   transportActionsPath,
   wavemapResynthesisPath,
+  audioRecordingModalPath,
   schemaPath,
   bridgePath,
   backendSchemaPath,
@@ -159,6 +161,18 @@ if (existsSync(wavemapResynthesisPath)) {
   }
 }
 
+if (existsSync(audioRecordingModalPath)) {
+  const source = read(audioRecordingModalPath);
+  if (!source.includes('import { isNative } from "../../ipc/bridge";')) {
+    fail("Track audio recorder browser fallback must import isNative.");
+  }
+  if (!source.includes("!isNative()")
+      || !source.includes("if (isNative()) return;")
+      || !source.includes("Track recording needs the native recorder backend")) {
+    fail("Track audio recorder browser fallback must stay disabled in native mode until native capture exists.");
+  }
+}
+
 if (existsSync(appPath)) {
   const source = read(appPath);
   if (!/if \(!isNative\(\)\)\s*\{\s*const ctx = getTimelineAudioContext\(\);/.test(source)) {
@@ -237,6 +251,7 @@ const webAudioAllowlist = new Set([
   "frontend/src/features/MidiEditor/MidiTransport.solid.tsx",
   "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx",
   "frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx",
+  "frontend/src/features/Tracks/AudioRecordingModal.solid.tsx",
 ]);
 
 const webAudioPatterns = [

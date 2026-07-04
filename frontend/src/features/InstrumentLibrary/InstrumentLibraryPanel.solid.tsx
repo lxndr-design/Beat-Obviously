@@ -30,11 +30,11 @@ interface WavetableStarter {
   label: string;
   icon: string;
   presetId: string;
-  fallbackName: string;
+  fallbackNameBase: string;
 }
 
 const WAVETABLE_STARTERS: WavetableStarter[] = [
-  { label: "Create Aether", icon: "ph:cube", presetId: "factory.init", fallbackName: "Aether" },
+  { label: "Create Aether", icon: "ph:cube", presetId: "factory.init", fallbackNameBase: "Aether Patch" },
 ];
 
 interface InstrumentLibraryPanelProps {
@@ -131,9 +131,10 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
 
   function createNodemap() {
     const draft = createDefaultSynthDraft();
+    const instrumentName = nextInstrumentName(instruments(), "Nodemap Patch");
     const namedDraft: SynthDraftPatch = {
       ...structuredClone(draft),
-      name: "Nodemap Instrument",
+      name: instrumentName,
       metadata: {
         ...structuredClone(draft.metadata),
         icon: "ph:graph",
@@ -155,9 +156,10 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
 
   function createBasicSynth() {
     const defaultDraft = createDefaultSynthDraft();
+    const instrumentName = nextInstrumentName(instruments(), "Basic");
     const namedDraft: SynthDraftPatch = {
       ...structuredClone(defaultDraft),
-      name: "Basic Aether",
+      name: instrumentName,
       metadata: {
         ...structuredClone(defaultDraft.metadata),
         icon: "ph:wave-sine",
@@ -177,8 +179,9 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
   }
 
   function createSampler() {
+    const instrumentName = nextInstrumentName(instruments(), "Instrument");
     const id = useInstrumentStore.getState().addInstrument({
-      name: "Sampler Instrument",
+      name: instrumentName,
       icon: "ph:waveform",
       kind: "sampler",
       waveform: "sample",
@@ -192,9 +195,10 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
   function createWavetable(starter: WavetableStarter) {
     const preset = FACTORY_SYNTH_PRESETS.find((candidate) => candidate.id === starter.presetId);
     const draft = preset?.patch ?? createDefaultSynthDraft();
+    const instrumentName = nextInstrumentName(instruments(), starter.fallbackNameBase);
     const namedDraft: SynthDraftPatch = {
       ...structuredClone(draft),
-      name: starter.fallbackName,
+      name: instrumentName,
     };
     const id = useInstrumentStore.getState().addInstrument({
       ...synthDraftToInstrumentPatch(namedDraft),
@@ -644,6 +648,16 @@ function nextGroupName(sets: InstrumentSet[]): string {
     if (!existing.has(name.toLowerCase())) return name;
   }
   return "Group";
+}
+
+function nextInstrumentName(instruments: Instrument[], base: string): string {
+  const normalizedBase = base.trim() || "Instrument";
+  const existing = new Set(instruments.map((instrument) => instrument.name.trim().toLowerCase()));
+  for (let index = 1; index < 10000; index += 1) {
+    const name = `${normalizedBase} ${index}`;
+    if (!existing.has(name.toLowerCase())) return name;
+  }
+  return `${normalizedBase} ${Date.now()}`;
 }
 
 let previewCtx: AudioContext | null = null;

@@ -46,11 +46,18 @@ class AetherPreviewProcessor extends AudioWorkletProcessor {
       }
 
       const timeS = this.sampleIndex / sampleRate;
-      const modulation = modulationAtTime(this.instrument, timeS, durationS, this.bpm);
-      applyAutomationOffsets(this.instrument, modulation, this.automation, timeS);
       const baseFrequency = this.curve.length > 1
         ? frequencyAtCurveTime(this.curve, timeS)
         : glideFrequencyAtTime(this.frequency, this.targetFrequency, timeS, durationS);
+      const modulation = modulationAtTime(
+        this.instrument,
+        timeS,
+        durationS,
+        this.bpm,
+        clamp01(this.velocityGain),
+        keytrackSourceValue(baseFrequency),
+      );
+      applyAutomationOffsets(this.instrument, modulation, this.automation, timeS);
       const currentFrequency = baseFrequency * Math.pow(2, modulation.pitchSemitones / 12);
       const frame = renderStereoSample(this.instrument, this, currentFrequency, modulation);
       const amp = Math.min(1, timeS / 0.025, (durationS - timeS) / 0.08);
@@ -76,7 +83,12 @@ function createFilterState() {
 
 function renderStereoSample(instrument, state, frequency, modulation) {
   const raw = renderAetherStack(instrument, state, frequency, modulation);
-  const cutoff = clamp01((instrument.knobs?.cutoff ?? 0.6) + modulation.filterOffset + targetOffset(modulation, "filter.cutoff"));
+  const cutoff = clamp01(
+    (instrument.knobs?.cutoff ?? 0.6)
+    + filterKeytrackOffset(instrument, frequency)
+    + modulation.filterOffset
+    + targetOffset(modulation, "filter.cutoff"),
+  );
   const resonance = clamp01((instrument.knobs?.resonance ?? 0.1) + targetOffset(modulation, "filter.resonance"));
   const drive = clamp01((instrument.knobs?.drive ?? 0) + targetOffset(modulation, "filter.drive"));
   let left = raw.left;
@@ -93,18 +105,19 @@ function renderStereoSample(instrument, state, frequency, modulation) {
   right = resonantFilter(right, state.rightFilter, cutoff, resonance, instrument.filterType || "lowpass");
 
   const level = clamp01((instrument.ampLevel ?? 1) + targetOffset(modulation, "amp.level"));
+  const ampEnvelope = clamp01(modulation.ampEnvelope ?? 1);
   const pan = (instrument.ampPan ?? 0) + targetOffset(modulation, "amp.pan");
   const gains = panGains(pan);
   return {
-    left: left * level * gains[0],
-    right: right * level * gains[1],
+    left: left * level * ampEnvelope * gains[0],
+    right: right * level * ampEnvelope * gains[1],
   };
 }
 
 function renderAetherStack(instrument, state, frequency, modulation) {
   const config = instrument.aether;
   if (!config) {
-    const sample = wavetableOscillatorSample(instrument, state, state.phase, frequency, instrument.wavetable, modulation.positionOffset, targetOffset(modulation, "unison.detune"), targetOffset(modulation, "unison.spread"));
+    const sample = wavetableOscillatorSample(instrument, state, state.phase, frequency, instrument.wavetable, modulation.positionOffset, 0, targetOffset(modulation, "unison.detune"), targetOffset(modulation, "unison.spread"));
     return { left: sample, right: sample };
   }
 
@@ -125,11 +138,13 @@ function renderAetherStack(instrument, state, frequency, modulation) {
     const rate = oscillatorRate(osc.octave ?? 0, osc.semitone ?? 0, fine);
     const waveform = osc.waveform || "wavetable";
     const positionOffset = (key === "a" ? modulation.positionOffset : 0) + targetOffset(modulation, `osc.${key}.position`);
+    const warpOffset = targetOffset(modulation, `osc.${key}.warp`);
+    const phaseOffset = targetOffset(modulation, `osc.${key}.phase`);
     const value = waveform === "wavetable"
-      ? wavetableOscillatorSample(instrument, state, state.phase * rate, frequency * rate, osc.wavetable, positionOffset, targetOffset(modulation, "unison.detune"), targetOffset(modulation, "unison.spread"))
+      ? wavetableOscillatorSample(instrument, state, state.phase * rate + phaseOffset, frequency * rate, osc.wavetable, positionOffset, warpOffset, targetOffset(modulation, "unison.detune"), targetOffset(modulation, "unison.spread"))
       : waveform === "noise"
         ? nextNoise(state)
-        : oscillatorSample(waveform, state.phase * rate, clamp01(instrument.knobs?.color ?? 0.5));
+        : oscillatorSample(waveform, state.phase * rate + phaseOffset, clamp01(instrument.knobs?.color ?? 0.5));
     add(value, level, (osc.pan ?? 0) + targetOffset(modulation, `osc.${key}.pan`));
   };
 
@@ -149,7 +164,7 @@ function renderAetherStack(instrument, state, frequency, modulation) {
   return { left: clamp(left / normalizer, -1, 1), right: clamp(right / normalizer, -1, 1) };
 }
 
-function wavetableOscillatorSample(instrument, state, phase, frequency, config, positionOffset, detuneOffset, spreadOffset) {
+function wavetableOscillatorSample(instrument, state, phase, frequency, config, positionOffset, warpOffset, detuneOffset, spreadOffset) {
   const tableConfig = config || instrument.wavetable || { bank: "aether", position: 0.35, warp: 0.2, warpMode: "shape", unison: 1, detuneCents: 12, blend: 0.5 };
   const unison = Math.max(1, Math.min(8, Math.round(tableConfig.unison || 1)));
   const detune = Math.max(0, Math.min(100, (tableConfig.detuneCents || 0) + (detuneOffset || 0)));
@@ -158,7 +173,7 @@ function wavetableOscillatorSample(instrument, state, phase, frequency, config, 
   let sum = 0;
   for (let voice = 0; voice < unison; voice++) {
     const rate = plan.rates[voice];
-    sum += wavetableFrameMorph(instrument, state, tableConfig, phase * rate + plan.phaseOffsets[voice], frequency * rate, clamp01((tableConfig.position || 0) + (positionOffset || 0)), tableConfig.warp || 0, tableConfig.warpMode || "shape") * plan.weights[voice];
+    sum += wavetableFrameMorph(instrument, state, tableConfig, phase * rate + plan.phaseOffsets[voice], frequency * rate, clamp01((tableConfig.position || 0) + (positionOffset || 0)), clamp01((tableConfig.warp || 0) + (warpOffset || 0)), tableConfig.warpMode || "shape") * plan.weights[voice];
   }
   return clamp(sum / Math.max(1, plan.weightSum), -1, 1);
 }
@@ -347,7 +362,7 @@ function resonantFilter(input, filter, cutoff, resonance, type) {
   return clamp(filter.low + filter.band * resonance * 1.6, -1.2, 1.2);
 }
 
-function modulationAtTime(instrument, timeS, durationS, bpm = 120) {
+function modulationAtTime(instrument, timeS, durationS, bpm = 120, velocity = 1, keytrack = 0, modWheel = 0) {
   const rawLfo = lfoShape(
     instrument.lfoWaveform || "sine",
     timeS * effectiveLfoRateHz(instrument, 1, bpm) + (Number(instrument.lfoPhase) || 0) + effectiveLfoRandomPhaseOffset(instrument, 1),
@@ -361,22 +376,17 @@ function modulationAtTime(instrument, timeS, durationS, bpm = 120) {
     effectiveLfoSmoothing(instrument, 2),
   );
   const env = envelopeValue(timeS, durationS, instrument);
+  const env2 = modEnvelopeValue(timeS, durationS, instrument);
   const offsets = {};
   const routes = instrument.synthPatch?.modulation;
   if (Array.isArray(routes)) {
     for (const route of routes) {
-      if (route.enabled === false || !route.target || !route.amount) continue;
-      const source = route.source === "env.1"
-        ? (route.bipolar ? env * 2 - 1 : env)
-        : route.source === "lfo.1"
-          ? lfoRoute(rawLfo, route.bipolar !== false)
-          : route.source === "lfo.2"
-            ? lfoRoute(rawLfo2, route.bipolar !== false)
-            : null;
+      if (route.enabled === false || !isRuntimeModulationTarget(route.target) || !route.amount) continue;
+      const source = modulationSourceValue(instrument, route, rawLfo, rawLfo2, env, env2, velocity, keytrack, modWheel);
       if (source == null) continue;
       offsets[route.target] = (offsets[route.target] || 0) + source * clamp(route.amount, -1, 1) * targetScale(route.target);
     }
-    return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, targetOffsets: offsets };
+    return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, ampEnvelope: env, targetOffsets: offsets };
   }
   const positionLfo = lfoRoute(rawLfo, instrument.lfoPositionBipolar ?? true);
   const pitchLfo = lfoRoute(rawLfo, instrument.lfoPitchBipolar ?? true);
@@ -385,8 +395,33 @@ function modulationAtTime(instrument, timeS, durationS, bpm = 120) {
     pitchSemitones: pitchLfo * Math.max(0, instrument.lfoToPitch || 0),
     filterOffset: filterLfo * clamp(instrument.lfoToFilter || 0, -1, 1) * 0.35 + env * clamp(instrument.envToFilter || 0, -1, 1) * 0.35,
     positionOffset: positionLfo * clamp01(instrument.lfoDepth || 0),
+    ampEnvelope: env,
     targetOffsets: offsets,
   };
+}
+
+function modulationSourceValue(instrument, route, rawLfo, rawLfo2, env, env2, velocity, keytrack, modWheel) {
+  if (route.source === "lfo.1") {
+    if (instrument.synthPatch?.parameters?.["lfo.1.enabled"] === false) return 0;
+    return lfoRoute(rawLfo, route.bipolar !== false);
+  }
+  if (route.source === "lfo.2") {
+    if (instrument.synthPatch?.parameters?.["lfo.2.enabled"] !== true && instrument.lfo2Enabled !== true) return 0;
+    return lfoRoute(rawLfo2, route.bipolar !== false);
+  }
+  if (route.source === "env.1") return route.bipolar ? env * 2 - 1 : env;
+  if (route.source === "env.2") return route.bipolar ? env2 * 2 - 1 : env2;
+  if (route.source === "velocity") return route.bipolar ? velocity * 2 - 1 : velocity;
+  if (route.source === "keytrack") return route.bipolar ? keytrack * 2 - 1 : keytrack;
+  if (route.source === "modWheel") {
+    const value = clamp01(modWheel);
+    return route.bipolar ? value * 2 - 1 : value;
+  }
+  if (isMacroAutomationTarget(route.source)) {
+    const value = clamp01(Number(instrument.synthPatch?.parameters?.[route.source]) || 0);
+    return route.bipolar ? value * 2 - 1 : value;
+  }
+  return null;
 }
 
 function targetOffset(modulation, target) {
@@ -410,12 +445,16 @@ function baseAutomationValue(instrument, target) {
   switch (target) {
     case "osc.a.position": return instrument.aether?.oscA?.wavetable?.position ?? instrument.wavetable?.position ?? 0;
     case "osc.b.position": return instrument.aether?.oscB?.wavetable?.position ?? instrument.wavetable?.position ?? 0;
+    case "osc.a.warp": return instrument.aether?.oscA?.wavetable?.warp ?? instrument.wavetable?.warp ?? 0;
+    case "osc.b.warp": return instrument.aether?.oscB?.wavetable?.warp ?? instrument.wavetable?.warp ?? 0;
     case "osc.a.fine": return instrument.aether?.oscA?.fineCents ?? 0;
     case "osc.b.fine": return instrument.aether?.oscB?.fineCents ?? 0;
     case "osc.a.level": return instrument.aether?.oscA?.level ?? 0;
     case "osc.b.level": return instrument.aether?.oscB?.level ?? 0;
     case "osc.a.pan": return instrument.aether?.oscA?.pan ?? 0;
     case "osc.b.pan": return instrument.aether?.oscB?.pan ?? 0;
+    case "osc.a.phase": return instrument.aether?.oscA?.phase ?? 0;
+    case "osc.b.phase": return instrument.aether?.oscB?.phase ?? 0;
     case "filter.cutoff": return instrument.knobs?.cutoff ?? 1;
     case "filter.resonance": return instrument.knobs?.resonance ?? 0;
     case "filter.drive": return instrument.knobs?.drive ?? 0;
@@ -442,13 +481,17 @@ function automationValueAtTime(points, timeS) {
 function isRuntimeModulationTarget(value) {
   return [
     "osc.a.position",
+    "osc.a.warp",
     "osc.a.fine",
     "osc.a.level",
     "osc.a.pan",
+    "osc.a.phase",
     "osc.b.position",
+    "osc.b.warp",
     "osc.b.fine",
     "osc.b.level",
     "osc.b.pan",
+    "osc.b.phase",
     "filter.cutoff",
     "filter.resonance",
     "filter.drive",
@@ -459,10 +502,29 @@ function isRuntimeModulationTarget(value) {
   ].includes(value);
 }
 
+function isMacroAutomationTarget(value) {
+  return value === "macro.1" || value === "macro.2" || value === "macro.3" || value === "macro.4";
+}
+
 function targetScale(target) {
   if (target.endsWith(".fine") || target === "unison.detune") return 100;
   if (target === "filter.cutoff") return 0.35;
   return 1;
+}
+
+function filterKeytrackOffset(instrument, frequency) {
+  const keytrack = clamp01(instrument.filterKeytrack ?? 0);
+  if (keytrack <= 0 || !Number.isFinite(frequency) || frequency <= 0) return 0;
+  const minHz = 50;
+  const maxHz = Math.min(16000, sampleRate * 0.45);
+  const octaveOffset = Math.log2(frequency / 261.6255653005986);
+  return (octaveOffset * keytrack) / Math.log2(maxHz / minHz);
+}
+
+function keytrackSourceValue(frequency) {
+  if (!Number.isFinite(frequency) || frequency <= 0) return 0;
+  const midi = 69 + 12 * Math.log2(frequency / 440);
+  return clamp01(midi / 127);
 }
 
 function syncedLfoDivisionBeats(value) {
@@ -542,15 +604,91 @@ function lfoRoute(raw, bipolar) {
 
 function envelopeValue(timeS, durationS, instrument) {
   const env = instrument.envelope || {};
+  const params = instrument.synthPatch?.parameters;
   const attack = Math.max(0.001, (env.attackMs ?? 5) / 1000);
   const decay = Math.max(0.001, (env.decayMs ?? 100) / 1000);
   const sustain = clamp01(env.sustain ?? 0.7);
   const release = Math.max(0.001, (env.releaseMs ?? 200) / 1000);
-  if (timeS < attack) return timeS / attack;
-  if (timeS < attack + decay) return 1 + (sustain - 1) * ((timeS - attack) / decay);
+  const attackCurve = envelopeCurveParam(params?.["env.1.attackCurve"] ?? env.attackCurve);
+  const decayCurve = envelopeCurveParam(params?.["env.1.decayCurve"] ?? env.decayCurve);
+  const releaseCurve = envelopeCurveParam(params?.["env.1.releaseCurve"] ?? env.releaseCurve);
+  const segmentValue = (time) => {
+    if (time < attack) return applyEnvelopeCurve(time / attack, attackCurve);
+    const t = applyEnvelopeCurve(Math.min(1, (time - attack) / decay), decayCurve);
+    return 1 + (sustain - 1) * t;
+  };
   const releaseStart = Math.max(attack + decay, durationS - release);
-  if (timeS > releaseStart) return sustain * Math.max(0, 1 - (timeS - releaseStart) / release);
+  if (params?.["env.1.loop"] === true || env.loop === true) {
+    const cycleLength = Math.max(0.001, attack + decay);
+    if (timeS > releaseStart) {
+      const releaseValue = segmentValue(releaseStart % cycleLength);
+      const t = applyEnvelopeCurve((timeS - releaseStart) / release, releaseCurve);
+      return releaseValue * Math.max(0, 1 - t);
+    }
+    return segmentValue(timeS % cycleLength);
+  }
+  if (timeS < attack) return applyEnvelopeCurve(timeS / attack, attackCurve);
+  if (timeS < attack + decay) {
+    const t = applyEnvelopeCurve((timeS - attack) / decay, decayCurve);
+    return 1 + (sustain - 1) * t;
+  }
+  if (timeS > releaseStart) {
+    const t = applyEnvelopeCurve((timeS - releaseStart) / release, releaseCurve);
+    return sustain * Math.max(0, 1 - t);
+  }
   return sustain;
+}
+
+function modEnvelopeValue(timeS, durationS, instrument) {
+  const params = instrument.synthPatch?.parameters;
+  const attack = Math.max(0.001, numberParam(params?.["env.2.attack"], 0.01));
+  const decay = Math.max(0.001, numberParam(params?.["env.2.decay"], 0.3));
+  const sustain = clamp01(numberParam(params?.["env.2.sustain"], 0));
+  const release = Math.max(0.001, numberParam(params?.["env.2.release"], 0.2));
+  const attackCurve = envelopeCurveParam(params?.["env.2.attackCurve"]);
+  const decayCurve = envelopeCurveParam(params?.["env.2.decayCurve"]);
+  const releaseCurve = envelopeCurveParam(params?.["env.2.releaseCurve"]);
+  const segmentValue = (time) => {
+    if (time < attack) return applyEnvelopeCurve(time / attack, attackCurve);
+    const t = applyEnvelopeCurve(Math.min(1, (time - attack) / decay), decayCurve);
+    return 1 + (sustain - 1) * t;
+  };
+  const releaseStart = Math.max(attack + decay, durationS - release);
+  if (params?.["env.2.loop"] === true) {
+    const cycleLength = Math.max(0.001, attack + decay);
+    if (timeS > releaseStart) {
+      const releaseValue = segmentValue(releaseStart % cycleLength);
+      const t = applyEnvelopeCurve((timeS - releaseStart) / release, releaseCurve);
+      return releaseValue * Math.max(0, 1 - t);
+    }
+    return segmentValue(timeS % cycleLength);
+  }
+  if (timeS < attack) return applyEnvelopeCurve(timeS / attack, attackCurve);
+  if (timeS < attack + decay) {
+    const t = applyEnvelopeCurve((timeS - attack) / decay, decayCurve);
+    return 1 + (sustain - 1) * t;
+  }
+  if (timeS > releaseStart) {
+    const t = applyEnvelopeCurve((timeS - releaseStart) / release, releaseCurve);
+    return sustain * Math.max(0, 1 - t);
+  }
+  return sustain;
+}
+
+function numberParam(value, fallback) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function envelopeCurveParam(value) {
+  return value === "exp" || value === "log" || value === "s-curve" ? value : "linear";
+}
+
+function applyEnvelopeCurve(value, curve) {
+  const x = clamp01(value);
+  if (curve === "exp") return x * x;
+  if (curve === "log") return 1 - (1 - x) * (1 - x);
+  if (curve === "s-curve") return x * x * (3 - 2 * x);
+  return x;
 }
 
 function oscillatorRate(octave, semitone, fineCents) {

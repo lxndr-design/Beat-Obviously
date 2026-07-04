@@ -94,6 +94,9 @@ export function inferInstrumentTaxonomy(instrument: Pick<Instrument, "name" | "k
     instrument.waveform,
     ...(instrument.descriptors ?? []),
   ].join(" ").toLowerCase();
+  const explicit = inferExplicitInstrumentTaxonomy(haystack);
+  if (explicit) return explicit;
+
   let best: { score: number; entry: TaxonomyInstrument } | undefined;
 
   for (const entry of taxonomyInstruments) {
@@ -116,4 +119,56 @@ export function inferInstrumentTaxonomy(instrument: Pick<Instrument, "name" | "k
 
   if (!best || best.score <= 0) return undefined;
   return taxonomyAssignmentForInstrumentId(best.entry.id);
+}
+
+function inferExplicitInstrumentTaxonomy(haystack: string): InstrumentTaxonomyAssignment | undefined {
+  const rules: Array<[RegExp, string]> = [
+    [/\b(orchestral|concert)\s+bass\s+drum\b/, "concert_bass_drum"],
+    [/\b(sub\s+kick|808)\b/, "808_bass"],
+    [/\bkick\b/, "kick_drum"],
+    [/\bsnare\b/, "snare"],
+    [/\b(closed|open)?\s*hat\b|\bhi[- ]?hat\b|\bhihat\b/, "hi_hat"],
+    [/\bsuspended\s+cymbal\b/, "suspended_cymbal"],
+    [/\bsplash\b/, "splash_cymbal"],
+    [/\bcrash\b/, "crash_cymbals"],
+    [/\bride\b/, "ride_cymbal"],
+    [/\bcymbal\b/, "cymbals"],
+    [/\btom\b|\btoms\b/, "tom_toms"],
+    [/\bclap\b/, "clap"],
+    [/\brim\b|\brimshot\b/, "rimshot"],
+    [/\bcowbell\b/, "cowbell"],
+    [/\bconga\b/, "conga"],
+    [/\btimbal\b/, "timbales"],
+    [/\btambourine\b|\btamb\b/, "tambourine"],
+    [/\bguiro\b/, "guiro"],
+    [/\btriangle\b/, "triangle"],
+    [/\bflute\b/, "concert_flute"],
+    [/\bviolin\b/, "violin"],
+    [/\btoy\s+xylophone\b/, "toy_xylophone"],
+    [/\bxylophone\b/, "xylophone"],
+    [/\bfelt\s+piano\b/, "felt_piano"],
+    [/\bpiano\b|\bkeys\b/, "electric_piano"],
+    [/\bchoir\b/, "synthetic_choir"],
+    [/\bvocal\b|\bvoice\b|\bvowel\b|\btalk\b/, "synthetic_voice"],
+    [/\breese\b/, "reese_bass"],
+    [/\bsub\s+bass\b/, "sub_bass"],
+    [/\bbass\b/, "synth_bass"],
+    [/\bpad\b/, "pad_synth"],
+    [/\blead\b/, "lead_synth"],
+    [/\bpluck\b|\barp\b/, "digital_synth"],
+    [/\bbell\b/, "glockenspiel"],
+    [/\bmallet\b/, "xylophone"],
+    [/\bdrone\b|\batmosphere\b|\btexture\b/, "textures"],
+    [/\bmodular\b|\bnodemap\b/, "modular_synth"],
+    [/\baether\b|\bwavemap\b|\bwavetable\b/, "wavetable_synth"],
+    [/\bsampler\b|\bsample\b|\bdecent\s*sampler\b/, "sampler"],
+    [/\bsynth\b/, "digital_synth"],
+  ];
+
+  for (const [pattern, instrumentId] of rules) {
+    if (!pattern.test(haystack)) continue;
+    const assignment = taxonomyAssignmentForInstrumentId(instrumentId);
+    if (assignment) return assignment;
+  }
+  return undefined;
 }

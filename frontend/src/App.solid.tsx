@@ -13,7 +13,7 @@ import { importAudioFiles } from "./audio/audioImport";
 import { preloadInstrumentSample } from "./audio/synthPreview";
 import { installGlobalHotkeys } from "./hotkeys/hotkeys";
 import { isNative, onEvent, send } from "./ipc/bridge";
-import { useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore, useTransportStore, useUiStore } from "./state/store";
+import { useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore, useSettingsStore, useTransportStore, useUiStore } from "./state/store";
 import { useSynthStore } from "./state/synthStore";
 import { useExportStore } from "./state/exportStore";
 import { useComponentStore } from "./state/components";
@@ -60,6 +60,7 @@ const startupStageOrder: StartupReadinessKey[] = [
 
 export function App() {
   const shouldMountEditorHost = createStoreSelector(useUiStore, (s) => s.openEditors.length > 0 || Boolean(s.trackEffectsEditorTrackId));
+  const themeContrastLevel = createStoreSelector(useSettingsStore, (s) => s.themeContrastLevel);
   const [showHome, setShowHome] = createSignal(true);
   const [startupReadiness, setStartupReadiness] = createSignal<Record<StartupReadinessKey, boolean>>(initialStartupReadiness(), { equals: false });
   const [startupMinimumElapsed, setStartupMinimumElapsed] = createSignal(false);
@@ -87,6 +88,10 @@ export function App() {
     if (startupReadySent || !startupMinimumElapsed() || !allStartupReady(startupReadiness())) return;
     startupReadySent = true;
     void send({ kind: "app.ready" });
+  });
+
+  createEffect(() => {
+    document.documentElement.dataset.themeContrast = themeContrastLevel();
   });
 
   onMount(() => {

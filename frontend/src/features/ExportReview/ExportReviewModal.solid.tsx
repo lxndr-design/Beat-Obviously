@@ -1,9 +1,11 @@
 import { createMemo, For, Show } from "solid-js";
-import { appAlert, appPrompt, Button, Icon, Modal, Select, Tag, Toggle } from "../../solid-ui";
+import { appAlert, appPrompt, Button, Icon, Modal, Select, Toggle } from "../../solid-ui";
+import { isNative, send } from "../../ipc/bridge";
 import { createStoreSelector } from "../../solid-utils/store";
 import { useDocumentStore, useProjectStore, useTransportStore, useUiStore } from "../../state/store";
 import {
   FACTORY_EXPORT_PRESETS,
+  applyExportPresetOverride,
   allExportPresets,
   exportValidationBlocksExport,
   normalizeExportOptions,
@@ -18,7 +20,9 @@ import styles from "./ExportReviewModal.module.css";
 export function ExportReviewModal() {
   const selectedPresetId = createStoreSelector(useExportStore, (state) => state.selectedPresetId);
   const userPresets = createStoreSelector(useExportStore, (state) => state.userPresets);
+  const presetOverrides = createStoreSelector(useExportStore, (state) => state.presetOverrides);
   const recentDestinations = createStoreSelector(useExportStore, (state) => state.recentDestinations);
+  const exportDestinationFolder = createStoreSelector(useExportStore, (state) => state.exportDestinationFolder);
   const job = createStoreSelector(useExportStore, (state) => state.job);
   const validation = createStoreSelector(useExportStore, (state) => state.validation);
   const validateBeforeExport = createStoreSelector(useExportStore, (state) => state.validateBeforeExport);
@@ -28,7 +32,10 @@ export function ExportReviewModal() {
   const loopRange = createStoreSelector(useTransportStore, (state) => state.loopRange);
 
   const presets = createMemo(() => allExportPresets(userPresets()));
-  const preset = createMemo(() => presets().find((candidate) => candidate.id === selectedPresetId()) ?? FACTORY_EXPORT_PRESETS[0]);
+  const preset = createMemo(() => applyExportPresetOverride(
+    presets().find((candidate) => candidate.id === selectedPresetId()) ?? FACTORY_EXPORT_PRESETS[0],
+    presetOverrides(),
+  ));
   const editablePreset = createMemo(() => Boolean(preset().userCreated));
   const options = createMemo(() => normalizeExportOptions(preset().options));
   const rangeReady = createMemo(() => loopRange().endBeat > loopRange().startBeat);
@@ -83,10 +90,26 @@ export function ExportReviewModal() {
   }
 
   function updatePresetOptions(patch: Partial<ReturnType<typeof normalizeExportOptions>>) {
-    if (!editablePreset()) return;
-    useExportStore.getState().updateUserPreset(preset().id, {
+    useExportStore.getState().updatePresetRenderSettings(preset().id, {
       options: { ...options(), ...patch },
     });
+  }
+
+  async function chooseDestinationFolder() {
+    if (!isNative()) {
+      await appAlert("Export folder selection is available in the native app.");
+      return;
+    }
+    try {
+      const result = await send({
+        kind: "project.chooseExportFolder",
+        pathHint: exportDestinationFolder() || defaultExportFolder() || undefined,
+      });
+      if (result.error) throw new Error(result.error);
+      if (result.path?.trim()) useExportStore.getState().setExportDestinationFolder(result.path);
+    } catch (error) {
+      await appAlert(error instanceof Error ? error.message : "Could not choose export folder.");
+    }
   }
 
   return (
@@ -104,30 +127,10 @@ export function ExportReviewModal() {
       )}
     >
       <div class={styles.panel}>
-        <section class={styles.summary} aria-label="Export summary">
-          <div>
-            <span class={styles.label}>Preset</span>
-            <strong>{preset().name}</strong>
-          </div>
-          <div>
-            <span class={styles.label}>Target</span>
-            <strong>{targetLabel(preset())}</strong>
-          </div>
-          <div>
-            <span class={styles.label}>Format</span>
-            <strong>{options().sampleRate / 1000} kHz / {options().bitDepth}-bit</strong>
-          </div>
-          <div>
-            <span class={styles.label}>Channels</span>
-            <strong>{options().channels === 1 ? "Mono" : "Stereo"}</strong>
-          </div>
-        </section>
-
         <section class={styles.section}>
           <div class={styles.sectionHeader}>
-            <h3>Presets</h3>
+            <h3>Export Mode</h3>
             <div class={styles.headerActions}>
-              <span>{FACTORY_EXPORT_PRESETS.length} factory / {userPresets().length} custom</span>
               <Button size="sm" onClick={() => void savePresetAs()}>Save As</Button>
               <Show when={editablePreset()}>
                 <Button size="sm" onClick={deletePreset}>Delete</Button>
@@ -143,11 +146,8 @@ export function ExportReviewModal() {
                   onClick={() => useExportStore.getState().setSelectedPresetId(candidate.id)}
                 >
                   <Icon name={iconForTarget(candidate.target)} size={16} decorative />
-                  <span>
-                    <strong>{candidate.name}</strong>
-                    <span>{candidate.description}</span>
-                    <Show when={candidate.userCreated}><span>Custom preset</span></Show>
-                  </span>
+                  <strong>{candidate.name}</strong>
+                  <span>{candidate.description}</span>
                 </button>
               )}
             </For>
@@ -157,16 +157,12 @@ export function ExportReviewModal() {
         <section class={styles.section}>
           <div class={styles.sectionHeader}>
             <h3>Render Settings</h3>
-            <div class={styles.headerActions}>
-              <Tag>{editablePreset() ? "Editable" : "Factory"}</Tag>
-              <Tag>{preset().includeTail ? "Tail on" : "No tail"}</Tag>
-            </div>
           </div>
           <div class={styles.controls}>
             <Select
               label="Sample Rate"
               value={String(options().sampleRate)}
-              disabled={!editablePreset()}
+              layout="inline"
               onChange={(event) => updatePresetOptions({ sampleRate: Number(event.currentTarget.value) })}
             >
               <For each={[44100, 48000, 88200, 96000]}>
@@ -176,7 +172,7 @@ export function ExportReviewModal() {
             <Select
               label="Bit Depth"
               value={String(options().bitDepth)}
-              disabled={!editablePreset()}
+              layout="inline"
               onChange={(event) => updatePresetOptions({ bitDepth: Number(event.currentTarget.value) as 16 | 24 | 32 })}
             >
               <For each={[16, 24, 32] as const}>
@@ -186,7 +182,7 @@ export function ExportReviewModal() {
             <Select
               label="Channels"
               value={String(options().channels)}
-              disabled={!editablePreset()}
+              layout="inline"
               onChange={(event) => updatePresetOptions({ channels: Number(event.currentTarget.value) as 1 | 2 })}
             >
               <option value={1}>Mono</option>
@@ -195,7 +191,7 @@ export function ExportReviewModal() {
             <Select
               label="Block"
               value={String(options().blockSize)}
-              disabled={!editablePreset()}
+              layout="inline"
               onChange={(event) => updatePresetOptions({ blockSize: Number(event.currentTarget.value) })}
             >
               <For each={[128, 256, 512, 1024, 2048]}>
@@ -206,11 +202,25 @@ export function ExportReviewModal() {
           <div class={styles.tailControl}>
             <Toggle
               checked={preset().includeTail}
-              disabled={!editablePreset()}
-              onChange={(includeTail) => useExportStore.getState().updateUserPreset(preset().id, { includeTail })}
+              onChange={(includeTail) => useExportStore.getState().updatePresetRenderSettings(preset().id, { includeTail })}
               label="Include effect tail"
             />
           </div>
+        </section>
+
+        <section class={styles.section}>
+          <div class={styles.sectionHeader}>
+            <h3>Export Destination</h3>
+            <Button size="sm" onClick={() => void chooseDestinationFolder()}>
+              <Icon name="ph:folder-open" size={14} decorative />
+              Choose Folder
+            </Button>
+          </div>
+          <StateBanner
+            icon="ph:folder-open"
+            title={exportDestinationFolder() ? "Selected folder" : "No export folder selected"}
+            body={exportDestinationFolder() || "Export will ask for a destination."}
+          />
         </section>
 
         <StateBanner
@@ -222,7 +232,7 @@ export function ExportReviewModal() {
         <section class={styles.section}>
           <div class={styles.sectionHeader}>
             <h3>Project Health</h3>
-            <Button size="sm" onClick={() => useExportStore.getState().setValidateBeforeExport(!validateBeforeExport())}>
+            <Button className={styles.outlineButton} size="sm" onClick={() => useExportStore.getState().setValidateBeforeExport(!validateBeforeExport())}>
               {validateBeforeExport() ? "Validate on" : "Validate off"}
             </Button>
           </div>
@@ -238,7 +248,7 @@ export function ExportReviewModal() {
             <section class={styles.section}>
               <div class={styles.sectionHeader}>
                 <h3>Post-Export Analysis</h3>
-                <Tag>{job()?.ok ? "Passed" : "Review"}</Tag>
+                <span>{job()?.ok ? "Passed" : "Review"}</span>
               </div>
               <div class={styles.analysisGrid}>
                 <Metric label="Duration" value={formatDuration(analysis().durationSeconds)} />
@@ -268,9 +278,6 @@ export function ExportReviewModal() {
               <Button size="sm" onClick={() => useExportStore.getState().clearRecentDestinations()}>Clear</Button>
             </Show>
           </div>
-          <Show when={defaultExportFolder()}>
-            {(folder) => <StateBanner icon="ph:folder-open" title="Default Folder" body={folder()} />}
-          </Show>
           <Show
             when={recentDestinations().length > 0}
             fallback={<StateBanner icon="ph:folder-open" title="No export destination history yet." body="Completed exports will appear here for review." />}
@@ -342,13 +349,6 @@ function validationBody(status: ExportValidationStatus, enabled: boolean): strin
     return `${details}. Checked ${new Date(status.checkedAt).toLocaleTimeString()}.`;
   }
   return undefined;
-}
-
-function targetLabel(preset: ExportPreset): string {
-  if (preset.target === "range") return "Review Range";
-  if (preset.target === "track") return "Selected Stem";
-  if (preset.target === "stems") return "All Stems";
-  return "Full Mix";
 }
 
 function iconForTarget(target: ExportPreset["target"]): string {

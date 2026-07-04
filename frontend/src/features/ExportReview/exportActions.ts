@@ -17,12 +17,14 @@ export async function runProjectExport(mode: ExportPresetTarget = "project") {
   const exportState = useExportStore.getState();
   const exportPreset = exportPresetById(exportState.selectedPresetId, mode);
   const options = normalizeExportOptions(exportPreset.options);
+  const pathHint = exportPathHint(exportState.exportDestinationFolder, mode);
   const validation = await validateCurrentProjectBeforeExport();
   if (exportValidationBlocksExport(validation)) throw new Error(validation.message);
   const request = {
     project: useProjectStore.getState().project,
     instruments: useInstrumentStore.getState().instruments,
     audioFiles: useAudioFileStore.getState().files,
+    pathHint,
     options,
   };
   const renderableTracks = request.project.tracks.filter(isRenderableStemTrack);
@@ -104,7 +106,7 @@ export async function runProjectExport(mode: ExportPresetTarget = "project") {
         kind: "project.exportTrackWav",
         ...request,
         trackId: track.id,
-        pathHint: `${safeStemFileName(track.name)}.wav`,
+        pathHint: stemExportPathHint(exportState.exportDestinationFolder, track.name),
       });
       if (result.error) throw new Error(result.error);
       recordCompletedExport(result.path, "track");
@@ -265,4 +267,22 @@ function recordCompletedExport(path: string, type: "project" | "track" | "range"
     path,
     progress: 1,
   });
+}
+
+function exportPathHint(folder: string, mode: ExportPresetTarget): string | undefined {
+  const cleanFolder = folder.trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+  if (!cleanFolder) return undefined;
+  if (mode === "stems") return cleanFolder;
+  const fileName = mode === "range"
+    ? "Beat Range Export.wav"
+    : mode === "track"
+      ? "Beat Track Export.wav"
+      : "Beat Export.wav";
+  return `${cleanFolder}/${fileName}`;
+}
+
+function stemExportPathHint(folder: string, trackName: string): string {
+  const cleanFolder = folder.trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+  const fileName = `${safeStemFileName(trackName)}.wav`;
+  return cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
 }

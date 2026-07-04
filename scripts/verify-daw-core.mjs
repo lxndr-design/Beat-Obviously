@@ -313,7 +313,7 @@ try {
   assert.ok(legacySynthProbe.aether, "new legacy synth creation should include Aether settings");
 
   const seededInstruments = store.useInstrumentStore.getState().instruments;
-  const breakcoreAetherInstrumentNames = [
+  const deprecatedBreakcoreAetherInstrumentNames = [
     "Breakcore Kick (Aether)",
     "Breakcore Snare (Aether)",
     "Breakcore Ghost Snare (Aether)",
@@ -326,26 +326,25 @@ try {
     "Breakcore Metal Hit (Aether)",
     "Breakcore Rim Click (Aether)",
     "Breakcore Fast Roll Snare (Aether)",
+    "Breakcore Kick (Synth)",
+    "Breakcore Snare (Synth)",
+    "Breakcore Ghost Snare (Synth)",
+    "Breakcore Closed Hat (Synth)",
+    "Breakcore Open Hat (Synth)",
+    "Breakcore Crash Ride (Synth)",
+    "Breakcore Pitched Snare (Synth)",
+    "Breakcore Noise Burst (Synth)",
+    "Breakcore Clap Layer (Synth)",
+    "Breakcore Metal Hit (Synth)",
+    "Breakcore Rim Click (Synth)",
+    "Breakcore Fast Roll Snare (Synth)",
   ];
-  for (const name of breakcoreAetherInstrumentNames) {
-    const instrument = seededInstruments.find((candidate) => candidate.name === name);
-    assert.ok(instrument, `expected seeded factory instrument ${name}`);
-    assert.equal(instrument.kind, "wavetable", `${name} should use the Aether wavetable instrument path`);
-    assert.ok(instrument.aether, `${name} should include Aether oscillator settings`);
-    assert.ok(instrument.descriptors?.includes("aether"), `${name} should be tagged as an Aether factory preset`);
-    const samples = new Float32Array(2048);
-    synthPreview.renderInstrumentSamples(instrument, samples, 44100, 110, "visual", true, undefined, undefined, undefined, 180, 110);
-    let peak = 0;
-    let sumSquares = 0;
-    for (const sample of samples) {
-      assert.ok(Number.isFinite(sample), `${name} rendered a non-finite sample`);
-      peak = Math.max(peak, Math.abs(sample));
-      sumSquares += sample * sample;
-    }
-    const rms = Math.sqrt(sumSquares / samples.length);
-    assert.ok(peak > 0.0005, `${name} should render non-silent audio`);
-    assert.ok(rms > 0.0001, `${name} should have measurable rendered energy`);
-    assert.ok(peak <= 1.0001, `${name} should stay inside normalized preview range`);
+  for (const name of deprecatedBreakcoreAetherInstrumentNames) {
+    assert.equal(
+      seededInstruments.some((candidate) => candidate.name === name),
+      false,
+      `deprecated rough factory instrument should not be seeded: ${name}`,
+    );
   }
   const sampledPearlCymbalNames = ["Pearl Crash 2", "Pearl Ride 2", "Pearl Splash", "Pearl Splash 2"];
   for (const name of sampledPearlCymbalNames) {
@@ -354,6 +353,30 @@ try {
     assert.equal(instrument.kind, "sampler", `${name} should use the sample instrument path`);
     assert.ok(instrument.sampleUrl?.includes("/samples/pearl-master-studio/"), `${name} should reference the Pearl sample library`);
   }
+  const taxonomyOf = (name) => {
+    const instrument = seededInstruments.find((candidate) => candidate.name === name);
+    assert.ok(instrument, `expected seeded instrument ${name}`);
+    assert.ok(instrument.taxonomy, `${name} should have a canonical taxonomy assignment`);
+    return instrument.taxonomy;
+  };
+  assert.deepEqual(taxonomyOf("Pearl Kick"), { categoryId: "percussion", instrumentId: "kick_drum" });
+  assert.deepEqual(taxonomyOf("Pearl Snare"), { categoryId: "percussion", instrumentId: "snare" });
+  assert.deepEqual(taxonomyOf("Pearl Closed Hat"), { categoryId: "percussion", instrumentId: "hi_hat" });
+  assert.deepEqual(taxonomyOf("Pearl Crash 2"), { categoryId: "percussion", instrumentId: "crash_cymbals" });
+  assert.deepEqual(taxonomyOf("Pearl Ride 2"), { categoryId: "percussion", instrumentId: "ride_cymbal" });
+  assert.deepEqual(taxonomyOf("Pearl Splash"), { categoryId: "percussion", instrumentId: "splash_cymbal" });
+  assert.deepEqual(taxonomyOf("TR-505 Rim"), { categoryId: "percussion", instrumentId: "rimshot" });
+  assert.deepEqual(taxonomyOf("TR-505 Cowbell Low"), { categoryId: "percussion", instrumentId: "cowbell" });
+  assert.deepEqual(taxonomyOf("CR-78 Tambourine"), { categoryId: "percussion", instrumentId: "tambourine" });
+  assert.deepEqual(taxonomyOf("Orchestral Bass Drum"), { categoryId: "percussion", instrumentId: "concert_bass_drum" });
+  assert.deepEqual(taxonomyOf("Triangle"), { categoryId: "percussion", instrumentId: "triangle" });
+  assert.deepEqual(taxonomyOf("Suspended Cymbal"), { categoryId: "percussion", instrumentId: "suspended_cymbal" });
+  assert.deepEqual(taxonomyOf("Flute Staccato"), { categoryId: "woodwinds", instrumentId: "concert_flute" });
+  assert.deepEqual(taxonomyOf("Violin Pizzicato"), { categoryId: "strings", instrumentId: "violin" });
+  assert.deepEqual(taxonomyOf("Sub Kick (Synth)"), { categoryId: "bass", instrumentId: "808_bass" });
+  assert.deepEqual(taxonomyOf("Lead Saw"), { categoryId: "synth_electronic", instrumentId: "lead_synth" });
+  assert.deepEqual(taxonomyOf("Sample Pad"), { categoryId: "synth_electronic", instrumentId: "pad_synth" });
+  assert.deepEqual(taxonomyOf("Legacy Synth Creation Probe"), { categoryId: "synth_electronic", instrumentId: "wavetable_synth" });
 
   const factoryInstrumentNames = [
     "Pearl Kick",
@@ -379,8 +402,10 @@ try {
     "TR-505 Cowbell High",
     "TR-505 Low Conga",
     "TR-505 High Conga",
+    "TR-505 Crash",
+    "TR-505 Ride",
+    "CR-78 Cymbal",
     "CR-78 Tambourine",
-    ...breakcoreAetherInstrumentNames,
   ];
   components.useComponentStore.getState().seedDefaultDrumLoops(
     factoryInstrumentNames.map((name, index) => ({ id: `factory-inst-${index}`, name })),
@@ -423,6 +448,9 @@ try {
   assert.equal(drumSteps.drumPatternDurationBeats(16), 16, "drum pattern duration should not be divided by grid density");
   assert.equal(drumSteps.drumStepLengthBeats(16, 16), 1, "sixteen-step drum patterns should preserve their full beat length");
   assert.equal(drumSteps.drumPatternDurationSeconds(16, 120, 2), 4, "preview playback rate should be separate from grid density");
+  assert.equal(drumSteps.drumPlaybackDurationBeats(16, 4), 4, "drum playback duration should match arranged segment length");
+  assert.equal(drumSteps.drumPlaybackStepLengthBeats(16, 16, 4), 0.25, "sixteen-step speed-4 drums should place hits on sixteenth notes");
+  assert.equal(drumSteps.drumPlaybackDurationSeconds(16, 120, 4, 2), 1, "drum playback duration should combine grid speed and preview speed");
 
   const onSteps = (loopName, rowName, occurrence = 0) => {
     const loop = factoryLoops.find((component) => component.name === loopName);
@@ -446,11 +474,11 @@ try {
   assert.deepEqual(onSteps("Basic Hip-Hop / Boom Bap", "Pearl Snare", 1), [4, 6, 11, 15], "boom bap ghost snare framework should match the reference grid");
   assert.deepEqual(onSteps("House / Four-on-the-Floor", "LM-2 Kick"), [1, 5, 9, 13], "house kick framework should stay four-on-the-floor");
   assert.deepEqual(onSteps("Drum & Bass", "Pearl Closed Hat"), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], "drum and bass hats should run sixteenths");
-  assert.deepEqual(onSteps("Breakcore Amen Skeleton", "Breakcore Snare (Aether)"), [3, 5, 8, 10, 13, 16], "amen skeleton snare should carry the extra breakbeat attacks");
-  assert.deepEqual(onSteps("Hyperactive Snare-Chop Breakcore", "Breakcore Snare (Aether)"), [2, 4, 5, 7, 8, 10, 13, 14, 16], "hyperactive breakcore should make the snare the lead rhythm");
-  assert.deepEqual(onSteps("Glitch Breakcore / IDM Break", "Breakcore Noise Burst (Aether)"), [4, 8, 11, 16], "glitch breakcore should keep sliced noise bursts on the edit points");
-  assert.deepEqual(onSteps("Venetian Snares-Style 7/8 Breakcore", "Breakcore Kick (Aether)"), [1, 3, 7, 9, 12], "venetian-style breakcore should preserve the 14-step lurch");
-  assert.deepEqual(onSteps("Blast Breakcore / Maximum Density", "Breakcore Kick (Aether)"), [1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, 15], "blast breakcore should keep the maximum-density kick grid");
+  assert.deepEqual(onSteps("Breakcore Amen Skeleton", "Pearl Snare"), [3, 5, 8, 10, 13, 16], "amen skeleton snare should carry the extra breakbeat attacks");
+  assert.deepEqual(onSteps("Hyperactive Snare-Chop Breakcore", "Pearl Snare"), [2, 4, 5, 7, 8, 10, 13, 14, 16], "hyperactive breakcore should make the snare the lead rhythm");
+  assert.deepEqual(onSteps("Glitch Breakcore / IDM Break", "CR-78 Cymbal"), [4, 8, 11, 16], "glitch breakcore should keep sliced noise bursts on the edit points");
+  assert.deepEqual(onSteps("Venetian Snares-Style 7/8 Breakcore", "Pearl Kick"), [1, 3, 7, 9, 12], "venetian-style breakcore should preserve the 14-step lurch");
+  assert.deepEqual(onSteps("Blast Breakcore / Maximum Density", "Pearl Kick"), [1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, 15], "blast breakcore should keep the maximum-density kick grid");
   assert.deepEqual(onSteps("Afrobeat / Afropop-Inspired", "CR-78 Tambourine"), [1, 2, 4, 5, 7, 9, 10, 12, 13, 15], "afrobeat shaker should use the interlocking reference pattern");
   assert.equal(rowNames("Breakcore Amen Skeleton").includes("Breakcore Crash Ride (Aether)"), false, "breakcore amen should not use the rough Aether crash/ride when sampled cymbals are available");
   assert.equal(rowNames("Venetian Snares-Style 7/8 Breakcore").includes("Breakcore Crash Ride (Aether)"), false, "7/8 breakcore should not use the rough Aether crash/ride when sampled cymbals are available");
@@ -459,6 +487,11 @@ try {
   const openHatRows = factoryLoops.flatMap((component) => component.rows.map((row) => row.name).filter((name) => /open hat/i.test(name)));
   assert.ok(openHatRows.length > 0, "factory loops should include sampled open-hat rows");
   assert.equal(openHatRows.some((name) => /aether/i.test(name)), false, "factory open-hat rows should avoid the rough Aether open-hat patch");
+  assert.equal(
+    factoryLoops.some((component) => component.rows.some((row) => deprecatedBreakcoreAetherInstrumentNames.includes(row.name))),
+    false,
+    "factory drum loops should not expose deprecated breakcore Aether/Synth rows",
+  );
 
   const trackA = store.useProjectStore.getState().project.tracks[0].id;
   const trackB = projectStore.addTrack({ name: "Target" });

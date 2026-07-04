@@ -2868,6 +2868,26 @@ namespace beat
             return juce::var(response.get());
         }
 
+        if (kind == PROJECT_CHOOSE_EXPORT_FOLDER)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto pathHint = payload.getProperty("pathHint", {}).toString();
+            const auto start = pathHint.isNotEmpty()
+                ? juce::File(pathHint)
+                : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+            juce::FileChooser chooser("Choose Export Folder", start, "*", true);
+            if (!chooser.browseForDirectory())
+            {
+                response->setProperty("path", juce::String());
+                response->setProperty("cancelled", true);
+                return juce::var(response.get());
+            }
+
+            response->setProperty("path", chooser.getResult().getFullPathName());
+            response->setProperty("cancelled", false);
+            return juce::var(response.get());
+        }
+
         if (kind == PROJECT_INSPECT_DOCUMENT)
         {
             juce::DynamicObject::Ptr response = new juce::DynamicObject();

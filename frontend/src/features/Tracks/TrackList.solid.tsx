@@ -1,8 +1,9 @@
 import { createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { createStoreSelector } from "../../solid-utils/store";
 import { Button, HoverInfo, Icon } from "../../solid-ui";
-import { useProjectStore, useTransportStore, useUiStore, useViewStore } from "../../state/store";
+import { useAudioFileStore, useProjectStore, useTransportStore, useUiStore, useViewStore } from "../../state/store";
 import { clipboardStore } from "../../state/clipboard";
+import { AudioRecordingModal } from "./AudioRecordingModal.solid";
 import { TrackLane } from "./TrackLane.solid";
 import { TrackEffectHeaderRows, TrackEffectLaneRows } from "./TrackEffectRows.solid";
 import { Timeline } from "./Timeline.solid";
@@ -16,7 +17,7 @@ import {
   type TimelineRect,
 } from "./geometry";
 import styles from "./TrackList.module.css";
-import type { Id } from "../../state/types";
+import type { AudioFile, Id } from "../../state/types";
 
 const ZOOM_STEP = 8;
 const MIN_ZOOM = 16;
@@ -37,6 +38,7 @@ export function TrackList() {
 
   const tracks = createStoreSelector(useProjectStore, (state) => state.project.tracks);
   const lengthBeats = createStoreSelector(useProjectStore, (state) => state.project.lengthBeats);
+  const bpm = createStoreSelector(useProjectStore, (state) => state.project.bpm);
   const selectedTrackIds = createStoreSelector(useUiStore, (state) => state.selectedTrackIds);
   const selectedSegmentIds = createStoreSelector(useUiStore, (state) => state.selectedSegmentIds);
   const loopEnabled = createStoreSelector(useTransportStore, (state) => state.loopEnabled);
@@ -44,6 +46,7 @@ export function TrackList() {
   const beatsToPx = createStoreSelector(useViewStore, (state) => state.beatsToPx);
   const [marquee, setMarquee] = createSignal<MarqueeState | null>(null, { equals: false });
   const [expandedEffectIds, setExpandedEffectIds] = createSignal<Set<Id>>(new Set(), { equals: false });
+  const [audioRecordingRequest, setAudioRecordingRequest] = createSignal<{ trackId: Id; startBeat: number } | null>(null);
   const selectedSegments = createMemo(() => {
     const ids = new Set(selectedSegmentIds());
     return tracks().flatMap((track) => track.segments).filter((segment) => ids.has(segment.id));
@@ -51,6 +54,11 @@ export function TrackList() {
   const selectedGroupIds = createMemo(() => Array.from(new Set(selectedSegments()
     .map((segment) => segment.groupId)
     .filter((groupId): groupId is Id => Boolean(groupId)))));
+  const audioRecordingContext = createMemo(() => {
+    const request = audioRecordingRequest();
+    const track = request ? tracks().find((candidate) => candidate.id === request.trackId) : undefined;
+    return request && track ? { request, track } : null;
+  });
 
   function clearSelection() {
     useUiStore.getState().setSelectedTracks([]);
@@ -222,6 +230,26 @@ export function TrackList() {
     useUiStore.getState().setSelectedSegments([]);
   }
 
+  function commitRecordedTake(take: {
+    file: AudioFile;
+    lengthBeats: number;
+    sourceStartBeat: number;
+  }) {
+    const request = audioRecordingRequest();
+    if (!request) return;
+    const lengthBeats = Math.max(0.03125, take.lengthBeats);
+    useAudioFileStore.getState().addFile(take.file);
+    useProjectStore.getState().addSegment(request.trackId, {
+      name: take.file.name || "Recorded audio",
+      startBeat: request.startBeat,
+      lengthBeats,
+      sourceStartBeat: take.sourceStartBeat,
+      payload: { kind: "audio", audioFileId: take.file.id, gainDb: 0 },
+    });
+    useViewStore.getState().setLastSegmentLength(lengthBeats);
+    setAudioRecordingRequest(null);
+  }
+
   return (
     <div class={styles.panel}>
       <div class={styles.area}>
@@ -308,6 +336,7 @@ export function TrackList() {
                     <TrackLane
                       trackId={track.id}
                       selected={selectedTrackIds().includes(track.id)}
+                      onRequestAudioRecording={(request) => setAudioRecordingRequest(request)}
                     />
                     <TrackEffectLaneRows
                       trackId={track.id}
@@ -360,6 +389,19 @@ export function TrackList() {
           </div>
         </div>
       </div>
+
+      <Show when={audioRecordingContext()}>
+        {(context) => (
+          <AudioRecordingModal
+            trackId={context().request.trackId}
+            trackName={context().track.name}
+            startBeat={context().request.startBeat}
+            bpm={bpm()}
+            onClose={() => setAudioRecordingRequest(null)}
+            onCommit={commitRecordedTake}
+          />
+        )}
+      </Show>
     </div>
   );
 }

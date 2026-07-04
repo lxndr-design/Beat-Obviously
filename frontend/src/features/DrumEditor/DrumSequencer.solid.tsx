@@ -11,8 +11,8 @@ import { TimeSignatureControl } from "../Transport/TimeSignatureControl.solid";
 import {
   DEFAULT_DRUM_MIDI_PITCH,
   DEFAULT_DRUM_VELOCITY,
-  drumPatternDurationSeconds,
-  drumStepLengthBeats,
+  drumPlaybackDurationSeconds,
+  drumPlaybackStepLengthBeats,
   drumTimingOffsetBeats,
   effectiveDrumVelocity,
   formatFrequency,
@@ -280,7 +280,7 @@ export function DrumSequencer(props: Props) {
   }
 
   function scheduleStep(step: number, atTimeS: number, stepSeconds: number) {
-    const stepLengthBeats = drumStepLengthBeats(props.lengthBeats, props.stepCount);
+    const stepLengthBeats = drumPlaybackStepLengthBeats(props.lengthBeats, props.stepCount, props.speed);
     const beatsPerSecond = props.bpm / 60;
     for (const row of rowsRef.current) {
       const cell = normalizeDrumCell(row.steps[step]);
@@ -336,9 +336,9 @@ export function DrumSequencer(props: Props) {
 
     const ctx = getCtx();
     const tick = () => {
-      const phraseSeconds = drumPatternDurationSeconds(props.lengthBeats, props.bpm);
+      const phraseSeconds = drumPlaybackDurationSeconds(props.lengthBeats, props.bpm, props.speed);
       const stepSeconds = Math.max(0.005, phraseSeconds / Math.max(1, props.stepCount));
-      const stepLengthBeats = drumStepLengthBeats(props.lengthBeats, props.stepCount);
+      const stepLengthBeats = drumPlaybackStepLengthBeats(props.lengthBeats, props.stepCount, props.speed);
       const beatsPerSecond = props.bpm / 60;
       const now = ctx.currentTime;
       const elapsed = Math.max(0, now - loopStartTimeRef.current);

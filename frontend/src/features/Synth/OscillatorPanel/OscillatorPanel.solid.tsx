@@ -92,14 +92,13 @@ type WavemapAnalysisView = "compact" | "details";
 export function OscillatorPanel() {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
+  const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
   const previewInstrument = createMemo(() => synthDraftToPreviewInstrument(draft()));
 
   return (
-    <section class={`ds-panel ${styles.panel}`} aria-label="Oscillator">
-      <header class="ds-panel-header">
-        <div class="ds-panel-title">Oscillators</div>
-      </header>
-      <div class={`ds-panel-body ${styles.body}`}>
+    <section class={`${styles.panel} ${styles.majorSection}`} aria-label="Oscillator">
+      <div class={styles.majorSectionTitle}>Oscillators</div>
+      <div class={styles.body}>
         <OscillatorRow oscillator="a" previewInstrument={previewInstrument()} />
         <OscillatorRow oscillator="b" previewInstrument={previewInstrument()} />
         <div class={styles.row} aria-label="Voice stack row">
@@ -110,6 +109,26 @@ export function OscillatorPanel() {
             <div class={`${styles.settingsPane} ${styles.unisonSettingsPane}`}>
               <div class={styles.unisonBody}>
                 <div class={styles.voiceStackControls}>
+                  <div class={styles.voiceStackToggleGroup}>
+                    <Button
+                      size="xs"
+                      className={styles.voiceStackToggleButton}
+                      selected={getBooleanParam(draft(), "mono.enabled")}
+                      aria-pressed={getBooleanParam(draft(), "mono.enabled")}
+                      onClick={() => setBooleanParameter("mono.enabled", !getBooleanParam(draft(), "mono.enabled"))}
+                    >
+                      Mono
+                    </Button>
+                    <Button
+                      size="xs"
+                      className={styles.voiceStackToggleButton}
+                      selected={getBooleanParam(draft(), "legato.enabled")}
+                      aria-pressed={getBooleanParam(draft(), "legato.enabled")}
+                      onClick={() => setBooleanParameter("legato.enabled", !getBooleanParam(draft(), "legato.enabled"))}
+                    >
+                      Legato
+                    </Button>
+                  </div>
                   <div class={styles.voiceStackKnobGroup}>
                   <For each={[
                     ["unison.voices", "Voices", 1, 16, 1, 1],
@@ -260,7 +279,7 @@ function OscillatorRow(props: {
                   aria-expanded={customEditorOpen()}
                   onClick={() => setCustomEditorOpen((open) => !open)}
                 >
-                  {customEditorOpen() ? "Hide" : "Show"}
+                  {customEditorOpen() ? "Hide Wave Settings" : "Show Wave Settings"}
                 </Button>
               </div>
               <Show when={customEditorOpen()}>
@@ -485,12 +504,17 @@ function OscillatorParamGroup(props: {
 }) {
   return (
     <div class={`${styles.oscillatorControlGroup} ${props.warpModeValue ? styles.warpControlGroup : ""}`} aria-label={`${props.label} controls`}>
-      <div class={styles.oscillatorControlGroupTitle}>{props.label}</div>
-      <Show when={props.warpModeValue && props.onWarpModeChange ? true : false}>
-        <WarpModeButtons
-          value={props.warpModeValue ?? "shape"}
-          onChange={props.onWarpModeChange ?? (() => undefined)}
-        />
+      <Show
+        when={props.warpModeValue && props.onWarpModeChange ? true : false}
+        fallback={<div class={styles.oscillatorControlGroupTitle}>{props.label}</div>}
+      >
+        <div class={styles.warpModeStack}>
+          <div class={styles.oscillatorControlGroupTitle}>{props.label}</div>
+          <WarpModeButtons
+            value={props.warpModeValue ?? "shape"}
+            onChange={props.onWarpModeChange ?? (() => undefined)}
+          />
+        </div>
       </Show>
       <div class={styles.oscillatorControlGroupKnobs}>
         <For each={props.suffixes}>
@@ -564,9 +588,8 @@ function CustomWavetableFrameCard(props: {
       <div class={styles.frameLabel}>
         {frameLabel()}
       </div>
-      <div class={styles.frameBody}>
+        <div class={styles.frameBody}>
         <div class={styles.frameScanBlock} aria-label={`${frameLabel()} frame scan controls`}>
-          <div class={styles.frameScanLabel}>Frame/Scan</div>
           <MiniWaveform
             samples={renderCustomFramePreview(props.frame)}
             disabled={props.editMode !== "freehand"}

@@ -287,6 +287,34 @@
   --segment-radius: 0; /* hard edges everywhere */
 }
 
+html[data-theme-contrast="low"] {
+  --color-fg-hover: rgba(255, 255, 255, 0.92);
+  --grid-line-faint: rgba(255, 255, 255, 0.14);
+  --grid-line-soft:  rgba(255, 255, 255, 0.18);
+  --grid-line-mid:   rgba(255, 255, 255, 0.24);
+  --grid-line-bold:  rgba(255, 255, 255, 0.58);
+  --surface-subtle: color-mix(in srgb, var(--color-fg) 14%, var(--color-bg));
+  --surface-hover: color-mix(in srgb, var(--color-fg) 20%, var(--color-bg));
+  --surface-selected: color-mix(in srgb, var(--color-fg) 42%, var(--color-bg));
+  --surface-selected-strong: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
+  --border-fg-color: color-mix(in srgb, var(--color-fg) 82%, transparent);
+  --border-soft: 1px solid color-mix(in srgb, var(--color-fg) 48%, transparent);
+}
+
+html[data-theme-contrast="high"] {
+  --color-fg-hover: rgba(210, 210, 210, 0.72);
+  --grid-line-faint: rgba(255, 255, 255, 0.05);
+  --grid-line-soft:  rgba(255, 255, 255, 0.09);
+  --grid-line-mid:   rgba(255, 255, 255, 0.14);
+  --grid-line-bold:  rgba(255, 255, 255, 0.52);
+  --surface-subtle: color-mix(in srgb, var(--color-fg) 5%, var(--color-bg));
+  --surface-hover: color-mix(in srgb, var(--color-fg) 11%, var(--color-bg));
+  --surface-selected: color-mix(in srgb, var(--color-fg) 30%, var(--color-bg));
+  --surface-selected-strong: color-mix(in srgb, var(--color-fg) 54%, var(--color-bg));
+  --border-fg-color: color-mix(in srgb, var(--color-fg) 64%, transparent);
+  --border-soft: 1px solid color-mix(in srgb, var(--color-fg) 28%, transparent);
+}
+
 /* Theme inversion utility — for the few surfaces that need a white base.
  * Apply class="theme-inverse" to a subtree.
  */

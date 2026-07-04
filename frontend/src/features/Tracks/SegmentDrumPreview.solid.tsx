@@ -1,5 +1,10 @@
 import { For, Show } from "solid-js";
-import { drumStepOn } from "../../state/drumSteps";
+import {
+  drumPlaybackDurationBeats,
+  drumPlaybackStepLengthBeats,
+  drumTimingOffsetBeats,
+  normalizeDrumCell,
+} from "../../state/drumSteps";
 import type { Segment } from "../../state/types";
 import styles from "./SegmentDrumPreview.module.css";
 
@@ -11,10 +16,14 @@ interface Props {
 
 export function SegmentDrumPreview(props: Props) {
   const drumPayload = () => props.segment.payload.kind === "drum" ? props.segment.payload : null;
-  const viewLength = () => Math.max(0.001, props.displayLengthBeats ?? props.segment.lengthBeats);
+  const effectiveLength = () => {
+    const payload = drumPayload();
+    return payload ? drumPlaybackDurationBeats(props.segment.lengthBeats, payload.speed) : props.segment.lengthBeats;
+  };
+  const viewLength = () => Math.max(0.001, props.displayLengthBeats ?? effectiveLength());
   const stepBeats = () => {
     const payload = drumPayload();
-    return payload ? props.segment.lengthBeats / payload.stepCount : 0;
+    return payload ? drumPlaybackStepLengthBeats(props.segment.lengthBeats, payload.stepCount, payload.speed) : 0;
   };
 
   return (
@@ -29,16 +38,23 @@ export function SegmentDrumPreview(props: Props) {
                 return (
                   <For each={row.steps.slice(0, payload().stepCount)}>
                     {(step, stepIndex) => {
-                      if (!drumStepOn(step)) return null;
-                      const cellX = stepIndex() * stepBeats();
+                      const cell = normalizeDrumCell(step);
+                      if (!cell.on) return null;
+                      const cellX = Math.max(
+                        0,
+                        stepIndex() * stepBeats()
+                          + drumTimingOffsetBeats(stepIndex(), stepBeats(), payload().swingPercent, cell.leanPercent),
+                      );
                       if (cellX >= viewLength()) return null;
-                      const markerWidth = Math.max(0.025, Math.min(stepBeats() * 0.16, 0.08));
+                      const markerWidth = Math.max(0.025, Math.min(stepBeats() * 0.24, 0.09));
+                      const velocity = Math.max(0, Math.min(127, cell.velocity ?? 96));
                       return (
                         <rect
                           x={Math.min(viewLength() - markerWidth, cellX + stepBeats() * 0.5 - markerWidth * 0.5)}
                           y={rowTop + rowHeight * 0.22}
                           width={markerWidth}
                           height={Math.max(2.5, rowHeight * 0.56)}
+                          opacity={0.44 + velocity / 230}
                           class={`${styles.hit} ${props.playing ? styles.playing : ""}`}
                         />
                       );

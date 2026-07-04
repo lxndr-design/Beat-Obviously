@@ -1,7 +1,13 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { ActionFooter, Button, HoverInfo, Icon, MarqueeText } from "../../solid-ui";
 import { useComponentStore, type BeatComponent, type DrumComponent, type MidiComponent } from "../../state/components";
-import { drumPatternDurationBeats, drumPatternDurationSeconds, normalizeDrumCell } from "../../state/drumSteps";
+import {
+  drumPlaybackDurationBeats,
+  drumPlaybackDurationSeconds,
+  drumPlaybackStepLengthBeats,
+  drumTimingOffsetBeats,
+  normalizeDrumCell,
+} from "../../state/drumSteps";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";
 import type { Instrument } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
@@ -349,8 +355,9 @@ function DrumPatternPreview(props: {
   instruments: Instrument[];
   progress: number;
 }) {
+  const effectiveLength = () => drumPlaybackDurationBeats(props.component.lengthBeats, props.component.speed);
   const columns = () => Math.max(1, props.component.stepCount);
-  const stepWidth = () => columns() > 32 ? 18 : 24;
+  const contentWidth = () => Math.max(280, Math.round(effectiveLength() * 96));
   const clampedProgress = () => Math.max(0, Math.min(1, props.progress));
 
   return (
@@ -365,21 +372,32 @@ function DrumPatternPreview(props: {
         </For>
       </div>
       <div class={styles.drumStepsViewport}>
-        <div class={styles.drumStepsContent} style={{ width: `${columns() * stepWidth()}px` }}>
-          <span class={styles.drumStepPlayhead} style={{ left: `${clampedProgress() * columns() * stepWidth()}px` }} aria-hidden />
+        <div class={styles.drumStepsContent} style={{ width: `${contentWidth()}px` }}>
+          <span class={styles.drumStepPlayhead} style={{ left: `${clampedProgress() * contentWidth()}px` }} aria-hidden />
           <For each={props.component.rows}>
             {(row, rowIndex) => (
-              <div
-                class={styles.drumMatrixRow}
-                style={{ "grid-template-columns": `repeat(${columns()}, var(--pattern-step-width))` }}
-              >
+              <div class={styles.drumMatrixRow}>
                 <For each={Array.from({ length: columns() }, (_, stepIndex) => stepIndex)}>
                   {(stepIndex) => {
                     const cell = () => normalizeDrumCell(row.steps[stepIndex]);
+                    const x = () => {
+                      const stepLength = drumPlaybackStepLengthBeats(props.component.lengthBeats, props.component.stepCount, props.component.speed);
+                      const beat = Math.max(
+                        0,
+                        Math.min(
+                          effectiveLength(),
+                          stepIndex * stepLength + drumTimingOffsetBeats(stepIndex, stepLength, props.component.swingPercent, cell().leanPercent),
+                        ),
+                      );
+                      return (beat / effectiveLength()) * 100;
+                    };
                     return (
                       <span
                         class={`${styles.drumMatrixCell} ${cell().on ? styles.drumMatrixCellOn : ""}`}
-                        style={cell().on ? { opacity: `${0.4 + Math.max(0, Math.min(127, cell().velocity ?? 96)) / 210}` } : undefined}
+                        style={{
+                          left: `${x()}%`,
+                          opacity: cell().on ? `${0.4 + Math.max(0, Math.min(127, cell().velocity ?? 96)) / 210}` : "0.18",
+                        }}
                         data-row={rowIndex()}
                         data-step={stepIndex}
                       />
@@ -417,7 +435,7 @@ function editorLabel(component: BeatComponent): string {
 
 function componentLength(component: BeatComponent): string {
   const beats = component.kind === "drum"
-    ? drumPatternDurationBeats(component.lengthBeats)
+    ? drumPlaybackDurationBeats(component.lengthBeats, component.speed)
     : component.lengthBeats;
   return `${formatNumber(beats)} beats`;
 }
@@ -434,7 +452,7 @@ function componentItemCount(component: BeatComponent): string {
 function patternDurationSeconds(component: BeatComponent, bpm: number, playbackRate = 1): number {
   const secondsPerBeat = 60 / Math.max(1, bpm);
   return component.kind === "drum"
-    ? drumPatternDurationSeconds(component.lengthBeats, bpm, playbackRate)
+    ? drumPlaybackDurationSeconds(component.lengthBeats, bpm, component.speed, playbackRate)
     : Math.max(0.1, (component.lengthBeats * secondsPerBeat) / Math.max(0.25, playbackRate));
 }
 

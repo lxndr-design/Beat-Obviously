@@ -24,11 +24,13 @@ interface RenderModulation {
 
 type DirectRuntimeModulationTarget =
   | "osc.a.position"
+  | "osc.a.warp"
   | "osc.a.fine"
   | "osc.a.level"
   | "osc.a.pan"
   | "osc.a.phase"
   | "osc.b.position"
+  | "osc.b.warp"
   | "osc.b.fine"
   | "osc.b.level"
   | "osc.b.pan"
@@ -983,6 +985,8 @@ function aetherStackSample(
     const waveform = osc.waveform ?? "wavetable";
     const legacyPositionOffset = key === "a" ? modulation.positionOffset : 0;
     const wavetableOffset = legacyPositionOffset + modulationTargetOffset(modulation, `osc.${key}.position`);
+    const warpOffset = modulationTargetOffset(modulation, `osc.${key}.warp`);
+    const wavetable = warpOffset === 0 ? osc.wavetable : { ...osc.wavetable, warp: clamp01(osc.wavetable.warp + warpOffset) };
     const unisonDetuneOffset = modulationTargetOffset(modulation, "unison.detune");
     const unisonSpreadOffset = modulationTargetOffset(modulation, "unison.spread");
     const phaseOffset = oscillatorPhaseOffset(osc, key) + modulationTargetOffset(modulation, `osc.${key}.phase`);
@@ -992,7 +996,7 @@ function aetherStackSample(
           state.phase * rate + phaseOffset,
           sampleRate,
           frequency * rate,
-          osc.wavetable,
+          wavetable,
           wavetableOffset,
           unisonDetuneOffset,
           unisonSpreadOffset,
@@ -1060,6 +1064,8 @@ function aetherStackStereoSample(
     const waveform = osc.waveform ?? "wavetable";
     const legacyPositionOffset = key === "a" ? modulation.positionOffset : 0;
     const wavetableOffset = legacyPositionOffset + modulationTargetOffset(modulation, `osc.${key}.position`);
+    const warpOffset = modulationTargetOffset(modulation, `osc.${key}.warp`);
+    const wavetable = warpOffset === 0 ? osc.wavetable : { ...osc.wavetable, warp: clamp01(osc.wavetable.warp + warpOffset) };
     const unisonDetuneOffset = modulationTargetOffset(modulation, "unison.detune");
     const unisonSpreadOffset = modulationTargetOffset(modulation, "unison.spread");
     const phaseOffset = oscillatorPhaseOffset(osc, key) + modulationTargetOffset(modulation, `osc.${key}.phase`);
@@ -1069,7 +1075,7 @@ function aetherStackStereoSample(
           state.phase * rate + phaseOffset,
           sampleRate,
           frequency * rate,
-          osc.wavetable,
+          wavetable,
           wavetableOffset,
           unisonDetuneOffset,
           unisonSpreadOffset,
@@ -1679,6 +1685,10 @@ function baseAutomationValue(instrument: Instrument, target: RuntimeModulationTa
       return instrument.aether?.oscA.wavetable.position ?? instrument.wavetable?.position ?? 0;
     case "osc.b.position":
       return instrument.aether?.oscB.wavetable.position ?? instrument.wavetable?.position ?? 0;
+    case "osc.a.warp":
+      return instrument.aether?.oscA.wavetable.warp ?? instrument.wavetable?.warp ?? 0;
+    case "osc.b.warp":
+      return instrument.aether?.oscB.wavetable.warp ?? instrument.wavetable?.warp ?? 0;
     case "osc.a.fine":
       return instrument.aether?.oscA.fineCents ?? 0;
     case "osc.b.fine":
@@ -1876,11 +1886,13 @@ function isRuntimeModulationTarget(value: unknown): value is RuntimeModulationTa
 function isDirectRuntimeModulationTarget(value: unknown): value is DirectRuntimeModulationTarget {
   return typeof value === "string" && [
     "osc.a.position",
+    "osc.a.warp",
     "osc.a.fine",
     "osc.a.level",
     "osc.a.pan",
     "osc.a.phase",
     "osc.b.position",
+    "osc.b.warp",
     "osc.b.fine",
     "osc.b.level",
     "osc.b.pan",

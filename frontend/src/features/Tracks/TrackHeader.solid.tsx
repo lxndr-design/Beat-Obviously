@@ -106,6 +106,14 @@ export function TrackHeader(props: Props) {
     if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
   }
 
+  function onHeaderDragStart(event: DragEvent) {
+    if (shouldSuppressHeaderDrag(event.target)) {
+      event.preventDefault();
+      return;
+    }
+    onHandleDragStart(event);
+  }
+
   function onRowDragOver(event: DragEvent) {
     if (!event.dataTransfer?.types.includes(DND_MIME)) return;
     event.preventDefault();
@@ -151,6 +159,9 @@ export function TrackHeader(props: Props) {
           onDragOver={onRowDragOver}
           onDragLeave={() => setDropPosition(null)}
           onDrop={onRowDrop}
+          onDragStart={onHeaderDragStart}
+          onDragEnd={() => setDropPosition(null)}
+          draggable={!editingName()}
           data-track-header
           data-track-index={props.index}
         >
@@ -283,6 +294,14 @@ export function TrackHeader(props: Props) {
 
 function isPlainSelectionClick(event: MouseEvent): boolean {
   return event.button === 0 && !event.ctrlKey;
+}
+
+function shouldSuppressHeaderDrag(target: EventTarget | null): boolean {
+  const element = target instanceof Element ? target : null;
+  if (!element) return false;
+  if (element.closest("input, select, textarea, [contenteditable='true'], [data-track-no-drag]")) return true;
+  const button = element.closest("button");
+  return Boolean(button && !button.classList.contains(styles.name));
 }
 
 function formatGainBadge(gainDb: number): string | null {

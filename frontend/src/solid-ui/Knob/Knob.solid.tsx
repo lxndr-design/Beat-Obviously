@@ -41,6 +41,7 @@ export function Knob(allProps: KnobProps) {
   const baselineAngle = createMemo(() => -135 + normalizeValue(baseline(), props.min, props.max) * 270);
   const shifted = createMemo(() => Math.abs(props.value - baseline()) > Math.max(0.0001, step() / 2));
   const hasModulation = createMemo(() => Math.abs(props.modulationAmount ?? 0) > 0.0001 || Boolean(props.modulationLabel));
+  const isPickable = createMemo(() => Boolean(props.pickTargetId || props.pickSourceId));
   const modulationText = createMemo(() => props.modulationLabel || formatSignedPercent(props.modulationAmount ?? 0));
   const arcSegments = createMemo(() => shifted() ? describeArcSegments(0, 0, 47, baselineAngle(), angle()) : []);
   const className = createMemo(() => [
@@ -58,6 +59,7 @@ export function Knob(allProps: KnobProps) {
 
   function handlePointerDown(event: PointerEvent) {
     if (props.disabled || editing() !== null) return;
+    if (isNonDragTarget(event.target)) return;
     event.preventDefault();
     (event.currentTarget as Element).setPointerCapture(event.pointerId);
     startY = event.clientY;
@@ -141,17 +143,24 @@ export function Knob(allProps: KnobProps) {
       data-synth-target-id={props.pickTargetId}
       data-synth-source-id={props.pickSourceId}
       data-disabled={props.disabled ? "true" : "false"}
+      onPointerDown={handlePointerDown}
     >
+      <Show when={isPickable()}>
+        <span class={styles.pickAnchor} data-synth-pick-anchor aria-hidden="true">
+          <Icon name="ph:plug" size={12} decorative />
+        </span>
+      </Show>
       <Show when={hasModulation()}>
         <div class={styles.modulation} aria-label={`${props.label ?? "Value"} modulation ${modulationText()}`}>
-          <Icon name="ph:plug" size={12} decorative />
+          <span class={styles.modulationIcon}>
+            <Icon name="ph:plug" size={12} decorative />
+          </span>
           <span class={styles.modulationLabel}>{modulationText()}</span>
         </div>
       </Show>
       <div
         class={styles.dial}
         data-knob-dial
-        onPointerDown={handlePointerDown}
         role="slider"
         aria-valuemin={props.min}
         aria-valuemax={props.max}
@@ -218,6 +227,11 @@ export function Knob(allProps: KnobProps) {
       </Show>
     </div>
   );
+}
+
+function isNonDragTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest("[data-knob-value], [data-synth-pick-anchor], input, button, select, textarea"));
 }
 
 function clamp(value: number, min: number, max: number) {

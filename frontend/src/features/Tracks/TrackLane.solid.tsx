@@ -45,6 +45,7 @@ import type { DrumRow, Id, Instrument, Segment as SegmentModel, Track } from "..
 interface Props {
   trackId: Id;
   selected?: boolean;
+  onRequestAudioRecording?: (request: { trackId: Id; startBeat: number }) => void;
 }
 
 export function TrackLane(props: Props) {
@@ -78,7 +79,6 @@ export function TrackLane(props: Props) {
     if (!track()) return [];
     const canPaste = clipboardStore.getState().segments.length > 0;
     const projectStore = useProjectStore.getState();
-    const viewStore = useViewStore.getState();
     return [
       ...(canPaste
         ? [{
@@ -144,13 +144,7 @@ export function TrackLane(props: Props) {
         label: "Record Audio",
         icon: "ph:record-fill",
         onSelect: () => {
-          projectStore.addSegment(props.trackId, {
-            name: nextSegmentName(tracks(), "audio"),
-            startBeat: lastClickBeat,
-            lengthBeats: lastLen(),
-            payload: { kind: "audio", audioFileId: "", gainDb: 0 },
-          });
-          viewStore.setLastSegmentLength(lastLen());
+          props.onRequestAudioRecording?.({ trackId: props.trackId, startBeat: lastClickBeat });
         },
       },
     ];

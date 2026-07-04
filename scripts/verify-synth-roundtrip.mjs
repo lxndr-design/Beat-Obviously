@@ -405,13 +405,13 @@ try {
   });
   assert.deepEqual(synthStore.modulationSourceAffordance(draft, "lfo.1"), {
     source: "lfo.1",
-    label: "Edit LFO 1",
+    label: "LFO 1",
     detail: "On · triangle · 1/8",
     editor: "lfo",
   });
   assert.deepEqual(synthStore.modulationSourceAffordance(draft, "env.1"), {
     source: "env.1",
-    label: "Edit Env 1",
+    label: "Amp Env",
     detail: "Loop · A exp · R log",
     editor: "envelope",
   });
@@ -451,7 +451,7 @@ try {
   });
   assert.deepEqual(synthStore.modulationSourceAffordance(draft, "macro.1"), {
     source: "macro.1",
-    label: "Edit Brightness",
+    label: "Brightness / M1",
     detail: "20-80% · ease-in",
     editor: "macro",
   });
@@ -473,16 +473,39 @@ try {
     ["lfo.1", "env.2", "macro.1", "performance", "performance", "performance"],
     "modulation source affordances should focus the matching source editor surface",
   );
-  assert.ok(synthStore.FACTORY_SYNTH_PRESETS.length >= 5);
+  assert.ok(synthStore.FACTORY_SYNTH_PRESETS.length >= 17);
   assert.equal(
     new Set(synthStore.FACTORY_SYNTH_PRESETS.map((preset) => preset.id)).size,
     synthStore.FACTORY_SYNTH_PRESETS.length,
   );
-  const requiredPresetFamilies = ["Bass", "Keys", "Lead", "Pad", "Percussion", "Pluck", "Template", "Texture", "Wavetable"];
+  const requiredPresetFamilies = [
+    "Poly Keys",
+    "Arp Pluck",
+    "Pad",
+    "Bass",
+    "Lead",
+    "Bell",
+    "Lo-Fi Pad",
+    "Chord Stab",
+    "Sub Bass",
+    "Atmosphere",
+    "Bass / Crunch",
+    "Crunch Lead",
+    "Vocal Pad",
+    "Vocal Pluck",
+    "Synth String",
+    "Keys / Synth Piano",
+    "Mallet",
+  ];
   const presetFamilies = new Set(synthStore.FACTORY_SYNTH_PRESETS.map((preset) => preset.family));
   for (const family of requiredPresetFamilies) {
     assert.ok(presetFamilies.has(family), `expected factory Aether preset family ${family}`);
   }
+  assert.equal(
+    synthStore.FACTORY_SYNTH_PRESETS.some((preset) => /^Breakcore\b/i.test(preset.name)),
+    false,
+    "factory Aether preset bank should not include rough breakcore synth drums",
+  );
   for (const preset of synthStore.FACTORY_SYNTH_PRESETS) {
     assert.equal(preset.patch.name, preset.name);
     assert.equal(typeof preset.category, "string", `expected factory preset ${preset.id} to expose a category`);
@@ -497,7 +520,9 @@ try {
     assert.ok(preset.auditionNote.trim().length > 0, `expected factory preset ${preset.id} to expose an audition note`);
     assert.deepEqual(synthStore.normalizeSynthDraftPatch(JSON.parse(JSON.stringify(preset.patch))), preset.patch);
     const presetPreview = synthStore.synthDraftToPreviewInstrument(preset.patch);
-    const presetSamples = new Float32Array(12000);
+    const presetAttackSeconds = Math.max(0, Number(preset.patch.parameters["env.1.attack"]) || 0);
+    const presetSampleCount = Math.max(12000, Math.min(192000, Math.ceil((presetAttackSeconds + 0.5) * 48000)));
+    const presetSamples = new Float32Array(presetSampleCount);
     synthPreview.renderInstrumentSamples(presetPreview, presetSamples, 48000, synthPreview.previewFrequency(presetPreview), "audio", true);
     let presetEnergy = 0;
     let presetPeak = 0;
@@ -569,14 +594,14 @@ try {
   assert.ok(presetCategories.includes("Lead"), "factory preset categories should be searchable facets");
   assert.ok(presetCategories.includes("Glass"), "user instrument tags should become searchable category facets");
   const leadPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { category: "Lead" });
-  assert.ok(leadPresetResults.some((entry) => entry.id === "factory.wt-lead"), "category facets should include matching factory presets");
+  assert.ok(leadPresetResults.some((entry) => entry.id === "factory.laser-brass-lead"), "category facets should include matching factory presets");
   assert.ok(leadPresetResults.some((entry) => entry.id === favoritedUserPreset.id), "category facets should include matching user presets");
   assert.ok(
     presetLibraryEntries.every((entry) => Number.isInteger(entry.routeCount) && Number.isInteger(entry.effectCount)),
     "preset library entries should expose sortable complexity metadata",
   );
   const glassPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { search: "glass" });
-  assert.ok(glassPresetResults.some((entry) => entry.id === "factory.glass-pad"), "search should match factory descriptions");
+  assert.ok(glassPresetResults.some((entry) => entry.id === "factory.glass-runner"), "search should match factory descriptions");
   assert.ok(glassPresetResults.some((entry) => entry.id === "instrument-glass-user"), "search should match user instrument tags");
   const macroUserPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, {
     search: "macro user preset",
@@ -596,13 +621,17 @@ try {
   assert.deepEqual(
     aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { search: "glass", sort: "name" })
       .map((entry) => entry.name),
-    ["Glass Pad", "Saved Glass Instrument"],
+    ["Glass Runner", "Saved Glass Instrument"],
     "name sort should order mixed-source preset results by display name",
   );
+  const complexityGlassResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { search: "glass", sort: "complexity" });
   assert.deepEqual(
-    aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { search: "glass", sort: "complexity" })
-      .map((entry) => entry.id),
-    ["instrument-glass-user", "factory.glass-pad"],
+    new Set(complexityGlassResults.map((entry) => entry.id)),
+    new Set(["instrument-glass-user", "factory.glass-runner"]),
+    "complexity sort should retain mixed-source preset results",
+  );
+  assert.ok(
+    complexityGlassResults[0].routeCount + complexityGlassResults[0].effectCount >= complexityGlassResults[1].routeCount + complexityGlassResults[1].effectCount,
     "complexity sort should prioritize route/effect-heavy presets",
   );
 

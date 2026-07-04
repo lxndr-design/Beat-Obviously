@@ -1,8 +1,26 @@
 .panel {
+  display: grid;
+  gap: 6px;
   width: 100%;
   height: auto;
   min-height: max-content;
   min-width: 0;
+}
+
+.majorSection {
+  background: transparent;
+  border: 0;
+}
+
+.majorSectionTitle {
+  min-width: 0;
+  padding-left: 6px;
+  color: var(--color-fg);
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .body {
@@ -114,11 +132,34 @@
 
 .voiceStackControls {
   display: inline-grid;
-  grid-template-columns: max-content max-content;
+  grid-template-columns: max-content max-content max-content;
   justify-content: center;
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+
+.voiceStackToggleGroup {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 7px;
+  border: var(--border-fg);
+}
+
+.voiceStackToggleButton {
+  height: 28px;
+  min-width: 70px;
+  padding: 0 10px;
+  border: var(--border-soft);
+  border-right: 0;
+}
+
+.voiceStackToggleButton:last-child {
+  border-right: var(--border-soft);
 }
 
 .voiceStackKnobGroup {
@@ -187,32 +228,41 @@
 }
 
 .warpControlGroup {
-  grid-template-rows: minmax(54px, auto);
-  grid-template-columns: max-content repeat(2, 50px);
-  align-items: stretch;
-  column-gap: 10px;
-  padding: 5px 8px;
+  grid-template-rows: auto;
+  grid-template-columns: minmax(112px, max-content) repeat(2, 54px);
+  align-items: start;
+  justify-content: center;
+  column-gap: 12px;
+  padding: 5px 8px 4px;
 }
 
-.warpControlGroup .oscillatorControlGroupTitle {
+.warpModeStack {
   grid-column: 1;
   grid-row: 1;
-  align-self: start;
-  padding-top: 1px;
+  display: grid;
+  grid-template-rows: 12px 34px 12px;
+  gap: 1px;
+  align-content: start;
+  align-items: center;
+  justify-items: center;
+  min-width: 0;
 }
 
-.warpControlGroup .wavetableControl {
-  grid-column: 1;
+.warpModeStack .oscillatorControlGroupTitle {
   grid-row: 1;
-  align-self: end;
+}
+
+.warpModeStack .wavetableControl {
+  grid-row: 2;
+  align-self: center;
 }
 
 .warpControlGroup .oscillatorControlGroupKnobs {
   grid-column: 2 / -1;
   grid-row: 1;
   display: grid;
-  grid-template-columns: repeat(2, 50px);
-  gap: 10px;
+  grid-template-columns: repeat(2, 54px);
+  gap: 12px;
   align-items: start;
 }
 
@@ -410,7 +460,7 @@
   display: grid;
   grid-template-columns: max-content max-content max-content 1fr max-content;
   align-items: center;
-  column-gap: 12px;
+  column-gap: 34px;
   min-width: 0;
   padding: 6px;
   border-top: var(--border-soft);
@@ -423,6 +473,7 @@
 .interpolationModes {
   display: inline-flex;
   align-items: center;
+  align-self: center;
   gap: 0;
   min-width: 0;
 }
@@ -433,27 +484,37 @@
   grid-template-areas: "label dial value";
   align-items: center;
   column-gap: 4px;
-  margin-left: 8px;
+  flex: 0 0 auto;
+  align-self: center;
+  width: max-content;
+  min-width: 0;
+  margin-left: 10px;
 }
 
-.toolbarMorphKnob :global(.label) {
+.toolbarMorphKnob [data-knob-label] {
   grid-area: label;
   font-size: var(--font-size-ui);
   font-weight: var(--font-weight-regular);
 }
 
-.toolbarMorphKnob :global(.dial) {
+.toolbarMorphKnob [data-knob-dial] {
   grid-area: dial;
   width: 28px !important;
   height: 28px !important;
 }
 
-.toolbarMorphKnob :global(.value),
-.toolbarMorphKnob :global(.editValue) {
+.toolbarMorphKnob [data-knob-value] {
   grid-area: value;
-  width: 24px;
+  box-sizing: border-box;
+  width: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
   min-height: 12px;
+  padding: 0 !important;
+  border: 0 !important;
   font-size: var(--font-size-ui);
+  line-height: 1;
+  text-align: left;
 }
 
 .wavemapSourceRow {
@@ -489,6 +550,7 @@
 .resynthesisModes {
   display: inline-flex;
   align-items: center;
+  align-self: center;
   gap: 0;
   min-width: 0;
 }
@@ -496,12 +558,16 @@
 .wavemapActionGroup {
   display: inline-flex;
   align-items: center;
+  align-self: center;
   gap: 0;
   min-width: 0;
 }
 
 .analysisToggleButton {
+  grid-column: 5;
   justify-self: end;
+  align-self: center;
+  margin-left: auto;
 }
 
 .analysisModes {
@@ -646,23 +712,11 @@
 
 .frameScanBlock {
   display: grid;
-  grid-template-rows: auto minmax(52px, 1fr);
-  gap: 4px;
+  grid-template-rows: minmax(74px, 1fr);
+  gap: 0;
   min-width: 0;
   padding: 7px;
   border: var(--border-fg);
-}
-
-.frameScanLabel {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 18px;
-  color: color-mix(in srgb, var(--color-fg) 82%, transparent);
-  font-size: var(--font-size-ui);
-  font-weight: var(--font-weight-medium);
-  line-height: 1;
-  text-align: center;
 }
 
 .harmonicsBlock {
@@ -676,10 +730,6 @@
   min-width: 0;
   padding: 6px;
   border: var(--border-fg);
-}
-
-.frameScanLabel {
-  text-align: center;
 }
 
 .frameKnobRowThree,
@@ -830,14 +880,14 @@
 }
 
 .zeroLine {
-  stroke: color-mix(in srgb, var(--color-fg) 34%, transparent);
+  stroke: color-mix(in srgb, var(--color-fg) 32%, transparent);
   stroke-width: 0.45;
   vector-effect: non-scaling-stroke;
 }
 
 .previewPath {
   fill: none;
-  stroke: var(--color-fg);
+  stroke: color-mix(in srgb, var(--color-fg) 72%, transparent);
   stroke-width: 1;
   stroke-linecap: round;
   stroke-linejoin: round;

@@ -45,6 +45,8 @@ export interface PianoRollProps {
   onLengthChange?: (lengthBeats: number) => void;
   onChange: (notes: MidiNote[]) => void;
   onPreviewNote?: (pitch: number, velocity?: number) => void;
+  /** Advanced per-note Aether automation. Hidden by default so the piano roll stays a plain MIDI editor. */
+  showAutomation?: boolean;
 }
 
 /**
@@ -375,6 +377,7 @@ export function PianoRoll(props: PianoRollProps) {
   function onGridPointerDown(e: PointerEvent) {
     if (e.target !== e.currentTarget) return;
     if (e.button !== 0) return;
+    e.preventDefault();
     setNoteMenu(null);
     setGridMenu(null);
     setVolumePopover(null);
@@ -455,6 +458,7 @@ export function PianoRoll(props: PianoRollProps) {
   }
 
   function startMove(idx: number, e: PointerEvent) {
+    e.preventDefault();
     e.stopPropagation();
     if (e.button !== 0) return;
     setNoteMenu(null);
@@ -527,6 +531,7 @@ export function PianoRoll(props: PianoRollProps) {
   }
 
   function startResize(idx: number, edge: "left" | "right", e: PointerEvent) {
+    e.preventDefault();
     e.stopPropagation();
     if (e.button !== 0) return;
     (e.target as Element).setPointerCapture(e.pointerId);
@@ -775,6 +780,11 @@ export function PianoRoll(props: PianoRollProps) {
 
   function startConnect(idx: number) {
     const rect = noteRect(notes[idx]);
+    setCurveFrom(null);
+    setCurvePointer(null);
+    setGridMenu(null);
+    setVolumePopover(null);
+    setNoteEditor(null);
     setConnectFrom(idx);
     setConnectPointer({
       x: Math.min(width(), rect.left + rect.width + 24),
@@ -784,6 +794,11 @@ export function PianoRoll(props: PianoRollProps) {
 
   function startCurve(idx: number) {
     const rect = noteRect(notes[idx]);
+    setConnectFrom(null);
+    setConnectPointer(null);
+    setGridMenu(null);
+    setVolumePopover(null);
+    setNoteEditor(null);
     setCurveFrom(idx);
     setCurvePointer({
       x: Math.min(width(), rect.left + rect.width + 24),
@@ -840,6 +855,10 @@ export function PianoRoll(props: PianoRollProps) {
       });
     commitChange(next);
     setSelected([]);
+    setConnectFrom(null);
+    setConnectPointer(null);
+    setCurveFrom(null);
+    setCurvePointer(null);
   }
 
   function addAutomationLaneToSelection() {
@@ -1548,57 +1567,58 @@ export function PianoRoll(props: PianoRollProps) {
             </Button>
           </HoverInfo>
         </div>
-        <div class={styles.automationPanel} aria-label="Aether note automation lanes">
-          <div class={styles.automationHeader}>
-            <span>Aether lanes</span>
-            <span>{aetherNoteAutomationTargetLabel(activeAutomationTarget())} · {selectedAutomationSummary()}</span>
-          </div>
-          <div
-            class={styles.automationEffectiveBadge}
-            data-tone={selectedAutomationEffective().tone}
-            title={selectedAutomationEffective().detail}
-          >
-            <span>{selectedAutomationEffective().label}</span>
-            <span>{selectedAutomationEffective().detail}</span>
-          </div>
-          <div class={styles.automationTargets} role="radiogroup" aria-label="Aether note automation target">
-            {AETHER_NOTE_AUTOMATION_TARGETS.map((target) => (
-              <Button
-                size="xs"
-                selected={activeAutomationTarget() === target.target}
-                aria-label={`${target.label} automation lane`}
-                onClick={() => setActiveAutomationTarget(target.target)}
-              >
-                {target.label}
-              </Button>
-            ))}
-          </div>
-          <div class={styles.automationActions}>
-            <Button size="xs" disabled={selected().length === 0} onClick={addAutomationLaneToSelection}>
-              Add lane
-            </Button>
-            <Button size="xs" disabled={selected().length === 0} onClick={clearAutomationLaneFromSelection}>
-              Clear
-            </Button>
-            {activeAutomationTarget() !== "pitch" && (
-              <FloatingSelect
-                value={selectedAutomationCurve()}
-                options={automationCurveOptions}
-                open={automationCurveSelectOpen()}
-                className={styles.automationCurveSelect}
-                layout="inline"
-                ariaLabel="Aether note automation curve"
-                onOpenChange={setAutomationCurveSelectOpen}
-                onChange={setAutomationCurve}
-              />
-            )}
-          </div>
-          {activeAutomationTarget() === "pitch" ? (
-            <div class={styles.automationValueEditor}>
-              <span>Pitch uses note curve handles</span>
+        {props.showAutomation && (
+          <div class={styles.automationPanel} aria-label="Aether note automation lanes">
+            <div class={styles.automationHeader}>
+              <span>Aether lanes</span>
+              <span>{aetherNoteAutomationTargetLabel(activeAutomationTarget())} · {selectedAutomationSummary()}</span>
             </div>
-          ) : (
-            <div class={styles.automationValueEditor}>
+            <div
+              class={styles.automationEffectiveBadge}
+              data-tone={selectedAutomationEffective().tone}
+              title={selectedAutomationEffective().detail}
+            >
+              <span>{selectedAutomationEffective().label}</span>
+              <span>{selectedAutomationEffective().detail}</span>
+            </div>
+            <div class={styles.automationTargets} role="radiogroup" aria-label="Aether note automation target">
+              {AETHER_NOTE_AUTOMATION_TARGETS.map((target) => (
+                <Button
+                  size="xs"
+                  selected={activeAutomationTarget() === target.target}
+                  aria-label={`${target.label} automation lane`}
+                  onClick={() => setActiveAutomationTarget(target.target)}
+                >
+                  {target.label}
+                </Button>
+              ))}
+            </div>
+            <div class={styles.automationActions}>
+              <Button size="xs" disabled={selected().length === 0} onClick={addAutomationLaneToSelection}>
+                Add lane
+              </Button>
+              <Button size="xs" disabled={selected().length === 0} onClick={clearAutomationLaneFromSelection}>
+                Clear
+              </Button>
+              {activeAutomationTarget() !== "pitch" && (
+                <FloatingSelect
+                  value={selectedAutomationCurve()}
+                  options={automationCurveOptions}
+                  open={automationCurveSelectOpen()}
+                  className={styles.automationCurveSelect}
+                  layout="inline"
+                  ariaLabel="Aether note automation curve"
+                  onOpenChange={setAutomationCurveSelectOpen}
+                  onChange={setAutomationCurve}
+                />
+              )}
+            </div>
+            {activeAutomationTarget() === "pitch" ? (
+              <div class={styles.automationValueEditor}>
+                <span>Pitch uses note curve handles</span>
+              </div>
+            ) : (
+              <div class={styles.automationValueEditor}>
               <label>
                 <span>Start</span>
                 <input
@@ -1789,9 +1809,10 @@ export function PianoRoll(props: PianoRollProps) {
                   )}
                 </For>
               </div>
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       {(() => {
         const currentNoteMenu = noteMenu();
@@ -1907,24 +1928,30 @@ function NoteMenu({
   canCopy: boolean;
   canPaste: boolean;
 }) {
+  const runMenuAction = (event: MouseEvent, action: () => void) => {
+    event.preventDefault();
+    event.stopPropagation();
+    action();
+  };
+
   return createPortal(
     <FloatingLayer class={styles.noteMenu} x={x} y={y} role="menu">
-      <button type="button" class={styles.noteMenuItem} onClick={onVolume} role="menuitem">
+      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onVolume)} role="menuitem">
         Volume
       </button>
-      <button type="button" class={styles.noteMenuItem} onClick={onConnect} role="menuitem">
+      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onConnect)} role="menuitem">
         Connect To
       </button>
-      <button type="button" class={styles.noteMenuItem} onClick={onCurve} role="menuitem">
+      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onCurve)} role="menuitem">
         Curve To…
       </button>
-      <button type="button" class={styles.noteMenuItem} onClick={onCopy} disabled={!canCopy} role="menuitem">
+      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onCopy)} disabled={!canCopy} role="menuitem">
         Copy
       </button>
-      <button type="button" class={styles.noteMenuItem} onClick={onPaste} disabled={!canPaste} role="menuitem">
+      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onPaste)} disabled={!canPaste} role="menuitem">
         Paste
       </button>
-      <button type="button" class={styles.noteMenuItem} onClick={onDelete} role="menuitem">
+      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onDelete)} role="menuitem">
         Delete
       </button>
     </FloatingLayer>,
@@ -1947,12 +1974,18 @@ function GridMenu({
   onCopy: () => void;
   onPaste: () => void;
 }) {
+  const runMenuAction = (event: MouseEvent, action: () => void) => {
+    event.preventDefault();
+    event.stopPropagation();
+    action();
+  };
+
   return createPortal(
     <FloatingLayer class={styles.noteMenu} x={x} y={y} role="menu">
-      <button type="button" class={styles.noteMenuItem} onClick={onCopy} disabled={!canCopy} role="menuitem">
+      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onCopy)} disabled={!canCopy} role="menuitem">
         Copy
       </button>
-      <button type="button" class={styles.noteMenuItem} onClick={onPaste} disabled={!canPaste} role="menuitem">
+      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onPaste)} disabled={!canPaste} role="menuitem">
         Paste
       </button>
     </FloatingLayer>,

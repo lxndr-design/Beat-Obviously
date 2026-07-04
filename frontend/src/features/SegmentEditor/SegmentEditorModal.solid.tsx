@@ -62,6 +62,10 @@ type MidiLikePayload = Extract<Segment["payload"], { kind: "midi" | "mixed" }>;
 type DrumPayload = Extract<Segment["payload"], { kind: "drum" }>;
 type AudioPayload = Extract<Segment["payload"], { kind: "audio" }>;
 
+// Keep the default MIDI modal focused on piano-roll editing. Aether arrangement
+// automation needs a separate opt-in surface instead of living under every MIDI clip.
+const SHOW_SEGMENT_AUTOMATION_PANEL = false;
+
 export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const source = createStoreSelector(useProjectStore, () => selectSegment(props.segmentId));
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
@@ -564,6 +568,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
               onPreviewNote={previewNote}
             />
 
+            {SHOW_SEGMENT_AUTOMATION_PANEL && (
             <div class={styles.automationPanel} aria-label="Aether segment automation lanes">
               <div class={styles.automationHeader}>
                 <span>Aether segment lanes</span>
@@ -788,6 +793,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                 </For>
               </div>
             </div>
+            )}
           </>
         </Show>
 

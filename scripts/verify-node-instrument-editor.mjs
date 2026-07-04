@@ -17,18 +17,25 @@ const EXPECTED_NODE_KINDS = [
   "oscillatorMerge",
   "noise",
   "mixer",
+  "panWidth",
   "filter",
   "gain",
   "unison",
   "constant",
   "cvScale",
+  "cvCombiner",
+  "gateTrigger",
   "velocity",
   "keytrack",
   "modWheel",
+  "midiControl",
   "macro",
   "random",
   "lfo",
+  "wavetableLfo",
   "envelope",
+  "drive",
+  "resonator",
   "shaper",
   "distortion",
   "delay",
@@ -38,8 +45,19 @@ const EXPECTED_NODE_KINDS = [
   "flanger",
   "compressor",
   "bitcrush",
+  "meterScope",
   "output",
 ];
+
+const HIDDEN_COMPATIBILITY_NODE_KINDS = new Set([
+  "oscillatorMerge",
+  "shaper",
+  "distortion",
+  "modWheel",
+]);
+
+const EXPECTED_BROWSER_NODE_KINDS = EXPECTED_NODE_KINDS
+  .filter((kind) => kind !== "output" && !HIDDEN_COMPATIBILITY_NODE_KINDS.has(kind));
 
 const RELEASE_RULE_COVERED_NODE_KINDS = new Set(EXPECTED_NODE_KINDS);
 
@@ -468,6 +486,78 @@ try {
   assert.equal(effectPatch.synthPatch.effects.filters[2].params.timeMs, 370);
   assert.equal(effectPatch.synthPatch.effects.filters[2].params.feedback, 41);
   assert.equal(effectPatch.synthPatch.effects.filters[3].params.rateHz, 1.25);
+
+  const expandedCatalogGraph = nodeGraph.createOutputOnlyInstrumentNodeGraph();
+  const catalogOsc = nodeGraph.createInstrumentNode("oscillator", 90, 120, "Catalog Oscillator");
+  const catalogPan = nodeGraph.createInstrumentNode("panWidth", 330, 120, "Pan / Width");
+  const catalogDrive = nodeGraph.createInstrumentNode("drive", 570, 120, "Drive");
+  const catalogResonator = nodeGraph.createInstrumentNode("resonator", 810, 120, "Resonator");
+  const catalogMeter = nodeGraph.createInstrumentNode("meterScope", 1050, 120, "Meter / Scope");
+  const catalogGain = nodeGraph.createInstrumentNode("gain", 1290, 120, "Gain / VCA");
+  const catalogLfo = nodeGraph.createInstrumentNode("wavetableLfo", 90, 380, "Wavetable LFO");
+  const catalogConstant = nodeGraph.createInstrumentNode("constant", 330, 380, "Pan Offset");
+  const catalogCombiner = nodeGraph.createInstrumentNode("cvCombiner", 570, 380, "Pan Mod Combiner");
+  const catalogMidi = nodeGraph.createInstrumentNode("midiControl", 810, 380, "MIDI Control");
+  const catalogGate = nodeGraph.createInstrumentNode("gateTrigger", 1050, 380, "Gate / Trigger");
+  const catalogOutput = expandedCatalogGraph.nodes.find((node) => node.kind === "output");
+  catalogPan.parameters.pan = -0.15;
+  catalogDrive.parameters.mode = "overdrive";
+  catalogDrive.parameters.drive = 0.36;
+  catalogDrive.parameters.mix = 0.44;
+  catalogResonator.parameters.frequency = 660;
+  catalogResonator.parameters.feedback = 0.42;
+  catalogResonator.parameters.mix = 0.31;
+  catalogGain.parameters.level = 0.71;
+  catalogLfo.parameters.amount = 0.2;
+  catalogConstant.parameters.value = 0.25;
+  catalogCombiner.parameters.weightA = 0.5;
+  catalogCombiner.parameters.weightB = 0.4;
+  catalogCombiner.parameters.offset = 0.05;
+  catalogMidi.parameters.amount = 0.12;
+  expandedCatalogGraph.nodes.push(
+    catalogOsc,
+    catalogPan,
+    catalogDrive,
+    catalogResonator,
+    catalogMeter,
+    catalogGain,
+    catalogLfo,
+    catalogConstant,
+    catalogCombiner,
+    catalogMidi,
+    catalogGate,
+  );
+  expandedCatalogGraph.cables.push(
+    cablePatch("catalog-osc-pan", catalogOsc, "audio-out", catalogPan, "audio-in"),
+    cablePatch("catalog-pan-drive", catalogPan, "audio-out", catalogDrive, "audio-in"),
+    cablePatch("catalog-drive-resonator", catalogDrive, "audio-out", catalogResonator, "audio-in"),
+    cablePatch("catalog-resonator-meter", catalogResonator, "audio-out", catalogMeter, "audio-in"),
+    cablePatch("catalog-meter-gain", catalogMeter, "audio-out", catalogGain, "audio-in"),
+    cablePatch("catalog-gain-output", catalogGain, "audio-out", catalogOutput, "audio-in"),
+    cablePatch("catalog-lfo-combiner", catalogLfo, "cv-out", catalogCombiner, "cv-a"),
+    cablePatch("catalog-constant-combiner", catalogConstant, "cv-out", catalogCombiner, "cv-b"),
+    cablePatch("catalog-combiner-pan", catalogCombiner, "cv-out", catalogPan, "pan-cv"),
+    cablePatch("catalog-midi-filter", catalogMidi, "cv-out", catalogDrive, "drive-cv"),
+    cablePatch("catalog-gate-resonator", catalogGate, "gate-out", catalogResonator, "decay-cv"),
+  );
+  const catalogPatch = nodeGraph.compileNodeGraphToInstrumentPatch(expandedCatalogGraph, instrument);
+  assert.equal(catalogPatch.synthPatch.parameters["amp.level"], 0.71, "expanded catalog Gain / VCA should compile into amp level");
+  assert.ok(
+    typeof catalogPatch.synthPatch.parameters["amp.pan"] === "number"
+      && catalogPatch.synthPatch.parameters["amp.pan"] > -0.1
+      && catalogPatch.synthPatch.parameters["amp.pan"] < 0.2,
+    "Pan / Width and CV Combiner should compile into bounded pan behavior",
+  );
+  assert.deepEqual(
+    catalogPatch.synthPatch.effects.filters.map((effect) => effect.kind),
+    ["saturator", "phaser"],
+    "expanded Drive and Resonator nodes should compile into current Aether FX equivalents while Meter / Scope stays pass-through",
+  );
+  assert.ok(
+    catalogPatch.synthPatch.modulation.some((route) => route.source === "lfo.1" && route.target === "amp.pan")
+      && catalogPatch.synthPatch.modulation.some((route) => route.source === "modWheel" && route.target === "filter.drive") === false,
+    "Wavetable LFO should compile as a dynamic modulation source and unsupported FX CV should remain harmless",
+  );
   assert.equal(effectPatch.synthPatch.effects.filters[3].params.depthMs, 13);
   assert.equal(effectPatch.synthPatch.effects.filters[4].params.roomSize, 66);
   assert.equal(effectPatch.synthPatch.effects.filters[4].params.damping, 44);
@@ -844,8 +934,13 @@ function assertNodeReleaseRules(nodeGraph) {
   assert.equal(groupedNodeKinds.includes("output"), false, "Instrument Out is protected and must not be user-creatable from the browser");
   assert.deepEqual(
     [...groupedNodeKinds].sort(),
-    EXPECTED_NODE_KINDS.filter((kind) => kind !== "output").sort(),
-    "Every non-output node must appear exactly once in the grouped node browser",
+    EXPECTED_BROWSER_NODE_KINDS.sort(),
+    "Every current catalog node must appear exactly once in the grouped node browser while hidden compatibility aliases stay out",
+  );
+  assert.deepEqual(
+    EXPECTED_NODE_KINDS.filter((kind) => !groupedNodeKinds.includes(kind) && kind !== "output").sort(),
+    [...HIDDEN_COMPATIBILITY_NODE_KINDS].sort(),
+    "Only documented compatibility aliases should be hidden from the Nodemap browser",
   );
 
   assert.deepEqual(
@@ -876,12 +971,20 @@ function assertNodeReleaseRules(nodeGraph) {
   assert.deepEqual(
     declaredControlInputs,
     [
+      "cvCombiner.cv-a",
+      "cvCombiner.cv-b",
+      "cvCombiner.cv-c",
       "cvScale.cv-in",
+      "drive.drive-cv",
+      "drive.mix-cv",
+      "drive.tone-cv",
       "filter.cutoff-cv",
       "filter.drive-cv",
       "filter.resonance-cv",
       "gain.level-cv",
       "gain.pan-cv",
+      "gateTrigger.gate-in",
+      "gateTrigger.trigger-in",
       "instrument.level-cv",
       "instrument.pitch",
       "noise.level-cv",
@@ -889,10 +992,17 @@ function assertNodeReleaseRules(nodeGraph) {
       "oscillator.pan-cv",
       "oscillator.pitch",
       "oscillator.position-cv",
+      "panWidth.pan-cv",
+      "panWidth.width-cv",
+      "resonator.decay-cv",
+      "resonator.mix-cv",
+      "resonator.pitch-cv",
       "unison.detune-cv",
       "unison.spread-cv",
+      "wavetableLfo.position-cv",
+      "wavetableLfo.reset",
     ],
-    "Nodemap should expose explicit CV-input targets for pitch, level, pan, filter, unison, noise, instrument, and CV utility routing",
+    "Nodemap should expose explicit CV-input targets for pitch, level, pan, filter, unison, noise, instrument, utility, gate, and catalog routing",
   );
 
   for (const kind of EXPECTED_NODE_KINDS) {

@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "so
 import { previewFrequency, renderAetherOutputPreviewSamples, renderedInstrumentBuffer } from "../../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../../audio/synthWorkletPreview";
 import { Button, FloatingSelect, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, Select, Slider, TextInput } from "../../../solid-ui";
+import { useContextualHotkey } from "../../../solid-utils/contextualHotkeys.solid";
 import { createStoreSelector } from "../../../solid-utils/store";
 import {
   createTrackEffect,
@@ -16,10 +17,10 @@ import {
   type EffectParamSpec,
 } from "../../../state/effects";
 import {
+  FACTORY_SYNTH_PRESETS,
   MACRO_IDS,
   getEnvelopeCurveParam,
   getNumberParam,
-  macroAssignmentsForId,
   macroConflictDetailsForId,
   macroConflictSummaryForId,
   macroDefinitionForId,
@@ -38,6 +39,7 @@ import {
   type ModulationTargetId,
   type SynthDraftPatch,
   type SynthExpressionActivity,
+  type SynthFactoryPresetRecord,
   type SynthModulationSourceEditorTarget,
   type SynthParameterId,
 } from "../../../state/synthStore";
@@ -49,12 +51,13 @@ import {
   instrumentTaxonomyOptionsForCategory,
   taxonomyAssignmentForInstrumentId,
 } from "../../../state/instrumentTaxonomy";
-import type { EnvelopeCurve, TrackEffect } from "../../../state/types";
+import type { EnvelopeCurve, Instrument, TrackEffect } from "../../../state/types";
 import { ModulationMatrix } from "../ModulationMatrix/ModulationMatrix.solid";
 import { OscillatorPanel } from "../OscillatorPanel/OscillatorPanel.solid";
 import styles from "./SynthEditor.module.css";
 
 const AUDITION_SECONDS = 1.4;
+const MAX_AUDITION_SECONDS = 4.25;
 const ANALYZER_BANDS = ANALYZER_BAND_COUNT;
 const FILTER_TYPES = [
   ["lowpass", "LP", "Lowpass", "ph:wave-sine"],
@@ -73,6 +76,27 @@ const LFO_SHAPES = [
   ["saw", "Saw", "ph:wave-sawtooth"],
   ["square", "Square", "ph:wave-square"],
 ] as const;
+
+function performanceSourceForSummaryId(id: string): ModulationSourceId | undefined {
+  if (id === "velocity") return "velocity";
+  if (id === "keytrack") return "keytrack";
+  if (id === "mod-wheel") return "modWheel";
+  return undefined;
+}
+
+function auditionSecondsForInstrument(instrument: Instrument): number {
+  const attack = Math.max(0, (instrument.envelope.attackMs ?? 0) / 1000);
+  const decay = Math.max(0, (instrument.envelope.decayMs ?? 0) / 1000);
+  const sustain = Math.max(0, Math.min(1, instrument.envelope.sustain ?? 0));
+  const release = Math.max(0, (instrument.envelope.releaseMs ?? 0) / 1000);
+  if (sustain <= 0.04) {
+    return Math.max(0.65, Math.min(MAX_AUDITION_SECONDS, attack + decay + release + 0.18));
+  }
+  if (attack >= 0.65 || release >= 1.5) {
+    return Math.min(MAX_AUDITION_SECONDS, Math.max(AUDITION_SECONDS, attack + 1.2));
+  }
+  return AUDITION_SECONDS;
+}
 const LFO_SYNC_RATES = [
   ["1/1", "1/1", "Whole note", "ph:metronome"],
   ["1/2", "1/2", "Half note", "ph:metronome"],
@@ -81,7 +105,6 @@ const LFO_SYNC_RATES = [
   ["1/16", "1/16", "Sixteenth note", "ph:metronome"],
   ["1/32", "1/32", "Thirty-second note", "ph:metronome"],
 ] as const;
-
 interface AuditionHandle {
   node: AudioNode;
   stop: (when?: number) => void;
@@ -89,6 +112,7 @@ interface AuditionHandle {
 
 export interface SynthEditorProps {
   instrumentId?: string;
+  hotkeyScopeId?: string;
 }
 
 export function SynthEditor(props: SynthEditorProps) {
@@ -115,6 +139,7 @@ export function SynthEditor(props: SynthEditorProps) {
 
   const [taxonomyTypeOpen, setTaxonomyTypeOpen] = createSignal(false);
   const [taxonomyNameOpen, setTaxonomyNameOpen] = createSignal(false);
+  const [importPresetOpen, setImportPresetOpen] = createSignal(false);
   const [auditioning, setAuditioning] = createSignal(false);
   const [focusedSourceTarget, setFocusedSourceTarget] = createSignal<SynthModulationSourceEditorTarget | null>(null);
   const [expressionActivity, setExpressionActivity] = createSignal<SynthExpressionActivity | null>(null);
@@ -125,6 +150,25 @@ export function SynthEditor(props: SynthEditorProps) {
     return id ? liveExpressionActivities()[id] ?? null : null;
   });
   const analyzerWaveform = createMemo(() => renderAetherOutputPreviewSamples(synthDraftToPreviewInstrument(draft()), 320, "mix"));
+  const importPresetOptions = createMemo(() => FACTORY_SYNTH_PRESETS);
+  const hotkeyScopeId = () => props.hotkeyScopeId ?? (props.instrumentId ? `synth-editor-${props.instrumentId}` : "synth-editor");
+
+  useContextualHotkey(hotkeyScopeId, "space", () => {
+    const target = document.activeElement as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "BUTTON" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable ||
+        target.closest("button, select, [role='button'], [role='menuitem'], [data-native-keyboard-control]"))
+    ) {
+      return false;
+    }
+    void onAudition();
+    return true;
+  });
 
   createEffect(() => {
     const id = props.instrumentId;
@@ -206,6 +250,7 @@ export function SynthEditor(props: SynthEditorProps) {
     if (ctx.state === "suspended") void ctx.resume().catch(() => undefined);
 
     const instrument = synthDraftToPreviewInstrument(options.patch ?? draft());
+    const auditionSeconds = auditionSecondsForInstrument(instrument);
     const bpm = useProjectStore.getState().project.bpm;
     const frequency = previewFrequency(instrument);
     setExpressionActivity({
@@ -234,7 +279,7 @@ export function SynthEditor(props: SynthEditorProps) {
       }
     };
 
-    const worklet = await createSynthWorkletPreviewNode(ctx, instrument, AUDITION_SECONDS, frequency, () => {
+    const worklet = await createSynthWorkletPreviewNode(ctx, instrument, auditionSeconds, frequency, () => {
       if (handle) finishAudition(handle.node);
     }, { bpm }).catch(() => null);
     if (worklet) {
@@ -243,7 +288,7 @@ export function SynthEditor(props: SynthEditorProps) {
         stop: () => worklet.stop(),
       };
     } else {
-      const buffer = renderedInstrumentBuffer(ctx, instrument, AUDITION_SECONDS, frequency, undefined, bpm);
+      const buffer = renderedInstrumentBuffer(ctx, instrument, auditionSeconds, frequency, undefined, bpm);
       const left = buffer.getChannelData(0);
       const right = buffer.getChannelData(1);
       seedAnalyzerFromSamples(mixStereoToMono(left, right));
@@ -264,7 +309,7 @@ export function SynthEditor(props: SynthEditorProps) {
     nextGain.gain.value = 0;
     nextGain.gain.setValueAtTime(0, ctx.currentTime);
     nextGain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 0.015);
-    nextGain.gain.setTargetAtTime(0, ctx.currentTime + Math.max(0.05, AUDITION_SECONDS - 0.08), 0.03);
+    nextGain.gain.setTargetAtTime(0, ctx.currentTime + Math.max(0.05, auditionSeconds - 0.08), 0.03);
     handle.node.connect(nextGain).connect(analyser).connect(ctx.destination);
     audition = handle;
     gain = nextGain;
@@ -272,7 +317,7 @@ export function SynthEditor(props: SynthEditorProps) {
     setAuditioning(true);
     if (handle.node instanceof AudioBufferSourceNode) {
       handle.node.start();
-      handle.node.stop(ctx.currentTime + AUDITION_SECONDS);
+      handle.node.stop(ctx.currentTime + auditionSeconds);
     } else if (!seededAnalyzer) {
       publishAnalyzerSnapshot(createEmptyAnalyzerSnapshot());
     }
@@ -369,6 +414,11 @@ export function SynthEditor(props: SynthEditorProps) {
     else closeEditor({ kind: "synth" });
   }
 
+  function onCancelInstrument() {
+    if (props.instrumentId) closeEditor({ kind: "synthInstrument", instrumentId: props.instrumentId });
+    else closeEditor({ kind: "synth" });
+  }
+
   function setInstrumentTaxonomyById(instrumentId: string) {
     const taxonomy = taxonomyAssignmentForInstrumentId(instrumentId);
     if (!taxonomy) return;
@@ -386,6 +436,13 @@ export function SynthEditor(props: SynthEditorProps) {
     const firstInstrumentId = firstInstrumentTaxonomyIdForCategory(categoryId);
     if (!firstInstrumentId) return;
     setInstrumentTaxonomyById(firstInstrumentId);
+  }
+
+  function importFactoryPreset(preset: SynthFactoryPresetRecord) {
+    setDraft(preset.patch);
+    setImportPresetOpen(false);
+    setTaxonomyTypeOpen(false);
+    setTaxonomyNameOpen(false);
   }
 
   function focusModulationSourceEditor(source: ModulationSourceId) {
@@ -410,14 +467,11 @@ export function SynthEditor(props: SynthEditorProps) {
     <div class={`ds-editor-shell ds-fill ${styles.shell}`} role="region" aria-label="Aether engine">
       <div ref={bodyRef} class={`ds-editor-body ds-scroll ${styles.body}`}>
         <section
-          class={`ds-panel ${focusedSourceTarget() === "performance" ? styles.sourceFocus : ""}`}
+          class={`${styles.majorSection} ${styles.identitySection} ${focusedSourceTarget() === "performance" ? styles.sourceFocus : ""}`}
           aria-label="Synth identity"
           data-synth-source-editor="performance"
         >
-          <header class="ds-panel-header">
-            <div class="ds-panel-title">Instrument Details - Aether Engine</div>
-          </header>
-          <div class={`ds-panel-body ${styles.identityBody}`}>
+          <div class={styles.identityBody}>
             <InstrumentOutputPreview
               samples={analyzerWaveform()}
               playing={auditioning()}
@@ -433,9 +487,34 @@ export function SynthEditor(props: SynthEditorProps) {
                   onInput={(event) => setName(event.currentTarget.value)}
                 />
               </div>
-              <Button size="xs" variant="ghost" className={styles.importPresetButton}>
-                Import Preset
-              </Button>
+              <div class={styles.importPresetWrap}>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  className={styles.importPresetButton}
+                  aria-expanded={importPresetOpen() ? "true" : "false"}
+                  onClick={() => setImportPresetOpen((open) => !open)}
+                >
+                  Import Preset
+                </Button>
+                <Show when={importPresetOpen()}>
+                  <div class={styles.importPresetMenu} role="menu" aria-label="Factory Aether presets">
+                    <For each={importPresetOptions()}>
+                      {(preset) => (
+                        <button
+                          type="button"
+                          class={styles.importPresetItem}
+                          role="menuitem"
+                          onClick={() => importFactoryPreset(preset)}
+                        >
+                          <span class={styles.importPresetName}>{preset.name}</span>
+                          <span class={styles.importPresetMeta}>{preset.family} / {preset.role}</span>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </div>
               <div class={styles.taxonomyControls}>
                 <FloatingSelect
                   label="Category"
@@ -467,9 +546,15 @@ export function SynthEditor(props: SynthEditorProps) {
                       class={styles.expressionSummaryItem}
                       data-active={item.active ? "true" : "false"}
                       data-live={item.live ? "true" : "false"}
+                      data-synth-source-id={performanceSourceForSummaryId(item.id)}
                       data-mesh-variant={meshTintVariantFor(item.id)}
                       title={`${item.label}: ${item.value} - ${item.detail}`}
                     >
+                      <Show when={performanceSourceForSummaryId(item.id)}>
+                        <span class={styles.sourcePickAnchor} data-synth-pick-anchor aria-hidden="true">
+                          <Icon name="ph:plug" size={12} decorative />
+                        </span>
+                      </Show>
                       <span class={styles.expressionSummaryLabel}>
                         {item.label}
                         <HoverInfo content={item.detail}>
@@ -508,16 +593,23 @@ export function SynthEditor(props: SynthEditorProps) {
       </div>
 
       <footer class={`ds-action-footer ${styles.footer}`}>
-        <Button className={styles.footerButton} variant="ghost" selected={auditioning()} onClick={() => void onAudition()}>
-          <Icon name={auditioning() ? "ph:stop-fill" : "ph:play-fill"} size={12} decorative />
-          {auditioning() ? "Stop" : "Play"}
-        </Button>
-        <Button className={styles.footerButton} onClick={() => void onApply()}>
-          Apply
-        </Button>
-        <Button className={styles.footerButton} variant="primary" onClick={() => void onSaveInstrument()}>
-          Save
-        </Button>
+        <div class={styles.footerLeft}>
+          <Button className={styles.footerButton} variant="ghost" selected={auditioning()} onClick={() => void onAudition()}>
+            <Icon name={auditioning() ? "ph:stop-fill" : "ph:play-fill"} size={12} decorative />
+            {auditioning() ? "Stop" : "Audition"}
+          </Button>
+        </div>
+        <div class={styles.footerRight}>
+          <Button className={styles.footerButton} variant="ghost" onClick={onCancelInstrument}>
+            Cancel
+          </Button>
+          <Button className={styles.footerButton} onClick={() => void onApply()}>
+            Apply
+          </Button>
+          <Button className={styles.footerButton} variant="primary" onClick={() => void onSaveInstrument()}>
+            Save
+          </Button>
+        </div>
       </footer>
     </div>
   );
@@ -774,16 +866,12 @@ function MacroControlsPanel(props: { focusedSourceTarget?: SynthModulationSource
         <For each={MACRO_IDS}>
           {(id, index) => {
             const definition = () => macroDefinitionForId(draft(), id);
-            const assignments = () => macroAssignmentsForId(draft(), id);
-            const disabled = () => assignments().length === 0;
             const conflict = () => macroConflictSummaryForId(draft(), id);
             const conflictDetails = () => macroConflictDetailsForId(draft(), id);
             return (
               <div
                 class={`${styles.macroCard} ${props.focusedSourceTarget === id ? styles.sourceFocus : ""}`}
                 data-synth-source-editor={id}
-                data-disabled={disabled() ? "true" : "false"}
-                aria-disabled={disabled() ? "true" : "false"}
                 aria-label={`${definition().label} macro control`}
               >
                 <TextInput
@@ -791,7 +879,6 @@ function MacroControlsPanel(props: { focusedSourceTarget?: SynthModulationSource
                   layout="bare"
                   aria-label={`Macro ${index() + 1} name`}
                   value={definition().label}
-                  disabled={disabled()}
                   onInput={(event) => updateMacroDefinition(id, { label: event.currentTarget.value })}
                 />
                 <Knob
@@ -803,9 +890,8 @@ function MacroControlsPanel(props: { focusedSourceTarget?: SynthModulationSource
                   max={1}
                   step={0.01}
                   defaultValue={0}
-                  disabled={disabled()}
                   {...modulationPropsForSource(draft(), id)}
-                  pickSourceId={disabled() ? undefined : id}
+                  pickSourceId={id}
                   formatValue={formatPercent}
                   onChange={(value) => setNumericParameter(id, value)}
                 />
@@ -832,7 +918,6 @@ function MacroControlsPanel(props: { focusedSourceTarget?: SynthModulationSource
                   layout="bare"
                   selectClassName={styles.macroCurveSelect}
                   value={definition().curve}
-                  disabled={disabled()}
                   aria-label={`${definition().label} response curve`}
                   onInput={(event) => updateMacroDefinition(id, { curve: event.currentTarget.value as MacroCurve })}
                 >
@@ -920,11 +1005,9 @@ function describeEffectChain(effects: TrackEffect[]): string {
 
 function LfoPanel(props: { focusedSourceTarget?: SynthModulationSourceEditorTarget | null }) {
   return (
-    <section class={`ds-panel ${styles.lfoPanel}`} aria-label="LFO">
-      <header class="ds-panel-header">
-        <div class="ds-panel-title">LFO</div>
-      </header>
-      <div class={`ds-panel-body ${styles.lfoStack}`}>
+    <section class={`${styles.majorSection} ${styles.lfoPanel}`} aria-label="LFO">
+      <div class={styles.majorSectionTitle}>LFO</div>
+      <div class={styles.lfoStack}>
         <LfoLane lfo={1} focused={props.focusedSourceTarget === "lfo.1"} />
         <LfoLane lfo={2} focused={props.focusedSourceTarget === "lfo.2"} />
       </div>
@@ -958,6 +1041,7 @@ function LfoLane(props: { lfo: 1 | 2; focused?: boolean }) {
       class={`${styles.lfoLane} ${enabled() ? "" : styles.disabledPanel} ${props.focused ? styles.sourceFocus : ""}`}
       aria-label={`LFO ${props.lfo}`}
       data-synth-source-editor={`lfo.${props.lfo}`}
+      data-synth-source-id={`lfo.${props.lfo}`}
     >
       <header class={styles.lfoLaneHeader}>
         <div class={styles.lfoHeaderLeft}>
@@ -971,6 +1055,9 @@ function LfoLane(props: { lfo: 1 | 2; focused?: boolean }) {
           >
             <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={12} decorative />
           </Button>
+          <span class={styles.sourcePickAnchor} data-synth-pick-anchor aria-hidden="true">
+            <Icon name="ph:plug" size={12} decorative />
+          </span>
           <div class={styles.lfoLaneTitle}>LFO {props.lfo}</div>
           <SegmentedIconStrip
             ariaLabel={`LFO ${props.lfo} Shape`}
@@ -982,24 +1069,24 @@ function LfoLane(props: { lfo: 1 | 2; focused?: boolean }) {
         </div>
         <div class={styles.lfoHeaderActions}>
           <Button
-            iconOnly
             size="xs"
-            className={styles.lfoHeaderButton}
+            className={styles.lfoHeaderTextButton}
             selected={oneShot()}
             aria-label={`${oneShot() ? "Disable" : "Enable"} LFO ${props.lfo} one-shot`}
             onClick={() => setBooleanParameter(oneShotId, !oneShot())}
           >
-            <Icon name={oneShot() ? "ph:flag-pennant-fill" : "ph:flag-pennant"} size={12} decorative />
+            <Icon name={oneShot() ? "ph:power-fill" : "ph:power"} size={12} decorative />
+            <span>One Shot</span>
           </Button>
           <Button
-            iconOnly
             size="xs"
-            className={styles.lfoHeaderButton}
+            className={styles.lfoHeaderTextButton}
             selected={retrigger()}
             aria-label={`${retrigger() ? "Disable" : "Enable"} LFO ${props.lfo} retrigger`}
             onClick={() => setBooleanParameter(retriggerId, !retrigger())}
           >
-            <Icon name={retrigger() ? "ph:arrow-counter-clockwise-fill" : "ph:arrow-counter-clockwise"} size={12} decorative />
+            <Icon name={retrigger() ? "ph:power-fill" : "ph:power"} size={12} decorative />
+            <span>Retrigger</span>
           </Button>
         </div>
       </header>
@@ -1032,13 +1119,12 @@ function LfoLane(props: { lfo: 1 | 2; focused?: boolean }) {
               />
             }
           >
-            <SegmentedIconStrip
+            <SegmentedTextStrip
               ariaLabel={`LFO ${props.lfo} Sync Rate`}
               value={String(draft().parameters[syncedRateId] ?? (props.lfo === 1 ? "1/4" : "1/2"))}
               options={LFO_SYNC_RATES}
               onChange={(value) => setParameter(syncedRateId, value)}
             />
-            <span class={styles.lfoSyncValue}>{String(draft().parameters[syncedRateId] ?? (props.lfo === 1 ? "1/4" : "1/2"))}</span>
           </Show>
         </div>
         <div class={styles.lfoKnobBlock}>
@@ -1108,7 +1194,42 @@ function SegmentedIconStrip(props: {
                 className={styles.segmentedIconButton}
                 onClick={() => props.onChange(optionValue)}
               >
-                <Icon name={icon} size={14} decorative />
+                <Icon name={icon} size={12} decorative />
+              </Button>
+            </HoverInfo>
+          );
+        }}
+      </For>
+    </div>
+  );
+}
+
+function SegmentedTextStrip(props: {
+  ariaLabel: string;
+  value: string;
+  options: ReadonlyArray<readonly [string, string, string] | readonly [string, string, string, string]>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div class={styles.segmentedTextStrip} role="radiogroup" aria-label={props.ariaLabel}>
+      <For each={props.options}>
+        {(option) => {
+          const [optionValue, shortLabel, fullLabelOrIcon, maybeIcon] = option;
+          const fullLabel = maybeIcon ? fullLabelOrIcon : shortLabel;
+          const active = () => props.value === optionValue;
+          return (
+            <HoverInfo content={fullLabel}>
+              <Button
+                size="xs"
+                variant="ghost"
+                selected={active()}
+                role="radio"
+                aria-checked={active()}
+                aria-label={fullLabel}
+                className={styles.segmentedTextButton}
+                onClick={() => props.onChange(optionValue)}
+              >
+                {shortLabel}
               </Button>
             </HoverInfo>
           );
@@ -1135,25 +1256,24 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
 
   return (
     <section
-      class={`ds-panel ${filterEnabled() ? "" : styles.disabledPanel} ${props.focusedSourceTarget === "env.1" || props.focusedSourceTarget === "env.2" ? styles.sourceFocus : ""}`}
+      class={`${styles.majorSection} ${filterEnabled() ? "" : styles.disabledPanel} ${props.focusedSourceTarget === "env.1" || props.focusedSourceTarget === "env.2" ? styles.sourceFocus : ""}`}
       aria-label="Amp and filter"
       data-synth-source-editor={props.focusedSourceTarget === "env.1" || props.focusedSourceTarget === "env.2" ? props.focusedSourceTarget : undefined}
     >
-      <header class="ds-panel-header">
-        <div class="ds-panel-title">Envelopes</div>
-        <div class="ds-panel-actions">
-          <Button
-            iconOnly
-            size="xs"
-            selected={filterEnabled()}
-            aria-label={`${filterEnabled() ? "Disable" : "Enable"} filter`}
-            onClick={() => setBooleanParameter("filter.enabled", !filterEnabled())}
-          >
-            <Icon name={filterEnabled() ? "ph:power-fill" : "ph:power"} size={12} decorative />
-          </Button>
-        </div>
-      </header>
-      <div class={`ds-panel-body ${styles.ampFilterBody}`}>
+      <div class={styles.ampFilterRibbon}>
+        <Button
+          iconOnly
+          size="xs"
+          selected={filterEnabled()}
+          className={styles.ampFilterPowerButton}
+          aria-label={`${filterEnabled() ? "Disable" : "Enable"} AMP/Filter`}
+          onClick={() => setBooleanParameter("filter.enabled", !filterEnabled())}
+        >
+          <Icon name={filterEnabled() ? "ph:power-fill" : "ph:power"} size={12} decorative />
+        </Button>
+        <div class={styles.ampFilterRibbonTitle}>AMP/Filter</div>
+      </div>
+      <div class={styles.ampFilterBody}>
         <div class={styles.envelopeCards}>
           <For each={["env.1", "env.2"] as const}>
             {(source) => (
@@ -1285,15 +1405,45 @@ function EnvelopeEditorCard(props: {
 }) {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const envelope = createMemo(() => synthEnvelopeEditorSummary(draft(), props.source));
+  const updateModulationRoute = useSynthStore.getState().updateModulationRoute;
+  const addModulationRoute = useSynthStore.getState().addModulationRoute;
+  const envelopeTargetAmount = (target: ModulationTargetId) =>
+    draft()
+      .modulation
+      .filter((route) => route.enabled && route.source === props.source && route.target === target)
+      .reduce((sum, route) => sum + route.amount, 0);
+  const setEnvelopeTargetAmount = (target: ModulationTargetId, amount: number) => {
+    const nextAmount = snap01(amount);
+    const route = draft().modulation.find((candidate) => candidate.source === props.source && candidate.target === target);
+    if (route) {
+      updateModulationRoute(route.id, {
+        amount: nextAmount,
+        enabled: nextAmount > 0,
+        bipolar: false,
+      });
+      return;
+    }
+    addModulationRoute({
+      source: props.source,
+      target,
+      amount: nextAmount,
+      bipolar: false,
+      enabled: nextAmount > 0,
+    });
+  };
 
   return (
     <div
       class={styles.envelopeCard}
       data-synth-source-editor={props.source}
+      data-synth-source-id={props.source}
       data-aether-envelope-editor={props.source}
       data-active={props.active ? "true" : "false"}
     >
       <div class={styles.envelopeCardHeader}>
+        <span class={styles.sourcePickAnchor} data-synth-pick-anchor aria-hidden="true">
+          <Icon name="ph:plug" size={12} decorative />
+        </span>
         <strong>{envelope().label}</strong>
       </div>
       <EnvelopeHandleEditor
@@ -1301,41 +1451,29 @@ function EnvelopeEditorCard(props: {
         onChange={props.onChange}
       />
       <div class={styles.envelopeTimingRow}>
-        <span>Atk {formatSeconds(getNumberParam(draft(), `${props.source}.attack` as SynthParameterId))}</span>
-        <span>Dec {formatSeconds(getNumberParam(draft(), `${props.source}.decay` as SynthParameterId))}</span>
-        <span>Rel {formatSeconds(getNumberParam(draft(), `${props.source}.release` as SynthParameterId))}</span>
-        <span>S {formatPercent(getNumberParam(draft(), `${props.source}.sustain` as SynthParameterId))}</span>
+        <EnvelopeTimingInput source={props.source} parameter="attack" label="Atk" unit="ms" onChange={props.onChange} />
+        <EnvelopeTimingInput source={props.source} parameter="decay" label="Dec" unit="ms" onChange={props.onChange} />
+        <EnvelopeTimingInput source={props.source} parameter="release" label="Rel" unit="ms" onChange={props.onChange} />
+        <EnvelopeTimingInput source={props.source} parameter="sustain" label="S" unit="" onChange={props.onChange} />
       </div>
       <div class={styles.envelopeEditorControls}>
         <div class={styles.envelopeKnobs}>
-          <Knob
-            size="sm"
-            label="Cutoff"
-            value={getNumberParam(draft(), "filter.cutoff")}
-            min={20}
-            max={20000}
-            step={10}
-            unit="Hz"
-            defaultValue={18000}
-            formatValue={(value) => Math.round(value).toString()}
-            onChange={(value) => props.onChange("filter.cutoff", value)}
-          />
           <For each={[
-            ["filter.resonance", "Res", 0.1],
-            ["filter.keytrack", "Key", 0],
-            ["filter.drive", "Drive", 0],
-          ] as Array<[SynthParameterId, string, number]>}>
-            {([id, label, defaultValue]) => (
+            ["filter.cutoff", "Cut Amt"],
+            ["filter.resonance", "Res Amt"],
+            ["filter.drive", "Drive Amt"],
+          ] as Array<[ModulationTargetId, string]>}>
+            {([target, label]) => (
               <Knob
                 size="sm"
                 label={label}
-                value={getNumberParam(draft(), id)}
+                value={envelopeTargetAmount(target)}
                 min={0}
                 max={1}
                 step={0.01}
-                defaultValue={defaultValue}
+                defaultValue={0}
                 formatValue={formatPercent}
-                onChange={(value) => props.onChange(id, value)}
+                onChange={(value) => setEnvelopeTargetAmount(target, value)}
               />
             )}
           </For>
@@ -1357,6 +1495,44 @@ function EnvelopeEditorCard(props: {
         </div>
       </div>
     </div>
+  );
+}
+
+function EnvelopeTimingInput(props: {
+  source: "env.1" | "env.2";
+  parameter: "attack" | "decay" | "release" | "sustain";
+  label: string;
+  unit: "ms" | "";
+  onChange: (id: SynthParameterId, value: number) => void;
+}) {
+  const draft = createStoreSelector(useSynthStore, (state) => state.draft);
+  const id = createMemo(() => `${props.source}.${props.parameter}` as SynthParameterId);
+  const isSustain = createMemo(() => props.parameter === "sustain");
+  const displayValue = createMemo(() => {
+    const value = getNumberParam(draft(), id());
+    return isSustain() ? Math.round(value * 100) : Math.round(value * 1000);
+  });
+  const handleChange = (value: number) => {
+    props.onChange(id(), isSustain() ? value / 100 : value / 1000);
+  };
+
+  return (
+    <span class={styles.envelopeTimingField}>
+      <span class={styles.envelopeTimingLabel}>{props.label}</span>
+      <NumberInput
+        layout="bare"
+        value={displayValue()}
+        min={0}
+        max={isSustain() ? 100 : 30000}
+        step={isSustain() ? 1 : 1}
+        unit={props.unit}
+        maxLength={isSustain() ? 3 : 5}
+        ariaLabel={`${props.source === "env.1" ? "Amp envelope" : "Mod envelope"} ${props.label}`}
+        className={styles.envelopeTimingNumber}
+        inputClassName={styles.envelopeTimingInput}
+        onChange={handleChange}
+      />
+    </span>
   );
 }
 

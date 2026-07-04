@@ -26,6 +26,7 @@ import {
   type FileAssetPolicy,
   type MemoryCachePreset,
   type StartupProjectBehavior,
+  type ThemeContrastLevel,
 } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
 import styles from "./PreferencesModal.module.css";
@@ -44,6 +45,7 @@ export function PreferencesModal() {
   const [assetPolicyOpen, setAssetPolicyOpen] = createSignal(false);
   const [memoryOpen, setMemoryOpen] = createSignal(false);
   const [startupOpen, setStartupOpen] = createSignal(false);
+  const [contrastOpen, setContrastOpen] = createSignal(false);
   const [deviceSnapshot, setDeviceSnapshot] = createSignal<AudioDeviceSnapshot | null>(null);
   const [deviceStatus, setDeviceStatus] = createSignal("");
   const [exportStatus, setExportStatus] = createSignal("");
@@ -94,6 +96,7 @@ export function PreferencesModal() {
     setAssetPolicyOpen(false);
     setMemoryOpen(false);
     setStartupOpen(false);
+    setContrastOpen(false);
     setModelOpen(false);
   }
 
@@ -200,17 +203,16 @@ export function PreferencesModal() {
         <div class={styles.tabs} role="tablist" aria-label="Preferences sections">
           <For each={PREFERENCE_TABS}>
             {(tab) => (
-              <Button
-                variant="ghost"
-                selected={activeTab() === tab.id}
+              <button
+                type="button"
                 role="tab"
                 aria-selected={activeTab() === tab.id}
-                className={styles.tabButton}
+                class={styles.navButton}
+                classList={{ [styles.navButtonActive]: activeTab() === tab.id }}
                 onClick={() => selectTab(tab.id)}
               >
-                <Icon name={tab.icon} size={14} decorative />
                 {tab.label}
-              </Button>
+              </button>
             )}
           </For>
         </div>
@@ -259,8 +261,12 @@ export function PreferencesModal() {
             />
           </Show>
 
-          <Show when={activeTab() === "grid"}>
-            <GridPreferences settings={settings()} />
+          <Show when={activeTab() === "theme"}>
+            <ThemePreferences
+              settings={settings()}
+              contrastOpen={contrastOpen()}
+              setContrastOpen={setContrastOpen}
+            />
           </Show>
 
           <Show when={activeTab() === "ai"}>
@@ -517,47 +523,75 @@ function FilesPreferences(props: FilesPreferencesProps) {
   );
 }
 
-function GridPreferences(props: { settings: SettingsState }) {
+interface ThemePreferencesProps {
+  settings: SettingsState;
+  contrastOpen: boolean;
+  setContrastOpen: (open: boolean) => void;
+}
+
+function ThemePreferences(props: ThemePreferencesProps) {
   return (
-    <section class={styles.section}>
-      <h3 class={styles.sectionTitle}>Grid Snap</h3>
-      <div class={styles.gridRows}>
-        <div class={styles.gridRow}>
-          <Toggle
-            className={styles.gridToggle}
-            labelClassName={styles.gridToggleLabel}
-            label="Timeline snap"
-            checked={props.settings.timelineSmartGrid}
-            onChange={props.settings.setTimelineSmartGrid}
-          />
-          <RadioGroup
-            className={styles.gridRadio}
-            ariaLabel="Timeline smart grid subdivision"
-            value={props.settings.timelineSubdivision}
-            options={SUBDIVISION_OPTIONS}
-            disabled={!props.settings.timelineSmartGrid}
-            onChange={props.settings.setTimelineSubdivision}
+    <>
+      <section class={styles.section}>
+        <h3 class={styles.sectionTitle}>Theme</h3>
+        <div class={styles.settingsGrid}>
+          <FloatingSelect
+            className={styles.fieldSelect}
+            label="Contrast"
+            layout="inline"
+            value={props.settings.themeContrastLevel}
+            ariaLabel="Theme contrast level"
+            options={CONTRAST_LEVEL_OPTIONS}
+            open={props.contrastOpen}
+            onOpenChange={props.setContrastOpen}
+            onChange={(value) => props.settings.setThemeContrastLevel(value as ThemeContrastLevel)}
           />
         </div>
-        <div class={styles.gridRow}>
-          <Toggle
-            className={styles.gridToggle}
-            labelClassName={styles.gridToggleLabel}
-            label="MIDI snap"
-            checked={props.settings.midiSmartGrid}
-            onChange={props.settings.setMidiSmartGrid}
-          />
-          <RadioGroup
-            className={styles.gridRadio}
-            ariaLabel="MIDI smart grid subdivision"
-            value={props.settings.midiSubdivision}
-            options={SUBDIVISION_OPTIONS}
-            disabled={!props.settings.midiSmartGrid}
-            onChange={props.settings.setMidiSubdivision}
-          />
+        <p class={styles.hint}>
+          Normal keeps the current UI balance. Low pushes faint lines and surfaces closer to white. High restores more separation between subtle and strong UI states.
+        </p>
+      </section>
+
+      <section class={styles.section}>
+        <h3 class={styles.sectionTitle}>Grid</h3>
+        <div class={styles.gridRows}>
+          <div class={styles.gridRow}>
+            <Toggle
+              className={styles.gridToggle}
+              labelClassName={styles.gridToggleLabel}
+              label="Arrangement snap"
+              checked={props.settings.timelineSmartGrid}
+              onChange={props.settings.setTimelineSmartGrid}
+            />
+            <RadioGroup
+              className={styles.gridRadio}
+              ariaLabel="Arrangement grid subdivision"
+              value={props.settings.timelineSubdivision}
+              options={SUBDIVISION_OPTIONS}
+              disabled={!props.settings.timelineSmartGrid}
+              onChange={props.settings.setTimelineSubdivision}
+            />
+          </div>
+          <div class={styles.gridRow}>
+            <Toggle
+              className={styles.gridToggle}
+              labelClassName={styles.gridToggleLabel}
+              label="MIDI snap"
+              checked={props.settings.midiSmartGrid}
+              onChange={props.settings.setMidiSmartGrid}
+            />
+            <RadioGroup
+              className={styles.gridRadio}
+              ariaLabel="MIDI grid subdivision"
+              value={props.settings.midiSubdivision}
+              options={SUBDIVISION_OPTIONS}
+              disabled={!props.settings.midiSmartGrid}
+              onChange={props.settings.setMidiSubdivision}
+            />
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
 
@@ -647,13 +681,13 @@ function AiPreferences(props: AiPreferencesProps) {
   );
 }
 
-type PreferenceTab = "audio" | "files" | "grid" | "ai";
+type PreferenceTab = "audio" | "files" | "theme" | "ai";
 
-const PREFERENCE_TABS: Array<{ id: PreferenceTab; label: string; icon: string }> = [
-  { id: "audio", label: "Audio", icon: "ph:speaker-high" },
-  { id: "files", label: "Files", icon: "ph:folder-open" },
-  { id: "grid", label: "Grid", icon: "ph:grid-four" },
-  { id: "ai", label: "AI", icon: "ph:sparkle" },
+const PREFERENCE_TABS: Array<{ id: PreferenceTab; label: string }> = [
+  { id: "audio", label: "Audio" },
+  { id: "files", label: "Files" },
+  { id: "theme", label: "Theme" },
+  { id: "ai", label: "AI" },
 ];
 
 const MODEL_OPTIONS = ["qwen3:4b", "qwen3:8b", "beat-qwen:latest", "beat-instrument-qwen:latest", "beat-midi-qwen:latest"];
@@ -683,6 +717,11 @@ const STARTUP_OPTIONS = [
   { value: "home", label: "Home" },
   { value: "restore-last", label: "Restore last" },
   { value: "new-project", label: "New project" },
+];
+const CONTRAST_LEVEL_OPTIONS: Array<{ value: ThemeContrastLevel; label: string }> = [
+  { value: "low", label: "Low" },
+  { value: "normal", label: "Normal" },
+  { value: "high", label: "High" },
 ];
 const RECENT_PROJECT_OPTIONS = ["4", "8", "12", "16", "24"].map((value) => ({ value, label: value }));
 const SAMPLE_RATE_OPTIONS = [44100, 48000, 88200, 96000, 192000].map((value) => ({

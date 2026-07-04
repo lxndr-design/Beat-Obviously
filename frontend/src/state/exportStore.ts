@@ -24,6 +24,11 @@ export interface ExportPreset {
   updatedAt?: number;
 }
 
+interface ExportPresetOverride {
+  options?: Required<ProjectExportOptions>;
+  includeTail?: boolean;
+}
+
 const USER_EXPORT_PRESETS_KEY = "beat:user-export-presets:v1";
 const EXPORT_PREFERENCES_KEY = "beat:export-preferences:v1";
 
@@ -82,7 +87,9 @@ interface ExportState {
   job: ProjectExportJobStatus | null;
   selectedPresetId: string;
   userPresets: ExportPreset[];
+  presetOverrides: Record<string, ExportPresetOverride>;
   recentDestinations: string[];
+  exportDestinationFolder: string;
   validateBeforeExport: boolean;
   validation: ExportValidationStatus;
   updatedAt: number;
@@ -90,7 +97,9 @@ interface ExportState {
   setSelectedPresetId: (presetId: string) => void;
   saveUserPreset: (name: string, preset: ExportPreset) => string;
   updateUserPreset: (presetId: string, patch: Partial<Pick<ExportPreset, "options" | "includeTail" | "name" | "description">>) => void;
+  updatePresetRenderSettings: (presetId: string, patch: Partial<Pick<ExportPreset, "options" | "includeTail">>) => void;
   deleteUserPreset: (presetId: string) => void;
+  setExportDestinationFolder: (path: string) => void;
   setValidateBeforeExport: (enabled: boolean) => void;
   setValidation: (validation: ExportValidationStatus) => void;
   clearValidation: () => void;
@@ -110,7 +119,9 @@ export const IDLE_EXPORT_VALIDATION: ExportValidationStatus = {
 };
 
 interface ExportPreferencesRecord {
+  presetOverrides: Record<string, ExportPresetOverride>;
   recentDestinations: string[];
+  exportDestinationFolder: string;
   validateBeforeExport: boolean;
 }
 
@@ -120,7 +131,9 @@ export const useExportStore = create<ExportState>((set) => ({
   job: null,
   selectedPresetId: "full-mix-review",
   userPresets: loadUserExportPresets(),
+  presetOverrides: loadExportPreferences().presetOverrides,
   recentDestinations: loadExportPreferences().recentDestinations,
+  exportDestinationFolder: loadExportPreferences().exportDestinationFolder,
   validateBeforeExport: loadExportPreferences().validateBeforeExport,
   validation: IDLE_EXPORT_VALIDATION,
   updatedAt: 0,
@@ -130,7 +143,9 @@ export const useExportStore = create<ExportState>((set) => ({
         ? normalizeRecentDestinations([job.path, ...state.recentDestinations])
         : state.recentDestinations;
       persistExportPreferences({
+        presetOverrides: state.presetOverrides,
         recentDestinations,
+        exportDestinationFolder: state.exportDestinationFolder,
         validateBeforeExport: state.validateBeforeExport,
       });
       return {
@@ -185,6 +200,40 @@ export const useExportStore = create<ExportState>((set) => ({
       persistUserExportPresets(userPresets);
       return { userPresets, updatedAt: now };
     }),
+  updatePresetRenderSettings: (presetId, patch) =>
+    set((state) => {
+      const now = Date.now();
+      const factoryPreset = FACTORY_EXPORT_PRESETS.find((preset) => preset.id === presetId);
+      if (!factoryPreset) {
+        const userPresets = state.userPresets.map((preset) => {
+          if (preset.id !== presetId) return preset;
+          return {
+            ...preset,
+            options: patch.options ? normalizeExportOptions(patch.options) : preset.options,
+            includeTail: patch.includeTail ?? preset.includeTail,
+            updatedAt: now,
+          };
+        });
+        persistUserExportPresets(userPresets);
+        return { userPresets, updatedAt: now };
+      }
+
+      const current = state.presetOverrides[presetId] ?? {};
+      const nextOverrides = {
+        ...state.presetOverrides,
+        [presetId]: {
+          options: patch.options ? normalizeExportOptions(patch.options) : current.options,
+          includeTail: patch.includeTail ?? current.includeTail,
+        },
+      };
+      persistExportPreferences({
+        presetOverrides: nextOverrides,
+        recentDestinations: state.recentDestinations,
+        exportDestinationFolder: state.exportDestinationFolder,
+        validateBeforeExport: state.validateBeforeExport,
+      });
+      return { presetOverrides: nextOverrides, updatedAt: now };
+    }),
   deleteUserPreset: (presetId) =>
     set((state) => {
       const userPresets = state.userPresets.filter((preset) => preset.id !== presetId);
@@ -198,10 +247,23 @@ export const useExportStore = create<ExportState>((set) => ({
   setValidateBeforeExport: (enabled) =>
     set((state) => {
       persistExportPreferences({
+        presetOverrides: state.presetOverrides,
         recentDestinations: state.recentDestinations,
+        exportDestinationFolder: state.exportDestinationFolder,
         validateBeforeExport: enabled,
       });
       return { validateBeforeExport: enabled, updatedAt: Date.now() };
+    }),
+  setExportDestinationFolder: (path) =>
+    set((state) => {
+      const exportDestinationFolder = path.trim();
+      persistExportPreferences({
+        presetOverrides: state.presetOverrides,
+        recentDestinations: state.recentDestinations,
+        exportDestinationFolder,
+        validateBeforeExport: state.validateBeforeExport,
+      });
+      return { exportDestinationFolder, updatedAt: Date.now() };
     }),
   setValidation: (validation) => set({ validation, updatedAt: Date.now() }),
   clearValidation: () => set({ validation: IDLE_EXPORT_VALIDATION, updatedAt: Date.now() }),
@@ -213,7 +275,9 @@ export const useExportStore = create<ExportState>((set) => ({
         return { updatedAt: Date.now() };
       }
       persistExportPreferences({
+        presetOverrides: state.presetOverrides,
         recentDestinations,
+        exportDestinationFolder: state.exportDestinationFolder,
         validateBeforeExport: state.validateBeforeExport,
       });
       return {
@@ -225,7 +289,9 @@ export const useExportStore = create<ExportState>((set) => ({
     set((state) => {
       const recentDestinations = state.recentDestinations.filter((candidate) => candidate !== path);
       persistExportPreferences({
+        presetOverrides: state.presetOverrides,
         recentDestinations,
+        exportDestinationFolder: state.exportDestinationFolder,
         validateBeforeExport: state.validateBeforeExport,
       });
       return {
@@ -236,7 +302,9 @@ export const useExportStore = create<ExportState>((set) => ({
   clearRecentDestinations: () =>
     set((state) => {
       persistExportPreferences({
+        presetOverrides: state.presetOverrides,
         recentDestinations: [],
+        exportDestinationFolder: state.exportDestinationFolder,
         validateBeforeExport: state.validateBeforeExport,
       });
       return { recentDestinations: [], updatedAt: Date.now() };
@@ -253,8 +321,19 @@ export function allExportPresets(userPresets = useExportStore.getState().userPre
 }
 
 export function exportPresetById(id: string | undefined, fallbackTarget: ExportPresetTarget = "project"): ExportPreset {
-  const preset = allExportPresets().find((candidate) => candidate.id === id);
-  return preset?.target === fallbackTarget ? preset : defaultExportPresetForTarget(fallbackTarget);
+  const state = useExportStore.getState();
+  const preset = allExportPresets(state.userPresets).find((candidate) => candidate.id === id);
+  return applyExportPresetOverride(preset?.target === fallbackTarget ? preset : defaultExportPresetForTarget(fallbackTarget), state.presetOverrides);
+}
+
+export function applyExportPresetOverride(preset: ExportPreset, overrides = useExportStore.getState().presetOverrides): ExportPreset {
+  const override = overrides[preset.id];
+  if (!override) return preset;
+  return {
+    ...preset,
+    options: override.options ? normalizeExportOptions(override.options) : preset.options,
+    includeTail: override.includeTail ?? preset.includeTail,
+  };
 }
 
 export function normalizeExportOptions(options: ProjectExportOptions | undefined): Required<ProjectExportOptions> {
@@ -328,7 +407,9 @@ function persistUserExportPresets(presets: ExportPreset[]) {
 function loadExportPreferences(): ExportPreferencesRecord {
   if (cachedExportPreferences) return cachedExportPreferences;
   const fallback: ExportPreferencesRecord = {
+    presetOverrides: {},
     recentDestinations: [],
+    exportDestinationFolder: "",
     validateBeforeExport: true,
   };
   if (typeof window === "undefined") {
@@ -338,7 +419,9 @@ function loadExportPreferences(): ExportPreferencesRecord {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(EXPORT_PREFERENCES_KEY) ?? "{}") as Partial<ExportPreferencesRecord>;
     cachedExportPreferences = {
+      presetOverrides: normalizePresetOverrides(parsed.presetOverrides),
       recentDestinations: normalizeRecentDestinations(Array.isArray(parsed.recentDestinations) ? parsed.recentDestinations : []),
+      exportDestinationFolder: typeof parsed.exportDestinationFolder === "string" ? parsed.exportDestinationFolder.trim() : "",
       validateBeforeExport: parsed.validateBeforeExport !== false,
     };
     return cachedExportPreferences;
@@ -350,7 +433,9 @@ function loadExportPreferences(): ExportPreferencesRecord {
 
 function persistExportPreferences(preferences: ExportPreferencesRecord) {
   const normalized: ExportPreferencesRecord = {
+    presetOverrides: normalizePresetOverrides(preferences.presetOverrides),
     recentDestinations: normalizeRecentDestinations(preferences.recentDestinations),
+    exportDestinationFolder: preferences.exportDestinationFolder.trim(),
     validateBeforeExport: preferences.validateBeforeExport,
   };
   cachedExportPreferences = normalized;
@@ -360,6 +445,20 @@ function persistExportPreferences(preferences: ExportPreferencesRecord) {
   } catch {
     // Export preference persistence is best-effort.
   }
+}
+
+function normalizePresetOverrides(value: unknown): Record<string, ExportPresetOverride> {
+  if (!value || typeof value !== "object") return {};
+  const result: Record<string, ExportPresetOverride> = {};
+  for (const [presetId, override] of Object.entries(value as Record<string, unknown>)) {
+    if (!presetId.trim() || !override || typeof override !== "object") continue;
+    const record = override as Partial<ExportPresetOverride>;
+    result[presetId] = {
+      options: record.options ? normalizeExportOptions(record.options) : undefined,
+      includeTail: typeof record.includeTail === "boolean" ? record.includeTail : undefined,
+    };
+  }
+  return result;
 }
 
 function normalizeRecentDestinations(paths: readonly string[]): string[] {

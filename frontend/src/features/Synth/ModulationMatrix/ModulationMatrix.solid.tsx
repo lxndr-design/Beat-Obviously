@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
-import { Button, HoverInfo, Icon, Select, Slider, Toggle } from "../../../solid-ui";
+import { Button, HoverInfo, Icon, Select, Slider } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import {
   MODULATION_SOURCE_LABELS,
@@ -32,8 +32,14 @@ const TARGETS_BY_SOURCE: Record<ModulationSourceId, ModulationTargetId[]> = {
 type PickMode = {
   routeId: string;
   kind: "source" | "target";
+  anchorElement: HTMLElement;
   anchor: { x: number; y: number };
   pointer: { x: number; y: number };
+};
+
+type PickCandidate = {
+  value: string | undefined;
+  point: { x: number; y: number } | null;
 };
 
 export interface ModulationMatrixProps {
@@ -67,15 +73,28 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
     }
 
     function onPointerMove(event: PointerEvent) {
-      setPickMode((current) => current ? { ...current, pointer: { x: event.clientX, y: event.clientY } } : current);
+      const candidate = pickCandidateFromTarget(pick.kind, event.target as Element | null);
+      const pointer = candidate.point ?? { x: event.clientX, y: event.clientY };
+      setPickMode((current) => current ? { ...current, anchor: pickAnchorPoint(current.anchorElement), pointer } : current);
+    }
+
+    function refreshPosition() {
+      setPickMode((current) => {
+        if (!current) return current;
+        const target = document.elementFromPoint(current.pointer.x, current.pointer.y);
+        const candidate = pickCandidateFromTarget(current.kind, target);
+        return {
+          ...current,
+          anchor: pickAnchorPoint(current.anchorElement),
+          pointer: candidate.point ?? current.pointer,
+        };
+      });
     }
 
     function onPointerDown(event: PointerEvent) {
       const target = event.target as Element | null;
       const route = routes().find((candidate) => candidate.id === pick.routeId);
-      const value = pick.kind === "target"
-        ? target?.closest<HTMLElement>("[data-synth-target-id]")?.dataset.synthTargetId
-        : target?.closest<HTMLElement>("[data-synth-source-id]")?.dataset.synthSourceId;
+      const { value } = pickCandidateFromTarget(pick.kind, target);
 
       event.preventDefault();
       event.stopPropagation();
@@ -97,11 +116,15 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
     window.addEventListener("keydown", onKeyDown, true);
     window.addEventListener("pointermove", onPointerMove, true);
     window.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("scroll", refreshPosition, true);
+    window.addEventListener("resize", refreshPosition);
     onCleanup(() => {
       delete document.body.dataset.synthPickMode;
       window.removeEventListener("keydown", onKeyDown, true);
       window.removeEventListener("pointermove", onPointerMove, true);
       window.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("scroll", refreshPosition, true);
+      window.removeEventListener("resize", refreshPosition);
     });
   });
 
@@ -110,7 +133,7 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
     event.stopPropagation();
     const rect = event.currentTarget.getBoundingClientRect();
     const anchor = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-    setPickMode({ routeId, kind, anchor, pointer: anchor });
+    setPickMode({ routeId, kind, anchorElement: event.currentTarget, anchor, pointer: anchor });
   }
 
   return (
@@ -132,7 +155,7 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
           <span>Target</span>
           <span />
           <span>Strength</span>
-          <span>Polarity</span>
+          <span />
           <span />
         </div>
         <For each={routes()}>
@@ -149,11 +172,17 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                 data-modulation-route-id={route.id}
               >
                 <div class={styles.onCell}>
-                  <Toggle
-                    checked={route.enabled}
+                  <Button
+                    iconOnly
+                    size="xs"
+                    className={styles.onButton}
+                    selected={route.enabled}
+                    aria-pressed={route.enabled}
                     aria-label={`Route ${routeNumber()} enabled`}
-                    onChange={(enabled) => updateRoute(route.id, { enabled })}
-                  />
+                    onClick={() => updateRoute(route.id, { enabled: !route.enabled })}
+                  >
+                    <Icon name="ph:power" size={12} decorative />
+                  </Button>
                 </div>
                 <div class={styles.sourceCell}>
                   <Select
@@ -278,6 +307,20 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
       </Show>
     </section>
   );
+}
+
+function pickCandidateFromTarget(kind: "source" | "target", target: Element | null): PickCandidate {
+  const selector = kind === "target" ? "[data-synth-target-id]" : "[data-synth-source-id]";
+  const element = target?.closest<HTMLElement>(selector);
+  if (!element) return { value: undefined, point: null };
+  const value = kind === "target" ? element.dataset.synthTargetId : element.dataset.synthSourceId;
+  return { value, point: pickAnchorPoint(element) };
+}
+
+function pickAnchorPoint(element: HTMLElement) {
+  const anchor = element.querySelector<HTMLElement>("[data-synth-pick-anchor]") ?? element;
+  const rect = anchor.getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 }
 
 function PickerCable(props: {

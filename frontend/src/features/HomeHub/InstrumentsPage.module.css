@@ -114,39 +114,11 @@
 
 .rowMeta {
   display: inline-grid;
-  grid-template-columns: 68px minmax(54px, max-content) 22px;
+  grid-template-columns: minmax(54px, max-content) 22px;
   align-items: center;
   gap: 6px;
   justify-self: end;
   min-width: 0;
-}
-
-.referenceChip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 66px;
-  height: 18px;
-  padding: 0 4px;
-  border: 1px solid color-mix(in srgb, var(--color-fg) 44%, transparent);
-  color: var(--color-fg-hover);
-  font-size: var(--font-size-ui);
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.referenceManaged {
-  background: var(--surface-subtle);
-}
-
-.referenceWarning {
-  background: color-mix(in srgb, var(--color-fg) 10%, var(--color-bg));
-  color: var(--color-fg);
-}
-
-.referenceDanger {
-  background: var(--color-fg);
-  color: var(--color-fg-inverse);
 }
 
 .rowPlay {
@@ -190,6 +162,7 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  min-height: 100%;
 }
 
 .waveformStage {
@@ -304,7 +277,8 @@
 
 .taxonomyRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
   min-width: 0;
 }
 
@@ -336,6 +310,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--font-size-ui);
+}
+
+.instrumentActions {
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--color-fg) 35%, transparent);
+  justify-content: flex-end;
 }
 
 .sampleStructure {
@@ -477,7 +458,7 @@
 
 .sampleRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 68px minmax(96px, auto);
+  grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
   align-items: center;
   gap: 6px;
   min-height: 24px;

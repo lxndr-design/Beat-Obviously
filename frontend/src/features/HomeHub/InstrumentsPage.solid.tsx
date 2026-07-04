@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
-import { ActionFooter, Button, FloatingSelect, HoverInfo, Icon, MarqueeText } from "../../solid-ui";
+import { ActionFooter, appConfirm, Button, FloatingSelect, HoverInfo, Icon, MarqueeText } from "../../solid-ui";
 import {
   cachedInstrumentSampleBuffer,
   createInstrumentSampleBufferSource,
@@ -12,9 +12,15 @@ import {
 } from "../../audio/synthPreview";
 import { isNative, send } from "../../ipc/bridge";
 import type { AudioRenderAnalysis, AudioWaveformSummary } from "../../ipc/schema";
-import { INSTRUMENT_TAXONOMY_OPTIONS, taxonomyAssignmentForInstrumentId } from "../../state/instrumentTaxonomy";
+import { listProjects } from "../../persistence/dexie";
+import {
+  firstInstrumentTaxonomyIdForCategory,
+  INSTRUMENT_TAXONOMY_CATEGORY_OPTIONS,
+  instrumentTaxonomyOptionsForCategory,
+  taxonomyAssignmentForInstrumentId,
+} from "../../state/instrumentTaxonomy";
 import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, useProjectStore } from "../../state/store";
-import type { Instrument, InstrumentSet } from "../../state/types";
+import type { Instrument, InstrumentSet, Project } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { AssetPageShell, AssetStateMessage } from "./AssetPageShell.solid";
 import styles from "./InstrumentsPage.module.css";
@@ -29,9 +35,20 @@ const SAMPLE_VARIABLE_OPTIONS: Array<{ mode: SampleVariable; label: string }> = 
   { mode: "hit", label: "Hit" },
   { mode: "pitch", label: "Pitch" },
 ];
+const CATEGORY_OPTIONS = [
+  { value: "", label: "Unassigned" },
+  ...INSTRUMENT_TAXONOMY_CATEGORY_OPTIONS,
+];
 
 type RefValue<T> = { current: T };
 type PlaybackPointerEvent = PointerEvent & { currentTarget: HTMLDivElement };
+type InstrumentUsageSummary = {
+  projectCount: number;
+  segmentCount: number;
+  trackCount: number;
+  projectLabel: string;
+  segmentLabel: string;
+};
 type InstrumentRenderState = {
     waveform: AudioWaveformSummary | null;
     analysis: AudioRenderAnalysis | null;
@@ -44,15 +61,19 @@ export function InstrumentsPage() {
   const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
   const sets = createStoreSelector(useInstrumentStore, (state) => state.instrumentSets);
   const loading = createStoreSelector(useInstrumentStore, (state) => state.loading);
+  const project = createStoreSelector(useProjectStore, (state) => state.project);
   const projectBpm = createStoreSelector(useProjectStore, (state) => state.project.bpm);
   const updateInstrument = useInstrumentStore.getState().updateInstrument;
+  const removeInstrument = useInstrumentStore.getState().removeInstrument;
   const [activeId, setActiveId] = createSignal<string | null>(null);
   const [playingId, setPlayingId] = createSignal<string | null>(null);
   const [loopPreview, setLoopPreview] = createSignal(false);
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal("");
-  const [taxonomyOpen, setTaxonomyOpen] = createSignal(false);
+  const [taxonomyCategoryOpen, setTaxonomyCategoryOpen] = createSignal(false);
+  const [taxonomyInstrumentOpen, setTaxonomyInstrumentOpen] = createSignal(false);
   const [samplePreviewIndex, setSamplePreviewIndex] = createSignal<Record<string, number>>({}, { equals: false });
+  const [usageByInstrument, setUsageByInstrument] = createSignal<Record<string, InstrumentUsageSummary>>({}, { equals: false });
   const [previewProgress, setPreviewProgress] = createSignal(0);
   const [scrubbing, setScrubbing] = createSignal(false);
   const [renderState, setRenderState] = createSignal<InstrumentRenderState>({ waveform: null, analysis: null, loading: false }, { equals: false });
@@ -77,6 +98,7 @@ export function InstrumentsPage() {
   const activeInstrument = createMemo(() => visibleInstruments().find((instrument) => instrument.id === activeId()) ?? visibleInstruments()[0] ?? null);
   const activeSampleUrls = createMemo(() => activeInstrument() ? instrumentSampleUrls(activeInstrument()!) : []);
   const activeReference = createMemo(() => activeInstrument() ? instrumentReferenceState(activeInstrument()!) : null);
+  const activeUsage = createMemo(() => activeInstrument() ? usageByInstrument()[activeInstrument()!.id] ?? instrumentUsageSummary(activeInstrument()!.id, [project()]) : null);
   const activeSampleUrl = createMemo(() => activeInstrument() && !isSustainedPreview(activeInstrument()!) && activeSampleUrls().length > 0
     ? activeSampleUrls()[(samplePreviewIndex()[activeInstrument()!.id] ?? 0) % activeSampleUrls().length]
     : undefined);
@@ -94,7 +116,26 @@ export function InstrumentsPage() {
 
   createEffect(() => {
     activeId();
-    setTaxonomyOpen(false);
+    setTaxonomyCategoryOpen(false);
+    setTaxonomyInstrumentOpen(false);
+  });
+
+  createEffect(() => {
+    const currentProject = project();
+    let cancelled = false;
+    void listProjects()
+      .then((projects) => {
+        if (cancelled) return;
+        const projectsById = new Map(projects.map((savedProject) => [savedProject.id, savedProject]));
+        projectsById.set(currentProject.id, currentProject);
+        setUsageByInstrument(buildInstrumentUsageMap([...projectsById.values()]));
+      })
+      .catch(() => {
+        if (!cancelled) setUsageByInstrument(buildInstrumentUsageMap([currentProject]));
+      });
+    onCleanup(() => {
+      cancelled = true;
+    });
   });
 
   onCleanup(() => stopPreview());
@@ -291,6 +332,19 @@ export function InstrumentsPage() {
     startProgress(ctx, duration, shouldLoop, initialProgress);
   }
 
+  async function deleteActiveInstrument() {
+    const instrument = activeInstrument();
+    if (!instrument?.userCreated) return;
+    const usage = activeUsage() ?? instrumentUsageSummary(instrument.id, [project()]);
+    const useText = usage.segmentCount > 0
+      ? ` It is used by ${usage.segmentCount} segment${usage.segmentCount === 1 ? "" : "s"} in the current project.`
+      : "";
+    if (!await appConfirm(`Delete "${instrument.name}" from the Beat library?${useText}`)) return;
+    removeInstrument(instrument.id);
+    const fallback = visibleInstruments().find((candidate) => candidate.id !== instrument.id)?.id ?? null;
+    setActiveId(fallback);
+  }
+
   return (
     <AssetPageShell
       variant="instrument"
@@ -350,40 +404,36 @@ export function InstrumentsPage() {
                 <span>{instrumentSetDisplayName(group.set)}</span>
                 <strong>{group.instruments.length}</strong>
               </div>
-              {group.instruments.map((instrument) => {
-                const reference = instrumentReferenceState(instrument);
-                return (
-                  <div
-                    class={`${styles.row} ${activeInstrument()?.id === instrument.id ? styles.rowActive : ""}`}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setActiveId(instrument.id)}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter" && event.key !== " ") return;
-                      event.preventDefault();
-                      setActiveId(instrument.id);
-                    }}
-                  >
-                    <Icon name={instrument.icon || "ph:piano-keys"} size={14} decorative />
-                    <MarqueeText className={styles.rowName} text={instrument.name} />
-                    <span class={styles.rowMeta}>
-                      <span class={`${styles.referenceChip} ${styles[reference.className]}`}>{reference.label}</span>
-                      <span class={styles.rowType}>{instrument.kind}</span>
-                      <button
-                        type="button"
-                        class={`${styles.rowPlay} ${playingId() === instrument.id ? styles.rowPlayActive : ""}`}
-                        aria-label={`Preview ${instrument.name}`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void playPreview(instrument);
-                        }}
-                      >
-                        <Icon name={playingId() === instrument.id ? "ph:pause-fill" : "ph:play-fill"} size={12} decorative />
-                      </button>
-                    </span>
-                  </div>
-                );
-              })}
+              {group.instruments.map((instrument) => (
+                <div
+                  class={`${styles.row} ${activeInstrument()?.id === instrument.id ? styles.rowActive : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setActiveId(instrument.id)}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    setActiveId(instrument.id);
+                  }}
+                >
+                  <Icon name={instrument.icon || "ph:piano-keys"} size={14} decorative />
+                  <MarqueeText className={styles.rowName} text={instrument.name} />
+                  <span class={styles.rowMeta}>
+                    <span class={styles.rowType}>{formatInstrumentType(instrument)}</span>
+                    <button
+                      type="button"
+                      class={`${styles.rowPlay} ${playingId() === instrument.id ? styles.rowPlayActive : ""}`}
+                      aria-label={`Preview ${instrument.name}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void playPreview(instrument);
+                      }}
+                    >
+                      <Icon name={playingId() === instrument.id ? "ph:pause-fill" : "ph:play-fill"} size={12} decorative />
+                    </button>
+                  </span>
+                </div>
+              ))}
             </div>
           ))}
         </div>
@@ -462,23 +512,39 @@ export function InstrumentsPage() {
             <div class={styles.taxonomyRow}>
               <FloatingSelect
                 className={styles.taxonomySelect}
-                label="Structure"
+                label="Category"
+                layout="inline"
+                value={activeInstrument()!.taxonomy?.categoryId ?? ""}
+                ariaLabel="Instrument category"
+                options={CATEGORY_OPTIONS}
+                open={taxonomyCategoryOpen()}
+                onOpenChange={setTaxonomyCategoryOpen}
+                onChange={(value) => {
+                  const instrumentId = value ? firstInstrumentTaxonomyIdForCategory(value) : "";
+                  updateInstrument(activeInstrument()!.id, { taxonomy: instrumentId ? taxonomyAssignmentForInstrumentId(instrumentId) : undefined });
+                }}
+              />
+              <FloatingSelect
+                className={styles.taxonomySelect}
+                label="Instrument"
                 layout="inline"
                 value={activeInstrument()!.taxonomy?.instrumentId ?? ""}
-                ariaLabel="Instrument library structure"
-                options={INSTRUMENT_TAXONOMY_OPTIONS}
-                open={taxonomyOpen()}
-                onOpenChange={setTaxonomyOpen}
+                ariaLabel="Instrument taxonomy"
+                options={taxonomyInstrumentOptions(activeInstrument()!)}
+                open={taxonomyInstrumentOpen()}
+                onOpenChange={setTaxonomyInstrumentOpen}
                 onChange={(value) => {
-                  const nextTaxonomy = taxonomyAssignmentForInstrumentId(value);
-                  updateInstrument(activeInstrument()!.id, { taxonomy: nextTaxonomy });
+                  updateInstrument(activeInstrument()!.id, { taxonomy: value ? taxonomyAssignmentForInstrumentId(value) : undefined });
                 }}
               />
             </div>
             <dl class={styles.details}>
               <Info label="Engine" value={formatEngine(activeInstrument()!)} />
+              <Info label="Type" value={formatInstrumentType(activeInstrument()!)} />
               <Info label="Source" value={activeInstrument()!.source?.label ?? "Made in Beat"} />
               <Info label="Reference" value={activeReference()?.detail ?? "Unknown"} />
+              <Info label="Used In" value={activeUsage()?.projectLabel ?? "0 projects"} />
+              <Info label="Segments" value={activeUsage()?.segmentLabel ?? "0 segments"} />
               <Info label="Preview Mode" value={isSustainedPreview(activeInstrument()!) ? "Sustain until pause" : loopPreview() ? "Looping sample" : "One-shot sample"} />
               <Info label="Preview Source" value={activeSampleUrl() ? sampleName(activeSampleUrl()!) : "Rendered instrument"} />
               <Info label="Waveform" value={activeInstrument()!.waveform} />
@@ -493,6 +559,17 @@ export function InstrumentsPage() {
             {!isSustainedPreview(activeInstrument()!) && (
               <SampleStructure instrument={activeInstrument()!} activeSampleUrl={activeSampleUrl()} />
             )}
+            <ActionFooter class={styles.instrumentActions}>
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={!activeInstrument()!.userCreated}
+                title={activeInstrument()!.userCreated ? "Delete this library instrument" : "Factory instruments cannot be deleted"}
+                onClick={() => void deleteActiveInstrument()}
+              >
+                Delete
+              </Button>
+            </ActionFooter>
           </div>
         ) : (
           <div class={styles.emptyPreview}>
@@ -811,14 +888,11 @@ function SampleStructure(props: { instrument: Instrument; activeSampleUrl?: stri
             ) : null}
           </div>
           <div class={styles.sampleRows}>
-            {group.rows.map((row) => {
-              const reference = sampleReferenceState(row.path);
-              return (
+            {group.rows.map((row) => (
                 <div
                   class={`${styles.sampleRow} ${row.path === props.activeSampleUrl ? styles.sampleRowActive : ""}`}
                 >
                   <MarqueeText text={row.name} />
-                  <span class={`${styles.referenceChip} ${styles[reference.className]}`}>{reference.label}</span>
                   {row.editable ? (
                     <span
                       class={styles.sampleValue}
@@ -844,8 +918,7 @@ function SampleStructure(props: { instrument: Instrument; activeSampleUrl?: stri
                     </span>
                   ) : null}
                 </div>
-              );
-            })}
+            ))}
           </div>
         </div>
       ))}
@@ -1447,9 +1520,81 @@ function isSustainedPreview(instrument: Instrument) {
 }
 
 function formatEngine(instrument: Instrument) {
+  if (instrument.nodeGraph) return "Nodemap";
   if (instrument.aether || instrument.kind === "wavetable") return "Aether";
   if (instrument.kind === "sampler") return "Sampler";
-  return instrument.kind;
+  if (instrument.kind === "synth") return "Basic";
+  return titleCase(instrument.kind);
+}
+
+function formatInstrumentType(instrument: Instrument) {
+  if (instrument.nodeGraph) return "Nodemap";
+  if (instrument.kind === "sampler" || instrument.waveform === "sample") return "Sampler";
+  if (instrument.aether || instrument.kind === "wavetable") return "Aether";
+  if (instrument.kind === "synth") return "Basic";
+  return titleCase(instrument.kind);
+}
+
+function taxonomyInstrumentOptions(instrument: Instrument) {
+  const categoryId = instrument.taxonomy?.categoryId ?? "";
+  return [
+    { value: "", label: "Unassigned" },
+    ...(categoryId ? instrumentTaxonomyOptionsForCategory(categoryId) : []),
+  ];
+}
+
+function buildInstrumentUsageMap(projects: Project[]) {
+  const instrumentIds = new Set<string>();
+  for (const project of projects) {
+    for (const track of project.tracks) {
+      for (const segment of track.segments) {
+        if (segment.instrumentId) instrumentIds.add(segment.instrumentId);
+        if (segment.payload.kind === "drum") {
+          for (const row of segment.payload.rows) {
+            if (row.instrumentId) instrumentIds.add(row.instrumentId);
+          }
+        }
+      }
+    }
+  }
+  const usage: Record<string, InstrumentUsageSummary> = {};
+  for (const instrumentId of instrumentIds) usage[instrumentId] = instrumentUsageSummary(instrumentId, projects);
+  return usage;
+}
+
+function instrumentUsageSummary(instrumentId: string, projects: Project[]): InstrumentUsageSummary {
+  let segmentCount = 0;
+  const trackKeys = new Set<string>();
+  const projectIds = new Set<string>();
+  for (const project of projects) {
+    for (const track of project.tracks) {
+      for (const segment of track.segments) {
+        const segmentUsesInstrument = segment.instrumentId === instrumentId;
+        const drumUsesInstrument = segment.payload.kind === "drum"
+          && segment.payload.rows.some((row) => row.instrumentId === instrumentId);
+        if (!segmentUsesInstrument && !drumUsesInstrument) continue;
+        segmentCount += 1;
+        trackKeys.add(`${project.id}:${track.id}`);
+        projectIds.add(project.id);
+      }
+    }
+  }
+  const projectCount = projectIds.size;
+  return {
+    projectCount,
+    segmentCount,
+    trackCount: trackKeys.size,
+    projectLabel: `${projectCount} project${projectCount === 1 ? "" : "s"}`,
+    segmentLabel: `${segmentCount} segment${segmentCount === 1 ? "" : "s"} / ${trackKeys.size} track${trackKeys.size === 1 ? "" : "s"}`,
+  };
+}
+
+function titleCase(value: string) {
+  return value
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1).toLowerCase()}`)
+    .join(" ");
 }
 
 function formatEnvelope(instrument: Instrument) {

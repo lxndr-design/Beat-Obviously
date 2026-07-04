@@ -270,6 +270,7 @@ export type OutboundRequest =
   | { kind: "project.recentList" }
   | { kind: "project.recentRemove"; path: string }
   | { kind: "project.revealFile"; path: string }
+  | { kind: "project.chooseExportFolder"; pathHint?: string }
   | { kind: "project.inspectDocument"; document: BeatProjectDocument; projectPath?: string }
   | { kind: "project.repairDocument"; document: BeatProjectDocument; projectPath?: string; action: "rebuildAssetManifest" | "repairSegmentTrackIds" }
   | { kind: "project.listBackups"; projectPath: string }
@@ -330,6 +331,7 @@ export type ResponseFor<R extends OutboundRequest> =
   R extends { kind: "project.recentList" } ? { projects: RecentProjectEntry[] } :
   R extends { kind: "project.recentRemove" } ? { ok: true } :
   R extends { kind: "project.revealFile" } ? { ok: boolean; missing?: boolean; error?: string } :
+  R extends { kind: "project.chooseExportFolder" } ? { path: string; cancelled?: boolean; error?: string } :
   R extends { kind: "project.inspectDocument" } ? { path?: string; missingAssets: BeatProjectAsset[]; integrityReport?: BeatProjectIntegrityReport; error?: string } :
   R extends { kind: "project.repairDocument" } ? { changed: boolean; document?: BeatProjectDocument; path?: string; missingAssets: BeatProjectAsset[]; integrityReport?: BeatProjectIntegrityReport; error?: string } :
   R extends { kind: "project.listBackups" } ? { backups: ProjectBackupEntry[]; error?: string } :
