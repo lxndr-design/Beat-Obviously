@@ -268,27 +268,71 @@
         <section id="make-plugin">
           <h2>How To Make A Plugin</h2>
           <p>
-            Until Beat has a public plugin SDK, a plugin should be built as a
-            safe adapter around serializable project data, not as arbitrary code
-            running in the audio callback.
+            Beat supports plugin-style work in three tiers. The safest current
+            tier is an import adapter. The second tier is a native Beat
+            instrument engine such as Aether or Nodemap. A full AU/VST3 host is
+            future work and should not be treated as available in production.
+          </p>
+
+          <h3>Path A: Import Adapter Instrument</h3>
+          <p>
+            Use this when the source is a package format such as
+            DecentSampler, a sample pack, a preset bundle, or another
+            serializable format that Beat can convert into native instruments.
           </p>
           <ol>
-            <li>Choose the adapter format: usually <code>native</code> for internal Beat adapters or <code>decent-sampler</code> for DS packages.</li>
-            <li>Define import data that can be saved in a `.beat` project without needing the original download folder.</li>
-            <li>Register all audio assets with Beat's audio-file library or package sidecar.</li>
-            <li>Create or link an associated Beat instrument if the adapter plays notes.</li>
-            <li>Declare capabilities: instrument/effect/renderer/utility, realtime/offline support, latency, and fallback behavior.</li>
-            <li>Add project-health validation for missing files, missing associated instruments, stale references, and unsupported runtime modes.</li>
-            <li>Add a verifier or backend stress fixture that proves import, save/open, live playback, and export behavior.</li>
+            <li>Choose a stable format id such as <code>decent-sampler</code> or <code>sample-pack</code>.</li>
+            <li>Write a parser that reads metadata without executing third-party code.</li>
+            <li>Reject unsafe paths, absolute paths, parent-directory escapes, malformed packages, and unsupported media.</li>
+            <li>Copy or register all referenced samples into Beat-managed library storage or the project sidecar.</li>
+            <li>Create an associated Beat instrument when the adapter needs to play MIDI notes.</li>
+            <li>Store the adapter and associated instrument id in the `.beat` project document.</li>
+            <li>Open an adapter-specific UI instead of sending the user to the generic Aether editor.</li>
+            <li>Add Project Health checks for missing samples, missing associated instruments, stale package references, and unsupported modes.</li>
+            <li>Add a verifier that imports, saves, reopens, previews, renders live audio, and exports audio from the adapter.</li>
           </ol>
-          <h3>Minimum Internal Checklist</h3>
+
+          <h3>Path B: Native Beat Instrument Engine</h3>
+          <p>
+            Use this when the instrument is actually implemented by Beat, like
+            Aether or Nodemap. This is the right path for a new synth, sampler,
+            granular engine, drum engine, or modular instrument.
+          </p>
+          <ol>
+            <li>Define the engine name, default patch name, taxonomy category, and instrument type.</li>
+            <li>Define the serializable patch model: parameters, nodes, modulation, sample references, and version number.</li>
+            <li>Implement deterministic patch defaults so a new instrument starts from a valid playable state.</li>
+            <li>Implement the audio renderer in the native/backend path, not only in the browser preview path.</li>
+            <li>Implement browser audition only as a preview of the same patch model, with documented differences if any remain.</li>
+            <li>Build an editor that uses shared UI-kit controls and stores changes through the same patch model.</li>
+            <li>Wire Save, Apply, Cancel, Audition, and Spacebar preview through the shared instrument-editor modal behavior.</li>
+            <li>Support project save/open, undo boundaries, copy/duplicate, delete, taxonomy edits, and export rendering.</li>
+            <li>Add tests for patch migration, parameter changes, live playback, export, and large/edge-case patches.</li>
+          </ol>
+
+          <h3>Path C: Future Hosted Plugin</h3>
+          <p>
+            Use this only as a design target for AU/VST3-style hosting. Beat
+            can preserve intent metadata today, but it does not yet scan,
+            sandbox, instantiate, or run third-party plugin binaries.
+          </p>
+          <ol>
+            <li>Represent the plugin as metadata first: format, vendor, name, version, plugin id, role, and fallback behavior.</li>
+            <li>Do not execute binary plugin code in the audio callback until a protected host process exists.</li>
+            <li>Design scanning as an isolated process with crash protection and explicit user permission.</li>
+            <li>Design UI hosting as a separate surface from Beat native instrument editors.</li>
+            <li>Define fallback rendering behavior when the plugin is missing, unsupported, or blocked by Project Health.</li>
+          </ol>
+
+          <h3>Capability Checklist</h3>
           <ul>
-            <li>Parser rejects unsafe paths and malformed packages.</li>
-            <li>Import copies or registers assets into Beat-managed storage.</li>
-            <li>Adapter state is serializable and document-roundtrip safe.</li>
-            <li>Project Health reports missing or broken dependencies.</li>
-            <li>Live playback and export agree, or the difference is documented.</li>
-            <li>The UI opens an adapter-specific editor instead of falling back to Aether unless explicitly intended.</li>
+            <li><strong>Instrument</strong>: accepts MIDI notes and produces audio.</li>
+            <li><strong>Effect</strong>: accepts audio input and returns processed audio.</li>
+            <li><strong>Renderer</strong>: can render offline/export even if realtime preview is limited.</li>
+            <li><strong>Utility</strong>: manages data, package metadata, routing, or project assets.</li>
+            <li><strong>Realtime</strong>: safe to run in live playback without blocking or allocation spikes.</li>
+            <li><strong>Offline</strong>: safe to render during export and bounce workflows.</li>
+            <li><strong>Fallback</strong>: describes what Beat should do when the original package or plugin is unavailable.</li>
           </ul>
         </section>
 
