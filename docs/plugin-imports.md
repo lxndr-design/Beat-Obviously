@@ -37,6 +37,11 @@ around serializable data:
 
 ## Decent Sampler baseline
 
+Decent Sampler is third-party sampler software and a package ecosystem, not
+software developed by Beat. Beat's current support is an importer/compatibility
+bridge for Decent Sampler package files; it does not embed or execute the
+official Decent Sampler runtime.
+
 Decent Sampler packs are the first adapter target.
 
 - `.dspreset` files are parsed as XML sample maps.

@@ -197,10 +197,17 @@
           <h2>Plugins and DecentSampler</h2>
           <p>
             Beat currently supports plugin-style instruments through safe import
-            adapters. The supported path is DecentSampler package import plus a
-            Beat sampler bridge. AU/VST3 live hosting is not enabled yet.
+            adapters. DecentSampler is third-party sampler software and package
+            format not developed by Beat. Beat does not ship or run the official
+            DecentSampler engine; it imports compatible DecentSampler packages
+            and plays them through a Beat sampler bridge. AU/VST3 live hosting
+            is not enabled yet.
           </p>
           <h3>DecentSampler Workflow</h3>
+          <p>
+            This workflow is for DecentSampler-compatible package files, not for
+            editing or embedding the official DecentSampler application itself.
+          </p>
           <ol>
             <li>Open the DS rail tab or plugin import action.</li>
             <li>Choose a `.zip` or `.dspreset` file.</li>
@@ -223,13 +230,13 @@
             <tr>
               <td>DecentSampler `.dspreset`</td>
               <td>Supported in native app</td>
-              <td>XML parsing, sample-zone import, UI metadata preservation, Beat sampler bridge, MIDI/drum editor mode.</td>
+              <td>Third-party package XML parsing, sample-zone import, UI metadata preservation, Beat sampler bridge, MIDI/drum editor mode.</td>
               <td>Official DecentSampler runtime hosting.</td>
             </tr>
             <tr>
               <td>DecentSampler ZIP</td>
               <td>Supported in native app</td>
-              <td>Safe extraction, preset discovery, sample registration, package wrapper, associated instrument creation.</td>
+              <td>Safe extraction of third-party compatible packs, preset discovery, sample registration, package wrapper, associated instrument creation.</td>
               <td>Browser-only ZIP extraction. Use the native app for full install.</td>
             </tr>
             <tr>
