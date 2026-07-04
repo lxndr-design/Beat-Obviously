@@ -71,7 +71,7 @@ See [frontend/src/design/README.md](frontend/src/design/README.md). Short versio
 
 ## Roadmap (post-v1)
 
-- [Documentation](docs/index.html) — combined user guide, plugin compatibility,
+- [User guide](docs/user-guide.html) — combined guide, plugin compatibility,
   adapter how-tos, workflows, and version history in one app-styled page.
 - [Changelog](CHANGELOG.md) — source change history mirrored into the docs
   version-history section.

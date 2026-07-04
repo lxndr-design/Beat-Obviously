@@ -7,7 +7,7 @@ native Beat assets, but import itself should not pretend that a third-party
 runtime is already running in the audio callback.
 
 For user-facing plugin help, compatibility status, adapter-development
-guidance, and version history, see `docs/index.html#plugins`.
+guidance, and version history, see `docs/user-guide.html#plugins`.
 
 ## Compatibility matrix
 
