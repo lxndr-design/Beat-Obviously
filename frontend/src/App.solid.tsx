@@ -118,6 +118,11 @@ export function App() {
     if (await closeCurrentDocumentForHome()) setShowHome(true);
   }
 
+  function openUserGuide() {
+    const url = new URL("docs/user-guide.html", window.location.href);
+    window.open(url.href, "_blank", "noopener");
+  }
+
   async function createFromHome() {
     if (await createNewDocument()) closeHome();
   }
@@ -449,6 +454,7 @@ export function App() {
     onExport: () => useUiStore.getState().openEditor({ kind: "exportReview" }),
     onRecover: () => undefined,
     onHealth: () => useUiStore.getState().openEditor({ kind: "projectHealth" }),
+    onUserGuide: openUserGuide,
     onSettings: () => useUiStore.getState().openEditor({ kind: "preferences" }),
   });
 
@@ -464,6 +470,7 @@ export function App() {
     onExportTrack: () => void runProjectExport("track").catch((error) => appAlert(error instanceof Error ? error.message : "Track export failed.")),
     onRecover: () => void recoverFromMenu(),
     onHealth: () => useUiStore.getState().openEditor({ kind: "projectHealth" }),
+    onUserGuide: openUserGuide,
     onSettings: () => useUiStore.getState().openEditor({ kind: "preferences" }),
   });
 

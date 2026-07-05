@@ -22,6 +22,7 @@ export interface TopBarProps {
   onExportTrack: () => void;
   onRecover: () => void;
   onHealth: () => void;
+  onUserGuide: () => void;
   onSettings: () => void;
 }
 

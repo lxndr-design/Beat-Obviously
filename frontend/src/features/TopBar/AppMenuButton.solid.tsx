@@ -19,6 +19,7 @@ export interface AppMenuButtonProps {
   onExportTrack?: () => void;
   onRecover?: () => void;
   onHealth?: () => void;
+  onUserGuide: () => void;
   onSettings: () => void;
   disableHome?: boolean;
   disableFileStateActions?: boolean;
@@ -38,6 +39,7 @@ export function AppMenuButton(props: { props: Accessor<AppMenuButtonProps> }) {
     return [
       { label: "Home", icon: "ph:house", disabled: callbacks.disableHome, onSelect: callbacks.onHome },
       { label: "What's New", icon: "ph:sparkle", onSelect: () => void appAlert("What's New is coming soon.") },
+      { label: "User Guide", icon: "ph:book-open-text", onSelect: callbacks.onUserGuide },
       { label: "New Project", icon: "ph:plus", separatorBefore: true, onSelect: callbacks.onNew },
       { label: "Open...", icon: "ph:folder-open", onSelect: callbacks.onOpen },
       { label: "Import...", icon: "ph:download-simple", disabled: true, hint: "Later" },

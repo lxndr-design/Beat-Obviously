@@ -25,6 +25,7 @@ export interface HomeHubProps {
   onExport: () => void;
   onRecover?: () => void;
   onHealth?: () => void;
+  onUserGuide: () => void;
   onSettings: () => void;
 }
 
@@ -56,6 +57,7 @@ export function HomeHub(props: HomeHubProps) {
             onExport={props.onExport}
             onRecover={props.onRecover}
             onHealth={props.onHealth}
+            onUserGuide={props.onUserGuide}
             onSettings={props.onSettings}
             onQuit={() => void quitBeat()}
             disableHome={false}
@@ -86,6 +88,7 @@ export function HomeHub(props: HomeHubProps) {
           onExport={props.onExport}
           onRecover={props.onRecover}
           onHealth={props.onHealth}
+          onUserGuide={props.onUserGuide}
           onSettings={props.onSettings}
           onQuit={() => void quitBeat()}
           disableHome
@@ -176,6 +179,7 @@ interface HomeHeaderProps {
   onExport: () => void;
   onRecover?: () => void;
   onHealth?: () => void;
+  onUserGuide: () => void;
   onSettings: () => void;
   onQuit: () => void;
   disableHome?: boolean;
@@ -195,6 +199,7 @@ function HomeHeader(props: HomeHeaderProps) {
             onExport: props.onExport,
             onRecover: props.onRecover,
             onHealth: props.onHealth,
+            onUserGuide: props.onUserGuide,
             onSettings: props.onSettings,
             disableHome: props.disableHome,
             disableFileStateActions: true,
