@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
-import { Button, HoverInfo, Icon, Select, Slider } from "../../../solid-ui";
+import { Button, FloatingSelect, HoverInfo, Icon, Slider } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import {
   MODULATION_SOURCE_LABELS,
@@ -142,7 +142,7 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
         <div class="ds-panel-title">Modulation Matrix</div>
         <div class="ds-panel-actions">
           <Button size="xs" onClick={() => addRoute()}>
-            <Icon name="ph:plus" size={12} decorative />
+            <Icon name="ph:plus" size={18} decorative />
             Add
           </Button>
         </div>
@@ -181,41 +181,34 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                     aria-label={`Route ${routeNumber()} enabled`}
                     onClick={() => updateRoute(route.id, { enabled: !route.enabled })}
                   >
-                    <Icon name="ph:power" size={12} decorative />
+                    <Icon name="ph:power" size={18} decorative />
                   </Button>
                 </div>
                 <div class={styles.sourceCell}>
-                  <Select
+                  <FloatingSelect
                     layout="bare"
-                    selectClassName={`${styles.routeSelect} ${styles.sourceSelect}`}
+                    triggerClassName={`${styles.routeSelect} ${styles.sourceSelect}`}
                     value={route.source}
                     aria-label={`Route ${routeNumber()} source`}
-                    onChange={(event) => {
-                      const source = event.currentTarget.value as ModulationSourceId;
+                    options={SOURCES.map((source) => ({ value: source, label: MODULATION_SOURCE_LABELS[source] }))}
+                    onChange={(value) => {
+                      const source = value as ModulationSourceId;
                       const nextTargets = targetsForSource(source);
                       updateRoute(route.id, {
                         source,
                         target: nextTargets.includes(route.target) ? route.target : nextTargets[0],
                       });
                     }}
-                  >
-                    <For each={SOURCES}>
-                      {(source) => (
-                        <option value={source}>
-                          {MODULATION_SOURCE_LABELS[source]}
-                        </option>
-                      )}
-                    </For>
-                  </Select>
-                  <button
-                    type="button"
+                  />
+                  <Button
+                    variant="ghost"
                     class={styles.sourceAffordance}
                     title={`${sourceAffordance().label}: ${sourceAffordance().detail}`}
                     onClick={() => props.onFocusSource?.(route.source)}
                   >
                     <span>{sourceAffordance().label}</span>
                     <span>{sourceAffordance().detail}</span>
-                  </button>
+                  </Button>
                 </div>
                 <HoverInfo content="Pick source">
                   <Button
@@ -226,7 +219,7 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                     aria-label="Pick modulation source"
                     onPointerDown={(event) => startPick(route.id, "source", event)}
                   >
-                    <Icon name="ph:plug" size={12} decorative />
+                    <Icon name="ph:plug" size={18} decorative />
                   </Button>
                 </HoverInfo>
                 <TargetSelect
@@ -244,7 +237,7 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                     aria-label="Pick modulation target"
                     onPointerDown={(event) => startPick(route.id, "target", event)}
                   >
-                    <Icon name="ph:plug" size={12} decorative />
+                    <Icon name="ph:plug" size={18} decorative />
                   </Button>
                 </HoverInfo>
                 <Slider
@@ -294,7 +287,7 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                     aria-label="Remove modulation route"
                     onClick={() => removeRoute(route.id)}
                   >
-                    <Icon name="ph:trash" size={12} decorative />
+                    <Icon name="ph:trash" size={18} decorative />
                   </Button>
                 </HoverInfo>
               </div>
@@ -409,8 +402,8 @@ function TargetSelect(props: {
 
   return (
     <div ref={triggerRef} class={styles.targetMenu}>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         class={styles.targetTrigger}
         aria-label={props.label ?? "Modulation target"}
         aria-haspopup="listbox"
@@ -418,8 +411,8 @@ function TargetSelect(props: {
         onClick={() => setOpen((value) => !value)}
       >
         <TargetLabel prefix={selected().prefix} name={selected().name} />
-        <Icon name="ph:caret-down" size={12} decorative />
-      </button>
+        <Icon name="ph:caret-down" size={18} decorative />
+      </Button>
       <Show when={open() && menuRect()}>
         {(rect) => (
           <FloatingLayer

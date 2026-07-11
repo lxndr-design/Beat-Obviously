@@ -2,15 +2,20 @@
   width: 100%;
   height: 100%;
   display: block;
+  pointer-events: none;
 }
 
 .hit {
   fill: var(--color-bg);
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 .playing {
   fill: var(--color-fg);
   stroke: color-mix(in srgb, var(--color-bg) 68%, var(--color-fg));
   stroke-width: 0.08;
+  vector-effect: non-scaling-stroke;
   filter: drop-shadow(0 0 0.18px var(--color-bg));
 }

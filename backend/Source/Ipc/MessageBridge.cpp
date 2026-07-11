@@ -1077,6 +1077,7 @@ namespace beat
                 juce::DynamicObject::Ptr sample = new juce::DynamicObject();
                 sample->setProperty("path", sourceSample.path);
                 sample->setProperty("name", sourceSample.name);
+                sample->setProperty("trigger", sourceSample.trigger);
                 sample->setProperty("rootNote", sourceSample.rootNote);
                 sample->setProperty("loNote", sourceSample.loNote);
                 sample->setProperty("hiNote", sourceSample.hiNote);
@@ -4013,6 +4014,29 @@ namespace beat
             response->setProperty("ok", ok);
             if (!ok)
                 response->setProperty("error", error.isNotEmpty() ? error : "Could not select input device.");
+            response->setProperty("snapshot", makeAudioDeviceSnapshotVar(engine.listAudioDevices()));
+            return juce::var(response.get());
+        }
+
+        if (kind == AUDIO_SELECT_OUTPUT_DEVICE)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto typeName = payload.getProperty("typeName", {}).toString();
+            const auto deviceName = payload.getProperty("deviceName", {}).toString();
+
+            if (deviceName.isEmpty())
+            {
+                response->setProperty("ok", false);
+                response->setProperty("error", "No output device was selected.");
+                response->setProperty("snapshot", makeAudioDeviceSnapshotVar(engine.listAudioDevices()));
+                return juce::var(response.get());
+            }
+
+            juce::String error;
+            const bool ok = engine.selectOutputDevice(typeName, deviceName, &error);
+            response->setProperty("ok", ok);
+            if (!ok)
+                response->setProperty("error", error.isNotEmpty() ? error : "Could not select output device.");
             response->setProperty("snapshot", makeAudioDeviceSnapshotVar(engine.listAudioDevices()));
             return juce::var(response.get());
         }

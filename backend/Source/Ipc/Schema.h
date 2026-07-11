@@ -68,6 +68,7 @@ namespace beat::ipc
         constexpr const char* AUDIO_WAVEFORM      = "audio.waveform";
         constexpr const char* AUDIO_LIST_DEVICES  = "audio.listDevices";
         constexpr const char* AUDIO_SELECT_INPUT_DEVICE = "audio.selectInputDevice";
+        constexpr const char* AUDIO_SELECT_OUTPUT_DEVICE = "audio.selectOutputDevice";
 
         // Recording
         constexpr const char* RECORDING_PLAN      = "recording.plan";

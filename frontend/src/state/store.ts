@@ -5,6 +5,7 @@ import { temporal, type TemporalStoreApi } from "./temporal";
 import { defaultTrackEffectParams } from "./effects";
 import { pruneDevFixtureInstruments } from "./instrumentLibraryGuards";
 import { normalizeInstrumentTaxonomy } from "./instrumentTaxonomy";
+import { normalizeSampleMap } from "./sampleZones";
 import type { BeatProjectAsset, BeatProjectIntegrityReport, ProjectSidecarCleanupReport, RecentProjectEntry } from "../ipc/schema";
 import type {
   Beats,
@@ -13,7 +14,6 @@ import type {
   Instrument,
   InstrumentSet,
   InstrumentSnapshot,
-  MidiNote,
   PluginAdapter,
   Project,
   ReturnBus,
@@ -895,13 +895,11 @@ export const useProjectStore = create<ProjectSlice>()(
               right.sourceStartBeat = (segment.sourceStartBeat ?? 0) + leftLength;
               right.fadeInBeats = clampFade(right.fadeInBeats ?? 0, rightLength);
               right.fadeOutBeats = clampFade(right.fadeOutBeats ?? 0, rightLength);
-              trimSegmentPayloadToRange(right, leftLength, segment.lengthBeats);
 
               segment.lengthBeats = leftLength;
               segment.repeats = 0;
               segment.fadeInBeats = clampFade(segment.fadeInBeats ?? 0, leftLength);
               segment.fadeOutBeats = clampFade(segment.fadeOutBeats ?? 0, leftLength);
-              trimSegmentPayloadToRange(segment, 0, leftLength);
               enforceSegmentBounds(segment, s.project.lengthBeats);
               enforceSegmentBounds(right, s.project.lengthBeats);
               track.segments.splice(segmentIndex + 1, 0, right);
@@ -1099,6 +1097,7 @@ function segmentHasContent(segment: Segment): boolean {
   if (segment.payload.kind === "drum") {
     return segment.payload.rows.some((row) => row.steps.some((step) => Boolean(typeof step === "object" ? step.on : step)));
   }
+  if (segment.payload.kind === "drumpad") return segment.payload.hits.length > 0;
   return Boolean(segment.payload.audioFileId);
 }
 
@@ -1127,53 +1126,14 @@ function applySegmentWindow(
   const newStartBeat = Math.max(0, nextStartBeat);
   const newLengthBeats = Math.max(MIN_SEGMENT_LENGTH_BEATS, nextLengthBeats);
   const localStart = Math.max(0, newStartBeat - oldStartBeat);
-  const localEnd = Math.min(oldLengthBeats, localStart + newLengthBeats);
   if (origin?.payload) segment.payload = cloneProjectData(origin.payload);
+  if (segment.payload.kind === "drum" && segment.payload.sourceLengthBeats == null) {
+    segment.payload.sourceLengthBeats = oldLengthBeats;
+  }
   segment.startBeat = newStartBeat;
   segment.lengthBeats = newLengthBeats;
   segment.sourceStartBeat = Math.max(0, oldSourceStartBeat + localStart);
-  trimSegmentPayloadToRange(segment, localStart, localEnd);
   enforceSegmentBounds(segment, projectLengthBeats);
-}
-
-function trimSegmentPayloadToRange(segment: Segment, rangeStartBeat: Beats, rangeEndBeat: Beats): void {
-  if (segment.payload.kind === "midi" || segment.payload.kind === "mixed") {
-    segment.payload.notes = trimNotesToRange(segment.payload.notes, rangeStartBeat, rangeEndBeat);
-  }
-}
-
-function trimNotesToRange(notes: MidiNote[], rangeStartBeat: Beats, rangeEndBeat: Beats): MidiNote[] {
-  return notes.flatMap((note) => {
-    const noteStart = note.startBeat;
-    const noteEnd = note.startBeat + note.lengthBeats;
-    const overlapStart = Math.max(noteStart, rangeStartBeat);
-    const overlapEnd = Math.min(noteEnd, rangeEndBeat);
-    if (overlapEnd - overlapStart < 0.000001) return [];
-    const shifted: MidiNote = {
-      ...note,
-      curve: note.curve?.map((point) => ({ ...point })),
-      automation: note.automation?.map((lane) => ({
-        ...lane,
-        points: lane.points.map((point) => ({ ...point })),
-      })),
-      startBeat: overlapStart - rangeStartBeat,
-      lengthBeats: Math.max(0.03125, overlapEnd - overlapStart),
-    };
-    if (shifted.curve) {
-      shifted.curve = shifted.curve
-        .filter((point) => point.beat >= overlapStart && point.beat <= overlapEnd)
-        .map((point) => ({ ...point, beat: point.beat - rangeStartBeat }));
-    }
-    if (shifted.automation) {
-      shifted.automation = shifted.automation.map((lane) => ({
-        ...lane,
-        points: lane.points
-          .filter((point) => point.beat >= overlapStart && point.beat <= overlapEnd)
-          .map((point) => ({ ...point, beat: point.beat - rangeStartBeat })),
-      }));
-    }
-    return [shifted];
-  });
 }
 
 function clampFade(value: Beats, lengthBeats: Beats): Beats {
@@ -1245,7 +1205,7 @@ interface ViewSlice {
 export const useViewStore = create<ViewSlice>()((set) => ({
   beatsToPx: 64,
   lastSegmentLength: 4,
-  sidebarWidth: 324,
+  sidebarWidth: 330,
   setZoom: (px) => set({ beatsToPx: Math.max(8, Math.min(256, px)) }),
   setLastSegmentLength: (n) => set({ lastSegmentLength: Math.max(0.25, n) }),
   setSidebarWidth: (px) => set({ sidebarWidth: Math.max(220, Math.min(560, px)) }),
@@ -1869,8 +1829,10 @@ interface InstrumentLibrarySlice {
   loading: boolean;
   instruments: Instrument[];
   instrumentSets: InstrumentSet[];
+  deletedInstrumentStack: Instrument[];
   addInstrument: (i?: Partial<Instrument>) => Id;
   removeInstrument: (id: Id) => void;
+  undoLastInstrumentDelete: () => boolean;
   updateInstrument: (id: Id, patch: Partial<Instrument>) => void;
   duplicateInstrument: (id: Id) => Id;
   hydrateInstruments: (instruments: Instrument[], sets?: InstrumentSet[]) => void;
@@ -2080,12 +2042,14 @@ function withOriginal(instrument: Instrument): Instrument {
 
 function normalizeInstrument(instrument: Instrument): Instrument {
   const source = instrument.source ?? inferInstrumentSource(instrument);
+  const sampleMap = normalizeSampleMap(instrument.sampleMap);
   const setId = isDecentSamplerInstancedInstrument(instrument, source)
     && (!instrument.setId || instrument.setId === USER_INSTRUMENT_SET_ID)
     ? TEMPORARY_DS_INSTRUMENT_SET_ID
     : instrument.setId ?? (instrument.userCreated ? USER_INSTRUMENT_SET_ID : FACTORY_SYNTH_SET_ID);
   return {
     ...instrument,
+    sampleMap,
     setId,
     source,
     taxonomy: normalizeInstrumentTaxonomy(instrument),
@@ -2278,6 +2242,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
     loading: true,
     instruments: [],
     instrumentSets: defaultInstrumentSets(),
+    deletedInstrumentStack: [],
     addInstrument: (patch) => {
       const normalizedPatch = aetherizeCreatedInstrumentPatch(patch);
       const requestedId = normalizedPatch.id;
@@ -2296,8 +2261,22 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         // System instruments (userCreated === false) are not deletable.
         const target = s.instruments.find((i) => i.id === id);
         if (!target || !target.userCreated) return;
+        s.deletedInstrumentStack.push(structuredClone(target));
         s.instruments = s.instruments.filter((i) => i.id !== id);
       }),
+    undoLastInstrumentDelete: () => {
+      let restored = false;
+      set((s) => {
+        const target = s.deletedInstrumentStack.pop();
+        if (!target) return;
+        const idTaken = s.instruments.some((instrument) => instrument.id === target.id);
+        const restoredInstrument = idTaken ? { ...target, id: nanoid() } : target;
+        restoredInstrument.name = uniqueInstrumentName(restoredInstrument.name, s.instruments, restoredInstrument.id);
+        s.instruments.push(restoredInstrument);
+        restored = true;
+      });
+      return restored;
+    },
     updateInstrument: (id, patch) =>
       set((s) => {
         const i = s.instruments.find((x) => x.id === id);

@@ -27,7 +27,7 @@ export function DecentSamplerLibraryPanel(props: DecentSamplerLibraryPanelProps)
         actions={(
           <HoverInfo content="Import DS file">
             <SectionRibbonActionButton onClick={() => setImportOpen(true)} aria-label="Import DS file">
-              <Icon name="ph:plus" size={16} decorative />
+              <Icon name="ph:plus" size={18} decorative />
             </SectionRibbonActionButton>
           </HoverInfo>
         )}

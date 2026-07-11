@@ -208,6 +208,19 @@
             DecentSampler packages are handled as third-party package imports,
             then converted into Beat-managed sampler instruments.
           </p>
+          <p>
+            Some DecentSampler-style hosts show a piano keyboard below the
+            package UI. That keyboard is host interface, not usually authored
+            inside the `.dspreset`. Beat should show its own generic keyboard
+            and keymap view for DS instruments by reading the package sample
+            zones.
+          </p>
+          <p>
+            Many piano packages use stretched key ranges instead of one sample
+            per chromatic note. Beat should make those mapped ranges visible so
+            users can see which keys are direct samples and which keys are
+            interpolation ranges.
+          </p>
           <h3 id="workflow">DecentSampler Workflow</h3>
           <p>
             This workflow is for DecentSampler-compatible package files, not for

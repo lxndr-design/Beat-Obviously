@@ -13,6 +13,7 @@ export type DrumSpeed = 1 | 2 | 3 | 4 | 5 | 6;
 export type TrackKind = "audio" | "midi" | "mixed" | "group";
 
 export type WavetableWarpMode = "shape" | "fold" | "pinch" | "mirror";
+export type SamplerComplexity = "single" | "layered" | "mapped" | "performance";
 
 export type MidiAutomationTarget =
   | "pitch"
@@ -58,6 +59,10 @@ export interface MidiNote {
   curve?: Array<{ beat: Beats; pitch: number }>;
   /** Optional per-note parameter automation. Existing curve remains the legacy pitch lane. */
   automation?: MidiAutomationLane[];
+  /** Optional sampler zone/articulation override for sampler-backed instruments. */
+  sampleZoneId?: Id;
+  samplePath?: string;
+  sampleLabel?: string;
 }
 
 export interface DrumCell {
@@ -79,10 +84,42 @@ export interface DrumRow {
   steps: DrumStep[];
 }
 
+export type DrumpadKeyboardLayout = "mac" | "windows";
+
+export interface DrumpadLane {
+  id: Id;
+  instrumentId?: Id;
+  name: string;
+  keyCode?: string;
+  keyLabel?: string;
+  muted?: boolean;
+  pitch?: number;
+}
+
+export interface DrumpadHit {
+  id: Id;
+  laneId: Id;
+  startBeat: Beats;
+  lengthBeats: Beats;
+  velocity: number;
+  keyCode?: string;
+}
+
+export interface DrumpadPayload {
+  kind: "drumpad";
+  keyboardLayout: DrumpadKeyboardLayout;
+  lanes: DrumpadLane[];
+  hits: DrumpadHit[];
+  /** Recording quantization in seconds. Defaults to 1/64 second. */
+  quantizeSeconds: number;
+  gainDb?: number;
+}
+
 export type SegmentPayload =
   | { kind: "audio"; audioFileId: Id; gainDb: number }
   | { kind: "midi"; notes: MidiNote[]; gainDb?: number }
-  | { kind: "drum"; rows: DrumRow[]; stepCount: number; speed: DrumSpeed; defaultPitchHz?: number; swingPercent?: number; timeSignature?: TimeSignature }
+  | { kind: "drum"; rows: DrumRow[]; stepCount: number; speed: DrumSpeed; sourceLengthBeats?: Beats; defaultPitchHz?: number; swingPercent?: number; timeSignature?: TimeSignature }
+  | DrumpadPayload
   | { kind: "mixed"; audioFileId: Id; notes: MidiNote[]; gainDb: number };
 
 export interface Segment {
@@ -315,6 +352,8 @@ export interface Instrument {
   sampleUrls?: string[];
   /** Optional multisample, hit-variant, or round-robin zones, e.g. parsed from imports. */
   sampleMap?: InstrumentSampleZone[];
+  /** Sampler editing/runtime complexity level. Keeps simple one-shots separate from layered or performable maps. */
+  samplerComplexity?: SamplerComplexity;
   /** Sidebar grouping bucket for instrument library organization. */
   setId?: Id;
   /** Canonical library taxonomy assignment for search and organization. */
@@ -332,8 +371,11 @@ export interface Instrument {
 }
 
 export interface InstrumentSampleZone {
+  /** Stable zone identity used by MIDI notes that force a specific sample/articulation. */
+  id?: Id;
   path: string;
   name?: string;
+  trigger?: string;
   rootNote: number;
   loNote: number;
   hiNote: number;
@@ -403,6 +445,8 @@ export interface AetherNoiseConfig {
 export interface AetherSynthConfig {
   oscA: AetherOscillatorConfig;
   oscB: AetherOscillatorConfig;
+  /** Ordered oscillator collection. oscA/oscB remain for document compatibility. */
+  oscillators?: Array<AetherOscillatorConfig & { id: string; name: string }>;
   sub: AetherSubConfig;
   noise: AetherNoiseConfig;
   /** 0..1 opt-in runtime nonlinear warp applied after Aether oscillator mixing. */
@@ -733,6 +777,7 @@ export interface InstrumentSnapshot {
   sampleUrl?: string;
   sampleUrls?: string[];
   sampleMap?: InstrumentSampleZone[];
+  samplerComplexity?: SamplerComplexity;
   taxonomy?: InstrumentTaxonomyAssignment;
   parentIds?: Id[];
   descriptors?: string[];
@@ -758,6 +803,8 @@ export interface AudioFile {
   sizeBytes?: number;
   /** Unix ms timestamp when the asset entered the Beat audio library. */
   importedAt?: number;
+  /** User-provided source/provenance label captured at import time. */
+  importSource?: string;
   /** Native producer-facing analysis metadata. Omitted when unavailable. */
   leftPeakDbFS?: number;
   rightPeakDbFS?: number;
@@ -867,12 +914,12 @@ export interface UiState {
   activeSegmentPlayback: Record<Id, number>;
   /** Open editors. Multiple modals can be open at once. */
   openEditors: Array<
-    | { kind: "instrument"; instrumentId: Id }
-    | { kind: "samplerInstrument"; instrumentId: Id }
-    | { kind: "synthInstrument"; instrumentId: Id }
+    | { kind: "instrument"; instrumentId: Id; draftInstrument?: Instrument }
+    | { kind: "samplerInstrument"; instrumentId: Id; draftInstrument?: Instrument }
+    | { kind: "synthInstrument"; instrumentId: Id; draftInstrument?: Instrument }
     | { kind: "synth" }
     | { kind: "track"; trackId: Id }
-    | { kind: "segment"; segmentId: Id }
+    | { kind: "segment"; segmentId: Id; discardIfUntouched?: boolean }
     | { kind: "component"; componentId: Id }
     | { kind: "plugin"; pluginId: Id }
     | { kind: "eq" }

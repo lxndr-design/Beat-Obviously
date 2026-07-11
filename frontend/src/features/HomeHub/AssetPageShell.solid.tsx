@@ -65,7 +65,7 @@ export function AssetStateMessage(props: {
   return (
     <div class={className()}>
       <span class={styles.stateIcon} aria-hidden>
-        <Icon name={props.icon} size={16} decorative />
+        <Icon name={props.icon} size={18} decorative />
       </span>
       <div class={styles.stateCopy}>
         <strong>{props.title}</strong>

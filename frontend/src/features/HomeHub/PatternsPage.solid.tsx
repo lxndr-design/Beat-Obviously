@@ -137,14 +137,15 @@ export function PatternsPage() {
                   {(component) => {
                     const issue = () => patternReferenceIssue(component, instruments());
                     return (
-                      <button
-                        type="button"
-                        class={`${styles.row} ${active()?.id === component.id ? styles.rowActive : ""}`}
+                      <Button
+                        variant="ghost"
+                        selected={active()?.id === component.id}
+                        class={styles.row}
                         onClick={() => setActiveId(component.id)}
                         onDblClick={() => openEditor({ kind: "component", componentId: component.id })}
                       >
                         <span class={styles.nameCell}>
-                          <Icon name={componentIcon(component)} size={14} decorative />
+                          <Icon name={componentIcon(component)} size={18} decorative />
                           <MarqueeText text={component.name} />
                         </span>
                         <span class={`${styles.referenceChip} ${issue() ? styles.referenceWarning : styles.referenceManaged}`}>
@@ -153,7 +154,7 @@ export function PatternsPage() {
                         <span>{componentLabel(component)}</span>
                         <span>{componentLength(component)}</span>
                         <span>{componentItemCount(component)}</span>
-                      </button>
+                      </Button>
                     );
                   }}
                 </For>
@@ -199,7 +200,7 @@ export function PatternsPage() {
               <div class={styles.previewControls}>
                 <HoverInfo content="Restart pattern">
                   <Button iconOnly size="md" onClick={() => playPreview(currentActive())} aria-label="Restart pattern">
-                    <Icon name="ph:skip-back" size={14} decorative />
+                    <Icon name="ph:skip-back" size={18} decorative />
                   </Button>
                 </HoverInfo>
                 <HoverInfo content={playingId() === currentActive().id ? "Pause pattern" : "Play pattern"}>
@@ -210,7 +211,7 @@ export function PatternsPage() {
                     onClick={() => togglePreview(currentActive())}
                     aria-label={playingId() === currentActive().id ? "Pause pattern" : "Play pattern"}
                   >
-                    <Icon name={playingId() === currentActive().id ? "ph:pause-fill" : "ph:play-fill"} size={14} decorative />
+                    <Icon name={playingId() === currentActive().id ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
                   </Button>
                 </HoverInfo>
                 <HoverInfo content="Preview speed">
@@ -220,13 +221,13 @@ export function PatternsPage() {
                 </HoverInfo>
                 <HoverInfo content="Loop pattern">
                   <Button iconOnly size="md" selected={loopPreview()} onClick={() => setLoopPreview((current) => !current)} aria-label="Loop pattern">
-                    <Icon name="ph:repeat" size={14} decorative />
+                    <Icon name="ph:repeat" size={18} decorative />
                   </Button>
                 </HoverInfo>
               </div>
               <ActionFooter className={styles.previewActions}>
                 <Button className={styles.previewActionButton} variant="primary" onClick={editActive}>
-                  <Icon name="ph:pencil-simple" size={14} decorative />
+                  <Icon name="ph:pencil-simple" size={18} decorative />
                   Edit Pattern
                 </Button>
               </ActionFooter>
@@ -302,7 +303,7 @@ function PatternSegmentPreview(props: {
       <div class={styles.segmentBlock}>
         <div class={styles.segmentHeader}>
           <span>{props.component.name}</span>
-          <Icon name={componentIcon(props.component)} size={16} decorative />
+          <Icon name={componentIcon(props.component)} size={18} decorative />
         </div>
         <Show when={kind() === "midi"}>
           <div class={styles.segmentPlayhead} aria-hidden />

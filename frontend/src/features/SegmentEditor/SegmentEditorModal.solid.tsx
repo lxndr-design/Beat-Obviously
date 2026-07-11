@@ -37,7 +37,7 @@ import { importAudioFile } from "../../audio/audioImport";
 import { createInstrumentBufferSource, noteFrequency } from "../../audio/synthPreview";
 import { appAlert, useModalStack } from "../../solid-ui";
 import { updateDrumBeatFeedback } from "../../persistence/dexie";
-import { Button, FloatingSelect, Icon, Modal, NumberInput, TextInput } from "../../solid-ui";
+import { Button, Checkbox, FloatingSelect, Icon, Modal, NumberInput, Slider, TextInput } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { selectSegment } from "../../state/selectors";
 import {
@@ -52,10 +52,19 @@ import type { AutomationCurve, DrumRow, DrumSpeed, Instrument, MidiNote, Segment
 import { DrumSequencer } from "../DrumEditor/DrumSequencer.solid";
 import { PianoRoll } from "../MidiEditor/PianoRoll.solid";
 import { MidiTransport } from "../MidiEditor/MidiTransport.solid";
+import {
+  MIDI_LIVE_MIN_LENGTH_BEATS,
+  composeLiveMidiNotes,
+  eraseMidiNotesOverlappingSweep,
+  makeLiveMidiNote,
+  sortedMidiNotes,
+  type MidiLiveHeldKey,
+} from "./midiLiveRecording";
 import styles from "./SegmentEditorModal.module.css";
 
 export interface SegmentEditorModalProps {
   segmentId: string;
+  discardIfUntouched?: boolean;
 }
 
 type MidiLikePayload = Extract<Segment["payload"], { kind: "midi" | "mixed" }>;
@@ -65,6 +74,27 @@ type AudioPayload = Extract<Segment["payload"], { kind: "audio" }>;
 // Keep the default MIDI modal focused on piano-roll editing. Aether arrangement
 // automation needs a separate opt-in surface instead of living under every MIDI clip.
 const SHOW_SEGMENT_AUTOMATION_PANEL = false;
+const MIDI_LIVE_BASE_BPM = 120;
+const MIDI_LIVE_KEY_MAP: Record<string, number> = {
+  a: 60,
+  w: 61,
+  s: 62,
+  e: 63,
+  d: 64,
+  f: 65,
+  t: 66,
+  g: 67,
+  y: 68,
+  h: 69,
+  u: 70,
+  j: 71,
+  k: 72,
+  o: 73,
+  l: 74,
+  p: 75,
+};
+const MIDI_LIVE_WHITE_KEYS = ["a", "s", "d", "f", "g", "h", "j", "k", "l"] as const;
+const MIDI_LIVE_BLACK_KEYS = ["w", "e", "", "t", "y", "u", "", "o", "p"] as const;
 
 export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const source = createStoreSelector(useProjectStore, () => selectSegment(props.segmentId));
@@ -74,30 +104,51 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const timeSignature = createStoreSelector(useProjectStore, (s) => s.project.timeSignature);
   const bpm = createStoreSelector(useProjectStore, (s) => s.project.bpm);
   const updateSegment = useProjectStore.getState().updateSegment;
+  const removeSegment = useProjectStore.getState().removeSegment;
   const closeEditor = useUiStore.getState().closeEditor;
+  const setSelectedSegments = useUiStore.getState().setSelectedSegments;
   const requestDirtyClose = useModalStack.getState().requestDirtyClose;
   const addInstrument = useInstrumentStore.getState().addInstrument;
   const addAudioFile = useAudioFileStore.getState().addFile;
   const scopeId = () => `segment-${props.segmentId}`;
-  const [draft, setDraft] = createSignal<Segment | undefined>(source() ? structuredClone(source()) : undefined, { equals: false });
+  const [draft, setDraftInternal] = createSignal<Segment | undefined>(source() ? structuredClone(source()) : undefined, { equals: false });
+  const [touched, setTouched] = createSignal(false);
   const [instrumentSelectOpen, setInstrumentSelectOpen] = createSignal(false);
-  const [midiTimeSignatureOpen, setMidiTimeSignatureOpen] = createSignal(false);
   const [segmentAutomationCurveOpen, setSegmentAutomationCurveOpen] = createSignal(false);
   const [activeSegmentAutomationTarget, setActiveSegmentAutomationTarget] = createSignal<AetherArrangementAutomationTarget>("macro.1");
   const [draggedSegmentAutomationEdge, setDraggedSegmentAutomationEdge] = createSignal<"start" | "mid" | "end" | null>(null);
   const [segmentAutomationPointClipboard, setSegmentAutomationPointClipboard] = createSignal<AetherArrangementAutomationPointClipboard | null>(null);
   const [selectedSegmentAutomationPointIndices, setSelectedSegmentAutomationPointIndices] = createSignal<number[]>([]);
   const [midiPreviewBeat, setMidiPreviewBeat] = createSignal<number | null>(null);
+  const [midiLiveRecording, setMidiLiveRecording] = createSignal(false);
+  const [midiLiveMode, setMidiLiveMode] = createSignal<"overwrite" | "additive">("additive");
+  const [midiLiveStartedAtMs, setMidiLiveStartedAtMs] = createSignal<number | null>(null);
+  const [midiLiveElapsedMs, setMidiLiveElapsedMs] = createSignal(0);
+  const [midiLiveHeldKeys, setMidiLiveHeldKeys] = createSignal<Record<string, MidiLiveHeldKey>>({});
+  const [midiLiveSourceNotes, setMidiLiveSourceNotes] = createSignal<MidiNote[] | null>(null);
+  const [midiLiveCommittedNotes, setMidiLiveCommittedNotes] = createSignal<MidiNote[]>([]);
+  const [midiLiveOverwriteSweepBeat, setMidiLiveOverwriteSweepBeat] = createSignal(0);
   const [drumTrainingSessionId, setDrumTrainingSessionId] = createSignal<string | null>(null);
   let previewCtx: AudioContext | null = null;
+  let midiLiveRaf: number | null = null;
+
+  function markTouched() {
+    if (props.discardIfUntouched) setTouched(true);
+  }
+
+  function setDraft(next: Segment | undefined | ((current: Segment | undefined) => Segment | undefined)) {
+    markTouched();
+    setDraftInternal(next as Segment | undefined);
+  }
 
   createEffect(() => {
     const currentSource = source();
-    if (currentSource && !draft()) setDraft(structuredClone(currentSource));
+    if (currentSource && !draft()) setDraftInternal(structuredClone(currentSource));
   });
 
   onCleanup(() => {
     if (previewCtx) void previewCtx.close();
+    if (midiLiveRaf) cancelAnimationFrame(midiLiveRaf);
   });
 
   const dirty = createMemo(() => Boolean(source() && draft() && JSON.stringify(source()) !== JSON.stringify(draft())));
@@ -107,8 +158,6 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const midiNotes = createMemo<MidiNote[]>(() => isMidi() ? (draft()?.payload as MidiLikePayload).notes : []);
   const transpose = createMemo(() => draft()?.transpose ?? 0);
   const midiGainDb = createMemo(() => draft() ? midiSegmentGainDb(draft()!.payload) : 0);
-  const midiVolumePercent = createMemo(() => gainDbToVolumePercent(midiGainDb()));
-  const midiTimeSignature = createMemo(() => draft()?.timeSignature ?? timeSignature());
   const activeSegmentAutomationMeta = createMemo(() => aetherArrangementAutomationTargetMeta(activeSegmentAutomationTarget()));
   const segmentAutomationRange = createMemo(() => segmentAutomationValueRange(draft(), activeSegmentAutomationTarget()));
   const activeSegmentAutomationCurve = createMemo(() => segmentAutomationCurve(draft(), activeSegmentAutomationTarget()));
@@ -124,13 +173,25 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
     setSelectedSegmentAutomationPointIndices([]);
   });
   const segmentAutomationCurveOptions = AUTOMATION_CURVES.map((curve) => ({ value: curve, label: automationCurveLabel(curve) }));
-  const previewMidiNotes = createMemo(() => midiNotes().map((note) => ({
+  const liveMidiNotes = createMemo(() => {
+    if (!midiLiveRecording()) return midiNotes();
+    return composeLiveMidiNotes({
+      sourceNotes: midiLiveSourceNotes() ?? midiNotes(),
+      committedNotes: midiLiveCommittedNotes(),
+      heldKeys: midiLiveHeldKeys(),
+      currentBeat: midiPreviewBeat() ?? 0,
+    });
+  });
+  const previewMidiNotes = createMemo(() => liveMidiNotes().map((note) => ({
     ...note,
     pitch: Math.max(0, Math.min(127, note.pitch + transpose())),
     curve: note.curve?.map((point) => ({ ...point, pitch: Math.max(0, Math.min(127, point.pitch + transpose())) })),
   })));
-  const displayName = createMemo(() => draft()?.name?.trim() || `Segment ${props.segmentId.slice(0, 6)}`);
-  const ribbonName = createMemo(() => dirty() ? `${displayName()} *` : displayName());
+  const editorTitle = createMemo(() => {
+    const currentDraft = draft();
+    if (!currentDraft) return "Segment";
+    return `${segmentTypeTitle(currentDraft.payload.kind)}${dirty() ? " *" : ""}`;
+  });
   const globalPlayheadBeat = createMemo(() => {
     const currentDraft = draft();
     if (!currentDraft || !playing()) return null;
@@ -140,9 +201,54 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       : null;
   });
   const playheadBeat = createMemo(() => midiPreviewBeat() ?? globalPlayheadBeat());
+  const midiLiveElapsedLabel = createMemo(() => `${(midiLiveElapsedMs() / 1000).toFixed(2)}s`);
+  const midiLiveActiveKeys = createMemo(() => new Set(Object.keys(midiLiveHeldKeys())));
+
+  createEffect(() => {
+    if (!isMidi()) return;
+    window.addEventListener("keydown", handleMidiLiveKeyDown, true);
+    window.addEventListener("keyup", handleMidiLiveKeyUp, true);
+    onCleanup(() => {
+      window.removeEventListener("keydown", handleMidiLiveKeyDown, true);
+      window.removeEventListener("keyup", handleMidiLiveKeyUp, true);
+    });
+  });
+
+  createEffect(() => {
+    if (!midiLiveRecording()) {
+      if (midiLiveRaf) cancelAnimationFrame(midiLiveRaf);
+      midiLiveRaf = null;
+      return;
+    }
+
+    const tick = () => {
+      const now = performance.now();
+      const startedAt = midiLiveStartedAtMs();
+      if (startedAt != null) setMidiLiveElapsedMs(now - startedAt);
+      const beat = currentMidiLiveBeat(now);
+      ensureMidiLiveLengthForBeat(beat);
+      sweepMidiLiveOverwriteToBeat(beat);
+      setMidiPreviewBeat(beat);
+      midiLiveRaf = requestAnimationFrame(tick);
+    };
+
+    midiLiveRaf = requestAnimationFrame(tick);
+    onCleanup(() => {
+      if (midiLiveRaf) cancelAnimationFrame(midiLiveRaf);
+      midiLiveRaf = null;
+    });
+  });
+
+  function closeEditorOnly() {
+    closeEditor({ kind: "segment", segmentId: props.segmentId });
+  }
 
   function close() {
-    closeEditor({ kind: "segment", segmentId: props.segmentId });
+    if (props.discardIfUntouched && !touched()) {
+      removeSegment(props.segmentId);
+      setSelectedSegments([]);
+    }
+    closeEditorOnly();
   }
 
   function save() {
@@ -156,7 +262,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       }).then(() => maybeRunDueTraining("drums"));
     }
     updateSegment(props.segmentId, prepareSegmentForSave(currentDraft));
-    close();
+    closeEditorOnly();
   }
 
   function requestClose() {
@@ -171,11 +277,112 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
     });
   }
 
-  function updateMidiVolume(percent: number) {
-    const gainDb = volumePercentToGainDb(percent);
-    setDraft((current) => {
-      if (!current || (current.payload.kind !== "midi" && current.payload.kind !== "mixed")) return current;
-      return { ...current, payload: { ...current.payload, gainDb } };
+  function currentMidiLiveBeat(nowMs = performance.now()) {
+    const startedAt = midiLiveStartedAtMs();
+    if (startedAt == null) return 0;
+    const beatsPerSecond = (bpm() || MIDI_LIVE_BASE_BPM) / 60;
+    return Math.max(0, ((nowMs - startedAt) / 1000) * beatsPerSecond);
+  }
+
+  function ensureMidiLiveLengthForBeat(beat: number) {
+    const current = draft();
+    if (!current || (current.payload.kind !== "midi" && current.payload.kind !== "mixed")) return;
+    if (beat <= current.lengthBeats - MIDI_LIVE_MIN_LENGTH_BEATS) return;
+    const nextLength = Math.ceil((beat + MIDI_LIVE_MIN_LENGTH_BEATS) * 4) / 4;
+    setDraft({ ...current, lengthBeats: Math.max(current.lengthBeats, nextLength) });
+  }
+
+  function sweepMidiLiveOverwriteToBeat(beat: number) {
+    if (midiLiveMode() !== "overwrite") return;
+    const previousBeat = midiLiveOverwriteSweepBeat();
+    if (beat <= previousBeat) return;
+    setMidiLiveSourceNotes((sourceNotes) => eraseMidiNotesOverlappingSweep(sourceNotes ?? midiNotes(), previousBeat, beat));
+    setMidiLiveOverwriteSweepBeat(beat);
+  }
+
+  function finalMidiLiveNotes(nowMs = performance.now()) {
+    const held = midiLiveHeldKeys();
+    const entries = Object.entries(held);
+    const endBeat = currentMidiLiveBeat(nowMs);
+    ensureMidiLiveLengthForBeat(endBeat);
+    sweepMidiLiveOverwriteToBeat(endBeat);
+    const heldNotes = entries.map(([, heldKey]) => makeLiveMidiNote(heldKey.pitch, heldKey.startBeat, endBeat));
+    return composeLiveMidiNotes({
+      sourceNotes: midiLiveSourceNotes() ?? midiNotes(),
+      committedNotes: [...midiLiveCommittedNotes(), ...heldNotes],
+      heldKeys: {},
+      currentBeat: endBeat,
+    });
+  }
+
+  function clearMidiLiveSession() {
+    setMidiLiveHeldKeys({});
+    setMidiLiveSourceNotes(null);
+    setMidiLiveCommittedNotes([]);
+    setMidiLiveOverwriteSweepBeat(0);
+  }
+
+  function startMidiLiveRecording() {
+    if (!isMidi()) return;
+    const now = performance.now();
+    clearMidiLiveSession();
+    setMidiLiveSourceNotes(structuredClone(midiNotes()));
+    setMidiLiveStartedAtMs(now);
+    setMidiLiveElapsedMs(0);
+    setMidiPreviewBeat(0);
+    setMidiLiveRecording(true);
+  }
+
+  function stopMidiLiveRecording() {
+    updateMidi(finalMidiLiveNotes());
+    setMidiLiveRecording(false);
+    setMidiLiveStartedAtMs(null);
+    setMidiPreviewBeat(null);
+    clearMidiLiveSession();
+  }
+
+  function toggleMidiLiveRecording() {
+    if (midiLiveRecording()) stopMidiLiveRecording();
+    else startMidiLiveRecording();
+  }
+
+  function handleMidiLiveKeyDown(event: KeyboardEvent) {
+    if (!isMidi() || !midiLiveRecording() || isEditableEventTarget(event.target)) return;
+    const key = event.key.toLowerCase();
+    const pitch = MIDI_LIVE_KEY_MAP[key];
+    if (pitch == null || event.repeat) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    const startBeat = currentMidiLiveBeat();
+    ensureMidiLiveLengthForBeat(startBeat);
+    sweepMidiLiveOverwriteToBeat(startBeat);
+    setMidiPreviewBeat(startBeat);
+    setMidiLiveHeldKeys((held) => {
+      if (held[key]) return held;
+      return { ...held, [key]: { pitch, startBeat, startedAtMs: performance.now() } };
+    });
+    previewNote(pitch, 112);
+  }
+
+  function handleMidiLiveKeyUp(event: KeyboardEvent) {
+    if (!isMidi() || !midiLiveRecording() || isEditableEventTarget(event.target)) return;
+    const key = event.key.toLowerCase();
+    const heldKey = midiLiveHeldKeys()[key];
+    if (!heldKey) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    const endBeat = currentMidiLiveBeat();
+    ensureMidiLiveLengthForBeat(endBeat);
+    sweepMidiLiveOverwriteToBeat(endBeat);
+    setMidiPreviewBeat(endBeat);
+    const note = makeLiveMidiNote(heldKey.pitch, heldKey.startBeat, endBeat);
+    setMidiLiveCommittedNotes((notes) => sortedMidiNotes([...notes, note]));
+    setMidiLiveHeldKeys((held) => {
+      const next = { ...held };
+      delete next[key];
+      return next;
     });
   }
 
@@ -476,7 +683,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       <Modal
         open
         scopeId={scopeId()}
-        title={<><Icon name={segmentIcon(draft()!.payload.kind)} size={14} decorative />{ribbonName()}</>}
+        title={<><Icon name={segmentIcon(draft()!.payload.kind)} size={18} decorative />{editorTitle()}</>}
         width="lg"
         dirty={dirty()}
         onClose={requestClose}
@@ -490,14 +697,13 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       >
         <Show when={isMidi()}>
           <>
-            <div class={styles.controls}>
-              <NumberInput
+            <div class={styles.midiTopFields}>
+              <TextInput
+                label="Name"
                 layout="inline"
-                label="Length"
-                value={draft()!.lengthBeats}
-                min={1}
-                step={1}
-                onChange={(lengthBeats) => setDraft((current) => current ? { ...current, lengthBeats: Math.max(1, Math.round(lengthBeats)) } : current)}
+                value={draft()?.name ?? ""}
+                placeholder="Trackname"
+                onInput={(event) => setDraft((current) => current ? { ...current, name: event.currentTarget.value } : current)}
               />
               <FloatingSelect
                 layout="inline"
@@ -508,61 +714,101 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                   { value: "", label: "-- none --" },
                   ...instruments().map((instrument) => ({ value: instrument.id, label: instrument.name })),
                 ]}
+                searchable
+                searchPlaceholder="Search instruments"
                 open={instrumentSelectOpen()}
                 onOpenChange={setInstrumentSelectOpen}
                 onChange={(instrumentId) =>
                   setDraft((current) => current ? { ...current, instrumentId: instrumentId || undefined } : current)
                 }
               />
-              <NumberInput
-                layout="inline"
-                label="Transpose"
-                value={transpose()}
-                min={-48}
-                max={DRUM_MAX_STEPS}
-                step={1}
-                onChange={(value) => setDraft((current) => current ? { ...current, transpose: Math.round(value) } : current)}
-              />
-              <NumberInput
-                layout="inline"
-                label="Vol"
-                value={midiVolumePercent()}
-                min={0}
-                max={100}
-                step={1}
-                unit="%"
-                maxLength={3}
-                commitOnChange
-                onChange={(value) => updateMidiVolume(Math.round(value))}
-              />
-              <FloatingSelect
-                layout="inline"
-                label="Time"
-                value={formatTimeSignature(midiTimeSignature())}
-                ariaLabel="MIDI time signature"
-                options={TIME_SIGNATURE_OPTIONS.map((signature) => ({ value: signature, label: signature }))}
-                open={midiTimeSignatureOpen()}
-                onOpenChange={setMidiTimeSignatureOpen}
-                onChange={(value) => setDraft((current) => current ? { ...current, timeSignature: parseTimeSignature(value) } : current)}
-              />
-              <div class={styles.transportSlot}>
-                <MidiTransport
-                  notes={previewMidiNotes()}
-                  gainDb={midiGainDb()}
-                  lengthBeats={draft()!.lengthBeats}
-                  bpm={bpm()}
-                  instrument={instruments().find((instrument) => instrument.id === draft()!.instrumentId)}
-                  hotkeyScopeId={scopeId()}
-                  onPositionChange={setMidiPreviewBeat}
-                />
+            </div>
+            <div class={styles.midiLivePanel} aria-label="Live MIDI keyboard recording">
+              <div class={styles.midiLiveTransport}>
+                <div class={styles.transportSlot}>
+                  <MidiTransport
+                    notes={previewMidiNotes()}
+                    gainDb={midiGainDb()}
+                    lengthBeats={draft()!.lengthBeats}
+                    bpm={bpm()}
+                    instrument={instruments().find((instrument) => instrument.id === draft()!.instrumentId)}
+                    hotkeyScopeId={scopeId()}
+                    captureSpaceKey
+                    onPositionChange={setMidiPreviewBeat}
+                  />
+                </div>
+                <Button
+                  size="xs"
+                  variant={midiLiveRecording() ? "primary" : "default"}
+                  onClick={toggleMidiLiveRecording}
+                >
+                  <Icon name={midiLiveRecording() ? "ph:stop-fill" : "ph:record-fill"} size={18} decorative />
+                  Record
+                </Button>
+                <Button
+                  size="xs"
+                  selected={midiLiveMode() === "overwrite"}
+                  disabled={midiLiveRecording()}
+                  onClick={() => setMidiLiveMode("overwrite")}
+                >
+                  Overwrite
+                </Button>
+                <Button
+                  size="xs"
+                  selected={midiLiveMode() === "additive"}
+                  disabled={midiLiveRecording()}
+                  onClick={() => setMidiLiveMode("additive")}
+                >
+                  Additive
+                </Button>
+                <span class={styles.midiLiveTime}>{midiLiveElapsedLabel()}</span>
               </div>
+              <Show when={midiLiveRecording()}>
+                <div class={styles.midiLiveKeyboard} aria-label="Computer keyboard MIDI map">
+                  <div class={styles.midiLiveKeyboardRow} data-row="black">
+                    <For each={MIDI_LIVE_BLACK_KEYS}>
+                      {(key) => key
+                        ? (
+                          <span
+                            classList={{
+                              [styles.midiLiveKey]: true,
+                              [styles.midiLiveBlackKey]: true,
+                              [styles.midiLiveKeyActive]: midiLiveActiveKeys().has(key),
+                            }}
+                          >
+                            <span>{key.toUpperCase()}</span>
+                            <span>{midiPitchName(MIDI_LIVE_KEY_MAP[key])}</span>
+                          </span>
+                        )
+                        : <span class={styles.midiLiveKeySpacer} />}
+                    </For>
+                  </div>
+                  <div class={styles.midiLiveKeyboardRow} data-row="white">
+                    <For each={MIDI_LIVE_WHITE_KEYS}>
+                      {(key) => (
+                        <span
+                          classList={{
+                            [styles.midiLiveKey]: true,
+                            [styles.midiLiveKeyActive]: midiLiveActiveKeys().has(key),
+                          }}
+                        >
+                          <span>{key.toUpperCase()}</span>
+                          <span>{midiPitchName(MIDI_LIVE_KEY_MAP[key])}</span>
+                        </span>
+                      )}
+                    </For>
+                  </div>
+                </div>
+              </Show>
             </div>
 
             <PianoRoll
-              notes={midiNotes()}
+              notes={liveMidiNotes()}
+              instrument={instruments().find((instrument) => instrument.id === draft()!.instrumentId)}
               lengthBeats={draft()!.lengthBeats}
               playheadBeat={playheadBeat()}
               hotkeyScopeId={scopeId()}
+              showAutomation={false}
               onLengthChange={(lengthBeats: number) => setDraft((current) => current ? { ...current, lengthBeats: Math.max(1, Math.round(lengthBeats)) } : current)}
               onChange={updateMidi}
               onPreviewNote={previewNote}
@@ -623,42 +869,9 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                 />
               </div>
               <div class={styles.automationValueEditor}>
-                <label>
-                  <span>Start</span>
-                  <input
-                    type="range"
-                    min={activeSegmentAutomationMeta().min}
-                    max={activeSegmentAutomationMeta().max}
-                    step={activeSegmentAutomationMeta().step}
-                    value={segmentAutomationRange().startValue}
-                    onInput={(event) => setSegmentAutomationValueEdge("start", event.currentTarget.value)}
-                  />
-                  <span>{formatAetherArrangementAutomationValue(activeSegmentAutomationTarget(), segmentAutomationRange().startValue)}</span>
-                </label>
-                <label>
-                  <span>Mid</span>
-                  <input
-                    type="range"
-                    min={activeSegmentAutomationMeta().min}
-                    max={activeSegmentAutomationMeta().max}
-                    step={activeSegmentAutomationMeta().step}
-                    value={segmentAutomationRange().midValue}
-                    onInput={(event) => setSegmentAutomationValueEdge("mid", event.currentTarget.value)}
-                  />
-                  <span>{formatAetherArrangementAutomationValue(activeSegmentAutomationTarget(), segmentAutomationRange().midValue)}</span>
-                </label>
-                <label>
-                  <span>End</span>
-                  <input
-                    type="range"
-                    min={activeSegmentAutomationMeta().min}
-                    max={activeSegmentAutomationMeta().max}
-                    step={activeSegmentAutomationMeta().step}
-                    value={segmentAutomationRange().endValue}
-                    onInput={(event) => setSegmentAutomationValueEdge("end", event.currentTarget.value)}
-                  />
-                  <span>{formatAetherArrangementAutomationValue(activeSegmentAutomationTarget(), segmentAutomationRange().endValue)}</span>
-                </label>
+                <Slider layout="inline" label="Start" min={activeSegmentAutomationMeta().min} max={activeSegmentAutomationMeta().max} step={activeSegmentAutomationMeta().step} value={segmentAutomationRange().startValue} readout={formatAetherArrangementAutomationValue(activeSegmentAutomationTarget(), segmentAutomationRange().startValue)} onChange={(value) => setSegmentAutomationValueEdge("start", String(value))} />
+                <Slider layout="inline" label="Mid" min={activeSegmentAutomationMeta().min} max={activeSegmentAutomationMeta().max} step={activeSegmentAutomationMeta().step} value={segmentAutomationRange().midValue} readout={formatAetherArrangementAutomationValue(activeSegmentAutomationTarget(), segmentAutomationRange().midValue)} onChange={(value) => setSegmentAutomationValueEdge("mid", String(value))} />
+                <Slider layout="inline" label="End" min={activeSegmentAutomationMeta().min} max={activeSegmentAutomationMeta().max} step={activeSegmentAutomationMeta().step} value={segmentAutomationRange().endValue} readout={formatAetherArrangementAutomationValue(activeSegmentAutomationTarget(), segmentAutomationRange().endValue)} onChange={(value) => setSegmentAutomationValueEdge("end", String(value))} />
               </div>
               <div class={styles.automationHandleRail} aria-label="Drag segment automation values">
                 <span class={styles.automationHandleLine} aria-hidden="true" />
@@ -748,9 +961,8 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                         [styles.automationPointRowSelected]: activeSelectedSegmentAutomationPointIndices().includes(index()),
                       }}
                     >
-                      <input
-                        class={styles.automationPointSelect}
-                        type="checkbox"
+                      <Checkbox
+                        inputClassName={styles.automationPointSelect}
                         checked={activeSelectedSegmentAutomationPointIndices().includes(index())}
                         readOnly
                         aria-label={`Select segment automation point ${index() + 1}`}
@@ -760,28 +972,8 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                         }}
                       />
                       <span class={styles.automationPointIndex}>{index() + 1}</span>
-                      <label>
-                        <span>Beat</span>
-                        <input
-                          type="number"
-                          min={0}
-                          max={draft()!.lengthBeats}
-                          step={0.125}
-                          value={point.beat}
-                          onChange={(event) => setSegmentAutomationPointBeat(index(), event.currentTarget.value)}
-                        />
-                      </label>
-                      <label>
-                        <span>Value</span>
-                        <input
-                          type="number"
-                          min={activeSegmentAutomationMeta().min}
-                          max={activeSegmentAutomationMeta().max}
-                          step={activeSegmentAutomationMeta().step}
-                          value={point.value}
-                          onChange={(event) => setSegmentAutomationPointValue(index(), event.currentTarget.value)}
-                        />
-                      </label>
+                      <NumberInput layout="inline" label="Beat" min={0} max={draft()!.lengthBeats} step={0.125} value={point.beat} onChange={(value) => setSegmentAutomationPointBeat(index(), String(value))} />
+                      <NumberInput layout="inline" label="Value" min={activeSegmentAutomationMeta().min} max={activeSegmentAutomationMeta().max} step={activeSegmentAutomationMeta().step} value={point.value} onChange={(value) => setSegmentAutomationPointValue(index(), String(value))} />
                       <span class={styles.automationPointValue}>
                         {formatAetherArrangementAutomationValue(activeSegmentAutomationTarget(), point.value)}
                       </span>
@@ -883,23 +1075,29 @@ function drumPayloadFromSegment(segment: Segment): GeneratedDrumBeat | undefined
 function segmentIcon(kind: Segment["payload"]["kind"]): string {
   if (kind === "audio") return "ph:waveform";
   if (kind === "drum") return "ph:music-notes-simple";
+  if (kind === "drumpad") return "ph:keyboard";
   return "ph:piano-keys";
 }
 
-function formatTimeSignature(timeSignature: TimeSignature): string {
-  return `${timeSignature.num}/${timeSignature.denom}`;
+function segmentTypeTitle(kind: Segment["payload"]["kind"]): string {
+  if (kind === "audio") return "WAV Segment";
+  if (kind === "drum") return "Drum Sequencer";
+  if (kind === "drumpad") return "Drum Pad";
+  return "MIDI Segment";
 }
 
-function parseTimeSignature(value: string): TimeSignature {
-  const [numRaw, denomRaw] = value.split("/");
-  return {
-    num: Math.max(1, Math.min(16, Number(numRaw) || 4)),
-    denom: Number(denomRaw) === 8 ? 8 : 4,
-    boldBeats: [1],
-  };
+const MIDI_NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
+
+function midiPitchName(pitch: number): string {
+  const name = MIDI_NOTE_NAMES[((pitch % 12) + 12) % 12];
+  const octave = Math.floor(pitch / 12) - 1;
+  return `${name}${octave}`;
 }
 
-const TIME_SIGNATURE_OPTIONS = ["4/4", "3/4", "6/8", "5/4", "7/8", "12/8"] as const;
+function isEditableEventTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+}
 
 function prepareSegmentForSave(segment: Segment): Segment {
   if (segment.payload.kind !== "midi" && segment.payload.kind !== "mixed") return segment;
@@ -947,17 +1145,6 @@ function clipNoteCurve(note: MidiNote, startBeat: number, endBeat: number): Midi
 function midiSegmentGainDb(payload: Segment["payload"]): number {
   if (payload.kind === "midi" || payload.kind === "mixed") return payload.gainDb ?? 0;
   return 0;
-}
-
-function gainDbToVolumePercent(gainDb: number): number {
-  const gain = Math.pow(10, Math.max(-96, Math.min(24, gainDb)) / 20);
-  return Math.max(0, Math.min(100, Math.round(gain * 100)));
-}
-
-function volumePercentToGainDb(percent: number): number {
-  const gain = Math.max(0, Math.min(100, percent)) / 100;
-  if (gain <= 0) return -96;
-  return Math.max(-96, Math.min(0, 20 * Math.log10(gain)));
 }
 
 function applyGainToVelocity(velocity: number, gainDb: number): number {

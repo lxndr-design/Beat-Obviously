@@ -606,10 +606,17 @@ namespace beat
 
         snapshot.currentTypeName = device->getCurrentAudioDeviceType();
 
+        juce::AudioDeviceManager::AudioDeviceSetup setup;
+        device->getAudioDeviceSetup(setup);
+        snapshot.currentInputName = setup.inputDeviceName;
+        snapshot.currentOutputName = setup.outputDeviceName;
+
         if (auto* current = device->getCurrentAudioDevice())
         {
-            snapshot.currentInputName = current->getName();
-            snapshot.currentOutputName = current->getName();
+            if (snapshot.currentInputName.isEmpty())
+                snapshot.currentInputName = current->getName();
+            if (snapshot.currentOutputName.isEmpty())
+                snapshot.currentOutputName = current->getName();
             snapshot.sampleRate = current->getCurrentSampleRate();
             snapshot.bufferSize = current->getCurrentBufferSizeSamples();
             snapshot.inputLatencySamples = current->getInputLatencyInSamples();
@@ -699,6 +706,36 @@ namespace beat
         if (error != nullptr)
             *error = {};
         refreshMidiInputCallbacks();
+        return true;
+    }
+
+    bool AudioEngine::selectOutputDevice(const juce::String& typeName,
+                                         const juce::String& outputDeviceName,
+                                         juce::String* error)
+    {
+        if (device == nullptr)
+            device = std::make_unique<juce::AudioDeviceManager>();
+
+        const auto requestedType = typeName.trim();
+        if (requestedType.isNotEmpty() && requestedType != device->getCurrentAudioDeviceType())
+            device->setCurrentAudioDeviceType(requestedType, true);
+
+        juce::AudioDeviceManager::AudioDeviceSetup setup;
+        device->getAudioDeviceSetup(setup);
+        setup.outputDeviceName = outputDeviceName;
+        setup.useDefaultOutputChannels = true;
+        setup.outputChannels.clear();
+
+        const auto err = device->setAudioDeviceSetup(setup, true);
+        if (err.isNotEmpty())
+        {
+            if (error != nullptr)
+                *error = err;
+            return false;
+        }
+
+        if (error != nullptr)
+            *error = {};
         return true;
     }
 

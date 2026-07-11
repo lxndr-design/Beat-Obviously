@@ -40,14 +40,14 @@ export function ExportJobPanel() {
                   onClick={() => void send({ kind: "project.exportCancel" }).then(useExportStore.getState().setJob)}
                   aria-label="Cancel export"
                 >
-                  <Icon name="ph:x" size={14} decorative />
+                  <Icon name="ph:x" size={18} decorative />
                 </Button>
               </HoverInfo>
             </Show>
             <Show when={current().finished}>
               <HoverInfo content="Dismiss export status" placement="left">
                 <Button iconOnly size="xs" onClick={useExportStore.getState().clear} aria-label="Dismiss export status">
-                  <Icon name="ph:x" size={14} decorative />
+                  <Icon name="ph:x" size={18} decorative />
                 </Button>
               </HoverInfo>
             </Show>

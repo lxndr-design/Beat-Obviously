@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from "solid-js";
-import { Button, HoverInfo, Icon, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
+import { HoverInfo, Icon, LibrarySearch, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { appConfirm } from "../../solid-ui";
 import { usePluginStore, useUiStore } from "../../state/store";
 import type { PluginAdapter } from "../../state/types";
@@ -43,10 +43,13 @@ const BUILTIN_DECENT_SAMPLER_PLUGIN: PluginAdapter = {
 export function PluginLibraryPanel(props: PluginLibraryPanelProps) {
   const plugins = createStoreSelector(usePluginStore, (s) => s.plugins);
   const [importOpen, setImportOpen] = createSignal(false);
+  const [searchQuery, setSearchQuery] = createSignal("");
+  const normalizedSearch = () => searchQuery().trim().toLowerCase();
   const visiblePlugins = () => [
     ...plugins().filter((plugin) => plugin.format !== "decent-sampler"),
     BUILTIN_DECENT_SAMPLER_PLUGIN,
-  ];
+  ].filter((plugin) => !normalizedSearch()
+    || `${plugin.name} ${plugin.vendor} ${plugin.kind} ${plugin.format}`.toLowerCase().includes(normalizedSearch()));
 
   function openPlugin(plugin: PluginAdapter) {
     if (plugin.id === BUILTIN_DECENT_SAMPLER_PLUGIN_ID) {
@@ -66,10 +69,17 @@ export function PluginLibraryPanel(props: PluginLibraryPanelProps) {
         actions={(
           <HoverInfo content="Import DS file">
             <SectionRibbonActionButton onClick={() => setImportOpen(true)} aria-label="Import DS file">
-              <Icon name="ph:plus" size={16} decorative />
+              <Icon name="ph:plus" size={18} decorative />
             </SectionRibbonActionButton>
           </HoverInfo>
         )}
+      />
+
+      <LibrarySearch
+        value={searchQuery()}
+        onInput={(event) => setSearchQuery(event.currentTarget.value)}
+        placeholder="Search..."
+        aria-label="Search plugins"
       />
 
       <ul class={`${styles.list} ${props.expanded ? styles.listOpen : ""}`} aria-hidden={!props.expanded}>
@@ -162,7 +172,7 @@ export function PluginItem(props: PluginItemProps) {
       onContextMenu={menu.onContextMenu}
       onDragStart={onDragStart}
       title={draggablePluginId() ? "Drag to a track to create a new DS instrument instance" : undefined}
-      dragSlot={draggablePluginId() && <Icon name="ph:dots-six-vertical" size={14} decorative />}
+      dragSlot={draggablePluginId() && <Icon name="ph:dots-six-vertical" size={18} decorative />}
       icon={
         isAetherBridgeHost() ? (
           <AetherBridgeIcon />
@@ -171,17 +181,14 @@ export function PluginItem(props: PluginItemProps) {
         ) : props.plugin.format === "decent-sampler" && props.plugin.uiImageDataUrl ? (
           <img class={styles.itemThumb} src={props.plugin.uiImageDataUrl} alt="" />
         ) : (
-          <Icon name={iconForPlugin(props.plugin)} size={14} decorative />
+          <Icon name={iconForPlugin(props.plugin)} size={18} decorative />
         )
       }
       name={props.plugin.name}
       meta={`${props.plugin.vendor} · ${isBuiltInDecentSampler() ? "built-in plugin" : props.plugin.format === "decent-sampler" ? "DS package" : props.plugin.kind} · ${props.plugin.status}`}
       detail={isBuiltInDecentSampler() ? "host" : `v${props.plugin.version ?? "1.0.0"}`}
       action={(
-        <Button
-          className={styles.itemOpenButton}
-          iconOnly
-          size="sm"
+        <RowActionButton
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
@@ -189,8 +196,8 @@ export function PluginItem(props: PluginItemProps) {
           }}
           aria-label={`Open ${props.plugin.name}`}
         >
-          <Icon name="ph:arrow-square-out" size={12} decorative />
-        </Button>
+          <Icon name="ph:arrow-square-out" size={18} decorative />
+        </RowActionButton>
       )}
     >
       {menu.menu()}

@@ -60,6 +60,10 @@ const DEV_AETHER_PERFORMANCE_INSTRUMENT_ID_MARKER = "Aether performance editor d
 const DEV_AETHER_AUTOMATION_INSTRUMENT_ID_MARKER = "Aether automation dev fixture";
 const DEV_AETHER_AUTOMATION_TRACK_ID = "dev-aether-automation-track";
 const DEV_AETHER_AUTOMATION_SEGMENT_ID = "dev-aether-automation-segment";
+const DEV_DRUMPAD_LINKS_TRACK_ID = "dev-drumpad-links-track";
+const DEV_DRUMPAD_LINKS_SEGMENT_ID = "dev-drumpad-links-segment";
+const DEV_DRUMPAD_LINKS_LANE_A_ID = "dev-drumpad-links-lane-a";
+const DEV_DRUMPAD_LINKS_LANE_S_ID = "dev-drumpad-links-lane-s";
 const DEV_NODE_INSTRUMENT_INTERACTION_ID = "dev-node-instrument-interaction-host";
 const USER_PRESET_PREFIX = "user:";
 
@@ -136,6 +140,11 @@ declare global {
         segmentId: string;
         instrumentId: string;
       };
+      installDrumpadLinksFixture: () => {
+        trackId: string;
+        segmentId: string;
+      };
+      readDrumpadLinksFixtureState: () => DevDrumpadLinksFixtureState;
       openAetherAutomationFixtureEditor: (editor: DevAetherAutomationEditor) => Promise<DevAetherAutomationFixtureState>;
       readAetherAutomationFixtureState: () => DevAetherAutomationFixtureState;
       exerciseAetherAutomationPointEditorFlow: () => Promise<DevAetherAutomationPointExerciseState>;
@@ -154,6 +163,17 @@ interface DevAutomationPanelState {
   buttonLabels: string[];
   rangeCount: number;
   disabledControlCount: number;
+}
+
+interface DevDrumpadLinksFixtureState {
+  dialogTitle: string | null;
+  assignedKeyCount: number;
+  lanePlugCount: number;
+  linkPathCount: number;
+  linkPathData: string[];
+  linkPathRects: Array<{ width: number; height: number; left: number; top: number }>;
+  keyPlugRects: Array<{ code: string | null; width: number; height: number; left: number; top: number }>;
+  lanePlugRects: Array<{ laneId: string | null; width: number; height: number; left: number; top: number }>;
 }
 
 interface DevAetherAutomationFixtureState {
@@ -1800,6 +1820,93 @@ export function installBeatDevHooks() {
     return { trackId: track.id, segmentId: DEV_AETHER_AUTOMATION_SEGMENT_ID, instrumentId };
   };
 
+  const installDrumpadLinksFixture = () => {
+    const project = createEmptyProject();
+    project.id = "dev-drumpad-links-project";
+    project.name = "Drumpad Links Fixture";
+    project.lengthBeats = 32;
+    project.bpm = 120;
+    const track = project.tracks[0];
+    track.id = DEV_DRUMPAD_LINKS_TRACK_ID;
+    track.name = "Drumpad Links Track";
+    track.kind = "midi";
+    track.segments = [
+      {
+        id: DEV_DRUMPAD_LINKS_SEGMENT_ID,
+        trackId: DEV_DRUMPAD_LINKS_TRACK_ID,
+        name: "Drumpad Links",
+        startBeat: 0,
+        lengthBeats: 16,
+        repeats: 0,
+        layer: 0,
+        payload: {
+          kind: "drumpad",
+          keyboardLayout: "mac",
+          quantizeSeconds: 1 / 64,
+          lanes: [
+            {
+              id: DEV_DRUMPAD_LINKS_LANE_A_ID,
+              name: "TR-505 Timbal",
+              keyCode: "KeyA",
+              keyLabel: "A",
+              pitch: 60,
+            },
+            {
+              id: DEV_DRUMPAD_LINKS_LANE_S_ID,
+              name: "LM-2 Snare",
+              keyCode: "KeyS",
+              keyLabel: "S",
+              pitch: 62,
+            },
+          ],
+          hits: [
+            { id: "dev-drumpad-hit-a-1", laneId: DEV_DRUMPAD_LINKS_LANE_A_ID, startBeat: 2, lengthBeats: 0.125, velocity: 110, keyCode: "KeyA" },
+            { id: "dev-drumpad-hit-s-1", laneId: DEV_DRUMPAD_LINKS_LANE_S_ID, startBeat: 4, lengthBeats: 0.125, velocity: 108, keyCode: "KeyS" },
+          ],
+        },
+      },
+    ];
+
+    useProjectStore.getState().loadProject(project);
+    useUiStore.setState({
+      openEditors: [],
+      selectedTrackIds: [],
+      selectedSegmentIds: [],
+      selectedTrackEffectAutomationPointKeys: [],
+    });
+    useUiStore.getState().openEditor({ kind: "segment", segmentId: DEV_DRUMPAD_LINKS_SEGMENT_ID });
+    return { trackId: track.id, segmentId: DEV_DRUMPAD_LINKS_SEGMENT_ID };
+  };
+
+  const readDrumpadLinksFixtureState = (): DevDrumpadLinksFixtureState => {
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    const pathElements = Array.from(document.querySelectorAll<SVGPathElement>("[data-drumpad-link-path]"));
+    const keyPlugElements = Array.from(document.querySelectorAll<HTMLElement>("[data-drumpad-key][data-assigned='1']"));
+    const lanePlugElements = Array.from(document.querySelectorAll<HTMLElement>("[data-drumpad-lane-plug]"));
+    const rectToJson = (rect: DOMRect) => ({
+      width: Math.round(rect.width * 100) / 100,
+      height: Math.round(rect.height * 100) / 100,
+      left: Math.round(rect.left * 100) / 100,
+      top: Math.round(rect.top * 100) / 100,
+    });
+    return {
+      dialogTitle: dialog?.getAttribute("aria-label") ?? dialog?.querySelector("h1,h2,h3")?.textContent?.trim() ?? null,
+      assignedKeyCount: keyPlugElements.length,
+      lanePlugCount: lanePlugElements.length,
+      linkPathCount: pathElements.length,
+      linkPathData: pathElements.map((path) => path.getAttribute("d") ?? ""),
+      linkPathRects: pathElements.map((path) => rectToJson(path.getBoundingClientRect())),
+      keyPlugRects: keyPlugElements.map((key) => ({
+        code: key.getAttribute("data-drumpad-key"),
+        ...rectToJson(key.getBoundingClientRect()),
+      })),
+      lanePlugRects: lanePlugElements.map((plug) => ({
+        laneId: plug.getAttribute("data-drumpad-lane-plug"),
+        ...rectToJson(plug.getBoundingClientRect()),
+      })),
+    };
+  };
+
   const openAetherAutomationFixtureEditor = async (editor: DevAetherAutomationEditor) => {
     const fixture = ensureAetherAutomationFixture();
     useUiStore.setState({ openEditors: [] });
@@ -2157,6 +2264,8 @@ export function installBeatDevHooks() {
     exerciseAetherPresetRestoreInitFlow,
     exerciseAetherPresetSaveDeleteFlow,
     installAetherAutomationFixture,
+    installDrumpadLinksFixture,
+    readDrumpadLinksFixtureState,
     openAetherAutomationFixtureEditor,
     readAetherAutomationFixtureState,
     exerciseAetherAutomationPointEditorFlow,
@@ -2258,6 +2367,10 @@ export function installBeatDevHooks() {
     window.setTimeout(() => {
       const editor = new URLSearchParams(window.location.search).get("beatAutomationEditor");
       void openAetherAutomationFixtureEditor(isAetherAutomationEditor(editor) ? editor : "segment");
+    }, 0);
+  } else if (fixture === "drumpad-links") {
+    window.setTimeout(() => {
+      installDrumpadLinksFixture();
     }, 0);
   } else if (fixture === "aether-automation-points") {
     window.setTimeout(() => {

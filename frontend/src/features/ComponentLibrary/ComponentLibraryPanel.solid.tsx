@@ -1,5 +1,5 @@
 import { createSignal, For, onCleanup, Show } from "solid-js";
-import { Button, Icon, RowItem, SectionRibbon, createContextMenu, type ContextMenuItem } from "../../solid-ui";
+import { Icon, LibraryFolder, LibrarySearch, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { appPrompt } from "../../solid-ui";
 import { createInstrumentBufferSource, noteFrequency, preloadInstrumentSample } from "../../audio/synthPreview";
 import {
@@ -10,7 +10,13 @@ import {
   drumTimingOffsetBeats,
   normalizeDrumCell,
 } from "../../state/drumSteps";
-import { useComponentStore, type BeatComponent } from "../../state/components";
+import {
+  FACTORY_COMPONENT_FOLDER_ID,
+  USER_COMPONENT_FOLDER_ID,
+  useComponentStore,
+  type BeatComponent,
+  type ComponentFolder,
+} from "../../state/components";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";
 import type { Instrument, MidiNote } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
@@ -23,10 +29,23 @@ interface ComponentLibraryPanelProps {
 
 export function ComponentLibraryPanel(props: ComponentLibraryPanelProps) {
   const components = createStoreSelector(useComponentStore, (s) => s.components);
+  const folders = createStoreSelector(useComponentStore, (s) => s.componentFolders);
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
   const bpm = createStoreSelector(useProjectStore, (s) => s.project.bpm);
   const [playingId, setPlayingId] = createSignal<string | null>(null);
+  const [openFolders, setOpenFolders] = createSignal<Record<string, boolean>>({
+    [FACTORY_COMPONENT_FOLDER_ID]: true,
+    [USER_COMPONENT_FOLDER_ID]: true,
+  });
+  const [renamingFolderId, setRenamingFolderId] = createSignal<string | null>(null);
+  const [searchQuery, setSearchQuery] = createSignal("");
+  const normalizedSearch = () => searchQuery().trim().toLowerCase();
   let playback: ComponentPlayback | null = null;
+  const addMenu = createContextMenu((): ContextMenuItem[] => [{
+    label: "New folder",
+    icon: "ph:folder-plus",
+    onSelect: createFolder,
+  }]);
 
   onCleanup(() => stopComponentPlayback(playback));
 
@@ -46,35 +65,98 @@ export function ComponentLibraryPanel(props: ComponentLibraryPanelProps) {
     setPlayingId(component.id);
   }
 
+  function createFolder() {
+    const id = useComponentStore.getState().addFolder();
+    setOpenFolders((current) => ({ ...current, [id]: true }));
+    setRenamingFolderId(id);
+  }
+
   return (
-    <div class={styles.panel}>
+    <div class={styles.panel} onContextMenu={addMenu.onContextMenu}>
       <SectionRibbon
         title="Components"
         expanded={props.expanded}
         onToggle={props.onToggle}
         showToggle={false}
-        count={components().length}
+        onContextMenu={addMenu.onContextMenu}
+        actions={(
+          <SectionRibbonActionButton
+            onClick={(event) => addMenu.openAt(event.clientX, event.clientY)}
+            aria-label="Add component item"
+          >
+            <Icon name="ph:plus" size={18} decorative />
+          </SectionRibbonActionButton>
+        )}
       />
 
-      <ul class={`${styles.list} ${props.expanded ? styles.listOpen : ""}`} aria-hidden={!props.expanded}>
+      <LibrarySearch
+        value={searchQuery()}
+        onInput={(event) => setSearchQuery(event.currentTarget.value)}
+        placeholder="Search..."
+        aria-label="Search patterns"
+      />
+
+      <div class={`${styles.list} ${props.expanded ? styles.listOpen : ""}`} aria-hidden={!props.expanded}>
         <Show when={components().length === 0}>
-          <li class={styles.empty}>
+          <div class={styles.empty}>
             Right-click a MIDI or drum segment to save it as a component.
-          </li>
+          </div>
         </Show>
-        <For each={components()}>
-          {(component) => (
-            <ComponentItem
-              component={component}
-              itemCount={component.kind === "drum"
-                ? component.rows.reduce((sum, row) => sum + row.steps.filter(Boolean).length, 0)
-                : component.notes.length}
-              playing={playingId() === component.id}
-              onTogglePreview={() => togglePreview(component)}
-            />
-          )}
+        <For each={folders()}>
+          {(folder) => {
+            const items = () => components().filter((component) =>
+              componentFolderId(component) === folder.id
+              && (!normalizedSearch() || `${component.name} ${component.kind}`.toLowerCase().includes(normalizedSearch())),
+            );
+            const open = () => openFolders()[folder.id] ?? false;
+            return (
+              <Show when={!normalizedSearch() || items().length > 0}>
+              <LibraryFolder
+                name={componentFolderDisplayName(folder)}
+                count={items().length}
+                scale="large"
+                factory={folder.factory}
+                locked={folder.id === USER_COMPONENT_FOLDER_ID}
+                open={Boolean(normalizedSearch()) || open()}
+                renaming={renamingFolderId() === folder.id}
+                dragMime="application/x-beat-component"
+                onToggle={() => setOpenFolders((current) => ({ ...current, [folder.id]: !open() }))}
+                onDropItem={(componentId) => useComponentStore.getState().moveToFolder(componentId, folder.id)}
+                onStartRename={() => setRenamingFolderId(folder.id)}
+                onRename={(name) => {
+                  useComponentStore.getState().renameFolder(folder.id, name);
+                  setRenamingFolderId(null);
+                }}
+                onCancelRename={() => setRenamingFolderId(null)}
+                onUngroup={() => {
+                  useComponentStore.getState().ungroupFolder(folder.id);
+                  setOpenFolders((current) => {
+                    const next = { ...current };
+                    delete next[folder.id];
+                    return next;
+                  });
+                }}
+              >
+                <For each={items()}>
+                  {(component) => (
+                    <ComponentItem
+                      component={component}
+                      itemCount={component.kind === "drum"
+                        ? component.rows.reduce((sum, row) => sum + row.steps.filter(Boolean).length, 0)
+                        : component.notes.length}
+                      playing={playingId() === component.id}
+                      onTogglePreview={() => togglePreview(component)}
+                      onMoveBefore={(componentId) => useComponentStore.getState().moveToFolder(componentId, folder.id, component.id)}
+                    />
+                  )}
+                </For>
+              </LibraryFolder>
+              </Show>
+            );
+          }}
         </For>
-      </ul>
+      </div>
+      {addMenu.menu()}
     </div>
   );
 }
@@ -84,6 +166,7 @@ interface ItemProps {
   itemCount: number;
   playing: boolean;
   onTogglePreview: () => void;
+  onMoveBefore: (componentId: string) => void;
 }
 
 function ComponentItem(props: ItemProps) {
@@ -114,7 +197,20 @@ function ComponentItem(props: ItemProps) {
   function onDragStart(event: DragEvent) {
     event.dataTransfer?.setData("application/x-beat-component", props.component.id);
     event.dataTransfer?.setData("text/plain", props.component.name);
-    if (event.dataTransfer) event.dataTransfer.effectAllowed = "copy";
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  }
+
+  function onDragOver(event: DragEvent) {
+    if (!Array.from(event.dataTransfer?.types ?? []).includes("application/x-beat-component")) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  }
+
+  function onDrop(event: DragEvent) {
+    const draggedId = event.dataTransfer?.getData("application/x-beat-component");
+    if (!draggedId || draggedId === props.component.id) return;
+    event.preventDefault();
+    props.onMoveBefore(draggedId);
   }
 
   const kind = () => props.component.kind ?? "midi";
@@ -123,19 +219,19 @@ function ComponentItem(props: ItemProps) {
     <RowItem
       className={styles.componentRow}
       density="compact"
+      scale="large"
       cursor="grab"
       draggable
       onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
       onContextMenu={menu.onContextMenu}
       title={`${props.itemCount} ${kind() === "drum" ? "hit" : "note"}${props.itemCount === 1 ? "" : "s"} · ${componentPlaybackLength(props.component)} beats`}
-      icon={kind() === "drum" ? <span class={styles.drumIcon} aria-hidden /> : <Icon name="ph:piano-keys" size={14} decorative />}
-      hoverIcon={<Icon name="ph:dots-six-vertical" size={14} decorative />}
+      icon={kind() === "drum" ? <span class={styles.drumIcon} aria-hidden /> : <Icon name="ph:piano-keys" size={18} decorative />}
+      hoverIcon={<Icon name="ph:dots-six-vertical" size={18} decorative />}
       name={props.component.name}
       action={(
-        <Button
-          className={styles.itemPreviewButton}
-          iconOnly
-          size="sm"
+        <RowActionButton
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
@@ -143,13 +239,22 @@ function ComponentItem(props: ItemProps) {
           }}
           aria-label={`${props.playing ? "Pause" : "Play"} ${props.component.name}`}
         >
-          <Icon name={props.playing ? "ph:pause-fill" : "ph:play-fill"} size={12} decorative />
-        </Button>
+          <Icon name={props.playing ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
+        </RowActionButton>
       )}
     >
       {menu.menu()}
     </RowItem>
   );
+}
+
+function componentFolderId(component: BeatComponent): string {
+  return component.folderId ?? (component.factory ? FACTORY_COMPONENT_FOLDER_ID : USER_COMPONENT_FOLDER_ID);
+}
+
+function componentFolderDisplayName(folder: ComponentFolder): string {
+  if (!folder.factory || folder.name.toLowerCase().startsWith("factory")) return folder.name;
+  return `Factory ${folder.name}`;
 }
 
 export interface ComponentPlayback {

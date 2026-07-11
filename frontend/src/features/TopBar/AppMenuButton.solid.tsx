@@ -1,10 +1,9 @@
 import { type Accessor } from "solid-js";
-import { appAlert, appConfirm } from "../../solid-ui";
+import { AppLogo, appAlert, appConfirm, RailButton } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { useExportStore } from "../../state/exportStore";
 import { useDocumentStore, useTransportStore, useUiStore } from "../../state/store";
-import { BrandMark } from "./BrandMark.solid";
 import styles from "./AppMenuButton.module.css";
 
 export interface AppMenuButtonProps {
@@ -39,7 +38,7 @@ export function AppMenuButton(props: { props: Accessor<AppMenuButtonProps> }) {
     return [
       { label: "Home", icon: "ph:house", disabled: callbacks.disableHome, onSelect: callbacks.onHome },
       { label: "What's New", icon: "ph:sparkle", onSelect: () => void appAlert("What's New is coming soon.") },
-      { label: "User Guide", icon: "ph:book-open-text", onSelect: callbacks.onUserGuide },
+      { label: "User Guide", icon: "ph:folder-open", onSelect: callbacks.onUserGuide },
       { label: "New Project", icon: "ph:plus", separatorBefore: true, onSelect: callbacks.onNew },
       { label: "Open...", icon: "ph:folder-open", onSelect: callbacks.onOpen },
       { label: "Import...", icon: "ph:download-simple", disabled: true, hint: "Later" },
@@ -128,17 +127,16 @@ export function AppMenuButton(props: { props: Accessor<AppMenuButtonProps> }) {
 
   return (
     <>
-      <button
+      <RailButton
         ref={buttonElement}
-        type="button"
         class={styles.menuButton}
         onClick={openMenu}
         onContextMenu={menu.onContextMenu}
         aria-label="Beat menu"
         aria-haspopup="menu"
       >
-        <BrandMark />
-      </button>
+        <AppLogo class={styles.menuLogo} />
+      </RailButton>
       {menu.menu()}
     </>
   );

@@ -81,7 +81,7 @@ export function Modal(allProps: ModalProps) {
               <div class={styles.headerRight}>
                 <Show when={props.headerActions}><div class={styles.headerActions}>{props.headerActions}</div></Show>
                 <button class={styles.closeBtn} onClick={requestClose} aria-label="Close" type="button">
-                  <Icon name="ph:x" size={16} decorative />
+                  <Icon name="ph:x" size={18} decorative />
                 </button>
               </div>
             </header>

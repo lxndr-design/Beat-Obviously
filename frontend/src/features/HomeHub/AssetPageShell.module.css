@@ -7,7 +7,7 @@
 }
 
 .pageWideBrowser {
-  grid-template-columns: minmax(520px, 1.35fr) minmax(320px, 0.85fr);
+  grid-template-columns: minmax(519px, 1.35fr) minmax(321px, 0.85fr);
 }
 
 .pageInstrument {
@@ -47,12 +47,12 @@
 
 .stateMessage {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: 21px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   width: 100%;
-  min-height: 52px;
-  padding: 8px;
+  min-height: 51px;
+  padding: 9px;
   border: var(--border-fg);
   background: var(--surface-subtle);
   color: var(--color-fg);
@@ -62,8 +62,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 21px;
+  height: 21px;
   color: var(--color-fg-hover);
 }
 

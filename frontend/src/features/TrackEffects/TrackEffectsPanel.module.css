@@ -1,7 +1,7 @@
 .panel {
   position: fixed;
-  width: min(520px, calc(100vw - 16px));
-  max-height: calc(100vh - 64px);
+  width: min(519px, calc(100vw - 15px));
+  max-height: calc(100vh - 63px);
   display: flex;
   flex-direction: column;
   background: var(--color-bg);
@@ -25,8 +25,8 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 6px 8px;
-  padding: 0 8px;
+  gap: 6px 9px;
+  padding: 0 9px;
 }
 
 .title {
@@ -52,13 +52,13 @@
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   min-height: 6px;
 }
 
 .filterDot {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--color-fg);
 }
@@ -71,19 +71,19 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  gap: 8px;
-  padding: 8px;
+  gap: 9px;
+  padding: 9px;
   overflow: auto;
 }
 
 .addRow {
   display: flex;
   align-items: stretch;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .empty {
-  padding: 8px 0;
+  padding: 9px 0;
   font-size: var(--font-size-ui);
   line-height: 1;
   opacity: 0.65;
@@ -92,7 +92,7 @@
 .chain {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
 }
 
 .effect {
@@ -106,15 +106,15 @@
 
 .effectHeader {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 32px var(--button-square-xs);
+  grid-template-columns: minmax(0, 1fr) 33px var(--button-square-xs);
   align-items: center;
-  min-height: 28px;
+  min-height: 27px;
   border-bottom: var(--border-fg);
 }
 
 .effectTitle {
   margin: 0;
-  padding: 0 8px;
+  padding: 0 9px;
   font-size: var(--font-size-ui);
   line-height: 1;
   font-weight: var(--font-weight-medium);
@@ -122,9 +122,9 @@
 
 .params {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(147px, 1fr));
   gap: 6px;
-  padding: 8px;
+  padding: 9px;
 }
 
 .addMenu {
@@ -136,8 +136,8 @@
 }
 
 .addOption {
-  height: 28px;
-  padding: 0 8px;
+  height: 27px;
+  padding: 0 9px;
   background: var(--color-bg);
   color: var(--color-fg);
   border: 0;

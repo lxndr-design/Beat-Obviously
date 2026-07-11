@@ -106,6 +106,19 @@ try {
     "MIDI note automation curve metadata should survive document migration",
   );
   assert.deepEqual(
+    {
+      sampleZoneId: migratedMidiPayload.notes[0].sampleZoneId,
+      samplePath: migratedMidiPayload.notes[0].samplePath,
+      sampleLabel: migratedMidiPayload.notes[0].sampleLabel,
+    },
+    {
+      sampleZoneId: "zone-kick-main",
+      samplePath: "/Samples/Kick.wav",
+      sampleLabel: "Kick",
+    },
+    "MIDI note sampler-zone override metadata should survive document migration",
+  );
+  assert.deepEqual(
     migrated.project.tracks[0].segments[0].automation?.[0].points.map((point) => [point.beat, point.value, point.curve]),
     [
       [0, 0.2, "linear"],
@@ -505,6 +518,9 @@ function makeRepresentativeDocument() {
                     velocity: 100,
                     startBeat: 0,
                     lengthBeats: 2,
+                    sampleZoneId: "zone-kick-main",
+                    samplePath: "/Samples/Kick.wav",
+                    sampleLabel: "Kick",
                     curve: [
                       { beat: 0, pitch: 60 },
                       { beat: 2, pitch: 67 },
@@ -555,6 +571,7 @@ function makeRepresentativeDocument() {
         sampleUrls: ["/Samples/Kick.wav"],
         sampleMap: [
           {
+            id: "zone-kick-main",
             path: "/Samples/Kick.wav",
             name: "Kick",
             rootNote: 36,

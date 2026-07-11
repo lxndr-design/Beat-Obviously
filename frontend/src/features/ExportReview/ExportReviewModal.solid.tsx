@@ -1,5 +1,5 @@
 import { createMemo, For, Show } from "solid-js";
-import { appAlert, appPrompt, Button, Icon, Modal, Select, Toggle } from "../../solid-ui";
+import { appAlert, appPrompt, Button, FloatingSelect, Icon, Modal, Toggle } from "../../solid-ui";
 import { isNative, send } from "../../ipc/bridge";
 import { createStoreSelector } from "../../solid-utils/store";
 import { useDocumentStore, useProjectStore, useTransportStore, useUiStore } from "../../state/store";
@@ -116,7 +116,7 @@ export function ExportReviewModal() {
     <Modal
       open
       scopeId="export-review"
-      title={<><Icon name="ph:export" size={14} decorative />Export Review</>}
+      title={<><Icon name="ph:export" size={18} decorative />Export Review</>}
       width="md"
       onClose={close}
       footer={(
@@ -140,15 +140,16 @@ export function ExportReviewModal() {
           <div class={styles.presetGrid}>
             <For each={presets()}>
               {(candidate) => (
-                <button
-                  type="button"
-                  class={`${styles.presetButton} ${candidate.id === selectedPresetId() ? styles.presetButtonActive : ""}`}
+                <Button
+                  variant="ghost"
+                  selected={candidate.id === selectedPresetId()}
+                  class={styles.presetButton}
                   onClick={() => useExportStore.getState().setSelectedPresetId(candidate.id)}
                 >
-                  <Icon name={iconForTarget(candidate.target)} size={16} decorative />
+                  <Icon name={iconForTarget(candidate.target)} size={18} decorative />
                   <strong>{candidate.name}</strong>
                   <span>{candidate.description}</span>
-                </button>
+                </Button>
               )}
             </For>
           </div>
@@ -159,45 +160,34 @@ export function ExportReviewModal() {
             <h3>Render Settings</h3>
           </div>
           <div class={styles.controls}>
-            <Select
+            <FloatingSelect
               label="Sample Rate"
               value={String(options().sampleRate)}
               layout="inline"
-              onChange={(event) => updatePresetOptions({ sampleRate: Number(event.currentTarget.value) })}
-            >
-              <For each={[44100, 48000, 88200, 96000]}>
-                {(value) => <option value={value}>{value} Hz</option>}
-              </For>
-            </Select>
-            <Select
+              options={[44100, 48000, 88200, 96000].map((value) => ({ value: String(value), label: `${value} Hz` }))}
+              onChange={(value) => updatePresetOptions({ sampleRate: Number(value) })}
+            />
+            <FloatingSelect
               label="Bit Depth"
               value={String(options().bitDepth)}
               layout="inline"
-              onChange={(event) => updatePresetOptions({ bitDepth: Number(event.currentTarget.value) as 16 | 24 | 32 })}
-            >
-              <For each={[16, 24, 32] as const}>
-                {(value) => <option value={value}>{value}-bit PCM</option>}
-              </For>
-            </Select>
-            <Select
+              options={[16, 24, 32].map((value) => ({ value: String(value), label: `${value}-bit PCM` }))}
+              onChange={(value) => updatePresetOptions({ bitDepth: Number(value) as 16 | 24 | 32 })}
+            />
+            <FloatingSelect
               label="Channels"
               value={String(options().channels)}
               layout="inline"
-              onChange={(event) => updatePresetOptions({ channels: Number(event.currentTarget.value) as 1 | 2 })}
-            >
-              <option value={1}>Mono</option>
-              <option value={2}>Stereo</option>
-            </Select>
-            <Select
+              options={[{ value: "1", label: "Mono" }, { value: "2", label: "Stereo" }]}
+              onChange={(value) => updatePresetOptions({ channels: Number(value) as 1 | 2 })}
+            />
+            <FloatingSelect
               label="Block"
               value={String(options().blockSize)}
               layout="inline"
-              onChange={(event) => updatePresetOptions({ blockSize: Number(event.currentTarget.value) })}
-            >
-              <For each={[128, 256, 512, 1024, 2048]}>
-                {(value) => <option value={value}>{value} samples</option>}
-              </For>
-            </Select>
+              options={[128, 256, 512, 1024, 2048].map((value) => ({ value: String(value), label: `${value} samples` }))}
+              onChange={(value) => updatePresetOptions({ blockSize: Number(value) })}
+            />
           </div>
           <div class={styles.tailControl}>
             <Toggle
@@ -212,7 +202,7 @@ export function ExportReviewModal() {
           <div class={styles.sectionHeader}>
             <h3>Export Destination</h3>
             <Button size="sm" onClick={() => void chooseDestinationFolder()}>
-              <Icon name="ph:folder-open" size={14} decorative />
+              <Icon name="ph:folder-open" size={18} decorative />
               Choose Folder
             </Button>
           </div>
@@ -308,7 +298,7 @@ export function ExportReviewModal() {
 function StateBanner(props: { icon: string; title: string; body?: string }) {
   return (
     <div class={styles.stateBanner}>
-      <Icon name={props.icon} size={16} decorative />
+      <Icon name={props.icon} size={18} decorative />
       <div>
         <strong>{props.title}</strong>
         <Show when={props.body}><span>{props.body}</span></Show>

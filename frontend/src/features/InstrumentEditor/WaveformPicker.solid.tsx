@@ -55,7 +55,7 @@ function WaveformPickerRuntime(props: { state: Accessor<WaveformPickerProps> }) 
                 className={styles.btn}
                 onClick={() => props.state().onChange(option.value)}
               >
-                <Icon name={option.icon} size={16} decorative />
+                <Icon name={option.icon} size={18} decorative />
               </Button>
             </HoverInfo>
           )}

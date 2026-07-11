@@ -1,6 +1,5 @@
 import { For, Show } from "solid-js";
 import {
-  drumPlaybackDurationBeats,
   drumPlaybackStepLengthBeats,
   drumTimingOffsetBeats,
   normalizeDrumCell,
@@ -16,14 +15,15 @@ interface Props {
 
 export function SegmentDrumPreview(props: Props) {
   const drumPayload = () => props.segment.payload.kind === "drum" ? props.segment.payload : null;
-  const effectiveLength = () => {
+  const sourceLength = () => {
     const payload = drumPayload();
-    return payload ? drumPlaybackDurationBeats(props.segment.lengthBeats, payload.speed) : props.segment.lengthBeats;
+    return payload ? Math.max(0.25, payload.sourceLengthBeats ?? props.segment.lengthBeats) : props.segment.lengthBeats;
   };
-  const viewLength = () => Math.max(0.001, props.displayLengthBeats ?? effectiveLength());
+  const viewLength = () => Math.max(0.001, props.displayLengthBeats ?? props.segment.lengthBeats);
+  const sourceOffset = () => Math.max(0, props.segment.sourceStartBeat ?? 0);
   const stepBeats = () => {
     const payload = drumPayload();
-    return payload ? drumPlaybackStepLengthBeats(props.segment.lengthBeats, payload.stepCount, payload.speed) : 0;
+    return payload ? drumPlaybackStepLengthBeats(sourceLength(), payload.stepCount, payload.speed) : 0;
   };
 
   return (
@@ -40,12 +40,10 @@ export function SegmentDrumPreview(props: Props) {
                     {(step, stepIndex) => {
                       const cell = normalizeDrumCell(step);
                       if (!cell.on) return null;
-                      const cellX = Math.max(
-                        0,
-                        stepIndex() * stepBeats()
-                          + drumTimingOffsetBeats(stepIndex(), stepBeats(), payload().swingPercent, cell.leanPercent),
-                      );
-                      if (cellX >= viewLength()) return null;
+                      const cellX = stepIndex() * stepBeats()
+                        + drumTimingOffsetBeats(stepIndex(), stepBeats(), payload().swingPercent, cell.leanPercent)
+                        - sourceOffset();
+                      if (cellX < 0 || cellX >= viewLength()) return null;
                       const markerWidth = Math.max(0.025, Math.min(stepBeats() * 0.24, 0.09));
                       const velocity = Math.max(0, Math.min(127, cell.velocity ?? 96));
                       return (

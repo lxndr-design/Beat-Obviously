@@ -21,6 +21,7 @@ export interface MidiComponent {
   /** Creation timestamp (ms since epoch). */
   createdAt: number;
   factory?: boolean;
+  folderId?: Id;
 }
 
 export interface DrumComponent {
@@ -36,32 +37,55 @@ export interface DrumComponent {
   timeSignature?: TimeSignature;
   createdAt: number;
   factory?: boolean;
+  folderId?: Id;
 }
 
 export type BeatComponent = MidiComponent | DrumComponent;
+export interface ComponentFolder {
+  id: Id;
+  name: string;
+  factory?: boolean;
+}
+
+export const FACTORY_COMPONENT_FOLDER_ID = "factory-components";
+export const USER_COMPONENT_FOLDER_ID = "user-components";
+
+function defaultComponentFolders(): ComponentFolder[] {
+  return [
+    { id: FACTORY_COMPONENT_FOLDER_ID, name: "Factory", factory: true },
+    { id: USER_COMPONENT_FOLDER_ID, name: "User" },
+  ];
+}
 type ComponentInput =
   | Omit<MidiComponent, "id" | "createdAt">
   | Omit<DrumComponent, "id" | "createdAt">;
 
 interface ComponentSlice {
   components: BeatComponent[];
+  componentFolders: ComponentFolder[];
   add: (c: ComponentInput) => Id;
-  hydrate: (components: BeatComponent[]) => void;
+  hydrate: (components: BeatComponent[], folders?: ComponentFolder[]) => void;
   seedDefaultDrumLoops: (instruments: Instrument[]) => void;
   update: (id: Id, patch: Partial<Omit<MidiComponent, "id" | "createdAt">> | Partial<Omit<DrumComponent, "id" | "createdAt">>) => void;
   remove: (id: Id) => void;
   rename: (id: Id, name: string) => void;
+  addFolder: (name?: string) => Id;
+  renameFolder: (id: Id, name: string) => void;
+  ungroupFolder: (id: Id) => void;
+  moveToFolder: (id: Id, folderId: Id, beforeComponentId?: Id | null) => void;
 }
 
 export const useComponentStore = create<ComponentSlice>()(
   immer((set) => ({
     components: [],
+    componentFolders: defaultComponentFolders(),
     add: (c) => {
       const id = nanoid();
       set((s) => {
         s.components.unshift({
           id,
           createdAt: Date.now(),
+          folderId: USER_COMPONENT_FOLDER_ID,
           ...c,
           ...(c.kind === "drum"
             ? { rows: structuredClone(c.rows) }
@@ -70,13 +94,16 @@ export const useComponentStore = create<ComponentSlice>()(
       });
       return id;
     },
-    hydrate: (components) =>
+    hydrate: (components, folders) =>
       set((s) => {
         const factory = s.components.filter((component) => component.factory);
         const user = components
           .filter((component) => !component.factory)
-          .map((component) => component.kind ? component : { ...component, kind: "midi" as const });
+          .map((component) => normalizeComponentFolder(component));
         s.components = [...user, ...factory];
+        const defaults = defaultComponentFolders();
+        const custom = (folders ?? []).filter((folder) => !defaults.some((item) => item.id === folder.id));
+        s.componentFolders = [...defaults, ...custom];
       }),
     seedDefaultDrumLoops: (instruments) =>
       set((s) => {
@@ -115,8 +142,51 @@ export const useComponentStore = create<ComponentSlice>()(
         const c = s.components.find((x) => x.id === id);
         if (c) c.name = name;
       }),
+    addFolder: (name) => {
+      const id = nanoid();
+      set((s) => {
+        const count = s.componentFolders.filter((folder) => !folder.factory && folder.id !== USER_COMPONENT_FOLDER_ID).length + 1;
+        s.componentFolders.push({ id, name: name?.trim() || `Folder ${count}` });
+      });
+      return id;
+    },
+    renameFolder: (id, name) =>
+      set((s) => {
+        const folder = s.componentFolders.find((candidate) => candidate.id === id);
+        const next = name.trim();
+        if (!folder || folder.factory || id === USER_COMPONENT_FOLDER_ID || !next) return;
+        folder.name = next.slice(0, 48);
+      }),
+    ungroupFolder: (id) =>
+      set((s) => {
+        const folder = s.componentFolders.find((candidate) => candidate.id === id);
+        if (!folder || folder.factory || id === USER_COMPONENT_FOLDER_ID) return;
+        for (const component of s.components) {
+          if (component.folderId === id) component.folderId = USER_COMPONENT_FOLDER_ID;
+        }
+        s.componentFolders = s.componentFolders.filter((candidate) => candidate.id !== id);
+      }),
+    moveToFolder: (id, folderId, beforeComponentId) =>
+      set((s) => {
+        const moving = s.components.find((component) => component.id === id);
+        if (!moving || !s.componentFolders.some((folder) => folder.id === folderId)) return;
+        moving.folderId = folderId;
+        s.components = s.components.filter((component) => component.id !== id);
+        const targetIndex = beforeComponentId
+          ? s.components.findIndex((component) => component.id === beforeComponentId)
+          : -1;
+        if (targetIndex >= 0) s.components.splice(targetIndex, 0, moving);
+        else s.components.push(moving);
+      }),
   })),
 );
+
+function normalizeComponentFolder(component: BeatComponent): BeatComponent {
+  if (component.kind === "drum") {
+    return { ...component, folderId: component.folderId ?? USER_COMPONENT_FOLDER_ID };
+  }
+  return { ...component, kind: "midi", folderId: component.folderId ?? USER_COMPONENT_FOLDER_ID };
+}
 
 function makeFactoryDrumLoops(instruments: Instrument[]): DrumComponent[] {
   const pick = (...names: string[]) =>
@@ -178,6 +248,7 @@ function makeFactoryDrumLoops(instruments: Instrument[]): DrumComponent[] {
     defaultPitchHz,
     createdAt: Date.now(),
     factory: true,
+    folderId: FACTORY_COMPONENT_FOLDER_ID,
     rows,
   });
 

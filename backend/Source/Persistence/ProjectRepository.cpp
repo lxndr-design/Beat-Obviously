@@ -1543,7 +1543,10 @@ namespace beat
                 stmt.columnText(1),
                 normalizeTimestampMs((juce::int64) stmt.columnDouble(2)),
                 stmt.columnDouble(3),
-                juce::File(path).existsAsFile(),
+                // Do not probe recent-project paths while building the startup
+                // list. On macOS, checking a file under Documents can trigger
+                // a TCC permission prompt before the user chooses to open it.
+                path.isNotEmpty(),
             });
         }
         return out;

@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { bounceTrackInPlace, unfreezeBouncedTrack } from "../ExportReview/exportActions";
-import { Button, Icon, Select, Slider, Tag } from "../../solid-ui";
+import { Button, FloatingSelect, Icon, MicroButton, Slider, Tag } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { useAnalyzerStore } from "../../state/analyzerStore";
 import { EFFECT_LABELS, formatEffectLatency } from "../../state/effects";
@@ -24,7 +24,7 @@ export function MixerPanel() {
     <div class={styles.mixer} data-mixer-panel>
       <div class={styles.ribbon}>
         <div class={styles.title}>
-          <Icon name="ph:sliders-horizontal" size={16} decorative />
+          <Icon name="ph:sliders-horizontal" size={18} decorative />
           <span>Mixer</span>
         </div>
         <Tag>{activeTracks()} tracks</Tag>
@@ -108,7 +108,7 @@ function ChannelStrip(props: ChannelStripProps) {
           <div class={styles.stripName} title={props.track.name}>{props.track.name}</div>
           <div class={styles.stripKind}>{props.track.kind}</div>
         </div>
-        <Icon name={props.track.kind === "group" ? "ph:folder-simple" : "ph:waveform"} size={14} decorative />
+        <Icon name={props.track.kind === "group" ? "ph:folder-simple" : "ph:waveform"} size={18} decorative />
       </div>
 
       <div class={styles.meterPair} aria-label={`${props.track.name} stereo meter`} role="group">
@@ -121,39 +121,31 @@ function ChannelStrip(props: ChannelStripProps) {
       </div>
 
       <div class={styles.buttonRow}>
-        <button
-          type="button"
-          class={`${styles.toggle} ${props.track.solo ? styles.toggleOn : ""}`}
+        <MicroButton
+          active={props.track.solo}
           onClick={() => setSolo(!props.track.solo)}
-          aria-pressed={props.track.solo}
         >
           S
-        </button>
-        <button
-          type="button"
-          class={`${styles.toggle} ${props.track.mute ? styles.toggleOn : ""}`}
+        </MicroButton>
+        <MicroButton
+          active={props.track.mute}
           onClick={() => setMute(!props.track.mute)}
-          aria-pressed={props.track.mute}
           disabled={props.track.solo}
         >
           M
-        </button>
-        <button
-          type="button"
-          class={`${styles.toggle} ${props.track.recordArmed ? styles.toggleOn : ""}`}
+        </MicroButton>
+        <MicroButton
+          active={props.track.recordArmed}
           onClick={() => updateTrack({ recordArmed: !props.track.recordArmed })}
-          aria-pressed={props.track.recordArmed}
         >
           R
-        </button>
-        <button
-          type="button"
-          class={`${styles.toggle} ${props.track.inputMonitoring ? styles.toggleOn : ""}`}
+        </MicroButton>
+        <MicroButton
+          active={props.track.inputMonitoring}
           onClick={() => updateTrack({ inputMonitoring: !props.track.inputMonitoring })}
-          aria-pressed={props.track.inputMonitoring}
         >
           In
-        </button>
+        </MicroButton>
       </div>
 
       <div class={styles.controls}>
@@ -180,21 +172,19 @@ function ChannelStrip(props: ChannelStripProps) {
       </div>
 
       <div class={styles.routing}>
-        <Select
+        <FloatingSelect
           label="Output"
-          layout="stacked"
           value={props.track.parentTrackId ?? "master"}
-          onChange={(event) => updateTrack({ parentTrackId: event.currentTarget.value === "master" ? undefined : event.currentTarget.value as Id })}
-        >
-          <option value="master">Master</option>
-          <For each={groupOptions()}>
-            {(group) => (
-              <option value={group.id} disabled={wouldCreateGroupCycle(props.track, group, props.groups)}>
-                {group.name}
-              </option>
-            )}
-          </For>
-        </Select>
+          options={[
+            { value: "master", label: "Master" },
+            ...groupOptions().map((group) => ({
+              value: group.id,
+              label: group.name,
+              disabled: wouldCreateGroupCycle(props.track, group, props.groups),
+            })),
+          ]}
+          onChange={(value) => updateTrack({ parentTrackId: value === "master" ? undefined : value as Id })}
+        />
         <div class={styles.routeMeta}>
           <span>{sendTotal()} sends</span>
           <span>{effectTotal()} inserts</span>
@@ -248,15 +238,16 @@ function SendControl(props: SendControlProps) {
 
   return (
     <div class={styles.sendRow} data-mixer-send={`${props.track.id}:${props.bus.id}`}>
-      <button
-        type="button"
-        class={`${styles.sendToggle} ${effectiveSend().enabled ? styles.toggleOn : ""}`}
+      <Button
+        variant="ghost"
+        selected={effectiveSend().enabled}
+        class={styles.sendToggle}
         onClick={() => updateSend({ enabled: !effectiveSend().enabled, gainDb: send()?.gainDb ?? -12, pan: send()?.pan ?? 0 })}
         aria-pressed={effectiveSend().enabled}
         aria-label={`${props.track.name} send to ${props.bus.name}`}
       >
         {props.bus.name}
-      </button>
+      </Button>
       <Slider
         layout="bare"
         min={-96}
@@ -298,17 +289,15 @@ function ReturnStrip(props: ReturnStripProps) {
           <div class={styles.stripName} title={props.bus.name}>{props.bus.name}</div>
           <div class={styles.stripKind}>return</div>
         </div>
-        <Icon name="ph:arrow-elbow-down-right" size={14} decorative />
+        <Icon name="ph:arrow-elbow-down-right" size={18} decorative />
       </div>
       <div class={styles.buttonRow}>
-        <button
-          type="button"
-          class={`${styles.toggle} ${props.bus.mute ? styles.toggleOn : ""}`}
+        <MicroButton
+          active={props.bus.mute}
           onClick={() => updateBus({ mute: !props.bus.mute })}
-          aria-pressed={props.bus.mute}
         >
           M
-        </button>
+        </MicroButton>
       </div>
       <div class={styles.controls}>
         <Slider
@@ -364,24 +353,25 @@ function InsertList(props: InsertListProps) {
         <For each={props.effects}>
           {(effect, index) => (
             <div class={`${styles.insertRow} ${effect.bypassed ? styles.insertBypassed : ""}`} data-mixer-insert={effect.id}>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                selected={!effect.bypassed}
                 class={styles.insertName}
                 onClick={() => props.onBypass(effect)}
                 aria-pressed={!effect.bypassed}
               >
                 {EFFECT_LABELS[effect.kind]}
-              </button>
+              </Button>
               <span class={styles.insertLatency}>{formatEffectLatency(effect)}</span>
-              <button type="button" class={styles.insertAction} onClick={() => props.onMove(effect, -1)} disabled={index() === 0} aria-label="Move insert up">
-                <Icon name="ph:caret-up" size={12} decorative />
-              </button>
-              <button type="button" class={styles.insertAction} onClick={() => props.onMove(effect, 1)} disabled={index() === props.effects.length - 1} aria-label="Move insert down">
-                <Icon name="ph:caret-down" size={12} decorative />
-              </button>
-              <button type="button" class={styles.insertAction} onClick={() => props.onRemove(effect)} aria-label="Remove insert">
-                <Icon name="ph:x" size={12} decorative />
-              </button>
+              <Button iconOnly size="xs" variant="ghost" class={styles.insertAction} onClick={() => props.onMove(effect, -1)} disabled={index() === 0} aria-label="Move insert up">
+                <Icon name="ph:caret-up" size={18} decorative />
+              </Button>
+              <Button iconOnly size="xs" variant="ghost" class={styles.insertAction} onClick={() => props.onMove(effect, 1)} disabled={index() === props.effects.length - 1} aria-label="Move insert down">
+                <Icon name="ph:caret-down" size={18} decorative />
+              </Button>
+              <Button iconOnly size="xs" variant="ghost" class={styles.insertAction} onClick={() => props.onRemove(effect)} aria-label="Remove insert">
+                <Icon name="ph:x" size={18} decorative />
+              </Button>
             </div>
           )}
         </For>
@@ -404,7 +394,7 @@ function MasterStrip(props: MasterStripProps) {
           <div class={styles.stripName}>Master</div>
           <div class={styles.stripKind}>output</div>
         </div>
-        <Icon name="ph:speaker-high" size={14} decorative />
+        <Icon name="ph:speaker-high" size={18} decorative />
       </div>
       <div class={styles.meterPair} aria-label="Master stereo meter" role="group">
         <span class={styles.meterLane} data-meter-channel="left">

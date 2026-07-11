@@ -29,6 +29,7 @@ These are the remaining product-level workflows that keep Beat from feeling like
    - Remaining: batch stem naming polish and export analysis browser smoke/parity review.
 5. **Sampler keymap editing**
    - Sampler instruments need key/velocity zones, root-note helpers, sample trim, loop/crossfade loops, round-robin, choke, exclusive groups, and missing-zone repair UI.
+   - Sampler-zone and MIDI sample-switch work should land before any Vocaloid-style feature. Beat should first support reliable per-note sample/articulation selection, mapped-zone editing, persistence, and playback/export parity.
 6. **Nodemap modular synth**
    - Nodemap is its own modular synth engine surface, not an Aether UI skin. Native graph schema/evaluation, one-note audition, DAW playback/export, and persistence now exist independently from the temporary frontend Aether compile bridge.
    - Current foundation: protected `Instrument Out`, multi-cable ports, grouped node browser, six proof templates, warnings, persistence, migration/repair, JS compile/preview verification, broad graph semantics, native render timing, linked instance references, live/export WAV parity, and in-app browser replay for create/connect/edit/undo/redo/audition/apply.
@@ -171,6 +172,67 @@ Acceptance:
 
 - A user can create and reuse musical ideas without copy/paste becoming the only workflow.
 - MIDI/drum edits remain ordinary DAW data and survive document roundtrip.
+
+### Sampler Zones And MIDI Sample Switching
+
+Purpose: make sampler instruments explicit, editable, and musically addressable from the MIDI editor before adding any Vocaloid-style phrase system.
+
+Current assets:
+
+- `Instrument.sampleMap` supports pitch ranges, velocity ranges, root note, gain, pan, tuning, round-robin position, sample trim, loop flags, one-shot flags, duration bands, and choke metadata.
+- Browser playback resolves sampler zones by pitch, velocity, note duration, and optional note-level sample-zone override, with legacy path fallback.
+- The sampler instrument editor now exposes editable sampler-zone rows, including duplicate-zone creation and duplicate-zone removal for layered samples.
+- The sampler instrument editor can audition an individual zone after preloading its sample path, so zone edits can be checked without leaving the modal.
+- `MidiNote` supports optional sample-zone ID, sample path, and sample label metadata, and the piano roll receives the active instrument to assign zones to selected notes.
+- The piano roll warns when notes still point at a sampler zone/path that no longer exists on the active instrument and can clear those stale assignments back to auto zone resolution.
+
+Build:
+
+1. **Sampler zone editor foundation**
+   - Done: move sample-map editing into the sampler instrument editor.
+   - Done: add zone rows for sample label, root note, key range, velocity range, trim start/end, volume, pan, tuning, one-shot, loop, and duplicate-zone actions.
+   - Use the shared UI kit for dropdowns, numeric fields, toggles, row items, and footers.
+   - Done: warn when MIDI notes reference missing sampler zone metadata and provide a clear-stale-assignments repair action.
+   - Remaining: add round-robin, choke group, exclusive group, and duration-band polish.
+
+2. **Stable zone identity**
+   - Done: add stable zone IDs or an equivalent migration-safe identity for sample zones.
+   - Done: preserve legacy path-based lookup for older instruments and DecentSampler imports.
+   - Done: update document normalization so missing IDs are repaired deterministically on load.
+
+3. **MIDI note sample switch metadata**
+   - Done: add optional sampler metadata to `MidiNote`, including selected zone ID, sample label, and forced sample path fallback.
+   - Done: keep ordinary MIDI notes valid without sample metadata.
+   - Done: add document roundtrip and migration coverage for the new field.
+
+4. **Piano roll sampler awareness**
+   - Done: pass the active segment instrument into the MIDI editor.
+   - Done: when the instrument is sampler-backed, show a compact sample/articulation selector for selected notes.
+   - Done: display the selected articulation/sample label on notes only when useful and without cluttering the plain MIDI editor.
+   - Preserve existing note drag, resize, selection, copy/paste, right-click actions, and note preview behavior.
+
+5. **Playback and export parity**
+   - Done: make note-level sample selection override the normal pitch/velocity/length resolver.
+   - Done: fall back to the existing resolver if the selected zone is missing, invalid, or unloaded.
+   - Done: preload selected zones before explicit sampler-zone audition.
+   - Done: cover live playback, segment playback, editor audition, document migration, and source-wiring contracts with `verify:sampler-zones`, `verify:documents`, `verify:audio-boundary`, and `verify:daw`.
+
+6. **Sampler-focused audition**
+   - Done: add selected-zone preview in the sampler editor.
+   - Add MIDI editor audition when changing a note's sample/articulation.
+   - Keep audition scoped to the active modal/editor so global transport hotkeys do not hijack it.
+
+Deferred:
+
+- Lyric entry, phoneme dictionaries, vowel/consonant transition rules, formant handling, pitch-time correction, and Vocaloid-style phrase smoothing.
+- These should only begin after sampler-zone editing and note-level sample switching are stable.
+
+Acceptance:
+
+- A sampler instrument can be built from multiple samples, mapped by key/velocity/round-robin/trim/loop settings, saved, reopened, and played.
+- A MIDI note can explicitly choose a sampler zone/articulation, and that choice survives copy/paste, document roundtrip, live playback, and export.
+- Existing MIDI editing remains reliable; sampler controls appear only when the selected instrument supports them.
+- DecentSampler-derived instruments keep working through the same sampler-zone model without requiring official DecentSampler runtime hosting.
 
 ## Phase 4: Automation As A First-Class DAW Surface
 

@@ -124,7 +124,7 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
       <Modal
         open
         scopeId={scopeId()}
-        title={<><Icon name={kind() === "drum" ? "ph:music-notes-simple" : "ph:piano-keys"} size={14} decorative />{draft()?.name}</>}
+        title={<><Icon name={kind() === "drum" ? "ph:music-notes-simple" : "ph:piano-keys"} size={18} decorative />{draft()?.name}</>}
         width="lg"
         dirty={dirty()}
         onClose={requestClose}
@@ -189,6 +189,7 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
           {(midiDraft) => (
             <PianoRoll
               notes={midiDraft().notes}
+              instrument={instruments().find((instrument) => instrument.id === midiDraft().instrumentId)}
               lengthBeats={midiDraft().lengthBeats}
               playheadBeat={null}
               onChange={(notes: MidiNote[]) => setMidiPatch({ notes })}

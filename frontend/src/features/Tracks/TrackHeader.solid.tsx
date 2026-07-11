@@ -1,8 +1,15 @@
 import { createMemo, createSignal, Show } from "solid-js";
 import { nanoid as newNanoid } from "nanoid";
-import { appConfirm } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
-import { createContextMenu, HoverInfo, Icon, type ContextMenuItem } from "../../solid-ui";
+import {
+  appConfirm,
+  createContextMenu,
+  HoverInfo,
+  Icon,
+  MicroButton,
+  StatusChip,
+  type ContextMenuItem,
+} from "../../solid-ui";
 import { useAnalyzerStore } from "../../state/analyzerStore";
 import { useProjectStore, useUiStore } from "../../state/store";
 import styles from "./TrackHeader.module.css";
@@ -172,7 +179,7 @@ export function TrackHeader(props: Props) {
             onDragStart={onHandleDragStart}
             aria-hidden="true"
           >
-            <Icon name="ph:dots-six-vertical" size={16} decorative />
+            <Icon name="ph:dots-six-vertical" size={18} decorative />
           </span>
 
           <div class={styles.nameStack}>
@@ -208,9 +215,8 @@ export function TrackHeader(props: Props) {
 
             <div class={styles.channelControls}>
               <HoverInfo content={current().solo ? "Unsolo" : "Solo (mute others)"}>
-                <button
-                  type="button"
-                  class={`${styles.dot} ${styles.textDot} ${current().solo ? styles.dotOn : ""}`}
+                <MicroButton
+                  active={current().solo}
                   onClick={(event) => {
                     event.stopPropagation();
                     if (event.ctrlKey) return;
@@ -219,12 +225,11 @@ export function TrackHeader(props: Props) {
                   aria-label={current().solo ? "Unsolo" : "Solo"}
                 >
                   S
-                </button>
+                </MicroButton>
               </HoverInfo>
               <HoverInfo content={current().solo ? "Soloed - can't mute" : current().mute ? "Unmute" : "Mute"}>
-                <button
-                  type="button"
-                  class={`${styles.dot} ${styles.textDot} ${current().mute ? styles.dotOn : ""}`}
+                <MicroButton
+                  active={current().mute}
                   onClick={(event) => {
                     event.stopPropagation();
                     if (event.ctrlKey) return;
@@ -234,7 +239,7 @@ export function TrackHeader(props: Props) {
                   disabled={current().solo}
                 >
                   M
-                </button>
+                </MicroButton>
               </HoverInfo>
             </div>
             <div class={styles.meter} aria-label="Stereo track meter" role="group">
@@ -247,19 +252,18 @@ export function TrackHeader(props: Props) {
             </div>
             <Show when={gainBadge() || panBadge() || current().recordArmed || current().inputMonitoring}>
               <div class={styles.statusRow} aria-hidden="true">
-                <Show when={gainBadge()}>{(badge) => <span class={styles.statusBadge}>{badge()}</span>}</Show>
-                <Show when={panBadge()}>{(badge) => <span class={styles.statusBadge}>{badge()}</span>}</Show>
-                <Show when={current().recordArmed}><span class={styles.statusBadge}>REC</span></Show>
-                <Show when={current().inputMonitoring}><span class={styles.statusBadge}>IN</span></Show>
+                <Show when={gainBadge()}>{(badge) => <StatusChip>{badge()}</StatusChip>}</Show>
+                <Show when={panBadge()}>{(badge) => <StatusChip>{badge()}</StatusChip>}</Show>
+                <Show when={current().recordArmed}><StatusChip>REC</StatusChip></Show>
+                <Show when={current().inputMonitoring}><StatusChip>IN</StatusChip></Show>
               </div>
             </Show>
           </div>
 
           <div class={styles.controls}>
             <HoverInfo content={current().recordArmed ? "Disarm recording" : "Arm recording"}>
-              <button
-                type="button"
-                class={`${styles.dot} ${current().recordArmed ? styles.dotOn : ""}`}
+              <MicroButton
+                active={current().recordArmed}
                 onClick={(event) => {
                   event.stopPropagation();
                   if (event.ctrlKey) return;
@@ -267,13 +271,12 @@ export function TrackHeader(props: Props) {
                 }}
                 aria-label={current().recordArmed ? "Disarm recording" : "Arm recording"}
               >
-                <Icon name={current().recordArmed ? "ph:microphone-fill" : "ph:microphone"} size={12} decorative />
-              </button>
+                <Icon name={current().recordArmed ? "ph:microphone-fill" : "ph:microphone"} size={18} decorative />
+              </MicroButton>
             </HoverInfo>
             <HoverInfo content={current().inputMonitoring ? "Disable input monitoring" : "Enable input monitoring"}>
-              <button
-                type="button"
-                class={`${styles.dot} ${current().inputMonitoring ? styles.dotOn : ""}`}
+              <MicroButton
+                active={current().inputMonitoring}
                 onClick={(event) => {
                   event.stopPropagation();
                   if (event.ctrlKey) return;
@@ -281,8 +284,8 @@ export function TrackHeader(props: Props) {
                 }}
                 aria-label={current().inputMonitoring ? "Disable input monitoring" : "Enable input monitoring"}
               >
-                <Icon name={current().inputMonitoring ? "ph:speaker-high-fill" : "ph:speaker-high"} size={12} decorative />
-              </button>
+                <Icon name={current().inputMonitoring ? "ph:speaker-high-fill" : "ph:speaker-high"} size={18} decorative />
+              </MicroButton>
             </HoverInfo>
           </div>
           {menu.menu()}

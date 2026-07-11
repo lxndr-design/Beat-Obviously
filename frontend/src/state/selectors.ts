@@ -1,6 +1,5 @@
 import type { Beats, Id, Segment, Track } from "./types";
 import { useProjectStore } from "./store";
-import { drumPlaybackDurationBeats } from "./drumSteps";
 
 /** Any track currently soloed? Used to derive effective mute. */
 export function isAnySoloActive(): boolean {
@@ -72,5 +71,5 @@ export function expandTrackSegments(
 }
 
 function effectiveSegmentLength(seg: Segment): Beats {
-  return seg.payload.kind === "drum" ? drumPlaybackDurationBeats(seg.lengthBeats, seg.payload.speed ?? 1) : seg.lengthBeats;
+  return seg.lengthBeats;
 }

@@ -10,8 +10,8 @@
 }
 
 .rail {
-  flex: 0 0 var(--sidebar-rail-size);
-  width: var(--sidebar-rail-size);
+  flex: 0 0 var(--navigation-rail-size);
+  width: var(--navigation-rail-size);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -27,60 +27,15 @@
 }
 
 .railButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--sidebar-rail-size);
-  height: var(--sidebar-rail-size);
-  padding: 0;
-  background: transparent;
-  color: var(--color-fg);
-  border: 0;
-  border-bottom: var(--border-fg);
-  transition:
-    background var(--duration-hover) var(--ease-out),
-    color var(--duration-hover) var(--ease-out);
-}
-
-.railButtonActive {
-  background:
-    radial-gradient(circle at 25% 18%, color-mix(in srgb, var(--color-bg) 24%, transparent) 0 18%, transparent 44%),
-    radial-gradient(circle at 82% 72%, color-mix(in srgb, var(--color-bg) 18%, transparent) 0 16%, transparent 42%),
-    radial-gradient(circle at 55% 48%, color-mix(in srgb, var(--color-bg) 12%, transparent) 0 22%, transparent 54%),
-    linear-gradient(145deg, color-mix(in srgb, var(--color-bg) 10%, transparent), transparent 70%),
-    var(--color-fg);
-  color: var(--color-fg-inverse);
-}
-
-.railButton:hover {
-  background: var(--interaction-hover-bg);
-  color: var(--color-fg);
-}
-
-.railButton:active {
-  background: var(--interaction-pressed-bg);
-}
-
-.railButton:focus-visible {
-  box-shadow: var(--interaction-focus-ring);
-}
-
-.railButtonActive:hover {
-  background:
-    radial-gradient(circle at 25% 18%, color-mix(in srgb, var(--color-bg) 24%, transparent) 0 18%, transparent 44%),
-    radial-gradient(circle at 82% 72%, color-mix(in srgb, var(--color-bg) 18%, transparent) 0 16%, transparent 42%),
-    radial-gradient(circle at 55% 48%, color-mix(in srgb, var(--color-bg) 12%, transparent) 0 22%, transparent 54%),
-    linear-gradient(145deg, color-mix(in srgb, var(--color-bg) 10%, transparent), transparent 70%),
-    var(--color-fg);
-  color: var(--color-fg-inverse);
+  border-bottom: 1px solid var(--border-fg-color);
 }
 
 .decentSamplerIcon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
 }
 
 .decentSamplerIcon svg {
@@ -105,25 +60,10 @@
   letter-spacing: 0;
 }
 
-.railButtonActive .decentSamplerIconFrame,
-.railButtonActive:hover .decentSamplerIconFrame {
-  fill: var(--color-fg);
-  stroke: currentColor;
-}
-
-.railButtonActive .decentSamplerIconGlyph,
-.railButtonActive:hover .decentSamplerIconGlyph {
-  fill: var(--color-fg-inverse);
-}
-
 .railBottom {
   display: flex;
   flex-direction: column;
   border-top: var(--border-fg);
-}
-
-.railBottom .railButton {
-  border-bottom: var(--border-fg);
 }
 
 .railBottom > :last-child .railButton {
@@ -137,8 +77,8 @@
 
 .dirtyDot {
   position: absolute;
-  top: 5px;
-  right: 4px;
+  top: 6px;
+  right: 3px;
   width: 6px;
   height: 6px;
   background: var(--color-fg);
@@ -196,8 +136,8 @@
 .resizeHandle {
   position: absolute;
   top: 0;
-  right: -2px;
-  width: 4px;
+  right: -3px;
+  width: 3px;
   height: 100%;
   cursor: col-resize;
   background: transparent;

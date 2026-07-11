@@ -1,7 +1,7 @@
 .wrap {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  height: 33px;
   border: var(--border-fg);
   background: var(--color-bg);
 }

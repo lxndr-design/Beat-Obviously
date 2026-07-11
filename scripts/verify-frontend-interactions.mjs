@@ -16,9 +16,12 @@ try {
     esbuild,
     [
       join(repoRoot, "frontend/src/testing/interactionRunner.ts"),
+      join(repoRoot, "frontend/src/features/MidiEditor/pianoRollInteraction.ts"),
+      join(repoRoot, "frontend/src/features/SegmentEditor/midiLiveRecording.ts"),
       join(repoRoot, "frontend/src/automation/aetherNoteAutomation.ts"),
       join(repoRoot, "frontend/src/automation/aetherArrangementAutomation.ts"),
       join(repoRoot, "frontend/src/automation/aetherAutomationConflicts.ts"),
+      join(repoRoot, "frontend/src/state/components.ts"),
       "--bundle",
       "--format=esm",
       "--platform=node",
@@ -28,11 +31,25 @@ try {
   );
 
   const runner = await import(pathToFileURL(join(outDir, "testing/interactionRunner.js")));
+  const midiInteraction = await import(pathToFileURL(join(outDir, "features/MidiEditor/pianoRollInteraction.js")));
+  const midiLiveRecording = await import(pathToFileURL(join(outDir, "features/SegmentEditor/midiLiveRecording.js")));
   const noteAutomation = await import(pathToFileURL(join(outDir, "automation/aetherNoteAutomation.js")));
   const arrangementAutomation = await import(pathToFileURL(join(outDir, "automation/aetherArrangementAutomation.js")));
   const automationConflicts = await import(pathToFileURL(join(outDir, "automation/aetherAutomationConflicts.js")));
+  const componentState = await import(pathToFileURL(join(outDir, "state/components.js")));
   const pianoRollSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.solid.tsx"), "utf8");
+  const pianoRollCss = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.module.css"), "utf8");
+  const midiTransportSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/MidiTransport.solid.tsx"), "utf8");
   const segmentEditorSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx"), "utf8");
+  const drumpadEditorSource = readFileSync(join(repoRoot, "frontend/src/features/DrumpadEditor/DrumpadEditorModal.solid.tsx"), "utf8");
+  const drumpadEditorCss = readFileSync(join(repoRoot, "frontend/src/features/DrumpadEditor/DrumpadEditorModal.module.css"), "utf8");
+  const preferencesSource = readFileSync(join(repoRoot, "frontend/src/features/Preferences/PreferencesModal.solid.tsx"), "utf8");
+  const ipcSchemaSource = readFileSync(join(repoRoot, "frontend/src/ipc/schema.ts"), "utf8");
+  const ipcBridgeSource = readFileSync(join(repoRoot, "frontend/src/ipc/bridge.ts"), "utf8");
+  const ipcBackendSchemaSource = readFileSync(join(repoRoot, "backend/Source/Ipc/Schema.h"), "utf8");
+  const ipcBackendBridgeSource = readFileSync(join(repoRoot, "backend/Source/Ipc/MessageBridge.cpp"), "utf8");
+  const audioEngineHeaderSource = readFileSync(join(repoRoot, "backend/Source/Audio/AudioEngine.h"), "utf8");
+  const audioEngineSource = readFileSync(join(repoRoot, "backend/Source/Audio/AudioEngine.cpp"), "utf8");
   const trackDetailsSource = readFileSync(join(repoRoot, "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx"), "utf8");
   const trackHeaderSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackHeader.solid.tsx"), "utf8");
   const homeHubSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/HomeHub.solid.tsx"), "utf8");
@@ -62,11 +79,321 @@ try {
   const instrumentsPageSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/InstrumentsPage.solid.tsx"), "utf8");
   const instrumentEditorSource = readFileSync(join(repoRoot, "frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx"), "utf8");
   const componentLibrarySource = readFileSync(join(repoRoot, "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx"), "utf8");
+  const instrumentLibrarySource = readFileSync(join(repoRoot, "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx"), "utf8");
   const drumSequencerSource = readFileSync(join(repoRoot, "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx"), "utf8");
   const devHooksSource = readFileSync(join(repoRoot, "frontend/src/testing/devHooks.ts"), "utf8");
 
   assert.equal(runner.snapBeat(1.12, 0.25), 1, "snapBeat should snap to nearest grid");
+  componentState.useComponentStore.getState().hydrate([], []);
+  const componentFolderId = componentState.useComponentStore.getState().addFolder("Sketches");
+  const componentId = componentState.useComponentStore.getState().add({
+    name: "Verse",
+    notes: [],
+    lengthBeats: 4,
+  });
+  componentState.useComponentStore.getState().moveToFolder(componentId, componentFolderId);
+  assert.equal(
+    componentState.useComponentStore.getState().components.find((component) => component.id === componentId)?.folderId,
+    componentFolderId,
+    "component folders should accept moved components",
+  );
+  componentState.useComponentStore.getState().renameFolder(componentFolderId, "Ideas");
+  assert.equal(
+    componentState.useComponentStore.getState().componentFolders.find((folder) => folder.id === componentFolderId)?.name,
+    "Ideas",
+    "component folders should be renameable",
+  );
+  componentState.useComponentStore.getState().ungroupFolder(componentFolderId);
+  assert.equal(
+    componentState.useComponentStore.getState().components.find((component) => component.id === componentId)?.folderId,
+    componentState.USER_COMPONENT_FOLDER_ID,
+    "ungrouping a component folder should move its contents to User",
+  );
+  assert.ok(
+    componentLibrarySource.includes("<LibraryFolder") && instrumentLibrarySource.includes("<LibraryFolder"),
+    "instrument and component libraries should share the LibraryFolder UI and interactions",
+  );
   assert.equal(runner.snapBeat(1.13, 0.25), 1.25, "snapBeat should round upward past the midpoint");
+  assert.deepEqual(
+    midiInteraction.midiNoteSelectionAfterPointerDown({ selectedIndices: [], noteIndex: 1, additive: false }),
+    [1],
+    "MIDI note click should select the pressed note",
+  );
+  assert.deepEqual(
+    midiInteraction.midiNoteSelectionAfterPointerDown({ selectedIndices: [0, 2], noteIndex: 2, additive: false }),
+    [0, 2],
+    "MIDI note click on an already-selected note should preserve multi-selection for dragging",
+  );
+  assert.deepEqual(
+    midiInteraction.midiNoteSelectionAfterPointerDown({ selectedIndices: [0], noteIndex: 2, additive: true }),
+    [0, 2],
+    "MIDI note additive selection should extend the selection",
+  );
+  assert.deepEqual(
+    midiInteraction.midiNoteDragIndicesForSelection([0, 2], 2),
+    [0, 2],
+    "MIDI note edits should target the active selection when the pressed note is selected",
+  );
+  assert.deepEqual(
+    midiInteraction.midiNoteDragIndicesForSelection([0, 2], 1),
+    [1],
+    "MIDI note edits should switch to the pressed note when it is outside the active selection",
+  );
+  assert.equal(
+    midiInteraction.midiNotePointerMovedPastThreshold({
+      startClientX: 10,
+      startClientY: 10,
+      currentClientX: 12,
+      currentClientY: 10,
+      thresholdPx: 3,
+    }),
+    false,
+    "MIDI note pointer jitter below the threshold should not start an edit",
+  );
+  assert.equal(
+    midiInteraction.midiNotePointerMovedPastThreshold({
+      startClientX: 10,
+      startClientY: 10,
+      currentClientX: 13,
+      currentClientY: 10,
+      thresholdPx: 3,
+    }),
+    true,
+    "MIDI note pointer movement at the threshold should start an edit",
+  );
+  assert.equal(midiInteraction.midiVisibleGridBeatStep(48), 1, "normal MIDI grid lines should snap shift-drags to whole-beat ticks");
+  assert.equal(midiInteraction.midiVisibleGridBeatStep(120), 0.25, "medium zoom MIDI grid lines should snap shift-drags to quarter-beat ticks");
+  assert.equal(midiInteraction.midiVisibleGridBeatStep(240), 0.0625, "close zoom MIDI grid lines should snap shift-drags to sixteenth-beat ticks");
+  assert.equal(midiInteraction.snapMidiBeatToVisibleGrid(2.37, 48), 2, "visible-grid snapping should use whole-beat ticks at normal zoom");
+  assert.equal(midiInteraction.snapMidiBeatToVisibleGrid(2.37, 120), 2.25, "visible-grid snapping should use quarter-beat ticks at medium zoom");
+  assert.equal(midiInteraction.snapMidiBeatToVisibleGrid(2.37, 240), 2.375, "visible-grid snapping should use sixteenth-beat ticks at close zoom");
+  assert.ok(
+    pianoRollSource.includes("const isSelected = () => selected().includes(i)")
+      && pianoRollSource.includes("isSelected() && styles.noteSelected")
+      && pianoRollSource.includes("const hoveredSide = () =>")
+      && pianoRollSource.includes("const rect = createMemo(() => visibleNoteRect(n))")
+      && pianoRollSource.includes("style={noteStyle()}"),
+    "piano roll note selection, hover classes, and zoom-scaled note rects should be reactive after note nodes are created",
+  );
+  assert.ok(
+    pianoRollSource.includes("has: (_target, property) => Reflect.has(props.notes, property)")
+      && pianoRollSource.includes("getOwnPropertyDescriptor: (_target, property) => Reflect.getOwnPropertyDescriptor(props.notes, property)"),
+    "piano roll note proxy should support array methods such as slice during note drags",
+  );
+  assert.ok(
+    pianoRollSource.includes('window.addEventListener("pointermove", moveDrag, true)')
+      && pianoRollSource.includes('window.addEventListener("mousemove", moveDrag, true)')
+      && pianoRollSource.includes("function noteMouseDown")
+      && pianoRollSource.includes("function noteEditDragHasStarted")
+      && pianoRollSource.includes("midiNotePointerMovedPastThreshold")
+      && pianoRollSource.includes("snapMidiBeatToVisibleGrid(beat, pxPerBeat())")
+      && pianoRollSource.includes("const startBeat = clamp(e.shiftKey ? snapShiftDrag(rawStartBeat) : rawStartBeat")
+      && pianoRollSource.includes("const rawEnd = start.startBeat + start.lengthBeats + dLen")
+      && pianoRollSource.includes("const nextEnd = e.shiftKey ? snapShiftDrag(rawEnd) : rawEnd")
+      && pianoRollSource.includes("const rawStart = start.startBeat + dLen")
+      && pianoRollSource.includes("const nextStart = clamp(e.shiftKey ? snapShiftDrag(rawStart) : rawStart"),
+    "piano roll note movement should use window-level tracking and shift-snap note drags/resizes to visible grid ticks",
+  );
+  assert.ok(
+    pianoRollSource.includes("e.currentTarget.setPointerCapture(e.pointerId)")
+      && pianoRollSource.includes("const valueFromPointer = (slider: HTMLElement, clientX: number)")
+      && pianoRollSource.includes("updateValueFromPointer(e.currentTarget, e.clientX)")
+      && pianoRollSource.includes('role="slider"')
+      && pianoRollSource.includes("onPointerMove={(e) => {")
+      && pianoRollSource.includes("e.currentTarget.releasePointerCapture(e.pointerId)")
+      && pianoRollSource.includes('window.addEventListener("mousemove", handleMouseMove, true)')
+      && pianoRollSource.includes("onMouseDown={handleMouseDown}")
+      && pianoRollCss.includes(".volumeSliderThumb")
+      && pianoRollCss.includes("grid-template-columns: 27px minmax(108px, 1fr) 36px")
+      && pianoRollCss.includes("height: 21px")
+      && pianoRollCss.includes("width: 9px")
+      && pianoRollCss.includes("touch-action: none"),
+    "piano roll note volume slider should stay compact while preserving pointer drag handling",
+  );
+  assert.ok(
+    pianoRollSource.includes("function noteDetailViewportState(state: VolumePopoverState)")
+      && pianoRollSource.includes("viewportVersion()")
+      && pianoRollSource.includes("const x = clientX == null ? rect.width / 2 : clientX - rect.left")
+      && pianoRollSource.includes("state={noteDetailViewportState(currentNoteEditor)}"),
+    "piano roll zoom and scroll should keep note-attached editors anchored to the current note geometry",
+  );
+  assert.ok(
+    pianoRollSource.includes('type="button"')
+      && pianoRollSource.includes('data-midi-interactive="true"')
+      && pianoRollSource.includes('aria-label={`Drag pitch curve start handle')
+      && pianoRollSource.includes('activeEdge={dragActive() && drag.current?.mode === "curve-handle"')
+      && pianoRollCss.includes("width: 21px")
+      && pianoRollCss.includes(".curveHandle:hover::before")
+      && pianoRollCss.includes(".curveHandleActive::before"),
+    "piano roll pitch curve handles should be selectable and show hover/active feedback",
+  );
+  assert.ok(
+    segmentEditorSource.indexOf("<MidiTransport") > segmentEditorSource.indexOf('class={styles.midiLiveTransport}')
+      && segmentEditorSource.includes("captureSpaceKey")
+      && midiTransportSource.includes("function togglePlayback()")
+      && midiTransportSource.includes("captureSpaceKey")
+      && midiTransportSource.includes('event.key !== " " && event.key !== "Space" && event.key !== "Spacebar"')
+      && midiTransportSource.includes("event.stopImmediatePropagation()")
+      && !midiTransportSource.includes('register(scopeId, "space", restart'),
+    "MIDI segment preview transport should live with record controls and space should only toggle play/pause",
+  );
+  assert.ok(
+    midiTransportSource.includes("function pause()")
+      && midiTransportSource.includes("props.state().onPositionChange?.(positionBeat)")
+      && !midiTransportSource.includes("function pause() {\n    setPlaying(false);\n    stopPreviewAudio();\n    props.state().onPositionChange?.(null);")
+      && midiTransportSource.includes("onCleanup(() => {\n    stopPreviewAudio();\n    props.state().onPositionChange?.(null);"),
+    "MIDI preview pause should keep the playhead visible and only clear preview position on cleanup",
+  );
+  assert.ok(
+    drumpadEditorSource.includes("function togglePlayback()")
+      && drumpadEditorSource.includes("createInstrumentBufferSource")
+      && drumpadEditorSource.includes("auditionLane(lane")
+      && drumpadEditorSource.includes("triggerKeyCode(key.code, { record: recording() })")
+      && drumpadEditorSource.includes('aria-label={playing() ? "Pause" : "Play"}'),
+    "drumpad editor should expose playback and immediate key/hit audition feedback",
+  );
+  assert.ok(
+    drumpadEditorSource.includes("<FloatingSelect")
+      && drumpadEditorSource.includes("searchable")
+      && drumpadEditorSource.includes('searchPlaceholder="Search instruments"')
+      && drumpadEditorSource.includes("onChange={(instrumentId) => changeLaneInstrument(lane.id, instrumentId)}")
+      && !drumpadEditorSource.includes("<Select\n                          layout=\"bare\""),
+    "drumpad lane instruments should use searchable FloatingSelect controls that update lane instruments",
+  );
+  assert.ok(
+    drumpadEditorSource.includes('"--lane-head-width": `${DRUMPAD_LANE_HEAD_WIDTH_PX}px`')
+      && drumpadEditorSource.includes('"--playhead-progress": playheadProgress()')
+      && drumpadEditorSource.includes("rect.width - 20 - DRUMPAD_LANE_HEAD_WIDTH_PX")
+      && drumpadEditorCss.includes("left: calc(9px + var(--lane-head-width)")
+      && drumpadEditorCss.includes("grid-template-columns: var(--lane-head-width) minmax(261px, 1fr)"),
+    "drumpad timeline playhead and drag math should start at the end of the lane head column",
+  );
+  assert.ok(
+    drumpadEditorCss.includes("vector-effect: non-scaling-stroke")
+      && drumpadEditorCss.includes("color-mix(in srgb, var(--color-fg) 54%, transparent)")
+      && drumpadEditorCss.includes("opacity: 0.64"),
+    "drumpad keyboard plug links should render as faint non-scaling graph-style connections",
+  );
+  assert.ok(
+    drumpadEditorSource.includes("interface KeyboardLinkFrame")
+      && drumpadEditorSource.includes("function measureKeyboardLinks()")
+      && drumpadEditorSource.includes("onMount(() => queueMeasureKeyboardLinks())")
+      && drumpadEditorSource.includes("pendingNodes = true")
+      && drumpadEditorSource.includes('bodyRef.querySelector<HTMLElement>(`[data-drumpad-key="${lane.keyCode}"]`)')
+      && drumpadEditorSource.includes('data-drumpad-lane-plug={lane.id}')
+      && drumpadEditorSource.includes("<KeyboardLinkLines frame={keyboardLinkFrame()} />")
+      && drumpadEditorCss.includes("z-index: 5")
+      && drumpadEditorCss.includes("z-index: 7")
+      && !drumpadEditorSource.includes("<KeyboardLinkLines laneId="),
+    "drumpad keyboard plug links should persistently measure and connect assigned keys to lane plugs",
+  );
+  assert.ok(
+    drumpadEditorSource.includes("keyboardLayoutToggle")
+      && drumpadEditorSource.includes('aria-label="Use Apple keyboard layout"')
+      && drumpadEditorSource.includes('aria-label="Use Windows keyboard layout"')
+      && drumpadEditorCss.includes("width: 39px")
+      && drumpadEditorCss.includes("height: 39px")
+      && drumpadEditorCss.includes("flex-basis: 45px")
+      && drumpadEditorCss.includes("flex-basis: 63px")
+      && drumpadEditorCss.includes("flex-basis: 84px")
+      && drumpadEditorSource.includes("<MicroButton")
+      && drumpadEditorSource.includes("active={lane.muted}")
+      && !drumpadEditorSource.includes("Instrument Config")
+      && !drumpadEditorSource.includes("Keyboard Setup")
+      && !drumpadEditorSource.includes("Change Keyboard"),
+    "drumpad keyboard setup chrome should be removed, with compact layout toggles, square alphanumerics, and smaller mute buttons",
+  );
+  assert.ok(
+    drumpadEditorSource.includes("const [trackViewStartBeat, setTrackViewStartBeat]")
+      && drumpadEditorSource.includes("const [trackViewLengthBeats, setTrackViewLengthBeats]")
+      && drumpadEditorSource.includes("function onTrackWheel(event: WheelEvent)")
+      && drumpadEditorSource.includes("event.ctrlKey || event.metaKey")
+      && drumpadEditorSource.includes("const horizontalDelta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.shiftKey ? event.deltaY : 0")
+      && drumpadEditorSource.includes("onWheel={onTrackWheel}")
+      && drumpadEditorCss.includes("touch-action: pan-x pinch-zoom")
+      && !drumpadEditorCss.includes("touch-action: none"),
+    "drumpad track should support trackpad pinch zoom and horizontal wheel scrolling instead of blocking gestures",
+  );
+  assert.ok(
+    drumpadEditorSource.includes("DRUMPAD_FINE_TICKS_PER_BEAT = 8")
+      && drumpadEditorSource.includes("const trackGridLines = createMemo")
+      && drumpadEditorSource.includes('data-kind={line.kind}')
+      && drumpadEditorSource.includes("event.shiftKey ? snapBeatToStep(rawPrimaryStart, visibleTickBeatStep()) : rawPrimaryStart")
+      && drumpadEditorSource.includes("function alignSelectedHitsToNearestNotch()")
+      && drumpadEditorSource.includes("function onTrackKeyDown(event: KeyboardEvent)")
+      && drumpadEditorSource.includes("function updateMarqueeSelection(state: MarqueeState)")
+      && drumpadEditorCss.includes("clip-path: polygon(0 0, 100% 50%, 0 100%)")
+      && drumpadEditorCss.includes(".hit::before")
+      && drumpadEditorCss.includes(".hit[data-selected=\"1\"]")
+      && drumpadEditorCss.includes(".marquee")
+      && drumpadEditorCss.includes(".addInstrumentRow")
+      && drumpadEditorCss.includes('.gridLine[data-kind="measure"]')
+      && drumpadEditorCss.includes("width: 3px")
+      && !drumpadEditorCss.includes("repeating-linear-gradient(\n      to right"),
+    "drumpad hits should be fixed stem/triangle handles, with fine tick lines, selected state, marquee selection, align-to-notch, and shift-drag snapping",
+  );
+  assert.ok(
+    preferencesSource.includes('kind: "audio.selectOutputDevice"')
+      && preferencesSource.includes('response.ok ? "Output selected"')
+      && preferencesSource.includes('"output channel"')
+      && preferencesSource.includes('<Show when={dirty()} fallback={<Button variant="primary" onClick={close}>Done</Button>}>')
+      && ipcSchemaSource.includes('| { kind: "audio.selectOutputDevice"; typeName?: string; deviceName: string }')
+      && ipcSchemaSource.includes('R extends { kind: "audio.selectOutputDevice" } ? { ok: boolean; snapshot: AudioDeviceSnapshot; error?: string }')
+      && ipcBridgeSource.includes('case "audio.selectOutputDevice":')
+      && ipcBackendSchemaSource.includes('AUDIO_SELECT_OUTPUT_DEVICE = "audio.selectOutputDevice"')
+      && ipcBackendBridgeSource.includes("if (kind == AUDIO_SELECT_OUTPUT_DEVICE)")
+      && audioEngineHeaderSource.includes("bool selectOutputDevice")
+      && audioEngineSource.includes("snapshot.currentOutputName = setup.outputDeviceName")
+      && audioEngineSource.includes("setup.outputDeviceName = outputDeviceName")
+      && audioEngineSource.includes("setup.useDefaultOutputChannels = true"),
+    "preferences output device selection should call native IPC and channel counts should be labeled as channels",
+  );
+  {
+    const sourceNotes = [
+      { pitch: 60, startBeat: 0.5, lengthBeats: 0.5, velocity: 100 },
+      { pitch: 62, startBeat: 2, lengthBeats: 0.5, velocity: 100 },
+    ];
+    const committedNotes = [{ pitch: 67, startBeat: 1.25, lengthBeats: 0.25, velocity: 112 }];
+    const heldKeys = { a: { pitch: 64, startBeat: 1, startedAtMs: 100 } };
+    const liveNotes = midiLiveRecording.composeLiveMidiNotes({
+      sourceNotes,
+      committedNotes,
+      heldKeys,
+      currentBeat: 1.75,
+    });
+    assert.deepEqual(
+      liveNotes.map((note) => [note.pitch, note.startBeat, note.lengthBeats]),
+      [
+        [60, 0.5, 0.5],
+        [64, 1, 0.75],
+        [67, 1.25, 0.25],
+        [62, 2, 0.5],
+      ],
+      "live MIDI recording should include held-note preview before keyup and extend it to the current beat",
+    );
+    assert.deepEqual(
+      midiLiveRecording.eraseMidiNotesOverlappingSweep(sourceNotes, 0.75, 1.5).map((note) => note.pitch),
+      [62],
+      "MIDI overwrite sweep should remove only source notes overlapped by the swept playhead interval",
+    );
+    assert.deepEqual(
+      midiLiveRecording.composeLiveMidiNotes({
+        sourceNotes: midiLiveRecording.eraseMidiNotesOverlappingSweep(sourceNotes, 0.75, 1.5),
+        committedNotes,
+        heldKeys: {},
+        currentBeat: 1.5,
+      }).map((note) => note.pitch),
+      [67, 62],
+      "MIDI overwrite sweep should preserve notes recorded during the current session",
+    );
+    assert.ok(
+      segmentEditorSource.includes("setMidiLiveSourceNotes(structuredClone(midiNotes()))")
+        && segmentEditorSource.includes("sweepMidiLiveOverwriteToBeat(beat)")
+        && segmentEditorSource.includes("notes={liveMidiNotes()}")
+        && !segmentEditorSource.includes('if (midiLiveMode() === "overwrite") updateMidi([])'),
+      "MIDI live recording should preview held notes and avoid whole-clip clearing at overwrite start",
+    );
+  }
   assert.ok(
     trackHeaderSource.includes("leftPeak") && trackHeaderSource.includes("rightPeak"),
     "track headers should render stereo channel meters instead of aggregate-only peak/RMS rows",

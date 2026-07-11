@@ -16,7 +16,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 28px;
+  min-height: 27px;
   padding: 0 6px;
   border-bottom: var(--border-fg);
 }
@@ -38,15 +38,15 @@
 
 .body {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   padding: 6px;
 }
 
 .row {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) 58px;
+  grid-template-columns: 57px minmax(0, 1fr) 57px;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -69,7 +69,7 @@
 
 .track {
   position: relative;
-  height: 8px;
+  height: 9px;
   border: var(--border-fg);
   overflow: hidden;
 }
@@ -84,15 +84,15 @@
 .countGrid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
+  gap: 3px;
 }
 
 .countPill {
   min-width: 0;
   border: var(--border-muted);
-  padding: 3px 4px;
+  padding: 3px 3px;
   display: grid;
-  gap: 2px;
+  gap: 3px;
   color: var(--color-muted);
   text-transform: uppercase;
   overflow: hidden;
@@ -112,7 +112,7 @@
 }
 
 .collapsed {
-  width: 32px;
+  width: 33px;
   border: 0;
   background: transparent;
 }

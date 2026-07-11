@@ -1,0 +1,52 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--field-control-height);
+  width: var(--field-control-height);
+  min-width: var(--field-control-height);
+  max-width: var(--field-control-height);
+  height: var(--field-control-height);
+  min-height: var(--field-control-height);
+  max-height: var(--field-control-height);
+  padding: 6px;
+  border: var(--border-fg);
+  border-radius: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  transition: var(--interaction-transition);
+}
+
+.button:hover:not(:disabled) {
+  background: var(--interaction-hover-bg);
+}
+
+.button:active:not(:disabled) {
+  background: var(--interaction-pressed-bg);
+  transform: var(--interaction-press-transform);
+}
+
+.button:focus-visible {
+  box-shadow: var(--interaction-focus-ring);
+}
+
+.active {
+  border-color: var(--color-fg);
+  background: var(--interaction-active-bg);
+  color: var(--interaction-active-fg);
+}
+
+.active:hover:not(:disabled) {
+  background: var(--interaction-active-hover-bg);
+  color: var(--interaction-active-fg);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
+.button :global(svg) {
+  width: 18px;
+  height: 18px;
+}

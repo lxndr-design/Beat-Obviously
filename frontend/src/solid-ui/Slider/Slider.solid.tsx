@@ -67,7 +67,13 @@ export function Slider(allProps: SliderProps) {
   function valueFromPointer(clientX: number): number | null {
     const rect = fieldFrameRef?.getBoundingClientRect();
     if (!rect || rect.width <= 0) return null;
-    const ratio = clamp((clientX - rect.left) / rect.width, 0, 1);
+    const thumbHitWidth = inputRef
+      ? Number.parseFloat(window.getComputedStyle(inputRef).getPropertyValue("--slider-thumb-hit-width"))
+      : 0;
+    const safeThumbHitWidth = Number.isFinite(thumbHitWidth) ? Math.min(thumbHitWidth, rect.width) : 0;
+    const railLeft = rect.left + safeThumbHitWidth / 2;
+    const railWidth = Math.max(1, rect.width - safeThumbHitWidth);
+    const ratio = clamp((clientX - railLeft) / railWidth, 0, 1);
     return normalizeValue(local.min + ratio * (local.max - local.min));
   }
 

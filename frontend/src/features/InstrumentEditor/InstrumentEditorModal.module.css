@@ -12,7 +12,7 @@
 
 .identityRow {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(140px, 0.34fr);
+  grid-template-columns: minmax(279px, 1fr) minmax(141px, 0.34fr);
   gap: 6px;
   min-width: 0;
 }
@@ -32,7 +32,7 @@
 
 .identityStack {
   display: grid;
-  grid-template-rows: repeat(4, 32px);
+  grid-template-rows: repeat(4, var(--field-control-height));
   gap: 6px;
   min-width: 0;
 }
@@ -41,14 +41,14 @@
   display: flex;
   align-items: stretch;
   gap: 6px;
-  height: 32px;
+  height: var(--field-control-height);
   min-width: 0;
 }
 
 .nameIconRow {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 32px;
+  grid-template-columns: minmax(0, 1fr) var(--field-control-height);
   gap: 6px;
   min-width: 0;
 }
@@ -61,35 +61,15 @@
   min-width: 0;
 }
 
-.iconPickerButton,
-.squareIconButton {
-  flex: 0 0 32px;
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  aspect-ratio: 1 / 1;
-  border: var(--border-fg);
-  background: var(--color-bg);
-  color: var(--color-fg);
-}
-
-.iconPickerButton:hover:not(:disabled),
-.iconPickerButton:focus-visible,
-.squareIconButton:hover:not(:disabled),
-.squareIconButton:focus-visible {
-  background: var(--interaction-hover-bg);
-  color: var(--color-fg);
-}
-
 .iconMenu {
   position: absolute;
-  top: 31px;
+  top: var(--field-control-height);
   right: 0;
   z-index: 30;
   display: grid;
   grid-template-columns: repeat(6, 48px);
   gap: 0;
-  max-height: 260px;
+  max-height: 261px;
   overflow-y: auto;
   border: var(--border-fg);
   background: color-mix(in srgb, var(--color-bg) 94%, transparent);
@@ -98,12 +78,12 @@
 
 .iconOption {
   display: grid;
-  grid-template-rows: 28px 12px;
+  grid-template-rows: 27px 12px;
   align-items: center;
   justify-items: center;
   width: 48px;
   min-height: 48px;
-  padding: 4px 2px;
+  padding: 3px 3px;
   border-right: var(--border-fg);
   border-bottom: var(--border-fg);
 }
@@ -155,14 +135,14 @@
 .field {
   display: flex;
   align-items: center;
-  height: 32px;
+  height: 33px;
   padding: 0 var(--space-1);
   background: var(--color-bg);
   color: var(--color-fg);
   border: var(--border-fg);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-ui);
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -235,7 +215,7 @@
 
 .modGrid {
   display: grid;
-  grid-template-columns: minmax(148px, 1.45fr) repeat(7, minmax(68px, 1fr));
+  grid-template-columns: minmax(147px, 1.45fr) repeat(7, minmax(69px, 1fr));
   gap: 6px;
   align-items: stretch;
 }
@@ -267,9 +247,9 @@
 .aetherModule {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
-  padding: 5px;
+  padding: 6px;
   border: var(--border-fg);
   background: color-mix(in srgb, var(--color-fg) 4%, var(--color-bg));
 }
@@ -290,7 +270,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 22px;
+  min-height: 21px;
   font-size: var(--font-size-ui);
   font-weight: var(--font-weight-bold);
   line-height: 1;
@@ -303,27 +283,328 @@
 
 .aetherKnobs {
   display: grid;
-  grid-template-columns: repeat(6, minmax(56px, 1fr));
-  gap: 4px;
+  grid-template-columns: repeat(6, minmax(57px, 1fr));
+  gap: 3px;
 }
 
 .aetherGlobalGrid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(56px, 1fr));
-  gap: 4px;
+  grid-template-columns: repeat(7, minmax(57px, 1fr));
+  gap: 3px;
   align-items: end;
 }
 
 .aetherKnobsCompact {
   display: grid;
-  grid-template-columns: repeat(3, minmax(56px, 1fr));
-  gap: 4px;
+  grid-template-columns: repeat(3, minmax(57px, 1fr));
+  gap: 3px;
 }
 
 .samplesRow {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+.sampleZoneEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.samplerPropertiesHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.samplerPropertyGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 6px;
+  min-height: 93px;
+  border: var(--border-fg);
+  padding: 6px;
+}
+
+.samplerPropertyCard {
+  position: relative;
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  min-height: 75px;
+  padding: 9px;
+  border: var(--border-fg);
+}
+
+.samplerPropertyClose {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+}
+
+.samplerPropertyTitle {
+  padding-right: 33px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+}
+
+.sampleZoneHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 27px;
+  padding: 0 6px;
+  border: var(--border-fg);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  font-weight: var(--font-weight-bold);
+}
+
+.sampleZoneHeader span:last-child {
+  font-family: var(--font-family-mono);
+  font-weight: var(--font-weight-regular);
+  opacity: 0.65;
+}
+
+.samplerOrganization {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(261px, 0.42fr) minmax(321px, 0.58fr);
+  min-height: 300px;
+  border: var(--border-fg);
+  padding: 6px;
+  isolation: isolate;
+}
+
+.samplerHoverLink {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  left: calc(42% - 3px);
+  width: calc(58% - 24px);
+  height: 1px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--color-fg) 70%, transparent);
+  opacity: 0.55;
+}
+
+.samplerAudioPane,
+.samplerAssignmentPane {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border: var(--border-fg);
+  background: var(--color-bg);
+}
+
+.samplerAudioPane {
+  border-right: 0;
+}
+
+.samplerPaneRibbon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 27px;
+  padding: 0 6px;
+  border-bottom: var(--border-fg);
+  font-size: var(--font-size-ui);
+}
+
+.samplerPaneActions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.samplerAudioList {
+  display: grid;
+  align-content: start;
+  min-height: 0;
+  overflow: auto;
+}
+
+.samplerAudioSource {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 30px;
+  min-width: 0;
+  gap: 3px;
+  padding: 0 6px;
+  border-bottom: var(--border-fg);
+  cursor: grab;
+  color: var(--color-fg);
+  font-size: var(--font-size-ui);
+}
+
+.samplerAudioSource[data-assigned="true"] {
+  opacity: 0.48;
+}
+
+.samplerAudioSource[data-hovered="true"],
+.samplerAudioSource:hover {
+  background: color-mix(in srgb, var(--color-fg) 8%, var(--color-bg));
+  opacity: 1;
+}
+
+.samplerAudioSource span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.samplerAssignedCount {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+  color: var(--color-bg);
+  background: color-mix(in srgb, var(--color-fg) 70%, var(--color-bg));
+  border-radius: 3px;
+  font-size: var(--font-size-ui);
+  line-height: 1;
+}
+
+.samplerAssignmentTitle {
+  display: grid;
+  place-items: center;
+  min-height: 27px;
+  border-bottom: var(--border-fg);
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+}
+
+.samplerAssignmentList {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-height: 0;
+  overflow: auto;
+  padding: 9px;
+}
+
+.samplerAssignmentList[data-grid="single-property"] {
+  grid-template-columns: 1fr;
+}
+
+.samplerAssignmentList[data-grid="two-property"] {
+  grid-template-columns: repeat(var(--sampler-columns), minmax(93px, 1fr));
+  grid-auto-rows: minmax(33px, auto);
+}
+
+.samplerAssignmentSlot {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto 27px 27px;
+  align-items: center;
+  gap: 3px;
+  min-height: 33px;
+  padding: 3px 3px;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  font-size: var(--font-size-ui);
+}
+
+.samplerAssignmentList[data-grid="two-property"] .samplerAssignmentSlot {
+  grid-template-columns: 15px minmax(0, 1fr) auto 24px 24px;
+  min-height: 33px;
+  padding: 3px;
+}
+
+.samplerAssignmentSlot[data-filled="false"] {
+  grid-template-columns: minmax(0, 1fr);
+  opacity: 0.45;
+}
+
+.samplerAssignmentSlot[data-linked="true"] {
+  background: color-mix(in srgb, var(--color-fg) 10%, var(--color-bg));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-fg) 58%, transparent);
+}
+
+.samplerEmptySlot {
+  text-align: center;
+  color: var(--color-fg);
+  opacity: 0.55;
+}
+
+.samplerAssignmentEmpty {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  padding: 12px;
+  color: var(--color-fg);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  opacity: 0.65;
+}
+
+.samplerSlotVelocity {
+  color: var(--color-fg);
+  font-family: var(--font-family-mono);
+  opacity: 0.72;
+}
+
+.samplerAudioPicker {
+  display: grid;
+  max-height: 420px;
+  overflow: auto;
+  border: var(--border-fg);
+}
+
+.samplerAudioPickerRow {
+  display: grid;
+  grid-template-columns: 21px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-height: 33px;
+  padding: 0 9px;
+  color: var(--color-fg);
+  background: var(--color-bg);
+  border: 0;
+  border-bottom: var(--border-fg);
+  text-align: left;
+  font: inherit;
+}
+
+.samplerAudioPickerRow:hover {
+  background: color-mix(in srgb, var(--color-fg) 8%, var(--color-bg));
+}
+
+.samplerAudioPickerCheck {
+  width: 15px;
+  height: 15px;
+  border: var(--border-fg);
+}
+
+.samplerAudioPickerRow[data-selected="true"] .samplerAudioPickerCheck {
+  background: var(--color-fg);
+  box-shadow: inset 0 0 0 4px var(--color-bg);
+}
+
+.sampleZonePath {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-fg);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  opacity: 0.55;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sourceRow {
@@ -336,7 +617,7 @@
 .sourceText {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 8px;
+  gap: 3px 9px;
   min-width: 0;
   font-size: var(--font-size-ui);
   line-height: 1;
@@ -380,7 +661,7 @@
 
 .glideSlider {
   align-self: end;
-  gap: 8px;
+  gap: 9px;
   min-width: 0;
 }
 
@@ -388,7 +669,7 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -408,7 +689,7 @@
 }
 
 .glideRange {
-  height: 20px;
+  height: 21px;
 }
 
 .lfoShapeControl {
@@ -416,14 +697,14 @@
   flex-direction: column;
   align-items: center;
   justify-content: end;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
 .lfoShapeButtons {
   display: inline-flex;
   width: auto;
-  min-height: 32px;
+  min-height: 33px;
   border: var(--border-fg);
 }
 
@@ -431,8 +712,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 33px;
+  height: 33px;
   padding: 0;
   border-right: var(--border-fg);
 }
@@ -461,7 +742,7 @@
 
 .verticalSwitch {
   width: 18px;
-  height: 40px;
+  height: 39px;
   border: var(--border-fg);
   background: var(--color-bg);
   position: relative;
@@ -473,8 +754,8 @@
   position: absolute;
   left: 3px;
   bottom: 3px;
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   background: var(--color-fg);
   transition: transform var(--duration-hover) var(--ease-in-out);
 }
@@ -485,7 +766,7 @@
 
 .verticalSwitchOn .switchBall {
   background: var(--color-fg);
-  transform: translateY(-22px);
+  transform: translateY(-21px);
 }
 
 .switchOption,

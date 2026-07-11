@@ -1,19 +1,30 @@
 .wrap {
   position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
   min-width: 0;
   box-sizing: border-box;
 }
 
+.wrap:not(.inline):not(.bare) {
+  min-width: 96px;
+}
+
 .inline {
-  display: inline-flex;
+  flex-direction: row;
   align-items: center;
-  height: 32px;
-  gap: 4px;
-  padding: 0 var(--space-1);
+  height: var(--field-control-height);
+  gap: 3px;
+  padding: 0 var(--space-1) 0 var(--field-label-inset);
   border: var(--border-fg);
   background: var(--color-bg);
   transition: var(--interaction-transition);
   box-sizing: border-box;
+}
+
+.bare {
+  flex-direction: row;
 }
 
 .fillHeight {
@@ -21,24 +32,31 @@
 }
 
 .label {
-  font-size: var(--font-size-ui);
+  flex: 0 0 auto;
+  min-width: max-content;
+  overflow: visible;
+  text-overflow: clip;
+  font-size: var(--font-size-field-label);
   line-height: 1;
   text-transform: none;
   letter-spacing: 0;
   font-weight: var(--font-weight-medium);
-  opacity: 0.7;
   white-space: nowrap;
+}
+
+.inline .label {
+  opacity: 0.7;
 }
 
 .trigger {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 12px;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   width: 100%;
-  height: 32px;
+  height: var(--field-control-height);
   min-width: 0;
-  padding: 0 8px;
+  padding: 0 9px;
   background: var(--color-bg);
   color: var(--color-fg);
   border: var(--border-fg);
@@ -54,10 +72,15 @@
 .inline .trigger {
   height: 100%;
   min-width: 0;
-  padding: 0 2px;
+  padding: 0 3px;
   background: transparent;
   color: inherit;
   border: 0;
+}
+
+.bare .trigger {
+  height: 100%;
+  min-width: 0;
 }
 
 .fillHeight .trigger {
@@ -79,6 +102,11 @@
   box-shadow: var(--interaction-focus-ring);
 }
 
+.trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .inline:hover .trigger {
   background: transparent;
   color: inherit;
@@ -96,10 +124,41 @@
   border: var(--border-fg);
   background: var(--color-bg);
   padding: 0;
-  max-height: min(260px, 48vh);
+  max-height: min(261px, 48vh);
   overflow-y: auto;
   box-sizing: border-box;
   min-width: 0;
+}
+
+.search {
+  display: block;
+  width: 100%;
+  height: 33px;
+  box-sizing: border-box;
+  padding: 0 9px;
+  border: 0;
+  border-bottom: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  outline: 0;
+}
+
+.search:focus,
+.search:focus-visible {
+  box-shadow: var(--interaction-focus-ring);
+}
+
+.empty {
+  min-height: 24px;
+  box-sizing: border-box;
+  padding: 6px 9px;
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-ui);
+  line-height: 1;
 }
 
 .option {
@@ -107,7 +166,7 @@
   width: 100%;
   box-sizing: border-box;
   min-height: 24px;
-  padding: 0 8px;
+  padding: 0 9px;
   background: transparent;
   color: var(--color-fg);
   border: 0;
@@ -145,6 +204,11 @@
 
 .option:focus-visible {
   box-shadow: var(--interaction-focus-ring);
+}
+
+.option:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .optionSelected:active {

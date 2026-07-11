@@ -29,7 +29,7 @@ import {
   normalizeAetherNoteAutomationValue,
 } from "../../automation/aetherNoteAutomation";
 import { AUTOMATION_CURVES, automationCurveLabel } from "../../automation/curves";
-import { Button, FloatingSelect, Modal, NumberInput, TextInput, Toggle } from "../../solid-ui";
+import { Button, Checkbox, FloatingSelect, Modal, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
 import { useProjectStore, useUiStore } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
 import styles from "./TrackDetailsModal.module.css";
@@ -351,42 +351,9 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
                   />
                 </div>
                 <div class={styles.automationValueEditor}>
-                  <label>
-                    <span>Start</span>
-                    <input
-                      type="range"
-                      min={activeAutomationMeta().min}
-                      max={activeAutomationMeta().max}
-                      step={activeAutomationMeta().step}
-                      value={automationRange().startValue}
-                      onInput={(event) => setTrackAutomationValueEdge("start", event.currentTarget.value)}
-                    />
-                    <span>{formatAetherArrangementAutomationValue(activeAutomationTarget(), automationRange().startValue)}</span>
-                  </label>
-                  <label>
-                    <span>Mid</span>
-                    <input
-                      type="range"
-                      min={activeAutomationMeta().min}
-                      max={activeAutomationMeta().max}
-                      step={activeAutomationMeta().step}
-                      value={automationRange().midValue}
-                      onInput={(event) => setTrackAutomationValueEdge("mid", event.currentTarget.value)}
-                    />
-                    <span>{formatAetherArrangementAutomationValue(activeAutomationTarget(), automationRange().midValue)}</span>
-                  </label>
-                  <label>
-                    <span>End</span>
-                    <input
-                      type="range"
-                      min={activeAutomationMeta().min}
-                      max={activeAutomationMeta().max}
-                      step={activeAutomationMeta().step}
-                      value={automationRange().endValue}
-                      onInput={(event) => setTrackAutomationValueEdge("end", event.currentTarget.value)}
-                    />
-                    <span>{formatAetherArrangementAutomationValue(activeAutomationTarget(), automationRange().endValue)}</span>
-                  </label>
+                  <Slider layout="inline" label="Start" min={activeAutomationMeta().min} max={activeAutomationMeta().max} step={activeAutomationMeta().step} value={automationRange().startValue} readout={formatAetherArrangementAutomationValue(activeAutomationTarget(), automationRange().startValue)} onChange={(value) => setTrackAutomationValueEdge("start", String(value))} />
+                  <Slider layout="inline" label="Mid" min={activeAutomationMeta().min} max={activeAutomationMeta().max} step={activeAutomationMeta().step} value={automationRange().midValue} readout={formatAetherArrangementAutomationValue(activeAutomationTarget(), automationRange().midValue)} onChange={(value) => setTrackAutomationValueEdge("mid", String(value))} />
+                  <Slider layout="inline" label="End" min={activeAutomationMeta().min} max={activeAutomationMeta().max} step={activeAutomationMeta().step} value={automationRange().endValue} readout={formatAetherArrangementAutomationValue(activeAutomationTarget(), automationRange().endValue)} onChange={(value) => setTrackAutomationValueEdge("end", String(value))} />
                 </div>
                 <div class={styles.automationHandleRail} aria-label="Drag track automation values">
                   <span class={styles.automationHandleLine} aria-hidden="true" />
@@ -476,9 +443,8 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
                           [styles.automationPointRowSelected]: activeSelectedAutomationPointIndices().includes(index()),
                         }}
                       >
-                        <input
-                          class={styles.automationPointSelect}
-                          type="checkbox"
+                        <Checkbox
+                          inputClassName={styles.automationPointSelect}
                           checked={activeSelectedAutomationPointIndices().includes(index())}
                           readOnly
                           aria-label={`Select track automation point ${index() + 1}`}
@@ -488,28 +454,8 @@ export function TrackDetailsModal(props: TrackDetailsModalProps) {
                           }}
                         />
                         <span class={styles.automationPointIndex}>{index() + 1}</span>
-                        <label>
-                          <span>Beat</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={projectLengthBeats()}
-                            step={0.125}
-                            value={point.beat}
-                            onChange={(event) => setTrackAutomationPointBeat(index(), event.currentTarget.value)}
-                          />
-                        </label>
-                        <label>
-                          <span>Value</span>
-                          <input
-                            type="number"
-                            min={activeAutomationMeta().min}
-                            max={activeAutomationMeta().max}
-                            step={activeAutomationMeta().step}
-                            value={point.value}
-                            onChange={(event) => setTrackAutomationPointValue(index(), event.currentTarget.value)}
-                          />
-                        </label>
+                        <NumberInput layout="inline" label="Beat" min={0} max={projectLengthBeats()} step={0.125} value={point.beat} onChange={(value) => setTrackAutomationPointBeat(index(), String(value))} />
+                        <NumberInput layout="inline" label="Value" min={activeAutomationMeta().min} max={activeAutomationMeta().max} step={activeAutomationMeta().step} value={point.value} onChange={(value) => setTrackAutomationPointValue(index(), String(value))} />
                         <span class={styles.automationPointValue}>
                           {formatAetherArrangementAutomationValue(activeAutomationTarget(), point.value)}
                         </span>
@@ -593,19 +539,19 @@ interface SliderRowProps {
 
 function SliderRow(props: SliderRowProps) {
   return (
-    <label class={styles.sliderRow}>
-      <span class={styles.sliderLabel}>{props.label}</span>
-      <input
-        class={styles.range}
-        type="range"
-        value={props.value}
-        min={props.min}
-        max={props.max}
-        step={props.step}
-        onInput={(event) => props.onChange(Number(event.currentTarget.value))}
-      />
-      <span class={styles.sliderValue}>{props.display}</span>
-    </label>
+    <Slider
+      className={styles.sliderRow}
+      inputClassName={styles.range}
+      readoutClassName={styles.sliderValue}
+      layout="inline"
+      label={props.label}
+      value={props.value}
+      min={props.min}
+      max={props.max}
+      step={props.step}
+      readout={props.display}
+      onChange={props.onChange}
+    />
   );
 }
 

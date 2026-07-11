@@ -22,7 +22,6 @@ import type { AudioDeviceInfo, AudioDeviceSnapshot } from "../../ipc/schema";
 import {
   useSettingsStore,
   useUiStore,
-  type AudioLatencyMode,
   type FileAssetPolicy,
   type MemoryCachePreset,
   type StartupProjectBehavior,
@@ -40,7 +39,6 @@ export function PreferencesModal() {
   const [outputOpen, setOutputOpen] = createSignal(false);
   const [sampleRateOpen, setSampleRateOpen] = createSignal(false);
   const [bufferOpen, setBufferOpen] = createSignal(false);
-  const [latencyOpen, setLatencyOpen] = createSignal(false);
   const [recentOpen, setRecentOpen] = createSignal(false);
   const [assetPolicyOpen, setAssetPolicyOpen] = createSignal(false);
   const [memoryOpen, setMemoryOpen] = createSignal(false);
@@ -91,7 +89,6 @@ export function PreferencesModal() {
     setOutputOpen(false);
     setSampleRateOpen(false);
     setBufferOpen(false);
-    setLatencyOpen(false);
     setRecentOpen(false);
     setAssetPolicyOpen(false);
     setMemoryOpen(false);
@@ -133,11 +130,26 @@ export function PreferencesModal() {
     }
   }
 
-  function selectOutputDevice(value: string) {
+  async function selectOutputDevice(value: string) {
     setOutputOpen(false);
     const device = parseDeviceValue(value);
     useSettingsStore.getState().setPreferredOutputDevice(device?.typeName ?? "", device?.name ?? "");
-    setDeviceStatus(device ? "Output preference saved" : "Following system output");
+    if (!device) {
+      setDeviceStatus("Following system output");
+      return;
+    }
+
+    try {
+      const response = await send({
+        kind: "audio.selectOutputDevice",
+        typeName: device.typeName,
+        deviceName: device.name,
+      });
+      setDeviceSnapshot(response.snapshot);
+      setDeviceStatus(response.ok ? "Output selected" : response.error ?? "Output selection unavailable");
+    } catch (error) {
+      setDeviceStatus(error instanceof Error ? error.message : "Output selection unavailable");
+    }
   }
 
   async function refreshTrainingStats() {
@@ -187,32 +199,32 @@ export function PreferencesModal() {
     <Modal
       open
       scopeId="preferences"
-      title={<><Icon name="ph:gear" size={14} decorative />Preferences</>}
+      title={<><Icon name="ph:gear" size={18} decorative />Preferences</>}
       width="lg"
+      flushBody
       dirty={dirty()}
       onClose={close}
       onRequestCloseDirty={save}
       footer={
-        <>
+        <Show when={dirty()} fallback={<Button variant="primary" onClick={close}>Done</Button>}>
           <Button variant="ghost" onClick={close}>Cancel</Button>
           <Button variant="primary" disabled={!dirty()} onClick={save}>Save</Button>
-        </>
+        </Show>
       }
     >
       <div class={styles.panel}>
         <div class={styles.tabs} role="tablist" aria-label="Preferences sections">
           <For each={PREFERENCE_TABS}>
             {(tab) => (
-              <button
-                type="button"
+              <Button
                 role="tab"
                 aria-selected={activeTab() === tab.id}
                 class={styles.navButton}
-                classList={{ [styles.navButtonActive]: activeTab() === tab.id }}
+                selected={activeTab() === tab.id}
                 onClick={() => selectTab(tab.id)}
               >
                 {tab.label}
-              </button>
+              </Button>
             )}
           </For>
         </div>
@@ -235,12 +247,10 @@ export function PreferencesModal() {
               outputOpen={outputOpen()}
               sampleRateOpen={sampleRateOpen()}
               bufferOpen={bufferOpen()}
-              latencyOpen={latencyOpen()}
               setInputOpen={setInputOpen}
               setOutputOpen={setOutputOpen}
               setSampleRateOpen={setSampleRateOpen}
               setBufferOpen={setBufferOpen}
-              setLatencyOpen={setLatencyOpen}
               refreshDevices={refreshDevices}
               selectInputDevice={selectInputDevice}
               selectOutputDevice={selectOutputDevice}
@@ -304,15 +314,13 @@ interface AudioPreferencesProps {
   outputOpen: boolean;
   sampleRateOpen: boolean;
   bufferOpen: boolean;
-  latencyOpen: boolean;
   setInputOpen: (open: boolean) => void;
   setOutputOpen: (open: boolean) => void;
   setSampleRateOpen: (open: boolean) => void;
   setBufferOpen: (open: boolean) => void;
-  setLatencyOpen: (open: boolean) => void;
   refreshDevices: () => Promise<void>;
   selectInputDevice: (value: string) => Promise<void>;
-  selectOutputDevice: (value: string) => void;
+  selectOutputDevice: (value: string) => Promise<void>;
 }
 
 function AudioPreferences(props: AudioPreferencesProps) {
@@ -322,7 +330,7 @@ function AudioPreferences(props: AudioPreferencesProps) {
         <div class={styles.sectionHeader}>
           <h3 class={styles.sectionTitle}>Audio I/O</h3>
           <Button size="xs" onClick={() => void props.refreshDevices()}>
-            <Icon name="ph:arrows-clockwise" size={14} decorative />
+            <Icon name="ph:arrows-clockwise" size={18} decorative />
             Refresh
           </Button>
         </div>
@@ -347,9 +355,9 @@ function AudioPreferences(props: AudioPreferencesProps) {
             options={props.outputOptions}
             open={props.outputOpen}
             onOpenChange={props.setOutputOpen}
-            onChange={props.selectOutputDevice}
+            onChange={(value) => void props.selectOutputDevice(value)}
           />
-          <Readout label="Driver" value={props.deviceSnapshot?.currentTypeName || "System"} />
+          <Readout label="Audio system" value={props.deviceSnapshot?.currentTypeName || "System"} />
           <FloatingSelect
             className={styles.fieldSelect}
             label="Rate"
@@ -372,21 +380,10 @@ function AudioPreferences(props: AudioPreferencesProps) {
             onOpenChange={props.setBufferOpen}
             onChange={(value) => props.settings.setPreferredBufferSize(Number(value))}
           />
-          <FloatingSelect
-            className={styles.fieldSelect}
-            label="Latency"
-            layout="inline"
-            value={props.settings.audioLatencyMode}
-            ariaLabel="Audio latency handling"
-            options={LATENCY_MODE_OPTIONS}
-            open={props.latencyOpen}
-            onOpenChange={props.setLatencyOpen}
-            onChange={(value) => props.settings.setAudioLatencyMode(value as AudioLatencyMode)}
-          />
         </div>
         <div class={styles.channelGrid}>
-          <Readout label="Inputs" value={formatChannels(props.deviceSnapshot?.inputChannelNames)} />
-          <Readout label="Outputs" value={formatChannels(props.deviceSnapshot?.outputChannelNames)} />
+          <Readout label="Inputs" value={formatChannelCount(props.deviceSnapshot?.inputChannelNames, "input")} />
+          <Readout label="Outputs" value={formatChannelCount(props.deviceSnapshot?.outputChannelNames, "output")} />
           <Readout label="Current rate" value={formatSampleRate(props.deviceSnapshot?.sampleRate)} />
           <Readout label="Current buffer" value={formatBufferSize(props.deviceSnapshot?.bufferSize)} />
           <Readout label="Reported latency" value={formatLatency(props.deviceSnapshot)} />
@@ -660,15 +657,15 @@ function AiPreferences(props: AiPreferencesProps) {
         </div>
         <div class={styles.exportActions}>
           <Button size="sm" onClick={() => void props.exportDataset()}>
-            <Icon name="ph:download-simple" size={14} decorative />
+            <Icon name="ph:download-simple" size={18} decorative />
             Drum training data
           </Button>
           <Button size="sm" onClick={() => void props.exportInstrumentDataset()}>
-            <Icon name="ph:download-simple" size={14} decorative />
+            <Icon name="ph:download-simple" size={18} decorative />
             Instrument training data
           </Button>
           <Button size="sm" onClick={() => void props.exportMidiDataset()}>
-            <Icon name="ph:download-simple" size={14} decorative />
+            <Icon name="ph:download-simple" size={18} decorative />
             MIDI training data
           </Button>
         </div>
@@ -724,7 +721,7 @@ const CONTRAST_LEVEL_OPTIONS: Array<{ value: ThemeContrastLevel; label: string }
   { value: "high", label: "High" },
 ];
 const RECENT_PROJECT_OPTIONS = ["4", "8", "12", "16", "24"].map((value) => ({ value, label: value }));
-const SAMPLE_RATE_OPTIONS = [44100, 48000, 88200, 96000, 192000].map((value) => ({
+const SAMPLE_RATE_OPTIONS = [8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200, 96000, 192000].map((value) => ({
   value: String(value),
   label: formatSampleRate(value),
 }));
@@ -732,13 +729,6 @@ const BUFFER_SIZE_OPTIONS = [64, 128, 256, 512, 1024, 2048].map((value) => ({
   value: String(value),
   label: formatBufferSize(value),
 }));
-const LATENCY_MODE_OPTIONS: Array<{ value: AudioLatencyMode; label: string }> = [
-  { value: "reported", label: "Reported" },
-  { value: "low", label: "Low" },
-  { value: "balanced", label: "Balanced" },
-  { value: "safe", label: "Safe" },
-];
-
 function Readout(props: { label: string; value: string }) {
   return (
     <div class={styles.readout}>
@@ -793,9 +783,18 @@ function formatLatency(snapshot: AudioDeviceSnapshot | null) {
   return `${samples} spl / ${((samples / snapshot.sampleRate) * 1000).toFixed(1)} ms`;
 }
 
-function formatChannels(channels: string[] | undefined) {
-  if (!channels || channels.length === 0) return "--";
-  return channels.slice(0, 4).join(" / ") + (channels.length > 4 ? ` +${channels.length - 4}` : "");
+function formatChannelCount(channels: string[] | undefined, direction: "input" | "output") {
+  const count = channels?.length ?? 0;
+  if (count === 0) return direction === "input" ? "No input channels" : "No output channels";
+  const noun =
+    direction === "input"
+      ? count === 1
+        ? "input channel"
+        : "input channels"
+      : count === 1
+        ? "output channel"
+        : "output channels";
+  return `${count} ${noun}`;
 }
 
 function formatCheckpointStatus(

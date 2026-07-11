@@ -9,22 +9,20 @@
 .list {
   display: flex;
   flex-direction: column;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-height: 0;
-  max-height: 0;
   opacity: 0;
   overflow-y: hidden;
   overflow-x: hidden;
   pointer-events: none;
   transition:
-    max-height 180ms var(--ease-out),
     opacity 120ms var(--ease-out);
   visibility: hidden;
 }
 
 .listOpen {
-  max-height: calc(100vh - var(--height-topbar) - (3 * var(--sidebar-rail-size)));
   opacity: 1;
+  padding-bottom: 9px;
   overflow-y: auto;
   pointer-events: auto;
   scrollbar-color: color-mix(in srgb, var(--color-fg) 42%, transparent) transparent;
@@ -40,7 +38,7 @@
   display: flex;
   align-items: center;
   min-height: var(--sidebar-subrow-height);
-  padding: 0 8px;
+  padding: 0 9px;
   font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
@@ -51,8 +49,8 @@
 .drumIcon {
   position: relative;
   display: inline-block;
-  width: 13px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
   border: 1px solid currentColor;
   border-top-width: 2px;
   border-radius: 2px 2px 4px 4px;
@@ -62,19 +60,19 @@
 .drumIcon::after {
   content: "";
   position: absolute;
-  top: -4px;
+  top: -3px;
   width: 1px;
-  height: 5px;
+  height: 6px;
   background: currentColor;
   transform-origin: bottom center;
 }
 
 .drumIcon::before {
-  left: 2px;
+  left: 3px;
   transform: rotate(-34deg);
 }
 
 .drumIcon::after {
-  right: 2px;
+  right: 3px;
   transform: rotate(34deg);
 }

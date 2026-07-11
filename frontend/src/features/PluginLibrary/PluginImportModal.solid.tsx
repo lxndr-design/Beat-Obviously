@@ -73,7 +73,7 @@ export function PluginImportModal(props: {
       scopeId="plugin-import"
       title={(
         <>
-          <Icon name="ph:plug" size={14} decorative />
+          <Icon name="ph:plug" size={18} decorative />
           Import DS File
         </>
       )}
@@ -83,7 +83,7 @@ export function PluginImportModal(props: {
         <>
           <Button variant="ghost" onClick={props.onClose}>Cancel</Button>
           <Button variant="primary" onClick={() => void install()} disabled={!file() || installing()}>
-            <Icon name="ph:download-simple" size={14} decorative />
+            <Icon name="ph:download-simple" size={18} decorative />
             {installing() ? "Installing" : "Install"}
           </Button>
         </>
@@ -96,7 +96,7 @@ export function PluginImportModal(props: {
             accept=".zip,.dspreset,.dslibrary,.dsconfig,.xml"
             onChange={(event) => setFile(event.currentTarget.files?.[0] ?? null)}
           />
-          <Icon name="ph:archive" size={32} decorative />
+          <Icon name="ph:archive" size={18} decorative />
           <span>{file()?.name ?? "Choose DS file"}</span>
         </label>
 

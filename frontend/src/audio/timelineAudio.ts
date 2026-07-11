@@ -82,6 +82,7 @@ export function scheduleTimelineMidiNote(
           durationS,
           note.velocity,
           bpm,
+          { sampleZoneId: note.sampleZoneId, samplePath: note.samplePath },
         );
       })
       .catch(() => undefined);
@@ -112,16 +113,25 @@ export function scheduleTimelineMidiNote(
           connectScheduledNode(audio, worklet.node, worklet.stop, atTimeS, playbackDuration, note.velocity);
           return;
         }
-        scheduleBufferSource(audio, instrument, baseFrequency, targetFrequency, curve, automation, atTimeS, durationS, note.velocity, bpm);
+        scheduleBufferSource(audio, instrument, baseFrequency, targetFrequency, curve, automation, atTimeS, durationS, note.velocity, bpm, {
+          sampleZoneId: note.sampleZoneId,
+          samplePath: note.samplePath,
+        });
       })
       .catch(() => {
         if (scheduleToken !== stopToken) return;
-        scheduleBufferSource(audio, instrument, baseFrequency, targetFrequency, curve, automation, atTimeS, durationS, note.velocity, bpm);
+        scheduleBufferSource(audio, instrument, baseFrequency, targetFrequency, curve, automation, atTimeS, durationS, note.velocity, bpm, {
+          sampleZoneId: note.sampleZoneId,
+          samplePath: note.samplePath,
+        });
       });
     return;
   }
 
-  scheduleBufferSource(audio, instrument, baseFrequency, targetFrequency, curve, automation, atTimeS, durationS, note.velocity, bpm);
+  scheduleBufferSource(audio, instrument, baseFrequency, targetFrequency, curve, automation, atTimeS, durationS, note.velocity, bpm, {
+    sampleZoneId: note.sampleZoneId,
+    samplePath: note.samplePath,
+  });
 }
 
 function scheduleBufferSource(
@@ -135,13 +145,12 @@ function scheduleBufferSource(
   durationS: number,
   velocity: number,
   bpm: number,
+  sampleSelection?: { sampleZoneId?: string; samplePath?: string },
 ) {
   const source = curve.length > 1 || automation.length > 0
-    ? createInstrumentCurveBufferSource(audio, instrument, durationS + 0.05, baseFrequency, curve, atTimeS, automation, bpm, velocity)
-    : createInstrumentBufferSource(audio, instrument, durationS + 0.05, baseFrequency, targetFrequency, velocity, bpm);
-  const playbackDuration = source.buffer
-    ? Math.max(durationS, Math.min(1.5, source.buffer.duration / source.playbackRate.value))
-    : durationS;
+    ? createInstrumentCurveBufferSource(audio, instrument, durationS + 0.05, baseFrequency, curve, atTimeS, automation, bpm, velocity, sampleSelection)
+    : createInstrumentBufferSource(audio, instrument, durationS + 0.05, baseFrequency, targetFrequency, velocity, bpm, sampleSelection);
+  const playbackDuration = Math.max(0.03, durationS);
   connectScheduledNode(
     audio,
     source,

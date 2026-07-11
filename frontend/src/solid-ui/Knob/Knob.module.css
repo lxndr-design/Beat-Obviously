@@ -4,7 +4,7 @@
   grid-template-rows: auto auto auto auto;
   justify-items: center;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   user-select: none;
   touch-action: none;
   cursor: ns-resize;
@@ -12,8 +12,8 @@
 
 .pickAnchor {
   position: absolute;
-  top: -2px;
-  right: -2px;
+  top: -3px;
+  right: -3px;
   z-index: 2;
   display: inline-flex;
   width: 12px;
@@ -89,7 +89,7 @@
   min-height: var(--space-2);
   cursor: text;
   width: auto;
-  min-width: 28px;
+  min-width: 27px;
 }
 
 .value:hover {
@@ -115,11 +115,11 @@
 .modulation {
   order: 3;
   display: inline-grid;
-  grid-template-columns: 10px minmax(0, 52px);
+  grid-template-columns: 9px minmax(0, 51px);
   align-items: center;
   gap: 3px;
-  width: 65px;
-  min-height: 11px;
+  width: 66px;
+  min-height: 12px;
   font-family: var(--font-family-mono);
   font-size: var(--font-size-hint);
   line-height: 1;
@@ -127,8 +127,8 @@
 
 .modulationIcon {
   display: inline-flex;
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   align-items: center;
   justify-content: center;
 }

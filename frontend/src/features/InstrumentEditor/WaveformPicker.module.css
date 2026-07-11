@@ -2,7 +2,7 @@
   display: inline-flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 4px;
+  gap: 3px;
 }
 
 .row {
@@ -16,8 +16,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 33px;
+  height: 33px;
   border-right: var(--border-fg);
   padding: 0;
 }

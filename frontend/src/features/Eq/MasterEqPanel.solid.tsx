@@ -67,15 +67,16 @@ export function MasterEqPanel() {
           <div class={styles.presetWrap}>
             <Button class={styles.presetButton} size="xs" onClick={() => setPresetOpen((open) => !open)}>
               Presets
-              <Icon name="ph:caret-down" size={12} decorative />
+              <Icon name="ph:caret-down" size={18} decorative />
             </Button>
             <Show when={presetOpen()}>
               <div class={styles.presetMenu} role="menu">
                 <For each={presets()}>
                   {(preset) => (
                     <div class={styles.presetItem}>
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        fullWidth
                         class={styles.presetName}
                         onClick={() => {
                           setBandsDb(preset.bandsDb);
@@ -83,23 +84,25 @@ export function MasterEqPanel() {
                         }}
                       >
                         {preset.name}
-                      </button>
+                      </Button>
                       <Show when={preset.user}>
-                        <button
-                          type="button"
+                        <Button
+                          iconOnly
+                          size="xs"
+                          variant="ghost"
                           class={styles.presetDelete}
                           onClick={() => deletePreset(preset.id)}
                           aria-label={`Delete ${preset.name}`}
                         >
-                          <Icon name="ph:trash" size={12} decorative />
-                        </button>
+                          <Icon name="ph:trash" size={18} decorative />
+                        </Button>
                       </Show>
                     </div>
                   )}
                 </For>
-                <button type="button" class={styles.savePreset} onClick={() => void savePreset()}>
+                <Button variant="ghost" fullWidth class={styles.savePreset} onClick={() => void savePreset()}>
                   Save as preset
-                </button>
+                </Button>
               </div>
             </Show>
           </div>
@@ -111,7 +114,7 @@ export function MasterEqPanel() {
               onClick={() => useUiStore.getState().openEditor({ kind: "eq" })}
               aria-label="Edit automation"
             >
-              <Icon name="ph:pencil-simple" size={16} decorative />
+              <Icon name="ph:pencil-simple" size={18} decorative />
             </Button>
           </HoverInfo>
         </div>

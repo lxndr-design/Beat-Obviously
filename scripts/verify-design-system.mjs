@@ -14,6 +14,8 @@ const packageJsonPath = join(repoRoot, "frontend", "package.json");
 const tsconfigPath = join(repoRoot, "frontend", "tsconfig.json");
 const viteConfigPath = join(repoRoot, "frontend", "vite.config.ts");
 const appDialogPath = join(frontendSrc, "solid-ui", "AppDialog", "AppDialog.solid.tsx");
+const iconPath = join(frontendSrc, "solid-ui", "Icon", "Icon.solid.tsx");
+const buttonCssPath = join(frontendSrc, "solid-ui", "Button", "Button.module.css");
 const phIconSubsetPath = join(frontendSrc, "solid-ui", "Icon", "phIconSubset.ts");
 const nodeInstrumentEditorPath = join(frontendSrc, "features", "NodeInstrumentEditor", "NodeInstrumentEditor.solid.tsx");
 const nodeCanvasPath = join(frontendSrc, "features", "NodeInstrumentEditor", "NodeCanvas.solid.tsx");
@@ -79,6 +81,34 @@ function lineEntries(source) {
     line,
     lineNumber: index + 1,
   }));
+}
+
+const threePixelGridPropertyPattern = /^(?:gap|row-gap|column-gap|padding(?:-(?:top|right|bottom|left|inline|inline-start|inline-end|block|block-start|block-end))?|margin(?:-(?:top|right|bottom|left|inline|inline-start|inline-end|block|block-start|block-end))?|width|height|min-width|max-width|min-height|max-height|flex|flex-basis|top|right|bottom|left|inset(?:-(?:inline|inline-start|inline-end|block|block-start|block-end))?|grid-template-(?:columns|rows)|grid-auto-(?:columns|rows)|outline-offset|transform)$/;
+const threePixelGridCustomPropertyPattern = /(?:space|gap|padding|margin|width|height|size|inset|offset|row|column|track|node|cell)/;
+
+function checkThreePixelGrid(file, source) {
+  for (const { line, lineNumber } of lineEntries(source)) {
+    const declaration = line.match(/^\s*([\w-]+)\s*:\s*(.+)$/);
+    if (!declaration) continue;
+
+    const property = declaration[1];
+    const isGridProperty = threePixelGridPropertyPattern.test(property);
+    const isGridCustomProperty =
+      property.startsWith("--") &&
+      threePixelGridCustomPropertyPattern.test(property) &&
+      !/(?:font|border|duration|radius|blur|stroke)/.test(property);
+    if (!isGridProperty && !isGridCustomProperty) continue;
+
+    for (const match of declaration[2].matchAll(/(-?\d+(?:\.\d+)?)px/g)) {
+      const value = Number(match[1]);
+      const absoluteValue = Math.abs(value);
+      const isStrokeOrOpticalOffset = absoluteValue === 0.5 || absoluteValue === 1;
+      const isDerivedHalfGridValue = property.includes("half") && absoluteValue * 2 % 3 === 0;
+      if (value !== 0 && absoluteValue % 3 !== 0 && !isStrokeOrOpticalOffset && !isDerivedHalfGridValue) {
+        fail(`Spacing and block geometry must use the 3px grid ${location(file, lineNumber)}: ${line.trim()}`);
+      }
+    }
+  }
 }
 
 function isAllowed(allowlist, file, line, value) {
@@ -224,6 +254,12 @@ for (const file of sourceFiles) {
       usedPhIconNames.set(iconName, rel(file));
     }
   }
+  for (const match of source.matchAll(/<Icon\b[^>]*>/gs)) {
+    const literalSize = match[0].match(/\bsize=\{(\d+)\}/)?.[1];
+    if (literalSize && literalSize !== "18") {
+      fail(`Icons must use the standard 18px glyph size in ${rel(file)}: ${match[0].replace(/\s+/g, " ").trim()}`);
+    }
+  }
 }
 
 const phIconSubsetSource = existsSync(phIconSubsetPath) ? readFileSync(phIconSubsetPath, "utf8") : "";
@@ -235,6 +271,15 @@ for (const [iconName, firstSeenFile] of usedPhIconNames) {
   if (!phIconSubsetSource.includes(subsetKey)) {
     fail(`Icon ${iconName} used in ${firstSeenFile} is missing from generated offline icon subset. Run npm run generate:icons.`);
   }
+}
+
+const iconSource = existsSync(iconPath) ? readFileSync(iconPath, "utf8") : "";
+const buttonCssSource = existsSync(buttonCssPath) ? readFileSync(buttonCssPath, "utf8") : "";
+if (!iconSource.includes("size?: 18;") || !iconSource.includes("local.size ?? 18")) {
+  fail("Shared Icon must keep 18px as its only public and default glyph size.");
+}
+if (!/\.iconOnly\s*\{[^}]*padding:\s*6px;/s.test(buttonCssSource)) {
+  fail("Icon-only Button must keep 6px padding around the standard 18px glyph.");
 }
 
 const sharedCssFiles = [
@@ -259,6 +304,14 @@ if (!tokenSource) {
 }
 if (tokenSource.includes("--transition-invert")) {
   fail("frontend/src/design/tokens.css must not restore the removed --transition-invert token.");
+}
+if (tokenSource.includes("--font-size-7") || tokenSource.includes("--font-size-8")) {
+  fail("Unused display font sizes 7 and 8 must stay removed from frontend/src/design/tokens.css.");
+}
+for (const token of ["xs", "sm", "md", "lg"]) {
+  if (!tokenSource.includes(`--button-square-${token}: 30px;`)) {
+    fail(`Icon-only Button ${token} footprint must stay 30px for an 18px glyph with 6px padding.`);
+  }
 }
 for (const { line, lineNumber } of lineEntries(tokenSource)) {
   for (const match of line.matchAll(tokenRawColorPattern)) {
@@ -493,9 +546,45 @@ const featureUnknownTokenAllowlist = [
   },
 ];
 
+// Raw controls are reserved for direct-manipulation geometry and inline editing
+// whose behavior is not represented by a shared UI primitive.
+const rawFeatureButtonAllowlist = new Map([
+  ["frontend/src/features/DrumEditor/DrumSequencer.solid.tsx", ["styles.stepCell"]],
+  ["frontend/src/features/DrumpadEditor/DrumpadEditorModal.solid.tsx", ["styles.key", "styles.lanePlug"]],
+  ["frontend/src/features/MidiEditor/PianoRoll.solid.tsx", ["styles.automationPointHandle", "styles.curveHandle"]],
+  ["frontend/src/features/NodeInstrumentEditor/NodeCanvas.solid.tsx", ["data-node-port"]],
+  ["frontend/src/features/PluginLibrary/PluginHostModal.solid.tsx", ["styles.decentSkinHotspot"]],
+  ["frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx", ["data-aether-segment-automation-handle"]],
+  ["frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx", ["styles.fxDragHandle", "styles.envelopeHandle"]],
+  ["frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx", ["data-aether-track-automation-handle"]],
+  ["frontend/src/features/Tracks/Segment.solid.tsx", ["data-segment-fade-handle"]],
+  ["frontend/src/features/Tracks/Timeline.solid.tsx", ["styles.loopClamp"]],
+  ["frontend/src/features/Tracks/TrackHeader.solid.tsx", ["styles.name"]],
+]);
+
+const rawFeatureInputAllowlist = new Map([
+  ["frontend/src/features/HomeHub/InstrumentsPage.solid.tsx", ["styles.sampleValueInput"]],
+  ["frontend/src/features/InstrumentLibrary/ImportInstrumentModal.solid.tsx", ["instrument-import-types"]],
+  ["frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx", ["styles.setNameInput"]],
+  ["frontend/src/features/PluginLibrary/PluginImportModal.solid.tsx", ["type=\"file\""]],
+  ["frontend/src/features/TopBar/TopBar.solid.tsx", ["styles.projectNameInput"]],
+  ["frontend/src/features/Tracks/Segment.solid.tsx", ["styles.nameInput"]],
+  ["frontend/src/features/Tracks/TrackEffectRows.solid.tsx", ["styles.pointInput"]],
+  ["frontend/src/features/Tracks/TrackHeader.solid.tsx", ["styles.nameInput"]],
+]);
+
+function isAllowlistedRawControl(allowlist, file, tag) {
+  const markers = allowlist.get(rel(file)) ?? [];
+  return markers.some((marker) => tag.includes(marker));
+}
+
 const featureFiles = existsSync(featuresDir)
   ? walk(featuresDir, (path) => /\.(css|ts|tsx)$/.test(path))
   : [];
+const cssFiles = walk(frontendSrc, (path) => path.endsWith(".css"));
+for (const file of cssFiles) {
+  checkThreePixelGrid(file, readFileSync(file, "utf8"));
+}
 
 for (const file of sourceFiles) {
   if (file.endsWith(".tsx") && !file.endsWith(".solid.tsx")) {
@@ -521,6 +610,24 @@ for (const file of featureFiles) {
   const isCss = file.endsWith(".css");
   if (isCss) {
     checkInteractionTokens(file, source);
+  }
+
+  if (file.endsWith(".tsx")) {
+    for (const match of source.matchAll(/<button\b[^>]*>/gs)) {
+      const tag = match[0].replace(/\s+/g, " ");
+      if (!isAllowlistedRawControl(rawFeatureButtonAllowlist, file, tag)) {
+        fail(`Common feature command must use a shared UI primitive in ${rel(file)}: ${tag}`);
+      }
+    }
+    for (const match of source.matchAll(/<input\b[^>]*>/gs)) {
+      const tag = match[0].replace(/\s+/g, " ");
+      if (!isAllowlistedRawControl(rawFeatureInputAllowlist, file, tag)) {
+        fail(`Common feature input must use TextInput, NumberInput, Slider, Checkbox, or Toggle in ${rel(file)}: ${tag}`);
+      }
+    }
+    if (/<select\b/.test(source)) {
+      fail(`Feature dropdown must use FloatingSelect in ${rel(file)}.`);
+    }
   }
 
   for (const { line, lineNumber } of lineEntries(source)) {

@@ -7,8 +7,6 @@
 .text-4 { font-size: var(--font-size-4); line-height: var(--line-height-snug); }
 .text-5 { font-size: var(--font-size-5); line-height: var(--line-height-tight); }
 .text-6 { font-size: var(--font-size-6); line-height: var(--line-height-tight); letter-spacing: var(--letter-spacing-tight); }
-.text-7 { font-size: var(--font-size-7); line-height: var(--line-height-tight); letter-spacing: var(--letter-spacing-tight); }
-.text-8 { font-size: var(--font-size-8); line-height: var(--line-height-tight); letter-spacing: var(--letter-spacing-tight); }
 
 .text-regular { font-weight: var(--font-weight-regular); }
 .text-medium  { font-weight: var(--font-weight-medium); }
@@ -43,12 +41,5 @@
 .text-heading {
   font-size: var(--font-size-3);
   font-weight: var(--font-weight-bold);
-  letter-spacing: var(--letter-spacing-tight);
-}
-
-.text-hero {
-  font-size: var(--font-size-8);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-tight);
   letter-spacing: var(--letter-spacing-tight);
 }

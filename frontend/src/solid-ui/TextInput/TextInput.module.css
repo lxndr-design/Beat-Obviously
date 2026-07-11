@@ -1,16 +1,16 @@
 .wrap {
   display: inline-flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
 .inline {
   flex-direction: row;
   align-items: center;
-  height: 32px;
-  gap: 4px;
-  padding: 0 var(--space-1);
+  height: var(--field-control-height);
+  gap: 3px;
+  padding: 0 var(--space-1) 0 var(--field-label-inset);
   border: var(--border-fg);
   background: var(--color-bg);
 }
@@ -20,11 +20,16 @@
 }
 
 .label {
-  font-size: var(--font-size-ui);
+  flex: 0 0 auto;
+  min-width: max-content;
+  overflow: visible;
+  font-size: var(--font-size-field-label);
   line-height: 1;
   text-transform: none;
   letter-spacing: 0;
   font-weight: var(--font-weight-medium);
+  text-overflow: clip;
+  white-space: nowrap;
 }
 
 .inline .label {
@@ -34,7 +39,7 @@
 .fieldFrame {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  height: var(--field-control-height);
   min-width: 96px;
   padding: 0 6px;
   gap: 3px;
@@ -48,7 +53,7 @@
   width: 100%;
   height: 100%;
   min-width: 0;
-  padding: 0 2px;
+  padding: 0 3px;
   border: 0;
 }
 
@@ -64,7 +69,7 @@
   font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 16px;
-  min-height: 20px;
+  min-height: 21px;
 }
 
 .input:focus,

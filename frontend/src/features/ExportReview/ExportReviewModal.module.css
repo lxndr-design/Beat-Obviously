@@ -30,10 +30,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 9px;
   min-height: 24px;
   border-bottom: var(--border-fg);
-  padding-bottom: 4px;
+  padding-bottom: 3px;
 }
 
 .sectionHeader h3 {
@@ -68,8 +68,8 @@
   grid-template-rows: auto minmax(0, 1fr);
   gap: 6px;
   align-items: start;
-  min-height: 70px;
-  padding: 7px;
+  min-height: 69px;
+  padding: 6px;
   color: var(--color-fg);
   background: var(--color-bg);
   border: var(--border-fg);
@@ -144,7 +144,7 @@
   display: grid;
   gap: 3px;
   min-width: 0;
-  padding: 7px;
+  padding: 6px;
   border-right: var(--border-fg);
   border-bottom: var(--border-fg);
 }
@@ -174,10 +174,10 @@
 .pathRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: 9px;
   align-items: center;
   min-width: 0;
-  padding: 7px;
+  padding: 6px;
   border-bottom: var(--border-fg);
 }
 
@@ -194,15 +194,15 @@
 .pathActions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .stateBanner {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 7px;
+  gap: 6px;
   align-items: start;
-  padding: 7px;
+  padding: 6px;
   border: var(--border-fg);
 }
 

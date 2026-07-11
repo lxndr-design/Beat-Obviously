@@ -120,7 +120,7 @@ function EffectRowGroupHeader(props: {
         data-track-effect-header-id={props.effect.id}
       >
         <span class={styles.effectHeaderIcon}>
-          <Icon name={props.expanded ? "ph:caret-down" : "ph:caret-right"} size={12} decorative />
+          <Icon name={props.expanded ? "ph:caret-down" : "ph:caret-right"} size={18} decorative />
         </span>
         <span class={styles.effectHeaderTitle}>{props.effect.kind === "plugin" && props.effect.pluginName ? props.effect.pluginName : meta().label}</span>
         {menu.menu()}
@@ -138,7 +138,7 @@ function ValueHeaderRow(props: { effect: TrackEffect; param: EffectParamMeta }) 
   return (
     <div class={styles.valueHeader} data-track-effect-value-header-id={`${props.effect.id}:${props.param.key}`}>
       <span class={styles.valueHeaderIcon}>
-        <Icon name="ph:arrow-elbow-down-right" size={12} decorative />
+        <Icon name="ph:arrow-elbow-down-right" size={18} decorative />
       </span>
       <span class={styles.valueHeaderTitle}>{props.param.label}</span>
       <span class={styles.valueHeaderValue}>

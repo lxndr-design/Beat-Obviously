@@ -1,9 +1,9 @@
 .effectHeader {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
+  grid-template-columns: 15px minmax(0, 1fr);
   align-items: center;
   gap: var(--space-1);
-  height: var(--height-track-effect-row, 22px);
+  height: var(--height-track-effect-row, 21px);
   padding: 0 var(--space-1);
   border-bottom: var(--border-fg);
   background: var(--surface-subtle);
@@ -40,10 +40,10 @@
 
 .valueHeader {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto;
+  grid-template-columns: 15px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-1);
-  height: var(--height-track-effect-row, 22px);
+  height: var(--height-track-effect-row, 21px);
   padding: 0 var(--space-1);
   border-bottom: var(--border-fg);
   background: color-mix(in srgb, var(--color-fg) 4%, var(--color-bg));
@@ -73,7 +73,7 @@
 
 .effectLane {
   position: relative;
-  height: var(--height-track-effect-row, 22px);
+  height: var(--height-track-effect-row, 21px);
   flex-shrink: 0;
   border-bottom: 1px solid color-mix(in srgb, var(--color-fg) 18%, transparent);
   background: color-mix(in srgb, var(--color-fg) 3%, var(--color-bg));
@@ -125,8 +125,8 @@
 
 .valueDiamond {
   position: absolute;
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border: var(--border-fg);
   background: var(--color-bg);
   transform: translate(-50%, -50%) rotate(45deg);
@@ -143,9 +143,9 @@
 .valueTooltip {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 5px);
-  min-width: 32px;
-  padding: 1px 4px;
+  bottom: calc(100% + 6px);
+  min-width: 33px;
+  padding: 1px 3px;
   border: var(--border-fg);
   background: var(--color-bg);
   color: var(--color-fg);
@@ -173,9 +173,9 @@
   position: absolute;
   z-index: 30;
   display: inline-grid;
-  grid-template-columns: 44px auto;
+  grid-template-columns: 45px auto;
   align-items: center;
-  height: 22px;
+  height: 21px;
   border: var(--border-fg);
   background: var(--color-bg);
   color: var(--color-fg);
@@ -183,8 +183,8 @@
 }
 
 .pointInput {
-  width: 44px;
-  height: 20px;
+  width: 45px;
+  height: 21px;
   min-width: 0;
   padding: 0 var(--space-1);
   border: 0;

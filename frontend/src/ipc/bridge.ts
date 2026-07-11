@@ -249,6 +249,23 @@ async function mockResponse<R extends OutboundRequest>(
           devices: [],
         },
       } as unknown as ResponseFor<R>;
+    case "audio.selectOutputDevice":
+      return {
+        ok: false,
+        error: "Output device selection is only available in the native app.",
+        snapshot: {
+          currentTypeName: "Mock",
+          currentInputName: "",
+          currentOutputName: "Mock Output",
+          sampleRate: 48000,
+          bufferSize: 512,
+          inputLatencySamples: 0,
+          outputLatencySamples: 0,
+          inputChannelNames: [],
+          outputChannelNames: ["L", "R"],
+          devices: [],
+        },
+      } as unknown as ResponseFor<R>;
     case "training.run":
       return {
         started: false,

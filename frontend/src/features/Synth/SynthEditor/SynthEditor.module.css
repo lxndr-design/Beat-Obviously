@@ -2,7 +2,7 @@
   --synth-gap: 6px;
   --synth-font: var(--font-size-ui);
   --synth-mono-font: var(--font-size-ui);
-  --synth-control-height: 28px;
+  --synth-control-height: 27px;
   --border-fg-color: color-mix(in srgb, var(--color-fg) 50%, transparent);
   --border-fg: 1px solid var(--border-fg-color);
   --border-soft: 1px solid var(--border-fg-color);
@@ -73,7 +73,7 @@
 
 .sourceFocus {
   outline: 1px solid color-mix(in srgb, var(--color-fg) 72%, transparent);
-  outline-offset: -2px;
+  outline-offset: -3px;
   background:
     radial-gradient(circle at 20% 10%, color-mix(in srgb, var(--color-fg) 13%, transparent), transparent 38%),
     radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--color-fg) 8%, transparent), transparent 34%),
@@ -100,7 +100,7 @@
 
 .utilityGrid {
   display: grid;
-  grid-template-columns: minmax(360px, 1.15fr) minmax(320px, 0.85fr);
+  grid-template-columns: minmax(360px, 1.15fr) minmax(321px, 0.85fr);
   align-items: start;
   gap: var(--synth-gap);
   min-width: 0;
@@ -118,9 +118,9 @@
 }
 
 .fxAddSelect {
-  width: 92px;
-  height: 28px;
-  min-height: 28px;
+  width: 93px;
+  height: 27px;
+  min-height: 27px;
   border: var(--border-fg);
 }
 
@@ -134,10 +134,10 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  min-height: 32px;
+  min-height: 33px;
   gap: var(--synth-gap);
   border: var(--border-fg);
-  padding: 4px 6px;
+  padding: 3px 6px;
   color: color-mix(in srgb, var(--color-fg) 64%, transparent);
   font-size: var(--font-size-ui);
   line-height: 1;
@@ -151,7 +151,7 @@
 }
 
 .fxEmpty {
-  min-height: 32px;
+  min-height: 33px;
   display: flex;
   align-items: center;
   color: color-mix(in srgb, var(--color-fg) 68%, transparent);
@@ -203,9 +203,9 @@
 
 .fxHeader {
   display: grid;
-  grid-template-columns: 22px 24px minmax(0, 1fr) 24px;
+  grid-template-columns: 21px 30px minmax(0, 1fr) var(--field-control-height);
   align-items: center;
-  min-height: 34px;
+  min-height: 33px;
   border-bottom: var(--border-fg);
 }
 
@@ -213,9 +213,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
+  width: 21px;
   height: 100%;
-  min-height: 34px;
+  min-height: 33px;
   padding: 0;
   border: 0;
   border-right: var(--border-soft);
@@ -273,7 +273,7 @@
   min-height: 18px;
   display: inline-flex;
   align-items: center;
-  padding: 0 5px;
+  padding: 0 6px;
   border-radius: 3px;
   background: color-mix(in srgb, var(--color-fg) 20%, transparent);
   color: color-mix(in srgb, var(--color-fg) 70%, transparent);
@@ -283,24 +283,29 @@
   white-space: nowrap;
 }
 
-.fxPowerButton {
-  width: 24px !important;
-  min-width: 24px !important;
-  height: 24px !important;
-  min-height: 24px !important;
+.fxToggle {
+  justify-self: center;
 }
 
 .fxActions {
   display: flex;
   align-items: center;
   justify-content: center;
+  align-self: stretch;
   padding: 0;
+}
+
+.fxRemoveButton {
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: var(--border-soft);
 }
 
 .fxParams {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 5px;
+  gap: 6px;
   align-items: start;
   padding: var(--synth-gap);
 }
@@ -308,8 +313,8 @@
 .fxSlider {
   min-width: 0;
   min-height: 24px;
-  gap: 5px;
-  grid-template-columns: 58px minmax(0, 1fr) 50px;
+  gap: 6px;
+  grid-template-columns: 57px minmax(0, 1fr) 51px;
 }
 
 .fxSlider :global(.ds-field-label) {
@@ -318,7 +323,7 @@
 }
 
 .fxSliderInput {
-  height: 14px;
+  height: 15px;
 }
 
 .fxSliderReadout {
@@ -326,14 +331,14 @@
 }
 
 .fxNumberInput {
-  height: 26px;
-  min-height: 26px;
+  height: 27px;
+  min-height: 27px;
   padding: 0 6px;
 }
 
 .identityBody {
   display: grid;
-  grid-template-columns: minmax(340px, 0.44fr) minmax(0, 1fr);
+  grid-template-columns: minmax(339px, 0.44fr) minmax(0, 1fr);
   align-items: start;
   gap: var(--synth-gap);
   min-width: 0;
@@ -345,7 +350,7 @@
   grid-template-rows: minmax(0, 1fr) 30px;
   min-width: 0;
   min-height: 0;
-  height: 118px;
+  height: 117px;
   border: var(--border-fg);
 }
 
@@ -383,7 +388,7 @@
 .identityFields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
-  grid-template-rows: 32px 32px auto;
+  grid-template-rows: 33px 33px auto;
   gap: var(--synth-gap);
   align-content: start;
   min-width: 0;
@@ -398,7 +403,7 @@
 
 .nameField {
   width: 100%;
-  height: 32px;
+  height: 33px;
 }
 
 .nameField > span:last-child {
@@ -415,7 +420,7 @@
 
 .taxonomySelect {
   min-width: 0;
-  min-height: 32px;
+  min-height: 33px;
 }
 
 .identityPerformanceControls {
@@ -446,7 +451,7 @@
 }
 
 .presetTags span {
-  min-height: 14px;
+  min-height: 15px;
   padding: 0 3px;
   border-radius: 3px;
   background: color-mix(in srgb, var(--color-fg) 18%, transparent);
@@ -468,7 +473,7 @@
   grid-template-rows: auto auto auto;
   gap: 1px;
   min-width: 0;
-  min-height: 38px;
+  min-height: 39px;
   padding: 3px 6px;
   border: var(--border-soft);
   background: var(--surface-subtle);
@@ -541,8 +546,8 @@
 }
 
 .importPresetButton {
-  min-width: 92px;
-  height: 32px;
+  min-width: 93px;
+  height: 33px;
 }
 
 .importPresetWrap {
@@ -555,12 +560,12 @@
 
 .importPresetMenu {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 3px);
   right: 0;
   z-index: 40;
   display: grid;
-  width: min(340px, calc(100vw - 32px));
-  max-height: 332px;
+  width: min(339px, calc(100vw - 33px));
+  max-height: 333px;
   overflow-y: auto;
   border: var(--border-fg);
   background: var(--color-bg);
@@ -570,7 +575,7 @@
 .importPresetItem {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 2px;
+  gap: 3px;
   width: 100%;
   min-height: 42px;
   padding: 6px;
@@ -645,7 +650,7 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
   color: color-mix(in srgb, var(--color-fg) 82%, transparent);
   font-size: var(--font-size-ui);
@@ -670,7 +675,7 @@
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
   font-family: var(--font-family-mono);
@@ -715,7 +720,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
-  min-height: 28px;
+  min-height: 27px;
   padding: 0;
   border-bottom: var(--border-fg);
 }
@@ -737,19 +742,19 @@
 }
 
 .lfoHeaderButton {
-  width: 28px !important;
-  min-width: 28px !important;
-  height: 28px !important;
-  min-height: 28px !important;
+  width: 27px !important;
+  min-width: 27px !important;
+  height: 27px !important;
+  min-height: 27px !important;
   border-right: var(--border-fg);
 }
 
 .lfoHeaderTextButton {
-  height: 28px !important;
-  min-height: 28px !important;
-  min-width: 74px !important;
+  height: 27px !important;
+  min-height: 27px !important;
+  min-width: 75px !important;
   padding: 0 6px;
-  gap: 4px;
+  gap: 3px;
   border-right: var(--border-fg);
 }
 
@@ -761,8 +766,8 @@
 .lfoLaneTitle {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
-  padding: 0 8px 0 6px;
+  min-height: 27px;
+  padding: 0 9px 0 6px;
   font-weight: var(--font-weight-medium);
   white-space: nowrap;
 }
@@ -781,7 +786,7 @@
 .lfoHeaderValue {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
+  min-height: 27px;
   padding-left: 6px;
 }
 
@@ -789,19 +794,19 @@
   display: inline-flex;
   width: max-content;
   min-width: 0;
-  height: 20px;
-  min-height: 20px;
+  height: 21px;
+  min-height: 21px;
   border: var(--border-soft);
   overflow: hidden;
 }
 
 .segmentedIconButton {
-  width: 20px !important;
-  min-width: 20px !important;
-  max-width: 20px !important;
-  height: 20px !important;
-  min-height: 20px !important;
-  max-height: 20px !important;
+  width: 21px !important;
+  min-width: 21px !important;
+  max-width: 21px !important;
+  height: 21px !important;
+  min-height: 21px !important;
+  max-height: 21px !important;
   padding: 0;
   border-right: var(--border-soft);
 }
@@ -819,8 +824,8 @@
 }
 
 .segmentedTextButton {
-  width: 32px !important;
-  min-width: 32px !important;
+  width: 33px !important;
+  min-width: 33px !important;
   height: 24px !important;
   min-height: 24px !important;
   padding: 0 3px;
@@ -837,7 +842,7 @@
 
 .lfoControls {
   display: grid;
-  grid-template-columns: minmax(260px, max-content) minmax(210px, max-content);
+  grid-template-columns: minmax(261px, max-content) minmax(210px, max-content);
   gap: var(--synth-gap);
   align-items: stretch;
   justify-content: start;
@@ -849,7 +854,7 @@
   display: grid;
   align-items: center;
   min-width: 0;
-  min-height: 64px;
+  min-height: 63px;
   padding: var(--synth-gap);
   border: var(--border-fg);
 }
@@ -880,13 +885,13 @@
 }
 
 .lfoKnobBlock {
-  grid-template-columns: repeat(3, 64px);
+  grid-template-columns: repeat(3, 63px);
   gap: var(--synth-gap);
 }
 
 .controlGrid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(58px, 1fr));
+  grid-template-columns: repeat(5, minmax(57px, 1fr));
   gap: var(--synth-gap);
   align-items: end;
   padding: var(--synth-gap);
@@ -938,8 +943,8 @@
 .envelopeCard {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(94px, auto) auto auto;
-  gap: 4px;
+  grid-template-rows: auto minmax(93px, auto) auto auto;
+  gap: 3px;
   min-width: 0;
   padding: 6px;
   border: var(--border-soft);
@@ -978,8 +983,8 @@
 
 .sourcePickAnchor {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 3px;
+  right: 3px;
   z-index: 2;
   display: inline-flex;
   width: 12px;
@@ -1002,7 +1007,7 @@
   position: relative;
   width: 100%;
   min-width: 0;
-  height: 94px;
+  height: 93px;
   border: var(--border-soft);
   background:
     linear-gradient(to right, transparent 24%, var(--grid-line-faint) 24%, transparent 25%, transparent 49%, var(--grid-line-faint) 49%, transparent 50%, transparent 74%, var(--grid-line-faint) 74%, transparent 75%),
@@ -1026,8 +1031,8 @@
 
 .envelopeHandle {
   position: absolute;
-  width: 11px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
   padding: 0;
   border: 1px solid var(--color-fg);
   border-radius: 50%;
@@ -1064,7 +1069,7 @@
 .envelopeTimingField {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -1073,7 +1078,7 @@
 }
 
 .envelopeTimingNumber {
-  width: 56px;
+  width: 57px;
   height: 18px;
   color: inherit;
 }
@@ -1097,7 +1102,7 @@
 
 .envelopeEditorControls {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) 184px;
+  grid-template-columns: minmax(261px, 1fr) 183px;
   gap: var(--synth-gap);
   min-width: 0;
   align-items: stretch;
@@ -1108,28 +1113,28 @@
   grid-template-columns: repeat(3, minmax(54px, 1fr));
   gap: var(--synth-gap);
   min-width: 0;
-  padding: 5px;
+  padding: 6px;
   border: var(--border-soft);
 }
 
 .envelopeCurves {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 4px;
+  gap: 3px;
   align-content: start;
   min-width: 0;
-  padding: 5px;
+  padding: 6px;
   border: var(--border-soft);
 }
 
 .envelopeCurveControl {
-  --button-square-xs: 22px;
+  --button-square-xs: 30px;
   display: grid;
-  grid-template-columns: 30px 88px 34px;
+  grid-template-columns: 30px 87px 33px;
   gap: 6px;
   align-items: center;
   min-width: 0;
-  min-height: 22px;
+  min-height: 21px;
 }
 
 .envelopeCurveLabel,
@@ -1146,27 +1151,27 @@
 
 .envelopeCurveControl .shapeButtons {
   display: grid;
-  grid-template-columns: repeat(4, 22px);
-  min-height: 22px;
-  width: 88px;
+  grid-template-columns: repeat(4, 21px);
+  min-height: 21px;
+  width: 87px;
 }
 
 .envelopeCurveControl .shapeButton {
   box-sizing: border-box;
   aspect-ratio: 1;
-  width: 22px !important;
-  min-width: 22px !important;
-  height: 22px !important;
-  min-height: 22px !important;
+  width: 21px !important;
+  min-width: 21px !important;
+  height: 21px !important;
+  min-height: 21px !important;
   padding: 0 !important;
 }
 
 .ampFilterGroup {
   display: grid;
   grid-template-rows: auto 1fr;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
-  padding: 5px 6px;
+  padding: 6px 6px;
   border: var(--border-soft);
   background: var(--surface-subtle);
 }
@@ -1174,7 +1179,7 @@
 .ampFilterWideGroup {
   grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
-  column-gap: 8px;
+  column-gap: 9px;
 }
 
 .ampFilterWideGroup .ampFilterGroupTitle,
@@ -1212,7 +1217,7 @@
 .curveCluster {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 3px;
   align-items: end;
   min-width: 0;
 }
@@ -1220,7 +1225,7 @@
 .knobCluster {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
-  gap: 4px;
+  gap: 3px;
   align-items: end;
   min-width: 0;
 }
@@ -1229,13 +1234,13 @@
   display: grid;
   justify-items: center;
   align-content: end;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
 .shapeButtons {
   display: inline-flex;
-  min-height: 22px;
+  min-height: 21px;
   border: var(--border-fg);
 }
 
@@ -1243,10 +1248,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px !important;
-  min-width: 22px !important;
-  height: 22px !important;
-  min-height: 22px !important;
+  width: 21px !important;
+  min-width: 21px !important;
+  height: 21px !important;
+  min-height: 21px !important;
   padding: 0;
   border-right: var(--border-fg);
 }
@@ -1277,7 +1282,7 @@
 }
 
 .lfoPanel {
-  min-height: 136px;
+  min-height: 135px;
 }
 
 .disabledPanel .ampFilterBody {
@@ -1297,7 +1302,7 @@
   }
 
   .controlGrid {
-    grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(75px, 1fr));
   }
 
   .ampFilterBody,
@@ -1348,7 +1353,7 @@
 .ampFilterBody :global(.knob),
 .lfoStack :global(.knob) {
   display: grid !important;
-  grid-template-rows: auto 34px auto;
+  grid-template-rows: auto 33px auto;
   justify-items: center;
   align-items: center;
   gap: 1px;
@@ -1374,7 +1379,7 @@
 .lfoStack :global(.knob .editValue) {
   grid-row: 3;
   width: auto;
-  min-width: 28px;
+  min-width: 27px;
   min-height: 12px;
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
   font-size: var(--font-size-ui);

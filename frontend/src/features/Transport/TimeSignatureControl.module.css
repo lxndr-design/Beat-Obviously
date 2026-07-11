@@ -7,9 +7,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
-  min-width: 56px;
-  height: 32px;
+  gap: 3px;
+  min-width: 57px;
+  height: 33px;
   padding: 0 var(--space-1);
   border: var(--border-fg);
   font-family: var(--font-family-mono);

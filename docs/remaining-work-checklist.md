@@ -38,6 +38,7 @@ Current implementation focus:
   - Asset/package management: relink, replace, reveal, delete, copy into project, remove unused, reference counts, missing media repair, and one-click project packaging.
   - Export review/presets: full mix, review range, selected stem, all stems, sample-rate/bit-depth presets, progress/cancel, analysis panel, and destination history.
   - Sampler keymap editing: velocity layers, key ranges, root-note helpers, sample trim, loop/crossfade loops, round-robin, choke, and exclusive groups.
+  - Sampler/MIDI sample switching: reusable sampler-zone editor, stable zone IDs, optional per-note sample/articulation metadata, sampler-aware piano-roll selector, and live/export playback parity before any Vocaloid-style phrase system.
   - Project Health repair flows: deterministic repair UI for safe fixes, backup restore polish, validate-before-export, and explicit recovery messaging.
   - Broad browser/runtime proof: arrangement editing, recording, mixer, asset relink/package, export, Project Health repairs, and migration-era UI states.
 
@@ -105,7 +106,9 @@ Current implementation focus:
    - Done: persisted project manifests, relink rebuilds, native manifest repair, and sidecar packaging stress now preserve track/segment/instrument sample-id-aware audio references.
    - Deferred: visible project asset browser was removed until it can be redesigned with the shared UI kit and folded cleanly into Audio Files / Project Health flows.
    - Finish global replace, copy-into-project polish, visible project asset-management design, and native chooser-level missing-asset relink harness coverage.
-   - Add sampler/keymap editors for velocity layers, sample trim, loop markers, crossfade loops, root-note helpers, round-robin, choke, and exclusive groups.
+   - Done: sampler instruments now expose editable sampler zones for labels, key/velocity ranges, trims, gain, tuning, pan, one-shot/loop state, duplicate-zone creation/removal for layered samples, and individual zone audition.
+   - Done: sampler-aware MIDI note switching now persists selected note sample-zone metadata, exposes a piano-roll selector, warns on stale zone references, clears stale assignments back to auto zone resolution, forwards forced sample-zone playback, and is covered by document and sampler-zone verifiers.
+   - Add remaining sampler/keymap polish for loop markers/crossfade loops, root-note helpers, round-robin visualization, choke/exclusive groups, and broader repair flows.
    - Run a real AU/VST3 plugin-host feasibility pass after the protected adapter layer is stable.
 6. `[~]` Aether synth maturity.
    - Finish macro live-preview parity, visible macro lanes, deeper macro conflict/precedence display, and modulation matrix semantic cleanup.

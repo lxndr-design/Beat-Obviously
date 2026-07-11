@@ -52,25 +52,30 @@ Compact DAW UI tokens:
 
 - `--font-size-hint`: 10px, non-interactive hints and ticks only.
 - `--font-size-ui`: 11px, dense controls and compact rows.
+- `--font-size-field-label`: 12px, untruncated input and dropdown labels.
+- `--field-label-inset`: 6px, left inset for inline labeled fields.
+- `--structural-muted-opacity`: 54%, shared opacity for non-interactive block titles and borders.
+
+`LibrarySearch` is the full-width filtering row placed directly below library section ribbons.
 - `--font-size-ui-lg`: 14px, larger dense controls.
 - `--font-size-section`: 16px, section labels and standard readable text.
 - `--font-size-title`: 18px, compact modal and panel titles.
 
 Editorial/display ramp:
 
-- `--font-size-1` through `--font-size-8`: 16, 20, 24, 32, 40, 56, 72, 90px.
+- `--font-size-1` through `--font-size-6`: 16, 20, 24, 32, 40, 56px.
 
 Do not scale type with viewport width. Use `letter-spacing: var(--letter-spacing-*)`.
 
 ### Spacing
 
-The base unit is 8px. Use `--space-*` tokens for gaps, padding, margins, fixed
+The base unit is 3px. Use `--space-*` tokens for gaps, padding, margins, fixed
 control dimensions, and layout rhythm.
 
-Allowed non-8px values:
+Allowed non-3px values:
 
 - `1px` borders and gridlines.
-- Tokenized compact control sizes that already exist in `tokens.css`.
+- `0.5px` and `1px` optical offsets used to align those strokes.
 - Geometry that is derived from audio/time data, SVG paths, or rendered waveforms.
 
 ### Borders
@@ -139,17 +144,18 @@ Use shared Solid components before styling feature-local controls.
 | `ContextMenu` | Pointer and keyboard-invoked menus | disabled item, submenu, separators |
 | `DitheredImage` | Raster preview imagery | loading, success, failure fallback |
 | `FloatingLayer` | Portaled popovers | positioned layer with role |
-| `FloatingSelect` | Compact selects in constrained panels | open, selected, long labels |
+| `FloatingSelect` | All dropdown fields and constrained-panel selects | stacked, inline, bare, disabled, searchable, open, selected, long labels |
 | `HoverInfo` | Tooltips and compact hover detail | hover/focus, viewport clamping |
 | `Icon` | All product icons | decorative and labelled |
 | `Knob` | Continuous synth/audio parameters | small/medium/large, bipolar, edited, modulation |
 | `MarqueeText` | Single-line overflowing labels | short and overflow text |
 | `Modal` | Editors and confirmations | stacked, dirty, footer, close controls |
-| `NumberInput` | Numeric fields | clamping, unit, arrow-key stepping |
+| `NumberInput` | Numeric fields | stacked, inline, editor, and bare layouts; clamping, unit, arrow-key stepping |
+| `RowActionButton` | Row actions | standard and compact icon actions for `RowItem` |
+| `LibraryFolder` | Asset grouping | shared expandable, renamable, droppable folder for library panels |
 | `RadioGroup` | Mutually exclusive modes | selected, disabled |
 | `RowItem` | Library/browser list rows | compact/media density, drag/icon/meta/action slots |
 | `SectionRibbon` | Sidebar/panel headers | expanded/collapsed, count, actions |
-| `Select` | Native dropdown fields | stacked, inline, bare, disabled |
 | `Slider` | Native range controls | stacked, inline, bare, readout, disabled |
 | `Tag` | Compact tinted metadata labels and counters | numeric/text content, inherited context |
 | `TextInput` | Text fields | stacked, inline, bare, unit |

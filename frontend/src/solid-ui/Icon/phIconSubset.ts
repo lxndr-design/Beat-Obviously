@@ -14,9 +14,6 @@ export const PH_ICON_SUBSET = {
     "arrow-counter-clockwise": {
       "body": "<path fill=\"currentColor\" d=\"M224 128a96 96 0 0 1-94.71 96H128a95.38 95.38 0 0 1-65.9-26.2a8 8 0 0 1 11-11.63a80 80 0 1 0-1.67-114.78a3 3 0 0 1-.26.25L44.59 96H72a8 8 0 0 1 0 16H24a8 8 0 0 1-8-8V56a8 8 0 0 1 16 0v29.8L60.25 60A96 96 0 0 1 224 128\"/>"
     },
-    "arrow-counter-clockwise-fill": {
-      "body": "<path fill=\"currentColor\" d=\"M224 128a96 96 0 0 1-94.71 96H128a95.38 95.38 0 0 1-65.9-26.2a8 8 0 0 1 11-11.63a80 80 0 1 0-1.67-114.78a3 3 0 0 1-.26.25l-10.54 9.65l17 17A8 8 0 0 1 72 112H24a8 8 0 0 1-8-8V56a8 8 0 0 1 13.66-5.7L49.31 70l10.94-10A96 96 0 0 1 224 128\"/>"
-    },
     "arrow-elbow-down-right": {
       "body": "<path fill=\"currentColor\" d=\"m221.66 181.66l-48 48a8 8 0 0 1-11.32-11.32L196.69 184H72a8 8 0 0 1-8-8V32a8 8 0 0 1 16 0v136h116.69l-34.35-34.34a8 8 0 0 1 11.32-11.32l48 48a8 8 0 0 1 0 11.32\"/>"
     },
@@ -50,9 +47,6 @@ export const PH_ICON_SUBSET = {
     "caret-down": {
       "body": "<path fill=\"currentColor\" d=\"m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32\"/>"
     },
-    "caret-left": {
-      "body": "<path fill=\"currentColor\" d=\"M165.66 202.34a8 8 0 0 1-11.32 11.32l-80-80a8 8 0 0 1 0-11.32l80-80a8 8 0 0 1 11.32 11.32L91.31 128Z\"/>"
-    },
     "caret-right": {
       "body": "<path fill=\"currentColor\" d=\"m181.66 133.66l-80 80a8 8 0 0 1-11.32-11.32L164.69 128L90.34 53.66a8 8 0 0 1 11.32-11.32l80 80a8 8 0 0 1 0 11.32\"/>"
     },
@@ -82,12 +76,6 @@ export const PH_ICON_SUBSET = {
     },
     "clipboard-text": {
       "body": "<path fill=\"currentColor\" d=\"M168 152a8 8 0 0 1-8 8H96a8 8 0 0 1 0-16h64a8 8 0 0 1 8 8m-8-40H96a8 8 0 0 0 0 16h64a8 8 0 0 0 0-16m56-64v168a16 16 0 0 1-16 16H56a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h36.26a47.92 47.92 0 0 1 71.48 0H200a16 16 0 0 1 16 16M96 64h64a32 32 0 0 0-64 0m104-16h-26.75A47.9 47.9 0 0 1 176 64v8a8 8 0 0 1-8 8H88a8 8 0 0 1-8-8v-8a47.9 47.9 0 0 1 2.75-16H56v168h144Z\"/>"
-    },
-    "clock-countdown": {
-      "body": "<path fill=\"currentColor\" d=\"M232 136.66A104.12 104.12 0 1 1 119.34 24a8 8 0 0 1 1.32 16A88.12 88.12 0 1 0 216 135.34a8 8 0 0 1 16 1.32M120 72v56a8 8 0 0 0 8 8h56a8 8 0 0 0 0-16h-48V72a8 8 0 0 0-16 0m40-24a12 12 0 1 0-12-12a12 12 0 0 0 12 12m36 24a12 12 0 1 0-12-12a12 12 0 0 0 12 12m24 36a12 12 0 1 0-12-12a12 12 0 0 0 12 12\"/>"
-    },
-    "clock-countdown-fill": {
-      "body": "<path fill=\"currentColor\" d=\"M208 96a12 12 0 1 1 12 12a12 12 0 0 1-12-12m-12-24a12 12 0 1 0-12-12a12 12 0 0 0 12 12m28.66 56a8 8 0 0 0-8.63 7.31A88.12 88.12 0 1 1 120.66 40a8 8 0 0 0-1.32-16A104.12 104.12 0 1 0 232 136.66a8 8 0 0 0-7.34-8.66M128 56a72 72 0 1 1-72 72a72.08 72.08 0 0 1 72-72m-8 72a8 8 0 0 0 8 8h48a8 8 0 0 0 0-16h-40V80a8 8 0 0 0-16 0Zm40-80a12 12 0 1 0-12-12a12 12 0 0 0 12 12\"/>"
     },
     "clock-counter-clockwise": {
       "body": "<path fill=\"currentColor\" d=\"M136 80v43.47l36.12 21.67a8 8 0 0 1-8.24 13.72l-40-24A8 8 0 0 1 120 128V80a8 8 0 0 1 16 0m-8-48a95.44 95.44 0 0 0-67.92 28.15C52.81 67.51 46.35 74.59 40 82V64a8 8 0 0 0-16 0v40a8 8 0 0 0 8 8h40a8 8 0 0 0 0-16H49c7.15-8.42 14.27-16.35 22.39-24.57a80 80 0 1 1 1.66 114.75a8 8 0 1 0-11 11.64A96 96 0 1 0 128 32\"/>"
@@ -127,12 +115,6 @@ export const PH_ICON_SUBSET = {
     },
     "file-audio": {
       "body": "<path fill=\"currentColor\" d=\"M99.06 128.61a8 8 0 0 0-8.72 1.73L68.69 152H48a8 8 0 0 0-8 8v40a8 8 0 0 0 8 8h20.69l21.65 21.66A8 8 0 0 0 104 224v-88a8 8 0 0 0-4.94-7.39M88 204.69l-10.34-10.35A8 8 0 0 0 72 192H56v-24h16a8 8 0 0 0 5.66-2.34L88 155.31ZM152 180a40.55 40.55 0 0 1-20 34.91a8 8 0 0 1-8-13.82a24.49 24.49 0 0 0 0-42.18a8 8 0 0 1 8-13.82A40.55 40.55 0 0 1 152 180m61.66-97.66l-56-56A8 8 0 0 0 152 24H56a16 16 0 0 0-16 16v80a8 8 0 0 0 16 0V40h88v48a8 8 0 0 0 8 8h48v120h-32a8 8 0 0 0 0 16h32a16 16 0 0 0 16-16V88a8 8 0 0 0-2.34-5.66M160 51.31L188.69 80H160Z\"/>"
-    },
-    "flag-pennant": {
-      "body": "<path fill=\"currentColor\" d=\"m242.63 96.44l-184-64A8 8 0 0 0 48 40v176a8 8 0 0 0 16 0v-42.31l178.63-62.13a8 8 0 0 0 0-15.12M64 156.75V51.25L215.65 104Z\"/>"
-    },
-    "flag-pennant-fill": {
-      "body": "<path fill=\"currentColor\" d=\"M248 104a8 8 0 0 1-5.37 7.56L64 173.69V216a8 8 0 0 1-16 0V40a8 8 0 0 1 10.63-7.56l184 64A8 8 0 0 1 248 104\"/>"
     },
     "floppy-disk": {
       "body": "<path fill=\"currentColor\" d=\"M219.31 72L184 36.69A15.86 15.86 0 0 0 172.69 32H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V83.31A15.86 15.86 0 0 0 219.31 72M168 208H88v-56h80Zm40 0h-24v-56a16 16 0 0 0-16-16H88a16 16 0 0 0-16 16v56H48V48h124.69L208 83.31ZM160 72a8 8 0 0 1-8 8H96a8 8 0 0 1 0-16h56a8 8 0 0 1 8 8\"/>"
@@ -187,6 +169,9 @@ export const PH_ICON_SUBSET = {
     },
     "intersect-three": {
       "body": "<path fill=\"currentColor\" d=\"M195.88 96c.07-1.31.12-2.63.12-4a68 68 0 0 0-136 0c0 1.33 0 2.65.12 4A68 68 0 1 0 128 213.65A68 68 0 1 0 195.88 96M128 193.47a51.9 51.9 0 0 1-16-35.38a67.55 67.55 0 0 0 31.9 0a51.9 51.9 0 0 1-15.9 35.38m0-49.47a52 52 0 0 1-14.08-1.95A52.06 52.06 0 0 1 128 118.53a52.06 52.06 0 0 1 14.08 23.52A52 52 0 0 1 128 144m-28.77-8.71A52.2 52.2 0 0 1 77.92 106a51.88 51.88 0 0 1 36.79 3.28a68.2 68.2 0 0 0-15.48 26.01m42.06-26.06a51.88 51.88 0 0 1 36.79-3.23a52.2 52.2 0 0 1-21.31 29.34a68.2 68.2 0 0 0-15.48-26.11M128 40a52.06 52.06 0 0 1 52 49.91a67.72 67.72 0 0 0-52 8.44a67.72 67.72 0 0 0-51.95-8.44A52.06 52.06 0 0 1 128 40M40 156a52 52 0 0 1 23.23-43.29A68.36 68.36 0 0 0 96.12 152c-.07 1.31-.12 2.63-.12 4a67.74 67.74 0 0 0 18.71 46.77A52 52 0 0 1 40 156m124 52a51.65 51.65 0 0 1-22.71-5.23A67.74 67.74 0 0 0 160 156c0-1.33-.05-2.65-.12-4a68.36 68.36 0 0 0 32.89-39.33A52 52 0 0 1 164 208\"/>"
+    },
+    "keyboard": {
+      "body": "<path fill=\"currentColor\" d=\"M224 48H32a16 16 0 0 0-16 16v128a16 16 0 0 0 16 16h192a16 16 0 0 0 16-16V64a16 16 0 0 0-16-16m0 144H32V64h192zm-16-64a8 8 0 0 1-8 8H56a8 8 0 0 1 0-16h144a8 8 0 0 1 8 8m0-32a8 8 0 0 1-8 8H56a8 8 0 0 1 0-16h144a8 8 0 0 1 8 8M72 160a8 8 0 0 1-8 8h-8a8 8 0 0 1 0-16h8a8 8 0 0 1 8 8m96 0a8 8 0 0 1-8 8H96a8 8 0 0 1 0-16h64a8 8 0 0 1 8 8m40 0a8 8 0 0 1-8 8h-8a8 8 0 0 1 0-16h8a8 8 0 0 1 8 8\"/>"
     },
     "lightning": {
       "body": "<path fill=\"currentColor\" d=\"M215.79 118.17a8 8 0 0 0-5-5.66L153.18 90.9l14.66-73.33a8 8 0 0 0-13.69-7l-112 120a8 8 0 0 0 3 13l57.63 21.61l-14.62 73.25a8 8 0 0 0 13.69 7l112-120a8 8 0 0 0 1.94-7.26M109.37 214l10.47-52.38a8 8 0 0 0-5-9.06L62 132.71l84.62-90.66l-10.46 52.38a8 8 0 0 0 5 9.06l52.8 19.8Z\"/>"
@@ -423,3 +408,405 @@ export const PH_ICON_SUBSET = {
   "width": 256,
   "height": 256
 } as IconifyJSON;
+
+export const PH_ICON_USAGE_SIZES = {
+  "ph:activity": [
+    18
+  ],
+  "ph:archive": [
+    18
+  ],
+  "ph:arrow-counter-clockwise": [
+    18
+  ],
+  "ph:arrow-elbow-down-right": [
+    18
+  ],
+  "ph:arrow-right": [
+    18
+  ],
+  "ph:arrow-square-in": [
+    18
+  ],
+  "ph:arrow-square-out": [
+    18
+  ],
+  "ph:arrows-clockwise": [
+    18
+  ],
+  "ph:arrows-in-line-horizontal": [
+    18
+  ],
+  "ph:bell": [
+    18
+  ],
+  "ph:bezier-curve": [
+    18
+  ],
+  "ph:brackets-curly": [
+    18
+  ],
+  "ph:brackets-square": [
+    18
+  ],
+  "ph:caret-down": [
+    18
+  ],
+  "ph:caret-right": [
+    18
+  ],
+  "ph:caret-up": [
+    18
+  ],
+  "ph:chart-line": [
+    18
+  ],
+  "ph:check": [
+    18
+  ],
+  "ph:check-circle": [
+    18
+  ],
+  "ph:checks": [
+    18
+  ],
+  "ph:circle": [
+    18
+  ],
+  "ph:circle-notch": [
+    18
+  ],
+  "ph:clipboard": [
+    18
+  ],
+  "ph:clipboard-text": [
+    18
+  ],
+  "ph:clock-counter-clockwise": [
+    18
+  ],
+  "ph:copy": [
+    18
+  ],
+  "ph:cube": [
+    18
+  ],
+  "ph:cursor": [
+    18
+  ],
+  "ph:database": [
+    18
+  ],
+  "ph:diamond": [
+    18
+  ],
+  "ph:diamonds-four": [
+    18
+  ],
+  "ph:disc": [
+    18
+  ],
+  "ph:dots-six-vertical": [
+    18
+  ],
+  "ph:dots-three": [
+    18
+  ],
+  "ph:download-simple": [
+    18
+  ],
+  "ph:export": [
+    18
+  ],
+  "ph:file-audio": [
+    18
+  ],
+  "ph:floppy-disk": [
+    18
+  ],
+  "ph:floppy-disk-back": [
+    18
+  ],
+  "ph:folder-open": [
+    18
+  ],
+  "ph:folder-plus": [
+    18
+  ],
+  "ph:folder-simple": [
+    18
+  ],
+  "ph:folder-simple-dashed": [
+    18
+  ],
+  "ph:gauge-fill": [
+    18
+  ],
+  "ph:gear": [
+    18
+  ],
+  "ph:git-branch": [
+    18
+  ],
+  "ph:grains": [
+    18
+  ],
+  "ph:graph": [
+    18
+  ],
+  "ph:grid-four": [
+    18
+  ],
+  "ph:guitar": [
+    18
+  ],
+  "ph:headphones": [
+    18
+  ],
+  "ph:house": [
+    18
+  ],
+  "ph:info": [
+    18
+  ],
+  "ph:intersect": [
+    18
+  ],
+  "ph:intersect-three": [
+    18
+  ],
+  "ph:keyboard": [
+    18
+  ],
+  "ph:lightning": [
+    18
+  ],
+  "ph:link": [
+    18
+  ],
+  "ph:magnifying-glass": [
+    18
+  ],
+  "ph:magnifying-glass-minus": [
+    18
+  ],
+  "ph:magnifying-glass-plus": [
+    18
+  ],
+  "ph:metronome": [
+    18
+  ],
+  "ph:microphone": [
+    18
+  ],
+  "ph:microphone-fill": [
+    18
+  ],
+  "ph:microphone-stage": [
+    18
+  ],
+  "ph:minus": [
+    18
+  ],
+  "ph:music-note": [
+    18
+  ],
+  "ph:music-note-fill": [
+    18
+  ],
+  "ph:music-notes": [
+    18
+  ],
+  "ph:music-notes-simple": [
+    18
+  ],
+  "ph:package": [
+    18
+  ],
+  "ph:pause-fill": [
+    18
+  ],
+  "ph:pen": [
+    18
+  ],
+  "ph:pencil-line": [
+    18
+  ],
+  "ph:pencil-simple": [
+    18
+  ],
+  "ph:piano-keys": [
+    18
+  ],
+  "ph:piano-keys-fill": [
+    18
+  ],
+  "ph:planet": [
+    18
+  ],
+  "ph:play-fill": [
+    18
+  ],
+  "ph:plug": [
+    18
+  ],
+  "ph:plus": [
+    18
+  ],
+  "ph:power": [
+    18
+  ],
+  "ph:power-fill": [
+    18
+  ],
+  "ph:pulse": [
+    18
+  ],
+  "ph:puzzle-piece": [
+    18
+  ],
+  "ph:radio": [
+    18
+  ],
+  "ph:record": [
+    18
+  ],
+  "ph:record-fill": [
+    18
+  ],
+  "ph:repeat": [
+    18
+  ],
+  "ph:rewind-fill": [
+    18
+  ],
+  "ph:scissors": [
+    18
+  ],
+  "ph:share-network": [
+    18
+  ],
+  "ph:share-network-fill": [
+    18
+  ],
+  "ph:shield-check": [
+    18
+  ],
+  "ph:shooting-star": [
+    18
+  ],
+  "ph:sign-out": [
+    18
+  ],
+  "ph:skip-back": [
+    18
+  ],
+  "ph:skip-back-fill": [
+    18
+  ],
+  "ph:sliders-horizontal": [
+    18
+  ],
+  "ph:sparkle": [
+    18
+  ],
+  "ph:speaker-high": [
+    18
+  ],
+  "ph:speaker-high-fill": [
+    18
+  ],
+  "ph:speaker-x": [
+    18
+  ],
+  "ph:spinner": [
+    18
+  ],
+  "ph:spiral": [
+    18
+  ],
+  "ph:square": [
+    18
+  ],
+  "ph:squares-four": [
+    18
+  ],
+  "ph:stack": [
+    18
+  ],
+  "ph:stack-fill": [
+    18
+  ],
+  "ph:stack-simple": [
+    18
+  ],
+  "ph:stop-fill": [
+    18
+  ],
+  "ph:swap": [
+    18
+  ],
+  "ph:text-aa": [
+    18
+  ],
+  "ph:thumbs-down": [
+    18
+  ],
+  "ph:thumbs-up": [
+    18
+  ],
+  "ph:trash": [
+    18
+  ],
+  "ph:trend-down": [
+    18
+  ],
+  "ph:trend-up": [
+    18
+  ],
+  "ph:triangle": [
+    18
+  ],
+  "ph:upload": [
+    18
+  ],
+  "ph:upload-simple": [
+    18
+  ],
+  "ph:vinyl-record": [
+    18
+  ],
+  "ph:warning": [
+    18
+  ],
+  "ph:warning-circle": [
+    18
+  ],
+  "ph:warning-diamond": [
+    18
+  ],
+  "ph:wave-sawtooth": [
+    18
+  ],
+  "ph:wave-sine": [
+    18
+  ],
+  "ph:wave-square": [
+    18
+  ],
+  "ph:wave-triangle": [
+    18
+  ],
+  "ph:waveform": [
+    18
+  ],
+  "ph:wind": [
+    18
+  ],
+  "ph:x": [
+    18
+  ],
+  "ph:x-circle": [
+    18
+  ]
+} as const;

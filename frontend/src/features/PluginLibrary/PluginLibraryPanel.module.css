@@ -51,14 +51,14 @@
   display: block;
   width: auto;
   height: 100%;
-  max-width: 86px;
+  max-width: 87px;
   object-fit: contain;
 }
 
 .itemLogo {
   display: block;
-  width: 26px;
-  height: 26px;
+  width: 27px;
+  height: 27px;
   object-fit: contain;
 }
 
@@ -66,8 +66,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 27px;
+  height: 27px;
   border: 1px solid color-mix(in srgb, var(--color-fg) 82%, transparent);
   background:
     radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--color-fg) 74%, transparent) 0 18%, transparent 42%),
@@ -83,8 +83,8 @@
 
 .aetherBridgeIcon svg {
   display: block;
-  width: 25px;
-  height: 25px;
+  width: 24px;
+  height: 24px;
   overflow: visible;
 }
 
@@ -115,9 +115,9 @@
 .fileDrop {
   position: relative;
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-columns: 33px minmax(0, 1fr);
   align-items: center;
-  gap: 4px 8px;
+  gap: 3px 9px;
   min-height: 72px;
   padding: 12px;
   border: var(--border-fg);

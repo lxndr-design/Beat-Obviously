@@ -58,7 +58,8 @@ export interface WavemapManualRange {
   endPercent: number;
 }
 
-export type OscillatorKey = "a" | "b";
+export type OscillatorKey = string;
+export interface SynthOscillatorDefinition { id: OscillatorKey; name: string }
 export type OscillatorParamSuffix =
   | "enabled"
   | "wavetable"
@@ -275,6 +276,7 @@ export interface SynthDraftPatch {
     macros: Record<MacroId, SynthMacroDefinition>;
     wavemaps?: Record<string, WavemapDefinition>;
     customWavetables?: Record<string, CustomWavetableDefinition>;
+    oscillators: SynthOscillatorDefinition[];
   };
 }
 
@@ -301,6 +303,9 @@ interface SynthStoreState {
   expressionActivityByInstrument: Record<string, SynthInstrumentExpressionActivity>;
   bindInstrument: (instrumentId: string | null) => void;
   setSelectedOscillator: (id: OscillatorKey) => void;
+  addOscillator: () => void;
+  removeOscillator: (id: OscillatorKey) => void;
+  renameOscillator: (id: OscillatorKey, name: string) => void;
   setDraft: (patch: SynthDraftPatch | SynthPatchSnapshot) => void;
   resetDraft: () => void;
   setWavemap: (definition: WavemapDefinition) => void;
@@ -328,6 +333,30 @@ export const FACTORY_WAVETABLES: Array<{ id: WavetableId; label: string }> = [
 ];
 
 export const CUSTOM_WAVETABLE_FRAME_LABELS = ["A", "B", "C", "D"] as const;
+
+const DEFAULT_ADDED_OSCILLATOR_PARAMETERS: Record<OscillatorParamSuffix, SynthParameterValue> = {
+  enabled: true, wavetable: "basic.saw", position: 0, warp: 0.2, warpMode: "shape",
+  octave: 0, semitone: 0, fine: 0, level: 0.6, pan: 0, phase: 0, randomPhase: 0.25,
+};
+
+function oscillatorIdForIndex(index: number): string {
+  return index < 26 ? String.fromCharCode(97 + index) : `osc-${index + 1}`;
+}
+
+function oscillatorLabelForIndex(index: number): string {
+  return index < 26 ? String.fromCharCode(65 + index) : String(index + 1);
+}
+
+function normalizeOscillatorDefinitions(value: unknown): SynthOscillatorDefinition[] {
+  const definitions = Array.isArray(value) ? value.flatMap((entry) => {
+    if (!isRecord(entry) || typeof entry.id !== "string" || !/^[a-z][a-z0-9-]*$/.test(entry.id)) return [];
+    return [{ id: entry.id, name: typeof entry.name === "string" && entry.name.trim() ? entry.name.trim().slice(0, 48) : `Oscillator ${entry.id.toUpperCase()}` }];
+  }) : [];
+  if (definitions.length === 0) return [{ id: "a", name: "Oscillator A" }, { id: "b", name: "Oscillator B" }];
+  const unique = definitions.filter((entry, index) => definitions.findIndex((candidate) => candidate.id === entry.id) === index);
+  if (!unique.some((entry) => entry.id === "a")) unique.unshift({ id: "a", name: "Oscillator A" });
+  return unique;
+}
 export const CUSTOM_WAVETABLE_PARTIAL_COUNT = 16;
 const WAVEMAP_SCAN_ANCHOR_MARGIN = 0.01;
 
@@ -1144,6 +1173,7 @@ export function createDefaultSynthDraft(): SynthDraftPatch {
       macros: cloneDefaultMacros(),
       wavemaps: { [DEFAULT_CUSTOM_WAVETABLE_ID]: createDefaultCustomWavetable() },
       customWavetables: { [DEFAULT_CUSTOM_WAVETABLE_ID]: createDefaultCustomWavetable() },
+      oscillators: [{ id: "a", name: "Oscillator A" }, { id: "b", name: "Oscillator B" }],
     },
   };
 }
@@ -1201,6 +1231,7 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
       macros: normalizeMacroDefinitions(inputMetadata.macros),
       wavemaps,
       customWavetables: wavemaps,
+      oscillators: normalizeOscillatorDefinitions(inputMetadata.oscillators),
     },
   };
 }
@@ -1607,6 +1638,11 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     aether: {
       oscA,
       oscB,
+      oscillators: draft.metadata.oscillators.map(({ id, name }) => ({
+        id,
+        name,
+        ...oscillatorFromDraft(draft, id, wavetableFromDraft(draft, id)),
+      })),
       sub: {
         enabled: false,
         level: 0,
@@ -1905,6 +1941,32 @@ export const useSynthStore = create<SynthStoreState>((set) => ({
   setSelectedOscillator: (id) => set({ selectedOscillator: id }),
   setDraft: (draft) => set({ draft: normalizeSynthDraftPatch(draft) }),
   resetDraft: () => set({ draft: createDefaultSynthDraft(), selectedOscillator: "a" }),
+  addOscillator: () => set((state) => {
+    const used = new Set(state.draft.metadata.oscillators.map((oscillator) => oscillator.id));
+    let index = 1;
+    let id = oscillatorIdForIndex(index);
+    while (used.has(id)) id = oscillatorIdForIndex(++index);
+    const label = oscillatorLabelForIndex(index);
+    const parameters = { ...state.draft.parameters };
+    for (const [suffix, value] of Object.entries(DEFAULT_ADDED_OSCILLATOR_PARAMETERS)) {
+      parameters[`osc.${id}.${suffix}`] = value;
+    }
+    return {
+      selectedOscillator: id,
+      draft: { ...state.draft, parameters, metadata: { ...state.draft.metadata, oscillators: [...state.draft.metadata.oscillators, { id, name: `Oscillator ${label}` }] } },
+    };
+  }),
+  removeOscillator: (id) => set((state) => {
+    if (id === "a") return state;
+    const parameters = Object.fromEntries(Object.entries(state.draft.parameters).filter(([key]) => !key.startsWith(`osc.${id}.`))) as SynthDraftPatch["parameters"];
+    return {
+      selectedOscillator: state.selectedOscillator === id ? "a" : state.selectedOscillator,
+      draft: { ...state.draft, parameters, modulation: state.draft.modulation.filter((route) => !route.target.startsWith(`osc.${id}.`)), metadata: { ...state.draft.metadata, oscillators: state.draft.metadata.oscillators.filter((oscillator) => oscillator.id !== id) } },
+    };
+  }),
+  renameOscillator: (id, name) => set((state) => ({
+    draft: { ...state.draft, metadata: { ...state.draft.metadata, oscillators: state.draft.metadata.oscillators.map((oscillator) => oscillator.id === id ? { ...oscillator, name: name.trim().slice(0, 48) || oscillator.name } : oscillator) } },
+  })),
   setInstrumentExpressionActivity: (instrumentId, activity) =>
     set((state) => ({
       expressionActivityByInstrument: {

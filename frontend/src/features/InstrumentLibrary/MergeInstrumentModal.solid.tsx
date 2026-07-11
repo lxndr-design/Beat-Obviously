@@ -48,14 +48,15 @@ export function MergeInstrumentModal(props: Props) {
           <For each={others()}>
             {(instrument) => (
               <li>
-                <button
-                  type="button"
-                  class={`${styles.option} ${pickedId() === instrument.id ? styles.selected : ""}`}
+                <Button
+                  variant="ghost"
+                  selected={pickedId() === instrument.id}
+                  class={styles.option}
                   onClick={() => setPickedId(instrument.id)}
                 >
                   <span class={styles.optionName}>{instrument.name}</span>
                   <span class={styles.optionKind}>{instrument.kind}</span>
-                </button>
+                </Button>
               </li>
             )}
           </For>

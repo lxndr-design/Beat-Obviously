@@ -1,7 +1,7 @@
 import Dexie, { type Table } from "dexie";
 import type { GeneratedInstrument, GenerateInstrumentOptions } from "../ai/aiService";
 import type { DrumGenre, GeneratedDrumBeat, GenerateDrumBeatOptions } from "../ai/drumBeatGenerator";
-import type { BeatComponent } from "../state/components";
+import type { BeatComponent, ComponentFolder } from "../state/components";
 import { normalizeAetherEffectPresetRecord, type AetherEffectPresetRecord } from "../state/effectPresets";
 import { pruneDevFixtureInstruments } from "../state/instrumentLibraryGuards";
 import { normalizeSynthPresetRecord, type SynthPresetRecord } from "../state/synthPresets";
@@ -103,6 +103,7 @@ export class BeatDB extends Dexie {
   instrumentSets!: Table<InstrumentSet, string>;
   audioFiles!: Table<AudioFile, string>;
   components!: Table<BeatComponent, string>;
+  componentFolders!: Table<ComponentFolder, string>;
   drumBeatFeedback!: Table<DrumBeatFeedback, string>;
   instrumentGenerationFeedback!: Table<InstrumentGenerationFeedback, string>;
   midiSongFeedback!: Table<MidiSongFeedback, string>;
@@ -184,6 +185,19 @@ export class BeatDB extends Dexie {
       instrumentSets: "id, name, factory",
       audioFiles: "id, name, path",
       components: "id, name, kind, factory, createdAt",
+      drumBeatFeedback: "id, genre, rating, createdAt",
+      instrumentGenerationFeedback: "id, rating, createdAt",
+      midiSongFeedback: "id, rating, createdAt",
+      synthPresets: "id, kind, name, updatedAt",
+      effectPresets: "id, kind, name, updatedAt",
+    });
+    this.version(10).stores({
+      projects: "id, name, savedAt",
+      instruments: "id, name, userCreated, setId",
+      instrumentSets: "id, name, factory",
+      audioFiles: "id, name, path",
+      components: "id, name, kind, factory, createdAt, folderId",
+      componentFolders: "id, name, factory",
       drumBeatFeedback: "id, genre, rating, createdAt",
       instrumentGenerationFeedback: "id, rating, createdAt",
       midiSongFeedback: "id, rating, createdAt",
@@ -296,13 +310,21 @@ export async function listAudioFiles(): Promise<AudioFile[]> {
   return db.audioFiles.orderBy("name").toArray();
 }
 
-export async function saveComponents(components: BeatComponent[]) {
-  await db.components.clear();
-  if (components.length > 0) await db.components.bulkPut(components);
+export async function saveComponents(components: BeatComponent[], folders: ComponentFolder[] = []) {
+  await db.transaction("rw", db.components, db.componentFolders, async () => {
+    await db.components.clear();
+    await db.componentFolders.clear();
+    if (components.length > 0) await db.components.bulkPut(components);
+    if (folders.length > 0) await db.componentFolders.bulkPut(folders);
+  });
 }
 
-export async function listComponents(): Promise<BeatComponent[]> {
-  return db.components.orderBy("createdAt").reverse().toArray();
+export async function listComponents(): Promise<{ components: BeatComponent[]; folders: ComponentFolder[] }> {
+  const [components, folders] = await Promise.all([
+    db.components.orderBy("createdAt").reverse().toArray(),
+    db.componentFolders.toArray(),
+  ]);
+  return { components, folders };
 }
 
 export async function saveDrumBeatFeedback(feedback: DrumBeatFeedback) {
@@ -510,6 +532,9 @@ function normalizeMidiNotes(notes: MidiNote[]): MidiNote[] {
       lengthBeats: roundBeat(Math.max(0.03125, note.lengthBeats)),
       ...(note.frequencyHz ? { frequencyHz: note.frequencyHz } : {}),
       ...(note.connectToIndex != null ? { connectToIndex: note.connectToIndex } : {}),
+      ...(note.sampleZoneId ? { sampleZoneId: note.sampleZoneId } : {}),
+      ...(note.samplePath ? { samplePath: note.samplePath } : {}),
+      ...(note.sampleLabel ? { sampleLabel: note.sampleLabel } : {}),
       ...(note.curve ? { curve: note.curve.map((point) => ({ beat: roundBeat(point.beat), pitch: roundPitch(point.pitch) })) } : {}),
     }))
     .sort((a, b) => a.startBeat - b.startBeat || a.pitch - b.pitch);

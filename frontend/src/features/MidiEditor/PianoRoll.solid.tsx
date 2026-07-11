@@ -28,11 +28,19 @@ import {
   upsertMidiNoteAutomationTarget,
 } from "../../automation/aetherNoteAutomation";
 import { AUTOMATION_CURVES, automationCurveLabel } from "../../automation/curves";
-import { Button, FloatingLayer, FloatingSelect, HoverInfo, Icon } from "../../solid-ui";
+import { Button, Checkbox, FloatingLayer, FloatingSelect, HoverInfo, Icon, NumberInput, Slider } from "../../solid-ui";
 import { useContextualHotkey } from "../../solid-utils/contextualHotkeys.solid";
 import { useSettingsStore } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
-import type { MidiAutomationTarget, MidiNote } from "../../state/types";
+import { isSampleBackedInstrument, midiNoteSampleLabel, sampleZoneDisplayName, sampleZoneStableId } from "../../state/sampleZones";
+import type { Instrument, MidiAutomationTarget, MidiNote } from "../../state/types";
+import {
+  midiNoteDragIndicesForSelection,
+  midiNotePointerMovedPastThreshold,
+  midiNoteSelectionAfterPointerDown,
+  midiVisibleGridBeatStep,
+  snapMidiBeatToVisibleGrid,
+} from "./pianoRollInteraction";
 import styles from "./PianoRoll.module.css";
 
 export interface PianoRollProps {
@@ -47,6 +55,8 @@ export interface PianoRollProps {
   onPreviewNote?: (pitch: number, velocity?: number) => void;
   /** Advanced per-note Aether automation. Hidden by default so the piano roll stays a plain MIDI editor. */
   showAutomation?: boolean;
+  /** Active track/component instrument. Used for sampler-zone note overrides. */
+  instrument?: Instrument;
 }
 
 /**
@@ -69,6 +79,7 @@ const MAX_PX_PER_BEAT = 384;
 const ZOOM_STEP = 8;
 const PX_PER_PITCH = 16;
 const VIEW_HEIGHT = 520;
+const ENABLE_AETHER_NOTE_AUTOMATION_PANEL = false;
 const TOP_PITCH = 96;     // C7
 const BOTTOM_PITCH = 36;  // C2
 const PITCH_RANGE = TOP_PITCH - BOTTOM_PITCH + 1;
@@ -108,6 +119,9 @@ function createCompatEffect(effect: () => void | (() => void), _deps?: unknown[]
 export function PianoRoll(props: PianoRollProps) {
   const notes = new Proxy([] as MidiNote[], {
     get: (_target, property) => Reflect.get(props.notes, property),
+    has: (_target, property) => Reflect.has(props.notes, property),
+    ownKeys: () => Reflect.ownKeys(props.notes),
+    getOwnPropertyDescriptor: (_target, property) => Reflect.getOwnPropertyDescriptor(props.notes, property),
   });
   const lengthBeats = {
     valueOf: () => props.lengthBeats,
@@ -136,10 +150,13 @@ export function PianoRoll(props: PianoRollProps) {
   const [curvePointer, setCurvePointer] = createSignal<{ x: number; y: number } | null>(null);
   const [draggedAutomationEdge, setDraggedAutomationEdge] = createSignal<"start" | "mid" | "end" | null>(null);
   const [automationCurveSelectOpen, setAutomationCurveSelectOpen] = createSignal(false);
+  const [sampleZoneSelectOpen, setSampleZoneSelectOpen] = createSignal(false);
   const [automationPointClipboard, setAutomationPointClipboard] = createSignal<AetherNoteAutomationPointClipboard | null>(null);
   const [selectedAutomationPointIndices, setSelectedAutomationPointIndices] = createSignal<number[]>([]);
+  const [viewportVersion, setViewportVersion] = createSignal(0);
   const lastDrawnLengthRef = createRef(DEFAULT_NOTE_LENGTH_BEATS);
   const lastPointerTargetRef = createRef<PasteTarget | null>(null);
+  const lastPointerDownAtRef = createRef(0);
   const historyRef = createRef<MidiNote[][]>([]);
   const dragAuditionRef = createRef<{ idx: number; pitch: number } | null>(null);
   const automationDragHistoryPushedRef = createRef(false);
@@ -161,16 +178,19 @@ export function PianoRoll(props: PianoRollProps) {
         startY: number;
         startNotes: Array<Pick<MidiNote, "startBeat" | "pitch" | "lengthBeats"> & { curve?: MidiNote["curve"]; automation?: MidiNote["automation"] }>;
         historyPushed?: boolean;
+        editStarted?: boolean;
       }
     | {
         mode: "resize";
         indices: number[];
         edge: "left" | "right";
         startX: number;
+        startY: number;
         startNotes: Array<Pick<MidiNote, "startBeat" | "lengthBeats"> & { curve?: MidiNote["curve"]; automation?: MidiNote["automation"] }>;
         historyPushed?: boolean;
+        editStarted?: boolean;
       }
-    | { mode: "curve-handle"; idx: number; edge: "start" | "end"; historyPushed?: boolean }
+    | { mode: "curve-handle"; idx: number; edge: "start" | "end"; startX: number; startY: number; historyPushed?: boolean; editStarted?: boolean }
     | { mode: "length-resize"; startX: number; startLengthBeats: number }
     | { mode: "select"; anchorX: number; anchorY: number; pointerId: number }
     | null
@@ -258,6 +278,80 @@ export function PianoRoll(props: PianoRollProps) {
     return (widest.start + widest.end) / 2;
   });
   const automationCurveOptions = AUTOMATION_CURVES.map((curve) => ({ value: curve, label: automationCurveLabel(curve) }));
+  const samplerZones = createMemo(() => props.instrument?.sampleMap ?? []);
+  const samplerZoneOptions = createMemo(() => [
+    { value: "", label: "Auto" },
+    ...samplerZones().map((zone, index) => ({
+      value: sampleZoneStableId(zone, index),
+      label: sampleZoneDisplayName(zone, index),
+    })),
+  ]);
+  const missingSamplerZoneCount = createMemo(() => {
+    if (!isSampleBackedInstrument(props.instrument)) return 0;
+    const zoneIds = new Set(samplerZones().map((zone, index) => sampleZoneStableId(zone, index)));
+    const zonePaths = new Set(samplerZones().map((zone) => zone.path));
+    return props.notes.filter((note) => (
+      (note.sampleZoneId && !zoneIds.has(note.sampleZoneId))
+      || (note.samplePath && !zonePaths.has(note.samplePath))
+    )).length;
+  });
+  const selectedSampleZoneValue = createMemo(() => {
+    const selection = selected().map((index) => props.notes[index]).filter(Boolean) as MidiNote[];
+    if (selection.length === 0) return "";
+    const values = selection.map((note) => note.sampleZoneId ?? note.samplePath ?? "");
+    const first = values[0] ?? "";
+    return values.every((value) => value === first) ? first : "";
+  });
+  const selectedSampleSummary = createMemo(() => {
+    const count = selected().length;
+    if (count === 0) return "Select notes to assign a sample zone.";
+    const value = selectedSampleZoneValue();
+    if (!value) return `${count} selected · Auto zone`;
+    const note = selected().map((index) => props.notes[index]).find(Boolean) as MidiNote | undefined;
+    const label = note ? midiNoteSampleLabel(props.instrument, note) : undefined;
+    return `${count} selected · ${label ?? "Sample zone"}`;
+  });
+  const showSamplerZoneControls = createMemo(() =>
+    isSampleBackedInstrument(props.instrument) && samplerZones().length > 0
+  );
+
+  function assignSampleZoneToSelection(value: string) {
+    const selection = selected();
+    if (selection.length === 0) return;
+    const zoneIndex = samplerZones().findIndex((candidate, index) => sampleZoneStableId(candidate, index) === value);
+    const zone = zoneIndex >= 0 ? samplerZones()[zoneIndex] : undefined;
+    onChange(props.notes.map((note, index) => {
+      if (!selection.includes(index)) return note;
+      if (!zone) {
+        const nextNote = { ...note };
+        delete nextNote.sampleZoneId;
+        delete nextNote.samplePath;
+        delete nextNote.sampleLabel;
+        return nextNote;
+      }
+      return {
+        ...note,
+        sampleZoneId: sampleZoneStableId(zone, zoneIndex),
+        samplePath: zone.path,
+        sampleLabel: sampleZoneDisplayName(zone, zoneIndex),
+      };
+    }));
+  }
+
+  function clearMissingSamplerZoneAssignments() {
+    const zoneIds = new Set(samplerZones().map((zone, index) => sampleZoneStableId(zone, index)));
+    const zonePaths = new Set(samplerZones().map((zone) => zone.path));
+    onChange(props.notes.map((note) => {
+      const missingZone = note.sampleZoneId && !zoneIds.has(note.sampleZoneId);
+      const missingPath = note.samplePath && !zonePaths.has(note.samplePath);
+      if (!missingZone && !missingPath) return note;
+      const nextNote = { ...note };
+      delete nextNote.sampleZoneId;
+      delete nextNote.samplePath;
+      delete nextNote.sampleLabel;
+      return nextNote;
+    }));
+  }
 
   useContextualHotkey(
     () => props.hotkeyScopeId ?? "",
@@ -306,14 +400,24 @@ export function PianoRoll(props: PianoRollProps) {
 
   createCompatEffect(() => {
     if (!dragActive()) return;
+    function moveDrag(event: PointerEvent | MouseEvent) {
+      event.preventDefault();
+      onNotePointerMove(event);
+    }
     function finishDrag() {
       onNotePointerUp();
     }
+    window.addEventListener("pointermove", moveDrag, true);
     window.addEventListener("pointerup", finishDrag);
     window.addEventListener("pointercancel", finishDrag);
+    window.addEventListener("mousemove", moveDrag, true);
+    window.addEventListener("mouseup", finishDrag);
     return () => {
+      window.removeEventListener("pointermove", moveDrag, true);
       window.removeEventListener("pointerup", finishDrag);
       window.removeEventListener("pointercancel", finishDrag);
+      window.removeEventListener("mousemove", moveDrag, true);
+      window.removeEventListener("mouseup", finishDrag);
     };
   }, [dragActive(), notes, selectBox()]);
 
@@ -342,7 +446,7 @@ export function PianoRoll(props: PianoRollProps) {
     return Math.round(beat * factor) / factor;
   }
   function snapShiftDrag(beat: number): number {
-    return Math.round(beat * 4) / 4;
+    return clamp(snapMidiBeatToVisibleGrid(beat, pxPerBeat()), 0, lengthBeats);
   }
 
   function pushHistorySnapshot() {
@@ -367,6 +471,23 @@ export function PianoRoll(props: PianoRollProps) {
     d.historyPushed = true;
   }
 
+  function noteEditDragHasStarted(
+    d: Extract<NonNullable<typeof drag.current>, { startX: number; startY: number; editStarted?: boolean }>,
+    e: PointerEvent | MouseEvent,
+  ): boolean {
+    if (d.editStarted) return true;
+    if (!midiNotePointerMovedPastThreshold({
+      startClientX: d.startX,
+      startClientY: d.startY,
+      currentClientX: e.clientX,
+      currentClientY: e.clientY,
+    })) {
+      return false;
+    }
+    d.editStarted = true;
+    return true;
+  }
+
   function undoLocal() {
     const previous = historyRef.current.pop();
     if (!previous) return;
@@ -374,15 +495,30 @@ export function PianoRoll(props: PianoRollProps) {
     setSelected((prev) => prev.filter((idx) => previous[idx]));
   }
 
+  function capturePointer(event: PointerEvent | MouseEvent) {
+    if (!("pointerId" in event)) return;
+    const target = event.currentTarget;
+    if (!(target instanceof Element)) return;
+    try {
+      target.setPointerCapture(event.pointerId);
+    } catch {
+      // Synthetic verifier events and detached test nodes may not support capture.
+    }
+  }
+
+  function isMidiInteractiveTarget(target: EventTarget | null) {
+    return target instanceof Element && target.closest("[data-midi-interactive='true']") != null;
+  }
+
   function onGridPointerDown(e: PointerEvent) {
-    if (e.target !== e.currentTarget) return;
+    if (isMidiInteractiveTarget(e.target)) return;
     if (e.button !== 0) return;
     e.preventDefault();
     setNoteMenu(null);
     setGridMenu(null);
     setVolumePopover(null);
     setNoteEditor(null);
-    (e.target as Element).setPointerCapture(e.pointerId);
+    capturePointer(e);
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -433,7 +569,7 @@ export function PianoRoll(props: PianoRollProps) {
     setGridMenu(null);
     setVolumePopover(null);
     setNoteEditor(null);
-    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+    capturePointer(e);
     startMarquee(e.clientX - rect.left, y, e.pointerId);
   }
 
@@ -448,6 +584,7 @@ export function PianoRoll(props: PianoRollProps) {
     if (!onLengthChange || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
+    capturePointer(e);
     setNoteMenu(null);
     setGridMenu(null);
     setVolumePopover(null);
@@ -457,7 +594,17 @@ export function PianoRoll(props: PianoRollProps) {
     setDragActive(true);
   }
 
-  function startMove(idx: number, e: PointerEvent) {
+  function notePointerDown(idx: number, e: PointerEvent) {
+    lastPointerDownAtRef.current = performance.now();
+    startMove(idx, e);
+  }
+
+  function noteMouseDown(idx: number, e: MouseEvent) {
+    if (performance.now() - lastPointerDownAtRef.current < 500) return;
+    startMove(idx, e);
+  }
+
+  function startMove(idx: number, e: PointerEvent | MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     if (e.button !== 0) return;
@@ -478,7 +625,7 @@ export function PianoRoll(props: PianoRollProps) {
       completeCurve(activeCurveFrom, targetFromClient(e.clientX, e.clientY));
       return;
     }
-    (e.target as Element).setPointerCapture(e.pointerId);
+    capturePointer(e);
     if (e.altKey) {
       const sourceIndices = selected().includes(idx) ? selected() : [idx];
       const duplicated = duplicateNotes(notes, sourceIndices);
@@ -498,6 +645,7 @@ export function PianoRoll(props: PianoRollProps) {
           automation: structuredClone(duplicated.notes[i].automation),
         })),
         historyPushed: true,
+        editStarted: true,
       };
       const auditionIdx = duplicated.indices.length === 1 ? duplicated.indices[0] : null;
       dragAuditionRef.current = auditionIdx == null
@@ -506,7 +654,13 @@ export function PianoRoll(props: PianoRollProps) {
       setDragActive(true);
       return;
     }
-    const indices = selected().includes(idx) ? selected() : [idx];
+    const currentSelection = selected();
+    const nextSelection = midiNoteSelectionAfterPointerDown({
+      selectedIndices: currentSelection,
+      noteIndex: idx,
+      additive: e.shiftKey,
+    });
+    const indices = nextSelection;
     drag.current = {
       mode: "move",
       indices,
@@ -525,23 +679,22 @@ export function PianoRoll(props: PianoRollProps) {
       ? null
       : { idx: auditionIdx, pitch: notes[auditionIdx]?.pitch ?? -1 };
     setDragActive(true);
-    setSelected(e.shiftKey
-      ? selected().includes(idx) ? selected() : [...selected(), idx]
-      : [idx]);
+    setSelected(nextSelection);
   }
 
-  function startResize(idx: number, edge: "left" | "right", e: PointerEvent) {
+  function startResize(idx: number, edge: "left" | "right", e: PointerEvent | MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     if (e.button !== 0) return;
-    (e.target as Element).setPointerCapture(e.pointerId);
-    const indices = selected().includes(idx) ? selected() : [idx];
+    capturePointer(e);
+    const dragIndices = midiNoteDragIndicesForSelection(selected(), idx);
     drag.current = {
       mode: "resize",
-      indices,
+      indices: dragIndices,
       edge,
       startX: e.clientX,
-      startNotes: indices.map((i) => ({
+      startY: e.clientY,
+      startNotes: dragIndices.map((i) => ({
         startBeat: notes[i].startBeat,
         lengthBeats: notes[i].lengthBeats,
         curve: structuredClone(notes[i].curve),
@@ -549,10 +702,10 @@ export function PianoRoll(props: PianoRollProps) {
       })),
     };
     setDragActive(true);
-    setSelected(indices);
+    setSelected(dragIndices);
   }
 
-  function onNotePointerMove(e: PointerEvent) {
+  function onNotePointerMove(e: PointerEvent | MouseEvent) {
     const d = drag.current;
     if (connectFrom() != null) {
       const rect = containerRef.current?.getBoundingClientRect();
@@ -580,9 +733,10 @@ export function PianoRoll(props: PianoRollProps) {
       };
       applyTransientChange(next);
     } else if (d.mode === "move") {
-      ensureDragHistory(d);
       const dx = e.clientX - d.startX;
       const dy = e.clientY - d.startY;
+      if (!noteEditDragHasStarted(d, e)) return;
+      ensureDragHistory(d);
       const rawBeatDelta = dx / pxPerBeat();
       const dPitch = -Math.round(dy / PX_PER_PITCH);
       const next = notes.slice();
@@ -590,7 +744,7 @@ export function PianoRoll(props: PianoRollProps) {
         if (!next[idx]) return;
         const start = d.startNotes[groupIdx];
         const rawStartBeat = start.startBeat + rawBeatDelta;
-        const startBeat = clamp(e.shiftKey ? snap(rawStartBeat) : rawStartBeat, 0, lengthBeats - start.lengthBeats);
+        const startBeat = clamp(e.shiftKey ? snapShiftDrag(rawStartBeat) : rawStartBeat, 0, lengthBeats - start.lengthBeats);
         const pitch = clamp(start.pitch + dPitch, BOTTOM_PITCH, TOP_PITCH);
         next[idx] = {
           ...next[idx],
@@ -607,21 +761,25 @@ export function PianoRoll(props: PianoRollProps) {
       }
       applyTransientChange(next);
     } else if (d.mode === "resize") {
-      ensureDragHistory(d);
       const dx = e.clientX - d.startX;
-      const dLen = e.shiftKey ? snapShiftDrag(dx / pxPerBeat()) : dx / pxPerBeat();
+      if (!noteEditDragHasStarted(d, e)) return;
+      ensureDragHistory(d);
+      const dLen = dx / pxPerBeat();
       const next = notes.slice();
       d.indices.forEach((idx, groupIdx) => {
         if (!next[idx]) return;
         const start = d.startNotes[groupIdx];
         if (d.edge === "right") {
+          const rawEnd = start.startBeat + start.lengthBeats + dLen;
+          const nextEnd = e.shiftKey ? snapShiftDrag(rawEnd) : rawEnd;
           next[idx] = {
             ...next[idx],
-            lengthBeats: clamp(start.lengthBeats + dLen, MIN_NOTE_LENGTH_BEATS, lengthBeats - start.startBeat),
+            lengthBeats: clamp(nextEnd - start.startBeat, MIN_NOTE_LENGTH_BEATS, lengthBeats - start.startBeat),
           };
         } else {
           const originalEnd = start.startBeat + start.lengthBeats;
-          const nextStart = clamp(start.startBeat + dLen, 0, originalEnd - MIN_NOTE_LENGTH_BEATS);
+          const rawStart = start.startBeat + dLen;
+          const nextStart = clamp(e.shiftKey ? snapShiftDrag(rawStart) : rawStart, 0, originalEnd - MIN_NOTE_LENGTH_BEATS);
           next[idx] = {
             ...next[idx],
             startBeat: nextStart,
@@ -632,9 +790,10 @@ export function PianoRoll(props: PianoRollProps) {
       });
       applyTransientChange(next);
     } else if (d.mode === "curve-handle") {
-      ensureDragHistory(d);
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
+      if (!noteEditDragHasStarted(d, e)) return;
+      ensureDragHistory(d);
       const next = notes.slice();
       const note = next[d.idx];
       if (!note) return;
@@ -690,7 +849,7 @@ export function PianoRoll(props: PianoRollProps) {
   }
 
   function openGridMenu(e: MouseEvent) {
-    if (e.target !== e.currentTarget) return;
+    if (isMidiInteractiveTarget(e.target)) return;
     e.preventDefault();
     e.stopPropagation();
     const target = targetFromClient(e.clientX, e.clientY);
@@ -763,9 +922,12 @@ export function PianoRoll(props: PianoRollProps) {
   function startCurveHandleDrag(idx: number, edge: "start" | "end", e: PointerEvent) {
     e.preventDefault();
     e.stopPropagation();
-    (e.target as Element).setPointerCapture(e.pointerId);
+    capturePointer(e);
+    setNoteMenu(null);
+    setGridMenu(null);
+    setVolumePopover(null);
     setSelected([idx]);
-    drag.current = { mode: "curve-handle", idx, edge };
+    drag.current = { mode: "curve-handle", idx, edge, startX: e.clientX, startY: e.clientY };
     setDragActive(true);
   }
 
@@ -1127,16 +1289,22 @@ export function PianoRoll(props: PianoRollProps) {
       if (isCopyPasteModifier && e.key.toLowerCase() === "c") {
         if (!copyCurrentSelection()) return;
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
         return;
       }
       if (isCopyPasteModifier && e.key.toLowerCase() === "v") {
         if (!pasteCopiedNotes()) return;
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
         return;
       }
       if (e.key !== "Backspace" && e.key !== "Delete") return;
       if (selected().length === 0) return;
       e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
       const removed = new Set(selected());
       const indexMap = new Map<number, number>();
       let nextIndex = 0;
@@ -1152,8 +1320,8 @@ export function PianoRoll(props: PianoRollProps) {
       commitChange(next);
       setSelected([]);
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [selected(), notes, onChange, volumePopover(), props.playheadBeat]);
 
   createCompatEffect(() => {
@@ -1182,15 +1350,16 @@ export function PianoRoll(props: PianoRollProps) {
   function syncKeyScroll() {
     if (!keysScrollRef.current || !timeScrollRef.current) return;
     keysScrollRef.current.scrollTop = timeScrollRef.current.scrollTop;
+    setViewportVersion((version) => version + 1);
   }
 
   function zoom(delta: number, clientX?: number) {
     setPxPerBeat((current) => {
       const next = Math.max(MIN_PX_PER_BEAT, Math.min(MAX_PX_PER_BEAT, current + delta));
       const scroll = timeScrollRef.current;
-      if (scroll && clientX != null && next !== current) {
+      if (scroll && next !== current) {
         const rect = scroll.getBoundingClientRect();
-        const x = clientX - rect.left;
+        const x = clientX == null ? rect.width / 2 : clientX - rect.left;
         const beatUnderPointer = (scroll.scrollLeft + x) / current;
         requestAnimationFrame(() => {
           scroll.scrollLeft = Math.max(0, beatUnderPointer * next - x);
@@ -1240,6 +1409,19 @@ export function PianoRoll(props: PianoRollProps) {
     if (!gridRect) return null;
     const rect = noteRect(note);
     return new DOMRect(gridRect.left + rect.left, gridRect.top + rect.top, rect.width, rect.height);
+  }
+
+  function noteDetailViewportState(state: VolumePopoverState): VolumePopoverState {
+    viewportVersion();
+    pxPerBeat();
+    const note = notes[state.idx];
+    const rect = note ? noteViewportRect(note) : null;
+    if (!rect) return state;
+    return {
+      ...state,
+      x: rect.left,
+      y: rect.bottom + 4,
+    };
   }
 
   function scrollKeysWithGrid(e: WheelEvent) {
@@ -1325,6 +1507,7 @@ export function PianoRoll(props: PianoRollProps) {
                   if (drag.current?.mode !== "length-resize") setLengthHandleActive(false);
                 }}
                 aria-hidden
+                data-midi-interactive="true"
               />
               {/* Horizontal rows (per pitch) */}
               {keyLabels().map((k, i) => (
@@ -1422,35 +1605,44 @@ export function PianoRoll(props: PianoRollProps) {
             <For each={props.notes}>
               {(n, index) => {
                 const i = index();
-                const rect = visibleNoteRect(n);
-                if (!rect) return null;
-                const isSelected = selected().includes(i);
-                const isAuditioned = auditionedNoteIndex() === i;
-                const isPlaying = isNotePlaying(n);
-                const hovered = hoveredNoteSide();
-                const hoveredSide = hovered?.idx === i ? hovered.side : null;
+                const rect = createMemo(() => visibleNoteRect(n));
+                const noteStyle = createMemo(() => {
+                  const currentRect = rect();
+                  if (!currentRect) return { display: "none" } as JSX.CSSProperties;
+                  const volumePercent = Math.round((clamp(n.velocity, 0, 127) / 127) * 100);
+                  return {
+                    left: px(currentRect.left),
+                    top: px(currentRect.top),
+                    width: px(currentRect.width),
+                    height: px(currentRect.height),
+                    "--note-volume": `${volumePercent}%`,
+                  } as JSX.CSSProperties;
+                });
+                const isSelected = () => selected().includes(i);
+                const isAuditioned = () => auditionedNoteIndex() === i;
+                const isPlaying = () => isNotePlaying(n);
+                const hoveredSide = () => {
+                  const hovered = hoveredNoteSide();
+                  return hovered?.idx === i ? hovered.side : null;
+                };
                 const volumePercent = Math.round((clamp(n.velocity, 0, 127) / 127) * 100);
                 const laneCount = midiNoteAutomationTargetCount(n);
-                const hasActiveAutomation = midiNoteHasAutomationTarget(n, activeAutomationTarget());
+                const hasActiveAutomation = () => midiNoteHasAutomationTarget(n, activeAutomationTarget());
                 return (
                   <div
                     class={[
                       styles.note,
-                      isSelected && styles.noteSelected,
-                      isAuditioned && styles.noteAuditioned,
-                      isPlaying && styles.notePlaying,
-                      hoveredSide === "left" && styles.noteHoverLeft,
-                      hoveredSide === "right" && styles.noteHoverRight,
+                      isSelected() && styles.noteSelected,
+                      isAuditioned() && styles.noteAuditioned,
+                      isPlaying() && styles.notePlaying,
+                      hoveredSide() === "left" && styles.noteHoverLeft,
+                      hoveredSide() === "right" && styles.noteHoverRight,
                     ].filter(Boolean).join(" ")}
-                    style={{
-                      left: px(rect.left),
-                      top: px(rect.top),
-                      width: px(rect.width),
-                      height: px(rect.height),
-                      "--note-volume": `${volumePercent}%`,
-                    } as JSX.CSSProperties}
+                    style={noteStyle()}
                     data-midi-note-index={String(i)}
-                    onPointerDown={(e) => startMove(i, e)}
+                    data-midi-interactive="true"
+                    onPointerDown={(e) => notePointerDown(i, e)}
+                    onMouseDown={(e) => noteMouseDown(i, e)}
                     onPointerMove={onNotePointerMove}
                     onPointerUp={onNotePointerUp}
                     onMouseMove={(event) => {
@@ -1471,7 +1663,7 @@ export function PianoRoll(props: PianoRollProps) {
                         {volumePercent}%
                       </div>
                     )}
-                    {hasActiveAutomation && <div class={styles.noteAutomationStripe} aria-hidden />}
+                    {hasActiveAutomation() && <div class={styles.noteAutomationStripe} aria-hidden />}
                     {laneCount > 0 && (
                       <div class={styles.noteAutomationBadge} aria-label={`${laneCount} automation lane${laneCount === 1 ? "" : "s"}`}>
                         {laneCount}
@@ -1479,12 +1671,14 @@ export function PianoRoll(props: PianoRollProps) {
                     )}
                     <div
                       class={`${styles.noteResize} ${styles.noteResizeLeft}`}
+                      data-midi-interactive="true"
                       onPointerDown={(e) => startResize(i, "left", e)}
                       onPointerMove={onNotePointerMove}
                       onPointerUp={onNotePointerUp}
                     />
                     <div
                       class={`${styles.noteResize} ${styles.noteResizeRight}`}
+                      data-midi-interactive="true"
                       onPointerDown={(e) => startResize(i, "right", e)}
                       onPointerMove={onNotePointerMove}
                       onPointerUp={onNotePointerUp}
@@ -1495,6 +1689,7 @@ export function PianoRoll(props: PianoRollProps) {
                         pxPerBeat={pxPerBeat()}
                         onPointerDown={startCurveHandleDrag}
                         noteIndex={i}
+                        activeEdge={dragActive() && drag.current?.mode === "curve-handle" && drag.current.idx === i ? drag.current.edge : null}
                       />
                     )}
                   </div>
@@ -1531,7 +1726,7 @@ export function PianoRoll(props: PianoRollProps) {
               onClick={() => setToolMode("draw")}
               aria-label="Draw notes tool, D"
             >
-              <Icon name="ph:pen" size={16} decorative />
+              <Icon name="ph:pen" size={18} decorative />
             </Button>
           </HoverInfo>
           <HoverInfo content="Select notes (S)">
@@ -1542,7 +1737,7 @@ export function PianoRoll(props: PianoRollProps) {
               onClick={() => setToolMode("select")}
               aria-label="Select notes tool, S"
             >
-              <Icon name="ph:cursor" size={16} decorative />
+              <Icon name="ph:cursor" size={18} decorative />
             </Button>
           </HoverInfo>
           <span class={styles.toolDivider} aria-hidden />
@@ -1553,7 +1748,7 @@ export function PianoRoll(props: PianoRollProps) {
               onClick={() => zoom(-ZOOM_STEP)}
               aria-label="Zoom MIDI editor out"
             >
-              <Icon name="ph:magnifying-glass-minus" size={16} decorative />
+              <Icon name="ph:magnifying-glass-minus" size={18} decorative />
             </Button>
           </HoverInfo>
           <HoverInfo content="Zoom in">
@@ -1563,11 +1758,38 @@ export function PianoRoll(props: PianoRollProps) {
               onClick={() => zoom(ZOOM_STEP)}
               aria-label="Zoom MIDI editor in"
             >
-              <Icon name="ph:magnifying-glass-plus" size={16} decorative />
+              <Icon name="ph:magnifying-glass-plus" size={18} decorative />
             </Button>
           </HoverInfo>
         </div>
-        {props.showAutomation && (
+        {showSamplerZoneControls() && (
+          <div class={styles.samplerPanel} aria-label="Sampler zone note overrides">
+            <div class={styles.samplerHeader}>
+              <span>Sampler zone</span>
+              <span>{selectedSampleSummary()}</span>
+              {missingSamplerZoneCount() > 0 && (
+                <span class={styles.samplerWarning}>
+                  {missingSamplerZoneCount()} missing
+                </span>
+              )}
+              {missingSamplerZoneCount() > 0 && (
+                <Button size="xs" onClick={clearMissingSamplerZoneAssignments}>
+                  Clear
+                </Button>
+              )}
+            </div>
+            <FloatingSelect
+              className={styles.samplerSelect}
+              value={selectedSampleZoneValue()}
+              options={samplerZoneOptions()}
+              open={sampleZoneSelectOpen()}
+              onOpenChange={setSampleZoneSelectOpen}
+              onChange={assignSampleZoneToSelection}
+              ariaLabel="Assign selected MIDI notes to a sampler zone"
+            />
+          </div>
+        )}
+        {ENABLE_AETHER_NOTE_AUTOMATION_PANEL && props.showAutomation && (
           <div class={styles.automationPanel} aria-label="Aether note automation lanes">
             <div class={styles.automationHeader}>
               <span>Aether lanes</span>
@@ -1619,45 +1841,9 @@ export function PianoRoll(props: PianoRollProps) {
               </div>
             ) : (
               <div class={styles.automationValueEditor}>
-              <label>
-                <span>Start</span>
-                <input
-                  type="range"
-                  min={activeAutomationMeta().min}
-                  max={activeAutomationMeta().max}
-                  step={activeAutomationMeta().step}
-                  value={selectedAutomationValueRange().startValue}
-                  disabled={selected().length === 0}
-                  onChange={(event) => setAutomationValueEdge("start", event.currentTarget.value)}
-                />
-                <span>{formatAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().startValue)}</span>
-              </label>
-              <label>
-                <span>Mid</span>
-                <input
-                  type="range"
-                  min={activeAutomationMeta().min}
-                  max={activeAutomationMeta().max}
-                  step={activeAutomationMeta().step}
-                  value={selectedAutomationValueRange().midValue}
-                  disabled={selected().length === 0}
-                  onChange={(event) => setAutomationValueEdge("mid", event.currentTarget.value)}
-                />
-                <span>{formatAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().midValue)}</span>
-              </label>
-              <label>
-                <span>End</span>
-                <input
-                  type="range"
-                  min={activeAutomationMeta().min}
-                  max={activeAutomationMeta().max}
-                  step={activeAutomationMeta().step}
-                  value={selectedAutomationValueRange().endValue}
-                  disabled={selected().length === 0}
-                  onChange={(event) => setAutomationValueEdge("end", event.currentTarget.value)}
-                />
-                <span>{formatAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().endValue)}</span>
-              </label>
+              <Slider layout="inline" label="Start" min={activeAutomationMeta().min} max={activeAutomationMeta().max} step={activeAutomationMeta().step} value={selectedAutomationValueRange().startValue} disabled={selected().length === 0} readout={formatAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().startValue)} onChange={(value) => setAutomationValueEdge("start", String(value))} />
+              <Slider layout="inline" label="Mid" min={activeAutomationMeta().min} max={activeAutomationMeta().max} step={activeAutomationMeta().step} value={selectedAutomationValueRange().midValue} disabled={selected().length === 0} readout={formatAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().midValue)} onChange={(value) => setAutomationValueEdge("mid", String(value))} />
+              <Slider layout="inline" label="End" min={activeAutomationMeta().min} max={activeAutomationMeta().max} step={activeAutomationMeta().step} value={selectedAutomationValueRange().endValue} disabled={selected().length === 0} readout={formatAetherNoteAutomationValue(activeAutomationTarget(), selectedAutomationValueRange().endValue)} onChange={(value) => setAutomationValueEdge("end", String(value))} />
               <div class={styles.automationPointRail} aria-label="Drag start and end automation values">
                 <div class={styles.automationPointLine} aria-hidden="true" />
                 <button
@@ -1758,9 +1944,8 @@ export function PianoRoll(props: PianoRollProps) {
                         [styles.automationPointRowSelected]: activeSelectedAutomationPointIndices().includes(index()),
                       }}
                     >
-                      <input
-                        class={styles.automationPointSelect}
-                        type="checkbox"
+                      <Checkbox
+                        inputClassName={styles.automationPointSelect}
                         checked={activeSelectedAutomationPointIndices().includes(index())}
                         readOnly
                         aria-label={`Select automation point ${index() + 1}`}
@@ -1770,30 +1955,8 @@ export function PianoRoll(props: PianoRollProps) {
                         }}
                       />
                       <span class={styles.automationPointIndex}>{index() + 1}</span>
-                      <label>
-                        <span>Beat</span>
-                        <input
-                          type="number"
-                          min={0}
-                          max={selectedAutomationPointLength()}
-                          step={0.125}
-                          value={roundTo(point.beat, 0.001)}
-                          disabled={selected().length === 0}
-                          onChange={(event) => setAutomationPointBeat(index(), event.currentTarget.value)}
-                        />
-                      </label>
-                      <label>
-                        <span>Value</span>
-                        <input
-                          type="number"
-                          min={activeAutomationMeta().min}
-                          max={activeAutomationMeta().max}
-                          step={activeAutomationMeta().step}
-                          value={roundTo(point.value, activeAutomationMeta().step)}
-                          disabled={selected().length === 0}
-                          onChange={(event) => setAutomationPointValue(index(), event.currentTarget.value)}
-                        />
-                      </label>
+                      <NumberInput layout="inline" label="Beat" min={0} max={selectedAutomationPointLength()} step={0.125} value={roundTo(point.beat, 0.001)} disabled={selected().length === 0} onChange={(value) => setAutomationPointBeat(index(), String(value))} />
+                      <NumberInput layout="inline" label="Value" min={activeAutomationMeta().min} max={activeAutomationMeta().max} step={activeAutomationMeta().step} value={roundTo(point.value, activeAutomationMeta().step)} disabled={selected().length === 0} onChange={(value) => setAutomationPointValue(index(), String(value))} />
                       <span class={styles.automationPointValue}>
                         {formatAetherNoteAutomationValue(activeAutomationTarget(), point.value)}
                       </span>
@@ -1875,7 +2038,7 @@ export function PianoRoll(props: PianoRollProps) {
         if (!currentVolumePopover) return null;
         return (
         <VolumePopover
-          state={currentVolumePopover}
+          state={noteDetailViewportState(currentVolumePopover)}
           onChange={(value: string) => setVolumePopover({ ...currentVolumePopover, value, error: false })}
           onApply={applyNoteVolume}
           onClear={clearNoteVolume}
@@ -1887,7 +2050,7 @@ export function PianoRoll(props: PianoRollProps) {
         if (!currentNoteEditor) return null;
         return (
         <VolumePopover
-          state={currentNoteEditor}
+          state={noteDetailViewportState(currentNoteEditor)}
           label="Vol"
           showClear={false}
           onChange={(value: string) => setNoteEditor({ ...currentNoteEditor, value, error: false })}
@@ -1936,24 +2099,24 @@ function NoteMenu({
 
   return createPortal(
     <FloatingLayer class={styles.noteMenu} x={x} y={y} role="menu">
-      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onVolume)} role="menuitem">
+      <Button variant="ghost" fullWidth class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onVolume)} role="menuitem">
         Volume
-      </button>
-      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onConnect)} role="menuitem">
+      </Button>
+      <Button variant="ghost" fullWidth class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onConnect)} role="menuitem">
         Connect To
-      </button>
-      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onCurve)} role="menuitem">
+      </Button>
+      <Button variant="ghost" fullWidth class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onCurve)} role="menuitem">
         Curve To…
-      </button>
-      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onCopy)} disabled={!canCopy} role="menuitem">
+      </Button>
+      <Button variant="ghost" fullWidth class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onCopy)} disabled={!canCopy} role="menuitem">
         Copy
-      </button>
-      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onPaste)} disabled={!canPaste} role="menuitem">
+      </Button>
+      <Button variant="ghost" fullWidth class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onPaste)} disabled={!canPaste} role="menuitem">
         Paste
-      </button>
-      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onDelete)} role="menuitem">
+      </Button>
+      <Button variant="ghost" fullWidth class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onDelete)} role="menuitem">
         Delete
-      </button>
+      </Button>
     </FloatingLayer>,
     document.body,
   );
@@ -1982,12 +2145,12 @@ function GridMenu({
 
   return createPortal(
     <FloatingLayer class={styles.noteMenu} x={x} y={y} role="menu">
-      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onCopy)} disabled={!canCopy} role="menuitem">
+      <Button variant="ghost" fullWidth class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onCopy)} disabled={!canCopy} role="menuitem">
         Copy
-      </button>
-      <button type="button" class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onPaste)} disabled={!canPaste} role="menuitem">
+      </Button>
+      <Button variant="ghost" fullWidth class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onPaste)} disabled={!canPaste} role="menuitem">
         Paste
-      </button>
+      </Button>
     </FloatingLayer>,
     document.body,
   );
@@ -2020,11 +2183,13 @@ function CurveHandles({
   note,
   noteIndex,
   pxPerBeat,
+  activeEdge,
   onPointerDown,
 }: {
   note: MidiNote;
   noteIndex: number;
   pxPerBeat: number;
+  activeEdge: "start" | "end" | null;
   onPointerDown: (idx: number, edge: "start" | "end", event: PointerEvent) => void;
 }) {
   const startPitch = curveEdgePitch(note, "start");
@@ -2052,18 +2217,24 @@ function CurveHandles({
           d={`M 0 ${startY} C ${curveC} ${startY}, ${Math.max(0, endX - curveC)} ${endY}, ${endX} ${endY}`}
         />
       </svg>
-      <span
-        class={`${styles.curveHandle} ${styles.curveHandleStart}`}
+      <button
+        type="button"
+        class={`${styles.curveHandle} ${styles.curveHandleStart} ${activeEdge === "start" ? styles.curveHandleActive : ""}`}
         style={{ left: px(0), top: px(startY) }}
         title={`Start ${formatPitchValue(startPitch)}`}
         data-midi-note-detail
+        data-midi-interactive="true"
+        aria-label={`Drag pitch curve start handle, ${formatPitchValue(startPitch)}`}
         onPointerDown={(event) => onPointerDown(noteIndex, "start", event)}
       />
-      <span
-        class={`${styles.curveHandle} ${styles.curveHandleEnd}`}
+      <button
+        type="button"
+        class={`${styles.curveHandle} ${styles.curveHandleEnd} ${activeEdge === "end" ? styles.curveHandleActive : ""}`}
         style={{ left: px(endX), top: px(endY) }}
         title={`End ${formatPitchValue(endPitch)}`}
         data-midi-note-detail
+        data-midi-interactive="true"
+        aria-label={`Drag pitch curve end handle, ${formatPitchValue(endPitch)}`}
         onPointerDown={(event) => onPointerDown(noteIndex, "end", event)}
       />
     </>
@@ -2086,28 +2257,133 @@ function VolumePopover({
   onClear: () => void;
 }) {
   const numericValue = Math.max(0, Math.min(100, Number(state.value.replace(/%$/, "")) || 0));
+  const valueFromPointer = (slider: HTMLElement, clientX: number) => {
+    const rect = slider.getBoundingClientRect();
+    if (rect.width <= 0) return String(numericValue);
+    const ratio = clamp((clientX - rect.left) / rect.width, 0, 1);
+    return String(Math.round(ratio * 100));
+  };
+  const updateValueFromPointer = (slider: HTMLElement, clientX: number) => {
+    onChange(valueFromPointer(slider, clientX));
+  };
+  const updateValueByStep = (delta: number) => {
+    onChange(String(clamp(numericValue + delta, 0, 100)));
+  };
+  let mouseDragInput: HTMLElement | null = null;
+  const stopMouseDrag = () => {
+    window.removeEventListener("mousemove", handleMouseMove, true);
+    window.removeEventListener("mouseup", handleMouseUp, true);
+    mouseDragInput = null;
+  };
+  const handleMouseMove = (event: MouseEvent) => {
+    if (!mouseDragInput) return;
+    event.preventDefault();
+    event.stopPropagation();
+    updateValueFromPointer(mouseDragInput, event.clientX);
+  };
+  const handleMouseUp = (event: MouseEvent) => {
+    if (!mouseDragInput) return;
+    event.preventDefault();
+    event.stopPropagation();
+    updateValueFromPointer(mouseDragInput, event.clientX);
+    stopMouseDrag();
+    onApply();
+  };
+  const handleMouseDown = (event: MouseEvent & { currentTarget: HTMLElement }) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    mouseDragInput = event.currentTarget;
+    updateValueFromPointer(event.currentTarget, event.clientX);
+    window.addEventListener("mousemove", handleMouseMove, true);
+    window.addEventListener("mouseup", handleMouseUp, true);
+  };
+  onCleanup(stopMouseDrag);
   return createPortal(
     <FloatingLayer class={styles.volumePopover} x={state.x} y={state.y}>
       <div class={`${styles.volumeSliderRow} ${!showClear ? styles.volumeSliderRowNoClear : ""}`} data-midi-note-detail>
         <span class={styles.volumeLabel}>{label}</span>
-        <input
+        <div
           class={styles.volumeSlider}
-          type="range"
-          min={0}
-          max={100}
-          step={1}
-          value={numericValue}
-          onInput={(e) => onChange(e.currentTarget.value)}
-          onPointerUp={onApply}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onApply();
+          role="slider"
+          tabIndex={0}
+          aria-label={`${label} volume`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={numericValue}
+          aria-valuetext={`${numericValue}%`}
+          style={{ "--volume-slider-percent": `${numericValue}%` } as JSX.CSSProperties}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId);
+            } catch {
+              // Synthetic verifier events and detached test nodes may not support capture.
+            }
+            updateValueFromPointer(e.currentTarget, e.clientX);
           }}
-        />
+          onPointerMove={(e) => {
+            e.stopPropagation();
+            if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+            updateValueFromPointer(e.currentTarget, e.clientX);
+          }}
+          onPointerUp={(e) => {
+            e.stopPropagation();
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+              updateValueFromPointer(e.currentTarget, e.clientX);
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            }
+            onApply();
+          }}
+          onMouseDown={handleMouseDown}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.stopPropagation();
+              onApply();
+              return;
+            }
+            if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+              e.preventDefault();
+              e.stopPropagation();
+              updateValueByStep(-1);
+              return;
+            }
+            if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+              e.preventDefault();
+              e.stopPropagation();
+              updateValueByStep(1);
+              return;
+            }
+            if (e.key === "PageDown") {
+              e.preventDefault();
+              e.stopPropagation();
+              updateValueByStep(-10);
+              return;
+            }
+            if (e.key === "PageUp") {
+              e.preventDefault();
+              e.stopPropagation();
+              updateValueByStep(10);
+              return;
+            }
+            if (e.key === "Home" || e.key === "End") {
+              e.preventDefault();
+              e.stopPropagation();
+              onChange(e.key === "Home" ? "0" : "100");
+            }
+          }}
+        >
+          <span class={styles.volumeSliderTrack} aria-hidden />
+          <span class={styles.volumeSliderFill} aria-hidden />
+          <span class={styles.volumeSliderThumb} aria-hidden />
+        </div>
         <span class={styles.volumeValue}>{numericValue}%</span>
         {showClear && (
-          <button type="button" class={styles.volumeClear} onClick={onClear} aria-label="Clear note volume">
+          <Button iconOnly size="xs" variant="ghost" class={styles.volumeClear} onClick={onClear} aria-label="Clear note volume">
             x
-          </button>
+          </Button>
         )}
       </div>
       {state.error && <div class={styles.volumeError}>Use 0-100%</div>}
@@ -2264,8 +2540,7 @@ function formatPitchValue(pitch: number): string {
 }
 
 function makeGridLines(lengthBeats: number, pxPerBeat: number): Array<{ beat: number; kind: "bar" | "beat" | "sub" }> {
-  const subdivision = pxPerBeat >= 240 ? 16 : pxPerBeat >= 120 ? 4 : 1;
-  const step = 1 / subdivision;
+  const step = midiVisibleGridBeatStep(pxPerBeat);
   const count = Math.floor(lengthBeats / step);
   const lines: Array<{ beat: number; kind: "bar" | "beat" | "sub" }> = [];
   for (let i = 0; i <= count; i++) {

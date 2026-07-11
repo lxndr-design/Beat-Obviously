@@ -271,7 +271,7 @@ export function ProjectHealthModal() {
     <Modal
       open
       scopeId="project-health"
-      title={<><Icon name="ph:shield-check" size={14} decorative />Project Health</>}
+      title={<><Icon name="ph:shield-check" size={18} decorative />Project Health</>}
       headerActions={<Button size="sm" disabled={rescanning()} onClick={() => void rescanHealth()}>{rescanning() ? "Scanning" : "Rescan"}</Button>}
       width="md"
       onClose={close}
@@ -347,7 +347,7 @@ export function ProjectHealthModal() {
                 const count = () => categoryFindingCount(category);
                 return (
                   <div class={`${styles.categoryTile} ${styles[`categoryTone-${tone()}`]}`}>
-                    <Icon name={category.icon} size={14} decorative />
+                    <Icon name={category.icon} size={18} decorative />
                     <span>{category.title}</span>
                     <strong>{count() > 0 ? count() : "Clear"}</strong>
                   </div>
@@ -384,7 +384,7 @@ export function ProjectHealthModal() {
 function StateBanner(props: { tone: MessageTone; icon: string; title: string; body?: string }) {
   return (
     <div class={`${styles.stateBanner} ${styles[`message-${props.tone}`]}`}>
-      <Icon name={props.icon} size={16} decorative />
+      <Icon name={props.icon} size={18} decorative />
       <div>
         <strong>{props.title}</strong>
         <Show when={props.body}><span>{props.body}</span></Show>
@@ -414,7 +414,7 @@ function CategorySection(props: {
     <section class={styles.categorySection}>
       <div class={styles.categoryHeader}>
         <div class={styles.categoryTitle}>
-          <Icon name={props.category.icon} size={16} decorative />
+          <Icon name={props.category.icon} size={18} decorative />
           <div>
             <h3>{props.category.title}</h3>
             <p>{props.category.detail}</p>

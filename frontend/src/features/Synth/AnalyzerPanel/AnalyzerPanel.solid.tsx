@@ -37,7 +37,7 @@ export function AnalyzerPanel(props: { state: Accessor<AnalyzerPanelProps> }) {
                 onClick={() => props.state().onTogglePlayback?.()}
                 aria-label={props.state().playing ? "Stop analyzer audition" : "Play analyzer audition"}
               >
-                <Icon name={props.state().playing ? "ph:stop-fill" : "ph:play-fill"} size={12} decorative />
+                <Icon name={props.state().playing ? "ph:stop-fill" : "ph:play-fill"} size={18} decorative />
                 {props.state().playing ? "Stop" : "Play"}
               </Button>
             </div>

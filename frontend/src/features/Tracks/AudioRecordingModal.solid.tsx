@@ -1,5 +1,5 @@
-import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { appAlert, Button, Icon, Modal, Select, Slider } from "../../solid-ui";
+import { createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { appAlert, Button, FloatingSelect, Icon, Modal, Slider } from "../../solid-ui";
 import { browserBlobToAudioFile } from "../../audio/audioImport";
 import { isNative } from "../../ipc/bridge";
 import type { AudioFile, Id } from "../../state/types";
@@ -220,7 +220,7 @@ export function AudioRecordingModal(props: Props) {
   return (
     <Modal
       open
-      title={<><Icon name="ph:record-fill" size={14} decorative /> REC Audio</>}
+      title={<><Icon name="ph:record-fill" size={18} decorative /> REC Audio</>}
       subtitle={`${props.trackName} · starts at beat ${formatNumber(props.startBeat)}`}
       width="md"
       onClose={props.onClose}
@@ -232,18 +232,15 @@ export function AudioRecordingModal(props: Props) {
       )}
     >
       <div class={styles.recorder}>
-        <Select
+        <FloatingSelect
           label="Device"
           value={deviceId()}
           disabled={recording()}
-          onChange={(event) => setDeviceId(event.currentTarget.value)}
-        >
-          <For each={devices()} fallback={<option value="">Default input</option>}>
-            {(device, index) => (
-              <option value={device.deviceId}>{device.label || `Input ${index() + 1}`}</option>
-            )}
-          </For>
-        </Select>
+          options={devices().length > 0
+            ? devices().map((device, index) => ({ value: device.deviceId, label: device.label || `Input ${index + 1}` }))
+            : [{ value: "", label: "Default input" }]}
+          onChange={setDeviceId}
+        />
 
         <div class={styles.transportRow}>
           <Button
@@ -251,12 +248,12 @@ export function AudioRecordingModal(props: Props) {
             disabled={!canRecord()}
             onClick={() => recording() ? stopRecording() : void startRecording()}
           >
-            <Icon name={recording() ? "ph:stop-fill" : "ph:record-fill"} size={14} decorative />
+            <Icon name={recording() ? "ph:stop-fill" : "ph:record-fill"} size={18} decorative />
             {recording() ? "Stop" : "Record"}
           </Button>
           <Show when={hasTake()}>
             <Button variant="default" onClick={() => playing() ? stopPlayback() : playCrop()}>
-              <Icon name={playing() ? "ph:stop-fill" : "ph:play-fill"} size={14} decorative />
+              <Icon name={playing() ? "ph:stop-fill" : "ph:play-fill"} size={18} decorative />
               {playing() ? "Stop" : "Play"}
             </Button>
           </Show>

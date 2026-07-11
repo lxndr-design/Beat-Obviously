@@ -10,7 +10,7 @@
   display: grid;
   grid-template-columns: auto auto 1fr;
   align-items: stretch;
-  min-height: 28px;
+  min-height: 27px;
   border-bottom: var(--border-fg);
   background: color-mix(in srgb, var(--color-bg) 92%, transparent);
   backdrop-filter: blur(8px);
@@ -59,7 +59,7 @@
   display: flex;
   align-items: center;
   min-height: var(--sidebar-subrow-height);
-  padding: 0 8px;
+  padding: 0 9px;
   font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;

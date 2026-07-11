@@ -26,6 +26,7 @@
 .actionButton {
   background: transparent;
   color: var(--color-fg);
+  border: 0;
 }
 
 .toggle,
@@ -61,11 +62,21 @@
   box-shadow: var(--interaction-focus-ring);
 }
 
+.toggleIcon {
+  display: inline-flex;
+  transform: rotate(0deg);
+  transition: transform var(--duration-slide) var(--ease-in-out);
+}
+
+.toggleIconExpanded {
+  transform: rotate(90deg);
+}
+
 .label {
   min-width: 0;
-  padding: 0 4px;
+  padding: 0 6px;
   overflow: hidden;
-  font-size: var(--section-ribbon-label-size, var(--font-size-ui));
+  font-size: 12px;
   font-weight: var(--font-weight-bold);
   line-height: 1;
   text-align: left;
@@ -76,7 +87,7 @@
 }
 
 .ribbonNoToggle .label {
-  padding-left: 4px;
+  padding-left: 6px;
 }
 
 .right {

@@ -5,7 +5,6 @@ import { AppLogo, Button, HoverInfo, Icon } from "../../solid-ui";
 import { useComponentStore } from "../../state/components";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
-import { AppMenuButton } from "../TopBar/AppMenuButton.solid";
 import { AudioFilesPage } from "./AudioFilesPage.solid";
 import { InstrumentsPage } from "./InstrumentsPage.solid";
 import { PatternsPage } from "./PatternsPage.solid";
@@ -50,15 +49,6 @@ export function HomeHub(props: HomeHubProps) {
           <HomeHeader
             title={pageTitle(page())}
             onHome={() => setPage("home")}
-            onNew={props.onNew}
-            onOpen={props.onOpen}
-            onSave={props.onSave}
-            onSaveAs={props.onSaveAs}
-            onExport={props.onExport}
-            onRecover={props.onRecover}
-            onHealth={props.onHealth}
-            onUserGuide={props.onUserGuide}
-            onSettings={props.onSettings}
             onQuit={() => void quitBeat()}
             disableHome={false}
           />
@@ -81,15 +71,6 @@ export function HomeHub(props: HomeHubProps) {
         <HomeHeader
           title="Beat"
           onHome={props.onHome}
-          onNew={props.onNew}
-          onOpen={props.onOpen}
-          onSave={props.onSave}
-          onSaveAs={props.onSaveAs}
-          onExport={props.onExport}
-          onRecover={props.onRecover}
-          onHealth={props.onHealth}
-          onUserGuide={props.onUserGuide}
-          onSettings={props.onSettings}
           onQuit={() => void quitBeat()}
           disableHome
         />
@@ -98,14 +79,14 @@ export function HomeHub(props: HomeHubProps) {
           <section class={styles.panel}>
             <div class={styles.ribbon}>Projects</div>
             <div class={styles.projectActions}>
-              <button type="button" class={styles.actionRow} onClick={props.onNew}>
-                <Icon name="ph:plus" size={16} decorative />
+              <Button variant="ghost" class={styles.actionRow} onClick={props.onNew}>
+                <Icon name="ph:plus" size={18} decorative />
                 <span>New Project</span>
-              </button>
-              <button type="button" class={styles.actionRow} onClick={props.onOpen}>
-                <Icon name="ph:folder-open" size={16} decorative />
+              </Button>
+              <Button variant="ghost" class={styles.actionRow} onClick={props.onOpen}>
+                <Icon name="ph:folder-open" size={18} decorative />
                 <span>Open Project</span>
-              </button>
+              </Button>
             </div>
             <div class={styles.subRibbon}>Recent</div>
             <Show
@@ -129,38 +110,38 @@ export function HomeHub(props: HomeHubProps) {
           <div class={styles.panelStack}>
             <section class={styles.panel}>
               <div class={styles.ribbon}>Assets</div>
-              <button type="button" class={styles.assetRow} onClick={() => setPage("audio")}>
+              <Button variant="ghost" class={styles.assetRow} onClick={() => setPage("audio")}>
                 <span>
-                  <Icon name="ph:music-note" size={16} decorative />
+                  <Icon name="ph:music-note" size={18} decorative />
                   <span>Audio Files</span>
                 </span>
                 <strong>{audioFileCount()}</strong>
-              </button>
-              <button type="button" class={styles.assetRow} onClick={() => setPage("instruments")}>
+              </Button>
+              <Button variant="ghost" class={styles.assetRow} onClick={() => setPage("instruments")}>
                 <span>
-                  <Icon name="ph:piano-keys" size={16} decorative />
+                  <Icon name="ph:piano-keys" size={18} decorative />
                   <span>Instruments</span>
                 </span>
                 <strong>{instrumentCount()}</strong>
-              </button>
-              <button type="button" class={styles.assetRow} onClick={() => setPage("patterns")}>
+              </Button>
+              <Button variant="ghost" class={styles.assetRow} onClick={() => setPage("patterns")}>
                 <span>
-                  <Icon name="ph:stack" size={16} decorative />
+                  <Icon name="ph:stack" size={18} decorative />
                   <span>Patterns</span>
                 </span>
                 <strong>{patternCount()}</strong>
-              </button>
+              </Button>
             </section>
 
             <section class={styles.panel}>
               <div class={styles.ribbon}>AI</div>
-              <button type="button" class={styles.trainingRow} onClick={() => setPage("training")}>
+              <Button variant="ghost" class={styles.trainingRow} onClick={() => setPage("training")}>
                 <span>
-                  <Icon name="ph:sparkle" size={16} decorative />
+                  <Icon name="ph:sparkle" size={18} decorative />
                   <span>AI Training</span>
                 </span>
-                <Icon name="ph:arrow-right" size={16} decorative />
-              </button>
+                <Icon name="ph:arrow-right" size={18} decorative />
+              </Button>
             </section>
           </div>
         </div>
@@ -172,15 +153,6 @@ export function HomeHub(props: HomeHubProps) {
 interface HomeHeaderProps {
   title: string;
   onHome: () => void;
-  onNew: () => void;
-  onOpen: () => void;
-  onSave: () => void;
-  onSaveAs: () => void;
-  onExport: () => void;
-  onRecover?: () => void;
-  onHealth?: () => void;
-  onUserGuide: () => void;
-  onSettings: () => void;
   onQuit: () => void;
   disableHome?: boolean;
 }
@@ -188,37 +160,19 @@ interface HomeHeaderProps {
 function HomeHeader(props: HomeHeaderProps) {
   return (
     <div class={styles.header}>
-      <div class={styles.brand}>
-        <AppMenuButton
-          props={() => ({
-            onHome: props.onHome,
-            onNew: props.onNew,
-            onOpen: props.onOpen,
-            onSave: props.onSave,
-            onSaveAs: props.onSaveAs,
-            onExport: props.onExport,
-            onRecover: props.onRecover,
-            onHealth: props.onHealth,
-            onUserGuide: props.onUserGuide,
-            onSettings: props.onSettings,
-            disableHome: props.disableHome,
-            disableFileStateActions: true,
-          })}
-        />
+      <Show
+        when={!props.disableHome}
+        fallback={<span class={styles.headerSpacer} aria-hidden="true" />}
+      >
         <h1 class={styles.breadcrumb}>
-          <Show
-            when={!props.disableHome}
-            fallback={<span>Beat</span>}
-          >
-            <button type="button" class={styles.breadcrumbHome} onClick={props.onHome}>Beat</button>
-            <span class={styles.breadcrumbSlash}>/</span>
-            <span>{props.title}</span>
-          </Show>
+          <Button variant="ghost" class={styles.breadcrumbHome} onClick={props.onHome}>Beat</Button>
+          <span class={styles.breadcrumbSlash}>/</span>
+          <span>{props.title}</span>
         </h1>
-      </div>
+      </Show>
       <HoverInfo content="Quit" placement="left">
         <Button iconOnly size="md" onClick={props.onQuit} aria-label="Quit">
-          <Icon name="ph:power" size={16} decorative />
+          <Icon name="ph:power" size={18} decorative />
         </Button>
       </HoverInfo>
     </div>
@@ -232,7 +186,7 @@ function RecentProjectCard(props: {
 }) {
   const name = () => props.project.name || fileName(props.project.path);
   return (
-    <button type="button" class={styles.recentCard} onClick={props.onOpen} title={props.project.path}>
+    <Button variant="ghost" class={styles.recentCard} onClick={props.onOpen} title={props.project.path}>
       <span class={styles.recentArt}>
         <AppLogo class={styles.recentLogo} />
         <HoverInfo content="Remove from recent">
@@ -252,7 +206,7 @@ function RecentProjectCard(props: {
               props.onRemove();
             }}
           >
-            <Icon name="ph:x" size={14} decorative />
+            <Icon name="ph:x" size={18} decorative />
           </span>
         </HoverInfo>
       </span>
@@ -260,7 +214,7 @@ function RecentProjectCard(props: {
         <span class={styles.recentName}>{name()}</span>
         <span class={styles.recentDate}>{formatRecentDate(props.project.openedAt)}</span>
       </span>
-    </button>
+    </Button>
   );
 }
 

@@ -271,15 +271,15 @@ export function TrackList() {
               </div>
             )}
           </For>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             class={styles.addRow}
             onClick={addTrack}
             aria-label="Add track"
           >
-            <Icon name="ph:plus" size={16} decorative />
+            <Icon name="ph:plus" size={18} decorative />
             <span>Add track</span>
-          </button>
+          </Button>
           <div class={styles.timelineSpacer} aria-hidden="true" />
         </div>
 
@@ -289,7 +289,7 @@ export function TrackList() {
               <span class={styles.selectionCount}>{selectedSegments().length}</span>
               <HoverInfo content="Group selected segments">
                 <Button iconOnly size="xs" aria-label="Group selected segments" onClick={groupSelectedSegments}>
-                  <Icon name="ph:brackets-square" size={16} decorative />
+                  <Icon name="ph:brackets-square" size={18} decorative />
                 </Button>
               </HoverInfo>
               <HoverInfo content="Ungroup selected segments">
@@ -300,17 +300,17 @@ export function TrackList() {
                   disabled={selectedGroupIds().length === 0}
                   onClick={ungroupSelectedSegments}
                 >
-                  <Icon name="ph:brackets-curly" size={16} decorative />
+                  <Icon name="ph:brackets-curly" size={18} decorative />
                 </Button>
               </HoverInfo>
               <HoverInfo content="Copy selected segments">
                 <Button iconOnly size="xs" aria-label="Copy selected segments" onClick={copySelectedSegments}>
-                  <Icon name="ph:clipboard" size={16} decorative />
+                  <Icon name="ph:clipboard" size={18} decorative />
                 </Button>
               </HoverInfo>
               <HoverInfo content="Delete selected segments">
                 <Button iconOnly size="xs" aria-label="Delete selected segments" onClick={deleteSelectedSegments}>
-                  <Icon name="ph:trash" size={16} decorative />
+                  <Icon name="ph:trash" size={18} decorative />
                 </Button>
               </HoverInfo>
             </div>
@@ -373,7 +373,7 @@ export function TrackList() {
                 onClick={() => setZoom(Math.max(MIN_ZOOM, beatsToPx() - ZOOM_STEP))}
                 aria-label="Zoom out"
               >
-                <Icon name="ph:magnifying-glass-minus" size={16} decorative />
+                <Icon name="ph:magnifying-glass-minus" size={18} decorative />
               </Button>
             </HoverInfo>
             <HoverInfo content="Zoom in">
@@ -383,7 +383,7 @@ export function TrackList() {
                 onClick={() => setZoom(Math.min(MAX_ZOOM, beatsToPx() + ZOOM_STEP))}
                 aria-label="Zoom in"
               >
-                <Icon name="ph:magnifying-glass-plus" size={16} decorative />
+                <Icon name="ph:magnifying-glass-plus" size={18} decorative />
               </Button>
             </HoverInfo>
           </div>

@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
-import { ActionFooter, appConfirm, Button, FloatingSelect, HoverInfo, Icon, MarqueeText } from "../../solid-ui";
+import { ActionFooter, Button, FloatingSelect, HoverInfo, Icon, MarqueeText, TextInput } from "../../solid-ui";
 import {
   cachedInstrumentSampleBuffer,
   createInstrumentSampleBufferSource,
@@ -332,14 +332,9 @@ export function InstrumentsPage() {
     startProgress(ctx, duration, shouldLoop, initialProgress);
   }
 
-  async function deleteActiveInstrument() {
+  function deleteActiveInstrument() {
     const instrument = activeInstrument();
     if (!instrument?.userCreated) return;
-    const usage = activeUsage() ?? instrumentUsageSummary(instrument.id, [project()]);
-    const useText = usage.segmentCount > 0
-      ? ` It is used by ${usage.segmentCount} segment${usage.segmentCount === 1 ? "" : "s"} in the current project.`
-      : "";
-    if (!await appConfirm(`Delete "${instrument.name}" from the Beat library?${useText}`)) return;
     removeInstrument(instrument.id);
     const fallback = visibleInstruments().find((candidate) => candidate.id !== instrument.id)?.id ?? null;
     setActiveId(fallback);
@@ -361,11 +356,12 @@ export function InstrumentsPage() {
             onClick={() => setSearchOpen((value) => !value)}
             aria-label="Search instruments by name"
           >
-            <Icon name="ph:magnifying-glass" size={14} decorative />
+            <Icon name="ph:magnifying-glass" size={18} decorative />
           </Button>
           {(searchOpen() || searchQuery().length > 0) && (
-            <input
-              class={styles.searchInput}
+            <TextInput
+              layout="bare"
+              inputClassName={styles.searchInput}
               value={searchQuery()}
               onInput={(event) => setSearchQuery(event.currentTarget.value)}
               onKeyDown={(event) => {
@@ -416,21 +412,23 @@ export function InstrumentsPage() {
                     setActiveId(instrument.id);
                   }}
                 >
-                  <Icon name={instrument.icon || "ph:piano-keys"} size={14} decorative />
+                  <Icon name={instrument.icon || "ph:piano-keys"} size={18} decorative />
                   <MarqueeText className={styles.rowName} text={instrument.name} />
                   <span class={styles.rowMeta}>
                     <span class={styles.rowType}>{formatInstrumentType(instrument)}</span>
-                    <button
-                      type="button"
-                      class={`${styles.rowPlay} ${playingId() === instrument.id ? styles.rowPlayActive : ""}`}
+                    <Button
+                      iconOnly
+                      variant="ghost"
+                      selected={playingId() === instrument.id}
+                      class={styles.rowPlay}
                       aria-label={`Preview ${instrument.name}`}
                       onClick={(event) => {
                         event.stopPropagation();
                         void playPreview(instrument);
                       }}
                     >
-                      <Icon name={playingId() === instrument.id ? "ph:pause-fill" : "ph:play-fill"} size={12} decorative />
-                    </button>
+                      <Icon name={playingId() === instrument.id ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
+                    </Button>
                   </span>
                 </div>
               ))}
@@ -473,7 +471,7 @@ export function InstrumentsPage() {
               )}
             </div>
             <div class={styles.previewName}>
-              <Icon name={activeInstrument()!.icon || "ph:piano-keys"} size={16} decorative />
+              <Icon name={activeInstrument()!.icon || "ph:piano-keys"} size={18} decorative />
               <MarqueeText text={activeInstrument()!.name} />
             </div>
             <div
@@ -500,12 +498,12 @@ export function InstrumentsPage() {
                   onClick={() => void playPreview(activeInstrument()!)}
                   aria-label="Play or pause instrument preview"
                 >
-                  <Icon name={playingId() === activeInstrument()!.id ? "ph:pause-fill" : "ph:play-fill"} size={14} decorative />
+                  <Icon name={playingId() === activeInstrument()!.id ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
                 </Button>
               </HoverInfo>
               <HoverInfo content="Loop sample preview">
                 <Button iconOnly selected={loopPreview()} onClick={() => toggleLoopPreview(activeInstrument()!)} aria-label="Loop sample preview">
-                  <Icon name="ph:repeat" size={14} decorative />
+                  <Icon name="ph:repeat" size={18} decorative />
                 </Button>
               </HoverInfo>
             </div>
@@ -565,7 +563,7 @@ export function InstrumentsPage() {
                 variant="danger"
                 disabled={!activeInstrument()!.userCreated}
                 title={activeInstrument()!.userCreated ? "Delete this library instrument" : "Factory instruments cannot be deleted"}
-                onClick={() => void deleteActiveInstrument()}
+                onClick={deleteActiveInstrument}
               >
                 Delete
               </Button>
@@ -863,18 +861,19 @@ function SampleStructure(props: { instrument: Instrument; activeSampleUrl?: stri
         ) : draftVariables().map((variable) => {
           const option = SAMPLE_VARIABLE_OPTIONS.find((item) => item.mode === variable);
           return (
-          <button
-            type="button"
-            class={variable === activeGrouping() ? styles.sampleGroupingActive : ""}
+          <Button
+            size="xs"
+            variant="ghost"
+            selected={variable === activeGrouping()}
             onClick={() => setDraftGrouping(variable)}
           >
             {option?.label ?? variable}
-          </button>
+          </Button>
           );
         })}
-        <button class={styles.sampleAddVariable} type="button" onClick={addVariable} disabled={draftVariables().length >= SAMPLE_VARIABLE_OPTIONS.length}>
+        <Button size="xs" variant="ghost" class={styles.sampleAddVariable} onClick={addVariable} disabled={draftVariables().length >= SAMPLE_VARIABLE_OPTIONS.length}>
           + Variable
-        </button>
+        </Button>
       </div>
       {groups().map((group) => (
         <div class={styles.sampleGroup}>
@@ -882,9 +881,9 @@ function SampleStructure(props: { instrument: Instrument; activeSampleUrl?: stri
             <span>{group.title}</span>
             <strong>{group.rows.length}</strong>
             {group.mode !== "single" ? (
-              <button class={styles.sampleRemoveVariable} type="button" onClick={() => removeVariable(group.mode as SampleGrouping)}>
+              <Button size="xs" variant="ghost" class={styles.sampleRemoveVariable} onClick={() => removeVariable(group.mode as SampleGrouping)}>
                 Remove variable
-              </button>
+              </Button>
             ) : null}
           </div>
           <div class={styles.sampleRows}>

@@ -1,0 +1,21 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 15px;
+  height: 12px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  background: var(--color-fg);
+  color: var(--color-fg-inverse);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-hint);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.muted {
+  background: var(--surface-subtle);
+  color: var(--color-fg);
+}

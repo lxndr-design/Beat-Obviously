@@ -1,8 +1,11 @@
-import { For } from "solid-js";
+import { createEffect, createSignal, For } from "solid-js";
 import { Modal } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
-import { useInstrumentStore, useUiStore } from "../../state/store";
+import { selectSegment } from "../../state/selectors";
+import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";
+import type { Instrument } from "../../state/types";
 import { ComponentEditorModal } from "../ComponentLibrary/ComponentEditorModal.solid";
+import { DrumpadEditorModal } from "../DrumpadEditor/DrumpadEditorModal.solid";
 import { EqAutomationModal } from "../EqAutomation/EqAutomationModal.solid";
 import { ExportReviewModal } from "../ExportReview/ExportReviewModal.solid";
 import { InstrumentEditorModal } from "../InstrumentEditor/InstrumentEditorModal.solid";
@@ -20,6 +23,7 @@ export function EditorHost() {
   const openEditors = createStoreSelector(useUiStore, (state) => state.openEditors);
   const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
   const closeEditor = useUiStore.getState().closeEditor;
+  const addInstrument = useInstrumentStore.getState().addInstrument;
   const updateInstrument = useInstrumentStore.getState().updateInstrument;
 
   return (
@@ -33,11 +37,12 @@ export function EditorHost() {
               return (
                 <InstrumentEditorModal
                   instrumentId={editor.instrumentId}
+                  draftInstrument={editor.draftInstrument}
                   editorKind={editor.kind === "instrument" ? "instrument" : "samplerInstrument"}
                 />
               );
             case "synthInstrument": {
-              const instrument = () => instruments().find((candidate) => candidate.id === editor.instrumentId) ?? null;
+              const instrument = () => editor.draftInstrument ?? instruments().find((candidate) => candidate.id === editor.instrumentId) ?? null;
               const scopeId = `synth-editor-${editor.instrumentId}`;
               return (
                 <Modal
@@ -49,7 +54,14 @@ export function EditorHost() {
                   onClose={() => closeEditor({ kind: "synthInstrument", instrumentId: editor.instrumentId })}
                 >
                   {instrument()?.nodeGraph ? (
-                    <NodeInstrumentEditor instrument={instrument()} updateInstrument={updateInstrument} />
+                    <DraftNodeInstrumentEditor
+                      instrument={instrument()!}
+                      onCommit={(saved) => {
+                        if (instruments().some((candidate) => candidate.id === saved.id)) updateInstrument(saved.id, saved);
+                        else addInstrument(saved);
+                        closeEditor({ kind: "synthInstrument", instrumentId: editor.instrumentId });
+                      }}
+                    />
                   ) : (
                     <SynthEditor instrumentId={editor.instrumentId} hotkeyScopeId={scopeId} />
                   )}
@@ -72,7 +84,7 @@ export function EditorHost() {
             case "track":
               return <TrackDetailsModal trackId={editor.trackId} />;
             case "segment":
-              return <SegmentEditorModal segmentId={editor.segmentId} />;
+              return <SegmentEditorSwitch segmentId={editor.segmentId} discardIfUntouched={editor.discardIfUntouched} />;
             case "component":
               return <ComponentEditorModal componentId={editor.componentId} />;
             case "plugin":
@@ -105,4 +117,44 @@ export function EditorHost() {
       </For>
     </>
   );
+}
+
+function cloneInstrument(instrument: Instrument): Instrument {
+  return typeof structuredClone === "function"
+    ? structuredClone(instrument)
+    : JSON.parse(JSON.stringify(instrument));
+}
+
+function DraftNodeInstrumentEditor(props: {
+  instrument: Instrument;
+  onCommit: (instrument: Instrument) => void;
+}) {
+  const [draft, setDraft] = createSignal<Instrument>(cloneInstrument(props.instrument), { equals: false });
+  const [sourceId, setSourceId] = createSignal(props.instrument.id);
+
+  createEffect(() => {
+    const next = props.instrument;
+    if (next.id === sourceId()) return;
+    setSourceId(next.id);
+    setDraft(cloneInstrument(next));
+  });
+
+  function updateDraft(id: string, patch: Partial<Instrument>) {
+    setDraft((current) => current.id === id ? { ...current, ...patch } : current);
+  }
+
+  return (
+    <NodeInstrumentEditor
+      instrument={draft()}
+      updateInstrument={updateDraft}
+      onSaveInstrument={props.onCommit}
+    />
+  );
+}
+
+function SegmentEditorSwitch(props: { segmentId: string; discardIfUntouched?: boolean }) {
+  const segment = createStoreSelector(useProjectStore, () => selectSegment(props.segmentId));
+  return segment()?.payload.kind === "drumpad"
+    ? <DrumpadEditorModal segmentId={props.segmentId} discardIfUntouched={props.discardIfUntouched} />
+    : <SegmentEditorModal segmentId={props.segmentId} discardIfUntouched={props.discardIfUntouched} />;
 }

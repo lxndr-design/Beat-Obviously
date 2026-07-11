@@ -23,6 +23,16 @@
   text-transform: none;
 }
 
+.majorSectionTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  padding: 0 6px;
+}
+
+.majorSectionTitleRow .majorSectionTitle { padding-left: 0; }
+
 .body {
   display: grid;
   gap: 6px;
@@ -32,7 +42,7 @@
 }
 
 .panel :global(.ds-section-header) {
-  min-height: 28px;
+  min-height: 27px;
   padding: 0 6px;
 }
 
@@ -43,20 +53,35 @@
   gap: 0 !important;
 }
 
+.oscillatorName {
+  width: min(180px, 24vw);
+  align-self: center;
+  margin: 0 6px;
+}
+
+.oscillatorName input {
+  font-weight: var(--font-weight-bold);
+}
+
+.removeOscillatorButton {
+  margin-left: auto;
+  border-left: var(--border-soft);
+}
+
 .oscillatorHeader :global(.ds-section-title) {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
-  padding: 0 8px 0 6px;
+  min-height: 27px;
+  padding: 0 9px 0 6px;
 }
 
 .oscillatorPowerButton {
-  width: 28px !important;
-  min-width: 28px !important;
-  max-width: 28px !important;
-  height: 28px !important;
-  min-height: 28px !important;
-  max-height: 28px !important;
+  width: 27px !important;
+  min-width: 27px !important;
+  max-width: 27px !important;
+  height: 27px !important;
+  min-height: 27px !important;
+  max-height: 27px !important;
   margin: 0;
   border-right: var(--border-soft);
 }
@@ -78,7 +103,7 @@
 .rowMain {
   position: relative;
   display: grid;
-  grid-template-columns: 238px minmax(0, 1fr);
+  grid-template-columns: 237px minmax(0, 1fr);
   align-items: stretch;
   min-width: 0;
 }
@@ -103,31 +128,31 @@
   gap: 0;
   align-items: stretch;
   min-width: 0;
-  padding: 6px 6px 6px 8px;
+  padding: 6px 6px 6px 9px;
 }
 
 .unisonBody {
   display: grid;
   justify-content: center;
   align-items: center;
-  min-height: 118px;
+  min-height: 117px;
   min-width: 0;
   padding: 6px;
 }
 
 .rowKnobs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(58px, 1fr));
+  grid-template-columns: repeat(5, minmax(57px, 1fr));
   column-gap: 6px;
   row-gap: 6px;
   align-items: center;
   align-content: center;
   min-width: 0;
-  padding: 0 4px;
+  padding: 0 3px;
 }
 
 .unisonKnobs {
-  grid-template-columns: repeat(5, minmax(52px, 1fr));
+  grid-template-columns: repeat(5, minmax(51px, 1fr));
 }
 
 .voiceStackControls {
@@ -135,7 +160,7 @@
   grid-template-columns: max-content max-content max-content;
   justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   min-width: 0;
 }
 
@@ -146,14 +171,14 @@
   align-items: center;
   justify-content: center;
   gap: 0;
-  padding: 7px;
+  padding: 6px;
   border: var(--border-fg);
 }
 
 .voiceStackToggleButton {
-  height: 28px;
-  min-width: 70px;
-  padding: 0 10px;
+  height: 27px;
+  min-width: 69px;
+  padding: 0 9px;
   border: var(--border-soft);
   border-right: 0;
 }
@@ -165,20 +190,20 @@
 .voiceStackKnobGroup {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 56px;
+  grid-auto-columns: 57px;
   align-items: start;
   justify-content: center;
-  gap: 2px;
-  padding: 7px 8px;
+  gap: 3px;
+  padding: 6px 9px;
   border: var(--border-fg);
 }
 
 .voiceStackKnob {
   display: grid !important;
-  grid-template-rows: auto 34px auto;
+  grid-template-rows: auto 33px auto;
   justify-items: center;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -194,14 +219,14 @@
 
 .voiceStackKnob [data-knob-dial] {
   grid-row: 2;
-  width: 32px !important;
-  height: 32px !important;
+  width: 33px !important;
+  height: 33px !important;
 }
 
 .voiceStackKnob [data-knob-value] {
   grid-row: 3;
   width: auto;
-  min-width: 28px;
+  min-width: 27px;
   min-height: 12px;
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
   font-size: var(--font-size-ui);
@@ -210,7 +235,7 @@
 
 .oscillatorControlGroups {
   display: grid;
-  grid-template-columns: minmax(230px, 250px) minmax(142px, 170px) minmax(106px, 128px) minmax(106px, 128px);
+  grid-template-columns: minmax(231px, 249px) minmax(141px, 171px) minmax(105px, 129px) minmax(105px, 129px);
   gap: 6px;
   align-content: start;
   justify-content: start;
@@ -222,25 +247,25 @@
   grid-template-rows: auto auto 1fr;
   gap: 3px;
   min-width: 0;
-  padding: 5px 6px;
+  padding: 6px 6px;
   border: var(--border-soft);
   background: var(--surface-subtle);
 }
 
 .warpControlGroup {
   grid-template-rows: auto;
-  grid-template-columns: minmax(112px, max-content) repeat(2, 54px);
+  grid-template-columns: minmax(111px, max-content) repeat(2, 54px);
   align-items: start;
   justify-content: center;
   column-gap: 12px;
-  padding: 5px 8px 4px;
+  padding: 6px 9px 3px;
 }
 
 .warpModeStack {
   grid-column: 1;
   grid-row: 1;
   display: grid;
-  grid-template-rows: 12px 34px 12px;
+  grid-template-rows: 12px 33px 12px;
   gap: 1px;
   align-content: start;
   align-items: center;
@@ -281,14 +306,14 @@
 .oscillatorControlGroupKnobs {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
-  gap: 4px;
+  gap: 3px;
   align-items: start;
   min-width: 0;
 }
 
 .oscillatorControlGroup :global(.knob) {
   display: grid !important;
-  grid-template-rows: auto 34px auto;
+  grid-template-rows: auto 33px auto;
   justify-items: center;
   align-items: center;
   gap: 1px;
@@ -309,7 +334,7 @@
 .oscillatorControlGroup :global(.knob .editValue) {
   grid-row: 3;
   width: auto;
-  min-width: 26px;
+  min-width: 27px;
   min-height: 12px;
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
   font-size: var(--font-size-ui);
@@ -324,7 +349,7 @@
   display: grid;
   justify-items: start;
   align-content: start;
-  gap: 2px;
+  gap: 3px;
   width: 100%;
   min-width: 0;
 }
@@ -344,8 +369,8 @@
 }
 
 .wavetableControl[data-compact="true"] .wavetableButtons {
-  grid-auto-columns: 20px;
-  min-height: 20px;
+  grid-auto-columns: 21px;
+  min-height: 21px;
 }
 
 .wavetableButton {
@@ -365,13 +390,13 @@
 }
 
 .wavetableControl[data-compact="true"] .wavetableButton {
-  width: 20px !important;
-  height: 20px !important;
-  min-height: 20px !important;
-  min-width: 20px !important;
-  max-width: 20px !important;
-  max-height: 20px !important;
-  flex: 0 0 20px;
+  width: 21px !important;
+  height: 21px !important;
+  min-height: 21px !important;
+  min-width: 21px !important;
+  max-width: 21px !important;
+  max-height: 21px !important;
+  flex: 0 0 21px;
 }
 
 .wavetableButton:last-child {
@@ -446,9 +471,9 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
-  max-width: min(100%, 520px);
+  max-width: min(100%, 519px);
   margin-left: auto;
   font-family: var(--font-family-mono);
   font-size: var(--font-size-ui);
@@ -460,7 +485,7 @@
   display: grid;
   grid-template-columns: max-content max-content max-content 1fr max-content;
   align-items: center;
-  column-gap: 34px;
+  column-gap: 33px;
   min-width: 0;
   padding: 6px;
   border-top: var(--border-soft);
@@ -483,12 +508,12 @@
   grid-template-columns: auto auto auto;
   grid-template-areas: "label dial value";
   align-items: center;
-  column-gap: 4px;
+  column-gap: 3px;
   flex: 0 0 auto;
   align-self: center;
   width: max-content;
   min-width: 0;
-  margin-left: 10px;
+  margin-left: 9px;
 }
 
 .toolbarMorphKnob [data-knob-label] {
@@ -499,16 +524,16 @@
 
 .toolbarMorphKnob [data-knob-dial] {
   grid-area: dial;
-  width: 28px !important;
-  height: 28px !important;
+  width: 27px !important;
+  height: 27px !important;
 }
 
 .toolbarMorphKnob [data-knob-value] {
   grid-area: value;
   box-sizing: border-box;
-  width: 34px !important;
-  min-width: 34px !important;
-  max-width: 34px !important;
+  width: 33px !important;
+  min-width: 33px !important;
+  max-width: 33px !important;
   min-height: 12px;
   padding: 0 !important;
   border: 0 !important;
@@ -537,14 +562,14 @@
 }
 
 .wavemapMeta span {
-  max-width: 112px;
+  max-width: 111px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .wavemapMeta .wavemapMetaWide {
-  max-width: 220px;
+  max-width: 219px;
 }
 
 .resynthesisModes {
@@ -579,16 +604,16 @@
 
 .manualRangeControl {
   display: inline-grid;
-  grid-template-columns: 72px 104px 104px auto;
+  grid-template-columns: 72px 105px 105px auto;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
 .manualRangeStrip {
   position: relative;
   width: 72px;
-  height: 10px;
+  height: 9px;
   border: var(--border-fg);
   background:
     linear-gradient(90deg, color-mix(in srgb, var(--color-fg) 10%, transparent), transparent 48%),
@@ -625,11 +650,11 @@
 .analysisHeader,
 .analysisFrameRow {
   display: grid;
-  grid-template-columns: minmax(160px, 2fr) repeat(8, minmax(64px, 1fr)) minmax(80px, 1fr);
+  grid-template-columns: minmax(159px, 2fr) repeat(8, minmax(63px, 1fr)) minmax(81px, 1fr);
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
-  padding: 6px 8px;
+  padding: 6px 9px;
   color: color-mix(in srgb, var(--color-fg) 72%, transparent);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-hint);
@@ -712,10 +737,10 @@
 
 .frameScanBlock {
   display: grid;
-  grid-template-rows: minmax(74px, 1fr);
+  grid-template-rows: minmax(75px, 1fr);
   gap: 0;
   min-width: 0;
-  padding: 7px;
+  padding: 6px;
   border: var(--border-fg);
 }
 
@@ -741,20 +766,20 @@
 
 .frameKnobRowThree {
   grid-template-columns: repeat(3, minmax(42px, 1fr));
-  column-gap: 10px;
+  column-gap: 9px;
 }
 
 .frameKnobRowFour {
-  grid-template-columns: repeat(4, minmax(38px, 1fr));
+  grid-template-columns: repeat(4, minmax(39px, 1fr));
   column-gap: 6px;
 }
 
 .frameKnob {
   display: grid !important;
-  grid-template-rows: auto 34px auto;
+  grid-template-rows: auto 33px auto;
   justify-items: center;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -770,14 +795,14 @@
 
 .frameKnob [data-knob-dial] {
   grid-row: 2;
-  width: 32px !important;
-  height: 32px !important;
+  width: 33px !important;
+  height: 33px !important;
 }
 
 .frameKnob [data-knob-value] {
   grid-row: 3;
   width: auto;
-  min-width: 28px;
+  min-width: 27px;
   min-height: 12px;
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
   font-size: var(--font-size-ui);
@@ -787,7 +812,7 @@
 .frameWaveform {
   display: block;
   width: 100%;
-  height: 56px;
+  height: 57px;
   min-width: 0;
   touch-action: none;
   cursor: crosshair;
@@ -812,7 +837,7 @@
   grid-template-columns: repeat(16, minmax(0, 1fr));
   align-items: end;
   gap: 1px;
-  height: 44px;
+  height: 45px;
   min-width: 0;
   padding: 3px;
   border: var(--border-fg);
@@ -852,7 +877,7 @@
 
 .previewPane {
   display: grid;
-  grid-template-rows: minmax(70px, 1fr);
+  grid-template-rows: minmax(69px, 1fr);
   align-content: stretch;
   align-self: stretch;
   min-width: 0;
@@ -871,7 +896,7 @@
   width: 100%;
   height: 100%;
   max-height: 96px;
-  min-height: 70px;
+  min-height: 69px;
   border: var(--border-soft);
 }
 

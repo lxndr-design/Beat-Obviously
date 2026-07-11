@@ -1,6 +1,5 @@
-import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
-import { Button, HoverInfo, Icon, RowItem, SectionRibbon, SectionRibbonActionButton, Tag, createContextMenu, type ContextMenuItem } from "../../solid-ui";
-import { appConfirm } from "../../solid-ui";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { Button, Checkbox, HoverInfo, Icon, LibraryFolder, LibrarySearch, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { createInstrumentBufferSource, preloadInstrumentSample, previewFrequency } from "../../audio/synthPreview";
 import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useProjectStore, useUiStore } from "../../state/store";
 import { instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
@@ -26,6 +25,8 @@ const KIND_HINT: Record<string, string> = {
   wavetable: "Aether WT",
 };
 
+const INSTRUMENT_SET_EXPANSION_KEY = "beat.instrument-library.open-sets.v1";
+
 interface WavetableStarter {
   label: string;
   icon: string;
@@ -37,6 +38,22 @@ const WAVETABLE_STARTERS: WavetableStarter[] = [
   { label: "Create Aether", icon: "ph:cube", presetId: "factory.init", fallbackNameBase: "Aether Patch" },
 ];
 
+function createDraftId() {
+  return globalThis.crypto?.randomUUID?.() ?? `draft_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function createDraftInstrument(patch: Partial<Instrument>): Instrument {
+  return {
+    ...(patch as Instrument),
+    id: patch.id ?? createDraftId(),
+    name: patch.name ?? "Instrument",
+    kind: patch.kind ?? "sampler",
+    userCreated: patch.userCreated ?? true,
+    knobs: patch.knobs ?? { cutoff: 0.6, resonance: 0.2, drive: 0.1, color: 0.5 },
+    envelope: patch.envelope ?? { attackMs: 5, decayMs: 100, sustain: 0.7, releaseMs: 200 },
+  };
+}
+
 interface InstrumentLibraryPanelProps {
   expanded: boolean;
   onToggle: () => void;
@@ -44,13 +61,15 @@ interface InstrumentLibraryPanelProps {
 }
 
 export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
+  const [searchQuery, setSearchQuery] = createSignal("");
+  const normalizedSearch = () => searchQuery().trim().toLowerCase();
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
   const instrumentSets = createStoreSelector(useInstrumentStore, (s) => s.instrumentSets);
   const loading = createStoreSelector(useInstrumentStore, (s) => s.loading);
   const plugins = createStoreSelector(usePluginStore, (s) => s.plugins);
   const [mergeFromId, setMergeFromId] = createSignal<string | null>(null);
   const [previewingId, setPreviewingId] = createSignal<string | null>(null);
-  const [openSets, setOpenSets] = createSignal<Record<string, boolean>>({}, { equals: false });
+  const [openSets, setOpenSets] = createSignal<Record<string, boolean>>(loadOpenInstrumentSets(), { equals: false });
   const [renamingSetId, setRenamingSetId] = createSignal<string | null>(null);
   const [selectMode, setSelectMode] = createSignal(false);
   const [selectedIds, setSelectedIds] = createSignal<Set<string>>(new Set(), { equals: false });
@@ -61,6 +80,8 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
   const selectedInstruments = () => instruments().filter((instrument) => selectedIds().has(instrument.id));
   const sortedInstrumentSets = () => [...instrumentSets()]
     .sort((a, b) => instrumentSetDisplayName(a).localeCompare(instrumentSetDisplayName(b), undefined, { sensitivity: "base" }));
+
+  createEffect(() => persistOpenInstrumentSets(openSets()));
 
   const panelMenu = createContextMenu((): ContextMenuItem[] => [
     {
@@ -79,11 +100,6 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
       label: "Create Aether",
       icon: "ph:cube",
       onSelect: () => createWavetable(WAVETABLE_STARTERS[0]),
-    },
-    {
-      label: "Create Basic",
-      icon: "ph:wave-sine",
-      onSelect: createBasicSynth,
     },
     {
       label: "Create Sampler",
@@ -141,46 +157,27 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
         tags: [...new Set([...draft.metadata.tags, "node", "nodemap"])],
       },
     };
-    const id = useInstrumentStore.getState().addInstrument({
+    const baseInstrument = createDraftInstrument({
       ...synthDraftToInstrumentPatch(namedDraft),
       icon: "ph:graph",
       name: namedDraft.name,
       userCreated: true,
     });
-    const instrument = useInstrumentStore.getState().instruments.find((candidate) => candidate.id === id);
-    if (!instrument) return;
-    const graph = createStarterInstrumentNodeGraph(instrument);
-    useInstrumentStore.getState().updateInstrument(id, compileNodeGraphToInstrumentPatch(graph, instrument));
-    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: id });
-  }
-
-  function createBasicSynth() {
-    const defaultDraft = createDefaultSynthDraft();
-    const instrumentName = nextInstrumentName(instruments(), "Basic");
-    const namedDraft: SynthDraftPatch = {
-      ...structuredClone(defaultDraft),
-      name: instrumentName,
-      metadata: {
-        ...structuredClone(defaultDraft.metadata),
-        icon: "ph:wave-sine",
-        tags: [...new Set([...defaultDraft.metadata.tags, "basic", "aether"])],
-      },
+    const graph = createStarterInstrumentNodeGraph(baseInstrument);
+    const draftInstrument = {
+      ...baseInstrument,
+      ...compileNodeGraphToInstrumentPatch(graph, baseInstrument),
     };
-    const id = useInstrumentStore.getState().addInstrument({
-      ...synthDraftToInstrumentPatch(namedDraft),
-      name: namedDraft.name,
-      icon: "ph:wave-sine",
-      source: { kind: "created", label: "Made in Beat" },
-      userCreated: true,
+    useUiStore.getState().openEditor({
+      kind: "synthInstrument",
+      instrumentId: draftInstrument.id,
+      draftInstrument,
     });
-    useSynthStore.getState().bindInstrument(id);
-    useSynthStore.getState().setDraft(namedDraft);
-    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: id });
   }
 
   function createSampler() {
     const instrumentName = nextInstrumentName(instruments(), "Instrument");
-    const id = useInstrumentStore.getState().addInstrument({
+    const draftInstrument = createDraftInstrument({
       name: instrumentName,
       icon: "ph:waveform",
       kind: "sampler",
@@ -189,7 +186,11 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
       source: { kind: "created", label: "Made in Beat" },
       userCreated: true,
     });
-    useUiStore.getState().openEditor({ kind: "samplerInstrument", instrumentId: id });
+    useUiStore.getState().openEditor({
+      kind: "samplerInstrument",
+      instrumentId: draftInstrument.id,
+      draftInstrument,
+    });
   }
 
   function createWavetable(starter: WavetableStarter) {
@@ -200,14 +201,9 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
       ...structuredClone(draft),
       name: instrumentName,
     };
-    const id = useInstrumentStore.getState().addInstrument({
-      ...synthDraftToInstrumentPatch(namedDraft),
-      name: namedDraft.name,
-      userCreated: true,
-    });
-    useSynthStore.getState().bindInstrument(id);
+    useSynthStore.getState().bindInstrument(null);
     useSynthStore.getState().setDraft(namedDraft);
-    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: id });
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: createDraftId() });
   }
 
   function createNewGroup() {
@@ -274,19 +270,17 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
     setLastSelectedId(instrumentId);
   }
 
-  async function deleteSelected() {
+  function deleteSelected() {
     const deletable = selectedInstruments().filter((candidate) => candidate.userCreated);
     if (deletable.length === 0) return;
-    if (!await appConfirm(`Delete ${deletable.length} instrument${deletable.length === 1 ? "" : "s"} from this project?`)) return;
     for (const instrument of deletable) {
       useInstrumentStore.getState().removeInstrument(instrument.id);
     }
     exitSelectMode();
   }
 
-  async function deleteInstrument(instrument: Instrument) {
+  function deleteInstrument(instrument: Instrument) {
     if (!instrument.userCreated) return;
-    if (!await appConfirm(`Delete "${instrument.name}" from this project?`)) return;
     useInstrumentStore.getState().removeInstrument(instrument.id);
   }
 
@@ -301,7 +295,6 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
   return (
     <div ref={panelElement} class={styles.panel} onContextMenu={panelMenu.onContextMenu}>
       <SectionRibbon
-        className={styles.instrumentsRibbon}
         title="Instruments"
         expanded={props.expanded}
         onToggle={props.onToggle}
@@ -312,9 +305,15 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
             onClick={(event) => addMenu.openAt(event.clientX, event.clientY)}
             aria-label="Add instrument item"
           >
-            <Icon name="ph:plus" size={16} decorative />
+            <Icon name="ph:plus" size={18} decorative />
           </SectionRibbonActionButton>
         )}
+      />
+      <LibrarySearch
+        value={searchQuery()}
+        onInput={(event) => setSearchQuery(event.currentTarget.value)}
+        placeholder="Search..."
+        aria-label="Search instruments"
       />
       <Show when={selectMode() && props.expanded}>
         <div class={styles.selectionBar}>
@@ -342,15 +341,23 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
           <For each={sortedInstrumentSets()}>
             {(set) => {
               const setOpen = () => openSets()[set.id] ?? false;
-              const items = () => instruments().filter((instrument) => instrumentSetId(instrument) === set.id);
+              const items = () => instruments().filter((instrument) =>
+                instrumentSetId(instrument) === set.id
+                && (!normalizedSearch() || `${instrument.name} ${instrument.kind}`.toLowerCase().includes(normalizedSearch())),
+              );
               return (
-                <InstrumentSetSection
-                  set={set}
-                  open={setOpen()}
-                  items={items()}
+                <Show when={!normalizedSearch() || items().length > 0}>
+                <LibraryFolder
+                  name={instrumentSetDisplayName(set)}
+                  count={items().length}
+                  factory={set.factory}
+                  locked={set.id === "user-instruments" || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID}
+                  open={Boolean(normalizedSearch()) || setOpen()}
+                  scale="large"
                   renaming={renamingSetId() === set.id}
+                  dragMime="application/x-beat-instrument"
                   onToggle={() => setOpenSets((value) => ({ ...value, [set.id]: !setOpen() }))}
-                  onDropInstrument={(instrumentId) => useInstrumentStore.getState().moveInstrument(instrumentId, set.id)}
+                  onDropItem={(instrumentId) => useInstrumentStore.getState().moveInstrument(instrumentId, set.id)}
                   onStartRename={() => setRenamingSetId(set.id)}
                   onRename={(name) => {
                     useInstrumentStore.getState().renameInstrumentSet(set.id, name);
@@ -391,7 +398,8 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
                       />
                     )}
                   </For>
-                </InstrumentSetSection>
+                </LibraryFolder>
+                </Show>
               );
             }}
           </For>
@@ -469,8 +477,10 @@ function InstrumentItem(props: InstrumentItemProps) {
   return (
     <RowItem
       className={`${styles.item} ${props.selected ? styles.itemSelected : ""} ${props.selectMode ? styles.itemSelecting : ""}`}
+      density="compact"
+      scale="large"
       reserveDragSlot={false}
-      cursor="pointer"
+      cursor={props.selectMode ? "pointer" : "grab"}
       draggable={!props.selectMode}
       onClick={(event) => {
         if (!props.selectMode) return;
@@ -483,9 +493,8 @@ function InstrumentItem(props: InstrumentItemProps) {
       onContextMenu={menu.onContextMenu}
       iconAriaHidden={!props.selectMode}
       icon={props.selectMode ? (
-        <input
-          class={styles.itemCheckbox}
-          type="checkbox"
+        <Checkbox
+          inputClassName={styles.itemCheckbox}
           checked={props.selected}
           readOnly
           onClick={(event) => {
@@ -496,27 +505,22 @@ function InstrumentItem(props: InstrumentItemProps) {
         />
       ) : (
         <HoverInfo content={hint()}>
-          <Icon name={icon()} size={14} title={hint()} />
+          <Icon name={icon()} size={18} title={hint()} />
         </HoverInfo>
       )}
-      hoverIcon={!props.selectMode && <Icon name="ph:dots-six-vertical" size={14} decorative />}
+      hoverIcon={!props.selectMode && <Icon name="ph:dots-six-vertical" size={18} decorative />}
       name={props.instrument.name}
       action={(
-        <HoverInfo content={props.previewing ? "Pause sound" : "Play sound"}>
-          <Button
-            className={styles.itemPreviewButton}
-            iconOnly
-            size="sm"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onTogglePreview();
-            }}
-            aria-label={`${props.previewing ? "Pause" : "Play"} ${props.instrument.name}`}
-          >
-            <Icon name={props.previewing ? "ph:pause-fill" : "ph:play-fill"} size={12} decorative />
-          </Button>
-        </HoverInfo>
+        <RowActionButton
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            props.onTogglePreview();
+          }}
+          aria-label={`${props.previewing ? "Pause" : "Play"} ${props.instrument.name}`}
+        >
+          <Icon name={props.previewing ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
+        </RowActionButton>
       )}
     >
       {menu.menu()}
@@ -524,116 +528,28 @@ function InstrumentItem(props: InstrumentItemProps) {
   );
 }
 
-function InstrumentSetSection(props: {
-  set: InstrumentSet;
-  open: boolean;
-  items: Instrument[];
-  children: JSX.Element;
-  renaming: boolean;
-  onToggle: () => void;
-  onDropInstrument: (instrumentId: string) => void;
-  onStartRename: () => void;
-  onRename: (name: string) => void;
-  onCancelRename: () => void;
-  onUngroup: () => void;
-}) {
-  const [draftName, setDraftName] = createSignal(props.set.name);
-  const displayName = () => instrumentSetDisplayName(props.set);
-  const hasItems = () => props.items.length > 0;
-  const expanded = () => props.open && hasItems();
-  const menu = createContextMenu((): ContextMenuItem[] => [
-    {
-      label: "Rename",
-      icon: "ph:pencil-simple",
-      onSelect: () => {
-        setDraftName(props.set.name);
-        props.onStartRename();
-      },
-    },
-    {
-      label: "Ungroup",
-      icon: "ph:folder-simple-dashed",
-      disabled: Boolean(props.set.factory),
-      onSelect: props.onUngroup,
-      separatorBefore: true,
-    },
-  ]);
-
-  createEffect(() => {
-    if (props.renaming) setDraftName(props.set.name);
-  });
-
-  function onDragOver(event: DragEvent) {
-    if (!Array.from(event.dataTransfer?.types ?? []).includes("application/x-beat-instrument")) return;
-    event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-  }
-
-  function onDrop(event: DragEvent) {
-    const draggedId = event.dataTransfer?.getData("application/x-beat-instrument");
-    if (!draggedId) return;
-    event.preventDefault();
-    props.onDropInstrument(draggedId);
-  }
-
-  return (
-    <section class={styles.setSection} onDragOver={onDragOver} onDrop={onDrop}>
-      <div
-        class={[
-          styles.setHeader,
-          expanded() && styles.setHeaderOpen,
-          !hasItems() && styles.setHeaderDisabled,
-        ].filter(Boolean).join(" ")}
-        role={props.renaming || !hasItems() ? undefined : "button"}
-        tabIndex={props.renaming || !hasItems() ? undefined : 0}
-        aria-expanded={props.renaming || !hasItems() ? undefined : expanded()}
-        aria-disabled={props.renaming || hasItems() ? undefined : true}
-        aria-label={props.renaming ? undefined : hasItems() ? `${expanded() ? "Collapse" : "Expand"} ${displayName()}` : displayName()}
-        onClick={props.renaming || !hasItems() ? undefined : props.onToggle}
-        onContextMenu={menu.onContextMenu}
-        onKeyDown={props.renaming || !hasItems() ? undefined : (event) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          props.onToggle();
-        }}
-      >
-        <span class={styles.setToggle} aria-hidden>
-          <Icon name={expanded() ? "ph:caret-down" : "ph:caret-right"} size={12} decorative />
-        </span>
-        <Show
-          when={props.renaming}
-          fallback={(
-            <span class={styles.setNameButton}>
-              <span class={styles.setName} title={displayName()}>{displayName()}</span>
-            </span>
-          )}
-        >
-          <input
-            class={styles.setNameInput}
-            value={draftName()}
-            autofocus
-            onFocus={(event) => event.currentTarget.select()}
-            onInput={(event) => setDraftName(event.currentTarget.value)}
-            onBlur={() => props.onRename(draftName())}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") props.onRename(draftName());
-              if (event.key === "Escape") props.onCancelRename();
-            }}
-            aria-label={`Rename ${displayName()}`}
-          />
-        </Show>
-        <Tag className={styles.setCount} tone={props.items.length === 0 ? "zero" : "default"}>{props.items.length}</Tag>
-      </div>
-      <ul class={`${styles.setList} ${expanded() ? styles.setListOpen : ""}`} aria-hidden={!expanded()}>
-        {props.children}
-      </ul>
-      {menu.menu()}
-    </section>
-  );
-}
-
 function instrumentSetId(instrument: Instrument): string {
   return instrument.setId ?? "user-instruments";
+}
+
+function loadOpenInstrumentSets(): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(INSTRUMENT_SET_EXPANSION_KEY) ?? "{}") as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean"));
+  } catch {
+    return {};
+  }
+}
+
+function persistOpenInstrumentSets(openSets: Record<string, boolean>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(INSTRUMENT_SET_EXPANSION_KEY, JSON.stringify(openSets));
+  } catch {
+    // Storage can be unavailable in restricted browser contexts.
+  }
 }
 
 function instrumentSetDisplayName(set: InstrumentSet): string {

@@ -23,3 +23,8 @@ if (shouldInstallBeatDevHooks()) {
 }
 
 render(() => <App />, container);
+
+if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("beatDevFixture")) {
+  document.getElementById("beat-boot-splash")?.remove();
+  document.title = "Beat UI Kit | Live Preview";
+}

@@ -8,7 +8,7 @@ export interface NumberInputProps {
   step?: number;
   unit?: string;
   label?: string;
-  layout?: "stacked" | "inline" | "bare";
+  layout?: "stacked" | "inline" | "editor" | "bare";
   ariaLabel?: string;
   className?: string;
   inputClassName?: string;
@@ -66,6 +66,7 @@ export function NumberInput(props: NumberInputProps) {
       class={[
         styles.wrap,
         props.layout === "inline" && styles.inline,
+        props.layout === "editor" && styles.editor,
         props.layout === "bare" && styles.bare,
         props.className,
       ].filter(Boolean).join(" ")}

@@ -11,6 +11,7 @@ namespace beat
     {
         juce::String path;
         juce::String name;
+        juce::String trigger { "attack" };
         int rootNote { 60 };
         int loNote { 0 };
         int hiNote { 127 };

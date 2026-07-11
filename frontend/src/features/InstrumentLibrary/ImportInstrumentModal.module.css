@@ -1,14 +1,14 @@
 .panel {
   display: flex;
   flex-direction: column;
-  min-height: min(680px, calc(90vh - 96px));
-  gap: 8px;
+  min-height: min(681px, calc(90vh - 96px));
+  gap: 9px;
 }
 
 .topRow {
   display: grid;
   grid-template-columns: auto auto auto;
-  gap: 8px;
+  gap: 9px;
   align-items: center;
   justify-content: start;
 }
@@ -21,7 +21,7 @@
 }
 
 .status {
-  padding: 6px 8px;
+  padding: 6px 9px;
   border: var(--border-fg);
   background: var(--surface-subtle);
   font-size: var(--font-size-ui);
@@ -30,9 +30,9 @@
 
 .importGrid {
   display: grid;
-  grid-template-columns: minmax(190px, 1fr) minmax(360px, 2fr);
+  grid-template-columns: minmax(189px, 1fr) minmax(360px, 2fr);
   flex: 1 1 auto;
-  gap: 8px;
+  gap: 9px;
   min-height: 0;
 }
 
@@ -51,8 +51,8 @@
   z-index: 1;
   display: flex;
   align-items: center;
-  min-height: 28px;
-  padding: 0 8px;
+  min-height: 27px;
+  padding: 0 9px;
   border-bottom: var(--border-fg);
   background: color-mix(in srgb, var(--color-bg) 92%, transparent);
   backdrop-filter: blur(8px);
@@ -64,7 +64,7 @@
 }
 
 .empty {
-  padding: 8px;
+  padding: 9px;
   font-size: var(--font-size-ui);
   line-height: 1.35;
   opacity: 0.65;
@@ -72,9 +72,9 @@
 
 .fileRow {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) 48px 28px;
+  grid-template-columns: 18px minmax(0, 1fr) 48px 27px;
   align-items: center;
-  min-height: 28px;
+  min-height: 27px;
   width: 100%;
   padding: 0;
   border-bottom: var(--border-fg);
@@ -137,8 +137,8 @@
   justify-content: center;
   justify-self: stretch;
   align-self: stretch;
-  width: 28px;
-  min-width: 28px;
+  width: 27px;
+  min-width: 27px;
   border: 0;
   border-left: var(--border-fg);
   background: transparent;
@@ -157,20 +157,20 @@
 }
 
 .groupList {
-  gap: 8px;
-  padding-bottom: 8px;
+  gap: 9px;
+  padding-bottom: 9px;
 }
 
 .groupCard {
   display: flex;
   flex-direction: column;
-  margin: 0 8px;
+  margin: 0 9px;
   border: var(--border-fg);
   background: var(--color-bg);
 }
 
 .groupCard:first-of-type {
-  margin-top: 8px;
+  margin-top: 9px;
 }
 
 .groupHeader {
@@ -189,7 +189,7 @@
 .volumeBlock {
   display: flex;
   flex-direction: column;
-  min-height: 28px;
+  min-height: 27px;
   border-bottom: var(--border-fg);
 }
 
@@ -245,8 +245,8 @@
   display: inline-flex;
   align-items: center;
   min-width: 0;
-  height: 32px;
-  gap: 4px;
+  height: 33px;
+  gap: 3px;
   padding: 0 var(--space-1);
   border: var(--border-fg);
   background: var(--color-bg);
@@ -277,9 +277,9 @@
 .normalizeField {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  height: 33px;
   gap: 6px;
-  padding: 0 8px;
+  padding: 0 9px;
   border: var(--border-fg);
   background: var(--color-bg);
   white-space: nowrap;

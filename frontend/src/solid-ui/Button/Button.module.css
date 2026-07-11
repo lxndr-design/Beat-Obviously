@@ -45,7 +45,9 @@
 }
 
 /* Variants ------------------------------------------------------------- */
-.variant-default { /* default state */ }
+.variant-default {
+  background: var(--surface-subtle);
+}
 
 .variant-primary {
   background: var(--interaction-active-bg);
@@ -93,8 +95,8 @@
 
 /* Sizes ---------------------------------------------------------------- */
 .size-xs {
-  min-height: 28px;
-  min-width: 28px;
+  min-height: 27px;
+  min-width: 27px;
   padding: 0 var(--space-1);
   font-size: var(--font-size-ui);
 }
@@ -120,7 +122,7 @@
 /* Icon-only: 1:1 ratio. Sizes pin to --button-square-* tokens. */
 .iconOnly {
   flex: 0 0 auto;
-  padding: 0;
+  padding: 6px;
   letter-spacing: normal;
   aspect-ratio: 1;
 }

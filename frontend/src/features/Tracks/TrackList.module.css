@@ -6,10 +6,6 @@
   flex-direction: column;
 }
 
-.tracksBlock :global([class*="Block-module_header"]) {
-  height: var(--sidebar-rail-size);
-}
-
 .tracksBlock.tracksBlock {
   border-top: 0;
   border-left: 0;
@@ -42,7 +38,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  height: 32px;
+  height: 33px;
   padding: 0 var(--space-1);
   background: transparent;
   color: var(--color-fg);
@@ -74,8 +70,8 @@
 
 .selectionBar {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 9px;
+  right: 9px;
   z-index: 5;
   display: flex;
   align-items: center;
@@ -85,7 +81,7 @@
 }
 
 .selectionCount {
-  min-width: 20px;
+  min-width: 21px;
   height: var(--button-square-xs);
   display: inline-flex;
   align-items: center;
@@ -108,8 +104,8 @@
  * so the scrollbar reads as a framed control. Inset (not border) keeps the
  * full 8px track height intact. */
 .laneScroll::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
 }
 .laneScroll::-webkit-scrollbar-track {
   background: transparent;
@@ -175,7 +171,7 @@
 /* Empty row in the lane column matching the +add-track row's 32px height
  * so the column rows stay vertically aligned with the header column. */
 .addRowLaneSpacer {
-  height: 32px;
+  height: 33px;
   flex-shrink: 0;
 }
 
@@ -183,8 +179,8 @@
  * (not the scroll content), 8px from the bottom-right edge. */
 .zoomFloat {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
+  bottom: 9px;
+  right: 9px;
   display: flex;
   gap: 0;
   padding: 0;

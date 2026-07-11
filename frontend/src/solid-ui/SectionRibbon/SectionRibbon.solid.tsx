@@ -36,7 +36,9 @@ export function SectionRibbon(allProps: SectionRibbonProps) {
           onClick={local.onToggle}
           aria-label={local.expanded ? `Collapse ${local.title}` : `Expand ${local.title}`}
         >
-          <Icon name={local.expanded ? "ph:caret-down" : "ph:caret-right"} size={16} decorative />
+          <span class={`${styles.toggleIcon} ${local.expanded ? styles.toggleIconExpanded : ""}`}>
+            <Icon name="ph:caret-right" size={18} decorative />
+          </span>
         </Button>
       </Show>
       <span class={styles.label}>{local.title}</span>

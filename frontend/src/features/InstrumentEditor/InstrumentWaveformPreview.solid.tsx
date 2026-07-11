@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, type Accessor } from "solid-js";
-import { Button, HoverInfo, Icon } from "../../solid-ui";
+import { FieldActionButton, HoverInfo, Icon } from "../../solid-ui";
 import {
   cachedInstrumentSampleBuffer,
   createInstrumentBufferSource,
@@ -335,26 +335,22 @@ function InstrumentWaveformPreviewRuntime(props: { state: Accessor<InstrumentWav
           <span class={styles.meta}>{shouldDrawSample() ? "sample" : props.state().instrument.waveform}</span>
           <div class={styles.previewControls}>
             <HoverInfo content={playing() ? "Stop preview" : "Play preview"}>
-              <Button
-                iconOnly
-                size="xs"
-                variant={playing() ? "primary" : "default"}
+              <FieldActionButton
+                active={playing()}
                 aria-label={playing() ? "Stop waveform preview" : "Play waveform preview"}
                 onClick={() => void playPreview()}
               >
-                <Icon name={playing() ? "ph:stop-fill" : "ph:play-fill"} size={12} decorative />
-              </Button>
+                <Icon name={playing() ? "ph:stop-fill" : "ph:play-fill"} size={18} decorative />
+              </FieldActionButton>
             </HoverInfo>
             <HoverInfo content={looping() ? "Stop loop" : "Loop preview"}>
-              <Button
-                iconOnly
-                size="xs"
-                variant={looping() ? "primary" : "default"}
+              <FieldActionButton
+                active={looping()}
                 aria-label={looping() ? "Stop waveform loop" : "Play waveform loop"}
                 onClick={() => void toggleLoop()}
               >
-                <Icon name={looping() ? "ph:stop-fill" : "ph:repeat"} size={12} decorative />
-              </Button>
+                <Icon name={looping() ? "ph:stop-fill" : "ph:repeat"} size={18} decorative />
+              </FieldActionButton>
             </HoverInfo>
           </div>
         </div>

@@ -1,0 +1,32 @@
+.preview {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
+.rowLine {
+  stroke: color-mix(in srgb, var(--color-bg) 24%, transparent);
+  stroke-width: 1;
+}
+
+.hit {
+  fill: var(--color-bg);
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.hitPlaying {
+  fill: var(--color-fg);
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+}

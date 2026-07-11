@@ -131,7 +131,7 @@
   z-index: 3;
   background: var(--color-bg);
   color: var(--color-fg);
-  padding: 2px 4px;
+  padding: 3px 3px;
   display: flex;
   align-items: center;
   gap: 3px;
@@ -182,15 +182,15 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 11px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
   opacity: 0.78;
 }
 
 .decentSamplerBadge img {
   display: block;
-  width: 11px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
   object-fit: contain;
 }
 
@@ -267,8 +267,8 @@
 
 .fadeHandle {
   position: absolute;
-  top: 2px;
-  width: 14px;
+  top: 3px;
+  width: 15px;
   height: 18px;
   padding: 0;
   transform: translateX(-50%);
@@ -325,7 +325,7 @@
 
 .fadeHandle:focus-visible {
   outline: 1px solid currentColor;
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 .segment.playing {

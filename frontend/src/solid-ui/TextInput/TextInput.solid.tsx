@@ -6,10 +6,11 @@ export interface TextInputProps extends Omit<JSX.InputHTMLAttributes<HTMLInputEl
   layout?: "stacked" | "inline" | "bare";
   unit?: string;
   className?: string;
+  inputClassName?: string;
 }
 
 export function TextInput(allProps: TextInputProps) {
-  const [local, props] = splitProps(allProps, ["label", "layout", "unit", "class", "className", "type"]);
+  const [local, props] = splitProps(allProps, ["label", "layout", "unit", "class", "className", "inputClassName", "type"]);
   const cls = () => [
     styles.wrap,
     (local.layout ?? "stacked") === "inline" && styles.inline,
@@ -24,7 +25,7 @@ export function TextInput(allProps: TextInputProps) {
         <span class={styles.label}>{local.label}</span>
       </Show>
       <span class={styles.fieldFrame}>
-        <input class={styles.input} type={local.type ?? "text"} {...props} />
+        <input class={[styles.input, local.inputClassName].filter(Boolean).join(" ")} type={local.type ?? "text"} {...props} />
         <Show when={local.unit}>
           <span class={styles.unit}>{local.unit}</span>
         </Show>

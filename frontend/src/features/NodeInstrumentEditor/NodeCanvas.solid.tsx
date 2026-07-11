@@ -225,7 +225,7 @@ function NodeBlock(props: {
       >
         <div class={styles.nodeHeader} onPointerDown={(event) => props.state().onStartNodeDrag(event, props.node)}>
           <span class={styles.nodeIcon}>
-            <Icon name={definition.icon} size={14} decorative />
+            <Icon name={definition.icon} size={18} decorative />
           </span>
           <span class={styles.nodeTitle}>
             <strong>{definition.label}</strong>
@@ -243,7 +243,7 @@ function NodeBlock(props: {
               }}
               aria-label={`Remove ${props.node.label}`}
             >
-              <Icon name="ph:trash" size={12} decorative />
+              <Icon name="ph:trash" size={18} decorative />
             </Button>
           )}
         </div>

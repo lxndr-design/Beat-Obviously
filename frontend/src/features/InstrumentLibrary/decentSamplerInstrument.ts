@@ -22,7 +22,8 @@ function decentSamplerInstrumentPatch(
   preset: DecentSamplerImport,
   options: CreateDecentSamplerInstrumentOptions = {},
 ): Partial<Instrument> {
-  const sampleUrls = Array.from(new Set(preset.sampleUrls));
+  const attackSamples = decentSamplerAttackSamples(preset);
+  const sampleUrls = Array.from(new Set(attackSamples.map((sample) => sample.path)));
   const audioIds = new Map(preset.audioFiles.map((file) => [file.path, file.id]));
   const releaseMs = decentSamplerReleaseMs(preset);
   const effects = decentSamplerEffects(preset);
@@ -35,9 +36,10 @@ function decentSamplerInstrumentPatch(
     sampleIds: sampleUrls.map((url) => audioIds.get(url)).filter(Boolean) as string[],
     sampleUrl: sampleUrls[0],
     sampleUrls,
-    sampleMap: preset.samples.map((sample) => ({
+    sampleMap: attackSamples.map((sample) => ({
       path: sample.path,
       name: sample.name,
+      trigger: sample.trigger ?? "attack",
       rootNote: sample.rootNote,
       loNote: sample.loNote,
       hiNote: sample.hiNote,
@@ -70,6 +72,16 @@ function decentSamplerInstrumentPatch(
     descriptors: describeDecentPreset(preset),
     userCreated: true,
   };
+}
+
+function decentSamplerAttackSamples(preset: DecentSamplerImport) {
+  const attackSamples = (preset.samples ?? []).filter((sample) => !isReleaseTrigger(sample.trigger));
+  return attackSamples.length > 0 ? attackSamples : (preset.samples ?? []);
+}
+
+function isReleaseTrigger(trigger: string | undefined) {
+  const normalized = (trigger ?? "attack").trim().toLowerCase();
+  return normalized === "release" || normalized === "note_off" || normalized === "note-off" || normalized === "noteoff";
 }
 
 function decentSamplerReleaseMs(preset: DecentSamplerImport) {

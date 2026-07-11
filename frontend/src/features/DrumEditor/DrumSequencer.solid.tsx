@@ -1,6 +1,6 @@
 import { createEffect, createSignal, onCleanup, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
-import { Button, FloatingLayer, FloatingSelect, HoverInfo, Icon, NumberInput, RadioGroup, TextInput } from "../../solid-ui";
+import { Button, FloatingLayer, FloatingSelect, HoverInfo, Icon, NumberInput, RadioGroup, Slider, TextInput } from "../../solid-ui";
 import { ai } from "../../ai/aiService";
 import { DRUM_COMPLEXITY_DEFAULT, DRUM_GENRES, DRUM_MAX_STEPS, type DrumGenre, type GeneratedDrumBeat } from "../../ai/drumBeatGenerator";
 import { maybeRunDueTraining } from "../../ai/trainingRunner";
@@ -762,21 +762,17 @@ export function DrumSequencer(props: Props) {
           />
         )}
         {props.onSwingChange && (
-          <label class={styles.swingControl}>
-            <span class={styles.swingHeader}>
-              <span class={styles.swingLabel}>Swing</span>
-              <span class={styles.swingValue}>{sanitizeSwingPercent(swingPercent())}%</span>
-            </span>
-            <input
-              class={styles.swingRange}
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={sanitizeSwingPercent(swingPercent())}
-              onInput={(event) => props.onSwingChange?.(Number(event.currentTarget.value))}
-            />
-          </label>
+          <Slider
+            className={styles.swingControl}
+            layout="inline"
+            label="Swing"
+            min={0}
+            max={100}
+            step={1}
+            value={sanitizeSwingPercent(swingPercent())}
+            readout={`${sanitizeSwingPercent(swingPercent())}%`}
+            onChange={(value) => props.onSwingChange?.(value)}
+          />
         )}
         {props.onTimeSignatureChange && (
           <TimeSignatureControl
@@ -801,22 +797,18 @@ export function DrumSequencer(props: Props) {
             }}
             onChange={(value) => setGenerateGenre(value as DrumGenre)}
           />
-          <label class={styles.complexityControl}>
-            <span class={styles.complexityHeader}>
-              <span class={styles.complexityLabel}>Complexity</span>
-              <span class={styles.complexityValue}>{generateComplexity()}</span>
-            </span>
-            <input
-              class={styles.complexityRange}
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={generateComplexity()}
-              onInput={(event) => setGenerateComplexity(Number(event.currentTarget.value))}
-              aria-label="Generated beat complexity"
-            />
-          </label>
+          <Slider
+            className={styles.complexityControl}
+            layout="inline"
+            label="Complexity"
+            min={0}
+            max={100}
+            step={1}
+            value={generateComplexity()}
+            readout={generateComplexity()}
+            ariaLabel="Generated beat complexity"
+            onChange={setGenerateComplexity}
+          />
           <Button
             class={styles.generateButton}
             iconOnly
@@ -825,7 +817,7 @@ export function DrumSequencer(props: Props) {
             aria-label="Generate beat"
             disabled={generating()}
           >
-            <Icon name={generating() ? "ph:spinner" : "ph:sparkle"} size={14} decorative />
+            <Icon name={generating() ? "ph:spinner" : "ph:sparkle"} size={18} decorative />
           </Button>
         </div>
         {lastGeneratedBeat() && !feedbackSubmitted() && (
@@ -838,7 +830,7 @@ export function DrumSequencer(props: Props) {
                 onClick={() => void rateGeneratedBeat("up")}
                 aria-label="Rate generated beat up"
               >
-                <Icon name="ph:thumbs-up" size={14} decorative />
+                <Icon name="ph:thumbs-up" size={18} decorative />
               </Button>
             </HoverInfo>
             <HoverInfo content="Bad generation">
@@ -852,7 +844,7 @@ export function DrumSequencer(props: Props) {
                 }}
                 aria-label="Rate generated beat down"
               >
-                <Icon name="ph:thumbs-down" size={14} decorative />
+                <Icon name="ph:thumbs-down" size={18} decorative />
               </Button>
             </HoverInfo>
           </div>
@@ -895,19 +887,19 @@ export function DrumSequencer(props: Props) {
                   onClick={() => removeRow(row.id)}
                   aria-label={`Remove ${row.name}`}
                 >
-                  <Icon name="ph:trash" size={12} decorative />
+                  <Icon name="ph:trash" size={18} decorative />
                 </Button>
               </HoverInfo>
             </div>
           ))}
           <div class={styles.addRowControls}>
             <Button size="sm" onClick={addRow} fullWidth>
-              <Icon name="ph:plus" size={14} decorative />
+              <Icon name="ph:plus" size={18} decorative />
               Instrument
             </Button>
             {props.onUploadRow && (
               <Button iconOnly size="xs" onClick={props.onUploadRow} aria-label="Upload drum instrument row">
-                <Icon name="ph:upload" size={14} decorative />
+                <Icon name="ph:upload" size={18} decorative />
               </Button>
             )}
           </div>
@@ -1006,7 +998,7 @@ export function DrumSequencer(props: Props) {
               onClick={play}
               aria-label="Restart drum sequence"
             >
-              <Icon name="ph:skip-back-fill" size={16} decorative />
+              <Icon name="ph:skip-back-fill" size={18} decorative />
             </Button>
           </HoverInfo>
           <HoverInfo content={playing() ? "Pause" : "Play"}>
@@ -1017,7 +1009,7 @@ export function DrumSequencer(props: Props) {
               onClick={playing() ? stop : play}
               aria-label={playing() ? "Pause drum sequence" : "Play drum sequence"}
             >
-              <Icon name={playing() ? "ph:pause-fill" : "ph:play-fill"} size={16} decorative />
+              <Icon name={playing() ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
             </Button>
           </HoverInfo>
         </div>
@@ -1029,7 +1021,7 @@ export function DrumSequencer(props: Props) {
               onClick={() => setCellSize((size) => Math.max(MIN_CELL_SIZE, size - CELL_ZOOM_STEP))}
               aria-label="Zoom drum cells out"
             >
-              <Icon name="ph:magnifying-glass-minus" size={16} decorative />
+              <Icon name="ph:magnifying-glass-minus" size={18} decorative />
             </Button>
           </HoverInfo>
           <HoverInfo content="Reset zoom">
@@ -1039,7 +1031,7 @@ export function DrumSequencer(props: Props) {
               onClick={() => setCellSize(DEFAULT_CELL_SIZE)}
               aria-label="Reset drum cell zoom"
             >
-              <Icon name="ph:arrow-counter-clockwise" size={16} decorative />
+              <Icon name="ph:arrow-counter-clockwise" size={18} decorative />
             </Button>
           </HoverInfo>
           <HoverInfo content="Zoom in">
@@ -1049,7 +1041,7 @@ export function DrumSequencer(props: Props) {
               onClick={() => setCellSize((size) => Math.min(MAX_CELL_WIDTH, size + CELL_ZOOM_STEP))}
               aria-label="Zoom drum cells in"
             >
-              <Icon name="ph:magnifying-glass-plus" size={16} decorative />
+              <Icon name="ph:magnifying-glass-plus" size={18} decorative />
             </Button>
           </HoverInfo>
         </div>
@@ -1195,24 +1187,24 @@ function CellMenu({
   const labelSuffix = selectionSize > 1 ? " selection" : " cell";
   return createPortal(
     <FloatingLayer class={styles.cellMenu} x={state.x} y={state.y} role="menu">
-      <button type="button" class={styles.cellMenuItem} onClick={onShiftPitch} role="menuitem">
+      <Button variant="ghost" fullWidth class={styles.cellMenuItem} onClick={onShiftPitch} role="menuitem">
         Shift pitch
-      </button>
-      <button type="button" class={styles.cellMenuItem} onClick={onVolume} role="menuitem">
+      </Button>
+      <Button variant="ghost" fullWidth class={styles.cellMenuItem} onClick={onVolume} role="menuitem">
         Volume
-      </button>
-      <button type="button" class={styles.cellMenuItem} onClick={onLean} role="menuitem">
+      </Button>
+      <Button variant="ghost" fullWidth class={styles.cellMenuItem} onClick={onLean} role="menuitem">
         Lean beat…
-      </button>
-      <button type="button" class={styles.cellMenuItem} onClick={onCopy} role="menuitem">
+      </Button>
+      <Button variant="ghost" fullWidth class={styles.cellMenuItem} onClick={onCopy} role="menuitem">
         Copy{labelSuffix}
-      </button>
-      <button type="button" class={styles.cellMenuItem} onClick={onPaste} disabled={!hasClipboard} role="menuitem">
+      </Button>
+      <Button variant="ghost" fullWidth class={styles.cellMenuItem} onClick={onPaste} disabled={!hasClipboard} role="menuitem">
         Paste
-      </button>
-      <button type="button" class={styles.cellMenuItem} onClick={onReset} role="menuitem">
+      </Button>
+      <Button variant="ghost" fullWidth class={styles.cellMenuItem} onClick={onReset} role="menuitem">
         Reset{labelSuffix}
-      </button>
+      </Button>
     </FloatingLayer>,
     document.body,
   );

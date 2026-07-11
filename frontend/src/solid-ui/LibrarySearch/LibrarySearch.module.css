@@ -1,0 +1,32 @@
+.input {
+  display: block;
+  width: 100%;
+  height: var(--field-control-height);
+  min-height: var(--field-control-height);
+  padding: 0 6px;
+  box-sizing: border-box;
+  border: 0;
+  border-bottom: var(--border-fg);
+  border-radius: 0;
+  outline: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  appearance: none;
+}
+
+.input::placeholder {
+  color: color-mix(in srgb, var(--color-fg) 48%, transparent);
+  opacity: 1;
+}
+
+.input:focus,
+.input:focus-visible {
+  box-shadow: var(--interaction-focus-ring);
+}
+
+.input::-webkit-search-cancel-button {
+  appearance: none;
+}

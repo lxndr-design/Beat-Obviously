@@ -5,12 +5,18 @@ namespace
 {
     namespace menuCommand
     {
+        constexpr auto home         = "home";
+        constexpr auto whatsNew     = "whatsNew";
+        constexpr auto userGuide    = "userGuide";
         constexpr auto newProject   = "newProject";
         constexpr auto openProject  = "openProject";
         constexpr auto saveProject  = "saveProject";
         constexpr auto importAudio  = "importAudio";
         constexpr auto exportWav    = "exportWav";
         constexpr auto preferences  = "preferences";
+        constexpr auto undo         = "undo";
+        constexpr auto redo         = "redo";
+        constexpr auto songInfo     = "songInfo";
     }
 
     enum MenuItemIds
@@ -21,6 +27,12 @@ namespace
         menuImportAudio,
         menuExportWav,
         menuPreferences,
+        menuHome,
+        menuWhatsNew,
+        menuUserGuide,
+        menuUndo,
+        menuRedo,
+        menuSongInfo,
         menuQuit,
     };
 
@@ -42,21 +54,26 @@ namespace
         return {};
     }
 
-    class SquareWindowButton : public juce::Button
+    class SquareWindowButton : public juce::Button,
+                               private juce::Timer
     {
     public:
         SquareWindowButton(const juce::String& name, int type)
             : juce::Button(name), buttonType(type)
         {
             setWantsKeyboardFocus(false);
+            startTimerHz(30);
         }
 
-        void paintButton(juce::Graphics& g, bool highlighted, bool down) override
+        void paintButton(juce::Graphics& g, bool, bool down) override
         {
             auto r = getLocalBounds().toFloat();
-            auto fg = highlighted || down ? juce::Colours::black : juce::Colours::white;
+            const auto liveHover = isPointerActuallyOverButton();
+            lastPointerHover = liveHover;
+            const auto active = liveHover || down;
+            auto fg = active ? juce::Colours::black : juce::Colours::white;
 
-            if (highlighted || down)
+            if (active)
             {
                 g.setColour(juce::Colours::white);
                 g.fillRect(r);
@@ -83,7 +100,28 @@ namespace
         }
 
     private:
+        bool isPointerActuallyOverButton() const
+        {
+            if (!isShowing())
+                return false;
+            const auto pointer = juce::Desktop::getInstance()
+                .getMainMouseSource()
+                .getScreenPosition()
+                .roundToInt();
+            return getScreenBounds().contains(pointer);
+        }
+
+        void timerCallback() override
+        {
+            const auto nextHover = isPointerActuallyOverButton();
+            if (nextHover == lastPointerHover)
+                return;
+            lastPointerHover = nextHover;
+            repaint();
+        }
+
         int buttonType;
+        bool lastPointerHover { false };
     };
 
     class BeatLookAndFeel : public juce::LookAndFeel_V4
@@ -233,7 +271,13 @@ public:
     {
         juce::LookAndFeel::setDefaultLookAndFeel(&lookAndFeel);
        #if JUCE_MAC
-        juce::MenuBarModel::setMacMainMenu(this);
+        macApplicationMenu.clear();
+        macApplicationMenu.addItem(menuHome, "Home");
+        macApplicationMenu.addItem(menuWhatsNew, "What's New");
+        macApplicationMenu.addItem(menuUserGuide, "User Guide");
+        macApplicationMenu.addSeparator();
+        macApplicationMenu.addItem(menuPreferences, "Settings...");
+        juce::MenuBarModel::setMacMainMenu(this, &macApplicationMenu);
        #endif
         mainWindow.reset(new MainWindow(getApplicationName(), findBeatProjectPathInCommandLine(commandLine)));
     }
@@ -261,7 +305,7 @@ public:
 
     juce::StringArray getMenuBarNames() override
     {
-        return { "File", "Beat" };
+        return { "File", "Edit" };
     }
 
     juce::PopupMenu getMenuForIndex(int index, const juce::String&) override
@@ -275,12 +319,13 @@ public:
             menu.addSeparator();
             menu.addItem(menuImportAudio, "Import Audio...");
             menu.addItem(menuExportWav, "Export WAV...");
-            menu.addSeparator();
-            menu.addItem(menuQuit, "Quit Beat");
         }
         else if (index == 1)
         {
-            menu.addItem(menuPreferences, "Preferences...");
+            menu.addItem(menuUndo, "Undo");
+            menu.addItem(menuRedo, "Redo");
+            menu.addSeparator();
+            menu.addItem(menuSongInfo, "Song Info...");
         }
         return menu;
     }
@@ -289,12 +334,18 @@ public:
     {
         switch (menuItemID)
         {
+            case menuHome:        sendCommandToFrontend(menuCommand::home); break;
+            case menuWhatsNew:    sendCommandToFrontend(menuCommand::whatsNew); break;
+            case menuUserGuide:   sendCommandToFrontend(menuCommand::userGuide); break;
             case menuNewProject:  sendCommandToFrontend(menuCommand::newProject); break;
             case menuOpenProject: sendCommandToFrontend(menuCommand::openProject); break;
             case menuSaveProject: sendCommandToFrontend(menuCommand::saveProject); break;
             case menuImportAudio: sendCommandToFrontend(menuCommand::importAudio); break;
             case menuExportWav:   sendCommandToFrontend(menuCommand::exportWav); break;
             case menuPreferences: sendCommandToFrontend(menuCommand::preferences); break;
+            case menuUndo:        sendCommandToFrontend(menuCommand::undo); break;
+            case menuRedo:        sendCommandToFrontend(menuCommand::redo); break;
+            case menuSongInfo:    sendCommandToFrontend(menuCommand::songInfo); break;
             case menuQuit:        systemRequestedQuit(); break;
             default: break;
         }
@@ -397,6 +448,7 @@ private:
     }
 
     BeatLookAndFeel lookAndFeel;
+    juce::PopupMenu macApplicationMenu;
     std::unique_ptr<MainWindow> mainWindow;
 };
 

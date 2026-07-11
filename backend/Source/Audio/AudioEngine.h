@@ -95,6 +95,9 @@ namespace beat
                                const juce::String& inputDeviceName,
                                int inputChannelCount,
                                juce::String* error = nullptr);
+        bool selectOutputDevice(const juce::String& typeName,
+                                const juce::String& outputDeviceName,
+                                juce::String* error = nullptr);
         void prepareForOffline(double sampleRate, int blockSize, int numOutputChannels);
         static bool renderProjectToWav(Project project,
                                        const juce::File& outputFile,

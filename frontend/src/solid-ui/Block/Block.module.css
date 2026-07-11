@@ -8,7 +8,7 @@
 }
 
 .framed {
-  border: var(--border-fg);
+  border: var(--border-structural);
 }
 
 .fill {
@@ -22,14 +22,16 @@
   align-items: center;
   justify-content: space-between;
   height: var(--height-track-header);
-  padding: 0 var(--space-1);
-  border-bottom: var(--border-fg);
+  padding: 0 var(--space-2);
+  border-bottom: var(--border-structural);
   flex-shrink: 0;
 }
 
 .title {
-  font-size: var(--font-size-ui);
-  font-weight: var(--font-weight-medium);
+  opacity: var(--structural-muted-opacity);
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
   text-transform: none;
   letter-spacing: 0;
 }
@@ -39,7 +41,7 @@
   align-items: center;
   gap: 0;
   align-self: stretch;
-  margin-right: calc(var(--space-1) * -1);
+  margin-right: calc(var(--space-2) * -1);
 }
 
 .body {

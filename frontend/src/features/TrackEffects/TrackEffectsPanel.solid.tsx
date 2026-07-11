@@ -140,7 +140,7 @@ export function TrackEffectsPanel() {
             </div>
             <HoverInfo content="Close">
               <Button iconOnly size="xs" onClick={() => useUiStore.getState().closeTrackEffects()} aria-label="Close effects and filters">
-                <Icon name="ph:x" size={14} decorative />
+                <Icon name="ph:x" size={18} decorative />
               </Button>
             </HoverInfo>
           </header>
@@ -169,7 +169,7 @@ export function TrackEffectsPanel() {
                 onClick={() => setAddOpen((open) => !open)}
                 aria-label="Add effect"
               >
-                <Icon name="ph:plus" size={14} decorative />
+                <Icon name="ph:plus" size={18} decorative />
                 Add effect
               </Button>
             </div>
@@ -184,14 +184,15 @@ export function TrackEffectsPanel() {
                 >
                   <For each={EFFECT_OPTIONS}>
                     {(option) => (
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        fullWidth
                         class={styles.addOption}
                         onClick={() => addEffect(option.value)}
                         role="menuitem"
                       >
                         {option.label}
-                      </button>
+                      </Button>
                     )}
                   </For>
                 </FloatingLayer>
@@ -220,7 +221,7 @@ function EffectBlock(props: {
         />
         <HoverInfo content="Remove effect">
           <Button iconOnly size="xs" onClick={props.onRemove} aria-label={`Remove ${EFFECT_LABELS[props.effect.kind]}`}>
-            <Icon name="ph:trash" size={12} decorative />
+            <Icon name="ph:trash" size={18} decorative />
           </Button>
         </HoverInfo>
       </div>

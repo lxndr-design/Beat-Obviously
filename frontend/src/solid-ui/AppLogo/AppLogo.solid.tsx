@@ -12,6 +12,8 @@ export function AppLogo(props: AppLogoProps) {
       aria-hidden={props.decorative ?? true}
       role={props.decorative === false ? "img" : undefined}
       aria-label={props.decorative === false ? "Beat" : undefined}
-    />
+    >
+      <img class={styles.image} src="/assets/beat-logo.svg" alt="" draggable={false} />
+    </span>
   );
 }

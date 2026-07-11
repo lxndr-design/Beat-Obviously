@@ -63,6 +63,8 @@ This note tracks backend capabilities that are ready for DAW UI wiring. It is in
 - Frontend state: DS rail lists installed DS packages; dragging a DS package creates a new Instanced Instrument; dragging an instanced instrument reuses the linked instance.
 - UI interactions: Import DS File modal, DS rail package list, drag DS to track, Instanced Instruments section, right-click Edit DS Instrument, and DS editor host for package-specific UI.
 - Backend-ready note: DS-created instruments must play through DS/sample mappings, not the generic synth editor. UI should treat editor kind as package metadata, not a generic plugin import kind.
+- Package inspection note: the Steinway Grand DS package defines a background image, labeled knobs, effects, sample zones, velocity layers, round robins, and release samples, but it does not author a piano/keybed UI. The keyboard shown in DecentSampler/Kontakt-style hosts is host chrome, so Beat should provide a generic DS keyboard/keymap strip from parsed `loNote`/`hiNote`/`rootNote` zones.
+- Keymap note: the Steinway package is sparse-mapped across anchor note ranges with velocity and round-robin layers, not sampled once for every chromatic key. The DS UI should expose stretched/interpolated note ranges and flag invalid package rows, such as a sample root note outside its declared `loNote`/`hiNote` range.
 
 ## Track Effects and Plugin Host
 

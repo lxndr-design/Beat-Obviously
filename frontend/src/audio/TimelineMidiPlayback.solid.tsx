@@ -6,7 +6,7 @@ import { expandTrackSegments, isTrackAudible } from "../state/selectors";
 import { isNative } from "../ipc/bridge";
 import { getTimelineAudioContext, scheduleTimelineMidiNote, stopTimelineAudio } from "./timelineAudio";
 import { useAnalyzerStore } from "../state/analyzerStore";
-import type { Instrument, MidiNote } from "../state/types";
+import type { Instrument, MidiNote, Segment } from "../state/types";
 import {
   DEFAULT_DRUM_MIDI_PITCH,
   DEFAULT_DRUM_VELOCITY,
@@ -114,7 +114,10 @@ export function TimelineMidiPlayback() {
           if (!seg || seg.muted) continue;
           if (seg.payload.kind === "drum") {
             const payloadSpeed = seg.payload.speed ?? 1;
-            const stepLengthBeats = drumPlaybackStepLengthBeats(seg.lengthBeats, seg.payload.stepCount, payloadSpeed);
+            const sourceStartBeat = seg.sourceStartBeat ?? 0;
+            const sourceLengthBeats = drumSegmentSourceLengthBeats(seg);
+            const stepLengthBeats = drumPlaybackStepLengthBeats(sourceLengthBeats, seg.payload.stepCount, payloadSpeed);
+            const occEndBeat = occ.startBeat + occ.lengthBeats;
             for (const row of seg.payload.rows) {
               const instrument =
                 currentInstruments.find((candidate) => candidate.id === row.instrumentId) ??
@@ -123,13 +126,19 @@ export function TimelineMidiPlayback() {
               for (let step = 0; step < seg.payload.stepCount; step++) {
                 const cell = normalizeDrumCell(row.steps[step]);
                 if (!cell.on) continue;
-                const noteStart = occ.startBeat
+                const rawStart = occ.startBeat
                   + step * stepLengthBeats
-                  + drumTimingOffsetBeats(step, stepLengthBeats, seg.payload.swingPercent, cell.leanPercent);
+                  + drumTimingOffsetBeats(step, stepLengthBeats, seg.payload.swingPercent, cell.leanPercent)
+                  - sourceStartBeat;
+                const rawEnd = rawStart + Math.min(0.25, stepLengthBeats);
+                const noteStart = Math.max(occ.startBeat, rawStart);
+                const noteEnd = Math.min(occEndBeat, rawEnd);
+                if (noteEnd - noteStart <= 0.000001) continue;
                 if (noteStart < currentBeat - 0.05 || noteStart > currentBeat + lookaheadBeats) continue;
-                const key = `${seg.id}:${occ.repetition}:${row.id}:${step}`;
+                const key = `${seg.id}:${occ.repetition}:${row.id}:${step}:${sourceStartBeat}`;
                 if (scheduled.has(key)) continue;
                 const delayS = Math.max(0, (noteStart - currentBeat) / beatsPerSecond);
+                const durationS = Math.max(0.03, Math.min(0.18, (noteEnd - noteStart) / beatsPerSecond));
                 const velocity = applyGainToVelocity(cell.velocity ?? DEFAULT_DRUM_VELOCITY, track.gainDb);
                 scheduleTimelineMidiNote(
                   {
@@ -137,11 +146,11 @@ export function TimelineMidiPlayback() {
                     frequencyHz: cell.pitchHz ?? seg.payload.defaultPitchHz,
                     velocity,
                     startBeat: 0,
-                    lengthBeats: Math.min(0.25, stepLengthBeats),
+                    lengthBeats: noteEnd - noteStart,
                   },
                   instrument,
                   audio.currentTime + delayS,
-                  Math.max(0.05, Math.min(0.18, stepLengthBeats / beatsPerSecond)),
+                  durationS,
                   undefined,
                   bpm,
                 );
@@ -152,11 +161,52 @@ export function TimelineMidiPlayback() {
                   velocity,
                   DEFAULT_DRUM_MIDI_PITCH,
                   delayS,
-                  Math.max(0.05, Math.min(0.18, stepLengthBeats / beatsPerSecond)),
+                  durationS,
                 );
                 useUiStore.getState().triggerSegmentPlayback(seg.id);
                 trackPeak = Math.max(trackPeak, velocity / 127);
               }
+            }
+            continue;
+          }
+          if (seg.payload.kind === "drumpad") {
+            const sourceStartBeat = seg.sourceStartBeat ?? 0;
+            const occEndBeat = occ.startBeat + occ.lengthBeats;
+            for (const hit of seg.payload.hits) {
+              const lane = seg.payload.lanes.find((candidate) => candidate.id === hit.laneId);
+              if (!lane || lane.muted) continue;
+              const rawStart = occ.startBeat + hit.startBeat - sourceStartBeat;
+              const rawEnd = rawStart + hit.lengthBeats;
+              const noteStart = Math.max(occ.startBeat, rawStart);
+              const noteEnd = Math.min(occEndBeat, rawEnd);
+              if (noteEnd - noteStart <= 0.000001) continue;
+              if (noteStart < currentBeat - 0.05 || noteStart > currentBeat + lookaheadBeats) continue;
+              const instrument =
+                currentInstruments.find((candidate) => candidate.id === lane.instrumentId) ??
+                currentInstruments.find((candidate) => candidate.id === seg.instrumentId) ??
+                fallbackInstrument;
+              const key = `${seg.id}:${occ.repetition}:${hit.id}:${hit.startBeat}:${hit.lengthBeats}:${sourceStartBeat}`;
+              if (scheduled.has(key)) continue;
+              const delayS = Math.max(0, (noteStart - currentBeat) / beatsPerSecond);
+              const durationS = Math.max(0.03, (noteEnd - noteStart) / beatsPerSecond);
+              const velocity = applyGainToVelocity(hit.velocity, track.gainDb + (seg.payload.gainDb ?? 0));
+              scheduleTimelineMidiNote(
+                {
+                  pitch: lane.pitch ?? DEFAULT_DRUM_MIDI_PITCH,
+                  velocity,
+                  startBeat: 0,
+                  lengthBeats: noteEnd - noteStart,
+                },
+                instrument,
+                audio.currentTime + delayS,
+                durationS,
+                undefined,
+                bpm,
+              );
+              scheduled.add(key);
+              scheduleExpressionActivity(instrument, key, velocity, lane.pitch ?? DEFAULT_DRUM_MIDI_PITCH, delayS, durationS);
+              useUiStore.getState().triggerSegmentPlayback(seg.id);
+              trackPeak = Math.max(trackPeak, velocity / 127);
             }
             continue;
           }
@@ -168,22 +218,31 @@ export function TimelineMidiPlayback() {
             fallbackInstrument;
 
           payload.notes.forEach((note, noteIndex) => {
-            const noteStart = occ.startBeat + note.startBeat;
+            const sourceStartBeat = seg.sourceStartBeat ?? 0;
+            const occEndBeat = occ.startBeat + occ.lengthBeats;
+            const rawStart = occ.startBeat + note.startBeat - sourceStartBeat;
+            const target = connectedLaterNote(payload.notes, noteIndex);
+            const rawDurationBeats = target ? Math.max(0.03, target.startBeat - note.startBeat) : note.lengthBeats;
+            const rawEnd = rawStart + rawDurationBeats;
+            const noteStart = Math.max(occ.startBeat, rawStart);
+            const noteEnd = Math.min(occEndBeat, rawEnd);
+            if (noteEnd - noteStart <= 0.000001) return;
             if (noteStart < currentBeat - 0.05 || noteStart > currentBeat + lookaheadBeats) return;
-            const key = `${seg.id}:${occ.repetition}:${noteIndex}:${note.pitch}:${note.startBeat}:${note.lengthBeats}`;
+            const key = `${seg.id}:${occ.repetition}:${noteIndex}:${note.pitch}:${note.startBeat}:${note.lengthBeats}:${sourceStartBeat}`;
             if (scheduled.has(key)) return;
             const transpose = seg.transpose ?? 0;
-            const target = connectedLaterNote(payload.notes, noteIndex);
             const delayS = Math.max(0, (noteStart - currentBeat) / beatsPerSecond);
-            const durationBeats = target ? Math.max(0.03, target.startBeat - note.startBeat) : note.lengthBeats;
+            const durationBeats = noteEnd - noteStart;
             const durationS = Math.max(0.03, durationBeats / beatsPerSecond);
             const noteWithGain = applySegmentGainToNote(transposeNote(note, transpose), (payload.gainDb ?? 0) + track.gainDb);
+            const targetStart = target ? occ.startBeat + target.startBeat - sourceStartBeat : null;
+            const clippedTarget = target && targetStart != null && targetStart < occEndBeat ? transposeNote(target, transpose) : undefined;
             scheduleTimelineMidiNote(
               noteWithGain,
               instrument,
               audio.currentTime + delayS,
               durationS,
-              target ? transposeNote(target, transpose) : undefined,
+              clippedTarget,
               bpm,
             );
             scheduled.add(key);
@@ -289,6 +348,11 @@ export function TimelineMidiPlayback() {
   }
 
   return null;
+}
+
+function drumSegmentSourceLengthBeats(segment: Segment): number {
+  if (segment.payload.kind !== "drum") return segment.lengthBeats;
+  return Math.max(0.25, segment.payload.sourceLengthBeats ?? segment.lengthBeats);
 }
 
 function isAetherExpressionInstrument(instrument: Instrument): boolean {

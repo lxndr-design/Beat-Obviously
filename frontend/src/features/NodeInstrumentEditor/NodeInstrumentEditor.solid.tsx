@@ -37,7 +37,7 @@ import {
   type InstrumentOutputWaveformPreview,
   type InstrumentPreviewAuditionHandle,
 } from "../../audio/synthPreview";
-import { Button, FloatingSelect, Icon, Knob, Select, TextInput, Toggle } from "../../solid-ui";
+import { Button, FloatingSelect, Icon, Knob, TextInput, Toggle } from "../../solid-ui";
 import styles from "./NodeInstrumentEditor.module.css";
 
 const NODE_WIDTH = 206;
@@ -68,6 +68,7 @@ interface DevSetParameterDetail {
 export interface NodeInstrumentEditorProps {
   instrument: Instrument | null;
   updateInstrument: (id: string, patch: Partial<Instrument>) => void;
+  onSaveInstrument?: (instrument: Instrument) => void;
 }
 
 interface NodeInstrumentEditorInternalProps {
@@ -518,7 +519,13 @@ function NodeInstrumentEditorView({ props }: NodeInstrumentEditorInternalProps) 
     const instrument = props().instrument;
     if (!instrument) return;
     const normalized = normalizeInstrumentNodeGraph(graph(), instrument);
-    props().updateInstrument(instrument.id, compileNodeGraphToInstrumentPatch(normalized, instrument));
+    const patch = compileNodeGraphToInstrumentPatch(normalized, instrument);
+    const onSaveInstrument = props().onSaveInstrument;
+    if (onSaveInstrument) {
+      onSaveInstrument({ ...instrument, ...patch });
+    } else {
+      props().updateInstrument(instrument.id, patch);
+    }
     setGraph(normalized);
     setDirty(false);
   }
@@ -549,7 +556,7 @@ function NodeInstrumentEditorView({ props }: NodeInstrumentEditorInternalProps) 
           <header class={styles.toolbar}>
             <div class={styles.identity}>
               <span class={styles.identityMark} aria-hidden="true">
-                <Icon name="ph:graph" size={16} decorative />
+                <Icon name="ph:graph" size={18} decorative />
               </span>
               <div class={styles.identityText}>
                 <strong>Nodemap</strong>
@@ -610,7 +617,7 @@ function NodeInstrumentEditorView({ props }: NodeInstrumentEditorInternalProps) 
           <footer class={`ds-action-footer ${styles.instrumentFooter}`}>
             <div class={styles.footerLeft}>
               <Button className={styles.footerButton} variant="ghost" selected={auditioning()} onClick={auditionGraph}>
-                <Icon name={auditioning() ? "ph:stop-fill" : "ph:play-fill"} size={12} decorative />
+                <Icon name={auditioning() ? "ph:stop-fill" : "ph:play-fill"} size={18} decorative />
                 {auditioning() ? "Stop" : "Audition"}
               </Button>
             </div>
@@ -713,7 +720,7 @@ function NodeBrowser(props: {
               <For each={group.nodeKinds}>
                 {(kind) => (
                   <Button size="sm" class={styles.nodePaletteButton} onClick={() => props.onAddNode(kind)}>
-                    <Icon name={NODE_DEFINITIONS[kind].icon} size={14} decorative />
+                    <Icon name={NODE_DEFINITIONS[kind].icon} size={18} decorative />
                     {NODE_DEFINITIONS[kind].label}
                   </Button>
                 )}
@@ -764,7 +771,7 @@ function NodeDetails(props: {
             <>
               <div class={styles.nodeDetailTitle}>
                 <span class={styles.nodeIcon} aria-hidden="true">
-                  <Icon name={selectedDefinition()?.icon ?? "ph:graph"} size={14} decorative />
+                  <Icon name={selectedDefinition()?.icon ?? "ph:graph"} size={18} decorative />
                 </span>
                 <TextInput
                   class={styles.detailTextField}
@@ -817,7 +824,7 @@ function NodeDetails(props: {
             <For each={props.issues}>
               {(issue) => (
                 <li>
-                  <Icon name="ph:warning" size={12} decorative />
+                  <Icon name="ph:warning" size={18} decorative />
                   <span>{issue.message}</span>
                 </li>
               )}
@@ -867,7 +874,7 @@ function PortDetailGroup(props: {
   return (
     <section class={styles.portDetailGroup} data-port-kind={portKind()}>
       <h4 class={styles.portDetailGroupTitle}>
-        <Icon name={portKind() === "input" ? "ph:arrow-square-in" : "ph:arrow-square-out"} size={14} decorative />
+        <Icon name={portKind() === "input" ? "ph:arrow-square-in" : "ph:arrow-square-out"} size={18} decorative />
         <span>{props.title}</span>
       </h4>
       <Show when={props.ports.length > 0} fallback={<p>None.</p>}>
@@ -877,7 +884,7 @@ function PortDetailGroup(props: {
             return (
               <div class={styles.portDetailRow}>
                 <div class={styles.portDetailHeader}>
-                  <Icon name={portSignalIcon(port.signal)} size={14} decorative />
+                  <Icon name={portSignalIcon(port.signal)} size={18} decorative />
                   <strong>{port.label}</strong>
                 </div>
                 <div class={styles.portDetailBody}>
@@ -918,17 +925,14 @@ function ParameterControl(props: ParameterControlProps) {
         <Show
           when={props.spec.kind === "boolean"}
           fallback={(
-            <Select
+            <FloatingSelect
               className={styles.selectField}
               label={props.spec.label}
               layout="inline"
               value={String(value())}
-              onChange={(event) => props.onChange(event.currentTarget.value)}
-            >
-                <For each={props.spec.options ?? []}>
-                  {(option) => <option value={option.value}>{option.label}</option>}
-                </For>
-            </Select>
+              options={props.spec.options ?? []}
+              onChange={props.onChange}
+            />
           )}
         >
           <Toggle

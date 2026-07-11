@@ -1,18 +1,8 @@
 .menuButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  background: transparent;
-  color: var(--color-fg);
-  border: 0;
   cursor: pointer;
 }
 
-.menuButton:hover :global(.brandMark),
-.menuButton:focus-visible :global(.brandMark) {
-  background: color-mix(in srgb, var(--color-fg) 18%, var(--color-bg));
-  color: var(--color-fg);
+.menuLogo {
+  width: 24px;
+  height: 24px;
 }

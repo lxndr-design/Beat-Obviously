@@ -1,7 +1,7 @@
 .panel {
   display: grid;
-  grid-template-columns: 176px minmax(0, 1fr);
-  height: min(620px, calc(100vh - 148px));
+  grid-template-columns: 177px minmax(0, 1fr);
+  height: min(621px, calc(100vh - 147px));
   min-height: 420px;
   overflow: hidden;
 }
@@ -12,13 +12,14 @@
   flex-direction: column;
   gap: 0;
   border-right: var(--border-fg);
-  padding: 8px 0;
+  padding: 0;
 }
 
 .navButton {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
+  width: 100%;
   min-width: 0;
   min-height: 30px;
   border: 0;
@@ -73,14 +74,14 @@
 .section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
 }
 
 .sectionHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 9px;
 }
 
 .sectionTitle {
@@ -104,7 +105,7 @@
 
 .modelSelect {
   width: min(100%, 390px);
-  min-width: 320px;
+  min-width: 321px;
 }
 
 .settingsGrid {
@@ -129,7 +130,7 @@
 
 .inlineToggle {
   width: 100%;
-  min-height: 26px;
+  min-height: 27px;
   border: var(--border-fg);
   padding: 0 6px;
   justify-content: space-between;
@@ -137,25 +138,25 @@
 
 .inlineToggle button {
   width: 24px;
-  height: 14px;
+  height: 15px;
 }
 
 .inlineToggle button::after {
-  top: 2px;
-  left: 2px;
-  width: 8px;
-  height: 8px;
+  top: 3px;
+  left: 3px;
+  width: 9px;
+  height: 9px;
 }
 
 .inlineToggle button[aria-checked="true"]::after {
-  transform: translateX(10px);
+  transform: translateX(9px);
 }
 
 .readout {
   display: grid;
-  grid-template-columns: minmax(92px, max-content) minmax(0, 1fr);
+  grid-template-columns: minmax(93px, max-content) minmax(0, 1fr);
   align-items: center;
-  min-height: 26px;
+  min-height: 27px;
   border: var(--border-fg);
   min-width: 0;
 }
@@ -197,30 +198,30 @@
 
 .gridRow {
   display: grid;
-  grid-template-columns: 128px minmax(0, 1fr);
+  grid-template-columns: 129px minmax(0, 1fr);
   align-items: center;
   gap: 6px;
 }
 
 .gridToggle {
-  width: 128px;
+  width: 129px;
   gap: 6px;
 }
 
 .gridToggle button {
   width: 24px;
-  height: 14px;
+  height: 15px;
 }
 
 .gridToggle button::after {
-  top: 2px;
-  left: 2px;
-  width: 8px;
-  height: 8px;
+  top: 3px;
+  left: 3px;
+  width: 9px;
+  height: 9px;
 }
 
 .gridToggle button[aria-checked="true"]::after {
-  transform: translateX(10px);
+  transform: translateX(9px);
 }
 
 .gridToggleLabel {
@@ -229,7 +230,7 @@
 }
 
 .gridRadio {
-  height: 26px;
+  height: 27px;
   justify-self: start;
   min-width: 0;
 }
@@ -240,7 +241,7 @@
 }
 
 .channelRadio button {
-  width: 64px;
+  width: 63px;
 }
 
 .hint {
@@ -265,9 +266,9 @@
 
 .checkpointRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 64px auto;
+  grid-template-columns: minmax(0, 1fr) 63px auto;
   align-items: center;
-  min-height: 28px;
+  min-height: 27px;
   border-bottom: var(--border-fg);
 }
 
@@ -278,9 +279,9 @@
 .checkpointMeta {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
-  padding: 4px 6px;
+  padding: 3px 6px;
 }
 
 .checkpointName {
@@ -322,7 +323,7 @@
 @media (max-width: 760px) {
   .panel {
     grid-template-columns: 1fr;
-    height: min(620px, calc(100vh - 120px));
+    height: min(621px, calc(100vh - 120px));
   }
 
   .tabs {
@@ -334,7 +335,7 @@
   }
 
   .navButton {
-    min-width: 92px;
+    min-width: 93px;
     border-bottom: 0;
     border-right: 1px solid color-mix(in srgb, var(--color-fg) 16%, transparent);
   }

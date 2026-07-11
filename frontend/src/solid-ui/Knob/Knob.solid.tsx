@@ -147,13 +147,13 @@ export function Knob(allProps: KnobProps) {
     >
       <Show when={isPickable()}>
         <span class={styles.pickAnchor} data-synth-pick-anchor aria-hidden="true">
-          <Icon name="ph:plug" size={12} decorative />
+          <Icon name="ph:plug" size={18} decorative />
         </span>
       </Show>
       <Show when={hasModulation()}>
         <div class={styles.modulation} aria-label={`${props.label ?? "Value"} modulation ${modulationText()}`}>
           <span class={styles.modulationIcon}>
-            <Icon name="ph:plug" size={12} decorative />
+            <Icon name="ph:plug" size={18} decorative />
           </span>
           <span class={styles.modulationLabel}>{modulationText()}</span>
         </div>

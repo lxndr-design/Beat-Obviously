@@ -1,16 +1,15 @@
 import { deflateSync } from "node:zlib";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
+const SVG_SOURCE = resolve("frontend/public/assets/beat-logo.svg");
 const OUT = resolve("backend/Assets/BeatIcon.png");
 const ICNS_OUT = resolve("backend/Assets/BeatIcon.icns");
 const SIZE = 1024;
 const SCALE = 3;
 const HI = SIZE * SCALE;
-const SOURCE_VIEWBOX = 64;
 const ICON_INSET = 138;
 const ICON_SIZE = SIZE - ICON_INSET * 2;
-const LOGO_PATH = "M51.24,33.92c-1.91-5.61-6.94-8.96-13.47-8.96-3.83,0-7.89,1.17-11.74,3.39-.91,.53-1.78,1.11-2.62,1.72v-14.69h6.72c.35,0,.67-.17,.87-.46L40.81,1.67c.49-.7-.02-1.67-.87-1.67h-20.89c-3.92,0-7.09,3.17-7.09,7.09v43.4l.03,.02c.04,1.56,.28,3.08,.77,4.53,1.91,5.61,6.94,8.96,13.47,8.96,3.83,0,7.89-1.17,11.74-3.39,10.47-6.04,16.3-17.76,13.27-26.68ZM39.52,44.93c-1.63,3.14-4.35,5.72-7.46,7.06-2.17,.93-4.38,1.21-6.22,.77-2.27-.54-2.53-1.62-2.65-2.07-.43-1.73,.07-4.28,1.29-6.65,1.62-3.14,4.34-5.71,7.46-7.06,2.17-.93,4.38-1.2,6.22-.76,2.27,.54,2.53,1.62,2.65,2.07,.43,1.74-.07,4.29-1.29,6.65Z";
 
 const alphaPixels = new Uint8Array(HI * HI);
 const lumaPixels = new Uint8Array(HI * HI);
@@ -31,10 +30,13 @@ function fillRect(x, y, w, h, value = 255) {
   }
 }
 
-function fillContoursEvenOdd(contours, value = 255) {
+function fillContoursEvenOdd(contours, viewBox, value = 255) {
+  const scale = Math.min(ICON_SIZE / viewBox.width, ICON_SIZE / viewBox.height);
+  const xInset = ICON_INSET + (ICON_SIZE - viewBox.width * scale) / 2;
+  const yInset = ICON_INSET + (ICON_SIZE - viewBox.height * scale) / 2;
   const scaledContours = contours.map((contour) => contour.map(([x, y]) => [
-    Math.round((ICON_INSET + (x / SOURCE_VIEWBOX) * ICON_SIZE) * SCALE),
-    Math.round((ICON_INSET + (y / SOURCE_VIEWBOX) * ICON_SIZE) * SCALE),
+    Math.round((xInset + (x - viewBox.x) * scale) * SCALE),
+    Math.round((yInset + (y - viewBox.y) * scale) * SCALE),
   ]));
   const allY = scaledContours.flat().map(([, y]) => y);
   const minY = Math.max(0, Math.min(...allY));
@@ -67,6 +69,7 @@ function parsePath(path) {
   let command = "";
   let cursor = [0, 0];
   let start = [0, 0];
+  let lastCubicControl = null;
   let contour = [];
   let index = 0;
 
@@ -84,7 +87,23 @@ function parsePath(path) {
   };
   const lineTo = (x, y) => {
     cursor = [x, y];
+    lastCubicControl = null;
     contour.push(cursor);
+  };
+  const cubicTo = (x1, y1, x2, y2, x3, y3) => {
+    const x0 = cursor[0];
+    const y0 = cursor[1];
+    for (let step = 1; step <= 24; step += 1) {
+      const t = step / 24;
+      const mt = 1 - t;
+      cursor = [
+        mt * mt * mt * x0 + 3 * mt * mt * t * x1 + 3 * mt * t * t * x2 + t * t * t * x3,
+        mt * mt * mt * y0 + 3 * mt * mt * t * y1 + 3 * mt * t * t * y2 + t * t * t * y3,
+      ];
+      contour.push(cursor);
+    }
+    cursor = [x3, y3];
+    lastCubicControl = [x2, y2];
   };
 
   while (index < tokens.length) {
@@ -92,10 +111,12 @@ function parsePath(path) {
     switch (command) {
       case "M":
         moveTo(number(), number());
+        lastCubicControl = null;
         command = "L";
         break;
       case "m":
         moveTo(cursor[0] + number(), cursor[1] + number());
+        lastCubicControl = null;
         command = "l";
         break;
       case "L":
@@ -128,14 +149,22 @@ function parsePath(path) {
           const y2 = number() + (relative ? y0 : 0);
           const x3 = number() + (relative ? x0 : 0);
           const y3 = number() + (relative ? y0 : 0);
-          for (let step = 1; step <= 24; step += 1) {
-            const t = step / 24;
-            const mt = 1 - t;
-            lineTo(
-              mt * mt * mt * x0 + 3 * mt * mt * t * x1 + 3 * mt * t * t * x2 + t * t * t * x3,
-              mt * mt * mt * y0 + 3 * mt * mt * t * y1 + 3 * mt * t * t * y2 + t * t * t * y3,
-            );
-          }
+          cubicTo(x1, y1, x2, y2, x3, y3);
+        }
+        break;
+      case "S":
+      case "s":
+        while (index < tokens.length && !isCommand(tokens[index])) {
+          const relative = command === "s";
+          const x0 = cursor[0];
+          const y0 = cursor[1];
+          const x1 = lastCubicControl ? 2 * x0 - lastCubicControl[0] : x0;
+          const y1 = lastCubicControl ? 2 * y0 - lastCubicControl[1] : y0;
+          const x2 = number() + (relative ? x0 : 0);
+          const y2 = number() + (relative ? y0 : 0);
+          const x3 = number() + (relative ? x0 : 0);
+          const y3 = number() + (relative ? y0 : 0);
+          cubicTo(x1, y1, x2, y2, x3, y3);
         }
         break;
       case "Z":
@@ -151,9 +180,44 @@ function parsePath(path) {
   return contours;
 }
 
+function contourBounds(contours) {
+  const points = contours.flat();
+  return {
+    minX: Math.min(...points.map(([x]) => x)),
+    maxX: Math.max(...points.map(([x]) => x)),
+    minY: Math.min(...points.map(([, y]) => y)),
+    maxY: Math.max(...points.map(([, y]) => y)),
+  };
+}
+
+function intersectsViewBox(bounds, viewBox) {
+  return (
+    bounds.maxX >= viewBox.x
+    && bounds.minX <= viewBox.x + viewBox.width
+    && bounds.maxY >= viewBox.y
+    && bounds.minY <= viewBox.y + viewBox.height
+  );
+}
+
+function readLogoContours() {
+  const svg = readFileSync(SVG_SOURCE, "utf8");
+  const viewBoxMatch = svg.match(/\bviewBox=["']([^"']+)["']/i);
+  if (!viewBoxMatch) throw new Error(`Missing viewBox in ${SVG_SOURCE}`);
+  const [x, y, width, height] = viewBoxMatch[1].trim().split(/[\s,]+/).map(Number);
+  const viewBox = { x, y, width, height };
+  const contours = [...svg.matchAll(/<path\b[^>]*\bd=["']([^"']+)["'][^>]*>/gi)]
+    .flatMap(([, d]) => {
+      const parsed = parsePath(d);
+      return intersectsViewBox(contourBounds(parsed), viewBox) ? parsed : [];
+    });
+  if (contours.length === 0) throw new Error(`No visible path contours found in ${SVG_SOURCE}`);
+  return { contours, viewBox };
+}
+
 // Dock/process icon: black square with the supplied Beat mark in white.
 fillRect(0, 0, SIZE, SIZE, 0);
-fillContoursEvenOdd(parsePath(LOGO_PATH), 255);
+const logo = readLogoContours();
+fillContoursEvenOdd(logo.contours, logo.viewBox, 255);
 
 const image = Buffer.alloc((SIZE * 4 + 1) * SIZE);
 for (let y = 0; y < SIZE; y += 1) {

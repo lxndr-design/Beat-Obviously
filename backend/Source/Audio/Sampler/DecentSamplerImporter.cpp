@@ -202,19 +202,36 @@ namespace beat
             return control;
         }
 
+        juce::String normalizedTrigger(const juce::String& raw)
+        {
+            const auto trigger = raw.trim().toLowerCase();
+            if (trigger == "release" || trigger == "note_off" || trigger == "note-off" || trigger == "noteoff")
+                return "release";
+            if (trigger == "attack" || trigger == "note_on" || trigger == "note-on" || trigger == "noteon")
+                return "attack";
+            if (trigger == "first" || trigger == "legato")
+                return trigger;
+            return trigger.isNotEmpty() ? trigger : "attack";
+        }
+
         void collectDecentSamples(const juce::XmlElement& element,
                                   const juce::File& presetFile,
                                   juce::AudioFormatManager& formatManager,
                                   DecentSamplerImport& preset,
                                   double inheritedVolumeDb = 0.0,
                                   int inheritedSeqPosition = 0,
-                                  int inheritedChokeGroup = 0)
+                                  int inheritedChokeGroup = 0,
+                                  juce::String inheritedTrigger = "attack")
         {
             if (element.hasTagName("group"))
             {
                 inheritedVolumeDb += doubleAttribute(element, { "volume", "gain" }, 0.0);
                 inheritedSeqPosition = intAttribute(element, { "seqPosition", "seq_position" }, inheritedSeqPosition);
                 inheritedChokeGroup = juce::jmax(0, intAttribute(element, { "chokeGroup", "choke_group", "exclusiveGroup", "exclusive_group" }, inheritedChokeGroup));
+                const auto groupTrigger = firstStringAttribute(element, { "trigger", "playbackMode", "playback_mode" });
+                inheritedTrigger = normalizedTrigger(groupTrigger.isNotEmpty() ? groupTrigger : inheritedTrigger);
+                if (inheritedTrigger == "attack" && element.getStringAttribute("name").containsIgnoreCase("release"))
+                    inheritedTrigger = "release";
             }
 
             if (element.hasTagName("sample"))
@@ -226,6 +243,8 @@ namespace beat
                     DecentSamplerSample sample;
                     sample.path = file.getFullPathName();
                     sample.name = file.getFileName();
+                    const auto sampleTrigger = firstStringAttribute(element, { "trigger", "playbackMode", "playback_mode" });
+                    sample.trigger = normalizedTrigger(sampleTrigger.isNotEmpty() ? sampleTrigger : inheritedTrigger);
                     sample.rootNote = intAttribute(element, { "rootNote", "root", "pitch_keycenter" }, 60);
                     sample.loNote = intAttribute(element, { "loNote", "loKey", "lokey" }, 0);
                     sample.hiNote = intAttribute(element, { "hiNote", "hiKey", "hikey" }, 127);
@@ -260,7 +279,7 @@ namespace beat
             }
 
             for (auto* child = element.getFirstChildElement(); child != nullptr; child = child->getNextElement())
-                collectDecentSamples(*child, presetFile, formatManager, preset, inheritedVolumeDb, inheritedSeqPosition, inheritedChokeGroup);
+                collectDecentSamples(*child, presetFile, formatManager, preset, inheritedVolumeDb, inheritedSeqPosition, inheritedChokeGroup, inheritedTrigger);
         }
 
         void collectDecentUiControls(const juce::XmlElement& element,

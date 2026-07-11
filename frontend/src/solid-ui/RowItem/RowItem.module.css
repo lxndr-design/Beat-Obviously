@@ -1,17 +1,18 @@
 .row {
   --row-height: var(--sidebar-subrow-height);
-  --row-icon-track: 14px;
-  --row-icon-size: 14px;
-  --row-action-width: var(--row-height);
+  --row-icon-track: 15px;
+  --row-icon-size: 15px;
+  --row-action-size: 18px;
+  --row-action-width: var(--row-action-size);
   --row-divider: 1px solid color-mix(in srgb, var(--color-fg) 18%, transparent);
 
   display: grid;
-  grid-template-columns: 14px var(--row-icon-track) minmax(0, 1fr) var(--row-action-width);
+  grid-template-columns: 15px var(--row-icon-track) minmax(0, 1fr) var(--row-action-width);
   align-items: center;
   gap: var(--row-gap, 3px);
   width: 100%;
   min-height: var(--row-height);
-  padding: 0 var(--row-padding-inline-end, 6px) 0 var(--row-padding-inline-start, 4px);
+  padding: 0 var(--row-padding-inline-end, 6px) 0 var(--row-padding-inline-start, 3px);
   box-sizing: border-box;
   border-bottom: var(--row-divider);
   color: var(--color-fg);
@@ -36,8 +37,13 @@
   grid-template-columns: var(--row-icon-track) minmax(0, 1fr) var(--row-action-width);
 }
 
+.hasAction {
+  padding-right: 0;
+}
+
 .density-compact {
-  --row-height: 22px;
+  --row-height: 21px;
+  --row-action-size: 15px;
 }
 
 .density-standard {
@@ -48,11 +54,19 @@
   --row-height: calc(var(--sidebar-subrow-height) * 2);
   --row-icon-track: minmax(42px, auto);
   --row-icon-size: auto;
-  --row-action-width: var(--sidebar-subrow-height);
 
-  gap: 4px;
-  padding-top: 4px;
-  padding-bottom: 4px;
+  gap: 3px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+.scale-large {
+  --row-height: 24px;
+  --row-action-size: 18px;
+}
+
+.scale-large .name {
+  font-size: var(--font-size-field-label);
 }
 
 .cursor-pointer {
@@ -81,8 +95,8 @@
 }
 
 .dragSlot {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   opacity: 0.72;
 }
 
@@ -91,7 +105,7 @@
   justify-self: center;
   width: var(--row-icon-size);
   min-width: var(--row-icon-size);
-  height: calc(var(--row-height) - 8px);
+  height: calc(var(--row-height) - 9px);
   overflow: hidden;
   opacity: 0.82;
 }
@@ -128,7 +142,7 @@
 }
 
 .density-compact .iconSlot {
-  height: 14px;
+  height: 15px;
 }
 
 .density-media .iconSlot {
@@ -141,30 +155,12 @@
   height: var(--row-height);
 }
 
-.action > :global(button) {
-  width: var(--row-action-width) !important;
-  min-width: var(--row-action-width);
-  max-width: var(--row-action-width);
-  height: var(--row-height) !important;
-  min-height: var(--row-height);
-  max-height: var(--row-height);
-  background: transparent;
-  color: inherit;
-}
-
-.row:hover .action > :global(button),
-.action > :global(button:hover:not(:disabled)),
-.action > :global(button:active:not(:disabled)) {
-  background: transparent;
-  color: inherit;
-}
-
 .text {
   display: flex;
   flex-direction: column;
   justify-content: center;
   min-width: 0;
-  gap: 2px;
+  gap: 3px;
 }
 
 .name,

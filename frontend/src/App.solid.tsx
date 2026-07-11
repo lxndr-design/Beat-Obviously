@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
-import { appAlert, appConfirm, Block } from "./solid-ui";
+import { appAlert, appConfirm, Block, SectionRibbon } from "./solid-ui";
 import { TimelineMidiPlayback } from "./audio/TimelineMidiPlayback.solid";
 import { LiveMidiExpressionInput } from "./audio/LiveMidiExpressionInput.solid";
 import { startAnalyzerClient } from "./audio/analyzerClient";
@@ -13,7 +13,7 @@ import { importAudioFiles } from "./audio/audioImport";
 import { preloadInstrumentSample } from "./audio/synthPreview";
 import { installGlobalHotkeys } from "./hotkeys/hotkeys";
 import { isNative, onEvent, send } from "./ipc/bridge";
-import { useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore, useSettingsStore, useTransportStore, useUiStore } from "./state/store";
+import { redo, undo, useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore, useSettingsStore, useTransportStore, useUiStore } from "./state/store";
 import { useSynthStore } from "./state/synthStore";
 import { useExportStore } from "./state/exportStore";
 import { useComponentStore } from "./state/components";
@@ -31,6 +31,8 @@ import { EditorHost } from "./features/EditorHost/EditorHost.solid";
 import { AppDialogHost } from "./solid-ui/AppDialog";
 import { ModalStackOverlay } from "./solid-ui/Modal";
 import trackStyles from "./features/Tracks/TrackList.module.css";
+import { SolidUiKitCatalog } from "./design/SolidUiKitCatalog.solid";
+import { UiKitOnePager } from "./design/UiKitOnePager.solid";
 
 type StartupReadinessKey = "instruments" | "components" | "audio";
 
@@ -58,7 +60,20 @@ const startupStageOrder: StartupReadinessKey[] = [
   "audio",
 ];
 
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  const element = target instanceof HTMLElement ? target : null;
+  if (!element) return false;
+  const tagName = element.tagName.toLowerCase();
+  return element.isContentEditable || tagName === "input" || tagName === "textarea" || tagName === "select";
+}
+
 export function App() {
+  if (import.meta.env.DEV && typeof window !== "undefined") {
+    const devFixture = new URLSearchParams(window.location.search).get("beatDevFixture");
+    if (devFixture === "ui-elements") return <SolidUiKitCatalog />;
+    if (devFixture === "ui-one-pager") return <UiKitOnePager />;
+  }
+
   const shouldMountEditorHost = createStoreSelector(useUiStore, (s) => s.openEditors.length > 0 || Boolean(s.trackEffectsEditorTrackId));
   const themeContrastLevel = createStoreSelector(useSettingsStore, (s) => s.themeContrastLevel);
   const [showHome, setShowHome] = createSignal(true);
@@ -82,6 +97,21 @@ export function App() {
       cleanupHotkeys();
       window.clearTimeout(timer);
     });
+  });
+
+  onMount(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (isEditableKeyboardTarget(event.target)) return;
+      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === "z") {
+        if (useInstrumentStore.getState().undoLastInstrumentDelete()) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown, true);
+    onCleanup(() => window.removeEventListener("keydown", onKeyDown, true));
   });
 
   createEffect(() => {
@@ -243,8 +273,8 @@ export function App() {
     let timer: number | null = null;
 
     void listComponents()
-      .then((components) => {
-        useComponentStore.getState().hydrate(components);
+      .then(({ components, folders }) => {
+        useComponentStore.getState().hydrate(components, folders);
         hydrated = true;
       })
       .catch((error) => {
@@ -261,7 +291,10 @@ export function App() {
         const snapshot = state.components
           .filter((component) => !component.factory)
           .map((component) => structuredClone(component));
-        void saveComponents(snapshot);
+        const folders = state.componentFolders
+          .filter((folder) => !folder.factory)
+          .map((folder) => structuredClone(folder));
+        void saveComponents(snapshot, folders);
       }, 800);
     });
     onCleanup(() => {
@@ -325,10 +358,12 @@ export function App() {
         if (
           loopEnabled &&
           loopRange.endBeat > loopRange.startBeat &&
-          positionBeat <= loopRange.endBeat &&
+          positionBeat < loopRange.endBeat &&
           next >= loopRange.endBeat
         ) {
-          useTransportStore.getState().setPosition(loopRange.startBeat);
+          const loopLength = loopRange.endBeat - loopRange.startBeat;
+          const overflow = Math.max(0, next - loopRange.endBeat);
+          useTransportStore.getState().setPosition(loopRange.startBeat + (overflow % loopLength));
           raf = requestAnimationFrame(tick);
           return;
         }
@@ -404,7 +439,30 @@ export function App() {
           useUiStore.getState().triggerSegmentPlayback(event.segmentId);
           break;
         case "native.menuCommand":
-          void handleNativeMenuCommand(event.command).catch((error) => {
+          void (async () => {
+            switch (event.command) {
+              case "home":
+                await openHome();
+                return;
+              case "whatsNew":
+                await appAlert("What's New is coming soon.");
+                return;
+              case "userGuide":
+                openUserGuide();
+                return;
+              case "undo":
+                undo();
+                return;
+              case "redo":
+                redo();
+                return;
+              case "songInfo":
+                await appAlert("Song Info is coming soon.");
+                return;
+              default:
+                await handleNativeMenuCommand(event.command);
+            }
+          })().catch((error) => {
             void appAlert(error instanceof Error ? error.message : "Project command failed.");
           });
           break;
@@ -519,7 +577,8 @@ export function App() {
 
 function TrackBlock() {
   return (
-    <Block title="Tracks" framed fill padding="none" className={trackStyles.tracksBlock}>
+    <Block framed fill padding="none" className={trackStyles.tracksBlock}>
+      <SectionRibbon title="Tracks" expanded showToggle={false} onToggle={() => undefined} />
       <TrackList />
     </Block>
   );

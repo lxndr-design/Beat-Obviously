@@ -17,6 +17,7 @@ export function NumberInputDemo() {
         commitOnChange
         onChange={(next) => setValue(Math.round(next * 100))}
       />
+      <NumberInput layout="editor" label="BPM" value={value()} min={20} max={999} step={1} onChange={setValue} />
     </section>
   );
 }

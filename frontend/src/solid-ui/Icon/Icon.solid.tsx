@@ -6,7 +6,7 @@ import { PH_ICON_SUBSET } from "./phIconSubset";
 
 export interface IconProps extends Omit<JSX.SvgSVGAttributes<SVGSVGElement>, "style"> {
   name: string;
-  size?: 12 | 14 | 16 | 24 | 32 | 40 | 48;
+  size?: 18;
   decorative?: boolean;
   title?: string;
   style?: JSX.CSSProperties;
@@ -32,7 +32,7 @@ export function Icon(allProps: IconProps) {
     return loaded ? buildIconSvg(loaded) : { body: "", viewBox: "0 0 16 16" };
   });
 
-  const size = () => local.size ?? 16;
+  const size = () => local.size ?? 18;
   const title = () => local.title ?? local.name;
 
   return (

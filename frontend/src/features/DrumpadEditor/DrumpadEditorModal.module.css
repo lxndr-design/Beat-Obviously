@@ -1,0 +1,410 @@
+.shell {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  min-height: 759px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.body {
+  position: relative;
+  display: grid;
+  gap: 9px;
+  padding: 9px;
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
+}
+
+.keyboardPanel,
+.trackPanel {
+  position: relative;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  z-index: 2;
+}
+
+.sectionRibbon {
+  min-height: 33px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  padding: 0 9px;
+  border-bottom: var(--border-fg);
+  font-size: var(--font-size-ui-lg);
+  font-weight: 700;
+}
+
+.keyboardWrap {
+  position: relative;
+  min-height: 213px;
+  display: grid;
+  place-items: center;
+  padding: 27px 21px 15px;
+  overflow: hidden;
+}
+
+.keyboard {
+  display: grid;
+  gap: 3px;
+  width: max-content;
+  max-width: 100%;
+  z-index: 6;
+}
+
+.keyRow {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+}
+
+.key {
+  position: relative;
+  flex: 0 0 39px;
+  min-width: 0;
+  width: 39px;
+  height: 39px;
+  border: var(--border-fg);
+  background: transparent;
+  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+  display: block;
+  font: inherit;
+  transition: var(--interaction-transition);
+}
+
+.key[data-wide="1"] {
+  flex-basis: 45px;
+  width: 45px;
+}
+
+.key[data-xwide="1"] {
+  flex-basis: 63px;
+  width: 63px;
+}
+
+.key[data-xxwide="1"] {
+  flex-basis: 84px;
+  width: 84px;
+}
+
+.key:hover,
+.key[data-target="1"] {
+  background: color-mix(in srgb, var(--color-fg) 10%, transparent);
+}
+
+.key[data-pressed="1"] {
+  background: color-mix(in srgb, var(--color-fg) 18%, transparent);
+  color: var(--color-fg);
+}
+
+.key[data-assigned="1"] {
+  color: var(--color-fg);
+}
+
+.keyLabel {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  max-width: calc(100% - 9px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-hint);
+  line-height: 1;
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+  pointer-events: none;
+}
+
+.keyPlug {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  z-index: 7;
+}
+
+.linkSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+  overflow: visible;
+}
+
+.linkPath {
+  stroke: color-mix(in srgb, var(--color-fg) 54%, transparent);
+  stroke-width: 1;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  fill: none;
+  opacity: 0.64;
+}
+
+.trackToolbar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 9px;
+}
+
+.keyboardLayoutToggle {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  z-index: 8;
+}
+
+.layoutButton {
+  width: 27px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--font-size-ui-lg);
+  line-height: 1;
+}
+
+.layoutButton:hover,
+.layoutButton[data-active="1"] {
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+
+.trackRows {
+  --lane-head-width: 240px;
+  --playhead-progress: 0;
+  padding: 0 9px 9px;
+  position: relative;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: pan-x pinch-zoom;
+}
+
+.trackRows:focus-visible {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-fg) 42%, transparent);
+}
+
+.gridLine {
+  position: absolute;
+  top: 0;
+  bottom: 9px;
+  left: calc(9px + var(--lane-head-width) + (100% - 21px - var(--lane-head-width)) * var(--tick-progress));
+  width: 1px;
+  background: color-mix(in srgb, var(--color-fg) 12%, transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.gridLine[data-kind="beat"] {
+  background: color-mix(in srgb, var(--color-fg) 20%, transparent);
+}
+
+.gridLine[data-kind="measure"] {
+  width: 3px;
+  background: color-mix(in srgb, var(--color-fg) 38%, transparent);
+}
+
+.playhead {
+  position: absolute;
+  top: -15px;
+  bottom: 9px;
+  left: calc(9px + var(--lane-head-width) + (100% - 21px - var(--lane-head-width)) * var(--playhead-progress));
+  width: 1px;
+  background: var(--color-fg);
+  opacity: 0.85;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.marquee {
+  position: absolute;
+  border: 1px solid var(--color-fg);
+  background: color-mix(in srgb, var(--color-fg) 9%, transparent);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.lane {
+  display: grid;
+  grid-template-columns: var(--lane-head-width) minmax(261px, 1fr);
+  min-height: 45px;
+  border: var(--border-fg);
+  border-bottom: 0;
+}
+
+.lane:last-child {
+  border-bottom: var(--border-fg);
+}
+
+.laneHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-right: var(--border-fg);
+}
+
+.laneSelectWrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.laneSelectWrap button {
+  min-height: 33px;
+}
+
+.lanePlug[data-active="1"] {
+  outline: 1px solid var(--color-fg);
+  outline-offset: 3px;
+}
+
+.lanePlug {
+  position: relative;
+  z-index: 7;
+}
+
+.hitLane {
+  position: relative;
+  min-height: 45px;
+  background: transparent;
+  overflow: hidden;
+  touch-action: pan-x pinch-zoom;
+  z-index: 1;
+}
+
+.hit {
+  position: absolute;
+  top: 13px;
+  width: 10px;
+  height: 19px;
+  min-width: 10px;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  z-index: 2;
+}
+
+.hit::before,
+.hit::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--color-fg);
+}
+
+.hit::before {
+  left: 0;
+  width: 2px;
+}
+
+.hit::after {
+  left: 2px;
+  width: 8px;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.hit:hover::before,
+.hit:hover::after {
+  background: color-mix(in srgb, var(--color-fg) 88%, var(--color-bg));
+}
+
+.hit[data-selected="1"] {
+  outline: 1px solid var(--color-fg);
+  outline-offset: 2px;
+}
+
+.hit:active {
+  cursor: grabbing;
+}
+
+.addInstrumentRow {
+  --lane-head-width: 240px;
+  display: flex;
+  width: var(--lane-head-width);
+  margin: 0 9px 9px;
+}
+
+.addInstrument {
+  width: 100%;
+  height: 39px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 9px;
+  border: var(--border-fg);
+  background: transparent;
+  color: var(--color-fg);
+  font: inherit;
+}
+
+.addInstrument:hover {
+  background: color-mix(in srgb, var(--color-fg) 10%, transparent);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  padding: 9px 9px;
+  border-top: var(--border-fg);
+}
+
+.footerActions,
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.countdown {
+  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+}
+
+.timeReadout {
+  min-width: 51px;
+  color: color-mix(in srgb, var(--color-fg) 66%, transparent);
+  font-size: var(--font-size-ui);
+}
+
+.skipEndIcon {
+  position: relative;
+  width: 15px;
+  height: 15px;
+  display: block;
+  color: currentColor;
+}
+
+.skipEndIcon::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid currentColor;
+}
+
+.skipEndIcon::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  width: 1px;
+  height: 9px;
+  background: currentColor;
+}

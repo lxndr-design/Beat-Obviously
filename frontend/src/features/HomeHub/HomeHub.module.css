@@ -9,6 +9,9 @@
   background: var(--color-bg);
   color: var(--color-fg);
   border: var(--border-fg);
+  width: 100vw;
+  max-width: 100vw;
+  overflow: hidden;
 }
 
 .header {
@@ -16,17 +19,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  height: 32px;
-  min-height: 32px;
+  height: 33px;
+  min-height: 33px;
   border: 0;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  min-width: 0;
 }
 
 .breadcrumb {
@@ -62,12 +57,20 @@
   font-weight: var(--font-weight-medium);
 }
 
+.headerSpacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .grid {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   min-height: 0;
   flex: 1 1 auto;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .panel {
@@ -122,6 +125,7 @@
 }
 
 .actionRow {
+  justify-content: flex-start;
   gap: 6px;
   padding: 0 12px;
   text-transform: uppercase;
@@ -149,8 +153,11 @@
 }
 
 .recentCard {
+  --recent-card-hover-bg: var(--interaction-mesh-current);
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
+  gap: 0;
   min-width: 0;
   padding: 0;
   border: var(--border-fg);
@@ -160,10 +167,11 @@
   text-align: left;
   cursor: pointer;
   transition: var(--interaction-transition);
+  white-space: normal;
 }
 
 .recentCard:hover {
-  background: var(--interaction-hover-bg);
+  background: var(--recent-card-hover-bg);
 }
 
 .recentArt {
@@ -172,15 +180,15 @@
   align-items: center;
   justify-content: center;
   aspect-ratio: 16 / 9;
-  min-height: 112px;
+  min-height: 111px;
   border-bottom: var(--border-fg);
   color: color-mix(in srgb, var(--color-fg) 26%, var(--color-bg));
   overflow: hidden;
 }
 
 .recentLogo {
-  width: 40px;
-  height: 40px;
+  width: 39px;
+  height: 39px;
 }
 
 .recentRemove {
@@ -216,7 +224,7 @@
 .recentMeta {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
   padding: 6px;
 }

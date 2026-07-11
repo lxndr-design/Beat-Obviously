@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
-import { Button, FloatingSelect, Icon, Modal } from "../../solid-ui";
+import { Button, FloatingSelect, Icon, Modal, Slider } from "../../solid-ui";
 import {
   decentSamplerControlBindingState,
   decentSamplerControlInstrumentPatch,
@@ -80,13 +80,13 @@ export function PluginHostModal(props: PluginHostModalProps) {
                 when={currentPlugin().kind === "synth"}
                 fallback={(
                   <Button variant="primary" disabled>
-                    <Icon name="ph:file-audio" size={14} decorative />
+                    <Icon name="ph:file-audio" size={18} decorative />
                     Render WAV
                   </Button>
                 )}
               >
                 <Button variant="primary" onClick={createInstrument}>
-                  <Icon name="ph:plus" size={14} decorative />
+                  <Icon name="ph:plus" size={18} decorative />
                   Create Instrument
                 </Button>
               </Show>
@@ -110,7 +110,7 @@ export function PluginHostModal(props: PluginHostModalProps) {
                       <span>{currentPlugin().vendor}</span>
                     </div>
                     <div class={styles.shellBody}>
-                      <Icon name="ph:puzzle-piece" size={32} decorative />
+                      <Icon name="ph:puzzle-piece" size={18} decorative />
                       <div>
                         <h3>{currentPlugin().name}</h3>
                         <p>{currentPlugin().description}</p>
@@ -159,7 +159,7 @@ function ModalTitle(props: { plugin: PluginAdapter }) {
 
   return (
     <>
-      <Icon name={props.plugin.kind === "synth" ? "ph:wave-sine" : "ph:puzzle-piece"} size={14} decorative />
+      <Icon name={props.plugin.kind === "synth" ? "ph:wave-sine" : "ph:puzzle-piece"} size={18} decorative />
       {props.plugin.name}
     </>
   );
@@ -177,7 +177,7 @@ function InfoCell(props: { label: string; value: string }) {
 function RouteCard(props: { icon: string; title: string; value: string }) {
   return (
     <div class={styles.routeCard}>
-      <Icon name={props.icon} size={16} decorative />
+      <Icon name={props.icon} size={18} decorative />
       <span>{props.title}</span>
       <p>{props.value}</p>
     </div>
@@ -357,17 +357,17 @@ function DecentSamplerHost(props: { plugin: PluginAdapter }) {
                 fallback={<em>{associatedInstrument() ? "Inspect only" : "Install package to enable control"}</em>}
               >
                 {(binding) => (
-                  <label class={styles.decentControlSlider}>
-                    <input
-                      type="range"
-                      min={binding().min}
-                      max={binding().max}
-                      step={binding().step}
-                      value={binding().value}
-                      onInput={(event) => updateActiveControl(event.currentTarget.valueAsNumber)}
-                    />
-                    <em>{binding().valueLabel}</em>
-                  </label>
+                  <Slider
+                    className={styles.decentControlSlider}
+                    layout="inline"
+                    min={binding().min}
+                    max={binding().max}
+                    step={binding().step}
+                    value={binding().value}
+                    readout={<em>{binding().valueLabel}</em>}
+                    ariaLabel={controlDisplayLabel(control())}
+                    onChange={updateActiveControl}
+                  />
                 )}
               </Show>
             </div>
@@ -403,6 +403,9 @@ function DecentSamplerHotspot(props: {
       onClick={props.onClick}
     >
       <DecentSamplerControlGlyph control={props.control} binding={props.binding} />
+      <Show when={shouldShowControlLabel(props.control)}>
+        <span class={styles.decentSkinHotspotLabel}>{label()}</span>
+      </Show>
     </button>
   );
 }
@@ -486,6 +489,11 @@ function controlDisplayKind(control: DecentSamplerUiControl) {
   if (kind.includes("button")) return "button";
   if (kind.includes("menu")) return "menu";
   return "knob";
+}
+
+function shouldShowControlLabel(control: DecentSamplerUiControl) {
+  const kind = String(control.kind || "").toLowerCase();
+  return kind.includes("labeled") && controlDisplayLabel(control).trim().length > 0;
 }
 
 function controlValuePercent(control: DecentSamplerUiControl, binding: ReturnType<typeof decentSamplerControlBindingState>) {

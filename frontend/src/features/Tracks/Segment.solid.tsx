@@ -30,6 +30,7 @@ import {
 } from "./segmentMath";
 import { SegmentMidiPreview } from "./SegmentMidiPreview.solid";
 import { SegmentDrumPreview } from "./SegmentDrumPreview.solid";
+import { SegmentDrumpadPreview } from "./SegmentDrumpadPreview.solid";
 import { SegmentWaveform } from "./SegmentWaveform.solid";
 import styles from "./Segment.module.css";
 import type { Id, Segment as SegmentType } from "../../state/types";
@@ -40,7 +41,7 @@ interface Props {
   lengthBeats: number;
   repetition: number;
   layer: number;
-  payloadKind: "audio" | "midi" | "drum" | "mixed";
+  payloadKind: "audio" | "midi" | "drum" | "drumpad" | "mixed";
   onEdit: () => void;
 }
 
@@ -373,7 +374,7 @@ export function Segment(props: Props) {
       ];
     }
     const isMidi = segment.payload.kind === "midi" || segment.payload.kind === "mixed";
-    const canLoop = isMidi || segment.payload.kind === "drum";
+    const canLoop = isMidi || segment.payload.kind === "drum" || segment.payload.kind === "drumpad";
     const playheadBeat = useTransportStore.getState().positionBeat;
     const canSplitAtPlayhead = playheadBeat > segment.startBeat + GRID_TICK_BEATS / 4
       && playheadBeat < segment.startBeat + segment.lengthBeats - GRID_TICK_BEATS / 4;
@@ -437,7 +438,7 @@ export function Segment(props: Props) {
         icon: "ph:x-circle",
         onSelect: () => projectStore.applySegmentEditCommand({ kind: "fade", segmentId: props.segmentId, fadeInBeats: 0, fadeOutBeats: 0 }),
       },
-      ...(isMidi || segment.payload.kind === "drum"
+      ...(isMidi || segment.payload.kind === "drum" || segment.payload.kind === "drumpad"
         ? [{
             label: "Save as Component",
             icon: "ph:package",
@@ -453,12 +454,26 @@ export function Segment(props: Props) {
                     rows: segment.payload.rows,
                     stepCount: segment.payload.stepCount,
                     speed: segment.payload.speed,
+                    lengthBeats: segment.payload.sourceLengthBeats ?? segment.lengthBeats,
                     defaultPitchHz: segment.payload.defaultPitchHz,
                     swingPercent: segment.payload.swingPercent,
                     timeSignature: segment.payload.timeSignature,
-                    lengthBeats: segment.lengthBeats,
                   });
                   void markSavedGeneratedDrum(segment);
+                } else if (segment.payload.kind === "drumpad") {
+                  useComponentStore.getState().add({
+                    kind: "midi",
+                    name,
+                    notes: segment.payload.hits.map((hit) => ({
+                      id: hit.id,
+                      pitch: 60,
+                      startBeat: hit.startBeat,
+                      lengthBeats: hit.lengthBeats,
+                      velocity: hit.velocity,
+                    })),
+                    lengthBeats: segment.lengthBeats,
+                    instrumentId: segment.instrumentId,
+                  });
                 } else if (segment.payload.kind === "midi" || segment.payload.kind === "mixed") {
                   useComponentStore.getState().add({
                     kind: "midi",
@@ -545,6 +560,8 @@ export function Segment(props: Props) {
         ? "ph:music-notes-simple"
         : props.payloadKind === "drum"
           ? "ph:squares-four"
+          : props.payloadKind === "drumpad"
+            ? "ph:piano-keys"
           : "ph:dots-three");
 
   return (
@@ -630,7 +647,7 @@ export function Segment(props: Props) {
             </Show>
             <Show when={props.repetition > 0}>
               <span class={styles.repBadge} aria-label="Loop repeat">
-                <Icon name="ph:repeat" size={12} decorative />
+                <Icon name="ph:repeat" size={18} decorative />
               </span>
             </Show>
             <Show when={decentSamplerPlugin()}>
@@ -640,7 +657,7 @@ export function Segment(props: Props) {
             </Show>
           </span>
           <span class={styles.kindIcon} aria-hidden="true">
-            <Icon name={kindIcon()} size={12} decorative />
+            <Icon name={kindIcon()} size={18} decorative />
           </span>
         </div>
         <div class={styles.content}>
@@ -649,6 +666,9 @@ export function Segment(props: Props) {
           </Show>
           <Show when={props.payloadKind === "drum" && liveSeg()}>
             {(segment) => <SegmentDrumPreview segment={segment()} displayLengthBeats={visualLengthBeats()} playing={playing()} />}
+          </Show>
+          <Show when={props.payloadKind === "drumpad" && liveSeg()}>
+            {(segment) => <SegmentDrumpadPreview segment={segment()} displayLengthBeats={visualLengthBeats()} playing={playing()} />}
           </Show>
           <Show when={props.payloadKind === "audio" && liveSeg()}>
             {(segment) => <SegmentWaveform segment={segment()} />}
@@ -707,24 +727,24 @@ export function Segment(props: Props) {
   );
 }
 
-function defaultName(kind: "audio" | "midi" | "drum" | "mixed"): string {
-  return kind === "midi" ? "Midi" : kind === "audio" ? "Audio" : kind === "drum" ? "Drums" : "Mixed";
+function defaultName(kind: "audio" | "midi" | "drum" | "drumpad" | "mixed"): string {
+  return kind === "midi" ? "MIDI Segment" : kind === "audio" ? "WAV Segment" : kind === "drum" ? "Drum Sequencer" : kind === "drumpad" ? "Drum Pad" : "Mixed";
 }
 
 function duplicateSegmentName(segment: SegmentType): string {
-  const kind = segment.payload.kind === "audio" ? "audio" : segment.payload.kind === "drum" ? "drum" : "midi";
-  const stem = kind === "midi" ? "Midi" : kind === "audio" ? "Audio" : "Drums";
+  const kind = segment.payload.kind === "audio" ? "audio" : segment.payload.kind === "drum" ? "drum" : segment.payload.kind === "drumpad" ? "drumpad" : "midi";
+  const stem = kind === "midi" ? "MIDI Segment" : kind === "audio" ? "WAV Segment" : kind === "drum" ? "Drum Sequencer" : "Drum Pad";
   const trimmed = segment.name?.trim() ?? "";
   if (!trimmed || new RegExp(`^${stem}\\s+\\d+$`).test(trimmed)) return nextAutoSegmentName(kind);
   return `${trimmed} copy`;
 }
 
-function nextAutoSegmentName(kind: "midi" | "audio" | "drum"): string {
-  const stem = kind === "midi" ? "Midi" : kind === "audio" ? "Audio" : "Drums";
+function nextAutoSegmentName(kind: "midi" | "audio" | "drum" | "drumpad"): string {
+  const stem = kind === "midi" ? "MIDI Segment" : kind === "audio" ? "WAV Segment" : kind === "drum" ? "Drum Sequencer" : "Drum Pad";
   const used = new Set<number>();
   for (const track of useProjectStore.getState().project.tracks) {
     for (const segment of track.segments) {
-      if (segment.payload.kind !== kind && (kind === "drum" || segment.payload.kind !== "mixed")) continue;
+      if (segment.payload.kind !== kind && (kind === "drum" || kind === "drumpad" || segment.payload.kind !== "mixed")) continue;
       const match = (segment.name ?? "").match(new RegExp(`^${stem}\\s+(\\d+)$`));
       if (match) used.add(parseInt(match[1], 10));
     }

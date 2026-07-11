@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { previewFrequency, renderAetherOutputPreviewSamples, renderedInstrumentBuffer } from "../../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../../audio/synthWorkletPreview";
-import { Button, FloatingSelect, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, Select, Slider, TextInput } from "../../../solid-ui";
+import { Button, FieldActionButton, FloatingSelect, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, Slider, TextInput, Toggle } from "../../../solid-ui";
 import { useContextualHotkey } from "../../../solid-utils/contextualHotkeys.solid";
 import { createStoreSelector } from "../../../solid-utils/store";
 import {
@@ -501,15 +501,16 @@ export function SynthEditor(props: SynthEditorProps) {
                   <div class={styles.importPresetMenu} role="menu" aria-label="Factory Aether presets">
                     <For each={importPresetOptions()}>
                       {(preset) => (
-                        <button
-                          type="button"
+                        <Button
+                          variant="ghost"
+                          fullWidth
                           class={styles.importPresetItem}
                           role="menuitem"
                           onClick={() => importFactoryPreset(preset)}
                         >
                           <span class={styles.importPresetName}>{preset.name}</span>
                           <span class={styles.importPresetMeta}>{preset.family} / {preset.role}</span>
-                        </button>
+                        </Button>
                       )}
                     </For>
                   </div>
@@ -552,7 +553,7 @@ export function SynthEditor(props: SynthEditorProps) {
                     >
                       <Show when={performanceSourceForSummaryId(item.id)}>
                         <span class={styles.sourcePickAnchor} data-synth-pick-anchor aria-hidden="true">
-                          <Icon name="ph:plug" size={12} decorative />
+                          <Icon name="ph:plug" size={18} decorative />
                         </span>
                       </Show>
                       <span class={styles.expressionSummaryLabel}>
@@ -595,7 +596,7 @@ export function SynthEditor(props: SynthEditorProps) {
       <footer class={`ds-action-footer ${styles.footer}`}>
         <div class={styles.footerLeft}>
           <Button className={styles.footerButton} variant="ghost" selected={auditioning()} onClick={() => void onAudition()}>
-            <Icon name={auditioning() ? "ph:stop-fill" : "ph:play-fill"} size={12} decorative />
+            <Icon name={auditioning() ? "ph:stop-fill" : "ph:play-fill"} size={18} decorative />
             {auditioning() ? "Stop" : "Audition"}
           </Button>
         </div>
@@ -631,7 +632,7 @@ function InstrumentOutputPreview(props: {
       </svg>
       <div class={styles.identityPreviewActions}>
         <Button size="xs" variant="ghost" selected={props.playing} onClick={props.onToggle}>
-          <Icon name={props.playing ? "ph:pause-fill" : "ph:play-fill"} size={12} decorative />
+          <Icon name={props.playing ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
           {props.playing ? "Pause" : "Play"}
         </Button>
         <Button size="xs" variant="ghost">
@@ -745,23 +746,21 @@ function InstrumentFxRack() {
       <div class={`ds-panel-body ${styles.fxBody}`}>
         <div class={styles.fxChainSummary} aria-label="Current Aether FX chain">
           <span>Current chain: {describeEffectChain(effects())}</span>
-          <Select
+          <FloatingSelect
             layout="bare"
-            selectClassName={styles.fxAddSelect}
+            triggerClassName={styles.fxAddSelect}
             aria-label="Add instrument effect"
             value=""
-            onChange={(event) => {
-              const value = event.currentTarget.value as EffectKind;
+            options={[
+              { value: "", label: "Add FX" },
+              ...EFFECT_OPTIONS.map((option) => ({ value: option.value, label: option.label })),
+            ]}
+            onChange={(nextValue) => {
+              const value = nextValue as EffectKind;
               if (!value) return;
               addEffect(value);
-              event.currentTarget.value = "";
             }}
-          >
-            <option value="">Add FX</option>
-            <For each={EFFECT_OPTIONS}>
-              {(option) => <option value={option.value}>{option.label}</option>}
-            </For>
-          </Select>
+          />
         </div>
         <Show when={effects().length > 0} fallback={<div class={styles.fxEmpty}>No instrument FX. Output goes directly to the track chain.</div>}>
           <div class={styles.fxChain}>
@@ -797,18 +796,14 @@ function InstrumentFxRack() {
                         setDragOverEffectId(null);
                       }}
                     >
-                      <Icon name="ph:dots-six-vertical" size={14} decorative />
+                      <Icon name="ph:dots-six-vertical" size={18} decorative />
                     </button>
-                    <Button
-                      iconOnly
-                      size="xs"
-                      className={styles.fxPowerButton}
-                      selected={!effect.bypassed}
+                    <Toggle
+                      className={styles.fxToggle}
+                      checked={!effect.bypassed}
                       aria-label={`${effect.bypassed ? "Enable" : "Bypass"} ${EFFECT_LABELS[effect.kind]}`}
-                      onClick={() => patchEffect(effect.id, { bypassed: !effect.bypassed })}
-                    >
-                      <Icon name="ph:power" size={14} decorative />
-                    </Button>
+                      onChange={(enabled) => patchEffect(effect.id, { bypassed: !enabled })}
+                    />
                     <div class={styles.fxTitleBlock}>
                       <div class={styles.fxTitleLine}>
                         <span class={styles.fxTitle}>{EFFECT_LABELS[effect.kind]}</span>
@@ -820,14 +815,13 @@ function InstrumentFxRack() {
                     </div>
                     <div class={styles.fxActions}>
                       <HoverInfo content="Remove effect">
-                        <Button
-                          iconOnly
-                          size="xs"
+                        <FieldActionButton
+                          className={styles.fxRemoveButton}
                           aria-label={`Remove ${EFFECT_LABELS[effect.kind]}`}
                           onClick={() => removeEffect(effect.id)}
                         >
-                          <Icon name="ph:trash" size={12} decorative />
-                        </Button>
+                          <Icon name="ph:trash" size={18} decorative />
+                        </FieldActionButton>
                       </HoverInfo>
                     </div>
                   </div>
@@ -914,18 +908,19 @@ function MacroControlsPanel(props: { focusedSourceTarget?: SynthModulationSource
                     </For>
                   </div>
                 </Show>
-                <Select
+                <FloatingSelect
                   layout="bare"
-                  selectClassName={styles.macroCurveSelect}
+                  triggerClassName={styles.macroCurveSelect}
                   value={definition().curve}
                   aria-label={`${definition().label} response curve`}
-                  onInput={(event) => updateMacroDefinition(id, { curve: event.currentTarget.value as MacroCurve })}
-                >
-                  <option value="linear">Linear</option>
-                  <option value="ease-in">Ease In</option>
-                  <option value="ease-out">Ease Out</option>
-                  <option value="s-curve">S-Curve</option>
-                </Select>
+                  options={[
+                    { value: "linear", label: "Linear" },
+                    { value: "ease-in", label: "Ease In" },
+                    { value: "ease-out", label: "Ease Out" },
+                    { value: "s-curve", label: "S-Curve" },
+                  ]}
+                  onChange={(value) => updateMacroDefinition(id, { curve: value as MacroCurve })}
+                />
               </div>
             );
           }}
@@ -1053,10 +1048,10 @@ function LfoLane(props: { lfo: 1 | 2; focused?: boolean }) {
             aria-label={`${enabled() ? "Disable" : "Enable"} LFO ${props.lfo}`}
             onClick={() => setBooleanParameter(enabledId, !enabled())}
           >
-            <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={12} decorative />
+            <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={18} decorative />
           </Button>
           <span class={styles.sourcePickAnchor} data-synth-pick-anchor aria-hidden="true">
-            <Icon name="ph:plug" size={12} decorative />
+            <Icon name="ph:plug" size={18} decorative />
           </span>
           <div class={styles.lfoLaneTitle}>LFO {props.lfo}</div>
           <SegmentedIconStrip
@@ -1075,7 +1070,7 @@ function LfoLane(props: { lfo: 1 | 2; focused?: boolean }) {
             aria-label={`${oneShot() ? "Disable" : "Enable"} LFO ${props.lfo} one-shot`}
             onClick={() => setBooleanParameter(oneShotId, !oneShot())}
           >
-            <Icon name={oneShot() ? "ph:power-fill" : "ph:power"} size={12} decorative />
+            <Icon name={oneShot() ? "ph:power-fill" : "ph:power"} size={18} decorative />
             <span>One Shot</span>
           </Button>
           <Button
@@ -1085,7 +1080,7 @@ function LfoLane(props: { lfo: 1 | 2; focused?: boolean }) {
             aria-label={`${retrigger() ? "Disable" : "Enable"} LFO ${props.lfo} retrigger`}
             onClick={() => setBooleanParameter(retriggerId, !retrigger())}
           >
-            <Icon name={retrigger() ? "ph:power-fill" : "ph:power"} size={12} decorative />
+            <Icon name={retrigger() ? "ph:power-fill" : "ph:power"} size={18} decorative />
             <span>Retrigger</span>
           </Button>
         </div>
@@ -1194,7 +1189,7 @@ function SegmentedIconStrip(props: {
                 className={styles.segmentedIconButton}
                 onClick={() => props.onChange(optionValue)}
               >
-                <Icon name={icon} size={12} decorative />
+                <Icon name={icon} size={18} decorative />
               </Button>
             </HoverInfo>
           );
@@ -1269,7 +1264,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
           aria-label={`${filterEnabled() ? "Disable" : "Enable"} AMP/Filter`}
           onClick={() => setBooleanParameter("filter.enabled", !filterEnabled())}
         >
-          <Icon name={filterEnabled() ? "ph:power-fill" : "ph:power"} size={12} decorative />
+          <Icon name={filterEnabled() ? "ph:power-fill" : "ph:power"} size={18} decorative />
         </Button>
         <div class={styles.ampFilterRibbonTitle}>AMP/Filter</div>
       </div>
@@ -1442,7 +1437,7 @@ function EnvelopeEditorCard(props: {
     >
       <div class={styles.envelopeCardHeader}>
         <span class={styles.sourcePickAnchor} data-synth-pick-anchor aria-hidden="true">
-          <Icon name="ph:plug" size={12} decorative />
+          <Icon name="ph:plug" size={18} decorative />
         </span>
         <strong>{envelope().label}</strong>
       </div>
@@ -1683,7 +1678,7 @@ function EnvelopeCurveSegmentedControl(props: {
                   className={styles.shapeButton}
                   onClick={() => props.onChange(value)}
                 >
-                  <Icon name={icon} size={14} decorative />
+                  <Icon name={icon} size={18} decorative />
                 </Button>
               </HoverInfo>
             );
@@ -1725,7 +1720,7 @@ function ShapeButtonSet(props: {
                   className={styles.shapeButton}
                   onClick={() => props.onChange(optionValue)}
                 >
-                  <Icon name={icon} size={14} decorative />
+                  <Icon name={icon} size={18} decorative />
                 </Button>
               </HoverInfo>
             );

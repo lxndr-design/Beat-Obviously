@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { appAlert, appConfirm, appPrompt } from "../../solid-ui";
-import { ActionFooter, Button, HoverInfo, Icon, MarqueeText } from "../../solid-ui";
+import { ActionFooter, Button, HoverInfo, Icon, MarqueeText, TextInput } from "../../solid-ui";
 import { importAudioFiles } from "../../audio/audioImport";
 import { isNative, send } from "../../ipc/bridge";
 import type { AudioWaveformSummary } from "../../ipc/schema";
@@ -11,7 +11,7 @@ import { createStoreSelector } from "../../solid-utils/store";
 import { AssetPageShell, AssetStateMessage } from "./AssetPageShell.solid";
 import styles from "./AudioFilesPage.module.css";
 
-type SortKey = "name" | "size" | "length" | "imported";
+type SortKey = "name" | "status" | "source" | "size" | "length" | "imported";
 type SortDirection = "asc" | "desc";
 type PreviewDirection = "forward" | "reverse";
 type WaveformChannelAnalysis = { upper: number[]; lower: number[] };
@@ -40,6 +40,7 @@ export function AudioFilesPage() {
   const [selectMode, setSelectMode] = createSignal(false);
   const [selectedIds, setSelectedIds] = createSignal<Set<string>>(new Set(), { equals: false });
   const [activeId, setActiveId] = createSignal<string | null>(null);
+  const [searchQuery, setSearchQuery] = createSignal("");
   const [sort, setSort] = createSignal<{ key: SortKey; direction: SortDirection }>({ key: "name", direction: "asc" }, { equals: false });
   const [playingId, setPlayingId] = createSignal<string | null>(null);
   const [previewSpeed, setPreviewSpeed] = createSignal<1 | 2 | 3>(1);
@@ -60,7 +61,8 @@ export function AudioFilesPage() {
   } };
   const bufferCache = new Map<string, AudioBuffer>();
 
-  const sortedFiles = createMemo(() => sortAudioFiles(files(), sort().key, sort().direction));
+  const visibleFiles = createMemo(() => filterAudioFiles(files(), searchQuery()));
+  const sortedFiles = createMemo(() => sortAudioFiles(visibleFiles(), sort().key, sort().direction));
   const activeFile = createMemo(() => files().find((file) => file.id === activeId()) ?? files()[0] ?? null);
   const activeReference = createMemo(() => activeFile() ? audioReferenceState(activeFile()!) : null);
   const selectedCount = createMemo(() => selectedIds().size);
@@ -149,7 +151,10 @@ export function AudioFilesPage() {
 
   async function onImport() {
     const imported = await importAudioFiles();
-    for (const file of imported) addFile(normalizeImportedAudioFile(file));
+    if (imported.length === 0) return;
+    const importedAt = Date.now();
+    const source = (await appPrompt("Source for this import", "", "Import Audio Source"))?.trim() ?? "";
+    for (const file of imported) addFile(normalizeImportedAudioFile(file, importedAt, source));
     if (imported[0]) setActiveId(imported[0].id);
   }
 
@@ -391,29 +396,39 @@ export function AudioFilesPage() {
       previewClassName={styles.preview}
       browser={
         <>
-        <div class={styles.actions}>
-          <Show when={selectMode()}>
-            <span class={styles.selectionCount}>{selectedCount()} selected</span>
-          </Show>
-          <Button variant={selectMode() ? "primary" : "default"} onClick={toggleSelectMode}>
-            {selectMode() ? "Done" : "Select"}
-          </Button>
-          <Button onClick={() => void onImport()}>
-            <Icon name="ph:plus" size={14} decorative />
-            Import Audio
-          </Button>
-          <HoverInfo content="Remove selected unused entries from the Beat library without deleting files">
-            <Button disabled={selectedCount() === 0} onClick={removeSelectedEntries} aria-label="Remove selected audio entries">
-              <Icon name="ph:minus" size={14} decorative />
-              Remove Entry
+        <div class={styles.browserControls}>
+          <div class={styles.actions}>
+            <Show when={selectMode()}>
+              <span class={styles.selectionCount}>{selectedCount()} selected</span>
+            </Show>
+            <Button variant={selectMode() ? "primary" : "default"} onClick={toggleSelectMode}>
+              {selectMode() ? "Done" : "Select"}
             </Button>
-          </HoverInfo>
-          <HoverInfo content="Delete selected unused files from disk and remove them from the library">
-            <Button variant="danger" disabled={selectedCount() === 0 || !nativeAvailable} onClick={deleteSelectedFiles} aria-label="Delete selected audio files from disk">
-              <Icon name="ph:trash" size={14} decorative />
-              Delete Files
+            <Button onClick={() => void onImport()}>
+              <Icon name="ph:plus" size={18} decorative />
+              Import Audio
             </Button>
-          </HoverInfo>
+            <HoverInfo content="Remove selected unused entries from the Beat library without deleting files">
+              <Button disabled={selectedCount() === 0} onClick={removeSelectedEntries} aria-label="Remove selected audio entries">
+                <Icon name="ph:minus" size={18} decorative />
+                Remove Entry
+              </Button>
+            </HoverInfo>
+            <HoverInfo content="Delete selected unused files from disk and remove them from the library">
+              <Button variant="danger" disabled={selectedCount() === 0 || !nativeAvailable} onClick={deleteSelectedFiles} aria-label="Delete selected audio files from disk">
+                <Icon name="ph:trash" size={18} decorative />
+                Delete Files
+              </Button>
+            </HoverInfo>
+          </div>
+          <TextInput
+            className={styles.searchField}
+            layout="bare"
+            value={searchQuery()}
+            onInput={(event) => setSearchQuery(event.currentTarget.value)}
+            placeholder="Search audio files"
+            aria-label="Search audio files"
+          />
         </div>
 
         <div class={`${styles.table} ${selectMode() ? styles.tableSelectMode : ""}`} role="table" aria-label="Audio files">
@@ -422,7 +437,8 @@ export function AudioFilesPage() {
               <span class={styles.checkHeader} />
             </Show>
             <SortHeader label="Name" sortKey="name" current={sort()} onSort={toggleSort} />
-            <span class={styles.staticHeader}>Status</span>
+            <SortHeader label="Status" sortKey="status" current={sort()} onSort={toggleSort} />
+            <SortHeader label="Source" sortKey="source" current={sort()} onSort={toggleSort} />
             <SortHeader label="Length" sortKey="length" current={sort()} onSort={toggleSort} />
             <SortHeader label="Size" sortKey="size" current={sort()} onSort={toggleSort} />
             <SortHeader label="Imported" sortKey="imported" current={sort()} onSort={toggleSort} />
@@ -435,11 +451,11 @@ export function AudioFilesPage() {
                 <div class={styles.emptyRow}>
                 <AssetStateMessage
                   icon="ph:waveform"
-                  title="No Audio Files"
-                  body="Import audio to build the project library."
+                  title={files().length > 0 ? "No Matching Audio Files" : "No Audio Files"}
+                  body={files().length > 0 ? "Adjust the search text to show more files." : "Import audio to build the project library."}
                 >
                   <Button size="sm" onClick={() => void onImport()}>
-                    <Icon name="ph:plus" size={14} decorative />
+                    <Icon name="ph:plus" size={18} decorative />
                     Import Audio
                   </Button>
                 </AssetStateMessage>
@@ -470,13 +486,14 @@ export function AudioFilesPage() {
                     <span class={styles.checkCell}>
                       <span class={`${styles.checkbox} ${selected() ? styles.checkboxChecked : ""}`}>
                         <Show when={selected()}>
-                          <Icon name="ph:check" size={12} decorative />
+                          <Icon name="ph:check" size={18} decorative />
                         </Show>
                       </span>
                     </span>
                   </Show>
                   <MarqueeText className={styles.nameCell} text={file.name} />
                   <span class={`${styles.referenceChip} ${styles[reference.className]}`}>{reference.label}</span>
+                  <span class={styles.sourceCell} title={formatImportSource(file)}>{formatImportSource(file)}</span>
                   <span>{formatDuration(file.durationSeconds)}</span>
                   <span>{formatFileSize(file.sizeBytes)}</span>
                   <span>{formatImported(file.importedAt)}</span>
@@ -507,11 +524,11 @@ export function AudioFilesPage() {
             </div>
             <div class={styles.previewFileName}>–</div>
             <div class={styles.previewControls} aria-hidden="true">
-              <Button iconOnly disabled aria-label="Play from start"><Icon name="ph:skip-back" size={14} decorative /></Button>
-              <Button iconOnly disabled aria-label="Play or pause"><Icon name="ph:play-fill" size={14} decorative /></Button>
+              <Button iconOnly disabled aria-label="Play from start"><Icon name="ph:skip-back" size={18} decorative /></Button>
+              <Button iconOnly disabled aria-label="Play or pause"><Icon name="ph:play-fill" size={18} decorative /></Button>
               <Button iconOnly disabled aria-hidden="true">-</Button>
-              <Button iconOnly disabled aria-label="Play backwards"><Icon name="ph:rewind-fill" size={14} decorative /></Button>
-              <Button iconOnly disabled aria-label="Loop preview"><Icon name="ph:repeat" size={14} decorative /></Button>
+              <Button iconOnly disabled aria-label="Play backwards"><Icon name="ph:rewind-fill" size={18} decorative /></Button>
+              <Button iconOnly disabled aria-label="Loop preview"><Icon name="ph:repeat" size={18} decorative /></Button>
             </div>
             <dl class={styles.details}>
               <Info label="Source" value="–" />
@@ -526,7 +543,7 @@ export function AudioFilesPage() {
             </dl>
             <ActionFooter class={styles.previewActions}>
               <Button size="sm" disabled>
-                <Icon name="ph:folder-open" size={14} decorative />
+                <Icon name="ph:folder-open" size={18} decorative />
                 View in Folder
               </Button>
             </ActionFooter>
@@ -584,12 +601,12 @@ export function AudioFilesPage() {
             <div class={styles.previewControls}>
               <HoverInfo content="Play from start">
                 <Button iconOnly onClick={() => void playPreview(file(), "forward", { restart: true, progress: 0 })} aria-label="Play from start">
-                  <Icon name="ph:skip-back" size={14} decorative />
+                  <Icon name="ph:skip-back" size={18} decorative />
                 </Button>
               </HoverInfo>
               <HoverInfo content="Play / pause">
                 <Button iconOnly selected={playingId() === file().id} onClick={() => void playPreview(file(), "forward", { progress: previewProgress() >= 1 ? 0 : previewProgress() })} aria-label="Play or pause">
-                  <Icon name={playingId() === file().id ? "ph:pause-fill" : "ph:play-fill"} size={14} decorative />
+                  <Icon name={playingId() === file().id ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
                 </Button>
               </HoverInfo>
               <HoverInfo content="Playback speed">
@@ -597,17 +614,18 @@ export function AudioFilesPage() {
               </HoverInfo>
               <HoverInfo content="Play backwards">
                 <Button iconOnly selected={playingId() === file().id && previewDirection() === "reverse"} onClick={toggleReversePlayback} aria-label="Play backwards">
-                  <Icon name="ph:rewind-fill" size={14} decorative />
+                  <Icon name="ph:rewind-fill" size={18} decorative />
                 </Button>
               </HoverInfo>
               <HoverInfo content="Loop preview">
                 <Button iconOnly selected={loopPreview()} onClick={toggleLoop} aria-label="Loop preview">
-                  <Icon name="ph:repeat" size={14} decorative />
+                  <Icon name="ph:repeat" size={18} decorative />
                 </Button>
               </HoverInfo>
             </div>
             <dl class={styles.details}>
               <Info label="Source" value={formatSource(file().path)} />
+              <Info label="Import Source" value={formatImportSource(file())} />
               <Info label="Reference" value={activeReference()?.detail ?? "Unknown"} />
               <Info label="Import Date" value={formatImported(file().importedAt)} />
               <Info label="Playback Resolution" value={formatPlaybackResolution(file())} />
@@ -628,13 +646,13 @@ export function AudioFilesPage() {
             <ActionFooter class={styles.previewActions}>
               <HoverInfo content={canRevealAudioReference(file()) ? "Reveal the referenced file in Finder" : "Reveal is available only for file references in the native app"}>
                 <Button size="sm" disabled={!canRevealAudioReference(file())} onClick={() => void viewInFolder(file())}>
-                  <Icon name="ph:folder-open" size={14} decorative />
+                  <Icon name="ph:folder-open" size={18} decorative />
                   Reveal File
                 </Button>
               </HoverInfo>
               <HoverInfo content="Copy the library reference">
                 <Button size="sm" disabled={!copyableAudioReference(file())} onClick={() => void copyReference(file())}>
-                  <Icon name="ph:copy" size={14} decorative />
+                  <Icon name="ph:copy" size={18} decorative />
                   Copy Reference
                 </Button>
               </HoverInfo>
@@ -719,17 +737,18 @@ interface SortHeaderProps {
 function SortHeader({ label, sortKey, current, onSort }: SortHeaderProps) {
   const active = current.key === sortKey;
   return (
-    <button type="button" class={`${styles.sortHeader} ${active ? styles.sortHeaderActive : ""}`} onClick={() => onSort(sortKey)}>
+    <Button variant="ghost" selected={active} class={styles.sortHeader} onClick={() => onSort(sortKey)}>
       <span>{label}</span>
-      {active && <Icon name={current.direction === "asc" ? "ph:caret-up" : "ph:caret-down"} size={12} decorative />}
-    </button>
+      {active && <Icon name={current.direction === "asc" ? "ph:caret-up" : "ph:caret-down"} size={18} decorative />}
+    </Button>
   );
 }
 
-function normalizeImportedAudioFile(file: AudioFile): AudioFile {
+function normalizeImportedAudioFile(file: AudioFile, importedAt = Date.now(), importSource = ""): AudioFile {
   return {
     ...file,
-    importedAt: file.importedAt ?? Date.now(),
+    importedAt: file.importedAt ?? importedAt,
+    importSource: importSource || file.importSource || "Unassigned",
     sizeBytes: file.sizeBytes ?? estimateDataUrlSize(file.path),
   };
 }
@@ -746,6 +765,9 @@ function legacyAudioMetadataPatch(file: AudioFile): Partial<AudioFile> | null {
   }
   if (!Number.isFinite(file.importedAt) || !file.importedAt) {
     patch.importedAt = Date.now();
+  }
+  if (file.importSource === undefined) {
+    patch.importSource = "";
   }
   return Object.keys(patch).length > 0 ? patch : null;
 }
@@ -798,10 +820,29 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
+function filterAudioFiles(files: AudioFile[], query: string) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return files;
+  return files.filter((file) => {
+    const reference = audioReferenceState(file);
+    return [
+      file.name,
+      file.path,
+      reference.label,
+      reference.detail,
+      formatImportSource(file),
+      formatSource(file.path),
+      formatExtension(file.name || file.path),
+    ].some((value) => value.toLowerCase().includes(normalized));
+  });
+}
+
 function sortAudioFiles(files: AudioFile[], key: SortKey, direction: SortDirection) {
   const factor = direction === "asc" ? 1 : -1;
   return [...files].sort((a, b) => {
     if (key === "name") return factor * a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    if (key === "status") return factor * audioReferenceState(a).label.localeCompare(audioReferenceState(b).label, undefined, { sensitivity: "base" });
+    if (key === "source") return factor * formatImportSource(a).localeCompare(formatImportSource(b), undefined, { sensitivity: "base" });
     if (key === "size") return factor * ((a.sizeBytes ?? -1) - (b.sizeBytes ?? -1));
     if (key === "length") return factor * ((a.durationSeconds ?? 0) - (b.durationSeconds ?? 0));
     return factor * ((a.importedAt ?? 0) - (b.importedAt ?? 0));
@@ -825,7 +866,7 @@ function formatFileSize(bytes?: number) {
 
 function formatImported(value?: number) {
   if (!Number.isFinite(value) || !value) return "Unknown";
-  return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "2-digit", day: "2-digit" });
+  return new Date(value).toLocaleString(undefined, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 function playableAudioUrl(path: string) {
@@ -1213,13 +1254,13 @@ function audioReferenceState(file: AudioFile): {
   }
   if (path.startsWith("data:")) {
     return {
-      label: "Embedded",
-      detail: "Embedded browser import",
-      title: "Embedded Audio",
-      body: "This file is stored inside the project library data instead of a revealable disk path.",
+      label: "Library",
+      detail: "Beat library audio",
+      title: "Library Audio",
+      body: "This audio is stored in Beat's library data.",
       icon: "ph:database",
-      tone: "warning",
-      className: "referenceWarning",
+      tone: "neutral",
+      className: "referenceManaged",
     };
   }
   if (/^https?:/i.test(path)) {
@@ -1235,9 +1276,9 @@ function audioReferenceState(file: AudioFile): {
   }
   if (path.includes("/Beat/Audio Files/")) {
     return {
-      label: "Managed",
+      label: "Library",
       detail: "Beat audio library file",
-      title: "Managed Audio File",
+      title: "Library Audio File",
       body: "Beat owns this library copy.",
       icon: "ph:folder-simple",
       tone: "neutral",
@@ -1246,13 +1287,13 @@ function audioReferenceState(file: AudioFile): {
   }
   if (path.startsWith("/")) {
     return {
-      label: "External",
-      detail: "External file reference",
-      title: "External Audio Reference",
-      body: "This entry points outside the Beat library. Keep the source file in place.",
-      icon: "ph:warning",
-      tone: "warning",
-      className: "referenceWarning",
+      label: "Library",
+      detail: "Beat audio library file",
+      title: "Library Audio File",
+      body: "Beat owns this imported audio entry.",
+      icon: "ph:folder-simple",
+      tone: "neutral",
+      className: "referenceManaged",
     };
   }
   return {
@@ -1280,8 +1321,13 @@ function copyableAudioReference(file: AudioFile) {
 function formatSource(path: string) {
   if (path.startsWith("data:")) return "Browser import";
   if (path.includes("/Beat/Audio Files/")) return "Beat audio library";
-  if (path.startsWith("/")) return "External file";
+  if (path.startsWith("/")) return "Beat audio library";
   return "Audio asset";
+}
+
+function formatImportSource(file: AudioFile) {
+  const source = file.importSource?.trim();
+  return source || "Unassigned";
 }
 
 function formatPlaybackResolution(file: AudioFile) {

@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { renderAetherOutputPreviewSamples } from "../../../audio/synthPreview";
-import { Button, HoverInfo, Icon, Knob } from "../../../solid-ui";
+import { Button, HoverInfo, Icon, Knob, TextInput } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import type { CustomWavetableFrame, WavemapDefinition, WavetableWarpMode } from "../../../state/types";
 import {
@@ -93,14 +93,21 @@ export function OscillatorPanel() {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
+  const addOscillator = useSynthStore.getState().addOscillator;
   const previewInstrument = createMemo(() => synthDraftToPreviewInstrument(draft()));
 
   return (
     <section class={`${styles.panel} ${styles.majorSection}`} aria-label="Oscillator">
-      <div class={styles.majorSectionTitle}>Oscillators</div>
+      <div class={styles.majorSectionTitleRow}>
+        <div class={styles.majorSectionTitle}>Oscillators</div>
+        <Button size="xs" onClick={addOscillator} aria-label="Add oscillator">
+          <Icon name="ph:plus" size={18} decorative /> Add Oscillator
+        </Button>
+      </div>
       <div class={styles.body}>
-        <OscillatorRow oscillator="a" previewInstrument={previewInstrument()} />
-        <OscillatorRow oscillator="b" previewInstrument={previewInstrument()} />
+        <For each={draft().metadata.oscillators}>
+          {(oscillator) => <OscillatorRow oscillator={oscillator.id} name={oscillator.name} previewInstrument={previewInstrument()} />}
+        </For>
         <div class={styles.row} aria-label="Voice stack row">
           <div class="ds-section-header">
             <div class="ds-section-title">Voice Stack</div>
@@ -190,6 +197,7 @@ export function OscillatorPanel() {
 
 function OscillatorRow(props: {
   oscillator: OscillatorKey;
+  name: string;
   previewInstrument: ReturnType<typeof synthDraftToPreviewInstrument>;
 }) {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
@@ -199,6 +207,8 @@ function OscillatorRow(props: {
   const setWavemap = useSynthStore.getState().setWavemap;
   const updateCustomWavetableFrame = useSynthStore.getState().updateCustomWavetableFrame;
   const updateWavemapMetadata = useSynthStore.getState().updateWavemapMetadata;
+  const removeOscillator = useSynthStore.getState().removeOscillator;
+  const renameOscillator = useSynthStore.getState().renameOscillator;
   const [resynthesisMode, setResynthesisMode] = createSignal<WavemapAudioSelectionMode>("full");
   const [analysisView, setAnalysisView] = createSignal<WavemapAnalysisView>("details");
   const [customEditorOpen, setCustomEditorOpen] = createSignal(true);
@@ -214,7 +224,7 @@ function OscillatorRow(props: {
   });
   const customTableId = createMemo(() => selectedWavetable().startsWith("user.") ? selectedWavetable() : DEFAULT_CUSTOM_WAVETABLE_ID);
   const customTable = createMemo(() => draft().metadata.wavemaps?.[customTableId()] ?? draft().metadata.customWavetables?.[customTableId()] ?? createDefaultCustomWavetable(customTableId()));
-  const label = createMemo(() => `Oscillator ${props.oscillator.toUpperCase()}`);
+  const label = createMemo(() => props.name);
   const waveform = createMemo(() => renderAetherOutputPreviewSamples(props.previewInstrument, 160, props.oscillator));
 
   function replaceCurrentWavemap(next: WavemapDefinition) {
@@ -233,22 +243,30 @@ function OscillatorRow(props: {
           aria-label={`${enabled() ? "Disable" : "Enable"} ${label()}`}
           onClick={() => setBooleanParameter(enabledId(), !enabled())}
         >
-          <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={12} decorative />
+          <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={18} decorative />
         </Button>
-        <div class="ds-section-title">{label()}</div>
-        <Show when={enabled()}>
-          <div class={styles.headerWavetable}>
-            <WavetableShapeButtons
-              compact
-              value={selectedWavetable()}
-              onChange={(value) => setParameter(wavetableId(), value)}
-            />
-            <span>{selectedWavetableLabel(selectedWavetable())}</span>
-          </div>
+        <TextInput
+          layout="bare"
+          className={styles.oscillatorName}
+          aria-label={`Rename ${label()}`}
+          value={props.name}
+          onChange={(event) => renameOscillator(props.oscillator, event.currentTarget.value)}
+        />
+        <div class={styles.headerWavetable}>
+          <WavetableShapeButtons
+            compact
+            value={selectedWavetable()}
+            onChange={(value) => setParameter(wavetableId(), value)}
+          />
+          <span>{selectedWavetableLabel(selectedWavetable())}</span>
+        </div>
+        <Show when={props.oscillator !== "a"}>
+          <Button iconOnly size="xs" className={styles.removeOscillatorButton} aria-label={`Remove ${label()}`} onClick={() => removeOscillator(props.oscillator)}>
+            <Icon name="ph:trash" size={18} decorative />
+          </Button>
         </Show>
       </div>
-      <Show when={enabled()}>
-        <div class={styles.rowMain}>
+      <div class={styles.rowMain}>
           <WaveformPreview label={`${label()} local oscillator preview`} samples={waveform()} disabled={!enabled()} />
           <div class={styles.settingsPane}>
             <div class={styles.rowBody}>
@@ -377,8 +395,7 @@ function OscillatorRow(props: {
               </Show>
             </div>
           </Show>
-        </div>
-      </Show>
+      </div>
     </div>
   );
 }
@@ -775,7 +792,7 @@ function WavetableShapeButtons(props: { value: WavetableId; onChange: (value: Wa
                   className={styles.wavetableButton}
                   onClick={() => props.onChange(table.id)}
                 >
-                  <Icon name={WAVETABLE_ICONS[table.id] ?? "ph:waveform"} size={12} decorative />
+                  <Icon name={WAVETABLE_ICONS[table.id] ?? "ph:waveform"} size={18} decorative />
                 </Button>
               </HoverInfo>
             );
@@ -818,7 +835,7 @@ function WarpModeButtons(props: { value: WavetableWarpMode; onChange: (value: Wa
                   className={styles.wavetableButton}
                   onClick={() => props.onChange(option.value)}
                 >
-                  <Icon name={option.icon} size={12} decorative />
+                  <Icon name={option.icon} size={18} decorative />
                 </Button>
               </HoverInfo>
             );

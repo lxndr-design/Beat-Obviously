@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onCleanup } from "solid-js";
-import { appAlert } from "../../solid-ui";
+import { appAlert, RailButton } from "../../solid-ui";
 import { saveCurrentDocument } from "../../persistence/documentActions";
 import { createStoreSelector } from "../../solid-utils/store";
 import { createContextMenu, HoverInfo, Icon, type ContextMenuItem } from "../../solid-ui";
@@ -73,9 +73,9 @@ export function Sidebar() {
         <div class={styles.railGroup}>
           {PANELS.map((panel) => (
             <HoverInfo content={panel.label} placement="right">
-              <button
-                type="button"
-                class={`${styles.railButton} ${activePanel() === panel.id ? styles.railButtonActive : ""}`}
+              <RailButton
+                selected={activePanel() === panel.id}
+                class={styles.railButton}
                 onClick={() => setActivePanel(panel.id)}
                 aria-label={panel.label}
                 aria-pressed={activePanel() === panel.id}
@@ -85,59 +85,55 @@ export function Sidebar() {
                 ) : (
                   <Icon
                     name={(activePanel() === panel.id ? panel.activeIcon : panel.icon) ?? "ph:square"}
-                    size={16}
+                    size={18}
                     decorative
                   />
                 )}
-              </button>
+              </RailButton>
             </HoverInfo>
           ))}
         </div>
         <div class={styles.railBottom}>
           <span class={styles.railSaveSlot}>
             <HoverInfo content="Save project" placement="right">
-              <button
-                type="button"
+              <RailButton
                 class={styles.railButton}
                 onClick={() => void onSave()}
                 onContextMenu={saveMenu.onContextMenu}
                 aria-label="Save"
               >
-                <Icon name="ph:floppy-disk" size={16} decorative />
-              </button>
+                <Icon name="ph:floppy-disk" size={18} decorative />
+              </RailButton>
             </HoverInfo>
             {documentOpen() && dirty() && <span class={styles.dirtyDot} aria-label="Unsaved changes" />}
             {saveMenu.menu()}
           </span>
           <HoverInfo content="Export WAV" placement="right">
-            <button
-              type="button"
+            <RailButton
               class={styles.railButton}
               onClick={() => useUiStore.getState().openEditor({ kind: "exportReview" })}
               aria-label="Export WAV"
             >
-              <Icon name="ph:export" size={16} decorative />
-            </button>
+              <Icon name="ph:export" size={18} decorative />
+            </RailButton>
           </HoverInfo>
           <HoverInfo content="Mixer" placement="right">
-            <button
-              type="button"
+            <RailButton
               class={styles.railButton}
               onClick={() => useUiStore.getState().openEditor({ kind: "mixer" })}
               aria-label="Mixer"
             >
-              <Icon name="ph:sliders-horizontal" size={16} decorative />
-            </button>
+              <Icon name="ph:sliders-horizontal" size={18} decorative />
+            </RailButton>
           </HoverInfo>
           <HoverInfo content="Settings" placement="right">
-            <button
-              type="button"
+            <RailButton
               class={styles.railButton}
               onClick={() => useUiStore.getState().openEditor({ kind: "preferences" })}
               aria-label="Settings"
             >
-              <Icon name="ph:gear" size={16} decorative />
-            </button>
+              <Icon name="ph:gear" size={18} decorative />
+            </RailButton>
           </HoverInfo>
         </div>
       </nav>

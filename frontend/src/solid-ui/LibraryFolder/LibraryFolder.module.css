@@ -1,0 +1,118 @@
+.folder {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+  height: var(--sidebar-subrow-height);
+  padding: 0 3px;
+  box-sizing: border-box;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-fg) 24%, transparent);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  cursor: pointer;
+  text-align: left;
+  transition: var(--interaction-transition);
+}
+
+.scale-large .header {
+  height: 27px;
+}
+
+.scale-large .name,
+.scale-large .nameInput {
+  font-size: var(--font-size-field-label);
+}
+
+.header:hover {
+  background: var(--interaction-hover-bg);
+}
+
+.header:focus,
+.header:focus-visible {
+  outline: 0;
+}
+
+.headerOpen {
+  background: var(--color-bg);
+}
+
+.headerDisabled {
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+  cursor: default;
+}
+
+.headerDisabled:hover {
+  background: var(--color-bg);
+}
+
+.headerDisabled .toggle {
+  color: color-mix(in srgb, var(--color-fg) 34%, transparent);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 100%;
+}
+
+.name,
+.nameInput {
+  min-width: 0;
+  width: 100%;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  letter-spacing: var(--letter-spacing-uppercase);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nameInput {
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.count {
+  min-width: 18px;
+  height: 15px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  max-height: 0;
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: max-height 160ms var(--ease-out), opacity 120ms var(--ease-out);
+  visibility: hidden;
+}
+
+.listOpen {
+  max-height: 639px;
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}

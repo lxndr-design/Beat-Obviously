@@ -20,7 +20,7 @@ import type {
   Track,
   WavemapDefinition,
 } from "../state/types";
-import type { BeatComponent } from "../state/components";
+import type { BeatComponent, ComponentFolder } from "../state/components";
 
 export interface BeatProjectDocument {
   schemaVersion: 1;
@@ -30,6 +30,7 @@ export interface BeatProjectDocument {
   instrumentSets?: InstrumentSet[];
   audioFiles?: AudioFile[];
   components?: BeatComponent[];
+  componentFolders?: ComponentFolder[];
   plugins?: PluginAdapter[];
   assets?: BeatProjectAsset[];
 }
@@ -200,6 +201,7 @@ export interface ProjectSidecarCleanupReport {
 export interface DecentSamplerImportSample {
   path: string;
   name: string;
+  trigger?: string;
   rootNote: number;
   loNote: number;
   hiNote: number;
@@ -307,6 +309,7 @@ export type OutboundRequest =
   | { kind: "audio.waveform"; path: string; bucketCount?: number }
   | { kind: "audio.listDevices" }
   | { kind: "audio.selectInputDevice"; typeName?: string; deviceName: string; inputChannelCount?: number }
+  | { kind: "audio.selectOutputDevice"; typeName?: string; deviceName: string }
   // Recording -------------------------------------------------------------
   | { kind: "recording.plan"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[]; trackId?: Id; startBeat: Beats; countInBeats?: Beats; maxDurationSeconds: number; inputChannels?: number; sampleRate?: number; bpm?: number; requireRecordArm?: boolean }
   | { kind: "recording.prepare"; maxDurationSeconds: number; inputChannels?: number }
@@ -360,6 +363,7 @@ export type ResponseFor<R extends OutboundRequest> =
   R extends { kind: "audio.waveform" } ? { waveform: AudioWaveformSummary | null; cached?: boolean; error?: string } :
   R extends { kind: "audio.listDevices" } ? { snapshot: AudioDeviceSnapshot } :
   R extends { kind: "audio.selectInputDevice" } ? { ok: boolean; snapshot: AudioDeviceSnapshot; error?: string } :
+  R extends { kind: "audio.selectOutputDevice" } ? { ok: boolean; snapshot: AudioDeviceSnapshot; error?: string } :
   R extends { kind: "recording.plan" } ? { plan: RecordingSessionPlan | null; error?: string } :
   R extends { kind: "recording.prepare" } ? { ok: boolean; stats: RecordingCaptureStats; error?: string } :
   R extends { kind: "recording.start" } ? { stats: RecordingCaptureStats } :
@@ -442,7 +446,7 @@ export type InboundEvent =
     }
   | (ProjectExportJobStatus & { kind: "project.exportProgress" })
   | { kind: "training.status"; task: "drums" | "instruments" | "midi"; status: "started" | "finished" | "failed"; signalCount: number; message?: string; exitCode?: number }
-  | { kind: "native.menuCommand"; command: "newProject" | "openProject" | "saveProject" | "importAudio" | "exportWav" | "preferences" }
+  | { kind: "native.menuCommand"; command: "home" | "whatsNew" | "userGuide" | "newProject" | "openProject" | "saveProject" | "importAudio" | "exportWav" | "preferences" | "undo" | "redo" | "songInfo" }
   | { kind: "native.openProjectFile"; path: string }
   | { kind: "log"; level: "info" | "warn" | "error"; message: string };
 

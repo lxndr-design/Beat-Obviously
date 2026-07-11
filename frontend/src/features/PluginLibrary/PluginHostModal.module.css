@@ -9,8 +9,8 @@
 
 .titleLogo {
   display: inline-block;
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   object-fit: contain;
 }
 
@@ -24,7 +24,7 @@
 .infoCell {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
   padding: 6px;
   border-right: var(--border-fg);
@@ -66,7 +66,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 116px;
+  min-height: 117px;
   padding: 6px;
 }
 
@@ -92,9 +92,9 @@
 
 .routeCard {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
+  grid-template-columns: 15px minmax(0, 1fr);
   align-items: start;
-  gap: 4px 6px;
+  gap: 3px 6px;
   min-width: 0;
   padding: 6px;
   border: var(--border-fg);
@@ -114,15 +114,15 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
-  height: min(620px, calc(100vh - 96px));
+  height: min(621px, calc(100vh - 96px));
 }
 
 .decentSkinToolbar {
   display: grid;
-  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  grid-template-columns: minmax(180px, 261px) minmax(0, 1fr);
   align-items: center;
   min-width: 0;
-  min-height: 34px;
+  min-height: 33px;
   border-bottom: var(--border-fg);
 }
 
@@ -133,7 +133,7 @@
 
 .decentSkinToolbar span {
   overflow: hidden;
-  padding: 0 8px;
+  padding: 0 9px;
   color: var(--color-fg-hover);
   font-size: var(--font-size-ui);
   line-height: 1;
@@ -143,10 +143,10 @@
 
 .decentSkinNotice {
   position: absolute;
-  left: 8px;
-  top: 8px;
+  left: 9px;
+  top: 9px;
   z-index: 3;
-  max-width: min(420px, calc(100% - 16px));
+  max-width: min(420px, calc(100% - 15px));
   overflow: hidden;
   padding: 6px;
   border: var(--border-fg);
@@ -167,7 +167,7 @@
 }
 
 .decentSkinWorkspaceWithDetails {
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.32fr);
+  grid-template-columns: minmax(0, 1fr) minmax(321px, 0.32fr);
 }
 
 .decentSkinCanvas {
@@ -183,7 +183,7 @@
 
 .decentSkinFrame {
   position: relative;
-  width: min(100%, calc((100vh - 188px) * var(--decent-ui-aspect, 1)), 1680px);
+  width: min(100%, calc((100vh - 189px) * var(--decent-ui-aspect, 1)), 1680px);
   max-width: 100%;
   max-height: 100%;
   background-color: var(--color-bg);
@@ -192,7 +192,9 @@
 .decentSkinHotspot {
   position: absolute;
   display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   place-items: center;
+  gap: 3px;
   min-width: 6px;
   min-height: 6px;
   padding: 0;
@@ -203,19 +205,34 @@
   opacity: 0.82;
 }
 
+.decentSkinHotspotLabel {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-fg);
+  font-size: var(--font-size-hint);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px var(--color-bg);
+  text-transform: none;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .decentSkinHotspot:hover,
 .decentSkinHotspot:focus-visible,
 .decentSkinHotspotActive {
   background: color-mix(in srgb, var(--color-bg) 10%, transparent);
   outline: 1px solid color-mix(in srgb, var(--color-fg) 70%, transparent);
-  outline-offset: 2px;
+  outline-offset: 3px;
   opacity: 1;
 }
 
 .decentSkinKnob {
   position: relative;
   display: block;
-  width: clamp(16px, 32%, 34px);
+  width: clamp(15px, 32%, 33px);
   aspect-ratio: 1;
   border: 1px solid color-mix(in srgb, var(--color-fg) 72%, transparent);
   border-radius: 999px;
@@ -229,7 +246,7 @@
   position: absolute;
   left: calc(50% - 1px);
   top: 12%;
-  width: 2px;
+  width: 3px;
   height: 38%;
   border-radius: 999px;
   background: var(--color-fg);
@@ -238,7 +255,7 @@
 
 .decentSkinSlider {
   display: block;
-  width: max(34px, min(72%, 92px));
+  width: max(33px, min(72%, 93px));
   height: 6px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--color-fg) 66%, transparent);
@@ -249,13 +266,13 @@
 .decentSkinSlider span {
   display: block;
   height: 100%;
-  min-width: 4px;
+  min-width: 3px;
   background: var(--color-fg);
 }
 
 .decentSkinButton {
   display: block;
-  width: clamp(14px, 28%, 30px);
+  width: clamp(15px, 28%, 30px);
   aspect-ratio: 1;
   border: 1px solid color-mix(in srgb, var(--color-fg) 70%, transparent);
   border-radius: 4px;
@@ -265,7 +282,7 @@
 .decentSkinEmpty {
   display: grid;
   justify-items: center;
-  gap: 8px;
+  gap: 9px;
   max-width: 360px;
   text-align: center;
 }
@@ -292,7 +309,7 @@
 
 .decentControlInspector {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
   padding: 6px;
   border-top: var(--border-fg);
@@ -347,7 +364,7 @@
 
 .decentBody {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(220px, 0.75fr);
+  grid-template-columns: minmax(261px, 1fr) minmax(219px, 0.75fr);
   gap: 6px;
   padding: 6px;
 }
@@ -393,7 +410,7 @@
 .decentHotspot::after {
   content: "";
   position: absolute;
-  inset: 2px;
+  inset: 3px;
   border: 1px solid color-mix(in srgb, var(--color-fg) 18%, transparent);
 }
 
@@ -415,7 +432,7 @@
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 5px;
+  gap: 6px;
   justify-items: center;
   max-width: calc(100% - 12px);
   text-align: center;
@@ -498,9 +515,9 @@
 .decentControls span {
   display: grid;
   min-width: 0;
-  min-height: 38px;
+  min-height: 39px;
   align-content: center;
-  gap: 4px;
+  gap: 3px;
   padding: 0 6px;
   border: var(--border-fg);
   line-height: 1;
@@ -533,7 +550,7 @@
   align-items: center;
   justify-content: space-between;
   min-width: 0;
-  min-height: 32px;
+  min-height: 33px;
   padding: 0 6px;
   border: var(--border-fg);
   background: var(--surface-subtle);
@@ -567,7 +584,7 @@
 
   .decentSkinWorkspaceWithDetails {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) minmax(220px, 0.55fr);
+    grid-template-rows: minmax(0, 1fr) minmax(219px, 0.55fr);
   }
 
   .decentDetails {
@@ -576,6 +593,6 @@
   }
 
   .decentSkinHost {
-    height: min(560px, calc(100vh - 96px));
+    height: min(561px, calc(100vh - 96px));
   }
 }

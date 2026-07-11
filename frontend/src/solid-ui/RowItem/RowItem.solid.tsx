@@ -3,9 +3,11 @@ import { meshTintVariantFor, type MeshTintVariant } from "../meshTint";
 import styles from "./RowItem.module.css";
 
 type RowItemDensity = "compact" | "standard" | "media";
+type RowItemScale = "default" | "large";
 
 export interface RowItemProps extends JSX.LiHTMLAttributes<HTMLLIElement> {
   density?: RowItemDensity;
+  scale?: RowItemScale;
   reserveDragSlot?: boolean;
   dragSlot?: JSX.Element;
   icon?: JSX.Element;
@@ -23,6 +25,7 @@ export interface RowItemProps extends JSX.LiHTMLAttributes<HTMLLIElement> {
 export function RowItem(allProps: RowItemProps) {
   const [local, props] = splitProps(allProps, [
     "density",
+    "scale",
     "reserveDragSlot",
     "dragSlot",
     "icon",
@@ -42,8 +45,10 @@ export function RowItem(allProps: RowItemProps) {
   const cls = () => [
     styles.row,
     styles[`density-${local.density ?? "standard"}`],
+    styles[`scale-${local.scale ?? "default"}`],
     styles[`cursor-${local.cursor ?? "pointer"}`],
     !reserveDragSlot() && styles.noDragSlot,
+    local.action && styles.hasAction,
     local.class,
     local.className,
   ].filter(Boolean).join(" ");

@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { Portal } from "solid-js/web";
-import { Button, HoverInfo, Icon, NumberInput, Select } from "../../solid-ui";
+import { Button, FloatingSelect, HoverInfo, Icon, NumberInput } from "../../solid-ui";
 import type { TimeSignature } from "../../state/types";
 import styles from "./TimeSignatureControl.module.css";
 import modalFrameStyles from "../../solid-ui/Modal/Modal.module.css";
@@ -32,7 +32,7 @@ export function TimeSignatureControl(props: TimeSignatureControlProps) {
           aria-expanded={menuOpen()}
         >
           {props.value.num}/{props.value.denom}
-          <Icon name={props.direction === "up" ? "ph:caret-up" : "ph:caret-down"} size={16} decorative />
+          <Icon name={props.direction === "up" ? "ph:caret-up" : "ph:caret-down"} size={18} decorative />
         </Button>
       </HoverInfo>
       <Show when={menuOpen()}>
@@ -126,9 +126,9 @@ function TimeSignatureModal(props: {
               <h2 id="time-signature-title" class={modalFrameStyles.title}>Time signature</h2>
             </div>
             <div class={modalFrameStyles.headerRight}>
-              <button type="button" class={modalFrameStyles.closeBtn} onClick={props.onClose} aria-label="Close">
-                <Icon name="ph:x" size={16} decorative />
-              </button>
+              <Button iconOnly variant="ghost" class={modalFrameStyles.closeBtn} onClick={props.onClose} aria-label="Close">
+                <Icon name="ph:x" size={18} decorative />
+              </Button>
             </div>
           </header>
           <div class={modalFrameStyles.body}>
@@ -141,17 +141,14 @@ function TimeSignatureModal(props: {
                 step={1}
                 onChange={setNum}
               />
-              <Select
+              <FloatingSelect
                 className={timeSignatureModalStyles.field}
-                selectClassName={timeSignatureModalStyles.select}
+                triggerClassName={timeSignatureModalStyles.select}
                 label="Note value"
                 value={String(denom())}
-                onChange={(event) => setDenom(Number(event.currentTarget.value))}
-              >
-                  <For each={DENOMS}>
-                    {(value) => <option value={String(value)}>1/{value}</option>}
-                  </For>
-              </Select>
+                options={DENOMS.map((value) => ({ value: String(value), label: `1/${value}` }))}
+                onChange={(value) => setDenom(Number(value))}
+              />
             </div>
             <div class={timeSignatureModalStyles.boldSection}>
               <span class={timeSignatureModalStyles.label}>Bold ticks (per bar)</span>

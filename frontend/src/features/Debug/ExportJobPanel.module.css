@@ -1,9 +1,9 @@
 .panel {
   position: fixed;
-  right: 44px;
+  right: 45px;
   bottom: 6px;
   z-index: 8999;
-  width: min(300px, calc(100vw - 56px));
+  width: min(300px, calc(100vw - 57px));
   background: var(--color-bg);
   color: var(--color-fg);
   border: var(--border-fg);
@@ -16,7 +16,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 28px;
+  min-height: 27px;
   padding: 0 6px;
   border-bottom: var(--border-fg);
 }
@@ -37,13 +37,13 @@
 
 .body {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   padding: 6px;
 }
 
 .track {
   position: relative;
-  height: 8px;
+  height: 9px;
   border: var(--border-fg);
   overflow: hidden;
 }

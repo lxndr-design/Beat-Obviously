@@ -1,13 +1,13 @@
 .table {
   display: grid;
-  grid-template-rows: 28px 1fr;
+  grid-template-rows: 27px 1fr;
   min-height: 0;
 }
 
 .headerRow,
 .row {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) 76px 72px 84px 84px;
+  grid-template-columns: minmax(159px, 1fr) 75px 72px 84px 84px;
   align-items: center;
 }
 
@@ -35,7 +35,7 @@
 
 .row {
   width: 100%;
-  min-height: 28px;
+  min-height: 27px;
   border: 0;
   border-bottom: var(--border-soft);
   background: transparent;
@@ -67,7 +67,7 @@
   display: flex;
   align-items: center;
   min-height: 72px;
-  padding: 8px;
+  padding: 9px;
   color: var(--color-fg-hover);
   font-size: var(--font-size-ui);
 }
@@ -79,7 +79,7 @@
   justify-self: start;
   width: 66px;
   height: 18px;
-  padding: 0 4px;
+  padding: 0 3px;
   border: 1px solid color-mix(in srgb, var(--color-fg) 44%, transparent);
   color: var(--color-fg-hover);
   font-size: var(--font-size-ui);
@@ -116,8 +116,8 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: var(--pattern-stage-min, 260px);
-  min-height: var(--pattern-stage-min, 260px);
+  height: var(--pattern-stage-min, 261px);
+  min-height: var(--pattern-stage-min, 261px);
   border: var(--border-fg);
   padding: 0;
   overflow: hidden;
@@ -138,7 +138,7 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-rows: 28px 1fr;
+  grid-template-rows: 27px 1fr;
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -152,7 +152,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  padding: 0 8px;
+  padding: 0 9px;
   border-bottom: var(--border-fg);
   font-size: var(--font-size-ui);
   font-weight: var(--font-weight-medium);
@@ -178,7 +178,7 @@
 .segmentPlayhead {
   position: absolute;
   z-index: 4;
-  top: 28px;
+  top: 27px;
   bottom: 0;
   left: calc(var(--pattern-label-width, 0px) + ((100% - var(--pattern-label-width, 0px)) * var(--pattern-progress, 0)));
   width: 1px;
@@ -190,7 +190,7 @@
 .noteBlock {
   position: absolute;
   height: 12px;
-  min-width: 4px;
+  min-width: 3px;
   border: var(--border-fg);
   background: var(--color-fg);
   opacity: 0.76;
@@ -263,17 +263,17 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 8px;
+  width: 9px;
   transform: translateX(-50%);
 }
 
 .drumMatrixCellOn::before {
   content: "";
   position: absolute;
-  top: 5px;
-  bottom: 5px;
+  top: 6px;
+  bottom: 6px;
   left: 50%;
-  width: 5px;
+  width: 6px;
   background: var(--color-fg);
   transform: translateX(-50%);
 }
@@ -295,7 +295,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  min-height: 28px;
+  min-height: 27px;
   color: var(--color-fg);
   font-size: var(--font-size-ui);
   line-height: 1.2;
@@ -313,7 +313,7 @@
 .playbackBar {
   position: relative;
   width: 100%;
-  height: 10px;
+  height: 9px;
   border: var(--border-fg);
   overflow: hidden;
   touch-action: none;
@@ -330,8 +330,8 @@
 .playbackKnob {
   position: absolute;
   top: 50%;
-  width: 10px;
-  height: 16px;
+  width: 9px;
+  height: 15px;
   border: var(--border-fg);
   background: var(--color-bg);
   transform: translate(-50%, -50%);
@@ -356,7 +356,7 @@
 }
 
 .previewActionButton {
-  min-width: 128px;
+  min-width: 129px;
   padding: 0 12px;
   border-top: 0;
   border-bottom: 0;
@@ -365,7 +365,7 @@
 .details {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 24px;
+  gap: 15px 24px;
   margin: 0;
   padding: 6px 0 0;
   font-size: var(--font-size-ui);
@@ -383,7 +383,7 @@
 }
 
 .details dd {
-  margin: 4px 0 0;
+  margin: 3px 0 0;
   min-width: 0;
   overflow: hidden;
   color: var(--color-fg);

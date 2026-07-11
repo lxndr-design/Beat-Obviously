@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
-import { Button, HoverInfo, Icon, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
+import { Button, Checkbox, HoverInfo, Icon, LibrarySearch, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { appAlert, appConfirm } from "../../solid-ui";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
@@ -20,6 +20,9 @@ export function AudioFileLibraryPanel(props: AudioFileLibraryPanelProps) {
   const [selectedIds, setSelectedIds] = createSignal<Set<string>>(new Set(), { equals: false });
   const [lastSelectedId, setLastSelectedId] = createSignal<string | null>(null);
   const [groupingFiles, setGroupingFiles] = createSignal<AudioFile[] | null>(null);
+  const [searchQuery, setSearchQuery] = createSignal("");
+  const normalizedSearch = () => searchQuery().trim().toLowerCase();
+  const visibleFiles = () => files().filter((file) => !normalizedSearch() || file.name.toLowerCase().includes(normalizedSearch()));
   let panelElement: HTMLDivElement | undefined;
   const panelMenu = createContextMenu((): ContextMenuItem[] => [
     {
@@ -123,10 +126,16 @@ export function AudioFileLibraryPanel(props: AudioFileLibraryPanelProps) {
         actions={(
           <HoverInfo content={`Upload ${SUPPORTED_AUDIO_IMPORT_LABEL}`}>
             <SectionRibbonActionButton onClick={() => void upload()} aria-label="Upload audio file">
-              <Icon name="ph:plus" size={16} decorative />
+              <Icon name="ph:plus" size={18} decorative />
             </SectionRibbonActionButton>
           </HoverInfo>
         )}
+      />
+      <LibrarySearch
+        value={searchQuery()}
+        onInput={(event) => setSearchQuery(event.currentTarget.value)}
+        placeholder="Search..."
+        aria-label="Search audio files"
       />
       <Show when={selectMode() && props.expanded}>
         <div class={styles.selectionBar}>
@@ -144,7 +153,7 @@ export function AudioFileLibraryPanel(props: AudioFileLibraryPanelProps) {
         <Show when={files().length === 0}>
           <li class={styles.empty}>No audio files yet.</li>
         </Show>
-        <For each={files()}>
+        <For each={visibleFiles()}>
           {(file) => (
             <AudioFileItem
               file={file}
@@ -218,9 +227,8 @@ function AudioFileItem(props: AudioFileItemProps) {
       onContextMenu={menu.onContextMenu}
       iconAriaHidden={!props.selectMode}
       icon={props.selectMode ? (
-        <input
-          class={styles.itemCheckbox}
-          type="checkbox"
+        <Checkbox
+          inputClassName={styles.itemCheckbox}
           checked={props.selected}
           readOnly
           onClick={(event) => {
@@ -231,14 +239,14 @@ function AudioFileItem(props: AudioFileItemProps) {
         />
       ) : (
         <span class={styles.itemDot} aria-hidden>
-          <Icon name="ph:dots-six-vertical" size={14} decorative />
+          <Icon name="ph:dots-six-vertical" size={18} decorative />
         </span>
       )}
       name={props.file.name}
       action={(
         <HoverInfo content={formatDuration(props.file.durationSeconds)}>
           <span class={styles.itemMeta}>
-            <Icon name="ph:waveform" size={14} decorative />
+            <Icon name="ph:waveform" size={18} decorative />
           </span>
         </HoverInfo>
       )}

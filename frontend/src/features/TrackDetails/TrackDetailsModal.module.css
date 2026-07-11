@@ -17,7 +17,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 26px;
+  min-height: 27px;
   padding: 0 var(--space-1);
   border-bottom: var(--border-fg);
   font-family: var(--font-family-base);
@@ -47,10 +47,10 @@
 
 .sliderRow {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 48px;
+  grid-template-columns: 57px minmax(0, 1fr) 48px;
   align-items: center;
   gap: var(--space-1);
-  min-height: 26px;
+  min-height: 27px;
   font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
 }
@@ -74,7 +74,7 @@
 .automationPanel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 4px;
+  gap: 3px;
   align-items: center;
   padding: var(--space-1);
 }
@@ -84,7 +84,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 9px;
   min-width: 0;
   color: color-mix(in srgb, var(--color-fg) 72%, transparent);
   font-size: var(--font-size-ui);
@@ -101,10 +101,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 9px;
   min-width: 0;
   min-height: 18px;
-  padding: 0 5px;
+  padding: 0 6px;
   border-radius: 3px;
   background: var(--interaction-hover-bg);
   color: color-mix(in srgb, var(--color-fg) 72%, transparent);
@@ -159,7 +159,7 @@
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
   color: color-mix(in srgb, var(--color-fg) 74%, transparent);
   font-size: var(--font-size-ui);
@@ -167,9 +167,9 @@
 
 .automationValueEditor label {
   display: grid;
-  grid-template-columns: 30px minmax(56px, 1fr) 42px;
+  grid-template-columns: 30px minmax(57px, 1fr) 42px;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -199,8 +199,8 @@
 
 .automationHandleLine {
   position: absolute;
-  left: 8px;
-  right: 8px;
+  left: 9px;
+  right: 9px;
   top: 50%;
   height: 1px;
   background: color-mix(in srgb, var(--color-fg) 32%, transparent);
@@ -212,7 +212,7 @@
   position: absolute;
   top: 50%;
   width: 18px;
-  height: 16px;
+  height: 15px;
   padding: 0;
   border: var(--border-soft);
   background: var(--color-bg);
@@ -236,7 +236,7 @@
   display: grid;
   gap: 3px;
   min-width: 0;
-  padding-top: 2px;
+  padding-top: 3px;
   border-top: 1px solid color-mix(in srgb, var(--color-fg) 24%, transparent);
 }
 
@@ -244,7 +244,7 @@
 .automationPointRow {
   display: grid;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
   font-size: var(--font-size-ui);
 }
@@ -258,7 +258,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -267,7 +267,7 @@
 }
 
 .automationPointRow {
-  grid-template-columns: 16px 20px minmax(72px, 0.8fr) minmax(80px, 1fr) 44px auto;
+  grid-template-columns: 15px 21px minmax(72px, 0.8fr) minmax(81px, 1fr) 45px auto;
 }
 
 .automationPointRowSelected {
@@ -291,7 +291,7 @@
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -306,7 +306,7 @@
   width: 100%;
   min-width: 0;
   height: 24px;
-  padding: 0 4px;
+  padding: 0 3px;
   border: 1px solid color-mix(in srgb, var(--color-fg) 45%, transparent);
   background: var(--color-bg);
   color: var(--color-fg);

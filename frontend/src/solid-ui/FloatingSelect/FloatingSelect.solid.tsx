@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Icon } from "../Icon";
 import styles from "./FloatingSelect.module.css";
@@ -6,29 +6,48 @@ import styles from "./FloatingSelect.module.css";
 export interface FloatingSelectOption {
   value: string;
   label: string;
+  disabled?: boolean;
 }
 
-interface FloatingSelectProps {
+export interface FloatingSelectProps {
   value: string;
   options: FloatingSelectOption[];
-  open: boolean;
+  open?: boolean;
   className?: string;
+  triggerClassName?: string;
   fillHeight?: boolean;
   label?: string;
-  layout?: "default" | "inline";
+  layout?: "default" | "inline" | "bare";
   ariaLabel?: string;
-  onOpenChange: (open: boolean) => void;
+  disabled?: boolean;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  onOpenChange?: (open: boolean) => void;
   onChange: (value: string) => void;
 }
 
 export function FloatingSelect(props: FloatingSelectProps) {
   let rootElement: HTMLDivElement | undefined;
+  const [internalOpen, setInternalOpen] = createSignal(false);
   const [menuRect, setMenuRect] = createSignal<{ left: number; top: number; width: number; maxHeight: number } | null>(null, { equals: false });
+  const [query, setQuery] = createSignal("");
+  const open = () => props.open ?? internalOpen();
+  const setOpen = (next: boolean) => {
+    if (props.disabled) return;
+    if (props.open === undefined) setInternalOpen(next);
+    props.onOpenChange?.(next);
+  };
   const selected = () => props.options.find((option) => option.value === props.value) ?? props.options[0];
+  const filteredOptions = createMemo(() => {
+    const normalized = query().trim().toLowerCase();
+    if (!normalized) return props.options;
+    return props.options.filter((option) => option.label.toLowerCase().includes(normalized));
+  });
 
   createEffect(() => {
-    if (!props.open) {
+    if (!open()) {
       setMenuRect(null);
+      setQuery("");
       return;
     }
 
@@ -36,7 +55,8 @@ export function FloatingSelect(props: FloatingSelectProps) {
       const rect = rootElement?.getBoundingClientRect();
       if (!rect) return;
       const margin = 8;
-      const estimatedHeight = Math.min(260, Math.max(24, props.options.length * 24));
+      const searchHeight = props.searchable ? 33 : 0;
+      const estimatedHeight = Math.min(260, Math.max(24, props.options.length * 24 + searchHeight));
       const availableBelow = window.innerHeight - rect.bottom - margin;
       const availableAbove = rect.top - margin;
       const openBelow = availableBelow >= Math.min(estimatedHeight, 144) || availableBelow >= availableAbove;
@@ -61,6 +81,7 @@ export function FloatingSelect(props: FloatingSelectProps) {
     props.className,
     props.fillHeight && styles.fillHeight,
     props.layout === "inline" && styles.inline,
+    props.layout === "bare" && styles.bare,
   ].filter(Boolean).join(" ");
 
   const menuStyle = (rect: NonNullable<ReturnType<typeof menuRect>>): JSX.CSSProperties => ({
@@ -77,16 +98,17 @@ export function FloatingSelect(props: FloatingSelectProps) {
       <Show when={props.label}><span class={styles.label}>{props.label}</span></Show>
       <button
         type="button"
-        class={styles.trigger}
-        onClick={() => props.onOpenChange(!props.open)}
+        class={[styles.trigger, props.triggerClassName].filter(Boolean).join(" ")}
+        onClick={() => setOpen(!open())}
         aria-label={props.ariaLabel}
         aria-haspopup="listbox"
-        aria-expanded={props.open}
+        aria-expanded={open()}
+        disabled={props.disabled}
       >
         <span class={styles.text}>{selected()?.label ?? ""}</span>
-        <Icon name="ph:caret-down" size={12} decorative />
+        <Icon name="ph:caret-down" size={18} decorative />
       </button>
-      <Show when={props.open && menuRect()}>
+      <Show when={open() && menuRect()}>
         {(rect) => (
           <Portal mount={document.body}>
             <div
@@ -95,22 +117,36 @@ export function FloatingSelect(props: FloatingSelectProps) {
               role="listbox"
               data-floating-layer
             >
-              <For each={props.options}>
+              <Show when={props.searchable}>
+                <input
+                  class={styles.search}
+                  type="search"
+                  value={query()}
+                  placeholder={props.searchPlaceholder ?? "Search"}
+                  onInput={(event) => setQuery(event.currentTarget.value)}
+                  onKeyDown={(event) => event.stopPropagation()}
+                />
+              </Show>
+              <Show when={filteredOptions().length > 0} fallback={<div class={styles.empty}>No matches</div>}>
+              <For each={filteredOptions()}>
                 {(option) => (
                   <button
                     type="button"
                     role="option"
                     aria-selected={option.value === selected()?.value}
+                    disabled={option.disabled}
                     class={`${styles.option} ${option.value === selected()?.value ? styles.optionSelected : ""}`}
                     onClick={() => {
+                      if (option.disabled) return;
                       props.onChange(option.value);
-                      props.onOpenChange(false);
+                      setOpen(false);
                     }}
                   >
                     {option.label}
                   </button>
                 )}
               </For>
+              </Show>
             </div>
           </Portal>
         )}

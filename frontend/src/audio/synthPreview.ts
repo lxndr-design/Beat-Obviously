@@ -1,5 +1,6 @@
 import { evaluateAutomationCurve } from "../automation/curves";
 import type { AutomationCurve, CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, WavetableConfig } from "../state/types";
+import { sampleZoneStableId } from "../state/sampleZones";
 
 export type SynthRenderMode = "visual" | "audio";
 
@@ -23,18 +24,7 @@ interface RenderModulation {
 }
 
 type DirectRuntimeModulationTarget =
-  | "osc.a.position"
-  | "osc.a.warp"
-  | "osc.a.fine"
-  | "osc.a.level"
-  | "osc.a.pan"
-  | "osc.a.phase"
-  | "osc.b.position"
-  | "osc.b.warp"
-  | "osc.b.fine"
-  | "osc.b.level"
-  | "osc.b.pan"
-  | "osc.b.phase"
+  | `osc.${"a" | "b"}.${"position" | "warp" | "fine" | "level" | "pan" | "phase"}`
   | "filter.cutoff"
   | "filter.resonance"
   | "filter.drive"
@@ -88,10 +78,11 @@ export function startInstrumentPreviewAudition(
   bpm = 120,
   velocity = 104,
   onEnded?: () => void,
+  sampleSelection?: SamplePlaybackSelection,
 ): InstrumentPreviewAuditionHandle {
   const ctx = getBrowserPreviewAudioContext();
   if (ctx.state === "suspended") void ctx.resume().catch(() => undefined);
-  const source = createInstrumentBufferSource(ctx, instrument, durationS, previewFrequency(instrument), undefined, velocity, bpm);
+  const source = createInstrumentBufferSource(ctx, instrument, durationS, previewFrequency(instrument), undefined, velocity, bpm, sampleSelection);
   const gain = ctx.createGain();
   let stopped = false;
 
@@ -126,6 +117,24 @@ export function startInstrumentPreviewAudition(
   };
 }
 
+export async function startInstrumentSampleZoneAudition(
+  instrument: Instrument,
+  sampleSelection: SamplePlaybackSelection,
+  durationS = 1.1,
+  gainValue = 0.24,
+  bpm = 120,
+  velocity = 112,
+  onEnded?: () => void,
+): Promise<InstrumentPreviewAuditionHandle> {
+  const ctx = getBrowserPreviewAudioContext();
+  if (sampleSelection.samplePath) {
+    await preloadInstrumentSampleUrl(ctx, sampleSelection.samplePath);
+  } else {
+    await preloadInstrumentSample(ctx, instrument);
+  }
+  return startInstrumentPreviewAudition(instrument, durationS, gainValue, bpm, velocity, onEnded, sampleSelection);
+}
+
 function getBrowserPreviewAudioContext(): AudioContext {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Ctor = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
@@ -143,6 +152,11 @@ interface SamplePlaybackTarget {
   hiLengthSeconds?: number;
   startSample?: number;
   endSample?: number;
+}
+
+export interface SamplePlaybackSelection {
+  sampleZoneId?: string;
+  samplePath?: string;
 }
 
 interface UnisonVoicePlan {
@@ -293,9 +307,10 @@ export function createInstrumentBufferSource(
   targetFrequency?: number,
   velocity = 127,
   bpm = 120,
+  sampleSelection?: SamplePlaybackSelection,
 ): AudioBufferSourceNode {
   const shouldGlide = targetFrequency != null && Number.isFinite(targetFrequency) && Math.abs(targetFrequency - frequency) > 0.01;
-  const sampleTarget = nextSampleTarget(instrument, frequency, velocity, durationS);
+  const sampleTarget = nextSampleTarget(instrument, frequency, velocity, durationS, sampleSelection);
   if (sampleTarget && sampleBufferCache.has(sampleTarget.url)) {
     const source = ctx.createBufferSource();
     source.buffer = sampleBufferWithGain(
@@ -459,7 +474,7 @@ export function renderWavetablePreviewSamples(instrument: Instrument, sampleCoun
 export function renderAetherOutputPreviewSamples(
   instrument: Instrument,
   sampleCount = 160,
-  scope: "mix" | "a" | "b" = "mix",
+  scope: string = "mix",
 ): number[] {
   if (!instrument.aether || sampleCount <= 0) {
     return renderWavetablePreviewSamples(instrument, sampleCount, scope === "b" ? "b" : "a");
@@ -473,6 +488,7 @@ export function renderAetherOutputPreviewSamples(
           ...instrument.aether,
           oscA: { ...instrument.aether.oscA, enabled: scope === "a" && instrument.aether.oscA.enabled },
           oscB: { ...instrument.aether.oscB, enabled: scope === "b" && instrument.aether.oscB.enabled },
+          oscillators: instrument.aether.oscillators?.map((oscillator) => ({ ...oscillator, enabled: oscillator.id === scope && oscillator.enabled })),
           sub: { ...instrument.aether.sub, enabled: false },
           noise: { ...instrument.aether.noise, enabled: false },
         },
@@ -499,9 +515,10 @@ export function createInstrumentCurveBufferSource(
   automation?: SynthAutomationLane[],
   bpm = 120,
   velocity = 127,
+  sampleSelection?: SamplePlaybackSelection,
 ): AudioBufferSourceNode {
   const sorted = normalizeFrequencyCurve(curve, durationS, frequency);
-  const sampleTarget = nextSampleTarget(instrument, frequency, velocity, durationS);
+  const sampleTarget = nextSampleTarget(instrument, frequency, velocity, durationS, sampleSelection);
   if (!automation?.length && sampleTarget && sampleBufferCache.has(sampleTarget.url)) {
     const source = ctx.createBufferSource();
     source.buffer = sampleBufferWithGain(
@@ -592,23 +609,49 @@ export function instrumentSampleUrls(instrument: Instrument): string[] {
   ].filter(Boolean)));
 }
 
-function nextSampleTarget(instrument: Instrument, frequency: number, velocity = 127, durationS = 0): SamplePlaybackTarget | undefined {
+function sampleZoneTarget(zone: NonNullable<Instrument["sampleMap"]>[number]): SamplePlaybackTarget {
+  return {
+    url: zone.path,
+    rootNote: zone.rootNote,
+    tuning: zone.tuning,
+    gain: decibelsToGain(zone.volumeDb),
+    durationSeconds: zone.durationSeconds,
+    loLengthSeconds: zone.loLengthSeconds,
+    hiLengthSeconds: zone.hiLengthSeconds,
+    startSample: zone.startSample,
+    endSample: zone.endSample,
+  };
+}
+
+function nextSampleTarget(
+  instrument: Instrument,
+  frequency: number,
+  velocity = 127,
+  durationS = 0,
+  sampleSelection?: SamplePlaybackSelection,
+): SamplePlaybackTarget | undefined {
   const midiPitch = frequencyToMidi(frequency);
-  const zones = (instrument.sampleMap ?? [])
+  const cachedZones = (instrument.sampleMap ?? [])
     .filter((zone) => sampleBufferCache.has(zone.path))
+    .map((zone, index) => ({ ...zone, id: sampleZoneStableId(zone, index) }));
+  if (sampleSelection?.sampleZoneId || sampleSelection?.samplePath) {
+    const selectedZone = cachedZones.find((zone) => zone.id === sampleSelection.sampleZoneId)
+      ?? cachedZones.find((zone) => zone.path === sampleSelection.samplePath);
+    if (selectedZone) return sampleZoneTarget(selectedZone);
+    if (sampleSelection.samplePath && sampleBufferCache.has(sampleSelection.samplePath)) {
+      return {
+        url: sampleSelection.samplePath,
+        rootNote: 60,
+        tuning: 0,
+        gain: 1,
+        durationSeconds: sampleBufferCache.get(sampleSelection.samplePath)?.duration,
+      };
+    }
+  }
+  const zones = cachedZones
     .filter((zone) => midiPitch >= zone.loNote && midiPitch <= zone.hiNote && velocity >= zone.loVel && velocity <= zone.hiVel);
   const targets = zones.length > 0
-    ? zones.map((zone) => ({
-      url: zone.path,
-      rootNote: zone.rootNote,
-      tuning: zone.tuning,
-      gain: decibelsToGain(zone.volumeDb),
-      durationSeconds: zone.durationSeconds,
-      loLengthSeconds: zone.loLengthSeconds,
-      hiLengthSeconds: zone.hiLengthSeconds,
-      startSample: zone.startSample,
-      endSample: zone.endSample,
-    }))
+    ? zones.map(sampleZoneTarget)
     : instrumentSampleUrls(instrument)
       .filter((url) => sampleBufferCache.has(url))
       .map((url) => ({ url, rootNote: 60, tuning: 0, gain: 1, durationSeconds: sampleBufferCache.get(url)?.duration }));
@@ -977,7 +1020,7 @@ function aetherStackSample(
 
   let sum = 0;
   let levelSum = 0;
-  const addOsc = (osc: NonNullable<Instrument["aether"]>["oscA"], key: "a" | "b") => {
+  const addOsc = (osc: NonNullable<Instrument["aether"]>["oscA"], key: string) => {
     const level = clamp01(osc.level + modulationTargetOffset(modulation, `osc.${key}.level`));
     if (!osc.enabled || level <= 0) return;
     const fineOffset = modulationTargetOffset(modulation, `osc.${key}.fine`);
@@ -1007,8 +1050,8 @@ function aetherStackSample(
     sum += sourceSample * level;
     levelSum += level;
   };
-  addOsc(config.oscA, "a");
-  addOsc(config.oscB, "b");
+  const oscillators = config.oscillators?.length ? config.oscillators : [{ ...config.oscA, id: "a" }, { ...config.oscB, id: "b" }];
+  for (const oscillator of oscillators) addOsc(oscillator, oscillator.id);
 
   if (config.sub.enabled && config.sub.level > 0) {
     const rate = oscillatorRate(config.sub.octave, 0, 0);
@@ -1055,7 +1098,7 @@ function aetherStackStereoSample(
 
   const addOsc = (
     osc: NonNullable<Instrument["aether"]>["oscA"],
-    key: "a" | "b",
+    key: string,
   ) => {
     const level = clamp01(osc.level + modulationTargetOffset(modulation, `osc.${key}.level`));
     if (!osc.enabled || level <= 0) return;
@@ -1086,8 +1129,8 @@ function aetherStackStereoSample(
     add(sourceSample, level, osc.pan + modulationTargetOffset(modulation, `osc.${key}.pan`));
   };
 
-  addOsc(config.oscA, "a");
-  addOsc(config.oscB, "b");
+  const oscillators = config.oscillators?.length ? config.oscillators : [{ ...config.oscA, id: "a" }, { ...config.oscB, id: "b" }];
+  for (const oscillator of oscillators) addOsc(oscillator, oscillator.id);
 
   if (config.sub.enabled && config.sub.level > 0) {
     const rate = oscillatorRate(config.sub.octave, 0, 0);
@@ -1561,11 +1604,11 @@ function whiteNoiseSample(index: number): number {
   return (((x ^ (x >>> 14)) >>> 0) / 4294967295) * 2 - 1;
 }
 
-function oscillatorPhaseOffset(osc: NonNullable<Instrument["aether"]>["oscA"], key: "a" | "b"): number {
+function oscillatorPhaseOffset(osc: NonNullable<Instrument["aether"]>["oscA"], key: string): number {
   const basePhase = clamp01(osc.phase ?? 0);
   const randomDepth = clamp01(osc.randomPhase ?? 0);
   if (randomDepth <= 0) return basePhase;
-  const seed = key === "a" ? 9176 : 3613;
+  const seed = Array.from(key).reduce((hash, character) => Math.imul(hash ^ character.charCodeAt(0), 16777619), 9176);
   const jitter = (whiteNoiseSample(seed + Math.round(basePhase * 10000)) + 1) * 0.5;
   return basePhase + jitter * randomDepth;
 }
@@ -1874,8 +1917,8 @@ function modulationSourceValue(
   return null;
 }
 
-function modulationTargetOffset(modulation: RenderModulation, target: DirectRuntimeModulationTarget): number {
-  const value = modulation.targetOffsets[target] ?? 0;
+function modulationTargetOffset(modulation: RenderModulation, target: string): number {
+  const value = (modulation.targetOffsets as Partial<Record<string, number>>)[target] ?? 0;
   return Number.isFinite(value) ? value : 0;
 }
 

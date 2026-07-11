@@ -2,11 +2,10 @@ import { createEffect, createSignal, onCleanup, Show, type Accessor } from "soli
 import { pauseTransport, playTransport, restartTransport, stopTransport } from "../../audio/transportActions";
 import { send } from "../../ipc/bridge";
 import { createStoreSelector } from "../../solid-utils/store";
-import { Button, HoverInfo, Icon } from "../../solid-ui";
+import { Button, HoverInfo, Icon, NumberInput } from "../../solid-ui";
 import { useProjectStore, useTransportStore } from "../../state/store";
 import { TimeSignatureControl } from "../Transport/TimeSignatureControl.solid";
 import { AppMenuButton } from "./AppMenuButton.solid";
-import { InlineNumber } from "./InlineNumber.solid";
 import marqueeStyles from "../../solid-ui/MarqueeText/MarqueeText.module.css";
 import styles from "./TopBar.module.css";
 
@@ -76,14 +75,14 @@ export function TopBar(props: { props: Accessor<TopBarProps> }) {
           <Show
             when={editingProjectName()}
             fallback={(
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 class={styles.projectName}
                 onDblClick={() => setEditingProjectName(true)}
                 title="Double-click to rename project"
               >
                 <MarqueeText text={projectName() || "Untitled"} className={styles.projectNameText} />
-              </button>
+              </Button>
             )}
           >
             <input
@@ -108,7 +107,7 @@ export function TopBar(props: { props: Accessor<TopBarProps> }) {
       <div class={styles.transport}>
         <HoverInfo content="Restart">
           <Button iconOnly size="md" onClick={restartTransport} aria-label="Restart">
-            <Icon name="ph:skip-back-fill" size={16} decorative />
+            <Icon name="ph:skip-back-fill" size={18} decorative />
           </Button>
         </HoverInfo>
         <HoverInfo content={playing() ? "Pause (Space)" : "Play (Space)"}>
@@ -119,7 +118,7 @@ export function TopBar(props: { props: Accessor<TopBarProps> }) {
             onClick={playing() ? pauseTransport : playTransport}
             aria-label={playing() ? "Pause" : "Play"}
           >
-            <Icon name={playing() ? "ph:pause-fill" : "ph:play-fill"} size={16} decorative />
+            <Icon name={playing() ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
           </Button>
         </HoverInfo>
         <HoverInfo content={loopEnabled() ? "Disable review loop" : "Enable review loop"}>
@@ -130,7 +129,7 @@ export function TopBar(props: { props: Accessor<TopBarProps> }) {
             onClick={onToggleLoop}
             aria-label={loopEnabled() ? "Disable review loop" : "Enable review loop"}
           >
-            <Icon name="ph:arrows-in-line-horizontal" size={16} decorative />
+            <Icon name="ph:arrows-in-line-horizontal" size={18} decorative />
           </Button>
         </HoverInfo>
         <HoverInfo content={repeatTrackEnabled() ? "Disable track repeat" : "Repeat track at end"}>
@@ -141,12 +140,12 @@ export function TopBar(props: { props: Accessor<TopBarProps> }) {
             onClick={() => useTransportStore.getState().setRepeatTrackEnabled(!repeatTrackEnabled())}
             aria-label={repeatTrackEnabled() ? "Disable track repeat" : "Enable track repeat"}
           >
-            <Icon name="ph:repeat" size={16} decorative />
+            <Icon name="ph:repeat" size={18} decorative />
           </Button>
         </HoverInfo>
         <HoverInfo content="Stop (.)">
           <Button iconOnly size="md" onClick={stopTransport} aria-label="Stop">
-            <Icon name="ph:stop-fill" size={16} decorative />
+            <Icon name="ph:stop-fill" size={18} decorative />
           </Button>
         </HoverInfo>
         <span class={`${styles.field} ${styles.timeField}`}>
@@ -155,7 +154,8 @@ export function TopBar(props: { props: Accessor<TopBarProps> }) {
       </div>
 
       <div class={styles.projectControls}>
-        <InlineNumber
+        <NumberInput
+          layout="editor"
           label="Length"
           value={lengthBeats()}
           min={4}
@@ -167,7 +167,8 @@ export function TopBar(props: { props: Accessor<TopBarProps> }) {
           value={timeSignature()}
           onChange={(value) => useProjectStore.getState().setTimeSignature(value)}
         />
-        <InlineNumber
+        <NumberInput
+          layout="editor"
           label="BPM"
           value={bpm()}
           min={20}

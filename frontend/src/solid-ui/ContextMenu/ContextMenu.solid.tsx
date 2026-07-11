@@ -142,7 +142,7 @@ function ContextMenuPortal(props: {
                   }}
                 >
                   <span class={styles.itemIcon}>
-                    <Show when={item.icon}>{(icon) => <Icon name={icon()} size={12} decorative />}</Show>
+                    <Show when={item.icon}>{(icon) => <Icon name={icon()} size={18} decorative />}</Show>
                   </span>
                   <span class={styles.itemLabel}>{item.label}</span>
                   <Show when={item.submenu} fallback={<Show when={item.hint}><span class={styles.itemHint}>{item.hint}</span></Show>}>
@@ -166,7 +166,7 @@ function ContextMenuPortal(props: {
                           }}
                         >
                           <span class={styles.itemIcon}>
-                            <Show when={child.icon}>{(icon) => <Icon name={icon()} size={12} decorative />}</Show>
+                            <Show when={child.icon}>{(icon) => <Icon name={icon()} size={18} decorative />}</Show>
                           </span>
                           <span class={styles.itemLabel}>{child.label}</span>
                           <Show when={child.hint}><span class={styles.itemHint}>{child.hint}</span></Show>

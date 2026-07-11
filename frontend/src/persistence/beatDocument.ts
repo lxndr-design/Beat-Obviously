@@ -24,6 +24,9 @@ export function buildCurrentBeatDocument(): BeatProjectDocument {
     components: useComponentStore.getState().components
       .filter((component) => !component.factory)
       .map((component) => structuredClone(component)),
+    componentFolders: useComponentStore.getState().componentFolders
+      .filter((folder) => !folder.factory)
+      .map((folder) => structuredClone(folder)),
     plugins,
     assets: buildAssetManifest({
       instruments,
@@ -88,6 +91,7 @@ export function migrateBeatDocument(input: unknown): BeatProjectDocument {
     instrumentSets: Array.isArray(input.instrumentSets) ? structuredClone(input.instrumentSets) : undefined,
     audioFiles,
     components: Array.isArray(input.components) ? structuredClone(input.components) : [],
+    componentFolders: Array.isArray(input.componentFolders) ? structuredClone(input.componentFolders) : [],
     plugins,
     assets: Array.isArray(input.assets)
       ? sanitizeAssetManifest(input.assets)
@@ -117,6 +121,7 @@ export async function applyBeatDocument(
   const instrumentSets = migrated.instrumentSets;
   const audioFiles = migrated.audioFiles ?? [];
   const components = migrated.components ?? [];
+  const componentFolders = migrated.componentFolders ?? [];
   const plugins = migrated.plugins ?? [];
 
   useProjectStore.getState().loadProject(migrated.project);
@@ -125,7 +130,7 @@ export async function applyBeatDocument(
     useInstrumentStore.getState().seedSystemInstruments();
   }
   useAudioFileStore.getState().hydrateFiles(audioFiles);
-  useComponentStore.getState().hydrate(components);
+  useComponentStore.getState().hydrate(components, componentFolders);
   useComponentStore.getState().seedDefaultDrumLoops(useInstrumentStore.getState().instruments);
   usePluginStore.getState().hydratePlugins(plugins);
 
@@ -133,7 +138,7 @@ export async function applyBeatDocument(
     saveProject(migrated.project),
     saveInstruments(useInstrumentStore.getState().instruments, useInstrumentStore.getState().instrumentSets),
     saveAudioFiles(audioFiles),
-    saveComponents(components),
+    saveComponents(components, componentFolders),
   ]);
   if (options.markSaved ?? true) {
     useDocumentStore.getState().markSaved(path ?? null, buildCurrentBeatDocumentFingerprint());

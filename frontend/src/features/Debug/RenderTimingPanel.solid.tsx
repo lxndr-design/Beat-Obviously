@@ -38,7 +38,7 @@ export function RenderTimingPanel() {
         <aside class={`${styles.panel} ${styles.collapsed}`} aria-label="Audio render timing">
           <HoverInfo content="Show render timing" placement="left">
             <Button iconOnly size="md" onClick={() => setCollapsed(false)} aria-label="Show render timing">
-              <Icon name="ph:gauge-fill" size={16} decorative />
+              <Icon name="ph:gauge-fill" size={18} decorative />
             </Button>
           </HoverInfo>
         </aside>
@@ -52,7 +52,7 @@ export function RenderTimingPanel() {
           </span>
           <HoverInfo content="Hide render timing">
             <Button iconOnly size="xs" onClick={() => setCollapsed(true)} aria-label="Hide render timing">
-              <Icon name="ph:x" size={14} decorative />
+              <Icon name="ph:x" size={18} decorative />
             </Button>
           </HoverInfo>
         </div>

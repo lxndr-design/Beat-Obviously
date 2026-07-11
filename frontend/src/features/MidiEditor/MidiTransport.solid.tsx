@@ -19,6 +19,7 @@ export interface MidiTransportProps {
   bpm: number;
   instrument?: Instrument;
   hotkeyScopeId?: string;
+  captureSpaceKey?: boolean;
   onPositionChange?: (beat: number | null) => void;
 }
 
@@ -80,16 +81,25 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
             connectPreviewNode(audioCtx, worklet.node, worklet.stop, atTimeS, durS, vel);
             return;
           }
-          scheduleBufferPreview(audioCtx, synth, frequency, targetFrequency, curve, automation, atTimeS, durS, vel);
+          scheduleBufferPreview(audioCtx, synth, frequency, targetFrequency, curve, automation, atTimeS, durS, vel, {
+            sampleZoneId: note.sampleZoneId,
+            samplePath: note.samplePath,
+          });
         })
         .catch(() => {
           if (scheduleToken !== stopToken) return;
-          scheduleBufferPreview(audioCtx, synth, frequency, targetFrequency, curve, automation, atTimeS, durS, vel);
+          scheduleBufferPreview(audioCtx, synth, frequency, targetFrequency, curve, automation, atTimeS, durS, vel, {
+            sampleZoneId: note.sampleZoneId,
+            samplePath: note.samplePath,
+          });
         });
       return;
     }
 
-    scheduleBufferPreview(audioCtx, synth, frequency, targetFrequency, curve, automation, atTimeS, durS, vel);
+    scheduleBufferPreview(audioCtx, synth, frequency, targetFrequency, curve, automation, atTimeS, durS, vel, {
+      sampleZoneId: note.sampleZoneId,
+      samplePath: note.samplePath,
+    });
   }
 
   function scheduleBufferPreview(
@@ -102,10 +112,11 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
     atTimeS: number,
     durS: number,
     vel: number,
+    sampleSelection?: { sampleZoneId?: string; samplePath?: string },
   ) {
     const source = curve.length > 1 || automation.length > 0
-      ? createInstrumentCurveBufferSource(audioCtx, synth, durS + 0.05, frequency, curve, atTimeS, automation, props.state().bpm, vel)
-      : createInstrumentBufferSource(audioCtx, synth, durS + 0.05, frequency, targetFrequency, vel, props.state().bpm);
+      ? createInstrumentCurveBufferSource(audioCtx, synth, durS + 0.05, frequency, curve, atTimeS, automation, props.state().bpm, vel, sampleSelection)
+      : createInstrumentBufferSource(audioCtx, synth, durS + 0.05, frequency, targetFrequency, vel, props.state().bpm, sampleSelection);
     connectPreviewNode(
       audioCtx,
       source,
@@ -198,7 +209,7 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
   function pause() {
     setPlaying(false);
     stopPreviewAudio();
-    props.state().onPositionChange?.(null);
+    props.state().onPositionChange?.(positionBeat);
   }
 
   function restart() {
@@ -211,23 +222,37 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
     setPlaying(true);
   }
 
+  function togglePlayback() {
+    if (playing()) pause();
+    else play();
+  }
+
   createEffect(() => {
     const scopeId = props.state().hotkeyScopeId ?? "";
     if (!scopeId) return;
-    const handler = () => {
-      if (playing()) pause();
-      else play();
-    };
-    useContextualHotkeyStore.getState().register(scopeId, "space", handler);
+    useContextualHotkeyStore.getState().register(scopeId, "space", togglePlayback);
     onCleanup(() => useContextualHotkeyStore.getState().unregister(scopeId, "space"));
   });
 
   createEffect(() => {
-    const state = props.state();
+    if (!props.state().captureSpaceKey) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== " " && event.key !== "Space" && event.key !== "Spacebar") return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      togglePlayback();
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    onCleanup(() => window.removeEventListener("keydown", onKeyDown, true));
+  });
+
+  createEffect(() => {
     if (!playing()) {
       if (raf) cancelAnimationFrame(raf);
       raf = null;
-      state.onPositionChange?.(null);
       return;
     }
 
@@ -273,6 +298,7 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
 
   onCleanup(() => {
     stopPreviewAudio();
+    props.state().onPositionChange?.(null);
     if (ctx) void ctx.close();
   });
 
@@ -280,7 +306,7 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
     <div class={styles.controls}>
       <HoverInfo content="Play from start">
         <Button iconOnly size="xs" onClick={restart} aria-label="Play from start">
-          <Icon name="ph:skip-back-fill" size={16} decorative />
+          <Icon name="ph:skip-back-fill" size={18} decorative />
         </Button>
       </HoverInfo>
       <HoverInfo content={playing() ? "Pause" : "Play"}>
@@ -288,10 +314,10 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
           iconOnly
           size="xs"
           variant={playing() ? "primary" : "default"}
-          onClick={playing() ? pause : play}
+          onClick={togglePlayback}
           aria-label={playing() ? "Pause" : "Play"}
         >
-          <Icon name={playing() ? "ph:pause-fill" : "ph:play-fill"} size={16} decorative />
+          <Icon name={playing() ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
         </Button>
       </HoverInfo>
     </div>

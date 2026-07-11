@@ -1,0 +1,301 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.hero {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: var(--border-fg);
+}
+
+.hero h1,
+.sectionHeader h2 {
+  margin: 0;
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-bold);
+}
+
+.eyebrow,
+.intro,
+.helpText,
+.sectionHeader p,
+.typeToken,
+.tokenDesc,
+.muted {
+  color: var(--color-muted);
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+}
+
+.intro {
+  margin: var(--space-1) 0 0;
+  max-width: 720px;
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-snug);
+}
+
+.heroActions,
+.row,
+.tagRow,
+.panelRibbon,
+.modalHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.section {
+  display: grid;
+  border: var(--border-fg);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--button-square-lg);
+  padding: 0 var(--space-1);
+  border-bottom: var(--border-fg);
+}
+
+.sectionHeader p {
+  margin: 0;
+  max-width: 681px;
+  font-size: var(--font-size-ui);
+  line-height: var(--line-height-snug);
+}
+
+.sectionBody {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-1);
+}
+
+.typographyGrid,
+.tokenGrid,
+.controlGrid,
+.splitGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-1);
+}
+
+.typeSample,
+.tokenSample,
+.editorPanel,
+.modalShell,
+.dropDemo,
+.modalContent {
+  min-width: 0;
+  border: var(--border-fg);
+}
+
+.typeSample {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-1);
+}
+
+.typeName,
+.tokenName,
+.sampleLabel {
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+}
+
+.typeToken,
+.tokenDesc,
+.typeText {
+  font-size: var(--font-size-ui);
+  line-height: var(--line-height-snug);
+}
+
+.typeToken,
+.tokenDesc {
+  font-family: var(--font-family-mono);
+}
+
+.tokenSample {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: var(--space-1);
+  align-items: center;
+  padding: var(--space-1);
+}
+
+.tokenSwatch {
+  width: 48px;
+  height: 33px;
+  border: var(--border-fg);
+}
+
+.tokenName,
+.tokenDesc {
+  display: block;
+}
+
+.ribbonDemo {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-height: var(--button-square-lg);
+  border: var(--border-fg);
+}
+
+.ribbonTitle {
+  margin-left: var(--space-1);
+  margin-right: auto;
+  font-weight: var(--font-weight-bold);
+}
+
+.controlGrid {
+  align-items: start;
+}
+
+.knobCluster,
+.knobGrid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-1);
+  border: var(--border-fg);
+}
+
+.rowList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dropDemo {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 63px minmax(120px, 1fr);
+  gap: var(--space-1);
+  align-items: center;
+  padding: var(--space-2);
+}
+
+.dragCard,
+.dropTarget {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 48px;
+  padding: 0 var(--space-1);
+  border: var(--border-fg);
+  background: color-mix(in srgb, var(--color-fg) 8%, transparent);
+}
+
+.dropLine {
+  height: 1px;
+  background: color-mix(in srgb, var(--color-fg) 45%, transparent);
+}
+
+.segmentDemo {
+  display: grid;
+  grid-template-columns: 6px 1fr 6px;
+  align-items: stretch;
+  height: 51px;
+  margin: var(--space-1);
+  border: var(--border-fg);
+}
+
+.segmentHandle {
+  background: var(--color-fg);
+}
+
+.segmentBody {
+  display: flex;
+  align-items: start;
+  padding: 3px 6px;
+  background: color-mix(in srgb, var(--color-fg) 72%, var(--color-bg));
+  color: var(--color-fg-inverse);
+}
+
+.editorPanel {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-1);
+}
+
+.panelRibbon {
+  min-height: var(--button-square-md);
+  border-bottom: var(--border-fg);
+}
+
+.squareButtonRow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: var(--border-fg);
+}
+
+.wavePreview {
+  min-height: 96px;
+  border: var(--border-fg);
+  background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-fg) 8%, transparent), transparent 58%);
+}
+
+.wavePreview svg {
+  width: 100%;
+  height: 100%;
+}
+
+.wavePreview path {
+  fill: none;
+  stroke: var(--color-fg);
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.modalShell {
+  display: grid;
+}
+
+.modalHeader {
+  min-height: var(--button-square-lg);
+  padding: 0 var(--space-1);
+  border-bottom: var(--border-fg);
+}
+
+.modalHeader strong {
+  margin-right: auto;
+}
+
+.modalBody {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-1);
+}
+
+.modalFooter {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-top: var(--border-fg);
+}
+
+.helpText {
+  margin: 0;
+  padding: var(--space-1);
+  font-size: var(--font-size-ui);
+}

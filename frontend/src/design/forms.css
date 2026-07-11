@@ -98,7 +98,7 @@
 
 .ds-control-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(129px, 1fr));
   gap: var(--space-1);
   min-width: 0;
 }

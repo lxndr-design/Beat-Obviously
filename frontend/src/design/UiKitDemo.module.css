@@ -54,7 +54,7 @@
 
 .sectionNote {
   margin: 0;
-  max-width: 640px;
+  max-width: 639px;
   font-family: var(--font-family-mono);
   font-size: var(--font-size-ui);
   line-height: var(--line-height-snug);
@@ -97,13 +97,13 @@
 
 .swatch {
   display: grid;
-  grid-template-rows: 64px auto;
+  grid-template-rows: 63px auto;
   min-width: 0;
   border: var(--border-fg);
 }
 
 .swatchChip {
-  min-height: 64px;
+  min-height: 63px;
   border-bottom: var(--border-fg);
 }
 

@@ -1,10 +1,11 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { appAlert, useModalStack } from "../../solid-ui";
-import { Modal, Button, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, Slider, TextInput } from "../../solid-ui";
+import { Modal, Button, FieldActionButton, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
 import { ai, type GeneratedInstrument } from "../../ai/aiService";
 import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
-import { browserBlobToAudioFile, importAudioFile } from "../../audio/audioImport";
+import { importAudioFiles } from "../../audio/audioImport";
+import { startInstrumentSampleZoneAudition, type InstrumentPreviewAuditionHandle } from "../../audio/synthPreview";
 import {
   listInstrumentGenerationFeedback,
   saveInstrumentGenerationFeedback,
@@ -13,7 +14,8 @@ import {
 import { INSTRUMENT_TAXONOMY_OPTIONS, taxonomyAssignmentForInstrumentId } from "../../state/instrumentTaxonomy";
 import { characterizeInstrument, defaultAetherSynthConfig, defaultWavetableConfig, snapshotInstrument, useAudioFileStore, useInstrumentStore, useUiStore } from "../../state/store";
 import { INSTRUMENT_ICON_OPTIONS, instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
-import type { Instrument, InstrumentSnapshot, WavetableWarpMode } from "../../state/types";
+import { normalizeSampleMap, sampleZoneDisplayName, sampleZoneStableId } from "../../state/sampleZones";
+import type { AudioFile, Instrument, InstrumentSampleZone, InstrumentSnapshot, WavetableWarpMode } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { WaveformPicker } from "./WaveformPicker.solid";
 import { InstrumentWaveformPreview } from "./InstrumentWaveformPreview.solid";
@@ -21,6 +23,7 @@ import styles from "./InstrumentEditorModal.module.css";
 
 export interface Props {
   instrumentId: string;
+  draftInstrument?: Instrument;
   editorKind?: "instrument" | "samplerInstrument";
 }
 
@@ -56,6 +59,7 @@ export function InstrumentEditorModal(props: Props) {
   const source = createStoreSelector(useInstrumentStore, (s) =>
     s.instruments.find((i) => i.id === props.instrumentId),
   );
+  const addInstrument = useInstrumentStore.getState().addInstrument;
   const update = useInstrumentStore.getState().updateInstrument;
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
   const closeEditor = useUiStore.getState().closeEditor;
@@ -64,32 +68,31 @@ export function InstrumentEditorModal(props: Props) {
   const audioFiles = createStoreSelector(useAudioFileStore, (s) => s.files);
   const id = () => `instrument-${props.instrumentId}`;
 
-  const [draft, setDraft] = createSignal<Instrument | undefined>(source() ? structuredClone(source()!) : undefined, { equals: false });
+  const editorSource = () => props.draftInstrument ?? source();
+  const [draft, setDraft] = createSignal<Instrument | undefined>(editorSource() ? structuredClone(editorSource()!) : undefined, { equals: false });
   const [typeOpen, setTypeOpen] = createSignal(false);
   const [taxonomyOpen, setTaxonomyOpen] = createSignal(false);
   const [iconOpen, setIconOpen] = createSignal(false);
-  const [recording, setRecording] = createSignal(false);
   const [aiPrompt, setAiPrompt] = createSignal("");
   const [generating, setGenerating] = createSignal(false);
   const [lastGenerated, setLastGenerated] = createSignal<GeneratedInstrument | null>(null, { equals: false });
   const [generationFeedbackId, setGenerationFeedbackId] = createSignal<string | null>(null);
   const [feedbackRating, setFeedbackRating] = createSignal<"up" | "down" | null>(null);
   const [feedbackSubmitted, setFeedbackSubmitted] = createSignal<"up" | "down" | null>(null);
-  let recorderRef: MediaRecorder | null = null;
-  let recordChunksRef: Blob[] = [];
-  let recordStreamRef: MediaStream | null = null;
 
   createEffect(() => {
-    const currentSource = source();
+    const currentSource = editorSource();
     if (currentSource && !draft()) setDraft(structuredClone(currentSource));
   });
 
-  onCleanup(() => {
-    recordStreamRef?.getTracks().forEach((track) => track.stop());
-  });
-
   const editorKind = () => props.editorKind ?? "instrument";
-  const dirty = createMemo(() => Boolean(draft() && source() && JSON.stringify(draft()) !== JSON.stringify(source())));
+  const dirty = createMemo(() => {
+    const currentDraft = draft();
+    const currentSource = editorSource();
+    if (!currentDraft || !currentSource) return false;
+    if (props.draftInstrument && !source()) return true;
+    return JSON.stringify(currentDraft) !== JSON.stringify(currentSource);
+  });
   const samplerEditorMode = createMemo(() => editorKind() === "samplerInstrument");
   const showOscillator = createMemo(() => Boolean(draft() && !samplerEditorMode() && draft()!.kind === "hybrid"));
   const showWavetable = createMemo(() => Boolean(draft() && !samplerEditorMode() && draft()!.kind === "wavetable"));
@@ -149,7 +152,8 @@ export function InstrumentEditorModal(props: Props) {
         rating: feedbackRating() ?? "up",
       });
     }
-    update(props.instrumentId, saved);
+    if (source()) update(props.instrumentId, saved);
+    else addInstrument(saved);
     closeEditor(closeRequest());
   }
   function close() {
@@ -160,14 +164,16 @@ export function InstrumentEditorModal(props: Props) {
     else close();
   }
 
-  async function uploadSample() {
-    const file = await importAudioFile();
-    if (!file) return;
-    if (!isSupportedAudioFileName(file.name) && !isSupportedAudioFileName(file.path)) {
+  async function importSamplerAudioFiles() {
+    const files = await importAudioFiles();
+    if (files.length === 0) return;
+    const unsupported = files.find((file) => !isSupportedAudioFileName(file.name) && !isSupportedAudioFileName(file.path));
+    if (unsupported) {
       await appAlert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
       return;
     }
-    attachSample(file);
+    files.forEach(addAudioFile);
+    return files;
   }
 
   async function generateInstrument() {
@@ -232,72 +238,14 @@ export function InstrumentEditorModal(props: Props) {
     window.setTimeout(() => setLastGenerated(null), 700);
   }
 
-  function attachSample(file: ReturnType<typeof useAudioFileStore.getState>["files"][number]) {
-    const currentDraft = draft();
-    if (!currentDraft) return;
-    addAudioFile(file);
-    const uploadedDraft: Instrument = {
-      ...currentDraft,
-      sampleIds: Array.from(new Set([...currentDraft.sampleIds, file.id])),
-      sampleUrl: file.path,
-      sampleUrls: Array.from(new Set([...(currentDraft.sampleUrls ?? []), file.path])),
-      kind: currentDraft.kind === "synth" ? "hybrid" : currentDraft.kind,
-      waveform: currentDraft.waveform === "sample" ? "sample" : currentDraft.waveform,
-      source: {
-        kind: "uploaded",
-        label: file.name,
-        url: file.path,
-        importedAt: Date.now(),
-        edited: false,
-      },
-    };
-    setDraft({
-      ...uploadedDraft,
-      descriptors: characterizeInstrument(uploadedDraft),
-      original: snapshotInstrument(uploadedDraft),
-    });
-  }
-
-  async function toggleRecording() {
-    if (recording()) {
-      recorderRef?.stop();
-      return;
-    }
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      await appAlert("Audio recording is not available in this browser.");
-      return;
-    }
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const recorder = new MediaRecorder(stream);
-    recordChunksRef = [];
-    recordStreamRef = stream;
-    recorderRef = recorder;
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) recordChunksRef.push(event.data);
-    };
-    recorder.onstop = async () => {
-      const blob = new Blob(recordChunksRef, { type: recorder.mimeType || "audio/webm" });
-      recordStreamRef?.getTracks().forEach((track) => track.stop());
-      recordStreamRef = null;
-      recorderRef = null;
-      setRecording(false);
-      if (blob.size === 0) return;
-      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const file = await browserBlobToAudioFile(blob, `Recording ${stamp}.webm`);
-      attachSample(file);
-    };
-    recorder.start();
-    setRecording(true);
-  }
-
   const currentDraft = () => draft()!;
 
   return (
-    <Show when={draft() && source()}>
+    <Show when={draft()}>
     <Modal
       open
       scopeId={id()}
-      title={<><Icon name={instrumentIcon(currentDraft())} size={14} decorative />{currentDraft().name}</>}
+      title={<><Icon name={instrumentIcon(currentDraft())} size={18} decorative />{currentDraft().name}</>}
       width="lg"
       dirty={dirty()}
       onClose={onClose}
@@ -324,15 +272,12 @@ export function InstrumentEditorModal(props: Props) {
               />
               <div class={styles.iconPicker}>
                 <HoverInfo content={instrumentIconLabel(currentDraft().icon ?? instrumentIcon(currentDraft()))}>
-                  <Button
-                    iconOnly
-                    size="md"
-                    class={styles.iconPickerButton}
+                  <FieldActionButton
                     aria-label="Change instrument icon"
                     onClick={() => setIconOpen((open) => !open)}
                   >
-                    <Icon name={instrumentIcon(currentDraft())} size={16} decorative />
-                  </Button>
+                    <Icon name={instrumentIcon(currentDraft())} size={18} decorative />
+                  </FieldActionButton>
                 </HoverInfo>
                 <Show when={iconOpen()}>
                   <div class={styles.iconMenu} role="menu" aria-label="Instrument icons">
@@ -349,7 +294,7 @@ export function InstrumentEditorModal(props: Props) {
                         }}
                         role="menuitem"
                       >
-                        <Icon name={option.icon} size={16} decorative />
+                        <Icon name={option.icon} size={18} decorative />
                         <span>{option.label}</span>
                       </Button>
                     )}</For>
@@ -400,42 +345,33 @@ export function InstrumentEditorModal(props: Props) {
                 }}
               />
               <HoverInfo content={lastGenerated() ? "Regenerate instrument" : `Generate ${instrumentKindLabel(currentDraft().kind)}`}>
-                <Button
-                  iconOnly
-                  size="md"
-                  class={styles.squareIconButton}
+                <FieldActionButton
                   disabled={!aiPrompt().trim() || generating()}
                   onClick={() => void generateInstrument()}
                   aria-label={lastGenerated() ? "Regenerate instrument" : `Generate ${instrumentKindLabel(currentDraft().kind)}`}
                 >
-                  <Icon name={generating() ? "ph:spinner" : "ph:sparkle"} size={14} decorative />
-                </Button>
+                  <Icon name={generating() ? "ph:spinner" : "ph:sparkle"} size={18} decorative />
+                </FieldActionButton>
               </HoverInfo>
               <Show when={lastGenerated() && !feedbackSubmitted()}>
                 <div class={styles.aiFeedback}>
                   <HoverInfo content="Good instrument">
-                    <Button
-                      iconOnly
-                      size="md"
-                      class={styles.squareIconButton}
-                      selected={feedbackRating() === "up"}
+                    <FieldActionButton
+                      active={feedbackRating() === "up"}
                       onClick={() => void rateGeneration("up")}
                       aria-label="Rate generated instrument up"
                     >
-                      <Icon name="ph:thumbs-up" size={14} decorative />
-                    </Button>
+                      <Icon name="ph:thumbs-up" size={18} decorative />
+                    </FieldActionButton>
                   </HoverInfo>
                   <HoverInfo content="Bad instrument">
-                    <Button
-                      iconOnly
-                      size="md"
-                      class={styles.squareIconButton}
-                      selected={feedbackRating() === "down"}
+                    <FieldActionButton
+                      active={feedbackRating() === "down"}
                       onClick={() => void rateGeneration("down")}
                       aria-label="Rate generated instrument down"
                     >
-                      <Icon name="ph:thumbs-down" size={14} decorative />
-                    </Button>
+                      <Icon name="ph:thumbs-down" size={18} decorative />
+                    </FieldActionButton>
                   </HoverInfo>
                 </div>
               </Show>
@@ -756,26 +692,22 @@ export function InstrumentEditorModal(props: Props) {
 
         <Show when={showSamples()}>
           <section class={`${styles.section} ${styles.spanFull}`}>
-            <h3 class={styles.sectionHeading}>Sample</h3>
-            <div class={styles.samplesRow}>
-              {currentDraft().sampleIds.length > 0 && (
-                <span class={styles.hint}>
-                  {currentDraft().sampleIds.length} sample{currentDraft().sampleIds.length === 1 ? "" : "s"} attached.
-                </span>
-              )}
-              <Button size="sm" onClick={uploadSample}>
-                Upload sample…
-              </Button>
-              <Button
-                iconOnly
-                size="sm"
-                variant={recording() ? "primary" : "default"}
-                onClick={toggleRecording}
-                aria-label={recording() ? "Stop recording sample" : "Record sample"}
-              >
-                <Icon name={recording() ? "ph:stop-fill" : "ph:microphone"} size={14} decorative />
-              </Button>
-            </div>
+            <h3 class={styles.sectionHeading}>Sampler</h3>
+            <SamplerZoneEditor
+              instrument={currentDraft()}
+              audioFiles={audioFiles()}
+              onImportAudio={importSamplerAudioFiles}
+              onRegisterAudioFiles={(files) => files.forEach(addAudioFile)}
+              onChange={(sampleMap) => {
+                const paths = uniqueSamplePaths(sampleMap.map((zone) => zone.path));
+                setDraft({
+                  ...currentDraft(),
+                  sampleMap,
+                  sampleUrl: paths[0],
+                  sampleUrls: paths,
+                });
+              }}
+            />
           </section>
         </Show>
 
@@ -804,13 +736,14 @@ export function InstrumentEditorModal(props: Props) {
                 </Show>
               </div>
               <Show when={canRevert()}>
-                <button
-                  type="button"
+                <Button
+                  size="xs"
+                  variant="ghost"
                   class={styles.revertLink}
                   onClick={() => setDraft(revertInstrument(currentDraft()))}
                 >
                   Revert to original
-                </button>
+                </Button>
               </Show>
             </div>
           </section>
@@ -818,6 +751,372 @@ export function InstrumentEditorModal(props: Props) {
       </div>
     </Modal>
     </Show>
+  );
+}
+
+function SamplerZoneEditor(props: {
+  instrument: Instrument;
+  audioFiles: AudioFile[];
+  onImportAudio: () => Promise<AudioFile[] | void>;
+  onRegisterAudioFiles: (files: AudioFile[]) => void;
+  onChange: (sampleMap: InstrumentSampleZone[]) => void;
+}) {
+  const zones = createMemo(() => materializeSamplerZones(props.instrument));
+  type SamplerPropertyKind = "hit-variance" | "volume";
+  type SamplerProperty = { kind: SamplerPropertyKind; label: string; steps: number };
+  const PROPERTY_PRESETS: SamplerProperty[] = [
+    { kind: "hit-variance", label: "Hit Variance", steps: 6 },
+    { kind: "volume", label: "Volume", steps: 4 },
+  ];
+  const [auditionZoneId, setAuditionZoneId] = createSignal<string | null>(null);
+  const [hoveredPath, setHoveredPath] = createSignal<string | null>(null);
+  const [audioPickerOpen, setAudioPickerOpen] = createSignal(false);
+  const [selectedAudioIds, setSelectedAudioIds] = createSignal<string[]>([]);
+  const [stagedAudioFiles, setStagedAudioFiles] = createSignal<AudioFile[]>([], { equals: false });
+  const [properties, setProperties] = createSignal<SamplerProperty[]>([], { equals: false });
+  let auditionHandle: InstrumentPreviewAuditionHandle | null = null;
+
+  onCleanup(() => {
+    auditionHandle?.stop();
+    auditionHandle = null;
+  });
+
+  function slotIndexForZone(zone: InstrumentSampleZone): number {
+    const layout = assignmentLayout();
+    const column = clampInteger(zone.seqPosition ?? 0, 0, layout.columns - 1);
+    const velocity = clampInteger(zone.loVel ?? 0, 0, 127);
+    const row = clampInteger(Math.floor((velocity / 128) * layout.rows), 0, layout.rows - 1);
+    return row * layout.columns + column;
+  }
+
+  function zoneIndexForSlot(slotIndex: number): number {
+    return zones().findIndex((zone) => slotIndexForZone(zone) === slotIndex);
+  }
+
+  function patchSlot(slotIndex: number, patch: Partial<InstrumentSampleZone>) {
+    const zoneIndex = zoneIndexForSlot(slotIndex);
+    if (zoneIndex < 0) return;
+    const next = zones().map((zone, index) => index === zoneIndex ? sanitizeSampleZone({ ...zone, ...patch }, index) : zone);
+    props.onChange(normalizeSampleMap(next) ?? next);
+  }
+
+  function assignPathToSlot(slotIndex: number, path: string) {
+    const existingIndex = zoneIndexForSlot(slotIndex);
+    const source = existingIndex >= 0 ? zones()[existingIndex] : undefined;
+    const audio = stagedAudioFiles().find((file) => file.path === path)
+      ?? props.audioFiles.find((file) => file.path === path);
+    const layout = assignmentLayout();
+    const column = slotIndex % layout.columns;
+    const row = Math.floor(slotIndex / layout.columns);
+    const velocitySpan = 127 / layout.rows;
+    const next = zones().slice();
+    const nextZone = sanitizeSampleZone({
+      ...(source ?? defaultSamplerZone(path, slotIndex)),
+      id: undefined,
+      path,
+      name: audio?.name ?? source?.name ?? sampleFilename(path, slotIndex),
+      seqPosition: column,
+      loVel: Math.max(0, Math.round(row * velocitySpan)),
+      hiVel: row === layout.rows - 1 ? 127 : Math.min(127, Math.round((row + 1) * velocitySpan) - 1),
+      durationSeconds: audio?.durationSeconds ?? source?.durationSeconds,
+    }, existingIndex >= 0 ? existingIndex : next.length);
+    if (existingIndex >= 0) next[existingIndex] = nextZone;
+    else next.push(nextZone);
+    props.onChange(normalizeSampleMap(next) ?? next);
+  }
+
+  function deleteSlot(slotIndex: number) {
+    const zoneIndex = zoneIndexForSlot(slotIndex);
+    if (zoneIndex < 0) return;
+    const next = zones()
+      .filter((_, index) => index !== zoneIndex)
+      .map((zone, index) => sanitizeSampleZone(zone, index));
+    props.onChange(normalizeSampleMap(next) ?? next);
+  }
+
+  async function auditionZone(zone: InstrumentSampleZone, index: number) {
+    const zoneId = sampleZoneStableId(zone, index);
+    if (auditionZoneId() === zoneId) {
+      auditionHandle?.stop();
+      auditionHandle = null;
+      setAuditionZoneId(null);
+      return;
+    }
+    auditionHandle?.stop();
+    auditionHandle = null;
+    setAuditionZoneId(zoneId);
+    try {
+      auditionHandle = await startInstrumentSampleZoneAudition(
+        props.instrument,
+        { sampleZoneId: zoneId, samplePath: zone.path },
+        Math.min(1.4, Math.max(0.18, zone.durationSeconds ?? 0.9)),
+        0.24,
+        120,
+        Math.max(1, Math.min(127, zone.hiVel ?? 112)),
+        () => {
+          if (auditionZoneId() === zoneId) setAuditionZoneId(null);
+          auditionHandle = null;
+        },
+      );
+    } catch {
+      if (auditionZoneId() === zoneId) setAuditionZoneId(null);
+      auditionHandle = null;
+      void appAlert("Could not audition this sample zone.");
+    }
+  }
+
+  const audioSources = createMemo(() => stagedAudioFiles().map((file) => ({
+    path: file.path,
+    name: file.name,
+    assignedCount: zones().filter((zone) => zone.path === file.path).length,
+    durationSeconds: file.durationSeconds,
+    sampleRate: file.sampleRate,
+  })).sort((a, b) => a.name.localeCompare(b.name)));
+
+  const hitProperty = createMemo(() => properties().find((property) => property.kind === "hit-variance"));
+  const volumeProperty = createMemo(() => properties().find((property) => property.kind === "volume"));
+  const assignmentLayout = createMemo(() => ({
+    columns: Math.max(1, hitProperty()?.steps ?? (properties().length > 0 ? properties()[0].steps : 0)),
+    rows: Math.max(1, volumeProperty()?.steps ?? (properties().length > 1 ? properties()[1].steps : 1)),
+  }));
+  const slotCount = createMemo(() => properties().length === 0 ? 0 : assignmentLayout().columns * assignmentLayout().rows);
+  const assignedSlots = createMemo(() => {
+    const slots = Array.from({ length: slotCount() }, () => null as { zone: InstrumentSampleZone; zoneIndex: number } | null);
+    for (const [zoneIndex, zone] of zones().entries()) {
+      const slotIndex = slotIndexForZone(zone);
+      if (slotIndex >= 0 && slotIndex < slots.length && !slots[slotIndex]) slots[slotIndex] = { zone, zoneIndex };
+    }
+    return slots;
+  });
+  const hoveredAssignedCount = createMemo(() => {
+    const path = hoveredPath();
+    if (!path) return 0;
+    return zones().filter((zone) => zone.path === path).length;
+  });
+
+  function toggleSelectedAudio(id: string) {
+    setSelectedAudioIds((current) => current.includes(id)
+      ? current.filter((selectedId) => selectedId !== id)
+      : [...current, id]);
+  }
+
+  function confirmSelectedAudio() {
+    const selected = props.audioFiles.filter((file) => selectedAudioIds().includes(file.id));
+    if (selected.length > 0) {
+      props.onRegisterAudioFiles(selected);
+      stageAudioFiles(selected);
+    }
+    setSelectedAudioIds([]);
+    setAudioPickerOpen(false);
+  }
+
+  function stageAudioFiles(files: AudioFile[]) {
+    setStagedAudioFiles((current) => {
+      const byPath = new Map(current.map((file) => [file.path, file]));
+      for (const file of files) byPath.set(file.path, file);
+      return Array.from(byPath.values());
+    });
+  }
+
+  async function importAudioIntoStaging() {
+    const imported = await props.onImportAudio();
+    if (imported?.length) stageAudioFiles(imported);
+  }
+
+  function addProperty() {
+    const current = properties();
+    const next = PROPERTY_PRESETS.find((preset) => !current.some((property) => property.kind === preset.kind));
+    if (!next) return;
+    setProperties([...current, { ...next }]);
+  }
+
+  function updateProperty(kind: SamplerPropertyKind, patch: Partial<SamplerProperty>) {
+    setProperties((current) => current.map((property) => property.kind === kind ? { ...property, ...patch } : property));
+  }
+
+  function removeProperty(kind: SamplerPropertyKind) {
+    const nextProperties = properties().filter((property) => property.kind !== kind);
+    setProperties(nextProperties);
+    if (nextProperties.length === 0) props.onChange([]);
+  }
+
+  function handleSourceDragStart(event: DragEvent, path: string) {
+    event.dataTransfer?.setData("application/x-beat-audio-path", path);
+    event.dataTransfer?.setData("text/plain", path);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = "copyMove";
+  }
+
+  function handleSlotDrop(event: DragEvent, slotIndex: number) {
+    event.preventDefault();
+    const path = event.dataTransfer?.getData("application/x-beat-audio-path")
+      || event.dataTransfer?.getData("text/plain");
+    if (!path) return;
+    assignPathToSlot(slotIndex, path);
+  }
+
+  return (
+    <div class={styles.sampleZoneEditor}>
+      <div class={styles.samplerPropertiesHead}>
+        <span>Properties</span>
+        <Button size="xs" onClick={addProperty} disabled={properties().length >= PROPERTY_PRESETS.length}>
+          New Property
+        </Button>
+      </div>
+      <div class={styles.samplerPropertyGrid}>
+        <Show when={properties().length > 0} fallback={<p class={styles.hint}>Add a property to create sampler assignment slots.</p>}>
+          <For each={properties()}>{(property) => (
+          <div class={styles.samplerPropertyCard}>
+            <Button
+              iconOnly
+              size="xs"
+              aria-label={`Remove ${property.label} property`}
+              className={styles.samplerPropertyClose}
+              onClick={() => removeProperty(property.kind)}
+            >
+              <Icon name="ph:x" size={18} decorative />
+            </Button>
+            <div class={styles.samplerPropertyTitle}>{property.label}</div>
+            <Slider
+              layout="inline"
+              label="Steps"
+              min={1}
+              max={16}
+              step={1}
+              value={property.steps}
+              readout={`${property.steps} step${property.steps === 1 ? "" : "s"}`}
+              onChange={(value) => updateProperty(property.kind, { steps: clampInteger(value, 1, 16) })}
+            />
+          </div>
+          )}</For>
+        </Show>
+      </div>
+
+      <div class={styles.sampleZoneHeader}>
+        <span>Audio Organization</span>
+        <span>{zones().length} assigned</span>
+      </div>
+      <div class={styles.samplerOrganization} data-linking={hoveredAssignedCount() > 0 ? "true" : "false"}>
+        <Show when={hoveredAssignedCount() > 0}><span class={styles.samplerHoverLink} aria-hidden="true" /></Show>
+        <div class={styles.samplerAudioPane}>
+          <div class={styles.samplerPaneRibbon}>
+            <span>Audio Files</span>
+            <div class={styles.samplerPaneActions}>
+              <Button size="xs" onClick={() => setAudioPickerOpen(true)}>Select Audio</Button>
+              <Button size="xs" onClick={() => void importAudioIntoStaging()}>Import Audio</Button>
+            </div>
+          </div>
+          <Show when={audioSources().length > 0} fallback={<p class={styles.hint}>Select or import audio to start mapping sampler slots.</p>}>
+            <div class={styles.samplerAudioList}>
+              <For each={audioSources()}>{(source) => (
+                <div
+                  class={styles.samplerAudioSource}
+                  data-assigned={source.assignedCount > 0 ? "true" : "false"}
+                  data-hovered={hoveredPath() === source.path ? "true" : "false"}
+                  draggable
+                  title={source.path}
+                  onDragStart={(event) => handleSourceDragStart(event, source.path)}
+                  onMouseEnter={() => setHoveredPath(source.path)}
+                  onMouseLeave={() => setHoveredPath(null)}
+                >
+                  <Icon name="ph:dots-six-vertical" size={18} decorative />
+                  <span>{source.name}</span>
+                  <Show when={source.assignedCount > 0}>
+                    <span class={styles.samplerAssignedCount}>{source.assignedCount}</span>
+                  </Show>
+                </div>
+              )}</For>
+            </div>
+          </Show>
+        </div>
+        <div class={styles.samplerAssignmentPane}>
+          <div class={styles.samplerAssignmentTitle}>
+            <span>{hitProperty()?.label ?? properties()[0]?.label ?? "Assignments"}</span>
+          </div>
+          <Show when={properties().length > 0} fallback={<div class={styles.samplerAssignmentEmpty}>Add a property before assigning audio.</div>}>
+          <div
+            class={styles.samplerAssignmentList}
+            style={`--sampler-columns: ${assignmentLayout().columns}; --sampler-rows: ${assignmentLayout().rows};`}
+            data-grid={properties().length > 1 ? "two-property" : "single-property"}
+          >
+            <For each={assignedSlots()}>{(slotEntry, index) => (
+              <div
+                class={styles.samplerAssignmentSlot}
+                data-filled={slotEntry ? "true" : "false"}
+                data-linked={slotEntry && hoveredPath() === slotEntry.zone.path ? "true" : "false"}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => handleSlotDrop(event, index())}
+              >
+                <Show
+                  when={slotEntry}
+                  fallback={<span class={styles.samplerEmptySlot}>Drop audio here</span>}
+                >
+                  {(slot) => (
+                    <>
+                      <Icon name="ph:dots-six-vertical" size={18} decorative />
+                      <TextInput
+                        label="Label"
+                        layout="inline"
+                        value={slot().zone.name ?? sampleZoneDisplayName(slot().zone, slot().zoneIndex)}
+                        onInput={(event) => patchSlot(index(), { name: event.currentTarget.value })}
+                      />
+                      <span class={styles.samplerSlotVelocity}>{Math.round((slot().zone.hiVel / 127) * 100)}%</span>
+                      <Button
+                        iconOnly
+                        size="xs"
+                        aria-label={`Audition ${sampleZoneDisplayName(slot().zone, slot().zoneIndex)}`}
+                        selected={auditionZoneId() === sampleZoneStableId(slot().zone, slot().zoneIndex)}
+                        onClick={() => void auditionZone(slot().zone, slot().zoneIndex)}
+                      >
+                        <Icon name={auditionZoneId() === sampleZoneStableId(slot().zone, slot().zoneIndex) ? "ph:stop-fill" : "ph:play-fill"} size={18} decorative />
+                      </Button>
+                      <Button
+                        iconOnly
+                        size="xs"
+                        aria-label={`Remove ${sampleZoneDisplayName(slot().zone, slot().zoneIndex)}`}
+                        onClick={() => deleteSlot(index())}
+                      >
+                        <Icon name="ph:x" size={18} decorative />
+                      </Button>
+                    </>
+                  )}
+                </Show>
+              </div>
+            )}</For>
+          </div>
+          </Show>
+        </div>
+      </div>
+      <Show when={audioPickerOpen()}>
+        <Modal
+          open
+          title="Audio Files"
+          width="md"
+          onClose={() => setAudioPickerOpen(false)}
+          footer={
+            <>
+              <Button onClick={() => setAudioPickerOpen(false)}>Cancel</Button>
+              <Button variant="primary" onClick={confirmSelectedAudio} disabled={selectedAudioIds().length === 0}>Confirm</Button>
+            </>
+          }
+        >
+          <div class={styles.samplerAudioPicker}>
+            <For each={props.audioFiles}>{(file) => (
+              <Button
+                variant="ghost"
+                fullWidth
+                selected={selectedAudioIds().includes(file.id)}
+                class={styles.samplerAudioPickerRow}
+                data-selected={selectedAudioIds().includes(file.id) ? "true" : "false"}
+                onClick={() => toggleSelectedAudio(file.id)}
+              >
+                <span class={styles.samplerAudioPickerCheck} />
+                <span>{file.name}</span>
+              </Button>
+            )}</For>
+          </div>
+        </Modal>
+      </Show>
+    </div>
   );
 }
 
@@ -847,7 +1146,7 @@ function AetherOscModule({
           aria-label={`${value.enabled ? "Disable" : "Enable"} ${label}`}
           onClick={() => onChange({ enabled: !value.enabled })}
         >
-          <Icon name={value.enabled ? "ph:power-fill" : "ph:power"} size={12} decorative />
+          <Icon name={value.enabled ? "ph:power-fill" : "ph:power"} size={18} decorative />
         </Button>
       </div>
       <div class={styles.aetherSource}>
@@ -983,7 +1282,7 @@ function AetherSubModule({
           aria-label={`${value.enabled ? "Disable" : "Enable"} Sub`}
           onClick={() => onChange({ enabled: !value.enabled })}
         >
-          <Icon name={value.enabled ? "ph:power-fill" : "ph:power"} size={12} decorative />
+          <Icon name={value.enabled ? "ph:power-fill" : "ph:power"} size={18} decorative />
         </Button>
       </div>
       <FloatingSelect
@@ -1046,7 +1345,7 @@ function AetherNoiseModule({
           aria-label={`${value.enabled ? "Disable" : "Enable"} Noise`}
           onClick={() => onChange({ enabled: !value.enabled })}
         >
-          <Icon name={value.enabled ? "ph:power-fill" : "ph:power"} size={12} decorative />
+          <Icon name={value.enabled ? "ph:power-fill" : "ph:power"} size={18} decorative />
         </Button>
       </div>
       <div class={styles.aetherKnobsCompact}>
@@ -1145,6 +1444,90 @@ function applyInstrumentPatch(instrument: Instrument, patch: Partial<Instrument>
   };
   if (next.kind === "synth" && next.waveform !== "sample") return instrumentWithKind(next, "wavetable");
   return next;
+}
+
+function materializeSamplerZones(instrument: Instrument): InstrumentSampleZone[] {
+  const existing = normalizeSampleMap(instrument.sampleMap) ?? [];
+  const paths = uniqueSamplePaths([
+    instrument.sampleUrl,
+    ...(instrument.sampleUrls ?? []),
+    ...existing.map((zone) => zone.path),
+  ]);
+  if (paths.length === 0) return existing.map(sanitizeSampleZone);
+
+  const next = paths.flatMap((path, pathIndex) => {
+    const zones = existing.filter((zone) => zone.path === path);
+    if (zones.length > 0) return zones.map((zone, zoneIndex) => sanitizeSampleZone(zone, pathIndex + zoneIndex));
+    return [defaultSamplerZone(path, pathIndex)];
+  });
+  return normalizeSampleMap(next) ?? next;
+}
+
+function defaultSamplerZone(path: string, index: number): InstrumentSampleZone {
+  const zone: InstrumentSampleZone = {
+    path,
+    name: sampleFilename(path, index),
+    rootNote: 60,
+    loNote: 0,
+    hiNote: 127,
+    loVel: 0,
+    hiVel: 127,
+    volumeDb: 0,
+    pan: 0,
+    tuning: 0,
+    seqPosition: index,
+    oneShot: true,
+  };
+  return { ...zone, id: sampleZoneStableId(zone, index) };
+}
+
+function sanitizeSampleZone(zone: InstrumentSampleZone, index = 0): InstrumentSampleZone {
+  const loNote = clampInteger(zone.loNote, 0, 127);
+  const hiNote = clampInteger(zone.hiNote, 0, 127);
+  const loVel = clampInteger(zone.loVel, 0, 127);
+  const hiVel = clampInteger(zone.hiVel, 0, 127);
+  const next: InstrumentSampleZone = {
+    ...zone,
+    id: zone.id ?? sampleZoneStableId(zone, index),
+    name: zone.name?.trim() || sampleFilename(zone.path, index),
+    rootNote: clampInteger(zone.rootNote, 0, 127),
+    loNote: Math.min(loNote, hiNote),
+    hiNote: Math.max(loNote, hiNote),
+    loVel: Math.min(loVel, hiVel),
+    hiVel: Math.max(loVel, hiVel),
+    volumeDb: clampDecimal(zone.volumeDb, -48, 12),
+    pan: clampDecimal(zone.pan, -1, 1),
+    tuning: clampInteger(zone.tuning, -1200, 1200),
+    seqPosition: Math.max(0, Math.round(zone.seqPosition ?? index)),
+  };
+  if (next.startSample != null) next.startSample = clampInteger(next.startSample, 0, Number.MAX_SAFE_INTEGER);
+  if (next.endSample != null) next.endSample = clampInteger(next.endSample, 0, Number.MAX_SAFE_INTEGER);
+  return next;
+}
+
+function uniqueSamplePaths(paths: Array<string | undefined>): string[] {
+  return paths.filter((path): path is string => Boolean(path?.trim()))
+    .filter((path, index, all) => all.indexOf(path) === index);
+}
+
+function sampleFilename(path: string, index = 0): string {
+  if (path.startsWith("data:")) return `Sample ${index + 1}`;
+  const last = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+  try {
+    return decodeURIComponent(last).replace(/\.[^.]+$/, "") || `Sample ${index + 1}`;
+  } catch {
+    return last.replace(/\.[^.]+$/, "") || `Sample ${index + 1}`;
+  }
+}
+
+function clampInteger(value: number, low: number, high: number): number {
+  if (!Number.isFinite(value)) return low;
+  return Math.max(low, Math.min(high, Math.round(value)));
+}
+
+function clampDecimal(value: number, low: number, high: number): number {
+  if (!Number.isFinite(value)) return low;
+  return Math.max(low, Math.min(high, value));
 }
 
 function revertInstrument(instrument: Instrument): Instrument {
@@ -1331,7 +1714,7 @@ function LfoShapePicker({ value, onChange }: LfoShapePickerProps) {
               className={styles.lfoShapeButton}
               onClick={() => onChange(option.value)}
             >
-              <Icon name={option.icon} size={16} decorative />
+              <Icon name={option.icon} size={18} decorative />
             </Button>
           </HoverInfo>
         )}</For>
@@ -1356,16 +1739,11 @@ function VerticalSwitch({ label, top, bottom, checked, onChange }: VerticalSwitc
       <span class={`${styles.switchOption} ${checked ? styles.switchOptionActive : ""}`}>
         {top}
       </span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
+      <Toggle
+        checked={checked}
         aria-label={label}
-        class={`${styles.verticalSwitch} ${checked ? styles.verticalSwitchOn : ""}`}
-        onClick={() => onChange(!checked)}
-      >
-        <span class={styles.switchBall} />
-      </button>
+        onChange={onChange}
+      />
       <span class={`${styles.switchOption} ${!checked ? styles.switchOptionActive : ""}`}>
         {bottom}
       </span>

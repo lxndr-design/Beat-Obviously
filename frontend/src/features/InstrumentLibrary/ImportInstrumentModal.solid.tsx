@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { Button, Icon, Modal, TextInput, createContextMenu } from "../../solid-ui";
+import { Button, Checkbox, Icon, Modal, TextInput, createContextMenu } from "../../solid-ui";
 import { appAlert } from "../../solid-ui";
 import { browserFileToAudioFile, importAudioFiles } from "../../audio/audioImport";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_EXTENSIONS, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
@@ -294,7 +294,7 @@ export function ImportInstrumentModal(props: Props) {
     <Modal
       open
       scopeId="import-instruments"
-      title={<><Icon name="ph:upload-simple" size={14} decorative />Import instruments</>}
+      title={<><Icon name="ph:upload-simple" size={18} decorative />Import instruments</>}
       width="lg"
       onClose={closeModal}
       footer={(
@@ -309,15 +309,15 @@ export function ImportInstrumentModal(props: Props) {
       <div class={styles.panel}>
         <div class={styles.topRow}>
           <Button onClick={() => void uploadFiles()}>
-            <Icon name="ph:plus" size={14} decorative />
+            <Icon name="ph:plus" size={18} decorative />
             Add WAVs
           </Button>
           <Button onClick={() => void importDecentPreset()}>
-            <Icon name="ph:waveform" size={14} decorative />
+            <Icon name="ph:waveform" size={18} decorative />
             Import DS Pack
           </Button>
           <Button disabled={selectedIds().size === 0} onClick={() => groupFiles(Array.from(selectedIds()))}>
-            <Icon name="ph:stack-simple" size={14} decorative />
+            <Icon name="ph:stack-simple" size={18} decorative />
             Group
           </Button>
         </div>
@@ -379,14 +379,12 @@ export function ImportInstrumentModal(props: Props) {
                         onInput={(event) => updateGroup(group.id, { type: event.currentTarget.value })}
                       />
                     </label>
-                    <label class={styles.normalizeField}>
-                      <input
-                        type="checkbox"
-                        checked={group.normalize}
-                        onChange={(event) => updateGroup(group.id, { normalize: event.currentTarget.checked })}
-                      />
-                      <span>Normalize</span>
-                    </label>
+                    <Checkbox
+                      class={styles.normalizeField}
+                      label="Normalize"
+                      checked={group.normalize}
+                      onChange={(checked) => updateGroup(group.id, { normalize: checked })}
+                    />
                   </div>
                   <div class={styles.groupRows}>
                     <For each={groupFiles}>
@@ -457,8 +455,10 @@ function FileRow(props: FileRowProps) {
       <span class={styles.dragHandle}>::</span>
       <span class={styles.fileName}>{props.file.name}</span>
       <span class={styles.fileMeta}>{formatDuration(props.file.durationSeconds)}</span>
-      <button
-        type="button"
+      <Button
+        iconOnly
+        size="xs"
+        variant="ghost"
         class={styles.previewButton}
         aria-label={`${props.playing ? "Stop" : "Preview"} ${props.file.name}`}
         onClick={(event) => {
@@ -472,8 +472,8 @@ function FileRow(props: FileRowProps) {
         }}
         draggable={false}
       >
-        <Icon name={props.playing ? "ph:pause-fill" : "ph:play-fill"} size={12} decorative />
-      </button>
+        <Icon name={props.playing ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
+      </Button>
     </div>
   );
 }
@@ -718,7 +718,7 @@ async function importDecentPresetInBrowser(): Promise<DecentSamplerImport | null
   })));
 
   const samples = Array.from(xml.querySelectorAll("sample"))
-    .map((sample) => sampleFromElement(sample, presetFile, entries))
+    .map((sample) => sampleFromElement(sample, presetFile, entries, inheritedSampleTrigger(sample)))
     .filter((sample): sample is DecentSamplerImport["samples"][number] => Boolean(sample));
 
   if (samples.length === 0) {
@@ -761,6 +761,7 @@ function sampleFromElement(
   element: Element,
   presetFile: File,
   entries: Array<{ file: File; audioFile: AudioFile }>,
+  inheritedTrigger = "attack",
 ): DecentSamplerImport["samples"][number] | null {
   const rawPath = firstAttribute(element, ["path", "file", "filename", "fileName", "sample"]);
   const match = matchBrowserSample(rawPath, presetFile, entries);
@@ -768,6 +769,7 @@ function sampleFromElement(
   return {
     path: match.audioFile.path,
     name: match.file.name,
+    trigger: normalizedDecentTrigger(firstAttribute(element, ["trigger", "playbackMode", "playback_mode"]) || inheritedTrigger),
     rootNote: intAttribute(element, ["rootNote", "root", "pitch_keycenter"], 60),
     loNote: intAttribute(element, ["loNote", "loKey", "lokey"], 0),
     hiNote: intAttribute(element, ["hiNote", "hiKey", "hikey"], 127),
@@ -785,6 +787,28 @@ function sampleFromElement(
     oneShot: boolAttribute(element, ["oneShot", "one_shot"], false)
       || stringAttributeMatches(element, ["trigger", "playbackMode", "loopMode", "loop_mode"], ["one_shot", "oneshot", "one shot"]),
   };
+}
+
+function inheritedSampleTrigger(element: Element) {
+  let trigger = "attack";
+  const groups: Element[] = [];
+  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+    if (parent.tagName.toLowerCase() === "group") groups.unshift(parent);
+  }
+  for (const parent of groups) {
+    const groupTrigger = firstAttribute(parent, ["trigger", "playbackMode", "playback_mode"]);
+    if (groupTrigger) trigger = normalizedDecentTrigger(groupTrigger);
+    const name = parent.getAttribute("name") ?? "";
+    if (trigger === "attack" && /release/i.test(name)) trigger = "release";
+  }
+  return trigger;
+}
+
+function normalizedDecentTrigger(raw: string) {
+  const trigger = raw.trim().toLowerCase();
+  if (["release", "note_off", "note-off", "noteoff"].includes(trigger)) return "release";
+  if (["attack", "note_on", "note-on", "noteon"].includes(trigger)) return "attack";
+  return trigger || "attack";
 }
 
 function matchBrowserSample(

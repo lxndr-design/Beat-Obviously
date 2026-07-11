@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { nanoid as nano } from "nanoid";
 import { createStoreSelector } from "../../solid-utils/store";
-import { appAlert } from "../../solid-ui";
+import { appAlert, Button } from "../../solid-ui";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
 import {
@@ -79,6 +79,11 @@ export function TrackLane(props: Props) {
     if (!track()) return [];
     const canPaste = clipboardStore.getState().segments.length > 0;
     const projectStore = useProjectStore.getState();
+    const addEditableSegment = (segment: Partial<SegmentModel>) => {
+      const segmentId = projectStore.addSegment(props.trackId, segment);
+      useUiStore.getState().setSelectedSegments([segmentId]);
+      openSegmentEditor(segmentId, { discardIfUntouched: true });
+    };
     return [
       ...(canPaste
         ? [{
@@ -88,11 +93,11 @@ export function TrackLane(props: Props) {
           } as ContextMenuItem]
         : []),
       {
-        label: "+ MIDI",
+        label: "MIDI Segment",
         icon: "ph:piano-keys",
         separatorBefore: canPaste,
         onSelect: () => {
-          projectStore.addSegment(props.trackId, {
+          addEditableSegment({
             name: nextSegmentName(tracks(), "midi"),
             startBeat: lastClickBeat,
             lengthBeats: lastLen(),
@@ -102,10 +107,10 @@ export function TrackLane(props: Props) {
         },
       },
       {
-        label: "+ Drum",
+        label: "Drum Sequencer",
         icon: "ph:squares-four",
         onSelect: () => {
-          projectStore.addSegment(props.trackId, {
+          addEditableSegment({
             name: nextSegmentName(tracks(), "drum"),
             startBeat: lastClickBeat,
             lengthBeats: 16,
@@ -113,6 +118,7 @@ export function TrackLane(props: Props) {
               kind: "drum",
               stepCount: 16,
               speed: 4,
+              sourceLengthBeats: 16,
               defaultPitchHz: 261.63,
               swingPercent: 50,
               rows: makeDefaultDrumRows(instruments()),
@@ -121,27 +127,56 @@ export function TrackLane(props: Props) {
         },
       },
       {
-        label: "+ WAV",
-        icon: "ph:upload",
-        onSelect: async () => {
-          const file = await importAudioFile();
-          if (file) {
-            if (!isSupportedAudioFileName(file.name) && !isSupportedAudioFileName(file.path)) {
-              await appAlert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
-              return;
-            }
-            useAudioFileStore.getState().addFile(file);
-          }
-          projectStore.addSegment(props.trackId, {
-            name: nextSegmentName(tracks(), "audio"),
+        label: "Drum Pad",
+        icon: "ph:piano-keys",
+        onSelect: () => {
+          const firstInstrument = instruments()[0];
+          addEditableSegment({
+            name: nextSegmentName(tracks(), "drumpad"),
             startBeat: lastClickBeat,
-            lengthBeats: lastLen(),
-            payload: { kind: "audio", audioFileId: file?.id ?? "", gainDb: 0 },
+            lengthBeats: Math.max(4, lastLen()),
+            instrumentId: firstInstrument?.id,
+            payload: {
+              kind: "drumpad",
+              keyboardLayout: "mac",
+              quantizeSeconds: 1 / 64,
+              lanes: firstInstrument
+                ? [{
+                    id: nano(),
+                    instrumentId: firstInstrument.id,
+                    name: firstInstrument.name,
+                    keyCode: "KeyA",
+                    keyLabel: "A",
+                    muted: false,
+                    pitch: 60,
+                  }]
+                : [],
+              hits: [],
+            },
           });
         },
       },
       {
-        label: "Record Audio",
+        label: "WAV Segment",
+        icon: "ph:upload",
+        onSelect: async () => {
+          const file = await importAudioFile();
+          if (!file) return;
+          if (!isSupportedAudioFileName(file.name) && !isSupportedAudioFileName(file.path)) {
+            await appAlert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
+            return;
+          }
+          useAudioFileStore.getState().addFile(file);
+          addEditableSegment({
+            name: nextSegmentName(tracks(), "audio"),
+            startBeat: lastClickBeat,
+            lengthBeats: lastLen(),
+            payload: { kind: "audio", audioFileId: file.id, gainDb: 0 },
+          });
+        },
+      },
+      {
+        label: "Live Record",
         icon: "ph:record-fill",
         onSelect: () => {
           props.onRequestAudioRecording?.({ trackId: props.trackId, startBeat: lastClickBeat });
@@ -150,10 +185,10 @@ export function TrackLane(props: Props) {
     ];
   });
 
-  function openSegmentEditor(segmentId: Id) {
+  function openSegmentEditor(segmentId: Id, options?: { discardIfUntouched?: boolean }) {
     const transport = useTransportStore.getState();
     if (transport.playing) pauseTransport();
-    useUiStore.getState().openEditor({ kind: "segment", segmentId });
+    useUiStore.getState().openEditor({ kind: "segment", segmentId, discardIfUntouched: options?.discardIfUntouched });
   }
 
   function beatAtX(clientX: number): number {
@@ -219,6 +254,7 @@ export function TrackLane(props: Props) {
             rows: structuredClone(component.rows),
             stepCount: component.stepCount,
             speed: component.speed,
+            sourceLengthBeats: component.lengthBeats,
             defaultPitchHz: component.defaultPitchHz,
             swingPercent: component.swingPercent,
             timeSignature: component.timeSignature,
@@ -258,6 +294,7 @@ export function TrackLane(props: Props) {
               rows: makeDecentSamplerDrumRows(instanceId, template),
               stepCount: 16,
               speed: 4,
+              sourceLengthBeats: lastLen(),
               defaultPitchHz: midiToFrequency(defaultDecentSamplerRootNote(template)),
             }
           : { kind: "midi", notes: [] },
@@ -283,6 +320,7 @@ export function TrackLane(props: Props) {
               rows: makeDecentSamplerDrumRows(instrument.id, instrument),
               stepCount: 16,
               speed: 4,
+              sourceLengthBeats: lastLen(),
               defaultPitchHz: midiToFrequency(defaultDecentSamplerRootNote(instrument)),
             }
           : { kind: "midi", notes: [] },
@@ -409,23 +447,27 @@ export function TrackLane(props: Props) {
                 <Show when={preview().count > 1}>
                   <span class={styles.automationCount}>{preview().count}</span>
                 </Show>
-                <button
-                  type="button"
+                <Button
+                  iconOnly
+                  size="xs"
+                  variant="ghost"
                   class={styles.automationAction}
                   aria-label={`Add ${preview().label} arrangement automation point`}
                   onClick={(event) => addArrangementAutomationPoint(event, preview().target)}
                 >
                   +
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  iconOnly
+                  size="xs"
+                  variant="ghost"
                   class={styles.automationAction}
                   aria-label={`Remove ${preview().label} arrangement automation point`}
                   disabled={preview().points.length === 0}
                   onClick={(event) => removeArrangementAutomationPoint(event, preview().target)}
                 >
                   -
-                </button>
+                </Button>
               </div>
               <svg
                 class={styles.automationCurve}
@@ -500,12 +542,12 @@ function findDraggingAutomationPointIndex(
   return bestIndex;
 }
 
-function nextSegmentName(tracks: Track[], kind: "midi" | "audio" | "drum"): string {
-  const stem = kind === "midi" ? "Midi" : kind === "audio" ? "Audio" : "Drums";
+function nextSegmentName(tracks: Track[], kind: "midi" | "audio" | "drum" | "drumpad"): string {
+  const stem = kind === "midi" ? "MIDI Segment" : kind === "audio" ? "WAV Segment" : kind === "drum" ? "Drum Sequencer" : "Drum Pad";
   const used = new Set<number>();
   for (const track of tracks) {
     for (const segment of track.segments) {
-      if (segment.payload.kind !== kind && (kind === "drum" || segment.payload.kind !== "mixed")) continue;
+      if (segment.payload.kind !== kind && (kind === "drum" || kind === "drumpad" || segment.payload.kind !== "mixed")) continue;
       const match = (segment.name ?? "").match(new RegExp(`^${stem}\\s+(\\d+)$`));
       if (match) used.add(parseInt(match[1], 10));
     }
