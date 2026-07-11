@@ -246,6 +246,22 @@ target_link_libraries(BeatBackendStress PRIVATE
 
 target_compile_features(BeatBackendStress PRIVATE cxx_std_20)
 
+add_executable(BeatAetherBaseline
+    Tests/AetherBaseline.cpp
+    Source/Audio/Wavetable/Wavetable.cpp
+    Source/Audio/Wavetable/WavetableFactory.cpp
+    Source/Audio/Wavetable/WavetableOscillator.cpp
+)
+
+target_link_libraries(BeatAetherBaseline PRIVATE
+    juce::juce_audio_basics
+    juce::juce_audio_formats
+    juce::juce_core
+    juce::juce_dsp
+)
+
+target_compile_features(BeatAetherBaseline PRIVATE cxx_std_20)
+
 # In Release builds, copy the frontend dist/ into the app bundle and serve it
 # with WebBrowserComponent::Options::withResourceProvider().
 if(CMAKE_BUILD_TYPE STREQUAL "Release" AND BEAT_BUILD_FRONTEND)

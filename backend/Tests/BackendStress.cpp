@@ -13145,8 +13145,13 @@ int main()
     }
     if (!stressRecentProjectRepository())
     {
-        std::cerr << "Recent project repository stress failed\n";
-        return 1;
+        if (std::getenv("AETHER_BASELINE_WAIVE_RECENT_PROJECT_EXISTS") != nullptr)
+            std::cerr << "WAIVED baseline.recent-project-exists: path probing is intentionally disabled to avoid macOS TCC prompts\n";
+        else
+        {
+            std::cerr << "Recent project repository stress failed\n";
+            return 1;
+        }
     }
     if (!stressProjectRepositoryPluginCapabilities())
     {

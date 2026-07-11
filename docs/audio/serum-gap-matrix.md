@@ -41,6 +41,14 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 5. Complete oscillator/modulation/filter/FX Milestone B in separately gated slices.
 6. Start source-slot and hybrid work only after A and B release reports are accepted.
 
+## Stabilized baseline gate
+
+- Non-native verification is green.
+- Native verification is green with the single explicit `baseline.recent-project-exists` waiver; all later sections execute.
+- The 150-render matrix is deterministic across block sizes.
+- A sample-rate preparation defect is now measured: a cached 440-Hz oscillator retains its 44.1-kHz phase delta after preparation at other rates. Correcting it belongs to Milestone A and is blocked until this report is reviewed.
+- High-note alias, DC, discontinuity, timing, RSS, queue overflow, and render hashes are captured in `current-engine-audit.md` and the external baseline artifact directory.
+
 ## Explicit non-goals
 
 - No Sytrus-style operator/FM graph.

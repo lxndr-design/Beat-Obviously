@@ -66,3 +66,17 @@ Offline allocation and file I/O are outside a real-time device callback. There i
 - Add callback-scope instrumentation for allocations, blocking locks, file operations, deadline overruns, and queue overflow. Instrumentation must only update preallocated/atomic state in the callback.
 - Bound all per-block iteration counts: instruments, voices, routes, effects, samples, modulation routes, grains, and future source slots.
 - Defer heavyweight destruction and table/source replacement cleanup to a non-audio reclamation queue.
+
+## Baseline-only test path
+
+```text
+BeatAetherBaseline (test executable, never called by Beat)
+  WavetableFactory::createBasic
+  WavetableOscillator::prepare / setFrequency / setPosition / renderSample
+  block-matrix render loop
+  JUCE FFT measurement
+  deterministic WAV + JSON output
+  local fixed-capacity RealtimeParameterQueue saturation probe
+```
+
+This path links existing production oscillator sources read-only. It does not change the live or offline call graph. It revealed that `WavetableOscillator::prepare()` can retain the 44.1-kHz phase delta when frequency remains numerically unchanged.

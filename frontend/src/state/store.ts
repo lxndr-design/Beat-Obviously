@@ -896,6 +896,14 @@ export const useProjectStore = create<ProjectSlice>()(
               right.fadeInBeats = clampFade(right.fadeInBeats ?? 0, rightLength);
               right.fadeOutBeats = clampFade(right.fadeOutBeats ?? 0, rightLength);
 
+              if (segment.payload.kind === "midi" || segment.payload.kind === "mixed") {
+                const originalNotes = cloneProjectData(segment.payload.notes);
+                segment.payload.notes = clipMidiNotesToWindow(originalNotes, 0, leftLength);
+                if (right.payload.kind === "midi" || right.payload.kind === "mixed") {
+                  right.payload.notes = clipMidiNotesToWindow(originalNotes, leftLength, rightLength);
+                }
+              }
+
               segment.lengthBeats = leftLength;
               segment.repeats = 0;
               segment.fadeInBeats = clampFade(segment.fadeInBeats ?? 0, leftLength);
@@ -1127,6 +1135,8 @@ function applySegmentWindow(
   const newLengthBeats = Math.max(MIN_SEGMENT_LENGTH_BEATS, nextLengthBeats);
   const localStart = Math.max(0, newStartBeat - oldStartBeat);
   if (origin?.payload) segment.payload = cloneProjectData(origin.payload);
+  if (segment.payload.kind === "midi" || segment.payload.kind === "mixed")
+    segment.payload.notes = clipMidiNotesToWindow(segment.payload.notes, localStart, newLengthBeats);
   if (segment.payload.kind === "drum" && segment.payload.sourceLengthBeats == null) {
     segment.payload.sourceLengthBeats = oldLengthBeats;
   }
@@ -1134,6 +1144,26 @@ function applySegmentWindow(
   segment.lengthBeats = newLengthBeats;
   segment.sourceStartBeat = Math.max(0, oldSourceStartBeat + localStart);
   enforceSegmentBounds(segment, projectLengthBeats);
+}
+
+function clipMidiNotesToWindow<T extends { startBeat: Beats; lengthBeats: Beats }>(
+  notes: T[],
+  windowStart: Beats,
+  windowLength: Beats,
+): T[] {
+  const windowEnd = windowStart + windowLength;
+  return notes
+    .filter((note) => note.startBeat < windowEnd && note.startBeat + note.lengthBeats > windowStart)
+    .map((note) => {
+      const clippedStart = Math.max(note.startBeat, windowStart);
+      const clippedEnd = Math.min(note.startBeat + note.lengthBeats, windowEnd);
+      return {
+        ...note,
+        startBeat: clippedStart - windowStart,
+        lengthBeats: clippedEnd - clippedStart,
+      };
+    })
+    .filter((note) => note.lengthBeats > 0);
 }
 
 function clampFade(value: Beats, lengthBeats: Beats): Beats {

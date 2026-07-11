@@ -45,9 +45,45 @@ Because the existing complete gates are not green, this audit is a release block
 - Offline WAV export allocates buffers/vectors and performs file I/O by design outside a device callback; this is acceptable only because the offline entry is not a real-time thread.
 - Existing telemetry counts work but does not prove allocation freedom, deadline compliance, or bounded destruction.
 
-## Baseline evidence still required before Milestone A
+## Original baseline evidence requirements
 
-1. Resolve or explicitly waive the eight Drumpad design-grid failures, then run all later non-native verifiers.
-2. Resolve or explicitly waive the recent-project persistence stress failure, then run all later native sections.
-3. Store deterministic WAV hashes and timing/RSS results for init, dense modulation, maximum unison, rapid automation, and high-note renders at the supported rate/block matrix.
-4. Add a non-production spectral probe or first test-only Milestone A harness for alias, pitch, DC, and discontinuity measurements; the current suite cannot produce those baselines.
+These requirements are addressed by the stabilization report below. The recent-project semantic mismatch remains the sole explicit waiver, and Milestone A remains blocked for review.
+
+## Baseline stabilization report — 2026-07-11
+
+Milestone A remains blocked pending human review of this report. No production Aether DSP or upstream implementation was changed or imported.
+
+### Snapshot discrepancy
+
+`062413553930fb102a81658063966c34500bf8a9` cannot be certified as containing the complete earlier dirty working state. The first audit status captured many modified and untracked source files while HEAD was `aea04342`; the only committed delta from `aea04342` to `06241355` is the six-file version bump. Current reflogs contain only a later reset to `06241355`, and unreachable-object enumeration did not establish a safe mapping back to the missing working files. The baseline therefore proceeds from `06241355` with this explicit limitation.
+
+The audit documents were frozen in snapshot commit `fcfc59f1` and tag `aether-audit-snapshot-2026-07-11`. The external bundle SHA-256 is `8a0a1d7139d5be67849be244983252d1e644b10045fc8bc6985e9744e276cbfc`.
+
+### Gate classification
+
+| Gate | Predates this Aether branch | Audio-engine validity | Disposition and evidence |
+| --- | --- | --- | --- |
+| Eight Drumpad 3px-grid violations | Yes; all lines blame to `aea04342` | None; CSS only | Fixed to 12/21/3/9px geometry. Design-system verifier passes. |
+| Direct Drumpad `AudioContext` | Yes; line blamed to `aea04342` | Boundary validity only; no native DSP change | Fixed by using the existing Beat-owned timeline browser-preview context. Audio-boundary verifier passes. |
+| DAW left-split MIDI clipping | Yes; split implementation dates to `a4666e84` | No oscillator/DSP impact; affects edit correctness and rendered note scheduling | Fixed production note-window clipping for split and origin-aware resize. Existing assertions were preserved; DAW verifier passes. |
+| Recent-project existence stress | Yes; no-path-probe policy blamed to `aea04342` | None; persistence/startup metadata only | Temporarily waived by explicit environment flag. Production deliberately reports a non-empty stored path without filesystem probing to avoid macOS TCC prompts. The original assertion still fails and remains visible. |
+
+### Complete gates
+
+- `npm run verify:non-native`: passed end-to-end, including build.
+- `Beat`, `BeatBackendStress`, and `BeatAetherBaseline`: built in Release.
+- `AETHER_BASELINE_WAIVE_RECENT_PROJECT_EXISTS=1 build-native/bin/BeatBackendStress`: passed every section with only `baseline.recent-project-exists` waived.
+- Native suite: 6.81 s wall, 5.08 s user, 0.80 s system; maximum RSS 194,297,856 bytes; reported peak footprint 180,814,544 bytes.
+
+### Test-only spectral/render baseline
+
+`BeatAetherBaseline` produced 150 WAVs: six scenarios × five sample rates (`44.1/48/88.2/96/192 kHz`) × five block sizes (`64/128/256/512/1024`). All five block-size renders for each scenario/rate share a hash, proving block-size determinism. Report hash: `38be9dfa47454ec6bb2c3e4ac490330229c62ffd993325c9843c8bba951c6830`; render-hash manifest: `488cff559576353b206afaf0bc041d6bcd23522b684effeb455e192ceab2fbad`.
+
+- Initialization exposed a real sample-rate preparation defect: pitch error is about `-0.036 cents` at 44.1 kHz but rises to `146.68`, `1199.98`, `1346.71`, and `2546.72 cents` at 48/88.2/96/192 kHz. `prepare()` calls `setFrequency()` with an unchanged cached frequency, so the early return leaves the old 44.1-kHz phase delta.
+- High-note pitch error remained between `-0.092` and `0.074 cents`; measured alias-energy ratio ranged `0.00297–0.01684`, DC stayed within `3.1e-9`, and maximum adjacent-sample step ranged `0.905–1.023`.
+- Modulated/unison scenario pitch and alias fields are descriptive composite-signal measurements, not fundamental-frequency accuracy claims. Dense modulation DC ranged `-0.00264–0.01222`; rapid-automation maximum step reached `0.5693`.
+- Harness time per 250-ms mono render ranged about `5.53–7.08 ms`; no coarse render deadline overruns were observed. Peak harness RSS was 14,450,688 bytes.
+- Fixed-capacity queue probe accepted 64 events and rejected/counts 16 overflow events.
+- The isolated oscillator harness bypasses the shared wavetable cache and records that fact explicitly. Existing full-engine stress supplies render-work and cache coverage; the harness does not fabricate those counters.
+
+The sample-rate pitch defect and existing timbre/mipmap-axis coupling are Milestone A inputs, not baseline-stabilization fixes, and remain untouched.

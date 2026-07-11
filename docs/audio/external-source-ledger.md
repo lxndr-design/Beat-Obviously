@@ -28,3 +28,12 @@ Before any Vital-derived line enters Beat:
 4. Add a verifier that every marked derived file has a manifest entry and notice, and that prohibited presets, branding and service endpoints are absent.
 5. Add focused tests before replacing current behavior.
 6. Update this table with the local destination, modifications, dependencies, RT assumptions, tests and upgrade strategy.
+
+## Secure reacquisition status
+
+- The original `/Users/alexcheng/beat-aether-references` tree is read-only quarantined evidence. It was not executed or imported.
+- Eleven repositories were reacquired at the pinned full SHAs into `/Users/alexcheng/beat-aether-references-reviewed` using an isolated HOME, disabled credentials/hooks/LFS smudging/submodule recursion, and canonical HTTPS remotes.
+- Static SHA-256 inventories, flagged dependency/build assets, acquisition commands/environment names, and SPDX 2.3 JSON were generated without executing upstream code.
+- Acquisition report SHA-256: `420fe52ec869cb96012504f68df85afb6f94cc5ece6f54a061310b99114a0aa6`.
+- SPDX report SHA-256: `e2390bc4bebdd86d255d0690b3c1fe1e9f438b9f64fe4271059cc870d5eb8b07`.
+- No project has import approval; no code, preset, asset, runtime dependency, or binary was incorporated.
