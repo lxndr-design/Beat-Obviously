@@ -8,7 +8,7 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 | Reliable band limiting | Immutable harmonic mips with continuous selection implemented | A1 | Alias measurements captured; release thresholds and offline-HQ policy remain open |
 | Wavetable construction invariants | Implemented for generated tables | A1 | Explicit validation, DC removal, common normalization, phase alignment, and deterministic generation tests pass |
 | Safe table replacement | Partial shared ownership | A1/A2 | Bounded crossfade and non-audio reclamation |
-| Parameter-rate taxonomy | Missing | A2 | Central metadata and migration-compatible stable IDs |
+| Parameter-rate taxonomy | Implemented for the 24-entry realtime voice surface | A2 | Central constexpr metadata, stable-ID/range/rate/smoothing/eligibility tests pass; future parameters must enter through the same policy |
 | Unified de-click behavior | Partial, subsystem-specific | A2 | Event taxonomy and peak-discontinuity thresholds |
 | Deterministic voice allocation | Missing | A3 | Beat-owned state and victim-order tests |
 | Callback-safety proof | Partial architecture, no detector | A3 | Allocation/lock/file/deadline instrumentation |

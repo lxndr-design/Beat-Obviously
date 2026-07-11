@@ -45,3 +45,7 @@ The sample-rate correction uses only existing Beat production sources and test i
 ## Milestone A1 provenance
 
 The immutable timbral-frame/mip model, harmonic-level generator, validation contract, two-axis playback interpolation, and tests are independently implemented from the previously audited Beat code and standard Fourier/wavetable mathematics. No upstream repository was opened during implementation, no upstream instructions were followed, and no copied, modified, translated, structurally adapted, or reference-derived external code was introduced. No runtime dependency was added. Vital import approval has not been requested or granted.
+
+## Milestone A2 provenance
+
+The realtime parameter metadata/policy refactor is an independent consolidation of existing Beat stable IDs, ranges, ramp behavior, and modulation targets. It uses no external implementation, introduces no dependency, and does not change the external-code manifest. Reviewed reference repositories were not consulted, executed, or imported.

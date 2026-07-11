@@ -120,3 +120,21 @@ audio callback
 ```
 
 No table generation, mutation, allocation, or lock was added to oscillator playback. The oscillator caches four immutable sample pointers (two frames by two mip levels) plus two interpolation fractions. Replacement crossfades and explicit deferred reclamation remain a later A slice.
+
+## Realtime parameter policy path
+
+```text
+queue/sequencer note or arrangement event
+  stable parameter ID + value + caller rampSamples
+  AudioEngine block event ordering
+  InstrumentVoice::setRealtimeParameterValue
+    ParameterPolicy lookup (constexpr linear table, no allocation)
+      authoritative range clamp
+      smoothing ownership / effective ramp length
+      rate class and modulation eligibility metadata
+    existing fixed VoiceRealtimeRampState
+  per-sample active-ramp advancement
+  apply value to oscillator/filter/amp/modulation state
+```
+
+The policy adds no callback allocation, lock, container growth, or string ownership. Lookup remains bounded at 24 constexpr entries. No render topology or timing semantics changed in this slice.

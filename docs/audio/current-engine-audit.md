@@ -126,3 +126,13 @@ The final 150-render matrix reproduced twice with zero WAV mismatches. Compared 
 Native stress completed in 7.12 s with 189,284,352-byte maximum RSS and no new waiver. Harness render measurements were 12.78–15.92 ms with 15,073,280-byte peak RSS and zero coarse deadline overruns. These harness times include constructing a complete multi-mip table for every render, so they measure generation plus playback rather than callback cost; production tables are generated on cache-miss setup paths and reused. Composite-signal alias fields remain descriptive rather than release thresholds.
 
 This completes only the A1 frame/mip foundation. Bounded table-replacement crossfades, destruction deferral proof, central parameter policy, unified de-clicking, deterministic stealing, callback instrumentation/budgets, DC blocking, and explicit quality modes remain open Milestone A slices.
+
+## Milestone A2 realtime parameter policy — 2026-07-11
+
+The existing 24-entry realtime voice surface now has one allocation-free constexpr metadata authority in `ParameterPolicy.h`. Each entry preserves its stable automation ID and defines minimum/maximum range, rate class, smoothing ownership, and modulation eligibility. The taxonomy supports discrete, smoothed-control, sample-accurate-control, and audio-rate classifications; current realtime entries are classified according to their implemented processing path rather than claiming unsupported audio-rate modulation.
+
+`VoiceRealtimeParams` now derives ID lookup and clamping from this table instead of parallel string and range switches. `InstrumentVoice` asks the policy for the effective ramp length before activating its existing sample-by-sample ramp. Every currently supported entry retains `callerRamp`, so caller-selected timing, zero-ramp immediacy, inactive-voice behavior, presets, automation IDs, and modulation semantics are unchanged.
+
+Compile-time checks require the policy count to match the realtime enum and reject duplicate stable IDs. Native coverage verifies complete lookup round trips, unique/nonempty IDs, valid ranges, exact clamping, smoothing ownership, representative rate classes, the 15 currently eligible modulation targets, and unknown-ID rejection. The full native and non-native gates pass with only the existing TCC waiver, and all 150 WAVs are byte-identical to the A1 freeze.
+
+This slice makes metadata authoritative for the implemented realtime voice surface. Parameters that are not currently realtime-applicable are not falsely advertised as supported; extending the surface requires adding policy metadata and coverage in the same change.

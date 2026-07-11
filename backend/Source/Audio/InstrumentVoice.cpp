@@ -211,6 +211,7 @@ namespace beat
         const auto param = (RealtimeParam) index;
         if (!VoiceRealtimeParams::isValid(param))
             return false;
+        rampSamples = ParameterPolicy::rampLengthFor((size_t) index, rampSamples);
         if (!isVoiceActive())
             rampSamples = 0;
         if (updateBaseline)

@@ -13,6 +13,7 @@
 #include "../Source/Audio/Oscillator/AetherTableStackRenderer.h"
 #include "../Source/Audio/Oscillator/BasicOscillator.h"
 #include "../Source/Audio/Parameters/ParameterIds.h"
+#include "../Source/Audio/Parameters/ParameterPolicy.h"
 #include "../Source/Audio/Parameters/SynthPatchContract.h"
 #include "../Source/Audio/Realtime/FixedObjectPool.h"
 #include "../Source/Audio/Realtime/RealtimeParameterQueue.h"
@@ -1775,6 +1776,43 @@ namespace
                 return false;
         }
         return queue.empty();
+    }
+
+    bool stressParameterPolicy()
+    {
+        using namespace beat::ParameterPolicy;
+        if (realtimeVoiceParameters.size() != beat::VoiceRealtimeParams::count || !hasUniqueStableIds())
+            return false;
+
+        int modulationTargets = 0;
+        for (size_t index = 0; index < realtimeVoiceParameters.size(); ++index)
+        {
+            const auto& metadata = realtimeVoiceParameters[index];
+            if (metadata.stableId.empty() || !(metadata.minimum < metadata.maximum))
+                return false;
+            if (indexForStableId(metadata.stableId) != (int) index || metadataFor(metadata.stableId) != &metadata)
+                return false;
+            if (beat::VoiceRealtimeParams::indexForParameterId(metadata.stableId) != (int) index)
+                return false;
+            if (beat::VoiceRealtimeParams::clampValue((beat::VoiceRealtimeParams::Id) index, metadata.minimum - 1000.0f) != metadata.minimum)
+                return false;
+            if (beat::VoiceRealtimeParams::clampValue((beat::VoiceRealtimeParams::Id) index, metadata.maximum + 1000.0f) != metadata.maximum)
+                return false;
+            if (metadata.smoothing == Smoothing::callerRamp && rampLengthFor(index, 127) != 127)
+                return false;
+            if (metadata.modulationEligible)
+                ++modulationTargets;
+        }
+
+        if (modulationTargets != 15)
+            return false;
+        if (metadataFor(beat::params::oscillator::a::position)->rateClass != RateClass::sampleAccurateControl)
+            return false;
+        if (metadataFor(beat::params::oscillator::a::phase)->rateClass != RateClass::smoothedControl)
+            return false;
+        if (metadataFor("unknown.parameter") != nullptr || indexForStableId("unknown.parameter") != -1)
+            return false;
+        return true;
     }
 
     bool stressSequencerTransport()
@@ -13061,6 +13099,11 @@ int main()
     if (!stressRealtimeParameterQueue())
     {
         std::cerr << "Realtime parameter queue stress failed\n";
+        return 1;
+    }
+    if (!stressParameterPolicy())
+    {
+        std::cerr << "Parameter policy stress failed\n";
         return 1;
     }
     std::cerr << "realtime: done\n";

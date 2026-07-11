@@ -46,6 +46,7 @@ target_sources(Beat PRIVATE
     Source/Audio/Analysis/AudioFileAnalyzer.cpp
     Source/Audio/Analysis/AudioFileAnalyzer.h
     Source/Audio/Parameters/ParameterIds.h
+    Source/Audio/Parameters/ParameterPolicy.h
     Source/Audio/Parameters/SynthPatchContract.cpp
     Source/Audio/Parameters/SynthPatchContract.h
     Source/Audio/Realtime/FixedObjectPool.h
@@ -184,6 +185,7 @@ add_executable(BeatBackendStress
     Source/Audio/Analysis/AudioFileAnalyzer.cpp
     Source/Audio/Analysis/AudioFileAnalyzer.h
     Source/Audio/Parameters/ParameterIds.h
+    Source/Audio/Parameters/ParameterPolicy.h
     Source/Audio/Parameters/SynthPatchContract.cpp
     Source/Audio/Parameters/SynthPatchContract.h
     Source/Audio/Realtime/FixedObjectPool.h

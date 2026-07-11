@@ -67,6 +67,12 @@ namespace beat::params
         inline constexpr std::string_view pan { "amp.pan" };
     }
 
+    namespace lfo
+    {
+        inline constexpr std::string_view rate1 { "lfo.1.rate" };
+        inline constexpr std::string_view depth1 { "lfo.1.depth" };
+    }
+
     namespace wavetable
     {
         inline constexpr std::string_view basicSine { "basic.sine" };
