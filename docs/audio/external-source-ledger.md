@@ -37,3 +37,7 @@ Before any Vital-derived line enters Beat:
 - Acquisition report SHA-256: `420fe52ec869cb96012504f68df85afb6f94cc5ece6f54a061310b99114a0aa6`.
 - SPDX report SHA-256: `e2390bc4bebdd86d255d0690b3c1fe1e9f438b9f64fe4271059cc870d5eb8b07`.
 - No project has import approval; no code, preset, asset, runtime dependency, or binary was incorporated.
+
+## Sample-rate baseline freeze
+
+The sample-rate correction uses only existing Beat production sources and test infrastructure. It contains no copied, translated, structurally adapted, or reference-derived upstream implementation and adds no runtime dependency. The reviewed and quarantined reference trees were neither executed nor imported. This ledger therefore has no new external-code entry for the correction.

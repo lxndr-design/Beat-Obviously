@@ -46,8 +46,9 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 - Non-native verification is green.
 - Native verification is green with the single explicit `baseline.recent-project-exists` waiver; all later sections execute.
 - The 150-render matrix is deterministic across block sizes.
-- A sample-rate preparation defect is now measured: a cached 440-Hz oscillator retains its 44.1-kHz phase delta after preparation at other rates. Correcting it belongs to Milestone A and is blocked until this report is reviewed.
+- The measured sample-rate preparation defect is corrected and frozen before Milestone A: preparation recomputes cached phase increments without resetting phase. Initialization pitch error is now within 0.037 cents at every supported rate, with the expected 20 render changes explicitly recorded.
 - High-note alias, DC, discontinuity, timing, RSS, queue overflow, and render hashes are captured in `current-engine-audit.md` and the external baseline artifact directory.
+- Milestone A remains blocked until the user explicitly chooses the canonical source state described in `source-state-reconciliation.md`.
 
 ## Explicit non-goals
 

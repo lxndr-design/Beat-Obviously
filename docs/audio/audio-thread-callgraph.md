@@ -80,3 +80,19 @@ BeatAetherBaseline (test executable, never called by Beat)
 ```
 
 This path links existing production oscillator sources read-only. It does not change the live or offline call graph. It revealed that `WavetableOscillator::prepare()` can retain the 44.1-kHz phase delta when frequency remains numerically unchanged.
+
+## Sample-rate preparation correction
+
+```text
+live AudioEngine preparation or AudioEngine::prepareForOffline(activeRate)
+  InstrumentVoice::prepare(activeRate, blockSize)
+    recompute voice phaseDelta = baseFrequencyHz / activeRate
+    WavetableOscillator::prepare(activeRate)
+      preserve phase
+      recompute phaseDelta = frequencyHz / activeRate
+      invalidate existing pitch-dependent frame cache
+    prepare every main and A/B unison oscillator instance
+    prepare envelopes and filters at activeRate
+```
+
+`BasicOscillator` is stateless and receives an explicitly rate-derived phase increment. The sub/noise paths using it therefore require no cached-coefficient invalidation. Live and offline use the same preparation propagation, and the focused test plus full matrix now cover all five supported rates. No callback topology or wavetable representation changed.

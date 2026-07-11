@@ -21,7 +21,8 @@ namespace beat
     void WavetableOscillator::prepare(double newSampleRate) noexcept
     {
         sampleRate = std::isfinite(newSampleRate) && newSampleRate > 0.0 ? newSampleRate : 44100.0;
-        setFrequency(frequencyHz);
+        frequencyHz = juce::jlimit(0.0, sampleRate * 0.49, frequencyHz);
+        phaseDelta = frequencyHz / sampleRate;
         markFrameCacheDirty();
     }
 

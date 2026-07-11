@@ -11142,6 +11142,71 @@ namespace
         return true;
     }
 
+    bool stressOscillatorSampleRatePreparation()
+    {
+        const auto sine = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Sine, 8, 2048);
+        constexpr double frequency = 440.0;
+        constexpr double phase = 0.371;
+        const std::array sampleRates { 44100.0, 48000.0, 88200.0, 96000.0, 192000.0 };
+
+        for (double sampleRate : sampleRates)
+        {
+            beat::WavetableOscillator beforePrepare;
+            beforePrepare.setFrequency(frequency);
+            beforePrepare.setPhase(phase);
+            beforePrepare.prepare(sampleRate);
+            beforePrepare.setWavetable(&sine);
+            if (std::abs(beforePrepare.getPhaseIncrement() - frequency / sampleRate) > 1.0e-12
+                || std::abs(beforePrepare.getPhase() - phase) > 1.0e-12)
+                return false;
+
+            const double firstIncrement = beforePrepare.getPhaseIncrement();
+            beforePrepare.prepare(sampleRate);
+            if (beforePrepare.getPhaseIncrement() != firstIncrement
+                || std::abs(beforePrepare.getPhase() - phase) > 1.0e-12)
+                return false;
+
+            beat::WavetableOscillator afterPrepare;
+            afterPrepare.prepare(sampleRate);
+            afterPrepare.setFrequency(frequency);
+            afterPrepare.setPhase(phase);
+            afterPrepare.setWavetable(&sine);
+            if (std::abs(afterPrepare.getPhaseIncrement() - beforePrepare.getPhaseIncrement()) > 1.0e-12)
+                return false;
+
+            for (int i = 0; i < 4096; ++i)
+            {
+                const float a = beforePrepare.renderSample();
+                const float b = afterPrepare.renderSample();
+                if (a != b) return false;
+            }
+
+            double basicPhase = 0.0;
+            int crossings = 0;
+            float previous = beat::BasicOscillator::sample(0, basicPhase, frequency / sampleRate);
+            for (int i = 1; i < (int) sampleRate; ++i)
+            {
+                basicPhase += frequency / sampleRate;
+                basicPhase -= std::floor(basicPhase);
+                const float next = beat::BasicOscillator::sample(0, basicPhase, frequency / sampleRate);
+                if (previous <= 0.0f && next > 0.0f) ++crossings;
+                previous = next;
+            }
+            if (crossings < 439 || crossings > 441) return false;
+        }
+
+        beat::WavetableOscillator changedRate;
+        changedRate.setWavetable(&sine);
+        changedRate.setFrequency(frequency);
+        changedRate.setPhase(phase);
+        changedRate.prepare(44100.0);
+        const double oldIncrement = changedRate.getPhaseIncrement();
+        changedRate.prepare(96000.0);
+        return std::abs(oldIncrement - frequency / 44100.0) <= 1.0e-12
+            && std::abs(changedRate.getPhaseIncrement() - frequency / 96000.0) <= 1.0e-12
+            && std::abs(changedRate.getPhase() - phase) <= 1.0e-12;
+    }
+
     bool stressSynthPatchContract()
     {
         beat::InstrumentDefinition untouched;
@@ -12921,6 +12986,11 @@ int main()
     if (!stressWavetableOscillator())
     {
         std::cerr << "Wavetable oscillator stress failed\n";
+        return 1;
+    }
+    if (!stressOscillatorSampleRatePreparation())
+    {
+        std::cerr << "Oscillator sample-rate preparation stress failed\n";
         return 1;
     }
     std::cerr << "wavetable: done\n";

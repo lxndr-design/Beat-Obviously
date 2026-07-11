@@ -86,4 +86,27 @@ The audit documents were frozen in snapshot commit `fcfc59f1` and tag `aether-au
 - Fixed-capacity queue probe accepted 64 events and rejected/counts 16 overflow events.
 - The isolated oscillator harness bypasses the shared wavetable cache and records that fact explicitly. Existing full-engine stress supplies render-work and cache coverage; the harness does not fabricate those counters.
 
-The sample-rate pitch defect and existing timbre/mipmap-axis coupling are Milestone A inputs, not baseline-stabilization fixes, and remain untouched.
+The existing timbre/mipmap-axis coupling remains a Milestone A input and is untouched.
+
+## Sample-rate correctness and baseline freeze — 2026-07-11
+
+Milestone A remains blocked pending both review of this freeze and an explicit canonical source-state decision. No upstream code was imported, and no wavetable frame/mipmap redesign was started.
+
+### Root cause and correction
+
+`WavetableOscillator::prepare()` previously called `setFrequency(frequencyHz)`. Because `setFrequency()` deliberately returns early when the numeric frequency is unchanged, preparing an oscillator at a new rate could retain the phase increment computed for 44.1 kHz. Preparation now always validates the active rate, clamps the cached frequency to the new Nyquist policy, and evaluates `phaseDelta = frequencyHz / sampleRate` directly. It marks the existing frame cache dirty but does not reset phase. `InstrumentVoice::prepare()` likewise recomputes its voice-owned `phaseDelta = baseFrequencyHz / sampleRate` before preparing the main, A/B-unison, and related oscillator banks. Stateless `BasicOscillator` and sub/noise calls already receive a rate-derived increment at their call sites; live and offline engines both propagate their active rate through voice preparation.
+
+Focused native coverage verifies 44.1/48/88.2/96/192 kHz tuning, changed-rate recomputation with unchanged frequency, same-rate idempotence, preserved phase, before/after-prepare frequency-order equivalence, BasicOscillator tuning, and exact WavetableOscillator phase increments. The complete live/offline stress path and render matrix remain green.
+
+### Frozen results
+
+- `npm run verify:non-native`: passed end-to-end.
+- `Beat`, `BeatBackendStress`, and `BeatAetherBaseline`: Release targets built.
+- Native stress with only `baseline.recent-project-exists` waived: passed every section in 6.69 s wall / 5.07 s user / 0.76 s system; maximum RSS 210,075,648 bytes. Compared with the prior run this is -0.12 s wall and +15,777,792 bytes RSS; this single-run delta is descriptive, not a performance regression conclusion.
+- Initialization pitch error before -> after (cents): 44.1 kHz `-0.0360 -> -0.0360`; 48 kHz `146.6803 -> -0.0132`; 88.2 kHz `1199.9821 -> -0.0360`; 96 kHz `1346.7135 -> -0.0132`; 192 kHz `2546.7217 -> -0.0132`.
+- Of 150 deterministic WAVs, 130 are byte-identical to the pre-fix baseline. Exactly 20 changed: the initialization scenario at each non-44.1-kHz rate across five block sizes. All 30 44.1-kHz renders and all non-initialization scenarios are unchanged. These expected changes are accepted explicitly rather than silently replacing hashes.
+- New JSON report SHA-256: `ac7d3bef75b98de5b69a9973dd2a8ac30549806190f2653fbef46345074b9231`; render manifest SHA-256: `c2a4a3632e39707473e91fe2889ea510fb1f2b1dfc16a71a35a699be072c621f`.
+- Per-render time range: 5.495–7.204 ms (prior 5.533–7.080 ms). Harness wall time was 1.09 s; JSON peak RSS was 14,319,616 bytes and `/usr/bin/time` maximum RSS was 14,729,216 bytes. No deadline overruns were observed.
+- Queue probe remains 64 accepted, 16 rejected, and 16 overflow. The isolated harness still bypasses the shared wavetable cache and does not invent unavailable full-engine render counters; full-engine stress remains the evidence for those paths.
+
+The only waiver remains `baseline.recent-project-exists`. It suppresses only the stale path-existence result when the explicit environment variable is present; order, legacy timestamp, removal, recording, and every later persistence/native stress remain asserted and executed. The untested behavior is filesystem existence probing of stored recent-project paths, intentionally disabled to avoid macOS TCC prompts.

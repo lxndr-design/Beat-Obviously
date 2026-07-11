@@ -15,6 +15,7 @@ namespace beat
         void setPhase(double newPhase) noexcept;
 
         double getPhase() const noexcept { return phase; }
+        double getPhaseIncrement() const noexcept { return phaseDelta; }
         double getFrequency() const noexcept { return frequencyHz; }
         float getPosition() const noexcept { return position; }
 

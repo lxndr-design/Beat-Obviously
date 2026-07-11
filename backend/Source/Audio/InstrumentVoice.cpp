@@ -92,7 +92,8 @@ namespace beat
 
     void InstrumentVoice::prepare(double sr, int blockSize)
     {
-        sampleRate = sr;
+        sampleRate = std::isfinite(sr) && sr > 0.0 ? sr : 44100.0;
+        phaseDelta = sampleRate > 0.0 ? baseFrequencyHz / sampleRate : 0.0;
         for (auto& osc : wavetableOscillators)
             osc.prepare(sampleRate);
         for (auto& osc : aetherOscillatorsA)
