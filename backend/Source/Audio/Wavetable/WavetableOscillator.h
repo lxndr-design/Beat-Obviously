@@ -34,8 +34,11 @@ namespace beat
         float position { 0.0f };
         bool frameCacheDirty { true };
         int cachedFrameSize { 0 };
-        const float* cachedFrame0Data { nullptr };
-        const float* cachedFrame1Data { nullptr };
+        const float* cachedFrame0Mip0Data { nullptr };
+        const float* cachedFrame1Mip0Data { nullptr };
+        const float* cachedFrame0Mip1Data { nullptr };
+        const float* cachedFrame1Mip1Data { nullptr };
         float cachedFrameFrac { 0.0f };
+        float cachedMipFrac { 0.0f };
     };
 }

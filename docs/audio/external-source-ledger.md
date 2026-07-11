@@ -41,3 +41,7 @@ Before any Vital-derived line enters Beat:
 ## Sample-rate baseline freeze
 
 The sample-rate correction uses only existing Beat production sources and test infrastructure. It contains no copied, translated, structurally adapted, or reference-derived upstream implementation and adds no runtime dependency. The reviewed and quarantined reference trees were neither executed nor imported. This ledger therefore has no new external-code entry for the correction.
+
+## Milestone A1 provenance
+
+The immutable timbral-frame/mip model, harmonic-level generator, validation contract, two-axis playback interpolation, and tests are independently implemented from the previously audited Beat code and standard Fourier/wavetable mathematics. No upstream repository was opened during implementation, no upstream instructions were followed, and no copied, modified, translated, structurally adapted, or reference-derived external code was introduced. No runtime dependency was added. Vital import approval has not been requested or granted.

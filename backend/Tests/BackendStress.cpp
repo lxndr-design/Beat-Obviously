@@ -11027,17 +11027,16 @@ namespace
         }
 
         {
-            constexpr int frames = 8;
             constexpr int size = 32;
-            std::vector<float> stepped((size_t) frames * (size_t) size, 0.0f);
-            for (int frame = 0; frame < frames; ++frame)
+            auto constantLevel = [](int harmonic, float value)
             {
-                const float value = (float) frame / (float) (frames - 1);
-                for (int i = 0; i < size; ++i)
-                    stepped[(size_t) frame * (size_t) size + (size_t) i] = value;
-            }
+                return beat::Wavetable::MipLevel { harmonic, std::vector<float>((size_t) size, value) };
+            };
+            std::vector<beat::Wavetable::TimbralFrame> frames(2);
+            frames[0].mipLevels = { constantLevel(8, 0.0f), constantLevel(1, 0.0f) };
+            frames[1].mipLevels = { constantLevel(8, 1.0f), constantLevel(1, 1.0f) };
 
-            beat::Wavetable testTable({ "test.bandlimit", "Bandlimit", "stress" }, frames, size, std::move(stepped));
+            beat::Wavetable testTable({ "test.axes", "Independent axes", "stress" }, std::move(frames));
             beat::WavetableOscillator lowOsc;
             lowOsc.prepare(44100.0);
             lowOsc.setWavetable(&testTable);
@@ -11050,10 +11049,127 @@ namespace
             highOsc.setPosition(1.0f);
             highOsc.setFrequency(44100.0 * 0.49);
 
-            if (lowOsc.renderSample() < 0.95f)
+            if (lowOsc.renderSample() < 0.95f || highOsc.renderSample() < 0.95f)
                 return false;
-            if (highOsc.renderSample() > 0.25f)
+        }
+
+        {
+            constexpr int size = 32;
+            beat::Wavetable::TimbralFrame frame;
+            frame.mipLevels = {
+                { 8, std::vector<float>((size_t) size, 0.8f) },
+                { 1, std::vector<float>((size_t) size, 0.2f) }
+            };
+            beat::Wavetable mipTable({ "test.mips", "Mip selection", "stress" }, { std::move(frame) });
+            beat::WavetableOscillator oscillator;
+            oscillator.prepare(44100.0);
+            oscillator.setWavetable(&mipTable);
+            oscillator.setFrequency(100.0);
+            const float low = oscillator.renderSample();
+            oscillator.reset();
+            oscillator.setFrequency(44100.0 * 0.49);
+            const float high = oscillator.renderSample();
+            if (low < 0.75f || high > 0.25f)
                 return false;
+
+            oscillator.reset();
+            oscillator.setFrequency(44100.0 * 0.48 / 8.0 * 0.999);
+            const float belowBoundary = oscillator.renderSample();
+            oscillator.reset();
+            oscillator.setFrequency(44100.0 * 0.48 / 8.0 * 1.001);
+            const float aboveBoundary = oscillator.renderSample();
+            if (std::abs(belowBoundary - aboveBoundary) > 0.01f)
+            {
+                std::cerr << "mip continuity failed " << belowBoundary << " " << aboveBoundary << "\n";
+                return false;
+            }
+        }
+
+        {
+            constexpr int size = 32;
+            std::vector<beat::Wavetable::TimbralFrame> frames(2);
+            frames[0].mipLevels = { { 8, std::vector<float>((size_t) size, 0.0f) }, { 1, std::vector<float>((size_t) size, 0.0f) } };
+            frames[1].mipLevels = { { 8, std::vector<float>((size_t) size, 1.0f) }, { 1, std::vector<float>((size_t) size, 1.0f) } };
+            beat::Wavetable table({ "test.frame-continuity", "Frame continuity", "stress" }, std::move(frames));
+            beat::WavetableOscillator oscillator;
+            oscillator.prepare(44100.0);
+            oscillator.setWavetable(&table);
+            oscillator.setFrequency(440.0);
+            oscillator.setPosition(0.499f);
+            const float before = oscillator.renderSample();
+            oscillator.reset();
+            oscillator.setPosition(0.501f);
+            const float after = oscillator.renderSample();
+            if (std::abs(before - after) > 0.01f)
+            {
+                std::cerr << "frame continuity failed " << before << " " << after << "\n";
+                return false;
+            }
+        }
+
+        {
+            using Error = beat::Wavetable::ValidationError;
+            beat::Wavetable noFrames({ "bad.empty", "Empty", "stress" }, std::vector<beat::Wavetable::TimbralFrame> {});
+            if (noFrames.isValid() || noFrames.getValidationError() != Error::noFrames || noFrames.getValidationErrorMessage().isEmpty())
+            {
+                std::cerr << "empty validation failed\n";
+                return false;
+            }
+
+            beat::Wavetable::TimbralFrame mismatched;
+            mismatched.mipLevels = {
+                { 8, std::vector<float>(32, 0.0f) },
+                { 4, std::vector<float>(16, 0.0f) }
+            };
+            beat::Wavetable badSize({ "bad.size", "Bad size", "stress" }, { std::move(mismatched) });
+            if (badSize.isValid() || badSize.getValidationError() != Error::inconsistentFrameSize)
+            {
+                std::cerr << "size validation failed " << (int) badSize.getValidationError() << "\n";
+                return false;
+            }
+
+            beat::Wavetable::TimbralFrame unordered;
+            unordered.mipLevels = {
+                { 4, std::vector<float>(32, 0.0f) },
+                { 8, std::vector<float>(32, 0.0f) }
+            };
+            beat::Wavetable badOrder({ "bad.order", "Bad order", "stress" }, { std::move(unordered) });
+            if (badOrder.isValid() || badOrder.getValidationError() != Error::unorderedHarmonicLimits)
+            {
+                std::cerr << "order validation failed " << (int) badOrder.getValidationError() << "\n";
+                return false;
+            }
+        }
+
+        {
+            const auto first = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 8, 2048);
+            const auto second = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 8, 2048);
+            if (first.getMipLevelCount() < 2 || first.getMipLevelCount() != second.getMipLevelCount())
+            {
+                std::cerr << "mip count failed\n";
+                return false;
+            }
+            for (int frame = 0; frame < first.getFrameCount(); ++frame)
+            {
+                for (int mip = 0; mip < first.getMipLevelCount(); ++mip)
+                {
+                    const auto* a = first.getMipLevel(frame, mip);
+                    const auto* b = second.getMipLevel(frame, mip);
+                    if (a == nullptr || b == nullptr || a->maxHarmonic != b->maxHarmonic || a->samples != b->samples)
+                    {
+                        std::cerr << "mip determinism failed " << frame << " " << mip << "\n";
+                        return false;
+                    }
+                    double mean = 0.0;
+                    for (const float sample : a->samples)
+                        mean += sample;
+                    if (std::abs(mean / (double) a->samples.size()) > 1.0e-6)
+                    {
+                        std::cerr << "mip dc failed " << frame << " " << mip << " " << mean / (double) a->samples.size() << "\n";
+                        return false;
+                    }
+                }
+            }
         }
 
         {

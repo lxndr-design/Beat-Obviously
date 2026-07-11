@@ -4,9 +4,9 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 
 | Capability | Current Beat state | Target milestone | Required proof / dependency |
 | --- | --- | --- | --- |
-| Independent timbre and harmonic-resolution axes | Missing; pitch clamps timbral position | A1 | New immutable frame/mip model; invariance and alias tests |
-| Reliable band limiting | Partial | A1 | Offline mip generation, level crossfade, alias thresholds |
-| Wavetable construction invariants | Partial | A1 | Validation, DC removal, normalization, phase policy, deterministic hashes |
+| Independent timbre and harmonic-resolution axes | Implemented in A1 foundation | A1 | Position invariance and independent-selection tests pass; final spectral thresholds remain to be ratified |
+| Reliable band limiting | Immutable harmonic mips with continuous selection implemented | A1 | Alias measurements captured; release thresholds and offline-HQ policy remain open |
+| Wavetable construction invariants | Implemented for generated tables | A1 | Explicit validation, DC removal, common normalization, phase alignment, and deterministic generation tests pass |
 | Safe table replacement | Partial shared ownership | A1/A2 | Bounded crossfade and non-audio reclamation |
 | Parameter-rate taxonomy | Missing | A2 | Central metadata and migration-compatible stable IDs |
 | Unified de-click behavior | Partial, subsystem-specific | A2 | Event taxonomy and peak-discontinuity thresholds |

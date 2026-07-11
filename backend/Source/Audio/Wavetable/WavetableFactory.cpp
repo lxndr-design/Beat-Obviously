@@ -114,18 +114,39 @@ namespace beat
             return 0.0f;
         }
 
-        void normalizeFrame(std::vector<float>& samples, int frameStart, int frameSize)
+        std::vector<int> mipHarmonicLimits(int maxHarmonic)
         {
+            std::vector<int> limits;
+            for (int limit = juce::jmax(1, maxHarmonic);; limit = juce::jmax(1, limit / 2))
+            {
+                limits.push_back(limit);
+                if (limit == 1)
+                    break;
+            }
+            return limits;
+        }
+
+        float dcFreePeak(const std::vector<float>& samples)
+        {
+            double mean = 0.0;
+            for (const float sample : samples)
+                mean += sample;
+            mean /= (double) juce::jmax<size_t>(1, samples.size());
+
             float peak = 0.0f;
-            for (int i = 0; i < frameSize; ++i)
-                peak = juce::jmax(peak, std::abs(samples[(size_t) frameStart + (size_t) i]));
+            for (const float sample : samples)
+                peak = juce::jmax(peak, std::abs(sample - (float) mean));
+            return peak;
+        }
 
-            if (peak <= 0.000001f)
-                return;
-
-            const float gain = 0.95f / peak;
-            for (int i = 0; i < frameSize; ++i)
-                samples[(size_t) frameStart + (size_t) i] *= gain;
+        void removeDcAndScale(std::vector<float>& samples, float gain)
+        {
+            double mean = 0.0;
+            for (const float sample : samples)
+                mean += sample;
+            mean /= (double) juce::jmax<size_t>(1, samples.size());
+            for (float& sample : samples)
+                sample = (sample - (float) mean) * gain;
         }
 
         float customAmplitude(const WavetableFactory::CustomFrame& frame, int harmonic, float warp, WavetableWarpMode warpMode)
@@ -259,8 +280,10 @@ namespace beat
         frameCount = juce::jlimit(1, 64, frameCount);
         frameSize = juce::jlimit(32, 32768, frameSize);
 
-        std::vector<float> samples((size_t) frameCount * (size_t) frameSize, 0.0f);
         const int maxTableHarmonic = juce::jmax(1, juce::jmin(generatedMaxHarmonics, frameSize / 2 - 1));
+        const auto mipLimits = mipHarmonicLimits(maxTableHarmonic);
+        std::vector<Wavetable::TimbralFrame> timbralFrames;
+        timbralFrames.reserve((size_t) frameCount);
 
         for (int frame = 0; frame < frameCount; ++frame)
         {
@@ -268,28 +291,36 @@ namespace beat
             const int harmonicLimit = shape == BasicWavetableShape::Sine
                 ? 1
                 : juce::jlimit(1, maxTableHarmonic, 1 + (int) std::round(frameNorm * (float) (maxTableHarmonic - 1)));
-            const int frameStart = frame * frameSize;
-
-            for (int i = 0; i < frameSize; ++i)
+            Wavetable::TimbralFrame timbralFrame;
+            timbralFrame.mipLevels.reserve(mipLimits.size());
+            for (const int mipLimit : mipLimits)
             {
-                const double phase = (double) i / (double) frameSize;
-                double value = 0.0;
-
-                for (int harmonic = 1; harmonic <= harmonicLimit; ++harmonic)
+                std::vector<float> levelSamples((size_t) frameSize, 0.0f);
+                const int levelHarmonicLimit = juce::jmin(harmonicLimit, mipLimit);
+                for (int i = 0; i < frameSize; ++i)
                 {
-                    const float amp = harmonicAmplitude(shape, harmonic);
-                    if (amp != 0.0f)
+                    const double phase = (double) i / (double) frameSize;
+                    double value = 0.0;
+                    for (int harmonic = 1; harmonic <= levelHarmonicLimit; ++harmonic)
                     {
-                        const float harmonicWarp = warpAmplitudeOffset(warpMode, harmonic, frameNorm, warp);
-                        const float shapedAmp = amp + harmonicWarp;
-                        value += std::sin(twoPi * phase * (double) harmonic + (double) warpPhaseOffset(warpMode, harmonic, frameNorm, warp)) * (double) shapedAmp;
+                        const float amp = harmonicAmplitude(shape, harmonic);
+                        if (amp != 0.0f)
+                        {
+                            const float harmonicWarp = warpAmplitudeOffset(warpMode, harmonic, frameNorm, warp);
+                            const float shapedAmp = amp + harmonicWarp;
+                            value += std::sin(twoPi * phase * (double) harmonic + (double) warpPhaseOffset(warpMode, harmonic, frameNorm, warp)) * (double) shapedAmp;
+                        }
                     }
+                    levelSamples[(size_t) i] = (float) value;
                 }
-
-                samples[(size_t) frameStart + (size_t) i] = (float) value;
+                timbralFrame.mipLevels.push_back({ mipLimit, std::move(levelSamples) });
             }
 
-            normalizeFrame(samples, frameStart, frameSize);
+            const float fullPeak = dcFreePeak(timbralFrame.mipLevels.front().samples);
+            const float commonGain = fullPeak > 0.000001f ? 0.95f / fullPeak : 1.0f;
+            for (auto& mip : timbralFrame.mipLevels)
+                removeDcAndScale(mip.samples, commonGain);
+            timbralFrames.push_back(std::move(timbralFrame));
         }
 
         return Wavetable(
@@ -298,9 +329,7 @@ namespace beat
                 shapeName(shape),
                 "generated.basic"
             },
-            frameCount,
-            frameSize,
-            std::move(samples));
+            std::move(timbralFrames));
     }
 
     Wavetable WavetableFactory::createCustom(const std::array<CustomFrame, 4>& frames, int frameCount, int frameSize)
@@ -318,31 +347,40 @@ namespace beat
         frameCount = juce::jlimit(1, 64, frameCount);
         frameSize = juce::jlimit(32, 32768, frameSize);
 
-        std::vector<float> samples((size_t) frameCount * (size_t) frameSize, 0.0f);
         const int maxTableHarmonic = juce::jmax(1, juce::jmin(generatedMaxHarmonics, frameSize / 2 - 1));
+        const auto mipLimits = mipHarmonicLimits(maxTableHarmonic);
+        std::vector<Wavetable::TimbralFrame> timbralFrames;
+        timbralFrames.reserve((size_t) frameCount);
 
         for (int frame = 0; frame < frameCount; ++frame)
         {
             const float frameNorm = frameCount <= 1 ? 0.0f : (float) frame / (float) (frameCount - 1);
             const auto customFrame = interpolateCustomFrame(frames, frameNorm, smoothInterpolation, morph);
-            const int frameStart = frame * frameSize;
-
-            for (int i = 0; i < frameSize; ++i)
+            Wavetable::TimbralFrame timbralFrame;
+            timbralFrame.mipLevels.reserve(mipLimits.size());
+            for (const int mipLimit : mipLimits)
             {
-                const double phase = (double) i / (double) frameSize;
-                double value = 0.0;
-
-                for (int harmonic = 1; harmonic <= maxTableHarmonic; ++harmonic)
+                std::vector<float> levelSamples((size_t) frameSize, 0.0f);
+                for (int i = 0; i < frameSize; ++i)
                 {
-                    const float amp = customAmplitude(customFrame, harmonic, warp, warpMode);
-                    if (amp <= 0.0001f) continue;
-                    value += std::sin(twoPi * phase * (double) harmonic + (double) customPhase(customFrame, harmonic, warp, warpMode)) * (double) amp;
+                    const double phase = (double) i / (double) frameSize;
+                    double value = 0.0;
+                    for (int harmonic = 1; harmonic <= mipLimit; ++harmonic)
+                    {
+                        const float amp = customAmplitude(customFrame, harmonic, warp, warpMode);
+                        if (amp <= 0.0001f) continue;
+                        value += std::sin(twoPi * phase * (double) harmonic + (double) customPhase(customFrame, harmonic, warp, warpMode)) * (double) amp;
+                    }
+                    levelSamples[(size_t) i] = (float) value;
                 }
-
-                samples[(size_t) frameStart + (size_t) i] = (float) value;
+                timbralFrame.mipLevels.push_back({ mipLimit, std::move(levelSamples) });
             }
 
-            normalizeFrame(samples, frameStart, frameSize);
+            const float fullPeak = dcFreePeak(timbralFrame.mipLevels.front().samples);
+            const float commonGain = fullPeak > 0.000001f ? 0.95f / fullPeak : 1.0f;
+            for (auto& mip : timbralFrame.mipLevels)
+                removeDcAndScale(mip.samples, commonGain);
+            timbralFrames.push_back(std::move(timbralFrame));
         }
 
         return Wavetable(
@@ -351,8 +389,6 @@ namespace beat
                 "Custom",
                 "generated.custom"
             },
-            frameCount,
-            frameSize,
-            std::move(samples));
+            std::move(timbralFrames));
     }
 }

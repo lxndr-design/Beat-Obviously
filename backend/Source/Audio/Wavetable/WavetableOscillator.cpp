@@ -1,13 +1,12 @@
 #include "WavetableOscillator.h"
 
 #include <cmath>
+#include <limits>
 
 namespace beat
 {
     namespace
     {
-        constexpr int generatedMaxHarmonics = 64;
-
         double wrap01(double value) noexcept
         {
             if (!std::isfinite(value))
@@ -78,9 +77,12 @@ namespace beat
     {
         frameCacheDirty = false;
         cachedFrameSize = 0;
-        cachedFrame0Data = nullptr;
-        cachedFrame1Data = nullptr;
+        cachedFrame0Mip0Data = nullptr;
+        cachedFrame1Mip0Data = nullptr;
+        cachedFrame0Mip1Data = nullptr;
+        cachedFrame1Mip1Data = nullptr;
         cachedFrameFrac = 0.0f;
+        cachedMipFrac = 0.0f;
 
         if (table == nullptr)
             return;
@@ -90,24 +92,51 @@ namespace beat
         if (frameCount <= 0 || frameSize <= 1)
             return;
 
-        float playbackPosition = position;
-        const int maxTableHarmonic = juce::jmax(1, juce::jmin(generatedMaxHarmonics, frameSize / 2 - 1));
-        if (maxTableHarmonic > 1 && frequencyHz > 0.0 && sampleRate > 0.0)
-        {
-            const int maxPlaybackHarmonic = juce::jmax(1, (int) std::floor((sampleRate * 0.48) / juce::jmax(20.0, frequencyHz)));
-            const float harmonicPosition = (float) (maxPlaybackHarmonic - 1) / (float) (maxTableHarmonic - 1);
-            playbackPosition = juce::jmin(playbackPosition, juce::jlimit(0.0f, 1.0f, harmonicPosition));
-        }
-
-        const float framePos = playbackPosition * (float) (frameCount - 1);
+        const float framePos = position * (float) (frameCount - 1);
         const int frame0 = juce::jlimit(0, frameCount - 1, (int) std::floor(framePos));
         const int frame1 = juce::jmin(frame0 + 1, frameCount - 1);
-        const float frameFrac = framePos - (float) frame0;
+
+        int mip0 = 0;
+        int mip1 = 0;
+        float mipFrac = 0.0f;
+        const int mipCount = table->getMipLevelCount();
+        const double playbackLimit = frequencyHz > 0.0 && sampleRate > 0.0
+            ? juce::jmax(1.0, (sampleRate * 0.48) / frequencyHz)
+            : std::numeric_limits<double>::max();
+        for (int mip = 0; mip + 1 < mipCount; ++mip)
+        {
+            const auto* current = table->getMipLevel(frame0, mip);
+            const auto* next = table->getMipLevel(frame0, mip + 1);
+            if (current == nullptr || next == nullptr)
+                break;
+            if (playbackLimit >= (double) current->maxHarmonic)
+                break;
+
+            mip0 = mip + 1;
+            mip1 = mip0;
+            if (playbackLimit > (double) next->maxHarmonic)
+            {
+                mip0 = mip;
+                mip1 = mip + 1;
+                const double logCurrent = std::log2((double) current->maxHarmonic);
+                const double logNext = std::log2((double) next->maxHarmonic);
+                const double logLimit = std::log2(playbackLimit);
+                mipFrac = (float) juce::jlimit(0.0, 1.0, (logCurrent - logLimit) / (logCurrent - logNext));
+                break;
+            }
+        }
 
         cachedFrameSize = frameSize;
-        cachedFrame0Data = table->getFrameData(frame0);
-        cachedFrame1Data = table->getFrameData(frame1);
-        cachedFrameFrac = frameFrac;
+        const auto* f0m0 = table->getMipLevel(frame0, mip0);
+        const auto* f1m0 = table->getMipLevel(frame1, mip0);
+        const auto* f0m1 = table->getMipLevel(frame0, mip1);
+        const auto* f1m1 = table->getMipLevel(frame1, mip1);
+        cachedFrame0Mip0Data = f0m0 != nullptr ? f0m0->samples.data() : nullptr;
+        cachedFrame1Mip0Data = f1m0 != nullptr ? f1m0->samples.data() : nullptr;
+        cachedFrame0Mip1Data = f0m1 != nullptr ? f0m1->samples.data() : nullptr;
+        cachedFrame1Mip1Data = f1m1 != nullptr ? f1m1->samples.data() : nullptr;
+        cachedFrameFrac = framePos - (float) frame0;
+        cachedMipFrac = mipFrac;
     }
 
     float WavetableOscillator::readCurrentSample() noexcept
@@ -115,7 +144,8 @@ namespace beat
         if (frameCacheDirty)
             updateFrameCache();
 
-        if (cachedFrameSize <= 1 || cachedFrame0Data == nullptr || cachedFrame1Data == nullptr)
+        if (cachedFrameSize <= 1 || cachedFrame0Mip0Data == nullptr || cachedFrame1Mip0Data == nullptr
+            || cachedFrame0Mip1Data == nullptr || cachedFrame1Mip1Data == nullptr)
             return 0.0f;
 
         const double samplePos = phase * (double) cachedFrameSize;
@@ -123,13 +153,16 @@ namespace beat
         const int index1 = index0 + 1 == cachedFrameSize ? 0 : index0 + 1;
         const float sampleFrac = (float) (samplePos - (double) index0);
 
-        const float a0 = cachedFrame0Data[(size_t) index0];
-        const float a1 = cachedFrame0Data[(size_t) index1];
-        const float b0 = cachedFrame1Data[(size_t) index0];
-        const float b1 = cachedFrame1Data[(size_t) index1];
-
-        const float frameASample = a0 + (a1 - a0) * sampleFrac;
-        const float frameBSample = b0 + (b1 - b0) * sampleFrac;
-        return frameASample + (frameBSample - frameASample) * cachedFrameFrac;
+        const auto interpolate = [index0, index1, sampleFrac](const float* data) noexcept
+        {
+            return data[(size_t) index0] + (data[(size_t) index1] - data[(size_t) index0]) * sampleFrac;
+        };
+        const float mip0Frame0 = interpolate(cachedFrame0Mip0Data);
+        const float mip0Frame1 = interpolate(cachedFrame1Mip0Data);
+        const float mip1Frame0 = interpolate(cachedFrame0Mip1Data);
+        const float mip1Frame1 = interpolate(cachedFrame1Mip1Data);
+        const float mip0Sample = mip0Frame0 + (mip0Frame1 - mip0Frame0) * cachedFrameFrac;
+        const float mip1Sample = mip1Frame0 + (mip1Frame1 - mip1Frame0) * cachedFrameFrac;
+        return mip0Sample + (mip1Sample - mip0Sample) * cachedMipFrac;
     }
 }

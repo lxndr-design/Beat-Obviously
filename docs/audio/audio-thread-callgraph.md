@@ -96,3 +96,27 @@ live AudioEngine preparation or AudioEngine::prepareForOffline(activeRate)
 ```
 
 `BasicOscillator` is stateless and receives an explicitly rate-derived phase increment. The sub/noise paths using it therefore require no cached-coefficient invalidation. Live and offline use the same preparation propagation, and the focused test plus full matrix now cover all five supported rates. No callback topology or wavetable representation changed.
+
+## Milestone A1 immutable wavetable path
+
+```text
+control/setup cache miss (non-playback path)
+  WavetableFactory
+    generate TimbralFrame[]
+      generate ordered MipLevel[] harmonic caps
+      remove DC and apply common per-frame normalization
+    validate complete immutable Wavetable
+  WavetableVoiceCache publishes shared_ptr<const Wavetable>
+  InstrumentVoice retains stable shared owner
+
+audio callback
+  WavetableOscillator::setPosition(position)
+    select adjacent timbral frames only
+  WavetableOscillator::setFrequency(frequency)
+    derive continuous harmonic budget from frequency/sample rate only
+    select adjacent mip levels
+  WavetableOscillator::renderSample
+    interpolate sample phase × frame axis × mip axis
+```
+
+No table generation, mutation, allocation, or lock was added to oscillator playback. The oscillator caches four immutable sample pointers (two frames by two mip levels) plus two interpolation fractions. Replacement crossfades and explicit deferred reclamation remain a later A slice.

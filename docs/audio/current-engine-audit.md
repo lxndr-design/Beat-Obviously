@@ -23,8 +23,8 @@ Because the existing complete gates are not green, this audit is a release block
 | Supplied claim | Finding | Evidence and consequence |
 | --- | --- | --- |
 | PolyBLEP saw and square | Verified | `BasicOscillator::sample()` applies `polyBlep()` at the saw discontinuity and both square edges. Triangle is naive and noise uses JUCE's process-global random source. |
-| Partially band-limited wavetable playback | Verified, architecturally incorrect | `WavetableOscillator::updateFrameCache()` computes a pitch-limited `playbackPosition`; the same axis selects timbral frames. Higher notes therefore change requested timbre instead of selecting an independent harmonic mip level. |
-| Linear runtime sample and frame interpolation | Verified | `readCurrentSample()` linearly interpolates adjacent samples in each of two frames and then linearly interpolates the frames. No higher-quality offline path exists. |
+| Independent timbral and harmonic-resolution axes | Resolved in Milestone A foundation | Position now selects adjacent immutable timbral frames only. Frequency/sample rate select adjacent harmonic mip levels only; playback crossfades continuously on both axes. |
+| Linear runtime sample, frame, and mip interpolation | Verified | `readCurrentSample()` linearly interpolates adjacent samples, timbral frames, and logarithmically selected mip levels. No higher-quality offline path exists yet. |
 | Mostly sample-rate-aware processing | Partial | Oscillator increments, ADSRs, filters, limiter release, glide, and LFO rates use the prepared rate. Several limits are constants or normalized policies; only existing stress coverage, not a systematic 44.1/48/88.2/96/192 kHz matrix, supports equivalence. |
 | Caller-controlled parameter ramps | Verified | `RealtimeParameterChange` carries `rampSamples`; queue callers and automation events choose it. `InstrumentVoice` applies that value directly. There is no central parameter-rate/smoothing policy. |
 | Partial click prevention | Verified | ADSR note tails, clip fades, sample fades, effect smoothing, and some project transitions exist. Hard voice stops call `clearCurrentNote()` without a shared steal/hard-stop fade, and routing/source/preset transitions do not share one de-click contract. |
@@ -110,3 +110,19 @@ Focused native coverage verifies 44.1/48/88.2/96/192 kHz tuning, changed-rate re
 - Queue probe remains 64 accepted, 16 rejected, and 16 overflow. The isolated harness still bypasses the shared wavetable cache and does not invent unavailable full-engine render counters; full-engine stress remains the evidence for those paths.
 
 The only waiver remains `baseline.recent-project-exists`. It suppresses only the stale path-existence result when the explicit environment variable is present; order, legacy timestamp, removal, recording, and every later persistence/native stress remain asserted and executed. The untested behavior is filesystem existence probing of stored recent-project paths, intentionally disabled to avoid macOS TCC prompts.
+
+## Milestone A1 frame/mip foundation — 2026-07-11
+
+Starting from canonical baseline `e74d6d99`, Beat now owns an immutable `TimbralFrame[]` model whose frames contain ordered immutable `MipLevel[]` sample vectors and explicit harmonic limits. Construction validates empty frames, missing or inconsistent levels, sample sizes, harmonic ordering/ranges, cross-frame harmonic-layout consistency, and finite samples with inspectable error codes/messages. The legacy flat constructor remains only as a compatibility boundary and creates a single-level table.
+
+The Beat factory deterministically generates common harmonic mip layouts (`64, 32, 16, 8, 4, 2, 1` at the default size) outside playback. Every generated level is DC-removed, phase-aligned by common harmonic synthesis, and scaled with the frame's common full-band normalization gain. The cache publishes the completed immutable table through existing `shared_ptr<const Wavetable>` voice ownership; audio-thread playback performs no generation or allocation.
+
+`WavetableOscillator` no longer derives frame position from pitch. Position crossfades only adjacent timbral frames. The continuously valued `0.48 * sampleRate / frequencyHz` harmonic budget selects and logarithmically crossfades adjacent mip levels; removing integer quantization avoids discontinuities at mip boundaries. Phase and preset/automation IDs are unchanged.
+
+Focused native tests cover malformed input, finite/bounded output, frame-position invariance between low and high notes, independent mip selection, frame and mip transition continuity, deterministic generation, generated-level DC, all existing custom/warp behavior, and the five-rate preparation suite. Full `verify:non-native`, Release `Beat`, `BeatBackendStress`, and `BeatAetherBaseline` pass with only the existing TCC waiver.
+
+The final 150-render matrix reproduced twice with zero WAV mismatches. Compared with the canonical sample-rate freeze, all 25 initialization renders remain byte-identical; the 125 position-dependent renders change intentionally because pitch no longer clamps timbral position. JSON SHA-256: `c8da1d0a0aa34849c501d5aaa3e4d850f67b1ca76efd9444af0d57b65f3011fc`; render-manifest SHA-256: `bb299db960d7942995e38a2b7361b9b14730e3497cd5313380b0fa738f77ae4f`.
+
+Native stress completed in 7.12 s with 189,284,352-byte maximum RSS and no new waiver. Harness render measurements were 12.78–15.92 ms with 15,073,280-byte peak RSS and zero coarse deadline overruns. These harness times include constructing a complete multi-mip table for every render, so they measure generation plus playback rather than callback cost; production tables are generated on cache-miss setup paths and reused. Composite-signal alias fields remain descriptive rather than release thresholds.
+
+This completes only the A1 frame/mip foundation. Bounded table-replacement crossfades, destruction deferral proof, central parameter policy, unified de-clicking, deterministic stealing, callback instrumentation/budgets, DC blocking, and explicit quality modes remain open Milestone A slices.
