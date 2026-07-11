@@ -1,5 +1,7 @@
 # Aether Completion Checklist
 
+> 2026-07-11 foundation audit: existing feature/stress checkmarks in this document describe previously exercised paths, not current release-gate status. `docs/audio/current-engine-audit.md` records reproducible baseline failures and foundational gaps in the wavetable data model, deterministic voice stealing, DC removal, callback instrumentation, and offline HQ policy. Do not begin the Serum-class DSP replacement until those gates are cleared.
+
 This checklist tracks the remaining work to move Aether from a strong prototype to a completion-ready Beat instrument. The broader DAW roadmap lives in `docs/serum-style-synth-roadmap.md`; this file is the focused Aether burn-down list.
 
 Status legend:
