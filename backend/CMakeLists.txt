@@ -19,10 +19,13 @@ target_sources(Beat PRIVATE
 
     Source/Audio/AudioEngine.cpp
     Source/Audio/AudioEngine.h
+    Source/Audio/BeatSynthesiser.cpp
+    Source/Audio/BeatSynthesiser.h
     Source/Audio/Sequencer.cpp
     Source/Audio/Sequencer.h
     Source/Audio/TrackModel.cpp
     Source/Audio/TrackModel.h
+    Source/Audio/Transitions/VoiceTransition.h
     Source/Audio/VoiceAllocation.h
     Source/Audio/Envelope/EnvelopeShaper.h
     Source/Audio/InstrumentVoice.cpp
@@ -150,6 +153,8 @@ add_executable(BeatBackendStress
     Tests/BackendStress.cpp
     Source/Audio/AudioEngine.cpp
     Source/Audio/AudioEngine.h
+    Source/Audio/BeatSynthesiser.cpp
+    Source/Audio/BeatSynthesiser.h
     Source/Audio/Effects/Bitcrush.cpp
     Source/Audio/Effects/Bitcrush.h
     Source/Audio/Effects/MasterEq.cpp
@@ -178,6 +183,7 @@ add_executable(BeatBackendStress
     Source/Audio/Sequencer.h
     Source/Audio/TrackModel.cpp
     Source/Audio/TrackModel.h
+    Source/Audio/Transitions/VoiceTransition.h
     Source/Audio/VoiceAllocation.h
     Source/Audio/Envelope/EnvelopeShaper.h
     Source/Audio/Analysis/FftAnalyzer.cpp

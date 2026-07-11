@@ -138,3 +138,22 @@ queue/sequencer note or arrangement event
 ```
 
 The policy adds no callback allocation, lock, container growth, or string ownership. Lookup remains bounded at 24 constexpr entries. No render topology or timing semantics changed in this slice.
+
+## Beat-owned steal path
+
+```text
+JUCE noteOn when all voices are active
+  BeatSynthesiser::findVoiceToSteal
+    inspect fixed voice array
+    released -> quietest -> oldest -> stable voice ID
+    InstrumentVoice::prepareForSteal (flag only)
+  JUCE stopNote(false) / immediate startNote
+    capture retained last stereo output
+    reset ordinary note DSP state
+    VoiceTransition::beginFrom(last output)
+  render replacement note
+    first sample equals prior victim output
+    bounded 1.5 ms linear handoff to new note
+```
+
+Selection scans the preallocated JUCE voice array and performs no sorting, temporary container growth, allocation, or lock beyond JUCE's existing synthesiser callback lock. Ordinary hard stops reset transition state and cannot affect a later unrelated note.

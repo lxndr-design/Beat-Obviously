@@ -136,3 +136,13 @@ The existing 24-entry realtime voice surface now has one allocation-free constex
 Compile-time checks require the policy count to match the realtime enum and reject duplicate stable IDs. Native coverage verifies complete lookup round trips, unique/nonempty IDs, valid ranges, exact clamping, smoothing ownership, representative rate classes, the 15 currently eligible modulation targets, and unknown-ID rejection. The full native and non-native gates pass with only the existing TCC waiver, and all 150 WAVs are byte-identical to the A1 freeze.
 
 This slice makes metadata authoritative for the implemented realtime voice surface. Parameters that are not currently realtime-applicable are not falsely advertised as supported; extending the surface requires adding policy metadata and coverage in the same change.
+
+## Milestone A3 deterministic steal transitions — 2026-07-11
+
+Beat now owns synthesiser victim selection through `BeatSynthesiser`, overriding JUCE's selection hook without modifying JUCE. Every `InstrumentVoice` exposes bounded allocation state: active/released flags, current stereo output level, and a stable construction-order voice ID. Victims are selected lexicographically: released first, then quietest, then oldest, then lowest stable ID. This ordering is allocation-free and deterministic for equal event streams.
+
+A true victim selection explicitly arms a fixed `VoiceTransition`; ordinary hard stops do not. On immediate reuse, the new note's first stereo sample is exactly the victim's last stereo output and a linear 1.5 ms handoff (clamped to 8–256 samples) reaches the replacement signal. This avoids a steal-boundary step while preserving MIDI event timing, note phase setup, envelopes, and voice limits. No stale transition survives an unrelated hard stop.
+
+Tests cover the complete victim comparator, real oldest and released-voice selection through a two-voice synthesiser, stable IDs, bounded transition length, exact first-sample continuity, completion, and actual one-voice stealing. Full native/non-native gates pass with only the TCC waiver, production Beat builds, and all 150 non-steal baseline WAVs remain byte-identical.
+
+This checkpoint addresses deterministic voice stealing and steal de-clicking. General route/effect/source/table replacement transitions and explicit reclamation remain open.

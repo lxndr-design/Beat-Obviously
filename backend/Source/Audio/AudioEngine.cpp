@@ -555,6 +555,7 @@ namespace beat
         for (int i = 0; i < 16; ++i)
         {
             auto* v = new InstrumentVoice();
+            v->setStableVoiceId(i);
             synth.addVoice(v);
         }
     }
@@ -1731,7 +1732,7 @@ namespace beat
 
     std::unique_ptr<juce::Synthesiser> AudioEngine::createInstrumentSynth(const InstrumentDefinition& instrument)
     {
-        auto instrumentSynth = std::make_unique<juce::Synthesiser>();
+        auto instrumentSynth = std::make_unique<BeatSynthesiser>();
         instrumentSynth->addSound(new PassSound());
 
         if (instrument.nodeGraph)
@@ -1934,8 +1935,9 @@ namespace beat
         instrumentSynth->setNoteStealingEnabled(allocation.noteStealing);
         for (int i = 0; i < allocation.voiceCount; ++i)
         {
-            auto* voice = new InstrumentVoice();
-            voice->prepare(sampleRate, mixBuf.getNumSamples() > 0 ? mixBuf.getNumSamples() : 512);
+                auto* voice = new InstrumentVoice();
+                voice->setStableVoiceId(i);
+                voice->prepare(sampleRate, mixBuf.getNumSamples() > 0 ? mixBuf.getNumSamples() : 512);
             voice->setParams(params);
             instrumentSynth->addVoice(voice);
         }

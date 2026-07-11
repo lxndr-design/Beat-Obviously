@@ -9,6 +9,7 @@
 #include "Realtime/RealtimeParameterQueue.h"
 #include "Realtime/RealtimeRamp.h"
 #include "Realtime/VoiceRealtimeRampState.h"
+#include "Transitions/VoiceTransition.h"
 #include "Realtime/VoiceRealtimeParams.h"
 #include "Realtime/VoiceNoteAutomation.h"
 #include "Realtime/VoiceNoteAutomationState.h"
@@ -242,6 +243,18 @@ namespace beat
         static VoiceStats::WavetableCache getWavetableCacheStats() noexcept;
         static VoiceStats::RenderWork consumeRenderWorkStats() noexcept;
 
+        struct AllocationState
+        {
+            bool active { false };
+            bool released { false };
+            float currentLevel { 0.0f };
+            int stableVoiceId { 0 };
+        };
+
+        void setStableVoiceId(int id) noexcept { stableVoiceId = id; }
+        AllocationState allocationState() const noexcept;
+        void prepareForSteal() noexcept { stealPrepared = true; }
+
     private:
         using StereoSample = DriveStage::StereoFrame;
 
@@ -309,5 +322,9 @@ namespace beat
         juce::ADSR::Parameters adsrParams;
         juce::ADSR env2Adsr;
         juce::ADSR::Parameters env2AdsrParams;
+        VoiceTransition stealTransition;
+        VoiceTransition::Stereo lastOutput;
+        int stableVoiceId { 0 };
+        bool stealPrepared { false };
     };
 }

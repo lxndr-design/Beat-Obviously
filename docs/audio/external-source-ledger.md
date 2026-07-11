@@ -49,3 +49,7 @@ The immutable timbral-frame/mip model, harmonic-level generator, validation cont
 ## Milestone A2 provenance
 
 The realtime parameter metadata/policy refactor is an independent consolidation of existing Beat stable IDs, ranges, ramp behavior, and modulation targets. It uses no external implementation, introduces no dependency, and does not change the external-code manifest. Reviewed reference repositories were not consulted, executed, or imported.
+
+## Milestone A3 provenance
+
+`BeatSynthesiser`, the deterministic victim comparator, voice allocation state, and bounded steal transition are independently implemented against JUCE's documented virtual synthesiser hooks and existing Beat voice code. JUCE source was inspected only to confirm local call ordering; JUCE was not modified and no new external code or dependency was imported.

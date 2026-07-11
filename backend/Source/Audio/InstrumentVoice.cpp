@@ -103,6 +103,7 @@ namespace beat
         adsr.setSampleRate(sr);
         env2Adsr.setSampleRate(sr);
         filterState.prepare(sr, blockSize, params.filterType);
+        stealTransition.prepare(sampleRate);
     }
 
     void InstrumentVoice::setParams(const Params& p)
@@ -299,6 +300,11 @@ namespace beat
     void InstrumentVoice::startNote(int midiNoteNumber, float velocity,
                                     juce::SynthesiserSound*, int currentPitchWheel)
     {
+        if (stealPrepared)
+            stealTransition.beginFrom(lastOutput);
+        else
+            stealTransition.reset();
+        stealPrepared = false;
         const bool legatoRetune = baseParams.legato && adsr.isActive();
         params = baseParams;
         realtimeRampState.resetFromParams(params);
@@ -407,6 +413,11 @@ namespace beat
             env1LoopState.reset();
             env2LoopState.reset();
             clearCurrentNote();
+            if (!stealPrepared)
+            {
+                stealTransition.reset();
+                lastOutput = {};
+            }
         }
     }
 
@@ -602,10 +613,16 @@ namespace beat
             const float voiceGain = env * level * 0.4f * ampLevel;
             const auto [leftGain, rightGain] = panGains;
 
+            const auto transitioned = stealTransition.process({
+                left * leftGain * voiceGain,
+                right * rightGain * voiceGain
+            });
+            lastOutput = transitioned;
             for (int ch = 0; ch < out.getNumChannels(); ++ch)
             {
-                const float sample = ch == 0 ? left * leftGain : ch == 1 ? right * rightGain : (left + right) * 0.5f;
-                const float output = sample * voiceGain;
+                const float output = ch == 0 ? transitioned.left
+                    : ch == 1 ? transitioned.right
+                    : (transitioned.left + transitioned.right) * 0.5f;
                 out.addSample(ch, startSample + i, VoiceMath::denormalSafe(output));
             }
 
@@ -634,6 +651,16 @@ namespace beat
             clearCurrentNote();
 
         VoiceRenderStats::recordBlock(currentBlockWork.snapshot());
+    }
+
+    InstrumentVoice::AllocationState InstrumentVoice::allocationState() const noexcept
+    {
+        return {
+            isVoiceActive(),
+            isPlayingButReleased(),
+            juce::jmax(std::abs(lastOutput.left), std::abs(lastOutput.right)),
+            stableVoiceId
+        };
     }
 
     float InstrumentVoice::shapedEnvelope(float rawEnvelope) noexcept

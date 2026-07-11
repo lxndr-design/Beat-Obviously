@@ -10,6 +10,7 @@
 #include "Effects/MasterLimiter.h"
 #include "Recording/RecordingCapture.h"
 #include "Realtime/RealtimeParameterQueue.h"
+#include "BeatSynthesiser.h"
 #include "Realtime/VoiceNoteAutomation.h"
 #include <array>
 #include <atomic>
@@ -264,7 +265,7 @@ namespace beat
 
     private:
         std::unique_ptr<juce::AudioDeviceManager> device;
-        juce::Synthesiser        synth;
+        BeatSynthesiser          synth;
         Sequencer                seq;
         Bitcrush                 bitcrush;
         MasterEq                 masterEq;

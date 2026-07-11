@@ -1,5 +1,6 @@
 #include "../Source/Audio/Sequencer.h"
 #include "../Source/Audio/AudioEngine.h"
+#include "../Source/Audio/BeatSynthesiser.h"
 #include "../Source/Audio/Analysis/AudioFileAnalyzer.h"
 #include "../Source/Audio/Analysis/FftAnalyzer.h"
 #include "../Source/Audio/Envelope/EnvelopeShaper.h"
@@ -25,6 +26,7 @@
 #include "../Source/Audio/Recording/RecordingSessionPlanner.h"
 #include "../Source/Audio/Rendering/TrackBouncePlanner.h"
 #include "../Source/Audio/Sampler/DecentSamplerImporter.h"
+#include "../Source/Audio/Transitions/VoiceTransition.h"
 #include "../Source/Audio/VoiceAllocation.h"
 #include "../Source/Audio/Wavetable/WavetableFactory.h"
 #include "../Source/Audio/Wavetable/WavetableOscillator.h"
@@ -907,10 +909,99 @@ namespace
             return false;
 
         const auto monoNoLegato = beat::VoiceAllocation::policyFor(12, true, false);
-        return monoNoLegato.voiceCount == 1
+        if (!(monoNoLegato.voiceCount == 1
             && monoNoLegato.mono
             && !monoNoLegato.legato
-            && monoNoLegato.noteStealing;
+            && monoNoLegato.noteStealing))
+            return false;
+
+        using State = beat::VoiceAllocation::VictimState;
+        if (!beat::VoiceAllocation::preferVictim({ true, 0.9f, 9, 9 }, { false, 0.01f, 0, 0 }))
+            return false;
+        if (!beat::VoiceAllocation::preferVictim({ false, 0.1f, 9, 9 }, { false, 0.2f, 0, 0 }))
+            return false;
+        if (!beat::VoiceAllocation::preferVictim({ false, 0.1f, 2, 9 }, { false, 0.1f, 3, 0 }))
+            return false;
+        if (!beat::VoiceAllocation::preferVictim({ false, 0.1f, 2, 1 }, { false, 0.1f, 2, 2 }))
+            return false;
+        return !beat::VoiceAllocation::preferVictim(State { false, 0.2f, 3, 3 }, State { true, 0.9f, 9, 9 });
+    }
+
+    bool stressVoiceStealTransition()
+    {
+        beat::VoiceTransition transition;
+        transition.prepare(48000.0);
+        transition.beginFrom({ 0.5f, -0.25f });
+        const auto first = transition.process({ -0.5f, 0.25f });
+        if (!near(first.left, 0.5f) || !near(first.right, -0.25f) || transition.getLengthSamples() != 72)
+            return false;
+        beat::VoiceTransition::Stereo last = first;
+        for (int i = 0; i <= transition.getLengthSamples(); ++i)
+            last = transition.process({ -0.5f, 0.25f });
+        if (transition.isActive() || !near(last.left, -0.5f) || !near(last.right, 0.25f))
+            return false;
+
+        struct TestSound final : juce::SynthesiserSound
+        {
+            bool appliesToNote(int) override { return true; }
+            bool appliesToChannel(int) override { return true; }
+        };
+
+        beat::BeatSynthesiser synth;
+        auto* voice = new beat::InstrumentVoice();
+        voice->setStableVoiceId(7);
+        voice->prepare(48000.0, 256);
+        beat::InstrumentVoice::Params params;
+        params.attackMs = 1.0f;
+        params.drive01 = 0.0f;
+        voice->setParams(params);
+        synth.addVoice(voice);
+        synth.addSound(new TestSound());
+        synth.setNoteStealingEnabled(true);
+        synth.setCurrentPlaybackSampleRate(48000.0);
+
+        juce::AudioBuffer<float> before(2, 1024);
+        before.clear();
+        synth.noteOn(1, 60, 1.0f);
+        synth.renderNextBlock(before, juce::MidiBuffer {}, 0, before.getNumSamples());
+        const float previousLeft = before.getSample(0, before.getNumSamples() - 1);
+        const float previousRight = before.getSample(1, before.getNumSamples() - 1);
+        if (std::abs(previousLeft) < 1.0e-5f && std::abs(previousRight) < 1.0e-5f)
+            return false;
+
+        juce::AudioBuffer<float> after(2, 256);
+        after.clear();
+        synth.noteOn(1, 67, 1.0f);
+        synth.renderNextBlock(after, juce::MidiBuffer {}, 0, after.getNumSamples());
+        if (std::abs(after.getSample(0, 0) - previousLeft) > 1.0e-5f
+            || std::abs(after.getSample(1, 0) - previousRight) > 1.0e-5f)
+            return false;
+        const auto state = voice->allocationState();
+        if (!(state.active && state.stableVoiceId == 7 && voice->getCurrentlyPlayingNote() == 67))
+            return false;
+
+        beat::BeatSynthesiser ordered;
+        for (int id = 0; id < 2; ++id)
+        {
+            auto* orderedVoice = new beat::InstrumentVoice();
+            orderedVoice->setStableVoiceId(10 + id);
+            orderedVoice->prepare(48000.0, 64);
+            orderedVoice->setParams(params);
+            ordered.addVoice(orderedVoice);
+        }
+        ordered.addSound(new TestSound());
+        ordered.setNoteStealingEnabled(true);
+        ordered.setCurrentPlaybackSampleRate(48000.0);
+        ordered.noteOn(1, 60, 1.0f);
+        ordered.noteOn(1, 62, 1.0f);
+        ordered.noteOn(1, 64, 1.0f);
+        if (ordered.getVoice(0)->getCurrentlyPlayingNote() != 64
+            || ordered.getVoice(1)->getCurrentlyPlayingNote() != 62)
+            return false;
+        ordered.noteOff(1, 62, 0.0f, true);
+        ordered.noteOn(1, 65, 1.0f);
+        return ordered.getVoice(0)->getCurrentlyPlayingNote() == 64
+            && ordered.getVoice(1)->getCurrentlyPlayingNote() == 65;
     }
 
     beat::Project makeStressProject()
@@ -13211,6 +13302,11 @@ int main()
     if (!stressVoiceAllocationHelper())
     {
         std::cerr << "Voice allocation helper stress failed\n";
+        return 1;
+    }
+    if (!stressVoiceStealTransition())
+    {
+        std::cerr << "Voice steal transition stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceWavetablePath())
