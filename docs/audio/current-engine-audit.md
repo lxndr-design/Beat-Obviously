@@ -90,7 +90,7 @@ The existing timbre/mipmap-axis coupling remains a Milestone A input and is unto
 
 ## Sample-rate correctness and baseline freeze — 2026-07-11
 
-Milestone A remains blocked pending both review of this freeze and an explicit canonical source-state decision. No upstream code was imported, and no wavetable frame/mipmap redesign was started.
+No upstream code was imported, and no wavetable frame/mipmap redesign was started. The user subsequently approved Option A on 2026-07-11, establishing freeze commit `e74d6d99` as the canonical source baseline; separate phase and licensing gates remain in force.
 
 ### Root cause and correction
 

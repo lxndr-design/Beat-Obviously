@@ -10,7 +10,7 @@ This document records an evidence boundary, not a silent reconciliation. Unknown
 - User-pinned intended audit revision: `062413553930fb102a81658063966c34500bf8a9`.
 - Immutable audit snapshot: `fcfc59f1`, tagged `aether-audit-snapshot-2026-07-11`.
 - Stabilized branch before this correction: `a332044a` on `codex/aether-serum-foundation`.
-- This sample-rate freeze is based on that stabilized branch; its final commit is recorded after the report is committed.
+- Canonical stabilized baseline: `e74d6d99` on `codex/aether-serum-foundation`.
 
 The committed difference from `aea04342` to `06241355` is limited to version/product metadata in `VERSION`, native main/message-bridge code, frontend package metadata, and the store adapter. It does not account for the broad modified and untracked source inventory observed at the start of the audit. Therefore `06241355` cannot be certified as a complete materialization of that earlier dirty state.
 
@@ -28,10 +28,10 @@ No authoritative archive, stash, commit, or mapped unreachable tree has been fou
 
 Relative to the pinned revision, the isolated branch contains audit/provenance documents and snapshot controls; non-DSP Drumpad grid and browser-preview boundary fixes; production MIDI segment clipping correctness; explicit non-fail-fast/waiver orchestration; the test-only `BeatAetherBaseline` harness; and this narrowly scoped sample-rate coefficient correction plus focused tests. It does not contain a wavetable frame/mipmap redesign or imported upstream code.
 
-## Decision requiring explicit approval
+## Canonical decision
 
-Recommended option: **A — adopt the stabilized branch as the new canonical baseline.** It is the only reproducible, hashed state with complete green-or-explicitly-waived gates and a frozen 150-render matrix. This recommendation is not a selection and grants no permission to discard a later-discovered authoritative snapshot.
+On 2026-07-11, the user explicitly approved **Option A — adopt the stabilized branch as the new canonical baseline**. Commit `e74d6d99` is therefore the authoritative starting point for subsequent Aether work. It is the reproducible, hashed state with complete green-or-explicitly-waived gates and a frozen 150-render matrix.
 
-Option B remains available if an authoritative recoverable original snapshot is found: reconcile it read-only against the stabilized branch, enumerate every semantic difference, and request approval before merging anything.
+This decision does not assert that `06241355` contained the earlier dirty state, does not authorize discarding a later-discovered authoritative snapshot, and does not merge any unknown dirty-tree content. If such a snapshot is found, reconcile it read-only against the canonical baseline, enumerate every semantic difference, and request approval before merging anything.
 
-No option is selected here. Milestone A remains blocked until the user explicitly approves A or directs recovery and reconciliation under B.
+The source-state decision gate is cleared. All separate licensing, upstream-import, external-dependency, execution, and phase-acceptance gates remain in force.

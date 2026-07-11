@@ -48,7 +48,7 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 - The 150-render matrix is deterministic across block sizes.
 - The measured sample-rate preparation defect is corrected and frozen before Milestone A: preparation recomputes cached phase increments without resetting phase. Initialization pitch error is now within 0.037 cents at every supported rate, with the expected 20 render changes explicitly recorded.
 - High-note alias, DC, discontinuity, timing, RSS, queue overflow, and render hashes are captured in `current-engine-audit.md` and the external baseline artifact directory.
-- Milestone A remains blocked until the user explicitly chooses the canonical source state described in `source-state-reconciliation.md`.
+- The user approved Option A on 2026-07-11: sample-rate freeze commit `e74d6d99` is the canonical source baseline. This clears only the source-state gate; all phase, licensing, and upstream-import gates remain independent.
 
 ## Explicit non-goals
 
