@@ -10,6 +10,7 @@
 #include "Effects/MasterLimiter.h"
 #include "Recording/RecordingCapture.h"
 #include "Realtime/RealtimeParameterQueue.h"
+#include "Realtime/RenderBudgets.h"
 #include "BeatSynthesiser.h"
 #include "Realtime/VoiceNoteAutomation.h"
 #include <array>
@@ -231,6 +232,11 @@ namespace beat
             int64_t routeFilterEffectSamples { 0 };
             int64_t routeNonlinearEffectSamples { 0 };
             int64_t routeDelayEffectSamples { 0 };
+            int64_t realtimeQueueAccepted { 0 };
+            int64_t realtimeQueueRejected { 0 };
+            int64_t blockEventOverflows { 0 };
+            int64_t deadlineOverruns { 0 };
+            int64_t callbackSafetyViolations { 0 };
         };
 
         bool pullRenderTimingSnapshot(RenderTimingSnapshot& out) const noexcept;
@@ -590,7 +596,7 @@ namespace beat
         int projectLatencySamples { 0 };
         juce::CriticalSection sampleLock;
         SpscRingBuffer<TransportCommand, 512> transportCommands;
-        RealtimeParameterQueue<1024> realtimeParameterChanges;
+        RealtimeParameterQueue<RenderBudgets::realtimeQueueEvents> realtimeParameterChanges;
 
         std::unique_ptr<juce::Synthesiser> createInstrumentSynth(const InstrumentDefinition& instrument);
         void rebuildSampleInstruments(const Project& project);
@@ -742,5 +748,10 @@ namespace beat
         std::atomic<int64_t> renderTimingRouteFilterEffectSamples { 0 };
         std::atomic<int64_t> renderTimingRouteNonlinearEffectSamples { 0 };
         std::atomic<int64_t> renderTimingRouteDelayEffectSamples { 0 };
+        std::atomic<int64_t> realtimeQueueAccepted { 0 };
+        std::atomic<int64_t> realtimeQueueRejected { 0 };
+        std::atomic<int64_t> blockEventOverflows { 0 };
+        std::atomic<int64_t> deadlineOverruns { 0 };
+        std::atomic<int64_t> callbackSafetyViolations { 0 };
     };
 }

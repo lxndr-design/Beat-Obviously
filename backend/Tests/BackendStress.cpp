@@ -10302,6 +10302,43 @@ namespace
         return true;
     }
 
+    bool stressAudioEngineDurableTelemetry()
+    {
+        beat::AudioEngine engine;
+        engine.prepareForOffline(48000.0, 64, 2);
+        engine.applyProject(makeTinyOfflineProject());
+        engine.requestPlay();
+
+        int accepted = 0;
+        int rejected = 0;
+        for (int i = 0; i < 1100; ++i)
+        {
+            if (engine.queueRealtimeParameterChange("offline-synth", "filter.cutoff", (float) (i % 100) / 100.0f, i % 64, 16))
+                ++accepted;
+            else
+                ++rejected;
+        }
+        if (accepted != (int) beat::RenderBudgets::realtimeQueueEvents || rejected <= 0)
+            return false;
+
+        renderEngineBlock(engine, 64);
+        beat::AudioEngine::RenderTimingSnapshot first;
+        if (!engine.pullRenderTimingSnapshot(first)
+            || first.realtimeQueueAccepted != accepted
+            || first.realtimeQueueRejected != rejected
+            || first.blockEventOverflows < 0
+            || first.deadlineOverruns < 0
+            || first.callbackSafetyViolations != 0)
+            return false;
+
+        renderEngineBlock(engine, 128);
+        beat::AudioEngine::RenderTimingSnapshot second;
+        return engine.pullRenderTimingSnapshot(second)
+            && second.realtimeQueueAccepted == accepted
+            && second.realtimeQueueRejected == rejected
+            && second.callbackSafetyViolations > first.callbackSafetyViolations;
+    }
+
     bool stressAudioEngineVariableBlockSizes()
     {
         beat::AudioEngine engine;
@@ -13898,6 +13935,11 @@ int main()
     if (!stressAudioEngineProjectApplyChurn())
     {
         std::cerr << "Audio engine project apply churn stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineDurableTelemetry())
+    {
+        std::cerr << "Audio engine durable telemetry stress failed\n";
         return 1;
     }
     if (!stressAudioEngineDenseAetherRoute())

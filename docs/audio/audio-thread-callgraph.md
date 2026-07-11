@@ -157,3 +157,20 @@ JUCE noteOn when all voices are active
 ```
 
 Selection scans the preallocated JUCE voice array and performs no sorting, temporary container growth, allocation, or lock beyond JUCE's existing synthesiser callback lock. Ordinary hard stops reset transition state and cannot affect a later unrelated note.
+
+## Telemetry and budget boundaries
+
+```text
+producer queue admission
+  accepted/rejected cumulative atomics
+audio callback
+  verify prepared buffer capacity before setSize
+  drain <= 256 realtime events
+  admit only within fixed block/route/note-off/voice/clip capacities
+  count every overflow/rejection
+  render and publish existing bounded work counters
+  compare total callback ticks with block deadline
+  publish cumulative safety/deadline/overflow counters
+```
+
+Overload does not trigger container growth or automatic quality reduction. Each admission limit has deterministic behavior, and normal in-budget render hashes are unchanged.

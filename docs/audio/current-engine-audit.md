@@ -146,3 +146,13 @@ A true victim selection explicitly arms a fixed `VoiceTransition`; ordinary hard
 Tests cover the complete victim comparator, real oldest and released-voice selection through a two-voice synthesiser, stable IDs, bounded transition length, exact first-sample continuity, completion, and actual one-voice stealing. Full native/non-native gates pass with only the TCC waiver, production Beat builds, and all 150 non-steal baseline WAVs remain byte-identical.
 
 This checkpoint addresses deterministic voice stealing and steal de-clicking. General route/effect/source/table replacement transitions and explicit reclamation remain open.
+
+## Milestone A4 durable telemetry and hard budgets — 2026-07-11
+
+`RenderTimingSnapshot` now publishes cumulative realtime-parameter queue accepted/rejected counts, block-event overflow, deadline overruns, and callback-capacity safety violations alongside existing timing/cache/work counters. Queue admission increments atomics at the producer boundary; block-capacity drops increment a separate counter; deadline comparison uses the active sample rate and block size; callback buffer growth risk is detected before `setSize()`.
+
+`RenderBudgets.h` centralizes fixed limits: 1024 queued realtime events, 256 drained per block, 2048 block parameter events, 1024 route events, 256 pending note-offs, 64 instrument routes, 192 sample voices, and 256 audio-clip voices. Callback admission no longer grows these containers. Excess sample/clip voices are rejected and counted; excess deferred note-offs are converted to an end-of-block note-off to avoid stuck notes; excess route/events are deterministically omitted and counted. In-budget behavior is unchanged.
+
+Native saturation coverage proves exact queue capacity, nonzero rejection, cumulative counters, zero prepared-capacity violations, and detection when a deliberately oversized test block would require callback growth. The complete native suite passes in 6.57 s with 185,991,168-byte maximum RSS. Full non-native verification passes, and all 150 in-budget WAVs remain byte-identical to the A1 freeze.
+
+The callback-safety counter detects known preallocation boundary violations; it is not yet a global malloc/lock/file-I/O interposer. That stronger detector and deferred shared-owner reclamation remain open.

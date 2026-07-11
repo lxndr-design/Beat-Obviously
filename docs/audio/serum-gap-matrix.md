@@ -11,8 +11,8 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 | Parameter-rate taxonomy | Implemented for the 24-entry realtime voice surface | A2 | Central constexpr metadata, stable-ID/range/rate/smoothing/eligibility tests pass; future parameters must enter through the same policy |
 | Unified de-click behavior | Deterministic steal bridge implemented; other transitions remain subsystem-specific | A2/A3 | Extend the bounded transition contract to route/effect/source/table replacement and ratify peak thresholds |
 | Deterministic voice allocation | Implemented for Beat instrument synthesis | A3 | Released/quietest/oldest/stable-ID ordering and actual steal tests pass; Node-map fallback uses the same selector with generic state |
-| Callback-safety proof | Partial architecture, no detector | A3 | Allocation/lock/file/deadline instrumentation |
-| Explicit hard budgets | Partial voice limits only | A3 | Oscillator, route, modulation and future-source budgets |
+| Callback-safety proof | Capacity/deadline/overflow detection implemented; global forbidden-operation interposer remains | A3/A4 | Add malloc/lock/file-I/O interception and deferred shared-owner reclamation |
+| Explicit hard budgets | Queue, event, route, pending-note, sample-voice and clip-voice admission budgets implemented | A3/A4 | Add explicit nonlinear/modulation work ceilings and future-source budgets as those engines are introduced |
 | Audible DC removal | Missing | A3 | Placement decision and frequency/DC regression |
 | Offline HQ mode | Missing | A4 | Quality enum, interpolation/oversampling policy, timing parity |
 | Two independent main oscillators | Substantially present | B1 | Normalize independence, routing, phase and stable targets |

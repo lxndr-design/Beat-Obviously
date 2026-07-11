@@ -53,3 +53,7 @@ The realtime parameter metadata/policy refactor is an independent consolidation 
 ## Milestone A3 provenance
 
 `BeatSynthesiser`, the deterministic victim comparator, voice allocation state, and bounded steal transition are independently implemented against JUCE's documented virtual synthesiser hooks and existing Beat voice code. JUCE source was inspected only to confirm local call ordering; JUCE was not modified and no new external code or dependency was imported.
+
+## Milestone A4 provenance
+
+The telemetry counters and render-budget policy consolidate and bound existing Beat queues, vectors, timing, and work counters. They are independently implemented, add no external dependency, and introduce no external-derived file.

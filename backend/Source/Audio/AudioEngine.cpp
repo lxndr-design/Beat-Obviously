@@ -530,8 +530,6 @@ namespace beat
             return tailSeconds;
         }
 
-        constexpr size_t maxActiveSampleVoices = 192;
-
         bool canLoadReaderIntoAudioBuffer(const juce::AudioFormatReader& reader) noexcept
         {
             return reader.numChannels > 0
@@ -544,13 +542,13 @@ namespace beat
     AudioEngine::AudioEngine()
     {
         formatManager.registerBasicFormats();
-        pendingNoteOffs.reserve(256);
-        pendingParameterAutomation.reserve(2048);
-        blockRealtimeParameterEvents.reserve(2048);
-        blockRouteParameterEvents.reserve(1024);
-        activeSampleVoices.reserve(256);
-        activeAudioClipVoices.reserve(256);
-        instrumentRenderStates.reserve(64);
+        pendingNoteOffs.reserve(RenderBudgets::pendingNoteOffs);
+        pendingParameterAutomation.reserve(RenderBudgets::blockParameterEvents);
+        blockRealtimeParameterEvents.reserve(RenderBudgets::blockParameterEvents);
+        blockRouteParameterEvents.reserve(RenderBudgets::blockRouteEvents);
+        activeSampleVoices.reserve(RenderBudgets::activeSampleVoices);
+        activeAudioClipVoices.reserve(RenderBudgets::activeAudioClipVoices);
+        instrumentRenderStates.reserve(RenderBudgets::instrumentRoutes);
         synth.addSound(new PassSound());
         for (int i = 0; i < 16; ++i)
         {
@@ -1168,11 +1166,13 @@ namespace beat
                                                    int sampleOffset,
                                                    int rampSamples) noexcept
     {
-        return realtimeParameterChanges.push(makeRealtimeParameterChange(instrumentId.toRawUTF8(),
-                                                                         parameterId.toRawUTF8(),
-                                                                         value,
-                                                                         sampleOffset,
-                                                                         rampSamples));
+        const bool accepted = realtimeParameterChanges.push(makeRealtimeParameterChange(instrumentId.toRawUTF8(),
+                                                                                         parameterId.toRawUTF8(),
+                                                                                         value,
+                                                                                         sampleOffset,
+                                                                                         rampSamples));
+        (accepted ? realtimeQueueAccepted : realtimeQueueRejected).fetch_add(1, std::memory_order_relaxed);
+        return accepted;
     }
 
     bool AudioEngine::pullMasterAnalyzerSnapshot(FftAnalyzer::Snapshot& out) const noexcept
@@ -1273,6 +1273,11 @@ namespace beat
         out.routeFilterEffectSamples = renderTimingRouteFilterEffectSamples.load(std::memory_order_relaxed);
         out.routeNonlinearEffectSamples = renderTimingRouteNonlinearEffectSamples.load(std::memory_order_relaxed);
         out.routeDelayEffectSamples = renderTimingRouteDelayEffectSamples.load(std::memory_order_relaxed);
+        out.realtimeQueueAccepted = realtimeQueueAccepted.load(std::memory_order_relaxed);
+        out.realtimeQueueRejected = realtimeQueueRejected.load(std::memory_order_relaxed);
+        out.blockEventOverflows = blockEventOverflows.load(std::memory_order_relaxed);
+        out.deadlineOverruns = deadlineOverruns.load(std::memory_order_relaxed);
+        out.callbackSafetyViolations = callbackSafetyViolations.load(std::memory_order_relaxed);
         return true;
     }
 
@@ -2080,7 +2085,7 @@ namespace beat
             }
         }
 
-        nextRenderStates.reserve(project.tracks.size());
+        nextRenderStates.reserve(std::min(project.tracks.size(), RenderBudgets::instrumentRoutes));
         std::vector<InstrumentRenderState> nextGroupStates;
         nextGroupStates.reserve(project.tracks.size());
         std::vector<InstrumentRenderState> nextReturnStates;
@@ -2159,7 +2164,10 @@ namespace beat
                 route.synth = createInstrumentSynth(*routeInstrument);
 
             prepareRouteEffects(route);
-            nextRenderStates.push_back(std::move(route));
+            if (nextRenderStates.size() < RenderBudgets::instrumentRoutes)
+                nextRenderStates.push_back(std::move(route));
+            else
+                blockEventOverflows.fetch_add(1, std::memory_order_relaxed);
         }
 
         for (const auto& bus : project.returnBuses)
@@ -2511,7 +2519,7 @@ namespace beat
     {
         RealtimeParameterChange change;
         int drained = 0;
-        while (drained < 256 && realtimeParameterChanges.pop(change))
+        while (drained < RenderBudgets::realtimeEventsDrainedPerBlock && realtimeParameterChanges.pop(change))
         {
             ++drained;
             if (change.sampleOffset >= numSamples)
@@ -2522,6 +2530,8 @@ namespace beat
             }
             if (blockRealtimeParameterEvents.size() < blockRealtimeParameterEvents.capacity())
                 blockRealtimeParameterEvents.push_back(change);
+            else
+                blockEventOverflows.fetch_add(1, std::memory_order_relaxed);
         }
     }
 
@@ -2536,6 +2546,8 @@ namespace beat
                 event.change.sampleOffset = juce::jlimit(0, numSamples - 1, event.samplesUntilEvent);
                 if (blockRealtimeParameterEvents.size() < blockRealtimeParameterEvents.capacity())
                     blockRealtimeParameterEvents.push_back(event.change);
+                else
+                    blockEventOverflows.fetch_add(1, std::memory_order_relaxed);
                 continue;
             }
 
@@ -3723,8 +3735,11 @@ namespace beat
         const auto msToSamples = [this](float ms) {
             return juce::jmax(0, (int) std::round((double) ms * sampleRate / 1000.0));
         };
-        if (activeSampleVoices.size() >= maxActiveSampleVoices)
-            activeSampleVoices.erase(activeSampleVoices.begin());
+        if (activeSampleVoices.size() >= RenderBudgets::activeSampleVoices)
+        {
+            blockEventOverflows.fetch_add(1, std::memory_order_relaxed);
+            return false;
+        }
         const int sourceSamples = sample->audio.getNumSamples();
         const int zoneStart = juce::jlimit(0, juce::jmax(0, sourceSamples - 2), zone.startSample);
         const int zoneEnd = zone.endSample > zoneStart + 1
@@ -3802,6 +3817,12 @@ namespace beat
         const int clipTotalSamples = juce::jmax(1, (int) std::round(ev.clipLengthBeats * outputSamplesPerBeat));
         const int elapsedSamples = juce::jlimit(0, clipTotalSamples, (int) std::round(ev.clipOffsetBeats * outputSamplesPerBeat));
         const auto fades = normalizedFadeSamples(ev.fadeInBeats, ev.fadeOutBeats, outputSamplesPerBeat, clipTotalSamples);
+
+        if (activeAudioClipVoices.size() >= RenderBudgets::activeAudioClipVoices)
+        {
+            blockEventOverflows.fetch_add(1, std::memory_order_relaxed);
+            return false;
+        }
 
         activeAudioClipVoices.push_back({
             ev.trackId,
@@ -4046,6 +4067,12 @@ namespace beat
         renderTimingRouteFilterEffectSamples.store(routeEffectWork.filterSamples, std::memory_order_relaxed);
         renderTimingRouteNonlinearEffectSamples.store(routeEffectWork.nonlinearSamples, std::memory_order_relaxed);
         renderTimingRouteDelayEffectSamples.store(routeEffectWork.delaySamples, std::memory_order_relaxed);
+        const auto ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
+        const auto deadlineTicks = sampleRate > 0.0
+            ? (int64_t) std::ceil((double) numSamples * ticksPerSecond / sampleRate)
+            : std::numeric_limits<int64_t>::max();
+        if (totalTicks > deadlineTicks)
+            deadlineOverruns.fetch_add(1, std::memory_order_relaxed);
         renderTimingSequence.fetch_add(1, std::memory_order_release);
     }
 
@@ -4075,7 +4102,11 @@ namespace beat
         auto markTicks = [] { return juce::Time::getHighResolutionTicks(); };
         auto ticksBetween = [](int64_t start, int64_t end) { return juce::jmax<int64_t>(0, end - start); };
 
-        mixBuf.setSize(juce::jmax(2, numOutChannels), numSamples, false, false, true);
+        const int requiredChannels = juce::jmax(2, numOutChannels);
+        if (mixBuf.getNumChannels() < requiredChannels || mixBuf.getNumSamples() < numSamples
+            || routeBuf.getNumChannels() < requiredChannels || routeBuf.getNumSamples() < numSamples)
+            callbackSafetyViolations.fetch_add(1, std::memory_order_relaxed);
+        mixBuf.setSize(requiredChannels, numSamples, false, false, true);
         routeBuf.setSize(juce::jmax(2, numOutChannels), numSamples, false, false, true);
         mixBuf.clear();
 
@@ -4126,8 +4157,13 @@ namespace beat
                 const auto pushParameterEvent = [&](const Sequencer::ParameterAutomationEvent& ev) {
                     if (isRouteAutomationTarget(ev.parameterId))
                     {
-                        if (ev.trackId.isEmpty() || blockRouteParameterEvents.size() >= blockRouteParameterEvents.capacity())
+                        if (ev.trackId.isEmpty())
                             return;
+                        if (blockRouteParameterEvents.size() >= blockRouteParameterEvents.capacity())
+                        {
+                            blockEventOverflows.fetch_add(1, std::memory_order_relaxed);
+                            return;
+                        }
                         blockRouteParameterEvents.push_back({
                             ev.trackId,
                             ev.parameterId,
@@ -4139,7 +4175,10 @@ namespace beat
                     }
 
                     if (blockRealtimeParameterEvents.size() >= blockRealtimeParameterEvents.capacity())
+                    {
+                        blockEventOverflows.fetch_add(1, std::memory_order_relaxed);
                         return;
+                    }
                     blockRealtimeParameterEvents.push_back(
                         makeRealtimeParameterChange(ev.instrumentId.toRawUTF8(),
                                                     ev.parameterId.toRawUTF8(),
@@ -4171,7 +4210,13 @@ namespace beat
                                }
                                else
                                {
-                                   pendingNoteOffs.push_back({ ev.trackId, ev.instrumentId, ev.pitch, offSample - numSamples });
+                                   if (pendingNoteOffs.size() < RenderBudgets::pendingNoteOffs)
+                                       pendingNoteOffs.push_back({ ev.trackId, ev.instrumentId, ev.pitch, offSample - numSamples });
+                                   else
+                                   {
+                                       blockEventOverflows.fetch_add(1, std::memory_order_relaxed);
+                                       targetMidi->addEvent(juce::MidiMessage::noteOff(1, ev.pitch), numSamples - 1);
+                                   }
                                }
 
                                if (onSegmentTriggered) onSegmentTriggered(ev);
