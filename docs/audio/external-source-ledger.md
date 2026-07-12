@@ -85,3 +85,7 @@ The per-oscillator unison parameter contract, legacy shared-value migration, fro
 ## Milestone B2 provenance
 
 The four oscillator-specific unison modulation targets, additive legacy compatibility, activity planning, preview/native routing, and tests are independently implemented extensions of Beat's modulation matrix. No upstream source was consulted, executed, adapted, or imported, and no dependency or licensing state changed.
+
+## Milestone B3 provenance
+
+The semitone, harmonic, ratio, and equal-division step tuning contracts, parameter schema, cached-rate calculation, preview support, and tests are independently implemented from elementary frequency-ratio mathematics. No upstream source or dependency was consulted, executed, adapted, or imported.

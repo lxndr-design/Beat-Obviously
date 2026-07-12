@@ -247,6 +247,13 @@ namespace beat
                 -100.0f,
                 100.0f,
                 (float) synthNumberParam(params, prefix + "fine", fallback.fineCents));
+            const auto tuningMode = synthStringParam(params, prefix + "tuning.mode", "semitone");
+            fallback.tuningMode = tuningMode == "harmonic" ? 1 : tuningMode == "ratio" ? 2 : tuningMode == "step" ? 3 : 0;
+            fallback.harmonic = juce::jlimit(1, 64, (int) std::round(synthNumberParam(params, prefix + "tuning.harmonic", fallback.harmonic)));
+            fallback.ratioNumerator = juce::jlimit(0.001f, 64.0f, (float) synthNumberParam(params, prefix + "tuning.numerator", fallback.ratioNumerator));
+            fallback.ratioDenominator = juce::jlimit(0.001f, 64.0f, (float) synthNumberParam(params, prefix + "tuning.denominator", fallback.ratioDenominator));
+            fallback.tuningStep = juce::jlimit(-96, 96, (int) std::round(synthNumberParam(params, prefix + "tuning.step", fallback.tuningStep)));
+            fallback.tuningDivisions = juce::jlimit(1, 96, (int) std::round(synthNumberParam(params, prefix + "tuning.divisions", fallback.tuningDivisions)));
             fallback.phase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "phase", fallback.phase));
             fallback.randomPhase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "randomPhase", fallback.randomPhase));
             fallback.wavetable = synthWavetableConfig(params, modulation, metadata, customWavetables, oscillator, fallback.wavetable);

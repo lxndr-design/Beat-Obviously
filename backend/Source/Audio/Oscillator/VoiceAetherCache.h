@@ -2,6 +2,7 @@
 
 #include "VoiceMath.h"
 
+#include <algorithm>
 #include <cmath>
 #include <utility>
 
@@ -34,13 +35,29 @@ namespace beat::VoiceAetherCache
     template <typename Params>
     inline PitchRates pitchRatesFor(const Params& params) noexcept
     {
+        const auto oscillatorRate = [](const auto& oscillator) noexcept {
+            const double octaveRate = std::exp2((double) oscillator.octave);
+            const double fineRate = std::exp2((double) oscillator.fineCents / 1200.0);
+            switch (oscillator.tuningMode)
+            {
+                case 1:
+                    return octaveRate * (double) std::max(1, oscillator.harmonic) * fineRate;
+                case 2:
+                    return octaveRate
+                        * ((double) std::max(0.001f, oscillator.ratioNumerator)
+                           / (double) std::max(0.001f, oscillator.ratioDenominator))
+                        * fineRate;
+                case 3:
+                    return octaveRate
+                        * std::exp2((double) oscillator.tuningStep / (double) std::max(1, oscillator.tuningDivisions))
+                        * fineRate;
+                default:
+                    return VoiceMath::pitchRate(oscillator.octave, oscillator.semitone, oscillator.fineCents);
+            }
+        };
         return {
-            VoiceMath::pitchRate(params.aetherOscA.octave,
-                                 params.aetherOscA.semitone,
-                                 params.aetherOscA.fineCents),
-            VoiceMath::pitchRate(params.aetherOscB.octave,
-                                 params.aetherOscB.semitone,
-                                 params.aetherOscB.fineCents),
+            oscillatorRate(params.aetherOscA),
+            oscillatorRate(params.aetherOscB),
             std::exp2((double) params.aetherSub.octave),
         };
     }

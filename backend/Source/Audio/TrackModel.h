@@ -161,6 +161,12 @@ namespace beat
             int octave { 0 };
             int semitone { 0 };
             float fineCents { 0.0f };
+            int tuningMode { 0 };
+            int harmonic { 1 };
+            float ratioNumerator { 1.0f };
+            float ratioDenominator { 1.0f };
+            int tuningStep { 0 };
+            int tuningDivisions { 12 };
             float phase { 0.0f };
             float randomPhase { 0.0f };
             WavetableConfig wavetable;

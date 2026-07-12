@@ -730,15 +730,31 @@ function renderedInstrumentBufferKey(
   });
 }
 
-function oscillatorRate(octave: number, semitone: number, fineCents: number): number {
+function oscillatorRate(
+  octave: number,
+  semitone: number,
+  fineCents: number,
+  tuningMode: "semitone" | "harmonic" | "ratio" | "step" = "semitone",
+  harmonic = 1,
+  ratioNumerator = 1,
+  ratioDenominator = 1,
+  tuningStep = 0,
+  tuningDivisions = 12,
+): number {
   const safeOctave = Math.round(clamp(octave, -8, 8));
   const safeSemitone = Math.round(clamp(semitone, -48, 48));
   const safeFine = quantizeKeyNumber(clamp(fineCents, -1200, 1200), 0.01);
-  const key = `${safeOctave}|${safeSemitone}|${safeFine}`;
+  const key = `${safeOctave}|${safeSemitone}|${safeFine}|${tuningMode}|${harmonic}|${ratioNumerator}|${ratioDenominator}|${tuningStep}|${tuningDivisions}`;
   const cached = oscillatorRateCache.get(key);
   if (cached != null) return cached;
 
-  const value = Math.pow(2, safeOctave + safeSemitone / 12 + safeFine / 1200);
+  const value = tuningMode === "semitone"
+    ? Math.pow(2, safeOctave + safeSemitone / 12 + safeFine / 1200)
+    : Math.pow(2, safeOctave + safeFine / 1200) * (tuningMode === "harmonic"
+    ? Math.max(1, Math.round(harmonic))
+    : tuningMode === "ratio"
+    ? Math.max(0.001, ratioNumerator) / Math.max(0.001, ratioDenominator)
+    : Math.pow(2, Math.round(tuningStep) / Math.max(1, Math.round(tuningDivisions))));
   oscillatorRateCache.set(key, value);
   trimCache(oscillatorRateCache, MAX_OSCILLATOR_RATE_ENTRIES);
   return value;
@@ -1024,7 +1040,8 @@ function aetherStackSample(
     const level = clamp01(osc.level + modulationTargetOffset(modulation, `osc.${key}.level`));
     if (!osc.enabled || level <= 0) return;
     const fineOffset = modulationTargetOffset(modulation, `osc.${key}.fine`);
-    const rate = oscillatorRate(osc.octave, osc.semitone, osc.fineCents + fineOffset);
+    const rate = oscillatorRate(osc.octave, osc.semitone, osc.fineCents + fineOffset,
+      osc.tuningMode, osc.harmonic, osc.ratioNumerator, osc.ratioDenominator, osc.tuningStep, osc.tuningDivisions);
     const waveform = osc.waveform ?? "wavetable";
     const legacyPositionOffset = key === "a" ? modulation.positionOffset : 0;
     const wavetableOffset = legacyPositionOffset + modulationTargetOffset(modulation, `osc.${key}.position`);
@@ -1105,7 +1122,8 @@ function aetherStackStereoSample(
     const level = clamp01(osc.level + modulationTargetOffset(modulation, `osc.${key}.level`));
     if (!osc.enabled || level <= 0) return;
     const fineOffset = modulationTargetOffset(modulation, `osc.${key}.fine`);
-    const rate = oscillatorRate(osc.octave, osc.semitone, osc.fineCents + fineOffset);
+    const rate = oscillatorRate(osc.octave, osc.semitone, osc.fineCents + fineOffset,
+      osc.tuningMode, osc.harmonic, osc.ratioNumerator, osc.ratioDenominator, osc.tuningStep, osc.tuningDivisions);
     const waveform = osc.waveform ?? "wavetable";
     const legacyPositionOffset = key === "a" ? modulation.positionOffset : 0;
     const wavetableOffset = legacyPositionOffset + modulationTargetOffset(modulation, `osc.${key}.position`);

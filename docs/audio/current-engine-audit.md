@@ -224,3 +224,13 @@ The targets flow through frontend normalization/labels/preview, native patch con
 Full native and non-native suites pass with only the TCC waiver, production Beat builds, and all 150 frozen WAVs remain byte-identical. B2 baseline JSON SHA-256 is `8a64d2389a2d4578e2cf6455d4a99f4b63ae647831b108791825f6c7e611ecce`.
 
 Shared legacy targets remain supported and additive. Per-source filter/direct/FX routing and audio-rate oscillator cross-modulation remain open.
+
+## Milestone B3 oscillator tuning modes — 2026-07-11
+
+Oscillators A and B now independently select one of four explicit tuning contracts. `semitone` preserves the existing octave + semitone + fine-cent calculation bit-for-bit. `harmonic` multiplies the octave base by an integer harmonic 1–64; `ratio` applies a bounded positive numerator/denominator; and `step` applies an integer step in an equal division of the octave (1–96 divisions). Fine cents remain available in every mode and octave remains an independent coarse multiplier.
+
+The persisted parameters are namespaced per oscillator under `osc.[a|b].tuning.*`. Defaults are semitone mode, harmonic 1, ratio 1/1, and step 0 of 12, so old documents and automation retain their prior result. Native and frontend conversion preserve all mode fields. Focused native tests verify semitone, harmonic, 3:2 ratio, and 7-of-19 step mathematics; frontend tests verify harmonic, ratio, and step round trips into preview state.
+
+No lookup table, allocation, lazy initialization, or container mutation was added to the callback. Tuning selection is a cached setup-time pitch-rate calculation and remains compatible with the A9 realtime-safety gate.
+
+Full native and non-native suites pass with only the existing TCC waiver, production Beat builds, and the 150 frozen WAVs are byte-identical to B2. B3 baseline JSON SHA-256 is `650cef36a89d84e52b360ecf78003ca910c595554ef0794b46766ee242b051bf`.

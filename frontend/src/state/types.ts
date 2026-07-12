@@ -424,6 +424,12 @@ export interface AetherOscillatorConfig {
   octave: number;
   semitone: number;
   fineCents: number;
+  tuningMode?: "semitone" | "harmonic" | "ratio" | "step";
+  harmonic?: number;
+  ratioNumerator?: number;
+  ratioDenominator?: number;
+  tuningStep?: number;
+  tuningDivisions?: number;
   phase: number;
   randomPhase: number;
   wavetable: WavetableConfig;

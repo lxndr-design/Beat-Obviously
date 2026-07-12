@@ -282,3 +282,13 @@ audio callback
   B unison offsets = shared + B-only
   existing bounded A/B unison plans render independently
 ```
+
+```text
+voice setup / parameter refresh
+  A tuning mode + fields -> cachedPitchRates.oscA
+  B tuning mode + fields -> cachedPitchRates.oscB
+audio callback
+  base note frequency * cached oscillator rate
+  optional existing fine modulation
+  unchanged oscillator phase advance/render path
+```

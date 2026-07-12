@@ -695,11 +695,16 @@ namespace
         params.aetherOscA.pan = -0.4f;
         params.aetherOscA.waveform = 0;
         params.aetherOscA.fineCents = 3.0f;
+        params.aetherOscA.tuningMode = 1;
+        params.aetherOscA.harmonic = 3;
         params.aetherOscB.enabled = true;
         params.aetherOscB.level = 0.38f;
         params.aetherOscB.pan = 0.55f;
         params.aetherOscB.waveform = 1;
         params.aetherOscB.semitone = 7;
+        params.aetherOscB.tuningMode = 2;
+        params.aetherOscB.ratioNumerator = 3.0f;
+        params.aetherOscB.ratioDenominator = 2.0f;
         params.aetherSub.enabled = true;
         params.aetherSub.level = 0.2f;
         params.aetherSub.octave = -1;
@@ -727,6 +732,18 @@ namespace
         juce::uint32 noiseState = 0x12345678u;
         const auto panGains = beat::VoiceAetherCache::panGainsFor(params);
         const auto pitchRates = beat::VoiceAetherCache::pitchRatesFor(params);
+        if (!near((float) pitchRates.oscA, 3.0f * std::exp2(3.0f / 1200.0f), 0.0001f)
+            || !near((float) pitchRates.oscB, 1.5f, 0.0001f))
+            return false;
+        auto stepParams = params;
+        stepParams.aetherOscA.tuningMode = 3;
+        stepParams.aetherOscA.tuningStep = 7;
+        stepParams.aetherOscA.tuningDivisions = 19;
+        stepParams.aetherOscB.tuningMode = 0;
+        const auto stepRates = beat::VoiceAetherCache::pitchRatesFor(stepParams);
+        if (!near((float) stepRates.oscA, std::exp2(7.0f / 19.0f) * std::exp2(3.0f / 1200.0f), 0.0001f)
+            || !near((float) stepRates.oscB, std::exp2(7.0f / 12.0f), 0.0001f))
+            return false;
         const auto targets = beat::DynamicModulation::targetActivityFlags(params.dynamicModulation);
         const auto result = beat::AetherTableStackRenderer::render(
             params,
@@ -11821,6 +11838,8 @@ namespace
             "osc.a.octave": -1,
             "osc.a.semitone": 12,
             "osc.a.fine": 7,
+            "osc.a.tuning.mode": "harmonic",
+            "osc.a.tuning.harmonic": 5,
             "osc.a.level": 0.7,
             "osc.a.pan": -0.4,
             "osc.a.phase": 0.33,
@@ -11836,6 +11855,9 @@ namespace
             "osc.b.octave": 1,
             "osc.b.semitone": 7,
             "osc.b.fine": -5,
+            "osc.b.tuning.mode": "ratio",
+            "osc.b.tuning.numerator": 3,
+            "osc.b.tuning.denominator": 2,
             "osc.b.level": 0.3,
             "osc.b.pan": 0.2,
             "osc.b.phase": 0.66,
@@ -11957,6 +11979,8 @@ namespace
             return false;
         if (!near(instrument.aether.oscA.phase, 0.33f) || !near(instrument.aether.oscA.randomPhase, 0.2f))
             return false;
+        if (instrument.aether.oscA.tuningMode != 1 || instrument.aether.oscA.harmonic != 5)
+            return false;
         if (!instrument.aether.oscB.enabled || instrument.aether.oscB.wavetable.bank != 3)
             return false;
         if (!near(instrument.aether.oscB.wavetable.warp, 0.36f) || instrument.aether.oscB.wavetable.warpMode != 2)
@@ -11972,6 +11996,10 @@ namespace
             || !near(instrument.aether.oscB.wavetable.blend, 0.83f))
             return false;
         if (instrument.aether.oscB.octave != 1 || instrument.aether.oscB.semitone != 7 || !near(instrument.aether.oscB.fineCents, -5.0f))
+            return false;
+        if (instrument.aether.oscB.tuningMode != 2
+            || !near(instrument.aether.oscB.ratioNumerator, 3.0f)
+            || !near(instrument.aether.oscB.ratioDenominator, 2.0f))
             return false;
         if (instrument.filterType != 2 || instrument.cutoff01 < 0.55f || instrument.cutoff01 > 0.7f)
             return false;

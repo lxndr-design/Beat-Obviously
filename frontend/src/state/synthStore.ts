@@ -79,9 +79,18 @@ export type OscillatorUnisonParameterId =
   | `osc.${OscillatorKey}.unison.detune`
   | `osc.${OscillatorKey}.unison.spread`;
 
+export type OscillatorTuningParameterId =
+  | `osc.${OscillatorKey}.tuning.mode`
+  | `osc.${OscillatorKey}.tuning.harmonic`
+  | `osc.${OscillatorKey}.tuning.numerator`
+  | `osc.${OscillatorKey}.tuning.denominator`
+  | `osc.${OscillatorKey}.tuning.step`
+  | `osc.${OscillatorKey}.tuning.divisions`;
+
 export type SynthParameterId =
   | `osc.${OscillatorKey}.${OscillatorParamSuffix}`
   | OscillatorUnisonParameterId
+  | OscillatorTuningParameterId
   | "unison.enabled"
   | "unison.voices"
   | "unison.detune"
@@ -949,6 +958,12 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "osc.a.unison.voices": 1,
   "osc.a.unison.detune": 0.12,
   "osc.a.unison.spread": 0.5,
+  "osc.a.tuning.mode": "semitone",
+  "osc.a.tuning.harmonic": 1,
+  "osc.a.tuning.numerator": 1,
+  "osc.a.tuning.denominator": 1,
+  "osc.a.tuning.step": 0,
+  "osc.a.tuning.divisions": 12,
   "osc.b.enabled": false,
   "osc.b.wavetable": "basic.square",
   "osc.b.position": 0,
@@ -964,6 +979,12 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "osc.b.unison.voices": 1,
   "osc.b.unison.detune": 0.12,
   "osc.b.unison.spread": 0.5,
+  "osc.b.tuning.mode": "semitone",
+  "osc.b.tuning.harmonic": 1,
+  "osc.b.tuning.numerator": 1,
+  "osc.b.tuning.denominator": 1,
+  "osc.b.tuning.step": 0,
+  "osc.b.tuning.divisions": 12,
   "unison.enabled": false,
   "unison.voices": 1,
   "unison.detune": 0.12,
@@ -1046,6 +1067,12 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "osc.a.unison.voices": "OSC A Voices",
   "osc.a.unison.detune": "OSC A Detune",
   "osc.a.unison.spread": "OSC A Spread",
+  "osc.a.tuning.mode": "OSC A Tuning",
+  "osc.a.tuning.harmonic": "OSC A Harmonic",
+  "osc.a.tuning.numerator": "OSC A Ratio Num",
+  "osc.a.tuning.denominator": "OSC A Ratio Den",
+  "osc.a.tuning.step": "OSC A Step",
+  "osc.a.tuning.divisions": "OSC A Divisions",
   "osc.b.enabled": "OSC B Enabled",
   "osc.b.wavetable": "OSC B Table",
   "osc.b.position": "OSC B Pos",
@@ -1061,6 +1088,12 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "osc.b.unison.voices": "OSC B Voices",
   "osc.b.unison.detune": "OSC B Detune",
   "osc.b.unison.spread": "OSC B Spread",
+  "osc.b.tuning.mode": "OSC B Tuning",
+  "osc.b.tuning.harmonic": "OSC B Harmonic",
+  "osc.b.tuning.numerator": "OSC B Ratio Num",
+  "osc.b.tuning.denominator": "OSC B Ratio Den",
+  "osc.b.tuning.step": "OSC B Step",
+  "osc.b.tuning.divisions": "OSC B Divisions",
   "unison.enabled": "Unison Enabled",
   "unison.voices": "Unison Voices",
   "unison.detune": "Unison Detune",
@@ -2176,6 +2209,10 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (id.includes(".octave")) return Math.max(-4, Math.min(4, Math.round(value)));
   if (id.includes(".semitone")) return Math.max(-12, Math.min(12, Math.round(value)));
   if (id.includes(".fine")) return Math.max(-100, Math.min(100, value));
+  if (id.endsWith(".tuning.harmonic")) return Math.max(1, Math.min(64, Math.round(value)));
+  if (id.endsWith(".tuning.numerator") || id.endsWith(".tuning.denominator")) return Math.max(0.001, Math.min(64, value));
+  if (id.endsWith(".tuning.step")) return Math.max(-96, Math.min(96, Math.round(value)));
+  if (id.endsWith(".tuning.divisions")) return Math.max(1, Math.min(96, Math.round(value)));
   if (id === "unison.voices") return Math.max(1, Math.min(16, Math.round(value)));
   if (id.endsWith(".unison.voices")) return Math.max(1, Math.min(8, Math.round(value)));
   if (id === "maxVoices") return Math.max(1, Math.min(32, Math.round(value)));
@@ -4162,6 +4199,12 @@ function oscillatorFromDraft(draft: SynthDraftPatch, oscillator: OscillatorKey, 
     octave: getNumberParam(draft, `osc.${oscillator}.octave` as SynthParameterId),
     semitone: getNumberParam(draft, `osc.${oscillator}.semitone` as SynthParameterId),
     fineCents: clamp(getNumberParam(draft, `${prefix}.fine` as SynthParameterId), -100, 100),
+    tuningMode: getStringParam(draft, `${prefix}.tuning.mode` as OscillatorTuningParameterId) as "semitone" | "harmonic" | "ratio" | "step",
+    harmonic: getNumberParam(draft, `${prefix}.tuning.harmonic` as OscillatorTuningParameterId),
+    ratioNumerator: getNumberParam(draft, `${prefix}.tuning.numerator` as OscillatorTuningParameterId),
+    ratioDenominator: getNumberParam(draft, `${prefix}.tuning.denominator` as OscillatorTuningParameterId),
+    tuningStep: getNumberParam(draft, `${prefix}.tuning.step` as OscillatorTuningParameterId),
+    tuningDivisions: getNumberParam(draft, `${prefix}.tuning.divisions` as OscillatorTuningParameterId),
     phase: getNumberParam(draft, `${prefix}.phase` as SynthParameterId),
     randomPhase: getNumberParam(draft, `${prefix}.randomPhase` as SynthParameterId),
     wavetable,
@@ -4175,6 +4218,12 @@ function applyOscillatorToDraft(draft: SynthDraftPatch, oscillator: OscillatorKe
   draft.parameters[`osc.${oscillator}.octave` as SynthParameterId] = source.octave;
   draft.parameters[`osc.${oscillator}.semitone` as SynthParameterId] = source.semitone;
   draft.parameters[`osc.${oscillator}.fine` as SynthParameterId] = source.fineCents;
+  draft.parameters[`osc.${oscillator}.tuning.mode` as OscillatorTuningParameterId] = source.tuningMode ?? "semitone";
+  draft.parameters[`osc.${oscillator}.tuning.harmonic` as OscillatorTuningParameterId] = source.harmonic ?? 1;
+  draft.parameters[`osc.${oscillator}.tuning.numerator` as OscillatorTuningParameterId] = source.ratioNumerator ?? 1;
+  draft.parameters[`osc.${oscillator}.tuning.denominator` as OscillatorTuningParameterId] = source.ratioDenominator ?? 1;
+  draft.parameters[`osc.${oscillator}.tuning.step` as OscillatorTuningParameterId] = source.tuningStep ?? 0;
+  draft.parameters[`osc.${oscillator}.tuning.divisions` as OscillatorTuningParameterId] = source.tuningDivisions ?? 12;
   draft.parameters[`osc.${oscillator}.phase` as SynthParameterId] = source.phase ?? 0;
   draft.parameters[`osc.${oscillator}.randomPhase` as SynthParameterId] = source.randomPhase ?? 0.25;
   applyWavetableToDraft(draft, oscillator, source.wavetable, oscillator === "a");
