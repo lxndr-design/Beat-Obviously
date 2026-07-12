@@ -801,7 +801,8 @@ function formatChannelCount(channels: string[] | undefined, direction: "input" |
       : count === 1
         ? "output channel"
         : "output channels";
-  return `${count} ${noun}`;
+  const names = (channels ?? []).map((name, index) => name.trim() || `Channel ${index + 1}`);
+  return `${count} ${noun}: ${names.join(", ")}`;
 }
 
 function formatCheckpointStatus(
