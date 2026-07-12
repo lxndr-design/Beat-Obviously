@@ -91,6 +91,7 @@ export type SynthParameterId =
   | `osc.${OscillatorKey}.${OscillatorParamSuffix}`
   | OscillatorUnisonParameterId
   | OscillatorTuningParameterId
+  | `osc.${OscillatorKey}.phaseMode`
   | "unison.enabled"
   | "unison.voices"
   | "unison.detune"
@@ -964,6 +965,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "osc.a.tuning.denominator": 1,
   "osc.a.tuning.step": 0,
   "osc.a.tuning.divisions": 12,
+  "osc.a.phaseMode": "retrigger",
   "osc.b.enabled": false,
   "osc.b.wavetable": "basic.square",
   "osc.b.position": 0,
@@ -985,6 +987,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "osc.b.tuning.denominator": 1,
   "osc.b.tuning.step": 0,
   "osc.b.tuning.divisions": 12,
+  "osc.b.phaseMode": "retrigger",
   "unison.enabled": false,
   "unison.voices": 1,
   "unison.detune": 0.12,
@@ -1073,6 +1076,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "osc.a.tuning.denominator": "OSC A Ratio Den",
   "osc.a.tuning.step": "OSC A Step",
   "osc.a.tuning.divisions": "OSC A Divisions",
+  "osc.a.phaseMode": "OSC A Phase Mode",
   "osc.b.enabled": "OSC B Enabled",
   "osc.b.wavetable": "OSC B Table",
   "osc.b.position": "OSC B Pos",
@@ -1094,6 +1098,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "osc.b.tuning.denominator": "OSC B Ratio Den",
   "osc.b.tuning.step": "OSC B Step",
   "osc.b.tuning.divisions": "OSC B Divisions",
+  "osc.b.phaseMode": "OSC B Phase Mode",
   "unison.enabled": "Unison Enabled",
   "unison.voices": "Unison Voices",
   "unison.detune": "Unison Detune",
@@ -4205,6 +4210,7 @@ function oscillatorFromDraft(draft: SynthDraftPatch, oscillator: OscillatorKey, 
     ratioDenominator: getNumberParam(draft, `${prefix}.tuning.denominator` as OscillatorTuningParameterId),
     tuningStep: getNumberParam(draft, `${prefix}.tuning.step` as OscillatorTuningParameterId),
     tuningDivisions: getNumberParam(draft, `${prefix}.tuning.divisions` as OscillatorTuningParameterId),
+    phaseMode: getStringParam(draft, `${prefix}.phaseMode` as SynthParameterId) === "memory" ? "memory" as const : "retrigger" as const,
     phase: getNumberParam(draft, `${prefix}.phase` as SynthParameterId),
     randomPhase: getNumberParam(draft, `${prefix}.randomPhase` as SynthParameterId),
     wavetable,
@@ -4224,6 +4230,7 @@ function applyOscillatorToDraft(draft: SynthDraftPatch, oscillator: OscillatorKe
   draft.parameters[`osc.${oscillator}.tuning.denominator` as OscillatorTuningParameterId] = source.ratioDenominator ?? 1;
   draft.parameters[`osc.${oscillator}.tuning.step` as OscillatorTuningParameterId] = source.tuningStep ?? 0;
   draft.parameters[`osc.${oscillator}.tuning.divisions` as OscillatorTuningParameterId] = source.tuningDivisions ?? 12;
+  draft.parameters[`osc.${oscillator}.phaseMode` as SynthParameterId] = source.phaseMode ?? "retrigger";
   draft.parameters[`osc.${oscillator}.phase` as SynthParameterId] = source.phase ?? 0;
   draft.parameters[`osc.${oscillator}.randomPhase` as SynthParameterId] = source.randomPhase ?? 0.25;
   applyWavetableToDraft(draft, oscillator, source.wavetable, oscillator === "a");

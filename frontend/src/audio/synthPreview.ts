@@ -1627,6 +1627,7 @@ function whiteNoiseSample(index: number): number {
 }
 
 function oscillatorPhaseOffset(osc: NonNullable<Instrument["aether"]>["oscA"], key: string): number {
+  if (osc.phaseMode === "memory") return 0;
   const basePhase = clamp01(osc.phase ?? 0);
   const randomDepth = clamp01(osc.randomPhase ?? 0);
   if (randomDepth <= 0) return basePhase;

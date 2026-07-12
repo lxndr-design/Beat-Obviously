@@ -758,6 +758,8 @@ namespace
             220.0,
             48000.0,
             0.125,
+            0.125,
+            0.125,
             0.0,
             0.25,
             0.5f,
@@ -802,6 +804,8 @@ namespace
             220.0,
             220.0,
             48000.0,
+            0.25,
+            0.25,
             0.25,
             0.0,
             0.0,
@@ -11840,6 +11844,7 @@ namespace
             "osc.a.fine": 7,
             "osc.a.tuning.mode": "harmonic",
             "osc.a.tuning.harmonic": 5,
+            "osc.a.phaseMode": "memory",
             "osc.a.level": 0.7,
             "osc.a.pan": -0.4,
             "osc.a.phase": 0.33,
@@ -11980,6 +11985,8 @@ namespace
         if (!near(instrument.aether.oscA.phase, 0.33f) || !near(instrument.aether.oscA.randomPhase, 0.2f))
             return false;
         if (instrument.aether.oscA.tuningMode != 1 || instrument.aether.oscA.harmonic != 5)
+            return false;
+        if (instrument.aether.oscA.phaseMode != 1)
             return false;
         if (!instrument.aether.oscB.enabled || instrument.aether.oscB.wavetable.bank != 3)
             return false;
@@ -12760,6 +12767,61 @@ namespace
         }
 
         return leftEnergy > rightEnergy * 20.0;
+    }
+
+    bool stressInstrumentVoicePhaseMemory()
+    {
+        auto baseParams = beat::InstrumentVoice::Params {};
+        baseParams.hasAether = true;
+        baseParams.aetherOscA.enabled = true;
+        baseParams.aetherOscA.level = 1.0f;
+        baseParams.aetherOscA.waveform = 0;
+        baseParams.aetherOscA.phaseMode = 1;
+        baseParams.aetherOscB.enabled = false;
+        baseParams.aetherSub.enabled = false;
+        baseParams.aetherNoise.enabled = false;
+        baseParams.cutoff01 = 1.0f;
+        baseParams.resonance01 = 0.0f;
+        baseParams.drive01 = 0.0f;
+        baseParams.attackMs = 0.0f;
+        baseParams.decayMs = 0.0f;
+        baseParams.sustain = 1.0f;
+
+        beat::InstrumentVoice basicVoice;
+        basicVoice.prepare(48000.0, 128);
+        basicVoice.setParams(baseParams);
+        basicVoice.startNote(69, 1.0f, nullptr, 8192);
+        juce::AudioBuffer<float> buffer(2, 37);
+        buffer.clear();
+        basicVoice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+        const double rememberedBasic = basicVoice.phaseMemoryBaseAForTest();
+        if (!(rememberedBasic > 0.0 && rememberedBasic < 1.0))
+            return false;
+        basicVoice.stopNote(0.0f, false);
+        basicVoice.startNote(69, 1.0f, nullptr, 8192);
+        if (std::abs(basicVoice.phaseMemoryBaseAForTest() - rememberedBasic) > 1.0e-12)
+            return false;
+        basicVoice.stopNote(0.0f, false);
+        baseParams.aetherOscA.phaseMode = 0;
+        basicVoice.setParams(baseParams);
+        basicVoice.startNote(69, 1.0f, nullptr, 8192);
+        if (std::abs(basicVoice.phaseMemoryBaseAForTest()) > 1.0e-12)
+            return false;
+
+        auto wavetableParams = baseParams;
+        wavetableParams.aetherOscA.waveform = 5;
+        wavetableParams.aetherOscA.phaseMode = 1;
+        wavetableParams.aetherOscA.wavetable.unison = 1;
+        beat::InstrumentVoice wavetableVoice;
+        wavetableVoice.prepare(48000.0, 128);
+        wavetableVoice.setParams(wavetableParams);
+        wavetableVoice.startNote(69, 1.0f, nullptr, 8192);
+        buffer.clear();
+        wavetableVoice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+        const double rememberedWavetable = wavetableVoice.wavetablePhaseAForTest();
+        wavetableVoice.stopNote(0.0f, false);
+        wavetableVoice.startNote(69, 1.0f, nullptr, 8192);
+        return std::abs(wavetableVoice.wavetablePhaseAForTest() - rememberedWavetable) <= 1.0e-12;
     }
 
     bool stressInstrumentVoiceBandlimitedBasicOscillators()
@@ -13713,6 +13775,11 @@ int main()
     if (!stressInstrumentVoiceWavetablePath())
     {
         std::cerr << "Instrument voice wavetable stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoicePhaseMemory())
+    {
+        std::cerr << "Instrument voice phase-memory stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceBandlimitedBasicOscillators())

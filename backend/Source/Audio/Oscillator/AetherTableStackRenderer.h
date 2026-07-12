@@ -43,6 +43,8 @@ namespace beat::AetherTableStackRenderer
         double baseFrequencyHz,
         double sampleRate,
         double phase,
+        double oscABasePhase,
+        double oscBBasePhase,
         double oscAPhaseOffset,
         double oscBPhaseOffset,
         float rawLfo,
@@ -93,6 +95,7 @@ namespace beat::AetherTableStackRenderer
             bool unisonDetuneIsDynamic,
             bool unisonSpreadIsDynamic,
             double staticRate,
+            double basePhase,
             double phaseOffset,
             int64_t& componentSampleCounter)
         {
@@ -151,7 +154,7 @@ namespace beat::AetherTableStackRenderer
             }
             else
             {
-                value = BasicOscillator::sample(osc.waveform, phase * rate + phaseOffset, (frequencyHz * rate) / sampleRate);
+                value = BasicOscillator::sample(osc.waveform, basePhase * rate + phaseOffset, (frequencyHz * rate) / sampleRate);
                 ++result.work.oscillatorSamples;
                 ++componentSampleCounter;
             }
@@ -176,6 +179,7 @@ namespace beat::AetherTableStackRenderer
             targets.oscAUnisonDetune,
             targets.oscAUnisonSpread,
             pitchRates.oscA,
+            oscABasePhase,
             oscAPhaseOffset,
             result.work.aetherOscASamples);
         renderOsc(
@@ -196,6 +200,7 @@ namespace beat::AetherTableStackRenderer
             targets.oscBUnisonDetune,
             targets.oscBUnisonSpread,
             pitchRates.oscB,
+            oscBBasePhase,
             oscBPhaseOffset,
             result.work.aetherOscBSamples);
 

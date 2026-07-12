@@ -167,6 +167,7 @@ namespace beat
             float ratioDenominator { 1.0f };
             int tuningStep { 0 };
             int tuningDivisions { 12 };
+            int phaseMode { 0 };
             float phase { 0.0f };
             float randomPhase { 0.0f };
             WavetableConfig wavetable;

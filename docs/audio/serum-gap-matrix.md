@@ -18,7 +18,7 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 | Two independent main oscillators | Source/table, tuning, phase/randomization, static unison, unison modulation, level and pan are independent; legacy shared unison migrates compatibly | B1/B2 | Add per-source filter/direct/FX routing and later audio-rate cross-modulation |
 | Dedicated sub and noise/transient | Present | B1 | Mono/direct/FX routing semantics and tests |
 | Per-oscillator unison | Present up to bounded counts | B1 | Tuning modes, performance and transition proof |
-| Phase memory/randomization | Partial deterministic reset/jitter | B1 | Explicit modes and preset migration |
+| Phase memory/randomization | Independent A/B retrigger and memory modes implemented; retrigger retains deterministic random-depth behavior | B4 | Add product-facing controls and audible regression fixtures across voice stealing/legato combinations |
 | Advanced tuning modes | Implemented independently for A/B: semitone, harmonic, ratio, and equal-division step modes plus fine cents | B3 | Add UI editor affordances and broader preset-library coverage without changing stable IDs |
 | Dual serial warp stages | Missing | B2 | Prioritized modes, alias and oversampling policy |
 | FM/PM/PD/AM/ring modulation | Partial modulation, no complete audio-rate architecture | B2 | Source/destination contracts and spectral tests |

@@ -254,6 +254,7 @@ namespace beat
             fallback.ratioDenominator = juce::jlimit(0.001f, 64.0f, (float) synthNumberParam(params, prefix + "tuning.denominator", fallback.ratioDenominator));
             fallback.tuningStep = juce::jlimit(-96, 96, (int) std::round(synthNumberParam(params, prefix + "tuning.step", fallback.tuningStep)));
             fallback.tuningDivisions = juce::jlimit(1, 96, (int) std::round(synthNumberParam(params, prefix + "tuning.divisions", fallback.tuningDivisions)));
+            fallback.phaseMode = synthStringParam(params, prefix + "phaseMode", "retrigger") == "memory" ? 1 : 0;
             fallback.phase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "phase", fallback.phase));
             fallback.randomPhase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "randomPhase", fallback.randomPhase));
             fallback.wavetable = synthWavetableConfig(params, modulation, metadata, customWavetables, oscillator, fallback.wavetable);

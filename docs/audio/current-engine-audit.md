@@ -234,3 +234,13 @@ The persisted parameters are namespaced per oscillator under `osc.[a|b].tuning.*
 No lookup table, allocation, lazy initialization, or container mutation was added to the callback. Tuning selection is a cached setup-time pitch-rate calculation and remains compatible with the A9 realtime-safety gate.
 
 Full native and non-native suites pass with only the existing TCC waiver, production Beat builds, and the 150 frozen WAVs are byte-identical to B2. B3 baseline JSON SHA-256 is `650cef36a89d84e52b360ecf78003ca910c595554ef0794b46766ee242b051bf`.
+
+## Milestone B4 oscillator phase memory — 2026-07-12
+
+Oscillators A and B now independently choose `retrigger` or `memory` phase behavior through stable `osc.[a|b].phaseMode` fields. Retrigger remains the default and preserves the existing explicit phase plus deterministic random-phase depth. Memory mode preserves each oscillator's phase across ordinary hard note boundaries and voice reuse instead of applying a new reset; A and B can select different modes.
+
+Basic waveform paths now maintain separate A/B base accumulators rather than deriving both from the legacy shared phase. Wavetable stacks preserve every unison member's existing oscillator phase across setup reconfiguration in memory mode. Project replacement still creates/reset voices through the existing lifecycle, and legato continues its pre-existing no-reset path. Sample-rate preparation does not reset phase.
+
+Native tests render both basic and wavetable sources, verify phase advances, prove exact preservation across stop/restart in memory mode, and prove retrigger mode returns the basic accumulator to zero. Native patch parsing and frontend preview/roundtrip tests cover the new mode. The implementation uses fixed stack arrays and existing oscillator state; no callback allocation, file operation, blocking wait, lazy initialization, or container growth is introduced.
+
+Full native and non-native suites pass with only the existing TCC waiver, production Beat builds, and all 150 frozen WAVs are byte-identical to B3. B4 baseline JSON SHA-256 is `9e95a0611f7c4ca33158d6ab4fa7dd20df9da80e11cfc23ec4e26f15d5580b7f`.

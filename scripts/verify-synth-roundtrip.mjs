@@ -170,6 +170,7 @@ try {
       "osc.a.unison.spread": 0.27,
       "osc.a.tuning.mode": "harmonic",
       "osc.a.tuning.harmonic": 5,
+      "osc.a.phaseMode": "memory",
       "osc.b.unison.voices": 7,
       "osc.b.unison.detune": 0.31,
       "osc.b.unison.spread": 0.83,
@@ -187,6 +188,7 @@ try {
   assert.equal(independentUnisonPreview.aether.oscB.wavetable.blend, 0.83);
   assert.equal(independentUnisonPreview.aether.oscA.tuningMode, "harmonic");
   assert.equal(independentUnisonPreview.aether.oscA.harmonic, 5);
+  assert.equal(independentUnisonPreview.aether.oscA.phaseMode, "memory");
   assert.equal(independentUnisonPreview.aether.oscB.tuningMode, "ratio");
   assert.equal(independentUnisonPreview.aether.oscB.ratioNumerator, 3);
   assert.equal(independentUnisonPreview.aether.oscB.ratioDenominator, 2);

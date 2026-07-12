@@ -355,12 +355,27 @@ namespace beat
         refreshCachedPanGains();
         refreshCachedDynamicModulationFlags();
 
+        std::array<double, 8> rememberedAetherPhasesA {};
+        std::array<double, 8> rememberedAetherPhasesB {};
+        for (size_t index = 0; index < rememberedAetherPhasesA.size(); ++index)
+        {
+            rememberedAetherPhasesA[index] = aetherOscillatorsA[index].getPhase();
+            rememberedAetherPhasesB[index] = aetherOscillatorsB[index].getPhase();
+        }
         phase     = 0.0;
         noiseState = (juce::uint32) (midiNoteNumber * 747796405u + 2891336453u);
-        aetherOscAPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscA.phase)
-            + VoiceMath::deterministicPhaseJitter(noiseState ^ 0xa9f14c31u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscA.randomPhase);
-        aetherOscBPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscB.phase)
-            + VoiceMath::deterministicPhaseJitter(noiseState ^ 0x6c8e9cf5u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscB.randomPhase);
+        if (params.aetherOscA.phaseMode == 0)
+        {
+            aetherOscABasePhase = 0.0;
+            aetherOscAPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscA.phase)
+                + VoiceMath::deterministicPhaseJitter(noiseState ^ 0xa9f14c31u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscA.randomPhase);
+        }
+        if (params.aetherOscB.phaseMode == 0)
+        {
+            aetherOscBBasePhase = 0.0;
+            aetherOscBPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscB.phase)
+                + VoiceMath::deterministicPhaseJitter(noiseState ^ 0x6c8e9cf5u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscB.randomPhase);
+        }
         if (params.lfoRetrigger)
             lfoPhase = std::fmod(juce::jlimit(0.0, 1.0, (double) params.lfoPhaseOffset)
                 + VoiceMath::deterministicPhaseJitter(noiseState ^ 0x35a1d7bdu) * juce::jlimit(0.0, 1.0, (double) params.lfoRandomPhase),
@@ -384,8 +399,10 @@ namespace beat
         if (aetherOscillatorNeedsWavetable(params.aetherOscA))
         {
             WavetableOscillatorBank::configure(aetherOscillatorsA, aetherTableA.get(), params.aetherOscA.wavetable, sampleRate, baseFrequencyHz);
-            for (auto& osc : aetherOscillatorsA)
-                osc.setPhase(aetherOscAPhaseOffset);
+            for (size_t index = 0; index < aetherOscillatorsA.size(); ++index)
+                aetherOscillatorsA[index].setPhase(params.aetherOscA.phaseMode == 1
+                    ? rememberedAetherPhasesA[index]
+                    : aetherOscAPhaseOffset);
         }
         else
             WavetableOscillatorBank::clear(aetherOscillatorsA, aetherUnisonPlanA);
@@ -393,8 +410,10 @@ namespace beat
         if (aetherOscillatorNeedsWavetable(params.aetherOscB))
         {
             WavetableOscillatorBank::configure(aetherOscillatorsB, aetherTableB.get(), params.aetherOscB.wavetable, sampleRate, baseFrequencyHz);
-            for (auto& osc : aetherOscillatorsB)
-                osc.setPhase(aetherOscBPhaseOffset);
+            for (size_t index = 0; index < aetherOscillatorsB.size(); ++index)
+                aetherOscillatorsB[index].setPhase(params.aetherOscB.phaseMode == 1
+                    ? rememberedAetherPhasesB[index]
+                    : aetherOscBPhaseOffset);
         }
         else
             WavetableOscillatorBank::clear(aetherOscillatorsB, aetherUnisonPlanB);
@@ -543,6 +562,8 @@ namespace beat
                     baseFrequencyHz,
                     sampleRate,
                     phase,
+                    aetherOscABasePhase,
+                    aetherOscBBasePhase,
                     aetherOscAPhaseOffset,
                     aetherOscBPhaseOffset,
                     rawLfo,
@@ -651,6 +672,10 @@ namespace beat
 
             phase += currentPhaseDelta;
             if (phase >= 1.0) phase -= 1.0;
+            aetherOscABasePhase += currentPhaseDelta;
+            if (aetherOscABasePhase >= 1.0) aetherOscABasePhase -= 1.0;
+            aetherOscBBasePhase += currentPhaseDelta;
+            if (aetherOscBBasePhase >= 1.0) aetherOscBBasePhase -= 1.0;
             if (needsLfoValue)
             {
                 lfoPhase += lfoPhaseDelta;

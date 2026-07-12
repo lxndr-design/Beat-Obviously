@@ -104,6 +104,7 @@ namespace beat
                 float ratioDenominator { 1.0f };
                 int tuningStep { 0 };
                 int tuningDivisions { 12 };
+                int phaseMode { 0 };
                 float phase { 0.0f };
                 float randomPhase { 0.0f };
                 WavetableConfig wavetable;
@@ -255,6 +256,12 @@ namespace beat
         static VoiceStats::WavetableCache getWavetableCacheStats() noexcept;
         static VoiceStats::RenderWork consumeRenderWorkStats() noexcept;
 
+#if BEAT_REALTIME_SAFETY_TESTING
+        double phaseMemoryBaseAForTest() const noexcept { return aetherOscABasePhase; }
+        double phaseMemoryBaseBForTest() const noexcept { return aetherOscBBasePhase; }
+        double wavetablePhaseAForTest() const noexcept { return aetherOscillatorsA.front().getPhase(); }
+#endif
+
         struct AllocationState
         {
             bool active { false };
@@ -295,6 +302,8 @@ namespace beat
         Params  params;
         double  sampleRate { 44100.0 };
         double  phase { 0.0 };
+        double  aetherOscABasePhase { 0.0 };
+        double  aetherOscBBasePhase { 0.0 };
         double  phaseDelta { 0.0 };
         double  baseFrequencyHz { 440.0 };
         double  lfoPhase { 0.0 };

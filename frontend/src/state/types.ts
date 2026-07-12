@@ -430,6 +430,7 @@ export interface AetherOscillatorConfig {
   ratioDenominator?: number;
   tuningStep?: number;
   tuningDivisions?: number;
+  phaseMode?: "retrigger" | "memory";
   phase: number;
   randomPhase: number;
   wavetable: WavetableConfig;

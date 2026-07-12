@@ -292,3 +292,18 @@ audio callback
   optional existing fine modulation
   unchanged oscillator phase advance/render path
 ```
+
+```text
+note start
+  phaseMode=retrigger
+    A/B basic accumulator -> 0
+    A/B wavetable members -> configured phase + deterministic jitter
+  phaseMode=memory
+    preserve A/B basic accumulator
+    snapshot fixed A/B wavetable member phases
+    configure table/rate state
+    restore member phases
+render
+  advance independent A/B base accumulators
+  wavetable members advance their existing internal phases
+```

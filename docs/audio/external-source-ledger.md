@@ -89,3 +89,7 @@ The four oscillator-specific unison modulation targets, additive legacy compatib
 ## Milestone B3 provenance
 
 The semitone, harmonic, ratio, and equal-division step tuning contracts, parameter schema, cached-rate calculation, preview support, and tests are independently implemented from elementary frequency-ratio mathematics. No upstream source or dependency was consulted, executed, adapted, or imported.
+
+## Milestone B4 provenance
+
+The independent A/B basic phase accumulators, wavetable-member phase preservation, retrigger/memory schema, lifecycle behavior, preview support, and tests are independent extensions of Beat's existing oscillator state. No upstream source, dependency, preset, asset, service, or binary was consulted, executed, adapted, or imported.
