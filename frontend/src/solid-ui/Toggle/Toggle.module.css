@@ -35,8 +35,8 @@
 .box::after {
   content: "";
   position: absolute;
-  top: 0;
-  left: 0;
+  top: var(--border-width);
+  left: var(--border-width);
   box-sizing: border-box;
   width: var(--toggle-thumb-size);
   height: var(--toggle-thumb-size);
