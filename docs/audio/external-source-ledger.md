@@ -77,3 +77,7 @@ The test-only allocation interposer, non-owning sequencer callback view, preallo
 ## Milestone A9 provenance
 
 The development/test-only mutex and file-operation interposers, fixed-capacity typed report buffer, lazy-initialization/container-growth hooks, callsite capture, negative tests, and offline exclusion are independently implemented against operating-system APIs already used by Beat/JUCE. No upstream repository was consulted, executed, or imported. No copied, translated, structurally adapted, or reference-derived code, runtime dependency, prebuilt binary, asset, service, or licensing change was introduced.
+
+## Milestone B1 provenance
+
+The per-oscillator unison parameter contract, legacy shared-value migration, frontend/native conversion, and focused tests are independent extensions of Beat's existing separate oscillator banks and unison plans. No upstream repository was consulted, executed, or imported, and no external code, dependency, asset, preset, service, binary, branding, or licensing change was introduced.

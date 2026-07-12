@@ -256,3 +256,18 @@ scope ends
 offline render
   no realtime scope -> no interception reports
 ```
+
+## Milestone B1 independent A/B unison configuration
+
+```text
+patch/control path
+  legacy shared unison fields -> inherited by A and B when per-osc fields are absent
+  osc.a.unison.* -> A WavetableConfig -> aetherOscillatorsA + unisonPlanA
+  osc.b.unison.* -> B WavetableConfig -> aetherOscillatorsB + unisonPlanB
+audio callback
+  render oscillator A with A's fixed bank/plan
+  render oscillator B with B's fixed bank/plan
+  sum through existing independent level/pan path
+```
+
+No callback parsing, allocation, or graph mutation is added. Parameter normalization and migration occur on the existing control/setup boundary.

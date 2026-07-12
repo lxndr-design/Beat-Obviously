@@ -204,3 +204,13 @@ Focused negative tests deliberately trigger and verify each category: non-elidab
 The full native suite passes with only `baseline.recent-project-exists` waived. Full non-native verification passes, production `Beat` and `BeatAetherBaseline` build, and all 150 WAVs are byte-identical to the A1/A7 freeze. Instrumentation report SHA-256 is `2fc02f1ba65191821360f5ccfcee237faa85155983fff60926930aacdb4d3935`; the matrix completed in 2.38 s wall / 2.17 s user / 0.05 s system with 15,450,112-byte maximum RSS and zero deadline overruns. No upstream code or dependency was introduced.
 
 Per the approved review decision, the traced A8 boundaries were sufficient to complete Milestone A; A9 is the stronger prerequisite for the expanded Milestone B graph. External product callbacks remain explicitly outside Beat's internal guarantee and must themselves obey the same contract when installed.
+
+## Milestone B1 oscillator A/B unison independence — 2026-07-11
+
+Milestone B begins by removing the remaining shared static unison configuration from the two main oscillator contracts. New stable parameters `osc.a.unison.voices/detune/spread` and `osc.b.unison.voices/detune/spread` independently configure the already separate A/B wavetable banks and unison plans. Voice count is bounded to 1–8, detune to 0–100 cents, and spread to 0–1. Source, wavetable, tuning, phase/randomization, level, pan, and table ownership were already independent and remain unchanged.
+
+Compatibility is explicit: patches without the six new fields inherit the existing shared `unison.voices/detune/spread` values. Existing frontend shared-unison controls write both oscillator parameter sets, while direct per-oscillator edits may diverge them. Draft normalization, preview conversion, native patch conversion, and reverse preview conversion preserve the new values; existing automation IDs are not renamed or removed.
+
+Native contract coverage verifies A at 3 voices / 11 cents / 0.27 spread and B at 7 voices / 31 cents / 0.83 spread in one patch. Frontend coverage verifies legacy shared-value inheritance and the same divergent preview configuration. Full native stress passes with only the TCC waiver, full non-native verification passes, production Beat builds, and all 150 frozen baseline WAVs are byte-identical. Baseline JSON SHA-256 is `b6dfabee16c5b61bee82ddfb29e9a5a7ab3a6ef2cd504b502e293984b6e13b0b`.
+
+This slice does not yet add per-oscillator FX sends, shared-filter routing, audio-rate cross-modulation, or separate unison modulation routes; those remain later B gates.

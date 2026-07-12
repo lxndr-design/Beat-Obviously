@@ -157,6 +157,29 @@ try {
       },
     },
   });
+  assert.equal(draft.parameters["osc.a.unison.voices"], 5);
+  assert.equal(draft.parameters["osc.b.unison.voices"], 5);
+  assert.equal(draft.parameters["osc.a.unison.detune"], 0.27);
+  assert.equal(draft.parameters["osc.b.unison.detune"], 0.27);
+  assert.equal(draft.parameters["osc.a.unison.spread"], 0.5);
+  assert.equal(draft.parameters["osc.b.unison.spread"], 0.5);
+  const independentUnisonDraft = synthStore.normalizeSynthDraftPatch({
+    parameters: {
+      "osc.a.unison.voices": 3,
+      "osc.a.unison.detune": 0.11,
+      "osc.a.unison.spread": 0.27,
+      "osc.b.unison.voices": 7,
+      "osc.b.unison.detune": 0.31,
+      "osc.b.unison.spread": 0.83,
+    },
+  });
+  const independentUnisonPreview = synthStore.synthDraftToPreviewInstrument(independentUnisonDraft);
+  assert.equal(independentUnisonPreview.aether.oscA.wavetable.unison, 3);
+  assert.equal(independentUnisonPreview.aether.oscA.wavetable.detuneCents, 11);
+  assert.equal(independentUnisonPreview.aether.oscA.wavetable.blend, 0.27);
+  assert.equal(independentUnisonPreview.aether.oscB.wavetable.unison, 7);
+  assert.equal(independentUnisonPreview.aether.oscB.wavetable.detuneCents, 31);
+  assert.equal(independentUnisonPreview.aether.oscB.wavetable.blend, 0.83);
 
   assert.equal(draft.parameters["future.experimental"], "preserve-me");
   assert.equal(new Set(draft.modulation.map((route) => route.id)).size, draft.modulation.length);

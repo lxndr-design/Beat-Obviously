@@ -207,6 +207,18 @@ namespace beat
                 (float) synthNumberParam(params, prefix + "position", fallback.position));
             fallback.warp = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "warp", fallback.warp));
             fallback.warpMode = synthWavetableWarpModeForId(synthStringParam(params, prefix + "warpMode", "shape"));
+            fallback.unison = juce::jlimit(
+                1,
+                8,
+                (int) std::round(synthNumberParam(params, prefix + "unison.voices", fallback.unison)));
+            fallback.detuneCents = juce::jlimit(
+                0.0f,
+                100.0f,
+                (float) synthNumberParam(params, prefix + "unison.detune", fallback.detuneCents / 100.0f) * 100.0f);
+            fallback.blend = juce::jlimit(
+                0.0f,
+                1.0f,
+                (float) synthNumberParam(params, prefix + "unison.spread", fallback.blend));
             return fallback;
         }
 
@@ -415,12 +427,6 @@ namespace beat
         instrument.hasAether = true;
         instrument.aether.oscA = synthOscillatorConfig(params, modulation, metadata, customWavetables, "a", oscA);
         instrument.aether.oscB = synthOscillatorConfig(params, modulation, metadata, customWavetables, "b", oscB);
-        instrument.aether.oscA.wavetable.unison = instrument.wavetableUnison;
-        instrument.aether.oscA.wavetable.detuneCents = instrument.wavetableDetuneCents;
-        instrument.aether.oscA.wavetable.blend = instrument.wavetableBlend;
-        instrument.aether.oscB.wavetable.unison = instrument.wavetableUnison;
-        instrument.aether.oscB.wavetable.detuneCents = instrument.wavetableDetuneCents;
-        instrument.aether.oscB.wavetable.blend = instrument.wavetableBlend;
         instrument.aether.runtimeWarp = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.runtimeWarp", 0.0));
         instrument.aether.runtimeWarpMode = synthRuntimeWarpModeForId(synthStringParam(params, "aether.runtimeWarpMode", "shape"));
 

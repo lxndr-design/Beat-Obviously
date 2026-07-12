@@ -11825,6 +11825,9 @@ namespace
             "osc.a.pan": -0.4,
             "osc.a.phase": 0.33,
             "osc.a.randomPhase": 0.2,
+            "osc.a.unison.voices": 3,
+            "osc.a.unison.detune": 0.11,
+            "osc.a.unison.spread": 0.27,
             "osc.b.enabled": true,
             "osc.b.wavetable": "basic.triangle",
             "osc.b.position": 0.1,
@@ -11837,6 +11840,9 @@ namespace
             "osc.b.pan": 0.2,
             "osc.b.phase": 0.66,
             "osc.b.randomPhase": 0.1,
+            "osc.b.unison.voices": 7,
+            "osc.b.unison.detune": 0.31,
+            "osc.b.unison.spread": 0.83,
             "unison.enabled": true,
             "unison.voices": 5,
             "unison.detune": 0.2,
@@ -11939,7 +11945,9 @@ namespace
             return false;
         if (!instrument.aether.oscA.enabled || instrument.aether.oscA.wavetable.bank != 4)
             return false;
-        if (!near(instrument.aether.oscA.wavetable.position, 0.25f) || instrument.aether.oscA.wavetable.unison != 5)
+        if (!near(instrument.aether.oscA.wavetable.position, 0.25f) || instrument.aether.oscA.wavetable.unison != 3)
+            return false;
+        if (!near(instrument.aether.oscA.wavetable.detuneCents, 11.0f) || !near(instrument.aether.oscA.wavetable.blend, 0.27f))
             return false;
         if (!near(instrument.aether.oscA.wavetable.warp, 0.58f) || instrument.aether.oscA.wavetable.warpMode != 1)
             return false;
@@ -11956,6 +11964,10 @@ namespace
         if (!near(instrument.aether.oscB.pan, 0.2f))
             return false;
         if (!near(instrument.aether.oscB.phase, 0.66f) || !near(instrument.aether.oscB.randomPhase, 0.1f))
+            return false;
+        if (instrument.aether.oscB.wavetable.unison != 7
+            || !near(instrument.aether.oscB.wavetable.detuneCents, 31.0f)
+            || !near(instrument.aether.oscB.wavetable.blend, 0.83f))
             return false;
         if (instrument.aether.oscB.octave != 1 || instrument.aether.oscB.semitone != 7 || !near(instrument.aether.oscB.fineCents, -5.0f))
             return false;

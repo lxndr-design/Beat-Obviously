@@ -74,8 +74,14 @@ export type OscillatorParamSuffix =
   | "phase"
   | "randomPhase";
 
+export type OscillatorUnisonParameterId =
+  | `osc.${OscillatorKey}.unison.voices`
+  | `osc.${OscillatorKey}.unison.detune`
+  | `osc.${OscillatorKey}.unison.spread`;
+
 export type SynthParameterId =
   | `osc.${OscillatorKey}.${OscillatorParamSuffix}`
+  | OscillatorUnisonParameterId
   | "unison.enabled"
   | "unison.voices"
   | "unison.detune"
@@ -936,6 +942,9 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "osc.a.pan": 0,
   "osc.a.phase": 0,
   "osc.a.randomPhase": 0.25,
+  "osc.a.unison.voices": 1,
+  "osc.a.unison.detune": 0.12,
+  "osc.a.unison.spread": 0.5,
   "osc.b.enabled": false,
   "osc.b.wavetable": "basic.square",
   "osc.b.position": 0,
@@ -948,6 +957,9 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "osc.b.pan": 0,
   "osc.b.phase": 0,
   "osc.b.randomPhase": 0.25,
+  "osc.b.unison.voices": 1,
+  "osc.b.unison.detune": 0.12,
+  "osc.b.unison.spread": 0.5,
   "unison.enabled": false,
   "unison.voices": 1,
   "unison.detune": 0.12,
@@ -1027,6 +1039,9 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "osc.a.pan": "OSC A Pan",
   "osc.a.phase": "OSC A Phase",
   "osc.a.randomPhase": "OSC A Random",
+  "osc.a.unison.voices": "OSC A Voices",
+  "osc.a.unison.detune": "OSC A Detune",
+  "osc.a.unison.spread": "OSC A Spread",
   "osc.b.enabled": "OSC B Enabled",
   "osc.b.wavetable": "OSC B Table",
   "osc.b.position": "OSC B Pos",
@@ -1039,6 +1054,9 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "osc.b.pan": "OSC B Pan",
   "osc.b.phase": "OSC B Phase",
   "osc.b.randomPhase": "OSC B Random",
+  "osc.b.unison.voices": "OSC B Voices",
+  "osc.b.unison.detune": "OSC B Detune",
+  "osc.b.unison.spread": "OSC B Spread",
   "unison.enabled": "Unison Enabled",
   "unison.voices": "Unison Voices",
   "unison.detune": "Unison Detune",
@@ -1178,6 +1196,16 @@ export function createDefaultSynthDraft(): SynthDraftPatch {
   };
 }
 
+function parameterPatch(id: SynthParameterId, value: SynthParameterValue): Record<string, SynthParameterValue> {
+  if (id === "unison.voices")
+    return { [id]: value, "osc.a.unison.voices": value, "osc.b.unison.voices": value };
+  if (id === "unison.detune")
+    return { [id]: value, "osc.a.unison.detune": value, "osc.b.unison.detune": value };
+  if (id === "unison.spread" || id === "unison.blend")
+    return { [id]: value, "osc.a.unison.spread": value, "osc.b.unison.spread": value };
+  return { [id]: value };
+}
+
 export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | SynthPatchSnapshot): SynthDraftPatch {
   const base = createDefaultSynthDraft();
   const parameters: SynthDraftPatch["parameters"] = { ...DEFAULT_SYNTH_PARAMETERS };
@@ -1199,6 +1227,16 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
         parameters[id] = value;
       }
     }
+    const inheritUnison = (suffix: "voices" | "detune" | "spread", legacyValue: SynthParameterValue) => {
+      for (const oscillator of ["a", "b"] as const) {
+        const id = `osc.${oscillator}.unison.${suffix}` as OscillatorUnisonParameterId;
+        if (!Object.prototype.hasOwnProperty.call(input.parameters, id))
+          parameters[id] = legacyValue;
+      }
+    };
+    inheritUnison("voices", parameters["unison.voices"]);
+    inheritUnison("detune", parameters["unison.detune"]);
+    inheritUnison("spread", parameters["unison.spread"]);
   }
 
   const modulation = Array.isArray(input.modulation)
@@ -2066,21 +2104,24 @@ export const useSynthStore = create<SynthStoreState>((set) => ({
     set((state) => ({
       draft: {
         ...state.draft,
-        parameters: { ...state.draft.parameters, [id]: value },
+        parameters: { ...state.draft.parameters, ...parameterPatch(id, value) },
       },
     })),
   setNumericParameter: (id, value) =>
-    set((state) => ({
-      draft: {
-        ...state.draft,
-        parameters: { ...state.draft.parameters, [id]: sanitizeNumber(value, id) },
-      },
-    })),
+    set((state) => {
+      const sanitized = sanitizeNumber(value, id);
+      return {
+        draft: {
+          ...state.draft,
+          parameters: { ...state.draft.parameters, ...parameterPatch(id, sanitized) },
+        },
+      };
+    }),
   setBooleanParameter: (id, value) =>
     set((state) => ({
       draft: {
         ...state.draft,
-        parameters: { ...state.draft.parameters, [id]: value },
+        parameters: { ...state.draft.parameters, ...parameterPatch(id, value) },
       },
     })),
   setName: (name) => set((state) => ({ draft: { ...state.draft, name } })),
@@ -2128,6 +2169,7 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (id.includes(".semitone")) return Math.max(-12, Math.min(12, Math.round(value)));
   if (id.includes(".fine")) return Math.max(-100, Math.min(100, value));
   if (id === "unison.voices") return Math.max(1, Math.min(16, Math.round(value)));
+  if (id.endsWith(".unison.voices")) return Math.max(1, Math.min(8, Math.round(value)));
   if (id === "maxVoices") return Math.max(1, Math.min(32, Math.round(value)));
   if (id === "glide.ms") return Math.max(0, Math.min(5000, Math.round(value)));
   if (id.includes(".pan")) return Math.max(-1, Math.min(1, value));
@@ -4080,16 +4122,15 @@ function isModulationTargetId(value: unknown): value is ModulationTargetId {
 function wavetableFromDraft(draft: SynthDraftPatch, oscillator: OscillatorKey): WavetableConfig {
   const wavetableId = getStringParam(draft, `osc.${oscillator}.wavetable` as SynthParameterId) as WavetableId;
   const warpMode = getStringParam(draft, `osc.${oscillator}.warpMode` as SynthParameterId);
-  const unisonEnabled = getBooleanParam(draft, "unison.enabled");
   return {
     bank: bankFromWavetableId(wavetableId),
     customId: wavetableId.startsWith("user.") ? wavetableId : undefined,
     position: clamp01(getNumberParam(draft, `osc.${oscillator}.position` as SynthParameterId)),
     warp: getNumberParam(draft, `osc.${oscillator}.warp` as SynthParameterId),
     warpMode: isWavetableWarpMode(warpMode) ? warpMode : "shape",
-    unison: unisonEnabled ? getNumberParam(draft, "unison.voices") : 1,
-    detuneCents: unisonEnabled ? clamp01(getNumberParam(draft, "unison.detune")) * 100 : 0,
-    blend: unisonEnabled ? clamp01(getNumberParam(draft, "unison.spread")) : 0,
+    unison: getNumberParam(draft, `osc.${oscillator}.unison.voices` as OscillatorUnisonParameterId),
+    detuneCents: clamp01(getNumberParam(draft, `osc.${oscillator}.unison.detune` as OscillatorUnisonParameterId)) * 100,
+    blend: clamp01(getNumberParam(draft, `osc.${oscillator}.unison.spread` as OscillatorUnisonParameterId)),
   };
 }
 
@@ -4143,6 +4184,9 @@ function applyWavetableToDraft(
   draft.parameters[`osc.${oscillator}.position` as SynthParameterId] = wavetable.position;
   draft.parameters[`osc.${oscillator}.warp` as SynthParameterId] = wavetable.warp;
   draft.parameters[`osc.${oscillator}.warpMode` as SynthParameterId] = wavetable.warpMode ?? "shape";
+  draft.parameters[`osc.${oscillator}.unison.voices` as OscillatorUnisonParameterId] = wavetable.unison;
+  draft.parameters[`osc.${oscillator}.unison.detune` as OscillatorUnisonParameterId] = wavetable.detuneCents / 100;
+  draft.parameters[`osc.${oscillator}.unison.spread` as OscillatorUnisonParameterId] = wavetable.blend;
   if (!applyGlobalUnison) return;
   draft.parameters["unison.enabled"] = wavetable.unison > 1;
   draft.parameters["unison.voices"] = wavetable.unison;
