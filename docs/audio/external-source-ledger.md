@@ -73,3 +73,7 @@ The dual-table playback cache, bounded replacement crossfade, and retained-owner
 ## Milestone A8 provenance
 
 The test-only allocation interposer, non-owning sequencer callback view, preallocated MIDI storage, bounded stable insertion ordering, and string-region matching are independently implemented from existing Beat/JUCE integration code and standard C++ allocation hooks. No upstream repository was consulted, executed, or imported; no external source, asset, service, prebuilt binary, or runtime dependency was added.
+
+## Milestone A9 provenance
+
+The development/test-only mutex and file-operation interposers, fixed-capacity typed report buffer, lazy-initialization/container-growth hooks, callsite capture, negative tests, and offline exclusion are independently implemented against operating-system APIs already used by Beat/JUCE. No upstream repository was consulted, executed, or imported. No copied, translated, structurally adapted, or reference-derived code, runtime dependency, prebuilt binary, asset, service, or licensing change was introduced.

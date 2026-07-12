@@ -1,4 +1,5 @@
 #include "AudioEngine.h"
+#include "RealtimeSafetyHooks.h"
 #include "Effects/TrackEffectDefaults.h"
 #include "Realtime/VoiceAutomationInbox.h"
 #include "VoiceAllocation.h"
@@ -4127,7 +4128,10 @@ namespace beat
         const int requiredChannels = juce::jmax(2, numOutChannels);
         if (mixBuf.getNumChannels() < requiredChannels || mixBuf.getNumSamples() < numSamples
             || routeBuf.getNumChannels() < requiredChannels || routeBuf.getNumSamples() < numSamples)
+        {
             callbackSafetyViolations.fetch_add(1, std::memory_order_relaxed);
+            BEAT_REPORT_REALTIME_CONTAINER_GROWTH();
+        }
         mixBuf.setSize(requiredChannels, numSamples, false, false, true);
         routeBuf.setSize(juce::jmax(2, numOutChannels), numSamples, false, false, true);
         mixBuf.clear();

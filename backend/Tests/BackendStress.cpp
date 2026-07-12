@@ -37,7 +37,7 @@
 #include "../Source/Persistence/AudioFileLibraryActions.h"
 #include "../Source/Persistence/Database.h"
 #include "../Source/Persistence/ProjectRepository.h"
-#include "AllocationProbe.h"
+#include "RealtimeSafetyProbe.h"
 
 #include <algorithm>
 #include <array>
@@ -53,6 +53,9 @@
 #include <thread>
 #include <vector>
 #include <dlfcn.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <unistd.h>
 
 namespace
 {
@@ -10446,23 +10449,115 @@ namespace
         if (!engine.queueRealtimeParameterChange("dense-aether", "osc.a.position", 0.73f, 37, 64))
             return false;
         output.clear();
-        beat::test::beginAllocationProbe();
+        beat::test::beginRealtimeSafetyProbe();
         engine.audioDeviceIOCallbackWithContext(nullptr, 0, outputs.data(), 2, blockSize, context);
-        const size_t allocations = beat::test::endAllocationProbe();
-        if (allocations != 0)
+        const size_t violations = beat::test::endRealtimeSafetyProbe();
+        if (violations != 0)
         {
-            std::cerr << "Audio callback allocated " << allocations << " heap blocks\n";
-            for (size_t index = 0; index < std::min<size_t>(allocations, 64); ++index)
+            std::cerr << "Audio callback realtime-safety violations: " << violations << "\n";
+            for (size_t index = 0; index < std::min<size_t>(violations, 128); ++index)
             {
                 Dl_info info {};
-                const auto address = beat::test::allocationProbeCallsite(index);
+                const auto violation = beat::test::realtimeSafetyViolation(index);
+                const auto address = violation.callsite;
                 if (address != nullptr && dladdr(address, &info) != 0)
-                    std::cerr << "  " << index << ": " << (info.dli_sname != nullptr ? info.dli_sname : "unknown")
+                    std::cerr << "  " << index << " kind=" << (int) violation.kind << ": "
+                              << (info.dli_sname != nullptr ? info.dli_sname : "unknown")
                               << " + " << (static_cast<const char*>(address) - static_cast<const char*>(info.dli_saddr))
                               << " bytes\n";
             }
         }
-        return allocations == 0 && std::isfinite(bufferEnergy(output));
+        return violations == 0 && std::isfinite(bufferEnergy(output));
+    }
+
+    bool stressRealtimeSafetyDetectorNegativeCases()
+    {
+        using Kind = beat::test::RealtimeViolationKind;
+        const auto detectsOnly = [](Kind expected, const std::function<void()>& operation) {
+            beat::test::beginRealtimeSafetyProbe();
+            operation();
+            const size_t count = beat::test::endRealtimeSafetyProbe();
+            if (count == 0)
+                return false;
+            for (size_t index = 0; index < count; ++index)
+                if (beat::test::realtimeSafetyViolation(index).kind == expected)
+                    return true;
+            return false;
+        };
+
+        if (!detectsOnly(Kind::heapAllocation, [] {
+                auto allocation = static_cast<void* (*)(size_t)>(&::operator new);
+                void* value = allocation(32);
+                ::operator delete(value);
+            }))
+        {
+            std::cerr << "  detector missed heap allocation\n";
+            return false;
+        }
+
+        pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+        std::atomic<bool> locked { false };
+        std::thread holder([&] {
+            pthread_mutex_lock(&mutex);
+            locked.store(true, std::memory_order_release);
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            pthread_mutex_unlock(&mutex);
+        });
+        while (!locked.load(std::memory_order_acquire))
+            std::this_thread::yield();
+        const bool lockDetected = detectsOnly(Kind::blockingLock, [&] {
+            pthread_mutex_lock(&mutex);
+            pthread_mutex_unlock(&mutex);
+        });
+        holder.join();
+        pthread_mutex_destroy(&mutex);
+        if (!lockDetected)
+        {
+            std::cerr << "  detector missed blocking lock\n";
+            return false;
+        }
+
+        const auto temp = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                              .getNonexistentChildFile("beat-realtime-probe", ".tmp", false);
+        temp.replaceWithText("probe");
+        const auto path = temp.getFullPathName().toStdString();
+        const bool fileDetected = detectsOnly(Kind::fileOperation, [&] {
+            const int fd = open(path.c_str(), O_RDONLY);
+            if (fd >= 0)
+            {
+                char byte {};
+                (void) read(fd, &byte, 1);
+                close(fd);
+            }
+        });
+        temp.deleteFile();
+        if (!fileDetected)
+        {
+            std::cerr << "  detector missed file operation\n";
+            return false;
+        }
+
+        if (!detectsOnly(Kind::lazyInitialization, [] { BEAT_REPORT_REALTIME_LAZY_INITIALIZATION(); }))
+        {
+            std::cerr << "  detector missed lazy initialization\n";
+            return false;
+        }
+        if (!detectsOnly(Kind::containerGrowth, [] { BEAT_REPORT_REALTIME_CONTAINER_GROWTH(); }))
+        {
+            std::cerr << "  detector missed container growth\n";
+            return false;
+        }
+
+        beat::AudioEngine offline;
+        offline.prepareForOffline(48000.0, 256, 2);
+        offline.applyProject(makeDenseAetherProject());
+        offline.requestPlay();
+        (void) renderEngineBlock(offline, 256);
+        beat::test::beginRealtimeSafetyProbe();
+        const bool offlineExcluded = beat::test::endRealtimeSafetyProbe() == 0;
+        if (!offlineExcluded)
+            std::cerr << "  detector incorrectly included offline render\n";
+        return offlineExcluded;
     }
 
     bool stressAudioEngineVariableBlockSizes()
@@ -13425,6 +13520,12 @@ namespace
 
 int main()
 {
+    beat::test::prepareRealtimeSafetyInterposers();
+    if (!stressRealtimeSafetyDetectorNegativeCases())
+    {
+        std::cerr << "Realtime safety detector negative-case stress failed\n";
+        return 1;
+    }
     std::cerr << "realtime: start\n";
     if (!stressRealtimeQueue())
     {

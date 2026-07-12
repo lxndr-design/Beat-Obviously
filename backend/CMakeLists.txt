@@ -153,8 +153,8 @@ target_link_libraries(Beat PRIVATE
 target_compile_features(Beat PRIVATE cxx_std_20)
 
 add_executable(BeatBackendStress
-    Tests/AllocationProbe.cpp
-    Tests/AllocationProbe.h
+    Tests/RealtimeSafetyProbe.cpp
+    Tests/RealtimeSafetyProbe.h
     Tests/BackendStress.cpp
     Source/Audio/AudioEngine.cpp
     Source/Audio/AudioEngine.h
@@ -261,6 +261,7 @@ target_link_libraries(BeatBackendStress PRIVATE
 )
 
 target_compile_features(BeatBackendStress PRIVATE cxx_std_20)
+target_compile_definitions(BeatBackendStress PRIVATE BEAT_REALTIME_SAFETY_TESTING=1)
 
 add_executable(BeatAetherBaseline
     Tests/AetherBaseline.cpp

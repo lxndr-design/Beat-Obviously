@@ -239,4 +239,20 @@ AudioEngine::audioDeviceIOCallbackWithContext
   disable probe
 ```
 
-The callback continues to use `ScopedTryLock` for the engine project-state boundary, so contention skips the guarded render path instead of blocking there. JUCE synthesiser rendering still enters JUCE's existing internal callback lock. No production callback invokes file-loading APIs in the traced dense path; the current native probe interposes heap allocation only, not OS file calls or all lock implementations. Product callbacks (`onSegmentTriggered`, `onPositionChanged`) remain external code boundaries and are not covered by the zero-allocation guarantee.
+The callback continues to use `ScopedTryLock` for the engine project-state boundary, so contention skips the guarded render path instead of blocking there. The A9 test interposer probes JUCE's internal pthread mutex with `trylock`: an uncontended acquisition proceeds, while an acquisition that would wait is recorded before normal semantics continue. POSIX/C file and stream calls are likewise intercepted while the realtime scope is active. Product callbacks (`onSegmentTriggered`, `onPositionChanged`) remain external code boundaries.
+
+```text
+test-only realtime scope (device callback simulation only)
+  C++ new/new[] -> record heapAllocation
+  pthread_mutex_lock
+    try succeeds -> proceed without violation
+    try reports busy -> record blockingLock, then preserve normal wait semantics
+  open/openat/read/write/fopen/fread/fwrite -> record fileOperation
+  explicit lazy-init/growth hooks -> record typed violation
+  fixed thread-local event array (128 entries, kind + return address)
+scope ends
+  symbolize/report outside callback
+
+offline render
+  no realtime scope -> no interception reports
+```
