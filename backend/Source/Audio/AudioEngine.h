@@ -13,6 +13,7 @@
 #include "Realtime/RealtimeParameterQueue.h"
 #include "Realtime/RenderBudgets.h"
 #include "BeatSynthesiser.h"
+#include "AudioQuality.h"
 #include "Realtime/VoiceNoteAutomation.h"
 #include <array>
 #include <atomic>
@@ -102,6 +103,8 @@ namespace beat
                                 const juce::String& outputDeviceName,
                                 juce::String* error = nullptr);
         void prepareForOffline(double sampleRate, int blockSize, int numOutputChannels);
+        void setProcessingQuality(AudioQuality quality) noexcept;
+        AudioQuality getProcessingQuality() const noexcept { return processingQuality; }
         static bool renderProjectToWav(Project project,
                                        const juce::File& outputFile,
                                        double sampleRate = 44100.0,
@@ -278,6 +281,7 @@ namespace beat
         MasterEq                 masterEq;
         MasterLimiter            masterLimiter;
         MasterDcBlocker          masterDcBlocker;
+        AudioQuality             processingQuality { AudioQuality::standardLive };
         FftAnalyzer              masterAnalyzer;
         MasterChainSettings      masterChainSettings;
         float                    masterCompressorEnvelope { 0.0f };

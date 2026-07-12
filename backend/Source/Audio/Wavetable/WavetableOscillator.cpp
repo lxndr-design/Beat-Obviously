@@ -153,8 +153,23 @@ namespace beat
         const int index1 = index0 + 1 == cachedFrameSize ? 0 : index0 + 1;
         const float sampleFrac = (float) (samplePos - (double) index0);
 
-        const auto interpolate = [index0, index1, sampleFrac](const float* data) noexcept
+        const auto interpolate = [this, index0, index1, sampleFrac](const float* data) noexcept
         {
+            if (quality == AudioQuality::offlineHighQuality)
+            {
+                const int previous = index0 == 0 ? cachedFrameSize - 1 : index0 - 1;
+                const int next = index1 + 1 == cachedFrameSize ? 0 : index1 + 1;
+                const float p0 = data[(size_t) previous];
+                const float p1 = data[(size_t) index0];
+                const float p2 = data[(size_t) index1];
+                const float p3 = data[(size_t) next];
+                const float t2 = sampleFrac * sampleFrac;
+                const float t3 = t2 * sampleFrac;
+                return 0.5f * ((2.0f * p1)
+                    + (-p0 + p2) * sampleFrac
+                    + (2.0f * p0 - 5.0f * p1 + 4.0f * p2 - p3) * t2
+                    + (-p0 + 3.0f * p1 - 3.0f * p2 + p3) * t3);
+            }
             return data[(size_t) index0] + (data[(size_t) index1] - data[(size_t) index0]) * sampleFrac;
         };
         const float mip0Frame0 = interpolate(cachedFrame0Mip0Data);

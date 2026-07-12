@@ -186,3 +186,18 @@ route/group/return mix
 ```
 
 The blocker is prepared outside the callback and reset only at explicit hard-stop/project-replacement boundaries. It adds one fixed recurrence per channel/sample and no allocation or dynamic dispatch.
+
+## Quality-mode branch
+
+```text
+AudioEngine quality selection (setup/control path)
+  propagate enum to fixed InstrumentVoice set
+  propagate to main/A/B/unison wavetable oscillators
+audio callback
+  identical event/modulation/phase path
+  Standard Live: linear phase-sample interpolation
+  Offline HQ: four-point Catmull-Rom phase-sample interpolation
+  identical frame/mip crossfades and phase advancement
+```
+
+Mode selection is not data-dependent and never changes automatically under load.

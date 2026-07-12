@@ -61,3 +61,7 @@ The telemetry counters and render-budget policy consolidate and bound existing B
 ## Milestone A5 provenance
 
 The first-order master DC blocker is independently implemented from the standard recurrence `y[n] = x[n] - x[n-1] + R*y[n-1]`. No external source, dependency, or reference-derived implementation was used.
+
+## Milestone A6 provenance
+
+The quality enum, engine/voice propagation, and four-point interpolation are independently implemented using standard Catmull-Rom mathematics. No external code, asset, service, or dependency was used.

@@ -106,6 +106,14 @@ namespace beat
         stealTransition.prepare(sampleRate);
     }
 
+    void InstrumentVoice::setProcessingQuality(AudioQuality quality) noexcept
+    {
+        processingQuality = quality;
+        for (auto& oscillator : wavetableOscillators) oscillator.setQuality(quality);
+        for (auto& oscillator : aetherOscillatorsA) oscillator.setQuality(quality);
+        for (auto& oscillator : aetherOscillatorsB) oscillator.setQuality(quality);
+    }
+
     void InstrumentVoice::setParams(const Params& p)
     {
         baseParams = p;

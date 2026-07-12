@@ -19,6 +19,7 @@ target_sources(Beat PRIVATE
 
     Source/Audio/AudioEngine.cpp
     Source/Audio/AudioEngine.h
+    Source/Audio/AudioQuality.h
     Source/Audio/BeatSynthesiser.cpp
     Source/Audio/BeatSynthesiser.h
     Source/Audio/Sequencer.cpp
@@ -155,6 +156,7 @@ add_executable(BeatBackendStress
     Tests/BackendStress.cpp
     Source/Audio/AudioEngine.cpp
     Source/Audio/AudioEngine.h
+    Source/Audio/AudioQuality.h
     Source/Audio/BeatSynthesiser.cpp
     Source/Audio/BeatSynthesiser.h
     Source/Audio/Effects/Bitcrush.cpp

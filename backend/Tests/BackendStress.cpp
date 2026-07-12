@@ -10393,6 +10393,38 @@ namespace
             && second.callbackSafetyViolations > first.callbackSafetyViolations;
     }
 
+    bool stressAudioEngineQualityModes()
+    {
+        beat::AudioEngine standard;
+        beat::AudioEngine highQuality;
+        standard.prepareForOffline(48000.0, 256, 2);
+        highQuality.prepareForOffline(48000.0, 256, 2);
+        if (standard.getProcessingQuality() != beat::AudioQuality::standardLive)
+            return false;
+        highQuality.setProcessingQuality(beat::AudioQuality::offlineHighQuality);
+        if (highQuality.getProcessingQuality() != beat::AudioQuality::offlineHighQuality)
+            return false;
+        standard.applyProject(makeDenseAetherProject());
+        highQuality.applyProject(makeDenseAetherProject());
+        standard.requestPlay();
+        highQuality.requestPlay();
+        const auto live = renderEngineBlock(standard, 4096);
+        const auto hq = renderEngineBlock(highQuality, 4096);
+        if (standard.sequencer().getPosition() != highQuality.sequencer().getPosition())
+            return false;
+        double difference = 0.0;
+        for (int channel = 0; channel < live.getNumChannels(); ++channel)
+            for (int sample = 0; sample < live.getNumSamples(); ++sample)
+            {
+                const float a = live.getSample(channel, sample);
+                const float b = hq.getSample(channel, sample);
+                if (!std::isfinite(a) || !std::isfinite(b))
+                    return false;
+                difference += std::abs((double) a - (double) b);
+            }
+        return difference > 0.0001;
+    }
+
     bool stressAudioEngineVariableBlockSizes()
     {
         beat::AudioEngine engine;
@@ -11390,6 +11422,36 @@ namespace
                     }
                 }
             }
+        }
+
+        {
+            const auto table = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 8, 2048);
+            beat::WavetableOscillator standard;
+            beat::WavetableOscillator highQuality;
+            standard.prepare(48000.0);
+            highQuality.prepare(48000.0);
+            standard.setWavetable(&table);
+            highQuality.setWavetable(&table);
+            standard.setFrequency(997.0);
+            highQuality.setFrequency(997.0);
+            standard.setPosition(0.73f);
+            highQuality.setPosition(0.73f);
+            standard.setPhase(0.12345);
+            highQuality.setPhase(0.12345);
+            highQuality.setQuality(beat::AudioQuality::offlineHighQuality);
+            double difference = 0.0;
+            for (int i = 0; i < 4096; ++i)
+            {
+                const float live = standard.renderSample();
+                const float hq = highQuality.renderSample();
+                if (!std::isfinite(live) || !std::isfinite(hq) || std::abs(hq) > 1.001f)
+                    return false;
+                difference += std::abs((double) live - (double) hq);
+                if (standard.getPhase() != highQuality.getPhase())
+                    return false;
+            }
+            if (difference <= 0.0001)
+                return false;
         }
 
         {
@@ -13999,6 +14061,11 @@ int main()
     if (!stressAudioEngineDurableTelemetry())
     {
         std::cerr << "Audio engine durable telemetry stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineQualityModes())
+    {
+        std::cerr << "Audio engine quality modes stress failed\n";
         return 1;
     }
     if (!stressAudioEngineDenseAetherRoute())

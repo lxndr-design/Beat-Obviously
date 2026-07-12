@@ -554,6 +554,7 @@ namespace beat
         {
             auto* v = new InstrumentVoice();
             v->setStableVoiceId(i);
+            v->setProcessingQuality(processingQuality);
             synth.addVoice(v);
         }
     }
@@ -772,6 +773,20 @@ namespace beat
         prepareMasterLoudnessMeter(channels);
         mixBuf.setSize(juce::jmax(2, channels), scratchBlock, false, false, true);
         routeBuf.setSize(juce::jmax(2, channels), scratchBlock, false, false, true);
+    }
+
+    void AudioEngine::setProcessingQuality(AudioQuality quality) noexcept
+    {
+        processingQuality = quality;
+        for (int i = 0; i < synth.getNumVoices(); ++i)
+            if (auto* voice = dynamic_cast<InstrumentVoice*>(synth.getVoice(i)))
+                voice->setProcessingQuality(quality);
+        const juce::ScopedLock lock(sampleLock);
+        for (auto& route : instrumentRenderStates)
+            if (route.synth != nullptr)
+                for (int i = 0; i < route.synth->getNumVoices(); ++i)
+                    if (auto* voice = dynamic_cast<InstrumentVoice*>(route.synth->getVoice(i)))
+                        voice->setProcessingQuality(quality);
     }
 
     bool AudioEngine::renderProjectToWav(Project project,
@@ -1946,6 +1961,7 @@ namespace beat
         {
                 auto* voice = new InstrumentVoice();
                 voice->setStableVoiceId(i);
+                voice->setProcessingQuality(processingQuality);
                 voice->prepare(sampleRate, mixBuf.getNumSamples() > 0 ? mixBuf.getNumSamples() : 512);
             voice->setParams(params);
             instrumentSynth->addVoice(voice);

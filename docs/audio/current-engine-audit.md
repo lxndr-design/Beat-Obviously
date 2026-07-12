@@ -164,3 +164,11 @@ A fixed-state `MasterDcBlocker` now processes the audible master signal after th
 State persists across ordinary blocks for block-size equivalence. Explicit hard transport reset and project replacement clear it, preventing sub-audible filter decay from leaking across those lifecycle boundaries. Monitoring disable alone retains the physically correct bounded filter decay; the stress contract measures it below `1e-5` total energy rather than requiring an impossible instantaneous state disappearance.
 
 Native tests cover 44.1/192 kHz coefficient ordering, one-second constant-signal rejection, stereo polarity, finite output, exact split/whole-block equality, monitoring decay, hard-stop silence, and project-replacement silence. Full native and non-native gates pass with only the existing TCC waiver. `BeatAetherBaseline` remains byte-identical because that isolated oscillator harness intentionally bypasses the production master chain; full-engine native render tests provide the DC-stage evidence.
+
+## Milestone A6 explicit quality modes — 2026-07-11
+
+`AudioQuality` defines explicit `standardLive` and `offlineHighQuality` modes. Standard Live remains the default for devices, ordinary offline engines, and all existing export entry points, so no render silently changes quality or semantics. Callers may explicitly select Offline HQ through `AudioEngine::setProcessingQuality()`.
+
+The mode propagates to every existing and newly created `InstrumentVoice` and its legacy/A/B/unison wavetable oscillators. Offline HQ uses four-point Catmull-Rom sample interpolation inside each already selected frame/mip; frame selection, mip selection, phase delta, event offsets, parameter ramps, modulation evaluation, envelopes, and routing are identical to Standard Live.
+
+Tests prove Standard Live remains the default and bit-stable, HQ is finite/bounded and audibly/numerically distinct on wavetable material, oscillator phase remains sample-exact between modes, and two full engines reach the exact same sequencer position. The full native suite passes with only the existing waiver. Offline HQ remains opt-in until a product-facing export-quality choice and performance gate are approved.

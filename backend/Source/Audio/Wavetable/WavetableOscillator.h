@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Wavetable.h"
+#include "../AudioQuality.h"
 
 namespace beat
 {
@@ -13,6 +14,7 @@ namespace beat
         void setFrequency(double newFrequencyHz) noexcept;
         void setPosition(float newPosition) noexcept;
         void setPhase(double newPhase) noexcept;
+        void setQuality(AudioQuality newQuality) noexcept { quality = newQuality; }
 
         double getPhase() const noexcept { return phase; }
         double getPhaseIncrement() const noexcept { return phaseDelta; }
@@ -40,5 +42,6 @@ namespace beat
         const float* cachedFrame1Mip1Data { nullptr };
         float cachedFrameFrac { 0.0f };
         float cachedMipFrac { 0.0f };
+        AudioQuality quality { AudioQuality::standardLive };
     };
 }

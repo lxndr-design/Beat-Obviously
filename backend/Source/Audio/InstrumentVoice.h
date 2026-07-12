@@ -10,6 +10,7 @@
 #include "Realtime/RealtimeRamp.h"
 #include "Realtime/VoiceRealtimeRampState.h"
 #include "Transitions/VoiceTransition.h"
+#include "AudioQuality.h"
 #include "Realtime/VoiceRealtimeParams.h"
 #include "Realtime/VoiceNoteAutomation.h"
 #include "Realtime/VoiceNoteAutomationState.h"
@@ -236,6 +237,7 @@ namespace beat
         void setParams(const Params& p);
         bool applyRealtimeParameter(std::string_view parameterId, float value, int rampSamples = 0) noexcept;
         void prepare(double sampleRate, int blockSize);
+        void setProcessingQuality(AudioQuality quality) noexcept;
 
         using WavetableCacheStats = VoiceStats::WavetableCache;
         using RenderWorkStats = VoiceStats::RenderWork;
@@ -326,5 +328,6 @@ namespace beat
         VoiceTransition::Stereo lastOutput;
         int stableVoiceId { 0 };
         bool stealPrepared { false };
+        AudioQuality processingQuality { AudioQuality::standardLive };
     };
 }
