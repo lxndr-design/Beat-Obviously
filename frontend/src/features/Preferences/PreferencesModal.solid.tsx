@@ -219,8 +219,8 @@ export function PreferencesModal() {
               <Button
                 role="tab"
                 aria-selected={activeTab() === tab.id}
-                class={styles.navButton}
-                selected={activeTab() === tab.id}
+                aria-current={activeTab() === tab.id ? "page" : undefined}
+                class={`${styles.navButton} ${activeTab() === tab.id ? styles.navButtonActive : ""}`}
                 onClick={() => selectTab(tab.id)}
               >
                 {tab.label}

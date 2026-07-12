@@ -59,6 +59,11 @@
 .navButtonActive {
   background: var(--interaction-selected-bg);
   font-weight: var(--font-weight-bold);
+  box-shadow: inset 3px 0 0 var(--color-fg);
+}
+
+.navButtonActive:hover {
+  background: var(--interaction-selected-hover-bg);
 }
 
 .tabContent {
