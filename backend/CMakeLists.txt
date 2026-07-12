@@ -91,6 +91,7 @@ target_sources(Beat PRIVATE
     Source/Audio/Effects/MasterEq.h
     Source/Audio/Effects/MasterLimiter.cpp
     Source/Audio/Effects/MasterLimiter.h
+    Source/Audio/Effects/MasterDcBlocker.h
     Source/Audio/Effects/TrackEffectDefaults.cpp
     Source/Audio/Effects/TrackEffectDefaults.h
 
@@ -162,6 +163,7 @@ add_executable(BeatBackendStress
     Source/Audio/Effects/MasterEq.h
     Source/Audio/Effects/MasterLimiter.cpp
     Source/Audio/Effects/MasterLimiter.h
+    Source/Audio/Effects/MasterDcBlocker.h
     Source/Audio/Effects/TrackEffectDefaults.cpp
     Source/Audio/Effects/TrackEffectDefaults.h
     Source/Audio/InstrumentVoice.cpp

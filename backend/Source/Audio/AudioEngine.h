@@ -8,6 +8,7 @@
 #include "Effects/Bitcrush.h"
 #include "Effects/MasterEq.h"
 #include "Effects/MasterLimiter.h"
+#include "Effects/MasterDcBlocker.h"
 #include "Recording/RecordingCapture.h"
 #include "Realtime/RealtimeParameterQueue.h"
 #include "Realtime/RenderBudgets.h"
@@ -276,6 +277,7 @@ namespace beat
         Bitcrush                 bitcrush;
         MasterEq                 masterEq;
         MasterLimiter            masterLimiter;
+        MasterDcBlocker          masterDcBlocker;
         FftAnalyzer              masterAnalyzer;
         MasterChainSettings      masterChainSettings;
         float                    masterCompressorEnvelope { 0.0f };

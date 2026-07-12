@@ -174,3 +174,15 @@ audio callback
 ```
 
 Overload does not trigger container growth or automatic quality reduction. Each admission limit has deterministic behavior, and normal in-budget render hashes are unchanged.
+
+## Master DC stage
+
+```text
+route/group/return mix
+  master EQ/compressor/bitcrush chain
+  MasterDcBlocker (5 Hz, persistent fixed per-channel state)
+  MasterLimiter
+  meters/analyzer/output copy
+```
+
+The blocker is prepared outside the callback and reset only at explicit hard-stop/project-replacement boundaries. It adds one fixed recurrence per channel/sample and no allocation or dynamic dispatch.

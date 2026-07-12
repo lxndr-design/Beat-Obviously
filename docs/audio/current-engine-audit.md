@@ -156,3 +156,11 @@ This checkpoint addresses deterministic voice stealing and steal de-clicking. Ge
 Native saturation coverage proves exact queue capacity, nonzero rejection, cumulative counters, zero prepared-capacity violations, and detection when a deliberately oversized test block would require callback growth. The complete native suite passes in 6.57 s with 185,991,168-byte maximum RSS. Full non-native verification passes, and all 150 in-budget WAVs remain byte-identical to the A1 freeze.
 
 The callback-safety counter detects known preallocation boundary violations; it is not yet a global malloc/lock/file-I/O interposer. That stronger detector and deferred shared-owner reclamation remain open.
+
+## Milestone A5 master DC invariant — 2026-07-11
+
+A fixed-state `MasterDcBlocker` now processes the audible master signal after the master chain and before the final limiter. It implements a 5 Hz first-order high-pass recurrence, recomputes its coefficient for the active sample rate, supports up to the engine's fixed 32-channel limit, suppresses denormals/non-finite output, and performs no callback allocation.
+
+State persists across ordinary blocks for block-size equivalence. Explicit hard transport reset and project replacement clear it, preventing sub-audible filter decay from leaking across those lifecycle boundaries. Monitoring disable alone retains the physically correct bounded filter decay; the stress contract measures it below `1e-5` total energy rather than requiring an impossible instantaneous state disappearance.
+
+Native tests cover 44.1/192 kHz coefficient ordering, one-second constant-signal rejection, stereo polarity, finite output, exact split/whole-block equality, monitoring decay, hard-stop silence, and project-replacement silence. Full native and non-native gates pass with only the existing TCC waiver. `BeatAetherBaseline` remains byte-identical because that isolated oscillator harness intentionally bypasses the production master chain; full-engine native render tests provide the DC-stage evidence.

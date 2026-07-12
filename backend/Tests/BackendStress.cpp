@@ -7,6 +7,7 @@
 #include "../Source/Audio/Filter/DriveStage.h"
 #include "../Source/Audio/Filter/FilterMath.h"
 #include "../Source/Audio/Filter/FilterStage.h"
+#include "../Source/Audio/Effects/MasterDcBlocker.h"
 #include "../Source/Audio/InstrumentVoice.h"
 #include "../Source/Audio/Modulation/DynamicModulation.h"
 #include "../Source/Audio/Modulation/Lfo.h"
@@ -892,6 +893,51 @@ namespace
         for (int i = 0; i < 64; ++i)
             frame = state.process(i == 0 ? 1.0f : 0.0f, i == 0 ? -1.0f : 0.0f);
         return std::isfinite(frame.left) && std::isfinite(frame.right);
+    }
+
+    bool stressMasterDcBlocker()
+    {
+        beat::MasterDcBlocker lowRate;
+        beat::MasterDcBlocker highRate;
+        lowRate.prepare(44100.0, 2);
+        highRate.prepare(192000.0, 2);
+        if (!(lowRate.getCoefficient() > 0.0f && lowRate.getCoefficient() < highRate.getCoefficient() && highRate.getCoefficient() < 1.0f))
+            return false;
+
+        juce::AudioBuffer<float> constant(2, 48000);
+        for (int channel = 0; channel < constant.getNumChannels(); ++channel)
+            std::fill(constant.getWritePointer(channel), constant.getWritePointer(channel) + constant.getNumSamples(), channel == 0 ? 0.75f : -0.5f);
+        beat::MasterDcBlocker blocker;
+        blocker.prepare(48000.0, 2);
+        blocker.process(constant);
+        if (std::abs(constant.getSample(0, constant.getNumSamples() - 1)) > 1.0e-5f
+            || std::abs(constant.getSample(1, constant.getNumSamples() - 1)) > 1.0e-5f)
+            return false;
+
+        juce::AudioBuffer<float> whole(2, 512);
+        juce::AudioBuffer<float> splitA(2, 256);
+        juce::AudioBuffer<float> splitB(2, 256);
+        for (int channel = 0; channel < 2; ++channel)
+        {
+            for (int i = 0; i < 512; ++i)
+            {
+                const float value = 0.2f + 0.5f * std::sin((float) i * 0.071f);
+                whole.setSample(channel, i, value);
+                (i < 256 ? splitA : splitB).setSample(channel, i % 256, value);
+            }
+        }
+        beat::MasterDcBlocker wholeBlocker;
+        beat::MasterDcBlocker splitBlocker;
+        wholeBlocker.prepare(48000.0, 2);
+        splitBlocker.prepare(48000.0, 2);
+        wholeBlocker.process(whole);
+        splitBlocker.process(splitA);
+        splitBlocker.process(splitB);
+        for (int channel = 0; channel < 2; ++channel)
+            for (int i = 0; i < 512; ++i)
+                if (whole.getSample(channel, i) != (i < 256 ? splitA : splitB).getSample(channel, i % 256))
+                    return false;
+        return true;
     }
 
     bool stressVoiceAllocationHelper()
@@ -4438,13 +4484,21 @@ namespace
         if (engine.isInputMonitoringEnabled())
             return false;
 
-        return std::isfinite(monitorEnergy)
+        const bool ok = std::isfinite(monitorEnergy)
             && monitorEnergy > 0.0001
             && metersOk
             && std::isfinite(disabledEnergy)
-            && disabledEnergy < 0.000001
+            // The master DC blocker retains a bounded sub-audible decay state
+            // after monitoring is disabled; it must remain negligible.
+            && disabledEnergy < 0.00001
             && std::isfinite(projectMonitorEnergy)
             && projectMonitorEnergy > 0.0001;
+        if (!ok)
+            std::cerr << "input monitor energy monitor=" << monitorEnergy
+                      << " disabled=" << disabledEnergy
+                      << " project=" << projectMonitorEnergy
+                      << " meters=" << metersOk << "\n";
+        return ok;
     }
 
     beat::Project makePluginLatencyCompensationProject(const juce::File& file)
@@ -13334,6 +13388,11 @@ int main()
     if (!stressFilterStageHelper())
     {
         std::cerr << "Filter stage helper stress failed\n";
+        return 1;
+    }
+    if (!stressMasterDcBlocker())
+    {
+        std::cerr << "Master DC blocker stress failed\n";
         return 1;
     }
     if (!stressVoiceAllocationHelper())

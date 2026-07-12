@@ -765,6 +765,7 @@ namespace beat
         bitcrush.prepare(sampleRate, scratchBlock);
         masterEq.prepare(sampleRate, scratchBlock, channels);
         masterLimiter.prepare(sampleRate, scratchBlock, channels);
+        masterDcBlocker.prepare(sampleRate, channels);
         masterLimiter.setCeilingDb(-0.3f);
         masterLimiter.setReleaseMs(35.0f);
         masterAnalyzer.prepare(sampleRate);
@@ -1096,6 +1097,7 @@ namespace beat
         masterCompressorEnvelope = 0.0f;
         projectLatencySamples = estimateProjectLatencySamples(p);
         rebuildSampleInstruments(p);
+        masterDcBlocker.reset();
     }
 
     void AudioEngine::setEqAutomation(std::vector<EqAutomationPoint> pts)
@@ -1598,6 +1600,8 @@ namespace beat
         defaultNoteAutomationContextCount = 0;
         activeSampleVoices.clear();
         activeAudioClipVoices.clear();
+        if (!allowTailOff)
+            masterDcBlocker.reset();
         resetMasterLoudnessMeter();
     }
 
@@ -4343,6 +4347,7 @@ namespace beat
         masterEq.setCurrentBeat(seq.getPosition());
         masterEq.process(mixBuf);
         processMasterChain(mixBuf, numSamples);
+        masterDcBlocker.process(mixBuf);
         masterLimiter.process(mixBuf);
         publishMasterMeter(numSamples);
         const auto masterFxTicks = ticksBetween(phaseStartTicks, markTicks());
