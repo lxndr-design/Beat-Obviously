@@ -11455,6 +11455,62 @@ namespace
         }
 
         {
+            const auto sine = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Sine, 8, 2048);
+            const auto square = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Square, 8, 2048);
+            const auto saw = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 8, 2048);
+            beat::WavetableOscillator transitioning;
+            beat::WavetableOscillator reference;
+            for (auto* oscillator : { &transitioning, &reference })
+            {
+                oscillator->prepare(48000.0);
+                oscillator->setWavetable(&sine);
+                oscillator->setFrequency(997.0);
+                oscillator->setPosition(0.8f);
+                oscillator->setPhase(0.31);
+            }
+            for (int i = 0; i < 257; ++i)
+            {
+                transitioning.renderSample();
+                reference.renderSample();
+            }
+            transitioning.setWavetable(&square);
+            if (!transitioning.isTableTransitionActive())
+                return false;
+            const float firstTransition = transitioning.renderSample();
+            const float continuedPrevious = reference.renderSample();
+            if (std::abs(firstTransition - continuedPrevious) > 1.0e-6f)
+            {
+                std::cerr << "table replacement first sample " << firstTransition << " expected " << continuedPrevious << "\n";
+                return false;
+            }
+
+            float previous = firstTransition;
+            float maxStep = 0.0f;
+            for (int i = 0; i < 120; ++i)
+            {
+                const float sample = transitioning.renderSample();
+                maxStep = std::max(maxStep, std::abs(sample - previous));
+                previous = sample;
+            }
+            transitioning.setWavetable(&saw);
+            if (!transitioning.isTableTransitionActive())
+                return false;
+            for (int i = 0; i < 512; ++i)
+            {
+                const float sample = transitioning.renderSample();
+                if (!std::isfinite(sample))
+                    return false;
+                maxStep = std::max(maxStep, std::abs(sample - previous));
+                previous = sample;
+            }
+            if (transitioning.isTableTransitionActive() || !std::isfinite(maxStep))
+            {
+                std::cerr << "table replacement completion active=" << transitioning.isTableTransitionActive() << " maxStep=" << maxStep << "\n";
+                return false;
+            }
+        }
+
+        {
             const std::array<beat::WavetableFactory::CustomFrame, 4> frames {{
                 { 0.12f, 0.04f, 0.0f, 0.06f, 0.04f, -0.24f, -0.55f, 0.18f, 0.0f },
                 { 0.38f, 0.18f, 0.2f, 0.22f, 0.12f, -0.08f, -0.15f, 0.36f, 0.25f },

@@ -65,3 +65,7 @@ The first-order master DC blocker is independently implemented from the standard
 ## Milestone A6 provenance
 
 The quality enum, engine/voice propagation, and four-point interpolation are independently implemented using standard Catmull-Rom mathematics. No external code, asset, service, or dependency was used.
+
+## Milestone A7 provenance
+
+The dual-table playback cache, bounded replacement crossfade, and retained-owner reclamation boundary are independently implemented from existing Beat ownership and oscillator code. No upstream source or dependency was used.

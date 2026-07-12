@@ -22,6 +22,7 @@ namespace beat
         sampleRate = std::isfinite(newSampleRate) && newSampleRate > 0.0 ? newSampleRate : 44100.0;
         frequencyHz = juce::jlimit(0.0, sampleRate * 0.49, frequencyHz);
         phaseDelta = frequencyHz / sampleRate;
+        tableTransitionLength = juce::jlimit(32, 512, (int) std::round(sampleRate * 0.005));
         markFrameCacheDirty();
     }
 
@@ -32,7 +33,14 @@ namespace beat
 
     void WavetableOscillator::setWavetable(const Wavetable* newTable) noexcept
     {
-        table = newTable != nullptr && newTable->isValid() ? newTable : nullptr;
+        const auto* validTable = newTable != nullptr && newTable->isValid() ? newTable : nullptr;
+        if (validTable == table)
+            return;
+        previousTable = table;
+        previousCache = currentCache;
+        table = validTable;
+        currentCache = {};
+        tableTransitionRemaining = previousTable != nullptr && table != nullptr ? tableTransitionLength : 0;
         markFrameCacheDirty();
     }
 
@@ -64,7 +72,16 @@ namespace beat
 
     float WavetableOscillator::renderSample() noexcept
     {
-        const float sample = readCurrentSample();
+        float sample = readCurrentSample(table, currentCache);
+        if (tableTransitionRemaining > 0 && previousTable != nullptr)
+        {
+            const float previous = readCurrentSample(previousTable, previousCache);
+            const float mix = 1.0f - (float) tableTransitionRemaining / (float) juce::jmax(1, tableTransitionLength);
+            sample = previous + (sample - previous) * mix;
+            --tableTransitionRemaining;
+            if (tableTransitionRemaining == 0)
+                previousTable = nullptr;
+        }
 
         phase += phaseDelta;
         if (phase >= 1.0)
@@ -73,22 +90,16 @@ namespace beat
         return std::isfinite(sample) ? juce::jlimit(-1.0f, 1.0f, sample) : 0.0f;
     }
 
-    void WavetableOscillator::updateFrameCache() noexcept
+    void WavetableOscillator::updateFrameCache(const Wavetable* source, PlaybackCache& cache) noexcept
     {
-        frameCacheDirty = false;
-        cachedFrameSize = 0;
-        cachedFrame0Mip0Data = nullptr;
-        cachedFrame1Mip0Data = nullptr;
-        cachedFrame0Mip1Data = nullptr;
-        cachedFrame1Mip1Data = nullptr;
-        cachedFrameFrac = 0.0f;
-        cachedMipFrac = 0.0f;
+        cache = {};
+        cache.dirty = false;
 
-        if (table == nullptr)
+        if (source == nullptr)
             return;
 
-        const int frameCount = table->getFrameCount();
-        const int frameSize = table->getFrameSize();
+        const int frameCount = source->getFrameCount();
+        const int frameSize = source->getFrameSize();
         if (frameCount <= 0 || frameSize <= 1)
             return;
 
@@ -99,14 +110,14 @@ namespace beat
         int mip0 = 0;
         int mip1 = 0;
         float mipFrac = 0.0f;
-        const int mipCount = table->getMipLevelCount();
+        const int mipCount = source->getMipLevelCount();
         const double playbackLimit = frequencyHz > 0.0 && sampleRate > 0.0
             ? juce::jmax(1.0, (sampleRate * 0.48) / frequencyHz)
             : std::numeric_limits<double>::max();
         for (int mip = 0; mip + 1 < mipCount; ++mip)
         {
-            const auto* current = table->getMipLevel(frame0, mip);
-            const auto* next = table->getMipLevel(frame0, mip + 1);
+            const auto* current = source->getMipLevel(frame0, mip);
+            const auto* next = source->getMipLevel(frame0, mip + 1);
             if (current == nullptr || next == nullptr)
                 break;
             if (playbackLimit >= (double) current->maxHarmonic)
@@ -126,39 +137,39 @@ namespace beat
             }
         }
 
-        cachedFrameSize = frameSize;
-        const auto* f0m0 = table->getMipLevel(frame0, mip0);
-        const auto* f1m0 = table->getMipLevel(frame1, mip0);
-        const auto* f0m1 = table->getMipLevel(frame0, mip1);
-        const auto* f1m1 = table->getMipLevel(frame1, mip1);
-        cachedFrame0Mip0Data = f0m0 != nullptr ? f0m0->samples.data() : nullptr;
-        cachedFrame1Mip0Data = f1m0 != nullptr ? f1m0->samples.data() : nullptr;
-        cachedFrame0Mip1Data = f0m1 != nullptr ? f0m1->samples.data() : nullptr;
-        cachedFrame1Mip1Data = f1m1 != nullptr ? f1m1->samples.data() : nullptr;
-        cachedFrameFrac = framePos - (float) frame0;
-        cachedMipFrac = mipFrac;
+        cache.frameSize = frameSize;
+        const auto* f0m0 = source->getMipLevel(frame0, mip0);
+        const auto* f1m0 = source->getMipLevel(frame1, mip0);
+        const auto* f0m1 = source->getMipLevel(frame0, mip1);
+        const auto* f1m1 = source->getMipLevel(frame1, mip1);
+        cache.frame0Mip0Data = f0m0 != nullptr ? f0m0->samples.data() : nullptr;
+        cache.frame1Mip0Data = f1m0 != nullptr ? f1m0->samples.data() : nullptr;
+        cache.frame0Mip1Data = f0m1 != nullptr ? f0m1->samples.data() : nullptr;
+        cache.frame1Mip1Data = f1m1 != nullptr ? f1m1->samples.data() : nullptr;
+        cache.frameFrac = framePos - (float) frame0;
+        cache.mipFrac = mipFrac;
     }
 
-    float WavetableOscillator::readCurrentSample() noexcept
+    float WavetableOscillator::readCurrentSample(const Wavetable* source, PlaybackCache& cache) noexcept
     {
-        if (frameCacheDirty)
-            updateFrameCache();
+        if (cache.dirty)
+            updateFrameCache(source, cache);
 
-        if (cachedFrameSize <= 1 || cachedFrame0Mip0Data == nullptr || cachedFrame1Mip0Data == nullptr
-            || cachedFrame0Mip1Data == nullptr || cachedFrame1Mip1Data == nullptr)
+        if (cache.frameSize <= 1 || cache.frame0Mip0Data == nullptr || cache.frame1Mip0Data == nullptr
+            || cache.frame0Mip1Data == nullptr || cache.frame1Mip1Data == nullptr)
             return 0.0f;
 
-        const double samplePos = phase * (double) cachedFrameSize;
+        const double samplePos = phase * (double) cache.frameSize;
         const int index0 = (int) samplePos;
-        const int index1 = index0 + 1 == cachedFrameSize ? 0 : index0 + 1;
+        const int index1 = index0 + 1 == cache.frameSize ? 0 : index0 + 1;
         const float sampleFrac = (float) (samplePos - (double) index0);
 
-        const auto interpolate = [this, index0, index1, sampleFrac](const float* data) noexcept
+        const auto interpolate = [this, &cache, index0, index1, sampleFrac](const float* data) noexcept
         {
             if (quality == AudioQuality::offlineHighQuality)
             {
-                const int previous = index0 == 0 ? cachedFrameSize - 1 : index0 - 1;
-                const int next = index1 + 1 == cachedFrameSize ? 0 : index1 + 1;
+                const int previous = index0 == 0 ? cache.frameSize - 1 : index0 - 1;
+                const int next = index1 + 1 == cache.frameSize ? 0 : index1 + 1;
                 const float p0 = data[(size_t) previous];
                 const float p1 = data[(size_t) index0];
                 const float p2 = data[(size_t) index1];
@@ -172,12 +183,12 @@ namespace beat
             }
             return data[(size_t) index0] + (data[(size_t) index1] - data[(size_t) index0]) * sampleFrac;
         };
-        const float mip0Frame0 = interpolate(cachedFrame0Mip0Data);
-        const float mip0Frame1 = interpolate(cachedFrame1Mip0Data);
-        const float mip1Frame0 = interpolate(cachedFrame0Mip1Data);
-        const float mip1Frame1 = interpolate(cachedFrame1Mip1Data);
-        const float mip0Sample = mip0Frame0 + (mip0Frame1 - mip0Frame0) * cachedFrameFrac;
-        const float mip1Sample = mip1Frame0 + (mip1Frame1 - mip1Frame0) * cachedFrameFrac;
-        return mip0Sample + (mip1Sample - mip0Sample) * cachedMipFrac;
+        const float mip0Frame0 = interpolate(cache.frame0Mip0Data);
+        const float mip0Frame1 = interpolate(cache.frame1Mip0Data);
+        const float mip1Frame0 = interpolate(cache.frame0Mip1Data);
+        const float mip1Frame1 = interpolate(cache.frame1Mip1Data);
+        const float mip0Sample = mip0Frame0 + (mip0Frame1 - mip0Frame0) * cache.frameFrac;
+        const float mip1Sample = mip1Frame0 + (mip1Frame1 - mip1Frame0) * cache.frameFrac;
+        return mip0Sample + (mip1Sample - mip0Sample) * cache.mipFrac;
     }
 }

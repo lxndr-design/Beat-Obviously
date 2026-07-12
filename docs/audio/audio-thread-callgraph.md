@@ -201,3 +201,21 @@ audio callback
 ```
 
 Mode selection is not data-dependent and never changes automatically under load.
+
+## Table replacement lifetime path
+
+```text
+control-thread replacement
+  build/find complete immutable new table
+  move current shared owner -> one bounded retired owner
+  publish new raw immutable view to oscillator
+audio callback
+  retain old/new playback caches
+  first sample continues old table exactly
+  crossfade old -> new for bounded 5 ms at identical phase/timing
+  drop old raw view when transition completes
+later control replacement or voice teardown
+  reclaim retired shared owner off callback
+```
+
+Same-table note reconfiguration does not restart a transition. Repeated replacement supersedes the earlier transition without accumulating owners or queues.

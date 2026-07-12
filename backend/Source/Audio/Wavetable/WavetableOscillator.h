@@ -22,26 +22,36 @@ namespace beat
         float getPosition() const noexcept { return position; }
 
         float renderSample() noexcept;
+        bool isTableTransitionActive() const noexcept { return tableTransitionRemaining > 0; }
 
     private:
-        void markFrameCacheDirty() noexcept { frameCacheDirty = true; }
-        void updateFrameCache() noexcept;
-        float readCurrentSample() noexcept;
+        struct PlaybackCache
+        {
+            bool dirty { true };
+            int frameSize { 0 };
+            const float* frame0Mip0Data { nullptr };
+            const float* frame1Mip0Data { nullptr };
+            const float* frame0Mip1Data { nullptr };
+            const float* frame1Mip1Data { nullptr };
+            float frameFrac { 0.0f };
+            float mipFrac { 0.0f };
+        };
+
+        void markFrameCacheDirty() noexcept { currentCache.dirty = true; previousCache.dirty = true; }
+        void updateFrameCache(const Wavetable* source, PlaybackCache& cache) noexcept;
+        float readCurrentSample(const Wavetable* source, PlaybackCache& cache) noexcept;
 
         const Wavetable* table { nullptr };
+        const Wavetable* previousTable { nullptr };
         double sampleRate { 44100.0 };
         double frequencyHz { 440.0 };
         double phase { 0.0 };
         double phaseDelta { 440.0 / 44100.0 };
         float position { 0.0f };
-        bool frameCacheDirty { true };
-        int cachedFrameSize { 0 };
-        const float* cachedFrame0Mip0Data { nullptr };
-        const float* cachedFrame1Mip0Data { nullptr };
-        const float* cachedFrame0Mip1Data { nullptr };
-        const float* cachedFrame1Mip1Data { nullptr };
-        float cachedFrameFrac { 0.0f };
-        float cachedMipFrac { 0.0f };
+        PlaybackCache currentCache;
+        PlaybackCache previousCache;
+        int tableTransitionLength { 220 };
+        int tableTransitionRemaining { 0 };
         AudioQuality quality { AudioQuality::standardLive };
     };
 }

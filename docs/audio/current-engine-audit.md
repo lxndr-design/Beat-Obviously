@@ -172,3 +172,13 @@ Native tests cover 44.1/192 kHz coefficient ordering, one-second constant-signal
 The mode propagates to every existing and newly created `InstrumentVoice` and its legacy/A/B/unison wavetable oscillators. Offline HQ uses four-point Catmull-Rom sample interpolation inside each already selected frame/mip; frame selection, mip selection, phase delta, event offsets, parameter ramps, modulation evaluation, envelopes, and routing are identical to Standard Live.
 
 Tests prove Standard Live remains the default and bit-stable, HQ is finite/bounded and audibly/numerically distinct on wavetable material, oscillator phase remains sample-exact between modes, and two full engines reach the exact same sequencer position. The full native suite passes with only the existing waiver. Offline HQ remains opt-in until a product-facing export-quality choice and performance gate are approved.
+
+## Milestone A7 bounded table replacement and reclamation — 2026-07-11
+
+`WavetableOscillator` now maintains independent current/previous immutable playback caches during replacement. A valid table change begins a 5 ms transition clamped to 32–512 samples; the first replacement sample is exactly the continuing old-table sample, then playback crossfades to the new table at the same phase, frequency, position, frame mix, and mip mix. Reapplying the same pointer is a no-op, and a newer replacement deterministically supersedes an in-flight one.
+
+Each `InstrumentVoice` retains one retired `shared_ptr<const Wavetable>` for the legacy, A, and B stacks. Oscillators read raw immutable views, while retained owners guarantee lifetime through the transition. Ownership is bounded at current plus one retired table per stack. Production `setParams()` occurs during control-thread synth construction/replacement under the engine boundary; cache eviction and voice teardown likewise occur off the callback. A subsequent controlled replacement reclaims the prior retired owner only after its oscillator view has been superseded.
+
+Tests cover exact first-sample continuity, bounded completion, repeated replacement during an active transition, finite output, same-pointer no-op behavior through existing note reconfiguration, and all prior frame/mip/quality invariants. Standard single-table renders remain unchanged.
+
+This completes the planned Milestone A production foundation. A release-gate review still needs to assess the remaining global malloc/lock/file-I/O interposer limitation and product-facing Offline HQ selection before declaring the entire phase releasable.

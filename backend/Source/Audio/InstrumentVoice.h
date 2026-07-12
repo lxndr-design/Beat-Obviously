@@ -298,6 +298,9 @@ namespace beat
         std::shared_ptr<const Wavetable> wavetableTable;
         std::shared_ptr<const Wavetable> aetherTableA;
         std::shared_ptr<const Wavetable> aetherTableB;
+        std::shared_ptr<const Wavetable> retiredWavetableTable;
+        std::shared_ptr<const Wavetable> retiredAetherTableA;
+        std::shared_ptr<const Wavetable> retiredAetherTableB;
         std::array<WavetableOscillator, 8> wavetableOscillators;
         std::array<WavetableOscillator, 8> aetherOscillatorsA;
         std::array<WavetableOscillator, 8> aetherOscillatorsB;

@@ -131,36 +131,51 @@ namespace beat
         if (legacyWavetableNeedsSetup())
         {
             activeWavetableUnison = juce::jlimit(1, 8, params.wavetable.unison);
-            wavetableTable = WavetableVoiceCache::sharedTableForConfig(params.wavetable);
+            auto nextTable = WavetableVoiceCache::sharedTableForConfig(params.wavetable);
+            if (nextTable.get() != wavetableTable.get())
+            {
+                retiredWavetableTable = std::move(wavetableTable);
+                wavetableTable = std::move(nextTable);
+            }
             WavetableOscillatorBank::configure(wavetableOscillators, wavetableTable.get(), params.wavetable, sampleRate, baseFrequencyHz);
             WavetableUnison::invalidate(wavetableUnisonPlan);
         }
         else
         {
             activeWavetableUnison = 1;
-            wavetableTable.reset();
+            retiredWavetableTable = std::move(wavetableTable);
             WavetableOscillatorBank::clear(wavetableOscillators, wavetableUnisonPlan);
         }
 
         if (aetherOscillatorNeedsWavetable(params.aetherOscA))
         {
-            aetherTableA = WavetableVoiceCache::sharedTableForConfig(params.aetherOscA.wavetable);
+            auto nextTable = WavetableVoiceCache::sharedTableForConfig(params.aetherOscA.wavetable);
+            if (nextTable.get() != aetherTableA.get())
+            {
+                retiredAetherTableA = std::move(aetherTableA);
+                aetherTableA = std::move(nextTable);
+            }
             WavetableOscillatorBank::configure(aetherOscillatorsA, aetherTableA.get(), params.aetherOscA.wavetable, sampleRate, baseFrequencyHz);
         }
         else
         {
-            aetherTableA.reset();
+            retiredAetherTableA = std::move(aetherTableA);
             WavetableOscillatorBank::clear(aetherOscillatorsA, aetherUnisonPlanA);
         }
 
         if (aetherOscillatorNeedsWavetable(params.aetherOscB))
         {
-            aetherTableB = WavetableVoiceCache::sharedTableForConfig(params.aetherOscB.wavetable);
+            auto nextTable = WavetableVoiceCache::sharedTableForConfig(params.aetherOscB.wavetable);
+            if (nextTable.get() != aetherTableB.get())
+            {
+                retiredAetherTableB = std::move(aetherTableB);
+                aetherTableB = std::move(nextTable);
+            }
             WavetableOscillatorBank::configure(aetherOscillatorsB, aetherTableB.get(), params.aetherOscB.wavetable, sampleRate, baseFrequencyHz);
         }
         else
         {
-            aetherTableB.reset();
+            retiredAetherTableB = std::move(aetherTableB);
             WavetableOscillatorBank::clear(aetherOscillatorsB, aetherUnisonPlanB);
         }
         adsrParams.attack  = juce::jmax(0.001f, p.attackMs  * 0.001f);
