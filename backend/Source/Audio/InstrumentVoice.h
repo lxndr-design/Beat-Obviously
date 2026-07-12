@@ -105,6 +105,7 @@ namespace beat
                 int tuningStep { 0 };
                 int tuningDivisions { 12 };
                 int phaseMode { 0 };
+                int routing { 0 };
                 float phase { 0.0f };
                 float randomPhase { 0.0f };
                 WavetableConfig wavetable;
@@ -116,6 +117,7 @@ namespace beat
                 float level { 0.0f };
                 int octave { -1 };
                 int waveform { 0 };
+                int routing { 0 };
             };
 
             struct AetherNoise
@@ -123,6 +125,7 @@ namespace beat
                 bool enabled { false };
                 float level { 0.0f };
                 float color { 0.5f };
+                int routing { 0 };
             };
 
             struct DynamicModTarget
@@ -341,6 +344,7 @@ namespace beat
         int activeWavetableUnison { 1 };
         VoiceStats::RenderWorkBlock currentBlockWork;
         DriveStage::State aetherRuntimeWarpState;
+        DriveStage::State aetherDirectRuntimeWarpState;
         DriveStage::State driveState;
         DriveStage::State filter2DriveState;
         FilterStage::State filterState;

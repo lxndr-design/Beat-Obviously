@@ -391,6 +391,7 @@ namespace beat
         phaseDelta = baseFrequencyHz / sampleRate;
         pitchFrequencyRamp.reset((float) baseFrequencyHz);
         aetherRuntimeWarpState.reset();
+        aetherDirectRuntimeWarpState.reset();
         driveState.reset();
         filter2DriveState.reset();
         previousRawEnvelope = 0.0f;
@@ -552,6 +553,7 @@ namespace beat
 
             // Oscillator
             StereoSample raw;
+            StereoSample directRaw;
             if (params.hasAether)
             {
                 const auto aetherResult = AetherTableStackRenderer::render(
@@ -579,7 +581,8 @@ namespace beat
                     noteKeytrack,
                     modWheel,
                     noiseState);
-                raw = { aetherResult.frame.left, aetherResult.frame.right };
+                raw = { aetherResult.filteredFrame.left, aetherResult.filteredFrame.right };
+                directRaw = { aetherResult.directFrame.left, aetherResult.directFrame.right };
                 currentBlockWork.add(aetherResult.work);
             }
             else
@@ -595,6 +598,8 @@ namespace beat
             }
             float left = raw.left;
             float right = raw.right;
+            float directLeft = directRaw.left;
+            float directRight = directRaw.right;
 
             if (params.hasAether && params.aetherRuntimeWarp > 0.0001f)
             {
@@ -605,10 +610,18 @@ namespace beat
                     params.aetherRuntimeWarpMode);
                 left = warped.left;
                 right = warped.right;
+                const auto directWarped = processRuntimeWarpOversampled(
+                    aetherDirectRuntimeWarpState,
+                    { directLeft, directRight },
+                    params.aetherRuntimeWarp,
+                    params.aetherRuntimeWarpMode);
+                directLeft = directWarped.left;
+                directRight = directWarped.right;
             }
             else
             {
                 aetherRuntimeWarpState.reset({ left, right });
+                aetherDirectRuntimeWarpState.reset({ directLeft, directRight });
             }
 
             const float filterInputLeft = left;
@@ -687,6 +700,12 @@ namespace beat
             else
             {
                 filter2DriveState.reset({ left, right });
+            }
+
+            if (params.hasAether && (directLeft != 0.0f || directRight != 0.0f))
+            {
+                left += directLeft;
+                right += directRight;
             }
 
             const float ampLevel = VoiceMath::clamp01(params.ampLevel + (useDynamicModulation && cachedDynamicTargets.ampLevel

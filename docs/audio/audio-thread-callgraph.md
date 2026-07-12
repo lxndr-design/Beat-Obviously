@@ -320,3 +320,14 @@ shared source mix
 ```
 
 Both filter and drive states are prepared outside the callback. Topology selection is a fixed per-sample branch with no graph mutation or dynamic ownership.
+
+```text
+A/B/sub/noise render
+  route=filter -> normalized filtered stereo bus
+  route=direct -> normalized direct stereo bus
+filtered bus -> runtime warp -> Filter 1 / optional Filter 2 topology
+direct bus -> independent runtime warp -> bypass shared filter drives and filters
+filtered + direct -> common amp/pan -> steal transition -> voice output
+```
+
+Route values are parsed and copied on the setup boundary. Both buses and runtime-warp states are fixed voice members; callback routing performs no allocation, ownership change, lazy initialization, file operation, or container growth.

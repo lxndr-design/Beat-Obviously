@@ -254,3 +254,11 @@ Filter 2 state and oversampled drive state are prepared/reset with the voice lif
 Focused native tests verify parsing, bounded finite output, and distinct serial, parallel, and Filter-1-only renders. Frontend coverage verifies Filter 2 settings and topology reach preview state. Per-source selection between Filter 1, Filter 2, both, and direct remains the next routing slice.
 
 The first complete non-native run exposed and retained a migration regression test: disabled Filter 2 cutoff was incorrectly sanitized from its Hz domain to `1`. The sanitizer now treats both filter cutoff IDs as 20–20,000 Hz, and the full roundtrip gate passes. Full native/non-native suites pass with only the existing TCC waiver, production Beat builds, and all 150 frozen WAVs are byte-identical to B4. B5 baseline JSON SHA-256 is `12d67613f247312e3cfdceb6bc69c1a46a5f0935e32af7869da1777153a1250a`.
+
+## Milestone B6 per-source direct routing — 2026-07-12
+
+Oscillator A, oscillator B, sub, and noise now independently select the stable `filter` or `direct` destination. `filter` remains the compatibility default. The stack renderer keeps one shared level normalizer, then publishes separate fixed stereo buses; the filtered bus follows the existing runtime-warp and Filter 1/Filter 2 path, while the direct bus receives an independent runtime-warp state and rejoins after both shared filters/drives but before the common amp, pan, and steal transition.
+
+Focused native coverage proves filtered and direct buses can be nonzero simultaneously and recombine to the bounded compatibility frame. Patch parsing verifies all four route fields. Frontend normalization, reverse conversion, and preview use the same destinations; the existing default preview remains exactly RMS `0.05915262597409699`, peak `0.5288043022155762`.
+
+Full native stress passes with only `baseline.recent-project-exists` waived, full non-native verification passes, and production `Beat` plus `BeatAetherBaseline` build. The 150-WAV matrix is byte-identical to B5; report SHA-256 is `48f94deb7d80373e3ee1ad5f9fdf162762bdad935e5f634a4289c7dc1e017d2c`, peak RSS is 15,335,424 bytes, deadline overruns are zero, and queue telemetry remains 64 accepted / 16 rejected / 16 overflow. Filter-1-only, Filter-2-only, both-filter, and FX-send destinations remain later routing slices.

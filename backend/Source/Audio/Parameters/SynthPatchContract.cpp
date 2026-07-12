@@ -255,6 +255,7 @@ namespace beat
             fallback.tuningStep = juce::jlimit(-96, 96, (int) std::round(synthNumberParam(params, prefix + "tuning.step", fallback.tuningStep)));
             fallback.tuningDivisions = juce::jlimit(1, 96, (int) std::round(synthNumberParam(params, prefix + "tuning.divisions", fallback.tuningDivisions)));
             fallback.phaseMode = synthStringParam(params, prefix + "phaseMode", "retrigger") == "memory" ? 1 : 0;
+            fallback.routing = synthStringParam(params, prefix + "route", "filter") == "direct" ? 1 : 0;
             fallback.phase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "phase", fallback.phase));
             fallback.randomPhase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "randomPhase", fallback.randomPhase));
             fallback.wavetable = synthWavetableConfig(params, modulation, metadata, customWavetables, oscillator, fallback.wavetable);
@@ -439,6 +440,8 @@ namespace beat
         instrument.hasAether = true;
         instrument.aether.oscA = synthOscillatorConfig(params, modulation, metadata, customWavetables, "a", oscA);
         instrument.aether.oscB = synthOscillatorConfig(params, modulation, metadata, customWavetables, "b", oscB);
+        instrument.aether.sub.routing = synthStringParam(params, "aether.sub.route", "filter") == "direct" ? 1 : 0;
+        instrument.aether.noise.routing = synthStringParam(params, "aether.noise.route", "filter") == "direct" ? 1 : 0;
         instrument.aether.runtimeWarp = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.runtimeWarp", 0.0));
         instrument.aether.runtimeWarpMode = synthRuntimeWarpModeForId(synthStringParam(params, "aether.runtimeWarpMode", "shape"));
 

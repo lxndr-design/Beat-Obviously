@@ -1942,6 +1942,7 @@ namespace beat
             instrument.aether.oscA.tuningStep,
             instrument.aether.oscA.tuningDivisions,
             instrument.aether.oscA.phaseMode,
+            instrument.aether.oscA.routing,
             instrument.aether.oscA.phase,
             instrument.aether.oscA.randomPhase,
             copyWavetable(instrument.aether.oscA.wavetable),
@@ -1961,6 +1962,7 @@ namespace beat
             instrument.aether.oscB.tuningStep,
             instrument.aether.oscB.tuningDivisions,
             instrument.aether.oscB.phaseMode,
+            instrument.aether.oscB.routing,
             instrument.aether.oscB.phase,
             instrument.aether.oscB.randomPhase,
             copyWavetable(instrument.aether.oscB.wavetable),
@@ -1970,11 +1972,13 @@ namespace beat
             instrument.aether.sub.level,
             instrument.aether.sub.octave,
             instrument.aether.sub.waveform,
+            instrument.aether.sub.routing,
         };
         params.aetherNoise = {
             instrument.aether.noise.enabled,
             instrument.aether.noise.level,
             instrument.aether.noise.color,
+            instrument.aether.noise.routing,
         };
         params.aetherRuntimeWarp = juce::jlimit(0.0f, 1.0f, instrument.aether.runtimeWarp);
         params.aetherRuntimeWarpMode = juce::jlimit(0, 3, instrument.aether.runtimeWarpMode);

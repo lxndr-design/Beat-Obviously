@@ -16,7 +16,7 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 | Audible DC removal | Implemented before final limiter | A5 | Sample-rate, constant-input, lifecycle reset, finite-output, and block-continuity tests pass |
 | Offline HQ mode | Explicit opt-in mode implemented for wavetable sample interpolation | A6 | Phase/transport parity tests pass; nonlinear oversampling policy and product-facing export selection remain open |
 | Two independent main oscillators | Source/table, tuning, phase/randomization, static unison, unison modulation, level and pan are independent; legacy shared unison migrates compatibly | B1/B2 | Add per-source filter/direct/FX routing and later audio-rate cross-modulation |
-| Dedicated sub and noise/transient | Present | B1 | Mono/direct/FX routing semantics and tests |
+| Dedicated sub and noise/transient | Present with independent shared-filter/direct routing | B1/B6 | Add per-filter and FX-send destinations |
 | Per-oscillator unison | Present up to bounded counts | B1 | Tuning modes, performance and transition proof |
 | Phase memory/randomization | Independent A/B retrigger and memory modes implemented; retrigger retains deterministic random-depth behavior | B4 | Add product-facing controls and audible regression fixtures across voice stealing/legato combinations |
 | Advanced tuning modes | Implemented independently for A/B: semitone, harmonic, ratio, and equal-division step modes plus fine cents | B3 | Add UI editor affordances and broader preset-library coverage without changing stable IDs |
@@ -24,7 +24,7 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 | FM/PM/PD/AM/ring modulation | Partial modulation, no complete audio-rate architecture | B2 | Source/destination contracts and spectral tests |
 | Four envelopes / ten LFOs / eight macros | Two envelopes, two LFOs, four macros | B3 | Stable IDs, bounded routes, migration and UI follow-up |
 | MPE/per-note expression | Partial note automation | B3 | Input capability mapping and deterministic persistence |
-| Dual shared filters and source routing | Two shared filters with serial/parallel topology implemented; all sources still enter the shared Filter-1 input | B5 | Add per-source Filter 1/Filter 2/both/direct selection and transition tests |
+| Dual shared filters and source routing | Two shared filters with serial/parallel topology plus per-source `filter`/`direct` selection implemented | B5/B6 | Add Filter-1-only, Filter-2-only, both-filter, and transition coverage |
 | Reorderable insert plus two FX buses | Partial instrument-owned fixed FX | B5 | De-clicked graph replacement and preset migrations |
 | Three source slots | Missing | C1 | Narrow source-engine interface after A/B freeze |
 | Sample engine | Partial sampler/zone playback | C2 | Slot integration, loops/slicing/tape modulation, RT-safe load |

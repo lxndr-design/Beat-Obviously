@@ -916,8 +916,11 @@ export function renderInstrumentSample(
   const color = clamp01(instrument.knobs.color);
   const sub = instrument.aether ? 0 : clamp01(instrument.subOscLevel ?? 0);
 
-  let v = instrument.kind === "wavetable" && instrument.aether
-    ? aetherStackSample(instrument, state, sampleRate, frequency, mode, modulation)
+  const aetherBuses = instrument.kind === "wavetable" && instrument.aether
+    ? aetherStackBuses(instrument, state, sampleRate, frequency, mode, modulation)
+    : null;
+  let v = aetherBuses
+    ? aetherBuses.filtered
     : instrument.kind === "wavetable" || instrument.waveform === "wavetable"
     ? wavetableOscillatorSample(
         instrument,
@@ -954,6 +957,7 @@ export function renderInstrumentSample(
       clamp01(instrument.filter2.cutoff), clamp01(instrument.filter2.resonance), instrument.filter2.type, true);
     filtered = instrument.filterRouting === "parallel" ? (filtered + filtered2) * 0.5 : filtered2;
   }
+  if (aetherBuses && aetherBuses.direct !== 0) filtered += aetherBuses.direct;
   const level = clamp01((instrument.ampLevel ?? 1) + modulationTargetOffset(modulation, "amp.level"));
   state.phase += frequency / sampleRate;
   state.index += 1;
@@ -980,6 +984,7 @@ function renderInstrumentStereoSample(
   const drive = clamp01(instrument.knobs.drive + modulationTargetOffset(modulation, "filter.drive"));
   const raw = aetherStackStereoSample(instrument, phaseState, sampleRate, frequency, mode, modulation);
   const warped = applyRuntimeWarpStereo(instrument, raw.left, raw.right);
+  const directWarped = applyRuntimeWarpStereo(instrument, raw.directLeft, raw.directRight);
   let left = warped.left;
   let right = warped.right;
 
@@ -1012,6 +1017,10 @@ function renderInstrumentStereoSample(
       left = filtered2Left;
       right = filtered2Right;
     }
+  }
+  if (directWarped.left !== 0 || directWarped.right !== 0) {
+    left += directWarped.left;
+    right += directWarped.right;
   }
 
   const level = clamp01((instrument.ampLevel ?? 1) + modulationTargetOffset(modulation, "amp.level"));
@@ -1087,10 +1096,23 @@ function aetherStackSample(
   mode: SynthRenderMode,
   modulation: RenderModulation,
 ): number {
+  const buses = aetherStackBuses(instrument, state, sampleRate, frequency, mode, modulation);
+  return clamp(buses.filtered + buses.direct, -1, 1);
+}
+
+function aetherStackBuses(
+  instrument: Instrument,
+  state: SynthRenderState,
+  sampleRate: number,
+  frequency: number,
+  mode: SynthRenderMode,
+  modulation: RenderModulation,
+): { filtered: number; direct: number } {
   const config = instrument.aether;
-  if (!config) return wavetableOscillatorSample(instrument, state.phase, sampleRate, frequency);
+  if (!config) return { filtered: wavetableOscillatorSample(instrument, state.phase, sampleRate, frequency), direct: 0 };
 
   let sum = 0;
+  let directSum = 0;
   let levelSum = 0;
   const addOsc = (osc: NonNullable<Instrument["aether"]>["oscA"], key: string) => {
     const level = clamp01(osc.level + modulationTargetOffset(modulation, `osc.${key}.level`));
@@ -1122,7 +1144,8 @@ function aetherStackSample(
       : waveform === "noise"
       ? mode === "audio" ? Math.random() * 2 - 1 : whiteNoiseSample(state.index + Math.round(rate * 97))
       : oscillatorSample(waveform, state.phase * rate + phaseOffset, clamp01(instrument.knobs.color));
-    sum += sourceSample * level;
+    if (osc.route === "direct") directSum += sourceSample * level;
+    else sum += sourceSample * level;
     levelSum += level;
   };
   const oscillators = config.oscillators?.length ? config.oscillators : [{ ...config.oscA, id: "a" }, { ...config.oscB, id: "b" }];
@@ -1130,20 +1153,26 @@ function aetherStackSample(
 
   if (config.sub.enabled && config.sub.level > 0) {
     const rate = oscillatorRate(config.sub.octave, 0, 0);
-    sum += oscillatorSample(config.sub.waveform, state.phase * rate, 0.5) * config.sub.level;
+    const subSample = oscillatorSample(config.sub.waveform, state.phase * rate, 0.5) * config.sub.level;
+    if (config.sub.route === "direct") directSum += subSample;
+    else sum += subSample;
     levelSum += config.sub.level;
   }
 
   if (config.noise.enabled && config.noise.level > 0) {
     const noise = mode === "audio" ? Math.random() * 2 - 1 : whiteNoiseSample(state.index);
     const softened = noise * (0.35 + clamp01(config.noise.color) * 0.65);
-    sum += softened * config.noise.level;
+    if (config.noise.route === "direct") directSum += softened * config.noise.level;
+    else sum += softened * config.noise.level;
     levelSum += config.noise.level;
   }
 
-  if (levelSum <= 0) return 0;
-  const sample = clamp(sum / Math.max(0.35, levelSum), -1, 1);
-  return runtimeWarpSample(sample, config.runtimeWarp ?? 0, config.runtimeWarpMode ?? "shape");
+  if (levelSum <= 0) return { filtered: 0, direct: 0 };
+  const normalizer = Math.max(0.35, levelSum);
+  return {
+    filtered: runtimeWarpSample(clamp(sum / normalizer, -1, 1), config.runtimeWarp ?? 0, config.runtimeWarpMode ?? "shape"),
+    direct: runtimeWarpSample(clamp(directSum / normalizer, -1, 1), config.runtimeWarp ?? 0, config.runtimeWarpMode ?? "shape"),
+  };
 }
 
 function aetherStackStereoSample(
@@ -1153,21 +1182,28 @@ function aetherStackStereoSample(
   frequency: number,
   mode: SynthRenderMode,
   modulation: RenderModulation,
-): { left: number; right: number } {
+): { left: number; right: number; directLeft: number; directRight: number } {
   const config = instrument.aether;
   if (!config) {
     const sample = wavetableOscillatorSample(instrument, state.phase, sampleRate, frequency);
-    return { left: sample, right: sample };
+    return { left: sample, right: sample, directLeft: 0, directRight: 0 };
   }
 
   let left = 0;
   let right = 0;
+  let directLeft = 0;
+  let directRight = 0;
   let levelSum = 0;
 
-  const add = (value: number, level: number, pan: number) => {
+  const add = (value: number, level: number, pan: number, route: "filter" | "direct" = "filter") => {
     const [leftGain, rightGain] = panGains(pan);
-    left += value * level * leftGain;
-    right += value * level * rightGain;
+    if (route === "direct") {
+      directLeft += value * level * leftGain;
+      directRight += value * level * rightGain;
+    } else {
+      left += value * level * leftGain;
+      right += value * level * rightGain;
+    }
     levelSum += level;
   };
 
@@ -1204,7 +1240,7 @@ function aetherStackStereoSample(
       : waveform === "noise"
       ? mode === "audio" ? Math.random() * 2 - 1 : whiteNoiseSample(state.index + Math.round(rate * 97))
       : oscillatorSample(waveform, state.phase * rate + phaseOffset, clamp01(instrument.knobs.color));
-    add(sourceSample, level, osc.pan + modulationTargetOffset(modulation, `osc.${key}.pan`));
+    add(sourceSample, level, osc.pan + modulationTargetOffset(modulation, `osc.${key}.pan`), osc.route);
   };
 
   const oscillators = config.oscillators?.length ? config.oscillators : [{ ...config.oscA, id: "a" }, { ...config.oscB, id: "b" }];
@@ -1212,20 +1248,22 @@ function aetherStackStereoSample(
 
   if (config.sub.enabled && config.sub.level > 0) {
     const rate = oscillatorRate(config.sub.octave, 0, 0);
-    add(oscillatorSample(config.sub.waveform, state.phase * rate, 0.5), config.sub.level, 0);
+    add(oscillatorSample(config.sub.waveform, state.phase * rate, 0.5), config.sub.level, 0, config.sub.route);
   }
 
   if (config.noise.enabled && config.noise.level > 0) {
     const noise = mode === "audio" ? Math.random() * 2 - 1 : whiteNoiseSample(state.index);
     const softened = noise * (0.35 + clamp01(config.noise.color) * 0.65);
-    add(softened, config.noise.level, 0);
+    add(softened, config.noise.level, 0, config.noise.route);
   }
 
-  if (levelSum <= 0) return { left: 0, right: 0 };
+  if (levelSum <= 0) return { left: 0, right: 0, directLeft: 0, directRight: 0 };
   const normalizer = Math.max(0.35, levelSum);
   return {
     left: clamp(left / normalizer, -1, 1),
     right: clamp(right / normalizer, -1, 1),
+    directLeft: clamp(directLeft / normalizer, -1, 1),
+    directRight: clamp(directRight / normalizer, -1, 1),
   };
 }
 

@@ -26,6 +26,8 @@ namespace beat::AetherTableStackRenderer
     struct Result
     {
         StereoFrame frame {};
+        StereoFrame filteredFrame {};
+        StereoFrame directFrame {};
         VoiceStats::RenderWork work {};
     };
 
@@ -66,14 +68,18 @@ namespace beat::AetherTableStackRenderer
             : 0.0f;
         float leftSum = 0.0f;
         float rightSum = 0.0f;
+        float directLeftSum = 0.0f;
+        float directRightSum = 0.0f;
         float levelSum = 0.0f;
 
-        const auto add = [&](float value, float level, float pan, std::pair<float, float> staticPanGains, bool panIsDynamic)
+        const auto add = [&](float value, float level, float pan, std::pair<float, float> staticPanGains, bool panIsDynamic, int routing)
         {
             const float safeLevel = VoiceMath::clamp01(level);
             const auto [leftGain, rightGain] = panIsDynamic ? VoiceMath::equalPowerPanGains(pan) : staticPanGains;
-            leftSum += value * safeLevel * leftGain;
-            rightSum += value * safeLevel * rightGain;
+            auto& destinationLeft = routing == 1 ? directLeftSum : leftSum;
+            auto& destinationRight = routing == 1 ? directRightSum : rightSum;
+            destinationLeft += value * safeLevel * leftGain;
+            destinationRight += value * safeLevel * rightGain;
             levelSum += safeLevel;
         };
 
@@ -115,7 +121,7 @@ namespace beat::AetherTableStackRenderer
             {
                 ++result.work.oscillatorSamples;
                 ++componentSampleCounter;
-                add(VoiceMath::nextNoise(noiseState), modulatedLevel, modulatedPan, staticPanGains, panIsDynamic);
+                add(VoiceMath::nextNoise(noiseState), modulatedLevel, modulatedPan, staticPanGains, panIsDynamic, osc.routing);
                 return;
             }
 
@@ -158,7 +164,7 @@ namespace beat::AetherTableStackRenderer
                 ++result.work.oscillatorSamples;
                 ++componentSampleCounter;
             }
-            add(value, modulatedLevel, modulatedPan, staticPanGains, panIsDynamic);
+            add(value, modulatedLevel, modulatedPan, staticPanGains, panIsDynamic, osc.routing);
         };
 
         renderOsc(
@@ -212,7 +218,8 @@ namespace beat::AetherTableStackRenderer
                 params.aetherSub.level,
                 0.0f,
                 VoiceMath::centerPanGains,
-                false);
+                false,
+                params.aetherSub.routing);
         }
 
         if (params.aetherNoise.enabled && params.aetherNoise.level > 0.0f)
@@ -220,15 +227,19 @@ namespace beat::AetherTableStackRenderer
             ++result.work.oscillatorSamples;
             ++result.work.aetherNoiseSamples;
             const float noise = VoiceMath::nextNoise(noiseState);
-            add(noise * (0.35f + VoiceMath::clamp01(params.aetherNoise.color) * 0.65f), params.aetherNoise.level, 0.0f, VoiceMath::centerPanGains, false);
+            add(noise * (0.35f + VoiceMath::clamp01(params.aetherNoise.color) * 0.65f), params.aetherNoise.level, 0.0f, VoiceMath::centerPanGains, false, params.aetherNoise.routing);
         }
 
         if (levelSum <= 0.0f)
             return result;
 
         const float normalizer = juce::jmax(0.35f, levelSum);
-        result.frame.left = juce::jlimit(-1.0f, 1.0f, leftSum / normalizer);
-        result.frame.right = juce::jlimit(-1.0f, 1.0f, rightSum / normalizer);
+        result.filteredFrame.left = juce::jlimit(-1.0f, 1.0f, leftSum / normalizer);
+        result.filteredFrame.right = juce::jlimit(-1.0f, 1.0f, rightSum / normalizer);
+        result.directFrame.left = juce::jlimit(-1.0f, 1.0f, directLeftSum / normalizer);
+        result.directFrame.right = juce::jlimit(-1.0f, 1.0f, directRightSum / normalizer);
+        result.frame.left = juce::jlimit(-1.0f, 1.0f, result.filteredFrame.left + result.directFrame.left);
+        result.frame.right = juce::jlimit(-1.0f, 1.0f, result.filteredFrame.right + result.directFrame.right);
         return result;
     }
 }

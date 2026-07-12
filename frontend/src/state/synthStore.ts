@@ -92,6 +92,7 @@ export type SynthParameterId =
   | OscillatorUnisonParameterId
   | OscillatorTuningParameterId
   | `osc.${OscillatorKey}.phaseMode`
+  | `osc.${OscillatorKey}.route`
   | "unison.enabled"
   | "unison.voices"
   | "unison.detune"
@@ -114,6 +115,8 @@ export type SynthParameterId =
   | "aether.noise.enabled"
   | "aether.noise.level"
   | "aether.noise.color"
+  | "aether.noise.route"
+  | "aether.sub.route"
   | "amp.level"
   | "amp.pan"
   | "maxVoices"
@@ -972,6 +975,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "osc.a.tuning.step": 0,
   "osc.a.tuning.divisions": 12,
   "osc.a.phaseMode": "retrigger",
+  "osc.a.route": "filter",
   "osc.b.enabled": false,
   "osc.b.wavetable": "basic.square",
   "osc.b.position": 0,
@@ -994,6 +998,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "osc.b.tuning.step": 0,
   "osc.b.tuning.divisions": 12,
   "osc.b.phaseMode": "retrigger",
+  "osc.b.route": "filter",
   "unison.enabled": false,
   "unison.voices": 1,
   "unison.detune": 0.12,
@@ -1016,6 +1021,8 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "aether.noise.enabled": false,
   "aether.noise.level": 0,
   "aether.noise.color": 0.5,
+  "aether.noise.route": "filter",
+  "aether.sub.route": "filter",
   "amp.level": 0.8,
   "amp.pan": 0,
   maxVoices: 16,
@@ -1089,6 +1096,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "osc.a.tuning.step": "OSC A Step",
   "osc.a.tuning.divisions": "OSC A Divisions",
   "osc.a.phaseMode": "OSC A Phase Mode",
+  "osc.a.route": "OSC A Route",
   "osc.b.enabled": "OSC B Enabled",
   "osc.b.wavetable": "OSC B Table",
   "osc.b.position": "OSC B Pos",
@@ -1111,6 +1119,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "osc.b.tuning.step": "OSC B Step",
   "osc.b.tuning.divisions": "OSC B Divisions",
   "osc.b.phaseMode": "OSC B Phase Mode",
+  "osc.b.route": "OSC B Route",
   "unison.enabled": "Unison Enabled",
   "unison.voices": "Unison Voices",
   "unison.detune": "Unison Detune",
@@ -1133,6 +1142,8 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "aether.noise.enabled": "Aether Noise Enabled",
   "aether.noise.level": "Aether Noise Level",
   "aether.noise.color": "Aether Noise Color",
+  "aether.noise.route": "Aether Noise Route",
+  "aether.sub.route": "Aether Sub Route",
   "amp.level": "Amp Level",
   "amp.pan": "Amp Pan",
   maxVoices: "Max Voices",
@@ -1758,11 +1769,13 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         level: 0,
         octave: -1,
         waveform: "sine",
+        route: getStringParam(draft, "aether.sub.route") === "direct" ? "direct" : "filter",
       },
       noise: {
         enabled: getBooleanParam(draft, "aether.noise.enabled"),
         level: clamp01(getNumberParam(draft, "aether.noise.level")),
         color: clamp01(getNumberParam(draft, "aether.noise.color")),
+        route: getStringParam(draft, "aether.noise.route") === "direct" ? "direct" : "filter",
       },
       runtimeWarp: clamp01(getNumberParam(draft, "aether.runtimeWarp")),
       runtimeWarpMode: isWavetableWarpMode(draft.parameters["aether.runtimeWarpMode"])
@@ -1958,6 +1971,8 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["aether.noise.enabled"] = instrument.aether?.noise.enabled ?? false;
   draft.parameters["aether.noise.level"] = instrument.aether?.noise.level ?? 0;
   draft.parameters["aether.noise.color"] = instrument.aether?.noise.color ?? 0.5;
+  draft.parameters["aether.noise.route"] = instrument.aether?.noise.route ?? "filter";
+  draft.parameters["aether.sub.route"] = instrument.aether?.sub.route ?? "filter";
   draft.parameters["amp.level"] = 0.8;
   draft.parameters["env.1.attack"] = instrument.envelope.attackMs / 1000;
   draft.parameters["env.1.attackCurve"] = instrument.envelope.attackCurve ?? "linear";
@@ -4246,6 +4261,7 @@ function oscillatorFromDraft(draft: SynthDraftPatch, oscillator: OscillatorKey, 
     tuningStep: getNumberParam(draft, `${prefix}.tuning.step` as OscillatorTuningParameterId),
     tuningDivisions: getNumberParam(draft, `${prefix}.tuning.divisions` as OscillatorTuningParameterId),
     phaseMode: getStringParam(draft, `${prefix}.phaseMode` as SynthParameterId) === "memory" ? "memory" as const : "retrigger" as const,
+    route: getStringParam(draft, `${prefix}.route` as SynthParameterId) === "direct" ? "direct" as const : "filter" as const,
     phase: getNumberParam(draft, `${prefix}.phase` as SynthParameterId),
     randomPhase: getNumberParam(draft, `${prefix}.randomPhase` as SynthParameterId),
     wavetable,
@@ -4266,6 +4282,7 @@ function applyOscillatorToDraft(draft: SynthDraftPatch, oscillator: OscillatorKe
   draft.parameters[`osc.${oscillator}.tuning.step` as OscillatorTuningParameterId] = source.tuningStep ?? 0;
   draft.parameters[`osc.${oscillator}.tuning.divisions` as OscillatorTuningParameterId] = source.tuningDivisions ?? 12;
   draft.parameters[`osc.${oscillator}.phaseMode` as SynthParameterId] = source.phaseMode ?? "retrigger";
+  draft.parameters[`osc.${oscillator}.route` as SynthParameterId] = source.route ?? "filter";
   draft.parameters[`osc.${oscillator}.phase` as SynthParameterId] = source.phase ?? 0;
   draft.parameters[`osc.${oscillator}.randomPhase` as SynthParameterId] = source.randomPhase ?? 0.25;
   applyWavetableToDraft(draft, oscillator, source.wavetable, oscillator === "a");

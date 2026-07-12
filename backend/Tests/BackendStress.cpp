@@ -788,6 +788,20 @@ namespace
         if (noiseState == 0x12345678u)
             return false;
 
+        params.aetherOscB.routing = 1;
+        params.aetherSub.routing = 1;
+        params.aetherNoise.routing = 1;
+        const auto routed = beat::AetherTableStackRenderer::render(
+            params, targets, panGains, pitchRates, oscillatorsA, oscillatorsB,
+            unisonPlanA, unisonPlanB, 220.0, 220.0, 48000.0, 0.125, 0.125,
+            0.125, 0.0, 0.25, 0.5f, -0.25f, 0.8f, 0.35f, 0.9f,
+            60.0f / 127.0f, 0.2f, noiseState);
+        if ((std::abs(routed.filteredFrame.left) <= 0.0001f && std::abs(routed.filteredFrame.right) <= 0.0001f)
+            || (std::abs(routed.directFrame.left) <= 0.0001f && std::abs(routed.directFrame.right) <= 0.0001f)
+            || !near(routed.frame.left, juce::jlimit(-1.0f, 1.0f, routed.filteredFrame.left + routed.directFrame.left), 0.00001f)
+            || !near(routed.frame.right, juce::jlimit(-1.0f, 1.0f, routed.filteredFrame.right + routed.directFrame.right), 0.00001f))
+            return false;
+
         params.aetherOscA.enabled = false;
         params.aetherOscB.enabled = false;
         params.aetherSub.enabled = false;
@@ -11845,6 +11859,7 @@ namespace
             "osc.a.tuning.mode": "harmonic",
             "osc.a.tuning.harmonic": 5,
             "osc.a.phaseMode": "memory",
+            "osc.a.route": "direct",
             "osc.a.level": 0.7,
             "osc.a.pan": -0.4,
             "osc.a.phase": 0.33,
@@ -11867,6 +11882,9 @@ namespace
             "osc.b.pan": 0.2,
             "osc.b.phase": 0.66,
             "osc.b.randomPhase": 0.1,
+            "osc.b.route": "filter",
+            "aether.sub.route": "direct",
+            "aether.noise.route": "direct",
             "osc.b.unison.voices": 7,
             "osc.b.unison.detune": 0.31,
             "osc.b.unison.spread": 0.83,
@@ -11993,6 +12011,9 @@ namespace
         if (instrument.aether.oscA.tuningMode != 1 || instrument.aether.oscA.harmonic != 5)
             return false;
         if (instrument.aether.oscA.phaseMode != 1)
+            return false;
+        if (instrument.aether.oscA.routing != 1 || instrument.aether.oscB.routing != 0
+            || instrument.aether.sub.routing != 1 || instrument.aether.noise.routing != 1)
             return false;
         if (!instrument.aether.oscB.enabled || instrument.aether.oscB.wavetable.bank != 3)
             return false;

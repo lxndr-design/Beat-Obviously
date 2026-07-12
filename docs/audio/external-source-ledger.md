@@ -97,3 +97,7 @@ The independent A/B basic phase accumulators, wavetable-member phase preservatio
 ## Milestone B5 provenance
 
 The second shared filter state, serial/parallel topology, gain policy, schema, preview path, and focused tests independently reuse Beat's existing filter and drive primitives. No upstream code, dependency, preset, asset, service, or binary was consulted, executed, adapted, or imported.
+
+## Milestone B6 provenance
+
+The per-source filtered/direct bus contract, shared normalization, direct filter bypass, independent runtime-warp state, schema, preview path, and tests are independent extensions of Beat's existing source mixer and voice graph. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived code, runtime dependency, prebuilt binary, preset, asset, branding, service, or licensing change was introduced.
