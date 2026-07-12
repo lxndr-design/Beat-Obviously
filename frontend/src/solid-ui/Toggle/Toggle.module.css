@@ -32,28 +32,16 @@
   box-shadow: var(--interaction-focus-ring);
 }
 
-.box::before {
-  content: "";
-  position: absolute;
-  inset: calc(-1 * var(--border-width));
-  border: var(--border-fg);
-  pointer-events: none;
-  z-index: 1;
-}
-
 .box::after {
   content: "";
   position: absolute;
-  top: var(--border-width);
-  left: var(--border-width);
-  box-sizing: border-box;
+  top: 0;
+  left: 0;
   width: var(--toggle-thumb-size);
   height: var(--toggle-thumb-size);
   background: var(--color-fg);
-  border: var(--border-bg);
   transition: var(--transition-slide-x);
   will-change: transform;
-  z-index: 0;
 }
 
 .on::after {
