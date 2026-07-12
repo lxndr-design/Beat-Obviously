@@ -37,9 +37,11 @@
   position: absolute;
   top: 0;
   left: 0;
+  box-sizing: border-box;
   width: var(--toggle-thumb-size);
   height: var(--toggle-thumb-size);
   background: var(--color-fg);
+  border: var(--border-bg);
   transition: var(--transition-slide-x);
   will-change: transform;
 }
