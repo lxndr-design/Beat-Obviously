@@ -277,6 +277,12 @@ namespace beat
         float drive01 { 0.1f };
         float color01 { 0.5f };
         int filterType { 0 };
+        bool filter2Enabled { false };
+        int filter2Type { 0 };
+        float filter2Cutoff01 { 1.0f };
+        float filter2Resonance01 { 0.0f };
+        float filter2Drive01 { 0.0f };
+        int filterRouting { 0 };
         float attackMs { 5.0f };
         int attackCurve { 0 };
         float decayMs { 100.0f };

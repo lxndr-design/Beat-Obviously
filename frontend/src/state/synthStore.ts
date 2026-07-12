@@ -103,6 +103,12 @@ export type SynthParameterId =
   | "filter.keytrack"
   | "filter.resonance"
   | "filter.drive"
+  | "filter.2.enabled"
+  | "filter.2.type"
+  | "filter.2.cutoff"
+  | "filter.2.resonance"
+  | "filter.2.drive"
+  | "filter.routing"
   | "aether.runtimeWarp"
   | "aether.runtimeWarpMode"
   | "aether.noise.enabled"
@@ -999,6 +1005,12 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "filter.keytrack": 0,
   "filter.resonance": 0.1,
   "filter.drive": 0,
+  "filter.2.enabled": false,
+  "filter.2.type": "lowpass",
+  "filter.2.cutoff": 18000,
+  "filter.2.resonance": 0.1,
+  "filter.2.drive": 0,
+  "filter.routing": "serial",
   "aether.runtimeWarp": 0,
   "aether.runtimeWarpMode": "shape",
   "aether.noise.enabled": false,
@@ -1110,6 +1122,12 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "filter.keytrack": "Filter Keytrack",
   "filter.resonance": "Filter Res",
   "filter.drive": "Filter Drive",
+  "filter.2.enabled": "Filter 2 Enabled",
+  "filter.2.type": "Filter 2 Type",
+  "filter.2.cutoff": "Filter 2 Cutoff",
+  "filter.2.resonance": "Filter 2 Res",
+  "filter.2.drive": "Filter 2 Drive",
+  "filter.routing": "Filter Routing",
   "aether.runtimeWarp": "Aether Runtime Warp",
   "aether.runtimeWarpMode": "Aether Runtime Warp Mode",
   "aether.noise.enabled": "Aether Noise Enabled",
@@ -1707,6 +1725,14 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
       color: clamp01(getNumberParam(draft, "osc.a.position")),
     },
     filterType: filterTypeFromDraft(draft),
+    filter2: {
+      enabled: getBooleanParam(draft, "filter.2.enabled"),
+      type: filterTypeFromId(getStringParam(draft, "filter.2.type")),
+      cutoff: clamp01(hzToNormalizedCutoff(getNumberParam(draft, "filter.2.cutoff"))),
+      resonance: clamp01(getNumberParam(draft, "filter.2.resonance")),
+      drive: clamp01(getNumberParam(draft, "filter.2.drive")),
+    },
+    filterRouting: getStringParam(draft, "filter.routing") === "parallel" ? "parallel" : "serial",
     filterKeytrack: getNumberParam(draft, "filter.keytrack"),
     envelope: {
       attackMs: getNumberParam(draft, "env.1.attack") * 1000,
@@ -1921,6 +1947,12 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["filter.resonance"] = instrument.knobs.resonance;
   draft.parameters["filter.drive"] = instrument.knobs.drive;
   draft.parameters["filter.type"] = instrument.filterType ?? "lowpass";
+  draft.parameters["filter.2.enabled"] = instrument.filter2?.enabled ?? false;
+  draft.parameters["filter.2.type"] = instrument.filter2?.type ?? "lowpass";
+  draft.parameters["filter.2.cutoff"] = normalizedCutoffToHz(instrument.filter2?.cutoff ?? 1);
+  draft.parameters["filter.2.resonance"] = instrument.filter2?.resonance ?? 0.1;
+  draft.parameters["filter.2.drive"] = instrument.filter2?.drive ?? 0;
+  draft.parameters["filter.routing"] = instrument.filterRouting ?? "serial";
   draft.parameters["aether.runtimeWarp"] = instrument.aether?.runtimeWarp ?? 0;
   draft.parameters["aether.runtimeWarpMode"] = instrument.aether?.runtimeWarpMode ?? "shape";
   draft.parameters["aether.noise.enabled"] = instrument.aether?.noise.enabled ?? false;
@@ -2209,7 +2241,7 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   const fallback = DEFAULT_SYNTH_PARAMETERS[id];
   if (!Number.isFinite(value)) return typeof fallback === "number" ? fallback : 0;
   if (id.endsWith(".enabled") || id === "filter.type" || id.endsWith(".wavetable") || id.endsWith(".warpMode")) return value;
-  if (id === "filter.cutoff") return Math.max(20, Math.min(20000, value));
+  if (id === "filter.cutoff" || id === "filter.2.cutoff") return Math.max(20, Math.min(20000, value));
   if (id === "lfo.1.rate" || id === "lfo.2.rate") return Math.max(0.05, Math.min(50, value));
   if (id.includes(".octave")) return Math.max(-4, Math.min(4, Math.round(value)));
   if (id.includes(".semitone")) return Math.max(-12, Math.min(12, Math.round(value)));
@@ -4190,7 +4222,10 @@ function lfoWaveformFromDraft(draft: SynthDraftPatch, lfo: 1 | 2 = 1): NonNullab
 }
 
 function filterTypeFromDraft(draft: SynthDraftPatch): NonNullable<Instrument["filterType"]> {
-  const type = getStringParam(draft, "filter.type");
+  return filterTypeFromId(getStringParam(draft, "filter.type"));
+}
+
+function filterTypeFromId(type: string): NonNullable<Instrument["filterType"]> {
   return type === "bandpass" || type === "highpass" ? type : "lowpass";
 }
 

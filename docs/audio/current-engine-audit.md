@@ -244,3 +244,13 @@ Basic waveform paths now maintain separate A/B base accumulators rather than der
 Native tests render both basic and wavetable sources, verify phase advances, prove exact preservation across stop/restart in memory mode, and prove retrigger mode returns the basic accumulator to zero. Native patch parsing and frontend preview/roundtrip tests cover the new mode. The implementation uses fixed stack arrays and existing oscillator state; no callback allocation, file operation, blocking wait, lazy initialization, or container growth is introduced.
 
 Full native and non-native suites pass with only the existing TCC waiver, production Beat builds, and all 150 frozen WAVs are byte-identical to B3. B4 baseline JSON SHA-256 is `9e95a0611f7c4ca33158d6ab4fa7dd20df9da80e11cfc23ec4e26f15d5580b7f`.
+
+## Milestone B5 dual shared-filter foundation — 2026-07-12
+
+The voice engine now owns two prepared shared filter stages. Filter 1 is the existing filter and retains all stable parameters and modulation behavior. Filter 2 is opt-in with independent enabled, type, cutoff, resonance, and drive fields. `filter.routing` selects serial or parallel topology; serial feeds Filter 1 into Filter 2, while parallel processes the same pre-Filter-1 input through both branches and averages them for bounded gain.
+
+Filter 2 state and oversampled drive state are prepared/reset with the voice lifecycle and never created in the callback. Disabled Filter 2 executes the original Filter-1 path without an additional arithmetic mix, preserving old renders. Native patch and frontend conversions preserve the new schema, and browser preview maintains an independent second filter state per channel.
+
+Focused native tests verify parsing, bounded finite output, and distinct serial, parallel, and Filter-1-only renders. Frontend coverage verifies Filter 2 settings and topology reach preview state. Per-source selection between Filter 1, Filter 2, both, and direct remains the next routing slice.
+
+The first complete non-native run exposed and retained a migration regression test: disabled Filter 2 cutoff was incorrectly sanitized from its Hz domain to `1`. The sanitizer now treats both filter cutoff IDs as 20–20,000 Hz, and the full roundtrip gate passes. Full native/non-native suites pass with only the existing TCC waiver, production Beat builds, and all 150 frozen WAVs are byte-identical to B4. B5 baseline JSON SHA-256 is `12d67613f247312e3cfdceb6bc69c1a46a5f0935e32af7869da1777153a1250a`.

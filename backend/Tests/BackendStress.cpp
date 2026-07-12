@@ -11884,6 +11884,12 @@ namespace
             "filter.keytrack": 0.62,
             "filter.resonance": 0.2,
             "filter.drive": 0.35,
+            "filter.2.enabled": true,
+            "filter.2.type": "bandpass",
+            "filter.2.cutoff": 2400,
+            "filter.2.resonance": 0.48,
+            "filter.2.drive": 0.22,
+            "filter.routing": "parallel",
             "env.1.attack": 0.01,
             "env.1.attackCurve": "exp",
             "env.1.decay": 0.2,
@@ -12013,6 +12019,12 @@ namespace
         if (!near(instrument.filterKeytrack, 0.62f))
             return false;
         if (!near(instrument.resonance01, 0.2f) || !near(instrument.drive01, 0.35f))
+            return false;
+        if (!instrument.filter2Enabled || instrument.filter2Type != 1
+            || instrument.filter2Cutoff01 < 0.65f || instrument.filter2Cutoff01 > 0.8f
+            || !near(instrument.filter2Resonance01, 0.48f)
+            || !near(instrument.filter2Drive01, 0.22f)
+            || instrument.filterRouting != 1)
             return false;
         if (!near(instrument.attackMs, 10.0f) || !near(instrument.decayMs, 200.0f))
             return false;
@@ -12822,6 +12834,58 @@ namespace
         wavetableVoice.stopNote(0.0f, false);
         wavetableVoice.startNote(69, 1.0f, nullptr, 8192);
         return std::abs(wavetableVoice.wavetablePhaseAForTest() - rememberedWavetable) <= 1.0e-12;
+    }
+
+    bool stressInstrumentVoiceDualFilters()
+    {
+        beat::InstrumentVoice::Params params;
+        params.waveform = 1;
+        params.cutoff01 = 0.58f;
+        params.resonance01 = 0.2f;
+        params.drive01 = 0.1f;
+        params.filterType = 0;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        params.filter2Enabled = true;
+        params.filter2Type = 2;
+        params.filter2Cutoff01 = 0.42f;
+        params.filter2Resonance01 = 0.35f;
+        params.filter2Drive01 = 0.18f;
+
+        const auto render = [](beat::InstrumentVoice::Params renderParams) {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 256);
+            voice.setParams(renderParams);
+            voice.startNote(57, 0.9f, nullptr, 8192);
+            juce::AudioBuffer<float> output(2, 2048);
+            output.clear();
+            voice.renderNextBlock(output, 0, output.getNumSamples());
+            return output;
+        };
+
+        params.filterRouting = 0;
+        const auto serial = render(params);
+        params.filterRouting = 1;
+        const auto parallel = render(params);
+        params.filter2Enabled = false;
+        const auto legacy = render(params);
+        double serialParallelDiff = 0.0;
+        double serialLegacyDiff = 0.0;
+        for (int channel = 0; channel < serial.getNumChannels(); ++channel)
+        {
+            for (int sample = 0; sample < serial.getNumSamples(); ++sample)
+            {
+                const float serialValue = serial.getSample(channel, sample);
+                const float parallelValue = parallel.getSample(channel, sample);
+                const float legacyValue = legacy.getSample(channel, sample);
+                if (!std::isfinite(serialValue) || !std::isfinite(parallelValue) || !std::isfinite(legacyValue))
+                    return false;
+                serialParallelDiff += std::abs((double) serialValue - (double) parallelValue);
+                serialLegacyDiff += std::abs((double) serialValue - (double) legacyValue);
+            }
+        }
+        return serialParallelDiff > 0.1 && serialLegacyDiff > 0.1;
     }
 
     bool stressInstrumentVoiceBandlimitedBasicOscillators()
@@ -13780,6 +13844,11 @@ int main()
     if (!stressInstrumentVoicePhaseMemory())
     {
         std::cerr << "Instrument voice phase-memory stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceDualFilters())
+    {
+        std::cerr << "Instrument voice dual-filter stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceBandlimitedBasicOscillators())

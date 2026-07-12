@@ -93,3 +93,7 @@ The semitone, harmonic, ratio, and equal-division step tuning contracts, paramet
 ## Milestone B4 provenance
 
 The independent A/B basic phase accumulators, wavetable-member phase preservation, retrigger/memory schema, lifecycle behavior, preview support, and tests are independent extensions of Beat's existing oscillator state. No upstream source, dependency, preset, asset, service, or binary was consulted, executed, adapted, or imported.
+
+## Milestone B5 provenance
+
+The second shared filter state, serial/parallel topology, gain policy, schema, preview path, and focused tests independently reuse Beat's existing filter and drive primitives. No upstream code, dependency, preset, asset, service, or binary was consulted, executed, adapted, or imported.

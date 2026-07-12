@@ -103,6 +103,7 @@ namespace beat
         adsr.setSampleRate(sr);
         env2Adsr.setSampleRate(sr);
         filterState.prepare(sr, blockSize, params.filterType);
+        filter2State.prepare(sr, blockSize, params.filter2Type);
         stealTransition.prepare(sampleRate);
     }
 
@@ -190,6 +191,7 @@ namespace beat
         env2Adsr.setParameters(env2AdsrParams);
 
         filterState.configure(p.filterType, p.cutoff01, p.resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
+        filter2State.configure(p.filter2Type, p.filter2Cutoff01, p.filter2Resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
         refreshCachedPanGains();
         refreshCachedPitchRates();
         refreshCachedDynamicModulationFlags();
@@ -342,6 +344,7 @@ namespace beat
                 ? juce::jmax(1, (int) std::round((params.glideMs / 1000.0f) * (float) sampleRate))
                 : 0;
             filterState.configure(params.filterType, params.cutoff01, params.resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
+            filter2State.configure(params.filter2Type, params.filter2Cutoff01, params.filter2Resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
             refreshCachedPanGains();
             refreshCachedDynamicModulationFlags();
             refreshCachedPitchRates();
@@ -352,6 +355,7 @@ namespace beat
         }
 
         filterState.configure(params.filterType, params.cutoff01, params.resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
+        filter2State.configure(params.filter2Type, params.filter2Cutoff01, params.filter2Resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
         refreshCachedPanGains();
         refreshCachedDynamicModulationFlags();
 
@@ -388,6 +392,7 @@ namespace beat
         pitchFrequencyRamp.reset((float) baseFrequencyHz);
         aetherRuntimeWarpState.reset();
         driveState.reset();
+        filter2DriveState.reset();
         previousRawEnvelope = 0.0f;
         previousRawEnv2Envelope = 0.0f;
         env1LoopState.reset();
@@ -606,6 +611,9 @@ namespace beat
                 aetherRuntimeWarpState.reset({ left, right });
             }
 
+            const float filterInputLeft = left;
+            const float filterInputRight = right;
+
             // Drive (soft clipping)
             const float drive = VoiceMath::clamp01(params.drive01 + (useDynamicModulation && cachedDynamicTargets.filterDrive
                 ? DynamicModulation::targetOffset(params.dynamicModulation.filterDrive, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, params.macroValues, 1.0f)
@@ -646,6 +654,40 @@ namespace beat
             const auto filtered = filterState.process(left, right);
             left = filtered.left;
             right = filtered.right;
+
+            if (params.filter2Enabled)
+            {
+                float filter2Left = params.filterRouting == 1 ? filterInputLeft : left;
+                float filter2Right = params.filterRouting == 1 ? filterInputRight : right;
+                const float filter2Drive = VoiceMath::clamp01(params.filter2Drive01);
+                if (filter2Drive > 0.0001f)
+                {
+                    const float driveGain = 1.0f + filter2Drive * 6.0f;
+                    const auto driven = DriveStage::processOversampled(filter2DriveState, { filter2Left, filter2Right }, driveGain);
+                    filter2Left = driven.left;
+                    filter2Right = driven.right;
+                    currentBlockWork.addFilterDriveSamples(DriveStage::workSamplesForChannels(2));
+                }
+                else
+                {
+                    filter2DriveState.reset({ filter2Left, filter2Right });
+                }
+                const auto filtered2 = filter2State.process(filter2Left, filter2Right);
+                if (params.filterRouting == 1)
+                {
+                    left = (left + filtered2.left) * 0.5f;
+                    right = (right + filtered2.right) * 0.5f;
+                }
+                else
+                {
+                    left = filtered2.left;
+                    right = filtered2.right;
+                }
+            }
+            else
+            {
+                filter2DriveState.reset({ left, right });
+            }
 
             const float ampLevel = VoiceMath::clamp01(params.ampLevel + (useDynamicModulation && cachedDynamicTargets.ampLevel
                 ? DynamicModulation::targetOffset(params.dynamicModulation.ampLevel, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, params.macroValues, 1.0f)

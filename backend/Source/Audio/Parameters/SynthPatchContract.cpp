@@ -454,6 +454,12 @@ namespace beat
             ? juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "filter.resonance", instrument.resonance01))
             : 0.0f;
         instrument.drive01 = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "filter.drive", instrument.drive01));
+        instrument.filter2Enabled = synthNumberParam(params, "filter.2.enabled", 0.0) >= 0.5;
+        instrument.filter2Type = parseSynthFilterType(synthStringParam(params, "filter.2.type", "lowpass"));
+        instrument.filter2Cutoff01 = juce::jlimit(0.0f, 1.0f, cutoffHzTo01(synthNumberParam(params, "filter.2.cutoff", 18000.0)));
+        instrument.filter2Resonance01 = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "filter.2.resonance", 0.1));
+        instrument.filter2Drive01 = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "filter.2.drive", 0.0));
+        instrument.filterRouting = synthStringParam(params, "filter.routing", "serial") == "parallel" ? 1 : 0;
         instrument.attackMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.1.attack", 0.005) * 1000.0f);
         instrument.attackCurve = envelopeCurveForId(synthStringParam(params, "env.1.attackCurve", "linear"));
         instrument.decayMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.1.decay", 0.15) * 1000.0f);

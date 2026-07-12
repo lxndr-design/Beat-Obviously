@@ -24,7 +24,7 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 | FM/PM/PD/AM/ring modulation | Partial modulation, no complete audio-rate architecture | B2 | Source/destination contracts and spectral tests |
 | Four envelopes / ten LFOs / eight macros | Two envelopes, two LFOs, four macros | B3 | Stable IDs, bounded routes, migration and UI follow-up |
 | MPE/per-note expression | Partial note automation | B3 | Input capability mapping and deterministic persistence |
-| Dual shared filters and source routing | Missing | B4 | Shared filter buses, serial/parallel/direct routing |
+| Dual shared filters and source routing | Two shared filters with serial/parallel topology implemented; all sources still enter the shared Filter-1 input | B5 | Add per-source Filter 1/Filter 2/both/direct selection and transition tests |
 | Reorderable insert plus two FX buses | Partial instrument-owned fixed FX | B5 | De-clicked graph replacement and preset migrations |
 | Three source slots | Missing | C1 | Narrow source-engine interface after A/B freeze |
 | Sample engine | Partial sampler/zone playback | C2 | Slot integration, loops/slicing/tape modulation, RT-safe load |

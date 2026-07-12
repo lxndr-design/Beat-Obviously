@@ -13,6 +13,12 @@ export interface SynthRenderState {
   filterResonance: number;
   filterF: number;
   filterDamping: number;
+  low2: number;
+  band2: number;
+  filterCutoff2: number;
+  filterResonance2: number;
+  filterF2: number;
+  filterDamping2: number;
 }
 
 interface RenderModulation {
@@ -167,7 +173,11 @@ interface UnisonVoicePlan {
 }
 
 export function createSynthRenderState(): SynthRenderState {
-  return { phase: 0, index: 0, low: 0, band: 0, filterCutoff: -1, filterResonance: -1, filterF: 0, filterDamping: 1 };
+  return {
+    phase: 0, index: 0,
+    low: 0, band: 0, filterCutoff: -1, filterResonance: -1, filterF: 0, filterDamping: 1,
+    low2: 0, band2: 0, filterCutoff2: -1, filterResonance2: -1, filterF2: 0, filterDamping2: 1,
+  };
 }
 
 export function noteFrequency(midiPitch: number, instrument?: Instrument): number {
@@ -927,12 +937,23 @@ export function renderInstrumentSample(
     v = v * (1 - sub * 0.45) + subWave * sub * 0.45;
   }
 
+  const filterInput = v;
   if (drive > 0) {
     const amount = 1 + drive * 10;
     v = Math.tanh(v * amount) / Math.tanh(amount);
   }
 
-  const filtered = resonantFilter(v, state, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass");
+  let filtered = resonantFilter(v, state, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass");
+  if (instrument.filter2?.enabled) {
+    let branch = instrument.filterRouting === "parallel" ? filterInput : filtered;
+    if (instrument.filter2.drive > 0) {
+      const amount = 1 + clamp01(instrument.filter2.drive) * 10;
+      branch = Math.tanh(branch * amount) / Math.tanh(amount);
+    }
+    const filtered2 = resonantFilter(branch, state, sampleRate,
+      clamp01(instrument.filter2.cutoff), clamp01(instrument.filter2.resonance), instrument.filter2.type, true);
+    filtered = instrument.filterRouting === "parallel" ? (filtered + filtered2) * 0.5 : filtered2;
+  }
   const level = clamp01((instrument.ampLevel ?? 1) + modulationTargetOffset(modulation, "amp.level"));
   state.phase += frequency / sampleRate;
   state.index += 1;
@@ -971,6 +992,27 @@ function renderInstrumentStereoSample(
 
   left = resonantFilter(left, leftFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass");
   right = resonantFilter(right, rightFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass");
+  if (instrument.filter2?.enabled) {
+    let branchLeft = instrument.filterRouting === "parallel" ? warped.left : left;
+    let branchRight = instrument.filterRouting === "parallel" ? warped.right : right;
+    if (instrument.filter2.drive > 0) {
+      const amount = 1 + clamp01(instrument.filter2.drive) * 10;
+      const normalizer = Math.tanh(amount);
+      branchLeft = Math.tanh(branchLeft * amount) / normalizer;
+      branchRight = Math.tanh(branchRight * amount) / normalizer;
+    }
+    const filtered2Left = resonantFilter(branchLeft, leftFilterState, sampleRate,
+      clamp01(instrument.filter2.cutoff), clamp01(instrument.filter2.resonance), instrument.filter2.type, true);
+    const filtered2Right = resonantFilter(branchRight, rightFilterState, sampleRate,
+      clamp01(instrument.filter2.cutoff), clamp01(instrument.filter2.resonance), instrument.filter2.type, true);
+    if (instrument.filterRouting === "parallel") {
+      left = (left + filtered2Left) * 0.5;
+      right = (right + filtered2Right) * 0.5;
+    } else {
+      left = filtered2Left;
+      right = filtered2Right;
+    }
+  }
 
   const level = clamp01((instrument.ampLevel ?? 1) + modulationTargetOffset(modulation, "amp.level"));
   const ampEnvelope = clamp01(modulation.ampEnvelope ?? 1);
@@ -990,24 +1032,38 @@ function resonantFilter(
   cutoff: number,
   resonance: number,
   type: NonNullable<Instrument["filterType"]>,
+  secondary = false,
 ): number {
   const minHz = 50;
   const maxHz = Math.min(16000, sampleRate * 0.45);
-  if (Math.abs(cutoff - state.filterCutoff) > 0.0005 || Math.abs(resonance - state.filterResonance) > 0.0005) {
+  let cachedCutoff = secondary ? state.filterCutoff2 : state.filterCutoff;
+  let cachedResonance = secondary ? state.filterResonance2 : state.filterResonance;
+  let filterF = secondary ? state.filterF2 : state.filterF;
+  let damping = secondary ? state.filterDamping2 : state.filterDamping;
+  let low = secondary ? state.low2 : state.low;
+  let band = secondary ? state.band2 : state.band;
+  if (Math.abs(cutoff - cachedCutoff) > 0.0005 || Math.abs(resonance - cachedResonance) > 0.0005) {
     const cutoffHz = minHz * Math.pow(maxHz / minHz, cutoff);
-    state.filterF = Math.min(0.98, 2 * Math.sin(Math.PI * cutoffHz / sampleRate));
-    state.filterDamping = 1.45 - resonance * 1.25;
-    state.filterCutoff = cutoff;
-    state.filterResonance = resonance;
+    filterF = Math.min(0.98, 2 * Math.sin(Math.PI * cutoffHz / sampleRate));
+    damping = 1.45 - resonance * 1.25;
+    cachedCutoff = cutoff;
+    cachedResonance = resonance;
   }
 
-  state.low = clamp(state.low + state.filterF * state.band, -4, 4);
-  const high = input - state.low - state.filterDamping * state.band;
-  state.band = clamp(state.band + state.filterF * high, -4, 4);
+  low = clamp(low + filterF * band, -4, 4);
+  const high = input - low - damping * band;
+  band = clamp(band + filterF * high, -4, 4);
+  if (secondary) {
+    state.low2 = low; state.band2 = band; state.filterF2 = filterF; state.filterDamping2 = damping;
+    state.filterCutoff2 = cachedCutoff; state.filterResonance2 = cachedResonance;
+  } else {
+    state.low = low; state.band = band; state.filterF = filterF; state.filterDamping = damping;
+    state.filterCutoff = cachedCutoff; state.filterResonance = cachedResonance;
+  }
 
-  const emphasized = state.low + state.band * resonance * 1.6;
+  const emphasized = low + band * resonance * 1.6;
   if (type === "highpass") return clamp(high, -1.2, 1.2);
-  if (type === "bandpass") return clamp(state.band * (1 + resonance), -1.2, 1.2);
+  if (type === "bandpass") return clamp(band * (1 + resonance), -1.2, 1.2);
   return clamp(emphasized, -1.2, 1.2);
 }
 

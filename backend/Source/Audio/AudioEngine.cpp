@@ -1811,6 +1811,12 @@ namespace beat
         params.drive01 = instrument.drive01;
         params.color01 = instrument.color01;
         params.filterType = instrument.filterType;
+        params.filter2Enabled = instrument.filter2Enabled;
+        params.filter2Type = instrument.filter2Type;
+        params.filter2Cutoff01 = instrument.filter2Cutoff01;
+        params.filter2Resonance01 = instrument.filter2Resonance01;
+        params.filter2Drive01 = instrument.filter2Drive01;
+        params.filterRouting = instrument.filterRouting;
         params.attackMs = instrument.attackMs;
         params.attackCurve = instrument.attackCurve;
         params.decayMs = instrument.decayMs;

@@ -287,6 +287,14 @@ export interface Instrument {
     color: number;      // 0..1, displayed as Shape % — waveform morph
   };
   filterType?: "lowpass" | "bandpass" | "highpass";
+  filter2?: {
+    enabled: boolean;
+    type: "lowpass" | "bandpass" | "highpass";
+    cutoff: number;
+    resonance: number;
+    drive: number;
+  };
+  filterRouting?: "serial" | "parallel";
   filterKeytrack?: number; // 0..1 — one cutoff octave per pitch octave at 1.0
   /** Wavetable / oscillator shape. */
   waveform: "sine" | "saw" | "square" | "triangle" | "noise" | "sample" | "wavetable";

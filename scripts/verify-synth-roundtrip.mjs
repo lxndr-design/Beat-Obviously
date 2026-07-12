@@ -202,6 +202,22 @@ try {
   assert.equal(stepTuningPreview.aether.oscA.tuningMode, "step");
   assert.equal(stepTuningPreview.aether.oscA.tuningStep, 7);
   assert.equal(stepTuningPreview.aether.oscA.tuningDivisions, 19);
+  const dualFilterDraft = synthStore.normalizeSynthDraftPatch({
+    parameters: {
+      "filter.2.enabled": true,
+      "filter.2.type": "bandpass",
+      "filter.2.cutoff": 2400,
+      "filter.2.resonance": 0.48,
+      "filter.2.drive": 0.22,
+      "filter.routing": "parallel",
+    },
+  });
+  const dualFilterPreview = synthStore.synthDraftToPreviewInstrument(dualFilterDraft);
+  assert.equal(dualFilterPreview.filter2.enabled, true);
+  assert.equal(dualFilterPreview.filter2.type, "bandpass");
+  assert.equal(dualFilterPreview.filter2.resonance, 0.48);
+  assert.equal(dualFilterPreview.filter2.drive, 0.22);
+  assert.equal(dualFilterPreview.filterRouting, "parallel");
   const independentUnisonModDraft = synthStore.normalizeSynthDraftPatch({
     parameters: independentUnisonDraft.parameters,
     modulation: [

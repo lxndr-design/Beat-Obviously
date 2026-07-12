@@ -307,3 +307,16 @@ render
   advance independent A/B base accumulators
   wavetable members advance their existing internal phases
 ```
+
+```text
+shared source mix
+  Filter 1 drive -> Filter 1
+  Filter 2 disabled -> existing output unchanged
+  Filter 2 enabled, serial
+    Filter 1 output -> Filter 2 drive -> Filter 2 -> amp
+  Filter 2 enabled, parallel
+    pre-Filter-1 input -> Filter 2 drive -> Filter 2
+    bounded average(Filter 1, Filter 2) -> amp
+```
+
+Both filter and drive states are prepared outside the callback. Topology selection is a fixed per-sample branch with no graph mutation or dynamic ownership.

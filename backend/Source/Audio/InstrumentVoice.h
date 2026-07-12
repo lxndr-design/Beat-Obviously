@@ -177,6 +177,12 @@ namespace beat
             float drive01     { 0.1f };
             float color01     { 0.5f };
             int filterType    { 0 };
+            bool filter2Enabled { false };
+            int filter2Type { 0 };
+            float filter2Cutoff01 { 1.0f };
+            float filter2Resonance01 { 0.0f };
+            float filter2Drive01 { 0.0f };
+            int filterRouting { 0 };
             // ADSR in ms / 0..1
             float attackMs  { 5.f };
             int attackCurve { 0 };
@@ -336,7 +342,9 @@ namespace beat
         VoiceStats::RenderWorkBlock currentBlockWork;
         DriveStage::State aetherRuntimeWarpState;
         DriveStage::State driveState;
+        DriveStage::State filter2DriveState;
         FilterStage::State filterState;
+        FilterStage::State filter2State;
         float previousRawEnvelope { 0.0f };
         float previousRawEnv2Envelope { 0.0f };
         EnvelopeShaper::LoopState env1LoopState;
