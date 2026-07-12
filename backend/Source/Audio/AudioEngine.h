@@ -596,6 +596,7 @@ namespace beat
         std::map<juce::String, std::shared_ptr<SampleBuffer>> audioFileBuffers;
         juce::AudioFormatManager formatManager;
         juce::AudioBuffer<float> routeBuf;
+        juce::MidiBuffer callbackMidi;
         RecordingCapture inputRecording;
         std::atomic<bool> inputMonitoringEnabled { false };
         std::atomic<float> inputMonitoringGain { 1.0f };

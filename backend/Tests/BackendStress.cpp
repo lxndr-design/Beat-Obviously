@@ -37,6 +37,7 @@
 #include "../Source/Persistence/AudioFileLibraryActions.h"
 #include "../Source/Persistence/Database.h"
 #include "../Source/Persistence/ProjectRepository.h"
+#include "AllocationProbe.h"
 
 #include <algorithm>
 #include <array>
@@ -51,6 +52,7 @@
 #include <string_view>
 #include <thread>
 #include <vector>
+#include <dlfcn.h>
 
 namespace
 {
@@ -10425,6 +10427,44 @@ namespace
         return difference > 0.0001;
     }
 
+    bool stressAudioCallbackAllocationFreedom()
+    {
+        beat::AudioEngine engine;
+        constexpr int blockSize = 256;
+        engine.prepareForOffline(48000.0, blockSize, 2);
+        engine.applyProject(makeDenseAetherProject());
+        engine.requestPlay();
+        for (int i = 0; i < 4; ++i)
+            renderEngineBlock(engine, blockSize);
+
+        juce::AudioBuffer<float> output(2, blockSize);
+        std::array<float*, 2> outputs {
+            output.getWritePointer(0),
+            output.getWritePointer(1),
+        };
+        juce::AudioIODeviceCallbackContext context;
+        if (!engine.queueRealtimeParameterChange("dense-aether", "osc.a.position", 0.73f, 37, 64))
+            return false;
+        output.clear();
+        beat::test::beginAllocationProbe();
+        engine.audioDeviceIOCallbackWithContext(nullptr, 0, outputs.data(), 2, blockSize, context);
+        const size_t allocations = beat::test::endAllocationProbe();
+        if (allocations != 0)
+        {
+            std::cerr << "Audio callback allocated " << allocations << " heap blocks\n";
+            for (size_t index = 0; index < std::min<size_t>(allocations, 64); ++index)
+            {
+                Dl_info info {};
+                const auto address = beat::test::allocationProbeCallsite(index);
+                if (address != nullptr && dladdr(address, &info) != 0)
+                    std::cerr << "  " << index << ": " << (info.dli_sname != nullptr ? info.dli_sname : "unknown")
+                              << " + " << (static_cast<const char*>(address) - static_cast<const char*>(info.dli_saddr))
+                              << " bytes\n";
+            }
+        }
+        return allocations == 0 && std::isfinite(bufferEnergy(output));
+    }
+
     bool stressAudioEngineVariableBlockSizes()
     {
         beat::AudioEngine engine;
@@ -14122,6 +14162,11 @@ int main()
     if (!stressAudioEngineQualityModes())
     {
         std::cerr << "Audio engine quality modes stress failed\n";
+        return 1;
+    }
+    if (!stressAudioCallbackAllocationFreedom())
+    {
+        std::cerr << "Audio callback allocation freedom stress failed\n";
         return 1;
     }
     if (!stressAudioEngineDenseAetherRoute())

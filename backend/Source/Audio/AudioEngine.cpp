@@ -210,17 +210,14 @@ namespace beat
             return fallback;
         }
 
-        void setTrackEffectParam(TrackEffect& effect, const juce::String& key, float value)
+        bool stringRegionEquals(const juce::String& text, int start, int length, const juce::String& expected) noexcept
         {
-            for (auto& param : effect.params)
-            {
-                if (param.key == key)
-                {
-                    param.value = value;
-                    return;
-                }
-            }
-            effect.params.push_back({ key, value });
+            if (length != expected.length() || start < 0 || start + length > text.length())
+                return false;
+            for (int index = 0; index < length; ++index)
+                if (text[start + index] != expected[index])
+                    return false;
+            return true;
         }
 
         bool isRouteAutomationTarget(const juce::String& target) noexcept
@@ -549,6 +546,7 @@ namespace beat
         activeSampleVoices.reserve(RenderBudgets::activeSampleVoices);
         activeAudioClipVoices.reserve(RenderBudgets::activeAudioClipVoices);
         instrumentRenderStates.reserve(RenderBudgets::instrumentRoutes);
+        callbackMidi.ensureSize(65536);
         synth.addSound(new PassSound());
         for (int i = 0; i < 16; ++i)
         {
@@ -3581,20 +3579,24 @@ namespace beat
         if (!singular && !plural)
             return false;
 
-        const auto prefixLength = singular ? 7 : 8;
-        const auto rest = target.substring(prefixLength);
-        const auto effectId = rest.upToFirstOccurrenceOf(".", false, false);
-        const auto param = rest.fromFirstOccurrenceOf(".", false, false);
-        if (effectId.isEmpty() || param.isEmpty())
+        const int prefixLength = singular ? 7 : 8;
+        const int separator = target.indexOfChar(prefixLength, '.');
+        if (separator <= prefixLength || separator >= target.length() - 1)
             return false;
 
         for (auto& effect : route.effects)
         {
-            if (effect.id == effectId)
+            if (!stringRegionEquals(target, prefixLength, separator - prefixLength, effect.id))
+                continue;
+            for (auto& parameter : effect.params)
             {
-                setTrackEffectParam(effect, param, event.value);
-                return true;
+                if (stringRegionEquals(target, separator + 1, target.length() - separator - 1, parameter.key))
+                {
+                    parameter.value = event.value;
+                    return true;
+                }
             }
+            return false;
         }
 
         return false;
@@ -4133,7 +4135,8 @@ namespace beat
         // 1. Advance the sequencer; collect MIDI events for this block.
         auto phaseStartTicks = markTicks();
         int64_t modulationTicks = 0;
-        juce::MidiBuffer midi;
+        callbackMidi.clear();
+        auto& midi = callbackMidi;
         {
             const juce::ScopedTryLock lock(sampleLock);
             if (lock.isLocked())
@@ -4245,13 +4248,23 @@ namespace beat
                            [&](const Sequencer::AudioClipEvent& ev) {
                                startAudioClipVoiceLocked(ev);
                            });
-                std::stable_sort(blockRouteParameterEvents.begin(),
-                                 blockRouteParameterEvents.end(),
-                                 [](const RouteParameterAutomationEvent& a, const RouteParameterAutomationEvent& b) {
-                                     if (a.trackId == b.trackId)
-                                         return a.sampleOffset < b.sampleOffset;
-                                     return a.trackId < b.trackId;
-                                 });
+                const auto orderedBefore = [](const RouteParameterAutomationEvent& a,
+                                              const RouteParameterAutomationEvent& b) noexcept {
+                    if (a.trackId == b.trackId)
+                        return a.sampleOffset < b.sampleOffset;
+                    return a.trackId < b.trackId;
+                };
+                for (size_t index = 1; index < blockRouteParameterEvents.size(); ++index)
+                {
+                    auto value = std::move(blockRouteParameterEvents[index]);
+                    size_t insertion = index;
+                    while (insertion > 0 && orderedBefore(value, blockRouteParameterEvents[insertion - 1]))
+                    {
+                        blockRouteParameterEvents[insertion] = std::move(blockRouteParameterEvents[insertion - 1]);
+                        --insertion;
+                    }
+                    blockRouteParameterEvents[insertion] = std::move(value);
+                }
             }
             else
             {

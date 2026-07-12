@@ -69,3 +69,7 @@ The quality enum, engine/voice propagation, and four-point interpolation are ind
 ## Milestone A7 provenance
 
 The dual-table playback cache, bounded replacement crossfade, and retained-owner reclamation boundary are independently implemented from existing Beat ownership and oscillator code. No upstream source or dependency was used.
+
+## Milestone A8 provenance
+
+The test-only allocation interposer, non-owning sequencer callback view, preallocated MIDI storage, bounded stable insertion ordering, and string-region matching are independently implemented from existing Beat/JUCE integration code and standard C++ allocation hooks. No upstream repository was consulted, executed, or imported; no external source, asset, service, prebuilt binary, or runtime dependency was added.

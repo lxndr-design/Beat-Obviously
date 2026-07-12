@@ -5,9 +5,44 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <type_traits>
+#include <utility>
 
 namespace beat
 {
+    template <typename Signature>
+    class CallbackRef;
+
+    /** Non-owning, allocation-free callback view. The referenced callable only
+     *  needs to remain alive for the duration of the receiving function call. */
+    template <typename Result, typename... Args>
+    class CallbackRef<Result(Args...)>
+    {
+    public:
+        CallbackRef() noexcept = default;
+
+        template <typename Callable,
+                  typename = std::enable_if_t<!std::is_same_v<std::decay_t<Callable>, CallbackRef>>>
+        CallbackRef(Callable&& callable) noexcept
+            : context(const_cast<void*>(static_cast<const void*>(std::addressof(callable))))
+            , invokeCallback([](void* target, Args... args) -> Result {
+                return (*static_cast<std::remove_reference_t<Callable>*>(target))(std::forward<Args>(args)...);
+            })
+        {
+        }
+
+        explicit operator bool() const noexcept { return invokeCallback != nullptr; }
+
+        Result operator()(Args... args) const
+        {
+            return invokeCallback(context, std::forward<Args>(args)...);
+        }
+
+    private:
+        void* context { nullptr };
+        Result (*invokeCallback)(void*, Args...) { nullptr };
+    };
+
     /**
      * Sequencer — sample-accurate beat timeline.
      *
@@ -37,7 +72,7 @@ namespace beat
             int    glideTargetPitch { -1 };
             float  instrumentGlideMs { 0.0f };
         };
-        using TriggerHandler = std::function<void(const TriggerEvent&)>;
+        using TriggerHandler = CallbackRef<void(const TriggerEvent&)>;
 
         struct ParameterAutomationEvent {
             Id     trackId;
@@ -49,7 +84,7 @@ namespace beat
             int    rampSamples { 0 };
             int    repetition { 0 };
         };
-        using ParameterAutomationHandler = std::function<void(const ParameterAutomationEvent&)>;
+        using ParameterAutomationHandler = CallbackRef<void(const ParameterAutomationEvent&)>;
 
         struct AudioClipEvent {
             Id     trackId;
@@ -68,7 +103,7 @@ namespace beat
             float  trackPan { 0.0f };
             float  segmentGainDb { 0.0f };
         };
-        using AudioClipHandler = std::function<void(const AudioClipEvent&)>;
+        using AudioClipHandler = CallbackRef<void(const AudioClipEvent&)>;
 
         void setProject(Project p);
         void setTempo(double newBpm)     { bpm.store(newBpm); }

@@ -153,6 +153,8 @@ target_link_libraries(Beat PRIVATE
 target_compile_features(Beat PRIVATE cxx_std_20)
 
 add_executable(BeatBackendStress
+    Tests/AllocationProbe.cpp
+    Tests/AllocationProbe.h
     Tests/BackendStress.cpp
     Source/Audio/AudioEngine.cpp
     Source/Audio/AudioEngine.h

@@ -219,3 +219,24 @@ later control replacement or voice teardown
 ```
 
 Same-table note reconfiguration does not restart a transition. Repeated replacement supersedes the earlier transition without accumulating owners or queues.
+
+## Callback allocation-proof path
+
+```text
+BeatBackendStress setup (test thread)
+  prepare dense Aether engine and all fixed callback buffers
+  warm four complete callbacks
+  queue one sample-offset realtime parameter change
+  enable test-only global new/new[] interposer
+AudioEngine::audioDeviceIOCallbackWithContext
+  clear preallocated callback MIDI storage
+  collect bounded events into reserved vectors
+  stable in-place route-event ordering
+  allocation-free route target/key region matching
+  Sequencer::render via synchronous non-owning callback views
+  render voices/routes/master/analyzer and publish telemetry
+  zero observed C++ heap allocations
+  disable probe
+```
+
+The callback continues to use `ScopedTryLock` for the engine project-state boundary, so contention skips the guarded render path instead of blocking there. JUCE synthesiser rendering still enters JUCE's existing internal callback lock. No production callback invokes file-loading APIs in the traced dense path; the current native probe interposes heap allocation only, not OS file calls or all lock implementations. Product callbacks (`onSegmentTriggered`, `onPositionChanged`) remain external code boundaries and are not covered by the zero-allocation guarantee.
