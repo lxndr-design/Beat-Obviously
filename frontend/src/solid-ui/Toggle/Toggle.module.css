@@ -43,16 +43,7 @@
   transition: transform var(--duration-hover) var(--ease-in-out);
 }
 
-.on {
-  background: var(--interaction-active-bg);
-}
-
-.wrap:hover .on {
-  background: var(--interaction-active-hover-bg);
-}
-
 .on::after {
-  background: var(--color-bg);
   transform: translateX(calc(var(--toggle-track-width) - var(--toggle-thumb-size) - var(--border-width) - var(--border-width)));
 }
 
