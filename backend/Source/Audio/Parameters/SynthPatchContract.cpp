@@ -307,6 +307,10 @@ namespace beat
             active |= configureDynamicTarget(dynamicModulation.oscBFine, modulation, "osc.b.fine", lfoEnabled, lfo2Enabled);
             active |= configureDynamicTarget(dynamicModulation.oscBLevel, modulation, "osc.b.level", lfoEnabled, lfo2Enabled);
             active |= configureDynamicTarget(dynamicModulation.oscBPan, modulation, "osc.b.pan", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.oscAUnisonDetune, modulation, "osc.a.unison.detune", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.oscAUnisonSpread, modulation, "osc.a.unison.spread", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.oscBUnisonDetune, modulation, "osc.b.unison.detune", lfoEnabled, lfo2Enabled);
+            active |= configureDynamicTarget(dynamicModulation.oscBUnisonSpread, modulation, "osc.b.unison.spread", lfoEnabled, lfo2Enabled);
             active |= configureDynamicTarget(dynamicModulation.filterCutoff, modulation, "filter.cutoff", lfoEnabled, lfo2Enabled);
             active |= configureDynamicTarget(dynamicModulation.filterResonance, modulation, "filter.resonance", lfoEnabled, lfo2Enabled);
             active |= configureDynamicTarget(dynamicModulation.filterDrive, modulation, "filter.drive", lfoEnabled, lfo2Enabled);

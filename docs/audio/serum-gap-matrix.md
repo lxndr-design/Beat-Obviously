@@ -15,7 +15,7 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 | Explicit hard budgets | Queue, event, route, pending-note, sample-voice and clip-voice admission budgets implemented | A3/A4 | Add explicit nonlinear/modulation work ceilings and future-source budgets as those engines are introduced |
 | Audible DC removal | Implemented before final limiter | A5 | Sample-rate, constant-input, lifecycle reset, finite-output, and block-continuity tests pass |
 | Offline HQ mode | Explicit opt-in mode implemented for wavetable sample interpolation | A6 | Phase/transport parity tests pass; nonlinear oversampling policy and product-facing export selection remain open |
-| Two independent main oscillators | Source/table, tuning, phase/randomization, static unison, level and pan are independent; legacy shared unison migrates compatibly | B1 | Add per-source filter/direct/FX routing and independent unison modulation targets |
+| Two independent main oscillators | Source/table, tuning, phase/randomization, static unison, unison modulation, level and pan are independent; legacy shared unison migrates compatibly | B1/B2 | Add per-source filter/direct/FX routing and later audio-rate cross-modulation |
 | Dedicated sub and noise/transient | Present | B1 | Mono/direct/FX routing semantics and tests |
 | Per-oscillator unison | Present up to bounded counts | B1 | Tuning modes, performance and transition proof |
 | Phase memory/randomization | Partial deterministic reset/jitter | B1 | Explicit modes and preset migration |

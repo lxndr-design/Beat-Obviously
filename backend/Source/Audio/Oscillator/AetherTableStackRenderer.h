@@ -83,11 +83,15 @@ namespace beat::AetherTableStackRenderer
             const auto& fineTarget,
             const auto& levelTarget,
             const auto& panTarget,
+            const auto& unisonDetuneTarget,
+            const auto& unisonSpreadTarget,
             std::pair<float, float> staticPanGains,
             bool panIsDynamic,
             bool fineIsDynamic,
             bool positionIsDynamic,
             bool levelIsDynamic,
+            bool unisonDetuneIsDynamic,
+            bool unisonSpreadIsDynamic,
             double staticRate,
             double phaseOffset,
             int64_t& componentSampleCounter)
@@ -123,6 +127,12 @@ namespace beat::AetherTableStackRenderer
             float value = 0.0f;
             if (osc.waveform == 5)
             {
+                const float oscillatorDetuneMod = useDynamicModulation && unisonDetuneIsDynamic
+                    ? DynamicModulation::targetOffset(unisonDetuneTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, params.macroValues, 100.0f)
+                    : 0.0f;
+                const float oscillatorSpreadMod = useDynamicModulation && unisonSpreadIsDynamic
+                    ? DynamicModulation::targetOffset(unisonSpreadTarget, rawLfo, rawLfo2, env, env2, velocity, noteKeytrack, modWheel, params.macroValues, 1.0f)
+                    : 0.0f;
                 const auto tableResult = WavetableOscillatorBank::render(
                     oscillators,
                     unisonPlan,
@@ -131,8 +141,8 @@ namespace beat::AetherTableStackRenderer
                     baseFrequencyHz,
                     sampleRate,
                     positionMod,
-                    unisonDetuneMod,
-                    unisonSpreadMod);
+                    unisonDetuneMod + oscillatorDetuneMod,
+                    unisonSpreadMod + oscillatorSpreadMod);
                 value = tableResult.sample;
                 result.work.wavetableVoiceSamples += tableResult.voiceSamples;
                 result.work.wavetableFrequencyUpdates += tableResult.frequencyUpdates;
@@ -156,11 +166,15 @@ namespace beat::AetherTableStackRenderer
             params.dynamicModulation.oscAFine,
             params.dynamicModulation.oscALevel,
             params.dynamicModulation.oscAPan,
+            params.dynamicModulation.oscAUnisonDetune,
+            params.dynamicModulation.oscAUnisonSpread,
             panGains.oscA,
             targets.oscAPan,
             targets.oscAFine,
             targets.oscAPosition,
             targets.oscALevel,
+            targets.oscAUnisonDetune,
+            targets.oscAUnisonSpread,
             pitchRates.oscA,
             oscAPhaseOffset,
             result.work.aetherOscASamples);
@@ -172,11 +186,15 @@ namespace beat::AetherTableStackRenderer
             params.dynamicModulation.oscBFine,
             params.dynamicModulation.oscBLevel,
             params.dynamicModulation.oscBPan,
+            params.dynamicModulation.oscBUnisonDetune,
+            params.dynamicModulation.oscBUnisonSpread,
             panGains.oscB,
             targets.oscBPan,
             targets.oscBFine,
             targets.oscBPosition,
             targets.oscBLevel,
+            targets.oscBUnisonDetune,
+            targets.oscBUnisonSpread,
             pitchRates.oscB,
             oscBPhaseOffset,
             result.work.aetherOscBSamples);

@@ -271,3 +271,14 @@ audio callback
 ```
 
 No callback parsing, allocation, or graph mutation is added. Parameter normalization and migration occur on the existing control/setup boundary.
+
+```text
+modulation setup
+  legacy unison.detune/spread -> shared target state
+  osc.a.unison.detune/spread -> A-only target state
+  osc.b.unison.detune/spread -> B-only target state
+audio callback
+  A unison offsets = shared + A-only
+  B unison offsets = shared + B-only
+  existing bounded A/B unison plans render independently
+```

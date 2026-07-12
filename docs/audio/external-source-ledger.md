@@ -81,3 +81,7 @@ The development/test-only mutex and file-operation interposers, fixed-capacity t
 ## Milestone B1 provenance
 
 The per-oscillator unison parameter contract, legacy shared-value migration, frontend/native conversion, and focused tests are independent extensions of Beat's existing separate oscillator banks and unison plans. No upstream repository was consulted, executed, or imported, and no external code, dependency, asset, preset, service, binary, branding, or licensing change was introduced.
+
+## Milestone B2 provenance
+
+The four oscillator-specific unison modulation targets, additive legacy compatibility, activity planning, preview/native routing, and tests are independently implemented extensions of Beat's modulation matrix. No upstream source was consulted, executed, adapted, or imported, and no dependency or licensing state changed.

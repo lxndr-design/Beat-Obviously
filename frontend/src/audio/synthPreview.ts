@@ -1030,8 +1030,10 @@ function aetherStackSample(
     const wavetableOffset = legacyPositionOffset + modulationTargetOffset(modulation, `osc.${key}.position`);
     const warpOffset = modulationTargetOffset(modulation, `osc.${key}.warp`);
     const wavetable = warpOffset === 0 ? osc.wavetable : { ...osc.wavetable, warp: clamp01(osc.wavetable.warp + warpOffset) };
-    const unisonDetuneOffset = modulationTargetOffset(modulation, "unison.detune");
-    const unisonSpreadOffset = modulationTargetOffset(modulation, "unison.spread");
+    const unisonDetuneOffset = modulationTargetOffset(modulation, "unison.detune")
+      + modulationTargetOffset(modulation, `osc.${key}.unison.detune`);
+    const unisonSpreadOffset = modulationTargetOffset(modulation, "unison.spread")
+      + modulationTargetOffset(modulation, `osc.${key}.unison.spread`);
     const phaseOffset = oscillatorPhaseOffset(osc, key) + modulationTargetOffset(modulation, `osc.${key}.phase`);
     const sourceSample = waveform === "wavetable"
       ? wavetableOscillatorSample(
@@ -1109,8 +1111,10 @@ function aetherStackStereoSample(
     const wavetableOffset = legacyPositionOffset + modulationTargetOffset(modulation, `osc.${key}.position`);
     const warpOffset = modulationTargetOffset(modulation, `osc.${key}.warp`);
     const wavetable = warpOffset === 0 ? osc.wavetable : { ...osc.wavetable, warp: clamp01(osc.wavetable.warp + warpOffset) };
-    const unisonDetuneOffset = modulationTargetOffset(modulation, "unison.detune");
-    const unisonSpreadOffset = modulationTargetOffset(modulation, "unison.spread");
+    const unisonDetuneOffset = modulationTargetOffset(modulation, "unison.detune")
+      + modulationTargetOffset(modulation, `osc.${key}.unison.detune`);
+    const unisonSpreadOffset = modulationTargetOffset(modulation, "unison.spread")
+      + modulationTargetOffset(modulation, `osc.${key}.unison.spread`);
     const phaseOffset = oscillatorPhaseOffset(osc, key) + modulationTargetOffset(modulation, `osc.${key}.phase`);
     const sourceSample = waveform === "wavetable"
       ? wavetableOscillatorSample(

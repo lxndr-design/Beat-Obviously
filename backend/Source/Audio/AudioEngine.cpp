@@ -1897,6 +1897,10 @@ namespace beat
         params.dynamicModulation.oscBFine = copyDynamicTarget(instrument.dynamicModulation.oscBFine);
         params.dynamicModulation.oscBLevel = copyDynamicTarget(instrument.dynamicModulation.oscBLevel);
         params.dynamicModulation.oscBPan = copyDynamicTarget(instrument.dynamicModulation.oscBPan);
+        params.dynamicModulation.oscAUnisonDetune = copyDynamicTarget(instrument.dynamicModulation.oscAUnisonDetune);
+        params.dynamicModulation.oscAUnisonSpread = copyDynamicTarget(instrument.dynamicModulation.oscAUnisonSpread);
+        params.dynamicModulation.oscBUnisonDetune = copyDynamicTarget(instrument.dynamicModulation.oscBUnisonDetune);
+        params.dynamicModulation.oscBUnisonSpread = copyDynamicTarget(instrument.dynamicModulation.oscBUnisonSpread);
         params.dynamicModulation.filterCutoff = copyDynamicTarget(instrument.dynamicModulation.filterCutoff);
         params.dynamicModulation.filterResonance = copyDynamicTarget(instrument.dynamicModulation.filterResonance);
         params.dynamicModulation.filterDrive = copyDynamicTarget(instrument.dynamicModulation.filterDrive);

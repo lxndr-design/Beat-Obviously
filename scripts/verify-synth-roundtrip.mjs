@@ -180,6 +180,15 @@ try {
   assert.equal(independentUnisonPreview.aether.oscB.wavetable.unison, 7);
   assert.equal(independentUnisonPreview.aether.oscB.wavetable.detuneCents, 31);
   assert.equal(independentUnisonPreview.aether.oscB.wavetable.blend, 0.83);
+  const independentUnisonModDraft = synthStore.normalizeSynthDraftPatch({
+    parameters: independentUnisonDraft.parameters,
+    modulation: [
+      { id: "a_detune", source: "macro.2", target: "osc.a.unison.detune", amount: 0.12, bipolar: false, enabled: true },
+      { id: "b_spread", source: "macro.1", target: "osc.b.unison.spread", amount: -0.15, bipolar: true, enabled: true },
+    ],
+  });
+  assert.equal(synthStore.modulationSummaryForTarget(independentUnisonModDraft, "osc.a.unison.detune").amount, 0);
+  assert.equal(synthStore.modulationSummaryForTarget(independentUnisonModDraft, "osc.b.unison.spread").count, 1);
 
   assert.equal(draft.parameters["future.experimental"], "preserve-me");
   assert.equal(new Set(draft.modulation.map((route) => route.id)).size, draft.modulation.length);

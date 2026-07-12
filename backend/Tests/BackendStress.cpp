@@ -11905,6 +11905,8 @@ namespace
             { "source": "macro.2", "target": "osc.b.pan", "amount": -0.25, "enabled": true },
             { "source": "macro.1", "target": "unison.detune", "amount": 0.1, "enabled": true },
             { "source": "macro.1", "target": "unison.spread", "amount": 0.2, "enabled": true },
+            { "source": "macro.2", "target": "osc.a.unison.detune", "amount": 0.12, "enabled": true },
+            { "source": "macro.1", "target": "osc.b.unison.spread", "amount": -0.15, "enabled": true },
             { "source": "macro.1", "target": "filter.cutoff", "amount": 0.1, "enabled": true },
             { "source": "macro.2", "target": "filter.resonance", "amount": 0.25, "enabled": true },
             { "source": "macro.2", "target": "amp.level", "amount": -0.2, "enabled": true },
@@ -12042,6 +12044,10 @@ namespace
         if (!near(instrument.dynamicModulation.unisonDetune.macro1, 0.1f))
             return false;
         if (!near(instrument.dynamicModulation.unisonSpread.macro1, 0.2f))
+            return false;
+        if (!near(instrument.dynamicModulation.oscAUnisonDetune.macro2, 0.12f))
+            return false;
+        if (!near(instrument.dynamicModulation.oscBUnisonSpread.macro1, -0.15f))
             return false;
         if (!near(instrument.dynamicModulation.filterCutoff.macro1, 0.1f))
             return false;

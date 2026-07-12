@@ -224,6 +224,10 @@ namespace beat
             DynamicModTarget oscBFine;
             DynamicModTarget oscBLevel;
             DynamicModTarget oscBPan;
+            DynamicModTarget oscAUnisonDetune;
+            DynamicModTarget oscAUnisonSpread;
+            DynamicModTarget oscBUnisonDetune;
+            DynamicModTarget oscBUnisonSpread;
             DynamicModTarget filterCutoff;
             DynamicModTarget filterResonance;
             DynamicModTarget filterDrive;

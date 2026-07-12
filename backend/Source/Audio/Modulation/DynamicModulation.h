@@ -19,6 +19,10 @@ namespace beat::DynamicModulation
         bool oscBPosition { false };
         bool oscALevel { false };
         bool oscBLevel { false };
+        bool oscAUnisonDetune { false };
+        bool oscAUnisonSpread { false };
+        bool oscBUnisonDetune { false };
+        bool oscBUnisonSpread { false };
         bool filterCutoff { false };
         bool filterResonance { false };
         bool filterDrive { false };
@@ -123,6 +127,10 @@ namespace beat::DynamicModulation
         flags.oscBPosition = targetActive(modulation.oscBPosition);
         flags.oscALevel = targetActive(modulation.oscALevel);
         flags.oscBLevel = targetActive(modulation.oscBLevel);
+        flags.oscAUnisonDetune = targetActive(modulation.oscAUnisonDetune);
+        flags.oscAUnisonSpread = targetActive(modulation.oscAUnisonSpread);
+        flags.oscBUnisonDetune = targetActive(modulation.oscBUnisonDetune);
+        flags.oscBUnisonSpread = targetActive(modulation.oscBUnisonSpread);
         flags.filterCutoff = targetActive(modulation.filterCutoff);
         flags.filterResonance = targetActive(modulation.filterResonance);
         flags.filterDrive = targetActive(modulation.filterDrive);
@@ -138,6 +146,10 @@ namespace beat::DynamicModulation
         addSourceActivity(flags, modulation.oscBPosition);
         addSourceActivity(flags, modulation.oscALevel);
         addSourceActivity(flags, modulation.oscBLevel);
+        addSourceActivity(flags, modulation.oscAUnisonDetune);
+        addSourceActivity(flags, modulation.oscAUnisonSpread);
+        addSourceActivity(flags, modulation.oscBUnisonDetune);
+        addSourceActivity(flags, modulation.oscBUnisonSpread);
         addSourceActivity(flags, modulation.filterCutoff);
         addSourceActivity(flags, modulation.filterResonance);
         addSourceActivity(flags, modulation.filterDrive);
@@ -154,6 +166,10 @@ namespace beat::DynamicModulation
             || flags.oscBPosition
             || flags.oscALevel
             || flags.oscBLevel
+            || flags.oscAUnisonDetune
+            || flags.oscAUnisonSpread
+            || flags.oscBUnisonDetune
+            || flags.oscBUnisonSpread
             || flags.filterCutoff
             || flags.filterResonance
             || flags.filterDrive

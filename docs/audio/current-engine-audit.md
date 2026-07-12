@@ -214,3 +214,13 @@ Compatibility is explicit: patches without the six new fields inherit the existi
 Native contract coverage verifies A at 3 voices / 11 cents / 0.27 spread and B at 7 voices / 31 cents / 0.83 spread in one patch. Frontend coverage verifies legacy shared-value inheritance and the same divergent preview configuration. Full native stress passes with only the TCC waiver, full non-native verification passes, production Beat builds, and all 150 frozen baseline WAVs are byte-identical. Baseline JSON SHA-256 is `b6dfabee16c5b61bee82ddfb29e9a5a7ab3a6ef2cd504b502e293984b6e13b0b`.
 
 This slice does not yet add per-oscillator FX sends, shared-filter routing, audio-rate cross-modulation, or separate unison modulation routes; those remain later B gates.
+
+## Milestone B2 independent A/B unison modulation — 2026-07-11
+
+Four stable modulation targets extend the B1 static contract: `osc.a.unison.detune`, `osc.a.unison.spread`, `osc.b.unison.detune`, and `osc.b.unison.spread`. Each route is evaluated only for its owning oscillator and added to the legacy shared unison route, preserving existing patches while allowing deliberate divergence. Detune remains clamped by the existing wavetable-bank plan in cents and spread by its existing bounded stereo plan.
+
+The targets flow through frontend normalization/labels/preview, native patch conversion, activity flags, cached modulation planning, and the separate A/B renderer calls. Native tests verify distinct macro routes reach only A detune and B spread; frontend tests verify route admission and target summaries. The expanded A9 callback-safety test remains green because route state is prepared outside the callback and evaluation adds no allocation, file operation, lock contention, lazy initialization, or container growth.
+
+Full native and non-native suites pass with only the TCC waiver, production Beat builds, and all 150 frozen WAVs remain byte-identical. B2 baseline JSON SHA-256 is `8a64d2389a2d4578e2cf6455d4a99f4b63ae647831b108791825f6c7e611ecce`.
+
+Shared legacy targets remain supported and additive. Per-source filter/direct/FX routing and audio-rate oscillator cross-modulation remain open.

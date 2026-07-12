@@ -186,6 +186,10 @@ export type ModulationTargetId =
   | "osc.b.fine"
   | "osc.b.level"
   | "osc.b.pan"
+  | "osc.a.unison.detune"
+  | "osc.a.unison.spread"
+  | "osc.b.unison.detune"
+  | "osc.b.unison.spread"
   | "filter.cutoff"
   | "filter.resonance"
   | "filter.drive"
@@ -1148,6 +1152,10 @@ export const MODULATION_TARGET_LABELS: Record<ModulationTargetId, string> = {
   "osc.b.fine": "OSC B Fine",
   "osc.b.level": "OSC B Level",
   "osc.b.pan": "OSC B Pan",
+  "osc.a.unison.detune": "OSC A Detune",
+  "osc.a.unison.spread": "OSC A Spread",
+  "osc.b.unison.detune": "OSC B Detune",
+  "osc.b.unison.spread": "OSC B Spread",
   "filter.cutoff": "Filter Cutoff",
   "filter.resonance": "Filter Res",
   "filter.drive": "Filter Drive",
