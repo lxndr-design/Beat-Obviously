@@ -185,6 +185,7 @@ export type MemoryCachePreset = "conservative" | "balanced" | "performance";
 export type StartupProjectBehavior = "home" | "restore-last" | "new-project";
 export type AudioLatencyMode = "reported" | "low" | "balanced" | "safe";
 export type ThemeContrastLevel = "low" | "normal" | "high";
+export type ThemeMode = "dark" | "light";
 
 interface SettingsSnapshot {
   resizeSnapSeconds: number;
@@ -194,6 +195,7 @@ interface SettingsSnapshot {
   timelineSubdivision: 2 | 4 | 8 | 16;
   midiSubdivision: 2 | 4 | 8 | 16;
   themeContrastLevel: ThemeContrastLevel;
+  themeMode: ThemeMode;
   preferredAudioTypeName: string;
   preferredInputDeviceName: string;
   preferredOutputDeviceName: string;
@@ -219,6 +221,7 @@ const DEFAULT_SETTINGS: SettingsSnapshot = {
   timelineSubdivision: 4,
   midiSubdivision: 4,
   themeContrastLevel: "normal",
+  themeMode: "dark",
   preferredAudioTypeName: "",
   preferredInputDeviceName: "",
   preferredOutputDeviceName: "",
@@ -261,6 +264,7 @@ function normalizeSettingsSnapshot(value: unknown): SettingsSnapshot {
     timelineSubdivision: normalizeSubdivision(source.timelineSubdivision, DEFAULT_SETTINGS.timelineSubdivision),
     midiSubdivision: normalizeSubdivision(source.midiSubdivision, DEFAULT_SETTINGS.midiSubdivision),
     themeContrastLevel: normalizeThemeContrastLevel(source.themeContrastLevel),
+    themeMode: normalizeThemeMode(source.themeMode),
     preferredAudioTypeName: normalizeString(source.preferredAudioTypeName),
     preferredInputDeviceName: normalizeString(source.preferredInputDeviceName),
     preferredOutputDeviceName: normalizeString(source.preferredOutputDeviceName),
@@ -305,6 +309,10 @@ function normalizeStartupProjectBehavior(value: StartupProjectBehavior | undefin
 
 function normalizeThemeContrastLevel(value: ThemeContrastLevel | undefined): ThemeContrastLevel {
   return value === "low" || value === "normal" || value === "high" ? value : DEFAULT_SETTINGS.themeContrastLevel;
+}
+
+function normalizeThemeMode(value: ThemeMode | undefined): ThemeMode {
+  return value === "light" || value === "dark" ? value : DEFAULT_SETTINGS.themeMode;
 }
 
 function normalizeSampleRate(value: number | undefined): number {
@@ -1225,6 +1233,7 @@ interface SettingsSlice {
   timelineSubdivision: 2 | 4 | 8 | 16;
   midiSubdivision: 2 | 4 | 8 | 16;
   themeContrastLevel: ThemeContrastLevel;
+  themeMode: ThemeMode;
   preferredAudioTypeName: string;
   preferredInputDeviceName: string;
   preferredOutputDeviceName: string;
@@ -1247,6 +1256,7 @@ interface SettingsSlice {
   setTimelineSubdivision: (subdivision: 2 | 4 | 8 | 16) => void;
   setMidiSubdivision: (subdivision: 2 | 4 | 8 | 16) => void;
   setThemeContrastLevel: (level: ThemeContrastLevel) => void;
+  setThemeMode: (mode: ThemeMode) => void;
   setPreferredInputDevice: (typeName: string, deviceName: string) => void;
   setPreferredOutputDevice: (typeName: string, deviceName: string) => void;
   setPreferredSampleRate: (sampleRate: number) => void;
@@ -1297,6 +1307,11 @@ export const useSettingsStore = create<SettingsSlice>()((set) => ({
     const normalized = normalizeThemeContrastLevel(themeContrastLevel);
     writeSettingsPatch({ themeContrastLevel: normalized });
     set({ themeContrastLevel: normalized });
+  },
+  setThemeMode: (themeMode) => {
+    const normalized = normalizeThemeMode(themeMode);
+    writeSettingsPatch({ themeMode: normalized });
+    set({ themeMode: normalized });
   },
   setPreferredInputDevice: (preferredAudioTypeName, preferredInputDeviceName) => {
     writeSettingsPatch({ preferredAudioTypeName, preferredInputDeviceName });

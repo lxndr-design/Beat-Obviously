@@ -532,6 +532,13 @@ function ThemePreferences(props: ThemePreferencesProps) {
       <section class={styles.section}>
         <h3 class={styles.sectionTitle}>Theme</h3>
         <div class={styles.settingsGrid}>
+          <Toggle
+            className={styles.inlineToggle}
+            labelClassName={styles.gridToggleLabel}
+            label="Light mode"
+            checked={props.settings.themeMode === "light"}
+            onChange={(enabled) => props.settings.setThemeMode(enabled ? "light" : "dark")}
+          />
           <FloatingSelect
             className={styles.fieldSelect}
             label="Contrast"

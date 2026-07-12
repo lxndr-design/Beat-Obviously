@@ -76,6 +76,7 @@ export function App() {
 
   const shouldMountEditorHost = createStoreSelector(useUiStore, (s) => s.openEditors.length > 0 || Boolean(s.trackEffectsEditorTrackId));
   const themeContrastLevel = createStoreSelector(useSettingsStore, (s) => s.themeContrastLevel);
+  const themeMode = createStoreSelector(useSettingsStore, (s) => s.themeMode);
   const [showHome, setShowHome] = createSignal(true);
   const [startupReadiness, setStartupReadiness] = createSignal<Record<StartupReadinessKey, boolean>>(initialStartupReadiness(), { equals: false });
   const [startupMinimumElapsed, setStartupMinimumElapsed] = createSignal(false);
@@ -122,6 +123,7 @@ export function App() {
 
   createEffect(() => {
     document.documentElement.dataset.themeContrast = themeContrastLevel();
+    document.documentElement.dataset.theme = themeMode();
   });
 
   onMount(() => {
