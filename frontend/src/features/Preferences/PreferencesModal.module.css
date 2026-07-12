@@ -131,25 +131,7 @@
 .inlineToggle {
   width: 100%;
   min-height: 27px;
-  border: var(--border-fg);
-  padding: 0 6px;
-  justify-content: space-between;
-}
-
-.inlineToggle button {
-  width: 24px;
-  height: 15px;
-}
-
-.inlineToggle button::after {
-  top: 3px;
-  left: 3px;
-  width: 9px;
-  height: 9px;
-}
-
-.inlineToggle button[aria-checked="true"]::after {
-  transform: translateX(9px);
+  justify-content: flex-start;
 }
 
 .readout {
@@ -206,22 +188,6 @@
 .gridToggle {
   width: 129px;
   gap: 6px;
-}
-
-.gridToggle button {
-  width: 24px;
-  height: 15px;
-}
-
-.gridToggle button::after {
-  top: 3px;
-  left: 3px;
-  width: 9px;
-  height: 9px;
-}
-
-.gridToggle button[aria-checked="true"]::after {
-  transform: translateX(9px);
 }
 
 .gridToggleLabel {
