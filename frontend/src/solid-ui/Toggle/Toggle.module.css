@@ -40,7 +40,8 @@
   width: var(--toggle-thumb-size);
   height: var(--toggle-thumb-size);
   background: var(--color-fg);
-  transition: transform var(--duration-hover) var(--ease-in-out);
+  transition: var(--transition-slide-x);
+  will-change: transform;
 }
 
 .on::after {
