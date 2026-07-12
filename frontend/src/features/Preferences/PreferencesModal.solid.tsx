@@ -17,7 +17,7 @@ import {
   type TrainingKind,
   type TrainingStatus,
 } from "../../ai/trainingRunner";
-import { onEvent, send } from "../../ipc/bridge";
+import { isNative, onEvent, send } from "../../ipc/bridge";
 import type { AudioDeviceInfo, AudioDeviceSnapshot } from "../../ipc/schema";
 import {
   useSettingsStore,
@@ -52,8 +52,9 @@ export function PreferencesModal() {
   const [trainingStatuses, setTrainingStatuses] = createSignal<Partial<Record<TrainingKind, TrainingStatus>>>(readTrainingStatuses());
   const dirty = createMemo(() => model().trim() !== getOllamaModel());
   const checkpoints = createMemo(() => makeTrainingCheckpoints(trainingStats(), trainedAt()));
-  const inputOptions = createMemo(() => deviceOptions(deviceSnapshot(), "input"));
-  const outputOptions = createMemo(() => deviceOptions(deviceSnapshot(), "output"));
+  const nativeAudioAvailable = isNative();
+  const inputOptions = createMemo(() => deviceOptions(deviceSnapshot(), "input", nativeAudioAvailable));
+  const outputOptions = createMemo(() => deviceOptions(deviceSnapshot(), "output", nativeAudioAvailable));
   const selectedInputValue = createMemo(() => selectedDeviceValue(
     inputOptions(),
     settings().preferredAudioTypeName,
@@ -62,7 +63,7 @@ export function PreferencesModal() {
   const selectedOutputValue = createMemo(() => selectedDeviceValue(
     outputOptions(),
     deviceSnapshot()?.currentTypeName || "",
-    settings().preferredOutputDeviceName || deviceSnapshot()?.currentOutputName || "",
+    deviceSnapshot()?.currentOutputName || settings().preferredOutputDeviceName || "",
   ));
   const activeTabLabel = createMemo(() => PREFERENCE_TABS.find((tab) => tab.id === activeTab())?.label);
 
@@ -101,7 +102,9 @@ export function PreferencesModal() {
     try {
       const response = await send({ kind: "audio.listDevices" });
       setDeviceSnapshot(response.snapshot);
-      setDeviceStatus(response.snapshot.currentTypeName ? "Audio ready" : "Audio unavailable");
+      setDeviceStatus(nativeAudioAvailable
+        ? response.snapshot.currentTypeName ? "Audio ready" : "Audio unavailable"
+        : "Browser preview follows the macOS system output");
     } catch (error) {
       setDeviceStatus(error instanceof Error ? error.message : "Audio unavailable");
     }
@@ -133,7 +136,6 @@ export function PreferencesModal() {
   async function selectOutputDevice(value: string) {
     setOutputOpen(false);
     const device = parseDeviceValue(value);
-    useSettingsStore.getState().setPreferredOutputDevice(device?.typeName ?? "", device?.name ?? "");
     if (!device) {
       setDeviceStatus("Following system output");
       return;
@@ -146,6 +148,9 @@ export function PreferencesModal() {
         deviceName: device.name,
       });
       setDeviceSnapshot(response.snapshot);
+      if (response.ok) {
+        useSettingsStore.getState().setPreferredOutputDevice(device.typeName, device.name);
+      }
       setDeviceStatus(response.ok ? "Output selected" : response.error ?? "Output selection unavailable");
     } catch (error) {
       setDeviceStatus(error instanceof Error ? error.message : "Output selection unavailable");
@@ -241,6 +246,7 @@ export function PreferencesModal() {
               deviceStatus={deviceStatus()}
               inputOptions={inputOptions()}
               outputOptions={outputOptions()}
+              nativeAudioAvailable={nativeAudioAvailable}
               selectedInputValue={selectedInputValue()}
               selectedOutputValue={selectedOutputValue()}
               inputOpen={inputOpen()}
@@ -308,6 +314,7 @@ interface AudioPreferencesProps {
   deviceStatus: string;
   inputOptions: Array<{ value: string; label: string }>;
   outputOptions: Array<{ value: string; label: string }>;
+  nativeAudioAvailable: boolean;
   selectedInputValue: string;
   selectedOutputValue: string;
   inputOpen: boolean;
@@ -353,6 +360,7 @@ function AudioPreferences(props: AudioPreferencesProps) {
             value={props.selectedOutputValue}
             ariaLabel="Audio output device"
             options={props.outputOptions}
+            disabled={!props.nativeAudioAvailable}
             open={props.outputOpen}
             onOpenChange={props.setOutputOpen}
             onChange={(value) => void props.selectOutputDevice(value)}
@@ -745,7 +753,10 @@ function Readout(props: { label: string; value: string }) {
   );
 }
 
-function deviceOptions(snapshot: AudioDeviceSnapshot | null, direction: "input" | "output") {
+function deviceOptions(snapshot: AudioDeviceSnapshot | null, direction: "input" | "output", nativeAvailable: boolean) {
+  if (!nativeAvailable) {
+    return [{ value: "system", label: direction === "input" ? "System input (browser)" : "System output (browser)" }];
+  }
   const devices = snapshot?.devices.filter((device) => direction === "input" ? device.input : device.output) ?? [];
   return [
     { value: "system", label: "System" },

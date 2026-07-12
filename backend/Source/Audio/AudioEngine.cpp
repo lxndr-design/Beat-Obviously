@@ -734,6 +734,17 @@ namespace beat
             return false;
         }
 
+        juce::AudioDeviceManager::AudioDeviceSetup appliedSetup;
+        device->getAudioDeviceSetup(appliedSetup);
+        const auto appliedType = device->getCurrentAudioDeviceType();
+        if (appliedSetup.outputDeviceName != outputDeviceName
+            || (requestedType.isNotEmpty() && appliedType != requestedType))
+        {
+            if (error != nullptr)
+                *error = "The audio system kept output on '" + appliedSetup.outputDeviceName + "'.";
+            return false;
+        }
+
         if (error != nullptr)
             *error = {};
         return true;
