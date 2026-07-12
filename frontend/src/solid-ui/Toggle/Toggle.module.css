@@ -32,6 +32,15 @@
   box-shadow: var(--interaction-focus-ring);
 }
 
+.box::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--border-width));
+  border: var(--border-fg);
+  pointer-events: none;
+  z-index: 1;
+}
+
 .box::after {
   content: "";
   position: absolute;
@@ -44,6 +53,7 @@
   border: var(--border-bg);
   transition: var(--transition-slide-x);
   will-change: transform;
+  z-index: 0;
 }
 
 .on::after {
