@@ -117,3 +117,7 @@ Macro 5–8 storage, real-time metadata, modulation evaluation, persistence, fro
 ## Milestone B10 provenance
 
 Envelope 3/4 ADSR, curve/loop lifecycle, cached activity planning, modulation evaluation, persistence, frontend preview/editor support, and tests independently extend Beat's existing Envelope 2 implementation and fixed voice graph. No upstream source was consulted, executed, copied, adapted, or imported, and no dependency, binary, preset, asset, service, branding, or licensing state changed.
+
+## Milestone B11 provenance
+
+The fixed LFO 3–10 configuration/phase/route arrays, conditional evaluation, persistence, frontend schema/preview support, and tests independently extend Beat's existing LFO implementation. No upstream source was consulted, executed, copied, adapted, or imported, and no dependency, binary, preset, asset, service, branding, or licensing state changed.

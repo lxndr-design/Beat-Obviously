@@ -197,6 +197,11 @@ try {
       "env.4.decay": 0.14,
       "env.4.sustain": 0.4,
       "env.4.release": 0.22,
+      "lfo.10.enabled": true,
+      "lfo.10.shape": "square",
+      "lfo.10.rate": 3.25,
+      "lfo.10.smoothing": 0.2,
+      "lfo.10.phase": 0.3,
     },
   });
   const independentUnisonPreview = synthStore.synthDraftToPreviewInstrument(independentUnisonDraft);
@@ -225,6 +230,9 @@ try {
   assert.equal(independentUnisonDraft.parameters["env.3.sustain"], 0.3);
   assert.equal(independentUnisonDraft.parameters["env.4.decay"], 0.14);
   assert.equal(independentUnisonDraft.parameters["env.4.release"], 0.22);
+  assert.equal(independentUnisonDraft.parameters["lfo.10.enabled"], true);
+  assert.equal(independentUnisonDraft.parameters["lfo.10.shape"], "square");
+  assert.equal(independentUnisonDraft.parameters["lfo.10.rate"], 3.25);
   assert.equal(independentUnisonPreview.aether.oscB.tuningMode, "ratio");
   assert.equal(independentUnisonPreview.aether.oscB.ratioNumerator, 3);
   assert.equal(independentUnisonPreview.aether.oscB.ratioDenominator, 2);

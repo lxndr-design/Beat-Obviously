@@ -22,6 +22,8 @@ const TARGETS_BY_SOURCE: Record<ModulationSourceId, ModulationTargetId[]> = {
   "env.4": MACRO_TARGETS,
   "lfo.1": MACRO_TARGETS,
   "lfo.2": MACRO_TARGETS,
+  "lfo.3": MACRO_TARGETS, "lfo.4": MACRO_TARGETS, "lfo.5": MACRO_TARGETS, "lfo.6": MACRO_TARGETS,
+  "lfo.7": MACRO_TARGETS, "lfo.8": MACRO_TARGETS, "lfo.9": MACRO_TARGETS, "lfo.10": MACRO_TARGETS,
   velocity: MACRO_TARGETS,
   keytrack: MACRO_TARGETS,
   modWheel: MACRO_TARGETS,

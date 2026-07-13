@@ -53,6 +53,7 @@ namespace beat::AetherTableStackRenderer
         double oscBPhaseOffset,
         float rawLfo,
         float rawLfo2,
+        const std::array<float, 8>& rawExtraLfos,
         float env,
         float env2,
         float env3,
@@ -65,10 +66,10 @@ namespace beat::AetherTableStackRenderer
         Result result;
         const bool useDynamicModulation = params.dynamicModulation.active && targets.any;
         const float unisonDetuneMod = useDynamicModulation && targets.unisonDetune
-            ? DynamicModulation::targetOffset(params.dynamicModulation.unisonDetune, rawLfo, rawLfo2, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 100.0f)
+            ? DynamicModulation::targetOffset(params.dynamicModulation.unisonDetune, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 100.0f)
             : 0.0f;
         const float unisonSpreadMod = useDynamicModulation && targets.unisonSpread
-            ? DynamicModulation::targetOffset(params.dynamicModulation.unisonSpread, rawLfo, rawLfo2, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 1.0f)
+            ? DynamicModulation::targetOffset(params.dynamicModulation.unisonSpread, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 1.0f)
             : 0.0f;
         float leftSum = 0.0f;
         float rightSum = 0.0f;
@@ -114,16 +115,16 @@ namespace beat::AetherTableStackRenderer
             int64_t& componentSampleCounter)
         {
             const float modulatedLevel = VoiceMath::clamp01(osc.level + (useDynamicModulation && levelIsDynamic
-                ? DynamicModulation::targetOffset(levelTarget, rawLfo, rawLfo2, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 1.0f)
+                ? DynamicModulation::targetOffset(levelTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 1.0f)
                 : 0.0f));
             if (!osc.enabled || modulatedLevel <= 0.0f)
                 return;
             const float modulatedPan = juce::jlimit(-1.0f, 1.0f, osc.pan + (useDynamicModulation
-                ? DynamicModulation::targetOffset(panTarget, rawLfo, rawLfo2, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 1.0f)
+                ? DynamicModulation::targetOffset(panTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 1.0f)
                 : 0.0f));
 
             const float positionMod = useDynamicModulation && positionIsDynamic
-                ? DynamicModulation::targetOffset(positionTarget, rawLfo, rawLfo2, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 1.0f)
+                ? DynamicModulation::targetOffset(positionTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 1.0f)
                 : 0.0f;
             if (osc.waveform == 4)
             {
@@ -136,7 +137,7 @@ namespace beat::AetherTableStackRenderer
             double rate = staticRate;
             if (fineIsDynamic)
             {
-                const float fineOffsetCents = DynamicModulation::targetOffset(fineTarget, rawLfo, rawLfo2, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 100.0f);
+                const float fineOffsetCents = DynamicModulation::targetOffset(fineTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 100.0f);
                 rate *= std::exp2((double) fineOffsetCents / 1200.0);
                 ++result.work.oscillatorRateCalculations;
             }
@@ -145,10 +146,10 @@ namespace beat::AetherTableStackRenderer
             if (osc.waveform == 5)
             {
                 const float oscillatorDetuneMod = useDynamicModulation && unisonDetuneIsDynamic
-                    ? DynamicModulation::targetOffset(unisonDetuneTarget, rawLfo, rawLfo2, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 100.0f)
+                    ? DynamicModulation::targetOffset(unisonDetuneTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 100.0f)
                     : 0.0f;
                 const float oscillatorSpreadMod = useDynamicModulation && unisonSpreadIsDynamic
-                    ? DynamicModulation::targetOffset(unisonSpreadTarget, rawLfo, rawLfo2, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 1.0f)
+                    ? DynamicModulation::targetOffset(unisonSpreadTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 1.0f)
                     : 0.0f;
                 const auto tableResult = WavetableOscillatorBank::render(
                     oscillators,

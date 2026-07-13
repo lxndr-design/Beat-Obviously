@@ -1872,6 +1872,12 @@ namespace beat
         params.lfo2PhaseOffset = juce::jlimit(0.0f, 1.0f, instrument.lfo2PhaseOffset);
         params.lfo2Retrigger = instrument.lfo2Retrigger;
         params.lfo2OneShot = instrument.lfo2OneShot;
+        for (size_t index = 0; index < params.extraLfos.size(); ++index)
+        {
+            const auto& source = instrument.extraLfos[index];
+            params.extraLfos[index] = { source.enabled, source.waveform, source.rateHz, source.smoothing,
+                source.randomPhase, source.phaseOffset, source.retrigger, source.oneShot };
+        }
         params.lfoPositionBipolar = instrument.lfoPositionBipolar;
         params.lfoPitchBipolar = instrument.lfoPitchBipolar;
         params.lfoFilterBipolar = instrument.lfoFilterBipolar;
@@ -1886,6 +1892,8 @@ namespace beat
             target.lfoBipolar = source.lfoBipolar;
             target.lfo2 = source.lfo2;
             target.lfo2Bipolar = source.lfo2Bipolar;
+            target.extraLfo = source.extraLfo;
+            target.extraLfoBipolar = source.extraLfoBipolar;
             target.env = source.env;
             target.envBipolar = source.envBipolar;
             target.env2 = source.env2;

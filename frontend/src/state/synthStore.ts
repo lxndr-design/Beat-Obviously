@@ -164,6 +164,7 @@ export type SynthParameterId =
   | "lfo.2.retrigger"
   | "lfo.2.oneShot"
   | "lfo.2.bipolar"
+  | `lfo.${3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}.${"enabled" | "rate" | "smoothing" | "randomPhase" | "shape" | "phase" | "retrigger" | "oneShot" | "bipolar"}`
   | "macro.1"
   | "macro.2"
   | "macro.3"
@@ -182,6 +183,7 @@ export type ModulationSourceId =
   | "env.4"
   | "lfo.1"
   | "lfo.2"
+  | `lfo.${3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}`
   | "velocity"
   | "keytrack"
   | "modWheel"
@@ -264,7 +266,7 @@ export interface SynthModulationSourceAffordance {
   editor: "lfo" | "envelope" | "macro" | "performance";
 }
 
-export type SynthModulationSourceEditorTarget = MacroId | "lfo.1" | "lfo.2" | "env.1" | "env.2" | "env.3" | "env.4" | "performance";
+export type SynthModulationSourceEditorTarget = MacroId | `lfo.${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}` | "env.1" | "env.2" | "env.3" | "env.4" | "performance";
 
 export interface SynthExpressionSummaryItem {
   id: "voices" | "legato" | "pitch-bend" | "velocity" | "keytrack" | "mod-wheel";
@@ -969,7 +971,40 @@ function analyzeSamplesToHarmonicSpectrum(samples: ArrayLike<number>, start: num
   };
 }
 
+type ExtraLfoParameterId = Extract<SynthParameterId, `lfo.${3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}.${string}`>;
+
+const EXTRA_LFO_DEFAULTS = (() => {
+  const values = {} as Record<ExtraLfoParameterId, SynthParameterValue>;
+  for (let index = 3; index <= 10; index += 1) {
+    const prefix = `lfo.${index}`;
+    values[`${prefix}.enabled` as ExtraLfoParameterId] = false;
+    values[`${prefix}.rate` as ExtraLfoParameterId] = 1;
+    values[`${prefix}.smoothing` as ExtraLfoParameterId] = 0;
+    values[`${prefix}.randomPhase` as ExtraLfoParameterId] = 0;
+    values[`${prefix}.shape` as ExtraLfoParameterId] = "sine";
+    values[`${prefix}.phase` as ExtraLfoParameterId] = 0;
+    values[`${prefix}.retrigger` as ExtraLfoParameterId] = true;
+    values[`${prefix}.oneShot` as ExtraLfoParameterId] = false;
+    values[`${prefix}.bipolar` as ExtraLfoParameterId] = true;
+  }
+  return values;
+})();
+
+const EXTRA_LFO_LABELS = (() => {
+  const values = {} as Record<ExtraLfoParameterId, string>;
+  for (let index = 3; index <= 10; index += 1) {
+    const prefix = `lfo.${index}`;
+    for (const [suffix, label] of [["enabled", "Enabled"], ["rate", "Rate"], ["smoothing", "Smoothing"],
+      ["randomPhase", "Random"], ["shape", "Shape"], ["phase", "Phase"], ["retrigger", "Retrigger"],
+      ["oneShot", "One-Shot"], ["bipolar", "Bipolar"]] as const) {
+      values[`${prefix}.${suffix}` as ExtraLfoParameterId] = `LFO ${index} ${label}`;
+    }
+  }
+  return values;
+})();
+
 export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterValue> = {
+  ...EXTRA_LFO_DEFAULTS,
   "osc.a.enabled": true,
   "osc.a.wavetable": "basic.saw",
   "osc.a.position": 0,
@@ -1101,6 +1136,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
 };
 
 export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
+  ...EXTRA_LFO_LABELS,
   "osc.a.enabled": "OSC A Enabled",
   "osc.a.wavetable": "OSC A Table",
   "osc.a.position": "OSC A Pos",
@@ -1240,6 +1276,8 @@ export const MODULATION_SOURCE_LABELS: Record<ModulationSourceId, string> = {
   "env.4": "Env 4",
   "lfo.1": "LFO 1",
   "lfo.2": "LFO 2",
+  "lfo.3": "LFO 3", "lfo.4": "LFO 4", "lfo.5": "LFO 5", "lfo.6": "LFO 6",
+  "lfo.7": "LFO 7", "lfo.8": "LFO 8", "lfo.9": "LFO 9", "lfo.10": "LFO 10",
   velocity: "Velocity",
   keytrack: "Keytrack",
   modWheel: "Mod Wheel",
@@ -1593,7 +1631,7 @@ export function modulationRouteDisplay(draft: SynthDraftPatch, route: SynthModul
 }
 
 export function modulationSourceAffordance(draft: SynthDraftPatch, source: ModulationSourceId): SynthModulationSourceAffordance {
-  if (source === "lfo.1" || source === "lfo.2") {
+  if (/^lfo\.(?:[1-9]|10)$/.test(source)) {
     const enabled = getBooleanParam(draft, `${source}.enabled` as SynthParameterId);
     const shape = getStringParam(draft, `${source}.shape` as SynthParameterId) || "sine";
     const sync = getBooleanParam(draft, `${source}.sync` as SynthParameterId);
@@ -2308,7 +2346,7 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (!Number.isFinite(value)) return typeof fallback === "number" ? fallback : 0;
   if (id.endsWith(".enabled") || id === "filter.type" || id.endsWith(".wavetable") || id.endsWith(".warpMode")) return value;
   if (id === "filter.cutoff" || id === "filter.2.cutoff") return Math.max(20, Math.min(20000, value));
-  if (id === "lfo.1.rate" || id === "lfo.2.rate") return Math.max(0.05, Math.min(50, value));
+  if (/^lfo\.(?:[1-9]|10)\.rate$/.test(id)) return Math.max(0.05, Math.min(50, value));
   if (id.includes(".octave")) return Math.max(-4, Math.min(4, Math.round(value)));
   if (id.includes(".semitone")) return Math.max(-12, Math.min(12, Math.round(value)));
   if (id.includes(".fine")) return Math.max(-100, Math.min(100, value));

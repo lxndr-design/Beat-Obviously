@@ -209,6 +209,8 @@ namespace beat
             bool lfoBipolar { true };
             float lfo2 { 0.0f };
             bool lfo2Bipolar { true };
+            std::array<float, 8> extraLfo {};
+            std::array<bool, 8> extraLfoBipolar {{ true, true, true, true, true, true, true, true }};
             float env { 0.0f };
             bool envBipolar { false };
             float env2 { 0.0f };
@@ -361,6 +363,18 @@ namespace beat
         float lfo2PhaseOffset { 0.0f };
         bool lfo2Retrigger { true };
         bool lfo2OneShot { false };
+        struct ExtraLfo
+        {
+            bool enabled { false };
+            int waveform { 0 };
+            float rateHz { 1.0f };
+            float smoothing { 0.0f };
+            float randomPhase { 0.0f };
+            float phaseOffset { 0.0f };
+            bool retrigger { true };
+            bool oneShot { false };
+        };
+        std::array<ExtraLfo, 8> extraLfos {};
         bool lfoPositionBipolar { true };
         bool lfoPitchBipolar { true };
         bool lfoFilterBipolar { true };

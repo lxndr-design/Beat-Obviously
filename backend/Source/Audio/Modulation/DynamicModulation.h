@@ -31,6 +31,7 @@ namespace beat::DynamicModulation
         bool unisonSpread { false };
         bool lfo { false };
         bool lfo2 { false };
+        std::array<bool, 8> extraLfo {};
         bool env { false };
         bool env2 { false };
         bool env3 { false };
@@ -50,6 +51,7 @@ namespace beat::DynamicModulation
         bool hasFilterMod { false };
         bool needsLfoValue { false };
         bool needsLfo2Value { false };
+        std::array<bool, 8> needsExtraLfoValue {};
         bool needsEnv2Value { false };
         bool needsEnv3Value { false };
         bool needsEnv4Value { false };
@@ -62,10 +64,16 @@ namespace beat::DynamicModulation
     }
 
     template <typename Target>
+    float targetOffset(
+        const Target&, float, float, const std::array<float, 8>&, float, float, float, float,
+        float, float, float, const std::array<float, 8>&, float) noexcept;
+
+    template <typename Target>
     bool targetActive(const Target& target) noexcept
     {
         return std::abs(target.lfo) > 0.0001f
             || std::abs(target.lfo2) > 0.0001f
+            || std::any_of(target.extraLfo.begin(), target.extraLfo.end(), [](float value) { return std::abs(value) > 0.0001f; })
             || std::abs(target.env) > 0.0001f
             || std::abs(target.env2) > 0.0001f
             || std::abs(target.env3) > 0.0001f
@@ -88,6 +96,8 @@ namespace beat::DynamicModulation
     {
         flags.lfo = flags.lfo || std::abs(target.lfo) > 0.0001f;
         flags.lfo2 = flags.lfo2 || std::abs(target.lfo2) > 0.0001f;
+        for (size_t index = 0; index < flags.extraLfo.size(); ++index)
+            flags.extraLfo[index] = flags.extraLfo[index] || std::abs(target.extraLfo[index]) > 0.0001f;
         flags.env = flags.env || std::abs(target.env) > 0.0001f;
         flags.env2 = flags.env2 || std::abs(target.env2) > 0.0001f;
         flags.env3 = flags.env3 || std::abs(target.env3) > 0.0001f;
@@ -99,9 +109,20 @@ namespace beat::DynamicModulation
 
     template <typename Target>
     float targetOffset(
+        const Target& target, float rawLfo, float rawLfo2, float env, float env2, float env3, float env4,
+        float velocity, float keytrack, float modWheel,
+        const std::array<float, 8>& macroValues, float scale) noexcept
+    {
+        return targetOffset(target, rawLfo, rawLfo2, std::array<float, 8> {}, env, env2, env3, env4,
+            velocity, keytrack, modWheel, macroValues, scale);
+    }
+
+    template <typename Target>
+    float targetOffset(
         const Target& target,
         float rawLfo,
         float rawLfo2,
+        const std::array<float, 8>& rawExtraLfos,
         float env,
         float env2,
         float env3,
@@ -112,8 +133,12 @@ namespace beat::DynamicModulation
         const std::array<float, 8>& macroValues,
         float scale) noexcept
     {
+        float extraLfoOffset = 0.0f;
+        for (size_t index = 0; index < rawExtraLfos.size(); ++index)
+            extraLfoOffset += Lfo::routeValue(rawExtraLfos[index], target.extraLfoBipolar[index]) * target.extraLfo[index];
         return (Lfo::routeValue(rawLfo, target.lfoBipolar) * target.lfo
             + Lfo::routeValue(rawLfo2, target.lfo2Bipolar) * target.lfo2
+            + extraLfoOffset
             + routeEnvValue(env, target.envBipolar) * target.env
             + routeEnvValue(env2, target.env2Bipolar) * target.env2
             + routeEnvValue(env3, target.env3Bipolar) * target.env3
@@ -137,7 +162,7 @@ namespace beat::DynamicModulation
         float velocity, float keytrack, float modWheel,
         const std::array<float, 8>& macroValues, float scale) noexcept
     {
-        return targetOffset(target, rawLfo, rawLfo2, env, env2, 0.0f, 0.0f,
+        return targetOffset(target, rawLfo, rawLfo2, std::array<float, 8> {}, env, env2, 0.0f, 0.0f,
             velocity, keytrack, modWheel, macroValues, scale);
     }
 
@@ -236,6 +261,8 @@ namespace beat::DynamicModulation
             || hasLegacyFilterEnvMod;
         plan.needsLfoValue = (plan.useDynamicModulation && flags.lfo) || plan.hasPitchMod || plan.hasPositionMod || hasLegacyFilterLfoMod;
         plan.needsLfo2Value = plan.useDynamicModulation && lfo2Enabled && flags.lfo2;
+        for (size_t index = 0; index < plan.needsExtraLfoValue.size(); ++index)
+            plan.needsExtraLfoValue[index] = plan.useDynamicModulation && flags.extraLfo[index];
         plan.needsEnv2Value = plan.useDynamicModulation && flags.env2;
         plan.needsEnv3Value = plan.useDynamicModulation && flags.env3;
         plan.needsEnv4Value = plan.useDynamicModulation && flags.env4;

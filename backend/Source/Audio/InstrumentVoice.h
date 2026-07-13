@@ -134,6 +134,8 @@ namespace beat
                 bool lfoBipolar { true };
                 float lfo2 { 0.0f };
                 bool lfo2Bipolar { true };
+                std::array<float, 8> extraLfo {};
+                std::array<bool, 8> extraLfoBipolar {{ true, true, true, true, true, true, true, true }};
                 float env { 0.0f };
                 bool envBipolar { false };
                 float env2 { 0.0f };
@@ -244,6 +246,12 @@ namespace beat
             float lfo2PhaseOffset { 0.0f };
             bool lfo2Retrigger { true };
             bool lfo2OneShot { false };
+            struct ExtraLfo
+            {
+                bool enabled { false }; int waveform { 0 }; float rateHz { 1.0f }; float smoothing { 0.0f };
+                float randomPhase { 0.0f }; float phaseOffset { 0.0f }; bool retrigger { true }; bool oneShot { false };
+            };
+            std::array<ExtraLfo, 8> extraLfos {};
             bool lfoPositionBipolar { true };
             bool lfoPitchBipolar { true };
             bool lfoFilterBipolar { true };
@@ -333,6 +341,7 @@ namespace beat
         double  baseFrequencyHz { 440.0 };
         double  lfoPhase { 0.0 };
         double  lfo2Phase { 0.0 };
+        std::array<double, 8> extraLfoPhases {};
         double  aetherOscAPhaseOffset { 0.0 };
         double  aetherOscBPhaseOffset { 0.0 };
         float   level { 0.0f };

@@ -2009,11 +2009,23 @@ export function modulationAtTime(
     lfo2OneShot,
     effectiveLfoSmoothing(instrument, 2),
   );
+  const rawExtraLfos = Array.from({ length: 8 }, (_, offset) => {
+    const index = offset + 3;
+    const prefix = `lfo.${index}`;
+    const params = instrument.synthPatch?.parameters;
+    if (params?.[`${prefix}.enabled`] !== true) return 0;
+    const rate = Math.max(0.01, Number(params?.[`${prefix}.rate`] ?? 1));
+    const phase = Number(params?.[`${prefix}.phase`] ?? 0);
+    const smoothing = clamp01(Number(params?.[`${prefix}.smoothing`] ?? 0));
+    const oneShot = params?.[`${prefix}.oneShot`] === true;
+    const shape = String(params?.[`${prefix}.shape`] ?? "sine") as NonNullable<Instrument["lfoWaveform"]>;
+    return lfoShapeValue(shape, timeS * rate + phase, oneShot, smoothing);
+  });
   const env = envelopePreviewValue(timeS, durationS, instrument);
   const env2 = modEnvelopePreviewValue(timeS, durationS, instrument, 2);
   const env3 = modEnvelopePreviewValue(timeS, durationS, instrument, 3);
   const env4 = modEnvelopePreviewValue(timeS, durationS, instrument, 4);
-  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env, env2, env3, env4, velocity, keytrack, modWheel, macroOverrides);
+  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, keytrack, modWheel, macroOverrides);
   if (targetOffsets) {
     return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, ampEnvelope: env, targetOffsets };
   }
@@ -2032,6 +2044,7 @@ function routeTargetOffsets(
   instrument: Instrument,
   rawLfo: number,
   rawLfo2: number,
+  rawExtraLfos: number[],
   env: number,
   env2: number,
   env3: number,
@@ -2050,7 +2063,7 @@ function routeTargetOffsets(
     const amount = Number.isFinite(route.amount) ? clamp(route.amount ?? 0, -1, 1) : 0;
     if (amount === 0) continue;
 
-    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, env, env2, env3, env4, velocity, keytrack, modWheel, macroOverrides);
+    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, keytrack, modWheel, macroOverrides);
     if (sourceValue == null) continue;
     offsets[route.target] = (offsets[route.target] ?? 0) + sourceValue * amount * modulationTargetScale(route.target);
   }
@@ -2062,6 +2075,7 @@ function modulationSourceValue(
   route: RuntimeModulationRoute,
   rawLfo: number,
   rawLfo2: number,
+  rawExtraLfos: number[],
   env: number,
   env2: number,
   env3: number,
@@ -2078,6 +2092,12 @@ function modulationSourceValue(
   if (route.source === "lfo.2") {
     if (instrument.synthPatch?.parameters?.["lfo.2.enabled"] !== true && instrument.lfo2Enabled !== true) return 0;
     return lfoRouteValue(rawLfo2, route.bipolar !== false);
+  }
+  const extraLfoSource = typeof route.source === "string" ? route.source : "";
+  const extraLfoMatch = /^lfo\.(?:[3-9]|10)$/.exec(extraLfoSource);
+  if (extraLfoMatch) {
+    const index = Number(extraLfoSource.slice(4));
+    return lfoRouteValue(rawExtraLfos[index - 3] ?? 0, route.bipolar !== false);
   }
   if (route.source === "env.1") {
     return route.bipolar ? env * 2 - 1 : env;

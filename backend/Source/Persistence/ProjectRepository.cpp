@@ -409,6 +409,11 @@ namespace beat
             o->setProperty("lfoBipolar", target.lfoBipolar);
             o->setProperty("lfo2", target.lfo2);
             o->setProperty("lfo2Bipolar", target.lfo2Bipolar);
+            for (size_t index = 0; index < target.extraLfo.size(); ++index)
+            {
+                o->setProperty("lfo" + juce::String((int) index + 3), target.extraLfo[index]);
+                o->setProperty("lfo" + juce::String((int) index + 3) + "Bipolar", target.extraLfoBipolar[index]);
+            }
             o->setProperty("env", target.env);
             o->setProperty("envBipolar", target.envBipolar);
             o->setProperty("env2", target.env2);
@@ -454,6 +459,12 @@ namespace beat
             fallback.lfoBipolar = bipolar(targetVar, "lfoBipolar", fallback.lfoBipolar);
             fallback.lfo2 = amount(targetVar, "lfo2", fallback.lfo2);
             fallback.lfo2Bipolar = bipolar(targetVar, "lfo2Bipolar", fallback.lfo2Bipolar);
+            for (size_t index = 0; index < fallback.extraLfo.size(); ++index)
+            {
+                const auto key = "lfo" + juce::String((int) index + 3);
+                fallback.extraLfo[index] = amount(targetVar, key, fallback.extraLfo[index]);
+                fallback.extraLfoBipolar[index] = bipolar(targetVar, key + "Bipolar", fallback.extraLfoBipolar[index]);
+            }
             fallback.env = amount(targetVar, "env", fallback.env);
             fallback.envBipolar = bipolar(targetVar, "envBipolar", fallback.envBipolar);
             fallback.env2 = amount(targetVar, "env2", fallback.env2);
@@ -952,6 +963,17 @@ namespace beat
             o->setProperty("lfo2Phase", instrument.lfo2PhaseOffset);
             o->setProperty("lfo2Retrigger", instrument.lfo2Retrigger);
             o->setProperty("lfo2OneShot", instrument.lfo2OneShot);
+            juce::Array<juce::var> extraLfos;
+            for (const auto& lfo : instrument.extraLfos)
+            {
+                auto* lfoObject = new juce::DynamicObject();
+                lfoObject->setProperty("enabled", lfo.enabled); lfoObject->setProperty("waveform", lfo.waveform);
+                lfoObject->setProperty("rateHz", lfo.rateHz); lfoObject->setProperty("smoothing", lfo.smoothing);
+                lfoObject->setProperty("randomPhase", lfo.randomPhase); lfoObject->setProperty("phaseOffset", lfo.phaseOffset);
+                lfoObject->setProperty("retrigger", lfo.retrigger); lfoObject->setProperty("oneShot", lfo.oneShot);
+                extraLfos.add(juce::var(lfoObject));
+            }
+            o->setProperty("extraLfos", extraLfos);
             o->setProperty("lfoPositionBipolar", instrument.lfoPositionBipolar);
             o->setProperty("lfoPitchBipolar", instrument.lfoPitchBipolar);
             o->setProperty("lfoFilterBipolar", instrument.lfoFilterBipolar);
@@ -1157,6 +1179,23 @@ namespace beat
                     instrument.lfo2PhaseOffset = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("lfo2Phase", instrument.lfo2PhaseOffset));
                     instrument.lfo2Retrigger = (bool) iv.getProperty("lfo2Retrigger", instrument.lfo2Retrigger);
                     instrument.lfo2OneShot = (bool) iv.getProperty("lfo2OneShot", instrument.lfo2OneShot);
+                    if (auto* extraLfos = iv.getProperty("extraLfos", {}).getArray())
+                    {
+                        const auto count = juce::jmin((int) extraLfos->size(), (int) instrument.extraLfos.size());
+                        for (int index = 0; index < count; ++index)
+                        {
+                            const auto& value = extraLfos->getReference(index);
+                            auto& lfo = instrument.extraLfos[(size_t) index];
+                            lfo.enabled = (bool) value.getProperty("enabled", lfo.enabled);
+                            lfo.waveform = juce::jlimit(0, 8, (int) value.getProperty("waveform", lfo.waveform));
+                            lfo.rateHz = juce::jlimit(0.01f, 50.0f, (float) (double) value.getProperty("rateHz", lfo.rateHz));
+                            lfo.smoothing = juce::jlimit(0.0f, 1.0f, (float) (double) value.getProperty("smoothing", lfo.smoothing));
+                            lfo.randomPhase = juce::jlimit(0.0f, 1.0f, (float) (double) value.getProperty("randomPhase", lfo.randomPhase));
+                            lfo.phaseOffset = juce::jlimit(0.0f, 1.0f, (float) (double) value.getProperty("phaseOffset", lfo.phaseOffset));
+                            lfo.retrigger = (bool) value.getProperty("retrigger", lfo.retrigger);
+                            lfo.oneShot = (bool) value.getProperty("oneShot", lfo.oneShot);
+                        }
+                    }
                     instrument.lfoPositionBipolar = (bool) iv.getProperty("lfoPositionBipolar", instrument.lfoPositionBipolar);
                     instrument.lfoPitchBipolar = (bool) iv.getProperty("lfoPitchBipolar", instrument.lfoPitchBipolar);
                     instrument.lfoFilterBipolar = (bool) iv.getProperty("lfoFilterBipolar", instrument.lfoFilterBipolar);

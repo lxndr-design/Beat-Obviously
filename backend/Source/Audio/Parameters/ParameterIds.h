@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string_view>
 
 namespace beat::params
@@ -90,6 +91,9 @@ namespace beat::params
         inline constexpr std::string_view sourceEnv4 { "env.4" };
         inline constexpr std::string_view sourceLfo1 { "lfo.1" };
         inline constexpr std::string_view sourceLfo2 { "lfo.2" };
+        inline constexpr std::array<std::string_view, 8> sourceExtraLfos {{
+            "lfo.3", "lfo.4", "lfo.5", "lfo.6", "lfo.7", "lfo.8", "lfo.9", "lfo.10"
+        }};
         inline constexpr std::string_view sourceVelocity { "velocity" };
         inline constexpr std::string_view sourceKeytrack { "keytrack" };
         inline constexpr std::string_view sourceModWheel { "modWheel" };

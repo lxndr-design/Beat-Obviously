@@ -370,3 +370,13 @@ audio callback
 ```
 
 All four envelopes use voice-owned fixed state. No route parsing, allocation, lock, file operation, lazy initialization, or container growth occurs in the callback.
+
+```text
+setup -> LFO 1/2 legacy fields + fixed extraLfos[8]
+target cache -> per-source activity for LFO 1..10
+audio callback
+  for each LFO 3..10: enabled && routed -> evaluate + advance fixed phase
+  rawExtraLfos[8] -> fixed target route arrays -> targetOffset
+```
+
+No extra-LFO vector, lookup map, or callback graph mutation is introduced. Disabled/unrouted slots do not evaluate or advance.

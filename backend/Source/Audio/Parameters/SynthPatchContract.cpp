@@ -278,6 +278,12 @@ namespace beat
             target.lfoBipolar = routeBipolar(modulation, "lfo.1", routeTarget, true);
             target.lfo2 = lfo2Enabled ? routeAmount(modulation, "lfo.2", routeTarget) : 0.0f;
             target.lfo2Bipolar = routeBipolar(modulation, "lfo.2", routeTarget, true);
+            for (size_t index = 0; index < target.extraLfo.size(); ++index)
+            {
+                const auto source = "lfo." + juce::String((int) index + 3);
+                target.extraLfo[index] = routeAmount(modulation, source, routeTarget);
+                target.extraLfoBipolar[index] = routeBipolar(modulation, source, routeTarget, true);
+            }
             target.env = routeAmount(modulation, "env.1", routeTarget);
             target.envBipolar = routeBipolar(modulation, "env.1", routeTarget, false);
             target.env2 = routeAmount(modulation, "env.2", routeTarget);
@@ -302,6 +308,7 @@ namespace beat
             target.macro8 = routeAmount(modulation, "macro.8", routeTarget);
             return std::abs(target.lfo) > 0.0001f
                 || std::abs(target.lfo2) > 0.0001f
+                || std::any_of(target.extraLfo.begin(), target.extraLfo.end(), [](float value) { return std::abs(value) > 0.0001f; })
                 || std::abs(target.env) > 0.0001f
                 || std::abs(target.env2) > 0.0001f
                 || std::abs(target.env3) > 0.0001f
@@ -539,6 +546,19 @@ namespace beat
         instrument.lfo2PhaseOffset = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "lfo.2.phase", instrument.lfo2PhaseOffset));
         instrument.lfo2Retrigger = synthNumberParam(params, "lfo.2.retrigger", instrument.lfo2Retrigger ? 1.0 : 0.0) >= 0.5;
         instrument.lfo2OneShot = synthNumberParam(params, "lfo.2.oneShot", instrument.lfo2OneShot ? 1.0 : 0.0) >= 0.5;
+        for (size_t index = 0; index < instrument.extraLfos.size(); ++index)
+        {
+            auto& lfo = instrument.extraLfos[index];
+            const auto prefix = "lfo." + juce::String((int) index + 3) + ".";
+            lfo.enabled = synthNumberParam(params, prefix + "enabled", 0.0) >= 0.5;
+            lfo.waveform = parseSynthLfoWaveform(synthStringParam(params, prefix + "shape", "sine"));
+            lfo.rateHz = juce::jlimit(0.01f, 50.0f, (float) synthNumberParam(params, prefix + "rate", 1.0));
+            lfo.smoothing = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "smoothing", 0.0));
+            lfo.randomPhase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "randomPhase", 0.0));
+            lfo.phaseOffset = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "phase", 0.0));
+            lfo.retrigger = synthNumberParam(params, prefix + "retrigger", 1.0) >= 0.5;
+            lfo.oneShot = synthNumberParam(params, prefix + "oneShot", 0.0) >= 0.5;
+        }
 
         const bool lfoEnabled = synthNumberParam(params, "lfo.1.enabled", 1.0) >= 0.5;
         instrument.lfoDepth = lfoEnabled ? std::abs(routeAmount(modulation, "lfo.1", "osc.a.position")) : 0.0f;
