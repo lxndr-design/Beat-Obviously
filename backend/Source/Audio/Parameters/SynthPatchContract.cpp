@@ -1,6 +1,7 @@
 #include "SynthPatchContract.h"
 
 #include <cmath>
+#include <utility>
 
 namespace beat
 {
@@ -490,6 +491,16 @@ namespace beat
         const auto interactionMode = synthStringParam(params, "aether.interaction.mode", "off");
         instrument.aether.interactionMode = interactionMode == "am" ? 1 : interactionMode == "ring" ? 2 : 0;
         instrument.aether.interactionAmount = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.interaction.amount", 0.0));
+        instrument.aether.memberExpressionZone.enabled = synthNumberParam(params, "aether.mpe.enabled", 0.0) >= 0.5;
+        instrument.aether.memberExpressionZone.schemaVersion = 1;
+        instrument.aether.memberExpressionZone.masterChannel = juce::jlimit(1, 16, (int) std::round(synthNumberParam(params, "aether.mpe.masterChannel", 1.0)));
+        instrument.aether.memberExpressionZone.firstMemberChannel = juce::jlimit(1, 16, (int) std::round(synthNumberParam(params, "aether.mpe.firstMemberChannel", 2.0)));
+        instrument.aether.memberExpressionZone.lastMemberChannel = juce::jlimit(1, 16, (int) std::round(synthNumberParam(params, "aether.mpe.lastMemberChannel", 16.0)));
+        if (instrument.aether.memberExpressionZone.firstMemberChannel > instrument.aether.memberExpressionZone.lastMemberChannel)
+            std::swap(instrument.aether.memberExpressionZone.firstMemberChannel, instrument.aether.memberExpressionZone.lastMemberChannel);
+        if (instrument.aether.memberExpressionZone.masterChannel >= instrument.aether.memberExpressionZone.firstMemberChannel
+            && instrument.aether.memberExpressionZone.masterChannel <= instrument.aether.memberExpressionZone.lastMemberChannel)
+            instrument.aether.memberExpressionZone.enabled = false;
 
         const bool filterEnabled = synthNumberParam(params, "filter.enabled", 1.0) >= 0.5;
         instrument.filterType = parseSynthFilterType(synthStringParam(params, "filter.type", "lowpass"));

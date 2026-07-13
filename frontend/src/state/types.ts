@@ -486,6 +486,13 @@ export interface AetherSynthConfig {
   runtimeWarp2Mode?: WavetableWarpMode;
   interactionMode?: "off" | "am" | "ring";
   interactionAmount?: number;
+  memberExpressionZone?: {
+    schemaVersion: 1;
+    enabled: boolean;
+    masterChannel: number;
+    firstMemberChannel: number;
+    lastMemberChannel: number;
+  };
 }
 
 export type SynthPatchParameterValue = boolean | number | string;

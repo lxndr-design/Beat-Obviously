@@ -1796,6 +1796,12 @@ namespace beat
     std::unique_ptr<juce::Synthesiser> AudioEngine::createInstrumentSynth(const InstrumentDefinition& instrument)
     {
         auto instrumentSynth = std::make_unique<BeatSynthesiser>();
+        instrumentSynth->configureMemberExpressionZone({
+            instrument.aether.memberExpressionZone.enabled,
+            instrument.aether.memberExpressionZone.masterChannel,
+            instrument.aether.memberExpressionZone.firstMemberChannel,
+            instrument.aether.memberExpressionZone.lastMemberChannel,
+        });
         instrumentSynth->addSound(new PassSound());
 
         if (instrument.nodeGraph)

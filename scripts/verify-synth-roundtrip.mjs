@@ -199,6 +199,10 @@ try {
       "aether.runtimeWarp2Mode": "pinch",
       "aether.interaction.mode": "ring",
       "aether.interaction.amount": 0.72,
+      "aether.mpe.enabled": true,
+      "aether.mpe.masterChannel": 1,
+      "aether.mpe.firstMemberChannel": 2,
+      "aether.mpe.lastMemberChannel": 8,
       "macro.5": 0.25,
       "macro.6": 0.35,
       "macro.7": 0.45,
@@ -245,6 +249,24 @@ try {
   assert.equal(independentUnisonPreview.aether.runtimeWarp2Mode, "pinch");
   assert.equal(independentUnisonPreview.aether.interactionMode, "ring");
   assert.equal(independentUnisonPreview.aether.interactionAmount, 0.72);
+  assert.deepEqual(independentUnisonPreview.aether.memberExpressionZone, {
+    schemaVersion: 1,
+    enabled: true,
+    masterChannel: 1,
+    firstMemberChannel: 2,
+    lastMemberChannel: 8,
+  });
+  const invalidMpeDraft = synthStore.normalizeSynthDraftPatch({
+    parameters: {
+      "aether.mpe.enabled": true,
+      "aether.mpe.masterChannel": 3,
+      "aether.mpe.firstMemberChannel": 4,
+      "aether.mpe.lastMemberChannel": 2,
+    },
+  });
+  assert.equal(invalidMpeDraft.parameters["aether.mpe.enabled"], false);
+  assert.equal(invalidMpeDraft.parameters["aether.mpe.firstMemberChannel"], 2);
+  assert.equal(invalidMpeDraft.parameters["aether.mpe.lastMemberChannel"], 4);
   assert.equal(independentUnisonDraft.parameters["macro.5"], 0.25);
   assert.equal(independentUnisonDraft.parameters["macro.6"], 0.35);
   assert.equal(independentUnisonDraft.parameters["macro.7"], 0.45);

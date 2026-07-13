@@ -3,18 +3,51 @@
 #include "InstrumentVoice.h"
 #include "VoiceAllocation.h"
 
+#include <utility>
+
 namespace beat
 {
     BeatSynthesiser::BeatSynthesiser()
     {
         for (size_t channel = 0; channel < memberRpnMsb.size(); ++channel)
         {
+            memberModWheel[channel].store(-1.0f, std::memory_order_relaxed);
             memberRpnMsb[channel].store(127, std::memory_order_relaxed);
             memberRpnLsb[channel].store(127, std::memory_order_relaxed);
             memberPitchBendSemitones[channel].store(-1, std::memory_order_relaxed);
             memberPitchBendCents[channel].store(0, std::memory_order_relaxed);
             memberPitchBendRange[channel].store(-1.0f, std::memory_order_relaxed);
         }
+    }
+
+    bool BeatSynthesiser::configureMemberExpressionZone(MemberExpressionZone zone) noexcept
+    {
+        zone.masterChannel = juce::jlimit(1, 16, zone.masterChannel);
+        zone.firstMemberChannel = juce::jlimit(1, 16, zone.firstMemberChannel);
+        zone.lastMemberChannel = juce::jlimit(1, 16, zone.lastMemberChannel);
+        if (zone.firstMemberChannel > zone.lastMemberChannel)
+            std::swap(zone.firstMemberChannel, zone.lastMemberChannel);
+        if (zone.enabled
+            && zone.masterChannel >= zone.firstMemberChannel
+            && zone.masterChannel <= zone.lastMemberChannel)
+        {
+            expressionZone = {};
+            return false;
+        }
+        expressionZone = zone;
+        return true;
+    }
+
+    bool BeatSynthesiser::isExpressionMasterChannel(int midiChannel) const noexcept
+    {
+        return expressionZone.enabled && midiChannel == expressionZone.masterChannel;
+    }
+
+    bool BeatSynthesiser::isExpressionMemberChannel(int midiChannel) const noexcept
+    {
+        return expressionZone.enabled
+            && midiChannel >= expressionZone.firstMemberChannel
+            && midiChannel <= expressionZone.lastMemberChannel;
     }
 
     void BeatSynthesiser::noteOn(int midiChannel, int midiNoteNumber, float velocity)
@@ -31,6 +64,9 @@ namespace beat
                 continue;
             if (auto* instrument = dynamic_cast<InstrumentVoice*>(voice))
             {
+                const float modWheel = memberModWheel[(size_t) channelIndex].load(std::memory_order_relaxed);
+                if (modWheel >= 0.0f)
+                    instrument->setMemberModWheel(modWheel);
                 instrument->setMemberExpression(memberPressure[(size_t) channelIndex].load(std::memory_order_relaxed),
                                                 memberTimbre[(size_t) channelIndex].load(std::memory_order_relaxed));
                 const float bendRange = memberPitchBendRange[(size_t) channelIndex].load(std::memory_order_relaxed);
@@ -39,10 +75,29 @@ namespace beat
         }
     }
 
+    void BeatSynthesiser::handlePitchWheel(int midiChannel, int wheelValue)
+    {
+        const juce::ScopedLock scopedLock(lock);
+        juce::Synthesiser::handlePitchWheel(midiChannel, wheelValue);
+        if (!isExpressionMasterChannel(midiChannel))
+            return;
+        for (int member = expressionZone.firstMemberChannel; member <= expressionZone.lastMemberChannel; ++member)
+        {
+            lastPitchWheelValues[member - 1] = juce::jlimit(0, 16383, wheelValue);
+            juce::Synthesiser::handlePitchWheel(member, wheelValue);
+        }
+    }
+
     void BeatSynthesiser::handleController(int midiChannel, int controllerNumber, int controllerValue)
     {
         const int channelIndex = juce::jlimit(1, 16, midiChannel) - 1;
-        if (controllerNumber == 74)
+        if (controllerNumber == 1)
+        {
+            memberModWheel[(size_t) channelIndex].store(
+                juce::jlimit(0.0f, 1.0f, (float) controllerValue / 127.0f),
+                std::memory_order_relaxed);
+        }
+        else if (controllerNumber == 74)
         {
             memberTimbre[(size_t) channelIndex].store(
                 juce::jlimit(0.0f, 1.0f, (float) controllerValue / 127.0f),
@@ -75,6 +130,18 @@ namespace beat
             }
         }
         juce::Synthesiser::handleController(midiChannel, controllerNumber, controllerValue);
+        if (isExpressionMasterChannel(midiChannel) && (controllerNumber == 1 || controllerNumber == 74))
+        {
+            const float normalized = juce::jlimit(0.0f, 1.0f, (float) controllerValue / 127.0f);
+            for (int member = expressionZone.firstMemberChannel; member <= expressionZone.lastMemberChannel; ++member)
+            {
+                if (controllerNumber == 1)
+                    memberModWheel[(size_t) (member - 1)].store(normalized, std::memory_order_relaxed);
+                else
+                    memberTimbre[(size_t) (member - 1)].store(normalized, std::memory_order_relaxed);
+                juce::Synthesiser::handleController(member, controllerNumber, controllerValue);
+            }
+        }
     }
 
     void BeatSynthesiser::handleChannelPressure(int midiChannel, int channelPressureValue)
@@ -84,6 +151,15 @@ namespace beat
             juce::jlimit(0.0f, 1.0f, (float) channelPressureValue / 127.0f),
             std::memory_order_relaxed);
         juce::Synthesiser::handleChannelPressure(midiChannel, channelPressureValue);
+        if (isExpressionMasterChannel(midiChannel))
+        {
+            const float normalized = juce::jlimit(0.0f, 1.0f, (float) channelPressureValue / 127.0f);
+            for (int member = expressionZone.firstMemberChannel; member <= expressionZone.lastMemberChannel; ++member)
+            {
+                memberPressure[(size_t) (member - 1)].store(normalized, std::memory_order_relaxed);
+                juce::Synthesiser::handleChannelPressure(member, channelPressureValue);
+            }
+        }
     }
 
     void BeatSynthesiser::applyMemberPitchBendRange(int midiChannel, float semitones) noexcept

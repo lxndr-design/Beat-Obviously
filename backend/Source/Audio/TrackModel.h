@@ -196,6 +196,15 @@ namespace beat
 
         struct AetherConfig
         {
+            struct MemberExpressionZone
+            {
+                int schemaVersion { 1 };
+                bool enabled { false };
+                int masterChannel { 1 };
+                int firstMemberChannel { 2 };
+                int lastMemberChannel { 16 };
+            };
+
             AetherOscillator oscA;
             AetherOscillator oscB;
             AetherSub sub;
@@ -207,6 +216,7 @@ namespace beat
             int runtimeWarp2Mode { 0 };
             int interactionMode { 0 }; // 0 off, 1 amplitude modulation, 2 ring modulation
             float interactionAmount { 0.0f };
+            MemberExpressionZone memberExpressionZone;
         };
 
         struct DynamicModTarget

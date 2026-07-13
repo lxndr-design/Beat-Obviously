@@ -295,6 +295,7 @@ namespace beat
             pressure = juce::jlimit(0.0f, 1.0f, newPressure);
             timbre = juce::jlimit(0.0f, 1.0f, newTimbre);
         }
+        void setMemberModWheel(float value) noexcept { modWheel = juce::jlimit(0.0f, 1.0f, value); }
         void setMemberPitchBendRange(float semitones) noexcept;
         bool applyRealtimeParameter(std::string_view parameterId, float value, int rampSamples = 0) noexcept;
         void prepare(double sampleRate, int blockSize);
@@ -312,6 +313,7 @@ namespace beat
         double wavetablePhaseAForTest() const noexcept { return aetherOscillatorsA.front().getPhase(); }
         float pressureForTest() const noexcept { return pressure; }
         float timbreForTest() const noexcept { return timbre; }
+        float modWheelForTest() const noexcept { return modWheel; }
         float pitchWheelSemitonesForTest() const noexcept { return pitchWheelSemitones; }
         float memberPitchBendRangeForTest() const noexcept { return memberPitchBendRangeSemitones; }
 #endif

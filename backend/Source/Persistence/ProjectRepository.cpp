@@ -2,6 +2,7 @@
 #include "../Audio/Effects/TrackEffectDefaults.h"
 
 #include <cmath>
+#include <utility>
 
 namespace beat
 {
@@ -379,6 +380,13 @@ namespace beat
             o->setProperty("runtimeWarp2Mode", aether.runtimeWarp2Mode);
             o->setProperty("interactionMode", aether.interactionMode);
             o->setProperty("interactionAmount", aether.interactionAmount);
+            juce::DynamicObject::Ptr expressionZone = new juce::DynamicObject();
+            expressionZone->setProperty("schemaVersion", aether.memberExpressionZone.schemaVersion);
+            expressionZone->setProperty("enabled", aether.memberExpressionZone.enabled);
+            expressionZone->setProperty("masterChannel", aether.memberExpressionZone.masterChannel);
+            expressionZone->setProperty("firstMemberChannel", aether.memberExpressionZone.firstMemberChannel);
+            expressionZone->setProperty("lastMemberChannel", aether.memberExpressionZone.lastMemberChannel);
+            o->setProperty("memberExpressionZone", juce::var(expressionZone.get()));
             return juce::var(o.get());
         }
 
@@ -421,6 +429,23 @@ namespace beat
             config.runtimeWarp2Mode = juce::jlimit(0, 3, (int) aetherVar.getProperty("runtimeWarp2Mode", config.runtimeWarp2Mode));
             config.interactionMode = juce::jlimit(0, 2, (int) aetherVar.getProperty("interactionMode", config.interactionMode));
             config.interactionAmount = juce::jlimit(0.0f, 1.0f, (float) (double) aetherVar.getProperty("interactionAmount", config.interactionAmount));
+            const auto expressionZone = aetherVar.getProperty("memberExpressionZone", {});
+            if (expressionZone.isObject())
+            {
+                const int sourceSchemaVersion = juce::jmax(0, (int) expressionZone.getProperty("schemaVersion", 0));
+                config.memberExpressionZone.schemaVersion = 1;
+                config.memberExpressionZone.enabled = (bool) expressionZone.getProperty("enabled", config.memberExpressionZone.enabled);
+                config.memberExpressionZone.masterChannel = juce::jlimit(1, 16, (int) expressionZone.getProperty("masterChannel", config.memberExpressionZone.masterChannel));
+                config.memberExpressionZone.firstMemberChannel = juce::jlimit(1, 16, (int) expressionZone.getProperty("firstMemberChannel", config.memberExpressionZone.firstMemberChannel));
+                config.memberExpressionZone.lastMemberChannel = juce::jlimit(1, 16, (int) expressionZone.getProperty("lastMemberChannel", config.memberExpressionZone.lastMemberChannel));
+                if (config.memberExpressionZone.firstMemberChannel > config.memberExpressionZone.lastMemberChannel)
+                    std::swap(config.memberExpressionZone.firstMemberChannel, config.memberExpressionZone.lastMemberChannel);
+                if (config.memberExpressionZone.masterChannel >= config.memberExpressionZone.firstMemberChannel
+                    && config.memberExpressionZone.masterChannel <= config.memberExpressionZone.lastMemberChannel)
+                    config.memberExpressionZone.enabled = false;
+                if (sourceSchemaVersion > config.memberExpressionZone.schemaVersion)
+                    config.memberExpressionZone.enabled = false;
+            }
             return config;
         }
 

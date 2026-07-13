@@ -514,3 +514,23 @@ MIDI note-on(channel)
 ```
 
 The selector, coarse/fine values, and effective range are fixed 16-channel atomic arrays. The MIDI/controller path owns no dynamic storage and performs no allocation, file access, lazy initialization, or container growth. Unconfigured channels preserve the saved patch bend range and legacy clamp; project rebuild resets negotiated state with the synthesiser outside the callback.
+
+## Milestone B20 explicit member-expression zone
+
+```text
+project/synth-patch setup
+  schema-v1 zone { enabled, master, first member, last member }
+  normalize bounds; reject overlap/future schema
+  AudioEngine::createInstrumentSynth
+    -> BeatSynthesiser::configureMemberExpressionZone
+MIDI master channel (zone enabled)
+  CC1 / CC74 / channel pressure / pitch wheel
+  -> update fixed state for each configured member channel
+  -> JUCE channel-filtered dispatch to active member voices
+MIDI member channel
+  -> update and dispatch only that channel
+MIDI outside zone
+  -> ordinary channel-local dispatch; no master broadcast
+```
+
+Zone configuration and validation occur while constructing the prepared synthesiser. Callback work is a fixed loop over at most 15 channel numbers plus JUCE's already bounded prepared voice scans. Storage is fixed atomic channel state; the path performs no allocation, resizing, sorting, file access, lazy initialization, or processor construction/destruction. The zone is default-off, so existing projects retain the pre-B20 path and output.

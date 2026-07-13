@@ -1386,9 +1386,53 @@ namespace
 
         stealing.noteOn(4, 69, 1.0f);
         auto* reset = voiceOnChannel(stealing, 4);
-        return reset != nullptr
-            && near(reset->pressureForTest(), 0.0f)
-            && near(reset->timbreForTest(), 0.0f);
+        if (reset == nullptr
+            || !near(reset->pressureForTest(), 0.0f)
+            || !near(reset->timbreForTest(), 0.0f))
+            return false;
+
+        beat::BeatSynthesiser zoned;
+        addVoice(zoned, 20);
+        addVoice(zoned, 21);
+        addVoice(zoned, 22);
+        zoned.addSound(new TestSound());
+        zoned.setNoteStealingEnabled(true);
+        zoned.setCurrentPlaybackSampleRate(48000.0);
+        if (!zoned.configureMemberExpressionZone({ true, 1, 2, 3 }))
+            return false;
+        zoned.noteOn(2, 60, 1.0f);
+        zoned.noteOn(3, 64, 1.0f);
+        zoned.noteOn(4, 67, 1.0f);
+        zoned.handleController(1, 1, 64);
+        zoned.handleController(1, 74, 96);
+        zoned.handleChannelPressure(1, 80);
+        zoned.handlePitchWheel(1, 12288);
+        auto* member2 = voiceOnChannel(zoned, 2);
+        auto* member3 = voiceOnChannel(zoned, 3);
+        auto* outside = voiceOnChannel(zoned, 4);
+        const float globalBend = (4096.0f / 8191.0f) * 2.0f;
+        if (member2 == nullptr || member3 == nullptr || outside == nullptr
+            || !near(member2->modWheelForTest(), 64.0f / 127.0f)
+            || !near(member3->modWheelForTest(), 64.0f / 127.0f)
+            || !near(member2->timbreForTest(), 96.0f / 127.0f)
+            || !near(member3->timbreForTest(), 96.0f / 127.0f)
+            || !near(member2->pressureForTest(), 80.0f / 127.0f)
+            || !near(member3->pressureForTest(), 80.0f / 127.0f)
+            || !near(member2->pitchWheelSemitonesForTest(), globalBend)
+            || !near(member3->pitchWheelSemitonesForTest(), globalBend)
+            || !near(outside->modWheelForTest(), 0.0f)
+            || !near(outside->timbreForTest(), 0.0f)
+            || !near(outside->pressureForTest(), 0.0f)
+            || !near(outside->pitchWheelSemitonesForTest(), 0.0f))
+            return false;
+        zoned.handleController(2, 74, 20);
+        if (!near(member2->timbreForTest(), 20.0f / 127.0f)
+            || !near(member3->timbreForTest(), 96.0f / 127.0f))
+            return false;
+
+        beat::BeatSynthesiser invalidZone;
+        return !invalidZone.configureMemberExpressionZone({ true, 2, 2, 4 })
+            && !invalidZone.memberExpressionZone().enabled;
     }
 
     beat::Project makeStressProject()
@@ -7483,6 +7527,7 @@ namespace
         instrument.aether.runtimeWarp2Mode = 2;
         instrument.aether.interactionMode = 2;
         instrument.aether.interactionAmount = 0.46f;
+        instrument.aether.memberExpressionZone = { 1, true, 1, 2, 8 };
 
         const auto beforeEnergy = bufferEnergy(renderOfflineBlock(project, 16000));
 
@@ -7592,6 +7637,11 @@ namespace
                 && loadedInstrument.aether.runtimeWarp2Mode == 2
                 && loadedInstrument.aether.interactionMode == 2
                 && near(loadedInstrument.aether.interactionAmount, 0.46f)
+                && loadedInstrument.aether.memberExpressionZone.schemaVersion == 1
+                && loadedInstrument.aether.memberExpressionZone.enabled
+                && loadedInstrument.aether.memberExpressionZone.masterChannel == 1
+                && loadedInstrument.aether.memberExpressionZone.firstMemberChannel == 2
+                && loadedInstrument.aether.memberExpressionZone.lastMemberChannel == 8
                 && loadedInstrument.effects.front().id == instrument.effects.front().id;
         }
 
@@ -12434,6 +12484,10 @@ namespace
             "aether.runtimeWarp2Mode": "pinch",
             "aether.interaction.mode": "ring",
             "aether.interaction.amount": 0.72,
+            "aether.mpe.enabled": true,
+            "aether.mpe.masterChannel": 1,
+            "aether.mpe.firstMemberChannel": 2,
+            "aether.mpe.lastMemberChannel": 8,
             "osc.b.unison.voices": 7,
             "osc.b.unison.detune": 0.31,
             "osc.b.unison.spread": 0.83,
@@ -12589,6 +12643,11 @@ namespace
             || !near(instrument.aether.runtimeWarp2, 0.41f) || instrument.aether.runtimeWarp2Mode != 2)
             return false;
         if (instrument.aether.interactionMode != 2 || !near(instrument.aether.interactionAmount, 0.72f))
+            return false;
+        if (!instrument.aether.memberExpressionZone.enabled
+            || instrument.aether.memberExpressionZone.masterChannel != 1
+            || instrument.aether.memberExpressionZone.firstMemberChannel != 2
+            || instrument.aether.memberExpressionZone.lastMemberChannel != 8)
             return false;
         if (!instrument.aether.oscB.enabled || instrument.aether.oscB.wavetable.bank != 3)
             return false;

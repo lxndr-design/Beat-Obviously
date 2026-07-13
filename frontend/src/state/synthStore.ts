@@ -129,6 +129,10 @@ export type SynthParameterId =
   | "aether.noise.fxSend2"
   | "aether.fxBus1Id"
   | "aether.fxBus2Id"
+  | "aether.mpe.enabled"
+  | "aether.mpe.masterChannel"
+  | "aether.mpe.firstMemberChannel"
+  | "aether.mpe.lastMemberChannel"
   | "amp.level"
   | "amp.pan"
   | "maxVoices"
@@ -1106,6 +1110,10 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "aether.noise.fxSend2": 0,
   "aether.fxBus1Id": "",
   "aether.fxBus2Id": "",
+  "aether.mpe.enabled": false,
+  "aether.mpe.masterChannel": 1,
+  "aether.mpe.firstMemberChannel": 2,
+  "aether.mpe.lastMemberChannel": 16,
   "amp.level": 0.8,
   "amp.pan": 0,
   maxVoices: 16,
@@ -1250,6 +1258,10 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "aether.noise.fxSend2": "Aether Noise FX Send 2",
   "aether.fxBus1Id": "Aether FX Bus 1",
   "aether.fxBus2Id": "Aether FX Bus 2",
+  "aether.mpe.enabled": "MPE Zone Enabled",
+  "aether.mpe.masterChannel": "MPE Master Channel",
+  "aether.mpe.firstMemberChannel": "MPE First Member Channel",
+  "aether.mpe.lastMemberChannel": "MPE Last Member Channel",
   "amp.level": "Amp Level",
   "amp.pan": "Amp Pan",
   maxVoices: "Max Voices",
@@ -1439,6 +1451,15 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
     inheritUnison("detune", parameters["unison.detune"]);
     inheritUnison("spread", parameters["unison.spread"]);
   }
+
+  const mpeMaster = clampMidiChannel(Number(parameters["aether.mpe.masterChannel"]));
+  const mpeFirst = clampMidiChannel(Number(parameters["aether.mpe.firstMemberChannel"]));
+  const mpeLast = clampMidiChannel(Number(parameters["aether.mpe.lastMemberChannel"]));
+  parameters["aether.mpe.masterChannel"] = mpeMaster;
+  parameters["aether.mpe.firstMemberChannel"] = Math.min(mpeFirst, mpeLast);
+  parameters["aether.mpe.lastMemberChannel"] = Math.max(mpeFirst, mpeLast);
+  if (mpeMaster >= Math.min(mpeFirst, mpeLast) && mpeMaster <= Math.max(mpeFirst, mpeLast))
+    parameters["aether.mpe.enabled"] = false;
 
   const modulation = Array.isArray(input.modulation)
     ? input.modulation
@@ -1944,6 +1965,13 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         ? draft.parameters["aether.interaction.mode"]
         : "off",
       interactionAmount: clamp01(getNumberParam(draft, "aether.interaction.amount")),
+      memberExpressionZone: {
+        schemaVersion: 1,
+        enabled: getBooleanParam(draft, "aether.mpe.enabled"),
+        masterChannel: clampMidiChannel(getNumberParam(draft, "aether.mpe.masterChannel")),
+        firstMemberChannel: clampMidiChannel(getNumberParam(draft, "aether.mpe.firstMemberChannel")),
+        lastMemberChannel: clampMidiChannel(getNumberParam(draft, "aether.mpe.lastMemberChannel")),
+      },
     },
     lfoWaveform: lfoWaveformFromDraft(draft),
     lfoRateHz: getNumberParam(draft, "lfo.1.rate"),
@@ -2146,6 +2174,10 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["aether.noise.fxSend2"] = instrument.aether?.noise.fxSends?.[1] ?? 0;
   draft.parameters["aether.fxBus1Id"] = instrument.aether?.fxBusIds?.[0] ?? "";
   draft.parameters["aether.fxBus2Id"] = instrument.aether?.fxBusIds?.[1] ?? "";
+  draft.parameters["aether.mpe.enabled"] = instrument.aether?.memberExpressionZone?.enabled ?? false;
+  draft.parameters["aether.mpe.masterChannel"] = clampMidiChannel(instrument.aether?.memberExpressionZone?.masterChannel ?? 1);
+  draft.parameters["aether.mpe.firstMemberChannel"] = clampMidiChannel(instrument.aether?.memberExpressionZone?.firstMemberChannel ?? 2);
+  draft.parameters["aether.mpe.lastMemberChannel"] = clampMidiChannel(instrument.aether?.memberExpressionZone?.lastMemberChannel ?? 16);
   draft.parameters["amp.level"] = 0.8;
   draft.parameters["env.1.attack"] = instrument.envelope.attackMs / 1000;
   draft.parameters["env.1.attackCurve"] = instrument.envelope.attackCurve ?? "linear";
@@ -2442,6 +2474,7 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (id.endsWith(".unison.voices")) return Math.max(1, Math.min(8, Math.round(value)));
   if (id === "maxVoices") return Math.max(1, Math.min(32, Math.round(value)));
   if (id === "glide.ms") return Math.max(0, Math.min(5000, Math.round(value)));
+  if (id.startsWith("aether.mpe.") && id.endsWith("Channel")) return clampMidiChannel(value);
   if (id.includes(".pan")) return Math.max(-1, Math.min(1, value));
   if (id.includes(".attack") || id.includes(".decay") || id.includes(".release")) return Math.max(0, Math.min(30, value));
   return Math.max(0, Math.min(1, value));
@@ -4579,6 +4612,10 @@ function clamp01(value: number): number {
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
+}
+
+function clampMidiChannel(value: number): number {
+  return Math.round(clamp(value, 1, 16));
 }
 
 function sanitize01(value: unknown, fallback: number): number {
