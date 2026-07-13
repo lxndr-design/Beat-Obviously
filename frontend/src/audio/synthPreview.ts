@@ -19,6 +19,8 @@ export interface SynthRenderState {
   filterResonance2: number;
   filterF2: number;
   filterDamping2: number;
+  low3: number; band3: number; filterCutoff3: number; filterResonance3: number; filterF3: number; filterDamping3: number;
+  low4: number; band4: number; filterCutoff4: number; filterResonance4: number; filterF4: number; filterDamping4: number;
 }
 
 interface RenderModulation {
@@ -177,6 +179,8 @@ export function createSynthRenderState(): SynthRenderState {
     phase: 0, index: 0,
     low: 0, band: 0, filterCutoff: -1, filterResonance: -1, filterF: 0, filterDamping: 1,
     low2: 0, band2: 0, filterCutoff2: -1, filterResonance2: -1, filterF2: 0, filterDamping2: 1,
+    low3: 0, band3: 0, filterCutoff3: -1, filterResonance3: -1, filterF3: 0, filterDamping3: 1,
+    low4: 0, band4: 0, filterCutoff4: -1, filterResonance4: -1, filterF4: 0, filterDamping4: 1,
   };
 }
 
@@ -954,8 +958,20 @@ export function renderInstrumentSample(
       branch = Math.tanh(branch * amount) / Math.tanh(amount);
     }
     const filtered2 = resonantFilter(branch, state, sampleRate,
-      clamp01(instrument.filter2.cutoff), clamp01(instrument.filter2.resonance), instrument.filter2.type, true);
+      clamp01(instrument.filter2.cutoff), clamp01(instrument.filter2.resonance), instrument.filter2.type, 1);
     filtered = instrument.filterRouting === "parallel" ? (filtered + filtered2) * 0.5 : filtered2;
+  }
+  if (aetherBuses?.filter1) {
+    let branch = aetherBuses.filter1;
+    if (drive > 0) { const amount = 1 + drive * 10; branch = Math.tanh(branch * amount) / Math.tanh(amount); }
+    filtered += resonantFilter(branch, state, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass", 2);
+  }
+  if (aetherBuses?.filter2) {
+    let branch = aetherBuses.filter2;
+    const routeDrive = clamp01(instrument.filter2?.drive ?? 0);
+    if (routeDrive > 0) { const amount = 1 + routeDrive * 10; branch = Math.tanh(branch * amount) / Math.tanh(amount); }
+    filtered += resonantFilter(branch, state, sampleRate, clamp01(instrument.filter2?.cutoff ?? 1),
+      clamp01(instrument.filter2?.resonance ?? 0), instrument.filter2?.type ?? "lowpass", 3);
   }
   if (aetherBuses && aetherBuses.direct !== 0) filtered += aetherBuses.direct;
   const level = clamp01((instrument.ampLevel ?? 1) + modulationTargetOffset(modulation, "amp.level"));
@@ -985,6 +1001,8 @@ function renderInstrumentStereoSample(
   const raw = aetherStackStereoSample(instrument, phaseState, sampleRate, frequency, mode, modulation);
   const warped = applyRuntimeWarpStereo(instrument, raw.left, raw.right);
   const directWarped = applyRuntimeWarpStereo(instrument, raw.directLeft, raw.directRight);
+  const filter1Warped = applyRuntimeWarpStereo(instrument, raw.filter1Left, raw.filter1Right);
+  const filter2Warped = applyRuntimeWarpStereo(instrument, raw.filter2Left, raw.filter2Right);
   let left = warped.left;
   let right = warped.right;
 
@@ -1007,9 +1025,9 @@ function renderInstrumentStereoSample(
       branchRight = Math.tanh(branchRight * amount) / normalizer;
     }
     const filtered2Left = resonantFilter(branchLeft, leftFilterState, sampleRate,
-      clamp01(instrument.filter2.cutoff), clamp01(instrument.filter2.resonance), instrument.filter2.type, true);
+      clamp01(instrument.filter2.cutoff), clamp01(instrument.filter2.resonance), instrument.filter2.type, 1);
     const filtered2Right = resonantFilter(branchRight, rightFilterState, sampleRate,
-      clamp01(instrument.filter2.cutoff), clamp01(instrument.filter2.resonance), instrument.filter2.type, true);
+      clamp01(instrument.filter2.cutoff), clamp01(instrument.filter2.resonance), instrument.filter2.type, 1);
     if (instrument.filterRouting === "parallel") {
       left = (left + filtered2Left) * 0.5;
       right = (right + filtered2Right) * 0.5;
@@ -1017,6 +1035,16 @@ function renderInstrumentStereoSample(
       left = filtered2Left;
       right = filtered2Right;
     }
+  }
+  if (filter1Warped.left !== 0 || filter1Warped.right !== 0) {
+    left += resonantFilter(filter1Warped.left, leftFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass", 2);
+    right += resonantFilter(filter1Warped.right, rightFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass", 2);
+  }
+  if (filter2Warped.left !== 0 || filter2Warped.right !== 0) {
+    left += resonantFilter(filter2Warped.left, leftFilterState, sampleRate, clamp01(instrument.filter2?.cutoff ?? 1),
+      clamp01(instrument.filter2?.resonance ?? 0), instrument.filter2?.type ?? "lowpass", 3);
+    right += resonantFilter(filter2Warped.right, rightFilterState, sampleRate, clamp01(instrument.filter2?.cutoff ?? 1),
+      clamp01(instrument.filter2?.resonance ?? 0), instrument.filter2?.type ?? "lowpass", 3);
   }
   if (directWarped.left !== 0 || directWarped.right !== 0) {
     left += directWarped.left;
@@ -1041,16 +1069,16 @@ function resonantFilter(
   cutoff: number,
   resonance: number,
   type: NonNullable<Instrument["filterType"]>,
-  secondary = false,
+  lane: 0 | 1 | 2 | 3 = 0,
 ): number {
   const minHz = 50;
   const maxHz = Math.min(16000, sampleRate * 0.45);
-  let cachedCutoff = secondary ? state.filterCutoff2 : state.filterCutoff;
-  let cachedResonance = secondary ? state.filterResonance2 : state.filterResonance;
-  let filterF = secondary ? state.filterF2 : state.filterF;
-  let damping = secondary ? state.filterDamping2 : state.filterDamping;
-  let low = secondary ? state.low2 : state.low;
-  let band = secondary ? state.band2 : state.band;
+  let cachedCutoff = lane === 1 ? state.filterCutoff2 : lane === 2 ? state.filterCutoff3 : lane === 3 ? state.filterCutoff4 : state.filterCutoff;
+  let cachedResonance = lane === 1 ? state.filterResonance2 : lane === 2 ? state.filterResonance3 : lane === 3 ? state.filterResonance4 : state.filterResonance;
+  let filterF = lane === 1 ? state.filterF2 : lane === 2 ? state.filterF3 : lane === 3 ? state.filterF4 : state.filterF;
+  let damping = lane === 1 ? state.filterDamping2 : lane === 2 ? state.filterDamping3 : lane === 3 ? state.filterDamping4 : state.filterDamping;
+  let low = lane === 1 ? state.low2 : lane === 2 ? state.low3 : lane === 3 ? state.low4 : state.low;
+  let band = lane === 1 ? state.band2 : lane === 2 ? state.band3 : lane === 3 ? state.band4 : state.band;
   if (Math.abs(cutoff - cachedCutoff) > 0.0005 || Math.abs(resonance - cachedResonance) > 0.0005) {
     const cutoffHz = minHz * Math.pow(maxHz / minHz, cutoff);
     filterF = Math.min(0.98, 2 * Math.sin(Math.PI * cutoffHz / sampleRate));
@@ -1062,9 +1090,15 @@ function resonantFilter(
   low = clamp(low + filterF * band, -4, 4);
   const high = input - low - damping * band;
   band = clamp(band + filterF * high, -4, 4);
-  if (secondary) {
+  if (lane === 1) {
     state.low2 = low; state.band2 = band; state.filterF2 = filterF; state.filterDamping2 = damping;
     state.filterCutoff2 = cachedCutoff; state.filterResonance2 = cachedResonance;
+  } else if (lane === 2) {
+    state.low3 = low; state.band3 = band; state.filterF3 = filterF; state.filterDamping3 = damping;
+    state.filterCutoff3 = cachedCutoff; state.filterResonance3 = cachedResonance;
+  } else if (lane === 3) {
+    state.low4 = low; state.band4 = band; state.filterF4 = filterF; state.filterDamping4 = damping;
+    state.filterCutoff4 = cachedCutoff; state.filterResonance4 = cachedResonance;
   } else {
     state.low = low; state.band = band; state.filterF = filterF; state.filterDamping = damping;
     state.filterCutoff = cachedCutoff; state.filterResonance = cachedResonance;
@@ -1097,7 +1131,7 @@ function aetherStackSample(
   modulation: RenderModulation,
 ): number {
   const buses = aetherStackBuses(instrument, state, sampleRate, frequency, mode, modulation);
-  return clamp(buses.filtered + buses.direct, -1, 1);
+  return clamp(buses.filtered + buses.filter1 + buses.filter2 + buses.direct, -1, 1);
 }
 
 function aetherStackBuses(
@@ -1107,12 +1141,14 @@ function aetherStackBuses(
   frequency: number,
   mode: SynthRenderMode,
   modulation: RenderModulation,
-): { filtered: number; direct: number } {
+): { filtered: number; filter1: number; filter2: number; direct: number } {
   const config = instrument.aether;
-  if (!config) return { filtered: wavetableOscillatorSample(instrument, state.phase, sampleRate, frequency), direct: 0 };
+  if (!config) return { filtered: wavetableOscillatorSample(instrument, state.phase, sampleRate, frequency), filter1: 0, filter2: 0, direct: 0 };
 
   let sum = 0;
   let directSum = 0;
+  let filter1Sum = 0;
+  let filter2Sum = 0;
   let levelSum = 0;
   const addOsc = (osc: NonNullable<Instrument["aether"]>["oscA"], key: string) => {
     const level = clamp01(osc.level + modulationTargetOffset(modulation, `osc.${key}.level`));
@@ -1145,6 +1181,8 @@ function aetherStackBuses(
       ? mode === "audio" ? Math.random() * 2 - 1 : whiteNoiseSample(state.index + Math.round(rate * 97))
       : oscillatorSample(waveform, state.phase * rate + phaseOffset, clamp01(instrument.knobs.color));
     if (osc.route === "direct") directSum += sourceSample * level;
+    else if (osc.route === "filter1") filter1Sum += sourceSample * level;
+    else if (osc.route === "filter2") filter2Sum += sourceSample * level;
     else sum += sourceSample * level;
     levelSum += level;
   };
@@ -1155,6 +1193,8 @@ function aetherStackBuses(
     const rate = oscillatorRate(config.sub.octave, 0, 0);
     const subSample = oscillatorSample(config.sub.waveform, state.phase * rate, 0.5) * config.sub.level;
     if (config.sub.route === "direct") directSum += subSample;
+    else if (config.sub.route === "filter1") filter1Sum += subSample;
+    else if (config.sub.route === "filter2") filter2Sum += subSample;
     else sum += subSample;
     levelSum += config.sub.level;
   }
@@ -1163,14 +1203,18 @@ function aetherStackBuses(
     const noise = mode === "audio" ? Math.random() * 2 - 1 : whiteNoiseSample(state.index);
     const softened = noise * (0.35 + clamp01(config.noise.color) * 0.65);
     if (config.noise.route === "direct") directSum += softened * config.noise.level;
+    else if (config.noise.route === "filter1") filter1Sum += softened * config.noise.level;
+    else if (config.noise.route === "filter2") filter2Sum += softened * config.noise.level;
     else sum += softened * config.noise.level;
     levelSum += config.noise.level;
   }
 
-  if (levelSum <= 0) return { filtered: 0, direct: 0 };
+  if (levelSum <= 0) return { filtered: 0, filter1: 0, filter2: 0, direct: 0 };
   const normalizer = Math.max(0.35, levelSum);
   return {
     filtered: runtimeWarpSample(clamp(sum / normalizer, -1, 1), config.runtimeWarp ?? 0, config.runtimeWarpMode ?? "shape"),
+    filter1: runtimeWarpSample(clamp(filter1Sum / normalizer, -1, 1), config.runtimeWarp ?? 0, config.runtimeWarpMode ?? "shape"),
+    filter2: runtimeWarpSample(clamp(filter2Sum / normalizer, -1, 1), config.runtimeWarp ?? 0, config.runtimeWarpMode ?? "shape"),
     direct: runtimeWarpSample(clamp(directSum / normalizer, -1, 1), config.runtimeWarp ?? 0, config.runtimeWarpMode ?? "shape"),
   };
 }
@@ -1182,24 +1226,27 @@ function aetherStackStereoSample(
   frequency: number,
   mode: SynthRenderMode,
   modulation: RenderModulation,
-): { left: number; right: number; directLeft: number; directRight: number } {
+): { left: number; right: number; filter1Left: number; filter1Right: number; filter2Left: number; filter2Right: number; directLeft: number; directRight: number } {
   const config = instrument.aether;
   if (!config) {
     const sample = wavetableOscillatorSample(instrument, state.phase, sampleRate, frequency);
-    return { left: sample, right: sample, directLeft: 0, directRight: 0 };
+    return { left: sample, right: sample, filter1Left: 0, filter1Right: 0, filter2Left: 0, filter2Right: 0, directLeft: 0, directRight: 0 };
   }
 
   let left = 0;
   let right = 0;
   let directLeft = 0;
   let directRight = 0;
+  let filter1Left = 0; let filter1Right = 0; let filter2Left = 0; let filter2Right = 0;
   let levelSum = 0;
 
-  const add = (value: number, level: number, pan: number, route: "filter" | "direct" = "filter") => {
+  const add = (value: number, level: number, pan: number, route: "filter" | "both" | "filter1" | "filter2" | "direct" = "filter") => {
     const [leftGain, rightGain] = panGains(pan);
     if (route === "direct") {
       directLeft += value * level * leftGain;
       directRight += value * level * rightGain;
+    } else if (route === "filter1") { filter1Left += value * level * leftGain; filter1Right += value * level * rightGain;
+    } else if (route === "filter2") { filter2Left += value * level * leftGain; filter2Right += value * level * rightGain;
     } else {
       left += value * level * leftGain;
       right += value * level * rightGain;
@@ -1257,11 +1304,13 @@ function aetherStackStereoSample(
     add(softened, config.noise.level, 0, config.noise.route);
   }
 
-  if (levelSum <= 0) return { left: 0, right: 0, directLeft: 0, directRight: 0 };
+  if (levelSum <= 0) return { left: 0, right: 0, filter1Left: 0, filter1Right: 0, filter2Left: 0, filter2Right: 0, directLeft: 0, directRight: 0 };
   const normalizer = Math.max(0.35, levelSum);
   return {
     left: clamp(left / normalizer, -1, 1),
     right: clamp(right / normalizer, -1, 1),
+    filter1Left: clamp(filter1Left / normalizer, -1, 1), filter1Right: clamp(filter1Right / normalizer, -1, 1),
+    filter2Left: clamp(filter2Left / normalizer, -1, 1), filter2Right: clamp(filter2Right / normalizer, -1, 1),
     directLeft: clamp(directLeft / normalizer, -1, 1),
     directRight: clamp(directRight / normalizer, -1, 1),
   };

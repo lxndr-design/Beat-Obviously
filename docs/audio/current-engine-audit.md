@@ -262,3 +262,11 @@ Oscillator A, oscillator B, sub, and noise now independently select the stable `
 Focused native coverage proves filtered and direct buses can be nonzero simultaneously and recombine to the bounded compatibility frame. Patch parsing verifies all four route fields. Frontend normalization, reverse conversion, and preview use the same destinations; the existing default preview remains exactly RMS `0.05915262597409699`, peak `0.5288043022155762`.
 
 Full native stress passes with only `baseline.recent-project-exists` waived, full non-native verification passes, and production `Beat` plus `BeatAetherBaseline` build. The 150-WAV matrix is byte-identical to B5; report SHA-256 is `48f94deb7d80373e3ee1ad5f9fdf162762bdad935e5f634a4289c7dc1e017d2c`, peak RSS is 15,335,424 bytes, deadline overruns are zero, and queue telemetry remains 64 accepted / 16 rejected / 16 overflow. Filter-1-only, Filter-2-only, both-filter, and FX-send destinations remain later routing slices.
+
+## Milestone B7 explicit filter destinations — 2026-07-12
+
+Each Aether source now accepts `both`, `filter1`, `filter2`, or `direct`; legacy `filter` is retained as an alias for `both`. `both` follows the existing global serial/parallel topology. Explicit Filter 1 and Filter 2 destinations use isolated, preprepared filter/drive/runtime-warp state lanes, preventing a shared state object from being processed twice in one sample when sources choose different destinations.
+
+Native tests prove all four renderer buses are independently populated, bounded, and recombine correctly; voice tests prove Filter-1-only and Filter-2-only renders are finite and audibly distinct. Frontend normalization and preview maintain corresponding isolated filter-state lanes. Default preview RMS/peak remain unchanged.
+
+Full native stress passes with only the existing TCC waiver, full non-native verification passes, and production targets build. All 150 default-route WAVs are byte-identical to B6. B7 report SHA-256 is `1f3a4ddd44fb3117a326ec939a75267e23ede01d88aefcfad65cea0084a27125`; peak RSS is 14,860,288 bytes, deadline overruns are zero, and queue telemetry remains 64 accepted / 16 rejected / 16 overflow. Per-source FX sends remain open.

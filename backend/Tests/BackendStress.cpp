@@ -788,8 +788,8 @@ namespace
         if (noiseState == 0x12345678u)
             return false;
 
-        params.aetherOscB.routing = 1;
-        params.aetherSub.routing = 1;
+        params.aetherOscB.routing = 2;
+        params.aetherSub.routing = 3;
         params.aetherNoise.routing = 1;
         const auto routed = beat::AetherTableStackRenderer::render(
             params, targets, panGains, pitchRates, oscillatorsA, oscillatorsB,
@@ -798,8 +798,10 @@ namespace
             60.0f / 127.0f, 0.2f, noiseState);
         if ((std::abs(routed.filteredFrame.left) <= 0.0001f && std::abs(routed.filteredFrame.right) <= 0.0001f)
             || (std::abs(routed.directFrame.left) <= 0.0001f && std::abs(routed.directFrame.right) <= 0.0001f)
-            || !near(routed.frame.left, juce::jlimit(-1.0f, 1.0f, routed.filteredFrame.left + routed.directFrame.left), 0.00001f)
-            || !near(routed.frame.right, juce::jlimit(-1.0f, 1.0f, routed.filteredFrame.right + routed.directFrame.right), 0.00001f))
+            || (std::abs(routed.filter1Frame.left) <= 0.0001f && std::abs(routed.filter1Frame.right) <= 0.0001f)
+            || (std::abs(routed.filter2Frame.left) <= 0.0001f && std::abs(routed.filter2Frame.right) <= 0.0001f)
+            || !near(routed.frame.left, juce::jlimit(-1.0f, 1.0f, routed.filteredFrame.left + routed.filter1Frame.left + routed.filter2Frame.left + routed.directFrame.left), 0.00001f)
+            || !near(routed.frame.right, juce::jlimit(-1.0f, 1.0f, routed.filteredFrame.right + routed.filter1Frame.right + routed.filter2Frame.right + routed.directFrame.right), 0.00001f))
             return false;
 
         params.aetherOscA.enabled = false;
@@ -11882,8 +11884,8 @@ namespace
             "osc.b.pan": 0.2,
             "osc.b.phase": 0.66,
             "osc.b.randomPhase": 0.1,
-            "osc.b.route": "filter",
-            "aether.sub.route": "direct",
+            "osc.b.route": "filter1",
+            "aether.sub.route": "filter2",
             "aether.noise.route": "direct",
             "osc.b.unison.voices": 7,
             "osc.b.unison.detune": 0.31,
@@ -12012,8 +12014,8 @@ namespace
             return false;
         if (instrument.aether.oscA.phaseMode != 1)
             return false;
-        if (instrument.aether.oscA.routing != 1 || instrument.aether.oscB.routing != 0
-            || instrument.aether.sub.routing != 1 || instrument.aether.noise.routing != 1)
+        if (instrument.aether.oscA.routing != 1 || instrument.aether.oscB.routing != 2
+            || instrument.aether.sub.routing != 3 || instrument.aether.noise.routing != 1)
             return false;
         if (!instrument.aether.oscB.enabled || instrument.aether.oscB.wavetable.bank != 3)
             return false;
@@ -12891,8 +12893,19 @@ namespace
         const auto parallel = render(params);
         params.filter2Enabled = false;
         const auto legacy = render(params);
+        auto routedParams = params;
+        routedParams.hasAether = true;
+        routedParams.aetherOscA.enabled = true;
+        routedParams.aetherOscA.level = 0.8f;
+        routedParams.aetherOscA.waveform = 1;
+        routedParams.filter2Enabled = true;
+        routedParams.aetherOscA.routing = 2;
+        const auto filter1Only = render(routedParams);
+        routedParams.aetherOscA.routing = 3;
+        const auto filter2Only = render(routedParams);
         double serialParallelDiff = 0.0;
         double serialLegacyDiff = 0.0;
+        double explicitFilterDiff = 0.0;
         for (int channel = 0; channel < serial.getNumChannels(); ++channel)
         {
             for (int sample = 0; sample < serial.getNumSamples(); ++sample)
@@ -12900,13 +12913,17 @@ namespace
                 const float serialValue = serial.getSample(channel, sample);
                 const float parallelValue = parallel.getSample(channel, sample);
                 const float legacyValue = legacy.getSample(channel, sample);
-                if (!std::isfinite(serialValue) || !std::isfinite(parallelValue) || !std::isfinite(legacyValue))
+                const float filter1Value = filter1Only.getSample(channel, sample);
+                const float filter2Value = filter2Only.getSample(channel, sample);
+                if (!std::isfinite(serialValue) || !std::isfinite(parallelValue) || !std::isfinite(legacyValue)
+                    || !std::isfinite(filter1Value) || !std::isfinite(filter2Value))
                     return false;
                 serialParallelDiff += std::abs((double) serialValue - (double) parallelValue);
                 serialLegacyDiff += std::abs((double) serialValue - (double) legacyValue);
+                explicitFilterDiff += std::abs((double) filter1Value - (double) filter2Value);
             }
         }
-        return serialParallelDiff > 0.1 && serialLegacyDiff > 0.1;
+        return serialParallelDiff > 0.1 && serialLegacyDiff > 0.1 && explicitFilterDiff > 0.1;
     }
 
     bool stressInstrumentVoiceBandlimitedBasicOscillators()

@@ -104,6 +104,8 @@ namespace beat
         env2Adsr.setSampleRate(sr);
         filterState.prepare(sr, blockSize, params.filterType);
         filter2State.prepare(sr, blockSize, params.filter2Type);
+        filter1RouteState.prepare(sr, blockSize, params.filterType);
+        filter2RouteState.prepare(sr, blockSize, params.filter2Type);
         stealTransition.prepare(sampleRate);
     }
 
@@ -192,6 +194,8 @@ namespace beat
 
         filterState.configure(p.filterType, p.cutoff01, p.resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
         filter2State.configure(p.filter2Type, p.filter2Cutoff01, p.filter2Resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
+        filter1RouteState.configure(p.filterType, p.cutoff01, p.resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
+        filter2RouteState.configure(p.filter2Type, p.filter2Cutoff01, p.filter2Resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
         refreshCachedPanGains();
         refreshCachedPitchRates();
         refreshCachedDynamicModulationFlags();
@@ -345,6 +349,8 @@ namespace beat
                 : 0;
             filterState.configure(params.filterType, params.cutoff01, params.resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
             filter2State.configure(params.filter2Type, params.filter2Cutoff01, params.filter2Resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
+            filter1RouteState.configure(params.filterType, params.cutoff01, params.resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
+            filter2RouteState.configure(params.filter2Type, params.filter2Cutoff01, params.filter2Resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
             refreshCachedPanGains();
             refreshCachedDynamicModulationFlags();
             refreshCachedPitchRates();
@@ -356,6 +362,8 @@ namespace beat
 
         filterState.configure(params.filterType, params.cutoff01, params.resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
         filter2State.configure(params.filter2Type, params.filter2Cutoff01, params.filter2Resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
+        filter1RouteState.configure(params.filterType, params.cutoff01, params.resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
+        filter2RouteState.configure(params.filter2Type, params.filter2Cutoff01, params.filter2Resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
         refreshCachedPanGains();
         refreshCachedDynamicModulationFlags();
 
@@ -392,6 +400,8 @@ namespace beat
         pitchFrequencyRamp.reset((float) baseFrequencyHz);
         aetherRuntimeWarpState.reset();
         aetherDirectRuntimeWarpState.reset();
+        aetherFilter1RuntimeWarpState.reset();
+        aetherFilter2RuntimeWarpState.reset();
         driveState.reset();
         filter2DriveState.reset();
         previousRawEnvelope = 0.0f;
@@ -554,6 +564,8 @@ namespace beat
             // Oscillator
             StereoSample raw;
             StereoSample directRaw;
+            StereoSample filter1Raw;
+            StereoSample filter2Raw;
             if (params.hasAether)
             {
                 const auto aetherResult = AetherTableStackRenderer::render(
@@ -583,6 +595,8 @@ namespace beat
                     noiseState);
                 raw = { aetherResult.filteredFrame.left, aetherResult.filteredFrame.right };
                 directRaw = { aetherResult.directFrame.left, aetherResult.directFrame.right };
+                filter1Raw = { aetherResult.filter1Frame.left, aetherResult.filter1Frame.right };
+                filter2Raw = { aetherResult.filter2Frame.left, aetherResult.filter2Frame.right };
                 currentBlockWork.add(aetherResult.work);
             }
             else
@@ -600,6 +614,10 @@ namespace beat
             float right = raw.right;
             float directLeft = directRaw.left;
             float directRight = directRaw.right;
+            float filter1RouteLeft = filter1Raw.left;
+            float filter1RouteRight = filter1Raw.right;
+            float filter2RouteLeft = filter2Raw.left;
+            float filter2RouteRight = filter2Raw.right;
 
             if (params.hasAether && params.aetherRuntimeWarp > 0.0001f)
             {
@@ -617,11 +635,21 @@ namespace beat
                     params.aetherRuntimeWarpMode);
                 directLeft = directWarped.left;
                 directRight = directWarped.right;
+                const auto filter1Warped = processRuntimeWarpOversampled(aetherFilter1RuntimeWarpState,
+                    { filter1RouteLeft, filter1RouteRight }, params.aetherRuntimeWarp, params.aetherRuntimeWarpMode);
+                const auto filter2Warped = processRuntimeWarpOversampled(aetherFilter2RuntimeWarpState,
+                    { filter2RouteLeft, filter2RouteRight }, params.aetherRuntimeWarp, params.aetherRuntimeWarpMode);
+                filter1RouteLeft = filter1Warped.left;
+                filter1RouteRight = filter1Warped.right;
+                filter2RouteLeft = filter2Warped.left;
+                filter2RouteRight = filter2Warped.right;
             }
             else
             {
                 aetherRuntimeWarpState.reset({ left, right });
                 aetherDirectRuntimeWarpState.reset({ directLeft, directRight });
+                aetherFilter1RuntimeWarpState.reset({ filter1RouteLeft, filter1RouteRight });
+                aetherFilter2RuntimeWarpState.reset({ filter2RouteLeft, filter2RouteRight });
             }
 
             const float filterInputLeft = left;
@@ -656,12 +684,15 @@ namespace beat
                     baseFrequencyHz,
                     6.0f);
                 currentBlockWork.addFilterCutoffUpdates(cutoffUpdates);
+                currentBlockWork.addFilterCutoffUpdates(filter1RouteState.updateCutoffIfChanged(
+                    params.cutoff01 + cutoffMod, sampleRate, params.filterKeytrack, baseFrequencyHz, 6.0f));
                 if (useDynamicModulation && cachedDynamicTargets.filterResonance)
                 {
                     const float resonance = VoiceMath::clamp01(params.resonance01
                         + DynamicModulation::targetOffset(params.dynamicModulation.filterResonance, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, params.macroValues, 1.0f));
                     const int resonanceUpdates = filterState.updateResonanceIfChanged(resonance, 0.001f);
                     currentBlockWork.addFilterResonanceUpdates(resonanceUpdates);
+                    currentBlockWork.addFilterResonanceUpdates(filter1RouteState.updateResonanceIfChanged(resonance, 0.001f));
                 }
             }
             const auto filtered = filterState.process(left, right);
@@ -701,6 +732,41 @@ namespace beat
             {
                 filter2DriveState.reset({ left, right });
             }
+
+            if (params.hasAether && (filter1RouteLeft != 0.0f || filter1RouteRight != 0.0f))
+            {
+                if (drive > 0.0001f)
+                {
+                    const auto driven = DriveStage::processOversampled(filter1RouteDriveState,
+                        { filter1RouteLeft, filter1RouteRight }, 1.0f + drive * 6.0f);
+                    filter1RouteLeft = driven.left;
+                    filter1RouteRight = driven.right;
+                    currentBlockWork.addFilterDriveSamples(DriveStage::workSamplesForChannels(2));
+                }
+                else filter1RouteDriveState.reset({ filter1RouteLeft, filter1RouteRight });
+                const auto routed = filter1RouteState.process(filter1RouteLeft, filter1RouteRight);
+                left += routed.left;
+                right += routed.right;
+            }
+            else filter1RouteDriveState.reset();
+
+            if (params.hasAether && (filter2RouteLeft != 0.0f || filter2RouteRight != 0.0f))
+            {
+                const float routeDrive = VoiceMath::clamp01(params.filter2Drive01);
+                if (routeDrive > 0.0001f)
+                {
+                    const auto driven = DriveStage::processOversampled(filter2RouteDriveState,
+                        { filter2RouteLeft, filter2RouteRight }, 1.0f + routeDrive * 6.0f);
+                    filter2RouteLeft = driven.left;
+                    filter2RouteRight = driven.right;
+                    currentBlockWork.addFilterDriveSamples(DriveStage::workSamplesForChannels(2));
+                }
+                else filter2RouteDriveState.reset({ filter2RouteLeft, filter2RouteRight });
+                const auto routed = filter2RouteState.process(filter2RouteLeft, filter2RouteRight);
+                left += routed.left;
+                right += routed.right;
+            }
+            else filter2RouteDriveState.reset();
 
             if (params.hasAether && (directLeft != 0.0f || directRight != 0.0f))
             {

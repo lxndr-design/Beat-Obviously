@@ -178,8 +178,8 @@ try {
       "osc.b.tuning.mode": "ratio",
       "osc.b.tuning.numerator": 3,
       "osc.b.tuning.denominator": 2,
-      "osc.b.route": "filter",
-      "aether.sub.route": "direct",
+      "osc.b.route": "filter1",
+      "aether.sub.route": "filter2",
       "aether.noise.route": "direct",
     },
   });
@@ -194,8 +194,8 @@ try {
   assert.equal(independentUnisonPreview.aether.oscA.harmonic, 5);
   assert.equal(independentUnisonPreview.aether.oscA.phaseMode, "memory");
   assert.equal(independentUnisonPreview.aether.oscA.route, "direct");
-  assert.equal(independentUnisonPreview.aether.oscB.route, "filter");
-  assert.equal(independentUnisonPreview.aether.sub.route, "direct");
+  assert.equal(independentUnisonPreview.aether.oscB.route, "filter1");
+  assert.equal(independentUnisonPreview.aether.sub.route, "filter2");
   assert.equal(independentUnisonPreview.aether.noise.route, "direct");
   assert.equal(independentUnisonPreview.aether.oscB.tuningMode, "ratio");
   assert.equal(independentUnisonPreview.aether.oscB.ratioNumerator, 3);

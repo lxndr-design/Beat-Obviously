@@ -331,3 +331,13 @@ filtered + direct -> common amp/pan -> steal transition -> voice output
 ```
 
 Route values are parsed and copied on the setup boundary. Both buses and runtime-warp states are fixed voice members; callback routing performs no allocation, ownership change, lazy initialization, file operation, or container growth.
+
+```text
+route=both (or legacy filter) -> existing shared serial/parallel Filter 1 + Filter 2 topology
+route=filter1 -> isolated prepared Filter 1 drive/state lane
+route=filter2 -> isolated prepared Filter 2 drive/state lane
+route=direct -> bypass filters
+all destination outputs -> common amp/pan/steal transition
+```
+
+The isolated lanes share parameter values, not mutable DSP state. They are configured with the voice lifecycle outside the callback and preserve the A9 zero-violation gate.

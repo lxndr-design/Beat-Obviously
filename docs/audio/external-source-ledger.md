@@ -101,3 +101,7 @@ The second shared filter state, serial/parallel topology, gain policy, schema, p
 ## Milestone B6 provenance
 
 The per-source filtered/direct bus contract, shared normalization, direct filter bypass, independent runtime-warp state, schema, preview path, and tests are independent extensions of Beat's existing source mixer and voice graph. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived code, runtime dependency, prebuilt binary, preset, asset, branding, service, or licensing change was introduced.
+
+## Milestone B7 provenance
+
+The explicit Filter 1, Filter 2, both-filter, and direct destinations; isolated prepared DSP state lanes; compatibility alias; preview implementation; and focused tests are independent extensions of Beat's B5/B6 graph. No upstream source was consulted, executed, copied, adapted, or imported, and no dependency, binary, asset, preset, service, branding, or licensing state changed.

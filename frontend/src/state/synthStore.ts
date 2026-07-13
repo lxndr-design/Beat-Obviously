@@ -1769,13 +1769,13 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         level: 0,
         octave: -1,
         waveform: "sine",
-        route: getStringParam(draft, "aether.sub.route") === "direct" ? "direct" : "filter",
+        route: sourceRouteFromId(getStringParam(draft, "aether.sub.route")),
       },
       noise: {
         enabled: getBooleanParam(draft, "aether.noise.enabled"),
         level: clamp01(getNumberParam(draft, "aether.noise.level")),
         color: clamp01(getNumberParam(draft, "aether.noise.color")),
-        route: getStringParam(draft, "aether.noise.route") === "direct" ? "direct" : "filter",
+        route: sourceRouteFromId(getStringParam(draft, "aether.noise.route")),
       },
       runtimeWarp: clamp01(getNumberParam(draft, "aether.runtimeWarp")),
       runtimeWarpMode: isWavetableWarpMode(draft.parameters["aether.runtimeWarpMode"])
@@ -4261,7 +4261,7 @@ function oscillatorFromDraft(draft: SynthDraftPatch, oscillator: OscillatorKey, 
     tuningStep: getNumberParam(draft, `${prefix}.tuning.step` as OscillatorTuningParameterId),
     tuningDivisions: getNumberParam(draft, `${prefix}.tuning.divisions` as OscillatorTuningParameterId),
     phaseMode: getStringParam(draft, `${prefix}.phaseMode` as SynthParameterId) === "memory" ? "memory" as const : "retrigger" as const,
-    route: getStringParam(draft, `${prefix}.route` as SynthParameterId) === "direct" ? "direct" as const : "filter" as const,
+    route: sourceRouteFromId(getStringParam(draft, `${prefix}.route` as SynthParameterId)),
     phase: getNumberParam(draft, `${prefix}.phase` as SynthParameterId),
     randomPhase: getNumberParam(draft, `${prefix}.randomPhase` as SynthParameterId),
     wavetable,
@@ -4286,6 +4286,11 @@ function applyOscillatorToDraft(draft: SynthDraftPatch, oscillator: OscillatorKe
   draft.parameters[`osc.${oscillator}.phase` as SynthParameterId] = source.phase ?? 0;
   draft.parameters[`osc.${oscillator}.randomPhase` as SynthParameterId] = source.randomPhase ?? 0.25;
   applyWavetableToDraft(draft, oscillator, source.wavetable, oscillator === "a");
+}
+
+function sourceRouteFromId(route: string): "both" | "filter1" | "filter2" | "direct" {
+  if (route === "direct" || route === "filter1" || route === "filter2") return route;
+  return "both";
 }
 
 function applyWavetableToDraft(

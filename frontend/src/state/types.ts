@@ -439,7 +439,7 @@ export interface AetherOscillatorConfig {
   tuningStep?: number;
   tuningDivisions?: number;
   phaseMode?: "retrigger" | "memory";
-  route?: "filter" | "direct";
+  route?: "filter" | "both" | "filter1" | "filter2" | "direct";
   phase: number;
   randomPhase: number;
   wavetable: WavetableConfig;
@@ -450,14 +450,14 @@ export interface AetherSubConfig {
   level: number;
   octave: number;
   waveform: "sine" | "square" | "triangle";
-  route?: "filter" | "direct";
+  route?: "filter" | "both" | "filter1" | "filter2" | "direct";
 }
 
 export interface AetherNoiseConfig {
   enabled: boolean;
   level: number;
   color: number;
-  route?: "filter" | "direct";
+  route?: "filter" | "both" | "filter1" | "filter2" | "direct";
 }
 
 export interface AetherSynthConfig {

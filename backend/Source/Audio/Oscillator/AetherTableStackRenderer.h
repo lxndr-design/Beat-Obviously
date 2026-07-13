@@ -27,6 +27,8 @@ namespace beat::AetherTableStackRenderer
     {
         StereoFrame frame {};
         StereoFrame filteredFrame {};
+        StereoFrame filter1Frame {};
+        StereoFrame filter2Frame {};
         StereoFrame directFrame {};
         VoiceStats::RenderWork work {};
     };
@@ -70,14 +72,18 @@ namespace beat::AetherTableStackRenderer
         float rightSum = 0.0f;
         float directLeftSum = 0.0f;
         float directRightSum = 0.0f;
+        float filter1LeftSum = 0.0f;
+        float filter1RightSum = 0.0f;
+        float filter2LeftSum = 0.0f;
+        float filter2RightSum = 0.0f;
         float levelSum = 0.0f;
 
         const auto add = [&](float value, float level, float pan, std::pair<float, float> staticPanGains, bool panIsDynamic, int routing)
         {
             const float safeLevel = VoiceMath::clamp01(level);
             const auto [leftGain, rightGain] = panIsDynamic ? VoiceMath::equalPowerPanGains(pan) : staticPanGains;
-            auto& destinationLeft = routing == 1 ? directLeftSum : leftSum;
-            auto& destinationRight = routing == 1 ? directRightSum : rightSum;
+            auto& destinationLeft = routing == 1 ? directLeftSum : routing == 2 ? filter1LeftSum : routing == 3 ? filter2LeftSum : leftSum;
+            auto& destinationRight = routing == 1 ? directRightSum : routing == 2 ? filter1RightSum : routing == 3 ? filter2RightSum : rightSum;
             destinationLeft += value * safeLevel * leftGain;
             destinationRight += value * safeLevel * rightGain;
             levelSum += safeLevel;
@@ -238,8 +244,12 @@ namespace beat::AetherTableStackRenderer
         result.filteredFrame.right = juce::jlimit(-1.0f, 1.0f, rightSum / normalizer);
         result.directFrame.left = juce::jlimit(-1.0f, 1.0f, directLeftSum / normalizer);
         result.directFrame.right = juce::jlimit(-1.0f, 1.0f, directRightSum / normalizer);
-        result.frame.left = juce::jlimit(-1.0f, 1.0f, result.filteredFrame.left + result.directFrame.left);
-        result.frame.right = juce::jlimit(-1.0f, 1.0f, result.filteredFrame.right + result.directFrame.right);
+        result.filter1Frame.left = juce::jlimit(-1.0f, 1.0f, filter1LeftSum / normalizer);
+        result.filter1Frame.right = juce::jlimit(-1.0f, 1.0f, filter1RightSum / normalizer);
+        result.filter2Frame.left = juce::jlimit(-1.0f, 1.0f, filter2LeftSum / normalizer);
+        result.filter2Frame.right = juce::jlimit(-1.0f, 1.0f, filter2RightSum / normalizer);
+        result.frame.left = juce::jlimit(-1.0f, 1.0f, result.filteredFrame.left + result.filter1Frame.left + result.filter2Frame.left + result.directFrame.left);
+        result.frame.right = juce::jlimit(-1.0f, 1.0f, result.filteredFrame.right + result.filter1Frame.right + result.filter2Frame.right + result.directFrame.right);
         return result;
     }
 }

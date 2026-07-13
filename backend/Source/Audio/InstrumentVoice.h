@@ -345,10 +345,16 @@ namespace beat
         VoiceStats::RenderWorkBlock currentBlockWork;
         DriveStage::State aetherRuntimeWarpState;
         DriveStage::State aetherDirectRuntimeWarpState;
+        DriveStage::State aetherFilter1RuntimeWarpState;
+        DriveStage::State aetherFilter2RuntimeWarpState;
         DriveStage::State driveState;
         DriveStage::State filter2DriveState;
+        DriveStage::State filter1RouteDriveState;
+        DriveStage::State filter2RouteDriveState;
         FilterStage::State filterState;
         FilterStage::State filter2State;
+        FilterStage::State filter1RouteState;
+        FilterStage::State filter2RouteState;
         float previousRawEnvelope { 0.0f };
         float previousRawEnv2Envelope { 0.0f };
         EnvelopeShaper::LoopState env1LoopState;
