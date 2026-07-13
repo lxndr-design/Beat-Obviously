@@ -609,3 +609,15 @@ The controls add no parameter ID, IPC message, schema branch, callback work, con
 ## Milestone B25 phase lifecycle fixture
 
 B25 adds no production call-graph edge. The native test invokes the existing `BeatSynthesiser::noteOn` -> deterministic victim selection -> `InstrumentVoice::prepareForSteal` -> `InstrumentVoice::startNote` path and the existing direct legato `InstrumentVoice::startNote` retune path, then observes test-only phase and output accessors. The audio callback and offline-render graphs are unchanged.
+
+## Milestone B26 disconnected interaction-oversampling candidate
+
+```text
+BackendStress analytic source provider (test only)
+  -> AetherInteractionStage::State::process (2 fixed subsamples)
+  -> AM/ring multiplication
+  -> 3 prepared fixed biquad sections
+  -> FFT alias measurement
+```
+
+There is intentionally no edge from `InstrumentVoice`, `AetherTableStackRenderer`, the device callback, or offline export to this stage yet. `prepare` computes coefficients outside the probe; the bounded `process` path passes the allocation/lock/file/lazy-init/growth detector.

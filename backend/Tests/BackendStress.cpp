@@ -12,6 +12,7 @@
 #include "../Source/Audio/Modulation/DynamicModulation.h"
 #include "../Source/Audio/Modulation/Lfo.h"
 #include "../Source/Audio/Nodemap/NodemapGraph.h"
+#include "../Source/Audio/Oscillator/AetherInteractionStage.h"
 #include "../Source/Audio/Oscillator/AetherTableStackRenderer.h"
 #include "../Source/Audio/Oscillator/BasicOscillator.h"
 #include "../Source/Audio/Parameters/ParameterIds.h"
@@ -802,12 +803,72 @@ namespace
         return totalEnergy > 0.0 ? aliasEnergy / totalEnergy : 0.0;
     }
 
+    double measureOversampledAetherInteractionAliasRatio(int mode, beat::AudioQuality quality)
+    {
+        constexpr double sampleRate = 44100.0;
+        constexpr int fftOrder = 12;
+        constexpr int fftSize = 1 << fftOrder;
+        constexpr double carrierHz = 7040.0;
+        constexpr double modulatorHz = 21120.0;
+        beat::AetherInteractionStage::State stage;
+        stage.prepare(sampleRate, quality);
+        stage.reset();
+
+        std::array<float, fftSize * 2> spectrum {};
+        int64_t oversampleIndex = 0;
+        for (int sample = 0; sample < fftSize; ++sample)
+        {
+            spectrum[(size_t) sample] = stage.process(mode, [&](int, int) noexcept
+            {
+                const double time = (double) oversampleIndex++ / (sampleRate * (double) stage.factor);
+                return std::pair {
+                    (float) std::sin(juce::MathConstants<double>::twoPi * carrierHz * time),
+                    (float) std::sin(juce::MathConstants<double>::twoPi * modulatorHz * time),
+                };
+            });
+        }
+
+        juce::dsp::WindowingFunction<float> window(fftSize, juce::dsp::WindowingFunction<float>::hann, false);
+        window.multiplyWithWindowingTable(spectrum.data(), fftSize);
+        juce::dsp::FFT fft(fftOrder);
+        fft.performFrequencyOnlyForwardTransform(spectrum.data(), true);
+
+        const int aliasBin = (int) std::round(15940.0 * fftSize / sampleRate);
+        double totalEnergy = 0.0;
+        double aliasEnergy = 0.0;
+        for (int bin = 1; bin < fftSize / 2; ++bin)
+        {
+            const double energy = (double) spectrum[(size_t) bin] * spectrum[(size_t) bin];
+            totalEnergy += energy;
+            if (std::abs(bin - aliasBin) <= 2)
+                aliasEnergy += energy;
+        }
+        return totalEnergy > 0.0 ? aliasEnergy / totalEnergy : 0.0;
+    }
+
     bool stressAetherInteractionSpectralBaseline()
     {
         const double amAliasRatio = measureAetherInteractionAliasRatio(1);
         const double ringAliasRatio = measureAetherInteractionAliasRatio(2);
+        const double oversampledAmAliasRatio = measureOversampledAetherInteractionAliasRatio(1, beat::AudioQuality::standardLive);
+        const double oversampledRingAliasRatio = measureOversampledAetherInteractionAliasRatio(2, beat::AudioQuality::standardLive);
+        const double offlineRingAliasRatio = measureOversampledAetherInteractionAliasRatio(2, beat::AudioQuality::offlineHighQuality);
+        beat::AetherInteractionStage::State callbackStage;
+        callbackStage.prepare(48000.0, beat::AudioQuality::standardLive);
+        beat::test::beginRealtimeSafetyProbe();
+        float callbackProbeOutput = 0.0f;
+        for (int sample = 0; sample < 64; ++sample)
+            callbackProbeOutput += callbackStage.process(2, [sample](int subsample, int factor) noexcept
+            {
+                const float phase = (float) (sample * factor + subsample) / (float) (64 * factor);
+                return std::pair { phase * 2.0f - 1.0f, 1.0f - phase * 2.0f };
+            });
+        const size_t callbackViolations = beat::test::endRealtimeSafetyProbe();
         std::cerr << "Aether interaction alias baseline am=" << amAliasRatio
-                  << " ring=" << ringAliasRatio << "\n";
+                  << " ring=" << ringAliasRatio
+                  << " candidate2xAm=" << oversampledAmAliasRatio
+                  << " candidate2xRing=" << oversampledRingAliasRatio
+                  << " candidateOfflineRing=" << offlineRingAliasRatio << "\n";
         bool ratesFinite = true;
         for (const double rate : { 44100.0, 48000.0, 88200.0, 96000.0, 192000.0 })
         {
@@ -831,7 +892,14 @@ namespace
         }
         return ratesFinite && std::isfinite(amAliasRatio) && std::isfinite(ringAliasRatio)
             && amAliasRatio > 0.0 && amAliasRatio < 1.0
-            && ringAliasRatio > 0.0 && ringAliasRatio < 1.0;
+            && ringAliasRatio > 0.0 && ringAliasRatio < 1.0
+            && oversampledAmAliasRatio < 0.005
+            && oversampledRingAliasRatio < 0.005
+            && offlineRingAliasRatio < 0.005
+            && oversampledAmAliasRatio < amAliasRatio * 0.1
+            && oversampledRingAliasRatio < ringAliasRatio * 0.1
+            && std::isfinite(callbackProbeOutput)
+            && callbackViolations == 0;
     }
 
     bool stressAetherTableStackRenderer()
