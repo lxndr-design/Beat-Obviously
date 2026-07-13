@@ -213,3 +213,20 @@ The two approved policies update release status only. No implementation,
 external-derived work, dependency, binary, asset, preset, branding, service,
 license, or ownership declaration changed. Milestone C remains subject to the
 existing approval gates for upstream import, execution, and dependencies.
+
+## Milestone C1 source-slot provenance
+
+The three-slot interface, non-owning rack, immutable sample definition,
+fixed-capacity playback implementation, pitch-rate table, interpolation,
+release/end fades, telemetry, and focused native tests are independently
+implemented Beat-owned code. No upstream repository, acquired implementation,
+factory preset, external sample, dependency, binary, service, branding, or
+downloaded data was consulted, executed, copied, translated, structurally
+adapted, imported, or linked. Existing JUCE AudioBuffer and math primitives are
+used through Beat's already-declared JUCE dependency; JUCE source is unchanged.
+No repository-wide license or ownership declaration changed. Local files are
+`backend/Source/Audio/Sources/SourceSlot.h`,
+`backend/Source/Audio/Sources/SourceSlotRack.h`,
+`backend/Source/Audio/Sources/SampleSourceSlot.h`, `backend/CMakeLists.txt`,
+`backend/Tests/BackendStress.cpp`, and these four audit documents; none is
+Vital-derived.

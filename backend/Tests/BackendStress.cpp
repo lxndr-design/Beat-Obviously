@@ -28,6 +28,8 @@
 #include "../Source/Audio/Recording/RecordingSessionPlanner.h"
 #include "../Source/Audio/Rendering/TrackBouncePlanner.h"
 #include "../Source/Audio/Sampler/DecentSamplerImporter.h"
+#include "../Source/Audio/Sources/SampleSourceSlot.h"
+#include "../Source/Audio/Sources/SourceSlotRack.h"
 #include "../Source/Audio/Transitions/VoiceTransition.h"
 #include "../Source/Audio/VoiceAllocation.h"
 #include "../Source/Audio/Wavetable/WavetableFactory.h"
@@ -11424,6 +11426,142 @@ namespace
         return violations == 0 && std::isfinite(bufferEnergy(output));
     }
 
+    bool stressAetherSampleSourceSlot()
+    {
+        if (beat::sourceSlotIndices.size() != 3
+            || beat::sourceSlotIndices[0] != beat::SourceSlotIndex::one
+            || beat::sourceSlotIndices[2] != beat::SourceSlotIndex::three)
+        {
+            return false;
+        }
+
+        auto source = std::make_shared<beat::ImmutableSampleSource>();
+        source->sourceSampleRate = 48000.0;
+        source->rootNote = 69;
+        source->gain = 0.8f;
+        source->pan = 0.0f;
+        source->audio.setSize(1, 48000, false, true, false);
+        for (int sample = 0; sample < source->audio.getNumSamples(); ++sample)
+            source->audio.setSample(0, sample, std::sin(juce::MathConstants<double>::twoPi * 440.0 * sample / 48000.0));
+
+        beat::SampleSourceSlot slot;
+        if (slot.prepare({ 48000.0, 512, 2 }) == false
+            || slot.publish(source) == false
+            || slot.stateVersion() != 1
+            || slot.lifecycleState() != beat::SourceLifecycleState::ready
+            || slot.complexity() != beat::SourceComplexity::singleSample
+            || slot.latencySamples() != 0)
+        {
+            return false;
+        }
+
+        beat::SampleSourceSlot secondSlot;
+        beat::SampleSourceSlot thirdSlot;
+        beat::SourceSlotRack rack;
+        rack.attach(beat::SourceSlotIndex::one, &slot);
+        rack.attach(beat::SourceSlotIndex::two, &secondSlot);
+        rack.attach(beat::SourceSlotIndex::three, &thirdSlot);
+        if (rack.slot(beat::SourceSlotIndex::one) != &slot
+            || !secondSlot.publish(source)
+            || !thirdSlot.publish(source)
+            || !rack.prepare({ 48000.0, 512, 2 })
+            || rack.latencySamples() != 0)
+        {
+            return false;
+        }
+
+        juce::AudioBuffer<float> output(2, 4800);
+        output.clear();
+        beat::test::beginRealtimeSafetyProbe();
+        const bool accepted = slot.noteOn({ 69, 0.75f, 1001 });
+        slot.render(output, 0, output.getNumSamples());
+        slot.noteOff(1001);
+        slot.render(output, 0, 512);
+        const size_t violations = beat::test::endRealtimeSafetyProbe();
+        if (!accepted || violations != 0 || slot.activeVoiceCount() != 0)
+            return false;
+
+        juce::AudioBuffer<float> rackOutput(2, 512);
+        rackOutput.clear();
+        if (!rack.noteOn(beat::SourceSlotIndex::one, { 69, 0.3f, 1101 })
+            || !rack.noteOn(beat::SourceSlotIndex::two, { 69, 0.3f, 1102 })
+            || !rack.noteOn(beat::SourceSlotIndex::three, { 69, 0.3f, 1103 }))
+        {
+            return false;
+        }
+        beat::test::beginRealtimeSafetyProbe();
+        rack.render(rackOutput, 0, rackOutput.getNumSamples());
+        const size_t rackViolations = beat::test::endRealtimeSafetyProbe();
+        rack.allNotesOff(true);
+        if (rackViolations != 0 || bufferEnergy(rackOutput) <= 0.01)
+            return false;
+
+        int crossings = 0;
+        int firstCrossing = -1;
+        int lastCrossing = -1;
+        const float* left = output.getReadPointer(0);
+        for (int sample = 1; sample < 4000; ++sample)
+        {
+            if (left[sample - 1] <= 0.0f && left[sample] > 0.0f)
+            {
+                if (firstCrossing < 0) firstCrossing = sample;
+                lastCrossing = sample;
+                ++crossings;
+            }
+        }
+        const double measuredFrequency = crossings > 1
+            ? (double) (crossings - 1) * 48000.0 / (double) (lastCrossing - firstCrossing)
+            : 0.0;
+        if (std::abs(measuredFrequency - 440.0) > 0.5
+            || bufferEnergy(output) <= 0.01
+            || slot.lifecycleState() != beat::SourceLifecycleState::ready)
+        {
+            return false;
+        }
+
+        slot.reset();
+        if (!slot.prepare({ 44100.0, 256, 2 }))
+            return false;
+        juce::AudioBuffer<float> resampled(2, 4410);
+        resampled.clear();
+        if (!slot.noteOn({ 69, 1.0f, 2001 }))
+            return false;
+        slot.render(resampled, 0, resampled.getNumSamples());
+        int resampledCrossings = 0;
+        int firstResampled = -1;
+        int lastResampled = -1;
+        const float* resampledLeft = resampled.getReadPointer(0);
+        for (int sample = 1; sample < resampled.getNumSamples(); ++sample)
+        {
+            if (resampledLeft[sample - 1] <= 0.0f && resampledLeft[sample] > 0.0f)
+            {
+                if (firstResampled < 0) firstResampled = sample;
+                lastResampled = sample;
+                ++resampledCrossings;
+            }
+        }
+        const double resampledFrequency = resampledCrossings > 1
+            ? (double) (resampledCrossings - 1) * 44100.0 / (double) (lastResampled - firstResampled)
+            : 0.0;
+        if (std::abs(resampledFrequency - 440.0) > 0.5)
+            return false;
+
+        if (slot.publish(source))
+            return false;
+        slot.allNotesOff(true);
+        slot.reset();
+        for (int voice = 0; voice < beat::SampleSourceSlot::maximumVoices; ++voice)
+            if (!slot.noteOn({ 60 + voice % 12, 1.0f, (uint64_t) (3000 + voice) }))
+                return false;
+        if (slot.noteOn({ 72, 1.0f, 4000 }))
+            return false;
+        const auto telemetry = slot.telemetry();
+        return slot.activeVoiceCount() == beat::SampleSourceSlot::maximumVoices
+            && telemetry.acceptedNoteEvents == beat::SampleSourceSlot::maximumVoices
+            && telemetry.rejectedNoteEvents == 1
+            && telemetry.renderedSamples == 0;
+    }
+
     bool stressRealtimeSafetyDetectorNegativeCases()
     {
         using Kind = beat::test::RealtimeViolationKind;
@@ -14818,6 +14956,11 @@ int main()
     if (!stressRealtimeSafetyDetectorNegativeCases())
     {
         std::cerr << "Realtime safety detector negative-case stress failed\n";
+        return 1;
+    }
+    if (!stressAetherSampleSourceSlot())
+    {
+        std::cerr << "Aether sample source-slot stress failed\n";
         return 1;
     }
     std::cerr << "realtime: start\n";

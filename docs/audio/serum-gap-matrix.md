@@ -33,7 +33,7 @@ dependency approvals remain separate.
 | Dual shared filters and source routing | Two shared filters with serial/parallel topology and per-source both/Filter-1/Filter-2/direct destinations plus two fixed source FX sends implemented | B5/B6/B7/B16 | Add transition automation and broader audible routing fixtures |
 | Reorderable insert plus two FX buses | Instrument inserts remain reorderable; two fixed Aether source buses feed project-owned shared return effect chains; same-project instrument/group/return reorder and bypass edits receive a bounded output bridge | B5/B16/B17 | Product-ratified transition ceiling, optional old-tail overlap decision, and broader mixed-era audible preset fixtures |
 | Three source slots | Missing | C1 | Narrow source-engine interface after A/B freeze |
-| Sample engine | Partial sampler/zone playback | C2 | Slot integration, loops/slicing/tape modulation, RT-safe load |
+| Sample engine | C1 adds a tested three-slot internal contract and fixed-capacity immutable single-sample renderer; existing AudioEngine sampler/zone playback remains separate | C1/C2 | Connect a slot through Aether persistence/UI/AudioEngine, then add replacement bridges, loop/slicing policy, mapped zones, and RT-safe publication before product readiness |
 | Multisample/SFZ | DecentSampler zones only | C3 | sfizz wrapper versus internal subset decision |
 | Granular | Missing | C4 | Desktop-native preallocated grain engine and CPU budget |
 | Spectral | Missing | C5 | Specialist-reviewed STFT analysis/resynthesis design |

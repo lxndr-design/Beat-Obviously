@@ -77,6 +77,9 @@ target_sources(Beat PRIVATE
     Source/Audio/Rendering/TrackBouncePlanner.h
     Source/Audio/Sampler/DecentSamplerImporter.cpp
     Source/Audio/Sampler/DecentSamplerImporter.h
+    Source/Audio/Sources/SampleSourceSlot.h
+    Source/Audio/Sources/SourceSlot.h
+    Source/Audio/Sources/SourceSlotRack.h
     Source/Audio/Wavetable/Wavetable.cpp
     Source/Audio/Wavetable/Wavetable.h
     Source/Audio/Wavetable/WavetableFactory.cpp
@@ -226,6 +229,9 @@ add_executable(BeatBackendStress
     Source/Audio/Rendering/TrackBouncePlanner.h
     Source/Audio/Sampler/DecentSamplerImporter.cpp
     Source/Audio/Sampler/DecentSamplerImporter.h
+    Source/Audio/Sources/SampleSourceSlot.h
+    Source/Audio/Sources/SourceSlot.h
+    Source/Audio/Sources/SourceSlotRack.h
     Source/Audio/Wavetable/Wavetable.cpp
     Source/Audio/Wavetable/Wavetable.h
     Source/Audio/Wavetable/WavetableFactory.cpp

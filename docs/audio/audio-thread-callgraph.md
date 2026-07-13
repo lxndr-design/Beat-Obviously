@@ -661,3 +661,28 @@ frontend factory bank load
 ```
 
 B29 adds two data records to the existing factory-load path. It adds no callback branch, allocation site, file operation, lock, container growth, lazy initialization, native schema, or DSP function. Preset selection continues through the already-audited patch application boundary; the audio callback graph is unchanged.
+
+## Milestone C1 source-slot foundation
+
+```text
+setup/control thread
+  -> construct already-decoded ImmutableSampleSource
+  -> SampleSourceSlot::publish (only while inactive)
+  -> SourceSlotRack::attach (three fixed non-owning positions)
+  -> SourceSlotRack::prepare
+       -> SampleSourceSlot::prepare
+       -> precompute 128 pitch-rate entries and release length
+
+future audio callback integration boundary (focused native fixture today)
+  -> SourceSlotRack::noteOn(slot, event)
+       -> fixed 16-voice search; accept or reject with telemetry
+  -> SourceSlotRack::render
+       -> fixed three-slot loop
+       -> SampleSourceSlot::render
+            -> fixed voice array
+            -> linear sample interpolation
+            -> equal-power pan, bounded release, source-end fade
+            -> preallocated scalar telemetry
+```
+
+The C1 code is compiled into the native target surface and exercised through BackendStress, but is not yet connected from AudioEngine, project/preset persistence, or the Aether product UI. The tested render boundary performs no ownership mutation, allocation, blocking lock, file access, lazy initialization, or container growth. Offline callers may use the same deterministic render contract without being classified as a real-time callback.
