@@ -21,7 +21,7 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 | Phase memory/randomization | Independent A/B retrigger and memory modes implemented; retrigger retains deterministic random-depth behavior | B4 | Add product-facing controls and audible regression fixtures across voice stealing/legato combinations |
 | Advanced tuning modes | Implemented independently for A/B: semitone, harmonic, ratio, and equal-division step modes plus fine cents | B3 | Add UI editor affordances and broader preset-library coverage without changing stable IDs |
 | Dual serial warp stages | Implemented with independent stable fields and the bounded fold/pinch/mirror/shape set | B8 | Ratify measured alias/stop-band thresholds for the existing oversampling policy |
-| FM/PM/PD/AM/ring modulation | Partial modulation, no complete audio-rate architecture | B2 | Source/destination contracts and spectral tests |
+| FM/PM/PD/AM/ring modulation | Bounded A-by-B AM and ring modes implemented; FM/PM/PD remain absent | B13 | High-note alias is measured and material, especially for ring; design/ratify oversampling and stop-band policy before release, and add other modes only with equivalent proof |
 | Four envelopes / ten LFOs / eight macros | Four envelopes, ten LFOs, eight macros | B9/B10/B11 | Add product-facing slot controls and broader routed audible fixtures |
 | MPE/per-note expression | Partial note automation | B3 | Input capability mapping and deterministic persistence |
 | Dual shared filters and source routing | Two shared filters with serial/parallel topology and per-source both/Filter-1/Filter-2/direct destinations implemented | B5/B6/B7 | Add transition automation and per-source FX sends |

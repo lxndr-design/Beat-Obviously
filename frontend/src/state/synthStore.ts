@@ -114,6 +114,8 @@ export type SynthParameterId =
   | "aether.runtimeWarpMode"
   | "aether.runtimeWarp2"
   | "aether.runtimeWarp2Mode"
+  | "aether.interaction.mode"
+  | "aether.interaction.amount"
   | "aether.noise.enabled"
   | "aether.noise.level"
   | "aether.noise.color"
@@ -1072,6 +1074,8 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "aether.runtimeWarpMode": "shape",
   "aether.runtimeWarp2": 0,
   "aether.runtimeWarp2Mode": "shape",
+  "aether.interaction.mode": "off",
+  "aether.interaction.amount": 0,
   "aether.noise.enabled": false,
   "aether.noise.level": 0,
   "aether.noise.color": 0.5,
@@ -1204,6 +1208,8 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "aether.runtimeWarpMode": "Aether Runtime Warp Mode",
   "aether.runtimeWarp2": "Aether Runtime Warp 2",
   "aether.runtimeWarp2Mode": "Aether Runtime Warp 2 Mode",
+  "aether.interaction.mode": "A/B Interaction",
+  "aether.interaction.amount": "A/B Interaction Amount",
   "aether.noise.enabled": "Aether Noise Enabled",
   "aether.noise.level": "Aether Noise Level",
   "aether.noise.color": "Aether Noise Color",
@@ -1868,6 +1874,10 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
       runtimeWarp2Mode: isWavetableWarpMode(draft.parameters["aether.runtimeWarp2Mode"])
         ? draft.parameters["aether.runtimeWarp2Mode"]
         : "shape",
+      interactionMode: draft.parameters["aether.interaction.mode"] === "am" || draft.parameters["aether.interaction.mode"] === "ring"
+        ? draft.parameters["aether.interaction.mode"]
+        : "off",
+      interactionAmount: clamp01(getNumberParam(draft, "aether.interaction.amount")),
     },
     lfoWaveform: lfoWaveformFromDraft(draft),
     lfoRateHz: getNumberParam(draft, "lfo.1.rate"),
@@ -2057,6 +2067,8 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["aether.runtimeWarpMode"] = instrument.aether?.runtimeWarpMode ?? "shape";
   draft.parameters["aether.runtimeWarp2"] = instrument.aether?.runtimeWarp2 ?? 0;
   draft.parameters["aether.runtimeWarp2Mode"] = instrument.aether?.runtimeWarp2Mode ?? "shape";
+  draft.parameters["aether.interaction.mode"] = instrument.aether?.interactionMode ?? "off";
+  draft.parameters["aether.interaction.amount"] = instrument.aether?.interactionAmount ?? 0;
   draft.parameters["aether.noise.enabled"] = instrument.aether?.noise.enabled ?? false;
   draft.parameters["aether.noise.level"] = instrument.aether?.noise.level ?? 0;
   draft.parameters["aether.noise.color"] = instrument.aether?.noise.color ?? 0.5;

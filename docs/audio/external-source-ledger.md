@@ -125,3 +125,7 @@ The fixed LFO 3–10 configuration/phase/route arrays, conditional evaluation, p
 ## Milestone B12 provenance
 
 The saturating fixed-graph work-ceiling arithmetic, extra-LFO and runtime-warp accounting, atomic block-boundary overrun telemetry, IPC/debug presentation, and focused negative tests are independently implemented from Beat's existing render counters and fixed voice graph. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived code, runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.
+
+## Milestone B13 provenance
+
+The bounded AM/ring formulas, carrier crossfade and gain/routing policy, nonlinear accounting, persistence/frontend contracts, and test-only FFT measurement are independently implemented from elementary signal multiplication and Beat's existing oscillator renderer. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived code, runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.

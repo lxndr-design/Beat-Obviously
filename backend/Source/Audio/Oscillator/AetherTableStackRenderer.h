@@ -81,6 +81,16 @@ namespace beat::AetherTableStackRenderer
         float filter2RightSum = 0.0f;
         float levelSum = 0.0f;
 
+        struct RenderedOscillator
+        {
+            float value { 0.0f };
+            float level { 0.0f };
+            float leftGain { 0.0f };
+            float rightGain { 0.0f };
+            int routing { 0 };
+            bool active { false };
+        } renderedA, renderedB;
+
         const auto add = [&](float value, float level, float pan, std::pair<float, float> staticPanGains, bool panIsDynamic, int routing)
         {
             const float safeLevel = VoiceMath::clamp01(level);
@@ -112,7 +122,8 @@ namespace beat::AetherTableStackRenderer
             double staticRate,
             double basePhase,
             double phaseOffset,
-            int64_t& componentSampleCounter)
+            int64_t& componentSampleCounter,
+            RenderedOscillator& rendered)
         {
             const float modulatedLevel = VoiceMath::clamp01(osc.level + (useDynamicModulation && levelIsDynamic
                 ? DynamicModulation::targetOffset(levelTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, params.macroValues, 1.0f)
@@ -173,6 +184,8 @@ namespace beat::AetherTableStackRenderer
                 ++result.work.oscillatorSamples;
                 ++componentSampleCounter;
             }
+            const auto [leftGain, rightGain] = panIsDynamic ? VoiceMath::equalPowerPanGains(modulatedPan) : staticPanGains;
+            rendered = { value, modulatedLevel, leftGain, rightGain, osc.routing, true };
             add(value, modulatedLevel, modulatedPan, staticPanGains, panIsDynamic, osc.routing);
         };
 
@@ -196,7 +209,8 @@ namespace beat::AetherTableStackRenderer
             pitchRates.oscA,
             oscABasePhase,
             oscAPhaseOffset,
-            result.work.aetherOscASamples);
+            result.work.aetherOscASamples,
+            renderedA);
         renderOsc(
             params.aetherOscB,
             oscillatorsB,
@@ -217,7 +231,24 @@ namespace beat::AetherTableStackRenderer
             pitchRates.oscB,
             oscBBasePhase,
             oscBPhaseOffset,
-            result.work.aetherOscBSamples);
+            result.work.aetherOscBSamples,
+            renderedB);
+
+        const float interactionAmount = VoiceMath::clamp01(params.aetherInteractionAmount);
+        if (params.aetherInteractionMode != 0 && interactionAmount > 0.0f && renderedA.active && renderedB.active)
+        {
+            const float interacted = params.aetherInteractionMode == 1
+                ? renderedA.value * (0.5f + 0.5f * renderedB.value)
+                : renderedA.value * renderedB.value;
+            const float delta = std::isfinite(interacted)
+                ? (interacted - renderedA.value) * interactionAmount
+                : 0.0f;
+            auto& destinationLeft = renderedA.routing == 1 ? directLeftSum : renderedA.routing == 2 ? filter1LeftSum : renderedA.routing == 3 ? filter2LeftSum : leftSum;
+            auto& destinationRight = renderedA.routing == 1 ? directRightSum : renderedA.routing == 2 ? filter1RightSum : renderedA.routing == 3 ? filter2RightSum : rightSum;
+            destinationLeft += delta * renderedA.level * renderedA.leftGain;
+            destinationRight += delta * renderedA.level * renderedA.rightGain;
+            ++result.work.nonlinearSamples;
+        }
 
         if (params.aetherSub.enabled && params.aetherSub.level > 0.0f)
         {

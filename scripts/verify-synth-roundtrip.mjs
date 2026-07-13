@@ -185,6 +185,8 @@ try {
       "aether.runtimeWarpMode": "fold",
       "aether.runtimeWarp2": 0.41,
       "aether.runtimeWarp2Mode": "pinch",
+      "aether.interaction.mode": "ring",
+      "aether.interaction.amount": 0.72,
       "macro.5": 0.25,
       "macro.6": 0.35,
       "macro.7": 0.45,
@@ -222,6 +224,8 @@ try {
   assert.equal(independentUnisonPreview.aether.runtimeWarpMode, "fold");
   assert.equal(independentUnisonPreview.aether.runtimeWarp2, 0.41);
   assert.equal(independentUnisonPreview.aether.runtimeWarp2Mode, "pinch");
+  assert.equal(independentUnisonPreview.aether.interactionMode, "ring");
+  assert.equal(independentUnisonPreview.aether.interactionAmount, 0.72);
   assert.equal(independentUnisonDraft.parameters["macro.5"], 0.25);
   assert.equal(independentUnisonDraft.parameters["macro.6"], 0.35);
   assert.equal(independentUnisonDraft.parameters["macro.7"], 0.45);
@@ -1385,6 +1389,24 @@ try {
   const runtimeWarpPeak = Math.max(...runtimeWarpFold.map((sample) => Math.abs(sample)));
   assert.ok(runtimeWarpDiff > 0.01, `expected runtime warp to change Aether output preview, got ${runtimeWarpDiff}`);
   assert.ok(runtimeWarpPeak <= 1, `expected runtime warp preview to stay bounded, got ${runtimeWarpPeak}`);
+  const interactionOff = synthPreview.renderAetherOutputPreviewSamples({
+    ...patch,
+    aether: { ...patch.aether, interactionMode: "off", interactionAmount: 0 },
+  });
+  const interactionRing = synthPreview.renderAetherOutputPreviewSamples({
+    ...patch,
+    aether: { ...patch.aether, interactionMode: "ring", interactionAmount: 0.8 },
+  });
+  const interactionAm = synthPreview.renderAetherOutputPreviewSamples({
+    ...patch,
+    aether: { ...patch.aether, interactionMode: "am", interactionAmount: 0.8 },
+  });
+  const interactionRingDiff = interactionOff.reduce((sum, sample, index) => sum + Math.abs(sample - interactionRing[index]), 0) / interactionOff.length;
+  const interactionModeDiff = interactionAm.reduce((sum, sample, index) => sum + Math.abs(sample - interactionRing[index]), 0) / interactionAm.length;
+  assert.ok(interactionRingDiff > 0.001, `expected ring interaction to change preview, got ${interactionRingDiff}`);
+  assert.ok(interactionModeDiff > 0.001, `expected AM and ring modes to differ, got ${interactionModeDiff}`);
+  assert.ok(interactionRing.every(Number.isFinite) && Math.max(...interactionRing.map(Math.abs)) <= 1,
+    "expected ring interaction preview to remain finite and bounded");
 
   const customDraft = synthStore.normalizeSynthDraftPatch({
     name: "Custom Table Probe",

@@ -1159,6 +1159,8 @@ function aetherStackBuses(
   let filter1Sum = 0;
   let filter2Sum = 0;
   let levelSum = 0;
+  const interactionA: { sample: number; level: number; route: NonNullable<Instrument["aether"]>["oscA"]["route"]; active: boolean } = { sample: 0, level: 0, route: "filter", active: false };
+  const interactionB = { sample: 0, active: false };
   const addOsc = (osc: NonNullable<Instrument["aether"]>["oscA"], key: string) => {
     const level = clamp01(osc.level + modulationTargetOffset(modulation, `osc.${key}.level`));
     if (!osc.enabled || level <= 0) return;
@@ -1189,6 +1191,9 @@ function aetherStackBuses(
       : waveform === "noise"
       ? mode === "audio" ? Math.random() * 2 - 1 : whiteNoiseSample(state.index + Math.round(rate * 97))
       : oscillatorSample(waveform, state.phase * rate + phaseOffset, clamp01(instrument.knobs.color));
+    if (key === "a") {
+      interactionA.sample = sourceSample; interactionA.level = level; interactionA.route = osc.route; interactionA.active = true;
+    } else if (key === "b") { interactionB.sample = sourceSample; interactionB.active = true; }
     if (osc.route === "direct") directSum += sourceSample * level;
     else if (osc.route === "filter1") filter1Sum += sourceSample * level;
     else if (osc.route === "filter2") filter2Sum += sourceSample * level;
@@ -1197,6 +1202,17 @@ function aetherStackBuses(
   };
   const oscillators = config.oscillators?.length ? config.oscillators : [{ ...config.oscA, id: "a" }, { ...config.oscB, id: "b" }];
   for (const oscillator of oscillators) addOsc(oscillator, oscillator.id);
+  if (config.interactionMode && config.interactionMode !== "off" && interactionA.active && interactionB.active) {
+    const amount = clamp01(config.interactionAmount ?? 0);
+    const interacted = config.interactionMode === "am"
+      ? interactionA.sample * (0.5 + 0.5 * interactionB.sample)
+      : interactionA.sample * interactionB.sample;
+    const delta = Number.isFinite(interacted) ? (interacted - interactionA.sample) * amount * interactionA.level : 0;
+    if (interactionA.route === "direct") directSum += delta;
+    else if (interactionA.route === "filter1") filter1Sum += delta;
+    else if (interactionA.route === "filter2") filter2Sum += delta;
+    else sum += delta;
+  }
 
   if (config.sub.enabled && config.sub.level > 0) {
     const rate = oscillatorRate(config.sub.octave, 0, 0);
@@ -1248,6 +1264,8 @@ function aetherStackStereoSample(
   let directRight = 0;
   let filter1Left = 0; let filter1Right = 0; let filter2Left = 0; let filter2Right = 0;
   let levelSum = 0;
+  const interactionA: { sample: number; level: number; pan: number; route: NonNullable<Instrument["aether"]>["oscA"]["route"]; active: boolean } = { sample: 0, level: 0, pan: 0, route: "filter", active: false };
+  const interactionB = { sample: 0, active: false };
 
   const add = (value: number, level: number, pan: number, route: "filter" | "both" | "filter1" | "filter2" | "direct" = "filter") => {
     const [leftGain, rightGain] = panGains(pan);
@@ -1296,11 +1314,27 @@ function aetherStackStereoSample(
       : waveform === "noise"
       ? mode === "audio" ? Math.random() * 2 - 1 : whiteNoiseSample(state.index + Math.round(rate * 97))
       : oscillatorSample(waveform, state.phase * rate + phaseOffset, clamp01(instrument.knobs.color));
-    add(sourceSample, level, osc.pan + modulationTargetOffset(modulation, `osc.${key}.pan`), osc.route);
+    const pan = osc.pan + modulationTargetOffset(modulation, `osc.${key}.pan`);
+    if (key === "a") {
+      interactionA.sample = sourceSample; interactionA.level = level; interactionA.pan = pan; interactionA.route = osc.route; interactionA.active = true;
+    } else if (key === "b") { interactionB.sample = sourceSample; interactionB.active = true; }
+    add(sourceSample, level, pan, osc.route);
   };
 
   const oscillators = config.oscillators?.length ? config.oscillators : [{ ...config.oscA, id: "a" }, { ...config.oscB, id: "b" }];
   for (const oscillator of oscillators) addOsc(oscillator, oscillator.id);
+  if (config.interactionMode && config.interactionMode !== "off" && interactionA.active && interactionB.active) {
+    const amount = clamp01(config.interactionAmount ?? 0);
+    const interacted = config.interactionMode === "am"
+      ? interactionA.sample * (0.5 + 0.5 * interactionB.sample)
+      : interactionA.sample * interactionB.sample;
+    const delta = Number.isFinite(interacted) ? (interacted - interactionA.sample) * amount * interactionA.level : 0;
+    const [leftGain, rightGain] = panGains(interactionA.pan);
+    if (interactionA.route === "direct") { directLeft += delta * leftGain; directRight += delta * rightGain; }
+    else if (interactionA.route === "filter1") { filter1Left += delta * leftGain; filter1Right += delta * rightGain; }
+    else if (interactionA.route === "filter2") { filter2Left += delta * leftGain; filter2Right += delta * rightGain; }
+    else { left += delta * leftGain; right += delta * rightGain; }
+  }
 
   if (config.sub.enabled && config.sub.level > 0) {
     const rate = oscillatorRate(config.sub.octave, 0, 0);

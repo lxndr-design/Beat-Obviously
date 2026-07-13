@@ -473,6 +473,9 @@ namespace beat
         instrument.aether.runtimeWarpMode = synthRuntimeWarpModeForId(synthStringParam(params, "aether.runtimeWarpMode", "shape"));
         instrument.aether.runtimeWarp2 = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.runtimeWarp2", 0.0));
         instrument.aether.runtimeWarp2Mode = synthRuntimeWarpModeForId(synthStringParam(params, "aether.runtimeWarp2Mode", "shape"));
+        const auto interactionMode = synthStringParam(params, "aether.interaction.mode", "off");
+        instrument.aether.interactionMode = interactionMode == "am" ? 1 : interactionMode == "ring" ? 2 : 0;
+        instrument.aether.interactionAmount = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.interaction.amount", 0.0));
 
         const bool filterEnabled = synthNumberParam(params, "filter.enabled", 1.0) >= 0.5;
         instrument.filterType = parseSynthFilterType(synthStringParam(params, "filter.type", "lowpass"));

@@ -201,6 +201,8 @@ namespace beat
             int runtimeWarpMode { 0 };
             float runtimeWarp2 { 0.0f };
             int runtimeWarp2Mode { 0 };
+            int interactionMode { 0 }; // 0 off, 1 amplitude modulation, 2 ring modulation
+            float interactionAmount { 0.0f };
         };
 
         struct DynamicModTarget

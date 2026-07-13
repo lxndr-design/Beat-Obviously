@@ -733,6 +733,85 @@ namespace
                 == std::numeric_limits<int64_t>::max();
     }
 
+    double measureAetherInteractionAliasRatio(int mode)
+    {
+        constexpr double sampleRate = 44100.0;
+        constexpr int fftOrder = 12;
+        constexpr int fftSize = 1 << fftOrder;
+        beat::InstrumentVoice::Params params;
+        params.hasAether = true;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        params.aetherOscA = { true, 0.7f, 0.0f, 0, 0, 0, 0.0f };
+        params.aetherOscA.routing = 1;
+        params.aetherOscB = { true, 0.5f, 0.0f, 0, 0, 0, 0.0f };
+        params.aetherOscB.tuningMode = 1;
+        params.aetherOscB.harmonic = 3;
+        params.aetherOscB.routing = 1;
+        params.aetherInteractionMode = mode;
+        params.aetherInteractionAmount = 1.0f;
+
+        beat::InstrumentVoice voice;
+        voice.prepare(sampleRate, 256);
+        voice.setParams(params);
+        voice.startNote(117, 1.0f, nullptr, 8192); // 7040 Hz carrier; 28160 Hz sum aliases to 15940 Hz.
+        juce::AudioBuffer<float> output(2, fftSize);
+        output.clear();
+        voice.renderNextBlock(output, 0, fftSize);
+
+        std::array<float, fftSize * 2> spectrum {};
+        std::copy(output.getReadPointer(0), output.getReadPointer(0) + fftSize, spectrum.begin());
+        juce::dsp::WindowingFunction<float> window(fftSize, juce::dsp::WindowingFunction<float>::hann, false);
+        window.multiplyWithWindowingTable(spectrum.data(), fftSize);
+        juce::dsp::FFT fft(fftOrder);
+        fft.performFrequencyOnlyForwardTransform(spectrum.data(), true);
+
+        const int aliasBin = (int) std::round(15940.0 * fftSize / sampleRate);
+        double totalEnergy = 0.0;
+        double aliasEnergy = 0.0;
+        for (int bin = 1; bin < fftSize / 2; ++bin)
+        {
+            const double energy = (double) spectrum[(size_t) bin] * spectrum[(size_t) bin];
+            totalEnergy += energy;
+            if (std::abs(bin - aliasBin) <= 2)
+                aliasEnergy += energy;
+        }
+        return totalEnergy > 0.0 ? aliasEnergy / totalEnergy : 0.0;
+    }
+
+    bool stressAetherInteractionSpectralBaseline()
+    {
+        const double amAliasRatio = measureAetherInteractionAliasRatio(1);
+        const double ringAliasRatio = measureAetherInteractionAliasRatio(2);
+        std::cerr << "Aether interaction alias baseline am=" << amAliasRatio
+                  << " ring=" << ringAliasRatio << "\n";
+        bool ratesFinite = true;
+        for (const double rate : { 44100.0, 48000.0, 88200.0, 96000.0, 192000.0 })
+        {
+            beat::InstrumentVoice::Params params;
+            params.hasAether = true;
+            params.attackMs = 0.0f; params.decayMs = 0.0f; params.sustain = 1.0f;
+            params.aetherOscA = { true, 0.7f, 0.0f, 0, 0, 0, 0.0f };
+            params.aetherOscB = { true, 0.5f, 0.0f, 0, 0, 7, 0.0f };
+            params.aetherOscA.routing = 1; params.aetherOscB.routing = 1;
+            params.aetherInteractionMode = 2; params.aetherInteractionAmount = 1.0f;
+            beat::InstrumentVoice voice;
+            voice.prepare(rate, 256);
+            voice.setParams(params);
+            voice.startNote(69, 1.0f, nullptr, 8192);
+            juce::AudioBuffer<float> output(2, 2048);
+            output.clear();
+            voice.renderNextBlock(output, 0, output.getNumSamples());
+            for (int channel = 0; channel < output.getNumChannels(); ++channel)
+                for (int sample = 0; sample < output.getNumSamples(); ++sample)
+                    ratesFinite &= std::isfinite(output.getSample(channel, sample));
+        }
+        return ratesFinite && std::isfinite(amAliasRatio) && std::isfinite(ringAliasRatio)
+            && amAliasRatio > 0.0 && amAliasRatio < 1.0
+            && ringAliasRatio > 0.0 && ringAliasRatio < 1.0;
+    }
+
     bool stressAetherTableStackRenderer()
     {
         beat::InstrumentVoice::Params params;
@@ -852,6 +931,31 @@ namespace
             || (std::abs(routed.filter2Frame.left) <= 0.0001f && std::abs(routed.filter2Frame.right) <= 0.0001f)
             || !near(routed.frame.left, juce::jlimit(-1.0f, 1.0f, routed.filteredFrame.left + routed.filter1Frame.left + routed.filter2Frame.left + routed.directFrame.left), 0.00001f)
             || !near(routed.frame.right, juce::jlimit(-1.0f, 1.0f, routed.filteredFrame.right + routed.filter1Frame.right + routed.filter2Frame.right + routed.directFrame.right), 0.00001f))
+            return false;
+
+        params.aetherSub.enabled = false;
+        params.aetherNoise.enabled = false;
+        params.aetherOscA.routing = 0;
+        params.aetherOscB.routing = 0;
+        params.aetherInteractionMode = 0;
+        params.aetherInteractionAmount = 0.0f;
+        const auto renderInteraction = [&](int mode, float amount) {
+            params.aetherInteractionMode = mode;
+            params.aetherInteractionAmount = amount;
+            return beat::AetherTableStackRenderer::render(
+                params, targets, beat::VoiceAetherCache::panGainsFor(params), beat::VoiceAetherCache::pitchRatesFor(params),
+                oscillatorsA, oscillatorsB, unisonPlanA, unisonPlanB, 220.0, 220.0, 48000.0, 0.125, 0.125,
+                0.125, 0.0, 0.25, 0.5f, -0.25f, std::array<float, 8> {}, 0.8f, 0.35f, 0.0f, 0.0f, 0.9f,
+                60.0f / 127.0f, 0.2f, noiseState);
+        };
+        const auto interactionOff = renderInteraction(0, 0.0f);
+        const auto am = renderInteraction(1, 0.8f);
+        const auto ring = renderInteraction(2, 0.8f);
+        if (interactionOff.work.nonlinearSamples != 0 || am.work.nonlinearSamples != 1 || ring.work.nonlinearSamples != 1
+            || !std::isfinite(am.frame.left) || !std::isfinite(am.frame.right)
+            || !std::isfinite(ring.frame.left) || !std::isfinite(ring.frame.right)
+            || (near(interactionOff.frame.left, am.frame.left) && near(interactionOff.frame.right, am.frame.right))
+            || (near(am.frame.left, ring.frame.left) && near(am.frame.right, ring.frame.right)))
             return false;
 
         params.aetherOscA.enabled = false;
@@ -7097,6 +7201,8 @@ namespace
         instrument.aether.runtimeWarpMode = 1;
         instrument.aether.runtimeWarp2 = 0.37f;
         instrument.aether.runtimeWarp2Mode = 2;
+        instrument.aether.interactionMode = 2;
+        instrument.aether.interactionAmount = 0.46f;
 
         const auto beforeEnergy = bufferEnergy(renderOfflineBlock(project, 16000));
 
@@ -7189,6 +7295,8 @@ namespace
                 && loadedInstrument.aether.runtimeWarpMode == 1
                 && near(loadedInstrument.aether.runtimeWarp2, 0.37f)
                 && loadedInstrument.aether.runtimeWarp2Mode == 2
+                && loadedInstrument.aether.interactionMode == 2
+                && near(loadedInstrument.aether.interactionAmount, 0.46f)
                 && loadedInstrument.effects.front().id == instrument.effects.front().id;
         }
 
@@ -11969,6 +12077,8 @@ namespace
             "aether.runtimeWarpMode": "fold",
             "aether.runtimeWarp2": 0.41,
             "aether.runtimeWarp2Mode": "pinch",
+            "aether.interaction.mode": "ring",
+            "aether.interaction.amount": 0.72,
             "osc.b.unison.voices": 7,
             "osc.b.unison.detune": 0.31,
             "osc.b.unison.spread": 0.83,
@@ -12118,6 +12228,8 @@ namespace
             return false;
         if (!near(instrument.aether.runtimeWarp, 0.24f) || instrument.aether.runtimeWarpMode != 1
             || !near(instrument.aether.runtimeWarp2, 0.41f) || instrument.aether.runtimeWarp2Mode != 2)
+            return false;
+        if (instrument.aether.interactionMode != 2 || !near(instrument.aether.interactionAmount, 0.72f))
             return false;
         if (!instrument.aether.oscB.enabled || instrument.aether.oscB.wavetable.bank != 3)
             return false;
@@ -13038,7 +13150,7 @@ namespace
         beat::InstrumentVoice::consumeRenderWorkStats();
         const auto dualWarp = render(dualWarpParams);
         const auto dualWarpWork = beat::InstrumentVoice::consumeRenderWorkStats();
-        if (dualWarpWork.nonlinearSamples != beat::RenderBudgets::voiceNonlinearWorkCeiling(dualWarpWork.voiceSamples)
+        if (dualWarpWork.nonlinearSamples != dualWarpWork.voiceSamples * 32
             || beat::RenderBudgets::exceedsVoiceNonlinearWorkCeiling(dualWarpWork.nonlinearSamples, dualWarpWork.voiceSamples))
             return false;
         double serialParallelDiff = 0.0;
@@ -13985,6 +14097,11 @@ int main()
     if (!stressVoiceRenderWorkBudgets())
     {
         std::cerr << "Voice render work budget stress failed\n";
+        return 1;
+    }
+    if (!stressAetherInteractionSpectralBaseline())
+    {
+        std::cerr << "Aether interaction spectral baseline failed\n";
         return 1;
     }
     if (!stressAetherTableStackRenderer())

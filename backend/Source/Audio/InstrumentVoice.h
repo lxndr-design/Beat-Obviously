@@ -274,6 +274,8 @@ namespace beat
             int aetherRuntimeWarpMode { 0 };
             float aetherRuntimeWarp2 { 0.0f };
             int aetherRuntimeWarp2Mode { 0 };
+            int aetherInteractionMode { 0 };
+            float aetherInteractionAmount { 0.0f };
         };
 
         void setParams(const Params& p);

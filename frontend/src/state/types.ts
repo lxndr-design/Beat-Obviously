@@ -478,6 +478,8 @@ export interface AetherSynthConfig {
   /** Optional second serial runtime warp stage. */
   runtimeWarp2?: number;
   runtimeWarp2Mode?: WavetableWarpMode;
+  interactionMode?: "off" | "am" | "ring";
+  interactionAmount?: number;
 }
 
 export type SynthPatchParameterValue = boolean | number | string;

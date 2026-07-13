@@ -393,3 +393,14 @@ MessageBridge -> frontend timing store/debug panel
 ```
 
 The comparison and reporting path performs only integer arithmetic and relaxed atomic operations in the callback. A ceiling trip reports an invariant violation; it does not branch the audio path, allocate, lock, perform I/O, or lower quality. Offline renders are not treated as real-time callback violations.
+
+```text
+fixed Oscillator A sample + fixed Oscillator B sample
+  interaction off/amount 0 -> exact existing A contribution
+  AM -> A * (0.5 + 0.5 * B)
+  ring -> A * B
+  amount crossfade -> A level/pan/source destination
+  -> existing route warp/filter/direct graph
+```
+
+The interaction adds one bounded multiplication evaluation per active voice sample and no state allocation. It is counted against the 33-evaluation nonlinear ceiling. Current processing is at the active sample rate without oversampling; measured high-note alias is recorded in `current-engine-audit.md`.

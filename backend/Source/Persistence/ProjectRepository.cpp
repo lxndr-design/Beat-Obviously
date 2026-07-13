@@ -340,6 +340,8 @@ namespace beat
             config.runtimeWarpMode = 0;
             config.runtimeWarp2 = 0.0f;
             config.runtimeWarp2Mode = 0;
+            config.interactionMode = 0;
+            config.interactionAmount = 0.0f;
             return config;
         }
 
@@ -365,6 +367,8 @@ namespace beat
             o->setProperty("runtimeWarpMode", aether.runtimeWarpMode);
             o->setProperty("runtimeWarp2", aether.runtimeWarp2);
             o->setProperty("runtimeWarp2Mode", aether.runtimeWarp2Mode);
+            o->setProperty("interactionMode", aether.interactionMode);
+            o->setProperty("interactionAmount", aether.interactionAmount);
             return juce::var(o.get());
         }
 
@@ -399,6 +403,8 @@ namespace beat
             config.runtimeWarpMode = juce::jlimit(0, 3, (int) aetherVar.getProperty("runtimeWarpMode", config.runtimeWarpMode));
             config.runtimeWarp2 = juce::jlimit(0.0f, 1.0f, (float) (double) aetherVar.getProperty("runtimeWarp2", config.runtimeWarp2));
             config.runtimeWarp2Mode = juce::jlimit(0, 3, (int) aetherVar.getProperty("runtimeWarp2Mode", config.runtimeWarp2Mode));
+            config.interactionMode = juce::jlimit(0, 2, (int) aetherVar.getProperty("interactionMode", config.interactionMode));
+            config.interactionAmount = juce::jlimit(0.0f, 1.0f, (float) (double) aetherVar.getProperty("interactionAmount", config.interactionAmount));
             return config;
         }
 
