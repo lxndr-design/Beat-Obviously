@@ -1271,6 +1271,97 @@ namespace
             && ordered.getVoice(1)->getCurrentlyPlayingNote() == 65;
     }
 
+    bool stressMemberChannelExpressionOwnership()
+    {
+        struct TestSound final : juce::SynthesiserSound
+        {
+            bool appliesToNote(int) override { return true; }
+            bool appliesToChannel(int) override { return true; }
+        };
+
+        const auto addVoice = [](beat::BeatSynthesiser& synth, int stableId)
+        {
+            auto* voice = new beat::InstrumentVoice();
+            voice->setStableVoiceId(stableId);
+            voice->prepare(48000.0, 64);
+            beat::InstrumentVoice::Params params;
+            params.attackMs = 1.0f;
+            params.drive01 = 0.0f;
+            voice->setParams(params);
+            synth.addVoice(voice);
+        };
+        const auto voiceOnChannel = [](beat::BeatSynthesiser& synth, int channel)
+        {
+            for (int index = 0; index < synth.getNumVoices(); ++index)
+            {
+                auto* voice = dynamic_cast<beat::InstrumentVoice*>(synth.getVoice(index));
+                if (voice != nullptr && voice->isVoiceActive() && voice->isPlayingChannel(channel))
+                    return voice;
+            }
+            return static_cast<beat::InstrumentVoice*>(nullptr);
+        };
+
+        beat::BeatSynthesiser synth;
+        addVoice(synth, 1);
+        addVoice(synth, 2);
+        synth.addSound(new TestSound());
+        synth.setNoteStealingEnabled(true);
+        synth.setCurrentPlaybackSampleRate(48000.0);
+
+        synth.handleChannelPressure(2, 32);
+        synth.handleController(2, 74, 48);
+        synth.handleChannelPressure(3, 96);
+        synth.handleController(3, 74, 112);
+        synth.noteOn(2, 60, 1.0f);
+        synth.noteOn(3, 64, 1.0f);
+
+        auto* channel2 = voiceOnChannel(synth, 2);
+        auto* channel3 = voiceOnChannel(synth, 3);
+        if (channel2 == nullptr || channel3 == nullptr
+            || !near(channel2->pressureForTest(), 32.0f / 127.0f)
+            || !near(channel2->timbreForTest(), 48.0f / 127.0f)
+            || !near(channel3->pressureForTest(), 96.0f / 127.0f)
+            || !near(channel3->timbreForTest(), 112.0f / 127.0f))
+            return false;
+
+        synth.handleChannelPressure(2, 20);
+        synth.handleController(2, 74, 30);
+        if (!near(channel2->pressureForTest(), 20.0f / 127.0f)
+            || !near(channel2->timbreForTest(), 30.0f / 127.0f)
+            || !near(channel3->pressureForTest(), 96.0f / 127.0f)
+            || !near(channel3->timbreForTest(), 112.0f / 127.0f))
+            return false;
+
+        synth.handleAftertouch(3, 64, 77);
+        if (!near(channel3->pressureForTest(), 77.0f / 127.0f)
+            || !near(channel2->pressureForTest(), 20.0f / 127.0f))
+            return false;
+
+        beat::BeatSynthesiser stealing;
+        addVoice(stealing, 7);
+        stealing.addSound(new TestSound());
+        stealing.setNoteStealingEnabled(true);
+        stealing.setCurrentPlaybackSampleRate(48000.0);
+        stealing.handleChannelPressure(2, 12);
+        stealing.handleController(2, 74, 24);
+        stealing.handleChannelPressure(3, 100);
+        stealing.handleController(3, 74, 110);
+        stealing.noteOn(2, 60, 1.0f);
+        stealing.noteOn(3, 67, 1.0f);
+        auto* stolen = voiceOnChannel(stealing, 3);
+        if (stolen == nullptr
+            || stolen->getCurrentlyPlayingNote() != 67
+            || !near(stolen->pressureForTest(), 100.0f / 127.0f)
+            || !near(stolen->timbreForTest(), 110.0f / 127.0f))
+            return false;
+
+        stealing.noteOn(4, 69, 1.0f);
+        auto* reset = voiceOnChannel(stealing, 4);
+        return reset != nullptr
+            && near(reset->pressureForTest(), 0.0f)
+            && near(reset->timbreForTest(), 0.0f);
+    }
+
     beat::Project makeStressProject()
     {
         beat::Project project;
@@ -14403,6 +14494,11 @@ int main()
     if (!stressVoiceStealTransition())
     {
         std::cerr << "Voice steal transition stress failed\n";
+        return 1;
+    }
+    if (!stressMemberChannelExpressionOwnership())
+    {
+        std::cerr << "Member-channel expression ownership stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceWavetablePath())

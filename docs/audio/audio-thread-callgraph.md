@@ -480,3 +480,21 @@ audio callback, return routes
 ```
 
 Graph comparison, vector traversal, and route-state publication stay outside the callback. The callback transition owns no dynamic storage and performs no effect construction, destruction, sorting, filesystem access, lazy initialization, or container growth. It bridges from the last output sample of the retired graph; it does not process the retired graph in parallel or preserve its effect tail. Offline rendering uses the same deterministic signal path but remains outside real-time callback instrumentation.
+
+## Milestone B18 member-channel expression ownership
+
+```text
+MIDI channel pressure / CC74
+  BeatSynthesiser fixed atomic cache[channel]
+  JUCE channel-filtered active-voice dispatch
+MIDI polyphonic aftertouch
+  JUCE channel-and-note-filtered active-voice dispatch
+MIDI note-on(channel, note)
+  JUCE starts or deterministically steals a voice with cached pitch wheel
+  BeatSynthesiser matches the started InstrumentVoice by channel and note
+  apply cached channel pressure + CC74 before rendering
+InstrumentVoice::renderNextBlock
+  fixed pressure/timbre scalar sources -> bounded modulation target evaluation
+```
+
+Cache storage is exactly two 16-element atomic float arrays. Controller ingestion performs no allocation, container growth, file access, lazy initialization, or additional lock acquisition. Note-on matching traverses the already bounded prepared JUCE voice array under the synthesiser's existing critical section. Project rebuilds replace the synthesiser and therefore reset all member-channel caches outside the callback.

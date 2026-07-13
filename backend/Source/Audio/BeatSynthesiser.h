@@ -2,13 +2,25 @@
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
+#include <array>
+#include <atomic>
+
 namespace beat
 {
     class BeatSynthesiser final : public juce::Synthesiser
     {
+    public:
+        void noteOn(int midiChannel, int midiNoteNumber, float velocity) override;
+        void handleController(int midiChannel, int controllerNumber, int controllerValue) override;
+        void handleChannelPressure(int midiChannel, int channelPressureValue) override;
+
     protected:
         juce::SynthesiserVoice* findVoiceToSteal(juce::SynthesiserSound* soundToPlay,
                                                   int midiChannel,
                                                   int midiNoteNumber) const override;
+
+    private:
+        std::array<std::atomic<float>, 16> memberPressure {};
+        std::array<std::atomic<float>, 16> memberTimbre {};
     };
 }

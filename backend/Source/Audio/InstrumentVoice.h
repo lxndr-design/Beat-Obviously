@@ -290,6 +290,11 @@ namespace beat
         };
 
         void setParams(const Params& p);
+        void setMemberExpression(float newPressure, float newTimbre) noexcept
+        {
+            pressure = juce::jlimit(0.0f, 1.0f, newPressure);
+            timbre = juce::jlimit(0.0f, 1.0f, newTimbre);
+        }
         bool applyRealtimeParameter(std::string_view parameterId, float value, int rampSamples = 0) noexcept;
         void prepare(double sampleRate, int blockSize);
         void setProcessingQuality(AudioQuality quality) noexcept;
@@ -304,6 +309,8 @@ namespace beat
         double phaseMemoryBaseAForTest() const noexcept { return aetherOscABasePhase; }
         double phaseMemoryBaseBForTest() const noexcept { return aetherOscBBasePhase; }
         double wavetablePhaseAForTest() const noexcept { return aetherOscillatorsA.front().getPhase(); }
+        float pressureForTest() const noexcept { return pressure; }
+        float timbreForTest() const noexcept { return timbre; }
 #endif
 
         struct AllocationState

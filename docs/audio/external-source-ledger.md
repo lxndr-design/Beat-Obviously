@@ -145,3 +145,7 @@ The two fixed source-send buffers, non-owning render context, source contributio
 ## Milestone B17 provenance
 
 The effect-descriptor comparison, same-project route matching, bounded output bridge, project-identity reset policy, and focused native test independently extend Beat's existing route-effect application and `VoiceTransition` infrastructure. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived implementation, runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.
+
+## Milestone B18 provenance
+
+The fixed member-channel pressure/timbre caches, note-start initialization, voice-steal lifecycle behavior, and focused isolation tests independently extend Beat's existing JUCE synthesiser wrapper and Aether modulation sources. JUCE's existing channel/note dispatch and pitch-wheel cache APIs are used without copying or modifying JUCE source. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived implementation, runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.

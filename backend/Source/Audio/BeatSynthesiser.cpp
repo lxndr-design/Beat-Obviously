@@ -5,6 +5,45 @@
 
 namespace beat
 {
+    void BeatSynthesiser::noteOn(int midiChannel, int midiNoteNumber, float velocity)
+    {
+        juce::Synthesiser::noteOn(midiChannel, midiNoteNumber, velocity);
+
+        const int channelIndex = juce::jlimit(1, 16, midiChannel) - 1;
+        const juce::ScopedLock scopedLock(lock);
+        for (auto* voice : voices)
+        {
+            if (!voice->isVoiceActive()
+                || voice->getCurrentlyPlayingNote() != midiNoteNumber
+                || !voice->isPlayingChannel(midiChannel))
+                continue;
+            if (auto* instrument = dynamic_cast<InstrumentVoice*>(voice))
+                instrument->setMemberExpression(memberPressure[(size_t) channelIndex].load(std::memory_order_relaxed),
+                                                memberTimbre[(size_t) channelIndex].load(std::memory_order_relaxed));
+        }
+    }
+
+    void BeatSynthesiser::handleController(int midiChannel, int controllerNumber, int controllerValue)
+    {
+        if (controllerNumber == 74)
+        {
+            const int channelIndex = juce::jlimit(1, 16, midiChannel) - 1;
+            memberTimbre[(size_t) channelIndex].store(
+                juce::jlimit(0.0f, 1.0f, (float) controllerValue / 127.0f),
+                std::memory_order_relaxed);
+        }
+        juce::Synthesiser::handleController(midiChannel, controllerNumber, controllerValue);
+    }
+
+    void BeatSynthesiser::handleChannelPressure(int midiChannel, int channelPressureValue)
+    {
+        const int channelIndex = juce::jlimit(1, 16, midiChannel) - 1;
+        memberPressure[(size_t) channelIndex].store(
+            juce::jlimit(0.0f, 1.0f, (float) channelPressureValue / 127.0f),
+            std::memory_order_relaxed);
+        juce::Synthesiser::handleChannelPressure(midiChannel, channelPressureValue);
+    }
+
     juce::SynthesiserVoice* BeatSynthesiser::findVoiceToSteal(juce::SynthesiserSound* soundToPlay,
                                                                int,
                                                                int) const
