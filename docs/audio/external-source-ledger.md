@@ -149,3 +149,7 @@ The effect-descriptor comparison, same-project route matching, bounded output br
 ## Milestone B18 provenance
 
 The fixed member-channel pressure/timbre caches, note-start initialization, voice-steal lifecycle behavior, and focused isolation tests independently extend Beat's existing JUCE synthesiser wrapper and Aether modulation sources. JUCE's existing channel/note dispatch and pitch-wheel cache APIs are used without copying or modifying JUCE source. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived implementation, runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.
+
+## Milestone B19 provenance
+
+The fixed RPN selector/range state, Data Entry interpretation, channel-specific voice update, current-wheel recomputation, and tests are an independent implementation of the public MIDI RPN 0,0 pitch-bend-sensitivity message contract on top of Beat's existing JUCE synthesiser wrapper. No upstream source was consulted, copied, modified, translated, structurally adapted, or imported; no runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.

@@ -1310,6 +1310,10 @@ namespace
 
         synth.handleChannelPressure(2, 32);
         synth.handleController(2, 74, 48);
+        synth.handleController(2, 101, 0);
+        synth.handleController(2, 100, 0);
+        synth.handleController(2, 6, 48);
+        synth.handleController(2, 38, 25);
         synth.handleChannelPressure(3, 96);
         synth.handleController(3, 74, 112);
         synth.noteOn(2, 60, 1.0f);
@@ -1320,8 +1324,26 @@ namespace
         if (channel2 == nullptr || channel3 == nullptr
             || !near(channel2->pressureForTest(), 32.0f / 127.0f)
             || !near(channel2->timbreForTest(), 48.0f / 127.0f)
+            || !near(channel2->memberPitchBendRangeForTest(), 48.25f)
+            || !near(channel3->memberPitchBendRangeForTest(), -1.0f)
             || !near(channel3->pressureForTest(), 96.0f / 127.0f)
             || !near(channel3->timbreForTest(), 112.0f / 127.0f))
+            return false;
+
+        synth.handlePitchWheel(2, 12288);
+        synth.handlePitchWheel(3, 16383);
+        if (!near(channel2->pitchWheelSemitonesForTest(), (4096.0f / 8191.0f) * 48.25f)
+            || !near(channel3->pitchWheelSemitonesForTest(), 2.0f))
+            return false;
+
+        synth.handleController(2, 6, 12);
+        if (!near(channel2->memberPitchBendRangeForTest(), 12.25f)
+            || !near(channel2->pitchWheelSemitonesForTest(), (4096.0f / 8191.0f) * 12.25f))
+            return false;
+        synth.handleController(2, 101, 127);
+        synth.handleController(2, 100, 127);
+        synth.handleController(2, 6, 7);
+        if (!near(channel2->memberPitchBendRangeForTest(), 12.25f))
             return false;
 
         synth.handleChannelPressure(2, 20);
@@ -1344,6 +1366,9 @@ namespace
         stealing.setCurrentPlaybackSampleRate(48000.0);
         stealing.handleChannelPressure(2, 12);
         stealing.handleController(2, 74, 24);
+        stealing.handleController(2, 101, 0);
+        stealing.handleController(2, 100, 0);
+        stealing.handleController(2, 6, 48);
         stealing.handleChannelPressure(3, 100);
         stealing.handleController(3, 74, 110);
         stealing.noteOn(2, 60, 1.0f);
@@ -1352,7 +1377,11 @@ namespace
         if (stolen == nullptr
             || stolen->getCurrentlyPlayingNote() != 67
             || !near(stolen->pressureForTest(), 100.0f / 127.0f)
-            || !near(stolen->timbreForTest(), 110.0f / 127.0f))
+            || !near(stolen->timbreForTest(), 110.0f / 127.0f)
+            || !near(stolen->memberPitchBendRangeForTest(), -1.0f))
+            return false;
+        stealing.handlePitchWheel(3, 16383);
+        if (!near(stolen->pitchWheelSemitonesForTest(), 2.0f))
             return false;
 
         stealing.noteOn(4, 69, 1.0f);

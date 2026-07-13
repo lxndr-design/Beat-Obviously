@@ -295,6 +295,7 @@ namespace beat
             pressure = juce::jlimit(0.0f, 1.0f, newPressure);
             timbre = juce::jlimit(0.0f, 1.0f, newTimbre);
         }
+        void setMemberPitchBendRange(float semitones) noexcept;
         bool applyRealtimeParameter(std::string_view parameterId, float value, int rampSamples = 0) noexcept;
         void prepare(double sampleRate, int blockSize);
         void setProcessingQuality(AudioQuality quality) noexcept;
@@ -311,6 +312,8 @@ namespace beat
         double wavetablePhaseAForTest() const noexcept { return aetherOscillatorsA.front().getPhase(); }
         float pressureForTest() const noexcept { return pressure; }
         float timbreForTest() const noexcept { return timbre; }
+        float pitchWheelSemitonesForTest() const noexcept { return pitchWheelSemitones; }
+        float memberPitchBendRangeForTest() const noexcept { return memberPitchBendRangeSemitones; }
 #endif
 
         struct AllocationState
@@ -370,6 +373,8 @@ namespace beat
         float   pressure { 0.0f };
         float   timbre { 0.0f };
         float   pitchWheelSemitones { 0.0f };
+        float   memberPitchBendRangeSemitones { -1.0f };
+        int     currentPitchWheelValue { 8192 };
         std::shared_ptr<const Wavetable> wavetableTable;
         std::shared_ptr<const Wavetable> aetherTableA;
         std::shared_ptr<const Wavetable> aetherTableB;

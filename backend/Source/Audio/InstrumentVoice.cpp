@@ -230,8 +230,20 @@ namespace beat
 
     void InstrumentVoice::pitchWheelMoved(int newPitchWheelValue)
     {
+        currentPitchWheelValue = juce::jlimit(0, 16383, newPitchWheelValue);
+        const float range = memberPitchBendRangeSemitones >= 0.0f
+            ? juce::jlimit(0.0f, 96.99f, memberPitchBendRangeSemitones)
+            : juce::jlimit(0.0f, 24.0f, params.pitchBendRangeSemitones);
         pitchWheelSemitones = VoiceMath::pitchWheelRatio(newPitchWheelValue)
-            * juce::jlimit(0.0f, 24.0f, params.pitchBendRangeSemitones);
+            * range;
+    }
+
+    void InstrumentVoice::setMemberPitchBendRange(float semitones) noexcept
+    {
+        memberPitchBendRangeSemitones = semitones < 0.0f
+            ? -1.0f
+            : juce::jlimit(0.0f, 96.99f, semitones);
+        pitchWheelMoved(currentPitchWheelValue);
     }
 
     void InstrumentVoice::setRealtimeRamp(RealtimeParam param, float value, int rampSamples) noexcept

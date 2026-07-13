@@ -497,4 +497,20 @@ InstrumentVoice::renderNextBlock
   fixed pressure/timbre scalar sources -> bounded modulation target evaluation
 ```
 
-Cache storage is exactly two 16-element atomic float arrays. Controller ingestion performs no allocation, container growth, file access, lazy initialization, or additional lock acquisition. Note-on matching traverses the already bounded prepared JUCE voice array under the synthesiser's existing critical section. Project rebuilds replace the synthesiser and therefore reset all member-channel caches outside the callback.
+Pressure/timbre cache storage is exactly two 16-element atomic float arrays; B19 adds the separately documented fixed RPN arrays below. Controller ingestion performs no allocation, container growth, file access, lazy initialization, or additional lock acquisition. Note-on matching traverses the already bounded prepared JUCE voice array under the synthesiser's existing critical section. Project rebuilds replace the synthesiser and therefore reset all member-channel caches outside the callback.
+
+## Milestone B19 channel pitch-range negotiation
+
+```text
+MIDI CC101/100(channel) -> fixed RPN selector[channel]
+MIDI CC6/38(channel), when RPN == 0,0
+  -> fixed coarse/fine pitch-range state[channel]
+  -> bounded active InstrumentVoice scan under existing synth lock
+  -> setMemberPitchBendRange -> recompute from cached current wheel
+MIDI RPN null 127,127 -> deselect; later Data Entry ignored
+MIDI note-on(channel)
+  JUCE applies retained channel pitch wheel
+  BeatSynthesiser applies retained RPN range for that channel
+```
+
+The selector, coarse/fine values, and effective range are fixed 16-channel atomic arrays. The MIDI/controller path owns no dynamic storage and performs no allocation, file access, lazy initialization, or container growth. Unconfigured channels preserve the saved patch bend range and legacy clamp; project rebuild resets negotiated state with the synthesiser outside the callback.
