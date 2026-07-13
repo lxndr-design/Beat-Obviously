@@ -137,3 +137,7 @@ The independent pressure/CC74 timbre route fields, JUCE MIDI dispatch integratio
 ## Milestone B15 provenance
 
 The LFO 3–10 sync fields, setup-time musical-division conversion, persistence/frontend contracts, and tests independently extend Beat's existing LFO 1/2 tempo-sync mathematics and fixed extra-LFO graph. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived implementation, runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.
+
+## Milestone B16 provenance
+
+The two fixed source-send buffers, non-owning render context, source contribution taps, return-bus aggregation, persistence/frontend controls, and tests independently extend Beat's existing Aether source mixer and project return-bus routing. JUCE's existing synchronous `Synthesiser::renderNextBlock` API is used without copying or modifying JUCE source. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived implementation, runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.

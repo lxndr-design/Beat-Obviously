@@ -286,6 +286,8 @@ namespace beat
             o->setProperty("fineCents", oscillator.fineCents);
             o->setProperty("phase", oscillator.phase);
             o->setProperty("randomPhase", oscillator.randomPhase);
+            o->setProperty("fxSend1", oscillator.fxSends[0]);
+            o->setProperty("fxSend2", oscillator.fxSends[1]);
             o->setProperty("wavetable", wavetableConfigToVar(oscillator.wavetable));
             return juce::var(o.get());
         }
@@ -306,6 +308,8 @@ namespace beat
             fallback.fineCents = juce::jlimit(-100.0f, 100.0f, (float) (double) oscillatorVar.getProperty("fineCents", fallback.fineCents));
             fallback.phase = juce::jlimit(0.0f, 1.0f, (float) (double) oscillatorVar.getProperty("phase", fallback.phase));
             fallback.randomPhase = juce::jlimit(0.0f, 1.0f, (float) (double) oscillatorVar.getProperty("randomPhase", fallback.randomPhase));
+            fallback.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) (double) oscillatorVar.getProperty("fxSend1", fallback.fxSends[0]));
+            fallback.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) (double) oscillatorVar.getProperty("fxSend2", fallback.fxSends[1]));
             fallback.wavetable = wavetableConfigFromVar(oscillatorVar.getProperty("wavetable", {}), fallback.wavetable);
             return fallback;
         }
@@ -356,13 +360,19 @@ namespace beat
             sub->setProperty("level", aether.sub.level);
             sub->setProperty("octave", aether.sub.octave);
             sub->setProperty("waveform", aether.sub.waveform);
+            sub->setProperty("fxSend1", aether.sub.fxSends[0]);
+            sub->setProperty("fxSend2", aether.sub.fxSends[1]);
             o->setProperty("sub", juce::var(sub.get()));
 
             juce::DynamicObject::Ptr noise = new juce::DynamicObject();
             noise->setProperty("enabled", aether.noise.enabled);
             noise->setProperty("level", aether.noise.level);
             noise->setProperty("color", aether.noise.color);
+            noise->setProperty("fxSend1", aether.noise.fxSends[0]);
+            noise->setProperty("fxSend2", aether.noise.fxSends[1]);
             o->setProperty("noise", juce::var(noise.get()));
+            o->setProperty("fxBus1Id", aether.fxBusIds[0]);
+            o->setProperty("fxBus2Id", aether.fxBusIds[1]);
             o->setProperty("runtimeWarp", aether.runtimeWarp);
             o->setProperty("runtimeWarpMode", aether.runtimeWarpMode);
             o->setProperty("runtimeWarp2", aether.runtimeWarp2);
@@ -390,6 +400,8 @@ namespace beat
                 config.sub.level = juce::jlimit(0.0f, 1.0f, (float) (double) sub.getProperty("level", config.sub.level));
                 config.sub.octave = juce::jlimit(-4, 0, (int) sub.getProperty("octave", config.sub.octave));
                 config.sub.waveform = juce::jlimit(0, 8, (int) sub.getProperty("waveform", config.sub.waveform));
+                config.sub.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) (double) sub.getProperty("fxSend1", config.sub.fxSends[0]));
+                config.sub.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) (double) sub.getProperty("fxSend2", config.sub.fxSends[1]));
             }
 
             const auto noise = aetherVar.getProperty("noise", {});
@@ -398,7 +410,11 @@ namespace beat
                 config.noise.enabled = (bool) noise.getProperty("enabled", config.noise.enabled);
                 config.noise.level = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("level", config.noise.level));
                 config.noise.color = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("color", config.noise.color));
+                config.noise.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("fxSend1", config.noise.fxSends[0]));
+                config.noise.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("fxSend2", config.noise.fxSends[1]));
             }
+            config.fxBusIds[0] = aetherVar.getProperty("fxBus1Id", config.fxBusIds[0]).toString();
+            config.fxBusIds[1] = aetherVar.getProperty("fxBus2Id", config.fxBusIds[1]).toString();
             config.runtimeWarp = juce::jlimit(0.0f, 1.0f, (float) (double) aetherVar.getProperty("runtimeWarp", config.runtimeWarp));
             config.runtimeWarpMode = juce::jlimit(0, 3, (int) aetherVar.getProperty("runtimeWarpMode", config.runtimeWarpMode));
             config.runtimeWarp2 = juce::jlimit(0.0f, 1.0f, (float) (double) aetherVar.getProperty("runtimeWarp2", config.runtimeWarp2));

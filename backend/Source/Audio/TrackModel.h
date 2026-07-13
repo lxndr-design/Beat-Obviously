@@ -171,6 +171,7 @@ namespace beat
             int routing { 0 };
             float phase { 0.0f };
             float randomPhase { 0.0f };
+            std::array<float, 2> fxSends {};
             WavetableConfig wavetable;
         };
 
@@ -181,6 +182,7 @@ namespace beat
             int octave { -1 };
             int waveform { 0 };
             int routing { 0 };
+            std::array<float, 2> fxSends {};
         };
 
         struct AetherNoise
@@ -189,6 +191,7 @@ namespace beat
             float level { 0.0f };
             float color { 0.5f };
             int routing { 0 };
+            std::array<float, 2> fxSends {};
         };
 
         struct AetherConfig
@@ -197,6 +200,7 @@ namespace beat
             AetherOscillator oscB;
             AetherSub sub;
             AetherNoise noise;
+            std::array<Id, 2> fxBusIds {};
             float runtimeWarp { 0.0f };
             int runtimeWarpMode { 0 };
             float runtimeWarp2 { 0.0f };

@@ -39,6 +39,7 @@ target_sources(Beat PRIVATE
     Source/Audio/Modulation/DynamicModulation.h
     Source/Audio/Modulation/Lfo.h
     Source/Audio/Oscillator/AetherTableStackRenderer.h
+    Source/Audio/Oscillator/AetherSourceBusContext.h
     Source/Audio/Oscillator/BasicOscillator.h
     Source/Audio/Oscillator/VoiceAetherCache.h
     Source/Audio/Oscillator/VoiceMath.h
@@ -180,6 +181,7 @@ add_executable(BeatBackendStress
     Source/Audio/Modulation/DynamicModulation.h
     Source/Audio/Modulation/Lfo.h
     Source/Audio/Oscillator/AetherTableStackRenderer.h
+    Source/Audio/Oscillator/AetherSourceBusContext.h
     Source/Audio/Oscillator/BasicOscillator.h
     Source/Audio/Oscillator/VoiceAetherCache.h
     Source/Audio/Oscillator/VoiceMath.h

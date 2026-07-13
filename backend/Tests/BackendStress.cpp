@@ -7258,6 +7258,7 @@ namespace
         auto& oscA = instrument.aether.oscA;
         oscA.phase = 0.37f;
         oscA.randomPhase = 0.18f;
+        oscA.fxSends = { 0.31f, 0.67f };
         oscA.wavetable.custom = true;
         oscA.wavetable.warpMode = 2;
         oscA.wavetable.smoothInterpolation = true;
@@ -7278,6 +7279,7 @@ namespace
         oscB.octave = 1;
         oscB.phase = 0.22f;
         oscB.randomPhase = 0.12f;
+        oscB.fxSends = { 0.23f, 0.41f };
         oscB.wavetable.custom = true;
         oscB.wavetable.bank = 3;
         oscB.wavetable.warpMode = 1;
@@ -7291,9 +7293,12 @@ namespace
         instrument.aether.sub.level = 0.24f;
         instrument.aether.sub.octave = -2;
         instrument.aether.sub.waveform = 1;
+        instrument.aether.sub.fxSends = { 0.17f, 0.29f };
         instrument.aether.noise.enabled = true;
         instrument.aether.noise.level = 0.06f;
         instrument.aether.noise.color = 0.81f;
+        instrument.aether.noise.fxSends = { 0.13f, 0.19f };
+        instrument.aether.fxBusIds = { "return-a", "return-b" };
         instrument.aether.runtimeWarp = 0.63f;
         instrument.aether.runtimeWarpMode = 1;
         instrument.aether.runtimeWarp2 = 0.37f;
@@ -7360,6 +7365,8 @@ namespace
                 && loadedOscA.enabled
                 && near(loadedOscA.phase, 0.37f)
                 && near(loadedOscA.randomPhase, 0.18f)
+                && near(loadedOscA.fxSends[0], 0.31f)
+                && near(loadedOscA.fxSends[1], 0.67f)
                 && loadedOscA.wavetable.custom
                 && loadedOscA.wavetable.warpMode == 2
                 && loadedOscA.wavetable.smoothInterpolation
@@ -7378,6 +7385,8 @@ namespace
                 && loadedOscB.octave == 1
                 && near(loadedOscB.phase, 0.22f)
                 && near(loadedOscB.randomPhase, 0.12f)
+                && near(loadedOscB.fxSends[0], 0.23f)
+                && near(loadedOscB.fxSends[1], 0.41f)
                 && loadedOscB.wavetable.custom
                 && loadedOscB.wavetable.bank == 3
                 && loadedOscB.wavetable.warpMode == 1
@@ -7390,9 +7399,15 @@ namespace
                 && near(loadedInstrument.aether.sub.level, 0.24f)
                 && loadedInstrument.aether.sub.octave == -2
                 && loadedInstrument.aether.sub.waveform == 1
+                && near(loadedInstrument.aether.sub.fxSends[0], 0.17f)
+                && near(loadedInstrument.aether.sub.fxSends[1], 0.29f)
                 && loadedInstrument.aether.noise.enabled
                 && near(loadedInstrument.aether.noise.level, 0.06f)
                 && near(loadedInstrument.aether.noise.color, 0.81f)
+                && near(loadedInstrument.aether.noise.fxSends[0], 0.13f)
+                && near(loadedInstrument.aether.noise.fxSends[1], 0.19f)
+                && loadedInstrument.aether.fxBusIds[0] == "return-a"
+                && loadedInstrument.aether.fxBusIds[1] == "return-b"
                 && near(loadedInstrument.aether.runtimeWarp, 0.63f)
                 && loadedInstrument.aether.runtimeWarpMode == 1
                 && near(loadedInstrument.aether.runtimeWarp2, 0.37f)
@@ -10306,6 +10321,66 @@ namespace
             std::cerr << "Send/return bus stress failed dryEnergy=" << dryEnergy
                       << " wetEnergy=" << wetEnergy
                       << " mutedEnergy=" << mutedEnergy
+                      << " mutedDiff=" << mutedDiff << "\n";
+        }
+        return ok;
+    }
+
+    bool stressAudioEngineAetherSourceSendBuses()
+    {
+        auto dryProject = makeDenseAetherProject();
+        auto sentProject = dryProject;
+        auto mutedProject = dryProject;
+
+        beat::ReturnBus bus;
+        bus.id = "aether-fx-1";
+        bus.name = "Aether FX 1";
+        sentProject.returnBuses.push_back(bus);
+        bus.mute = true;
+        mutedProject.returnBuses.push_back(bus);
+
+        auto configureSend = [](beat::Project& project)
+        {
+            auto& aether = project.instruments.front().aether;
+            aether.fxBusIds[0] = "aether-fx-1";
+            aether.oscA.fxSends[0] = 0.65f;
+            aether.oscB.fxSends[0] = 0.0f;
+            aether.sub.fxSends[0] = 0.0f;
+            aether.noise.fxSends[0] = 0.0f;
+        };
+        configureSend(sentProject);
+        configureSend(mutedProject);
+
+        const auto dry = renderOfflineChunks(dryProject, 8192, 257);
+        const auto sent = renderOfflineChunks(sentProject, 8192, 257);
+        const auto muted = renderOfflineChunks(mutedProject, 8192, 257);
+        const double dryEnergy = bufferEnergy(dry);
+        const double sentEnergy = bufferEnergy(sent);
+        double mutedDiff = 0.0;
+        double sentDiff = 0.0;
+        for (int channel = 0; channel < dry.getNumChannels(); ++channel)
+        {
+            for (int sample = 0; sample < dry.getNumSamples(); ++sample)
+            {
+                const float drySample = dry.getSample(channel, sample);
+                const float sentSample = sent.getSample(channel, sample);
+                const float mutedSample = muted.getSample(channel, sample);
+                if (!std::isfinite(drySample) || !std::isfinite(sentSample) || !std::isfinite(mutedSample))
+                    return false;
+                sentDiff += std::abs((double) sentSample - drySample);
+                mutedDiff += std::abs((double) mutedSample - drySample);
+            }
+        }
+
+        const bool ok = dryEnergy > 0.0001
+            && std::isfinite(sentEnergy)
+            && sentDiff > 0.01
+            && mutedDiff < 0.00001;
+        if (!ok)
+        {
+            std::cerr << "Aether source-send bus stress failed dryEnergy=" << dryEnergy
+                      << " sentEnergy=" << sentEnergy
+                      << " sentDiff=" << sentDiff
                       << " mutedDiff=" << mutedDiff << "\n";
         }
         return ok;
@@ -14854,6 +14929,11 @@ int main()
     if (!stressAudioEngineSendReturnBus())
     {
         std::cerr << "Audio engine send/return bus stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineAetherSourceSendBuses())
+    {
+        std::cerr << "Audio engine Aether source-send bus stress failed\n";
         return 1;
     }
     if (!stressAudioEngineGroupRouting())

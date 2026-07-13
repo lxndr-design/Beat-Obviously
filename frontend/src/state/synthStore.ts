@@ -72,7 +72,9 @@ export type OscillatorParamSuffix =
   | "level"
   | "pan"
   | "phase"
-  | "randomPhase";
+  | "randomPhase"
+  | "fxSend1"
+  | "fxSend2";
 
 export type OscillatorUnisonParameterId =
   | `osc.${OscillatorKey}.unison.voices`
@@ -121,6 +123,12 @@ export type SynthParameterId =
   | "aether.noise.color"
   | "aether.noise.route"
   | "aether.sub.route"
+  | "aether.sub.fxSend1"
+  | "aether.sub.fxSend2"
+  | "aether.noise.fxSend1"
+  | "aether.noise.fxSend2"
+  | "aether.fxBus1Id"
+  | "aether.fxBus2Id"
   | "amp.level"
   | "amp.pan"
   | "maxVoices"
@@ -391,6 +399,7 @@ export const CUSTOM_WAVETABLE_FRAME_LABELS = ["A", "B", "C", "D"] as const;
 const DEFAULT_ADDED_OSCILLATOR_PARAMETERS: Record<OscillatorParamSuffix, SynthParameterValue> = {
   enabled: true, wavetable: "basic.saw", position: 0, warp: 0.2, warpMode: "shape",
   octave: 0, semitone: 0, fine: 0, level: 0.6, pan: 0, phase: 0, randomPhase: 0.25,
+  fxSend1: 0, fxSend2: 0,
 };
 
 function oscillatorIdForIndex(index: number): string {
@@ -1025,6 +1034,8 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "osc.a.pan": 0,
   "osc.a.phase": 0,
   "osc.a.randomPhase": 0.25,
+  "osc.a.fxSend1": 0,
+  "osc.a.fxSend2": 0,
   "osc.a.unison.voices": 1,
   "osc.a.unison.detune": 0.12,
   "osc.a.unison.spread": 0.5,
@@ -1048,6 +1059,8 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "osc.b.pan": 0,
   "osc.b.phase": 0,
   "osc.b.randomPhase": 0.25,
+  "osc.b.fxSend1": 0,
+  "osc.b.fxSend2": 0,
   "osc.b.unison.voices": 1,
   "osc.b.unison.detune": 0.12,
   "osc.b.unison.spread": 0.5,
@@ -1087,6 +1100,12 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "aether.noise.color": 0.5,
   "aether.noise.route": "filter",
   "aether.sub.route": "filter",
+  "aether.sub.fxSend1": 0,
+  "aether.sub.fxSend2": 0,
+  "aether.noise.fxSend1": 0,
+  "aether.noise.fxSend2": 0,
+  "aether.fxBus1Id": "",
+  "aether.fxBus2Id": "",
   "amp.level": 0.8,
   "amp.pan": 0,
   maxVoices: 16,
@@ -1159,6 +1178,8 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "osc.a.pan": "OSC A Pan",
   "osc.a.phase": "OSC A Phase",
   "osc.a.randomPhase": "OSC A Random",
+  "osc.a.fxSend1": "OSC A FX Send 1",
+  "osc.a.fxSend2": "OSC A FX Send 2",
   "osc.a.unison.voices": "OSC A Voices",
   "osc.a.unison.detune": "OSC A Detune",
   "osc.a.unison.spread": "OSC A Spread",
@@ -1182,6 +1203,8 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "osc.b.pan": "OSC B Pan",
   "osc.b.phase": "OSC B Phase",
   "osc.b.randomPhase": "OSC B Random",
+  "osc.b.fxSend1": "OSC B FX Send 1",
+  "osc.b.fxSend2": "OSC B FX Send 2",
   "osc.b.unison.voices": "OSC B Voices",
   "osc.b.unison.detune": "OSC B Detune",
   "osc.b.unison.spread": "OSC B Spread",
@@ -1221,6 +1244,12 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "aether.noise.color": "Aether Noise Color",
   "aether.noise.route": "Aether Noise Route",
   "aether.sub.route": "Aether Sub Route",
+  "aether.sub.fxSend1": "Aether Sub FX Send 1",
+  "aether.sub.fxSend2": "Aether Sub FX Send 2",
+  "aether.noise.fxSend1": "Aether Noise FX Send 1",
+  "aether.noise.fxSend2": "Aether Noise FX Send 2",
+  "aether.fxBus1Id": "Aether FX Bus 1",
+  "aether.fxBus2Id": "Aether FX Bus 2",
   "amp.level": "Amp Level",
   "amp.pan": "Amp Pan",
   maxVoices: "Max Voices",
@@ -1893,13 +1922,16 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         octave: -1,
         waveform: "sine",
         route: sourceRouteFromId(getStringParam(draft, "aether.sub.route")),
+        fxSends: [clamp01(getNumberParam(draft, "aether.sub.fxSend1")), clamp01(getNumberParam(draft, "aether.sub.fxSend2"))],
       },
       noise: {
         enabled: getBooleanParam(draft, "aether.noise.enabled"),
         level: clamp01(getNumberParam(draft, "aether.noise.level")),
         color: clamp01(getNumberParam(draft, "aether.noise.color")),
         route: sourceRouteFromId(getStringParam(draft, "aether.noise.route")),
+        fxSends: [clamp01(getNumberParam(draft, "aether.noise.fxSend1")), clamp01(getNumberParam(draft, "aether.noise.fxSend2"))],
       },
+      fxBusIds: [getStringParam(draft, "aether.fxBus1Id"), getStringParam(draft, "aether.fxBus2Id")],
       runtimeWarp: clamp01(getNumberParam(draft, "aether.runtimeWarp")),
       runtimeWarpMode: isWavetableWarpMode(draft.parameters["aether.runtimeWarpMode"])
         ? draft.parameters["aether.runtimeWarpMode"]
@@ -2108,6 +2140,12 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["aether.noise.color"] = instrument.aether?.noise.color ?? 0.5;
   draft.parameters["aether.noise.route"] = instrument.aether?.noise.route ?? "filter";
   draft.parameters["aether.sub.route"] = instrument.aether?.sub.route ?? "filter";
+  draft.parameters["aether.sub.fxSend1"] = instrument.aether?.sub.fxSends?.[0] ?? 0;
+  draft.parameters["aether.sub.fxSend2"] = instrument.aether?.sub.fxSends?.[1] ?? 0;
+  draft.parameters["aether.noise.fxSend1"] = instrument.aether?.noise.fxSends?.[0] ?? 0;
+  draft.parameters["aether.noise.fxSend2"] = instrument.aether?.noise.fxSends?.[1] ?? 0;
+  draft.parameters["aether.fxBus1Id"] = instrument.aether?.fxBusIds?.[0] ?? "";
+  draft.parameters["aether.fxBus2Id"] = instrument.aether?.fxBusIds?.[1] ?? "";
   draft.parameters["amp.level"] = 0.8;
   draft.parameters["env.1.attack"] = instrument.envelope.attackMs / 1000;
   draft.parameters["env.1.attackCurve"] = instrument.envelope.attackCurve ?? "linear";
@@ -4414,6 +4452,10 @@ function oscillatorFromDraft(draft: SynthDraftPatch, oscillator: OscillatorKey, 
     route: sourceRouteFromId(getStringParam(draft, `${prefix}.route` as SynthParameterId)),
     phase: getNumberParam(draft, `${prefix}.phase` as SynthParameterId),
     randomPhase: getNumberParam(draft, `${prefix}.randomPhase` as SynthParameterId),
+    fxSends: [
+      clamp01(getNumberParam(draft, `${prefix}.fxSend1` as SynthParameterId)),
+      clamp01(getNumberParam(draft, `${prefix}.fxSend2` as SynthParameterId)),
+    ] as [number, number],
     wavetable,
   };
 }
@@ -4435,6 +4477,8 @@ function applyOscillatorToDraft(draft: SynthDraftPatch, oscillator: OscillatorKe
   draft.parameters[`osc.${oscillator}.route` as SynthParameterId] = source.route ?? "filter";
   draft.parameters[`osc.${oscillator}.phase` as SynthParameterId] = source.phase ?? 0;
   draft.parameters[`osc.${oscillator}.randomPhase` as SynthParameterId] = source.randomPhase ?? 0.25;
+  draft.parameters[`osc.${oscillator}.fxSend1` as SynthParameterId] = source.fxSends?.[0] ?? 0;
+  draft.parameters[`osc.${oscillator}.fxSend2` as SynthParameterId] = source.fxSends?.[1] ?? 0;
   applyWavetableToDraft(draft, oscillator, source.wavetable, oscillator === "a");
 }
 

@@ -479,6 +479,8 @@ namespace beat
             bool groupBus { false };
             juce::AudioBuffer<float> returnBuffer;
             juce::AudioBuffer<float> groupBuffer;
+            std::array<Id, AetherSourceBusContext::busCount> sourceFxBusIds {};
+            std::array<juce::AudioBuffer<float>, AetherSourceBusContext::busCount> sourceFxBuffers;
         };
 
         struct RouteEffectWorkStats
@@ -645,6 +647,9 @@ namespace beat
                                  juce::AudioBuffer<float>& route,
                                  int startSample,
                                  int numSamples) noexcept;
+        void addAetherSourceSendsLocked(InstrumentRenderState& routeState,
+                                        int startSample,
+                                        int numSamples) noexcept;
         void processGroupBusesLocked(int numSamples,
                                      int64_t* routeEffectTicks,
                                      RouteEffectWorkStats* routeEffectWork) noexcept;

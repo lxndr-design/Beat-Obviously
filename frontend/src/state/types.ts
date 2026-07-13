@@ -446,6 +446,8 @@ export interface AetherOscillatorConfig {
   route?: "filter" | "both" | "filter1" | "filter2" | "direct";
   phase: number;
   randomPhase: number;
+  /** Linear send levels into the two fixed shared Aether FX buses. */
+  fxSends?: [number, number];
   wavetable: WavetableConfig;
 }
 
@@ -455,6 +457,7 @@ export interface AetherSubConfig {
   octave: number;
   waveform: "sine" | "square" | "triangle";
   route?: "filter" | "both" | "filter1" | "filter2" | "direct";
+  fxSends?: [number, number];
 }
 
 export interface AetherNoiseConfig {
@@ -462,6 +465,7 @@ export interface AetherNoiseConfig {
   level: number;
   color: number;
   route?: "filter" | "both" | "filter1" | "filter2" | "direct";
+  fxSends?: [number, number];
 }
 
 export interface AetherSynthConfig {
@@ -471,6 +475,8 @@ export interface AetherSynthConfig {
   oscillators?: Array<AetherOscillatorConfig & { id: string; name: string }>;
   sub: AetherSubConfig;
   noise: AetherNoiseConfig;
+  /** Project return-bus ids targeted by the two fixed per-source buses. */
+  fxBusIds?: [string, string];
   /** 0..1 opt-in runtime nonlinear warp applied after Aether oscillator mixing. */
   runtimeWarp?: number;
   /** Runtime warp curve. Reuses table-generation warp labels for UI continuity. */

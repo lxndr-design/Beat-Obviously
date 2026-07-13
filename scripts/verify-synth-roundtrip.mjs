@@ -174,6 +174,8 @@ try {
       "osc.a.tuning.harmonic": 5,
       "osc.a.phaseMode": "memory",
       "osc.a.route": "direct",
+      "osc.a.fxSend1": 0.61,
+      "osc.a.fxSend2": 0.17,
       "osc.b.unison.voices": 7,
       "osc.b.unison.detune": 0.31,
       "osc.b.unison.spread": 0.83,
@@ -181,8 +183,16 @@ try {
       "osc.b.tuning.numerator": 3,
       "osc.b.tuning.denominator": 2,
       "osc.b.route": "filter1",
+      "osc.b.fxSend1": 0.23,
+      "osc.b.fxSend2": 0.71,
       "aether.sub.route": "filter2",
+      "aether.sub.fxSend1": 0.31,
+      "aether.sub.fxSend2": 0.41,
       "aether.noise.route": "direct",
+      "aether.noise.fxSend1": 0.19,
+      "aether.noise.fxSend2": 0.29,
+      "aether.fxBus1Id": "return-a",
+      "aether.fxBus2Id": "return-b",
       "aether.runtimeWarp": 0.24,
       "aether.runtimeWarpMode": "fold",
       "aether.runtimeWarp2": 0.41,
@@ -224,6 +234,11 @@ try {
   assert.equal(independentUnisonPreview.aether.oscB.route, "filter1");
   assert.equal(independentUnisonPreview.aether.sub.route, "filter2");
   assert.equal(independentUnisonPreview.aether.noise.route, "direct");
+  assert.deepEqual(independentUnisonPreview.aether.oscA.fxSends, [0.61, 0.17]);
+  assert.deepEqual(independentUnisonPreview.aether.oscB.fxSends, [0.23, 0.71]);
+  assert.deepEqual(independentUnisonPreview.aether.sub.fxSends, [0.31, 0.41]);
+  assert.deepEqual(independentUnisonPreview.aether.noise.fxSends, [0.19, 0.29]);
+  assert.deepEqual(independentUnisonPreview.aether.fxBusIds, ["return-a", "return-b"]);
   assert.equal(independentUnisonPreview.aether.runtimeWarp, 0.24);
   assert.equal(independentUnisonPreview.aether.runtimeWarpMode, "fold");
   assert.equal(independentUnisonPreview.aether.runtimeWarp2, 0.41);

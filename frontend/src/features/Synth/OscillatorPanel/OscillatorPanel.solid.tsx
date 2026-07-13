@@ -30,7 +30,7 @@ import {
 } from "../../../state/synthStore";
 import styles from "./OscillatorPanel.module.css";
 
-type OscParamSuffix = "position" | "warp" | "level" | "pan" | "octave" | "semitone" | "fine" | "phase" | "randomPhase";
+type OscParamSuffix = "position" | "warp" | "level" | "pan" | "octave" | "semitone" | "fine" | "phase" | "randomPhase" | "fxSend1" | "fxSend2";
 
 interface OscParamDefinition {
   suffix: OscParamSuffix;
@@ -52,6 +52,8 @@ const OSC_PARAMS: OscParamDefinition[] = [
   { suffix: "fine", label: "Fine", min: -100, max: 100, step: 1, defaultValue: 0, bipolar: true },
   { suffix: "phase", label: "Phase", min: 0, max: 1, step: 0.01, defaultValue: 0 },
   { suffix: "randomPhase", label: "Random", min: 0, max: 1, step: 0.01, defaultValue: 0.25 },
+  { suffix: "fxSend1", label: "FX 1", min: 0, max: 1, step: 0.01, defaultValue: 0 },
+  { suffix: "fxSend2", label: "FX 2", min: 0, max: 1, step: 0.01, defaultValue: 0 },
 ];
 
 const OSC_PARAM_BY_SUFFIX = Object.fromEntries(OSC_PARAMS.map((param) => [param.suffix, param])) as Record<OscParamSuffix, OscParamDefinition>;
@@ -61,6 +63,7 @@ const OSC_PARAM_GROUPS: Array<{ label: string; suffixes: OscParamSuffix[] }> = [
   { label: "Pitch", suffixes: ["octave", "semitone", "fine"] },
   { label: "Phase", suffixes: ["phase", "randomPhase"] },
   { label: "Mix", suffixes: ["pan", "level"] },
+  { label: "FX Sends", suffixes: ["fxSend1", "fxSend2"] },
 ];
 
 const WAVETABLE_ICONS: Record<WavetableId, string> = {

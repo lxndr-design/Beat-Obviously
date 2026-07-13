@@ -16,7 +16,7 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 | Audible DC removal | Implemented before final limiter | A5 | Sample-rate, constant-input, lifecycle reset, finite-output, and block-continuity tests pass |
 | Offline HQ mode | Explicit opt-in mode implemented for wavetable sample interpolation | A6 | Phase/transport parity tests pass; nonlinear oversampling policy and product-facing export selection remain open |
 | Two independent main oscillators | Source/table, tuning, phase/randomization, static unison, unison modulation, level and pan are independent; legacy shared unison migrates compatibly | B1/B2 | Add per-source filter/direct/FX routing and later audio-rate cross-modulation |
-| Dedicated sub and noise/transient | Present with independent shared-filter/direct routing | B1/B6 | Add per-filter and FX-send destinations |
+| Dedicated sub and noise/transient | Present with independent shared-filter/direct routing and two fixed shared FX sends | B1/B6/B16 | Add broader transition/audible preset fixtures |
 | Per-oscillator unison | Present up to bounded counts | B1 | Tuning modes, performance and transition proof |
 | Phase memory/randomization | Independent A/B retrigger and memory modes implemented; retrigger retains deterministic random-depth behavior | B4 | Add product-facing controls and audible regression fixtures across voice stealing/legato combinations |
 | Advanced tuning modes | Implemented independently for A/B: semitone, harmonic, ratio, and equal-division step modes plus fine cents | B3 | Add UI editor affordances and broader preset-library coverage without changing stable IDs |
@@ -24,8 +24,8 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 | FM/PM/PD/AM/ring modulation | Bounded A-by-B AM and ring modes implemented; FM/PM/PD remain absent | B13 | High-note alias is measured and material, especially for ring; design/ratify oversampling and stop-band policy before release, and add other modes only with equivalent proof |
 | Four envelopes / ten LFOs / eight macros | Four envelopes, ten LFOs with free/tempo-synced rates, and eight macros | B9/B10/B11/B15 | Add broader routed audible/preset fixtures and preserve the fixed-work gate as assignments grow |
 | MPE/per-note expression | Independent mod wheel, poly/channel pressure, and CC74 timbre sources plus partial note automation; full MPE member-channel ownership is not implemented | B3/B14 | Add deterministic per-note/member-channel state, capability negotiation, and persisted performance mapping before claiming MPE completeness |
-| Dual shared filters and source routing | Two shared filters with serial/parallel topology and per-source both/Filter-1/Filter-2/direct destinations implemented | B5/B6/B7 | Add transition automation and per-source FX sends |
-| Reorderable insert plus two FX buses | Partial instrument-owned fixed FX | B5 | De-clicked graph replacement and preset migrations |
+| Dual shared filters and source routing | Two shared filters with serial/parallel topology and per-source both/Filter-1/Filter-2/direct destinations plus two fixed source FX sends implemented | B5/B6/B7/B16 | Add transition automation and broader audible routing fixtures |
+| Reorderable insert plus two FX buses | Instrument inserts remain reorderable; two fixed Aether source buses feed project-owned shared return effect chains | B5/B16 | De-clicked effect graph replacement, reorder/bypass transition proof, and mixed-era preset migrations |
 | Three source slots | Missing | C1 | Narrow source-engine interface after A/B freeze |
 | Sample engine | Partial sampler/zone playback | C2 | Slot integration, loops/slicing/tape modulation, RT-safe load |
 | Multisample/SFZ | DecentSampler zones only | C3 | sfizz wrapper versus internal subset decision |

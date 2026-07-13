@@ -435,3 +435,27 @@ audio callback
 ```
 
 Musical-division strings are parsed only while copying project state into prepared voice parameters. The callback sees the same bounded scalar phase-delta path for free and synced modes. Disabled or unrouted extra slots retain the B11 zero-evaluation behavior.
+
+## Milestone B16 fixed Aether source-send buses
+
+```text
+AudioEngine::rebuildSampleInstruments (setup thread)
+  allocate two fixed stereo sourceFxBuffers per instrument route
+  copy two persisted return-bus IDs
+audio callback, per instrument route
+  clear fixed sourceFxBuffers
+  AetherSourceBusContext::ScopedTargets (non-owning TLS pointers)
+    BeatSynthesiser::renderNextBlock
+      InstrumentVoice::renderNextBlock
+        AetherTableStackRenderer sourceFrames[A, B, sub, noise]
+        fixed source send gains -> voice amp/envelope/pan
+        bounded per-bus steal transition
+        addSample into sourceFxBuffers
+  addAetherSourceSendsLocked
+    route gain/pan -> selected prepared returnBuffer
+  existing main route effects/sends/group or mix path
+processReturnBusesLocked
+  shared return effects -> master mix
+```
+
+The callback owns no auxiliary allocation, resizing, lookup container, effect instance, file operation, or destruction. The only target lookup scans the already bounded prepared return-state vector, matching the pre-existing track-send policy. Empty, muted, or missing target IDs produce no return contribution. Offline rendering traverses the same deterministic audio path but remains outside the real-time callback detector.

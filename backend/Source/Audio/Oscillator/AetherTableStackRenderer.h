@@ -30,6 +30,7 @@ namespace beat::AetherTableStackRenderer
         StereoFrame filter1Frame {};
         StereoFrame filter2Frame {};
         StereoFrame directFrame {};
+        std::array<StereoFrame, 4> sourceFrames {}; // osc A, osc B, sub, noise
         VoiceStats::RenderWork work {};
     };
 
@@ -93,14 +94,22 @@ namespace beat::AetherTableStackRenderer
             bool active { false };
         } renderedA, renderedB;
 
-        const auto add = [&](float value, float level, float pan, std::pair<float, float> staticPanGains, bool panIsDynamic, int routing)
+        const auto add = [&](float value, float level, float pan, std::pair<float, float> staticPanGains,
+                             bool panIsDynamic, int routing, StereoFrame& sourceFrame)
         {
             const float safeLevel = VoiceMath::clamp01(level);
             const auto [leftGain, rightGain] = panIsDynamic ? VoiceMath::equalPowerPanGains(pan) : staticPanGains;
             auto& destinationLeft = routing == 1 ? directLeftSum : routing == 2 ? filter1LeftSum : routing == 3 ? filter2LeftSum : leftSum;
             auto& destinationRight = routing == 1 ? directRightSum : routing == 2 ? filter1RightSum : routing == 3 ? filter2RightSum : rightSum;
-            destinationLeft += value * safeLevel * leftGain;
-            destinationRight += value * safeLevel * rightGain;
+            const float sourceLeft = value * safeLevel * leftGain;
+            const float sourceRight = value * safeLevel * rightGain;
+            destinationLeft += sourceLeft;
+            destinationRight += sourceRight;
+            if (params.hasAetherSourceSends)
+            {
+                sourceFrame.left += sourceLeft;
+                sourceFrame.right += sourceRight;
+            }
             levelSum += safeLevel;
         };
 
@@ -125,7 +134,8 @@ namespace beat::AetherTableStackRenderer
             double basePhase,
             double phaseOffset,
             int64_t& componentSampleCounter,
-            RenderedOscillator& rendered)
+            RenderedOscillator& rendered,
+            StereoFrame& sourceFrame)
         {
             const float modulatedLevel = VoiceMath::clamp01(osc.level + (useDynamicModulation && levelIsDynamic
                 ? DynamicModulation::targetOffset(levelTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f)
@@ -143,7 +153,8 @@ namespace beat::AetherTableStackRenderer
             {
                 ++result.work.oscillatorSamples;
                 ++componentSampleCounter;
-                add(VoiceMath::nextNoise(noiseState), modulatedLevel, modulatedPan, staticPanGains, panIsDynamic, osc.routing);
+                add(VoiceMath::nextNoise(noiseState), modulatedLevel, modulatedPan, staticPanGains,
+                    panIsDynamic, osc.routing, sourceFrame);
                 return;
             }
 
@@ -188,7 +199,7 @@ namespace beat::AetherTableStackRenderer
             }
             const auto [leftGain, rightGain] = panIsDynamic ? VoiceMath::equalPowerPanGains(modulatedPan) : staticPanGains;
             rendered = { value, modulatedLevel, leftGain, rightGain, osc.routing, true };
-            add(value, modulatedLevel, modulatedPan, staticPanGains, panIsDynamic, osc.routing);
+            add(value, modulatedLevel, modulatedPan, staticPanGains, panIsDynamic, osc.routing, sourceFrame);
         };
 
         renderOsc(
@@ -212,7 +223,8 @@ namespace beat::AetherTableStackRenderer
             oscABasePhase,
             oscAPhaseOffset,
             result.work.aetherOscASamples,
-            renderedA);
+            renderedA,
+            result.sourceFrames[0]);
         renderOsc(
             params.aetherOscB,
             oscillatorsB,
@@ -234,7 +246,8 @@ namespace beat::AetherTableStackRenderer
             oscBBasePhase,
             oscBPhaseOffset,
             result.work.aetherOscBSamples,
-            renderedB);
+            renderedB,
+            result.sourceFrames[1]);
 
         const float interactionAmount = VoiceMath::clamp01(params.aetherInteractionAmount);
         if (params.aetherInteractionMode != 0 && interactionAmount > 0.0f && renderedA.active && renderedB.active)
@@ -249,6 +262,11 @@ namespace beat::AetherTableStackRenderer
             auto& destinationRight = renderedA.routing == 1 ? directRightSum : renderedA.routing == 2 ? filter1RightSum : renderedA.routing == 3 ? filter2RightSum : rightSum;
             destinationLeft += delta * renderedA.level * renderedA.leftGain;
             destinationRight += delta * renderedA.level * renderedA.rightGain;
+            if (params.hasAetherSourceSends)
+            {
+                result.sourceFrames[0].left += delta * renderedA.level * renderedA.leftGain;
+                result.sourceFrames[0].right += delta * renderedA.level * renderedA.rightGain;
+            }
             ++result.work.nonlinearSamples;
         }
 
@@ -261,7 +279,8 @@ namespace beat::AetherTableStackRenderer
                 0.0f,
                 VoiceMath::centerPanGains,
                 false,
-                params.aetherSub.routing);
+                params.aetherSub.routing,
+                result.sourceFrames[2]);
         }
 
         if (params.aetherNoise.enabled && params.aetherNoise.level > 0.0f)
@@ -269,7 +288,8 @@ namespace beat::AetherTableStackRenderer
             ++result.work.oscillatorSamples;
             ++result.work.aetherNoiseSamples;
             const float noise = VoiceMath::nextNoise(noiseState);
-            add(noise * (0.35f + VoiceMath::clamp01(params.aetherNoise.color) * 0.65f), params.aetherNoise.level, 0.0f, VoiceMath::centerPanGains, false, params.aetherNoise.routing);
+            add(noise * (0.35f + VoiceMath::clamp01(params.aetherNoise.color) * 0.65f), params.aetherNoise.level,
+                0.0f, VoiceMath::centerPanGains, false, params.aetherNoise.routing, result.sourceFrames[3]);
         }
 
         if (levelSum <= 0.0f)
@@ -284,6 +304,14 @@ namespace beat::AetherTableStackRenderer
         result.filter1Frame.right = juce::jlimit(-1.0f, 1.0f, filter1RightSum / normalizer);
         result.filter2Frame.left = juce::jlimit(-1.0f, 1.0f, filter2LeftSum / normalizer);
         result.filter2Frame.right = juce::jlimit(-1.0f, 1.0f, filter2RightSum / normalizer);
+        if (params.hasAetherSourceSends)
+        {
+            for (auto& sourceFrame : result.sourceFrames)
+            {
+                sourceFrame.left = juce::jlimit(-1.0f, 1.0f, sourceFrame.left / normalizer);
+                sourceFrame.right = juce::jlimit(-1.0f, 1.0f, sourceFrame.right / normalizer);
+            }
+        }
         result.frame.left = juce::jlimit(-1.0f, 1.0f, result.filteredFrame.left + result.filter1Frame.left + result.filter2Frame.left + result.directFrame.left);
         result.frame.right = juce::jlimit(-1.0f, 1.0f, result.filteredFrame.right + result.filter1Frame.right + result.filter2Frame.right + result.directFrame.right);
         return result;

@@ -1982,6 +1982,7 @@ namespace beat
             instrument.aether.oscA.routing,
             instrument.aether.oscA.phase,
             instrument.aether.oscA.randomPhase,
+            instrument.aether.oscA.fxSends,
             copyWavetable(instrument.aether.oscA.wavetable),
         };
         params.aetherOscB = {
@@ -2002,6 +2003,7 @@ namespace beat
             instrument.aether.oscB.routing,
             instrument.aether.oscB.phase,
             instrument.aether.oscB.randomPhase,
+            instrument.aether.oscB.fxSends,
             copyWavetable(instrument.aether.oscB.wavetable),
         };
         params.aetherSub = {
@@ -2010,13 +2012,28 @@ namespace beat
             instrument.aether.sub.octave,
             instrument.aether.sub.waveform,
             instrument.aether.sub.routing,
+            instrument.aether.sub.fxSends,
         };
         params.aetherNoise = {
             instrument.aether.noise.enabled,
             instrument.aether.noise.level,
             instrument.aether.noise.color,
             instrument.aether.noise.routing,
+            instrument.aether.noise.fxSends,
         };
+        params.hasAetherSourceSends = [&instrument]
+        {
+            for (size_t bus = 0; bus < instrument.aether.fxBusIds.size(); ++bus)
+            {
+                if (instrument.aether.fxBusIds[bus].isNotEmpty()
+                    && (instrument.aether.oscA.fxSends[bus] > 0.0001f
+                        || instrument.aether.oscB.fxSends[bus] > 0.0001f
+                        || instrument.aether.sub.fxSends[bus] > 0.0001f
+                        || instrument.aether.noise.fxSends[bus] > 0.0001f))
+                    return true;
+            }
+            return false;
+        }();
         params.aetherRuntimeWarp = juce::jlimit(0.0f, 1.0f, instrument.aether.runtimeWarp);
         params.aetherRuntimeWarpMode = juce::jlimit(0, 3, instrument.aether.runtimeWarpMode);
         params.aetherRuntimeWarp2 = juce::jlimit(0.0f, 1.0f, instrument.aether.runtimeWarp2);
@@ -2249,7 +2266,16 @@ namespace beat
             route.routeCompensationSamples = juce::jmax(0, projectLatencySamples - route.routeLatencySamples);
 
             if (routeInstrument != nullptr)
+            {
                 route.synth = createInstrumentSynth(*routeInstrument);
+                route.sourceFxBusIds = routeInstrument->aether.fxBusIds;
+            }
+
+            for (auto& sourceFxBuffer : route.sourceFxBuffers)
+            {
+                sourceFxBuffer.setSize(routeBuf.getNumChannels(), routeBuf.getNumSamples(), false, false, true);
+                sourceFxBuffer.clear();
+            }
 
             prepareRouteEffects(route);
             if (nextRenderStates.size() < RenderBudgets::instrumentRoutes)
@@ -2915,6 +2941,41 @@ namespace beat
                 const int sourceCh = juce::jmin(ch, routeChannels - 1);
                 const float panGain = ch == 0 ? panGains.left : ch == 1 ? panGains.right : 1.0f;
                 bus.returnBuffer.addFrom(ch, startSample, route, sourceCh, startSample, numSamples, gain * panGain);
+            }
+        }
+    }
+
+    void AudioEngine::addAetherSourceSendsLocked(InstrumentRenderState& routeState,
+                                                  int startSample,
+                                                  int numSamples) noexcept
+    {
+        if (returnRenderStates.empty() || numSamples <= 0)
+            return;
+
+        const float routeGain = juce::Decibels::decibelsToGain(routeState.gainDb);
+        const auto panGains = equalPowerPan(routeState.pan);
+        for (size_t busIndex = 0; busIndex < routeState.sourceFxBuffers.size(); ++busIndex)
+        {
+            const auto& busId = routeState.sourceFxBusIds[busIndex];
+            if (busId.isEmpty())
+                continue;
+            auto found = std::find_if(returnRenderStates.begin(), returnRenderStates.end(),
+                [&](const InstrumentRenderState& bus) { return bus.trackId == busId; });
+            if (found == returnRenderStates.end())
+                continue;
+
+            auto& source = routeState.sourceFxBuffers[busIndex];
+            auto& destination = found->returnBuffer;
+            if (source.getNumSamples() < startSample + numSamples
+                || destination.getNumSamples() < startSample + numSamples)
+                continue;
+
+            for (int channel = 0; channel < destination.getNumChannels(); ++channel)
+            {
+                const int sourceChannel = juce::jmin(channel, source.getNumChannels() - 1);
+                const float panGain = channel == 0 ? panGains.left : channel == 1 ? panGains.right : 1.0f;
+                destination.addFrom(channel, startSample, source, sourceChannel, startSample, numSamples,
+                    routeGain * panGain);
             }
         }
     }
@@ -4388,20 +4449,25 @@ namespace beat
                 for (auto& route : instrumentRenderStates)
                 {
                     routeBuf.clear();
+                    for (auto& sourceFxBuffer : route.sourceFxBuffers)
+                        sourceFxBuffer.clear();
                     if (route.synth != nullptr)
                     {
                         VoiceAutomationInbox::setPending(route.noteAutomationContexts.data(),
                                                          route.noteAutomationContextCount);
                         voiceStartTicks = markTicks();
-                        renderSynthWithRealtimeParametersLocked(*route.synth,
-                                                                routeBuf,
-                                                                route.midi,
-                                                                route.instrumentId.toRawUTF8(),
-                                                                numSamples);
+                        const AetherSourceBusContext::ScopedTargets sourceBusTargets({
+                            &route.sourceFxBuffers[0],
+                            &route.sourceFxBuffers[1],
+                        });
+                        renderSynthWithRealtimeParametersLocked(*route.synth, routeBuf, route.midi,
+                            route.instrumentId.toRawUTF8(), numSamples);
                         voiceTicks += ticksBetween(voiceStartTicks, markTicks());
                         activeSynthVoiceCount += countActiveSynthVoices(*route.synth);
                         VoiceAutomationInbox::clearPending();
                     }
+
+                    addAetherSourceSendsLocked(route, 0, numSamples);
 
                     const auto routeSampleStartTicks = markTicks();
                     renderSampleVoicesForRouteLocked(route.trackId, routeBuf, numSamples);

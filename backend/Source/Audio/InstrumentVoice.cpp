@@ -109,6 +109,8 @@ namespace beat
         filter1RouteState.prepare(sr, blockSize, params.filterType);
         filter2RouteState.prepare(sr, blockSize, params.filter2Type);
         stealTransition.prepare(sampleRate);
+        for (auto& transition : sourceSendTransitions)
+            transition.prepare(sampleRate);
     }
 
     void InstrumentVoice::setProcessingQuality(AudioQuality quality) noexcept
@@ -352,9 +354,17 @@ namespace beat
                                     juce::SynthesiserSound*, int currentPitchWheel)
     {
         if (stealPrepared)
+        {
             stealTransition.beginFrom(lastOutput);
+            for (size_t bus = 0; bus < sourceSendTransitions.size(); ++bus)
+                sourceSendTransitions[bus].beginFrom(lastSourceSendOutputs[bus]);
+        }
         else
+        {
             stealTransition.reset();
+            for (auto& transition : sourceSendTransitions)
+                transition.reset();
+        }
         stealPrepared = false;
         const bool legatoRetune = baseParams.legato && adsr.isActive();
         params = baseParams;
@@ -523,6 +533,11 @@ namespace beat
             {
                 stealTransition.reset();
                 lastOutput = {};
+                for (size_t bus = 0; bus < sourceSendTransitions.size(); ++bus)
+                {
+                    sourceSendTransitions[bus].reset();
+                    lastSourceSendOutputs[bus] = {};
+                }
             }
         }
     }
@@ -639,6 +654,7 @@ namespace beat
             StereoSample directRaw;
             StereoSample filter1Raw;
             StereoSample filter2Raw;
+            std::array<AetherTableStackRenderer::StereoFrame, 4> sourceFrames {};
             if (params.hasAether)
             {
                 const auto aetherResult = AetherTableStackRenderer::render(
@@ -675,6 +691,7 @@ namespace beat
                 directRaw = { aetherResult.directFrame.left, aetherResult.directFrame.right };
                 filter1Raw = { aetherResult.filter1Frame.left, aetherResult.filter1Frame.right };
                 filter2Raw = { aetherResult.filter2Frame.left, aetherResult.filter2Frame.right };
+                sourceFrames = aetherResult.sourceFrames;
                 currentBlockWork.add(aetherResult.work);
             }
             else
@@ -891,6 +908,33 @@ namespace beat
                     : ch == 1 ? transitioned.right
                     : (transitioned.left + transitioned.right) * 0.5f;
                 out.addSample(ch, startSample + i, VoiceMath::denormalSafe(output));
+            }
+
+            if (params.hasAether && params.hasAetherSourceSends)
+            {
+                const std::array<std::array<float, 2>, 4> sendLevels {{
+                    params.aetherOscA.fxSends,
+                    params.aetherOscB.fxSends,
+                    params.aetherSub.fxSends,
+                    params.aetherNoise.fxSends,
+                }};
+                for (size_t bus = 0; bus < AetherSourceBusContext::busCount; ++bus)
+                {
+                    VoiceTransition::Stereo send {};
+                    for (size_t source = 0; source < sourceFrames.size(); ++source)
+                    {
+                        const float sendGain = VoiceMath::clamp01(sendLevels[source][bus]);
+                        send.left += sourceFrames[source].left * sendGain;
+                        send.right += sourceFrames[source].right * sendGain;
+                    }
+                    send.left *= leftGain * voiceGain;
+                    send.right *= rightGain * voiceGain;
+                    const auto transitionedSend = sourceSendTransitions[bus].process(send);
+                    lastSourceSendOutputs[bus] = transitionedSend;
+                    AetherSourceBusContext::add(bus, startSample + i,
+                        VoiceMath::denormalSafe(transitionedSend.left),
+                        VoiceMath::denormalSafe(transitionedSend.right));
+                }
             }
 
             phase += currentPhaseDelta;

@@ -1514,6 +1514,8 @@ namespace beat
             fallback.fineCents = floatParam(value, "fineCents", fallback.fineCents, -100.0f, 100.0f);
             fallback.phase = normalizedParam(value, "phase", fallback.phase);
             fallback.randomPhase = normalizedParam(value, "randomPhase", fallback.randomPhase);
+            fallback.fxSends[0] = normalizedParam(value, "fxSend1", fallback.fxSends[0]);
+            fallback.fxSends[1] = normalizedParam(value, "fxSend2", fallback.fxSends[1]);
             fallback.wavetable = parseWavetableConfig(value.getProperty("wavetable", {}), fallback.wavetable);
             return fallback;
         }
@@ -2188,11 +2190,17 @@ namespace beat
                         instrument.aether.sub.level = normalizedParam(sub, "level", 0.18f);
                         instrument.aether.sub.octave = juce::jlimit(-4, 0, (int) sub.getProperty("octave", -1));
                         instrument.aether.sub.waveform = parseSubWaveform(sub.getProperty("waveform", "sine"));
+                        instrument.aether.sub.fxSends[0] = normalizedParam(sub, "fxSend1", 0.0f);
+                        instrument.aether.sub.fxSends[1] = normalizedParam(sub, "fxSend2", 0.0f);
 
                         const auto noise = aether.getProperty("noise", {});
                         instrument.aether.noise.enabled = noise.isObject() ? (bool) noise.getProperty("enabled", false) : false;
                         instrument.aether.noise.level = normalizedParam(noise, "level", 0.08f);
                         instrument.aether.noise.color = normalizedParam(noise, "color", 0.45f);
+                        instrument.aether.noise.fxSends[0] = normalizedParam(noise, "fxSend1", 0.0f);
+                        instrument.aether.noise.fxSends[1] = normalizedParam(noise, "fxSend2", 0.0f);
+                        instrument.aether.fxBusIds[0] = aether.getProperty("fxBus1Id", "").toString();
+                        instrument.aether.fxBusIds[1] = aether.getProperty("fxBus2Id", "").toString();
                         instrument.aether.runtimeWarp = normalizedParam(aether, "runtimeWarp", 0.0f);
                         instrument.aether.runtimeWarpMode = parseWavetableWarpMode(aether.getProperty("runtimeWarpMode", 0));
                         instrument.aether.runtimeWarp2 = normalizedParam(aether, "runtimeWarp2", 0.0f);

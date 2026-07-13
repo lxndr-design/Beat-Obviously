@@ -263,6 +263,8 @@ namespace beat
             fallback.routing = route == "direct" ? 1 : route == "filter1" ? 2 : route == "filter2" ? 3 : 0;
             fallback.phase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "phase", fallback.phase));
             fallback.randomPhase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "randomPhase", fallback.randomPhase));
+            fallback.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "fxSend1", fallback.fxSends[0]));
+            fallback.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "fxSend2", fallback.fxSends[1]));
             fallback.wavetable = synthWavetableConfig(params, modulation, metadata, customWavetables, oscillator, fallback.wavetable);
             return fallback;
         }
@@ -475,6 +477,12 @@ namespace beat
         const auto sourceRoute = [](const juce::String& route) { return route == "direct" ? 1 : route == "filter1" ? 2 : route == "filter2" ? 3 : 0; };
         instrument.aether.sub.routing = sourceRoute(synthStringParam(params, "aether.sub.route", "filter"));
         instrument.aether.noise.routing = sourceRoute(synthStringParam(params, "aether.noise.route", "filter"));
+        instrument.aether.sub.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.sub.fxSend1", 0.0));
+        instrument.aether.sub.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.sub.fxSend2", 0.0));
+        instrument.aether.noise.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.noise.fxSend1", 0.0));
+        instrument.aether.noise.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.noise.fxSend2", 0.0));
+        instrument.aether.fxBusIds[0] = synthStringParam(params, "aether.fxBus1Id", "");
+        instrument.aether.fxBusIds[1] = synthStringParam(params, "aether.fxBus2Id", "");
         instrument.aether.runtimeWarp = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.runtimeWarp", 0.0));
         instrument.aether.runtimeWarpMode = synthRuntimeWarpModeForId(synthStringParam(params, "aether.runtimeWarpMode", "shape"));
         instrument.aether.runtimeWarp2 = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.runtimeWarp2", 0.0));

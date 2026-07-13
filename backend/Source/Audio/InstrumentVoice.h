@@ -5,6 +5,7 @@
 #include "Filter/FilterStage.h"
 #include "Modulation/DynamicModulation.h"
 #include "Oscillator/VoiceAetherCache.h"
+#include "Oscillator/AetherSourceBusContext.h"
 #include "Oscillator/VoiceStats.h"
 #include "Realtime/RealtimeParameterQueue.h"
 #include "Realtime/RealtimeRamp.h"
@@ -110,6 +111,7 @@ namespace beat
                 int routing { 0 };
                 float phase { 0.0f };
                 float randomPhase { 0.0f };
+                std::array<float, 2> fxSends {};
                 WavetableConfig wavetable;
             };
 
@@ -120,6 +122,7 @@ namespace beat
                 int octave { -1 };
                 int waveform { 0 };
                 int routing { 0 };
+                std::array<float, 2> fxSends {};
             };
 
             struct AetherNoise
@@ -128,6 +131,7 @@ namespace beat
                 float level { 0.0f };
                 float color { 0.5f };
                 int routing { 0 };
+                std::array<float, 2> fxSends {};
             };
 
             struct DynamicModTarget
@@ -272,6 +276,7 @@ namespace beat
             bool mono { false };
             bool legato { false };
             bool hasAether { false };
+            bool hasAetherSourceSends { false };
             AetherOscillator aetherOscA;
             AetherOscillator aetherOscB;
             AetherSub aetherSub;
@@ -413,6 +418,8 @@ namespace beat
         juce::ADSR::Parameters env4AdsrParams;
         VoiceTransition stealTransition;
         VoiceTransition::Stereo lastOutput;
+        std::array<VoiceTransition, AetherSourceBusContext::busCount> sourceSendTransitions;
+        std::array<VoiceTransition::Stereo, AetherSourceBusContext::busCount> lastSourceSendOutputs {};
         int stableVoiceId { 0 };
         bool stealPrepared { false };
         AudioQuality processingQuality { AudioQuality::standardLive };

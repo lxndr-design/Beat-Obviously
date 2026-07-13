@@ -1247,11 +1247,18 @@ function selectedOptionLabel(
 
 function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEditorTarget | null }) {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
+  const returnBuses = createStoreSelector(useProjectStore, (state) => state.project.returnBuses);
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
   const setParameter = useSynthStore.getState().setParameter;
   const filterType = createMemo(() => String(draft().parameters["filter.type"]));
   const filterEnabled = createMemo(() => draft().parameters["filter.enabled"] === true);
+  const [fxBus1Open, setFxBus1Open] = createSignal(false);
+  const [fxBus2Open, setFxBus2Open] = createSignal(false);
+  const fxBusOptions = createMemo(() => [
+    { value: "", label: "Off" },
+    ...returnBuses().filter((bus) => !bus.mute).map((bus) => ({ value: bus.id, label: bus.name || bus.id })),
+  ]);
 
   return (
     <section
@@ -1362,6 +1369,37 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               bipolar
               onChange={setNumericParameter}
             />
+          </div>
+        </div>
+        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label="Aether shared FX buses">
+          <div class={styles.ampFilterGroupTitle}>Source FX</div>
+          <div class={styles.ampFilterShapeRow}>
+            <FloatingSelect
+              label="Bus 1"
+              layout="inline"
+              value={String(draft().parameters["aether.fxBus1Id"] ?? "")}
+              ariaLabel="Aether FX bus 1 target"
+              options={fxBusOptions()}
+              open={fxBus1Open()}
+              onOpenChange={setFxBus1Open}
+              onChange={(value) => setParameter("aether.fxBus1Id", value)}
+            />
+            <FloatingSelect
+              label="Bus 2"
+              layout="inline"
+              value={String(draft().parameters["aether.fxBus2Id"] ?? "")}
+              ariaLabel="Aether FX bus 2 target"
+              options={fxBusOptions()}
+              open={fxBus2Open()}
+              onOpenChange={setFxBus2Open}
+              onChange={(value) => setParameter("aether.fxBus2Id", value)}
+            />
+          </div>
+          <div class={styles.knobCluster}>
+            <SynthParameterKnob id="aether.sub.fxSend1" label="Sub 1" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.sub.fxSend2" label="Sub 2" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.noise.fxSend1" label="Noise 1" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.noise.fxSend2" label="Noise 2" defaultValue={0} onChange={setNumericParameter} />
           </div>
         </div>
       </div>
