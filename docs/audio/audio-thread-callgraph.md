@@ -574,3 +574,19 @@ zone clear/replacement
 ```
 
 Both pitch offsets and all ranges/caches are fixed scalar or 16-channel state. The MCM path performs bounded channel/voice scans under the synthesiser's existing critical section and adds no ownership, allocation, resize, sort, filesystem access, lazy initialization, or processor construction. A focused development/test probe exercises RPN 6 ingestion and reports zero allocation, blocking-lock, file/stream, lazy-init, or growth violations. Offline rendering remains excluded from real-time callback classification.
+
+## Milestone B23 product MPE controls
+
+```text
+SynthEditor MPE switch/channel inputs (UI thread)
+  -> existing stable aether.mpe.* draft fields
+  -> overlap validation disables invalid saved zone
+Apply/Save
+  -> existing synthDraftToInstrumentPatch / project persistence
+  -> AudioEngine project-application setup
+  -> BeatSynthesiser::configureMemberExpressionZone
+audio callback
+  -> unchanged B20-B22 fixed zone/expression paths
+```
+
+The controls add no IPC message, persisted schema, callback branch, container, or DSP state. All validation and draft edits run on the frontend/UI path; the existing project-application boundary remains the only route into prepared native state.

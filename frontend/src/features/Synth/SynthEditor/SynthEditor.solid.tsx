@@ -544,6 +544,7 @@ export function SynthEditor(props: SynthEditorProps) {
                   onChange={setInstrumentTaxonomyById}
                 />
               </div>
+              <MpeZoneControls />
               <div class={styles.expressionSummary} aria-label="Aether expression and performance summary">
                 <For each={synthExpressionSummary(draft(), effectiveExpressionActivity())}>
                   {(item) => (
@@ -616,6 +617,77 @@ export function SynthEditor(props: SynthEditorProps) {
           </Button>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function MpeZoneControls() {
+  const draft = createStoreSelector(useSynthStore, (state) => state.draft);
+  const setNumericParameter = useSynthStore.getState().setNumericParameter;
+  const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
+  const enabled = createMemo(() => draft().parameters["aether.mpe.enabled"] === true);
+  const master = createMemo(() => Math.round(getNumberParam(draft(), "aether.mpe.masterChannel")));
+  const firstMember = createMemo(() => Math.round(getNumberParam(draft(), "aether.mpe.firstMemberChannel")));
+  const lastMember = createMemo(() => Math.round(getNumberParam(draft(), "aether.mpe.lastMemberChannel")));
+  const valid = createMemo(() => master() < firstMember() || master() > lastMember());
+
+  function setChannel(id: "aether.mpe.masterChannel" | "aether.mpe.firstMemberChannel" | "aether.mpe.lastMemberChannel", value: number) {
+    const channel = Math.max(1, Math.min(16, Math.round(value)));
+    const nextMaster = id === "aether.mpe.masterChannel" ? channel : master();
+    const nextFirst = id === "aether.mpe.firstMemberChannel" ? channel : firstMember();
+    const nextLast = id === "aether.mpe.lastMemberChannel" ? channel : lastMember();
+    setNumericParameter(id, channel);
+    if (nextMaster >= nextFirst && nextMaster <= nextLast)
+      setBooleanParameter("aether.mpe.enabled", false);
+  }
+
+  return (
+    <div class={styles.mpeZoneControls} aria-label="Aether MPE member zone">
+      <Toggle
+        className={styles.mpeZoneToggle}
+        label="MPE zone"
+        checked={enabled()}
+        aria-label="Enable Aether MPE member zone"
+        onChange={(next) => setBooleanParameter("aether.mpe.enabled", next && valid())}
+      />
+      <NumberInput
+        label="Manager"
+        layout="inline"
+        value={master()}
+        min={1}
+        max={16}
+        step={1}
+        ariaLabel="MPE manager channel"
+        className={styles.mpeChannelInput}
+        onChange={(value) => setChannel("aether.mpe.masterChannel", value)}
+      />
+      <NumberInput
+        label="First"
+        layout="inline"
+        value={firstMember()}
+        min={1}
+        max={lastMember()}
+        step={1}
+        ariaLabel="First MPE member channel"
+        className={styles.mpeChannelInput}
+        onChange={(value) => setChannel("aether.mpe.firstMemberChannel", value)}
+      />
+      <NumberInput
+        label="Last"
+        layout="inline"
+        value={lastMember()}
+        min={firstMember()}
+        max={16}
+        step={1}
+        ariaLabel="Last MPE member channel"
+        className={styles.mpeChannelInput}
+        onChange={(value) => setChannel("aether.mpe.lastMemberChannel", value)}
+      />
+      <span class={styles.mpeZoneStatus} data-valid={valid() ? "true" : "false"}>
+        {valid()
+          ? enabled() ? `Ch ${master()} -> ${firstMember()}-${lastMember()}` : "Saved zone off; RPN 6 may enable at runtime"
+          : "Manager must be outside the member range"}
+      </span>
     </div>
   );
 }

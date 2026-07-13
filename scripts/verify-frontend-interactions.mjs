@@ -1323,6 +1323,15 @@ try {
     "browser fixture coverage should exercise Aether Performance control editing",
   );
   assert.ok(
+    synthEditorSource.includes('aria-label="Aether MPE member zone"')
+      && synthEditorSource.includes('aria-label="Enable Aether MPE member zone"')
+      && synthEditorSource.includes('ariaLabel="MPE manager channel"')
+      && synthEditorSource.includes('ariaLabel="First MPE member channel"')
+      && synthEditorSource.includes('ariaLabel="Last MPE member channel"')
+      && synthEditorSource.includes('setBooleanParameter("aether.mpe.enabled", false)'),
+    "Aether Synth Editor should expose validated saved MPE zone controls",
+  );
+  assert.ok(
     synthEditorSource.includes("Import Preset")
       && editorHostSource.includes("Instrument - Aether Engine")
       && synthEditorSource.includes("onAudition")
