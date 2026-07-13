@@ -141,3 +141,7 @@ The LFO 3–10 sync fields, setup-time musical-division conversion, persistence/
 ## Milestone B16 provenance
 
 The two fixed source-send buffers, non-owning render context, source contribution taps, return-bus aggregation, persistence/frontend controls, and tests independently extend Beat's existing Aether source mixer and project return-bus routing. JUCE's existing synchronous `Synthesiser::renderNextBlock` API is used without copying or modifying JUCE source. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived implementation, runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.
+
+## Milestone B17 provenance
+
+The effect-descriptor comparison, same-project route matching, bounded output bridge, project-identity reset policy, and focused native test independently extend Beat's existing route-effect application and `VoiceTransition` infrastructure. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived implementation, runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.

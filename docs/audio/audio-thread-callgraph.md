@@ -459,3 +459,24 @@ processReturnBusesLocked
 ```
 
 The callback owns no auxiliary allocation, resizing, lookup container, effect instance, file operation, or destruction. The only target lookup scans the already bounded prepared return-state vector, matching the pre-existing track-send policy. Empty, muted, or missing target IDs produce no return contribution. Offline rendering traverses the same deterministic audio path but remains outside the real-time callback detector.
+
+## Milestone B17 bounded effect-graph transitions
+
+```text
+AudioEngine::applyProject / rebuildSampleInstruments (setup boundary)
+  compare ordered prepared effect descriptors for matching route IDs
+  changed same-project graph -> arm fixed 1.5 ms transition from last route output
+  different project ID -> retain full-project reset semantics
+audio callback, instrument/group routes
+  processRouteEffectsLocked
+  processEffectGraphTransitionLocked
+    inactive: capture final stereo sample only
+    active: fixed per-sample stereo bridge arithmetic
+  meter/sends/group-or-master accumulation
+audio callback, return routes
+  processRouteEffectsLocked
+  processEffectGraphTransitionLocked
+  master accumulation
+```
+
+Graph comparison, vector traversal, and route-state publication stay outside the callback. The callback transition owns no dynamic storage and performs no effect construction, destruction, sorting, filesystem access, lazy initialization, or container growth. It bridges from the last output sample of the retired graph; it does not process the retired graph in parallel or preserve its effect tail. Offline rendering uses the same deterministic signal path but remains outside real-time callback instrumentation.

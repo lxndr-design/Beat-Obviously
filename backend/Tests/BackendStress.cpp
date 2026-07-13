@@ -5330,6 +5330,64 @@ namespace
         return engine.sequencer().isPlaying();
     }
 
+    bool stressAudioEngineEffectGraphTransition()
+    {
+        auto project = makeTinyOfflineProject();
+        project.lengthBeats = 4.0;
+        project.tracks.front().segments.front().lengthBeats = 4.0;
+        project.tracks.front().segments.front().notes.front().lengthBeats = 3.0;
+
+        beat::TrackEffect lowpass;
+        lowpass.id = "graph-lowpass";
+        lowpass.kind = beat::TrackEffectKind::Lowpass;
+        lowpass.params.push_back({ "cutoffHz", 1800.0f });
+        lowpass.params.push_back({ "resonance", 22.0f });
+        beat::TrackEffect saturator;
+        saturator.id = "graph-saturator";
+        saturator.kind = beat::TrackEffectKind::Saturator;
+        saturator.params.push_back({ "drive", 64.0f });
+        saturator.params.push_back({ "mix", 75.0f });
+        project.tracks.front().effects = { lowpass, saturator };
+
+        beat::AudioEngine engine;
+        engine.prepareForOffline(44100.0, 256, 2);
+        engine.applyProject(project);
+        engine.requestPlay();
+        const auto before = renderEngineBlock(engine, 2048);
+        const float previousLeft = before.getSample(0, before.getNumSamples() - 1);
+        const float previousRight = before.getSample(1, before.getNumSamples() - 1);
+
+        project.tracks.front().effects = { saturator, lowpass };
+        project.tracks.front().effects.front().bypassed = true;
+        engine.applyProject(project);
+        const auto after = renderEngineBlock(engine, 256);
+        const float firstLeft = after.getSample(0, 0);
+        const float firstRight = after.getSample(1, 0);
+
+        bool finite = true;
+        float peak = 0.0f;
+        for (int channel = 0; channel < after.getNumChannels(); ++channel)
+        {
+            for (int sample = 0; sample < after.getNumSamples(); ++sample)
+            {
+                const float value = after.getSample(channel, sample);
+                finite = finite && std::isfinite(value);
+                peak = juce::jmax(peak, std::abs(value));
+            }
+        }
+
+        const float boundaryStep = juce::jmax(std::abs(firstLeft - previousLeft),
+                                               std::abs(firstRight - previousRight));
+        const bool ok = finite && peak > 0.00001f && boundaryStep < 0.2f;
+        if (!ok)
+        {
+            std::cerr << "Effect graph transition failed previous=" << previousLeft << "," << previousRight
+                      << " first=" << firstLeft << "," << firstRight
+                      << " boundaryStep=" << boundaryStep << " peak=" << peak << " finite=" << finite << "\n";
+        }
+        return ok;
+    }
+
     bool stressAudioEngineTransportCommandBurst()
     {
         beat::AudioEngine engine;
@@ -14702,6 +14760,12 @@ int main()
     if (!stressAudioEngineApplyProjectRuntimeBoundary())
     {
         std::cerr << "Audio engine apply-project runtime boundary stress failed\n";
+        return 1;
+    }
+    std::cerr << "  effect graph transition\n";
+    if (!stressAudioEngineEffectGraphTransition())
+    {
+        std::cerr << "Audio engine effect graph transition stress failed\n";
         return 1;
     }
     std::cerr << "  transport command burst\n";

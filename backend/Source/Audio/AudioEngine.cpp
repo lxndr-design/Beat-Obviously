@@ -277,6 +277,33 @@ namespace beat
             return effects;
         }
 
+        bool equivalentEffectGraphs(const std::vector<TrackEffect>& a,
+                                    const std::vector<TrackEffect>& b) noexcept
+        {
+            if (a.size() != b.size()) return false;
+            for (size_t index = 0; index < a.size(); ++index)
+            {
+                const auto& left = a[index];
+                const auto& right = b[index];
+                if (left.id != right.id || left.kind != right.kind
+                    || left.schemaVersion != right.schemaVersion
+                    || left.bypassed != right.bypassed
+                    || left.pluginId != right.pluginId
+                    || left.pluginName != right.pluginName
+                    || left.pluginFormat != right.pluginFormat
+                    || left.latencySamples != right.latencySamples
+                    || left.params.size() != right.params.size())
+                    return false;
+                for (size_t param = 0; param < left.params.size(); ++param)
+                {
+                    if (left.params[param].key != right.params[param].key
+                        || left.params[param].value != right.params[param].value)
+                        return false;
+                }
+            }
+            return true;
+        }
+
         int routeEffectsLatencySamples(const Project& project,
                                        const std::vector<TrackEffect>& effects) noexcept
         {
@@ -1054,6 +1081,7 @@ namespace beat
 
     void AudioEngine::applyProject(Project p)
     {
+        const bool replacingProject = activeProjectId.isNotEmpty() && activeProjectId != p.id;
         normalizeProjectTrackEffects(p);
         applyPluginEffectCapabilities(p);
         normalizeProjectTrackEffects(p);
@@ -1075,7 +1103,9 @@ namespace beat
         masterCompressorEnvelope = 0.0f;
         projectLatencySamples = estimateProjectLatencySamples(p);
         rebuildSampleInstruments(p);
-        masterDcBlocker.reset();
+        if (replacingProject || activeProjectId.isEmpty())
+            masterDcBlocker.reset();
+        activeProjectId = p.id;
     }
 
     void AudioEngine::setEqAutomation(std::vector<EqAutomationPoint> pts)
@@ -1529,6 +1559,8 @@ namespace beat
         route.gainDb = route.baseGainDb;
         route.pan = route.basePan;
         route.effects = route.baseEffects;
+        route.effectGraphTransition.reset();
+        route.lastEffectGraphOutput = {};
 
         for (auto& filter : route.filterStates)
         {
@@ -2305,6 +2337,21 @@ namespace beat
         }
 
         const juce::ScopedLock lock(sampleLock);
+        const auto armEffectTransitions = [this](auto& nextRoutes, const auto& currentRoutes)
+        {
+            for (auto& nextRoute : nextRoutes)
+            {
+                nextRoute.effectGraphTransition.prepare(sampleRate);
+                const auto found = std::find_if(currentRoutes.begin(), currentRoutes.end(),
+                    [&](const InstrumentRenderState& current) { return current.trackId == nextRoute.trackId; });
+                if (found != currentRoutes.end()
+                    && !equivalentEffectGraphs(found->effects, nextRoute.effects))
+                    nextRoute.effectGraphTransition.beginFrom(found->lastEffectGraphOutput);
+            }
+        };
+        armEffectTransitions(nextRenderStates, instrumentRenderStates);
+        armEffectTransitions(nextGroupStates, groupRenderStates);
+        armEffectTransitions(nextReturnStates, returnRenderStates);
         sampleInstruments = std::move(next);
         audioFileBuffers = std::move(nextAudioFiles);
         instrumentRenderStates = std::move(nextRenderStates);
@@ -3036,6 +3083,7 @@ namespace beat
 
             const auto effectStartTicks = juce::Time::getHighResolutionTicks();
             processRouteEffectsLocked(bus, bus.returnBuffer, 0, numSamples, routeEffectWork);
+            processEffectGraphTransitionLocked(bus, bus.returnBuffer, 0, numSamples);
             if (routeEffectTicks != nullptr)
             {
                 *routeEffectTicks += juce::jmax<int64_t>(
@@ -3760,6 +3808,7 @@ namespace beat
             {
                 const auto effectStartTicks = juce::Time::getHighResolutionTicks();
                 processRouteEffectsLocked(route, buffer, cursor, chunkSamples, routeEffectWork);
+                processEffectGraphTransitionLocked(route, buffer, cursor, chunkSamples);
                 if (routeEffectTicks != nullptr)
                 {
                     *routeEffectTicks += juce::jmax<int64_t>(
@@ -3775,6 +3824,40 @@ namespace beat
             }
 
             cursor = nextOffset;
+        }
+    }
+
+    void AudioEngine::processEffectGraphTransitionLocked(InstrumentRenderState& route,
+                                                           juce::AudioBuffer<float>& buffer,
+                                                           int startSample,
+                                                           int numSamples) noexcept
+    {
+        if (buffer.getNumChannels() <= 0 || numSamples <= 0)
+            return;
+
+        if (!route.effectGraphTransition.isActive())
+        {
+            const int lastSample = startSample + numSamples - 1;
+            const float left = buffer.getSample(0, lastSample);
+            route.lastEffectGraphOutput = {
+                left,
+                buffer.getNumChannels() > 1 ? buffer.getSample(1, lastSample) : left,
+            };
+            return;
+        }
+
+        for (int sample = 0; sample < numSamples; ++sample)
+        {
+            const int position = startSample + sample;
+            const float left = buffer.getSample(0, position);
+            const float right = buffer.getNumChannels() > 1 ? buffer.getSample(1, position) : left;
+            const auto output = route.effectGraphTransition.process({ left, right });
+            route.lastEffectGraphOutput = output;
+            buffer.setSample(0, position, denormalSafe(output.left));
+            if (buffer.getNumChannels() > 1)
+                buffer.setSample(1, position, denormalSafe(output.right));
+            for (int channel = 2; channel < buffer.getNumChannels(); ++channel)
+                buffer.setSample(channel, position, denormalSafe((output.left + output.right) * 0.5f));
         }
     }
 

@@ -481,6 +481,8 @@ namespace beat
             juce::AudioBuffer<float> groupBuffer;
             std::array<Id, AetherSourceBusContext::busCount> sourceFxBusIds {};
             std::array<juce::AudioBuffer<float>, AetherSourceBusContext::busCount> sourceFxBuffers;
+            VoiceTransition effectGraphTransition;
+            VoiceTransition::Stereo lastEffectGraphOutput {};
         };
 
         struct RouteEffectWorkStats
@@ -610,6 +612,7 @@ namespace beat
         std::atomic<bool> inputMonitoringEnabled { false };
         std::atomic<float> inputMonitoringGain { 1.0f };
         int projectLatencySamples { 0 };
+        Id activeProjectId;
         juce::CriticalSection sampleLock;
         SpscRingBuffer<TransportCommand, 512> transportCommands;
         RealtimeParameterQueue<RenderBudgets::realtimeQueueEvents> realtimeParameterChanges;
@@ -669,10 +672,14 @@ namespace beat
                                        RouteEffectWorkStats* workStats = nullptr) noexcept;
         void processMasterChain(juce::AudioBuffer<float>& buffer, int numSamples) noexcept;
         void processRouteAutomationLocked(InstrumentRenderState& route,
-                                          juce::AudioBuffer<float>& buffer,
-                                          int numSamples,
-                                          int64_t* routeEffectTicks,
-                                          RouteEffectWorkStats* routeEffectWork) noexcept;
+                                           juce::AudioBuffer<float>& buffer,
+                                           int numSamples,
+                                           int64_t* routeEffectTicks,
+                                           RouteEffectWorkStats* routeEffectWork) noexcept;
+        void processEffectGraphTransitionLocked(InstrumentRenderState& route,
+                                                juce::AudioBuffer<float>& buffer,
+                                                int startSample,
+                                                int numSamples) noexcept;
         bool applyRouteParameterLocked(InstrumentRenderState& route,
                                        const RouteParameterAutomationEvent& event) noexcept;
         void resetTrackMetersLocked() noexcept;
