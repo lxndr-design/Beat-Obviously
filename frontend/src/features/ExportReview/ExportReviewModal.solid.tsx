@@ -164,7 +164,7 @@ export function ExportReviewModal() {
               label="Sample Rate"
               value={String(options().sampleRate)}
               layout="inline"
-              options={[44100, 48000, 88200, 96000].map((value) => ({ value: String(value), label: `${value} Hz` }))}
+              options={[44100, 48000, 88200, 96000, 192000].map((value) => ({ value: String(value), label: `${value} Hz` }))}
               onChange={(value) => updatePresetOptions({ sampleRate: Number(value) })}
             />
             <FloatingSelect
@@ -187,6 +187,16 @@ export function ExportReviewModal() {
               layout="inline"
               options={[128, 256, 512, 1024, 2048].map((value) => ({ value: String(value), label: `${value} samples` }))}
               onChange={(value) => updatePresetOptions({ blockSize: Number(value) })}
+            />
+            <FloatingSelect
+              label="Quality"
+              value={options().quality}
+              layout="inline"
+              options={[
+                { value: "standard", label: "Standard" },
+                { value: "high", label: "Offline HQ" },
+              ]}
+              onChange={(value) => updatePresetOptions({ quality: value === "high" ? "high" : "standard" })}
             />
           </div>
           <div class={styles.tailControl}>

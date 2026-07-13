@@ -11328,7 +11328,60 @@ namespace
                     return false;
                 difference += std::abs((double) a - (double) b);
             }
-        return difference > 0.0001;
+        if (difference <= 0.0001)
+            return false;
+
+        auto exportProject = makeDenseAetherProject();
+        exportProject.lengthBeats = juce::jmin<beat::Beats>(exportProject.lengthBeats, 0.5);
+        const auto defaultFile = juce::File("/private/tmp/BeatBackendStress-export-quality-default.wav");
+        const auto standardFile = juce::File("/private/tmp/BeatBackendStress-export-quality-standard.wav");
+        const auto highFile = juce::File("/private/tmp/BeatBackendStress-export-quality-high.wav");
+        for (const auto& file : { defaultFile, standardFile, highFile })
+            if (file.existsAsFile())
+                file.deleteFile();
+
+        juce::String error;
+        const bool rendered = beat::AudioEngine::renderProjectToWav(
+                exportProject, defaultFile, 48000.0, 256, 2, &error, {}, 32)
+            && beat::AudioEngine::renderProjectToWav(
+                exportProject, standardFile, 48000.0, 256, 2, &error, {}, 32,
+                beat::AudioQuality::standardLive)
+            && beat::AudioEngine::renderProjectToWav(
+                exportProject, highFile, 48000.0, 256, 2, &error, {}, 32,
+                beat::AudioQuality::offlineHighQuality);
+        if (!rendered)
+        {
+            std::cerr << "Offline quality export failed: " << error << "\n";
+            for (const auto& file : { defaultFile, standardFile, highFile })
+                file.deleteFile();
+            return false;
+        }
+
+        constexpr int comparisonSamples = 4096;
+        const auto defaultExport = readWavPrefix(defaultFile, comparisonSamples);
+        const auto standardExport = readWavPrefix(standardFile, comparisonSamples);
+        const auto highExport = readWavPrefix(highFile, comparisonSamples);
+        for (const auto& file : { defaultFile, standardFile, highFile })
+            file.deleteFile();
+        if (defaultExport.getNumSamples() < comparisonSamples
+            || standardExport.getNumSamples() < comparisonSamples
+            || highExport.getNumSamples() < comparisonSamples)
+            return false;
+
+        double explicitStandardDifference = 0.0;
+        double highExportDifference = 0.0;
+        for (int channel = 0; channel < defaultExport.getNumChannels(); ++channel)
+            for (int sample = 0; sample < comparisonSamples; ++sample)
+            {
+                const float defaultSample = defaultExport.getSample(channel, sample);
+                const float standardSample = standardExport.getSample(channel, sample);
+                const float highSample = highExport.getSample(channel, sample);
+                if (!std::isfinite(defaultSample) || !std::isfinite(standardSample) || !std::isfinite(highSample))
+                    return false;
+                explicitStandardDifference += std::abs((double) defaultSample - standardSample);
+                highExportDifference += std::abs((double) defaultSample - highSample);
+            }
+        return explicitStandardDifference == 0.0 && highExportDifference > 0.0001;
     }
 
     bool stressAudioCallbackAllocationFreedom()

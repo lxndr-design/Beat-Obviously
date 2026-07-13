@@ -207,12 +207,12 @@ try {
   );
   assert.deepEqual(
     exportStore.normalizeExportOptions({ sampleRate: 123, bitDepth: 99, channels: 9, blockSize: 7 }),
-    { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512 },
+    { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512, quality: "standard" },
     "export option normalization should reject unsupported render settings",
   );
   assert.deepEqual(
-    exportStore.normalizeExportOptions({ sampleRate: 44100, bitDepth: 16, channels: 1, blockSize: 1024 }),
-    { sampleRate: 44100, bitDepth: 16, channels: 1, blockSize: 1024 },
+    exportStore.normalizeExportOptions({ sampleRate: 192000, bitDepth: 16, channels: 1, blockSize: 1024, quality: "high" }),
+    { sampleRate: 192000, bitDepth: 16, channels: 1, blockSize: 1024, quality: "high" },
     "export option normalization should preserve supported preset settings",
   );
   assert.equal(
@@ -227,17 +227,17 @@ try {
   assert.equal(exportStore.useExportStore.getState().selectedPresetId, "full-mix-review");
   const customExportPresetId = exportState.saveUserPreset("Archive Mono", {
     ...exportStore.FACTORY_EXPORT_PRESETS[0],
-    options: { sampleRate: 44100, bitDepth: 16, channels: 1, blockSize: 1024 },
+    options: { sampleRate: 44100, bitDepth: 16, channels: 1, blockSize: 1024, quality: "standard" },
   });
   assert.equal(exportStore.useExportStore.getState().selectedPresetId, customExportPresetId);
   assert.equal(exportStore.exportPresetById(customExportPresetId, "project").options.channels, 1);
   exportStore.useExportStore.getState().updateUserPreset(customExportPresetId, {
-    options: { sampleRate: 96000, bitDepth: 32, channels: 2, blockSize: 2048 },
+    options: { sampleRate: 96000, bitDepth: 32, channels: 2, blockSize: 2048, quality: "high" },
     includeTail: false,
   });
   assert.deepEqual(
     exportStore.exportPresetById(customExportPresetId, "project").options,
-    { sampleRate: 96000, bitDepth: 32, channels: 2, blockSize: 2048 },
+    { sampleRate: 96000, bitDepth: 32, channels: 2, blockSize: 2048, quality: "high" },
     "custom export presets should support editable render settings",
   );
   assert.equal(exportStore.exportPresetById(customExportPresetId, "project").includeTail, false);

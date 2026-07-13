@@ -166,6 +166,7 @@ export interface ProjectExportOptions {
   bitDepth?: 16 | 24 | 32;
   channels?: 1 | 2;
   blockSize?: number;
+  quality?: "standard" | "high";
 }
 
 export interface ProjectBackupEntry {

@@ -645,8 +645,10 @@ try {
       && exportStoreSource.includes("updateUserPreset")
       && exportReviewSource.includes("deletePreset")
       && exportStoreSource.includes("deleteUserPreset")
-      && exportReviewSource.includes("Include effect tail"),
-    "export review should expose custom export preset save, edit, tail, and delete controls",
+      && exportReviewSource.includes("Include effect tail")
+      && exportReviewSource.includes('label="Quality"')
+      && exportReviewSource.includes("Offline HQ"),
+    "export review should expose custom export preset save, edit, tail, quality, and delete controls",
   );
   assert.ok(
     exportReviewSource.includes("Post-Export Analysis")

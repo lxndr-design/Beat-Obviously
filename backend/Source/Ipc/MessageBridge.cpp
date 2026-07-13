@@ -321,6 +321,7 @@ namespace beat
             int blockSize { 512 };
             int channels { 2 };
             int bitDepth { 16 };
+            AudioQuality quality { AudioQuality::standardLive };
         };
 
         int normalizeExportBitDepth(int value) noexcept
@@ -340,6 +341,9 @@ namespace beat
                 out.blockSize = juce::jlimit(64, 8192, (int) options.getProperty("blockSize", out.blockSize));
                 out.channels = juce::jlimit(1, 2, (int) options.getProperty("channels", out.channels));
                 out.bitDepth = normalizeExportBitDepth((int) options.getProperty("bitDepth", out.bitDepth));
+                out.quality = options.getProperty("quality", "standard").toString() == "high"
+                    ? AudioQuality::offlineHighQuality
+                    : AudioQuality::standardLive;
             }
             return out;
         }
@@ -3375,7 +3379,8 @@ namespace beat
                                                            renderOptions.channels,
                                                            &trackError,
                                                            trackProgress,
-                                                           renderOptions.bitDepth);
+                                                           renderOptions.bitDepth,
+                                                           renderOptions.quality);
                         if (!ok)
                             error = track.name + ": " + trackError;
                         else
@@ -3394,7 +3399,8 @@ namespace beat
                                                              renderOptions.channels,
                                                              &error,
                                                              progress,
-                                                             renderOptions.bitDepth);
+                                                             renderOptions.bitDepth,
+                                                             renderOptions.quality);
                 }
                 else if (exportRange)
                 {
@@ -3408,7 +3414,8 @@ namespace beat
                                                                     renderOptions.channels,
                                                                     &error,
                                                                     progress,
-                                                                    renderOptions.bitDepth);
+                                                                    renderOptions.bitDepth,
+                                                                    renderOptions.quality);
                 }
                 else
                 {
@@ -3419,7 +3426,8 @@ namespace beat
                                                                renderOptions.channels,
                                                                &error,
                                                                progress,
-                                                               renderOptions.bitDepth);
+                                                               renderOptions.bitDepth,
+                                                               renderOptions.quality);
                 }
                 {
                     const std::lock_guard<std::mutex> statusLock(job->statusLock);
@@ -3502,7 +3510,8 @@ namespace beat
                                                                 renderOptions.channels,
                                                                 &error,
                                                                 {},
-                                                                renderOptions.bitDepth);
+                                                                renderOptions.bitDepth,
+                                                                renderOptions.quality);
             if (!rendered)
             {
                 response->setProperty("path", juce::String());
@@ -3627,7 +3636,8 @@ namespace beat
                                                              renderOptions.channels,
                                                              &error,
                                                              {},
-                                                             renderOptions.bitDepth);
+                                                             renderOptions.bitDepth,
+                                                             renderOptions.quality);
                 }
                 else if (exportRange)
                 {
@@ -3647,7 +3657,8 @@ namespace beat
                                                                     renderOptions.channels,
                                                                     &error,
                                                                     {},
-                                                                    renderOptions.bitDepth);
+                                                                    renderOptions.bitDepth,
+                                                                    renderOptions.quality);
                 }
                 else
                 {
@@ -3658,7 +3669,8 @@ namespace beat
                                                                renderOptions.channels,
                                                                &error,
                                                                {},
-                                                               renderOptions.bitDepth);
+                                                               renderOptions.bitDepth,
+                                                               renderOptions.quality);
                 }
 
                 if (exported)

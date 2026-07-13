@@ -112,7 +112,8 @@ namespace beat
                                        int numOutputChannels = 2,
                                        juce::String* error = nullptr,
                                        RenderProgressCallback progress = {},
-                                       int bitDepth = 16);
+                                       int bitDepth = 16,
+                                       AudioQuality quality = AudioQuality::standardLive);
         static bool renderProjectRangeToWav(Project project,
                                             Beats startBeat,
                                             Beats endBeat,
@@ -123,7 +124,8 @@ namespace beat
                                             int numOutputChannels = 2,
                                             juce::String* error = nullptr,
                                             RenderProgressCallback progress = {},
-                                            int bitDepth = 16);
+                                            int bitDepth = 16,
+                                            AudioQuality quality = AudioQuality::standardLive);
         static bool renderTrackToWav(Project project,
                                      const Id& trackId,
                                      const juce::File& outputFile,
@@ -132,7 +134,8 @@ namespace beat
                                      int numOutputChannels = 2,
                                      juce::String* error = nullptr,
                                      RenderProgressCallback progress = {},
-                                     int bitDepth = 16);
+                                     int bitDepth = 16,
+                                     AudioQuality quality = AudioQuality::standardLive);
         static int estimateProjectLatencySamples(const Project& project) noexcept;
         int getProjectLatencySamples() const noexcept { return projectLatencySamples; }
         void shutdown();

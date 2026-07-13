@@ -786,7 +786,8 @@ namespace beat
                                          int channels,
                                          juce::String* error,
                                          RenderProgressCallback progress,
-                                         int bitDepth)
+                                         int bitDepth,
+                                         AudioQuality quality)
     {
         const auto endBeat = project.lengthBeats;
         return renderProjectRangeToWav(std::move(project),
@@ -799,7 +800,8 @@ namespace beat
                                        channels,
                                        error,
                                        std::move(progress),
-                                       bitDepth);
+                                       bitDepth,
+                                       quality);
     }
 
     bool AudioEngine::renderProjectRangeToWav(Project project,
@@ -812,7 +814,8 @@ namespace beat
                                              int channels,
                                              juce::String* error,
                                              RenderProgressCallback progress,
-                                             int bitDepth)
+                                             int bitDepth,
+                                             AudioQuality quality)
     {
         const auto setError = [error](const juce::String& message)
         {
@@ -909,6 +912,7 @@ namespace beat
 
         AudioEngine offlineEngine;
         offlineEngine.prepareForOffline(sr, blockSize, channels);
+        offlineEngine.setProcessingQuality(quality);
         offlineEngine.applyProject(std::move(project));
         offlineEngine.requestSeek(startBeat);
         offlineEngine.requestPlay();
@@ -1028,7 +1032,8 @@ namespace beat
                                        int channels,
                                        juce::String* error,
                                        RenderProgressCallback progress,
-                                       int bitDepth)
+                                       int bitDepth,
+                                       AudioQuality quality)
     {
         const auto setError = [error](const juce::String& message)
         {
@@ -1052,7 +1057,9 @@ namespace beat
         if (!found)
             return setError("Selected track was not found in the project.");
 
-        return renderProjectToWav(std::move(project), outputFile, sr, blockSize, channels, error, std::move(progress), bitDepth);
+        return renderProjectToWav(
+            std::move(project), outputFile, sr, blockSize, channels, error,
+            std::move(progress), bitDepth, quality);
     }
 
     int AudioEngine::estimateProjectLatencySamples(const Project& project) noexcept

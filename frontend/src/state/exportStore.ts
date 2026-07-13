@@ -38,7 +38,7 @@ export const FACTORY_EXPORT_PRESETS: ExportPreset[] = [
     name: "Full Mix Review",
     description: "Stereo WAV for normal mix review.",
     target: "project",
-    options: { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512 },
+    options: { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512, quality: "standard" },
     includeTail: true,
   },
   {
@@ -46,7 +46,7 @@ export const FACTORY_EXPORT_PRESETS: ExportPreset[] = [
     name: "Review Range",
     description: "Loop/range export with effect tails.",
     target: "range",
-    options: { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512 },
+    options: { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512, quality: "standard" },
     includeTail: true,
   },
   {
@@ -54,7 +54,7 @@ export const FACTORY_EXPORT_PRESETS: ExportPreset[] = [
     name: "Selected Stem",
     description: "Selected track stem at mix-session quality.",
     target: "track",
-    options: { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512 },
+    options: { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512, quality: "standard" },
     includeTail: true,
   },
   {
@@ -62,7 +62,7 @@ export const FACTORY_EXPORT_PRESETS: ExportPreset[] = [
     name: "All Stems",
     description: "One stem per renderable track.",
     target: "stems",
-    options: { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512 },
+    options: { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512, quality: "standard" },
     includeTail: true,
   },
   {
@@ -70,7 +70,7 @@ export const FACTORY_EXPORT_PRESETS: ExportPreset[] = [
     name: "Web Draft",
     description: "Compact PCM16 draft for quick sharing.",
     target: "project",
-    options: { sampleRate: 44100, bitDepth: 16, channels: 2, blockSize: 512 },
+    options: { sampleRate: 44100, bitDepth: 16, channels: 2, blockSize: 512, quality: "standard" },
     includeTail: true,
   },
   {
@@ -78,7 +78,7 @@ export const FACTORY_EXPORT_PRESETS: ExportPreset[] = [
     name: "Mono Reference",
     description: "Mono compatibility reference render.",
     target: "project",
-    options: { sampleRate: 48000, bitDepth: 24, channels: 1, blockSize: 512 },
+    options: { sampleRate: 48000, bitDepth: 24, channels: 1, blockSize: 512, quality: "standard" },
     includeTail: true,
   },
 ];
@@ -344,10 +344,11 @@ export function normalizeExportOptions(options: ProjectExportOptions | undefined
     ? Math.round(options.blockSize)
     : 512;
   return {
-    sampleRate: clampToSet(sampleRate, [44100, 48000, 88200, 96000], 48000),
+    sampleRate: clampToSet(sampleRate, [44100, 48000, 88200, 96000, 192000], 48000),
     bitDepth: clampToSet(options?.bitDepth, [16, 24, 32], 24),
     channels: clampToSet(options?.channels, [1, 2], 2),
     blockSize: clampToSet(blockSize, [128, 256, 512, 1024, 2048], 512),
+    quality: options?.quality === "high" ? "high" : "standard",
   };
 }
 

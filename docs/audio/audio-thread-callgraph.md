@@ -37,6 +37,7 @@ caller thread
   AudioEngine::renderProjectToWav or renderTrackToWav
     allocate output stream, AudioEngine, AudioBuffer, pointer vector
     AudioEngine::prepareForOffline
+    apply normalized export quality (default Standard; optional Offline HQ)
     applyProject / seek / play
     loop
       AudioEngine::audioDeviceIOCallbackWithContext
@@ -45,7 +46,7 @@ caller thread
     validate temporary WAV and atomically replace destination
 ```
 
-Offline allocation and file I/O are outside a real-time device callback. There is no distinct high-quality DSP policy; live and offline use the same oscillator and nonlinear algorithms.
+Offline allocation and file I/O are outside a real-time device callback. Standard uses the live oscillator policy. An explicit Offline HQ export changes only the prepared wavetable interpolation policy; interaction oversampling remains the same measured fixed 2x policy in both modes. Event, modulation, phase, routing, effects, limiter, and meter paths remain shared.
 
 ## Thread-boundary findings
 
@@ -201,6 +202,22 @@ audio callback
 ```
 
 Mode selection is not data-dependent and never changes automatically under load.
+
+## Milestone B28 export quality selection
+
+```text
+Export Review quality field (UI thread)
+  -> normalized optional ProjectExportOptions.quality
+  -> synchronous/async project, range, track, stems, or bounce IPC
+  -> MessageBridge::parseExportRenderOptions (unknown -> Standard)
+  -> AudioEngine::render*ToWav final quality argument (default Standard)
+  -> prepareForOffline
+  -> setProcessingQuality
+  -> applyProject
+  -> existing offline render loop
+```
+
+The selection is setup-only and never enters the device callback. It does not mutate the live engine, project schema, automation IDs, event timing, or overload policy.
 
 ## Table replacement lifetime path
 
