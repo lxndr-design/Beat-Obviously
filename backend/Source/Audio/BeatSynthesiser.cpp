@@ -7,6 +7,19 @@
 
 namespace beat
 {
+    namespace
+    {
+        bool voicePlaysInChannelRange(const juce::SynthesiserVoice& voice,
+                                      int firstChannel,
+                                      int lastChannel) noexcept
+        {
+            for (int channel = firstChannel; channel <= lastChannel; ++channel)
+                if (voice.isPlayingChannel(channel))
+                    return true;
+            return false;
+        }
+    }
+
     BeatSynthesiser::BeatSynthesiser()
     {
         for (size_t channel = 0; channel < memberRpnMsb.size(); ++channel)
@@ -57,10 +70,21 @@ namespace beat
             || memberCount > 15)
             return false;
 
+        const auto previousZone = expressionZone;
         if (memberCount == 0)
         {
             if (expressionZone.enabled && expressionZone.masterChannel == managerChannel)
+            {
                 expressionZone.enabled = false;
+                const juce::ScopedLock scopedLock(lock);
+                for (auto* voice : voices)
+                    if (voice->isVoiceActive()
+                        && voicePlaysInChannelRange(*voice,
+                                                   previousZone.firstMemberChannel,
+                                                   previousZone.lastMemberChannel))
+                        if (auto* instrument = dynamic_cast<InstrumentVoice*>(voice))
+                            instrument->setMasterPitchWheel(8192, 0.0f);
+            }
             return true;
         }
 
@@ -68,6 +92,41 @@ namespace beat
             expressionZone = { true, 1, 2, 1 + memberCount };
         else
             expressionZone = { true, 16, 16 - memberCount, 15 };
+
+        memberPitchBendSemitones[(size_t) (managerChannel - 1)].store(2, std::memory_order_relaxed);
+        memberPitchBendCents[(size_t) (managerChannel - 1)].store(0, std::memory_order_relaxed);
+        memberPitchBendRange[(size_t) (managerChannel - 1)].store(2.0f, std::memory_order_relaxed);
+        for (int member = expressionZone.firstMemberChannel; member <= expressionZone.lastMemberChannel; ++member)
+        {
+            memberPitchBendSemitones[(size_t) (member - 1)].store(48, std::memory_order_relaxed);
+            memberPitchBendCents[(size_t) (member - 1)].store(0, std::memory_order_relaxed);
+            memberPitchBendRange[(size_t) (member - 1)].store(48.0f, std::memory_order_relaxed);
+        }
+
+        const int managerWheel = lastPitchWheelValues[managerChannel - 1];
+        const juce::ScopedLock scopedLock(lock);
+        for (auto* voice : voices)
+        {
+            if (!voice->isVoiceActive())
+                continue;
+            if (auto* instrument = dynamic_cast<InstrumentVoice*>(voice))
+            {
+                if (previousZone.enabled
+                    && voicePlaysInChannelRange(*voice,
+                                                previousZone.firstMemberChannel,
+                                                previousZone.lastMemberChannel))
+                    instrument->setMasterPitchWheel(8192, 0.0f);
+                if (voice->isPlayingChannel(managerChannel))
+                    instrument->setMemberPitchBendRange(2.0f);
+                else if (voicePlaysInChannelRange(*voice,
+                                                  expressionZone.firstMemberChannel,
+                                                  expressionZone.lastMemberChannel))
+                {
+                    instrument->setMemberPitchBendRange(48.0f);
+                    instrument->setMasterPitchWheel(managerWheel, 2.0f);
+                }
+            }
+        }
         return true;
     }
 
@@ -92,6 +151,13 @@ namespace beat
                                                 memberTimbre[(size_t) channelIndex].load(std::memory_order_relaxed));
                 const float bendRange = memberPitchBendRange[(size_t) channelIndex].load(std::memory_order_relaxed);
                 instrument->setMemberPitchBendRange(bendRange);
+                if (isExpressionMemberChannel(midiChannel))
+                {
+                    const int masterIndex = expressionZone.masterChannel - 1;
+                    instrument->setMasterPitchWheel(
+                        lastPitchWheelValues[masterIndex],
+                        memberPitchBendRange[(size_t) masterIndex].load(std::memory_order_relaxed));
+                }
             }
         }
     }
@@ -99,14 +165,19 @@ namespace beat
     void BeatSynthesiser::handlePitchWheel(int midiChannel, int wheelValue)
     {
         const juce::ScopedLock scopedLock(lock);
+        if (midiChannel >= 1 && midiChannel <= 16)
+            lastPitchWheelValues[midiChannel - 1] = juce::jlimit(0, 16383, wheelValue);
         juce::Synthesiser::handlePitchWheel(midiChannel, wheelValue);
         if (!isExpressionMasterChannel(midiChannel))
             return;
-        for (int member = expressionZone.firstMemberChannel; member <= expressionZone.lastMemberChannel; ++member)
-        {
-            lastPitchWheelValues[member - 1] = juce::jlimit(0, 16383, wheelValue);
-            juce::Synthesiser::handlePitchWheel(member, wheelValue);
-        }
+        const float masterRange = memberPitchBendRange[(size_t) (midiChannel - 1)].load(std::memory_order_relaxed);
+        for (auto* voice : voices)
+            if (voice->isVoiceActive()
+                && voicePlaysInChannelRange(*voice,
+                                            expressionZone.firstMemberChannel,
+                                            expressionZone.lastMemberChannel))
+                if (auto* instrument = dynamic_cast<InstrumentVoice*>(voice))
+                    instrument->setMasterPitchWheel(wheelValue, masterRange);
     }
 
     void BeatSynthesiser::handleController(int midiChannel, int controllerNumber, int controllerValue)
@@ -198,6 +269,17 @@ namespace beat
                 continue;
             if (auto* instrument = dynamic_cast<InstrumentVoice*>(voice))
                 instrument->setMemberPitchBendRange(semitones);
+        }
+        if (isExpressionMasterChannel(midiChannel))
+        {
+            const int wheelValue = lastPitchWheelValues[midiChannel - 1];
+            for (auto* voice : voices)
+                if (voice->isVoiceActive()
+                    && voicePlaysInChannelRange(*voice,
+                                                expressionZone.firstMemberChannel,
+                                                expressionZone.lastMemberChannel))
+                    if (auto* instrument = dynamic_cast<InstrumentVoice*>(voice))
+                        instrument->setMasterPitchWheel(wheelValue, semitones);
         }
     }
 

@@ -550,4 +550,27 @@ project rebuild
   -> saved schema-v1 zone is prepared again; runtime RPN state is not persisted
 ```
 
-RPN selection and interpretation use existing fixed 16-channel atomic selector arrays. The active zone is fixed-size scalar state and replacement is constant work; expression propagation remains bounded to 15 channel numbers. The path adds no allocation, container growth, filesystem or stream operation, lazy initialization, processor ownership, or lock acquisition. Offline rendering may consume the same MIDI semantics but remains outside the real-time callback detector. MIDI-CI profile exchange, simultaneous lower+upper zones, automatic MCM pitch-range defaults, and non-Aether initialization are outside this slice.
+RPN selection and interpretation use existing fixed 16-channel atomic selector arrays. The active zone is fixed-size scalar state and replacement is bounded work; expression propagation remains bounded to 15 channel numbers. The B21 mapping adds no allocation, container growth, filesystem or stream operation, lazy initialization, or processor ownership. B22 below adds a bounded active-voice update under the synthesiser's existing critical section and directly probes that path for blocking. Offline rendering may consume the same MIDI semantics but remains outside the real-time callback detector. MIDI-CI profile exchange, simultaneous lower+upper zones, and non-Aether initialization remain outside the current implementation.
+
+## Milestone B22 independent MPE pitch paths
+
+```text
+RPN 0,6 accepted
+  fixed manager range = 2 semitones
+  fixed negotiated member ranges = 48 semitones
+  bounded active-voice scan applies ranges and retained manager wheel
+member pitch wheel(channel)
+  JUCE/Beat fixed channel cache -> InstrumentVoice member semitone offset
+manager pitch wheel(master)
+  Beat fixed manager cache -> bounded active-member scan
+  -> InstrumentVoice manager/global semitone offset
+member note-on / deterministic steal
+  JUCE starts voice with retained member wheel
+  Beat applies retained member range + retained manager wheel/range
+InstrumentVoice::renderNextBlock
+  base pitch * exp2((member semitones + manager semitones) / 12)
+zone clear/replacement
+  bounded retired-member scan -> clear manager offset only
+```
+
+Both pitch offsets and all ranges/caches are fixed scalar or 16-channel state. The MCM path performs bounded channel/voice scans under the synthesiser's existing critical section and adds no ownership, allocation, resize, sort, filesystem access, lazy initialization, or processor construction. A focused development/test probe exercises RPN 6 ingestion and reports zero allocation, blocking-lock, file/stream, lazy-init, or growth violations. Offline rendering remains excluded from real-time callback classification.

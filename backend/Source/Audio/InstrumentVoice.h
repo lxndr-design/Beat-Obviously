@@ -297,6 +297,7 @@ namespace beat
         }
         void setMemberModWheel(float value) noexcept { modWheel = juce::jlimit(0.0f, 1.0f, value); }
         void setMemberPitchBendRange(float semitones) noexcept;
+        void setMasterPitchWheel(int wheelValue, float semitones) noexcept;
         bool applyRealtimeParameter(std::string_view parameterId, float value, int rampSamples = 0) noexcept;
         void prepare(double sampleRate, int blockSize);
         void setProcessingQuality(AudioQuality quality) noexcept;
@@ -314,7 +315,9 @@ namespace beat
         float pressureForTest() const noexcept { return pressure; }
         float timbreForTest() const noexcept { return timbre; }
         float modWheelForTest() const noexcept { return modWheel; }
-        float pitchWheelSemitonesForTest() const noexcept { return pitchWheelSemitones; }
+        float pitchWheelSemitonesForTest() const noexcept { return pitchWheelSemitones + masterPitchWheelSemitones; }
+        float memberPitchWheelSemitonesForTest() const noexcept { return pitchWheelSemitones; }
+        float masterPitchWheelSemitonesForTest() const noexcept { return masterPitchWheelSemitones; }
         float memberPitchBendRangeForTest() const noexcept { return memberPitchBendRangeSemitones; }
 #endif
 
@@ -375,6 +378,7 @@ namespace beat
         float   pressure { 0.0f };
         float   timbre { 0.0f };
         float   pitchWheelSemitones { 0.0f };
+        float   masterPitchWheelSemitones { 0.0f };
         float   memberPitchBendRangeSemitones { -1.0f };
         int     currentPitchWheelValue { 8192 };
         std::shared_ptr<const Wavetable> wavetableTable;

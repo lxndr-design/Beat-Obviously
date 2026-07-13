@@ -1424,7 +1424,10 @@ namespace
             || !near(outside->timbreForTest(), 0.0f)
             || !near(outside->pressureForTest(), 0.0f)
             || !near(outside->pitchWheelSemitonesForTest(), 0.0f))
+        {
+            std::cerr << "member expression persisted-zone propagation mismatch\n";
             return false;
+        }
         zoned.handleController(2, 74, 20);
         if (!near(member2->timbreForTest(), 20.0f / 127.0f)
             || !near(member3->timbreForTest(), 96.0f / 127.0f))
@@ -1448,12 +1451,21 @@ namespace
         addVoice(negotiated, 30);
         addVoice(negotiated, 31);
         addVoice(negotiated, 32);
+        addVoice(negotiated, 33);
         negotiated.addSound(new TestSound());
         negotiated.setNoteStealingEnabled(true);
         negotiated.setCurrentPlaybackSampleRate(48000.0);
         if (!negotiated.configureMemberExpressionZone({ true, 16, 13, 15 }))
             return false;
+        beat::test::beginRealtimeSafetyProbe();
         sendLegacyMpeConfiguration(negotiated, 1, 3);
+        const size_t negotiationViolations = beat::test::endRealtimeSafetyProbe();
+        if (negotiationViolations != 0)
+        {
+            std::cerr << "member expression MCM realtime-safety violations: "
+                      << negotiationViolations << "\n";
+            return false;
+        }
         const auto lowerZone = negotiated.memberExpressionZone();
         if (!lowerZone.enabled
             || lowerZone.masterChannel != 1
@@ -1465,21 +1477,64 @@ namespace
         negotiated.noteOn(4, 64, 1.0f);
         negotiated.noteOn(5, 67, 1.0f);
         negotiated.handleController(1, 74, 90);
+        negotiated.handlePitchWheel(1, 12288);
+        negotiated.noteOn(3, 69, 1.0f);
         auto* lowerFirst = voiceOnChannel(negotiated, 2);
         auto* lowerLast = voiceOnChannel(negotiated, 4);
         auto* lowerOutside = voiceOnChannel(negotiated, 5);
-        if (lowerFirst == nullptr || lowerLast == nullptr || lowerOutside == nullptr
+        auto* lowerStartedAfterMaster = voiceOnChannel(negotiated, 3);
+        if (lowerFirst == nullptr || lowerLast == nullptr || lowerOutside == nullptr || lowerStartedAfterMaster == nullptr
             || !near(lowerFirst->timbreForTest(), 90.0f / 127.0f)
             || !near(lowerLast->timbreForTest(), 90.0f / 127.0f)
-            || !near(lowerOutside->timbreForTest(), 0.0f))
+            || !near(lowerOutside->timbreForTest(), 0.0f)
+            || !near(lowerFirst->memberPitchBendRangeForTest(), 48.0f)
+            || !near(lowerLast->memberPitchBendRangeForTest(), 48.0f)
+            || !near(lowerFirst->masterPitchWheelSemitonesForTest(), (4096.0f / 8191.0f) * 2.0f)
+            || !near(lowerLast->pitchWheelSemitonesForTest(), (4096.0f / 8191.0f) * 2.0f)
+            || !near(lowerStartedAfterMaster->pitchWheelSemitonesForTest(), (4096.0f / 8191.0f) * 2.0f)
+            || !near(lowerOutside->pitchWheelSemitonesForTest(), 0.0f))
+        {
+            std::cerr << "member expression MCM defaults mismatch ranges="
+                      << lowerFirst->memberPitchBendRangeForTest() << ","
+                      << lowerLast->memberPitchBendRangeForTest() << " master="
+                      << lowerFirst->masterPitchWheelSemitonesForTest() << ","
+                      << lowerStartedAfterMaster->masterPitchWheelSemitonesForTest() << "\n";
             return false;
+        }
+        negotiated.handlePitchWheel(2, 12288);
+        if (!near(lowerFirst->memberPitchWheelSemitonesForTest(), (4096.0f / 8191.0f) * 48.0f)
+            || !near(lowerFirst->pitchWheelSemitonesForTest(), (4096.0f / 8191.0f) * 50.0f)
+            || !near(lowerLast->pitchWheelSemitonesForTest(), (4096.0f / 8191.0f) * 2.0f))
+        {
+            std::cerr << "member expression additive bend mismatch member="
+                      << lowerFirst->memberPitchWheelSemitonesForTest() << " total="
+                      << lowerFirst->pitchWheelSemitonesForTest() << " sibling="
+                      << lowerLast->pitchWheelSemitonesForTest() << "\n";
+            return false;
+        }
+        negotiated.handleController(1, 101, 0);
+        negotiated.handleController(1, 100, 0);
+        negotiated.handleController(1, 6, 12);
+        negotiated.handleController(1, 38, 25);
+        if (!near(lowerFirst->masterPitchWheelSemitonesForTest(), (4096.0f / 8191.0f) * 12.25f)
+            || !near(lowerFirst->pitchWheelSemitonesForTest(), (4096.0f / 8191.0f) * 60.25f)
+            || !near(lowerStartedAfterMaster->pitchWheelSemitonesForTest(), (4096.0f / 8191.0f) * 12.25f))
+        {
+            std::cerr << "member expression manager-range update mismatch master="
+                      << lowerFirst->masterPitchWheelSemitonesForTest() << " total="
+                      << lowerFirst->pitchWheelSemitonesForTest() << " pre-note="
+                      << lowerStartedAfterMaster->pitchWheelSemitonesForTest() << "\n";
+            return false;
+        }
 
         sendLegacyMpeConfiguration(negotiated, 16, 0);
         if (!negotiated.memberExpressionZone().enabled
             || negotiated.memberExpressionZone().masterChannel != 1)
             return false;
         sendLegacyMpeConfiguration(negotiated, 1, 0);
-        if (negotiated.memberExpressionZone().enabled)
+        if (negotiated.memberExpressionZone().enabled
+            || !near(lowerFirst->masterPitchWheelSemitonesForTest(), 0.0f)
+            || !near(lowerFirst->memberPitchWheelSemitonesForTest(), (4096.0f / 8191.0f) * 48.0f))
             return false;
 
         sendLegacyMpeConfiguration(negotiated, 16, 3);

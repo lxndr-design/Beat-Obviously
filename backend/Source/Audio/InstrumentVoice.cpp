@@ -127,6 +127,7 @@ namespace beat
         params = p;
         modWheel = juce::jlimit(0.0f, 1.0f, p.modWheel);
         pitchWheelSemitones = 0.0f;
+        masterPitchWheelSemitones = 0.0f;
         params.wavetable.bank = params.wavetableBank;
         params.wavetable.custom = params.wavetableBank == 5;
         params.wavetable.position = params.wavetablePosition;
@@ -244,6 +245,15 @@ namespace beat
             ? -1.0f
             : juce::jlimit(0.0f, 96.99f, semitones);
         pitchWheelMoved(currentPitchWheelValue);
+    }
+
+    void InstrumentVoice::setMasterPitchWheel(int wheelValue, float semitones) noexcept
+    {
+        const float range = semitones >= 0.0f
+            ? juce::jlimit(0.0f, 96.99f, semitones)
+            : juce::jlimit(0.0f, 24.0f, params.pitchBendRangeSemitones);
+        masterPitchWheelSemitones = VoiceMath::pitchWheelRatio(juce::jlimit(0, 16383, wheelValue))
+            * range;
     }
 
     void InstrumentVoice::setRealtimeRamp(RealtimeParam param, float value, int rampSamples) noexcept
@@ -384,6 +394,7 @@ namespace beat
         baseFrequencyHz = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
         level = velocity;
         noteKeytrack = juce::jlimit(0.0f, 1.0f, (float) midiNoteNumber / 127.0f);
+        masterPitchWheelSemitones = 0.0f;
         pitchWheelMoved(currentPitchWheel == 0 ? 8192 : currentPitchWheel);
 
         if (legatoRetune)
@@ -641,7 +652,7 @@ namespace beat
                     params.env4Sustain, params.env4AttackCurve, params.env4DecayCurve, params.env4ReleaseCurve))
                 : 0.0f;
             const double currentPitchFrequency = juce::jmax(1.0f, pitchFrequencyRamp.next())
-                * std::exp2((double) pitchWheelSemitones / 12.0);
+                * std::exp2((double) (pitchWheelSemitones + masterPitchWheelSemitones) / 12.0);
             double currentPhaseDelta = currentPitchFrequency / sampleRate;
             if (hasPitchMod)
                 currentPhaseDelta *= std::exp2((pitchLfo * pitchMod) / 12.0);
