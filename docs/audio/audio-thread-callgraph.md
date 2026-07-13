@@ -534,3 +534,20 @@ MIDI outside zone
 ```
 
 Zone configuration and validation occur while constructing the prepared synthesiser. Callback work is a fixed loop over at most 15 channel numbers plus JUCE's already bounded prepared voice scans. Storage is fixed atomic channel state; the path performs no allocation, resizing, sorting, file access, lazy initialization, or processor construction/destruction. The zone is default-off, so existing projects retain the pre-B20 path and output.
+
+## Milestone B21 legacy RPN 6 zone negotiation
+
+```text
+MIDI CC101/100(channel) -> fixed RPN selector[channel]
+MIDI CC6(channel), when RPN == 0,6
+  channel 1 + count 1..15 -> lower zone { master 1, members 2..1+count }
+  channel 16 + count 1..15 -> upper zone { master 16, members 16-count..15 }
+  count 0 -> clear only the zone owned by that manager
+  other manager/count, RPN null, or CC38 -> no zone change
+subsequent manager expression
+  -> existing B20 fixed member loop and channel-filtered dispatch
+project rebuild
+  -> saved schema-v1 zone is prepared again; runtime RPN state is not persisted
+```
+
+RPN selection and interpretation use existing fixed 16-channel atomic selector arrays. The active zone is fixed-size scalar state and replacement is constant work; expression propagation remains bounded to 15 channel numbers. The path adds no allocation, container growth, filesystem or stream operation, lazy initialization, processor ownership, or lock acquisition. Offline rendering may consume the same MIDI semantics but remains outside the real-time callback detector. MIDI-CI profile exchange, simultaneous lower+upper zones, automatic MCM pitch-range defaults, and non-Aether initialization are outside this slice.

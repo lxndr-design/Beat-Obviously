@@ -1431,8 +1431,78 @@ namespace
             return false;
 
         beat::BeatSynthesiser invalidZone;
-        return !invalidZone.configureMemberExpressionZone({ true, 2, 2, 4 })
-            && !invalidZone.memberExpressionZone().enabled;
+        if (invalidZone.configureMemberExpressionZone({ true, 2, 2, 4 })
+            || invalidZone.memberExpressionZone().enabled)
+            return false;
+
+        const auto sendLegacyMpeConfiguration = [](beat::BeatSynthesiser& target,
+                                                    int managerChannel,
+                                                    int memberCount)
+        {
+            target.handleController(managerChannel, 100, 6);
+            target.handleController(managerChannel, 101, 0);
+            target.handleController(managerChannel, 6, memberCount);
+        };
+
+        beat::BeatSynthesiser negotiated;
+        addVoice(negotiated, 30);
+        addVoice(negotiated, 31);
+        addVoice(negotiated, 32);
+        negotiated.addSound(new TestSound());
+        negotiated.setNoteStealingEnabled(true);
+        negotiated.setCurrentPlaybackSampleRate(48000.0);
+        if (!negotiated.configureMemberExpressionZone({ true, 16, 13, 15 }))
+            return false;
+        sendLegacyMpeConfiguration(negotiated, 1, 3);
+        const auto lowerZone = negotiated.memberExpressionZone();
+        if (!lowerZone.enabled
+            || lowerZone.masterChannel != 1
+            || lowerZone.firstMemberChannel != 2
+            || lowerZone.lastMemberChannel != 4)
+            return false;
+
+        negotiated.noteOn(2, 60, 1.0f);
+        negotiated.noteOn(4, 64, 1.0f);
+        negotiated.noteOn(5, 67, 1.0f);
+        negotiated.handleController(1, 74, 90);
+        auto* lowerFirst = voiceOnChannel(negotiated, 2);
+        auto* lowerLast = voiceOnChannel(negotiated, 4);
+        auto* lowerOutside = voiceOnChannel(negotiated, 5);
+        if (lowerFirst == nullptr || lowerLast == nullptr || lowerOutside == nullptr
+            || !near(lowerFirst->timbreForTest(), 90.0f / 127.0f)
+            || !near(lowerLast->timbreForTest(), 90.0f / 127.0f)
+            || !near(lowerOutside->timbreForTest(), 0.0f))
+            return false;
+
+        sendLegacyMpeConfiguration(negotiated, 16, 0);
+        if (!negotiated.memberExpressionZone().enabled
+            || negotiated.memberExpressionZone().masterChannel != 1)
+            return false;
+        sendLegacyMpeConfiguration(negotiated, 1, 0);
+        if (negotiated.memberExpressionZone().enabled)
+            return false;
+
+        sendLegacyMpeConfiguration(negotiated, 16, 3);
+        const auto upperZone = negotiated.memberExpressionZone();
+        if (!upperZone.enabled
+            || upperZone.masterChannel != 16
+            || upperZone.firstMemberChannel != 13
+            || upperZone.lastMemberChannel != 15)
+            return false;
+
+        sendLegacyMpeConfiguration(negotiated, 8, 4);
+        if (negotiated.memberExpressionZone().masterChannel != 16)
+            return false;
+        negotiated.handleController(16, 101, 127);
+        negotiated.handleController(16, 100, 127);
+        negotiated.handleController(16, 6, 0);
+        if (!negotiated.memberExpressionZone().enabled)
+            return false;
+        sendLegacyMpeConfiguration(negotiated, 16, 16);
+        return negotiated.memberExpressionZone().enabled
+            && negotiated.memberExpressionZone().masterChannel == 16
+            && negotiated.memberExpressionZone().firstMemberChannel == 13
+            && negotiated.memberExpressionZone().lastMemberChannel == 15;
     }
 
     beat::Project makeStressProject()

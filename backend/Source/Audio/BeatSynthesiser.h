@@ -32,6 +32,7 @@ namespace beat
                                                   int midiNoteNumber) const override;
 
     private:
+        bool applyLegacyMpeConfiguration(int managerChannel, int memberCount) noexcept;
         void applyMemberPitchBendRange(int midiChannel, float semitones) noexcept;
         bool isExpressionMasterChannel(int midiChannel) const noexcept;
         bool isExpressionMemberChannel(int midiChannel) const noexcept;

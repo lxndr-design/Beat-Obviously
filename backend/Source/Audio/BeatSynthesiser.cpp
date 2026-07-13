@@ -50,6 +50,27 @@ namespace beat
             && midiChannel <= expressionZone.lastMemberChannel;
     }
 
+    bool BeatSynthesiser::applyLegacyMpeConfiguration(int managerChannel, int memberCount) noexcept
+    {
+        if ((managerChannel != 1 && managerChannel != 16)
+            || memberCount < 0
+            || memberCount > 15)
+            return false;
+
+        if (memberCount == 0)
+        {
+            if (expressionZone.enabled && expressionZone.masterChannel == managerChannel)
+                expressionZone.enabled = false;
+            return true;
+        }
+
+        if (managerChannel == 1)
+            expressionZone = { true, 1, 2, 1 + memberCount };
+        else
+            expressionZone = { true, 16, 16 - memberCount, 15 };
+        return true;
+    }
+
     void BeatSynthesiser::noteOn(int midiChannel, int midiNoteNumber, float velocity)
     {
         juce::Synthesiser::noteOn(midiChannel, midiNoteNumber, velocity);
@@ -110,6 +131,12 @@ namespace beat
         else if (controllerNumber == 100)
         {
             memberRpnLsb[(size_t) channelIndex].store(juce::jlimit(0, 127, controllerValue), std::memory_order_relaxed);
+        }
+        else if (controllerNumber == 6
+            && memberRpnMsb[(size_t) channelIndex].load(std::memory_order_relaxed) == 0
+            && memberRpnLsb[(size_t) channelIndex].load(std::memory_order_relaxed) == 6)
+        {
+            applyLegacyMpeConfiguration(midiChannel, controllerValue);
         }
         else if ((controllerNumber == 6 || controllerNumber == 38)
             && memberRpnMsb[(size_t) channelIndex].load(std::memory_order_relaxed) == 0
