@@ -141,6 +141,7 @@ export type SynthParameterId =
   | "env.2.release"
   | "env.2.releaseCurve"
   | "env.2.loop"
+  | `env.${3 | 4}.${"attack" | "attackCurve" | "decay" | "decayCurve" | "sustain" | "release" | "releaseCurve" | "loop"}`
   | "lfo.1.enabled"
   | "lfo.1.rate"
   | "lfo.1.sync"
@@ -177,6 +178,8 @@ export type SynthParameterValue = boolean | number | string;
 export type ModulationSourceId =
   | "env.1"
   | "env.2"
+  | "env.3"
+  | "env.4"
   | "lfo.1"
   | "lfo.2"
   | "velocity"
@@ -261,7 +264,7 @@ export interface SynthModulationSourceAffordance {
   editor: "lfo" | "envelope" | "macro" | "performance";
 }
 
-export type SynthModulationSourceEditorTarget = MacroId | "lfo.1" | "lfo.2" | "env.1" | "env.2" | "performance";
+export type SynthModulationSourceEditorTarget = MacroId | "lfo.1" | "lfo.2" | "env.1" | "env.2" | "env.3" | "env.4" | "performance";
 
 export interface SynthExpressionSummaryItem {
   id: "voices" | "legato" | "pitch-bend" | "velocity" | "keytrack" | "mod-wheel";
@@ -291,7 +294,7 @@ export interface SynthEnvelopeShapePoint {
 }
 
 export interface SynthEnvelopeEditorSummary {
-  source: "env.1" | "env.2";
+  source: "env.1" | "env.2" | "env.3" | "env.4";
   label: string;
   mode: "Loop" | "One-shot";
   timingLabel: string;
@@ -1061,6 +1064,10 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "env.2.release": 0.2,
   "env.2.releaseCurve": "linear",
   "env.2.loop": false,
+  "env.3.attack": 0.01, "env.3.attackCurve": "linear", "env.3.decay": 0.3, "env.3.decayCurve": "linear",
+  "env.3.sustain": 0, "env.3.release": 0.2, "env.3.releaseCurve": "linear", "env.3.loop": false,
+  "env.4.attack": 0.01, "env.4.attackCurve": "linear", "env.4.decay": 0.3, "env.4.decayCurve": "linear",
+  "env.4.sustain": 0, "env.4.release": 0.2, "env.4.releaseCurve": "linear", "env.4.loop": false,
   "lfo.1.enabled": true,
   "lfo.1.rate": 1,
   "lfo.1.sync": true,
@@ -1188,6 +1195,12 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "env.2.release": "Env 2 Release",
   "env.2.releaseCurve": "Env 2 Release Curve",
   "env.2.loop": "Env 2 Loop",
+  "env.3.attack": "Env 3 Attack", "env.3.attackCurve": "Env 3 Attack Curve", "env.3.decay": "Env 3 Decay",
+  "env.3.decayCurve": "Env 3 Decay Curve", "env.3.sustain": "Env 3 Sustain", "env.3.release": "Env 3 Release",
+  "env.3.releaseCurve": "Env 3 Release Curve", "env.3.loop": "Env 3 Loop",
+  "env.4.attack": "Env 4 Attack", "env.4.attackCurve": "Env 4 Attack Curve", "env.4.decay": "Env 4 Decay",
+  "env.4.decayCurve": "Env 4 Decay Curve", "env.4.sustain": "Env 4 Sustain", "env.4.release": "Env 4 Release",
+  "env.4.releaseCurve": "Env 4 Release Curve", "env.4.loop": "Env 4 Loop",
   "lfo.1.enabled": "LFO 1 Enabled",
   "lfo.1.rate": "LFO 1 Rate",
   "lfo.1.sync": "LFO 1 Sync",
@@ -1223,6 +1236,8 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
 export const MODULATION_SOURCE_LABELS: Record<ModulationSourceId, string> = {
   "env.1": "Amp Env",
   "env.2": "Mod Env",
+  "env.3": "Env 3",
+  "env.4": "Env 4",
   "lfo.1": "LFO 1",
   "lfo.2": "LFO 2",
   velocity: "Velocity",
@@ -1593,7 +1608,7 @@ export function modulationSourceAffordance(draft: SynthDraftPatch, source: Modul
     };
   }
 
-  if (source === "env.1" || source === "env.2") {
+  if (source === "env.1" || source === "env.2" || source === "env.3" || source === "env.4") {
     const loop = getBooleanParam(draft, `${source}.loop` as SynthParameterId);
     const attackCurve = getEnvelopeCurveParam(draft, `${source}.attackCurve` as SynthParameterId);
     const releaseCurve = getEnvelopeCurveParam(draft, `${source}.releaseCurve` as SynthParameterId);
@@ -1631,7 +1646,7 @@ export function modulationSourceEditorTarget(source: ModulationSourceId): SynthM
   return source;
 }
 
-export function synthEnvelopeEditorSummary(draft: SynthDraftPatch, source: "env.1" | "env.2"): SynthEnvelopeEditorSummary {
+export function synthEnvelopeEditorSummary(draft: SynthDraftPatch, source: "env.1" | "env.2" | "env.3" | "env.4"): SynthEnvelopeEditorSummary {
   const attack = getNumberParam(draft, `${source}.attack` as SynthParameterId);
   const decay = getNumberParam(draft, `${source}.decay` as SynthParameterId);
   const sustain = clamp01(getNumberParam(draft, `${source}.sustain` as SynthParameterId));
@@ -2955,7 +2970,7 @@ function applyFactoryGuideFilter(parameters: Partial<Record<SynthParameterId, Sy
 
 function applyFactoryGuideEnvelope(
   parameters: Partial<Record<SynthParameterId, SynthParameterValue>>,
-  prefix: "env.1" | "env.2",
+  prefix: "env.1" | "env.2" | "env.3" | "env.4",
   envelope: FactoryGuideEnvelope | undefined,
 ) {
   if (!envelope) return;

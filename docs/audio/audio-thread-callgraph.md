@@ -359,3 +359,14 @@ audio callback -> targetOffset(...)
 ```
 
 Macro expansion changes fixed object size only. Route parsing, metadata construction, and container work remain outside the callback.
+
+```text
+voice setup -> ADSR/curve/loop state for Env 1..4
+cached target activity -> needsEnv2/needsEnv3/needsEnv4
+audio callback
+  Env 1 always drives amp lifecycle
+  Env 2..4 evaluate only when routed
+  targetOffset receives Env 1..4 values through every supported target
+```
+
+All four envelopes use voice-owned fixed state. No route parsing, allocation, lock, file operation, lazy initialization, or container growth occurs in the callback.

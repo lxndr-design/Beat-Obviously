@@ -1833,6 +1833,14 @@ namespace beat
         params.env2ReleaseMs = instrument.env2ReleaseMs;
         params.env2ReleaseCurve = instrument.env2ReleaseCurve;
         params.env2Loop = instrument.env2Loop;
+        params.env3AttackMs = instrument.env3AttackMs; params.env3AttackCurve = instrument.env3AttackCurve;
+        params.env3DecayMs = instrument.env3DecayMs; params.env3DecayCurve = instrument.env3DecayCurve;
+        params.env3Sustain = instrument.env3Sustain; params.env3ReleaseMs = instrument.env3ReleaseMs;
+        params.env3ReleaseCurve = instrument.env3ReleaseCurve; params.env3Loop = instrument.env3Loop;
+        params.env4AttackMs = instrument.env4AttackMs; params.env4AttackCurve = instrument.env4AttackCurve;
+        params.env4DecayMs = instrument.env4DecayMs; params.env4DecayCurve = instrument.env4DecayCurve;
+        params.env4Sustain = instrument.env4Sustain; params.env4ReleaseMs = instrument.env4ReleaseMs;
+        params.env4ReleaseCurve = instrument.env4ReleaseCurve; params.env4Loop = instrument.env4Loop;
         params.ampLevel = instrument.ampLevel;
         params.ampPan = instrument.ampPan;
         params.glideMs = juce::jlimit(0.0f, 5000.0f, instrument.glideMs);
@@ -1882,6 +1890,10 @@ namespace beat
             target.envBipolar = source.envBipolar;
             target.env2 = source.env2;
             target.env2Bipolar = source.env2Bipolar;
+            target.env3 = source.env3;
+            target.env3Bipolar = source.env3Bipolar;
+            target.env4 = source.env4;
+            target.env4Bipolar = source.env4Bipolar;
             target.velocity = source.velocity;
             target.velocityBipolar = source.velocityBipolar;
             target.keytrack = source.keytrack;

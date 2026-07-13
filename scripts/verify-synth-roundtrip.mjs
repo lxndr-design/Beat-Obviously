@@ -189,6 +189,14 @@ try {
       "macro.6": 0.35,
       "macro.7": 0.45,
       "macro.8": 0.65,
+      "env.3.attack": 0.02,
+      "env.3.decay": 0.12,
+      "env.3.sustain": 0.3,
+      "env.3.release": 0.18,
+      "env.4.attack": 0.03,
+      "env.4.decay": 0.14,
+      "env.4.sustain": 0.4,
+      "env.4.release": 0.22,
     },
   });
   const independentUnisonPreview = synthStore.synthDraftToPreviewInstrument(independentUnisonDraft);
@@ -213,6 +221,10 @@ try {
   assert.equal(independentUnisonDraft.parameters["macro.6"], 0.35);
   assert.equal(independentUnisonDraft.parameters["macro.7"], 0.45);
   assert.equal(independentUnisonDraft.parameters["macro.8"], 0.65);
+  assert.equal(independentUnisonDraft.parameters["env.3.attack"], 0.02);
+  assert.equal(independentUnisonDraft.parameters["env.3.sustain"], 0.3);
+  assert.equal(independentUnisonDraft.parameters["env.4.decay"], 0.14);
+  assert.equal(independentUnisonDraft.parameters["env.4.release"], 0.22);
   assert.equal(independentUnisonPreview.aether.oscB.tuningMode, "ratio");
   assert.equal(independentUnisonPreview.aether.oscB.ratioNumerator, 3);
   assert.equal(independentUnisonPreview.aether.oscB.ratioDenominator, 2);

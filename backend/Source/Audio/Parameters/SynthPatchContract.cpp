@@ -282,6 +282,10 @@ namespace beat
             target.envBipolar = routeBipolar(modulation, "env.1", routeTarget, false);
             target.env2 = routeAmount(modulation, "env.2", routeTarget);
             target.env2Bipolar = routeBipolar(modulation, "env.2", routeTarget, false);
+            target.env3 = routeAmount(modulation, "env.3", routeTarget);
+            target.env3Bipolar = routeBipolar(modulation, "env.3", routeTarget, false);
+            target.env4 = routeAmount(modulation, "env.4", routeTarget);
+            target.env4Bipolar = routeBipolar(modulation, "env.4", routeTarget, false);
             target.velocity = routeAmount(modulation, "velocity", routeTarget);
             target.velocityBipolar = routeBipolar(modulation, "velocity", routeTarget, false);
             target.keytrack = routeAmount(modulation, "keytrack", routeTarget);
@@ -300,6 +304,8 @@ namespace beat
                 || std::abs(target.lfo2) > 0.0001f
                 || std::abs(target.env) > 0.0001f
                 || std::abs(target.env2) > 0.0001f
+                || std::abs(target.env3) > 0.0001f
+                || std::abs(target.env4) > 0.0001f
                 || std::abs(target.velocity) > 0.0001f
                 || std::abs(target.keytrack) > 0.0001f
                 || std::abs(target.modWheel) > 0.0001f
@@ -495,6 +501,23 @@ namespace beat
         instrument.env2ReleaseMs = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, "env.2.release", 0.2) * 1000.0f);
         instrument.env2ReleaseCurve = envelopeCurveForId(synthStringParam(params, "env.2.releaseCurve", "linear"));
         instrument.env2Loop = synthNumberParam(params, "env.2.loop", instrument.env2Loop ? 1.0 : 0.0) >= 0.5;
+        const auto applyExtraEnvelope = [&](int index, float& attack, int& attackCurve, float& decay, int& decayCurve,
+                                             float& sustain, float& release, int& releaseCurve, bool& loop)
+        {
+            const auto prefix = "env." + juce::String(index) + ".";
+            attack = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, prefix + "attack", 0.01) * 1000.0f);
+            attackCurve = envelopeCurveForId(synthStringParam(params, prefix + "attackCurve", "linear"));
+            decay = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, prefix + "decay", 0.3) * 1000.0f);
+            decayCurve = envelopeCurveForId(synthStringParam(params, prefix + "decayCurve", "linear"));
+            sustain = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "sustain", 0.0));
+            release = juce::jlimit(0.0f, 30000.0f, (float) synthNumberParam(params, prefix + "release", 0.2) * 1000.0f);
+            releaseCurve = envelopeCurveForId(synthStringParam(params, prefix + "releaseCurve", "linear"));
+            loop = synthNumberParam(params, prefix + "loop", loop ? 1.0 : 0.0) >= 0.5;
+        };
+        applyExtraEnvelope(3, instrument.env3AttackMs, instrument.env3AttackCurve, instrument.env3DecayMs, instrument.env3DecayCurve,
+            instrument.env3Sustain, instrument.env3ReleaseMs, instrument.env3ReleaseCurve, instrument.env3Loop);
+        applyExtraEnvelope(4, instrument.env4AttackMs, instrument.env4AttackCurve, instrument.env4DecayMs, instrument.env4DecayCurve,
+            instrument.env4Sustain, instrument.env4ReleaseMs, instrument.env4ReleaseCurve, instrument.env4Loop);
         instrument.ampLevel = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "amp.level", instrument.ampLevel));
         instrument.ampPan = juce::jlimit(-1.0f, 1.0f, (float) synthNumberParam(params, "amp.pan", instrument.ampPan));
         instrument.lfoWaveform = parseSynthLfoWaveform(synthStringParam(params, "lfo.1.shape", "sine"));

@@ -113,3 +113,7 @@ The second serial runtime-warp state, stable schema, persistence/IPC conversion,
 ## Milestone B9 provenance
 
 Macro 5–8 storage, real-time metadata, modulation evaluation, persistence, frontend automation/node validation, and tests are independent extensions of Beat's existing fixed macro contract. No upstream source was consulted, executed, copied, adapted, or imported, and no dependency, binary, preset, asset, service, branding, or licensing state changed.
+
+## Milestone B10 provenance
+
+Envelope 3/4 ADSR, curve/loop lifecycle, cached activity planning, modulation evaluation, persistence, frontend preview/editor support, and tests independently extend Beat's existing Envelope 2 implementation and fixed voice graph. No upstream source was consulted, executed, copied, adapted, or imported, and no dependency, binary, preset, asset, service, branding, or licensing state changed.

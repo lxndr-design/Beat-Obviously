@@ -86,6 +86,8 @@ namespace beat::params
     {
         inline constexpr std::string_view sourceEnv1 { "env.1" };
         inline constexpr std::string_view sourceEnv2 { "env.2" };
+        inline constexpr std::string_view sourceEnv3 { "env.3" };
+        inline constexpr std::string_view sourceEnv4 { "env.4" };
         inline constexpr std::string_view sourceLfo1 { "lfo.1" };
         inline constexpr std::string_view sourceLfo2 { "lfo.2" };
         inline constexpr std::string_view sourceVelocity { "velocity" };

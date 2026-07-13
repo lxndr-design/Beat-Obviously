@@ -218,6 +218,15 @@ namespace
         if (!near(macro8Offset, -0.45f))
             return false;
 
+        decltype(target) extraEnvelopeTarget;
+        extraEnvelopeTarget.env3 = 0.4f;
+        extraEnvelopeTarget.env4 = -0.25f;
+        const float extraEnvelopeOffset = beat::DynamicModulation::targetOffset(
+            extraEnvelopeTarget, 0.0f, 0.0f, 0.0f, 0.0f, 0.75f, 0.2f,
+            0.0f, 0.0f, 0.0f, std::array<float, 8> {}, 2.0f);
+        if (!near(extraEnvelopeOffset, 0.5f))
+            return false;
+
         beat::DynamicModulation::TargetActivityFlags noFlags;
         const auto legacyPitchPlan = beat::DynamicModulation::makeRenderPlan(noFlags, false, true, 7.0f, 0.0f, 0.0f, 0.0f);
         if (!near(legacyPitchPlan.pitchMod, 7.0f)
@@ -774,6 +783,8 @@ namespace
             -0.25f,
             0.8f,
             0.35f,
+            0.0f,
+            0.0f,
             0.9f,
             60.0f / 127.0f,
             0.2f,
@@ -802,7 +813,7 @@ namespace
         const auto routed = beat::AetherTableStackRenderer::render(
             params, targets, panGains, pitchRates, oscillatorsA, oscillatorsB,
             unisonPlanA, unisonPlanB, 220.0, 220.0, 48000.0, 0.125, 0.125,
-            0.125, 0.0, 0.25, 0.5f, -0.25f, 0.8f, 0.35f, 0.9f,
+            0.125, 0.0, 0.25, 0.5f, -0.25f, 0.8f, 0.35f, 0.0f, 0.0f, 0.9f,
             60.0f / 127.0f, 0.2f, noiseState);
         if ((std::abs(routed.filteredFrame.left) <= 0.0001f && std::abs(routed.filteredFrame.right) <= 0.0001f)
             || (std::abs(routed.directFrame.left) <= 0.0001f && std::abs(routed.directFrame.right) <= 0.0001f)
@@ -833,6 +844,8 @@ namespace
             0.25,
             0.0,
             0.0,
+            0.0f,
+            0.0f,
             0.0f,
             0.0f,
             0.0f,
@@ -6995,11 +7008,15 @@ namespace
         instrument.env2ReleaseMs = 480.0f;
         instrument.env2ReleaseCurve = 3;
         instrument.env2Loop = true;
+        instrument.env3AttackMs = 23.0f; instrument.env3DecayMs = 123.0f; instrument.env3Sustain = 0.31f; instrument.env3ReleaseMs = 183.0f; instrument.env3Loop = true;
+        instrument.env4AttackMs = 34.0f; instrument.env4DecayMs = 144.0f; instrument.env4Sustain = 0.41f; instrument.env4ReleaseMs = 224.0f;
         instrument.macroValues = { 0.11f, 0.57f, 0.83f, 0.25f, 0.19f, 0.29f, 0.39f, 0.49f };
         instrument.dynamicModulation.oscAFine.lfo2 = 0.19f;
         instrument.dynamicModulation.oscAFine.lfo2Bipolar = false;
         instrument.dynamicModulation.filterCutoff.macro4 = -0.31f;
         instrument.dynamicModulation.filterCutoff.macro8 = 0.27f;
+        instrument.dynamicModulation.filterCutoff.env3 = 0.21f;
+        instrument.dynamicModulation.filterCutoff.env4 = -0.18f;
         instrument.dynamicModulation.ampLevel.velocity = 0.27f;
         instrument.dynamicModulation.ampLevel.velocityBipolar = false;
 
@@ -7087,6 +7104,12 @@ namespace
                 && !loadedInstrument.dynamicModulation.oscAFine.lfo2Bipolar
                 && near(loadedInstrument.dynamicModulation.filterCutoff.macro4, -0.31f)
                 && near(loadedInstrument.dynamicModulation.filterCutoff.macro8, 0.27f)
+                && near(loadedInstrument.dynamicModulation.filterCutoff.env3, 0.21f)
+                && near(loadedInstrument.dynamicModulation.filterCutoff.env4, -0.18f)
+                && near(loadedInstrument.env3AttackMs, 23.0f) && near(loadedInstrument.env3DecayMs, 123.0f)
+                && near(loadedInstrument.env3Sustain, 0.31f) && near(loadedInstrument.env3ReleaseMs, 183.0f) && loadedInstrument.env3Loop
+                && near(loadedInstrument.env4AttackMs, 34.0f) && near(loadedInstrument.env4DecayMs, 144.0f)
+                && near(loadedInstrument.env4Sustain, 0.41f) && near(loadedInstrument.env4ReleaseMs, 224.0f)
                 && near(loadedInstrument.dynamicModulation.ampLevel.velocity, 0.27f)
                 && !loadedInstrument.dynamicModulation.ampLevel.velocityBipolar
                 && loadedOscA.enabled
@@ -11948,6 +11971,15 @@ namespace
             "env.2.release": 0.16,
             "env.2.releaseCurve": "log",
             "env.2.loop": true,
+            "env.3.attack": 0.02,
+            "env.3.decay": 0.12,
+            "env.3.sustain": 0.3,
+            "env.3.release": 0.18,
+            "env.3.loop": true,
+            "env.4.attack": 0.03,
+            "env.4.decay": 0.14,
+            "env.4.sustain": 0.4,
+            "env.4.release": 0.22,
             "amp.level": 0.7,
             "amp.pan": -0.25,
             "lfo.1.enabled": true,
@@ -11975,6 +12007,8 @@ namespace
             { "source": "macro.1", "target": "osc.a.position", "amount": 0.4, "enabled": true },
             { "source": "macro.1", "target": "osc.b.position", "amount": -0.3, "enabled": true },
             { "source": "macro.2", "target": "osc.b.level", "amount": 0.5, "enabled": true },
+            { "source": "env.3", "target": "filter.drive", "amount": 0.33, "enabled": true },
+            { "source": "env.4", "target": "amp.pan", "amount": -0.27, "enabled": true },
             { "source": "macro.2", "target": "osc.b.fine", "amount": 0.25, "enabled": true },
             { "source": "macro.1", "target": "osc.a.pan", "amount": 0.2, "enabled": true },
             { "source": "macro.2", "target": "osc.b.pan", "amount": -0.25, "enabled": true },
@@ -12088,6 +12122,11 @@ namespace
             return false;
         if (!instrument.env2Loop)
             return false;
+        if (!near(instrument.env3AttackMs, 20.0f) || !near(instrument.env3DecayMs, 120.0f)
+            || !near(instrument.env3Sustain, 0.3f) || !near(instrument.env3ReleaseMs, 180.0f) || !instrument.env3Loop
+            || !near(instrument.env4AttackMs, 30.0f) || !near(instrument.env4DecayMs, 140.0f)
+            || !near(instrument.env4Sustain, 0.4f) || !near(instrument.env4ReleaseMs, 220.0f))
+            return false;
         if (!near(instrument.ampLevel, 0.7f) || !near(instrument.ampPan, -0.25f))
             return false;
         if (instrument.lfoWaveform != 3 || !near(instrument.lfoRateHz, 6.5f) || !near(instrument.lfoPhaseOffset, 0.25f))
@@ -12147,6 +12186,9 @@ namespace
         if (!near(instrument.dynamicModulation.filterCutoff.macro1, 0.1f))
             return false;
         if (!near(instrument.dynamicModulation.filterResonance.macro2, 0.25f))
+            return false;
+        if (!near(instrument.dynamicModulation.filterDrive.env3, 0.33f)
+            || !near(instrument.dynamicModulation.ampPan.env4, -0.27f))
             return false;
         if (!near(instrument.dynamicModulation.ampLevel.macro2, -0.2f))
             return false;

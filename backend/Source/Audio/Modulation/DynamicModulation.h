@@ -33,6 +33,8 @@ namespace beat::DynamicModulation
         bool lfo2 { false };
         bool env { false };
         bool env2 { false };
+        bool env3 { false };
+        bool env4 { false };
         bool velocity { false };
         bool keytrack { false };
         bool modWheel { false };
@@ -49,6 +51,8 @@ namespace beat::DynamicModulation
         bool needsLfoValue { false };
         bool needsLfo2Value { false };
         bool needsEnv2Value { false };
+        bool needsEnv3Value { false };
+        bool needsEnv4Value { false };
         bool hasAmpPanMod { false };
     };
 
@@ -64,6 +68,8 @@ namespace beat::DynamicModulation
             || std::abs(target.lfo2) > 0.0001f
             || std::abs(target.env) > 0.0001f
             || std::abs(target.env2) > 0.0001f
+            || std::abs(target.env3) > 0.0001f
+            || std::abs(target.env4) > 0.0001f
             || std::abs(target.velocity) > 0.0001f
             || std::abs(target.keytrack) > 0.0001f
             || std::abs(target.modWheel) > 0.0001f
@@ -84,6 +90,8 @@ namespace beat::DynamicModulation
         flags.lfo2 = flags.lfo2 || std::abs(target.lfo2) > 0.0001f;
         flags.env = flags.env || std::abs(target.env) > 0.0001f;
         flags.env2 = flags.env2 || std::abs(target.env2) > 0.0001f;
+        flags.env3 = flags.env3 || std::abs(target.env3) > 0.0001f;
+        flags.env4 = flags.env4 || std::abs(target.env4) > 0.0001f;
         flags.velocity = flags.velocity || std::abs(target.velocity) > 0.0001f;
         flags.keytrack = flags.keytrack || std::abs(target.keytrack) > 0.0001f;
         flags.modWheel = flags.modWheel || std::abs(target.modWheel) > 0.0001f;
@@ -96,6 +104,8 @@ namespace beat::DynamicModulation
         float rawLfo2,
         float env,
         float env2,
+        float env3,
+        float env4,
         float velocity,
         float keytrack,
         float modWheel,
@@ -106,6 +116,8 @@ namespace beat::DynamicModulation
             + Lfo::routeValue(rawLfo2, target.lfo2Bipolar) * target.lfo2
             + routeEnvValue(env, target.envBipolar) * target.env
             + routeEnvValue(env2, target.env2Bipolar) * target.env2
+            + routeEnvValue(env3, target.env3Bipolar) * target.env3
+            + routeEnvValue(env4, target.env4Bipolar) * target.env4
             + routeEnvValue(velocity, target.velocityBipolar) * target.velocity
             + routeEnvValue(keytrack, target.keytrackBipolar) * target.keytrack
             + routeEnvValue(modWheel, target.modWheelBipolar) * target.modWheel
@@ -117,6 +129,16 @@ namespace beat::DynamicModulation
             + macroValues[5] * target.macro6
             + macroValues[6] * target.macro7
             + macroValues[7] * target.macro8) * scale;
+    }
+
+    template <typename Target>
+    float targetOffset(
+        const Target& target, float rawLfo, float rawLfo2, float env, float env2,
+        float velocity, float keytrack, float modWheel,
+        const std::array<float, 8>& macroValues, float scale) noexcept
+    {
+        return targetOffset(target, rawLfo, rawLfo2, env, env2, 0.0f, 0.0f,
+            velocity, keytrack, modWheel, macroValues, scale);
     }
 
     template <typename Modulation>
@@ -215,6 +237,8 @@ namespace beat::DynamicModulation
         plan.needsLfoValue = (plan.useDynamicModulation && flags.lfo) || plan.hasPitchMod || plan.hasPositionMod || hasLegacyFilterLfoMod;
         plan.needsLfo2Value = plan.useDynamicModulation && lfo2Enabled && flags.lfo2;
         plan.needsEnv2Value = plan.useDynamicModulation && flags.env2;
+        plan.needsEnv3Value = plan.useDynamicModulation && flags.env3;
+        plan.needsEnv4Value = plan.useDynamicModulation && flags.env4;
         plan.hasAmpPanMod = flags.ampPan;
         return plan;
     }

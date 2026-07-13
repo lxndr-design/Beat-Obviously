@@ -2010,8 +2010,10 @@ export function modulationAtTime(
     effectiveLfoSmoothing(instrument, 2),
   );
   const env = envelopePreviewValue(timeS, durationS, instrument);
-  const env2 = modEnvelopePreviewValue(timeS, durationS, instrument);
-  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env, env2, velocity, keytrack, modWheel, macroOverrides);
+  const env2 = modEnvelopePreviewValue(timeS, durationS, instrument, 2);
+  const env3 = modEnvelopePreviewValue(timeS, durationS, instrument, 3);
+  const env4 = modEnvelopePreviewValue(timeS, durationS, instrument, 4);
+  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env, env2, env3, env4, velocity, keytrack, modWheel, macroOverrides);
   if (targetOffsets) {
     return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, ampEnvelope: env, targetOffsets };
   }
@@ -2032,6 +2034,8 @@ function routeTargetOffsets(
   rawLfo2: number,
   env: number,
   env2: number,
+  env3: number,
+  env4: number,
   velocity: number,
   keytrack: number,
   modWheel: number,
@@ -2046,7 +2050,7 @@ function routeTargetOffsets(
     const amount = Number.isFinite(route.amount) ? clamp(route.amount ?? 0, -1, 1) : 0;
     if (amount === 0) continue;
 
-    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, env, env2, velocity, keytrack, modWheel, macroOverrides);
+    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, env, env2, env3, env4, velocity, keytrack, modWheel, macroOverrides);
     if (sourceValue == null) continue;
     offsets[route.target] = (offsets[route.target] ?? 0) + sourceValue * amount * modulationTargetScale(route.target);
   }
@@ -2060,6 +2064,8 @@ function modulationSourceValue(
   rawLfo2: number,
   env: number,
   env2: number,
+  env3: number,
+  env4: number,
   velocity: number,
   keytrack: number,
   modWheel: number,
@@ -2079,6 +2085,8 @@ function modulationSourceValue(
   if (route.source === "env.2") {
     return route.bipolar ? env2 * 2 - 1 : env2;
   }
+  if (route.source === "env.3") return route.bipolar ? env3 * 2 - 1 : env3;
+  if (route.source === "env.4") return route.bipolar ? env4 * 2 - 1 : env4;
   if (route.source === "velocity") {
     return route.bipolar ? velocity * 2 - 1 : velocity;
   }
@@ -2245,15 +2253,16 @@ function envelopePreviewValue(timeS: number, durationS: number, instrument: Inst
   return sustain;
 }
 
-function modEnvelopePreviewValue(timeS: number, durationS: number, instrument: Instrument): number {
+function modEnvelopePreviewValue(timeS: number, durationS: number, instrument: Instrument, index: 2 | 3 | 4): number {
   const params = instrument.synthPatch?.parameters;
-  const attack = Math.max(0.001, numberParam(params?.["env.2.attack"], 0.01));
-  const decay = Math.max(0.001, numberParam(params?.["env.2.decay"], 0.3));
-  const sustain = clamp01(numberParam(params?.["env.2.sustain"], 0));
-  const release = Math.max(0.001, numberParam(params?.["env.2.release"], 0.2));
-  const attackCurve = envelopeCurveParam(params?.["env.2.attackCurve"]);
-  const decayCurve = envelopeCurveParam(params?.["env.2.decayCurve"]);
-  const releaseCurve = envelopeCurveParam(params?.["env.2.releaseCurve"]);
+  const prefix = `env.${index}` as const;
+  const attack = Math.max(0.001, numberParam(params?.[`${prefix}.attack`], 0.01));
+  const decay = Math.max(0.001, numberParam(params?.[`${prefix}.decay`], 0.3));
+  const sustain = clamp01(numberParam(params?.[`${prefix}.sustain`], 0));
+  const release = Math.max(0.001, numberParam(params?.[`${prefix}.release`], 0.2));
+  const attackCurve = envelopeCurveParam(params?.[`${prefix}.attackCurve`]);
+  const decayCurve = envelopeCurveParam(params?.[`${prefix}.decayCurve`]);
+  const releaseCurve = envelopeCurveParam(params?.[`${prefix}.releaseCurve`]);
   const segmentValue = (time: number) => {
     if (time < attack) {
       return applyEnvelopeCurve(time / attack, attackCurve);
@@ -2263,7 +2272,7 @@ function modEnvelopePreviewValue(timeS: number, durationS: number, instrument: I
     return 1 + (sustain - 1) * t;
   };
   const releaseStart = Math.max(attack + decay, durationS - release);
-  if (params?.["env.2.loop"] === true) {
+  if (params?.[`${prefix}.loop`] === true) {
     const cycleLength = Math.max(0.001, attack + decay);
     if (timeS > releaseStart) {
       const releaseValue = segmentValue(releaseStart % cycleLength);

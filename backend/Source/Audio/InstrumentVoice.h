@@ -138,6 +138,10 @@ namespace beat
                 bool envBipolar { false };
                 float env2 { 0.0f };
                 bool env2Bipolar { false };
+                float env3 { 0.0f };
+                bool env3Bipolar { false };
+                float env4 { 0.0f };
+                bool env4Bipolar { false };
                 float velocity { 0.0f };
                 bool velocityBipolar { false };
                 float keytrack { 0.0f };
@@ -207,6 +211,10 @@ namespace beat
             float env2ReleaseMs { 200.f };
             int env2ReleaseCurve { 0 };
             bool env2Loop { false };
+            float env3AttackMs { 10.f }; int env3AttackCurve { 0 }; float env3DecayMs { 300.f }; int env3DecayCurve { 0 };
+            float env3Sustain { 0.0f }; float env3ReleaseMs { 200.f }; int env3ReleaseCurve { 0 }; bool env3Loop { false };
+            float env4AttackMs { 10.f }; int env4AttackCurve { 0 }; float env4DecayMs { 300.f }; int env4DecayCurve { 0 };
+            float env4Sustain { 0.0f }; float env4ReleaseMs { 200.f }; int env4ReleaseCurve { 0 }; bool env4Loop { false };
             float ampLevel  { 1.0f };
             float ampPan    { 0.0f };
             float modWheel  { 0.0f };
@@ -312,6 +320,8 @@ namespace beat
         float shapedEnvelope(float rawEnvelope) noexcept;
         float env1LoopValue() noexcept;
         float env2LoopValue() noexcept;
+        float env3LoopValue() noexcept;
+        float env4LoopValue() noexcept;
 
         Params  baseParams;
         Params  params;
@@ -367,13 +377,21 @@ namespace beat
         FilterStage::State filter2RouteState;
         float previousRawEnvelope { 0.0f };
         float previousRawEnv2Envelope { 0.0f };
+        float previousRawEnv3Envelope { 0.0f };
+        float previousRawEnv4Envelope { 0.0f };
         EnvelopeShaper::LoopState env1LoopState;
         EnvelopeShaper::LoopState env2LoopState;
+        EnvelopeShaper::LoopState env3LoopState;
+        EnvelopeShaper::LoopState env4LoopState;
         juce::uint32 noiseState { 1 };
         juce::ADSR adsr;
         juce::ADSR::Parameters adsrParams;
         juce::ADSR env2Adsr;
         juce::ADSR::Parameters env2AdsrParams;
+        juce::ADSR env3Adsr;
+        juce::ADSR::Parameters env3AdsrParams;
+        juce::ADSR env4Adsr;
+        juce::ADSR::Parameters env4AdsrParams;
         VoiceTransition stealTransition;
         VoiceTransition::Stereo lastOutput;
         int stableVoiceId { 0 };

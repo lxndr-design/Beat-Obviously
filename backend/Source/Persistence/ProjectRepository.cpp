@@ -413,6 +413,10 @@ namespace beat
             o->setProperty("envBipolar", target.envBipolar);
             o->setProperty("env2", target.env2);
             o->setProperty("env2Bipolar", target.env2Bipolar);
+            o->setProperty("env3", target.env3);
+            o->setProperty("env3Bipolar", target.env3Bipolar);
+            o->setProperty("env4", target.env4);
+            o->setProperty("env4Bipolar", target.env4Bipolar);
             o->setProperty("velocity", target.velocity);
             o->setProperty("velocityBipolar", target.velocityBipolar);
             o->setProperty("keytrack", target.keytrack);
@@ -454,6 +458,10 @@ namespace beat
             fallback.envBipolar = bipolar(targetVar, "envBipolar", fallback.envBipolar);
             fallback.env2 = amount(targetVar, "env2", fallback.env2);
             fallback.env2Bipolar = bipolar(targetVar, "env2Bipolar", fallback.env2Bipolar);
+            fallback.env3 = amount(targetVar, "env3", fallback.env3);
+            fallback.env3Bipolar = bipolar(targetVar, "env3Bipolar", fallback.env3Bipolar);
+            fallback.env4 = amount(targetVar, "env4", fallback.env4);
+            fallback.env4Bipolar = bipolar(targetVar, "env4Bipolar", fallback.env4Bipolar);
             fallback.velocity = amount(targetVar, "velocity", fallback.velocity);
             fallback.velocityBipolar = bipolar(targetVar, "velocityBipolar", fallback.velocityBipolar);
             fallback.keytrack = amount(targetVar, "keytrack", fallback.keytrack);
@@ -903,6 +911,14 @@ namespace beat
             o->setProperty("env2ReleaseMs", instrument.env2ReleaseMs);
             o->setProperty("env2ReleaseCurve", instrument.env2ReleaseCurve);
             o->setProperty("env2Loop", instrument.env2Loop);
+            o->setProperty("env3AttackMs", instrument.env3AttackMs); o->setProperty("env3AttackCurve", instrument.env3AttackCurve);
+            o->setProperty("env3DecayMs", instrument.env3DecayMs); o->setProperty("env3DecayCurve", instrument.env3DecayCurve);
+            o->setProperty("env3Sustain", instrument.env3Sustain); o->setProperty("env3ReleaseMs", instrument.env3ReleaseMs);
+            o->setProperty("env3ReleaseCurve", instrument.env3ReleaseCurve); o->setProperty("env3Loop", instrument.env3Loop);
+            o->setProperty("env4AttackMs", instrument.env4AttackMs); o->setProperty("env4AttackCurve", instrument.env4AttackCurve);
+            o->setProperty("env4DecayMs", instrument.env4DecayMs); o->setProperty("env4DecayCurve", instrument.env4DecayCurve);
+            o->setProperty("env4Sustain", instrument.env4Sustain); o->setProperty("env4ReleaseMs", instrument.env4ReleaseMs);
+            o->setProperty("env4ReleaseCurve", instrument.env4ReleaseCurve); o->setProperty("env4Loop", instrument.env4Loop);
             o->setProperty("ampLevel", instrument.ampLevel);
             o->setProperty("ampPan", instrument.ampPan);
             o->setProperty("glideMs", instrument.glideMs);
@@ -1091,6 +1107,23 @@ namespace beat
                     instrument.env2ReleaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty("env2ReleaseMs", instrument.env2ReleaseMs));
                     instrument.env2ReleaseCurve = juce::jlimit(0, 3, (int) iv.getProperty("env2ReleaseCurve", instrument.env2ReleaseCurve));
                     instrument.env2Loop = (bool) iv.getProperty("env2Loop", instrument.env2Loop);
+                    const auto loadEnvelope = [&](const char* prefix, float& attack, int& attackCurve, float& decay, int& decayCurve,
+                                                  float& sustain, float& release, int& releaseCurve, bool& loop)
+                    {
+                        const juce::String p(prefix);
+                        attack = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty(p + "AttackMs", attack));
+                        attackCurve = juce::jlimit(0, 3, (int) iv.getProperty(p + "AttackCurve", attackCurve));
+                        decay = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty(p + "DecayMs", decay));
+                        decayCurve = juce::jlimit(0, 3, (int) iv.getProperty(p + "DecayCurve", decayCurve));
+                        sustain = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty(p + "Sustain", sustain));
+                        release = juce::jlimit(0.0f, 10000.0f, (float) (double) iv.getProperty(p + "ReleaseMs", release));
+                        releaseCurve = juce::jlimit(0, 3, (int) iv.getProperty(p + "ReleaseCurve", releaseCurve));
+                        loop = (bool) iv.getProperty(p + "Loop", loop);
+                    };
+                    loadEnvelope("env3", instrument.env3AttackMs, instrument.env3AttackCurve, instrument.env3DecayMs, instrument.env3DecayCurve,
+                        instrument.env3Sustain, instrument.env3ReleaseMs, instrument.env3ReleaseCurve, instrument.env3Loop);
+                    loadEnvelope("env4", instrument.env4AttackMs, instrument.env4AttackCurve, instrument.env4DecayMs, instrument.env4DecayCurve,
+                        instrument.env4Sustain, instrument.env4ReleaseMs, instrument.env4ReleaseCurve, instrument.env4Loop);
                     instrument.ampLevel = juce::jlimit(0.0f, 1.0f, (float) (double) iv.getProperty("ampLevel", instrument.ampLevel));
                     instrument.ampPan = juce::jlimit(-1.0f, 1.0f, (float) (double) iv.getProperty("ampPan", instrument.ampPan));
                     instrument.glideMs = juce::jlimit(0.0f, 5000.0f, (float) (double) iv.getProperty("glideMs", instrument.glideMs));
