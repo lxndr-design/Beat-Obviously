@@ -5,13 +5,14 @@
 
 Date: 2026-07-13  
 Branch: `codex/aether-serum-foundation`  
-Reviewed implementation head: `3d70d3ec`
+Reviewed implementation head: `b463dbe9`
 
 ## Outcome
 
-Milestone B implementation and automated verification are green, but the phase
-is **not declared released**. Two product/DSP policy decisions below require
-explicit human approval. Milestone C remains blocked.
+Milestone B implementation, automated verification, and the two required
+product/DSP policy decisions are accepted. The phase is **declared released**
+for this private build. Milestone C may proceed through its independently gated
+slices.
 
 No upstream implementation, factory content, branding, service integration, or
 new runtime dependency was imported or executed during Milestone B.
@@ -49,7 +50,9 @@ new runtime dependency was imported or executed during Milestone B.
 - Production interaction alias at 44.1 kHz: AM `0.0000102953`, ring
   `0.0000448392`; both below the current `0.005` regression gate.
 
-## Decisions requiring approval
+## Approved decisions
+
+The user explicitly approved both policies on 2026-07-13.
 
 ### 1. Transition policy
 
@@ -63,6 +66,8 @@ Recommended decision: accept the bounded bridge and no-old-tail-overlap policy
 for Milestone B, while treating `0.2` only as a fail-safe regression ceiling,
 not a psychoacoustic inaudibility claim. Tail overlap can remain a later
 opt-in architecture change because it expands ownership and callback work.
+
+Decision: **approved as recommended**.
 
 ### 2. Spectral threshold policy
 
@@ -78,6 +83,8 @@ Recommended decision: accept the current mode-specific gates for Milestone B
 and require every future nonlinear mode to add its own isolated spectral test.
 Do not adopt a single global threshold from the broad-band scenario metric.
 
+Decision: **approved as recommended**.
+
 ## Remaining non-release claims
 
 - The recent-project existence probe remains the sole explicit TCC waiver.
@@ -88,7 +95,9 @@ Do not adopt a single global threshold from the broad-band scenario metric.
 - Component isolation does not exempt the combined private build from GPLv3
   constraints if Vital-derived code is introduced later.
 
-## Stop condition
+## Release decision
 
-Do not begin Milestone C until the two decisions above are explicitly approved
-or revised and this report is marked accepted.
+Milestone B is accepted. This approval does not remove the private-build
+licensing gate, authorize distribution, approve an external dependency, or
+approve executing/importing upstream code. Each Milestone C slice retains those
+independent controls.

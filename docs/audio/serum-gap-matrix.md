@@ -1,10 +1,11 @@
 # Aether Serum-class gap matrix
 
-This matrix uses Serum-class instruments as a capability reference, not a source-compatibility promise. Milestone C is blocked until A and B pass their release gates.
+This matrix uses Serum-class instruments as a capability reference, not a source-compatibility promise. Milestones A and B have passed their release gates.
 
-Milestone B implementation and automated verification are green. Phase release
-remains pending the two explicit policy approvals in
-`milestone-b-release-report.md`; this is not a Milestone C authorization.
+Milestone B implementation, automated verification, bounded-transition policy,
+and mode-specific spectral policy are accepted. Milestone C may proceed through
+independently gated Beat-owned slices; licensing, upstream-import, and external
+dependency approvals remain separate.
 
 | Capability | Current Beat state | Target milestone | Required proof / dependency |
 | --- | --- | --- | --- |
