@@ -879,12 +879,21 @@ function runtimeWarpSample(input: number, amount: number, mode: WavetableConfig[
 
 function applyRuntimeWarpStereo(instrument: Instrument, left: number, right: number): { left: number; right: number } {
   const amount = clamp01(instrument.aether?.runtimeWarp ?? 0);
-  if (amount <= 0.0001) return { left, right };
   const mode = instrument.aether?.runtimeWarpMode ?? "shape";
+  const amount2 = clamp01(instrument.aether?.runtimeWarp2 ?? 0);
+  const mode2 = instrument.aether?.runtimeWarp2Mode ?? "shape";
   return {
-    left: runtimeWarpSample(left, amount, mode),
-    right: runtimeWarpSample(right, amount, mode),
+    left: runtimeWarpSample(runtimeWarpSample(left, amount, mode), amount2, mode2),
+    right: runtimeWarpSample(runtimeWarpSample(right, amount, mode), amount2, mode2),
   };
+}
+
+function applyRuntimeWarpSerial(input: number, config: NonNullable<Instrument["aether"]>): number {
+  return runtimeWarpSample(
+    runtimeWarpSample(input, config.runtimeWarp ?? 0, config.runtimeWarpMode ?? "shape"),
+    config.runtimeWarp2 ?? 0,
+    config.runtimeWarp2Mode ?? "shape",
+  );
 }
 
 function quantizeKeyNumber(value: number, step: number): number {
@@ -1212,10 +1221,10 @@ function aetherStackBuses(
   if (levelSum <= 0) return { filtered: 0, filter1: 0, filter2: 0, direct: 0 };
   const normalizer = Math.max(0.35, levelSum);
   return {
-    filtered: runtimeWarpSample(clamp(sum / normalizer, -1, 1), config.runtimeWarp ?? 0, config.runtimeWarpMode ?? "shape"),
-    filter1: runtimeWarpSample(clamp(filter1Sum / normalizer, -1, 1), config.runtimeWarp ?? 0, config.runtimeWarpMode ?? "shape"),
-    filter2: runtimeWarpSample(clamp(filter2Sum / normalizer, -1, 1), config.runtimeWarp ?? 0, config.runtimeWarpMode ?? "shape"),
-    direct: runtimeWarpSample(clamp(directSum / normalizer, -1, 1), config.runtimeWarp ?? 0, config.runtimeWarpMode ?? "shape"),
+    filtered: applyRuntimeWarpSerial(clamp(sum / normalizer, -1, 1), config),
+    filter1: applyRuntimeWarpSerial(clamp(filter1Sum / normalizer, -1, 1), config),
+    filter2: applyRuntimeWarpSerial(clamp(filter2Sum / normalizer, -1, 1), config),
+    direct: applyRuntimeWarpSerial(clamp(directSum / normalizer, -1, 1), config),
   };
 }
 

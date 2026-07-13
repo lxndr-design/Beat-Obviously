@@ -252,6 +252,8 @@ namespace beat
             AetherNoise aetherNoise;
             float aetherRuntimeWarp { 0.0f };
             int aetherRuntimeWarpMode { 0 };
+            float aetherRuntimeWarp2 { 0.0f };
+            int aetherRuntimeWarp2Mode { 0 };
         };
 
         void setParams(const Params& p);
@@ -347,6 +349,10 @@ namespace beat
         DriveStage::State aetherDirectRuntimeWarpState;
         DriveStage::State aetherFilter1RuntimeWarpState;
         DriveStage::State aetherFilter2RuntimeWarpState;
+        DriveStage::State aetherRuntimeWarp2State;
+        DriveStage::State aetherDirectRuntimeWarp2State;
+        DriveStage::State aetherFilter1RuntimeWarp2State;
+        DriveStage::State aetherFilter2RuntimeWarp2State;
         DriveStage::State driveState;
         DriveStage::State filter2DriveState;
         DriveStage::State filter1RouteDriveState;

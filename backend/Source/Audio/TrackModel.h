@@ -199,6 +199,8 @@ namespace beat
             AetherNoise noise;
             float runtimeWarp { 0.0f };
             int runtimeWarpMode { 0 };
+            float runtimeWarp2 { 0.0f };
+            int runtimeWarp2Mode { 0 };
         };
 
         struct DynamicModTarget

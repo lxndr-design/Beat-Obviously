@@ -341,3 +341,12 @@ all destination outputs -> common amp/pan/steal transition
 ```
 
 The isolated lanes share parameter values, not mutable DSP state. They are configured with the voice lifecycle outside the callback and preserve the A9 zero-violation gate.
+
+```text
+each Aether destination lane
+  runtime warp stage 1 (optional, prepared state)
+  -> runtime warp stage 2 (optional, separate prepared state)
+  -> selected filter/direct destination
+```
+
+Both stages are fixed branches over voice-owned state. Stage-two amount zero is an exact bypass/reset path and adds no ownership or graph mutation.

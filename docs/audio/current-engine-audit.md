@@ -270,3 +270,11 @@ Each Aether source now accepts `both`, `filter1`, `filter2`, or `direct`; legacy
 Native tests prove all four renderer buses are independently populated, bounded, and recombine correctly; voice tests prove Filter-1-only and Filter-2-only renders are finite and audibly distinct. Frontend normalization and preview maintain corresponding isolated filter-state lanes. Default preview RMS/peak remain unchanged.
 
 Full native stress passes with only the existing TCC waiver, full non-native verification passes, and production targets build. All 150 default-route WAVs are byte-identical to B6. B7 report SHA-256 is `1f3a4ddd44fb3117a326ec939a75267e23ede01d88aefcfad65cea0084a27125`; peak RSS is 14,860,288 bytes, deadline overruns are zero, and queue telemetry remains 64 accepted / 16 rejected / 16 overflow. Per-source FX sends remain open.
+
+## Milestone B8 dual serial runtime warp — 2026-07-12
+
+Aether now exposes two independent serial runtime warp stages. Stage one retains `aether.runtimeWarp` and `aether.runtimeWarpMode`; stage two adds stable `aether.runtimeWarp2` and `aether.runtimeWarp2Mode` fields and defaults to zero, preserving every existing patch and render. Both stages use the existing bounded fold, pinch, mirror, and shape set and the existing two-point nonlinear evaluation/downsample state. Every source destination lane owns fixed stage-one and stage-two state, so filter/direct routing does not share nonlinear history.
+
+Native coverage verifies patch conversion, project persistence, finite output, and a non-null audible delta between one and two enabled stages. Frontend normalization, reverse conversion, and preview apply the stages in the same order. The A9 callback probe remains at zero violations. This completes the two-stage architecture but does not invent an alias threshold: the existing oversampling stop-band/alias specification remains an explicit release-quality follow-up.
+
+Full native and non-native suites pass with only the TCC waiver; production targets build; all 150 default-stage-two-off WAVs are byte-identical to B7. B8 report SHA-256 is `1d448e4477c529783952236a9478c40c41daa417ccff6b78cdf1bd6db42e60c4`, peak RSS is 15,089,664 bytes, deadline overruns are zero, and queue telemetry remains 64 accepted / 16 rejected / 16 overflow.

@@ -105,3 +105,7 @@ The per-source filtered/direct bus contract, shared normalization, direct filter
 ## Milestone B7 provenance
 
 The explicit Filter 1, Filter 2, both-filter, and direct destinations; isolated prepared DSP state lanes; compatibility alias; preview implementation; and focused tests are independent extensions of Beat's B5/B6 graph. No upstream source was consulted, executed, copied, adapted, or imported, and no dependency, binary, asset, preset, service, branding, or licensing state changed.
+
+## Milestone B8 provenance
+
+The second serial runtime-warp state, stable schema, persistence/IPC conversion, preview ordering, and tests independently reuse Beat's existing bounded nonlinear warp implementation. No upstream repository was consulted or executed; no external code, dependency, binary, preset, asset, service, branding, or licensing change was introduced.

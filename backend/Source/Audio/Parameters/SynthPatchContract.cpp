@@ -446,6 +446,8 @@ namespace beat
         instrument.aether.noise.routing = sourceRoute(synthStringParam(params, "aether.noise.route", "filter"));
         instrument.aether.runtimeWarp = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.runtimeWarp", 0.0));
         instrument.aether.runtimeWarpMode = synthRuntimeWarpModeForId(synthStringParam(params, "aether.runtimeWarpMode", "shape"));
+        instrument.aether.runtimeWarp2 = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.runtimeWarp2", 0.0));
+        instrument.aether.runtimeWarp2Mode = synthRuntimeWarpModeForId(synthStringParam(params, "aether.runtimeWarp2Mode", "shape"));
 
         const bool filterEnabled = synthNumberParam(params, "filter.enabled", 1.0) >= 0.5;
         instrument.filterType = parseSynthFilterType(synthStringParam(params, "filter.type", "lowpass"));

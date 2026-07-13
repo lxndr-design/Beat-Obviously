@@ -1982,6 +1982,8 @@ namespace beat
         };
         params.aetherRuntimeWarp = juce::jlimit(0.0f, 1.0f, instrument.aether.runtimeWarp);
         params.aetherRuntimeWarpMode = juce::jlimit(0, 3, instrument.aether.runtimeWarpMode);
+        params.aetherRuntimeWarp2 = juce::jlimit(0.0f, 1.0f, instrument.aether.runtimeWarp2);
+        params.aetherRuntimeWarp2Mode = juce::jlimit(0, 3, instrument.aether.runtimeWarp2Mode);
 
         instrumentSynth->setNoteStealingEnabled(allocation.noteStealing);
         for (int i = 0; i < allocation.voiceCount; ++i)

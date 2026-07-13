@@ -2195,6 +2195,8 @@ namespace beat
                         instrument.aether.noise.color = normalizedParam(noise, "color", 0.45f);
                         instrument.aether.runtimeWarp = normalizedParam(aether, "runtimeWarp", 0.0f);
                         instrument.aether.runtimeWarpMode = parseWavetableWarpMode(aether.getProperty("runtimeWarpMode", 0));
+                        instrument.aether.runtimeWarp2 = normalizedParam(aether, "runtimeWarp2", 0.0f);
+                        instrument.aether.runtimeWarp2Mode = parseWavetableWarpMode(aether.getProperty("runtimeWarp2Mode", 0));
                     }
 
                     if (auto* sampleUrls = instrumentVar.getProperty("sampleUrls", {}).getArray())

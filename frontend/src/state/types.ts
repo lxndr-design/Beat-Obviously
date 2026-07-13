@@ -471,6 +471,9 @@ export interface AetherSynthConfig {
   runtimeWarp?: number;
   /** Runtime warp curve. Reuses table-generation warp labels for UI continuity. */
   runtimeWarpMode?: WavetableWarpMode;
+  /** Optional second serial runtime warp stage. */
+  runtimeWarp2?: number;
+  runtimeWarp2Mode?: WavetableWarpMode;
 }
 
 export type SynthPatchParameterValue = boolean | number | string;

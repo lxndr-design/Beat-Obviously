@@ -7035,6 +7035,8 @@ namespace
         instrument.aether.noise.color = 0.81f;
         instrument.aether.runtimeWarp = 0.63f;
         instrument.aether.runtimeWarpMode = 1;
+        instrument.aether.runtimeWarp2 = 0.37f;
+        instrument.aether.runtimeWarp2Mode = 2;
 
         const auto beforeEnergy = bufferEnergy(renderOfflineBlock(project, 16000));
 
@@ -7111,6 +7113,8 @@ namespace
                 && near(loadedInstrument.aether.noise.color, 0.81f)
                 && near(loadedInstrument.aether.runtimeWarp, 0.63f)
                 && loadedInstrument.aether.runtimeWarpMode == 1
+                && near(loadedInstrument.aether.runtimeWarp2, 0.37f)
+                && loadedInstrument.aether.runtimeWarp2Mode == 2
                 && loadedInstrument.effects.front().id == instrument.effects.front().id;
         }
 
@@ -11887,6 +11891,10 @@ namespace
             "osc.b.route": "filter1",
             "aether.sub.route": "filter2",
             "aether.noise.route": "direct",
+            "aether.runtimeWarp": 0.24,
+            "aether.runtimeWarpMode": "fold",
+            "aether.runtimeWarp2": 0.41,
+            "aether.runtimeWarp2Mode": "pinch",
             "osc.b.unison.voices": 7,
             "osc.b.unison.detune": 0.31,
             "osc.b.unison.spread": 0.83,
@@ -12016,6 +12024,9 @@ namespace
             return false;
         if (instrument.aether.oscA.routing != 1 || instrument.aether.oscB.routing != 2
             || instrument.aether.sub.routing != 3 || instrument.aether.noise.routing != 1)
+            return false;
+        if (!near(instrument.aether.runtimeWarp, 0.24f) || instrument.aether.runtimeWarpMode != 1
+            || !near(instrument.aether.runtimeWarp2, 0.41f) || instrument.aether.runtimeWarp2Mode != 2)
             return false;
         if (!instrument.aether.oscB.enabled || instrument.aether.oscB.wavetable.bank != 3)
             return false;
@@ -12903,9 +12914,19 @@ namespace
         const auto filter1Only = render(routedParams);
         routedParams.aetherOscA.routing = 3;
         const auto filter2Only = render(routedParams);
+        auto singleWarpParams = routedParams;
+        singleWarpParams.aetherOscA.routing = 0;
+        singleWarpParams.aetherRuntimeWarp = 0.45f;
+        singleWarpParams.aetherRuntimeWarpMode = 1;
+        const auto singleWarp = render(singleWarpParams);
+        auto dualWarpParams = singleWarpParams;
+        dualWarpParams.aetherRuntimeWarp2 = 0.55f;
+        dualWarpParams.aetherRuntimeWarp2Mode = 2;
+        const auto dualWarp = render(dualWarpParams);
         double serialParallelDiff = 0.0;
         double serialLegacyDiff = 0.0;
         double explicitFilterDiff = 0.0;
+        double dualWarpDiff = 0.0;
         for (int channel = 0; channel < serial.getNumChannels(); ++channel)
         {
             for (int sample = 0; sample < serial.getNumSamples(); ++sample)
@@ -12915,15 +12936,19 @@ namespace
                 const float legacyValue = legacy.getSample(channel, sample);
                 const float filter1Value = filter1Only.getSample(channel, sample);
                 const float filter2Value = filter2Only.getSample(channel, sample);
+                const float singleWarpValue = singleWarp.getSample(channel, sample);
+                const float dualWarpValue = dualWarp.getSample(channel, sample);
                 if (!std::isfinite(serialValue) || !std::isfinite(parallelValue) || !std::isfinite(legacyValue)
-                    || !std::isfinite(filter1Value) || !std::isfinite(filter2Value))
+                    || !std::isfinite(filter1Value) || !std::isfinite(filter2Value)
+                    || !std::isfinite(singleWarpValue) || !std::isfinite(dualWarpValue))
                     return false;
                 serialParallelDiff += std::abs((double) serialValue - (double) parallelValue);
                 serialLegacyDiff += std::abs((double) serialValue - (double) legacyValue);
                 explicitFilterDiff += std::abs((double) filter1Value - (double) filter2Value);
+                dualWarpDiff += std::abs((double) singleWarpValue - (double) dualWarpValue);
             }
         }
-        return serialParallelDiff > 0.1 && serialLegacyDiff > 0.1 && explicitFilterDiff > 0.1;
+        return serialParallelDiff > 0.1 && serialLegacyDiff > 0.1 && explicitFilterDiff > 0.1 && dualWarpDiff > 0.1;
     }
 
     bool stressInstrumentVoiceBandlimitedBasicOscillators()

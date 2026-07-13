@@ -181,6 +181,10 @@ try {
       "osc.b.route": "filter1",
       "aether.sub.route": "filter2",
       "aether.noise.route": "direct",
+      "aether.runtimeWarp": 0.24,
+      "aether.runtimeWarpMode": "fold",
+      "aether.runtimeWarp2": 0.41,
+      "aether.runtimeWarp2Mode": "pinch",
     },
   });
   const independentUnisonPreview = synthStore.synthDraftToPreviewInstrument(independentUnisonDraft);
@@ -197,6 +201,10 @@ try {
   assert.equal(independentUnisonPreview.aether.oscB.route, "filter1");
   assert.equal(independentUnisonPreview.aether.sub.route, "filter2");
   assert.equal(independentUnisonPreview.aether.noise.route, "direct");
+  assert.equal(independentUnisonPreview.aether.runtimeWarp, 0.24);
+  assert.equal(independentUnisonPreview.aether.runtimeWarpMode, "fold");
+  assert.equal(independentUnisonPreview.aether.runtimeWarp2, 0.41);
+  assert.equal(independentUnisonPreview.aether.runtimeWarp2Mode, "pinch");
   assert.equal(independentUnisonPreview.aether.oscB.tuningMode, "ratio");
   assert.equal(independentUnisonPreview.aether.oscB.ratioNumerator, 3);
   assert.equal(independentUnisonPreview.aether.oscB.ratioDenominator, 2);

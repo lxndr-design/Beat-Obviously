@@ -402,6 +402,10 @@ namespace beat
         aetherDirectRuntimeWarpState.reset();
         aetherFilter1RuntimeWarpState.reset();
         aetherFilter2RuntimeWarpState.reset();
+        aetherRuntimeWarp2State.reset();
+        aetherDirectRuntimeWarp2State.reset();
+        aetherFilter1RuntimeWarp2State.reset();
+        aetherFilter2RuntimeWarp2State.reset();
         driveState.reset();
         filter2DriveState.reset();
         previousRawEnvelope = 0.0f;
@@ -651,6 +655,22 @@ namespace beat
                 aetherFilter1RuntimeWarpState.reset({ filter1RouteLeft, filter1RouteRight });
                 aetherFilter2RuntimeWarpState.reset({ filter2RouteLeft, filter2RouteRight });
             }
+
+            const auto processSecondWarp = [&](DriveStage::State& state, float& laneLeft, float& laneRight)
+            {
+                if (params.hasAether && params.aetherRuntimeWarp2 > 0.0001f)
+                {
+                    const auto warped = processRuntimeWarpOversampled(state, { laneLeft, laneRight },
+                        params.aetherRuntimeWarp2, params.aetherRuntimeWarp2Mode);
+                    laneLeft = warped.left;
+                    laneRight = warped.right;
+                }
+                else state.reset({ laneLeft, laneRight });
+            };
+            processSecondWarp(aetherRuntimeWarp2State, left, right);
+            processSecondWarp(aetherDirectRuntimeWarp2State, directLeft, directRight);
+            processSecondWarp(aetherFilter1RuntimeWarp2State, filter1RouteLeft, filter1RouteRight);
+            processSecondWarp(aetherFilter2RuntimeWarp2State, filter2RouteLeft, filter2RouteRight);
 
             const float filterInputLeft = left;
             const float filterInputRight = right;
