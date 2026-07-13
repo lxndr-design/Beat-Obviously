@@ -419,6 +419,7 @@ export type InboundEvent =
       aetherNoiseSamples: number;
       filterSamples: number;
       filterDriveSamples: number;
+      voiceNonlinearSamples: number;
       filterCoefficientUpdates: number;
       filterCutoffUpdates: number;
       filterResonanceUpdates: number;
@@ -431,6 +432,8 @@ export type InboundEvent =
       routeFilterEffectSamples: number;
       routeNonlinearEffectSamples: number;
       routeDelayEffectSamples: number;
+      modulationWorkBudgetOverruns: number;
+      nonlinearWorkBudgetOverruns: number;
     }
   | { kind: "audio.deviceChanged"; deviceName: string; sampleRate: number }
   | {

@@ -1277,6 +1277,7 @@ namespace beat
         out.aetherNoiseSamples = renderTimingAetherNoiseSamples.load(std::memory_order_relaxed);
         out.filterSamples = renderTimingFilterSamples.load(std::memory_order_relaxed);
         out.filterDriveSamples = renderTimingFilterDriveSamples.load(std::memory_order_relaxed);
+        out.voiceNonlinearSamples = renderTimingVoiceNonlinearSamples.load(std::memory_order_relaxed);
         out.filterCoefficientUpdates = renderTimingFilterCoefficientUpdates.load(std::memory_order_relaxed);
         out.filterCutoffUpdates = renderTimingFilterCutoffUpdates.load(std::memory_order_relaxed);
         out.filterResonanceUpdates = renderTimingFilterResonanceUpdates.load(std::memory_order_relaxed);
@@ -1294,6 +1295,8 @@ namespace beat
         out.blockEventOverflows = blockEventOverflows.load(std::memory_order_relaxed);
         out.deadlineOverruns = deadlineOverruns.load(std::memory_order_relaxed);
         out.callbackSafetyViolations = callbackSafetyViolations.load(std::memory_order_relaxed);
+        out.modulationWorkBudgetOverruns = modulationWorkBudgetOverruns.load(std::memory_order_relaxed);
+        out.nonlinearWorkBudgetOverruns = nonlinearWorkBudgetOverruns.load(std::memory_order_relaxed);
         return true;
     }
 
@@ -4132,6 +4135,7 @@ namespace beat
         renderTimingAetherNoiseSamples.store(voiceWork.aetherNoiseSamples, std::memory_order_relaxed);
         renderTimingFilterSamples.store(voiceWork.filterSamples, std::memory_order_relaxed);
         renderTimingFilterDriveSamples.store(voiceWork.filterDriveSamples, std::memory_order_relaxed);
+        renderTimingVoiceNonlinearSamples.store(voiceWork.nonlinearSamples, std::memory_order_relaxed);
         renderTimingFilterCoefficientUpdates.store(voiceWork.filterCoefficientUpdates, std::memory_order_relaxed);
         renderTimingFilterCutoffUpdates.store(voiceWork.filterCutoffUpdates, std::memory_order_relaxed);
         renderTimingFilterResonanceUpdates.store(voiceWork.filterResonanceUpdates, std::memory_order_relaxed);
@@ -4144,6 +4148,10 @@ namespace beat
         renderTimingRouteFilterEffectSamples.store(routeEffectWork.filterSamples, std::memory_order_relaxed);
         renderTimingRouteNonlinearEffectSamples.store(routeEffectWork.nonlinearSamples, std::memory_order_relaxed);
         renderTimingRouteDelayEffectSamples.store(routeEffectWork.delaySamples, std::memory_order_relaxed);
+        if (RenderBudgets::exceedsVoiceModulationWorkCeiling(voiceWork.modulationSamples, voiceWork.voiceSamples))
+            modulationWorkBudgetOverruns.fetch_add(1, std::memory_order_relaxed);
+        if (RenderBudgets::exceedsVoiceNonlinearWorkCeiling(voiceWork.nonlinearSamples, voiceWork.voiceSamples))
+            nonlinearWorkBudgetOverruns.fetch_add(1, std::memory_order_relaxed);
         const auto ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
         const auto deadlineTicks = sampleRate > 0.0
             ? (int64_t) std::ceil((double) numSamples * ticksPerSecond / sampleRate)

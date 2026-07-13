@@ -2441,6 +2441,7 @@ namespace beat
             timingObject->setProperty("aetherNoiseSamples", (double) timing.aetherNoiseSamples);
             timingObject->setProperty("filterSamples", (double) timing.filterSamples);
             timingObject->setProperty("filterDriveSamples", (double) timing.filterDriveSamples);
+            timingObject->setProperty("voiceNonlinearSamples", (double) timing.voiceNonlinearSamples);
             timingObject->setProperty("filterCoefficientUpdates", (double) timing.filterCoefficientUpdates);
             timingObject->setProperty("filterCutoffUpdates", (double) timing.filterCutoffUpdates);
             timingObject->setProperty("filterResonanceUpdates", (double) timing.filterResonanceUpdates);
@@ -2453,6 +2454,8 @@ namespace beat
             timingObject->setProperty("routeFilterEffectSamples", (double) timing.routeFilterEffectSamples);
             timingObject->setProperty("routeNonlinearEffectSamples", (double) timing.routeNonlinearEffectSamples);
             timingObject->setProperty("routeDelayEffectSamples", (double) timing.routeDelayEffectSamples);
+            timingObject->setProperty("modulationWorkBudgetOverruns", (double) timing.modulationWorkBudgetOverruns);
+            timingObject->setProperty("nonlinearWorkBudgetOverruns", (double) timing.nonlinearWorkBudgetOverruns);
             emit(ipc::kind::EV_RENDER_TIMING, juce::var(timingObject.get()));
         }
 

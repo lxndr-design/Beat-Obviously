@@ -115,7 +115,12 @@ export function RenderTimingPanel() {
           <StaticRow
             label="FX Work"
             staticValue={stale() ? "--" : `T ${formatCount(timing().routeEffectSamples)} / F ${formatCount(timing().routeFilterEffectSamples)}`}
-            value={stale() ? "--" : `N ${formatCount(timing().routeNonlinearEffectSamples)} / D ${formatCount(timing().routeDelayEffectSamples)}`}
+            value={stale() ? "--" : `V ${formatCount(timing().voiceNonlinearSamples)} / N ${formatCount(timing().routeNonlinearEffectSamples)} / D ${formatCount(timing().routeDelayEffectSamples)}`}
+          />
+          <StaticRow
+            label="Work Limits"
+            staticValue={stale() ? "--" : `Mod ${formatCount(timing().modulationWorkBudgetOverruns)}`}
+            value={stale() ? "--" : `Nonlinear ${formatCount(timing().nonlinearWorkBudgetOverruns)}`}
           />
           <div class={styles.countGrid}>
             <For each={countRows}>

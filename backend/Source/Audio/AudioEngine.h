@@ -224,6 +224,7 @@ namespace beat
             int64_t aetherNoiseSamples { 0 };
             int64_t filterSamples { 0 };
             int64_t filterDriveSamples { 0 };
+            int64_t voiceNonlinearSamples { 0 };
             int64_t filterCoefficientUpdates { 0 };
             int64_t filterCutoffUpdates { 0 };
             int64_t filterResonanceUpdates { 0 };
@@ -241,6 +242,8 @@ namespace beat
             int64_t blockEventOverflows { 0 };
             int64_t deadlineOverruns { 0 };
             int64_t callbackSafetyViolations { 0 };
+            int64_t modulationWorkBudgetOverruns { 0 };
+            int64_t nonlinearWorkBudgetOverruns { 0 };
         };
 
         bool pullRenderTimingSnapshot(RenderTimingSnapshot& out) const noexcept;
@@ -743,6 +746,7 @@ namespace beat
         std::atomic<int64_t> renderTimingAetherNoiseSamples { 0 };
         std::atomic<int64_t> renderTimingFilterSamples { 0 };
         std::atomic<int64_t> renderTimingFilterDriveSamples { 0 };
+        std::atomic<int64_t> renderTimingVoiceNonlinearSamples { 0 };
         std::atomic<int64_t> renderTimingFilterCoefficientUpdates { 0 };
         std::atomic<int64_t> renderTimingFilterCutoffUpdates { 0 };
         std::atomic<int64_t> renderTimingFilterResonanceUpdates { 0 };
@@ -760,5 +764,7 @@ namespace beat
         std::atomic<int64_t> blockEventOverflows { 0 };
         std::atomic<int64_t> deadlineOverruns { 0 };
         std::atomic<int64_t> callbackSafetyViolations { 0 };
+        std::atomic<int64_t> modulationWorkBudgetOverruns { 0 };
+        std::atomic<int64_t> nonlinearWorkBudgetOverruns { 0 };
     };
 }

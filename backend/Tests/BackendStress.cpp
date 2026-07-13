@@ -666,6 +666,7 @@ namespace
         block.addOscillatorSamples(7);
         block.addWavetableRender(16, 3, 4);
         block.addFilterDriveSamples(256);
+        block.addNonlinearSamples(128);
         block.addFilterCutoffUpdates(5);
         block.addFilterResonanceUpdates(2);
         block.addModulationSamples(64);
@@ -690,6 +691,7 @@ namespace
             || work.wavetableFrequencyUpdates != 11
             || work.wavetablePositionUpdates != 14
             || work.filterDriveSamples != 256
+            || work.nonlinearSamples != 128
             || work.filterCutoffUpdates != 5
             || work.filterResonanceUpdates != 2
             || work.filterCoefficientUpdates != 7
@@ -708,8 +710,27 @@ namespace
             && reset.voiceSamples == 4
             && reset.filterSamples == 4
             && reset.oscillatorSamples == 0
+            && reset.nonlinearSamples == 0
             && reset.filterCoefficientUpdates == 0
             && reset.wavetableFrequencyUpdates == 0;
+    }
+
+    bool stressVoiceRenderWorkBudgets()
+    {
+        constexpr int64_t voiceSamples = 128;
+        constexpr auto modulationCeiling = beat::RenderBudgets::voiceModulationWorkCeiling(voiceSamples);
+        constexpr auto nonlinearCeiling = beat::RenderBudgets::voiceNonlinearWorkCeiling(voiceSamples);
+
+        return modulationCeiling == voiceSamples * beat::RenderBudgets::modulationEvaluationsPerVoiceSample
+            && nonlinearCeiling == voiceSamples * beat::RenderBudgets::nonlinearEvaluationsPerVoiceSample
+            && !beat::RenderBudgets::exceedsVoiceModulationWorkCeiling(modulationCeiling, voiceSamples)
+            && beat::RenderBudgets::exceedsVoiceModulationWorkCeiling(modulationCeiling + 1, voiceSamples)
+            && beat::RenderBudgets::exceedsVoiceModulationWorkCeiling(-1, voiceSamples)
+            && !beat::RenderBudgets::exceedsVoiceNonlinearWorkCeiling(nonlinearCeiling, voiceSamples)
+            && beat::RenderBudgets::exceedsVoiceNonlinearWorkCeiling(nonlinearCeiling + 1, voiceSamples)
+            && beat::RenderBudgets::exceedsVoiceNonlinearWorkCeiling(-1, voiceSamples)
+            && beat::RenderBudgets::voiceModulationWorkCeiling(std::numeric_limits<int64_t>::max())
+                == std::numeric_limits<int64_t>::max();
     }
 
     bool stressAetherTableStackRenderer()
@@ -13014,7 +13035,12 @@ namespace
         auto dualWarpParams = singleWarpParams;
         dualWarpParams.aetherRuntimeWarp2 = 0.55f;
         dualWarpParams.aetherRuntimeWarp2Mode = 2;
+        beat::InstrumentVoice::consumeRenderWorkStats();
         const auto dualWarp = render(dualWarpParams);
+        const auto dualWarpWork = beat::InstrumentVoice::consumeRenderWorkStats();
+        if (dualWarpWork.nonlinearSamples != beat::RenderBudgets::voiceNonlinearWorkCeiling(dualWarpWork.voiceSamples)
+            || beat::RenderBudgets::exceedsVoiceNonlinearWorkCeiling(dualWarpWork.nonlinearSamples, dualWarpWork.voiceSamples))
+            return false;
         double serialParallelDiff = 0.0;
         double serialLegacyDiff = 0.0;
         double explicitFilterDiff = 0.0;
@@ -13954,6 +13980,11 @@ int main()
     if (!stressVoiceRenderWorkBlock())
     {
         std::cerr << "Voice render work block stress failed\n";
+        return 1;
+    }
+    if (!stressVoiceRenderWorkBudgets())
+    {
+        std::cerr << "Voice render work budget stress failed\n";
         return 1;
     }
     if (!stressAetherTableStackRenderer())

@@ -380,3 +380,16 @@ audio callback
 ```
 
 No extra-LFO vector, lookup map, or callback graph mutation is introduced. Disabled/unrouted slots do not evaluate or advance.
+
+```text
+InstrumentVoice::renderNextBlock
+  fixed modulation sources -> VoiceStats::modulationSamples
+  four fixed destination lanes x two optional warp stages
+    -> VoiceStats::nonlinearSamples
+AudioEngine block publication
+  compare accumulated work with saturating structural ceilings
+  -> atomic modulationWorkBudgetOverruns / nonlinearWorkBudgetOverruns
+MessageBridge -> frontend timing store/debug panel
+```
+
+The comparison and reporting path performs only integer arithmetic and relaxed atomic operations in the callback. A ceiling trip reports an invariant violation; it does not branch the audio path, allocate, lock, perform I/O, or lower quality. Offline renders are not treated as real-time callback violations.

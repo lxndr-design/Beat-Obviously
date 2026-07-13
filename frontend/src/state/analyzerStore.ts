@@ -47,6 +47,7 @@ export interface RenderTimingSnapshot {
   aetherNoiseSamples: number;
   filterSamples: number;
   filterDriveSamples: number;
+  voiceNonlinearSamples: number;
   filterCoefficientUpdates: number;
   filterCutoffUpdates: number;
   filterResonanceUpdates: number;
@@ -59,6 +60,8 @@ export interface RenderTimingSnapshot {
   routeFilterEffectSamples: number;
   routeNonlinearEffectSamples: number;
   routeDelayEffectSamples: number;
+  modulationWorkBudgetOverruns: number;
+  nonlinearWorkBudgetOverruns: number;
   updatedAt: number;
 }
 
@@ -133,6 +136,7 @@ function createEmptyRenderTiming(): RenderTimingSnapshot {
     aetherNoiseSamples: 0,
     filterSamples: 0,
     filterDriveSamples: 0,
+    voiceNonlinearSamples: 0,
     filterCoefficientUpdates: 0,
     filterCutoffUpdates: 0,
     filterResonanceUpdates: 0,
@@ -145,6 +149,8 @@ function createEmptyRenderTiming(): RenderTimingSnapshot {
     routeFilterEffectSamples: 0,
     routeNonlinearEffectSamples: 0,
     routeDelayEffectSamples: 0,
+    modulationWorkBudgetOverruns: 0,
+    nonlinearWorkBudgetOverruns: 0,
     updatedAt: 0,
   };
 }

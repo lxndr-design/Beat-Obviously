@@ -16,6 +16,7 @@ namespace beat::VoiceRenderStats
         std::atomic<int64_t> renderAetherNoiseSamples { 0 };
         std::atomic<int64_t> renderFilterSamples { 0 };
         std::atomic<int64_t> renderFilterDriveSamples { 0 };
+        std::atomic<int64_t> renderNonlinearSamples { 0 };
         std::atomic<int64_t> renderFilterCoefficientUpdates { 0 };
         std::atomic<int64_t> renderFilterCutoffUpdates { 0 };
         std::atomic<int64_t> renderFilterResonanceUpdates { 0 };
@@ -38,6 +39,7 @@ namespace beat::VoiceRenderStats
         renderAetherNoiseSamples.fetch_add(stats.aetherNoiseSamples, std::memory_order_relaxed);
         renderFilterSamples.fetch_add(stats.filterSamples, std::memory_order_relaxed);
         renderFilterDriveSamples.fetch_add(stats.filterDriveSamples, std::memory_order_relaxed);
+        renderNonlinearSamples.fetch_add(stats.nonlinearSamples, std::memory_order_relaxed);
         renderFilterCoefficientUpdates.fetch_add(stats.filterCoefficientUpdates, std::memory_order_relaxed);
         renderFilterCutoffUpdates.fetch_add(stats.filterCutoffUpdates, std::memory_order_relaxed);
         renderFilterResonanceUpdates.fetch_add(stats.filterResonanceUpdates, std::memory_order_relaxed);
@@ -61,6 +63,7 @@ namespace beat::VoiceRenderStats
             renderAetherNoiseSamples.exchange(0, std::memory_order_relaxed),
             renderFilterSamples.exchange(0, std::memory_order_relaxed),
             renderFilterDriveSamples.exchange(0, std::memory_order_relaxed),
+            renderNonlinearSamples.exchange(0, std::memory_order_relaxed),
             renderFilterCoefficientUpdates.exchange(0, std::memory_order_relaxed),
             renderFilterCutoffUpdates.exchange(0, std::memory_order_relaxed),
             renderFilterResonanceUpdates.exchange(0, std::memory_order_relaxed),

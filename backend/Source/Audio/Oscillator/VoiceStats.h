@@ -23,6 +23,7 @@ namespace beat::VoiceStats
         int64_t aetherNoiseSamples { 0 };
         int64_t filterSamples { 0 };
         int64_t filterDriveSamples { 0 };
+        int64_t nonlinearSamples { 0 };
         int64_t filterCoefficientUpdates { 0 };
         int64_t filterCutoffUpdates { 0 };
         int64_t filterResonanceUpdates { 0 };
@@ -45,6 +46,7 @@ namespace beat::VoiceStats
         target.aetherNoiseSamples += delta.aetherNoiseSamples;
         target.filterSamples += delta.filterSamples;
         target.filterDriveSamples += delta.filterDriveSamples;
+        target.nonlinearSamples += delta.nonlinearSamples;
         target.filterCoefficientUpdates += delta.filterCoefficientUpdates;
         target.filterCutoffUpdates += delta.filterCutoffUpdates;
         target.filterResonanceUpdates += delta.filterResonanceUpdates;
@@ -87,6 +89,11 @@ namespace beat::VoiceStats
         void addFilterDriveSamples(int64_t samples) noexcept
         {
             work.filterDriveSamples += samples;
+        }
+
+        void addNonlinearSamples(int64_t samples) noexcept
+        {
+            work.nonlinearSamples += samples;
         }
 
         void addFilterCutoffUpdates(int64_t updates) noexcept

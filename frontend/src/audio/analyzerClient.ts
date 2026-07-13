@@ -50,6 +50,7 @@ export function startAnalyzerClient(): () => void {
         aetherNoiseSamples: positiveNumber(event.aetherNoiseSamples),
         filterSamples: positiveNumber(event.filterSamples),
         filterDriveSamples: positiveNumber(event.filterDriveSamples),
+        voiceNonlinearSamples: positiveNumber(event.voiceNonlinearSamples),
         filterCoefficientUpdates: positiveNumber(event.filterCoefficientUpdates),
         filterCutoffUpdates: positiveNumber(event.filterCutoffUpdates),
         filterResonanceUpdates: positiveNumber(event.filterResonanceUpdates),
@@ -62,6 +63,8 @@ export function startAnalyzerClient(): () => void {
         routeFilterEffectSamples: positiveNumber(event.routeFilterEffectSamples),
         routeNonlinearEffectSamples: positiveNumber(event.routeNonlinearEffectSamples),
         routeDelayEffectSamples: positiveNumber(event.routeDelayEffectSamples),
+        modulationWorkBudgetOverruns: positiveNumber(event.modulationWorkBudgetOverruns),
+        nonlinearWorkBudgetOverruns: positiveNumber(event.nonlinearWorkBudgetOverruns),
       });
       return;
     }

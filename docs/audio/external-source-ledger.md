@@ -121,3 +121,7 @@ Envelope 3/4 ADSR, curve/loop lifecycle, cached activity planning, modulation ev
 ## Milestone B11 provenance
 
 The fixed LFO 3–10 configuration/phase/route arrays, conditional evaluation, persistence, frontend schema/preview support, and tests independently extend Beat's existing LFO implementation. No upstream source was consulted, executed, copied, adapted, or imported, and no dependency, binary, preset, asset, service, branding, or licensing state changed.
+
+## Milestone B12 provenance
+
+The saturating fixed-graph work-ceiling arithmetic, extra-LFO and runtime-warp accounting, atomic block-boundary overrun telemetry, IPC/debug presentation, and focused negative tests are independently implemented from Beat's existing render counters and fixed voice graph. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived code, runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.

@@ -544,9 +544,11 @@ namespace beat
         const double lfo2PhaseDelta = juce::jmax(0.01f, params.lfo2RateHz) / sampleRate;
         std::array<double, 8> extraLfoPhaseDeltas {};
         std::array<bool, 8> needsExtraLfoValues {};
+        int activeExtraLfoCount = 0;
         for (size_t index = 0; index < params.extraLfos.size(); ++index)
         {
             needsExtraLfoValues[index] = modulationPlan.needsExtraLfoValue[index] && params.extraLfos[index].enabled;
+            activeExtraLfoCount += needsExtraLfoValues[index] ? 1 : 0;
             extraLfoPhaseDeltas[index] = juce::jmax(0.01f, params.extraLfos[index].rateHz) / sampleRate;
         }
         const bool hasVoiceAutomation = noteAutomationState.active();
@@ -573,6 +575,7 @@ namespace beat
                         params.extraLfos[index].smoothing, params.extraLfos[index].oneShot);
             if (needsLfoValue || useDynamicModulation)
                 currentBlockWork.addModulationSamples(1);
+            currentBlockWork.addModulationSamples(activeExtraLfoCount);
             const float positionLfo = hasPositionMod ? Lfo::routeValue(rawLfo, params.lfoPositionBipolar) * VoiceMath::clamp01(params.lfoDepth) : 0.0f;
             const float pitchLfo = hasPitchMod ? Lfo::routeValue(rawLfo, params.lfoPitchBipolar) : 0.0f;
             const float filterLfo = !useDynamicModulation && hasFilterMod ? Lfo::routeValue(rawLfo, params.lfoFilterBipolar) : 0.0f;
@@ -682,6 +685,7 @@ namespace beat
 
             if (params.hasAether && params.aetherRuntimeWarp > 0.0001f)
             {
+                currentBlockWork.addNonlinearSamples(4 * DriveStage::workSamplesForChannels(2));
                 const auto warped = processRuntimeWarpOversampled(
                     aetherRuntimeWarpState,
                     { left, right },
@@ -717,6 +721,7 @@ namespace beat
             {
                 if (params.hasAether && params.aetherRuntimeWarp2 > 0.0001f)
                 {
+                    currentBlockWork.addNonlinearSamples(DriveStage::workSamplesForChannels(2));
                     const auto warped = processRuntimeWarpOversampled(state, { laneLeft, laneRight },
                         params.aetherRuntimeWarp2, params.aetherRuntimeWarp2Mode);
                     laneLeft = warped.left;
