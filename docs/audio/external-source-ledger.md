@@ -189,3 +189,7 @@ The production connection of Beat's B26 interaction stage, duplicate fixed A/B o
 ## Milestone B28 provenance
 
 The optional export-quality field, legacy/default normalization, Export Review selector, IPC propagation, setup-time offline-engine selection, and focused tests independently expose Beat's existing A6 quality enum and render API. No external source, acquired reference, implementation, asset, preset, service, binary, or dependency was consulted, executed, copied, modified, translated, structurally adapted, imported, or linked. Repository-wide licensing and ownership are unchanged. Local modified files are `frontend/src/ipc/schema.ts`, `frontend/src/state/exportStore.ts`, `frontend/src/features/ExportReview/ExportReviewModal.solid.tsx`, `backend/Source/Ipc/MessageBridge.cpp`, `backend/Source/Audio/AudioEngine.h`, `backend/Source/Audio/AudioEngine.cpp`, `backend/Tests/BackendStress.cpp`, `scripts/verify-daw-core.mjs`, `scripts/verify-frontend-interactions.mjs`, and these four audit documents; none is Vital-derived.
+
+## Milestone B release-review provenance
+
+The release report and corresponding audit pointers summarize already-recorded Beat-owned implementation and measured evidence. They add no implementation, external-derived work, dependency, binary, asset, preset, branding, service, or licensing/ownership change. Local modified files are `docs/audio/milestone-b-release-report.md` and these four audit documents; none is Vital-derived.

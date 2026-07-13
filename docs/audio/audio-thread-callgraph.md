@@ -219,6 +219,10 @@ Export Review quality field (UI thread)
 
 The selection is setup-only and never enters the device callback. It does not mutate the live engine, project schema, automation IDs, event timing, or overload policy.
 
+## Milestone B release review
+
+The release review adds no production or test call-graph edge. It accepts the graphs documented above as the implementation under review and keeps Milestone C blocked pending the two human policy decisions in `milestone-b-release-report.md`.
+
 ## Table replacement lifetime path
 
 ```text

@@ -2,6 +2,10 @@
 
 This matrix uses Serum-class instruments as a capability reference, not a source-compatibility promise. Milestone C is blocked until A and B pass their release gates.
 
+Milestone B implementation and automated verification are green. Phase release
+remains pending the two explicit policy approvals in
+`milestone-b-release-report.md`; this is not a Milestone C authorization.
+
 | Capability | Current Beat state | Target milestone | Required proof / dependency |
 | --- | --- | --- | --- |
 | Independent timbre and harmonic-resolution axes | Implemented in A1 foundation | A1 | Position invariance and independent-selection tests pass; final spectral thresholds remain to be ratified |
