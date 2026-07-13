@@ -1,0 +1,117 @@
+{
+  "bankName": "Aether Benchmark Strings",
+  "schemaVersion": 1,
+  "source": {
+    "kind": "user-supplied",
+    "description": "Beat-native adaptations of two user-supplied Aether schema 2.0 benchmark presets. No upstream factory preset data is included."
+  },
+  "patches": [
+    {
+      "name": "Benchmark - Future Bass Strings",
+      "category": "Strings",
+      "intent": "Bright, animated future-bass string and supersaw hybrid with a saw-plus-square oscillator stack, tempo-synced amplitude and filter motion, chorus, phaser, saturation, delay, and bright room ambience.",
+      "tags": ["benchmark", "strings", "future-bass", "edm", "chords", "supersaw", "rhythmic", "bright"],
+      "role": "rhythmic synth string",
+      "auditionNote": "Audition with sustained future-bass chord stabs across C3-C5 and vary Motion, Color, Shape, and Space.",
+      "playMode": {"polyphony": 24, "mono": false, "legato": false, "glideMs": 0},
+      "oscillators": {
+        "oscA": {"enabled": true, "mode": "basic", "shape": "saw", "position": 0, "warpMode": "shape", "warp": 8, "octave": 0, "semitone": 0, "fineCents": 0, "phase": 0, "random": 90, "pan": 0, "level": 80},
+        "oscB": {"enabled": true, "mode": "basic", "shape": "square", "position": 0, "warpMode": "shape", "warp": 16, "octave": 1, "semitone": 0, "fineCents": 3, "phase": 25, "random": 95, "pan": 0, "level": 28}
+      },
+      "voiceStack": {"enabled": true, "voices": 8, "detune": 18, "blend": 68, "spread": 95, "max": 64},
+      "filter": {"enabled": true, "type": "LP12", "cutoffHz": 6500, "resonance": 14, "drive": 12, "keytrack": 42},
+      "envelopes": {
+        "ampEnv": {"attackMs": 65, "decayMs": 700, "sustain": 78, "releaseMs": 1100, "attackCurve": "linear", "decayCurve": "exp", "releaseCurve": "exp"},
+        "modEnv": {"attackMs": 50, "decayMs": 650, "sustain": 32, "releaseMs": 750, "attackCurve": "linear", "decayCurve": "exp", "releaseCurve": "exp"}
+      },
+      "lfos": {
+        "lfo1": {"enabled": true, "shape": "sine", "sync": false, "rateHz": 5.4, "phase": 0, "smooth": 15, "random": 4, "oneShot": false, "retrigger": false, "bipolar": true},
+        "lfo2": {"enabled": true, "shape": "saw", "sync": true, "rate": "1/4", "phase": 50, "smooth": 58, "random": 0, "oneShot": false, "retrigger": true, "bipolar": true}
+      },
+      "macros": [
+        {"slot": "motion", "label": "Motion", "default": 55},
+        {"slot": "color", "label": "Color", "default": 58},
+        {"slot": "shape", "label": "Shape", "default": 50},
+        {"slot": "space", "label": "Space", "default": 42}
+      ],
+      "modulationMatrix": [
+        {"enabled": true, "source": "lfo1", "target": "oscA.fine", "amount": 5.5, "polarity": "bipolar"},
+        {"enabled": true, "source": "lfo1", "target": "oscB.fine", "amount": 5.5, "polarity": "bipolar"},
+        {"enabled": true, "source": "lfo2", "target": "amp.level", "amount": 48, "polarity": "unipolar"},
+        {"enabled": true, "source": "lfo2", "target": "filter.cutoff", "amount": 20, "polarity": "unipolar"},
+        {"enabled": true, "source": "velocity", "target": "amp.level", "amount": 34, "polarity": "unipolar"},
+        {"enabled": true, "source": "velocity", "target": "filter.cutoff", "amount": 25, "polarity": "unipolar"},
+        {"enabled": true, "source": "velocity", "target": "oscB.level", "amount": 10, "polarity": "unipolar"},
+        {"enabled": true, "source": "modEnv", "target": "filter.cutoff", "amount": 30, "polarity": "unipolar"},
+        {"enabled": true, "source": "macro.motion", "target": "filter.cutoff", "amount": 12, "polarity": "unipolar"},
+        {"enabled": true, "source": "macro.color", "target": "filter.cutoff", "amount": 38, "polarity": "unipolar"},
+        {"enabled": true, "source": "macro.color", "target": "oscB.level", "amount": 16, "polarity": "unipolar"},
+        {"enabled": true, "source": "macro.space", "target": "unison.spread", "amount": 12, "polarity": "unipolar"}
+      ],
+      "fxChain": [
+        {"type": "Chorus", "params": {"rateHz": 0.52, "depthMs": 5.5, "delayMs": 15, "feedback": 7, "mix": 25}},
+        {"type": "Phaser", "params": {"rateHz": 0.12, "centerHz": 1150, "depthOctaves": 1.2, "feedback": 8, "mix": 8}},
+        {"type": "Saturator", "params": {"drive": 14, "tone": 50, "mix": 42}},
+        {"type": "High-pass", "params": {"cutoffHz": 170, "resonance": 0}},
+        {"type": "Compressor", "params": {"thresholdDb": -20, "ratio": 3, "attackMs": 8, "releaseMs": 180, "makeupDb": 2, "mix": 70}},
+        {"type": "Delay", "params": {"timeMs": 375, "feedback": 18, "mix": 8}},
+        {"type": "Reverb / Room", "params": {"size": 72, "damping": 35, "mix": 20}}
+      ]
+    },
+    {
+      "name": "Benchmark - Progressive House Strings",
+      "category": "Strings",
+      "intent": "Warm, sustained progressive-house string pad built from layered saw oscillators, moderate unison, slow filter bloom, chorus, saturation, compression, and a large room.",
+      "tags": ["benchmark", "strings", "progressive-house", "edm", "pad", "supersaw", "warm", "wide"],
+      "role": "synth string ensemble",
+      "auditionNote": "Audition with sustained progressive-house chords across C3-C5 and vary Motion, Color, Shape, and Space.",
+      "playMode": {"polyphony": 24, "mono": false, "legato": false, "glideMs": 0},
+      "oscillators": {
+        "oscA": {"enabled": true, "mode": "basic", "shape": "saw", "position": 0, "warpMode": "shape", "warp": 4, "octave": 0, "semitone": 0, "fineCents": 0, "phase": 0, "random": 72, "pan": 0, "level": 82},
+        "oscB": {"enabled": true, "mode": "basic", "shape": "saw", "position": 0, "warpMode": "shape", "warp": 8, "octave": 1, "semitone": 0, "fineCents": -4, "phase": 0, "random": 88, "pan": 0, "level": 24}
+      },
+      "voiceStack": {"enabled": true, "voices": 7, "detune": 12, "blend": 62, "spread": 82, "max": 48},
+      "filter": {"enabled": true, "type": "LP12", "cutoffHz": 4700, "resonance": 8, "drive": 6, "keytrack": 30},
+      "envelopes": {
+        "ampEnv": {"attackMs": 240, "decayMs": 1800, "sustain": 82, "releaseMs": 2600, "attackCurve": "linear", "decayCurve": "exp", "releaseCurve": "exp"},
+        "modEnv": {"attackMs": 650, "decayMs": 2600, "sustain": 45, "releaseMs": 2200, "attackCurve": "linear", "decayCurve": "exp", "releaseCurve": "exp"}
+      },
+      "lfos": {
+        "lfo1": {"enabled": true, "shape": "sine", "sync": false, "rateHz": 5.1, "phase": 0, "smooth": 20, "random": 5, "oneShot": false, "retrigger": false, "bipolar": true},
+        "lfo2": {"enabled": true, "shape": "sine", "sync": false, "rateHz": 0.14, "phase": 25, "smooth": 70, "random": 18, "oneShot": false, "retrigger": false, "bipolar": true}
+      },
+      "macros": [
+        {"slot": "motion", "label": "Motion", "default": 35},
+        {"slot": "color", "label": "Color", "default": 45},
+        {"slot": "shape", "label": "Shape", "default": 40},
+        {"slot": "space", "label": "Space", "default": 55}
+      ],
+      "modulationMatrix": [
+        {"enabled": true, "source": "lfo1", "target": "oscA.fine", "amount": 4.5, "polarity": "bipolar"},
+        {"enabled": true, "source": "lfo1", "target": "oscB.fine", "amount": 4.5, "polarity": "bipolar"},
+        {"enabled": true, "source": "lfo2", "target": "filter.cutoff", "amount": 7, "polarity": "bipolar"},
+        {"enabled": true, "source": "velocity", "target": "amp.level", "amount": 22, "polarity": "unipolar"},
+        {"enabled": true, "source": "velocity", "target": "filter.cutoff", "amount": 12, "polarity": "unipolar"},
+        {"enabled": true, "source": "modEnv", "target": "filter.cutoff", "amount": 22, "polarity": "unipolar"},
+        {"enabled": true, "source": "macro.motion", "target": "filter.cutoff", "amount": 18, "polarity": "unipolar"},
+        {"enabled": true, "source": "macro.color", "target": "filter.cutoff", "amount": 32, "polarity": "unipolar"},
+        {"enabled": true, "source": "macro.color", "target": "oscB.level", "amount": 10, "polarity": "unipolar"},
+        {"enabled": true, "source": "macro.space", "target": "unison.spread", "amount": 14, "polarity": "unipolar"}
+      ],
+      "fxChain": [
+        {"type": "Chorus", "params": {"rateHz": 0.33, "depthMs": 4.5, "delayMs": 18, "feedback": 8, "mix": 28}},
+        {"type": "Saturator", "params": {"drive": 8, "tone": 50, "mix": 35}},
+        {"type": "High-pass", "params": {"cutoffHz": 140, "resonance": 0}},
+        {"type": "Compressor", "params": {"thresholdDb": -18, "ratio": 2, "attackMs": 20, "releaseMs": 260, "makeupDb": 1.5, "mix": 60}},
+        {"type": "Reverb / Room", "params": {"size": 82, "damping": 58, "mix": 26}}
+      ]
+    }
+  ],
+  "conversionNotes": [
+    "Source normalized values were converted to the existing factory-guide percentage representation.",
+    "Oscillator phase degrees were converted to normalized cycle position.",
+    "Oscillator-wide vibrato was represented as matched oscillator A and B fine-pitch routes.",
+    "Future Bass Strings requested nine unison voices; the Beat-native adaptation uses Aether's supported maximum of eight.",
+    "FX-parameter, envelope-time, and LFO-depth or smoothing modulation routes are omitted because those are not current Aether modulation targets; authored static values remain present."
+  ]
+}

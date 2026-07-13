@@ -16,6 +16,7 @@ import type {
   WavetableWarpMode,
 } from "./types";
 import factoryAetherGuide from "../data/factory_demo_starter_bank_v4_acoustic_synth_guide.json";
+import benchmarkAetherStrings from "../data/aether_benchmark_strings_bank.json";
 import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
@@ -2649,6 +2650,9 @@ type FactoryGuidePatch = {
   name: string;
   category: string;
   intent?: string;
+  tags?: string[];
+  role?: string;
+  auditionNote?: string;
   playMode?: {
     polyphony?: number;
     mono?: boolean;
@@ -2742,6 +2746,7 @@ const FACTORY_GUIDE_CATEGORY_TAXONOMY: Record<string, string> = {
   "Vocal Pad": "vocal_pad",
   "Vocal Pluck": "vocal_fx",
   "Synth String": "electric_violin",
+  Strings: "electric_violin",
   "Keys / Synth Piano": "felt_piano",
   Mallet: "toy_xylophone",
 };
@@ -2816,8 +2821,9 @@ const FACTORY_GUIDE_MOD_TARGETS: Record<string, ModulationTargetId> = {
 };
 
 function createFactorySynthPresetsFromGuide(): SynthFactoryPresetRecord[] {
-  const guide = factoryAetherGuide as { patches?: FactoryGuidePatch[] };
-  return (guide.patches ?? [])
+  const guides = [factoryAetherGuide, benchmarkAetherStrings] as Array<{ patches?: FactoryGuidePatch[] }>;
+  return guides
+    .flatMap((guide) => guide.patches ?? [])
     .filter((patch) => patch.name && patch.category)
     .map(createFactorySynthPresetFromGuide);
 }
@@ -2847,7 +2853,13 @@ function createFactorySynthPresetFromGuide(patch: FactoryGuidePatch): SynthFacto
   const modulation = [...importedModulation, ...guideFallbackMacroRoutes(id, patch.category, importedModulation)];
   const effects = { filters: guideEffects(id, patch.fxChain) };
   const taxonomy = taxonomyAssignmentForInstrumentId(FACTORY_GUIDE_CATEGORY_TAXONOMY[patch.category] ?? "wavetable_synth");
-  const tags = ["factory", "aether", "guide", patch.category.toLowerCase().replaceAll(" ", "-").replaceAll("/", "-")];
+  const tags = Array.from(new Set([
+    "factory",
+    "aether",
+    "guide",
+    patch.category.toLowerCase().replaceAll(" ", "-").replaceAll("/", "-"),
+    ...(patch.tags ?? []),
+  ]));
   const normalized = normalizeSynthDraftPatch({
     name: patch.name,
     taxonomy,
@@ -2873,8 +2885,8 @@ function createFactorySynthPresetFromGuide(patch: FactoryGuidePatch): SynthFacto
     category: patch.category,
     description: patch.intent ?? `${patch.name} Aether factory patch.`,
     family: patch.category,
-    role: patch.category.toLowerCase(),
-    auditionNote: `${patch.category} patch built from the v4 Aether factory guide.`,
+    role: patch.role ?? patch.category.toLowerCase(),
+    auditionNote: patch.auditionNote ?? `${patch.category} patch built from the v4 Aether factory guide.`,
   };
 }
 

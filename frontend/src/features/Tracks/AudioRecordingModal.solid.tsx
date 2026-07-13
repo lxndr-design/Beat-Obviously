@@ -120,7 +120,7 @@ export function AudioRecordingModal(props: Props) {
     recorder = null;
     stopStream();
     if (blob.size === 0) return;
-    setRecordedBlob(blob);
+    setRecordedBlob(() => blob);
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     setRecordedName(`Recording ${stamp}.webm`);
     await analyzeBlob(blob);

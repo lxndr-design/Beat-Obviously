@@ -648,3 +648,16 @@ InstrumentVoice::renderNextBlock (active AM/ring and amount > 0 only)
 ```
 
 Interaction off or amount zero bypasses this edge exactly. Standard Live and Offline HQ both use the measured 2x source-rate policy. The callback path owns only fixed oscillator arrays, plans, filter history, and scalar work counters; preparation computes coefficients and configures table handles before rendering. The warmed production path passes the allocation/lock/file/lazy-init/growth detector. Offline export uses the same render edge but remains correctly excluded from real-time callback classification.
+
+## Milestone B29 benchmark factory presets
+
+```text
+frontend factory bank load
+  -> createFactorySynthPresetsFromGuide
+  -> createFactorySynthPresetFromGuide
+  -> normalizeSynthDraftPatch
+  -> existing preset selection / synthDraftToInstrumentPatch
+  -> existing backend SynthPatchContract application
+```
+
+B29 adds two data records to the existing factory-load path. It adds no callback branch, allocation site, file operation, lock, container growth, lazy initialization, native schema, or DSP function. Preset selection continues through the already-audited patch application boundary; the audio callback graph is unchanged.

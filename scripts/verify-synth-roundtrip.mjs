@@ -672,7 +672,7 @@ try {
     ["lfo.1", "env.2", "macro.1", "performance", "performance", "performance", "performance", "performance"],
     "modulation source affordances should focus the matching source editor surface",
   );
-  assert.ok(synthStore.FACTORY_SYNTH_PRESETS.length >= 17);
+  assert.ok(synthStore.FACTORY_SYNTH_PRESETS.length >= 19);
   assert.equal(
     new Set(synthStore.FACTORY_SYNTH_PRESETS.map((preset) => preset.id)).size,
     synthStore.FACTORY_SYNTH_PRESETS.length,
@@ -693,6 +693,7 @@ try {
     "Vocal Pad",
     "Vocal Pluck",
     "Synth String",
+    "Strings",
     "Keys / Synth Piano",
     "Mallet",
   ];
@@ -704,6 +705,34 @@ try {
     synthStore.FACTORY_SYNTH_PRESETS.some((preset) => /^Breakcore\b/i.test(preset.name)),
     false,
     "factory Aether preset bank should not include rough breakcore synth drums",
+  );
+  const futureBassBenchmark = synthStore.FACTORY_SYNTH_PRESETS.find(
+    (preset) => preset.id === "factory.benchmark-future-bass-strings",
+  );
+  const progressiveHouseBenchmark = synthStore.FACTORY_SYNTH_PRESETS.find(
+    (preset) => preset.id === "factory.benchmark-progressive-house-strings",
+  );
+  assert.equal(futureBassBenchmark?.name, "Benchmark - Future Bass Strings");
+  assert.equal(progressiveHouseBenchmark?.name, "Benchmark - Progressive House Strings");
+  assert.equal(futureBassBenchmark?.category, "Strings");
+  assert.equal(progressiveHouseBenchmark?.category, "Strings");
+  assert.ok(futureBassBenchmark?.tags.includes("benchmark"));
+  assert.ok(progressiveHouseBenchmark?.tags.includes("benchmark"));
+  assert.equal(futureBassBenchmark?.patch.parameters["osc.a.wavetable"], "basic.saw");
+  assert.equal(futureBassBenchmark?.patch.parameters["osc.b.wavetable"], "basic.square");
+  assert.equal(progressiveHouseBenchmark?.patch.parameters["osc.a.wavetable"], "basic.saw");
+  assert.equal(progressiveHouseBenchmark?.patch.parameters["osc.b.wavetable"], "basic.saw");
+  assert.equal(futureBassBenchmark?.patch.parameters["filter.cutoff"], 6500);
+  assert.equal(progressiveHouseBenchmark?.patch.parameters["filter.cutoff"], 4700);
+  assert.equal(futureBassBenchmark?.patch.parameters["osc.a.unison.voices"], 8);
+  assert.equal(progressiveHouseBenchmark?.patch.parameters["osc.a.unison.voices"], 7);
+  assert.deepEqual(
+    futureBassBenchmark?.patch.effects.filters.map((effect) => effect.kind),
+    ["chorus", "phaser", "saturator", "highpass", "compressor", "delay", "reverb"],
+  );
+  assert.deepEqual(
+    progressiveHouseBenchmark?.patch.effects.filters.map((effect) => effect.kind),
+    ["chorus", "saturator", "highpass", "compressor", "reverb"],
   );
   for (const preset of synthStore.FACTORY_SYNTH_PRESETS) {
     assert.equal(preset.patch.name, preset.name);

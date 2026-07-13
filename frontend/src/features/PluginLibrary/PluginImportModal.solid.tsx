@@ -94,7 +94,10 @@ export function PluginImportModal(props: {
           <input
             type="file"
             accept=".zip,.dspreset,.dslibrary,.dsconfig,.xml"
-            onChange={(event) => setFile(event.currentTarget.files?.[0] ?? null)}
+            onChange={(event) => {
+              const selected = event.currentTarget.files?.[0] ?? null;
+              setFile(() => selected);
+            }}
           />
           <Icon name="ph:archive" size={18} decorative />
           <span>{file()?.name ?? "Choose DS file"}</span>

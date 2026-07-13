@@ -193,3 +193,16 @@ The optional export-quality field, legacy/default normalization, Export Review s
 ## Milestone B release-review provenance
 
 The release report and corresponding audit pointers summarize already-recorded Beat-owned implementation and measured evidence. They add no implementation, external-derived work, dependency, binary, asset, preset, branding, service, or licensing/ownership change. Local modified files are `docs/audio/milestone-b-release-report.md` and these four audit documents; none is Vital-derived.
+
+## Milestone B29 benchmark factory-preset provenance
+
+Two user-supplied local preset documents were structurally adapted into Beat's existing factory-guide representation:
+
+| Supplied document | SHA-256 | Beat destination | Classification |
+| --- | --- | --- | --- |
+| /Users/alexcheng/Documents/aether_future_bass_strings_preset.json | e7bc2d66bffb4cc1dc04b6973c52eac0150732fab8f6768b5625af1d9dd09016 | frontend/src/data/aether_benchmark_strings_bank.json / Benchmark - Future Bass Strings | user-supplied, structurally adapted |
+| /Users/alexcheng/Documents/aether_progressive_house_strings_preset.json | 2d5874986920fca3852d041200b64392105a3dfedd6920dd87a815891dcb8d55 | frontend/src/data/aether_benchmark_strings_bank.json / Benchmark - Progressive House Strings | user-supplied, structurally adapted |
+
+The adaptation converts normalized source values to the factory guide's percentage representation, converts phase degrees to cycle position, maps oscillator-wide vibrato to matched A/B fine-pitch routes, and preserves the authored static oscillator, envelope, LFO, filter, macro, performance, and effect values supported by Aether. The Future Bass source requests nine unison voices; Aether's current per-oscillator maximum is eight, so the local preset explicitly uses eight to remain schema-idempotent. Dynamic routes targeting FX parameters, envelope time, LFO depth/smoothing, and other unavailable Aether modulation targets are not represented; their static target values remain present. No test was weakened to accept the conversion.
+
+These are user-provided benchmark definitions, not Vital or other upstream factory presets. No acquired repository, branding, service endpoint, binary, executable content, runtime dependency, repository-wide license, or ownership declaration was imported or changed. Local implementation files are frontend/src/data/aether_benchmark_strings_bank.json, frontend/src/state/synthStore.ts, scripts/verify-synth-roundtrip.mjs, two unrelated Solid setter compatibility fixes exposed by the full gate, and these four audit documents; none is Vital-derived.
