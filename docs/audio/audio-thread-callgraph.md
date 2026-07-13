@@ -590,3 +590,18 @@ audio callback
 ```
 
 The controls add no IPC message, persisted schema, callback branch, container, or DSP state. All validation and draft edits run on the frontend/UI path; the existing project-application boundary remains the only route into prepared native state.
+
+## Milestone B24 oscillator tuning/phase controls
+
+```text
+OscillatorPanel tuning/phase controls (UI thread)
+  -> existing osc.{a,b}.tuning.* / phaseMode draft fields
+Apply/Save
+  -> existing synthDraftToInstrumentPatch / project persistence
+  -> existing SynthPatchContract::applyOscillator
+  -> InstrumentVoice prepared parameter state
+audio callback
+  -> unchanged B3 tuning and B4 phase lifecycle paths
+```
+
+The controls add no parameter ID, IPC message, schema branch, callback work, container, ownership, or DSP behavior. Mode-dependent field visibility is entirely frontend state projection.

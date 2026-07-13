@@ -1332,6 +1332,16 @@ try {
     "Aether Synth Editor should expose validated saved MPE zone controls",
   );
   assert.ok(
+    oscillatorPanelSource.includes('ariaLabel={`${props.oscillator.toUpperCase()} tuning mode`}')
+      && oscillatorPanelSource.includes('ariaLabel={`${props.oscillator.toUpperCase()} phase mode`}')
+      && oscillatorPanelSource.includes('osc.${props.oscillator}.tuning.harmonic')
+      && oscillatorPanelSource.includes('osc.${props.oscillator}.tuning.numerator')
+      && oscillatorPanelSource.includes('osc.${props.oscillator}.tuning.denominator')
+      && oscillatorPanelSource.includes('osc.${props.oscillator}.tuning.step')
+      && oscillatorPanelSource.includes('osc.${props.oscillator}.tuning.divisions'),
+    "Aether oscillator rows should expose every stable tuning mode field and phase memory",
+  );
+  assert.ok(
     synthEditorSource.includes("Import Preset")
       && editorHostSource.includes("Instrument - Aether Engine")
       && synthEditorSource.includes("onAudition")

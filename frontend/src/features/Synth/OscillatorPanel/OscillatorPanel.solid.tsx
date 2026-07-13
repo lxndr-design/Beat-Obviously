@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { renderAetherOutputPreviewSamples } from "../../../audio/synthPreview";
-import { Button, HoverInfo, Icon, Knob, TextInput } from "../../../solid-ui";
+import { Button, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, TextInput } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import type { CustomWavetableFrame, WavemapDefinition, WavetableWarpMode } from "../../../state/types";
 import {
@@ -24,6 +24,7 @@ import {
   type WavemapAudioSelectionMode,
   type ModulationTargetId,
   type OscillatorKey,
+  type OscillatorTuningParameterId,
   type SynthDraftPatch,
   type SynthParameterId,
   type WavetableId,
@@ -87,6 +88,18 @@ const RESYNTHESIS_MODE_OPTIONS: Array<{ value: WavemapAudioSelectionMode; label:
   { value: "transient", label: "Transient" },
   { value: "sustain", label: "Sustain" },
   { value: "manual", label: "Manual" },
+];
+
+const TUNING_MODE_OPTIONS = [
+  { value: "semitone", label: "Semitone" },
+  { value: "harmonic", label: "Harmonic" },
+  { value: "ratio", label: "Ratio" },
+  { value: "step", label: "Equal division" },
+];
+
+const PHASE_MODE_OPTIONS = [
+  { value: "retrigger", label: "Retrigger" },
+  { value: "memory", label: "Memory" },
 ];
 
 type WavemapEditMode = "freehand" | "additive";
@@ -288,6 +301,12 @@ function OscillatorRow(props: {
                   )}
                 </For>
               </div>
+              <AdvancedOscillatorControls
+                oscillator={props.oscillator}
+                draft={draft()}
+                onNumericChange={setNumericParameter}
+                onStringChange={setParameter}
+              />
             </div>
           </div>
           <Show when={selectedWavetable().startsWith("user.")}>
@@ -399,6 +418,104 @@ function OscillatorRow(props: {
             </div>
           </Show>
       </div>
+    </div>
+  );
+}
+
+function AdvancedOscillatorControls(props: {
+  oscillator: OscillatorKey;
+  draft: SynthDraftPatch;
+  onNumericChange: (id: SynthParameterId, value: number) => void;
+  onStringChange: (id: SynthParameterId, value: string) => void;
+}) {
+  const tuningModeId = `osc.${props.oscillator}.tuning.mode` as OscillatorTuningParameterId;
+  const harmonicId = `osc.${props.oscillator}.tuning.harmonic` as OscillatorTuningParameterId;
+  const numeratorId = `osc.${props.oscillator}.tuning.numerator` as OscillatorTuningParameterId;
+  const denominatorId = `osc.${props.oscillator}.tuning.denominator` as OscillatorTuningParameterId;
+  const stepId = `osc.${props.oscillator}.tuning.step` as OscillatorTuningParameterId;
+  const divisionsId = `osc.${props.oscillator}.tuning.divisions` as OscillatorTuningParameterId;
+  const phaseModeId = `osc.${props.oscillator}.phaseMode` as SynthParameterId;
+  const tuningMode = () => getStringParam(props.draft, tuningModeId);
+
+  return (
+    <div class={styles.advancedOscillatorControls} aria-label={`${props.oscillator.toUpperCase()} advanced tuning and phase`}>
+      <FloatingSelect
+        layout="inline"
+        label="Tuning"
+        ariaLabel={`${props.oscillator.toUpperCase()} tuning mode`}
+        value={tuningMode()}
+        options={TUNING_MODE_OPTIONS}
+        onChange={(value) => props.onStringChange(tuningModeId, value)}
+      />
+      <div class={styles.tuningDetailControls}>
+        <Show when={tuningMode() === "semitone"}>
+          <span class={styles.tuningModeHint}>Octave, semitone, and fine controls remain active</span>
+        </Show>
+        <Show when={tuningMode() === "harmonic"}>
+          <NumberInput
+            layout="inline"
+            label="Harmonic"
+            ariaLabel={`${props.oscillator.toUpperCase()} harmonic number`}
+            value={getNumberParam(props.draft, harmonicId)}
+            min={1}
+            max={64}
+            step={1}
+            onChange={(value) => props.onNumericChange(harmonicId, value)}
+          />
+        </Show>
+        <Show when={tuningMode() === "ratio"}>
+          <NumberInput
+            layout="inline"
+            label="Numerator"
+            ariaLabel={`${props.oscillator.toUpperCase()} tuning ratio numerator`}
+            value={getNumberParam(props.draft, numeratorId)}
+            min={0.001}
+            max={64}
+            step={0.01}
+            onChange={(value) => props.onNumericChange(numeratorId, value)}
+          />
+          <NumberInput
+            layout="inline"
+            label="Denominator"
+            ariaLabel={`${props.oscillator.toUpperCase()} tuning ratio denominator`}
+            value={getNumberParam(props.draft, denominatorId)}
+            min={0.001}
+            max={64}
+            step={0.01}
+            onChange={(value) => props.onNumericChange(denominatorId, value)}
+          />
+        </Show>
+        <Show when={tuningMode() === "step"}>
+          <NumberInput
+            layout="inline"
+            label="Step"
+            ariaLabel={`${props.oscillator.toUpperCase()} equal-division step`}
+            value={getNumberParam(props.draft, stepId)}
+            min={-96}
+            max={96}
+            step={1}
+            onChange={(value) => props.onNumericChange(stepId, value)}
+          />
+          <NumberInput
+            layout="inline"
+            label="Divisions"
+            ariaLabel={`${props.oscillator.toUpperCase()} octave divisions`}
+            value={getNumberParam(props.draft, divisionsId)}
+            min={1}
+            max={96}
+            step={1}
+            onChange={(value) => props.onNumericChange(divisionsId, value)}
+          />
+        </Show>
+      </div>
+      <FloatingSelect
+        layout="inline"
+        label="Phase"
+        ariaLabel={`${props.oscillator.toUpperCase()} phase mode`}
+        value={getStringParam(props.draft, phaseModeId)}
+        options={PHASE_MODE_OPTIONS}
+        onChange={(value) => props.onStringChange(phaseModeId, value)}
+      />
     </div>
   );
 }

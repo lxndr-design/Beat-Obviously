@@ -125,10 +125,41 @@
 .rowBody {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 0;
+  gap: 6px;
   align-items: stretch;
   min-width: 0;
   padding: 6px 6px 6px 9px;
+}
+
+.advancedOscillatorControls {
+  display: grid;
+  grid-template-columns: minmax(171px, 0.8fr) minmax(330px, 2fr) minmax(171px, 0.8fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px;
+  border: var(--border-soft);
+  background: var(--surface-subtle);
+}
+
+.tuningDetailControls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tuningModeHint {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .unisonBody {

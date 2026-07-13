@@ -169,3 +169,7 @@ The fixed 2/48-semitone MCM defaults, independent additive manager/member pitch 
 ## Milestone B23 provenance
 
 The saved-zone switch, bounded integer channel inputs, overlap validation, compact status presentation, source-contract assertion, and live fixture verification independently expose Beat's existing B20 schema. No external source or acquired reference was consulted, executed, copied, modified, translated, structurally adapted, or imported. No runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing state changed. Local modified files are `frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx`, `SynthEditor.module.css`, `scripts/verify-frontend-interactions.mjs`, and these four audit documents; none is Vital-derived.
+
+## Milestone B24 provenance
+
+The tuning-mode selector, mode-specific bounded fields, phase-memory selector, compact oscillator-row layout, source-contract assertion, and live fixture verification independently expose Beat's existing B3/B4 stable fields. No external source or acquired reference was consulted, executed, copied, modified, translated, structurally adapted, or imported. No runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing state changed. Local modified files are `frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx`, `OscillatorPanel.module.css`, `scripts/verify-frontend-interactions.mjs`, and these four audit documents; none is Vital-derived.
