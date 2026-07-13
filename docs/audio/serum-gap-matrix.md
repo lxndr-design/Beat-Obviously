@@ -8,7 +8,7 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 | Reliable band limiting | Immutable harmonic mips with continuous selection implemented | A1 | Alias measurements captured; release thresholds and offline-HQ policy remain open |
 | Wavetable construction invariants | Implemented for generated tables | A1 | Explicit validation, DC removal, common normalization, phase alignment, and deterministic generation tests pass |
 | Safe table replacement | Implemented with bounded dual-table playback and one retired owner per stack | A7 | Exact boundary continuity/replacement supersession tests pass; global callback-operation interposer remains separate |
-| Parameter-rate taxonomy | Implemented for the 24-entry realtime voice surface | A2 | Central constexpr metadata, stable-ID/range/rate/smoothing/eligibility tests pass; future parameters must enter through the same policy |
+| Parameter-rate taxonomy | Implemented for the 28-entry realtime voice surface, including eight macros | A2/B9 | Central constexpr metadata, stable-ID/range/rate/smoothing/eligibility tests pass; future parameters must enter through the same policy |
 | Unified de-click behavior | Deterministic steal bridge implemented; other transitions remain subsystem-specific | A2/A3 | Extend the bounded transition contract to route/effect/source/table replacement and ratify peak thresholds |
 | Deterministic voice allocation | Implemented for Beat instrument synthesis | A3 | Released/quietest/oldest/stable-ID ordering and actual steal tests pass; Node-map fallback uses the same selector with generic state |
 | Callback-safety proof | Expanded A9 test gate passes: zero allocation, actually blocking mutex, file/stream, lazy-init, or growth violations on the warmed dense device-callback simulation; offline render is excluded | A3/A4/A8/A9 | Preserve the gate as Milestone B graph complexity grows; external product callbacks remain outside Beat's internal guarantee |
@@ -22,7 +22,7 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 | Advanced tuning modes | Implemented independently for A/B: semitone, harmonic, ratio, and equal-division step modes plus fine cents | B3 | Add UI editor affordances and broader preset-library coverage without changing stable IDs |
 | Dual serial warp stages | Implemented with independent stable fields and the bounded fold/pinch/mirror/shape set | B8 | Ratify measured alias/stop-band thresholds for the existing oversampling policy |
 | FM/PM/PD/AM/ring modulation | Partial modulation, no complete audio-rate architecture | B2 | Source/destination contracts and spectral tests |
-| Four envelopes / ten LFOs / eight macros | Two envelopes, two LFOs, four macros | B3 | Stable IDs, bounded routes, migration and UI follow-up |
+| Four envelopes / ten LFOs / eight macros | Two envelopes, two LFOs, eight macros | B9 | Expand envelopes and LFO slots with stable IDs, bounded routes, migration, and UI follow-up |
 | MPE/per-note expression | Partial note automation | B3 | Input capability mapping and deterministic persistence |
 | Dual shared filters and source routing | Two shared filters with serial/parallel topology and per-source both/Filter-1/Filter-2/direct destinations implemented | B5/B6/B7 | Add transition automation and per-source FX sends |
 | Reorderable insert plus two FX buses | Partial instrument-owned fixed FX | B5 | De-clicked graph replacement and preset migrations |

@@ -41,7 +41,7 @@ type DirectRuntimeModulationTarget =
   | "unison.detune"
   | "unison.spread";
 
-type MacroAutomationTarget = "macro.1" | "macro.2" | "macro.3" | "macro.4";
+type MacroAutomationTarget = `macro.${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`;
 type RuntimeModulationTarget = DirectRuntimeModulationTarget | MacroAutomationTarget;
 
 export type SynthAutomationTarget = RuntimeModulationTarget;
@@ -1937,6 +1937,10 @@ function baseAutomationValue(instrument: Instrument, target: RuntimeModulationTa
     case "macro.2":
     case "macro.3":
     case "macro.4":
+    case "macro.5":
+    case "macro.6":
+    case "macro.7":
+    case "macro.8":
       return clamp01(Number(instrument.synthPatch?.parameters?.[target] ?? 0));
     case "unison.detune":
       return instrument.wavetable?.detuneCents ?? instrument.aether?.oscA.wavetable.detuneCents ?? 0;
@@ -2126,7 +2130,7 @@ function isDirectRuntimeModulationTarget(value: unknown): value is DirectRuntime
 }
 
 function isMacroAutomationTarget(value: unknown): value is MacroAutomationTarget {
-  return value === "macro.1" || value === "macro.2" || value === "macro.3" || value === "macro.4";
+  return typeof value === "string" && /^macro\.[1-8]$/.test(value);
 }
 
 function modulationTargetScale(target: DirectRuntimeModulationTarget): number {

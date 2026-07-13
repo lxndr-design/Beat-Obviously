@@ -35,6 +35,10 @@ export const AETHER_NOTE_AUTOMATION_TARGETS: AetherNoteAutomationTargetMeta[] = 
   { target: "macro.2", label: "Macro 2", group: "Macro", defaultValue: 0.5, min: 0, max: 1, step: 0.01 },
   { target: "macro.3", label: "Macro 3", group: "Macro", defaultValue: 0.5, min: 0, max: 1, step: 0.01 },
   { target: "macro.4", label: "Macro 4", group: "Macro", defaultValue: 0.5, min: 0, max: 1, step: 0.01 },
+  { target: "macro.5", label: "Macro 5", group: "Macro", defaultValue: 0.5, min: 0, max: 1, step: 0.01 },
+  { target: "macro.6", label: "Macro 6", group: "Macro", defaultValue: 0.5, min: 0, max: 1, step: 0.01 },
+  { target: "macro.7", label: "Macro 7", group: "Macro", defaultValue: 0.5, min: 0, max: 1, step: 0.01 },
+  { target: "macro.8", label: "Macro 8", group: "Macro", defaultValue: 0.5, min: 0, max: 1, step: 0.01 },
 ];
 
 const TARGET_LABELS = new Map(AETHER_NOTE_AUTOMATION_TARGETS.map((meta) => [meta.target, meta.label]));

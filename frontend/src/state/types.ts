@@ -38,6 +38,10 @@ export type MidiAutomationTarget =
   | "macro.2"
   | "macro.3"
   | "macro.4"
+  | "macro.5"
+  | "macro.6"
+  | "macro.7"
+  | "macro.8"
   | "unison.detune"
   | "unison.spread";
 

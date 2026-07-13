@@ -188,7 +188,7 @@ namespace
             0.75f,
             0.5f,
             0.25f,
-            std::array<float, 4> {},
+            std::array<float, 8> {},
             2.0f);
 
         if (!near(offset, -0.075f))
@@ -208,6 +208,14 @@ namespace
             2.0f);
 
         if (!near(macroOffset, 0.125f))
+            return false;
+
+        decltype(target) macro8Target;
+        macro8Target.macro8 = -0.3f;
+        const float macro8Offset = beat::DynamicModulation::targetOffset(
+            macro8Target, 0.0f, 0.0f, 0.0f, 0.5f, 0.5f, 0.0f, 0.5f,
+            { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.75f }, 2.0f);
+        if (!near(macro8Offset, -0.45f))
             return false;
 
         beat::DynamicModulation::TargetActivityFlags noFlags;
@@ -6987,10 +6995,11 @@ namespace
         instrument.env2ReleaseMs = 480.0f;
         instrument.env2ReleaseCurve = 3;
         instrument.env2Loop = true;
-        instrument.macroValues = { 0.11f, 0.57f, 0.83f, 0.25f };
+        instrument.macroValues = { 0.11f, 0.57f, 0.83f, 0.25f, 0.19f, 0.29f, 0.39f, 0.49f };
         instrument.dynamicModulation.oscAFine.lfo2 = 0.19f;
         instrument.dynamicModulation.oscAFine.lfo2Bipolar = false;
         instrument.dynamicModulation.filterCutoff.macro4 = -0.31f;
+        instrument.dynamicModulation.filterCutoff.macro8 = 0.27f;
         instrument.dynamicModulation.ampLevel.velocity = 0.27f;
         instrument.dynamicModulation.ampLevel.velocityBipolar = false;
 
@@ -7069,10 +7078,15 @@ namespace
                 && near(loadedInstrument.macroValues[1], 0.57f)
                 && near(loadedInstrument.macroValues[2], 0.83f)
                 && near(loadedInstrument.macroValues[3], 0.25f)
+                && near(loadedInstrument.macroValues[4], 0.19f)
+                && near(loadedInstrument.macroValues[5], 0.29f)
+                && near(loadedInstrument.macroValues[6], 0.39f)
+                && near(loadedInstrument.macroValues[7], 0.49f)
                 && loadedInstrument.dynamicModulation.active
                 && near(loadedInstrument.dynamicModulation.oscAFine.lfo2, 0.19f)
                 && !loadedInstrument.dynamicModulation.oscAFine.lfo2Bipolar
                 && near(loadedInstrument.dynamicModulation.filterCutoff.macro4, -0.31f)
+                && near(loadedInstrument.dynamicModulation.filterCutoff.macro8, 0.27f)
                 && near(loadedInstrument.dynamicModulation.ampLevel.velocity, 0.27f)
                 && !loadedInstrument.dynamicModulation.ampLevel.velocityBipolar
                 && loadedOscA.enabled
@@ -12305,7 +12319,11 @@ namespace
             "osc.a.enabled": true,
             "osc.a.wavetable": "basic.saw",
             "amp.level": 0.4,
-            "macro.1": 0.5
+            "macro.1": 0.5,
+            "macro.5": 0.25,
+            "macro.6": 0.35,
+            "macro.7": 0.45,
+            "macro.8": 0.65
           },
           "metadata": {
             "macros": {
@@ -12313,7 +12331,8 @@ namespace
             }
           },
           "modulation": [
-            { "source": "macro.1", "target": "amp.level", "amount": 0.5, "enabled": true }
+            { "source": "macro.1", "target": "amp.level", "amount": 0.5, "enabled": true },
+            { "source": "macro.8", "target": "filter.drive", "amount": 0.37, "enabled": true }
           ]
         }
         )json");
@@ -12326,6 +12345,10 @@ namespace
         if (!near(macroInstrument.macroValues[0], 0.35f))
             return false;
         if (!near(macroInstrument.dynamicModulation.ampLevel.macro1, 0.5f))
+            return false;
+        if (!near(macroInstrument.macroValues[4], 0.25f) || !near(macroInstrument.macroValues[5], 0.35f)
+            || !near(macroInstrument.macroValues[6], 0.45f) || !near(macroInstrument.macroValues[7], 0.65f)
+            || !near(macroInstrument.dynamicModulation.filterDrive.macro8, 0.37f))
             return false;
 
         return true;

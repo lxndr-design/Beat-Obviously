@@ -95,6 +95,10 @@ namespace beat::params
         inline constexpr std::string_view sourceMacro2 { "macro.2" };
         inline constexpr std::string_view sourceMacro3 { "macro.3" };
         inline constexpr std::string_view sourceMacro4 { "macro.4" };
+        inline constexpr std::string_view sourceMacro5 { "macro.5" };
+        inline constexpr std::string_view sourceMacro6 { "macro.6" };
+        inline constexpr std::string_view sourceMacro7 { "macro.7" };
+        inline constexpr std::string_view sourceMacro8 { "macro.8" };
 
         inline constexpr std::string_view targetOscAPosition { "osc.a.position" };
         inline constexpr std::string_view targetOscAFine { "osc.a.fine" };

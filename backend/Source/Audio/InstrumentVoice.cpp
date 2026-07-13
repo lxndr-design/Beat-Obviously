@@ -283,6 +283,10 @@ namespace beat
             case RealtimeParam::Macro2:
             case RealtimeParam::Macro3:
             case RealtimeParam::Macro4:
+            case RealtimeParam::Macro5:
+            case RealtimeParam::Macro6:
+            case RealtimeParam::Macro7:
+            case RealtimeParam::Macro8:
                 break;
             case RealtimeParam::AmpPan:
             case RealtimeParam::OscAPan:

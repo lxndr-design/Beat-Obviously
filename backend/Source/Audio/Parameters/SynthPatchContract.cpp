@@ -97,6 +97,10 @@ namespace beat
             if (source == "macro.2") return 2;
             if (source == "macro.3") return 3;
             if (source == "macro.4") return 4;
+            if (source == "macro.5") return 5;
+            if (source == "macro.6") return 6;
+            if (source == "macro.7") return 7;
+            if (source == "macro.8") return 8;
             return 0;
         }
 
@@ -288,6 +292,10 @@ namespace beat
             target.macro2 = routeAmount(modulation, "macro.2", routeTarget);
             target.macro3 = routeAmount(modulation, "macro.3", routeTarget);
             target.macro4 = routeAmount(modulation, "macro.4", routeTarget);
+            target.macro5 = routeAmount(modulation, "macro.5", routeTarget);
+            target.macro6 = routeAmount(modulation, "macro.6", routeTarget);
+            target.macro7 = routeAmount(modulation, "macro.7", routeTarget);
+            target.macro8 = routeAmount(modulation, "macro.8", routeTarget);
             return std::abs(target.lfo) > 0.0001f
                 || std::abs(target.lfo2) > 0.0001f
                 || std::abs(target.env) > 0.0001f
@@ -298,7 +306,11 @@ namespace beat
                 || std::abs(target.macro1) > 0.0001f
                 || std::abs(target.macro2) > 0.0001f
                 || std::abs(target.macro3) > 0.0001f
-                || std::abs(target.macro4) > 0.0001f;
+                || std::abs(target.macro4) > 0.0001f
+                || std::abs(target.macro5) > 0.0001f
+                || std::abs(target.macro6) > 0.0001f
+                || std::abs(target.macro7) > 0.0001f
+                || std::abs(target.macro8) > 0.0001f;
         }
 
         void configureDynamicModulation(
@@ -518,6 +530,10 @@ namespace beat
             macroSourceValue(params, metadata, "macro.2"),
             macroSourceValue(params, metadata, "macro.3"),
             macroSourceValue(params, metadata, "macro.4"),
+            macroSourceValue(params, metadata, "macro.5"),
+            macroSourceValue(params, metadata, "macro.6"),
+            macroSourceValue(params, metadata, "macro.7"),
+            macroSourceValue(params, metadata, "macro.8"),
         };
         configureDynamicModulation(instrument.dynamicModulation, modulation, lfoEnabled, instrument.lfo2Enabled);
         return true;

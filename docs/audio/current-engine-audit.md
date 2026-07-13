@@ -129,7 +129,7 @@ This completes only the A1 frame/mip foundation. Bounded table-replacement cross
 
 ## Milestone A2 realtime parameter policy — 2026-07-11
 
-The existing 24-entry realtime voice surface now has one allocation-free constexpr metadata authority in `ParameterPolicy.h`. Each entry preserves its stable automation ID and defines minimum/maximum range, rate class, smoothing ownership, and modulation eligibility. The taxonomy supports discrete, smoothed-control, sample-accurate-control, and audio-rate classifications; current realtime entries are classified according to their implemented processing path rather than claiming unsupported audio-rate modulation.
+The realtime voice surface has one allocation-free constexpr metadata authority in `ParameterPolicy.h`. It began with 24 entries and expands to 28 with Milestone B9's Macro 5–8 IDs. Each entry preserves its stable automation ID and defines minimum/maximum range, rate class, smoothing ownership, and modulation eligibility. The taxonomy supports discrete, smoothed-control, sample-accurate-control, and audio-rate classifications; current realtime entries are classified according to their implemented processing path rather than claiming unsupported audio-rate modulation.
 
 `VoiceRealtimeParams` now derives ID lookup and clamping from this table instead of parallel string and range switches. `InstrumentVoice` asks the policy for the effective ramp length before activating its existing sample-by-sample ramp. Every currently supported entry retains `callerRamp`, so caller-selected timing, zero-ramp immediacy, inactive-voice behavior, presets, automation IDs, and modulation semantics are unchanged.
 
@@ -278,3 +278,11 @@ Aether now exposes two independent serial runtime warp stages. Stage one retains
 Native coverage verifies patch conversion, project persistence, finite output, and a non-null audible delta between one and two enabled stages. Frontend normalization, reverse conversion, and preview apply the stages in the same order. The A9 callback probe remains at zero violations. This completes the two-stage architecture but does not invent an alias threshold: the existing oversampling stop-band/alias specification remains an explicit release-quality follow-up.
 
 Full native and non-native suites pass with only the TCC waiver; production targets build; all 150 default-stage-two-off WAVs are byte-identical to B7. B8 report SHA-256 is `1d448e4477c529783952236a9478c40c41daa417ccff6b78cdf1bd6db42e60c4`, peak RSS is 15,089,664 bytes, deadline overruns are zero, and queue telemetry remains 64 accepted / 16 rejected / 16 overflow.
+
+## Milestone B9 eight-macro modulation surface — 2026-07-12
+
+The stable macro surface expands from four to eight with `macro.5` through `macro.8`. Native value storage is a fixed eight-float array; every dynamic target carries fixed Macro 5–8 route amounts; evaluation remains a bounded straight-line calculation. The authoritative real-time parameter policy now contains 28 entries and exposes all eight macros with the same sample-accurate-control/caller-ramp contract.
+
+Project persistence accepts old four-value arrays and zero-fills the new tail, while new documents preserve all eight values and route amounts. Frontend draft normalization, macro definitions, automation targets, modulation-matrix sources, preview evaluation, and node-editor validation expose the same IDs. Existing factory guide fallback routes remain limited to Macros 1–4, so normalization does not silently alter legacy preset sound; Macros 5–8 receive neutral definitions until deliberately routed.
+
+Focused native tests verify Macro 8 evaluation, parsing, and all eight persistence values. Frontend tests verify Macro 5–8 normalization. Full native stress and A9 instrumentation pass with only the TCC waiver; full non-native verification and production builds pass; all 150 WAVs are byte-identical to B8. B9 report SHA-256 is `56493200ccbc425d1d670063fdd5fa376168a4ec9ba07ddba68258a695c02f37`, peak RSS is 15,155,200 bytes, deadline overruns are zero, and queue telemetry remains 64 accepted / 16 rejected / 16 overflow.

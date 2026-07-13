@@ -148,6 +148,10 @@ namespace beat
                 float macro2 { 0.0f };
                 float macro3 { 0.0f };
                 float macro4 { 0.0f };
+                float macro5 { 0.0f };
+                float macro6 { 0.0f };
+                float macro7 { 0.0f };
+                float macro8 { 0.0f };
             };
 
             struct DynamicModulation
@@ -239,7 +243,7 @@ namespace beat
             float lfoToFilter { 0.0f };
             float envToFilter { 0.0f };
             DynamicModulation dynamicModulation;
-            std::array<float, 4> macroValues {};
+            std::array<float, 8> macroValues {};
             WavetableConfig wavetable;
             float glideMs { 0.0f };
             int maxVoices { 16 };

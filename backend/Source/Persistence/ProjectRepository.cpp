@@ -423,6 +423,10 @@ namespace beat
             o->setProperty("macro2", target.macro2);
             o->setProperty("macro3", target.macro3);
             o->setProperty("macro4", target.macro4);
+            o->setProperty("macro5", target.macro5);
+            o->setProperty("macro6", target.macro6);
+            o->setProperty("macro7", target.macro7);
+            o->setProperty("macro8", target.macro8);
             return juce::var(o.get());
         }
 
@@ -460,6 +464,10 @@ namespace beat
             fallback.macro2 = amount(targetVar, "macro2", fallback.macro2);
             fallback.macro3 = amount(targetVar, "macro3", fallback.macro3);
             fallback.macro4 = amount(targetVar, "macro4", fallback.macro4);
+            fallback.macro5 = amount(targetVar, "macro5", fallback.macro5);
+            fallback.macro6 = amount(targetVar, "macro6", fallback.macro6);
+            fallback.macro7 = amount(targetVar, "macro7", fallback.macro7);
+            fallback.macro8 = amount(targetVar, "macro8", fallback.macro8);
             return fallback;
         }
 

@@ -70,7 +70,11 @@ namespace beat::DynamicModulation
             || std::abs(target.macro1) > 0.0001f
             || std::abs(target.macro2) > 0.0001f
             || std::abs(target.macro3) > 0.0001f
-            || std::abs(target.macro4) > 0.0001f;
+            || std::abs(target.macro4) > 0.0001f
+            || std::abs(target.macro5) > 0.0001f
+            || std::abs(target.macro6) > 0.0001f
+            || std::abs(target.macro7) > 0.0001f
+            || std::abs(target.macro8) > 0.0001f;
     }
 
     template <typename Target>
@@ -95,7 +99,7 @@ namespace beat::DynamicModulation
         float velocity,
         float keytrack,
         float modWheel,
-        const std::array<float, 4>& macroValues,
+        const std::array<float, 8>& macroValues,
         float scale) noexcept
     {
         return (Lfo::routeValue(rawLfo, target.lfoBipolar) * target.lfo
@@ -108,7 +112,11 @@ namespace beat::DynamicModulation
             + macroValues[0] * target.macro1
             + macroValues[1] * target.macro2
             + macroValues[2] * target.macro3
-            + macroValues[3] * target.macro4) * scale;
+            + macroValues[3] * target.macro4
+            + macroValues[4] * target.macro5
+            + macroValues[5] * target.macro6
+            + macroValues[6] * target.macro7
+            + macroValues[7] * target.macro8) * scale;
     }
 
     template <typename Modulation>

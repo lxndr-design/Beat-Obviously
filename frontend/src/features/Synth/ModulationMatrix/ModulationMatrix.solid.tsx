@@ -27,6 +27,10 @@ const TARGETS_BY_SOURCE: Record<ModulationSourceId, ModulationTargetId[]> = {
   "macro.2": MACRO_TARGETS,
   "macro.3": MACRO_TARGETS,
   "macro.4": MACRO_TARGETS,
+  "macro.5": MACRO_TARGETS,
+  "macro.6": MACRO_TARGETS,
+  "macro.7": MACRO_TARGETS,
+  "macro.8": MACRO_TARGETS,
 };
 
 type PickMode = {

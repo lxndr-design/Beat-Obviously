@@ -56,6 +56,10 @@ namespace beat::ParameterPolicy
         Metadata { params::modulation::sourceMacro2, 0.0f, 1.0f, RateClass::sampleAccurateControl, Smoothing::callerRamp, false },
         Metadata { params::modulation::sourceMacro3, 0.0f, 1.0f, RateClass::sampleAccurateControl, Smoothing::callerRamp, false },
         Metadata { params::modulation::sourceMacro4, 0.0f, 1.0f, RateClass::sampleAccurateControl, Smoothing::callerRamp, false },
+        Metadata { params::modulation::sourceMacro5, 0.0f, 1.0f, RateClass::sampleAccurateControl, Smoothing::callerRamp, false },
+        Metadata { params::modulation::sourceMacro6, 0.0f, 1.0f, RateClass::sampleAccurateControl, Smoothing::callerRamp, false },
+        Metadata { params::modulation::sourceMacro7, 0.0f, 1.0f, RateClass::sampleAccurateControl, Smoothing::callerRamp, false },
+        Metadata { params::modulation::sourceMacro8, 0.0f, 1.0f, RateClass::sampleAccurateControl, Smoothing::callerRamp, false },
     };
 
     inline constexpr const Metadata* metadataAt(size_t index) noexcept

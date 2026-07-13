@@ -223,6 +223,10 @@ namespace beat
             float macro2 { 0.0f };
             float macro3 { 0.0f };
             float macro4 { 0.0f };
+            float macro5 { 0.0f };
+            float macro6 { 0.0f };
+            float macro7 { 0.0f };
+            float macro8 { 0.0f };
         };
 
         struct DynamicModulation
@@ -343,7 +347,7 @@ namespace beat
         float lfoToPitch { 0.0f };
         float lfoToFilter { 0.0f };
         float envToFilter { 0.0f };
-        std::array<float, 4> macroValues {};
+        std::array<float, 8> macroValues {};
         DynamicModulation dynamicModulation;
         bool hasAether { false };
         AetherConfig aether;

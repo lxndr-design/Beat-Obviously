@@ -35,6 +35,10 @@ namespace beat::VoiceRealtimeParams
         Macro2,
         Macro3,
         Macro4,
+        Macro5,
+        Macro6,
+        Macro7,
+        Macro8,
         Count,
     };
 
@@ -82,6 +86,10 @@ namespace beat::VoiceRealtimeParams
             case Id::Macro2: return params.macroValues[1];
             case Id::Macro3: return params.macroValues[2];
             case Id::Macro4: return params.macroValues[3];
+            case Id::Macro5: return params.macroValues[4];
+            case Id::Macro6: return params.macroValues[5];
+            case Id::Macro7: return params.macroValues[6];
+            case Id::Macro8: return params.macroValues[7];
             case Id::Count:
                 break;
         }
@@ -170,6 +178,18 @@ namespace beat::VoiceRealtimeParams
                 break;
             case Id::Macro4:
                 target.macroValues[3] = clamped;
+                break;
+            case Id::Macro5:
+                target.macroValues[4] = clamped;
+                break;
+            case Id::Macro6:
+                target.macroValues[5] = clamped;
+                break;
+            case Id::Macro7:
+                target.macroValues[6] = clamped;
+                break;
+            case Id::Macro8:
+                target.macroValues[7] = clamped;
                 break;
             case Id::Count:
                 break;

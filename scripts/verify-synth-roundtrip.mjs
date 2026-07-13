@@ -185,6 +185,10 @@ try {
       "aether.runtimeWarpMode": "fold",
       "aether.runtimeWarp2": 0.41,
       "aether.runtimeWarp2Mode": "pinch",
+      "macro.5": 0.25,
+      "macro.6": 0.35,
+      "macro.7": 0.45,
+      "macro.8": 0.65,
     },
   });
   const independentUnisonPreview = synthStore.synthDraftToPreviewInstrument(independentUnisonDraft);
@@ -205,6 +209,10 @@ try {
   assert.equal(independentUnisonPreview.aether.runtimeWarpMode, "fold");
   assert.equal(independentUnisonPreview.aether.runtimeWarp2, 0.41);
   assert.equal(independentUnisonPreview.aether.runtimeWarp2Mode, "pinch");
+  assert.equal(independentUnisonDraft.parameters["macro.5"], 0.25);
+  assert.equal(independentUnisonDraft.parameters["macro.6"], 0.35);
+  assert.equal(independentUnisonDraft.parameters["macro.7"], 0.45);
+  assert.equal(independentUnisonDraft.parameters["macro.8"], 0.65);
   assert.equal(independentUnisonPreview.aether.oscB.tuningMode, "ratio");
   assert.equal(independentUnisonPreview.aether.oscB.ratioNumerator, 3);
   assert.equal(independentUnisonPreview.aether.oscB.ratioDenominator, 2);

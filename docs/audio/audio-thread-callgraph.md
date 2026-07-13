@@ -350,3 +350,12 @@ each Aether destination lane
 ```
 
 Both stages are fixed branches over voice-owned state. Stage-two amount zero is an exact bypass/reset path and adds no ownership or graph mutation.
+
+```text
+setup/persistence -> fixed macroValues[8] + fixed route amounts per target
+audio callback -> targetOffset(...)
+  existing LFO/envelope/performance terms
+  + sum(macroValues[0..7] * target.macro1..macro8)
+```
+
+Macro expansion changes fixed object size only. Route parsing, metadata construction, and container work remain outside the callback.

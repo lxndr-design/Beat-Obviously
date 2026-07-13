@@ -461,6 +461,10 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
           { value: "macro.2", label: "Macro 2" },
           { value: "macro.3", label: "Macro 3" },
           { value: "macro.4", label: "Macro 4" },
+          { value: "macro.5", label: "Macro 5" },
+          { value: "macro.6", label: "Macro 6" },
+          { value: "macro.7", label: "Macro 7" },
+          { value: "macro.8", label: "Macro 8" },
         ],
       },
       { id: "amount", label: "Amount", kind: "number", min: -1, max: 1, step: 0.01 },
@@ -1638,7 +1642,7 @@ function modulationSourceForNode(node: InstrumentNode): ModulationSourceId | nul
 
 function macroSourceForNode(node: InstrumentNode): ModulationSourceId | null {
   const source = String(node.parameters.source ?? "macro.1");
-  if (source === "macro.1" || source === "macro.2" || source === "macro.3" || source === "macro.4") return source;
+  if (/^macro\.[1-8]$/.test(source)) return source as ModulationSourceId;
   return "macro.1";
 }
 

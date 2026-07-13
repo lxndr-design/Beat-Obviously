@@ -109,3 +109,7 @@ The explicit Filter 1, Filter 2, both-filter, and direct destinations; isolated 
 ## Milestone B8 provenance
 
 The second serial runtime-warp state, stable schema, persistence/IPC conversion, preview ordering, and tests independently reuse Beat's existing bounded nonlinear warp implementation. No upstream repository was consulted or executed; no external code, dependency, binary, preset, asset, service, branding, or licensing change was introduced.
+
+## Milestone B9 provenance
+
+Macro 5–8 storage, real-time metadata, modulation evaluation, persistence, frontend automation/node validation, and tests are independent extensions of Beat's existing fixed macro contract. No upstream source was consulted, executed, copied, adapted, or imported, and no dependency, binary, preset, asset, service, branding, or licensing state changed.

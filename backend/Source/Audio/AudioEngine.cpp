@@ -1892,6 +1892,10 @@ namespace beat
             target.macro2 = source.macro2;
             target.macro3 = source.macro3;
             target.macro4 = source.macro4;
+            target.macro5 = source.macro5;
+            target.macro6 = source.macro6;
+            target.macro7 = source.macro7;
+            target.macro8 = source.macro8;
             return target;
         };
         params.dynamicModulation.active = instrument.dynamicModulation.active;

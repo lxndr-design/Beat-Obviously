@@ -166,7 +166,11 @@ export type SynthParameterId =
   | "macro.1"
   | "macro.2"
   | "macro.3"
-  | "macro.4";
+  | "macro.4"
+  | "macro.5"
+  | "macro.6"
+  | "macro.7"
+  | "macro.8";
 
 export type SynthParameterValue = boolean | number | string;
 
@@ -181,19 +185,27 @@ export type ModulationSourceId =
   | "macro.1"
   | "macro.2"
   | "macro.3"
-  | "macro.4";
+  | "macro.4"
+  | "macro.5"
+  | "macro.6"
+  | "macro.7"
+  | "macro.8";
 
-export type MacroId = Extract<ModulationSourceId, `macro.${1 | 2 | 3 | 4}`>;
+export type MacroId = Extract<ModulationSourceId, `macro.${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`>;
 export type MacroCurve = SynthPatchMacroDefinition["curve"];
 export type SynthMacroDefinition = Omit<SynthPatchMacroDefinition, "id"> & { id: MacroId };
 
-export const MACRO_IDS = ["macro.1", "macro.2", "macro.3", "macro.4"] as const satisfies readonly MacroId[];
+export const MACRO_IDS = ["macro.1", "macro.2", "macro.3", "macro.4", "macro.5", "macro.6", "macro.7", "macro.8"] as const satisfies readonly MacroId[];
 
 const DEFAULT_MACROS: Record<MacroId, SynthMacroDefinition> = {
   "macro.1": { id: "macro.1", label: "Motion", min: 0, max: 1, curve: "linear" },
   "macro.2": { id: "macro.2", label: "Color", min: 0, max: 1, curve: "linear" },
   "macro.3": { id: "macro.3", label: "Shape", min: 0, max: 1, curve: "linear" },
   "macro.4": { id: "macro.4", label: "Space", min: 0, max: 1, curve: "linear" },
+  "macro.5": { id: "macro.5", label: "Macro 5", min: 0, max: 1, curve: "linear" },
+  "macro.6": { id: "macro.6", label: "Macro 6", min: 0, max: 1, curve: "linear" },
+  "macro.7": { id: "macro.7", label: "Macro 7", min: 0, max: 1, curve: "linear" },
+  "macro.8": { id: "macro.8", label: "Macro 8", min: 0, max: 1, curve: "linear" },
 };
 
 export type ModulationTargetId =
@@ -1075,6 +1087,10 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "macro.2": 0,
   "macro.3": 0,
   "macro.4": 0,
+  "macro.5": 0,
+  "macro.6": 0,
+  "macro.7": 0,
+  "macro.8": 0,
 };
 
 export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
@@ -1198,6 +1214,10 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "macro.2": "Macro 2",
   "macro.3": "Macro 3",
   "macro.4": "Macro 4",
+  "macro.5": "Macro 5",
+  "macro.6": "Macro 6",
+  "macro.7": "Macro 7",
+  "macro.8": "Macro 8",
 };
 
 export const MODULATION_SOURCE_LABELS: Record<ModulationSourceId, string> = {
@@ -1212,6 +1232,10 @@ export const MODULATION_SOURCE_LABELS: Record<ModulationSourceId, string> = {
   "macro.2": "Macro 2",
   "macro.3": "Macro 3",
   "macro.4": "Macro 4",
+  "macro.5": "Macro 5",
+  "macro.6": "Macro 6",
+  "macro.7": "Macro 7",
+  "macro.8": "Macro 8",
 };
 
 export const MODULATION_TARGET_LABELS: Record<ModulationTargetId, string> = {
@@ -2819,7 +2843,7 @@ function guideFallbackMacroRoutes(
 ): SynthModulationRoute[] {
   const present = new Set(imported.filter((route) => route.source.startsWith("macro.")).map((route) => route.source as MacroId));
   const defaults = guideFallbackMacroTargets(category);
-  return MACRO_IDS
+  return MACRO_IDS.slice(0, 4)
     .filter((source) => !present.has(source))
     .map((source, index) => {
       const fallback = defaults[source];
@@ -2841,6 +2865,8 @@ function guideFallbackMacroTargets(category: string): Record<MacroId, { target: 
       "macro.2": { target: "filter.cutoff", amount: 0.16, bipolar: false },
       "macro.3": { target: "unison.spread", amount: 0.18, bipolar: false },
       "macro.4": { target: "amp.pan", amount: 0.1, bipolar: true },
+      "macro.5": { target: "amp.level", amount: 0, bipolar: false }, "macro.6": { target: "amp.level", amount: 0, bipolar: false },
+      "macro.7": { target: "amp.level", amount: 0, bipolar: false }, "macro.8": { target: "amp.level", amount: 0, bipolar: false },
     };
   }
   if (category === "Bass" || category === "Bass / Crunch" || category === "Sub Bass") {
@@ -2849,6 +2875,8 @@ function guideFallbackMacroTargets(category: string): Record<MacroId, { target: 
       "macro.2": { target: "filter.cutoff", amount: 0.14, bipolar: true },
       "macro.3": { target: "filter.drive", amount: 0.18, bipolar: false },
       "macro.4": { target: "osc.a.fine", amount: 0.05, bipolar: true },
+      "macro.5": { target: "amp.level", amount: 0, bipolar: false }, "macro.6": { target: "amp.level", amount: 0, bipolar: false },
+      "macro.7": { target: "amp.level", amount: 0, bipolar: false }, "macro.8": { target: "amp.level", amount: 0, bipolar: false },
     };
   }
   if (category === "Bell" || category === "Mallet" || category === "Keys / Synth Piano" || category === "Arp Pluck") {
@@ -2857,6 +2885,8 @@ function guideFallbackMacroTargets(category: string): Record<MacroId, { target: 
       "macro.2": { target: "filter.cutoff", amount: 0.16, bipolar: false },
       "macro.3": { target: "osc.a.warp", amount: 0.14, bipolar: true },
       "macro.4": { target: "unison.spread", amount: 0.12, bipolar: false },
+      "macro.5": { target: "amp.level", amount: 0, bipolar: false }, "macro.6": { target: "amp.level", amount: 0, bipolar: false },
+      "macro.7": { target: "amp.level", amount: 0, bipolar: false }, "macro.8": { target: "amp.level", amount: 0, bipolar: false },
     };
   }
   return {
@@ -2864,6 +2894,8 @@ function guideFallbackMacroTargets(category: string): Record<MacroId, { target: 
     "macro.2": { target: "filter.cutoff", amount: 0.16, bipolar: false },
     "macro.3": { target: "osc.a.warp", amount: 0.14, bipolar: true },
     "macro.4": { target: "amp.pan", amount: 0.08, bipolar: true },
+    "macro.5": { target: "amp.level", amount: 0, bipolar: false }, "macro.6": { target: "amp.level", amount: 0, bipolar: false },
+    "macro.7": { target: "amp.level", amount: 0, bipolar: false }, "macro.8": { target: "amp.level", amount: 0, bipolar: false },
   };
 }
 
@@ -3169,6 +3201,10 @@ function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
       "macro.2": { ...DEFAULT_MACROS["macro.2"], label: labels[1] },
       "macro.3": { ...DEFAULT_MACROS["macro.3"], label: labels[2] },
       "macro.4": { ...DEFAULT_MACROS["macro.4"], label: labels[3] },
+      "macro.5": { ...DEFAULT_MACROS["macro.5"] },
+      "macro.6": { ...DEFAULT_MACROS["macro.6"] },
+      "macro.7": { ...DEFAULT_MACROS["macro.7"] },
+      "macro.8": { ...DEFAULT_MACROS["macro.8"] },
     };
   };
   const macroRoutes = (id: string, category: string): SynthModulationRoute[] => {
