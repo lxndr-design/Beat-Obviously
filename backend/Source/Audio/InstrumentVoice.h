@@ -5,6 +5,7 @@
 #include "Filter/FilterStage.h"
 #include "Modulation/DynamicModulation.h"
 #include "Oscillator/VoiceAetherCache.h"
+#include "Oscillator/AetherTableStackRenderer.h"
 #include "Oscillator/AetherSourceBusContext.h"
 #include "Oscillator/VoiceStats.h"
 #include "Realtime/RealtimeParameterQueue.h"
@@ -393,6 +394,7 @@ namespace beat
         WavetableUnisonPlan wavetableUnisonPlan;
         WavetableUnisonPlan aetherUnisonPlanA;
         WavetableUnisonPlan aetherUnisonPlanB;
+        AetherTableStackRenderer::InteractionState aetherInteractionState;
         VoiceAetherCache::PanGains cachedPanGains;
         VoiceAetherCache::PitchRates cachedPitchRates;
         DynamicModulation::TargetActivityFlags cachedDynamicTargets;

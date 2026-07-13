@@ -756,7 +756,7 @@ namespace
                 == std::numeric_limits<int64_t>::max();
     }
 
-    double measureAetherInteractionAliasRatio(int mode)
+    double measureAetherInteractionAliasRatio(int mode, beat::AudioQuality quality = beat::AudioQuality::standardLive)
     {
         constexpr double sampleRate = 44100.0;
         constexpr int fftOrder = 12;
@@ -777,6 +777,7 @@ namespace
 
         beat::InstrumentVoice voice;
         voice.prepare(sampleRate, 256);
+        voice.setProcessingQuality(quality);
         voice.setParams(params);
         voice.startNote(117, 1.0f, nullptr, 8192); // 7040 Hz carrier; 28160 Hz sum aliases to 15940 Hz.
         juce::AudioBuffer<float> output(2, fftSize);
@@ -848,8 +849,12 @@ namespace
 
     bool stressAetherInteractionSpectralBaseline()
     {
+        constexpr double historicalAmAliasRatio = 0.0705697;
+        constexpr double historicalRingAliasRatio = 0.24735;
         const double amAliasRatio = measureAetherInteractionAliasRatio(1);
         const double ringAliasRatio = measureAetherInteractionAliasRatio(2);
+        const double offlineRingProductionAliasRatio = measureAetherInteractionAliasRatio(
+            2, beat::AudioQuality::offlineHighQuality);
         const double oversampledAmAliasRatio = measureOversampledAetherInteractionAliasRatio(1, beat::AudioQuality::standardLive);
         const double oversampledRingAliasRatio = measureOversampledAetherInteractionAliasRatio(2, beat::AudioQuality::standardLive);
         const double offlineRingAliasRatio = measureOversampledAetherInteractionAliasRatio(2, beat::AudioQuality::offlineHighQuality);
@@ -864,8 +869,11 @@ namespace
                 return std::pair { phase * 2.0f - 1.0f, 1.0f - phase * 2.0f };
             });
         const size_t callbackViolations = beat::test::endRealtimeSafetyProbe();
-        std::cerr << "Aether interaction alias baseline am=" << amAliasRatio
-                  << " ring=" << ringAliasRatio
+        std::cerr << "Aether interaction alias historical1xAm=" << historicalAmAliasRatio
+                  << " historical1xRing=" << historicalRingAliasRatio
+                  << " production2xAm=" << amAliasRatio
+                  << " production2xRing=" << ringAliasRatio
+                  << " productionOfflineRing=" << offlineRingProductionAliasRatio
                   << " candidate2xAm=" << oversampledAmAliasRatio
                   << " candidate2xRing=" << oversampledRingAliasRatio
                   << " candidateOfflineRing=" << offlineRingAliasRatio << "\n";
@@ -890,16 +898,88 @@ namespace
                 for (int sample = 0; sample < output.getNumSamples(); ++sample)
                     ratesFinite &= std::isfinite(output.getSample(channel, sample));
         }
+
+        beat::InstrumentVoice::Params callbackParams;
+        callbackParams.hasAether = true;
+        callbackParams.attackMs = 0.0f;
+        callbackParams.decayMs = 0.0f;
+        callbackParams.sustain = 1.0f;
+        callbackParams.aetherOscA = { true, 0.7f, 0.0f, 0, 0, 0, 0.0f };
+        callbackParams.aetherOscB = { true, 0.5f, 0.0f, 0, 0, 7, 0.0f };
+        callbackParams.aetherOscA.waveform = 5;
+        callbackParams.aetherOscA.wavetable.unison = 3;
+        callbackParams.aetherOscB.waveform = 4;
+        callbackParams.aetherInteractionMode = 2;
+        callbackParams.aetherInteractionAmount = 1.0f;
+        beat::InstrumentVoice callbackVoice;
+        callbackVoice.prepare(48000.0, 256);
+        callbackVoice.setParams(callbackParams);
+        callbackVoice.startNote(81, 1.0f, nullptr, 8192);
+        juce::AudioBuffer<float> callbackOutput(2, 512);
+        callbackOutput.clear();
+        callbackVoice.renderNextBlock(callbackOutput, 0, 256);
+        beat::InstrumentVoice::consumeRenderWorkStats();
+        beat::test::beginRealtimeSafetyProbe();
+        callbackVoice.renderNextBlock(callbackOutput, 256, 256);
+        const size_t productionCallbackViolations = beat::test::endRealtimeSafetyProbe();
+        const auto productionWork = beat::InstrumentVoice::consumeRenderWorkStats();
+        bool productionOutputFinite = true;
+        for (int channel = 0; channel < callbackOutput.getNumChannels(); ++channel)
+            for (int sample = 256; sample < callbackOutput.getNumSamples(); ++sample)
+                productionOutputFinite &= std::isfinite(callbackOutput.getSample(channel, sample));
+
+        const auto renderCompatibilityPath = [](int mode, float amount)
+        {
+            beat::InstrumentVoice::Params pathParams;
+            pathParams.hasAether = true;
+            pathParams.attackMs = 0.0f;
+            pathParams.decayMs = 0.0f;
+            pathParams.sustain = 1.0f;
+            pathParams.aetherOscA = { true, 0.7f, 0.0f, 0, 0, 0, 0.0f };
+            pathParams.aetherOscB = { true, 0.5f, 0.0f, 0, 0, 7, 0.0f };
+            pathParams.aetherInteractionMode = mode;
+            pathParams.aetherInteractionAmount = amount;
+            beat::InstrumentVoice pathVoice;
+            pathVoice.prepare(48000.0, 256);
+            pathVoice.setParams(pathParams);
+            pathVoice.startNote(69, 1.0f, nullptr, 8192);
+            juce::AudioBuffer<float> pathOutput(2, 256);
+            pathOutput.clear();
+            pathVoice.renderNextBlock(pathOutput, 0, pathOutput.getNumSamples());
+            return pathOutput;
+        };
+        const auto interactionOff = renderCompatibilityPath(0, 0.0f);
+        const auto zeroAmount = renderCompatibilityPath(2, 0.0f);
+        bool zeroPathExact = true;
+        for (int channel = 0; channel < interactionOff.getNumChannels(); ++channel)
+            for (int sample = 0; sample < interactionOff.getNumSamples(); ++sample)
+                zeroPathExact &= interactionOff.getSample(channel, sample) == zeroAmount.getSample(channel, sample);
+
         return ratesFinite && std::isfinite(amAliasRatio) && std::isfinite(ringAliasRatio)
+            && std::isfinite(offlineRingProductionAliasRatio)
             && amAliasRatio > 0.0 && amAliasRatio < 1.0
             && ringAliasRatio > 0.0 && ringAliasRatio < 1.0
+            && amAliasRatio < 0.005
+            && ringAliasRatio < 0.005
+            && offlineRingProductionAliasRatio < 0.005
+            && amAliasRatio < historicalAmAliasRatio * 0.1
+            && ringAliasRatio < historicalRingAliasRatio * 0.1
             && oversampledAmAliasRatio < 0.005
             && oversampledRingAliasRatio < 0.005
             && offlineRingAliasRatio < 0.005
-            && oversampledAmAliasRatio < amAliasRatio * 0.1
-            && oversampledRingAliasRatio < ringAliasRatio * 0.1
+            && oversampledAmAliasRatio < historicalAmAliasRatio * 0.1
+            && oversampledRingAliasRatio < historicalRingAliasRatio * 0.1
             && std::isfinite(callbackProbeOutput)
-            && callbackViolations == 0;
+            && callbackViolations == 0
+            && productionCallbackViolations == 0
+            && productionWork.voiceSamples == 256
+            && productionWork.nonlinearSamples == productionWork.voiceSamples * 2
+            && productionWork.aetherOscASamples == productionWork.voiceSamples * 9
+            && productionWork.aetherOscBSamples == productionWork.voiceSamples * 3
+            && productionOutputFinite
+            && !beat::RenderBudgets::exceedsVoiceNonlinearWorkCeiling(
+                productionWork.nonlinearSamples, productionWork.voiceSamples)
+            && zeroPathExact;
     }
 
     bool stressAetherTableStackRenderer()

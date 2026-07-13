@@ -100,6 +100,7 @@ namespace beat
             osc.prepare(sampleRate);
         for (auto& osc : aetherOscillatorsB)
             osc.prepare(sampleRate);
+        aetherInteractionState.prepare(sampleRate, processingQuality);
         adsr.setSampleRate(sr);
         env2Adsr.setSampleRate(sr);
         env3Adsr.setSampleRate(sr);
@@ -119,6 +120,7 @@ namespace beat
         for (auto& oscillator : wavetableOscillators) oscillator.setQuality(quality);
         for (auto& oscillator : aetherOscillatorsA) oscillator.setQuality(quality);
         for (auto& oscillator : aetherOscillatorsB) oscillator.setQuality(quality);
+        aetherInteractionState.prepare(sampleRate, quality);
     }
 
     void InstrumentVoice::setParams(const Params& p)
@@ -186,6 +188,9 @@ namespace beat
             retiredAetherTableB = std::move(aetherTableB);
             WavetableOscillatorBank::clear(aetherOscillatorsB, aetherUnisonPlanB);
         }
+        aetherInteractionState.configure(aetherTableA.get(), params.aetherOscA,
+                                         aetherTableB.get(), params.aetherOscB,
+                                         baseFrequencyHz);
         adsrParams.attack  = juce::jmax(0.001f, p.attackMs  * 0.001f);
         adsrParams.decay   = juce::jmax(0.001f, p.decayMs   * 0.001f);
         adsrParams.sustain = juce::jlimit(0.0f, 1.0f, p.sustain);
@@ -504,6 +509,17 @@ namespace beat
         }
         else
             WavetableOscillatorBank::clear(aetherOscillatorsB, aetherUnisonPlanB);
+        std::array<double, 8> interactionPhasesA {};
+        std::array<double, 8> interactionPhasesB {};
+        for (size_t index = 0; index < interactionPhasesA.size(); ++index)
+        {
+            interactionPhasesA[index] = aetherOscillatorsA[index].getPhase();
+            interactionPhasesB[index] = aetherOscillatorsB[index].getPhase();
+        }
+        aetherInteractionState.configure(aetherTableA.get(), params.aetherOscA,
+                                         aetherTableB.get(), params.aetherOscB,
+                                         baseFrequencyHz);
+        aetherInteractionState.setPhases(interactionPhasesA, interactionPhasesB, noiseState);
         refreshCachedPitchRates();
         loadPendingNoteAutomation(midiNoteNumber);
         adsr.noteOn();
@@ -709,7 +725,8 @@ namespace beat
                     modWheel,
                     noiseState,
                     pressure,
-                    timbre);
+                    timbre,
+                    &aetherInteractionState);
                 raw = { aetherResult.filteredFrame.left, aetherResult.filteredFrame.right };
                 directRaw = { aetherResult.directFrame.left, aetherResult.directFrame.right };
                 filter1Raw = { aetherResult.filter1Frame.left, aetherResult.filter1Frame.right };

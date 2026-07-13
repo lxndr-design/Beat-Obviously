@@ -5,6 +5,7 @@
 #include "../Wavetable/WavetableOscillatorBank.h"
 #include "../Wavetable/WavetableUnisonPlan.h"
 #include "BasicOscillator.h"
+#include "AetherInteractionStage.h"
 #include "VoiceAetherCache.h"
 #include "VoiceMath.h"
 #include "VoiceStats.h"
@@ -32,6 +33,70 @@ namespace beat::AetherTableStackRenderer
         StereoFrame directFrame {};
         std::array<StereoFrame, 4> sourceFrames {}; // osc A, osc B, sub, noise
         VoiceStats::RenderWork work {};
+    };
+
+    struct InteractionState
+    {
+        AetherInteractionStage::State downsampler;
+        std::array<WavetableOscillator, 8> oscillatorsA;
+        std::array<WavetableOscillator, 8> oscillatorsB;
+        WavetableUnison::Plan unisonPlanA;
+        WavetableUnison::Plan unisonPlanB;
+        juce::uint32 noiseStateA { 1 };
+        juce::uint32 noiseStateB { 1 };
+        double baseSampleRate { 44100.0 };
+
+        void prepare(double sampleRate, AudioQuality quality) noexcept
+        {
+            baseSampleRate = std::isfinite(sampleRate) && sampleRate > 0.0 ? sampleRate : 44100.0;
+            downsampler.prepare(baseSampleRate, quality);
+            const double oversampledRate = baseSampleRate * (double) downsampler.factor;
+            for (auto& oscillator : oscillatorsA)
+            {
+                oscillator.prepare(oversampledRate);
+                oscillator.setQuality(quality);
+            }
+            for (auto& oscillator : oscillatorsB)
+            {
+                oscillator.prepare(oversampledRate);
+                oscillator.setQuality(quality);
+            }
+            downsampler.reset();
+        }
+
+        template <typename Config>
+        void configure(const Wavetable* tableA,
+                       const Config& configA,
+                       const Wavetable* tableB,
+                       const Config& configB,
+                       double frequencyHz) noexcept
+        {
+            const double oversampledRate = baseSampleRate * (double) downsampler.factor;
+            if (configA.waveform == 5)
+                WavetableOscillatorBank::configure(oscillatorsA, tableA, configA.wavetable, oversampledRate, frequencyHz);
+            else
+                WavetableOscillatorBank::clear(oscillatorsA, unisonPlanA);
+            if (configB.waveform == 5)
+                WavetableOscillatorBank::configure(oscillatorsB, tableB, configB.wavetable, oversampledRate, frequencyHz);
+            else
+                WavetableOscillatorBank::clear(oscillatorsB, unisonPlanB);
+            WavetableUnison::invalidate(unisonPlanA);
+            WavetableUnison::invalidate(unisonPlanB);
+        }
+
+        void setPhases(const std::array<double, 8>& phasesA,
+                       const std::array<double, 8>& phasesB,
+                       juce::uint32 noiseSeed) noexcept
+        {
+            for (size_t index = 0; index < oscillatorsA.size(); ++index)
+            {
+                oscillatorsA[index].setPhase(phasesA[index]);
+                oscillatorsB[index].setPhase(phasesB[index]);
+            }
+            noiseStateA = noiseSeed ^ 0x38f2a6d1u;
+            noiseStateB = noiseSeed ^ 0x9b71c45fu;
+            downsampler.reset();
+        }
     };
 
     template <typename Params, typename TargetActivityFlags>
@@ -64,7 +129,8 @@ namespace beat::AetherTableStackRenderer
         float modWheel,
         juce::uint32& noiseState,
         float pressure = 0.0f,
-        float timbre = 0.0f) noexcept
+        float timbre = 0.0f,
+        InteractionState* interactionState = nullptr) noexcept
     {
         Result result;
         const bool useDynamicModulation = params.dynamicModulation.active && targets.any;
@@ -92,6 +158,10 @@ namespace beat::AetherTableStackRenderer
             float rightGain { 0.0f };
             int routing { 0 };
             bool active { false };
+            double rate { 1.0 };
+            float positionMod { 0.0f };
+            float unisonDetuneMod { 0.0f };
+            float unisonSpreadMod { 0.0f };
         } renderedA, renderedB;
 
         const auto add = [&](float value, float level, float pan, std::pair<float, float> staticPanGains,
@@ -153,7 +223,12 @@ namespace beat::AetherTableStackRenderer
             {
                 ++result.work.oscillatorSamples;
                 ++componentSampleCounter;
-                add(VoiceMath::nextNoise(noiseState), modulatedLevel, modulatedPan, staticPanGains,
+                const float value = VoiceMath::nextNoise(noiseState);
+                const auto [leftGain, rightGain] = panIsDynamic
+                    ? VoiceMath::equalPowerPanGains(modulatedPan)
+                    : staticPanGains;
+                rendered = { value, modulatedLevel, leftGain, rightGain, osc.routing, true };
+                add(value, modulatedLevel, modulatedPan, staticPanGains,
                     panIsDynamic, osc.routing, sourceFrame);
                 return;
             }
@@ -167,12 +242,14 @@ namespace beat::AetherTableStackRenderer
             }
 
             float value = 0.0f;
+            float oscillatorDetuneMod = 0.0f;
+            float oscillatorSpreadMod = 0.0f;
             if (osc.waveform == 5)
             {
-                const float oscillatorDetuneMod = useDynamicModulation && unisonDetuneIsDynamic
+                oscillatorDetuneMod = useDynamicModulation && unisonDetuneIsDynamic
                     ? DynamicModulation::targetOffset(unisonDetuneTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 100.0f)
                     : 0.0f;
-                const float oscillatorSpreadMod = useDynamicModulation && unisonSpreadIsDynamic
+                oscillatorSpreadMod = useDynamicModulation && unisonSpreadIsDynamic
                     ? DynamicModulation::targetOffset(unisonSpreadTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f)
                     : 0.0f;
                 const auto tableResult = WavetableOscillatorBank::render(
@@ -198,7 +275,9 @@ namespace beat::AetherTableStackRenderer
                 ++componentSampleCounter;
             }
             const auto [leftGain, rightGain] = panIsDynamic ? VoiceMath::equalPowerPanGains(modulatedPan) : staticPanGains;
-            rendered = { value, modulatedLevel, leftGain, rightGain, osc.routing, true };
+            rendered = { value, modulatedLevel, leftGain, rightGain, osc.routing, true,
+                         rate, positionMod, unisonDetuneMod + oscillatorDetuneMod,
+                         unisonSpreadMod + oscillatorSpreadMod };
             add(value, modulatedLevel, modulatedPan, staticPanGains, panIsDynamic, osc.routing, sourceFrame);
         };
 
@@ -252,9 +331,74 @@ namespace beat::AetherTableStackRenderer
         const float interactionAmount = VoiceMath::clamp01(params.aetherInteractionAmount);
         if (params.aetherInteractionMode != 0 && interactionAmount > 0.0f && renderedA.active && renderedB.active)
         {
-            const float interacted = params.aetherInteractionMode == 1
-                ? renderedA.value * (0.5f + 0.5f * renderedB.value)
-                : renderedA.value * renderedB.value;
+            float interacted = 0.0f;
+            if (interactionState != nullptr)
+            {
+                const double oversampledRate = sampleRate * (double) interactionState->downsampler.factor;
+                const auto renderInteractionOscillator = [&](const auto& osc,
+                                                             const RenderedOscillator& rendered,
+                                                             std::array<WavetableOscillator, 8>& oscillators,
+                                                             WavetableUnison::Plan& plan,
+                                                             juce::uint32& interactionNoiseState,
+                                                             int64_t& componentSampleCounter,
+                                                             double basePhase,
+                                                             double phaseOffset,
+                                                             int subsample,
+                                                             int factor) noexcept
+                {
+                    if (osc.waveform == 4)
+                    {
+                        ++result.work.oscillatorSamples;
+                        ++componentSampleCounter;
+                        return VoiceMath::nextNoise(interactionNoiseState);
+                    }
+                    if (osc.waveform == 5)
+                    {
+                        const auto tableResult = WavetableOscillatorBank::render(
+                            oscillators, plan, osc.wavetable, frequencyHz * rendered.rate,
+                            baseFrequencyHz, oversampledRate, rendered.positionMod,
+                            rendered.unisonDetuneMod, rendered.unisonSpreadMod);
+                        result.work.wavetableVoiceSamples += tableResult.voiceSamples;
+                        result.work.wavetableFrequencyUpdates += tableResult.frequencyUpdates;
+                        result.work.wavetablePositionUpdates += tableResult.positionUpdates;
+                        componentSampleCounter += tableResult.voiceSamples;
+                        return tableResult.sample;
+                    }
+                    const double subsamplePhase = basePhase
+                        + (frequencyHz / sampleRate) * ((double) subsample / (double) factor);
+                    ++result.work.oscillatorSamples;
+                    ++componentSampleCounter;
+                    return BasicOscillator::sample(
+                        osc.waveform,
+                        subsamplePhase * rendered.rate + phaseOffset,
+                        (frequencyHz * rendered.rate) / oversampledRate);
+                };
+                interacted = interactionState->downsampler.process(params.aetherInteractionMode,
+                    [&](int subsample, int factor) noexcept
+                    {
+                        const float carrier = renderInteractionOscillator(
+                            params.aetherOscA, renderedA, interactionState->oscillatorsA,
+                            interactionState->unisonPlanA, interactionState->noiseStateA,
+                            result.work.aetherOscASamples,
+                            oscABasePhase, oscAPhaseOffset,
+                            subsample, factor);
+                        const float modulator = renderInteractionOscillator(
+                            params.aetherOscB, renderedB, interactionState->oscillatorsB,
+                            interactionState->unisonPlanB, interactionState->noiseStateB,
+                            result.work.aetherOscBSamples,
+                            oscBBasePhase, oscBPhaseOffset,
+                            subsample, factor);
+                        return std::pair { carrier, modulator };
+                    });
+                result.work.nonlinearSamples += interactionState->downsampler.factor;
+            }
+            else
+            {
+                interacted = params.aetherInteractionMode == 1
+                    ? renderedA.value * (0.5f + 0.5f * renderedB.value)
+                    : renderedA.value * renderedB.value;
+                ++result.work.nonlinearSamples;
+            }
             const float delta = std::isfinite(interacted)
                 ? (interacted - renderedA.value) * interactionAmount
                 : 0.0f;
@@ -267,7 +411,6 @@ namespace beat::AetherTableStackRenderer
                 result.sourceFrames[0].left += delta * renderedA.level * renderedA.leftGain;
                 result.sourceFrames[0].right += delta * renderedA.level * renderedA.rightGain;
             }
-            ++result.work.nonlinearSamples;
         }
 
         if (params.aetherSub.enabled && params.aetherSub.level > 0.0f)

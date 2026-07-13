@@ -20,7 +20,7 @@ namespace beat::RenderBudgets
     // sample; exceeding one is an invariant violation, not a quality-degradation
     // trigger. Keeping the response telemetry-only preserves deterministic audio.
     inline constexpr int64_t modulationEvaluationsPerVoiceSample = 16;
-    inline constexpr int64_t nonlinearEvaluationsPerVoiceSample = 33;
+    inline constexpr int64_t nonlinearEvaluationsPerVoiceSample = 34;
 
     constexpr int64_t saturatingProduct(int64_t left, int64_t right) noexcept
     {

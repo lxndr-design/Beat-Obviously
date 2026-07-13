@@ -403,7 +403,7 @@ fixed Oscillator A sample + fixed Oscillator B sample
   -> existing route warp/filter/direct graph
 ```
 
-The interaction adds one bounded multiplication evaluation per active voice sample and no state allocation. It is counted against the 33-evaluation nonlinear ceiling. Current processing is at the active sample rate without oversampling; measured high-note alias is recorded in `current-engine-audit.md`.
+At B13 the interaction added one base-rate multiplication per active voice sample against a 33-evaluation nonlinear ceiling. B27 supersedes that edge with two fixed source-rate evaluations and a 34-evaluation ceiling; the current production path is detailed below and its measured alias is recorded in `current-engine-audit.md`.
 
 ## Milestone B14 pressure and timbre modulation path
 
@@ -610,14 +610,20 @@ The controls add no parameter ID, IPC message, schema branch, callback work, con
 
 B25 adds no production call-graph edge. The native test invokes the existing `BeatSynthesiser::noteOn` -> deterministic victim selection -> `InstrumentVoice::prepareForSteal` -> `InstrumentVoice::startNote` path and the existing direct legato `InstrumentVoice::startNote` retune path, then observes test-only phase and output accessors. The audio callback and offline-render graphs are unchanged.
 
-## Milestone B26 disconnected interaction-oversampling candidate
+## Milestone B26/B27 interaction oversampling
 
 ```text
-BackendStress analytic source provider (test only)
-  -> AetherInteractionStage::State::process (2 fixed subsamples)
+InstrumentVoice::prepare / setProcessingQuality / startNote (non-render setup)
+  -> prepare duplicate A/B oscillator banks at 2x
+  -> prepare fixed low-pass coefficients and synchronize note phases
+InstrumentVoice::renderNextBlock (active AM/ring and amount > 0 only)
+  -> AetherTableStackRenderer::render
+  -> duplicate A/B source render (2 fixed subsamples)
+  -> AetherInteractionStage::State::process
   -> AM/ring multiplication
   -> 3 prepared fixed biquad sections
-  -> FFT alias measurement
+  -> replace only oscillator A interaction contribution
+  -> exact oscillator/unison/nonlinear work counters
 ```
 
-There is intentionally no edge from `InstrumentVoice`, `AetherTableStackRenderer`, the device callback, or offline export to this stage yet. `prepare` computes coefficients outside the probe; the bounded `process` path passes the allocation/lock/file/lazy-init/growth detector.
+Interaction off or amount zero bypasses this edge exactly. Standard Live and Offline HQ both use the measured 2x source-rate policy. The callback path owns only fixed oscillator arrays, plans, filter history, and scalar work counters; preparation computes coefficients and configures table handles before rendering. The warmed production path passes the allocation/lock/file/lazy-init/growth detector. Offline export uses the same render edge but remains correctly excluded from real-time callback classification.
