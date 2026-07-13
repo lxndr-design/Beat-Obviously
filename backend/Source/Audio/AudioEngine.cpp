@@ -1431,6 +1431,27 @@ namespace beat
                         1.0f,
                         (float) message.getControllerValue() / 127.0f);
                 }
+                else if (message.isAftertouch())
+                {
+                    midiExpressionPressure[target.instrumentId] = juce::jlimit(
+                        0.0f,
+                        1.0f,
+                        (float) message.getAfterTouchValue() / 127.0f);
+                }
+                else if (message.isChannelPressure())
+                {
+                    midiExpressionPressure[target.instrumentId] = juce::jlimit(
+                        0.0f,
+                        1.0f,
+                        (float) message.getChannelPressureValue() / 127.0f);
+                }
+                else if (message.isController() && message.getControllerNumber() == 74)
+                {
+                    midiExpressionTimbre[target.instrumentId] = juce::jlimit(
+                        0.0f,
+                        1.0f,
+                        (float) message.getControllerValue() / 127.0f);
+                }
                 else
                 {
                     continue;
@@ -1472,6 +1493,20 @@ namespace beat
             else
                 it = midiExpressionModWheel.erase(it);
         }
+        for (auto it = midiExpressionPressure.begin(); it != midiExpressionPressure.end();)
+        {
+            if (isRetained(it->first))
+                ++it;
+            else
+                it = midiExpressionPressure.erase(it);
+        }
+        for (auto it = midiExpressionTimbre.begin(); it != midiExpressionTimbre.end();)
+        {
+            if (isRetained(it->first))
+                ++it;
+            else
+                it = midiExpressionTimbre.erase(it);
+        }
     }
 
     AudioEngine::SynthExpressionActivity AudioEngine::midiExpressionSnapshotLocked(const Id& instrumentId) const
@@ -1496,9 +1531,15 @@ namespace beat
             activity.pitchBendSemitones = found->second;
         if (const auto found = midiExpressionModWheel.find(instrumentId); found != midiExpressionModWheel.end())
             activity.modWheel = found->second;
+        if (const auto found = midiExpressionPressure.find(instrumentId); found != midiExpressionPressure.end())
+            activity.pressure = found->second;
+        if (const auto found = midiExpressionTimbre.find(instrumentId); found != midiExpressionTimbre.end())
+            activity.timbre = found->second;
         activity.active = activity.activeNotes > 0
             || std::abs(activity.pitchBendSemitones) > 0.001f
-            || activity.modWheel > 0.001f;
+            || activity.modWheel > 0.001f
+            || activity.pressure > 0.001f
+            || activity.timbre > 0.001f;
         return activity;
     }
 
@@ -1911,6 +1952,10 @@ namespace beat
             target.keytrackBipolar = source.keytrackBipolar;
             target.modWheel = source.modWheel;
             target.modWheelBipolar = source.modWheelBipolar;
+            target.pressure = source.pressure;
+            target.pressureBipolar = source.pressureBipolar;
+            target.timbre = source.timbre;
+            target.timbreBipolar = source.timbreBipolar;
             target.macro1 = source.macro1;
             target.macro2 = source.macro2;
             target.macro3 = source.macro3;

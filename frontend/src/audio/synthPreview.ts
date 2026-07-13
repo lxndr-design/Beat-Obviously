@@ -2028,6 +2028,8 @@ export function modulationAtTime(
   keytrack = keytrackSourceValue(previewFrequency(instrument)),
   modWheel = 0,
   macroOverrides?: Partial<Record<MacroAutomationTarget, number>>,
+  pressure = 0,
+  timbre = 0,
 ): RenderModulation {
   const lfo1OneShot = instrument.synthPatch?.parameters?.["lfo.1.oneShot"] === true || instrument.lfoOneShot === true;
   const lfo2OneShot = instrument.synthPatch?.parameters?.["lfo.2.oneShot"] === true || instrument.lfo2OneShot === true;
@@ -2059,7 +2061,7 @@ export function modulationAtTime(
   const env2 = modEnvelopePreviewValue(timeS, durationS, instrument, 2);
   const env3 = modEnvelopePreviewValue(timeS, durationS, instrument, 3);
   const env4 = modEnvelopePreviewValue(timeS, durationS, instrument, 4);
-  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, keytrack, modWheel, macroOverrides);
+  const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, keytrack, modWheel, macroOverrides, pressure, timbre);
   if (targetOffsets) {
     return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, ampEnvelope: env, targetOffsets };
   }
@@ -2087,6 +2089,8 @@ function routeTargetOffsets(
   keytrack: number,
   modWheel: number,
   macroOverrides?: Partial<Record<MacroAutomationTarget, number>>,
+  pressure = 0,
+  timbre = 0,
 ): Partial<Record<DirectRuntimeModulationTarget, number>> | null {
   const routes = instrument.synthPatch?.modulation as RuntimeModulationRoute[] | undefined;
   if (!Array.isArray(routes)) return null;
@@ -2097,7 +2101,7 @@ function routeTargetOffsets(
     const amount = Number.isFinite(route.amount) ? clamp(route.amount ?? 0, -1, 1) : 0;
     if (amount === 0) continue;
 
-    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, keytrack, modWheel, macroOverrides);
+    const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, keytrack, modWheel, macroOverrides, pressure, timbre);
     if (sourceValue == null) continue;
     offsets[route.target] = (offsets[route.target] ?? 0) + sourceValue * amount * modulationTargetScale(route.target);
   }
@@ -2118,6 +2122,8 @@ function modulationSourceValue(
   keytrack: number,
   modWheel: number,
   macroOverrides?: Partial<Record<MacroAutomationTarget, number>>,
+  pressure = 0,
+  timbre = 0,
 ): number | null {
   if (route.source === "lfo.1") {
     if (instrument.synthPatch?.parameters?.["lfo.1.enabled"] === false) return 0;
@@ -2149,6 +2155,14 @@ function modulationSourceValue(
   }
   if (route.source === "modWheel") {
     const value = clamp01(modWheel);
+    return route.bipolar ? value * 2 - 1 : value;
+  }
+  if (route.source === "pressure") {
+    const value = clamp01(pressure);
+    return route.bipolar ? value * 2 - 1 : value;
+  }
+  if (route.source === "timbre") {
+    const value = clamp01(timbre);
     return route.bipolar ? value * 2 - 1 : value;
   }
   if (isMacroAutomationTarget(route.source)) {

@@ -129,3 +129,7 @@ The saturating fixed-graph work-ceiling arithmetic, extra-LFO and runtime-warp a
 ## Milestone B13 provenance
 
 The bounded AM/ring formulas, carrier crossfade and gain/routing policy, nonlinear accounting, persistence/frontend contracts, and test-only FFT measurement are independently implemented from elementary signal multiplication and Beat's existing oscillator renderer. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived code, runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.
+
+## Milestone B14 provenance
+
+The independent pressure/CC74 timbre route fields, JUCE MIDI dispatch integration, activity telemetry, persistence/frontend contracts, preview evaluation, and focused tests are independent extensions of Beat's existing fixed modulation and MIDI-input paths. JUCE APIs already present in Beat provide the MIDI message/voice callbacks; no JUCE source was copied or modified. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived implementation, runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.

@@ -128,6 +128,8 @@ try {
       { id: "env2_res", source: "env.2", target: "filter.resonance", amount: 0.2, bipolar: false, enabled: true },
       { id: "keytrack_level", source: "keytrack", target: "osc.a.level", amount: 0.2, bipolar: false, enabled: true },
       { id: "modwheel_pan", source: "modWheel", target: "amp.pan", amount: 0.35, bipolar: true, enabled: true },
+      { id: "pressure_drive", source: "pressure", target: "filter.drive", amount: 0.4, bipolar: false, enabled: true },
+      { id: "timbre_position", source: "timbre", target: "osc.b.position", amount: 0.3, bipolar: false, enabled: true },
       { id: "macro_cutoff", source: "macro.1", target: "filter.cutoff", amount: 0.12, bipolar: false, enabled: true },
       { id: "velocity_amp", source: "velocity", target: "amp.level", amount: 0.25, bipolar: false, enabled: true },
       { id: "disabled_macro", source: "macro.1", target: "amp.level", amount: -1, bipolar: false, enabled: false },
@@ -383,6 +385,16 @@ try {
     amount: 0.35,
     label: "Amp Pan +35",
   });
+  assert.deepEqual(synthStore.modulationSummaryForSource(draft, "pressure"), {
+    count: 1,
+    amount: 0.4,
+    label: "Filter Drive +40",
+  });
+  assert.deepEqual(synthStore.modulationSummaryForSource(draft, "timbre"), {
+    count: 1,
+    amount: 0.3,
+    label: "OSC B Pos +30",
+  });
   assert.equal(synthStore.MODULATION_SOURCE_LABELS.velocity, "Velocity");
   assert.deepEqual(synthStore.modulationSummaryForSource(draft, "velocity"), {
     count: 1,
@@ -432,6 +444,20 @@ try {
       detail: "1 routed",
       active: true,
     },
+    {
+      id: "pressure",
+      label: "Pressure",
+      value: "Filter Drive +40",
+      detail: "1 routed",
+      active: true,
+    },
+    {
+      id: "timbre",
+      label: "Timbre",
+      value: "OSC B Pos +30",
+      detail: "1 routed",
+      active: true,
+    },
   ]);
   assert.deepEqual(
     synthStore.synthExpressionSummary(draft, {
@@ -441,6 +467,8 @@ try {
       velocity: 0.78,
       keytrack: 0.64,
       modWheel: 0.33,
+      pressure: 0.55,
+      timbre: 0.67,
     }).filter((item) => item.live).map((item) => ({
       id: item.id,
       value: item.value,
@@ -452,6 +480,8 @@ try {
       { id: "velocity", value: "78%", detail: "1 routed live" },
       { id: "keytrack", value: "64%", detail: "1 routed live" },
       { id: "mod-wheel", value: "33%", detail: "1 routed live" },
+      { id: "pressure", value: "55%", detail: "1 routed live" },
+      { id: "timbre", value: "67%", detail: "1 routed live" },
     ],
   );
   const liveStore = synthStore.useSynthStore;
@@ -488,12 +518,20 @@ try {
   assert.ok(Math.abs(bentMidi.pitchBendSemitones - 1) < 0.0001);
   const modWheelMidi = midiExpressionTracker.applyData([0xb0, 1, 96]);
   assert.ok(Math.abs(modWheelMidi.modWheel - 96 / 127) < 0.0001);
+  const pressureMidi = midiExpressionTracker.applyData([0xd0, 88]);
+  assert.ok(Math.abs(pressureMidi.pressure - 88 / 127) < 0.0001);
+  const polyPressureMidi = midiExpressionTracker.applyData([0xa0, 64, 72]);
+  assert.ok(Math.abs(polyPressureMidi.pressure - 72 / 127) < 0.0001);
+  const timbreMidi = midiExpressionTracker.applyData([0xb0, 74, 84]);
+  assert.ok(Math.abs(timbreMidi.timbre - 84 / 127) < 0.0001);
   midiExpressionTracker.applyData([0x80, 64, 0]);
   const oneRemainingMidiNote = midiExpressionTracker.applyData([0x80, 76, 0]);
   assert.equal(oneRemainingMidiNote.activeNotes, 0);
   assert.ok(Math.abs(oneRemainingMidiNote.pitchBendSemitones - 1) < 0.0001);
   midiExpressionTracker.applyData([0xe0, 0, 64]);
-  assert.equal(midiExpressionTracker.applyData([0xb0, 1, 0]), null);
+  midiExpressionTracker.applyData([0xb0, 1, 0]);
+  midiExpressionTracker.applyData([0xd0, 0]);
+  assert.equal(midiExpressionTracker.applyData([0xb0, 74, 0]), null);
   const fineRoute = draft.modulation.find((route) => route.target === "osc.a.fine");
   assert.ok(fineRoute, "expected fine modulation route fixture");
   assert.deepEqual(synthStore.modulationRouteDisplay(draft, fineRoute), {
@@ -587,8 +625,10 @@ try {
       synthStore.modulationSourceEditorTarget("velocity"),
       synthStore.modulationSourceEditorTarget("keytrack"),
       synthStore.modulationSourceEditorTarget("modWheel"),
+      synthStore.modulationSourceEditorTarget("pressure"),
+      synthStore.modulationSourceEditorTarget("timbre"),
     ],
-    ["lfo.1", "env.2", "macro.1", "performance", "performance", "performance"],
+    ["lfo.1", "env.2", "macro.1", "performance", "performance", "performance", "performance", "performance"],
     "modulation source affordances should focus the matching source editor surface",
   );
   assert.ok(synthStore.FACTORY_SYNTH_PRESETS.length >= 17);
@@ -1022,6 +1062,26 @@ try {
     synthPreview.modulationAtTime(modWheelPreview, 0.25, 1, 120, 1, 0.6, 0.9).targetOffsets["amp.level"]
       > synthPreview.modulationAtTime(modWheelPreview, 0.25, 1, 120, 1, 0.6, 0.2).targetOffsets["amp.level"] * 3,
     "expected mod wheel modulation source to scale target offsets",
+  );
+  const pressurePreview = synthStore.synthDraftToPreviewInstrument({
+    ...draft,
+    parameters: { ...draft.parameters, "amp.level": 0 },
+    modulation: [{ id: "pressure_probe", source: "pressure", target: "amp.level", amount: 1, bipolar: false, enabled: true }],
+  });
+  assert.ok(
+    synthPreview.modulationAtTime(pressurePreview, 0.25, 1, 120, 1, 0.6, 0, undefined, 0.9).targetOffsets["amp.level"]
+      > synthPreview.modulationAtTime(pressurePreview, 0.25, 1, 120, 1, 0.6, 0, undefined, 0.2).targetOffsets["amp.level"] * 3,
+    "expected pressure modulation source to remain independent of mod wheel",
+  );
+  const timbrePreview = synthStore.synthDraftToPreviewInstrument({
+    ...draft,
+    parameters: { ...draft.parameters, "amp.level": 0 },
+    modulation: [{ id: "timbre_probe", source: "timbre", target: "amp.level", amount: 1, bipolar: false, enabled: true }],
+  });
+  assert.ok(
+    synthPreview.modulationAtTime(timbrePreview, 0.25, 1, 120, 1, 0.6, 0, undefined, 0, 0.9).targetOffsets["amp.level"]
+      > synthPreview.modulationAtTime(timbrePreview, 0.25, 1, 120, 1, 0.6, 0, undefined, 0, 0.2).targetOffsets["amp.level"] * 3,
+    "expected CC74 timbre modulation source to remain independent of pressure",
   );
   const lowModWheelSamples = new Float32Array(4096);
   const highModWheelSamples = new Float32Array(4096);

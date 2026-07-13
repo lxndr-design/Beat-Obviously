@@ -335,6 +335,8 @@ export function TimelineMidiPlayback() {
       velocity: velocity / activeNotes,
       keytrack: keytrack / activeNotes,
       modWheel: 0,
+      pressure: 0,
+      timbre: 0,
     });
   }
 

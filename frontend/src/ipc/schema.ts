@@ -446,6 +446,8 @@ export type InboundEvent =
       velocity: number;
       keytrack: number;
       modWheel: number;
+      pressure: number;
+      timbre: number;
     }
   | (ProjectExportJobStatus & { kind: "project.exportProgress" })
   | { kind: "training.status"; task: "drums" | "instruments" | "midi"; status: "started" | "finished" | "failed"; signalCount: number; message?: string; exitCode?: number }

@@ -185,6 +185,8 @@ namespace beat
             float velocity { 0.0f };
             float keytrack { 0.0f };
             float modWheel { 0.0f };
+            float pressure { 0.0f };
+            float timbre { 0.0f };
         };
 
         std::function<void(const SynthExpressionActivity&)> onSynthExpressionActivity;
@@ -591,6 +593,8 @@ namespace beat
         std::map<Id, std::vector<ActiveMidiExpressionNote>> activeMidiExpressionNotes;
         std::map<Id, float> midiExpressionPitchBend;
         std::map<Id, float> midiExpressionModWheel;
+        std::map<Id, float> midiExpressionPressure;
+        std::map<Id, float> midiExpressionTimbre;
         std::vector<juce::String> enabledMidiInputIdentifiers;
         std::vector<TrackMeterState> trackMeterStates;
         TrackMeterState masterMeterState { "master" };

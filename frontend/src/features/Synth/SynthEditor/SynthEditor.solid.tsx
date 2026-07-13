@@ -81,6 +81,8 @@ function performanceSourceForSummaryId(id: string): ModulationSourceId | undefin
   if (id === "velocity") return "velocity";
   if (id === "keytrack") return "keytrack";
   if (id === "mod-wheel") return "modWheel";
+  if (id === "pressure") return "pressure";
+  if (id === "timbre") return "timbre";
   return undefined;
 }
 
@@ -260,6 +262,8 @@ export function SynthEditor(props: SynthEditorProps) {
       velocity: 1,
       keytrack: keytrackFromFrequency(frequency),
       modWheel: 0,
+      pressure: 0,
+      timbre: 0,
     });
     let handle: AuditionHandle | null = null;
     let seededAnalyzer = false;

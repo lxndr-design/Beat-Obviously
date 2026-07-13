@@ -4,13 +4,17 @@ export interface LiveMidiExpressionSnapshot {
   velocity: number;
   keytrack: number;
   modWheel: number;
+  pressure: number;
+  timbre: number;
 }
 
 export type LiveMidiExpressionMessage =
   | { kind: "noteOn"; channel: number; note: number; velocity: number }
   | { kind: "noteOff"; channel: number; note: number }
   | { kind: "pitchBend"; channel: number; semitones: number }
-  | { kind: "modWheel"; channel: number; value: number };
+  | { kind: "modWheel"; channel: number; value: number }
+  | { kind: "pressure"; channel: number; value: number }
+  | { kind: "timbre"; channel: number; value: number };
 
 const DEFAULT_PITCH_BEND_RANGE_SEMITONES = 2;
 
@@ -34,6 +38,15 @@ export function parseLiveMidiExpressionMessage(
   if (status === 0xb0 && first === 1) {
     return { kind: "modWheel", channel, value: second / 127 };
   }
+  if (status === 0xb0 && first === 74) {
+    return { kind: "timbre", channel, value: second / 127 };
+  }
+  if (status === 0xa0) {
+    return { kind: "pressure", channel, value: second / 127 };
+  }
+  if (status === 0xd0) {
+    return { kind: "pressure", channel, value: first / 127 };
+  }
   if (status === 0xe0) {
     const raw = first + second * 128;
     const normalized = Math.max(-1, Math.min(1, (raw - 8192) / 8192));
@@ -46,6 +59,8 @@ export function createLiveMidiExpressionTracker(pitchBendRangeSemitones = DEFAUL
   const activeNotes = new Map<string, { velocity: number; keytrack: number }>();
   let pitchBendSemitones = 0;
   let modWheel = 0;
+  let pressure = 0;
+  let timbre = 0;
 
   function applyMessage(message: LiveMidiExpressionMessage): LiveMidiExpressionSnapshot | null {
     if (message.kind === "noteOn") {
@@ -57,8 +72,12 @@ export function createLiveMidiExpressionTracker(pitchBendRangeSemitones = DEFAUL
       activeNotes.delete(noteKey(message.channel, message.note));
     } else if (message.kind === "pitchBend") {
       pitchBendSemitones = Number.isFinite(message.semitones) ? message.semitones : 0;
-    } else {
+    } else if (message.kind === "modWheel") {
       modWheel = clamp01(message.value);
+    } else if (message.kind === "pressure") {
+      pressure = clamp01(message.value);
+    } else {
+      timbre = clamp01(message.value);
     }
     return snapshot();
   }
@@ -80,7 +99,7 @@ export function createLiveMidiExpressionTracker(pitchBendRangeSemitones = DEFAUL
       velocity /= activeCount;
       keytrack /= activeCount;
     }
-    const active = activeCount > 0 || Math.abs(pitchBendSemitones) > 0.001 || modWheel > 0.001;
+    const active = activeCount > 0 || Math.abs(pitchBendSemitones) > 0.001 || modWheel > 0.001 || pressure > 0.001 || timbre > 0.001;
     if (!active) return null;
     return {
       activeNotes: activeCount,
@@ -88,6 +107,8 @@ export function createLiveMidiExpressionTracker(pitchBendRangeSemitones = DEFAUL
       velocity,
       keytrack,
       modWheel,
+      pressure,
+      timbre,
     };
   }
 
@@ -95,6 +116,8 @@ export function createLiveMidiExpressionTracker(pitchBendRangeSemitones = DEFAUL
     activeNotes.clear();
     pitchBendSemitones = 0;
     modWheel = 0;
+    pressure = 0;
+    timbre = 0;
   }
 
   return {

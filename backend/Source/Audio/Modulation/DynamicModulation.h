@@ -39,6 +39,8 @@ namespace beat::DynamicModulation
         bool velocity { false };
         bool keytrack { false };
         bool modWheel { false };
+        bool pressure { false };
+        bool timbre { false };
         bool any { false };
     };
 
@@ -66,7 +68,7 @@ namespace beat::DynamicModulation
     template <typename Target>
     float targetOffset(
         const Target&, float, float, const std::array<float, 8>&, float, float, float, float,
-        float, float, float, const std::array<float, 8>&, float) noexcept;
+        float, float, float, float, float, const std::array<float, 8>&, float) noexcept;
 
     template <typename Target>
     bool targetActive(const Target& target) noexcept
@@ -81,6 +83,8 @@ namespace beat::DynamicModulation
             || std::abs(target.velocity) > 0.0001f
             || std::abs(target.keytrack) > 0.0001f
             || std::abs(target.modWheel) > 0.0001f
+            || std::abs(target.pressure) > 0.0001f
+            || std::abs(target.timbre) > 0.0001f
             || std::abs(target.macro1) > 0.0001f
             || std::abs(target.macro2) > 0.0001f
             || std::abs(target.macro3) > 0.0001f
@@ -105,6 +109,8 @@ namespace beat::DynamicModulation
         flags.velocity = flags.velocity || std::abs(target.velocity) > 0.0001f;
         flags.keytrack = flags.keytrack || std::abs(target.keytrack) > 0.0001f;
         flags.modWheel = flags.modWheel || std::abs(target.modWheel) > 0.0001f;
+        flags.pressure = flags.pressure || std::abs(target.pressure) > 0.0001f;
+        flags.timbre = flags.timbre || std::abs(target.timbre) > 0.0001f;
     }
 
     template <typename Target>
@@ -114,7 +120,17 @@ namespace beat::DynamicModulation
         const std::array<float, 8>& macroValues, float scale) noexcept
     {
         return targetOffset(target, rawLfo, rawLfo2, std::array<float, 8> {}, env, env2, env3, env4,
-            velocity, keytrack, modWheel, macroValues, scale);
+            velocity, keytrack, modWheel, 0.0f, 0.0f, macroValues, scale);
+    }
+
+    template <typename Target>
+    float targetOffset(
+        const Target& target, float rawLfo, float rawLfo2, const std::array<float, 8>& rawExtraLfos,
+        float env, float env2, float env3, float env4, float velocity, float keytrack, float modWheel,
+        const std::array<float, 8>& macroValues, float scale) noexcept
+    {
+        return targetOffset(target, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4,
+            velocity, keytrack, modWheel, 0.0f, 0.0f, macroValues, scale);
     }
 
     template <typename Target>
@@ -130,6 +146,8 @@ namespace beat::DynamicModulation
         float velocity,
         float keytrack,
         float modWheel,
+        float pressure,
+        float timbre,
         const std::array<float, 8>& macroValues,
         float scale) noexcept
     {
@@ -146,6 +164,8 @@ namespace beat::DynamicModulation
             + routeEnvValue(velocity, target.velocityBipolar) * target.velocity
             + routeEnvValue(keytrack, target.keytrackBipolar) * target.keytrack
             + routeEnvValue(modWheel, target.modWheelBipolar) * target.modWheel
+            + routeEnvValue(pressure, target.pressureBipolar) * target.pressure
+            + routeEnvValue(timbre, target.timbreBipolar) * target.timbre
             + macroValues[0] * target.macro1
             + macroValues[1] * target.macro2
             + macroValues[2] * target.macro3
@@ -163,7 +183,7 @@ namespace beat::DynamicModulation
         const std::array<float, 8>& macroValues, float scale) noexcept
     {
         return targetOffset(target, rawLfo, rawLfo2, std::array<float, 8> {}, env, env2, 0.0f, 0.0f,
-            velocity, keytrack, modWheel, macroValues, scale);
+            velocity, keytrack, modWheel, 0.0f, 0.0f, macroValues, scale);
     }
 
     template <typename Modulation>

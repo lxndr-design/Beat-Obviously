@@ -2337,6 +2337,8 @@ namespace beat
             o->setProperty("velocity", activity.velocity);
             o->setProperty("keytrack", activity.keytrack);
             o->setProperty("modWheel", activity.modWheel);
+            o->setProperty("pressure", activity.pressure);
+            o->setProperty("timbre", activity.timbre);
             emit(ipc::kind::EV_SYNTH_EXPRESSION_ACTIVITY, juce::var(o.get()));
         };
         startTimerHz(30);

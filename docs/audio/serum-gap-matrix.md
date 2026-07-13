@@ -23,7 +23,7 @@ This matrix uses Serum-class instruments as a capability reference, not a source
 | Dual serial warp stages | Implemented with independent stable fields and the bounded fold/pinch/mirror/shape set | B8 | Ratify measured alias/stop-band thresholds for the existing oversampling policy |
 | FM/PM/PD/AM/ring modulation | Bounded A-by-B AM and ring modes implemented; FM/PM/PD remain absent | B13 | High-note alias is measured and material, especially for ring; design/ratify oversampling and stop-band policy before release, and add other modes only with equivalent proof |
 | Four envelopes / ten LFOs / eight macros | Four envelopes, ten LFOs, eight macros | B9/B10/B11 | Add product-facing slot controls and broader routed audible fixtures |
-| MPE/per-note expression | Partial note automation | B3 | Input capability mapping and deterministic persistence |
+| MPE/per-note expression | Independent mod wheel, poly/channel pressure, and CC74 timbre sources plus partial note automation; full MPE member-channel ownership is not implemented | B3/B14 | Add deterministic per-note/member-channel state, capability negotiation, and persisted performance mapping before claiming MPE completeness |
 | Dual shared filters and source routing | Two shared filters with serial/parallel topology and per-source both/Filter-1/Filter-2/direct destinations implemented | B5/B6/B7 | Add transition automation and per-source FX sends |
 | Reorderable insert plus two FX buses | Partial instrument-owned fixed FX | B5 | De-clicked graph replacement and preset migrations |
 | Three source slots | Missing | C1 | Narrow source-engine interface after A/B freeze |

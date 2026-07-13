@@ -51,6 +51,8 @@ namespace beat
         void stopNote(float velocity, bool allowTailOff) override;
         void pitchWheelMoved(int newPitchWheelValue) override;
         void controllerMoved(int controllerNumber, int controllerValue) override;
+        void aftertouchChanged(int newAftertouchValue) override;
+        void channelPressureChanged(int newChannelPressureValue) override;
         void renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
                              int startSample, int numSamples) override;
 
@@ -150,6 +152,10 @@ namespace beat
                 bool keytrackBipolar { false };
                 float modWheel { 0.0f };
                 bool modWheelBipolar { false };
+                float pressure { 0.0f };
+                bool pressureBipolar { false };
+                float timbre { 0.0f };
+                bool timbreBipolar { false };
                 float macro1 { 0.0f };
                 float macro2 { 0.0f };
                 float macro3 { 0.0f };
@@ -349,6 +355,8 @@ namespace beat
         float   level { 0.0f };
         float   noteKeytrack { 0.0f };
         float   modWheel { 0.0f };
+        float   pressure { 0.0f };
+        float   timbre { 0.0f };
         float   pitchWheelSemitones { 0.0f };
         std::shared_ptr<const Wavetable> wavetableTable;
         std::shared_ptr<const Wavetable> aetherTableA;

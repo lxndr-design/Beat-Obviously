@@ -227,6 +227,10 @@ namespace beat
             bool keytrackBipolar { false };
             float modWheel { 0.0f };
             bool modWheelBipolar { false };
+            float pressure { 0.0f };
+            bool pressureBipolar { false };
+            float timbre { 0.0f };
+            bool timbreBipolar { false };
             float macro1 { 0.0f };
             float macro2 { 0.0f };
             float macro3 { 0.0f };

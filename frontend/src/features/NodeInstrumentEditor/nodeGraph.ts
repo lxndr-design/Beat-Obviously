@@ -1635,7 +1635,14 @@ function modulationSourceForNode(node: InstrumentNode): ModulationSourceId | nul
   if (node.kind === "envelope") return "env.1";
   if (node.kind === "velocity") return "velocity";
   if (node.kind === "keytrack") return "keytrack";
-  if (node.kind === "modWheel" || node.kind === "midiControl") return "modWheel";
+  if (node.kind === "modWheel") return "modWheel";
+  if (node.kind === "midiControl") {
+    const source = String(node.parameters.source ?? "modWheel");
+    if (source === "modWheel") return "modWheel";
+    if (source === "aftertouch") return "pressure";
+    if (source === "cc" && Math.round(Number(node.parameters.cc ?? 1)) === 74) return "timbre";
+    return null;
+  }
   if (node.kind === "macro") return macroSourceForNode(node);
   return null;
 }

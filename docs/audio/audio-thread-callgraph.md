@@ -404,3 +404,19 @@ fixed Oscillator A sample + fixed Oscillator B sample
 ```
 
 The interaction adds one bounded multiplication evaluation per active voice sample and no state allocation. It is counted against the 33-evaluation nonlinear ceiling. Current processing is at the active sample rate without oversampling; measured high-note alias is recorded in `current-engine-audit.md`.
+
+## Milestone B14 pressure and timbre modulation path
+
+```text
+MIDI input / scheduled MIDI buffer
+  poly aftertouch -> JUCE voice aftertouchChanged(note value) -> voice pressure
+  channel pressure -> JUCE voice channelPressureChanged(value) -> voice pressure
+  CC74 -> InstrumentVoice::controllerMoved -> voice timbre
+  CC1 -> existing voice modWheel
+InstrumentVoice::renderNextBlock
+  pressure + timbre + existing fixed sources
+  -> DynamicModulation::targetOffset
+  -> existing oscillator/unison/filter/drive/amp/pan targets
+```
+
+Pressure and timbre are normalized scalar voice state and fixed route fields. MIDI dispatch uses JUCE's existing prepared synthesiser path; target evaluation adds two bounded multiply-add terms and no callback allocation, lock, file operation, lazy initialization, or container growth. `AudioEngine` also publishes non-audio expression activity through pre-existing MIDI-input monitoring state and `MessageBridge`; that UI telemetry is not used to render the audio callback. Browser preview accepts explicit pressure/timbre inputs for deterministic route visualization. Offline rendering is not classified as a real-time callback by the A9 detector.

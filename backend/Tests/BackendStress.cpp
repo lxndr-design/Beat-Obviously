@@ -236,6 +236,17 @@ namespace
         if (!near(extraLfoOffset, 0.4f))
             return false;
 
+        decltype(target) expressionTarget;
+        expressionTarget.pressure = 0.4f;
+        expressionTarget.timbre = -0.2f;
+        expressionTarget.timbreBipolar = true;
+        const float expressionOffset = beat::DynamicModulation::targetOffset(
+            expressionTarget, 0.0f, 0.0f, std::array<float, 8> {},
+            0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.75f, 0.25f,
+            std::array<float, 8> {}, 2.0f);
+        if (!near(expressionOffset, 0.8f))
+            return false;
+
         beat::DynamicModulation::TargetActivityFlags noFlags;
         const auto legacyPitchPlan = beat::DynamicModulation::makeRenderPlan(noFlags, false, true, 7.0f, 0.0f, 0.0f, 0.0f);
         if (!near(legacyPitchPlan.pitchMod, 7.0f)
@@ -275,6 +286,8 @@ namespace
         modulation.filterResonance.modWheel = 0.4f;
         modulation.ampLevel.keytrack = 0.2f;
         modulation.ampPan.lfo = 0.2f;
+        modulation.filterDrive.pressure = 0.25f;
+        modulation.oscALevel.timbre = 0.2f;
         const auto flags = beat::DynamicModulation::targetActivityFlags(modulation);
         const bool ok = flags.any
             && flags.oscAPosition
@@ -284,13 +297,15 @@ namespace
             && flags.ampLevel
             && flags.ampPan
             && !flags.oscAPan
-            && !flags.filterDrive
+            && flags.filterDrive
             && flags.lfo
             && flags.lfo2
             && flags.env2
             && flags.velocity
             && flags.keytrack
             && flags.modWheel
+            && flags.pressure
+            && flags.timbre
             && beat::DynamicModulation::hasFilterCoefficientMod(flags);
         if (!ok)
             return false;
@@ -1736,6 +1751,18 @@ namespace
         if (!near(updates.back().modWheel, 96.0f / 127.0f, 0.0002f))
             return false;
 
+        engine.injectMidiInputForTesting(juce::MidiMessage::channelPressureChange(1, 88));
+        if (!near(updates.back().pressure, 88.0f / 127.0f, 0.0002f))
+            return false;
+
+        engine.injectMidiInputForTesting(juce::MidiMessage::aftertouchChange(1, 76, 72));
+        if (!near(updates.back().pressure, 72.0f / 127.0f, 0.0002f))
+            return false;
+
+        engine.injectMidiInputForTesting(juce::MidiMessage::controllerEvent(1, 74, 84));
+        if (!near(updates.back().timbre, 84.0f / 127.0f, 0.0002f))
+            return false;
+
         engine.injectMidiInputForTesting(juce::MidiMessage::noteOff(1, 64));
         engine.injectMidiInputForTesting(juce::MidiMessage::noteOff(1, 76));
         if (!updates.back().active || updates.back().activeNotes != 0)
@@ -1743,12 +1770,16 @@ namespace
 
         engine.injectMidiInputForTesting(juce::MidiMessage::pitchWheel(1, 8192));
         engine.injectMidiInputForTesting(juce::MidiMessage::controllerEvent(1, 1, 0));
+        engine.injectMidiInputForTesting(juce::MidiMessage::channelPressureChange(1, 0));
+        engine.injectMidiInputForTesting(juce::MidiMessage::controllerEvent(1, 74, 0));
         const auto cleared = updates.back();
         return cleared.instrumentId == "dense-aether"
             && !cleared.active
             && cleared.activeNotes == 0
             && near(cleared.pitchBendSemitones, 0.0f, 0.0002f)
-            && near(cleared.modWheel, 0.0f, 0.0002f);
+            && near(cleared.modWheel, 0.0f, 0.0002f)
+            && near(cleared.pressure, 0.0f, 0.0002f)
+            && near(cleared.timbre, 0.0f, 0.0002f);
     }
 
     bool stressFftAnalyzer()
@@ -7157,6 +7188,10 @@ namespace
         instrument.dynamicModulation.filterCutoff.extraLfo[7] = 0.29f;
         instrument.dynamicModulation.ampLevel.velocity = 0.27f;
         instrument.dynamicModulation.ampLevel.velocityBipolar = false;
+        instrument.dynamicModulation.filterDrive.pressure = 0.38f;
+        instrument.dynamicModulation.filterDrive.pressureBipolar = true;
+        instrument.dynamicModulation.oscBPosition.timbre = -0.24f;
+        instrument.dynamicModulation.oscBPosition.timbreBipolar = false;
 
         auto& oscA = instrument.aether.oscA;
         oscA.phase = 0.37f;
@@ -7255,6 +7290,10 @@ namespace
                 && near(loadedInstrument.dynamicModulation.filterCutoff.extraLfo[7], 0.29f)
                 && near(loadedInstrument.dynamicModulation.ampLevel.velocity, 0.27f)
                 && !loadedInstrument.dynamicModulation.ampLevel.velocityBipolar
+                && near(loadedInstrument.dynamicModulation.filterDrive.pressure, 0.38f)
+                && loadedInstrument.dynamicModulation.filterDrive.pressureBipolar
+                && near(loadedInstrument.dynamicModulation.oscBPosition.timbre, -0.24f)
+                && !loadedInstrument.dynamicModulation.oscBPosition.timbreBipolar
                 && loadedOscA.enabled
                 && near(loadedOscA.phase, 0.37f)
                 && near(loadedOscA.randomPhase, 0.18f)
@@ -12184,6 +12223,8 @@ namespace
             { "source": "env.2", "target": "filter.resonance", "amount": 0.2, "enabled": true },
             { "source": "keytrack", "target": "osc.a.level", "amount": 0.2, "enabled": true },
             { "source": "modWheel", "target": "amp.pan", "amount": 0.35, "bipolar": true, "enabled": true },
+            { "source": "pressure", "target": "filter.drive", "amount": 0.38, "bipolar": true, "enabled": true },
+            { "source": "timbre", "target": "osc.b.position", "amount": -0.24, "bipolar": false, "enabled": true },
             { "source": "lfo.1", "target": "filter.cutoff", "amount": -0.2, "bipolar": false, "enabled": true },
             { "source": "lfo.1", "target": "filter.cutoff", "amount": 1.0, "enabled": false },
             { "source": "env.1", "target": "filter.cutoff", "amount": 0.3, "enabled": true },
@@ -12377,6 +12418,10 @@ namespace
         if (!near(instrument.dynamicModulation.oscALevel.keytrack, 0.2f) || instrument.dynamicModulation.oscALevel.keytrackBipolar)
             return false;
         if (!near(instrument.dynamicModulation.ampPan.modWheel, 0.35f) || !instrument.dynamicModulation.ampPan.modWheelBipolar)
+            return false;
+        if (!near(instrument.dynamicModulation.filterDrive.pressure, 0.38f) || !instrument.dynamicModulation.filterDrive.pressureBipolar)
+            return false;
+        if (!near(instrument.dynamicModulation.oscBPosition.timbre, -0.24f) || instrument.dynamicModulation.oscBPosition.timbreBipolar)
             return false;
         if (!near(instrument.dynamicModulation.ampLevel.velocity, 0.25f) || instrument.dynamicModulation.ampLevel.velocityBipolar)
             return false;
@@ -12685,12 +12730,14 @@ namespace
         if (!(keytrackOpenEnergy > keytrackClosedEnergy * 1.1))
             return false;
 
-        auto renderWithVelocity = [](const beat::InstrumentVoice::Params& renderParams, float velocity, int midiNote = 69, int modWheelValue = 0, int pitchWheelValue = 8192) {
+        auto renderWithVelocity = [](const beat::InstrumentVoice::Params& renderParams, float velocity, int midiNote = 69, int modWheelValue = 0, int pitchWheelValue = 8192, int pressureValue = 0, int timbreValue = 0) {
             beat::InstrumentVoice voice;
             voice.prepare(44100.0, 256);
             voice.setParams(renderParams);
             voice.startNote(midiNote, velocity, nullptr, 8192);
             voice.controllerMoved(1, modWheelValue);
+            voice.channelPressureChanged(pressureValue);
+            voice.controllerMoved(74, timbreValue);
             voice.pitchWheelMoved(pitchWheelValue);
 
             juce::AudioBuffer<float> buffer(2, 4096);
@@ -12789,6 +12836,26 @@ namespace
             }
         }
         if (!(highModWheelEnergy > lowModWheelEnergy * 40.0))
+            return false;
+
+        auto pressureParams = params;
+        pressureParams.ampLevel = 0.0f;
+        pressureParams.wavetableUnison = 1;
+        pressureParams.dynamicModulation.active = true;
+        pressureParams.dynamicModulation.ampLevel.pressure = 1.0f;
+        const auto lowPressure = renderWithVelocity(pressureParams, 1.0f, 69, 0, 8192, 16);
+        const auto highPressure = renderWithVelocity(pressureParams, 1.0f, 69, 0, 8192, 127);
+        if (!(bufferEnergy(highPressure) > bufferEnergy(lowPressure) * 40.0))
+            return false;
+
+        auto timbreParams = params;
+        timbreParams.ampLevel = 0.0f;
+        timbreParams.wavetableUnison = 1;
+        timbreParams.dynamicModulation.active = true;
+        timbreParams.dynamicModulation.ampLevel.timbre = 1.0f;
+        const auto lowTimbre = renderWithVelocity(timbreParams, 1.0f, 69, 0, 8192, 0, 16);
+        const auto highTimbre = renderWithVelocity(timbreParams, 1.0f, 69, 0, 8192, 0, 127);
+        if (!(bufferEnergy(highTimbre) > bufferEnergy(lowTimbre) * 40.0))
             return false;
 
         auto pitchBendParams = params;

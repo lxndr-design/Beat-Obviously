@@ -76,6 +76,8 @@ export function LiveMidiExpressionInput() {
         velocity: snapshot.velocity,
         keytrack: snapshot.keytrack,
         modWheel: snapshot.modWheel,
+        pressure: snapshot.pressure,
+        timbre: snapshot.timbre,
       });
     }
   }

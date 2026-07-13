@@ -189,6 +189,8 @@ export type ModulationSourceId =
   | "velocity"
   | "keytrack"
   | "modWheel"
+  | "pressure"
+  | "timbre"
   | "macro.1"
   | "macro.2"
   | "macro.3"
@@ -271,7 +273,7 @@ export interface SynthModulationSourceAffordance {
 export type SynthModulationSourceEditorTarget = MacroId | `lfo.${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}` | "env.1" | "env.2" | "env.3" | "env.4" | "performance";
 
 export interface SynthExpressionSummaryItem {
-  id: "voices" | "legato" | "pitch-bend" | "velocity" | "keytrack" | "mod-wheel";
+  id: "voices" | "legato" | "pitch-bend" | "velocity" | "keytrack" | "mod-wheel" | "pressure" | "timbre";
   label: string;
   value: string;
   detail: string;
@@ -286,6 +288,8 @@ export interface SynthExpressionActivity {
   velocity?: number;
   keytrack?: number;
   modWheel?: number;
+  pressure?: number;
+  timbre?: number;
 }
 
 export interface SynthInstrumentExpressionActivity extends SynthExpressionActivity {
@@ -1287,6 +1291,8 @@ export const MODULATION_SOURCE_LABELS: Record<ModulationSourceId, string> = {
   velocity: "Velocity",
   keytrack: "Keytrack",
   modWheel: "Mod Wheel",
+  pressure: "Pressure",
+  timbre: "Timbre",
   "macro.1": "Macro 1",
   "macro.2": "Macro 2",
   "macro.3": "Macro 3",
@@ -1682,11 +1688,17 @@ export function modulationSourceAffordance(draft: SynthDraftPatch, source: Modul
   if (source === "keytrack") {
     return { source, label: "Performance source", detail: "MIDI note position", editor: "performance" };
   }
+  if (source === "pressure") {
+    return { source, label: "Performance source", detail: "Poly or channel pressure", editor: "performance" };
+  }
+  if (source === "timbre") {
+    return { source, label: "Performance source", detail: "MIDI CC74 timbre", editor: "performance" };
+  }
   return { source, label: "Performance source", detail: "Mod wheel CC1", editor: "performance" };
 }
 
 export function modulationSourceEditorTarget(source: ModulationSourceId): SynthModulationSourceEditorTarget {
-  if (source === "velocity" || source === "keytrack" || source === "modWheel") return "performance";
+  if (source === "velocity" || source === "keytrack" || source === "modWheel" || source === "pressure" || source === "timbre") return "performance";
   return source;
 }
 
@@ -1733,11 +1745,15 @@ export function synthExpressionSummary(draft: SynthDraftPatch, activity?: SynthE
   const velocity = modulationSummaryForSource(draft, "velocity");
   const keytrack = modulationSummaryForSource(draft, "keytrack");
   const modWheel = modulationSummaryForSource(draft, "modWheel");
+  const pressure = modulationSummaryForSource(draft, "pressure");
+  const timbre = modulationSummaryForSource(draft, "timbre");
   const filterKeytrack = clamp01(getNumberParam(draft, "filter.keytrack"));
   const liveSource = activity ? expressionActivitySourceLabel(activity.source) : "";
   const liveVelocity = activity?.velocity != null ? clamp01(activity.velocity) : null;
   const liveKeytrack = activity?.keytrack != null ? clamp01(activity.keytrack) : null;
   const liveModWheel = activity?.modWheel != null ? clamp01(activity.modWheel) : null;
+  const livePressure = activity?.pressure != null ? clamp01(activity.pressure) : null;
+  const liveTimbre = activity?.timbre != null ? clamp01(activity.timbre) : null;
   const livePitchBend = activity?.pitchBendSemitones != null && Number.isFinite(activity.pitchBendSemitones)
     ? activity.pitchBendSemitones
     : null;
@@ -1790,6 +1806,22 @@ export function synthExpressionSummary(draft: SynthDraftPatch, activity?: SynthE
       detail: liveModWheel == null ? modWheel.count > 0 ? `${modWheel.count} routed` : "No routes" : modWheel.count > 0 ? `${modWheel.count} routed live` : liveSource,
       active: liveModWheel != null || modWheel.count > 0,
       ...(liveModWheel != null ? { live: true } : {}),
+    },
+    {
+      id: "pressure",
+      label: "Pressure",
+      value: livePressure == null ? pressure.count > 0 ? pressure.label : "Available" : `${Math.round(livePressure * 100)}%`,
+      detail: livePressure == null ? pressure.count > 0 ? `${pressure.count} routed` : "No routes" : pressure.count > 0 ? `${pressure.count} routed live` : liveSource,
+      active: livePressure != null || pressure.count > 0,
+      ...(livePressure != null ? { live: true } : {}),
+    },
+    {
+      id: "timbre",
+      label: "Timbre",
+      value: liveTimbre == null ? timbre.count > 0 ? timbre.label : "Available" : `${Math.round(liveTimbre * 100)}%`,
+      detail: liveTimbre == null ? timbre.count > 0 ? `${timbre.count} routed` : "CC74" : timbre.count > 0 ? `${timbre.count} routed live` : liveSource,
+      active: liveTimbre != null || timbre.count > 0,
+      ...(liveTimbre != null ? { live: true } : {}),
     },
   ];
 }
@@ -2656,7 +2688,10 @@ const FACTORY_GUIDE_MOD_SOURCES: Record<string, ModulationSourceId> = {
   velocity: "velocity",
   keytrack: "keytrack",
   modWheel: "modWheel",
-  aftertouch: "modWheel",
+  aftertouch: "pressure",
+  pressure: "pressure",
+  timbre: "timbre",
+  cc74: "timbre",
   "macro.motion": "macro.1",
   "macro.color": "macro.2",
   "macro.shape": "macro.3",

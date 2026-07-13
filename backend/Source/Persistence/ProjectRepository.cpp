@@ -434,6 +434,10 @@ namespace beat
             o->setProperty("keytrackBipolar", target.keytrackBipolar);
             o->setProperty("modWheel", target.modWheel);
             o->setProperty("modWheelBipolar", target.modWheelBipolar);
+            o->setProperty("pressure", target.pressure);
+            o->setProperty("pressureBipolar", target.pressureBipolar);
+            o->setProperty("timbre", target.timbre);
+            o->setProperty("timbreBipolar", target.timbreBipolar);
             o->setProperty("macro1", target.macro1);
             o->setProperty("macro2", target.macro2);
             o->setProperty("macro3", target.macro3);
@@ -485,6 +489,10 @@ namespace beat
             fallback.keytrackBipolar = bipolar(targetVar, "keytrackBipolar", fallback.keytrackBipolar);
             fallback.modWheel = amount(targetVar, "modWheel", fallback.modWheel);
             fallback.modWheelBipolar = bipolar(targetVar, "modWheelBipolar", fallback.modWheelBipolar);
+            fallback.pressure = amount(targetVar, "pressure", fallback.pressure);
+            fallback.pressureBipolar = bipolar(targetVar, "pressureBipolar", fallback.pressureBipolar);
+            fallback.timbre = amount(targetVar, "timbre", fallback.timbre);
+            fallback.timbreBipolar = bipolar(targetVar, "timbreBipolar", fallback.timbreBipolar);
             fallback.macro1 = amount(targetVar, "macro1", fallback.macro1);
             fallback.macro2 = amount(targetVar, "macro2", fallback.macro2);
             fallback.macro3 = amount(targetVar, "macro3", fallback.macro3);

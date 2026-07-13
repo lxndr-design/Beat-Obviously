@@ -739,6 +739,8 @@ try {
   const velocityNode = nodeGraph.createInstrumentNode("velocity", 80, 360, "Velocity CV");
   const keytrackNode = nodeGraph.createInstrumentNode("keytrack", 280, 360, "Keytrack CV");
   const modWheelNode = nodeGraph.createInstrumentNode("modWheel", 480, 360, "Mod Wheel CV");
+  const pressureNode = nodeGraph.createInstrumentNode("midiControl", 560, 430, "Pressure CV");
+  const timbreNode = nodeGraph.createInstrumentNode("midiControl", 640, 430, "Timbre CV");
   const macroNode = nodeGraph.createInstrumentNode("macro", 680, 360, "Macro CV");
   const randomNode = nodeGraph.createInstrumentNode("random", 880, 360, "Random CV");
   const performanceOutput = performanceCvGraph.nodes.find((node) => node.kind === "output");
@@ -752,12 +754,17 @@ try {
   velocityNode.parameters.amount = 0.42;
   keytrackNode.parameters.amount = -0.31;
   modWheelNode.parameters.amount = 0.27;
+  pressureNode.parameters.source = "aftertouch";
+  pressureNode.parameters.amount = 0.24;
+  timbreNode.parameters.source = "cc";
+  timbreNode.parameters.cc = 74;
+  timbreNode.parameters.amount = -0.22;
   macroNode.parameters.source = "macro.3";
   macroNode.parameters.amount = -0.18;
   randomNode.parameters.seed = 42;
   randomNode.parameters.amount = 0.5;
   randomNode.parameters.offset = 0.1;
-  performanceCvGraph.nodes.push(performanceOsc, performanceFilter, performanceUnison, performanceGain, velocityNode, keytrackNode, modWheelNode, macroNode, randomNode);
+  performanceCvGraph.nodes.push(performanceOsc, performanceFilter, performanceUnison, performanceGain, velocityNode, keytrackNode, modWheelNode, pressureNode, timbreNode, macroNode, randomNode);
   performanceCvGraph.cables.push(
     cablePatch("perf-osc-filter", performanceOsc, "audio-out", performanceFilter, "audio-in"),
     cablePatch("perf-filter-unison", performanceFilter, "audio-out", performanceUnison, "audio-in"),
@@ -767,6 +774,8 @@ try {
     cablePatch("perf-keytrack-cutoff", keytrackNode, "cv-out", performanceFilter, "cutoff-cv"),
     cablePatch("perf-keytrack-drive", keytrackNode, "cv-out", performanceFilter, "drive-cv"),
     cablePatch("perf-modwheel-resonance", modWheelNode, "cv-out", performanceFilter, "resonance-cv"),
+    cablePatch("perf-pressure-pan", pressureNode, "cv-out", performanceOsc, "pan-cv"),
+    cablePatch("perf-timbre-level", timbreNode, "cv-out", performanceOsc, "level-cv"),
     cablePatch("perf-macro-position", macroNode, "cv-out", performanceOsc, "position-cv"),
     cablePatch("perf-random-spread", randomNode, "cv-out", performanceUnison, "spread-cv"),
   );
@@ -785,6 +794,8 @@ try {
       ["node_perf-keytrack-cutoff", "keytrack", "filter.cutoff", -0.31, false],
       ["node_perf-keytrack-drive", "keytrack", "filter.drive", -0.31, false],
       ["node_perf-modwheel-resonance", "modWheel", "filter.resonance", 0.27, false],
+      ["node_perf-pressure-pan", "pressure", "osc.a.pan", 0.24, true],
+      ["node_perf-timbre-level", "timbre", "osc.a.level", -0.22, false],
       ["node_perf-macro-position", "macro.3", "osc.a.position", -0.18, false],
     ],
     "performance CV nodes should compile into native Aether modulation sources",

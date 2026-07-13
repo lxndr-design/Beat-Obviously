@@ -298,6 +298,10 @@ namespace beat
             target.keytrackBipolar = routeBipolar(modulation, "keytrack", routeTarget, false);
             target.modWheel = routeAmount(modulation, "modWheel", routeTarget);
             target.modWheelBipolar = routeBipolar(modulation, "modWheel", routeTarget, false);
+            target.pressure = routeAmount(modulation, "pressure", routeTarget);
+            target.pressureBipolar = routeBipolar(modulation, "pressure", routeTarget, false);
+            target.timbre = routeAmount(modulation, "timbre", routeTarget);
+            target.timbreBipolar = routeBipolar(modulation, "timbre", routeTarget, false);
             target.macro1 = routeAmount(modulation, "macro.1", routeTarget);
             target.macro2 = routeAmount(modulation, "macro.2", routeTarget);
             target.macro3 = routeAmount(modulation, "macro.3", routeTarget);
@@ -316,6 +320,8 @@ namespace beat
                 || std::abs(target.velocity) > 0.0001f
                 || std::abs(target.keytrack) > 0.0001f
                 || std::abs(target.modWheel) > 0.0001f
+                || std::abs(target.pressure) > 0.0001f
+                || std::abs(target.timbre) > 0.0001f
                 || std::abs(target.macro1) > 0.0001f
                 || std::abs(target.macro2) > 0.0001f
                 || std::abs(target.macro3) > 0.0001f

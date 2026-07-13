@@ -480,6 +480,8 @@ export function App() {
               velocity: event.velocity,
               keytrack: event.keytrack,
               modWheel: event.modWheel,
+              pressure: event.pressure,
+              timbre: event.timbre,
             });
           } else {
             useSynthStore.getState().clearInstrumentExpressionActivity(event.instrumentId);

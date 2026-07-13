@@ -27,6 +27,8 @@ const TARGETS_BY_SOURCE: Record<ModulationSourceId, ModulationTargetId[]> = {
   velocity: MACRO_TARGETS,
   keytrack: MACRO_TARGETS,
   modWheel: MACRO_TARGETS,
+  pressure: MACRO_TARGETS,
+  timbre: MACRO_TARGETS,
   "macro.1": MACRO_TARGETS,
   "macro.2": MACRO_TARGETS,
   "macro.3": MACRO_TARGETS,
