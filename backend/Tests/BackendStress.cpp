@@ -13662,7 +13662,65 @@ namespace
         const double rememberedWavetable = wavetableVoice.wavetablePhaseAForTest();
         wavetableVoice.stopNote(0.0f, false);
         wavetableVoice.startNote(69, 1.0f, nullptr, 8192);
-        return std::abs(wavetableVoice.wavetablePhaseAForTest() - rememberedWavetable) <= 1.0e-12;
+        if (std::abs(wavetableVoice.wavetablePhaseAForTest() - rememberedWavetable) > 1.0e-12)
+            return false;
+
+        struct TestSound final : juce::SynthesiserSound
+        {
+            bool appliesToNote(int) override { return true; }
+            bool appliesToChannel(int) override { return true; }
+        };
+
+        beat::BeatSynthesiser stealing;
+        auto* stolenVoice = new beat::InstrumentVoice();
+        stolenVoice->setStableVoiceId(91);
+        stolenVoice->prepare(48000.0, 128);
+        auto stealParams = baseParams;
+        stealParams.aetherOscA.phaseMode = 1;
+        stolenVoice->setParams(stealParams);
+        stealing.addVoice(stolenVoice);
+        stealing.addSound(new TestSound());
+        stealing.setNoteStealingEnabled(true);
+        stealing.setCurrentPlaybackSampleRate(48000.0);
+        stealing.noteOn(1, 60, 1.0f);
+        juce::AudioBuffer<float> beforeSteal(2, 37);
+        beforeSteal.clear();
+        stealing.renderNextBlock(beforeSteal, juce::MidiBuffer {}, 0, beforeSteal.getNumSamples());
+        const double phaseBeforeSteal = stolenVoice->phaseMemoryBaseAForTest();
+        const float sampleBeforeSteal = beforeSteal.getSample(0, beforeSteal.getNumSamples() - 1);
+        stealing.noteOn(1, 67, 1.0f);
+        if (stolenVoice->getCurrentlyPlayingNote() != 67
+            || std::abs(stolenVoice->phaseMemoryBaseAForTest() - phaseBeforeSteal) > 1.0e-12)
+            return false;
+        juce::AudioBuffer<float> afterSteal(2, 128);
+        afterSteal.clear();
+        stealing.renderNextBlock(afterSteal, juce::MidiBuffer {}, 0, afterSteal.getNumSamples());
+        double stealEnergy = 0.0;
+        for (int channel = 0; channel < afterSteal.getNumChannels(); ++channel)
+            for (int sample = 0; sample < afterSteal.getNumSamples(); ++sample)
+            {
+                const float value = afterSteal.getSample(channel, sample);
+                if (!std::isfinite(value))
+                    return false;
+                stealEnergy += (double) value * (double) value;
+            }
+        if (stealEnergy <= 0.0
+            || std::abs(afterSteal.getSample(0, 0) - sampleBeforeSteal) > 1.0e-5f)
+            return false;
+
+        auto legatoParams = baseParams;
+        legatoParams.aetherOscA.phaseMode = 0;
+        legatoParams.legato = true;
+        beat::InstrumentVoice legatoVoice;
+        legatoVoice.prepare(48000.0, 128);
+        legatoVoice.setParams(legatoParams);
+        legatoVoice.startNote(60, 1.0f, nullptr, 8192);
+        buffer.clear();
+        legatoVoice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+        const double phaseBeforeLegatoRetune = legatoVoice.phaseMemoryBaseAForTest();
+        legatoVoice.startNote(72, 1.0f, nullptr, 8192);
+        return phaseBeforeLegatoRetune > 0.0
+            && std::abs(legatoVoice.phaseMemoryBaseAForTest() - phaseBeforeLegatoRetune) <= 1.0e-12;
     }
 
     bool stressInstrumentVoiceDualFilters()

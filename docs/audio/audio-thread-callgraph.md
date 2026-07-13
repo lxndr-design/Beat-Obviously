@@ -605,3 +605,7 @@ audio callback
 ```
 
 The controls add no parameter ID, IPC message, schema branch, callback work, container, ownership, or DSP behavior. Mode-dependent field visibility is entirely frontend state projection.
+
+## Milestone B25 phase lifecycle fixture
+
+B25 adds no production call-graph edge. The native test invokes the existing `BeatSynthesiser::noteOn` -> deterministic victim selection -> `InstrumentVoice::prepareForSteal` -> `InstrumentVoice::startNote` path and the existing direct legato `InstrumentVoice::startNote` retune path, then observes test-only phase and output accessors. The audio callback and offline-render graphs are unchanged.

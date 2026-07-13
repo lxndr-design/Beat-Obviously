@@ -173,3 +173,7 @@ The saved-zone switch, bounded integer channel inputs, overlap validation, compa
 ## Milestone B24 provenance
 
 The tuning-mode selector, mode-specific bounded fields, phase-memory selector, compact oscillator-row layout, source-contract assertion, and live fixture verification independently expose Beat's existing B3/B4 stable fields. No external source or acquired reference was consulted, executed, copied, modified, translated, structurally adapted, or imported. No runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing state changed. Local modified files are `frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx`, `OscillatorPanel.module.css`, `scripts/verify-frontend-interactions.mjs`, and these four audit documents; none is Vital-derived.
+
+## Milestone B25 provenance
+
+The memory-mode steal, bounded transition-output, and legato-retune phase assertions independently extend Beat's native test fixture around existing Beat-owned lifecycle behavior. No production implementation changed. No external source or acquired reference was consulted, executed, copied, modified, translated, structurally adapted, or imported. No dependency, binary, preset, asset, service, branding, or licensing state changed. Local modified files are `backend/Tests/BackendStress.cpp` and these four audit documents; none is Vital-derived.
