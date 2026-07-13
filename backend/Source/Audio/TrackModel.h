@@ -194,6 +194,17 @@ namespace beat
             std::array<float, 2> fxSends {};
         };
 
+        struct AetherSampleSlot
+        {
+            int schemaVersion { 1 };
+            bool enabled { false };
+            Id audioFileId;
+            int rootNote { 60 };
+            float level { 0.8f };
+            float pan { 0.0f };
+            int routing { 0 };
+        };
+
         struct AetherConfig
         {
             struct MemberExpressionZone
@@ -209,6 +220,7 @@ namespace beat
             AetherOscillator oscB;
             AetherSub sub;
             AetherNoise noise;
+            AetherSampleSlot sampleSlot1;
             std::array<Id, 2> fxBusIds {};
             float runtimeWarp { 0.0f };
             int runtimeWarpMode { 0 };

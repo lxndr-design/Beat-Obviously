@@ -372,6 +372,15 @@ namespace beat
             noise->setProperty("fxSend1", aether.noise.fxSends[0]);
             noise->setProperty("fxSend2", aether.noise.fxSends[1]);
             o->setProperty("noise", juce::var(noise.get()));
+            juce::DynamicObject::Ptr sampleSlot1 = new juce::DynamicObject();
+            sampleSlot1->setProperty("schemaVersion", aether.sampleSlot1.schemaVersion);
+            sampleSlot1->setProperty("enabled", aether.sampleSlot1.enabled);
+            sampleSlot1->setProperty("audioFileId", aether.sampleSlot1.audioFileId);
+            sampleSlot1->setProperty("rootNote", aether.sampleSlot1.rootNote);
+            sampleSlot1->setProperty("level", aether.sampleSlot1.level);
+            sampleSlot1->setProperty("pan", aether.sampleSlot1.pan);
+            sampleSlot1->setProperty("routing", aether.sampleSlot1.routing);
+            o->setProperty("sampleSlot1", juce::var(sampleSlot1.get()));
             o->setProperty("fxBus1Id", aether.fxBusIds[0]);
             o->setProperty("fxBus2Id", aether.fxBusIds[1]);
             o->setProperty("runtimeWarp", aether.runtimeWarp);
@@ -420,6 +429,22 @@ namespace beat
                 config.noise.color = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("color", config.noise.color));
                 config.noise.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("fxSend1", config.noise.fxSends[0]));
                 config.noise.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("fxSend2", config.noise.fxSends[1]));
+            }
+            const auto sampleSlot1 = aetherVar.getProperty("sampleSlot1", {});
+            if (sampleSlot1.isObject())
+            {
+                const int sourceSchemaVersion = juce::jmax(0, (int) sampleSlot1.getProperty("schemaVersion", 0));
+                config.sampleSlot1.schemaVersion = 1;
+                config.sampleSlot1.enabled = (bool) sampleSlot1.getProperty("enabled", false);
+                config.sampleSlot1.audioFileId = sampleSlot1.getProperty("audioFileId", "").toString();
+                config.sampleSlot1.rootNote = juce::jlimit(0, 127, (int) sampleSlot1.getProperty("rootNote", 60));
+                config.sampleSlot1.level = juce::jlimit(0.0f, 1.0f, (float) (double) sampleSlot1.getProperty("level", 0.8));
+                config.sampleSlot1.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) sampleSlot1.getProperty("pan", 0.0));
+                config.sampleSlot1.routing = juce::jlimit(0, 3, (int) sampleSlot1.getProperty("routing", 0));
+                if (sourceSchemaVersion > config.sampleSlot1.schemaVersion)
+                    config.sampleSlot1.enabled = false;
+                if (config.sampleSlot1.audioFileId.isEmpty())
+                    config.sampleSlot1.enabled = false;
             }
             config.fxBusIds[0] = aetherVar.getProperty("fxBus1Id", config.fxBusIds[0]).toString();
             config.fxBusIds[1] = aetherVar.getProperty("fxBus2Id", config.fxBusIds[1]).toString();

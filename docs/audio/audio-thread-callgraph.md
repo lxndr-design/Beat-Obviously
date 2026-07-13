@@ -686,3 +686,30 @@ future audio callback integration boundary (focused native fixture today)
 ```
 
 The C1 code is compiled into the native target surface and exercised through BackendStress, but is not yet connected from AudioEngine, project/preset persistence, or the Aether product UI. The tested render boundary performs no ownership mutation, allocation, blocking lock, file access, lazy initialization, or container growth. Offline callers may use the same deterministic render contract without being classified as a real-time callback.
+
+## Milestone C2A Slot 1 production connection
+
+```text
+control/setup thread: AudioEngine::applyProject
+  -> AudioEngine::rebuildSampleInstruments
+       -> resolve project AudioFileAsset
+       -> AudioFormatReader decode / existing loadedBufferCache
+       -> immutable alias retaining SampleBuffer lifetime
+       -> AudioEngine::createInstrumentSynth
+            -> InstrumentVoice::prepare
+                 -> SampleSourceSlot::prepare (pitch table/release length)
+            -> InstrumentVoice::setParams
+                 -> SampleSourceSlot::publish (inactive voice only)
+
+live callback or offline engine: BeatSynthesiser::renderNextBlock
+  -> InstrumentVoice::startNote
+       -> SampleSourceSlot::noteOn (fixed voice array)
+  -> InstrumentVoice::renderNextBlock
+       -> SampleSourceSlot::renderFrame
+       -> selected normal-filter / Filter 1 / Filter 2 / Direct lane
+       -> existing envelope, amp/pan, steal transition and route effects
+  -> InstrumentVoice::stopNote
+       -> bounded SampleSourceSlot release or immediate clear
+```
+
+Offline rendering follows the same graph but is excluded from real-time callback instrumentation. Missing assets publish no source and render silence. Slot identity changes are detected while rebuilding route state and arm the existing bounded `effectGraphTransition` from the previous route output; no old sample owner is destroyed by the callback.

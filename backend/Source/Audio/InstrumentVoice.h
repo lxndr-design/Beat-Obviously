@@ -16,6 +16,7 @@
 #include "Realtime/VoiceRealtimeParams.h"
 #include "Realtime/VoiceNoteAutomation.h"
 #include "Realtime/VoiceNoteAutomationState.h"
+#include "Sources/SampleSourceSlot.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
 #include "Wavetable/WavetableUnisonPlan.h"
@@ -133,6 +134,13 @@ namespace beat
                 float color { 0.5f };
                 int routing { 0 };
                 std::array<float, 2> fxSends {};
+            };
+
+            struct AetherSampleSlot
+            {
+                bool enabled { false };
+                std::shared_ptr<const ImmutableSampleSource> source;
+                int routing { 0 };
             };
 
             struct DynamicModTarget
@@ -282,6 +290,7 @@ namespace beat
             AetherOscillator aetherOscB;
             AetherSub aetherSub;
             AetherNoise aetherNoise;
+            AetherSampleSlot aetherSampleSlot1;
             float aetherRuntimeWarp { 0.0f };
             int aetherRuntimeWarpMode { 0 };
             float aetherRuntimeWarp2 { 0.0f };
@@ -395,6 +404,7 @@ namespace beat
         WavetableUnisonPlan aetherUnisonPlanA;
         WavetableUnisonPlan aetherUnisonPlanB;
         AetherTableStackRenderer::InteractionState aetherInteractionState;
+        SampleSourceSlot aetherSampleSlot1;
         VoiceAetherCache::PanGains cachedPanGains;
         VoiceAetherCache::PitchRates cachedPitchRates;
         DynamicModulation::TargetActivityFlags cachedDynamicTargets;

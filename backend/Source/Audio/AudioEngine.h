@@ -483,6 +483,7 @@ namespace beat
             juce::AudioBuffer<float> returnBuffer;
             juce::AudioBuffer<float> groupBuffer;
             std::array<Id, AetherSourceBusContext::busCount> sourceFxBusIds {};
+            juce::String aetherSampleSlot1Identity;
             std::array<juce::AudioBuffer<float>, AetherSourceBusContext::busCount> sourceFxBuffers;
             VoiceTransition effectGraphTransition;
             VoiceTransition::Stereo lastEffectGraphOutput {};
@@ -620,7 +621,9 @@ namespace beat
         SpscRingBuffer<TransportCommand, 512> transportCommands;
         RealtimeParameterQueue<RenderBudgets::realtimeQueueEvents> realtimeParameterChanges;
 
-        std::unique_ptr<juce::Synthesiser> createInstrumentSynth(const InstrumentDefinition& instrument);
+        std::unique_ptr<juce::Synthesiser> createInstrumentSynth(
+            const InstrumentDefinition& instrument,
+            std::shared_ptr<const ImmutableSampleSource> aetherSampleSlot1 = nullptr);
         void rebuildSampleInstruments(const Project& project);
         InstrumentRenderState* findInstrumentRenderState(const Id& instrumentId);
         InstrumentRenderState* findTrackRenderState(const Id& trackId, const Id& instrumentId);

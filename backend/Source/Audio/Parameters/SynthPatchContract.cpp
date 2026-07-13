@@ -478,6 +478,18 @@ namespace beat
         const auto sourceRoute = [](const juce::String& route) { return route == "direct" ? 1 : route == "filter1" ? 2 : route == "filter2" ? 3 : 0; };
         instrument.aether.sub.routing = sourceRoute(synthStringParam(params, "aether.sub.route", "filter"));
         instrument.aether.noise.routing = sourceRoute(synthStringParam(params, "aether.noise.route", "filter"));
+        instrument.aether.sampleSlot1.schemaVersion = 1;
+        instrument.aether.sampleSlot1.audioFileId = synthStringParam(params, "aether.sample.1.audioFileId", "");
+        instrument.aether.sampleSlot1.enabled = synthNumberParam(params, "aether.sample.1.enabled", 0.0) >= 0.5
+            && instrument.aether.sampleSlot1.audioFileId.isNotEmpty();
+        instrument.aether.sampleSlot1.rootNote = juce::jlimit(0, 127,
+            (int) std::round(synthNumberParam(params, "aether.sample.1.rootNote", 60.0)));
+        instrument.aether.sampleSlot1.level = juce::jlimit(0.0f, 1.0f,
+            (float) synthNumberParam(params, "aether.sample.1.level", 0.8));
+        instrument.aether.sampleSlot1.pan = juce::jlimit(-1.0f, 1.0f,
+            (float) synthNumberParam(params, "aether.sample.1.pan", 0.0));
+        instrument.aether.sampleSlot1.routing = sourceRoute(
+            synthStringParam(params, "aether.sample.1.route", "filter"));
         instrument.aether.sub.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.sub.fxSend1", 0.0));
         instrument.aether.sub.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.sub.fxSend2", 0.0));
         instrument.aether.noise.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.noise.fxSend1", 0.0));

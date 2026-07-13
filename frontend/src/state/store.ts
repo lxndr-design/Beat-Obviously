@@ -2002,6 +2002,15 @@ export function defaultAetherSynthConfig() {
       level: 0.08,
       color: 0.45,
     },
+    sampleSlot1: {
+      schemaVersion: 1,
+      enabled: false,
+      audioFileId: "",
+      rootNote: 60,
+      level: 0.8,
+      pan: 0,
+      route: "filter",
+    },
     runtimeWarp: 0,
     runtimeWarpMode: "shape",
   } satisfies Instrument["aether"];

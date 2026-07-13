@@ -20,7 +20,7 @@ import benchmarkAetherStrings from "../data/aether_benchmark_strings_bank.json";
 import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
-export const SYNTH_PATCH_SCHEMA_VERSION = 1;
+export const SYNTH_PATCH_SCHEMA_VERSION = 2;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
 export const SYNTH_INSTRUMENT_TYPE = "wavetable-synth";
 export const DEFAULT_CUSTOM_WAVETABLE_ID = "user.custom";
@@ -128,6 +128,12 @@ export type SynthParameterId =
   | "aether.sub.fxSend2"
   | "aether.noise.fxSend1"
   | "aether.noise.fxSend2"
+  | "aether.sample.1.enabled"
+  | "aether.sample.1.audioFileId"
+  | "aether.sample.1.rootNote"
+  | "aether.sample.1.level"
+  | "aether.sample.1.pan"
+  | "aether.sample.1.route"
   | "aether.fxBus1Id"
   | "aether.fxBus2Id"
   | "aether.mpe.enabled"
@@ -1109,6 +1115,12 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "aether.sub.fxSend2": 0,
   "aether.noise.fxSend1": 0,
   "aether.noise.fxSend2": 0,
+  "aether.sample.1.enabled": false,
+  "aether.sample.1.audioFileId": "",
+  "aether.sample.1.rootNote": 60,
+  "aether.sample.1.level": 0.8,
+  "aether.sample.1.pan": 0,
+  "aether.sample.1.route": "filter",
   "aether.fxBus1Id": "",
   "aether.fxBus2Id": "",
   "aether.mpe.enabled": false,
@@ -1257,6 +1269,12 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "aether.sub.fxSend2": "Aether Sub FX Send 2",
   "aether.noise.fxSend1": "Aether Noise FX Send 1",
   "aether.noise.fxSend2": "Aether Noise FX Send 2",
+  "aether.sample.1.enabled": "Sample Slot 1 Enabled",
+  "aether.sample.1.audioFileId": "Sample Slot 1 Audio File",
+  "aether.sample.1.rootNote": "Sample Slot 1 Root Note",
+  "aether.sample.1.level": "Sample Slot 1 Level",
+  "aether.sample.1.pan": "Sample Slot 1 Pan",
+  "aether.sample.1.route": "Sample Slot 1 Route",
   "aether.fxBus1Id": "Aether FX Bus 1",
   "aether.fxBus2Id": "Aether FX Bus 2",
   "aether.mpe.enabled": "MPE Zone Enabled",
@@ -1953,6 +1971,15 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         route: sourceRouteFromId(getStringParam(draft, "aether.noise.route")),
         fxSends: [clamp01(getNumberParam(draft, "aether.noise.fxSend1")), clamp01(getNumberParam(draft, "aether.noise.fxSend2"))],
       },
+      sampleSlot1: {
+        schemaVersion: 1,
+        enabled: getBooleanParam(draft, "aether.sample.1.enabled") && Boolean(getStringParam(draft, "aether.sample.1.audioFileId")),
+        audioFileId: getStringParam(draft, "aether.sample.1.audioFileId"),
+        rootNote: Math.max(0, Math.min(127, Math.round(getNumberParam(draft, "aether.sample.1.rootNote")))),
+        level: clamp01(getNumberParam(draft, "aether.sample.1.level")),
+        pan: clampBipolar(getNumberParam(draft, "aether.sample.1.pan")),
+        route: sourceRouteFromId(getStringParam(draft, "aether.sample.1.route")),
+      },
       fxBusIds: [getStringParam(draft, "aether.fxBus1Id"), getStringParam(draft, "aether.fxBus2Id")],
       runtimeWarp: clamp01(getNumberParam(draft, "aether.runtimeWarp")),
       runtimeWarpMode: isWavetableWarpMode(draft.parameters["aether.runtimeWarpMode"])
@@ -2007,6 +2034,9 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     legato: getBooleanParam(draft, "legato.enabled"),
     glideMs: getNumberParam(draft, "glide.ms"),
     effects: structuredClone(draft.effects),
+    sampleIds: getStringParam(draft, "aether.sample.1.audioFileId")
+      ? [getStringParam(draft, "aether.sample.1.audioFileId")]
+      : [],
     taxonomy: draft.taxonomy,
     synthPatch: cloneSynthPatch(draft),
   };
@@ -2173,6 +2203,12 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["aether.sub.fxSend2"] = instrument.aether?.sub.fxSends?.[1] ?? 0;
   draft.parameters["aether.noise.fxSend1"] = instrument.aether?.noise.fxSends?.[0] ?? 0;
   draft.parameters["aether.noise.fxSend2"] = instrument.aether?.noise.fxSends?.[1] ?? 0;
+  draft.parameters["aether.sample.1.enabled"] = instrument.aether?.sampleSlot1?.enabled ?? false;
+  draft.parameters["aether.sample.1.audioFileId"] = instrument.aether?.sampleSlot1?.audioFileId ?? "";
+  draft.parameters["aether.sample.1.rootNote"] = instrument.aether?.sampleSlot1?.rootNote ?? 60;
+  draft.parameters["aether.sample.1.level"] = instrument.aether?.sampleSlot1?.level ?? 0.8;
+  draft.parameters["aether.sample.1.pan"] = instrument.aether?.sampleSlot1?.pan ?? 0;
+  draft.parameters["aether.sample.1.route"] = instrument.aether?.sampleSlot1?.route ?? "filter";
   draft.parameters["aether.fxBus1Id"] = instrument.aether?.fxBusIds?.[0] ?? "";
   draft.parameters["aether.fxBus2Id"] = instrument.aether?.fxBusIds?.[1] ?? "";
   draft.parameters["aether.mpe.enabled"] = instrument.aether?.memberExpressionZone?.enabled ?? false;
@@ -2476,6 +2512,7 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (id === "maxVoices") return Math.max(1, Math.min(32, Math.round(value)));
   if (id === "glide.ms") return Math.max(0, Math.min(5000, Math.round(value)));
   if (id.startsWith("aether.mpe.") && id.endsWith("Channel")) return clampMidiChannel(value);
+  if (id === "aether.sample.1.rootNote") return Math.max(0, Math.min(127, Math.round(value)));
   if (id.includes(".pan")) return Math.max(-1, Math.min(1, value));
   if (id.includes(".attack") || id.includes(".decay") || id.includes(".release")) return Math.max(0, Math.min(30, value));
   return Math.max(0, Math.min(1, value));

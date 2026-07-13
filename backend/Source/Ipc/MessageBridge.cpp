@@ -1524,6 +1524,19 @@ namespace beat
             return fallback;
         }
 
+        int parseSourceRoute(const juce::var& value)
+        {
+            if (value.isString())
+            {
+                const auto route = value.toString();
+                if (route == "direct") return 1;
+                if (route == "filter1") return 2;
+                if (route == "filter2") return 3;
+                return 0;
+            }
+            return juce::jlimit(0, 3, (int) value);
+        }
+
         float normalizedParam(const juce::var& object, const juce::Identifier& name, float fallback)
         {
             if (!object.isObject()) return fallback;
@@ -2203,6 +2216,20 @@ namespace beat
                         instrument.aether.noise.color = normalizedParam(noise, "color", 0.45f);
                         instrument.aether.noise.fxSends[0] = normalizedParam(noise, "fxSend1", 0.0f);
                         instrument.aether.noise.fxSends[1] = normalizedParam(noise, "fxSend2", 0.0f);
+                        const auto sampleSlot1 = aether.getProperty("sampleSlot1", {});
+                        if (sampleSlot1.isObject())
+                        {
+                            const int slotSchemaVersion = juce::jmax(0, (int) sampleSlot1.getProperty("schemaVersion", 0));
+                            instrument.aether.sampleSlot1.schemaVersion = 1;
+                            instrument.aether.sampleSlot1.enabled = (bool) sampleSlot1.getProperty("enabled", false);
+                            instrument.aether.sampleSlot1.audioFileId = sampleSlot1.getProperty("audioFileId", "").toString();
+                            instrument.aether.sampleSlot1.rootNote = juce::jlimit(0, 127, (int) sampleSlot1.getProperty("rootNote", 60));
+                            instrument.aether.sampleSlot1.level = normalizedParam(sampleSlot1, "level", 0.8f);
+                            instrument.aether.sampleSlot1.pan = floatParam(sampleSlot1, "pan", 0.0f, -1.0f, 1.0f);
+                            instrument.aether.sampleSlot1.routing = parseSourceRoute(sampleSlot1.getProperty("route", "filter"));
+                            if (slotSchemaVersion > 1 || instrument.aether.sampleSlot1.audioFileId.isEmpty())
+                                instrument.aether.sampleSlot1.enabled = false;
+                        }
                         instrument.aether.fxBusIds[0] = aether.getProperty("fxBus1Id", "").toString();
                         instrument.aether.fxBusIds[1] = aether.getProperty("fxBus2Id", "").toString();
                         instrument.aether.runtimeWarp = normalizedParam(aether, "runtimeWarp", 0.0f);

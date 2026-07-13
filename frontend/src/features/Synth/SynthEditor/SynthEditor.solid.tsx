@@ -44,7 +44,7 @@ import {
   type SynthParameterId,
 } from "../../../state/synthStore";
 import { ANALYZER_BAND_COUNT, useAnalyzerStore, type AnalyzerSnapshot } from "../../../state/analyzerStore";
-import { useInstrumentStore, useProjectStore, useUiStore } from "../../../state/store";
+import { useAudioFileStore, useInstrumentStore, useProjectStore, useUiStore } from "../../../state/store";
 import {
   firstInstrumentTaxonomyIdForCategory,
   INSTRUMENT_TAXONOMY_CATEGORY_OPTIONS,
@@ -1320,6 +1320,7 @@ function selectedOptionLabel(
 function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEditorTarget | null }) {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const returnBuses = createStoreSelector(useProjectStore, (state) => state.project.returnBuses);
+  const audioFiles = createStoreSelector(useAudioFileStore, (state) => state.files);
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
   const setParameter = useSynthStore.getState().setParameter;
@@ -1327,6 +1328,8 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   const filterEnabled = createMemo(() => draft().parameters["filter.enabled"] === true);
   const [fxBus1Open, setFxBus1Open] = createSignal(false);
   const [fxBus2Open, setFxBus2Open] = createSignal(false);
+  const [sampleAssetOpen, setSampleAssetOpen] = createSignal(false);
+  const [sampleRouteOpen, setSampleRouteOpen] = createSignal(false);
   const fxBusOptions = createMemo(() => [
     { value: "", label: "Off" },
     ...returnBuses().filter((bus) => !bus.mute).map((bus) => ({ value: bus.id, label: bus.name || bus.id })),
@@ -1441,6 +1444,62 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               bipolar
               onChange={setNumericParameter}
             />
+          </div>
+        </div>
+        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label="Aether sample source slot 1">
+          <div class={styles.ampFilterGroupTitle}>Sample Slot 1</div>
+          <div class={styles.ampFilterShapeRow}>
+            <Toggle
+              label="Enabled"
+              checked={draft().parameters["aether.sample.1.enabled"] === true}
+              disabled={!String(draft().parameters["aether.sample.1.audioFileId"] ?? "")}
+              onChange={(value) => setBooleanParameter("aether.sample.1.enabled", value)}
+            />
+            <FloatingSelect
+              label="Asset"
+              layout="inline"
+              value={String(draft().parameters["aether.sample.1.audioFileId"] ?? "")}
+              ariaLabel="Aether sample slot 1 audio asset"
+              options={[
+                { value: "", label: "No sample" },
+                ...audioFiles().map((file) => ({ value: file.id, label: file.name || file.id })),
+              ]}
+              open={sampleAssetOpen()}
+              onOpenChange={setSampleAssetOpen}
+              onChange={(value) => {
+                setParameter("aether.sample.1.audioFileId", value);
+                setBooleanParameter("aether.sample.1.enabled", Boolean(value));
+              }}
+            />
+            <FloatingSelect
+              label="Route"
+              layout="inline"
+              value={String(draft().parameters["aether.sample.1.route"] ?? "filter")}
+              ariaLabel="Aether sample slot 1 route"
+              options={[
+                { value: "filter", label: "Filter" },
+                { value: "filter1", label: "Filter 1" },
+                { value: "filter2", label: "Filter 2" },
+                { value: "direct", label: "Direct" },
+              ]}
+              open={sampleRouteOpen()}
+              onOpenChange={setSampleRouteOpen}
+              onChange={(value) => setParameter("aether.sample.1.route", value)}
+            />
+          </div>
+          <div class={styles.knobCluster}>
+            <NumberInput
+              label="Root"
+              layout="inline"
+              value={getNumberParam(draft(), "aether.sample.1.rootNote")}
+              min={0}
+              max={127}
+              step={1}
+              ariaLabel="Aether sample slot 1 root MIDI note"
+              onChange={(value) => setNumericParameter("aether.sample.1.rootNote", value)}
+            />
+            <SynthParameterKnob id="aether.sample.1.level" label="Level" defaultValue={0.8} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.sample.1.pan" label="Pan" defaultValue={0} bipolar onChange={setNumericParameter} />
           </div>
         </div>
         <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label="Aether shared FX buses">

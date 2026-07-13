@@ -1800,7 +1800,9 @@ namespace beat
             applyTransportCommandLocked(terminalCommand);
     }
 
-    std::unique_ptr<juce::Synthesiser> AudioEngine::createInstrumentSynth(const InstrumentDefinition& instrument)
+    std::unique_ptr<juce::Synthesiser> AudioEngine::createInstrumentSynth(
+        const InstrumentDefinition& instrument,
+        std::shared_ptr<const ImmutableSampleSource> aetherSampleSlot1)
     {
         auto instrumentSynth = std::make_unique<BeatSynthesiser>();
         instrumentSynth->configureMemberExpressionZone({
@@ -2066,6 +2068,11 @@ namespace beat
             instrument.aether.noise.routing,
             instrument.aether.noise.fxSends,
         };
+        params.aetherSampleSlot1 = {
+            instrument.aether.sampleSlot1.enabled && aetherSampleSlot1 != nullptr,
+            std::move(aetherSampleSlot1),
+            juce::jlimit(0, 3, instrument.aether.sampleSlot1.routing),
+        };
         params.hasAetherSourceSends = [&instrument]
         {
             for (size_t bus = 0; bus < instrument.aether.fxBusIds.size(); ++bus)
@@ -2312,8 +2319,30 @@ namespace beat
 
             if (routeInstrument != nullptr)
             {
-                route.synth = createInstrumentSynth(*routeInstrument);
+                std::shared_ptr<const ImmutableSampleSource> aetherSampleSlot1;
+                const auto& slot = routeInstrument->aether.sampleSlot1;
+                if (routeInstrument->hasAether && slot.enabled && slot.audioFileId.isNotEmpty())
+                {
+                    const auto foundSample = nextAudioFiles.find(slot.audioFileId);
+                    if (foundSample != nextAudioFiles.end() && foundSample->second)
+                    {
+                        auto source = std::make_shared<ImmutableSampleSource>();
+                        source->audio = std::shared_ptr<const juce::AudioBuffer<float>>(
+                            foundSample->second, &foundSample->second->audio);
+                        source->sourceSampleRate = foundSample->second->sourceSampleRate;
+                        source->rootNote = juce::jlimit(0, 127, slot.rootNote);
+                        source->gain = juce::jlimit(0.0f, 1.0f, slot.level);
+                        source->pan = juce::jlimit(-1.0f, 1.0f, slot.pan);
+                        aetherSampleSlot1 = std::move(source);
+                    }
+                }
+                route.synth = createInstrumentSynth(*routeInstrument, std::move(aetherSampleSlot1));
                 route.sourceFxBusIds = routeInstrument->aether.fxBusIds;
+                route.aetherSampleSlot1Identity = slot.enabled
+                    ? slot.audioFileId + ":" + juce::String(slot.rootNote) + ":"
+                        + juce::String(slot.level, 6) + ":" + juce::String(slot.pan, 6)
+                        + ":" + juce::String(slot.routing)
+                    : juce::String();
             }
 
             for (auto& sourceFxBuffer : route.sourceFxBuffers)
@@ -2358,7 +2387,8 @@ namespace beat
                 const auto found = std::find_if(currentRoutes.begin(), currentRoutes.end(),
                     [&](const InstrumentRenderState& current) { return current.trackId == nextRoute.trackId; });
                 if (found != currentRoutes.end()
-                    && !equivalentEffectGraphs(found->effects, nextRoute.effects))
+                    && (!equivalentEffectGraphs(found->effects, nextRoute.effects)
+                        || found->aetherSampleSlot1Identity != nextRoute.aetherSampleSlot1Identity))
                     nextRoute.effectGraphTransition.beginFrom(found->lastEffectGraphOutput);
             }
         };

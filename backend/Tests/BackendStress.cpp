@@ -7795,6 +7795,7 @@ namespace
         instrument.aether.noise.level = 0.06f;
         instrument.aether.noise.color = 0.81f;
         instrument.aether.noise.fxSends = { 0.13f, 0.19f };
+        instrument.aether.sampleSlot1 = { 1, true, "sample-slot-asset", 57, 0.73f, -0.21f, 3 };
         instrument.aether.fxBusIds = { "return-a", "return-b" };
         instrument.aether.runtimeWarp = 0.63f;
         instrument.aether.runtimeWarpMode = 1;
@@ -7904,6 +7905,13 @@ namespace
                 && near(loadedInstrument.aether.noise.color, 0.81f)
                 && near(loadedInstrument.aether.noise.fxSends[0], 0.13f)
                 && near(loadedInstrument.aether.noise.fxSends[1], 0.19f)
+                && loadedInstrument.aether.sampleSlot1.schemaVersion == 1
+                && loadedInstrument.aether.sampleSlot1.enabled
+                && loadedInstrument.aether.sampleSlot1.audioFileId == "sample-slot-asset"
+                && loadedInstrument.aether.sampleSlot1.rootNote == 57
+                && near(loadedInstrument.aether.sampleSlot1.level, 0.73f)
+                && near(loadedInstrument.aether.sampleSlot1.pan, -0.21f)
+                && loadedInstrument.aether.sampleSlot1.routing == 3
                 && loadedInstrument.aether.fxBusIds[0] == "return-a"
                 && loadedInstrument.aether.fxBusIds[1] == "return-b"
                 && near(loadedInstrument.aether.runtimeWarp, 0.63f)
@@ -9721,6 +9729,79 @@ namespace
             && meanAbsDiff <= 0.00002;
     }
 
+    bool stressAudioEngineAetherSampleSlotLiveExportParity()
+    {
+        auto sampleFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-aether-slot-source.wav");
+        if (!writeAudioClipFixture(sampleFile)) return false;
+
+        auto project = makeDenseAetherProject();
+        project.lengthBeats = 2.0;
+        project.audioFiles.push_back({ "aether-slot-asset", "Aether Slot Fixture",
+            sampleFile.getFullPathName(), 0.5, 44100.0 });
+        auto& instrument = project.instruments.front();
+        instrument.aether.oscA.enabled = false;
+        instrument.aether.oscB.enabled = false;
+        instrument.aether.sub.enabled = false;
+        instrument.aether.noise.enabled = false;
+        instrument.aether.sampleSlot1 = { 1, true, "aether-slot-asset", 69, 0.72f, -0.18f, 0 };
+
+        constexpr int samples = 12000;
+        const auto live = renderOfflineChunks(project, samples, 257);
+        auto exportFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-aether-slot-parity.wav");
+        if (exportFile.existsAsFile()) exportFile.deleteFile();
+        juce::String error;
+        const bool exportedOk = beat::AudioEngine::renderProjectToWav(project, exportFile, 44100.0, 257, 2, &error);
+        const auto exported = exportedOk ? readWavPrefix(exportFile, samples) : juce::AudioBuffer<float>();
+
+        auto missingProject = project;
+        missingProject.instruments.front().aether.sampleSlot1.audioFileId = "missing-asset";
+        const auto missing = renderOfflineChunks(missingProject, samples, 257);
+
+        beat::AudioEngine transitionEngine;
+        transitionEngine.prepareForOffline(44100.0, 257, 2);
+        transitionEngine.applyProject(project);
+        transitionEngine.requestPlay();
+        const auto beforeReplacement = renderEngineBlock(transitionEngine, 4096);
+        const float previousLeft = beforeReplacement.getSample(0, beforeReplacement.getNumSamples() - 1);
+        const float previousRight = beforeReplacement.getSample(1, beforeReplacement.getNumSamples() - 1);
+        auto replacementProject = project;
+        replacementProject.instruments.front().aether.sampleSlot1.rootNote = 57;
+        replacementProject.instruments.front().aether.sampleSlot1.pan = 0.62f;
+        transitionEngine.applyProject(std::move(replacementProject));
+        const auto afterReplacement = renderEngineBlock(transitionEngine, 257);
+        const float replacementBoundaryStep = juce::jmax(
+            std::abs(afterReplacement.getSample(0, 0) - previousLeft),
+            std::abs(afterReplacement.getSample(1, 0) - previousRight));
+        sampleFile.deleteFile();
+        exportFile.deleteFile();
+        if (!exportedOk || exported.getNumSamples() < samples)
+        {
+            std::cerr << "Aether sample slot export failed: " << error << "\n";
+            return false;
+        }
+
+        double sumAbsDiff = 0.0;
+        float maxAbsDiff = 0.0f;
+        for (int channel = 0; channel < live.getNumChannels(); ++channel)
+            for (int sample = 0; sample < samples; ++sample)
+            {
+                const float a = live.getSample(channel, sample);
+                const float b = exported.getSample(channel, sample);
+                if (!std::isfinite(a) || !std::isfinite(b)) return false;
+                const float diff = std::abs(a - b);
+                sumAbsDiff += diff;
+                maxAbsDiff = std::max(maxAbsDiff, diff);
+            }
+        const double meanAbsDiff = sumAbsDiff / (double) (live.getNumChannels() * samples);
+        return bufferEnergy(live) > 0.0001
+            && bufferEnergy(missing) < 0.0000001
+            && std::isfinite(replacementBoundaryStep)
+            && bufferEnergy(afterReplacement) > 0.000001
+            && replacementBoundaryStep < 0.2f
+            && maxAbsDiff <= 0.00008f
+            && meanAbsDiff <= 0.00002;
+    }
+
     bool stressAudioEngineMixedLiveExportParity()
     {
         auto sampleFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-mixed-sample.wav");
@@ -11440,9 +11521,10 @@ namespace
         source->rootNote = 69;
         source->gain = 0.8f;
         source->pan = 0.0f;
-        source->audio.setSize(1, 48000, false, true, false);
-        for (int sample = 0; sample < source->audio.getNumSamples(); ++sample)
-            source->audio.setSample(0, sample, std::sin(juce::MathConstants<double>::twoPi * 440.0 * sample / 48000.0));
+        auto sourceAudio = std::make_shared<juce::AudioBuffer<float>>(1, 48000);
+        source->audio = sourceAudio;
+        for (int sample = 0; sample < sourceAudio->getNumSamples(); ++sample)
+            sourceAudio->setSample(0, sample, std::sin(juce::MathConstants<double>::twoPi * 440.0 * sample / 48000.0));
 
         beat::SampleSourceSlot slot;
         if (slot.prepare({ 48000.0, 512, 2 }) == false
@@ -15618,6 +15700,11 @@ int main()
     if (!stressAudioEngineSampleLiveExportParity())
     {
         std::cerr << "Audio engine sample live/export parity stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineAetherSampleSlotLiveExportParity())
+    {
+        std::cerr << "Audio engine Aether sample slot live/export parity stress failed\n";
         return 1;
     }
     if (!stressAudioEngineMixedLiveExportParity())

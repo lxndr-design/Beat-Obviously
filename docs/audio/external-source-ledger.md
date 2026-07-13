@@ -230,3 +230,9 @@ No repository-wide license or ownership declaration changed. Local files are
 `backend/Source/Audio/Sources/SampleSourceSlot.h`, `backend/CMakeLists.txt`,
 `backend/Tests/BackendStress.cpp`, and these four audit documents; none is
 Vital-derived.
+
+## Milestone C2A Slot 1 provenance
+
+The Slot 1 project fields, schema migration, decoded-cache alias, per-voice connection, filter/direct routing, bounded route replacement bridge, missing-asset behavior, product controls, and focused tests are independently implemented Beat-owned code on top of the C1 interfaces and Beat's existing audio-file decoder/cache. No upstream repository, acquired implementation, external sample, factory preset, dependency, binary, service, branding, downloaded data, or web endpoint was consulted, executed, copied, translated, structurally adapted, imported, or linked. Existing JUCE decoding and AudioBuffer APIs are used through Beat's already-declared dependency; JUCE source is unchanged. No repository-wide license or ownership declaration changed, and no file in this slice is Vital-derived.
+
+Local implementation files are `backend/Source/Audio/TrackModel.h`, `backend/Source/Audio/AudioEngine.h`, `backend/Source/Audio/AudioEngine.cpp`, `backend/Source/Audio/InstrumentVoice.h`, `backend/Source/Audio/InstrumentVoice.cpp`, `backend/Source/Audio/Sources/SampleSourceSlot.h`, `backend/Source/Audio/Parameters/SynthPatchContract.cpp`, `backend/Source/Ipc/MessageBridge.cpp`, `backend/Source/Persistence/ProjectRepository.cpp`, `frontend/src/state/types.ts`, `frontend/src/state/store.ts`, `frontend/src/state/synthStore.ts`, `frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx`, `backend/Tests/BackendStress.cpp`, `scripts/verify-synth-roundtrip.mjs`, and these four audit documents.

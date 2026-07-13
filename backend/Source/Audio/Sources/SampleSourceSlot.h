@@ -12,7 +12,9 @@ namespace beat
 {
     struct ImmutableSampleSource
     {
-        juce::AudioBuffer<float> audio;
+        // The decoder/cache owns the samples. This alias keeps that immutable
+        // cache entry alive without copying audio into every synth voice.
+        std::shared_ptr<const juce::AudioBuffer<float>> audio;
         double sourceSampleRate { 44100.0 };
         int rootNote { 60 };
         float gain { 1.0f };
@@ -20,8 +22,9 @@ namespace beat
 
         bool isValid() const noexcept
         {
-            return audio.getNumChannels() > 0
-                && audio.getNumSamples() > 1
+            return audio
+                && audio->getNumChannels() > 0
+                && audio->getNumSamples() > 1
                 && std::isfinite(sourceSampleRate)
                 && sourceSampleRate > 0.0;
         }
@@ -134,60 +137,65 @@ namespace beat
 
             const int outputStart = std::clamp(startSample, 0, output.getNumSamples());
             const int outputEnd = std::clamp(outputStart + numSamples, outputStart, output.getNumSamples());
-            const int sourceChannels = sample->audio.getNumChannels();
-            const int sourceSamples = sample->audio.getNumSamples();
+            for (int outputSample = outputStart; outputSample < outputEnd; ++outputSample)
+            {
+                const auto frame = renderFrame();
+                output.addSample(0, outputSample, frame.left);
+                if (output.getNumChannels() > 1)
+                    output.addSample(1, outputSample, frame.right);
+                for (int channel = 2; channel < output.getNumChannels(); ++channel)
+                    output.addSample(channel, outputSample, (frame.left + frame.right) * 0.5f);
+            }
+
+        }
+
+        struct StereoFrame { float left { 0.0f }; float right { 0.0f }; };
+
+        StereoFrame renderFrame() noexcept
+        {
+            StereoFrame result;
+            if (!sample || !sample->isValid())
+                return result;
+
+            const int sourceChannels = sample->audio->getNumChannels();
+            const int sourceSamples = sample->audio->getNumSamples();
             const float pan = std::clamp(sample->pan, -1.0f, 1.0f);
             const float leftPan = std::sqrt(0.5f * (1.0f - pan));
             const float rightPan = std::sqrt(0.5f * (1.0f + pan));
             bool anyReleasing = false;
-
             for (auto& voice : voices)
             {
-                if (!voice.active)
-                    continue;
-
-                for (int outputSample = outputStart; outputSample < outputEnd; ++outputSample)
+                if (!voice.active) continue;
+                const int sourceIndex = (int) voice.position;
+                if (sourceIndex >= sourceSamples - 1)
                 {
-                    const int sourceIndex = (int) voice.position;
-                    if (sourceIndex >= sourceSamples - 1)
-                    {
-                        voice = {};
-                        break;
-                    }
-
-                    const float fraction = (float) (voice.position - (double) sourceIndex);
-                    const int samplesToEnd = sourceSamples - 1 - sourceIndex;
-                    const float endGain = samplesToEnd < endFadeSamples
-                        ? std::clamp((float) samplesToEnd / (float) endFadeSamples, 0.0f, 1.0f)
-                        : 1.0f;
-                    const float releaseGain = voice.releasing
-                        ? std::clamp((float) voice.releaseRemaining / (float) std::max(1, releaseSamples), 0.0f, 1.0f)
-                        : 1.0f;
-                    const float gain = voice.gain * endGain * releaseGain;
-
-                    for (int channel = 0; channel < output.getNumChannels(); ++channel)
-                    {
-                        const int sourceChannel = std::min(channel, sourceChannels - 1);
-                        const float a = sample->audio.getSample(sourceChannel, sourceIndex);
-                        const float b = sample->audio.getSample(sourceChannel, sourceIndex + 1);
-                        const float panGain = channel == 0 ? leftPan : channel == 1 ? rightPan : 1.0f;
-                        output.addSample(channel, outputSample, (a + (b - a) * fraction) * gain * panGain);
-                    }
-
-                    voice.position += voice.rate;
-                    ++renderTelemetry.renderedVoiceSamples;
-                    if (voice.releasing && --voice.releaseRemaining <= 0)
-                    {
-                        voice = {};
-                        break;
-                    }
+                    voice = {};
+                    continue;
                 }
-
+                const float fraction = (float) (voice.position - (double) sourceIndex);
+                const int samplesToEnd = sourceSamples - 1 - sourceIndex;
+                const float endGain = samplesToEnd < endFadeSamples
+                    ? std::clamp((float) samplesToEnd / (float) endFadeSamples, 0.0f, 1.0f) : 1.0f;
+                const float releaseGain = voice.releasing
+                    ? std::clamp((float) voice.releaseRemaining / (float) std::max(1, releaseSamples), 0.0f, 1.0f) : 1.0f;
+                const float gain = voice.gain * endGain * releaseGain;
+                const auto interpolate = [&](int channel)
+                {
+                    const int sourceChannel = std::min(channel, sourceChannels - 1);
+                    const float a = sample->audio->getSample(sourceChannel, sourceIndex);
+                    const float b = sample->audio->getSample(sourceChannel, sourceIndex + 1);
+                    return (a + (b - a) * fraction) * gain;
+                };
+                result.left += interpolate(0) * leftPan;
+                result.right += interpolate(sourceChannels > 1 ? 1 : 0) * rightPan;
+                voice.position += voice.rate;
+                ++renderTelemetry.renderedVoiceSamples;
+                if (voice.releasing && --voice.releaseRemaining <= 0) voice = {};
                 anyReleasing = anyReleasing || (voice.active && voice.releasing);
             }
-
-            renderTelemetry.renderedSamples += (uint64_t) (outputEnd - outputStart);
             hasReleasingVoice = anyReleasing;
+            ++renderTelemetry.renderedSamples;
+            return result;
         }
 
         SourceLifecycleState lifecycleState() const noexcept override

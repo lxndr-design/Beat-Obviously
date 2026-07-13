@@ -112,6 +112,7 @@ namespace beat
         stealTransition.prepare(sampleRate);
         for (auto& transition : sourceSendTransitions)
             transition.prepare(sampleRate);
+        aetherSampleSlot1.prepare({ sampleRate, blockSize, 2 });
     }
 
     void InstrumentVoice::setProcessingQuality(AudioQuality quality) noexcept
@@ -191,6 +192,8 @@ namespace beat
         aetherInteractionState.configure(aetherTableA.get(), params.aetherOscA,
                                          aetherTableB.get(), params.aetherOscB,
                                          baseFrequencyHz);
+        aetherSampleSlot1.allNotesOff(true);
+        aetherSampleSlot1.publish(params.aetherSampleSlot1.enabled ? params.aetherSampleSlot1.source : nullptr);
         adsrParams.attack  = juce::jmax(0.001f, p.attackMs  * 0.001f);
         adsrParams.decay   = juce::jmax(0.001f, p.decayMs   * 0.001f);
         adsrParams.sustain = juce::jlimit(0.0f, 1.0f, p.sustain);
@@ -401,6 +404,9 @@ namespace beat
         noteKeytrack = juce::jlimit(0.0f, 1.0f, (float) midiNoteNumber / 127.0f);
         masterPitchWheelSemitones = 0.0f;
         pitchWheelMoved(currentPitchWheel == 0 ? 8192 : currentPitchWheel);
+        aetherSampleSlot1.allNotesOff(true);
+        if (params.hasAether && params.aetherSampleSlot1.enabled && params.aetherSampleSlot1.source)
+            aetherSampleSlot1.noteOn({ midiNoteNumber, 1.0f, (uint64_t) stableVoiceId });
 
         if (legatoRetune)
         {
@@ -530,6 +536,8 @@ namespace beat
 
     void InstrumentVoice::stopNote(float, bool allowTailOff)
     {
+        if (allowTailOff) aetherSampleSlot1.noteOff((uint64_t) stableVoiceId);
+        else aetherSampleSlot1.allNotesOff(true);
         if (allowTailOff)
         {
             if (params.env1Loop)
@@ -733,6 +741,26 @@ namespace beat
                 filter2Raw = { aetherResult.filter2Frame.left, aetherResult.filter2Frame.right };
                 sourceFrames = aetherResult.sourceFrames;
                 currentBlockWork.add(aetherResult.work);
+                if (params.aetherSampleSlot1.enabled && params.aetherSampleSlot1.source)
+                {
+                    const auto sampleFrame = aetherSampleSlot1.renderFrame();
+                    if (params.aetherSampleSlot1.routing == 1)
+                    {
+                        directRaw.left += sampleFrame.left; directRaw.right += sampleFrame.right;
+                    }
+                    else if (params.aetherSampleSlot1.routing == 2)
+                    {
+                        filter1Raw.left += sampleFrame.left; filter1Raw.right += sampleFrame.right;
+                    }
+                    else if (params.aetherSampleSlot1.routing == 3)
+                    {
+                        filter2Raw.left += sampleFrame.left; filter2Raw.right += sampleFrame.right;
+                    }
+                    else
+                    {
+                        raw.left += sampleFrame.left; raw.right += sampleFrame.right;
+                    }
+                }
             }
             else
             {

@@ -468,6 +468,16 @@ export interface AetherNoiseConfig {
   fxSends?: [number, number];
 }
 
+export interface AetherSampleSlotConfig {
+  schemaVersion: 1;
+  enabled: boolean;
+  audioFileId: Id;
+  rootNote: number;
+  level: number;
+  pan: number;
+  route?: "filter" | "both" | "filter1" | "filter2" | "direct";
+}
+
 export interface AetherSynthConfig {
   oscA: AetherOscillatorConfig;
   oscB: AetherOscillatorConfig;
@@ -475,6 +485,8 @@ export interface AetherSynthConfig {
   oscillators?: Array<AetherOscillatorConfig & { id: string; name: string }>;
   sub: AetherSubConfig;
   noise: AetherNoiseConfig;
+  /** First hybrid source slot. Slots 2-3 remain reserved. */
+  sampleSlot1?: AetherSampleSlotConfig;
   /** Project return-bus ids targeted by the two fixed per-source buses. */
   fxBusIds?: [string, string];
   /** 0..1 opt-in runtime nonlinear warp applied after Aether oscillator mixing. */
@@ -589,7 +601,8 @@ export interface SynthPatchMacroDefinition {
 }
 
 export interface SynthPatchSnapshot {
-  schemaVersion: 1;
+  /** v2 adds the optional Aether sample-slot parameter family. */
+  schemaVersion: 1 | 2;
   instrumentType: "wavetable-synth";
   namespace: "synth";
   name: string;
