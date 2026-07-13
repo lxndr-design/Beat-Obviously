@@ -3,6 +3,7 @@
 #include "Effects/TrackEffectDefaults.h"
 #include "Realtime/VoiceAutomationInbox.h"
 #include "VoiceAllocation.h"
+#include "Modulation/Lfo.h"
 
 #include <algorithm>
 #include <cmath>
@@ -124,43 +125,6 @@ namespace beat
                 clamped > 0.0f ? 1.0f - clamped : 1.0f,
                 clamped < 0.0f ? 1.0f + clamped : 1.0f,
             };
-        }
-
-        double syncedLfoDivisionBeats(const juce::String& division)
-        {
-            const auto trimmed = division.trim();
-            const bool dotted = trimmed.endsWithIgnoreCase("d");
-            const bool triplet = trimmed.endsWithIgnoreCase("t");
-            auto core = trimmed;
-            if (dotted || triplet)
-                core = core.dropLastCharacters(1);
-
-            const auto slash = core.indexOfChar('/');
-            if (slash <= 0 || slash >= core.length() - 1)
-                return 1.0;
-
-            const double numerator = core.substring(0, slash).getDoubleValue();
-            const double denominator = core.substring(slash + 1).getDoubleValue();
-            if (!std::isfinite(numerator) || !std::isfinite(denominator) || numerator <= 0.0 || denominator <= 0.0)
-                return 1.0;
-
-            double beats = (numerator / denominator) * 4.0;
-            if (dotted)
-                beats *= 1.5;
-            else if (triplet)
-                beats *= 2.0 / 3.0;
-
-            return juce::jlimit(1.0 / 64.0, 64.0, beats);
-        }
-
-        float effectiveLfoRateHz(float rateHz, bool sync, const juce::String& division, double bpm)
-        {
-            if (!sync)
-                return juce::jlimit(0.01f, 50.0f, rateHz);
-
-            const double beatsPerCycle = syncedLfoDivisionBeats(division);
-            const double cyclesPerSecond = (juce::jmax(1.0, bpm) / 60.0) / beatsPerCycle;
-            return juce::jlimit(0.01f, 50.0f, (float) cyclesPerSecond);
         }
 
         struct FadeSamplePair
@@ -1901,7 +1865,7 @@ namespace beat
         params.wavetableDetuneCents = instrument.wavetableDetuneCents;
         params.wavetableBlend = instrument.wavetableBlend;
         params.lfoWaveform = instrument.lfoWaveform;
-        params.lfoRateHz = effectiveLfoRateHz(instrument.lfoRateHz, instrument.lfoSync, instrument.lfoSyncedRate, seq.getTempo());
+        params.lfoRateHz = Lfo::effectiveRateHz(instrument.lfoRateHz, instrument.lfoSync, instrument.lfoSyncedRate, seq.getTempo());
         params.lfoDepth = instrument.lfoDepth;
         params.lfoSmoothing = juce::jlimit(0.0f, 1.0f, instrument.lfoSmoothing);
         params.lfoRandomPhase = juce::jlimit(0.0f, 1.0f, instrument.lfoRandomPhase);
@@ -1910,7 +1874,7 @@ namespace beat
         params.lfoOneShot = instrument.lfoOneShot;
         params.lfo2Enabled = instrument.lfo2Enabled;
         params.lfo2Waveform = instrument.lfo2Waveform;
-        params.lfo2RateHz = effectiveLfoRateHz(instrument.lfo2RateHz, instrument.lfo2Sync, instrument.lfo2SyncedRate, seq.getTempo());
+        params.lfo2RateHz = Lfo::effectiveRateHz(instrument.lfo2RateHz, instrument.lfo2Sync, instrument.lfo2SyncedRate, seq.getTempo());
         params.lfo2Smoothing = juce::jlimit(0.0f, 1.0f, instrument.lfo2Smoothing);
         params.lfo2RandomPhase = juce::jlimit(0.0f, 1.0f, instrument.lfo2RandomPhase);
         params.lfo2PhaseOffset = juce::jlimit(0.0f, 1.0f, instrument.lfo2PhaseOffset);
@@ -1919,7 +1883,8 @@ namespace beat
         for (size_t index = 0; index < params.extraLfos.size(); ++index)
         {
             const auto& source = instrument.extraLfos[index];
-            params.extraLfos[index] = { source.enabled, source.waveform, source.rateHz, source.smoothing,
+            params.extraLfos[index] = { source.enabled, source.waveform,
+                Lfo::effectiveRateHz(source.rateHz, source.sync, source.syncedRate, seq.getTempo()), source.smoothing,
                 source.randomPhase, source.phaseOffset, source.retrigger, source.oneShot };
         }
         params.lfoPositionBipolar = instrument.lfoPositionBipolar;

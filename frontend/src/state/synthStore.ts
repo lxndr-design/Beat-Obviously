@@ -166,7 +166,7 @@ export type SynthParameterId =
   | "lfo.2.retrigger"
   | "lfo.2.oneShot"
   | "lfo.2.bipolar"
-  | `lfo.${3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}.${"enabled" | "rate" | "smoothing" | "randomPhase" | "shape" | "phase" | "retrigger" | "oneShot" | "bipolar"}`
+  | `lfo.${3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}.${"enabled" | "rate" | "sync" | "syncedRate" | "smoothing" | "randomPhase" | "shape" | "phase" | "retrigger" | "oneShot" | "bipolar"}`
   | "macro.1"
   | "macro.2"
   | "macro.3"
@@ -985,6 +985,8 @@ const EXTRA_LFO_DEFAULTS = (() => {
     const prefix = `lfo.${index}`;
     values[`${prefix}.enabled` as ExtraLfoParameterId] = false;
     values[`${prefix}.rate` as ExtraLfoParameterId] = 1;
+    values[`${prefix}.sync` as ExtraLfoParameterId] = false;
+    values[`${prefix}.syncedRate` as ExtraLfoParameterId] = "1/4";
     values[`${prefix}.smoothing` as ExtraLfoParameterId] = 0;
     values[`${prefix}.randomPhase` as ExtraLfoParameterId] = 0;
     values[`${prefix}.shape` as ExtraLfoParameterId] = "sine";
@@ -1000,7 +1002,7 @@ const EXTRA_LFO_LABELS = (() => {
   const values = {} as Record<ExtraLfoParameterId, string>;
   for (let index = 3; index <= 10; index += 1) {
     const prefix = `lfo.${index}`;
-    for (const [suffix, label] of [["enabled", "Enabled"], ["rate", "Rate"], ["smoothing", "Smoothing"],
+    for (const [suffix, label] of [["enabled", "Enabled"], ["rate", "Rate"], ["sync", "Sync"], ["syncedRate", "Sync Rate"], ["smoothing", "Smoothing"],
       ["randomPhase", "Random"], ["shape", "Shape"], ["phase", "Phase"], ["retrigger", "Retrigger"],
       ["oneShot", "One-Shot"], ["bipolar", "Bipolar"]] as const) {
       values[`${prefix}.${suffix}` as ExtraLfoParameterId] = `LFO ${index} ${label}`;

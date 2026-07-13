@@ -2050,7 +2050,9 @@ export function modulationAtTime(
     const prefix = `lfo.${index}`;
     const params = instrument.synthPatch?.parameters;
     if (params?.[`${prefix}.enabled`] !== true) return 0;
-    const rate = Math.max(0.01, Number(params?.[`${prefix}.rate`] ?? 1));
+    const rate = params?.[`${prefix}.sync`] === true
+      ? syncedLfoRateHz(params?.[`${prefix}.syncedRate`] ?? "1/4", bpm)
+      : Math.max(0.01, Number(params?.[`${prefix}.rate`] ?? 1));
     const phase = Number(params?.[`${prefix}.phase`] ?? 0);
     const smoothing = clamp01(Number(params?.[`${prefix}.smoothing`] ?? 0));
     const oneShot = params?.[`${prefix}.oneShot`] === true;

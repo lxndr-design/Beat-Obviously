@@ -374,6 +374,8 @@ namespace beat
             bool enabled { false };
             int waveform { 0 };
             float rateHz { 1.0f };
+            bool sync { false };
+            juce::String syncedRate { "1/4" };
             float smoothing { 0.0f };
             float randomPhase { 0.0f };
             float phaseOffset { 0.0f };

@@ -982,7 +982,8 @@ namespace beat
             {
                 auto* lfoObject = new juce::DynamicObject();
                 lfoObject->setProperty("enabled", lfo.enabled); lfoObject->setProperty("waveform", lfo.waveform);
-                lfoObject->setProperty("rateHz", lfo.rateHz); lfoObject->setProperty("smoothing", lfo.smoothing);
+                lfoObject->setProperty("rateHz", lfo.rateHz); lfoObject->setProperty("sync", lfo.sync);
+                lfoObject->setProperty("syncedRate", lfo.syncedRate); lfoObject->setProperty("smoothing", lfo.smoothing);
                 lfoObject->setProperty("randomPhase", lfo.randomPhase); lfoObject->setProperty("phaseOffset", lfo.phaseOffset);
                 lfoObject->setProperty("retrigger", lfo.retrigger); lfoObject->setProperty("oneShot", lfo.oneShot);
                 extraLfos.add(juce::var(lfoObject));
@@ -1203,6 +1204,8 @@ namespace beat
                             lfo.enabled = (bool) value.getProperty("enabled", lfo.enabled);
                             lfo.waveform = juce::jlimit(0, 8, (int) value.getProperty("waveform", lfo.waveform));
                             lfo.rateHz = juce::jlimit(0.01f, 50.0f, (float) (double) value.getProperty("rateHz", lfo.rateHz));
+                            lfo.sync = (bool) value.getProperty("sync", lfo.sync);
+                            lfo.syncedRate = value.getProperty("syncedRate", lfo.syncedRate).toString();
                             lfo.smoothing = juce::jlimit(0.0f, 1.0f, (float) (double) value.getProperty("smoothing", lfo.smoothing));
                             lfo.randomPhase = juce::jlimit(0.0f, 1.0f, (float) (double) value.getProperty("randomPhase", lfo.randomPhase));
                             lfo.phaseOffset = juce::jlimit(0.0f, 1.0f, (float) (double) value.getProperty("phaseOffset", lfo.phaseOffset));

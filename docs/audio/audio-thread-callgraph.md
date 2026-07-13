@@ -420,3 +420,18 @@ InstrumentVoice::renderNextBlock
 ```
 
 Pressure and timbre are normalized scalar voice state and fixed route fields. MIDI dispatch uses JUCE's existing prepared synthesiser path; target evaluation adds two bounded multiply-add terms and no callback allocation, lock, file operation, lazy initialization, or container growth. `AudioEngine` also publishes non-audio expression activity through pre-existing MIDI-input monitoring state and `MessageBridge`; that UI telemetry is not used to render the audio callback. Browser preview accepts explicit pressure/timbre inputs for deterministic route visualization. Offline rendering is not classified as a real-time callback by the A9 detector.
+
+## Milestone B15 LFO 3–10 tempo preparation
+
+```text
+project/patch setup
+  extra LFO sync + musical division + sequencer BPM
+  -> Lfo::effectiveRateHz (setup thread)
+  -> fixed InstrumentVoice::Params::ExtraLfo.rateHz
+InstrumentVoice::refreshCachedPitchRates (non-callback parameter boundary)
+  -> fixed extraLfoPhaseDeltas[8]
+audio callback
+  enabled && routed slot -> phase += cached delta -> fixed target evaluation
+```
+
+Musical-division strings are parsed only while copying project state into prepared voice parameters. The callback sees the same bounded scalar phase-delta path for free and synced modes. Disabled or unrouted extra slots retain the B11 zero-evaluation behavior.

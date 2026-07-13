@@ -138,6 +138,13 @@ namespace
         if (!near(oneShotHeld, 1.0f, 0.0001f) || !near(looped, -0.2f, 0.0001f))
             return false;
 
+        if (!near(beat::Lfo::effectiveRateHz(7.0f, true, "1/4", 120.0), 2.0f)
+            || !near(beat::Lfo::effectiveRateHz(7.0f, true, "1/4", 60.0), 1.0f)
+            || !near(beat::Lfo::effectiveRateHz(7.0f, true, "1/8t", 120.0), 6.0f)
+            || !near(beat::Lfo::effectiveRateHz(7.0f, false, "1/4", 60.0), 7.0f)
+            || !near(beat::Lfo::effectiveRateHz(7.0f, false, "1/4", 120.0), 7.0f))
+            return false;
+
         return near(beat::Lfo::routeValue(-0.5f, true), -0.5f)
             && near(beat::Lfo::routeValue(-0.5f, false), 0.25f);
     }
@@ -4047,6 +4054,61 @@ namespace
         return energy;
     }
 
+    bool stressAudioEngineExtraLfoTempoSync()
+    {
+        auto project = makeDenseAetherProject();
+        project.lengthBeats = 16.0;
+        project.automation.clear();
+        auto& segment = project.tracks.front().segments.front();
+        segment.automation.clear();
+        segment.notes.resize(1);
+        segment.notes.front().startBeat = 0.0;
+        segment.notes.front().lengthBeats = 16.0;
+        auto& instrument = project.instruments.front();
+        instrument.dynamicModulation = {};
+        instrument.dynamicModulation.active = true;
+        instrument.dynamicModulation.ampLevel.extraLfo[7] = 0.7f;
+        instrument.ampLevel = 0.2f;
+        auto& lfo = instrument.extraLfos[7];
+        lfo.enabled = true;
+        lfo.waveform = 0;
+        lfo.rateHz = 3.25f;
+        lfo.sync = true;
+        lfo.syncedRate = "1/4";
+        lfo.smoothing = 0.0f;
+        lfo.randomPhase = 0.0f;
+        lfo.phaseOffset = 0.0f;
+        lfo.retrigger = true;
+        lfo.oneShot = false;
+
+        project.bpm = 60.0;
+        const auto syncedSlow = renderOfflineBlock(project, 12000);
+        project.bpm = 120.0;
+        const auto syncedFast = renderOfflineBlock(project, 12000);
+
+        auto absoluteDifference = [](const juce::AudioBuffer<float>& a, const juce::AudioBuffer<float>& b)
+        {
+            double difference = 0.0;
+            for (int channel = 0; channel < a.getNumChannels(); ++channel)
+                for (int sample = 0; sample < a.getNumSamples(); ++sample)
+                    difference += std::abs((double) a.getSample(channel, sample) - (double) b.getSample(channel, sample));
+            return difference;
+        };
+        const auto syncedDifference = absoluteDifference(syncedSlow, syncedFast);
+
+        project.instruments.front().extraLfos[7].sync = false;
+        project.bpm = 60.0;
+        const auto freeSlow = renderOfflineBlock(project, 12000);
+        project.bpm = 120.0;
+        const auto freeFast = renderOfflineBlock(project, 12000);
+        const auto freeDifference = absoluteDifference(freeSlow, freeFast);
+        const bool ok = syncedDifference > 10.0 && syncedDifference > freeDifference * 3.5;
+        if (!ok)
+            std::cerr << "Extra LFO tempo sync difference synced=" << syncedDifference
+                      << " free=" << freeDifference << "\n";
+        return ok;
+    }
+
     float bufferPeak(const juce::AudioBuffer<float>& buffer)
     {
         float peak = 0.0f;
@@ -7184,7 +7246,7 @@ namespace
         instrument.dynamicModulation.filterCutoff.macro8 = 0.27f;
         instrument.dynamicModulation.filterCutoff.env3 = 0.21f;
         instrument.dynamicModulation.filterCutoff.env4 = -0.18f;
-        instrument.extraLfos[7] = { true, 3, 3.25f, 0.2f, 0.15f, 0.3f, true, false };
+        instrument.extraLfos[7] = { true, 3, 3.25f, true, "1/8t", 0.2f, 0.15f, 0.3f, true, false };
         instrument.dynamicModulation.filterCutoff.extraLfo[7] = 0.29f;
         instrument.dynamicModulation.ampLevel.velocity = 0.27f;
         instrument.dynamicModulation.ampLevel.velocityBipolar = false;
@@ -7287,6 +7349,7 @@ namespace
                 && near(loadedInstrument.env4Sustain, 0.41f) && near(loadedInstrument.env4ReleaseMs, 224.0f)
                 && loadedInstrument.extraLfos[7].enabled && loadedInstrument.extraLfos[7].waveform == 3
                 && near(loadedInstrument.extraLfos[7].rateHz, 3.25f) && near(loadedInstrument.extraLfos[7].phaseOffset, 0.3f)
+                && loadedInstrument.extraLfos[7].sync && loadedInstrument.extraLfos[7].syncedRate == "1/8t"
                 && near(loadedInstrument.dynamicModulation.filterCutoff.extraLfo[7], 0.29f)
                 && near(loadedInstrument.dynamicModulation.ampLevel.velocity, 0.27f)
                 && !loadedInstrument.dynamicModulation.ampLevel.velocityBipolar
@@ -12191,6 +12254,8 @@ namespace
             ,"lfo.10.enabled": true
             ,"lfo.10.shape": "square"
             ,"lfo.10.rate": 3.25
+            ,"lfo.10.sync": true
+            ,"lfo.10.syncedRate": "1/8t"
             ,"lfo.10.smoothing": 0.2
             ,"lfo.10.phase": 0.3
           },
@@ -12351,6 +12416,7 @@ namespace
             return false;
         if (!instrument.extraLfos[7].enabled || instrument.extraLfos[7].waveform != 3
             || !near(instrument.extraLfos[7].rateHz, 3.25f) || !near(instrument.extraLfos[7].smoothing, 0.2f)
+            || !instrument.extraLfos[7].sync || instrument.extraLfos[7].syncedRate != "1/8t"
             || !near(instrument.extraLfos[7].phaseOffset, 0.3f)
             || !near(instrument.dynamicModulation.filterResonance.extraLfo[7], 0.29f))
             return false;
@@ -14453,6 +14519,12 @@ int main()
     if (!stressAudioEngineTrackGainPanRender())
     {
         std::cerr << "Audio engine track gain/pan render stress failed\n";
+        return 1;
+    }
+    std::cerr << "  extra LFO tempo sync\n";
+    if (!stressAudioEngineExtraLfoTempoSync())
+    {
+        std::cerr << "Audio engine extra-LFO tempo-sync stress failed\n";
         return 1;
     }
     std::cerr << "  track effects\n";

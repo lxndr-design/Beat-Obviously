@@ -562,6 +562,8 @@ namespace beat
             lfo.enabled = synthNumberParam(params, prefix + "enabled", 0.0) >= 0.5;
             lfo.waveform = parseSynthLfoWaveform(synthStringParam(params, prefix + "shape", "sine"));
             lfo.rateHz = juce::jlimit(0.01f, 50.0f, (float) synthNumberParam(params, prefix + "rate", 1.0));
+            lfo.sync = synthNumberParam(params, prefix + "sync", 0.0) >= 0.5;
+            lfo.syncedRate = synthStringParam(params, prefix + "syncedRate", "1/4");
             lfo.smoothing = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "smoothing", 0.0));
             lfo.randomPhase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "randomPhase", 0.0));
             lfo.phaseOffset = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "phase", 0.0));

@@ -133,3 +133,7 @@ The bounded AM/ring formulas, carrier crossfade and gain/routing policy, nonline
 ## Milestone B14 provenance
 
 The independent pressure/CC74 timbre route fields, JUCE MIDI dispatch integration, activity telemetry, persistence/frontend contracts, preview evaluation, and focused tests are independent extensions of Beat's existing fixed modulation and MIDI-input paths. JUCE APIs already present in Beat provide the MIDI message/voice callbacks; no JUCE source was copied or modified. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived implementation, runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.
+
+## Milestone B15 provenance
+
+The LFO 3–10 sync fields, setup-time musical-division conversion, persistence/frontend contracts, and tests independently extend Beat's existing LFO 1/2 tempo-sync mathematics and fixed extra-LFO graph. No upstream repository was consulted or executed; no copied, modified, translated, structurally adapted, or reference-derived implementation, runtime dependency, prebuilt binary, preset, asset, service, branding, or licensing change was introduced.

@@ -204,6 +204,8 @@ try {
       "lfo.10.enabled": true,
       "lfo.10.shape": "square",
       "lfo.10.rate": 3.25,
+      "lfo.10.sync": true,
+      "lfo.10.syncedRate": "1/8t",
       "lfo.10.smoothing": 0.2,
       "lfo.10.phase": 0.3,
     },
@@ -239,6 +241,8 @@ try {
   assert.equal(independentUnisonDraft.parameters["lfo.10.enabled"], true);
   assert.equal(independentUnisonDraft.parameters["lfo.10.shape"], "square");
   assert.equal(independentUnisonDraft.parameters["lfo.10.rate"], 3.25);
+  assert.equal(independentUnisonDraft.parameters["lfo.10.sync"], true);
+  assert.equal(independentUnisonDraft.parameters["lfo.10.syncedRate"], "1/8t");
   assert.equal(independentUnisonPreview.aether.oscB.tuningMode, "ratio");
   assert.equal(independentUnisonPreview.aether.oscB.ratioNumerator, 3);
   assert.equal(independentUnisonPreview.aether.oscB.ratioDenominator, 2);
@@ -2242,6 +2246,34 @@ try {
   const absoluteFast = synthPreview.modulationAtTime(absolutePreview, 0.125, 1, 120).targetOffsets["osc.b.position"];
   const absoluteSlow = synthPreview.modulationAtTime(absolutePreview, 0.125, 1, 60).targetOffsets["osc.b.position"];
   assert.ok(Math.abs(absoluteFast - absoluteSlow) < 0.000001, "absolute-rate LFO should not change modulation phase when BPM changes");
+
+  const extraSyncedDraft = synthStore.normalizeSynthDraftPatch({
+    name: "Synced LFO 10 Probe",
+    parameters: {
+      "lfo.10.enabled": true,
+      "lfo.10.sync": true,
+      "lfo.10.syncedRate": "1/4",
+      "lfo.10.rate": 7,
+      "lfo.10.shape": "sine",
+    },
+    modulation: [
+      { id: "sync_lfo10_position", source: "lfo.10", target: "osc.b.position", amount: 0.5, bipolar: true, enabled: true },
+    ],
+  });
+  const extraSyncedPreview = synthStore.synthDraftToPreviewInstrument(extraSyncedDraft);
+  const extraFastTempo = synthPreview.modulationAtTime(extraSyncedPreview, 0.125, 1, 120).targetOffsets["osc.b.position"];
+  const extraSlowTempo = synthPreview.modulationAtTime(extraSyncedPreview, 0.125, 1, 60).targetOffsets["osc.b.position"];
+  assert.ok(Math.abs(extraFastTempo - extraSlowTempo) > 0.05, "tempo-synced LFO 10 should change modulation phase when BPM changes");
+  const extraAbsolutePreview = {
+    ...extraSyncedPreview,
+    synthPatch: {
+      ...extraSyncedPreview.synthPatch,
+      parameters: { ...extraSyncedPreview.synthPatch.parameters, "lfo.10.sync": false },
+    },
+  };
+  const extraAbsoluteFast = synthPreview.modulationAtTime(extraAbsolutePreview, 0.125, 1, 120).targetOffsets["osc.b.position"];
+  const extraAbsoluteSlow = synthPreview.modulationAtTime(extraAbsolutePreview, 0.125, 1, 60).targetOffsets["osc.b.position"];
+  assert.ok(Math.abs(extraAbsoluteFast - extraAbsoluteSlow) < 0.000001, "free-rate LFO 10 should remain tempo independent");
 
   const hardSquareDraft = synthStore.normalizeSynthDraftPatch({
     name: "LFO Smoothing Probe",
