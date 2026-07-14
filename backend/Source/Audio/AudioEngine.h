@@ -103,6 +103,7 @@ namespace beat
                                 const juce::String& outputDeviceName,
                                 juce::String* error = nullptr);
         void prepareForOffline(double sampleRate, int blockSize, int numOutputChannels);
+        void prepareForRealtime(double sampleRate, int blockSize, int numOutputChannels);
         void setProcessingQuality(AudioQuality quality) noexcept;
         AudioQuality getProcessingQuality() const noexcept { return processingQuality; }
         static bool renderProjectToWav(Project project,
@@ -252,6 +253,12 @@ namespace beat
         };
 
         bool pullRenderTimingSnapshot(RenderTimingSnapshot& out) const noexcept;
+        struct SampleStreamingSnapshot
+        {
+            size_t assetCount { 0 };
+            SamplePageCacheTelemetry cache;
+        };
+        bool pullSampleStreamingSnapshot(SampleStreamingSnapshot& out) noexcept;
         bool prepareInputRecording(double maxDurationSeconds,
                                    int channels = 2,
                                    juce::String* error = nullptr);
@@ -609,6 +616,7 @@ namespace beat
         MasterLoudnessMeterState masterLoudnessMeterState;
         std::map<juce::String, SampleInstrument> sampleInstruments;
         std::map<juce::String, std::shared_ptr<SampleBuffer>> audioFileBuffers;
+        std::shared_ptr<SampleStreamingSession> sampleStreamingSession;
         juce::AudioFormatManager formatManager;
         juce::AudioBuffer<float> routeBuf;
         juce::MidiBuffer callbackMidi;
@@ -618,6 +626,7 @@ namespace beat
         int projectLatencySamples { 0 };
         Id activeProjectId;
         juce::CriticalSection sampleLock;
+        std::atomic<bool> realtimeDeviceMode { false };
         SpscRingBuffer<TransportCommand, 512> transportCommands;
         RealtimeParameterQueue<RenderBudgets::realtimeQueueEvents> realtimeParameterChanges;
 

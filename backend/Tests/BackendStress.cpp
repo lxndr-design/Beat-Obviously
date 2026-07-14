@@ -3247,7 +3247,7 @@ namespace
         return foundClip;
     }
 
-    bool writeAudioClipFixture(const juce::File& file)
+    bool writeAudioClipFixture(const juce::File& file, int totalSamples = 44100 / 2)
     {
         if (file.existsAsFile())
             file.deleteFile();
@@ -3258,10 +3258,9 @@ namespace
 
         constexpr int sampleRate = 44100;
         constexpr int channels = 1;
-        constexpr int totalSamples = sampleRate / 2;
         constexpr int bitsPerSample = 16;
         constexpr int bytesPerSample = bitsPerSample / 8;
-        constexpr uint32_t dataBytes = totalSamples * channels * bytesPerSample;
+        const uint32_t dataBytes = (uint32_t) totalSamples * channels * bytesPerSample;
 
         const auto writeU16 = [&stream](uint16_t value)
         {
@@ -9755,12 +9754,12 @@ namespace
     bool stressAudioEngineAetherSampleSlotLiveExportParity()
     {
         auto sampleFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-aether-slot-source.wav");
-        if (!writeAudioClipFixture(sampleFile)) return false;
+        if (!writeAudioClipFixture(sampleFile, 9 * 44100)) return false;
 
         auto project = makeDenseAetherProject();
         project.lengthBeats = 2.0;
         project.audioFiles.push_back({ "aether-slot-asset", "Aether Slot Fixture",
-            sampleFile.getFullPathName(), 0.5, 44100.0 });
+            sampleFile.getFullPathName(), 9.0, 44100.0 });
         auto& instrument = project.instruments.front();
         instrument.aether.oscA.enabled = false;
         instrument.aether.oscB.enabled = false;
@@ -9786,6 +9785,62 @@ namespace
         for (auto& zone : missingProject.instruments.front().aether.sampleSlot1.zones)
             zone.audioFileId = "missing-asset";
         const auto missing = renderOfflineChunks(missingProject, samples, 257);
+
+        auto explicitOfflineEngine = std::make_unique<beat::AudioEngine>();
+        explicitOfflineEngine->prepareForOffline(44100.0, 257, 2);
+        explicitOfflineEngine->applyProject(project);
+        beat::AudioEngine::SampleStreamingSnapshot offlineStreaming;
+        const bool offlineWasStreamed = explicitOfflineEngine->pullSampleStreamingSnapshot(offlineStreaming);
+
+        auto streamingEngine = std::make_unique<beat::AudioEngine>();
+        streamingEngine->prepareForRealtime(44100.0, 257, 2);
+        streamingEngine->applyProject(project);
+        beat::AudioEngine::SampleStreamingSnapshot initialStreaming;
+        const bool streamingSelected = streamingEngine->pullSampleStreamingSnapshot(initialStreaming);
+        streamingEngine->requestPlay();
+        juce::AudioBuffer<float> streamed(2, samples);
+        streamed.clear();
+        int streamedOffset = 0;
+        while (streamedOffset < samples)
+        {
+            const int count = std::min(257, samples - streamedOffset);
+            const auto block = renderEngineBlock(*streamingEngine, count);
+            for (int channel = 0; channel < streamed.getNumChannels(); ++channel)
+                streamed.copyFrom(channel, streamedOffset, block, channel, 0, count);
+            streamedOffset += count;
+        }
+        (void) renderEngineBlock(*streamingEngine, 257);
+        juce::AudioBuffer<float> streamingProbeOutput(2, 257);
+        std::array<float*, 2> streamingProbeChannels {
+            streamingProbeOutput.getWritePointer(0), streamingProbeOutput.getWritePointer(1),
+        };
+        juce::AudioIODeviceCallbackContext streamingProbeContext;
+        beat::test::beginRealtimeSafetyProbe();
+        streamingEngine->audioDeviceIOCallbackWithContext(
+            nullptr, 0, streamingProbeChannels.data(), 2, 257, streamingProbeContext);
+        const size_t streamingCallbackViolations = beat::test::endRealtimeSafetyProbe();
+        if (streamingCallbackViolations != 0)
+            for (size_t index = 0; index < std::min<size_t>(streamingCallbackViolations, 128); ++index)
+            {
+                Dl_info info {};
+                const auto violation = beat::test::realtimeSafetyViolation(index);
+                if (violation.callsite != nullptr && dladdr(violation.callsite, &info) != 0)
+                    std::cerr << "  streaming callback violation kind=" << (int) violation.kind
+                              << " symbol=" << (info.dli_sname ? info.dli_sname : "unknown")
+                              << " offset=" << (static_cast<const char*>(violation.callsite)
+                                  - static_cast<const char*>(info.dli_saddr)) << "\n";
+            }
+        beat::AudioEngine::SampleStreamingSnapshot finalStreaming;
+        const bool finalStreamingAvailable = streamingEngine->pullSampleStreamingSnapshot(finalStreaming);
+
+        auto sharedAssetProject = project;
+        if (!sharedAssetProject.tracks.empty() && !sharedAssetProject.tracks.front().segments.empty())
+            sharedAssetProject.tracks.front().segments.front().audioFileId = "aether-slot-asset";
+        auto sharedAssetEngine = std::make_unique<beat::AudioEngine>();
+        sharedAssetEngine->prepareForRealtime(44100.0, 257, 2);
+        sharedAssetEngine->applyProject(std::move(sharedAssetProject));
+        beat::AudioEngine::SampleStreamingSnapshot sharedAssetStreaming;
+        const bool sharedAssetWasStreamed = sharedAssetEngine->pullSampleStreamingSnapshot(sharedAssetStreaming);
 
         beat::AudioEngine transitionEngine;
         transitionEngine.prepareForOffline(44100.0, 257, 2);
@@ -9825,13 +9880,37 @@ namespace
                 maxAbsDiff = std::max(maxAbsDiff, diff);
             }
         const double meanAbsDiff = sumAbsDiff / (double) (live.getNumChannels() * samples);
-        return bufferEnergy(live) > 0.0001
+        const bool ok = bufferEnergy(live) > 0.0001
+            && streamingSelected
+            && initialStreaming.assetCount == 1
+            && finalStreamingAvailable
+            && finalStreaming.cache.pagesLoaded > 0
+            && finalStreaming.cache.cacheHits > 0
+            && streamingCallbackViolations == 0
+            && bufferEnergy(streamed) > 0.0001
+            && !offlineWasStreamed
+            && !sharedAssetWasStreamed
             && bufferEnergy(missing) < 0.0000001
             && std::isfinite(replacementBoundaryStep)
             && bufferEnergy(afterReplacement) > 0.000001
             && replacementBoundaryStep < 0.2f
             && maxAbsDiff <= 0.00008f
             && meanAbsDiff <= 0.00002;
+        if (!ok)
+            std::cerr << "Aether streaming fixture failed liveEnergy=" << bufferEnergy(live)
+                      << " streamingSelected=" << streamingSelected
+                      << " assets=" << initialStreaming.assetCount
+                      << " final=" << finalStreamingAvailable
+                      << " loads=" << finalStreaming.cache.pagesLoaded
+                      << " hits=" << finalStreaming.cache.cacheHits
+                      << " callbackViolations=" << streamingCallbackViolations
+                      << " streamedEnergy=" << bufferEnergy(streamed)
+                      << " offlineStreamed=" << offlineWasStreamed
+                      << " sharedStreamed=" << sharedAssetWasStreamed
+                      << " missingEnergy=" << bufferEnergy(missing)
+                      << " boundary=" << replacementBoundaryStep
+                      << " maxDiff=" << maxAbsDiff << " meanDiff=" << meanAbsDiff << "\n";
+        return ok;
     }
 
     bool stressAudioEngineMixedLiveExportParity()
@@ -11762,6 +11841,103 @@ namespace
         const auto afterInvalid = cache.telemetry();
         return afterInvalid.underflows == beforeInvalid.underflows + 1
             && afterInvalid.requestsAccepted == beforeInvalid.requestsAccepted;
+    }
+
+    bool stressSampleStreamingSession()
+    {
+        constexpr int sourceFrames = beat::BoundedSamplePageCache::pageFrames * 4;
+        constexpr double sourceRate = 48000.0;
+        auto file = juce::File("/private/tmp").getChildFile("BeatBackendStress-streaming-source.wav");
+        if (file.existsAsFile())
+            file.deleteFile();
+
+        juce::AudioBuffer<float> sourceAudio(2, sourceFrames);
+        for (int index = 0; index < sourceFrames; ++index)
+        {
+            const float value = 0.4f * std::sin(
+                juce::MathConstants<double>::twoPi * 440.0 * (double) index / sourceRate);
+            sourceAudio.setSample(0, index, value);
+            sourceAudio.setSample(1, index, -value * 0.5f);
+        }
+        juce::WavAudioFormat wav;
+        auto output = file.createOutputStream();
+        std::unique_ptr<juce::AudioFormatWriter> writer(
+            output != nullptr ? wav.createWriterFor(output.get(), sourceRate, 2, 24, {}, 0) : nullptr);
+        if (writer == nullptr)
+            return false;
+        output.release();
+        if (!writer->writeFromAudioSampleBuffer(sourceAudio, 0, sourceFrames))
+            return false;
+        writer.reset();
+
+        bool passed = false;
+        {
+            juce::AudioFormatManager formats;
+            formats.registerBasicFormats();
+            auto session = std::make_shared<beat::SampleStreamingSession>();
+            const auto metadata = session->addAsset(file, formats);
+            if (!metadata || metadata->frames != sourceFrames || metadata->channels != 2
+                || metadata->sampleRate != sourceRate)
+                return false;
+
+            auto source = std::make_shared<beat::ImmutableSampleSource>();
+            source->streamingSession = session;
+            source->streamingAssetIndex = metadata->index;
+            source->streamingFrameCount = metadata->frames;
+            source->streamingChannelCount = metadata->channels;
+            source->sourceSampleRate = metadata->sampleRate;
+            source->rootNote = 69;
+
+            beat::SampleSourceSlot slot;
+            if (!slot.prepare({ sourceRate, 256, 2 }) || !slot.publish(source)
+                || !slot.noteOn({ 69, 1.0f, 5001 }))
+                return false;
+
+            beat::test::beginRealtimeSafetyProbe();
+            const auto missing = slot.renderFrame();
+            const size_t missingViolations = beat::test::endRealtimeSafetyProbe();
+            if (missingViolations != 0 || missing.left != 0.0f || missing.right != 0.0f)
+                return false;
+
+            if (!session->preloadFrame(metadata->index, 0))
+                return false;
+            float recoveredPeak = 0.0f;
+            float maximumStep = 0.0f;
+            float previous = 0.0f;
+            beat::test::beginRealtimeSafetyProbe();
+            for (int index = 0; index < 192; ++index)
+            {
+                const auto frame = slot.renderFrame();
+                recoveredPeak = std::max(recoveredPeak, std::abs(frame.left));
+                maximumStep = std::max(maximumStep, std::abs(frame.left - previous));
+                previous = frame.left;
+            }
+            const size_t recoveryViolations = beat::test::endRealtimeSafetyProbe();
+            if (recoveryViolations != 0 || recoveredPeak < 0.1f || maximumStep > 0.08f)
+                return false;
+
+            if (!session->start())
+                return false;
+            const int64_t distantFrame = beat::BoundedSamplePageCache::pageFrames * 3 + 10;
+            beat::BoundedSamplePageCache::StereoFrame streamed;
+            beat::test::beginRealtimeSafetyProbe();
+            const bool initiallyResident = session->readStereoFrame(metadata->index, distantFrame, streamed);
+            const size_t requestViolations = beat::test::endRealtimeSafetyProbe();
+            bool loaded = initiallyResident;
+            for (int attempt = 0; !loaded && attempt < 200; ++attempt)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                loaded = session->readStereoFrame(metadata->index, distantFrame, streamed);
+            }
+            session->stop();
+            const auto telemetry = session->telemetry(metadata->index);
+            passed = !initiallyResident && requestViolations == 0 && loaded
+                && std::isfinite(streamed.left) && std::isfinite(streamed.right)
+                && telemetry.cacheHits > 0 && telemetry.underflows > 0
+                && telemetry.requestsAccepted > 0 && telemetry.pagesLoaded >= 2;
+        }
+        file.deleteFile();
+        return passed;
     }
 
     bool stressAetherSampleSourceSlot()
@@ -15516,6 +15692,11 @@ int main()
     if (!stressBoundedSamplePageCache())
     {
         std::cerr << "Bounded sample page-cache stress failed\n";
+        return 1;
+    }
+    if (!stressSampleStreamingSession())
+    {
+        std::cerr << "Sample streaming session stress failed\n";
         return 1;
     }
     if (!stressAetherSampleSourceSlot())

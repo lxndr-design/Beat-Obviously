@@ -828,3 +828,36 @@ candidate callback boundary (not production-connected)
 ```
 
 The candidate owns neither a thread nor a file reader. The callback edge cannot invoke `SamplePageLoader`, allocate, resize, acquire a mutex, or wait. A single background consumer is the only request-queue reader. Double page banks prevent the worker from writing the currently published bank, and generation-bearing descriptors prevent a delayed callback reader from accepting a replaced bank as the earlier page publication. Queue full is an explicit bounded failure. Production `SampleSourceSlot` still reads immutable decoded `AudioBuffer` data; therefore the production callback and offline call graphs above are unchanged. Connection remains gated on shared worker lifetime, attack/loop preloading, underflow fades, and explicit live/offline selection.
+
+## Milestone C2H production streaming edge
+
+```text
+setup/control
+  -> prepareForRealtime
+  -> conservative Aether-only >= 8 s asset classification
+  -> AudioFormatReader creation (maximum 8)
+  -> preload attack / next / loop-start / loop-end pages
+  -> start one SampleStreamingSession worker
+  -> publish immutable session + asset index to SampleSourceSlot
+
+background worker
+  -> pop fixed request from each asset cache
+  -> AudioFormatReader::read into preallocated scratch
+  -> inactive page bank
+  -> atomic descriptor publication
+
+real-time callback
+  -> SampleSourceSlot::renderFrame
+  -> SampleStreamingSession::readStereoFrame
+  -> BoundedSamplePageCache::readStereoFrame
+       hit: pin / verify / copy / unpin
+       miss: fixed request + atomic telemetry
+  -> 64-sample fade-out or recovery fade
+  -> existing sample gain/pan, filter/direct, and FX-send graph
+
+offline/export
+  -> prepareForOffline
+  -> existing complete decode and immutable AudioBuffer playback
+```
+
+The callback does not call `AudioFormatReader`, `Thread::notify`, `Thread::wait`, loader code, or any ownership-changing operation. Worker file I/O is outside the thread-local real-time probe. Project replacement keeps the retired session alive until old routes are destroyed, publishes the new session under the project lock, then signals and joins the retired worker after releasing the lock. An asset shared with an audio segment or conventional sampler never enters this edge. If a page is unavailable, position/timing advance normally while the held source value fades to silence; recovery begins only after the fade-out reaches zero.

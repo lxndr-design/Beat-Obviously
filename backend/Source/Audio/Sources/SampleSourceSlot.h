@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SampleStreamingSession.h"
 #include "SourceSlot.h"
 
 #include <algorithm>
@@ -15,6 +16,10 @@ namespace beat
         // The decoder/cache owns the samples. This alias keeps that immutable
         // cache entry alive without copying audio into every synth voice.
         std::shared_ptr<const juce::AudioBuffer<float>> audio;
+        std::shared_ptr<SampleStreamingSession> streamingSession;
+        size_t streamingAssetIndex { 0 };
+        int64_t streamingFrameCount { 0 };
+        int streamingChannelCount { 0 };
         double sourceSampleRate { 44100.0 };
         int rootNote { 60 };
         float gain { 1.0f };
@@ -31,12 +36,20 @@ namespace beat
 
         bool isValid() const noexcept
         {
-            return audio
-                && audio->getNumChannels() > 0
-                && audio->getNumSamples() > 1
+            const bool decodedValid = audio && audio->getNumChannels() > 0
+                && audio->getNumSamples() > 1;
+            const bool streamedValid = streamingSession && streamingFrameCount > 1
+                && streamingChannelCount > 0;
+            return (decodedValid || streamedValid)
                 && std::isfinite(sourceSampleRate)
                 && sourceSampleRate > 0.0;
         }
+
+        int frameCount() const noexcept
+        {
+            return audio ? audio->getNumSamples() : (int) streamingFrameCount;
+        }
+
     };
 
     class SampleSourceSlot final : public SourceSlot
@@ -167,7 +180,6 @@ namespace beat
             if (!sample || !sample->isValid())
                 return result;
 
-            const int sourceChannels = sample->audio->getNumChannels();
             const float pan = std::clamp(sample->pan, -1.0f, 1.0f);
             const float leftPan = std::sqrt(0.5f * (1.0f - pan));
             const float rightPan = std::sqrt(0.5f * (1.0f + pan));
@@ -190,9 +202,9 @@ namespace beat
                 const float releaseGain = voice.releasing
                     ? std::clamp((float) voice.releaseRemaining / (float) std::max(1, releaseSamples), 0.0f, 1.0f) : 1.0f;
                 const float gain = voice.gain * endGain * releaseGain;
-                const auto interpolateAt = [&](int channel, double position, bool wrapAtLoopEnd)
+                const auto interpolateAt = [&](double position, bool wrapAtLoopEnd,
+                                               StereoFrame& interpolated)
                 {
-                    const int sourceChannel = std::min(channel, sourceChannels - 1);
                     const int index = std::clamp((int) position, playbackStart, playbackEnd - 1);
                     int next = index + 1;
                     if (wrapAtLoopEnd && next >= playbackLoopEnd)
@@ -200,26 +212,36 @@ namespace beat
                     else
                         next = std::min(next, playbackEnd - 1);
                     const float fraction = (float) (position - (double) index);
-                    const float a = sample->audio->getSample(sourceChannel, index);
-                    const float b = sample->audio->getSample(sourceChannel, next);
-                    return a + (b - a) * fraction;
+                    StereoFrame a;
+                    StereoFrame b;
+                    if (!readSourceFrame(index, a) || !readSourceFrame(next, b))
+                        return false;
+                    interpolated.left = a.left + (b.left - a.left) * fraction;
+                    interpolated.right = a.right + (b.right - a.right) * fraction;
+                    return true;
                 };
-                const auto interpolate = [&](int channel)
+
+                StereoFrame sourceFrame;
+                bool sourceAvailable = interpolateAt(voice.position, playbackLoopEnabled, sourceFrame);
+                if (sourceAvailable && playbackLoopEnabled && loopCrossfadeSamples > 0
+                    && voice.position >= (double) (playbackLoopEnd - loopCrossfadeSamples))
                 {
-                    float value = interpolateAt(channel, voice.position, playbackLoopEnabled);
-                    if (playbackLoopEnabled && loopCrossfadeSamples > 0
-                        && voice.position >= (double) (playbackLoopEnd - loopCrossfadeSamples))
+                    const double offset = voice.position - (double) (playbackLoopEnd - loopCrossfadeSamples);
+                    const float blend = std::clamp((float) (offset / (double) loopCrossfadeSamples), 0.0f, 1.0f);
+                    const double incomingPosition = (double) playbackLoopStart + offset;
+                    StereoFrame incoming;
+                    sourceAvailable = interpolateAt(incomingPosition, false, incoming);
+                    if (sourceAvailable)
                     {
-                        const double offset = voice.position - (double) (playbackLoopEnd - loopCrossfadeSamples);
-                        const float blend = std::clamp((float) (offset / (double) loopCrossfadeSamples), 0.0f, 1.0f);
-                        const double incomingPosition = (double) playbackLoopStart + offset;
-                        const float incoming = interpolateAt(channel, incomingPosition, false);
-                        value += (incoming - value) * blend;
+                        sourceFrame.left += (incoming.left - sourceFrame.left) * blend;
+                        sourceFrame.right += (incoming.right - sourceFrame.right) * blend;
                     }
-                    return value * gain;
-                };
-                result.left += interpolate(0) * leftPan;
-                result.right += interpolate(sourceChannels > 1 ? 1 : 0) * rightPan;
+                }
+
+                if (sample->streamingSession)
+                    sourceFrame = applyStreamingTransition(voice, sourceFrame, sourceAvailable);
+                result.left += (sourceFrame.left * gain) * leftPan;
+                result.right += (sourceFrame.right * gain) * rightPan;
                 voice.position += voice.rate;
                 if (playbackLoopEnabled && voice.position >= (double) playbackLoopEnd)
                     voice.position = wrapLoopPosition(voice.position);
@@ -269,7 +291,77 @@ namespace beat
             double rate { 1.0 };
             float gain { 0.0f };
             int releaseRemaining { 0 };
+            float lastSourceLeft { 0.0f };
+            float lastSourceRight { 0.0f };
+            int underflowFadeRemaining { 0 };
+            int recoveryFadeRemaining { 0 };
+            bool waitingForStream { false };
         };
+
+        bool readSourceFrame(int index, StereoFrame& frame) noexcept
+        {
+            if (sample->audio)
+            {
+                const int channels = sample->audio->getNumChannels();
+                frame.left = sample->audio->getSample(0, index);
+                frame.right = sample->audio->getSample(channels > 1 ? 1 : 0, index);
+                return true;
+            }
+            BoundedSamplePageCache::StereoFrame streamed;
+            if (!sample->streamingSession->readStereoFrame(sample->streamingAssetIndex, index, streamed))
+            {
+                frame = {};
+                return false;
+            }
+            frame = { streamed.left, streamed.right };
+            return true;
+        }
+
+        static StereoFrame applyStreamingTransition(Voice& voice, StereoFrame current,
+                                                     bool available) noexcept
+        {
+            if (!available)
+            {
+                if (!voice.waitingForStream)
+                {
+                    voice.waitingForStream = true;
+                    voice.underflowFadeRemaining = streamTransitionSamples;
+                    voice.recoveryFadeRemaining = 0;
+                }
+                if (voice.underflowFadeRemaining > 0)
+                {
+                    const float gain = (float) voice.underflowFadeRemaining
+                        / (float) streamTransitionSamples;
+                    --voice.underflowFadeRemaining;
+                    return { voice.lastSourceLeft * gain, voice.lastSourceRight * gain };
+                }
+                return {};
+            }
+
+            if (voice.waitingForStream)
+            {
+                if (voice.underflowFadeRemaining > 0)
+                {
+                    const float gain = (float) voice.underflowFadeRemaining
+                        / (float) streamTransitionSamples;
+                    --voice.underflowFadeRemaining;
+                    return { voice.lastSourceLeft * gain, voice.lastSourceRight * gain };
+                }
+                voice.waitingForStream = false;
+                voice.recoveryFadeRemaining = streamTransitionSamples;
+            }
+            if (voice.recoveryFadeRemaining > 0)
+            {
+                const float gain = 1.0f - (float) voice.recoveryFadeRemaining
+                    / (float) streamTransitionSamples;
+                --voice.recoveryFadeRemaining;
+                current.left *= gain;
+                current.right *= gain;
+            }
+            voice.lastSourceLeft = current.left;
+            voice.lastSourceRight = current.right;
+            return current;
+        }
 
         void rebuildPitchRates() noexcept
         {
@@ -291,7 +383,7 @@ namespace beat
             if (!sample || !sample->isValid())
                 return;
 
-            const int sampleCount = sample->audio->getNumSamples();
+            const int sampleCount = sample->frameCount();
             const auto finiteRatio = [](float ratio, float fallback)
             {
                 return std::clamp(std::isfinite(ratio) ? ratio : fallback, 0.0f, 1.0f);
@@ -333,6 +425,7 @@ namespace beat
         }
 
         static constexpr int endFadeSamples = 64;
+        static constexpr int streamTransitionSamples = 64;
         SourcePrepareSpec prepared;
         std::shared_ptr<const ImmutableSampleSource> sample;
         std::array<double, 128> pitchRates {};
