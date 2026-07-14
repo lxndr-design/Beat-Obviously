@@ -2072,6 +2072,7 @@ namespace beat
             instrument.aether.sampleSlot1.enabled && aetherSampleSlot1 != nullptr,
             std::move(aetherSampleSlot1),
             juce::jlimit(0, 3, instrument.aether.sampleSlot1.routing),
+            instrument.aether.sampleSlot1.fxSends,
         };
         params.hasAetherSourceSends = [&instrument]
         {
@@ -2081,7 +2082,9 @@ namespace beat
                     && (instrument.aether.oscA.fxSends[bus] > 0.0001f
                         || instrument.aether.oscB.fxSends[bus] > 0.0001f
                         || instrument.aether.sub.fxSends[bus] > 0.0001f
-                        || instrument.aether.noise.fxSends[bus] > 0.0001f))
+                        || instrument.aether.noise.fxSends[bus] > 0.0001f
+                        || (instrument.aether.sampleSlot1.enabled
+                            && instrument.aether.sampleSlot1.fxSends[bus] > 0.0001f)))
                     return true;
             }
             return false;
@@ -2375,7 +2378,8 @@ namespace beat
                 route.synth = createInstrumentSynth(*routeInstrument, std::move(aetherSampleSlot1));
                 route.sourceFxBusIds = routeInstrument->aether.fxBusIds;
                 route.aetherSampleSlot1Identity = slot.enabled
-                    ? juce::String(slot.routing) + ":" + sampleIdentity
+                    ? juce::String(slot.routing) + ":" + juce::String(slot.fxSends[0], 6) + ":"
+                        + juce::String(slot.fxSends[1], 6) + ":" + sampleIdentity
                     : juce::String();
             }
 

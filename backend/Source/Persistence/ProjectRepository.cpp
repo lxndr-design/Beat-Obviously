@@ -385,6 +385,8 @@ namespace beat
             sampleSlot1->setProperty("loopEnabled", aether.sampleSlot1.loopEnabled);
             sampleSlot1->setProperty("loopStartRatio", aether.sampleSlot1.loopStartRatio);
             sampleSlot1->setProperty("loopEndRatio", aether.sampleSlot1.loopEndRatio);
+            sampleSlot1->setProperty("fxSend1", aether.sampleSlot1.fxSends[0]);
+            sampleSlot1->setProperty("fxSend2", aether.sampleSlot1.fxSends[1]);
             juce::Array<juce::var> mappedZones;
             for (const auto& zone : aether.sampleSlot1.zones)
             {
@@ -459,7 +461,7 @@ namespace beat
             if (sampleSlot1.isObject())
             {
                 const int sourceSchemaVersion = juce::jmax(0, (int) sampleSlot1.getProperty("schemaVersion", 0));
-                config.sampleSlot1.schemaVersion = 3;
+                config.sampleSlot1.schemaVersion = 4;
                 const bool requestedSlotEnabled = (bool) sampleSlot1.getProperty("enabled", false);
                 config.sampleSlot1.enabled = requestedSlotEnabled;
                 config.sampleSlot1.audioFileId = sampleSlot1.getProperty("audioFileId", "").toString();
@@ -472,6 +474,8 @@ namespace beat
                 config.sampleSlot1.loopEnabled = (bool) sampleSlot1.getProperty("loopEnabled", false);
                 config.sampleSlot1.loopStartRatio = juce::jlimit(0.0f, 1.0f, (float) (double) sampleSlot1.getProperty("loopStartRatio", 0.0));
                 config.sampleSlot1.loopEndRatio = juce::jlimit(0.0f, 1.0f, (float) (double) sampleSlot1.getProperty("loopEndRatio", 1.0));
+                config.sampleSlot1.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) (double) sampleSlot1.getProperty("fxSend1", 0.0));
+                config.sampleSlot1.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) (double) sampleSlot1.getProperty("fxSend2", 0.0));
                 if (config.sampleSlot1.endRatio <= config.sampleSlot1.startRatio)
                 {
                     config.sampleSlot1.startRatio = 0.0f;

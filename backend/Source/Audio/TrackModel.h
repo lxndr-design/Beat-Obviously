@@ -213,7 +213,7 @@ namespace beat
                 float loopEndRatio { 1.0f };
             };
 
-            int schemaVersion { 3 };
+            int schemaVersion { 4 };
             bool enabled { false };
             Id audioFileId;
             int rootNote { 60 };
@@ -226,6 +226,7 @@ namespace beat
             float loopStartRatio { 0.0f };
             float loopEndRatio { 1.0f };
             std::vector<Zone> zones;
+            std::array<float, 2> fxSends {};
         };
 
         struct AetherConfig

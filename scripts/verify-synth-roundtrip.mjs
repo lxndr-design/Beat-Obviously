@@ -191,6 +191,8 @@ try {
       "aether.noise.route": "direct",
       "aether.noise.fxSend1": 0.19,
       "aether.noise.fxSend2": 0.29,
+      "aether.sample.1.fxSend1": 0.37,
+      "aether.sample.1.fxSend2": 0.53,
       "aether.fxBus1Id": "return-a",
       "aether.fxBus2Id": "return-b",
       "aether.sample.1.enabled": true,
@@ -263,7 +265,7 @@ try {
   assert.deepEqual(independentUnisonPreview.aether.noise.fxSends, [0.19, 0.29]);
   assert.deepEqual(independentUnisonPreview.aether.fxBusIds, ["return-a", "return-b"]);
   assert.deepEqual(independentUnisonPreview.aether.sampleSlot1, {
-    schemaVersion: 3,
+    schemaVersion: 4,
     enabled: true,
     audioFileId: "audio-fixture-1",
     rootNote: 57,
@@ -275,15 +277,16 @@ try {
     loopEnabled: true,
     loopStartRatio: 0.25,
     loopEndRatio: 0.72,
+    fxSends: [0.37, 0.53],
     zones: independentUnisonDraft.metadata.sampleSlot1Zones,
   });
   assert.deepEqual(independentUnisonPreview.sampleIds, ["audio-fixture-1", "audio-low", "audio-high"]);
-  assert.equal(independentUnisonDraft.schemaVersion, 4);
+  assert.equal(independentUnisonDraft.schemaVersion, 5);
   const migratedSampleSlotDraft = synthStore.normalizeSynthDraftPatch({
     schemaVersion: 1,
     parameters: { "osc.a.level": 0.42 },
   });
-  assert.equal(migratedSampleSlotDraft.schemaVersion, 4);
+  assert.equal(migratedSampleSlotDraft.schemaVersion, 5);
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.enabled"], false);
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.audioFileId"], "");
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.start"], 0);
@@ -291,6 +294,8 @@ try {
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.loop.enabled"], false);
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.loop.start"], 0);
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.loop.end"], 1);
+  assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.fxSend1"], 0);
+  assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.fxSend2"], 0);
   assert.deepEqual(migratedSampleSlotDraft.metadata.sampleSlot1Zones, []);
   assert.equal(independentUnisonPreview.aether.runtimeWarp, 0.24);
   assert.equal(independentUnisonPreview.aether.runtimeWarpMode, "fold");

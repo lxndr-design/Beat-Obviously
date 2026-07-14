@@ -21,7 +21,7 @@ import benchmarkAetherStrings from "../data/aether_benchmark_strings_bank.json";
 import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
-export const SYNTH_PATCH_SCHEMA_VERSION = 4;
+export const SYNTH_PATCH_SCHEMA_VERSION = 5;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
 export const SYNTH_INSTRUMENT_TYPE = "wavetable-synth";
 export const DEFAULT_CUSTOM_WAVETABLE_ID = "user.custom";
@@ -140,6 +140,8 @@ export type SynthParameterId =
   | "aether.sample.1.loop.enabled"
   | "aether.sample.1.loop.start"
   | "aether.sample.1.loop.end"
+  | "aether.sample.1.fxSend1"
+  | "aether.sample.1.fxSend2"
   | "aether.fxBus1Id"
   | "aether.fxBus2Id"
   | "aether.mpe.enabled"
@@ -1167,6 +1169,8 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "aether.sample.1.loop.enabled": false,
   "aether.sample.1.loop.start": 0,
   "aether.sample.1.loop.end": 1,
+  "aether.sample.1.fxSend1": 0,
+  "aether.sample.1.fxSend2": 0,
   "aether.fxBus1Id": "",
   "aether.fxBus2Id": "",
   "aether.mpe.enabled": false,
@@ -1326,6 +1330,8 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "aether.sample.1.loop.enabled": "Sample Slot 1 Loop",
   "aether.sample.1.loop.start": "Sample Slot 1 Loop Start",
   "aether.sample.1.loop.end": "Sample Slot 1 Loop End",
+  "aether.sample.1.fxSend1": "Sample Slot 1 FX Send 1",
+  "aether.sample.1.fxSend2": "Sample Slot 1 FX Send 2",
   "aether.fxBus1Id": "Aether FX Bus 1",
   "aether.fxBus2Id": "Aether FX Bus 2",
   "aether.mpe.enabled": "MPE Zone Enabled",
@@ -2025,7 +2031,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         fxSends: [clamp01(getNumberParam(draft, "aether.noise.fxSend1")), clamp01(getNumberParam(draft, "aether.noise.fxSend2"))],
       },
       sampleSlot1: {
-        schemaVersion: 3,
+        schemaVersion: 4,
         enabled: getBooleanParam(draft, "aether.sample.1.enabled")
           && (Boolean(getStringParam(draft, "aether.sample.1.audioFileId")) || draft.metadata.sampleSlot1Zones.length > 0),
         audioFileId: getStringParam(draft, "aether.sample.1.audioFileId"),
@@ -2038,6 +2044,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         loopEnabled: getBooleanParam(draft, "aether.sample.1.loop.enabled"),
         loopStartRatio: clamp01(getNumberParam(draft, "aether.sample.1.loop.start")),
         loopEndRatio: clamp01(getNumberParam(draft, "aether.sample.1.loop.end")),
+        fxSends: [clamp01(getNumberParam(draft, "aether.sample.1.fxSend1")), clamp01(getNumberParam(draft, "aether.sample.1.fxSend2"))],
         zones: draft.metadata.sampleSlot1Zones,
       },
       fxBusIds: [getStringParam(draft, "aether.fxBus1Id"), getStringParam(draft, "aether.fxBus2Id")],
@@ -2275,6 +2282,8 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["aether.sample.1.loop.enabled"] = instrument.aether?.sampleSlot1?.loopEnabled ?? false;
   draft.parameters["aether.sample.1.loop.start"] = instrument.aether?.sampleSlot1?.loopStartRatio ?? 0;
   draft.parameters["aether.sample.1.loop.end"] = instrument.aether?.sampleSlot1?.loopEndRatio ?? 1;
+  draft.parameters["aether.sample.1.fxSend1"] = instrument.aether?.sampleSlot1?.fxSends?.[0] ?? 0;
+  draft.parameters["aether.sample.1.fxSend2"] = instrument.aether?.sampleSlot1?.fxSends?.[1] ?? 0;
   draft.metadata.sampleSlot1Zones = normalizeAetherSampleZones(instrument.aether?.sampleSlot1?.zones);
   draft.parameters["aether.fxBus1Id"] = instrument.aether?.fxBusIds?.[0] ?? "";
   draft.parameters["aether.fxBus2Id"] = instrument.aether?.fxBusIds?.[1] ?? "";

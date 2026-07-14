@@ -701,6 +701,7 @@ namespace beat
             StereoSample directRaw;
             StereoSample filter1Raw;
             StereoSample filter2Raw;
+            AetherTableStackRenderer::StereoFrame sampleSourceFrame {};
             std::array<AetherTableStackRenderer::StereoFrame, 4> sourceFrames {};
             if (params.hasAether)
             {
@@ -744,6 +745,7 @@ namespace beat
                 if (params.aetherSampleSlot1.enabled && params.aetherSampleSlot1.source)
                 {
                     const auto sampleFrame = aetherSampleSlot1.renderFrame();
+                    sampleSourceFrame = { sampleFrame.left, sampleFrame.right };
                     if (params.aetherSampleSlot1.routing == 1)
                     {
                         directRaw.left += sampleFrame.left; directRaw.right += sampleFrame.right;
@@ -995,6 +997,9 @@ namespace beat
                         send.left += sourceFrames[source].left * sendGain;
                         send.right += sourceFrames[source].right * sendGain;
                     }
+                    const float sampleSendGain = VoiceMath::clamp01(params.aetherSampleSlot1.fxSends[bus]);
+                    send.left += sampleSourceFrame.left * sampleSendGain;
+                    send.right += sampleSourceFrame.right * sampleSendGain;
                     send.left *= leftGain * voiceGain;
                     send.right *= rightGain * voiceGain;
                     const auto transitionedSend = sourceSendTransitions[bus].process(send);

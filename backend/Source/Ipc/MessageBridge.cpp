@@ -2220,7 +2220,7 @@ namespace beat
                         if (sampleSlot1.isObject())
                         {
                             const int slotSchemaVersion = juce::jmax(0, (int) sampleSlot1.getProperty("schemaVersion", 0));
-                            instrument.aether.sampleSlot1.schemaVersion = 3;
+                            instrument.aether.sampleSlot1.schemaVersion = 4;
                             const bool requestedSlotEnabled = (bool) sampleSlot1.getProperty("enabled", false);
                             instrument.aether.sampleSlot1.enabled = requestedSlotEnabled;
                             instrument.aether.sampleSlot1.audioFileId = sampleSlot1.getProperty("audioFileId", "").toString();
@@ -2233,6 +2233,18 @@ namespace beat
                             instrument.aether.sampleSlot1.loopEnabled = (bool) sampleSlot1.getProperty("loopEnabled", false);
                             instrument.aether.sampleSlot1.loopStartRatio = normalizedParam(sampleSlot1, "loopStartRatio", 0.0f);
                             instrument.aether.sampleSlot1.loopEndRatio = normalizedParam(sampleSlot1, "loopEndRatio", 1.0f);
+                            if (const auto* sampleFxSends = sampleSlot1.getProperty("fxSends", {}).getArray())
+                            {
+                                if (!sampleFxSends->isEmpty())
+                                    instrument.aether.sampleSlot1.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) (double) sampleFxSends->getReference(0));
+                                if (sampleFxSends->size() > 1)
+                                    instrument.aether.sampleSlot1.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) (double) sampleFxSends->getReference(1));
+                            }
+                            else
+                            {
+                                instrument.aether.sampleSlot1.fxSends[0] = normalizedParam(sampleSlot1, "fxSend1", 0.0f);
+                                instrument.aether.sampleSlot1.fxSends[1] = normalizedParam(sampleSlot1, "fxSend2", 0.0f);
+                            }
                             if (instrument.aether.sampleSlot1.endRatio <= instrument.aether.sampleSlot1.startRatio)
                             {
                                 instrument.aether.sampleSlot1.startRatio = 0.0f;
@@ -2266,7 +2278,7 @@ namespace beat
                                 }
                             }
                             instrument.aether.sampleSlot1.enabled = requestedSlotEnabled
-                                && slotSchemaVersion <= 3
+                                && slotSchemaVersion <= 4
                                 && (instrument.aether.sampleSlot1.audioFileId.isNotEmpty()
                                     || !instrument.aether.sampleSlot1.zones.empty());
                         }

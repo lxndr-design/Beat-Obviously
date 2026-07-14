@@ -7796,8 +7796,9 @@ namespace
         instrument.aether.noise.level = 0.06f;
         instrument.aether.noise.color = 0.81f;
         instrument.aether.noise.fxSends = { 0.13f, 0.19f };
-        instrument.aether.sampleSlot1 = { 3, true, "sample-slot-asset", 57, 0.73f, -0.21f, 3,
+        instrument.aether.sampleSlot1 = { 4, true, "sample-slot-asset", 57, 0.73f, -0.21f, 3,
             0.18f, 0.82f, true, 0.27f, 0.71f };
+        instrument.aether.sampleSlot1.fxSends = { 0.37f, 0.53f };
         instrument.aether.sampleSlot1.zones.push_back({ "sample-slot-low", 48, 0, 63, 0, 127,
             0.71f, -0.3f, 0.1f, 0.9f, true, 0.2f, 0.7f });
         instrument.aether.sampleSlot1.zones.push_back({ "sample-slot-high", 72, 64, 127, 32, 127,
@@ -7911,7 +7912,7 @@ namespace
                 && near(loadedInstrument.aether.noise.color, 0.81f)
                 && near(loadedInstrument.aether.noise.fxSends[0], 0.13f)
                 && near(loadedInstrument.aether.noise.fxSends[1], 0.19f)
-                && loadedInstrument.aether.sampleSlot1.schemaVersion == 3
+                && loadedInstrument.aether.sampleSlot1.schemaVersion == 4
                 && loadedInstrument.aether.sampleSlot1.enabled
                 && loadedInstrument.aether.sampleSlot1.audioFileId == "sample-slot-asset"
                 && loadedInstrument.aether.sampleSlot1.rootNote == 57
@@ -7923,6 +7924,8 @@ namespace
                 && loadedInstrument.aether.sampleSlot1.loopEnabled
                 && near(loadedInstrument.aether.sampleSlot1.loopStartRatio, 0.27f)
                 && near(loadedInstrument.aether.sampleSlot1.loopEndRatio, 0.71f)
+                && near(loadedInstrument.aether.sampleSlot1.fxSends[0], 0.37f)
+                && near(loadedInstrument.aether.sampleSlot1.fxSends[1], 0.53f)
                 && loadedInstrument.aether.sampleSlot1.zones.size() == 2
                 && loadedInstrument.aether.sampleSlot1.zones[0].audioFileId == "sample-slot-low"
                 && loadedInstrument.aether.sampleSlot1.zones[0].rootNote == 48
@@ -9762,7 +9765,7 @@ namespace
         instrument.aether.oscB.enabled = false;
         instrument.aether.sub.enabled = false;
         instrument.aether.noise.enabled = false;
-        instrument.aether.sampleSlot1 = { 3, true, "aether-slot-asset", 69, 0.72f, -0.18f, 0,
+        instrument.aether.sampleSlot1 = { 4, true, "aether-slot-asset", 69, 0.72f, -0.18f, 0,
             0.1f, 0.9f, true, 0.25f, 0.75f };
         instrument.aether.sampleSlot1.zones.push_back({ "aether-slot-asset", 69, 0, 63, 0, 127,
             0.72f, -0.18f, 0.1f, 0.9f, true, 0.25f, 0.75f });
@@ -10994,8 +10997,91 @@ namespace
                       << " sentEnergy=" << sentEnergy
                       << " sentDiff=" << sentDiff
                       << " mutedDiff=" << mutedDiff << "\n";
+            return false;
         }
-        return ok;
+
+        auto sampleFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-aether-sample-send.wav");
+        if (!writeAudioClipFixture(sampleFile))
+            return false;
+
+        auto sampleDryProject = makeDenseAetherProject();
+        sampleDryProject.audioFiles.push_back({ "aether-send-sample", "Aether Send Sample",
+            sampleFile.getFullPathName(), 0.5, 44100.0 });
+        auto& dryAether = sampleDryProject.instruments.front().aether;
+        dryAether.oscA.enabled = false;
+        dryAether.oscB.enabled = false;
+        dryAether.sub.enabled = false;
+        dryAether.noise.enabled = false;
+        dryAether.sampleSlot1 = { 4, true, "aether-send-sample", 69, 0.8f, 0.0f, 1,
+            0.0f, 1.0f, false, 0.0f, 1.0f };
+
+        auto sampleSentProject = sampleDryProject;
+        auto sampleMutedProject = sampleDryProject;
+        beat::ReturnBus sampleBus;
+        sampleBus.id = "aether-sample-fx-1";
+        sampleBus.name = "Aether Sample FX 1";
+        sampleSentProject.returnBuses.push_back(sampleBus);
+        sampleBus.mute = true;
+        sampleMutedProject.returnBuses.push_back(sampleBus);
+        const auto configureSampleSend = [](beat::Project& project)
+        {
+            auto& aether = project.instruments.front().aether;
+            aether.fxBusIds[0] = "aether-sample-fx-1";
+            aether.sampleSlot1.fxSends[0] = 0.65f;
+        };
+        configureSampleSend(sampleSentProject);
+        configureSampleSend(sampleMutedProject);
+
+        const auto sampleDry = renderOfflineChunks(sampleDryProject, 8192, 257);
+        const auto sampleSent = renderOfflineChunks(sampleSentProject, 8192, 257);
+        const auto sampleMuted = renderOfflineChunks(sampleMutedProject, 8192, 257);
+        double sampleSentDiff = 0.0;
+        double sampleMutedDiff = 0.0;
+        for (int channel = 0; channel < sampleDry.getNumChannels(); ++channel)
+            for (int sample = 0; sample < sampleDry.getNumSamples(); ++sample)
+            {
+                const float drySample = sampleDry.getSample(channel, sample);
+                const float sentSample = sampleSent.getSample(channel, sample);
+                const float mutedSample = sampleMuted.getSample(channel, sample);
+                if (!std::isfinite(drySample) || !std::isfinite(sentSample) || !std::isfinite(mutedSample))
+                {
+                    sampleFile.deleteFile();
+                    return false;
+                }
+                sampleSentDiff += std::abs((double) sentSample - drySample);
+                sampleMutedDiff += std::abs((double) mutedSample - drySample);
+            }
+
+        beat::AudioEngine callbackEngine;
+        constexpr int callbackBlockSize = 256;
+        callbackEngine.prepareForOffline(48000.0, callbackBlockSize, 2);
+        callbackEngine.applyProject(sampleSentProject);
+        callbackEngine.requestPlay();
+        for (int block = 0; block < 4; ++block)
+            renderEngineBlock(callbackEngine, callbackBlockSize);
+        juce::AudioBuffer<float> callbackOutput(2, callbackBlockSize);
+        std::array<float*, 2> callbackOutputs {
+            callbackOutput.getWritePointer(0), callbackOutput.getWritePointer(1),
+        };
+        juce::AudioIODeviceCallbackContext callbackContext;
+        beat::test::beginRealtimeSafetyProbe();
+        callbackEngine.audioDeviceIOCallbackWithContext(
+            nullptr, 0, callbackOutputs.data(), 2, callbackBlockSize, callbackContext);
+        const size_t sampleSendViolations = beat::test::endRealtimeSafetyProbe();
+        sampleFile.deleteFile();
+
+        const bool sampleOk = bufferEnergy(sampleDry) > 0.0001
+            && sampleSentDiff > 0.01
+            && sampleMutedDiff < 0.00001
+            && sampleSendViolations == 0
+            && std::isfinite(bufferEnergy(callbackOutput));
+        if (!sampleOk)
+        {
+            std::cerr << "Aether sample-source send stress failed sentDiff=" << sampleSentDiff
+                      << " mutedDiff=" << sampleMutedDiff
+                      << " callbackViolations=" << sampleSendViolations << "\n";
+        }
+        return sampleOk;
     }
 
     bool stressAudioEngineGroupRouting()

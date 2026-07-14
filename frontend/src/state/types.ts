@@ -469,7 +469,7 @@ export interface AetherNoiseConfig {
 }
 
 export interface AetherSampleSlotConfig {
-  schemaVersion: 3;
+  schemaVersion: 4;
   enabled: boolean;
   audioFileId: Id;
   rootNote: number;
@@ -481,6 +481,7 @@ export interface AetherSampleSlotConfig {
   loopEnabled: boolean;
   loopStartRatio: number;
   loopEndRatio: number;
+  fxSends?: [number, number];
   zones?: AetherSampleZoneConfig[];
 }
 
@@ -623,8 +624,8 @@ export interface SynthPatchMacroDefinition {
 }
 
 export interface SynthPatchSnapshot {
-  /** v2 adds Sample Slot 1; v3 slicing/looping; v4 bounded mapped zones. */
-  schemaVersion: 1 | 2 | 3 | 4;
+  /** v2 adds Sample Slot 1; v3 slicing/looping; v4 bounded mapped zones; v5 sample-source FX sends. */
+  schemaVersion: 1 | 2 | 3 | 4 | 5;
   instrumentType: "wavetable-synth";
   namespace: "synth";
   name: string;

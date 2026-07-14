@@ -1591,6 +1591,8 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             <SynthParameterKnob id="aether.sub.fxSend2" label="Sub 2" defaultValue={0} onChange={setNumericParameter} />
             <SynthParameterKnob id="aether.noise.fxSend1" label="Noise 1" defaultValue={0} onChange={setNumericParameter} />
             <SynthParameterKnob id="aether.noise.fxSend2" label="Noise 2" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.sample.1.fxSend1" label="Sample 1" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.sample.1.fxSend2" label="Sample 2" defaultValue={0} onChange={setNumericParameter} />
           </div>
         </div>
       </div>

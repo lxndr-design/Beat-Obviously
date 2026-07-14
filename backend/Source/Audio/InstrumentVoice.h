@@ -141,6 +141,7 @@ namespace beat
                 bool enabled { false };
                 std::shared_ptr<const ImmutableMappedSampleSource> source;
                 int routing { 0 };
+                std::array<float, 2> fxSends {};
             };
 
             struct DynamicModTarget

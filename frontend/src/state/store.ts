@@ -2003,7 +2003,7 @@ export function defaultAetherSynthConfig() {
       color: 0.45,
     },
     sampleSlot1: {
-      schemaVersion: 3,
+      schemaVersion: 4,
       enabled: false,
       audioFileId: "",
       rootNote: 60,
@@ -2015,6 +2015,7 @@ export function defaultAetherSynthConfig() {
       loopEnabled: false,
       loopStartRatio: 0,
       loopEndRatio: 1,
+      fxSends: [0, 0],
       zones: [],
     },
     runtimeWarp: 0,

@@ -1343,6 +1343,8 @@ try {
       && synthEditorSource.includes('checked={props.zone.loopEnabled}')
       && synthEditorSource.includes('const loopStartRatio = Math.max(startRatio, props.zone.loopStartRatio)')
       && synthEditorSource.includes('const loopEndRatio = Math.min(endRatio, props.zone.loopEndRatio)')
+      && synthEditorSource.includes('id="aether.sample.1.fxSend1"')
+      && synthEditorSource.includes('id="aether.sample.1.fxSend2"')
       && synthEditorSource.includes("zones.slice(0, 8)"),
     "Aether Sample Slot 1 should expose bounded mapped-zone selection and per-zone playback controls",
   );

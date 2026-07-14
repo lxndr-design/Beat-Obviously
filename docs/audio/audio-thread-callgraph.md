@@ -773,3 +773,23 @@ Solid editor NumberInput / Toggle
 ```
 
 Slice endpoint edits clamp the draft's loop endpoints before normalization; loop-point editing is disabled while the loop switch is off. No new function is called from `audioDeviceIOCallbackWithContext`, `InstrumentVoice::renderNextBlock`, or offline rendering. The C2C callback graph and fixed eight-zone bound are unchanged.
+
+## Milestone C2E sample-source send edge
+
+```text
+setup/control: schema-v5 patch / sample-slot-v4 project
+  -> clamp two sample send levels
+  -> resolve existing two project return-bus IDs
+  -> createInstrumentSynth fixed voice params
+
+callback render:
+  MappedSampleSourceSlot::renderFrame
+    -> existing filter/direct lane
+    -> fixed sampleSourceFrame
+       -> bus 1 accumulator * cached send 1
+       -> bus 2 accumulator * cached send 2
+  -> preallocated AetherSourceBusContext
+  -> existing project return-bus effect chains
+```
+
+The bus loop remains exactly two entries. A disabled sample slot or zero sends contributes silence; no map scan or send work is made variable by project size. Decoding, bus resolution, schema validation, and ownership changes stay on setup/control paths. Offline rendering follows the same accumulation edge and remains excluded from real-time interception.

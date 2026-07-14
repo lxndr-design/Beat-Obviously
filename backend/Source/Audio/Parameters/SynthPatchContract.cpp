@@ -478,7 +478,7 @@ namespace beat
         const auto sourceRoute = [](const juce::String& route) { return route == "direct" ? 1 : route == "filter1" ? 2 : route == "filter2" ? 3 : 0; };
         instrument.aether.sub.routing = sourceRoute(synthStringParam(params, "aether.sub.route", "filter"));
         instrument.aether.noise.routing = sourceRoute(synthStringParam(params, "aether.noise.route", "filter"));
-        instrument.aether.sampleSlot1.schemaVersion = 3;
+        instrument.aether.sampleSlot1.schemaVersion = 4;
         instrument.aether.sampleSlot1.audioFileId = synthStringParam(params, "aether.sample.1.audioFileId", "");
         const bool requestedSampleSlotEnabled = synthNumberParam(params, "aether.sample.1.enabled", 0.0) >= 0.5;
         instrument.aether.sampleSlot1.enabled = requestedSampleSlotEnabled
@@ -500,6 +500,10 @@ namespace beat
             (float) synthNumberParam(params, "aether.sample.1.loop.start", 0.0));
         instrument.aether.sampleSlot1.loopEndRatio = juce::jlimit(0.0f, 1.0f,
             (float) synthNumberParam(params, "aether.sample.1.loop.end", 1.0));
+        instrument.aether.sampleSlot1.fxSends[0] = juce::jlimit(0.0f, 1.0f,
+            (float) synthNumberParam(params, "aether.sample.1.fxSend1", 0.0));
+        instrument.aether.sampleSlot1.fxSends[1] = juce::jlimit(0.0f, 1.0f,
+            (float) synthNumberParam(params, "aether.sample.1.fxSend2", 0.0));
         if (instrument.aether.sampleSlot1.endRatio <= instrument.aether.sampleSlot1.startRatio)
         {
             instrument.aether.sampleSlot1.startRatio = 0.0f;
