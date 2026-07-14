@@ -469,13 +469,18 @@ export interface AetherNoiseConfig {
 }
 
 export interface AetherSampleSlotConfig {
-  schemaVersion: 1;
+  schemaVersion: 2;
   enabled: boolean;
   audioFileId: Id;
   rootNote: number;
   level: number;
   pan: number;
   route?: "filter" | "both" | "filter1" | "filter2" | "direct";
+  startRatio: number;
+  endRatio: number;
+  loopEnabled: boolean;
+  loopStartRatio: number;
+  loopEndRatio: number;
 }
 
 export interface AetherSynthConfig {
@@ -601,8 +606,8 @@ export interface SynthPatchMacroDefinition {
 }
 
 export interface SynthPatchSnapshot {
-  /** v2 adds the optional Aether sample-slot parameter family. */
-  schemaVersion: 1 | 2;
+  /** v2 adds Sample Slot 1; v3 adds its normalized slice and forward-loop fields. */
+  schemaVersion: 1 | 2 | 3;
   instrumentType: "wavetable-synth";
   namespace: "synth";
   name: string;

@@ -199,6 +199,11 @@ try {
       "aether.sample.1.level": 0.73,
       "aether.sample.1.pan": -0.22,
       "aether.sample.1.route": "filter2",
+      "aether.sample.1.start": 0.14,
+      "aether.sample.1.end": 0.86,
+      "aether.sample.1.loop.enabled": true,
+      "aether.sample.1.loop.start": 0.25,
+      "aether.sample.1.loop.end": 0.72,
       "aether.runtimeWarp": 0.24,
       "aether.runtimeWarpMode": "fold",
       "aether.runtimeWarp2": 0.41,
@@ -250,23 +255,33 @@ try {
   assert.deepEqual(independentUnisonPreview.aether.noise.fxSends, [0.19, 0.29]);
   assert.deepEqual(independentUnisonPreview.aether.fxBusIds, ["return-a", "return-b"]);
   assert.deepEqual(independentUnisonPreview.aether.sampleSlot1, {
-    schemaVersion: 1,
+    schemaVersion: 2,
     enabled: true,
     audioFileId: "audio-fixture-1",
     rootNote: 57,
     level: 0.73,
     pan: -0.22,
     route: "filter2",
+    startRatio: 0.14,
+    endRatio: 0.86,
+    loopEnabled: true,
+    loopStartRatio: 0.25,
+    loopEndRatio: 0.72,
   });
   assert.deepEqual(independentUnisonPreview.sampleIds, ["audio-fixture-1"]);
-  assert.equal(independentUnisonDraft.schemaVersion, 2);
+  assert.equal(independentUnisonDraft.schemaVersion, 3);
   const migratedSampleSlotDraft = synthStore.normalizeSynthDraftPatch({
     schemaVersion: 1,
     parameters: { "osc.a.level": 0.42 },
   });
-  assert.equal(migratedSampleSlotDraft.schemaVersion, 2);
+  assert.equal(migratedSampleSlotDraft.schemaVersion, 3);
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.enabled"], false);
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.audioFileId"], "");
+  assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.start"], 0);
+  assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.end"], 1);
+  assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.loop.enabled"], false);
+  assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.loop.start"], 0);
+  assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.loop.end"], 1);
   assert.equal(independentUnisonPreview.aether.runtimeWarp, 0.24);
   assert.equal(independentUnisonPreview.aether.runtimeWarpMode, "fold");
   assert.equal(independentUnisonPreview.aether.runtimeWarp2, 0.41);

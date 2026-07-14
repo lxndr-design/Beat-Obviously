@@ -1501,6 +1501,17 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             <SynthParameterKnob id="aether.sample.1.level" label="Level" defaultValue={0.8} onChange={setNumericParameter} />
             <SynthParameterKnob id="aether.sample.1.pan" label="Pan" defaultValue={0} bipolar onChange={setNumericParameter} />
           </div>
+          <div class={styles.knobCluster}>
+            <SynthParameterKnob id="aether.sample.1.start" label="Start" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.sample.1.end" label="End" defaultValue={1} onChange={setNumericParameter} />
+            <Toggle
+              label="Loop"
+              checked={draft().parameters["aether.sample.1.loop.enabled"] === true}
+              onChange={(value) => setBooleanParameter("aether.sample.1.loop.enabled", value)}
+            />
+            <SynthParameterKnob id="aether.sample.1.loop.start" label="Loop Start" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.sample.1.loop.end" label="Loop End" defaultValue={1} onChange={setNumericParameter} />
+          </div>
         </div>
         <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label="Aether shared FX buses">
           <div class={styles.ampFilterGroupTitle}>Source FX</div>

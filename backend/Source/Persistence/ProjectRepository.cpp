@@ -380,6 +380,11 @@ namespace beat
             sampleSlot1->setProperty("level", aether.sampleSlot1.level);
             sampleSlot1->setProperty("pan", aether.sampleSlot1.pan);
             sampleSlot1->setProperty("routing", aether.sampleSlot1.routing);
+            sampleSlot1->setProperty("startRatio", aether.sampleSlot1.startRatio);
+            sampleSlot1->setProperty("endRatio", aether.sampleSlot1.endRatio);
+            sampleSlot1->setProperty("loopEnabled", aether.sampleSlot1.loopEnabled);
+            sampleSlot1->setProperty("loopStartRatio", aether.sampleSlot1.loopStartRatio);
+            sampleSlot1->setProperty("loopEndRatio", aether.sampleSlot1.loopEndRatio);
             o->setProperty("sampleSlot1", juce::var(sampleSlot1.get()));
             o->setProperty("fxBus1Id", aether.fxBusIds[0]);
             o->setProperty("fxBus2Id", aether.fxBusIds[1]);
@@ -434,13 +439,31 @@ namespace beat
             if (sampleSlot1.isObject())
             {
                 const int sourceSchemaVersion = juce::jmax(0, (int) sampleSlot1.getProperty("schemaVersion", 0));
-                config.sampleSlot1.schemaVersion = 1;
+                config.sampleSlot1.schemaVersion = 2;
                 config.sampleSlot1.enabled = (bool) sampleSlot1.getProperty("enabled", false);
                 config.sampleSlot1.audioFileId = sampleSlot1.getProperty("audioFileId", "").toString();
                 config.sampleSlot1.rootNote = juce::jlimit(0, 127, (int) sampleSlot1.getProperty("rootNote", 60));
                 config.sampleSlot1.level = juce::jlimit(0.0f, 1.0f, (float) (double) sampleSlot1.getProperty("level", 0.8));
                 config.sampleSlot1.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) sampleSlot1.getProperty("pan", 0.0));
                 config.sampleSlot1.routing = juce::jlimit(0, 3, (int) sampleSlot1.getProperty("routing", 0));
+                config.sampleSlot1.startRatio = juce::jlimit(0.0f, 1.0f, (float) (double) sampleSlot1.getProperty("startRatio", 0.0));
+                config.sampleSlot1.endRatio = juce::jlimit(0.0f, 1.0f, (float) (double) sampleSlot1.getProperty("endRatio", 1.0));
+                config.sampleSlot1.loopEnabled = (bool) sampleSlot1.getProperty("loopEnabled", false);
+                config.sampleSlot1.loopStartRatio = juce::jlimit(0.0f, 1.0f, (float) (double) sampleSlot1.getProperty("loopStartRatio", 0.0));
+                config.sampleSlot1.loopEndRatio = juce::jlimit(0.0f, 1.0f, (float) (double) sampleSlot1.getProperty("loopEndRatio", 1.0));
+                if (config.sampleSlot1.endRatio <= config.sampleSlot1.startRatio)
+                {
+                    config.sampleSlot1.startRatio = 0.0f;
+                    config.sampleSlot1.endRatio = 1.0f;
+                }
+                if (config.sampleSlot1.loopStartRatio < config.sampleSlot1.startRatio
+                    || config.sampleSlot1.loopEndRatio > config.sampleSlot1.endRatio
+                    || config.sampleSlot1.loopEndRatio <= config.sampleSlot1.loopStartRatio)
+                {
+                    config.sampleSlot1.loopEnabled = false;
+                    config.sampleSlot1.loopStartRatio = config.sampleSlot1.startRatio;
+                    config.sampleSlot1.loopEndRatio = config.sampleSlot1.endRatio;
+                }
                 if (sourceSchemaVersion > config.sampleSlot1.schemaVersion)
                     config.sampleSlot1.enabled = false;
                 if (config.sampleSlot1.audioFileId.isEmpty())

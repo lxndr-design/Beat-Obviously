@@ -2333,6 +2333,11 @@ namespace beat
                         source->rootNote = juce::jlimit(0, 127, slot.rootNote);
                         source->gain = juce::jlimit(0.0f, 1.0f, slot.level);
                         source->pan = juce::jlimit(-1.0f, 1.0f, slot.pan);
+                        source->startRatio = juce::jlimit(0.0f, 1.0f, slot.startRatio);
+                        source->endRatio = juce::jlimit(0.0f, 1.0f, slot.endRatio);
+                        source->loopEnabled = slot.loopEnabled;
+                        source->loopStartRatio = juce::jlimit(0.0f, 1.0f, slot.loopStartRatio);
+                        source->loopEndRatio = juce::jlimit(0.0f, 1.0f, slot.loopEndRatio);
                         aetherSampleSlot1 = std::move(source);
                     }
                 }
@@ -2341,7 +2346,9 @@ namespace beat
                 route.aetherSampleSlot1Identity = slot.enabled
                     ? slot.audioFileId + ":" + juce::String(slot.rootNote) + ":"
                         + juce::String(slot.level, 6) + ":" + juce::String(slot.pan, 6)
-                        + ":" + juce::String(slot.routing)
+                        + ":" + juce::String(slot.routing) + ":" + juce::String(slot.startRatio, 6)
+                        + ":" + juce::String(slot.endRatio, 6) + ":" + juce::String((int) slot.loopEnabled)
+                        + ":" + juce::String(slot.loopStartRatio, 6) + ":" + juce::String(slot.loopEndRatio, 6)
                     : juce::String();
             }
 

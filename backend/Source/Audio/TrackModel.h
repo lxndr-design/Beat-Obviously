@@ -196,13 +196,18 @@ namespace beat
 
         struct AetherSampleSlot
         {
-            int schemaVersion { 1 };
+            int schemaVersion { 2 };
             bool enabled { false };
             Id audioFileId;
             int rootNote { 60 };
             float level { 0.8f };
             float pan { 0.0f };
             int routing { 0 };
+            float startRatio { 0.0f };
+            float endRatio { 1.0f };
+            bool loopEnabled { false };
+            float loopStartRatio { 0.0f };
+            float loopEndRatio { 1.0f };
         };
 
         struct AetherConfig

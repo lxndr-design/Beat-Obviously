@@ -7795,7 +7795,8 @@ namespace
         instrument.aether.noise.level = 0.06f;
         instrument.aether.noise.color = 0.81f;
         instrument.aether.noise.fxSends = { 0.13f, 0.19f };
-        instrument.aether.sampleSlot1 = { 1, true, "sample-slot-asset", 57, 0.73f, -0.21f, 3 };
+        instrument.aether.sampleSlot1 = { 2, true, "sample-slot-asset", 57, 0.73f, -0.21f, 3,
+            0.18f, 0.82f, true, 0.27f, 0.71f };
         instrument.aether.fxBusIds = { "return-a", "return-b" };
         instrument.aether.runtimeWarp = 0.63f;
         instrument.aether.runtimeWarpMode = 1;
@@ -7905,13 +7906,18 @@ namespace
                 && near(loadedInstrument.aether.noise.color, 0.81f)
                 && near(loadedInstrument.aether.noise.fxSends[0], 0.13f)
                 && near(loadedInstrument.aether.noise.fxSends[1], 0.19f)
-                && loadedInstrument.aether.sampleSlot1.schemaVersion == 1
+                && loadedInstrument.aether.sampleSlot1.schemaVersion == 2
                 && loadedInstrument.aether.sampleSlot1.enabled
                 && loadedInstrument.aether.sampleSlot1.audioFileId == "sample-slot-asset"
                 && loadedInstrument.aether.sampleSlot1.rootNote == 57
                 && near(loadedInstrument.aether.sampleSlot1.level, 0.73f)
                 && near(loadedInstrument.aether.sampleSlot1.pan, -0.21f)
                 && loadedInstrument.aether.sampleSlot1.routing == 3
+                && near(loadedInstrument.aether.sampleSlot1.startRatio, 0.18f)
+                && near(loadedInstrument.aether.sampleSlot1.endRatio, 0.82f)
+                && loadedInstrument.aether.sampleSlot1.loopEnabled
+                && near(loadedInstrument.aether.sampleSlot1.loopStartRatio, 0.27f)
+                && near(loadedInstrument.aether.sampleSlot1.loopEndRatio, 0.71f)
                 && loadedInstrument.aether.fxBusIds[0] == "return-a"
                 && loadedInstrument.aether.fxBusIds[1] == "return-b"
                 && near(loadedInstrument.aether.runtimeWarp, 0.63f)
@@ -9743,7 +9749,8 @@ namespace
         instrument.aether.oscB.enabled = false;
         instrument.aether.sub.enabled = false;
         instrument.aether.noise.enabled = false;
-        instrument.aether.sampleSlot1 = { 1, true, "aether-slot-asset", 69, 0.72f, -0.18f, 0 };
+        instrument.aether.sampleSlot1 = { 2, true, "aether-slot-asset", 69, 0.72f, -0.18f, 0,
+            0.1f, 0.9f, true, 0.25f, 0.75f };
 
         constexpr int samples = 12000;
         const auto live = renderOfflineChunks(project, samples, 257);
@@ -9767,6 +9774,7 @@ namespace
         auto replacementProject = project;
         replacementProject.instruments.front().aether.sampleSlot1.rootNote = 57;
         replacementProject.instruments.front().aether.sampleSlot1.pan = 0.62f;
+        replacementProject.instruments.front().aether.sampleSlot1.startRatio = 0.2f;
         transitionEngine.applyProject(std::move(replacementProject));
         const auto afterReplacement = renderEngineBlock(transitionEngine, 257);
         const float replacementBoundaryStep = juce::jmax(
@@ -11626,6 +11634,65 @@ namespace
             ? (double) (resampledCrossings - 1) * 44100.0 / (double) (lastResampled - firstResampled)
             : 0.0;
         if (std::abs(resampledFrequency - 440.0) > 0.5)
+            return false;
+
+        auto slicedSource = std::make_shared<beat::ImmutableSampleSource>(*source);
+        slicedSource->startRatio = 0.251f;
+        slicedSource->endRatio = 0.301f;
+        beat::SampleSourceSlot slicedSlot;
+        if (!slicedSlot.prepare({ 48000.0, 512, 2 }) || !slicedSlot.publish(slicedSource)
+            || !slicedSlot.noteOn({ 69, 1.0f, 2101 }))
+            return false;
+        const auto slicedFirst = slicedSlot.renderFrame();
+        const int expectedStart = (int) std::round(0.251 * sourceAudio->getNumSamples());
+        const float expectedFirst = sourceAudio->getSample(0, expectedStart)
+            * slicedSource->gain * std::sqrt(0.5f);
+        juce::AudioBuffer<float> slicedTail(2, 3000);
+        slicedTail.clear();
+        slicedSlot.render(slicedTail, 0, slicedTail.getNumSamples());
+        if (std::abs(slicedFirst.left - expectedFirst) > 0.00001f
+            || slicedSlot.activeVoiceCount() != 0)
+            return false;
+
+        auto loopedSource = std::make_shared<beat::ImmutableSampleSource>(*source);
+        loopedSource->startRatio = 0.1f;
+        loopedSource->endRatio = 0.9f;
+        loopedSource->loopEnabled = true;
+        loopedSource->loopStartRatio = 0.2f;
+        loopedSource->loopEndRatio = 0.3f;
+        beat::SampleSourceSlot loopedSlot;
+        juce::AudioBuffer<float> loopedOutput(2, 20000);
+        loopedOutput.clear();
+        if (!loopedSlot.prepare({ 48000.0, 512, 2 }) || !loopedSlot.publish(loopedSource)
+            || !loopedSlot.noteOn({ 69, 1.0f, 2201 }))
+            return false;
+        beat::test::beginRealtimeSafetyProbe();
+        loopedSlot.render(loopedOutput, 0, loopedOutput.getNumSamples());
+        const size_t loopViolations = beat::test::endRealtimeSafetyProbe();
+        float maximumLoopStep = 0.0f;
+        for (int sampleIndex = 1; sampleIndex < loopedOutput.getNumSamples(); ++sampleIndex)
+            maximumLoopStep = std::max(maximumLoopStep,
+                std::abs(loopedOutput.getSample(0, sampleIndex) - loopedOutput.getSample(0, sampleIndex - 1)));
+        loopedSlot.noteOff(2201);
+        loopedSlot.render(loopedOutput, 0, 512);
+        if (loopViolations != 0 || loopedSlot.activeVoiceCount() != 0
+            || bufferEnergy(loopedOutput) <= 0.01 || maximumLoopStep >= 0.15f)
+            return false;
+
+        auto invalidLoopSource = std::make_shared<beat::ImmutableSampleSource>(*source);
+        invalidLoopSource->startRatio = 0.2f;
+        invalidLoopSource->endRatio = 0.4f;
+        invalidLoopSource->loopEnabled = true;
+        invalidLoopSource->loopStartRatio = 0.35f;
+        invalidLoopSource->loopEndRatio = 0.25f;
+        beat::SampleSourceSlot invalidLoopSlot;
+        juce::AudioBuffer<float> invalidLoopOutput(2, 12000);
+        invalidLoopOutput.clear();
+        if (!invalidLoopSlot.prepare({ 48000.0, 512, 2 }) || !invalidLoopSlot.publish(invalidLoopSource)
+            || !invalidLoopSlot.noteOn({ 69, 1.0f, 2301 }))
+            return false;
+        invalidLoopSlot.render(invalidLoopOutput, 0, invalidLoopOutput.getNumSamples());
+        if (invalidLoopSlot.activeVoiceCount() != 0)
             return false;
 
         if (slot.publish(source))

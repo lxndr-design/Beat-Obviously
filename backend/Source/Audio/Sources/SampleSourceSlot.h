@@ -19,6 +19,11 @@ namespace beat
         int rootNote { 60 };
         float gain { 1.0f };
         float pan { 0.0f };
+        float startRatio { 0.0f };
+        float endRatio { 1.0f };
+        bool loopEnabled { false };
+        float loopStartRatio { 0.0f };
+        float loopEndRatio { 1.0f };
 
         bool isValid() const noexcept
         {
@@ -57,6 +62,7 @@ namespace beat
                 return false;
 
             sample = std::move(next);
+            rebuildPlaybackRegion();
             rebuildPitchRates();
             version.fetch_add(1, std::memory_order_release);
             return true;
@@ -92,7 +98,7 @@ namespace beat
                 false,
                 event.stableNoteId,
                 event.midiNote,
-                0.0,
+                (double) playbackStart,
                 pitchRates[(size_t) event.midiNote],
                 std::clamp(event.velocity, 0.0f, 1.0f) * sample->gain,
                 0,
@@ -158,7 +164,6 @@ namespace beat
                 return result;
 
             const int sourceChannels = sample->audio->getNumChannels();
-            const int sourceSamples = sample->audio->getNumSamples();
             const float pan = std::clamp(sample->pan, -1.0f, 1.0f);
             const float leftPan = std::sqrt(0.5f * (1.0f - pan));
             const float rightPan = std::sqrt(0.5f * (1.0f + pan));
@@ -166,29 +171,54 @@ namespace beat
             for (auto& voice : voices)
             {
                 if (!voice.active) continue;
-                const int sourceIndex = (int) voice.position;
-                if (sourceIndex >= sourceSamples - 1)
+                if (!playbackLoopEnabled && voice.position >= (double) (playbackEnd - 1))
                 {
                     voice = {};
                     continue;
                 }
-                const float fraction = (float) (voice.position - (double) sourceIndex);
-                const int samplesToEnd = sourceSamples - 1 - sourceIndex;
-                const float endGain = samplesToEnd < endFadeSamples
+                if (playbackLoopEnabled && voice.position >= (double) playbackLoopEnd)
+                    voice.position = wrapLoopPosition(voice.position);
+
+                const int sourceIndex = std::clamp((int) voice.position, playbackStart, playbackEnd - 1);
+                const int samplesToEnd = playbackEnd - 1 - sourceIndex;
+                const float endGain = !playbackLoopEnabled && samplesToEnd < endFadeSamples
                     ? std::clamp((float) samplesToEnd / (float) endFadeSamples, 0.0f, 1.0f) : 1.0f;
                 const float releaseGain = voice.releasing
                     ? std::clamp((float) voice.releaseRemaining / (float) std::max(1, releaseSamples), 0.0f, 1.0f) : 1.0f;
                 const float gain = voice.gain * endGain * releaseGain;
-                const auto interpolate = [&](int channel)
+                const auto interpolateAt = [&](int channel, double position, bool wrapAtLoopEnd)
                 {
                     const int sourceChannel = std::min(channel, sourceChannels - 1);
-                    const float a = sample->audio->getSample(sourceChannel, sourceIndex);
-                    const float b = sample->audio->getSample(sourceChannel, sourceIndex + 1);
-                    return (a + (b - a) * fraction) * gain;
+                    const int index = std::clamp((int) position, playbackStart, playbackEnd - 1);
+                    int next = index + 1;
+                    if (wrapAtLoopEnd && next >= playbackLoopEnd)
+                        next = playbackLoopStart;
+                    else
+                        next = std::min(next, playbackEnd - 1);
+                    const float fraction = (float) (position - (double) index);
+                    const float a = sample->audio->getSample(sourceChannel, index);
+                    const float b = sample->audio->getSample(sourceChannel, next);
+                    return a + (b - a) * fraction;
+                };
+                const auto interpolate = [&](int channel)
+                {
+                    float value = interpolateAt(channel, voice.position, playbackLoopEnabled);
+                    if (playbackLoopEnabled && loopCrossfadeSamples > 0
+                        && voice.position >= (double) (playbackLoopEnd - loopCrossfadeSamples))
+                    {
+                        const double offset = voice.position - (double) (playbackLoopEnd - loopCrossfadeSamples);
+                        const float blend = std::clamp((float) (offset / (double) loopCrossfadeSamples), 0.0f, 1.0f);
+                        const double incomingPosition = (double) playbackLoopStart + offset;
+                        const float incoming = interpolateAt(channel, incomingPosition, false);
+                        value += (incoming - value) * blend;
+                    }
+                    return value * gain;
                 };
                 result.left += interpolate(0) * leftPan;
                 result.right += interpolate(sourceChannels > 1 ? 1 : 0) * rightPan;
                 voice.position += voice.rate;
+                if (playbackLoopEnabled && voice.position >= (double) playbackLoopEnd)
+                    voice.position = wrapLoopPosition(voice.position);
                 ++renderTelemetry.renderedVoiceSamples;
                 if (voice.releasing && --voice.releaseRemaining <= 0) voice = {};
                 anyReleasing = anyReleasing || (voice.active && voice.releasing);
@@ -246,6 +276,58 @@ namespace beat
                 pitchRates[(size_t) note] = (sourceRate / engineRate) * std::exp2((double) (note - root) / 12.0);
         }
 
+        void rebuildPlaybackRegion() noexcept
+        {
+            playbackStart = 0;
+            playbackEnd = 2;
+            playbackLoopStart = 0;
+            playbackLoopEnd = 2;
+            playbackLoopEnabled = false;
+            loopCrossfadeSamples = 0;
+            if (!sample || !sample->isValid())
+                return;
+
+            const int sampleCount = sample->audio->getNumSamples();
+            const auto finiteRatio = [](float ratio, float fallback)
+            {
+                return std::clamp(std::isfinite(ratio) ? ratio : fallback, 0.0f, 1.0f);
+            };
+            float startRatio = finiteRatio(sample->startRatio, 0.0f);
+            float endRatio = finiteRatio(sample->endRatio, 1.0f);
+            if (endRatio <= startRatio)
+            {
+                startRatio = 0.0f;
+                endRatio = 1.0f;
+            }
+            const float requestedLoopStart = finiteRatio(sample->loopStartRatio, startRatio);
+            const float requestedLoopEnd = finiteRatio(sample->loopEndRatio, endRatio);
+            const bool requestedLoopValid = requestedLoopStart >= startRatio
+                && requestedLoopEnd <= endRatio
+                && requestedLoopEnd > requestedLoopStart;
+            const auto ratioToSample = [sampleCount](float ratio)
+            {
+                return (int) std::round(ratio * (float) sampleCount);
+            };
+            playbackStart = std::clamp(ratioToSample(startRatio), 0, sampleCount - 2);
+            playbackEnd = std::clamp(ratioToSample(endRatio), playbackStart + 2, sampleCount);
+            playbackLoopStart = std::clamp(ratioToSample(requestedLoopStart), playbackStart, playbackEnd - 2);
+            playbackLoopEnd = std::clamp(ratioToSample(requestedLoopEnd), playbackLoopStart + 2, playbackEnd);
+            playbackLoopEnabled = sample->loopEnabled && requestedLoopValid
+                && playbackLoopEnd - playbackLoopStart >= 2;
+            loopCrossfadeSamples = playbackLoopEnabled
+                ? std::min(endFadeSamples, (playbackLoopEnd - playbackLoopStart) / 2)
+                : 0;
+        }
+
+        double wrapLoopPosition(double position) const noexcept
+        {
+            const double loopStartAfterCrossfade = (double) (playbackLoopStart + loopCrossfadeSamples);
+            const double loopLength = (double) playbackLoopEnd - loopStartAfterCrossfade;
+            if (!playbackLoopEnabled || loopLength <= 0.0)
+                return position;
+            return loopStartAfterCrossfade + std::fmod(position - (double) playbackLoopEnd, loopLength);
+        }
+
         static constexpr int endFadeSamples = 64;
         SourcePrepareSpec prepared;
         std::shared_ptr<const ImmutableSampleSource> sample;
@@ -254,6 +336,12 @@ namespace beat
         std::atomic<uint64_t> version { 0 };
         SourceRenderTelemetry renderTelemetry;
         int releaseSamples { 176 };
+        int playbackStart { 0 };
+        int playbackEnd { 2 };
+        int playbackLoopStart { 0 };
+        int playbackLoopEnd { 2 };
+        int loopCrossfadeSamples { 0 };
+        bool playbackLoopEnabled { false };
         bool hasReleasingVoice { false };
     };
 }

@@ -478,7 +478,7 @@ namespace beat
         const auto sourceRoute = [](const juce::String& route) { return route == "direct" ? 1 : route == "filter1" ? 2 : route == "filter2" ? 3 : 0; };
         instrument.aether.sub.routing = sourceRoute(synthStringParam(params, "aether.sub.route", "filter"));
         instrument.aether.noise.routing = sourceRoute(synthStringParam(params, "aether.noise.route", "filter"));
-        instrument.aether.sampleSlot1.schemaVersion = 1;
+        instrument.aether.sampleSlot1.schemaVersion = 2;
         instrument.aether.sampleSlot1.audioFileId = synthStringParam(params, "aether.sample.1.audioFileId", "");
         instrument.aether.sampleSlot1.enabled = synthNumberParam(params, "aether.sample.1.enabled", 0.0) >= 0.5
             && instrument.aether.sampleSlot1.audioFileId.isNotEmpty();
@@ -490,6 +490,24 @@ namespace beat
             (float) synthNumberParam(params, "aether.sample.1.pan", 0.0));
         instrument.aether.sampleSlot1.routing = sourceRoute(
             synthStringParam(params, "aether.sample.1.route", "filter"));
+        instrument.aether.sampleSlot1.startRatio = juce::jlimit(0.0f, 1.0f,
+            (float) synthNumberParam(params, "aether.sample.1.start", 0.0));
+        instrument.aether.sampleSlot1.endRatio = juce::jlimit(0.0f, 1.0f,
+            (float) synthNumberParam(params, "aether.sample.1.end", 1.0));
+        instrument.aether.sampleSlot1.loopEnabled = synthNumberParam(params, "aether.sample.1.loop.enabled", 0.0) >= 0.5;
+        instrument.aether.sampleSlot1.loopStartRatio = juce::jlimit(0.0f, 1.0f,
+            (float) synthNumberParam(params, "aether.sample.1.loop.start", 0.0));
+        instrument.aether.sampleSlot1.loopEndRatio = juce::jlimit(0.0f, 1.0f,
+            (float) synthNumberParam(params, "aether.sample.1.loop.end", 1.0));
+        if (instrument.aether.sampleSlot1.endRatio <= instrument.aether.sampleSlot1.startRatio)
+        {
+            instrument.aether.sampleSlot1.startRatio = 0.0f;
+            instrument.aether.sampleSlot1.endRatio = 1.0f;
+        }
+        if (instrument.aether.sampleSlot1.loopStartRatio < instrument.aether.sampleSlot1.startRatio
+            || instrument.aether.sampleSlot1.loopEndRatio > instrument.aether.sampleSlot1.endRatio
+            || instrument.aether.sampleSlot1.loopEndRatio <= instrument.aether.sampleSlot1.loopStartRatio)
+            instrument.aether.sampleSlot1.loopEnabled = false;
         instrument.aether.sub.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.sub.fxSend1", 0.0));
         instrument.aether.sub.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.sub.fxSend2", 0.0));
         instrument.aether.noise.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.noise.fxSend1", 0.0));

@@ -713,3 +713,28 @@ live callback or offline engine: BeatSynthesiser::renderNextBlock
 ```
 
 Offline rendering follows the same graph but is excluded from real-time callback instrumentation. Missing assets publish no source and render silence. Slot identity changes are detected while rebuilding route state and arm the existing bounded `effectGraphTransition` from the previous route output; no old sample owner is destroyed by the callback.
+
+## Milestone C2B Slot 1 slice/loop edge
+
+Setup and persistence remain outside the callback:
+
+```text
+synth patch v1/v2 -> normalizeSynthDraftPatch -> v3 full-range/loop-off defaults
+MessageBridge / ProjectRepository -> AetherSampleSlot v2 -> AudioEngine::applyProject
+decoded cache alias -> ImmutableSampleSource normalized bounds
+  -> SampleSourceSlot::publish
+       -> rebuildPlaybackRegion (integer bounds + maximum 64-sample seam)
+```
+
+The live callback remains fixed-work:
+
+```text
+InstrumentVoice::renderNextBlock
+  -> SampleSourceSlot::renderFrame
+       -> cached slice-end test or cached loop wrap
+       -> one linear interpolation per channel normally
+       -> at most two per channel inside the bounded loop seam
+  -> existing Filter / Filter 1 / Filter 2 / Direct lane
+```
+
+Invalid loop bounds clear only looping. Offline rendering follows the same voice edge but remains excluded from real-time callback interception. Slice/loop identity changes enter the existing bounded route replacement bridge; no file decode, range validation, allocation, ownership destruction, or container growth occurs on the callback.

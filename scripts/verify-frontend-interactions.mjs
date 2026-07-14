@@ -1325,6 +1325,15 @@ try {
     "browser fixture coverage should exercise Aether Performance control editing",
   );
   assert.ok(
+    synthEditorSource.includes("Sample Slot 1")
+      && synthEditorSource.includes('id="aether.sample.1.start"')
+      && synthEditorSource.includes('id="aether.sample.1.end"')
+      && synthEditorSource.includes('checked={draft().parameters["aether.sample.1.loop.enabled"] === true}')
+      && synthEditorSource.includes('id="aether.sample.1.loop.start"')
+      && synthEditorSource.includes('id="aether.sample.1.loop.end"'),
+    "Aether Sample Slot 1 should expose every persisted slice and forward-loop field",
+  );
+  assert.ok(
     synthEditorSource.includes('aria-label="Aether MPE member zone"')
       && synthEditorSource.includes('aria-label="Enable Aether MPE member zone"')
       && synthEditorSource.includes('ariaLabel="MPE manager channel"')
