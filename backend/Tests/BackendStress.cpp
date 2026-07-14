@@ -29,6 +29,7 @@
 #include "../Source/Audio/Rendering/TrackBouncePlanner.h"
 #include "../Source/Audio/Sampler/DecentSamplerImporter.h"
 #include "../Source/Audio/Sources/SampleSourceSlot.h"
+#include "../Source/Audio/Sources/BoundedSamplePageCache.h"
 #include "../Source/Audio/Sources/MappedSampleSourceSlot.h"
 #include "../Source/Audio/Sources/SourceSlotRack.h"
 #include "../Source/Audio/Transitions/VoiceTransition.h"
@@ -11621,6 +11622,148 @@ namespace
         return violations == 0 && std::isfinite(bufferEnergy(output));
     }
 
+    class DeterministicSamplePageLoader final : public beat::SamplePageLoader
+    {
+    public:
+        explicit DeterministicSamplePageLoader(int64_t frames) : totalFrames(frames) {}
+
+        int readFrames(int64_t firstFrame, int frameCount,
+                       float* left, float* right) noexcept override
+        {
+            calls.fetch_add(1, std::memory_order_relaxed);
+            if (firstFrame < 0 || firstFrame >= totalFrames || frameCount <= 0)
+                return 0;
+            const int available = (int) std::min<int64_t>(frameCount, totalFrames - firstFrame);
+            for (int index = 0; index < available; ++index)
+            {
+                const float value = expected(firstFrame + index);
+                left[index] = value;
+                right[index] = -value;
+            }
+            return available;
+        }
+
+        static float expected(int64_t frame) noexcept
+        {
+            return (float) ((frame % 997) + 1) / 997.0f;
+        }
+
+        const int64_t totalFrames;
+        std::atomic<uint64_t> calls { 0 };
+    };
+
+    bool stressBoundedSamplePageCache()
+    {
+        constexpr int64_t frameCount = (int64_t) beat::BoundedSamplePageCache::pageFrames * 96 + 17;
+        DeterministicSamplePageLoader loader(frameCount);
+        beat::BoundedSamplePageCache cache(loader, frameCount);
+        if (!cache.isValid() || cache.frameCount() != frameCount || !cache.preloadFrame(0))
+            return false;
+
+        beat::BoundedSamplePageCache::StereoFrame frame;
+        beat::test::beginRealtimeSafetyProbe();
+        const bool hit = cache.readStereoFrame(123, frame);
+        const bool miss = cache.readStereoFrame(
+            (int64_t) beat::BoundedSamplePageCache::pageFrames * 20, frame);
+        const size_t callbackViolations = beat::test::endRealtimeSafetyProbe();
+        if (!hit || miss || callbackViolations != 0)
+        {
+            std::cerr << "  bounded cache callback boundary failed hit=" << hit
+                      << " miss=" << miss << " violations=" << callbackViolations << "\n";
+            return false;
+        }
+
+        // Repeated misses for one page occupy one queue entry.
+        (void) cache.readStereoFrame((int64_t) beat::BoundedSamplePageCache::pageFrames * 20, frame);
+        auto telemetry = cache.telemetry();
+        if (telemetry.requestsAccepted != 1 || telemetry.requestsDeduplicated != 1
+            || !cache.hasPendingRequest() || !cache.serviceOneRequest()
+            || !cache.isPageResident(20))
+        {
+            std::cerr << "  bounded cache request dedup/service failed accepted="
+                      << telemetry.requestsAccepted << " dedup=" << telemetry.requestsDeduplicated << "\n";
+            return false;
+        }
+
+        const int64_t requestedFrame = (int64_t) beat::BoundedSamplePageCache::pageFrames * 20 + 37;
+        if (!cache.readStereoFrame(requestedFrame, frame)
+            || !near(frame.left, DeterministicSamplePageLoader::expected(requestedFrame), 0.000001f)
+            || !near(frame.right, -frame.left, 0.000001f))
+        {
+            std::cerr << "  bounded cache materialized data mismatch\n";
+            return false;
+        }
+
+        // Queue overflow is explicit and bounded; it cannot allocate or block.
+        DeterministicSamplePageLoader saturationLoader(frameCount);
+        beat::BoundedSamplePageCache saturated(saturationLoader, frameCount);
+        for (int64_t page = 0; page < 90; ++page)
+            (void) saturated.readStereoFrame(page * beat::BoundedSamplePageCache::pageFrames, frame);
+        const auto saturationTelemetry = saturated.telemetry();
+        if (saturationTelemetry.requestsAccepted != beat::BoundedSamplePageCache::requestCapacity
+            || saturationTelemetry.requestsRejected == 0)
+        {
+            std::cerr << "  bounded cache saturation was not reported accepted="
+                      << saturationTelemetry.requestsAccepted << " rejected="
+                      << saturationTelemetry.requestsRejected << "\n";
+            return false;
+        }
+
+        // Exercise bank replacement while a single worker services callback requests.
+        DeterministicSamplePageLoader concurrentLoader(frameCount);
+        beat::BoundedSamplePageCache concurrent(concurrentLoader, frameCount);
+        for (int page = 0; page < (int) beat::BoundedSamplePageCache::residentPageCount; ++page)
+            if (!concurrent.preloadFrame((int64_t) page * beat::BoundedSamplePageCache::pageFrames))
+                return false;
+
+        std::atomic<bool> callbackDone { false };
+        std::thread worker([&] {
+            while (!callbackDone.load(std::memory_order_acquire) || concurrent.hasPendingRequest())
+            {
+                if (!concurrent.serviceOneRequest())
+                    std::this_thread::yield();
+            }
+        });
+
+        uint32_t random = 0x9e3779b9u;
+        uint64_t concurrentHits = 0;
+        bool coherent = true;
+        for (int iteration = 0; iteration < 200000; ++iteration)
+        {
+            random = random * 1664525u + 1013904223u;
+            const int64_t position = (int64_t) (random % (uint32_t) frameCount);
+            if (!concurrent.readStereoFrame(position, frame))
+                continue;
+            ++concurrentHits;
+            if (!std::isfinite(frame.left) || !std::isfinite(frame.right)
+                || !near(frame.left, DeterministicSamplePageLoader::expected(position), 0.000001f)
+                || !near(frame.right, -frame.left, 0.000001f))
+            {
+                coherent = false;
+                break;
+            }
+        }
+        callbackDone.store(true, std::memory_order_release);
+        worker.join();
+
+        telemetry = concurrent.telemetry();
+        if (!coherent || concurrentHits == 0 || telemetry.pagesLoaded <= beat::BoundedSamplePageCache::residentPageCount
+            || telemetry.cacheMisses == 0 || telemetry.underflows != telemetry.cacheMisses)
+        {
+            std::cerr << "  bounded cache concurrency failed coherent=" << coherent
+                      << " hits=" << concurrentHits << " loads=" << telemetry.pagesLoaded
+                      << " misses=" << telemetry.cacheMisses << " underflows=" << telemetry.underflows << "\n";
+            return false;
+        }
+
+        const auto beforeInvalid = cache.telemetry();
+        if (cache.readStereoFrame(frameCount, frame))
+            return false;
+        const auto afterInvalid = cache.telemetry();
+        return afterInvalid.underflows == beforeInvalid.underflows + 1
+            && afterInvalid.requestsAccepted == beforeInvalid.requestsAccepted;
+    }
+
     bool stressAetherSampleSourceSlot()
     {
         if (beat::sourceSlotIndices.size() != 3
@@ -15368,6 +15511,11 @@ int main()
     if (!stressRealtimeSafetyDetectorNegativeCases())
     {
         std::cerr << "Realtime safety detector negative-case stress failed\n";
+        return 1;
+    }
+    if (!stressBoundedSamplePageCache())
+    {
+        std::cerr << "Bounded sample page-cache stress failed\n";
         return 1;
     }
     if (!stressAetherSampleSourceSlot())

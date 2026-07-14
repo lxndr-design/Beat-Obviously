@@ -810,3 +810,21 @@ callback render
 ```
 
 Single matches, gaps, and identical key/velocity duplicates retain one-or-zero-child behavior. No crossfade coefficient evolves during rendering: weights are computed once at note-on and stored through each child voice's existing gain scalar. Offline rendering follows the same deterministic edge and is excluded from real-time interception.
+
+## Milestone C2G bounded streaming-cache foundation
+
+```text
+setup/test worker (not callback)
+  -> SamplePageLoader::readFrames
+  -> inactive preallocated page bank
+  -> atomic descriptor publication
+
+candidate callback boundary (not production-connected)
+  -> BoundedSamplePageCache::readStereoFrame
+       -> bounded 16-slot descriptor scan
+       -> reader pin + descriptor verification
+       -> preallocated stereo-frame copy on hit
+       -> fixed SPSC request + atomic underflow telemetry on miss
+```
+
+The candidate owns neither a thread nor a file reader. The callback edge cannot invoke `SamplePageLoader`, allocate, resize, acquire a mutex, or wait. A single background consumer is the only request-queue reader. Double page banks prevent the worker from writing the currently published bank, and generation-bearing descriptors prevent a delayed callback reader from accepting a replaced bank as the earlier page publication. Queue full is an explicit bounded failure. Production `SampleSourceSlot` still reads immutable decoded `AudioBuffer` data; therefore the production callback and offline call graphs above are unchanged. Connection remains gated on shared worker lifetime, attack/loop preloading, underflow fades, and explicit live/offline selection.

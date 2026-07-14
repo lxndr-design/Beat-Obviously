@@ -77,6 +77,7 @@ target_sources(Beat PRIVATE
     Source/Audio/Rendering/TrackBouncePlanner.h
     Source/Audio/Sampler/DecentSamplerImporter.cpp
     Source/Audio/Sampler/DecentSamplerImporter.h
+    Source/Audio/Sources/BoundedSamplePageCache.h
     Source/Audio/Sources/SampleSourceSlot.h
     Source/Audio/Sources/SourceSlot.h
     Source/Audio/Sources/SourceSlotRack.h
@@ -229,6 +230,7 @@ add_executable(BeatBackendStress
     Source/Audio/Rendering/TrackBouncePlanner.h
     Source/Audio/Sampler/DecentSamplerImporter.cpp
     Source/Audio/Sampler/DecentSamplerImporter.h
+    Source/Audio/Sources/BoundedSamplePageCache.h
     Source/Audio/Sources/SampleSourceSlot.h
     Source/Audio/Sources/SourceSlot.h
     Source/Audio/Sources/SourceSlotRack.h
