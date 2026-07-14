@@ -9767,9 +9767,9 @@ namespace
         instrument.aether.noise.enabled = false;
         instrument.aether.sampleSlot1 = { 4, true, "aether-slot-asset", 69, 0.72f, -0.18f, 0,
             0.1f, 0.9f, true, 0.25f, 0.75f };
-        instrument.aether.sampleSlot1.zones.push_back({ "aether-slot-asset", 69, 0, 63, 0, 127,
+        instrument.aether.sampleSlot1.zones.push_back({ "aether-slot-asset", 69, 0, 80, 0, 127,
             0.72f, -0.18f, 0.1f, 0.9f, true, 0.25f, 0.75f });
-        instrument.aether.sampleSlot1.zones.push_back({ "aether-slot-asset", 81, 64, 127, 0, 127,
+        instrument.aether.sampleSlot1.zones.push_back({ "aether-slot-asset", 81, 40, 127, 0, 127,
             0.68f, 0.18f, 0.0f, 1.0f, false, 0.0f, 1.0f });
 
         constexpr int samples = 12000;
@@ -11856,6 +11856,107 @@ namespace
         }
         if (mappedSlot.publish(mappedSource)) { std::cerr << "  mapped active publish accepted\n"; return false; }
         mappedSlot.allNotesOff(true);
+
+        auto overlapSource = std::make_shared<beat::ImmutableMappedSampleSource>();
+        overlapSource->zones[0] = mappedFixture(0.5f, 0, 80, 0, 127);
+        overlapSource->zones[1] = mappedFixture(0.25f, 40, 127, 0, 127);
+        overlapSource->zoneCount = 2;
+        beat::MappedSampleSourceSlot overlapSlot;
+        if (!overlapSlot.prepare({ 48000.0, 512, 2 }) || !overlapSlot.publish(overlapSource))
+            return false;
+        const auto renderOverlapNote = [&](int note, float velocity, uint64_t stableId)
+        {
+            if (!overlapSlot.noteOn({ note, velocity, stableId }))
+                return beat::SampleSourceSlot::StereoFrame {};
+            const auto frame = overlapSlot.renderFrame();
+            overlapSlot.allNotesOff(true);
+            return frame;
+        };
+        const auto lowOverlap = renderOverlapNote(40, 1.0f, 2501);
+        beat::test::beginRealtimeSafetyProbe();
+        const auto middleOverlap = renderOverlapNote(60, 1.0f, 2502);
+        const size_t overlapViolations = beat::test::endRealtimeSafetyProbe();
+        const auto highOverlap = renderOverlapNote(80, 1.0f, 2503);
+        const float expectedMiddle = (lowOverlap.left + highOverlap.left) * std::sqrt(0.5f);
+        if (lowOverlap.left <= highOverlap.left
+            || std::abs(middleOverlap.left - expectedMiddle) > 0.00001f
+            || overlapViolations != 0)
+        {
+            std::cerr << "  mapped key crossfade failed low=" << lowOverlap.left
+                      << " middle=" << middleOverlap.left << " expected=" << expectedMiddle
+                      << " high=" << highOverlap.left << " violations=" << overlapViolations << "\n";
+            return false;
+        }
+
+        auto velocityOverlapSource = std::make_shared<beat::ImmutableMappedSampleSource>();
+        velocityOverlapSource->zones[0] = mappedFixture(0.5f, 0, 127, 0, 80);
+        velocityOverlapSource->zones[1] = mappedFixture(0.25f, 0, 127, 40, 127);
+        velocityOverlapSource->zoneCount = 2;
+        beat::MappedSampleSourceSlot velocityOverlapSlot;
+        if (!velocityOverlapSlot.prepare({ 48000.0, 512, 2 }) || !velocityOverlapSlot.publish(velocityOverlapSource))
+            return false;
+        const auto renderVelocityOverlap = [&](int velocity, uint64_t stableId)
+        {
+            const float normalizedVelocity = (float) velocity / 127.0f;
+            if (!velocityOverlapSlot.noteOn({ 60, normalizedVelocity, stableId }))
+                return 0.0f;
+            const float normalizedFrame = velocityOverlapSlot.renderFrame().left / normalizedVelocity;
+            velocityOverlapSlot.allNotesOff(true);
+            return normalizedFrame;
+        };
+        const float lowVelocityOverlap = renderVelocityOverlap(40, 2601);
+        const float middleVelocityOverlap = renderVelocityOverlap(60, 2602);
+        const float highVelocityOverlap = renderVelocityOverlap(80, 2603);
+        const float expectedVelocityMiddle = (lowVelocityOverlap + highVelocityOverlap) * std::sqrt(0.5f);
+        if (std::abs(middleVelocityOverlap - expectedVelocityMiddle) > 0.00001f)
+        {
+            std::cerr << "  mapped velocity crossfade failed low=" << lowVelocityOverlap
+                      << " middle=" << middleVelocityOverlap << " expected=" << expectedVelocityMiddle
+                      << " high=" << highVelocityOverlap << "\n";
+            return false;
+        }
+
+        auto threeWayOverlapSource = std::make_shared<beat::ImmutableMappedSampleSource>();
+        threeWayOverlapSource->zones[0] = mappedFixture(-1.0f, 0, 127, 0, 127);
+        threeWayOverlapSource->zones[1] = mappedFixture(0.5f, 20, 100, 0, 127);
+        threeWayOverlapSource->zones[2] = mappedFixture(0.25f, 40, 85, 0, 127);
+        threeWayOverlapSource->zoneCount = 3;
+        beat::MappedSampleSourceSlot threeWayOverlapSlot;
+        if (!threeWayOverlapSlot.prepare({ 48000.0, 512, 2 })
+            || !threeWayOverlapSlot.publish(threeWayOverlapSource)
+            || !threeWayOverlapSlot.noteOn({ 60, 1.0f, 2651 }))
+            return false;
+        const auto threeWayFrame = threeWayOverlapSlot.renderFrame();
+        const float threeWayPosition = 20.0f / 45.0f;
+        const float expectedThreeWay = std::sqrt(0.5f) * (
+            0.25f * std::sin(threeWayPosition * juce::MathConstants<float>::halfPi)
+            + 0.5f * std::cos(threeWayPosition * juce::MathConstants<float>::halfPi));
+        if (threeWayOverlapSlot.activeVoiceCount() != 2
+            || std::abs(threeWayFrame.left - expectedThreeWay) > 0.00001f)
+        {
+            std::cerr << "  mapped three-way bound failed frame=" << threeWayFrame.left
+                      << " expected=" << expectedThreeWay
+                      << " voices=" << threeWayOverlapSlot.activeVoiceCount() << "\n";
+            return false;
+        }
+        threeWayOverlapSlot.allNotesOff(true);
+
+        auto duplicateSource = std::make_shared<beat::ImmutableMappedSampleSource>();
+        duplicateSource->zones[0] = mappedFixture(0.5f, 0, 127, 0, 127);
+        duplicateSource->zones[1] = mappedFixture(-0.5f, 0, 127, 0, 127);
+        duplicateSource->zoneCount = 2;
+        beat::MappedSampleSourceSlot duplicateSlot;
+        if (!duplicateSlot.prepare({ 48000.0, 512, 2 }) || !duplicateSlot.publish(duplicateSource)
+            || !duplicateSlot.noteOn({ 60, 1.0f, 2701 }))
+            return false;
+        const auto duplicateFrame = duplicateSlot.renderFrame();
+        if (duplicateFrame.left <= 0.0f || duplicateSlot.activeVoiceCount() != 1)
+        {
+            std::cerr << "  mapped duplicate tie-break failed frame=" << duplicateFrame.left
+                      << " voices=" << duplicateSlot.activeVoiceCount() << "\n";
+            return false;
+        }
+        duplicateSlot.allNotesOff(true);
 
         if (slot.publish(source))
             return false;

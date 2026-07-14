@@ -793,3 +793,20 @@ callback render:
 ```
 
 The bus loop remains exactly two entries. A disabled sample slot or zero sends contributes silence; no map scan or send work is made variable by project size. Decoding, bus resolution, schema validation, and ownership changes stay on setup/control paths. Offline rendering follows the same accumulation edge and remains excluded from real-time interception.
+
+## Milestone C2F overlap-selection edge
+
+```text
+callback note-on
+  -> fixed maximum-eight matching scan
+  -> most-specific + second-most-specific stable selection
+  -> key-overlap equal-power weights
+       or velocity-overlap weights when key centres coincide
+  -> at most two fixed SampleSourceSlot::noteOn calls
+
+callback render
+  -> existing fixed published-zone scan
+  -> child renderFrame sums already weighted voices
+```
+
+Single matches, gaps, and identical key/velocity duplicates retain one-or-zero-child behavior. No crossfade coefficient evolves during rendering: weights are computed once at note-on and stored through each child voice's existing gain scalar. Offline rendering follows the same deterministic edge and is excluded from real-time interception.

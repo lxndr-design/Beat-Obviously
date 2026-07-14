@@ -63,13 +63,24 @@ namespace beat
 
         bool noteOn(const SourceNoteEvent& event) noexcept override
         {
-            const int selected = selectZone(event);
-            if (selected < 0)
+            const auto selection = selectZones(event);
+            if (selection.first < 0)
             {
                 ++rejectedEvents;
                 return false;
             }
-            const bool accepted = zoneSlots[(size_t) selected].noteOn(event);
+
+            const auto startSelectedZone = [&](int index, float gain)
+            {
+                if (index < 0 || gain <= 0.000001f)
+                    return false;
+                auto weightedEvent = event;
+                weightedEvent.velocity = std::clamp(event.velocity, 0.0f, 1.0f) * gain;
+                return zoneSlots[(size_t) index].noteOn(weightedEvent);
+            };
+            const bool firstAccepted = startSelectedZone(selection.first, selection.firstGain);
+            const bool secondAccepted = startSelectedZone(selection.second, selection.secondGain);
+            const bool accepted = firstAccepted || secondAccepted;
             if (accepted) ++acceptedEvents;
             else ++rejectedEvents;
             return accepted;
@@ -156,13 +167,23 @@ namespace beat
         }
 
     private:
-        int selectZone(const SourceNoteEvent& event) const noexcept
+        struct ZoneSelection
+        {
+            int first { -1 };
+            int second { -1 };
+            float firstGain { 1.0f };
+            float secondGain { 0.0f };
+        };
+
+        ZoneSelection selectZones(const SourceNoteEvent& event) const noexcept
         {
             if (!map || event.midiNote < 0 || event.midiNote > 127)
-                return -1;
+                return {};
             const int velocity = std::clamp((int) std::round(std::clamp(event.velocity, 0.0f, 1.0f) * 127.0f), 0, 127);
             int best = -1;
+            int second = -1;
             int bestSpan = std::numeric_limits<int>::max();
+            int secondSpan = std::numeric_limits<int>::max();
             for (size_t index = 0; index < map->zoneCount; ++index)
             {
                 const auto& zone = map->zones[index];
@@ -172,11 +193,56 @@ namespace beat
                 const int span = (zone->hiNote - zone->loNote) * 128 + (zone->hiVelocity - zone->loVelocity);
                 if (span < bestSpan)
                 {
+                    second = best;
+                    secondSpan = bestSpan;
                     best = (int) index;
                     bestSpan = span;
                 }
+                else if (span < secondSpan)
+                {
+                    second = (int) index;
+                    secondSpan = span;
+                }
             }
-            return best;
+            if (best < 0 || second < 0)
+                return { best, -1, 1.0f, 0.0f };
+
+            const auto& firstZone = *map->zones[(size_t) best];
+            const auto& secondZone = *map->zones[(size_t) second];
+            const bool identicalBounds = firstZone.loNote == secondZone.loNote
+                && firstZone.hiNote == secondZone.hiNote
+                && firstZone.loVelocity == secondZone.loVelocity
+                && firstZone.hiVelocity == secondZone.hiVelocity;
+            if (identicalBounds)
+                return { best, -1, 1.0f, 0.0f };
+
+            const auto gainsAcrossOverlap = [](int firstLow, int firstHigh, int secondLow, int secondHigh, int value)
+            {
+                const int firstCentre = firstLow + firstHigh;
+                const int secondCentre = secondLow + secondHigh;
+                if (firstCentre == secondCentre)
+                    return std::array<float, 2> { 1.0f, 0.0f };
+                const int overlapLow = std::max(firstLow, secondLow);
+                const int overlapHigh = std::min(firstHigh, secondHigh);
+                const float position = overlapHigh == overlapLow ? 0.5f
+                    : std::clamp((float) (value - overlapLow) / (float) (overlapHigh - overlapLow), 0.0f, 1.0f);
+                const float lowGain = std::cos(position * juce::MathConstants<float>::halfPi);
+                const float highGain = std::sin(position * juce::MathConstants<float>::halfPi);
+                return firstCentre < secondCentre
+                    ? std::array<float, 2> { lowGain, highGain }
+                    : std::array<float, 2> { highGain, lowGain };
+            };
+
+            auto gains = gainsAcrossOverlap(firstZone.loNote, firstZone.hiNote,
+                secondZone.loNote, secondZone.hiNote, event.midiNote);
+            if (firstZone.loNote + firstZone.hiNote == secondZone.loNote + secondZone.hiNote)
+                gains = gainsAcrossOverlap(firstZone.loVelocity, firstZone.hiVelocity,
+                    secondZone.loVelocity, secondZone.hiVelocity, velocity);
+            if (gains[1] <= 0.000001f)
+                return { best, -1, 1.0f, 0.0f };
+            if (gains[0] <= 0.000001f)
+                return { second, -1, 1.0f, 0.0f };
+            return { best, second, gains[0], gains[1] };
         }
 
         SourcePrepareSpec prepared;

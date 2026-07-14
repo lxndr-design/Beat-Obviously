@@ -1549,7 +1549,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             </Button>
             <Show when={mappedZones().length > 0}>
               <Button size="xs" variant="ghost" onClick={() => commitMappedZones([])}>Use Single Zone</Button>
-              <span>{mappedZones().length}/8 zones · single controls seed new zones</span>
+              <span>{mappedZones().length}/8 zones · overlaps crossfade · single controls seed new zones</span>
             </Show>
           </div>
           <For each={mappedZones()}>{(zone, index) => (
