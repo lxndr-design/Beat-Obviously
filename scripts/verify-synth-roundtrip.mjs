@@ -234,6 +234,14 @@ try {
       "lfo.10.smoothing": 0.2,
       "lfo.10.phase": 0.3,
     },
+    metadata: {
+      sampleSlot1Zones: [
+        { audioFileId: "audio-low", rootNote: 48, loNote: 0, hiNote: 63, loVelocity: 0, hiVelocity: 127,
+          level: 0.8, pan: -0.2, startRatio: 0.1, endRatio: 0.9, loopEnabled: true, loopStartRatio: 0.2, loopEndRatio: 0.7 },
+        { audioFileId: "audio-high", rootNote: 72, loNote: 64, hiNote: 127, loVelocity: 32, hiVelocity: 127,
+          level: 0.7, pan: 0.2, startRatio: 0, endRatio: 1, loopEnabled: false, loopStartRatio: 0, loopEndRatio: 1 },
+      ],
+    },
   });
   const independentUnisonPreview = synthStore.synthDraftToPreviewInstrument(independentUnisonDraft);
   assert.equal(independentUnisonPreview.aether.oscA.wavetable.unison, 3);
@@ -255,7 +263,7 @@ try {
   assert.deepEqual(independentUnisonPreview.aether.noise.fxSends, [0.19, 0.29]);
   assert.deepEqual(independentUnisonPreview.aether.fxBusIds, ["return-a", "return-b"]);
   assert.deepEqual(independentUnisonPreview.aether.sampleSlot1, {
-    schemaVersion: 2,
+    schemaVersion: 3,
     enabled: true,
     audioFileId: "audio-fixture-1",
     rootNote: 57,
@@ -267,14 +275,15 @@ try {
     loopEnabled: true,
     loopStartRatio: 0.25,
     loopEndRatio: 0.72,
+    zones: independentUnisonDraft.metadata.sampleSlot1Zones,
   });
-  assert.deepEqual(independentUnisonPreview.sampleIds, ["audio-fixture-1"]);
-  assert.equal(independentUnisonDraft.schemaVersion, 3);
+  assert.deepEqual(independentUnisonPreview.sampleIds, ["audio-fixture-1", "audio-low", "audio-high"]);
+  assert.equal(independentUnisonDraft.schemaVersion, 4);
   const migratedSampleSlotDraft = synthStore.normalizeSynthDraftPatch({
     schemaVersion: 1,
     parameters: { "osc.a.level": 0.42 },
   });
-  assert.equal(migratedSampleSlotDraft.schemaVersion, 3);
+  assert.equal(migratedSampleSlotDraft.schemaVersion, 4);
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.enabled"], false);
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.audioFileId"], "");
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.start"], 0);
@@ -282,6 +291,7 @@ try {
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.loop.enabled"], false);
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.loop.start"], 0);
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.loop.end"], 1);
+  assert.deepEqual(migratedSampleSlotDraft.metadata.sampleSlot1Zones, []);
   assert.equal(independentUnisonPreview.aether.runtimeWarp, 0.24);
   assert.equal(independentUnisonPreview.aether.runtimeWarpMode, "fold");
   assert.equal(independentUnisonPreview.aether.runtimeWarp2, 0.41);

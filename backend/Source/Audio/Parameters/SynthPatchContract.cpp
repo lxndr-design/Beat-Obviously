@@ -478,9 +478,10 @@ namespace beat
         const auto sourceRoute = [](const juce::String& route) { return route == "direct" ? 1 : route == "filter1" ? 2 : route == "filter2" ? 3 : 0; };
         instrument.aether.sub.routing = sourceRoute(synthStringParam(params, "aether.sub.route", "filter"));
         instrument.aether.noise.routing = sourceRoute(synthStringParam(params, "aether.noise.route", "filter"));
-        instrument.aether.sampleSlot1.schemaVersion = 2;
+        instrument.aether.sampleSlot1.schemaVersion = 3;
         instrument.aether.sampleSlot1.audioFileId = synthStringParam(params, "aether.sample.1.audioFileId", "");
-        instrument.aether.sampleSlot1.enabled = synthNumberParam(params, "aether.sample.1.enabled", 0.0) >= 0.5
+        const bool requestedSampleSlotEnabled = synthNumberParam(params, "aether.sample.1.enabled", 0.0) >= 0.5;
+        instrument.aether.sampleSlot1.enabled = requestedSampleSlotEnabled
             && instrument.aether.sampleSlot1.audioFileId.isNotEmpty();
         instrument.aether.sampleSlot1.rootNote = juce::jlimit(0, 127,
             (int) std::round(synthNumberParam(params, "aether.sample.1.rootNote", 60.0)));
@@ -508,6 +509,32 @@ namespace beat
             || instrument.aether.sampleSlot1.loopEndRatio > instrument.aether.sampleSlot1.endRatio
             || instrument.aether.sampleSlot1.loopEndRatio <= instrument.aether.sampleSlot1.loopStartRatio)
             instrument.aether.sampleSlot1.loopEnabled = false;
+        if (const auto* mappedZones = objectProperty(metadata, "sampleSlot1Zones", {}).getArray())
+        {
+            for (int index = 0; index < juce::jmin(8, mappedZones->size()); ++index)
+            {
+                const auto& mapped = mappedZones->getReference(index);
+                if (!mapped.isObject()) continue;
+                InstrumentDefinition::AetherSampleSlot::Zone zone;
+                zone.audioFileId = mapped.getProperty("audioFileId", "").toString();
+                zone.rootNote = juce::jlimit(0, 127, (int) mapped.getProperty("rootNote", 60));
+                zone.loNote = juce::jlimit(0, 127, (int) mapped.getProperty("loNote", 0));
+                zone.hiNote = juce::jlimit(zone.loNote, 127, (int) mapped.getProperty("hiNote", 127));
+                zone.loVelocity = juce::jlimit(0, 127, (int) mapped.getProperty("loVelocity", 0));
+                zone.hiVelocity = juce::jlimit(zone.loVelocity, 127, (int) mapped.getProperty("hiVelocity", 127));
+                zone.level = juce::jlimit(0.0f, 1.0f, (float) (double) mapped.getProperty("level", 0.8));
+                zone.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) mapped.getProperty("pan", 0.0));
+                zone.startRatio = juce::jlimit(0.0f, 1.0f, (float) (double) mapped.getProperty("startRatio", 0.0));
+                zone.endRatio = juce::jlimit(zone.startRatio, 1.0f, (float) (double) mapped.getProperty("endRatio", 1.0));
+                zone.loopEnabled = (bool) mapped.getProperty("loopEnabled", false);
+                zone.loopStartRatio = juce::jlimit(zone.startRatio, zone.endRatio, (float) (double) mapped.getProperty("loopStartRatio", zone.startRatio));
+                zone.loopEndRatio = juce::jlimit(zone.loopStartRatio, zone.endRatio, (float) (double) mapped.getProperty("loopEndRatio", zone.endRatio));
+                if (zone.audioFileId.isNotEmpty()) instrument.aether.sampleSlot1.zones.push_back(std::move(zone));
+            }
+        }
+        instrument.aether.sampleSlot1.enabled = requestedSampleSlotEnabled
+            && (instrument.aether.sampleSlot1.audioFileId.isNotEmpty()
+                || !instrument.aether.sampleSlot1.zones.empty());
         instrument.aether.sub.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.sub.fxSend1", 0.0));
         instrument.aether.sub.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.sub.fxSend2", 0.0));
         instrument.aether.noise.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.noise.fxSend1", 0.0));

@@ -385,6 +385,26 @@ namespace beat
             sampleSlot1->setProperty("loopEnabled", aether.sampleSlot1.loopEnabled);
             sampleSlot1->setProperty("loopStartRatio", aether.sampleSlot1.loopStartRatio);
             sampleSlot1->setProperty("loopEndRatio", aether.sampleSlot1.loopEndRatio);
+            juce::Array<juce::var> mappedZones;
+            for (const auto& zone : aether.sampleSlot1.zones)
+            {
+                juce::DynamicObject::Ptr mapped = new juce::DynamicObject();
+                mapped->setProperty("audioFileId", zone.audioFileId);
+                mapped->setProperty("rootNote", zone.rootNote);
+                mapped->setProperty("loNote", zone.loNote);
+                mapped->setProperty("hiNote", zone.hiNote);
+                mapped->setProperty("loVelocity", zone.loVelocity);
+                mapped->setProperty("hiVelocity", zone.hiVelocity);
+                mapped->setProperty("level", zone.level);
+                mapped->setProperty("pan", zone.pan);
+                mapped->setProperty("startRatio", zone.startRatio);
+                mapped->setProperty("endRatio", zone.endRatio);
+                mapped->setProperty("loopEnabled", zone.loopEnabled);
+                mapped->setProperty("loopStartRatio", zone.loopStartRatio);
+                mapped->setProperty("loopEndRatio", zone.loopEndRatio);
+                mappedZones.add(juce::var(mapped.get()));
+            }
+            sampleSlot1->setProperty("zones", juce::var(mappedZones));
             o->setProperty("sampleSlot1", juce::var(sampleSlot1.get()));
             o->setProperty("fxBus1Id", aether.fxBusIds[0]);
             o->setProperty("fxBus2Id", aether.fxBusIds[1]);
@@ -439,8 +459,9 @@ namespace beat
             if (sampleSlot1.isObject())
             {
                 const int sourceSchemaVersion = juce::jmax(0, (int) sampleSlot1.getProperty("schemaVersion", 0));
-                config.sampleSlot1.schemaVersion = 2;
-                config.sampleSlot1.enabled = (bool) sampleSlot1.getProperty("enabled", false);
+                config.sampleSlot1.schemaVersion = 3;
+                const bool requestedSlotEnabled = (bool) sampleSlot1.getProperty("enabled", false);
+                config.sampleSlot1.enabled = requestedSlotEnabled;
                 config.sampleSlot1.audioFileId = sampleSlot1.getProperty("audioFileId", "").toString();
                 config.sampleSlot1.rootNote = juce::jlimit(0, 127, (int) sampleSlot1.getProperty("rootNote", 60));
                 config.sampleSlot1.level = juce::jlimit(0.0f, 1.0f, (float) (double) sampleSlot1.getProperty("level", 0.8));
@@ -468,6 +489,32 @@ namespace beat
                     config.sampleSlot1.enabled = false;
                 if (config.sampleSlot1.audioFileId.isEmpty())
                     config.sampleSlot1.enabled = false;
+                if (const auto* mappedZones = sampleSlot1.getProperty("zones", {}).getArray())
+                {
+                    for (int index = 0; index < juce::jmin(8, mappedZones->size()); ++index)
+                    {
+                        const auto& mapped = mappedZones->getReference(index);
+                        if (!mapped.isObject()) continue;
+                        InstrumentDefinition::AetherSampleSlot::Zone zone;
+                        zone.audioFileId = mapped.getProperty("audioFileId", "").toString();
+                        zone.rootNote = juce::jlimit(0, 127, (int) mapped.getProperty("rootNote", 60));
+                        zone.loNote = juce::jlimit(0, 127, (int) mapped.getProperty("loNote", 0));
+                        zone.hiNote = juce::jlimit(zone.loNote, 127, (int) mapped.getProperty("hiNote", 127));
+                        zone.loVelocity = juce::jlimit(0, 127, (int) mapped.getProperty("loVelocity", 0));
+                        zone.hiVelocity = juce::jlimit(zone.loVelocity, 127, (int) mapped.getProperty("hiVelocity", 127));
+                        zone.level = juce::jlimit(0.0f, 1.0f, (float) (double) mapped.getProperty("level", 0.8));
+                        zone.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) mapped.getProperty("pan", 0.0));
+                        zone.startRatio = juce::jlimit(0.0f, 1.0f, (float) (double) mapped.getProperty("startRatio", 0.0));
+                        zone.endRatio = juce::jlimit(zone.startRatio, 1.0f, (float) (double) mapped.getProperty("endRatio", 1.0));
+                        zone.loopEnabled = (bool) mapped.getProperty("loopEnabled", false);
+                        zone.loopStartRatio = juce::jlimit(zone.startRatio, zone.endRatio, (float) (double) mapped.getProperty("loopStartRatio", zone.startRatio));
+                        zone.loopEndRatio = juce::jlimit(zone.loopStartRatio, zone.endRatio, (float) (double) mapped.getProperty("loopEndRatio", zone.endRatio));
+                        if (zone.audioFileId.isNotEmpty()) config.sampleSlot1.zones.push_back(std::move(zone));
+                    }
+                }
+                config.sampleSlot1.enabled = requestedSlotEnabled
+                    && sourceSchemaVersion <= config.sampleSlot1.schemaVersion
+                    && (config.sampleSlot1.audioFileId.isNotEmpty() || !config.sampleSlot1.zones.empty());
             }
             config.fxBusIds[0] = aetherVar.getProperty("fxBus1Id", config.fxBusIds[0]).toString();
             config.fxBusIds[1] = aetherVar.getProperty("fxBus2Id", config.fxBusIds[1]).toString();

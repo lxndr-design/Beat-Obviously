@@ -1802,7 +1802,7 @@ namespace beat
 
     std::unique_ptr<juce::Synthesiser> AudioEngine::createInstrumentSynth(
         const InstrumentDefinition& instrument,
-        std::shared_ptr<const ImmutableSampleSource> aetherSampleSlot1)
+        std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1)
     {
         auto instrumentSynth = std::make_unique<BeatSynthesiser>();
         instrumentSynth->configureMemberExpressionZone({
@@ -2319,36 +2319,63 @@ namespace beat
 
             if (routeInstrument != nullptr)
             {
-                std::shared_ptr<const ImmutableSampleSource> aetherSampleSlot1;
+                std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1;
                 const auto& slot = routeInstrument->aether.sampleSlot1;
-                if (routeInstrument->hasAether && slot.enabled && slot.audioFileId.isNotEmpty())
+                auto sampleIdentity = juce::String();
+                if (routeInstrument->hasAether && slot.enabled)
                 {
-                    const auto foundSample = nextAudioFiles.find(slot.audioFileId);
-                    if (foundSample != nextAudioFiles.end() && foundSample->second)
+                    auto map = std::make_shared<ImmutableMappedSampleSource>();
+                    const auto addZone = [&](const Id& audioFileId, int rootNote, int loNote, int hiNote,
+                                             int loVelocity, int hiVelocity, float level, float pan,
+                                             float startRatio, float endRatio, bool loopEnabled,
+                                             float loopStartRatio, float loopEndRatio)
                     {
+                        if (map->zoneCount >= ImmutableMappedSampleSource::maximumZones || audioFileId.isEmpty())
+                            return;
+                        const auto foundSample = nextAudioFiles.find(audioFileId);
+                        if (foundSample == nextAudioFiles.end() || !foundSample->second)
+                            return;
                         auto source = std::make_shared<ImmutableSampleSource>();
                         source->audio = std::shared_ptr<const juce::AudioBuffer<float>>(
                             foundSample->second, &foundSample->second->audio);
                         source->sourceSampleRate = foundSample->second->sourceSampleRate;
-                        source->rootNote = juce::jlimit(0, 127, slot.rootNote);
-                        source->gain = juce::jlimit(0.0f, 1.0f, slot.level);
-                        source->pan = juce::jlimit(-1.0f, 1.0f, slot.pan);
-                        source->startRatio = juce::jlimit(0.0f, 1.0f, slot.startRatio);
-                        source->endRatio = juce::jlimit(0.0f, 1.0f, slot.endRatio);
-                        source->loopEnabled = slot.loopEnabled;
-                        source->loopStartRatio = juce::jlimit(0.0f, 1.0f, slot.loopStartRatio);
-                        source->loopEndRatio = juce::jlimit(0.0f, 1.0f, slot.loopEndRatio);
-                        aetherSampleSlot1 = std::move(source);
-                    }
+                        source->rootNote = juce::jlimit(0, 127, rootNote);
+                        source->loNote = juce::jlimit(0, 127, juce::jmin(loNote, hiNote));
+                        source->hiNote = juce::jlimit(0, 127, juce::jmax(loNote, hiNote));
+                        source->loVelocity = juce::jlimit(0, 127, juce::jmin(loVelocity, hiVelocity));
+                        source->hiVelocity = juce::jlimit(0, 127, juce::jmax(loVelocity, hiVelocity));
+                        source->gain = juce::jlimit(0.0f, 1.0f, level);
+                        source->pan = juce::jlimit(-1.0f, 1.0f, pan);
+                        source->startRatio = juce::jlimit(0.0f, 1.0f, startRatio);
+                        source->endRatio = juce::jlimit(0.0f, 1.0f, endRatio);
+                        source->loopEnabled = loopEnabled;
+                        source->loopStartRatio = juce::jlimit(0.0f, 1.0f, loopStartRatio);
+                        source->loopEndRatio = juce::jlimit(0.0f, 1.0f, loopEndRatio);
+                        map->zones[map->zoneCount++] = std::move(source);
+                        sampleIdentity += audioFileId + ":" + juce::String(rootNote) + ":"
+                            + juce::String(loNote) + ":" + juce::String(hiNote) + ":"
+                            + juce::String(loVelocity) + ":" + juce::String(hiVelocity) + ":"
+                            + juce::String(level, 6) + ":" + juce::String(pan, 6) + ":"
+                            + juce::String(startRatio, 6) + ":" + juce::String(endRatio, 6) + ":"
+                            + juce::String((int) loopEnabled) + ":" + juce::String(loopStartRatio, 6) + ":"
+                            + juce::String(loopEndRatio, 6) + ";";
+                    };
+                    if (slot.zones.empty())
+                        addZone(slot.audioFileId, slot.rootNote, 0, 127, 0, 127, slot.level, slot.pan,
+                                slot.startRatio, slot.endRatio, slot.loopEnabled, slot.loopStartRatio, slot.loopEndRatio);
+                    else
+                        for (const auto& zone : slot.zones)
+                            addZone(zone.audioFileId, zone.rootNote, zone.loNote, zone.hiNote,
+                                    zone.loVelocity, zone.hiVelocity, zone.level, zone.pan,
+                                    zone.startRatio, zone.endRatio, zone.loopEnabled,
+                                    zone.loopStartRatio, zone.loopEndRatio);
+                    if (map->zoneCount > 0)
+                        aetherSampleSlot1 = std::move(map);
                 }
                 route.synth = createInstrumentSynth(*routeInstrument, std::move(aetherSampleSlot1));
                 route.sourceFxBusIds = routeInstrument->aether.fxBusIds;
                 route.aetherSampleSlot1Identity = slot.enabled
-                    ? slot.audioFileId + ":" + juce::String(slot.rootNote) + ":"
-                        + juce::String(slot.level, 6) + ":" + juce::String(slot.pan, 6)
-                        + ":" + juce::String(slot.routing) + ":" + juce::String(slot.startRatio, 6)
-                        + ":" + juce::String(slot.endRatio, 6) + ":" + juce::String((int) slot.loopEnabled)
-                        + ":" + juce::String(slot.loopStartRatio, 6) + ":" + juce::String(slot.loopEndRatio, 6)
+                    ? juce::String(slot.routing) + ":" + sampleIdentity
                     : juce::String();
             }
 

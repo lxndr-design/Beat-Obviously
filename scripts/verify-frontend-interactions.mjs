@@ -1330,8 +1330,15 @@ try {
       && synthEditorSource.includes('id="aether.sample.1.end"')
       && synthEditorSource.includes('checked={draft().parameters["aether.sample.1.loop.enabled"] === true}')
       && synthEditorSource.includes('id="aether.sample.1.loop.start"')
-      && synthEditorSource.includes('id="aether.sample.1.loop.end"'),
-    "Aether Sample Slot 1 should expose every persisted slice and forward-loop field",
+      && synthEditorSource.includes('id="aether.sample.1.loop.end"')
+      && synthEditorSource.includes('aria-label="Aether Sample Slot 1 mapped zones"')
+      && synthEditorSource.includes("Create Key Map")
+      && synthEditorSource.includes('label="Key Low"')
+      && synthEditorSource.includes('label="Key High"')
+      && synthEditorSource.includes('label="Vel Low"')
+      && synthEditorSource.includes('label="Vel High"')
+      && synthEditorSource.includes("zones.slice(0, 8)"),
+    "Aether Sample Slot 1 should expose slicing, looping, and bounded mapped-zone controls",
   );
   assert.ok(
     synthEditorSource.includes('aria-label="Aether MPE member zone"')

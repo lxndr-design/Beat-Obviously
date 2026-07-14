@@ -469,13 +469,30 @@ export interface AetherNoiseConfig {
 }
 
 export interface AetherSampleSlotConfig {
-  schemaVersion: 2;
+  schemaVersion: 3;
   enabled: boolean;
   audioFileId: Id;
   rootNote: number;
   level: number;
   pan: number;
   route?: "filter" | "both" | "filter1" | "filter2" | "direct";
+  startRatio: number;
+  endRatio: number;
+  loopEnabled: boolean;
+  loopStartRatio: number;
+  loopEndRatio: number;
+  zones?: AetherSampleZoneConfig[];
+}
+
+export interface AetherSampleZoneConfig {
+  audioFileId: Id;
+  rootNote: number;
+  loNote: number;
+  hiNote: number;
+  loVelocity: number;
+  hiVelocity: number;
+  level: number;
+  pan: number;
   startRatio: number;
   endRatio: number;
   loopEnabled: boolean;
@@ -606,8 +623,8 @@ export interface SynthPatchMacroDefinition {
 }
 
 export interface SynthPatchSnapshot {
-  /** v2 adds Sample Slot 1; v3 adds its normalized slice and forward-loop fields. */
-  schemaVersion: 1 | 2 | 3;
+  /** v2 adds Sample Slot 1; v3 slicing/looping; v4 bounded mapped zones. */
+  schemaVersion: 1 | 2 | 3 | 4;
   instrumentType: "wavetable-synth";
   namespace: "synth";
   name: string;
@@ -624,6 +641,7 @@ export interface SynthPatchSnapshot {
     wavemaps?: Record<string, WavemapDefinition>;
     /** Legacy alias for older Aether patches. New code writes both keys. */
     customWavetables?: Record<string, CustomWavetableDefinition>;
+    sampleSlot1Zones?: AetherSampleZoneConfig[];
   };
 }
 

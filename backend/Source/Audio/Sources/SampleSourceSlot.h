@@ -24,6 +24,10 @@ namespace beat
         bool loopEnabled { false };
         float loopStartRatio { 0.0f };
         float loopEndRatio { 1.0f };
+        int loNote { 0 };
+        int hiNote { 127 };
+        int loVelocity { 0 };
+        int hiVelocity { 127 };
 
         bool isValid() const noexcept
         {

@@ -16,7 +16,7 @@
 #include "Realtime/VoiceRealtimeParams.h"
 #include "Realtime/VoiceNoteAutomation.h"
 #include "Realtime/VoiceNoteAutomationState.h"
-#include "Sources/SampleSourceSlot.h"
+#include "Sources/MappedSampleSourceSlot.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
 #include "Wavetable/WavetableUnisonPlan.h"
@@ -139,7 +139,7 @@ namespace beat
             struct AetherSampleSlot
             {
                 bool enabled { false };
-                std::shared_ptr<const ImmutableSampleSource> source;
+                std::shared_ptr<const ImmutableMappedSampleSource> source;
                 int routing { 0 };
             };
 
@@ -404,7 +404,7 @@ namespace beat
         WavetableUnisonPlan aetherUnisonPlanA;
         WavetableUnisonPlan aetherUnisonPlanB;
         AetherTableStackRenderer::InteractionState aetherInteractionState;
-        SampleSourceSlot aetherSampleSlot1;
+        MappedSampleSourceSlot aetherSampleSlot1;
         VoiceAetherCache::PanGains cachedPanGains;
         VoiceAetherCache::PitchRates cachedPitchRates;
         DynamicModulation::TargetActivityFlags cachedDynamicTargets;

@@ -196,7 +196,24 @@ namespace beat
 
         struct AetherSampleSlot
         {
-            int schemaVersion { 2 };
+            struct Zone
+            {
+                Id audioFileId;
+                int rootNote { 60 };
+                int loNote { 0 };
+                int hiNote { 127 };
+                int loVelocity { 0 };
+                int hiVelocity { 127 };
+                float level { 0.8f };
+                float pan { 0.0f };
+                float startRatio { 0.0f };
+                float endRatio { 1.0f };
+                bool loopEnabled { false };
+                float loopStartRatio { 0.0f };
+                float loopEndRatio { 1.0f };
+            };
+
+            int schemaVersion { 3 };
             bool enabled { false };
             Id audioFileId;
             int rootNote { 60 };
@@ -208,6 +225,7 @@ namespace beat
             bool loopEnabled { false };
             float loopStartRatio { 0.0f };
             float loopEndRatio { 1.0f };
+            std::vector<Zone> zones;
         };
 
         struct AetherConfig

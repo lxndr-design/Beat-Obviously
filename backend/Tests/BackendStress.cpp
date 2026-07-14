@@ -29,6 +29,7 @@
 #include "../Source/Audio/Rendering/TrackBouncePlanner.h"
 #include "../Source/Audio/Sampler/DecentSamplerImporter.h"
 #include "../Source/Audio/Sources/SampleSourceSlot.h"
+#include "../Source/Audio/Sources/MappedSampleSourceSlot.h"
 #include "../Source/Audio/Sources/SourceSlotRack.h"
 #include "../Source/Audio/Transitions/VoiceTransition.h"
 #include "../Source/Audio/VoiceAllocation.h"
@@ -7795,8 +7796,12 @@ namespace
         instrument.aether.noise.level = 0.06f;
         instrument.aether.noise.color = 0.81f;
         instrument.aether.noise.fxSends = { 0.13f, 0.19f };
-        instrument.aether.sampleSlot1 = { 2, true, "sample-slot-asset", 57, 0.73f, -0.21f, 3,
+        instrument.aether.sampleSlot1 = { 3, true, "sample-slot-asset", 57, 0.73f, -0.21f, 3,
             0.18f, 0.82f, true, 0.27f, 0.71f };
+        instrument.aether.sampleSlot1.zones.push_back({ "sample-slot-low", 48, 0, 63, 0, 127,
+            0.71f, -0.3f, 0.1f, 0.9f, true, 0.2f, 0.7f });
+        instrument.aether.sampleSlot1.zones.push_back({ "sample-slot-high", 72, 64, 127, 32, 127,
+            0.62f, 0.3f, 0.0f, 1.0f, false, 0.0f, 1.0f });
         instrument.aether.fxBusIds = { "return-a", "return-b" };
         instrument.aether.runtimeWarp = 0.63f;
         instrument.aether.runtimeWarpMode = 1;
@@ -7906,7 +7911,7 @@ namespace
                 && near(loadedInstrument.aether.noise.color, 0.81f)
                 && near(loadedInstrument.aether.noise.fxSends[0], 0.13f)
                 && near(loadedInstrument.aether.noise.fxSends[1], 0.19f)
-                && loadedInstrument.aether.sampleSlot1.schemaVersion == 2
+                && loadedInstrument.aether.sampleSlot1.schemaVersion == 3
                 && loadedInstrument.aether.sampleSlot1.enabled
                 && loadedInstrument.aether.sampleSlot1.audioFileId == "sample-slot-asset"
                 && loadedInstrument.aether.sampleSlot1.rootNote == 57
@@ -7918,6 +7923,14 @@ namespace
                 && loadedInstrument.aether.sampleSlot1.loopEnabled
                 && near(loadedInstrument.aether.sampleSlot1.loopStartRatio, 0.27f)
                 && near(loadedInstrument.aether.sampleSlot1.loopEndRatio, 0.71f)
+                && loadedInstrument.aether.sampleSlot1.zones.size() == 2
+                && loadedInstrument.aether.sampleSlot1.zones[0].audioFileId == "sample-slot-low"
+                && loadedInstrument.aether.sampleSlot1.zones[0].rootNote == 48
+                && loadedInstrument.aether.sampleSlot1.zones[0].hiNote == 63
+                && loadedInstrument.aether.sampleSlot1.zones[0].loopEnabled
+                && loadedInstrument.aether.sampleSlot1.zones[1].audioFileId == "sample-slot-high"
+                && loadedInstrument.aether.sampleSlot1.zones[1].loNote == 64
+                && loadedInstrument.aether.sampleSlot1.zones[1].loVelocity == 32
                 && loadedInstrument.aether.fxBusIds[0] == "return-a"
                 && loadedInstrument.aether.fxBusIds[1] == "return-b"
                 && near(loadedInstrument.aether.runtimeWarp, 0.63f)
@@ -9749,8 +9762,12 @@ namespace
         instrument.aether.oscB.enabled = false;
         instrument.aether.sub.enabled = false;
         instrument.aether.noise.enabled = false;
-        instrument.aether.sampleSlot1 = { 2, true, "aether-slot-asset", 69, 0.72f, -0.18f, 0,
+        instrument.aether.sampleSlot1 = { 3, true, "aether-slot-asset", 69, 0.72f, -0.18f, 0,
             0.1f, 0.9f, true, 0.25f, 0.75f };
+        instrument.aether.sampleSlot1.zones.push_back({ "aether-slot-asset", 69, 0, 63, 0, 127,
+            0.72f, -0.18f, 0.1f, 0.9f, true, 0.25f, 0.75f });
+        instrument.aether.sampleSlot1.zones.push_back({ "aether-slot-asset", 81, 64, 127, 0, 127,
+            0.68f, 0.18f, 0.0f, 1.0f, false, 0.0f, 1.0f });
 
         constexpr int samples = 12000;
         const auto live = renderOfflineChunks(project, samples, 257);
@@ -9762,6 +9779,8 @@ namespace
 
         auto missingProject = project;
         missingProject.instruments.front().aether.sampleSlot1.audioFileId = "missing-asset";
+        for (auto& zone : missingProject.instruments.front().aether.sampleSlot1.zones)
+            zone.audioFileId = "missing-asset";
         const auto missing = renderOfflineChunks(missingProject, samples, 257);
 
         beat::AudioEngine transitionEngine;
@@ -9775,6 +9794,7 @@ namespace
         replacementProject.instruments.front().aether.sampleSlot1.rootNote = 57;
         replacementProject.instruments.front().aether.sampleSlot1.pan = 0.62f;
         replacementProject.instruments.front().aether.sampleSlot1.startRatio = 0.2f;
+        replacementProject.instruments.front().aether.sampleSlot1.zones[0].startRatio = 0.2f;
         transitionEngine.applyProject(std::move(replacementProject));
         const auto afterReplacement = renderEngineBlock(transitionEngine, 257);
         const float replacementBoundaryStep = juce::jmax(
@@ -11694,6 +11714,62 @@ namespace
         invalidLoopSlot.render(invalidLoopOutput, 0, invalidLoopOutput.getNumSamples());
         if (invalidLoopSlot.activeVoiceCount() != 0)
             return false;
+
+        const auto mappedFixture = [](float value, int loNote, int hiNote, int loVelocity, int hiVelocity)
+        {
+            auto mappedSource = std::make_shared<beat::ImmutableSampleSource>();
+            auto audio = std::make_shared<juce::AudioBuffer<float>>(1, 4096);
+            audio->clear();
+            for (int sampleIndex = 0; sampleIndex < audio->getNumSamples(); ++sampleIndex)
+                audio->setSample(0, sampleIndex, value);
+            mappedSource->audio = audio;
+            mappedSource->sourceSampleRate = 48000.0;
+            mappedSource->rootNote = 60;
+            mappedSource->loNote = loNote;
+            mappedSource->hiNote = hiNote;
+            mappedSource->loVelocity = loVelocity;
+            mappedSource->hiVelocity = hiVelocity;
+            return mappedSource;
+        };
+        auto mappedSource = std::make_shared<beat::ImmutableMappedSampleSource>();
+        mappedSource->zones[0] = mappedFixture(0.5f, 0, 63, 0, 127);
+        mappedSource->zones[1] = mappedFixture(0.25f, 64, 127, 0, 50);
+        mappedSource->zones[2] = mappedFixture(-0.5f, 64, 127, 80, 127);
+        mappedSource->zoneCount = 3;
+        beat::MappedSampleSourceSlot mappedSlot;
+        if (!mappedSlot.prepare({ 48000.0, 512, 2 }) || !mappedSlot.publish(mappedSource)
+            || mappedSlot.complexity() != beat::SourceComplexity::mappedSample)
+        {
+            std::cerr << "  mapped setup failed\n";
+            return false;
+        }
+        if (!mappedSlot.noteOn({ 40, 1.0f, 2401 })) { std::cerr << "  mapped low key rejected\n"; return false; }
+        const auto lowKeyFrame = mappedSlot.renderFrame();
+        mappedSlot.allNotesOff(true);
+        if (!mappedSlot.noteOn({ 80, 0.25f, 2402 })) { std::cerr << "  mapped low velocity rejected\n"; return false; }
+        const auto lowVelocityFrame = mappedSlot.renderFrame();
+        mappedSlot.allNotesOff(true);
+        if (!mappedSlot.noteOn({ 80, 0.9f, 2403 })) { std::cerr << "  mapped high velocity rejected\n"; return false; }
+        beat::test::beginRealtimeSafetyProbe();
+        const auto highVelocityFrame = mappedSlot.renderFrame();
+        const size_t mappedViolations = beat::test::endRealtimeSafetyProbe();
+        if (mappedSlot.noteOn({ 80, 0.6f, 2404 })) { std::cerr << "  mapped gap accepted\n"; return false; }
+        if (lowKeyFrame.left <= 0.0f || lowVelocityFrame.left <= 0.0f
+            || highVelocityFrame.left >= 0.0f || mappedViolations != 0)
+        {
+            std::cerr << "  mapped frames failed low=" << lowKeyFrame.left << " lowVel=" << lowVelocityFrame.left
+                      << " highVel=" << highVelocityFrame.left << " violations=" << mappedViolations << "\n";
+            return false;
+        }
+        const auto mappedTelemetry = mappedSlot.telemetry();
+        if (mappedTelemetry.acceptedNoteEvents != 3 || mappedTelemetry.rejectedNoteEvents != 1)
+        {
+            std::cerr << "  mapped telemetry failed accepted=" << mappedTelemetry.acceptedNoteEvents
+                      << " rejected=" << mappedTelemetry.rejectedNoteEvents << "\n";
+            return false;
+        }
+        if (mappedSlot.publish(mappedSource)) { std::cerr << "  mapped active publish accepted\n"; return false; }
+        mappedSlot.allNotesOff(true);
 
         if (slot.publish(source))
             return false;

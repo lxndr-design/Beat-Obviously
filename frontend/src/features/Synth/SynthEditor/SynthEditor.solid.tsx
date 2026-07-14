@@ -51,7 +51,7 @@ import {
   instrumentTaxonomyOptionsForCategory,
   taxonomyAssignmentForInstrumentId,
 } from "../../../state/instrumentTaxonomy";
-import type { EnvelopeCurve, Instrument, TrackEffect } from "../../../state/types";
+import type { AetherSampleZoneConfig, AudioFile, EnvelopeCurve, Instrument, TrackEffect } from "../../../state/types";
 import { ModulationMatrix } from "../ModulationMatrix/ModulationMatrix.solid";
 import { OscillatorPanel } from "../OscillatorPanel/OscillatorPanel.solid";
 import styles from "./SynthEditor.module.css";
@@ -1324,6 +1324,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
   const setParameter = useSynthStore.getState().setParameter;
+  const setDraft = useSynthStore.getState().setDraft;
   const filterType = createMemo(() => String(draft().parameters["filter.type"]));
   const filterEnabled = createMemo(() => draft().parameters["filter.enabled"] === true);
   const [fxBus1Open, setFxBus1Open] = createSignal(false);
@@ -1334,6 +1335,36 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
     { value: "", label: "Off" },
     ...returnBuses().filter((bus) => !bus.mute).map((bus) => ({ value: bus.id, label: bus.name || bus.id })),
   ]);
+  const mappedZones = createMemo(() => draft().metadata.sampleSlot1Zones ?? []);
+  const commitMappedZones = (zones: AetherSampleZoneConfig[]) => setDraft({
+    ...draft(),
+    metadata: { ...draft().metadata, sampleSlot1Zones: zones.slice(0, 8) },
+  });
+  const baseZone = (): AetherSampleZoneConfig => ({
+    audioFileId: String(draft().parameters["aether.sample.1.audioFileId"] ?? ""),
+    rootNote: getNumberParam(draft(), "aether.sample.1.rootNote"),
+    loNote: 0,
+    hiNote: 127,
+    loVelocity: 0,
+    hiVelocity: 127,
+    level: getNumberParam(draft(), "aether.sample.1.level"),
+    pan: getNumberParam(draft(), "aether.sample.1.pan"),
+    startRatio: getNumberParam(draft(), "aether.sample.1.start"),
+    endRatio: getNumberParam(draft(), "aether.sample.1.end"),
+    loopEnabled: draft().parameters["aether.sample.1.loop.enabled"] === true,
+    loopStartRatio: getNumberParam(draft(), "aether.sample.1.loop.start"),
+    loopEndRatio: getNumberParam(draft(), "aether.sample.1.loop.end"),
+  });
+  const addMappedZone = () => {
+    const current = mappedZones();
+    if (current.length >= 8 || (!current.length && !baseZone().audioFileId)) return;
+    if (!current.length) {
+      const low = { ...baseZone(), hiNote: 63 };
+      commitMappedZones([low, { ...baseZone(), loNote: 64 }]);
+      return;
+    }
+    commitMappedZones([...current, { ...baseZone() }]);
+  };
 
   return (
     <section
@@ -1512,6 +1543,24 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             <SynthParameterKnob id="aether.sample.1.loop.start" label="Loop Start" defaultValue={0} onChange={setNumericParameter} />
             <SynthParameterKnob id="aether.sample.1.loop.end" label="Loop End" defaultValue={1} onChange={setNumericParameter} />
           </div>
+          <div class={styles.ampFilterShapeRow} aria-label="Aether Sample Slot 1 mapped zones">
+            <Button size="xs" onClick={addMappedZone} disabled={mappedZones().length >= 8 || (!mappedZones().length && !baseZone().audioFileId)}>
+              {mappedZones().length ? "Add Zone" : "Create Key Map"}
+            </Button>
+            <Show when={mappedZones().length > 0}>
+              <Button size="xs" variant="ghost" onClick={() => commitMappedZones([])}>Use Single Zone</Button>
+              <span>{mappedZones().length}/8 zones · single controls seed new zones</span>
+            </Show>
+          </div>
+          <For each={mappedZones()}>{(zone, index) => (
+            <MappedSampleZoneRow
+              zone={zone}
+              index={index()}
+              audioFiles={audioFiles()}
+              onPatch={(patch) => commitMappedZones(mappedZones().map((entry, zoneIndex) => zoneIndex === index() ? { ...entry, ...patch } : entry))}
+              onRemove={() => commitMappedZones(mappedZones().filter((_, zoneIndex) => zoneIndex !== index()))}
+            />
+          )}</For>
         </div>
         <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label="Aether shared FX buses">
           <div class={styles.ampFilterGroupTitle}>Source FX</div>
@@ -1546,6 +1595,38 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
         </div>
       </div>
     </section>
+  );
+}
+
+function MappedSampleZoneRow(props: {
+  zone: AetherSampleZoneConfig;
+  index: number;
+  audioFiles: AudioFile[];
+  onPatch: (patch: Partial<AetherSampleZoneConfig>) => void;
+  onRemove: () => void;
+}) {
+  const [assetOpen, setAssetOpen] = createSignal(false);
+  return (
+    <div class={styles.ampFilterShapeRow} aria-label={`Sample map zone ${props.index + 1}`}>
+      <FloatingSelect
+        label={`Zone ${props.index + 1}`}
+        layout="inline"
+        value={props.zone.audioFileId}
+        ariaLabel={`Sample map zone ${props.index + 1} audio asset`}
+        options={props.audioFiles.map((file) => ({ value: file.id, label: file.name || file.id }))}
+        open={assetOpen()}
+        onOpenChange={setAssetOpen}
+        onChange={(audioFileId) => props.onPatch({ audioFileId })}
+      />
+      <NumberInput label="Root" layout="inline" value={props.zone.rootNote} min={0} max={127} step={1} onChange={(rootNote) => props.onPatch({ rootNote })} />
+      <NumberInput label="Key Low" layout="inline" value={props.zone.loNote} min={0} max={props.zone.hiNote} step={1} onChange={(loNote) => props.onPatch({ loNote })} />
+      <NumberInput label="Key High" layout="inline" value={props.zone.hiNote} min={props.zone.loNote} max={127} step={1} onChange={(hiNote) => props.onPatch({ hiNote })} />
+      <NumberInput label="Vel Low" layout="inline" value={props.zone.loVelocity} min={0} max={props.zone.hiVelocity} step={1} onChange={(loVelocity) => props.onPatch({ loVelocity })} />
+      <NumberInput label="Vel High" layout="inline" value={props.zone.hiVelocity} min={props.zone.loVelocity} max={127} step={1} onChange={(hiVelocity) => props.onPatch({ hiVelocity })} />
+      <Button iconOnly size="xs" variant="ghost" aria-label={`Remove sample map zone ${props.index + 1}`} onClick={props.onRemove}>
+        <Icon name="ph:trash" size={18} decorative />
+      </Button>
+    </div>
   );
 }
 

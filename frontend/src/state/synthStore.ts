@@ -1,5 +1,6 @@
 import { createStore as create } from "zustand/vanilla";
 import type {
+  AetherSampleZoneConfig,
   CustomWavetableDefinition,
   CustomWavetableFrame,
   EnvelopeCurve,
@@ -20,7 +21,7 @@ import benchmarkAetherStrings from "../data/aether_benchmark_strings_bank.json";
 import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
-export const SYNTH_PATCH_SCHEMA_VERSION = 3;
+export const SYNTH_PATCH_SCHEMA_VERSION = 4;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
 export const SYNTH_INSTRUMENT_TYPE = "wavetable-synth";
 export const DEFAULT_CUSTOM_WAVETABLE_ID = "user.custom";
@@ -355,6 +356,7 @@ export interface SynthDraftPatch {
     wavemaps?: Record<string, WavemapDefinition>;
     customWavetables?: Record<string, CustomWavetableDefinition>;
     oscillators: SynthOscillatorDefinition[];
+    sampleSlot1Zones: AetherSampleZoneConfig[];
   };
 }
 
@@ -435,6 +437,40 @@ function normalizeOscillatorDefinitions(value: unknown): SynthOscillatorDefiniti
   const unique = definitions.filter((entry, index) => definitions.findIndex((candidate) => candidate.id === entry.id) === index);
   if (!unique.some((entry) => entry.id === "a")) unique.unshift({ id: "a", name: "Oscillator A" });
   return unique;
+}
+
+function normalizeAetherSampleZones(value: unknown): AetherSampleZoneConfig[] {
+  if (!Array.isArray(value)) return [];
+  const number = (entry: Record<string, unknown>, key: string, fallback: number) =>
+    typeof entry[key] === "number" && Number.isFinite(entry[key]) ? Number(entry[key]) : fallback;
+  const midi = (entry: Record<string, unknown>, key: string, fallback: number) =>
+    Math.max(0, Math.min(127, Math.round(number(entry, key, fallback))));
+  return value.slice(0, 8).flatMap((entry) => {
+    if (!isRecord(entry) || typeof entry.audioFileId !== "string" || !entry.audioFileId) return [];
+    const loNote = midi(entry, "loNote", 0);
+    const hiNote = Math.max(loNote, midi(entry, "hiNote", 127));
+    const loVelocity = midi(entry, "loVelocity", 0);
+    const hiVelocity = Math.max(loVelocity, midi(entry, "hiVelocity", 127));
+    const startRatio = clamp01(number(entry, "startRatio", 0));
+    const endRatio = Math.max(startRatio, clamp01(number(entry, "endRatio", 1)));
+    const loopStartRatio = Math.max(startRatio, Math.min(endRatio, number(entry, "loopStartRatio", startRatio)));
+    const loopEndRatio = Math.max(loopStartRatio, Math.min(endRatio, number(entry, "loopEndRatio", endRatio)));
+    return [{
+      audioFileId: entry.audioFileId,
+      rootNote: midi(entry, "rootNote", 60),
+      loNote,
+      hiNote,
+      loVelocity,
+      hiVelocity,
+      level: clamp01(number(entry, "level", 0.8)),
+      pan: clampBipolar(number(entry, "pan", 0)),
+      startRatio,
+      endRatio,
+      loopEnabled: entry.loopEnabled === true && loopEndRatio > loopStartRatio,
+      loopStartRatio,
+      loopEndRatio,
+    }];
+  });
 }
 export const CUSTOM_WAVETABLE_PARTIAL_COUNT = 16;
 const WAVEMAP_SCAN_ANCHOR_MARGIN = 0.01;
@@ -1439,6 +1475,7 @@ export function createDefaultSynthDraft(): SynthDraftPatch {
       wavemaps: { [DEFAULT_CUSTOM_WAVETABLE_ID]: createDefaultCustomWavetable() },
       customWavetables: { [DEFAULT_CUSTOM_WAVETABLE_ID]: createDefaultCustomWavetable() },
       oscillators: [{ id: "a", name: "Oscillator A" }, { id: "b", name: "Oscillator B" }],
+      sampleSlot1Zones: [],
     },
   };
 }
@@ -1526,6 +1563,7 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
       wavemaps,
       customWavetables: wavemaps,
       oscillators: normalizeOscillatorDefinitions(inputMetadata.oscillators),
+      sampleSlot1Zones: normalizeAetherSampleZones(inputMetadata.sampleSlot1Zones),
     },
   };
 }
@@ -1987,8 +2025,9 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         fxSends: [clamp01(getNumberParam(draft, "aether.noise.fxSend1")), clamp01(getNumberParam(draft, "aether.noise.fxSend2"))],
       },
       sampleSlot1: {
-        schemaVersion: 2,
-        enabled: getBooleanParam(draft, "aether.sample.1.enabled") && Boolean(getStringParam(draft, "aether.sample.1.audioFileId")),
+        schemaVersion: 3,
+        enabled: getBooleanParam(draft, "aether.sample.1.enabled")
+          && (Boolean(getStringParam(draft, "aether.sample.1.audioFileId")) || draft.metadata.sampleSlot1Zones.length > 0),
         audioFileId: getStringParam(draft, "aether.sample.1.audioFileId"),
         rootNote: Math.max(0, Math.min(127, Math.round(getNumberParam(draft, "aether.sample.1.rootNote")))),
         level: clamp01(getNumberParam(draft, "aether.sample.1.level")),
@@ -1999,6 +2038,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         loopEnabled: getBooleanParam(draft, "aether.sample.1.loop.enabled"),
         loopStartRatio: clamp01(getNumberParam(draft, "aether.sample.1.loop.start")),
         loopEndRatio: clamp01(getNumberParam(draft, "aether.sample.1.loop.end")),
+        zones: draft.metadata.sampleSlot1Zones,
       },
       fxBusIds: [getStringParam(draft, "aether.fxBus1Id"), getStringParam(draft, "aether.fxBus2Id")],
       runtimeWarp: clamp01(getNumberParam(draft, "aether.runtimeWarp")),
@@ -2054,9 +2094,10 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     legato: getBooleanParam(draft, "legato.enabled"),
     glideMs: getNumberParam(draft, "glide.ms"),
     effects: structuredClone(draft.effects),
-    sampleIds: getStringParam(draft, "aether.sample.1.audioFileId")
-      ? [getStringParam(draft, "aether.sample.1.audioFileId")]
-      : [],
+    sampleIds: [...new Set([
+      getStringParam(draft, "aether.sample.1.audioFileId"),
+      ...draft.metadata.sampleSlot1Zones.map((zone) => zone.audioFileId),
+    ].filter(Boolean))],
     taxonomy: draft.taxonomy,
     synthPatch: cloneSynthPatch(draft),
   };
@@ -2234,6 +2275,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["aether.sample.1.loop.enabled"] = instrument.aether?.sampleSlot1?.loopEnabled ?? false;
   draft.parameters["aether.sample.1.loop.start"] = instrument.aether?.sampleSlot1?.loopStartRatio ?? 0;
   draft.parameters["aether.sample.1.loop.end"] = instrument.aether?.sampleSlot1?.loopEndRatio ?? 1;
+  draft.metadata.sampleSlot1Zones = normalizeAetherSampleZones(instrument.aether?.sampleSlot1?.zones);
   draft.parameters["aether.fxBus1Id"] = instrument.aether?.fxBusIds?.[0] ?? "";
   draft.parameters["aether.fxBus2Id"] = instrument.aether?.fxBusIds?.[1] ?? "";
   draft.parameters["aether.mpe.enabled"] = instrument.aether?.memberExpressionZone?.enabled ?? false;

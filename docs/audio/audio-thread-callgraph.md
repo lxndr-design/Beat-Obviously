@@ -738,3 +738,27 @@ InstrumentVoice::renderNextBlock
 ```
 
 Invalid loop bounds clear only looping. Offline rendering follows the same voice edge but remains excluded from real-time callback interception. Slice/loop identity changes enter the existing bounded route replacement bridge; no file decode, range validation, allocation, ownership destruction, or container growth occurs on the callback.
+
+## Milestone C2C mapped-zone edge
+
+```text
+control/setup: patch/project zone array (maximum 8)
+  -> AudioEngine decoded project-asset cache lookup
+  -> ImmutableMappedSampleSource fixed array
+  -> MappedSampleSourceSlot::publish
+       -> eight fixed SampleSourceSlot children prepared/published
+
+callback note-on
+  -> MappedSampleSourceSlot::selectZone
+       -> at most eight key/velocity comparisons
+       -> narrowest combined span; stable order tie-break
+  -> exactly one SampleSourceSlot::noteOn
+
+callback render
+  -> MappedSampleSourceSlot::renderFrame
+       -> fixed published-zone scan
+       -> child C2B slice/loop renderFrame
+  -> existing Aether routing/envelope/transition graph
+```
+
+Missing assets and malformed/future state are resolved before publication. The callback performs no decode, path access, allocation, container mutation, ownership destruction, or lock acquisition. Offline rendering uses the identical selection/render edge but is excluded from real-time interception.

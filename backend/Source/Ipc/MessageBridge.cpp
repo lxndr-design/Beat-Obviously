@@ -2220,8 +2220,9 @@ namespace beat
                         if (sampleSlot1.isObject())
                         {
                             const int slotSchemaVersion = juce::jmax(0, (int) sampleSlot1.getProperty("schemaVersion", 0));
-                            instrument.aether.sampleSlot1.schemaVersion = 2;
-                            instrument.aether.sampleSlot1.enabled = (bool) sampleSlot1.getProperty("enabled", false);
+                            instrument.aether.sampleSlot1.schemaVersion = 3;
+                            const bool requestedSlotEnabled = (bool) sampleSlot1.getProperty("enabled", false);
+                            instrument.aether.sampleSlot1.enabled = requestedSlotEnabled;
                             instrument.aether.sampleSlot1.audioFileId = sampleSlot1.getProperty("audioFileId", "").toString();
                             instrument.aether.sampleSlot1.rootNote = juce::jlimit(0, 127, (int) sampleSlot1.getProperty("rootNote", 60));
                             instrument.aether.sampleSlot1.level = normalizedParam(sampleSlot1, "level", 0.8f);
@@ -2241,8 +2242,33 @@ namespace beat
                                 || instrument.aether.sampleSlot1.loopEndRatio > instrument.aether.sampleSlot1.endRatio
                                 || instrument.aether.sampleSlot1.loopEndRatio <= instrument.aether.sampleSlot1.loopStartRatio)
                                 instrument.aether.sampleSlot1.loopEnabled = false;
-                            if (slotSchemaVersion > 2 || instrument.aether.sampleSlot1.audioFileId.isEmpty())
-                                instrument.aether.sampleSlot1.enabled = false;
+                            if (const auto* mappedZones = sampleSlot1.getProperty("zones", {}).getArray())
+                            {
+                                for (int index = 0; index < juce::jmin(8, mappedZones->size()); ++index)
+                                {
+                                    const auto& mapped = mappedZones->getReference(index);
+                                    if (!mapped.isObject()) continue;
+                                    InstrumentDefinition::AetherSampleSlot::Zone zone;
+                                    zone.audioFileId = mapped.getProperty("audioFileId", "").toString();
+                                    zone.rootNote = juce::jlimit(0, 127, (int) mapped.getProperty("rootNote", 60));
+                                    zone.loNote = juce::jlimit(0, 127, (int) mapped.getProperty("loNote", 0));
+                                    zone.hiNote = juce::jlimit(zone.loNote, 127, (int) mapped.getProperty("hiNote", 127));
+                                    zone.loVelocity = juce::jlimit(0, 127, (int) mapped.getProperty("loVelocity", 0));
+                                    zone.hiVelocity = juce::jlimit(zone.loVelocity, 127, (int) mapped.getProperty("hiVelocity", 127));
+                                    zone.level = normalizedParam(mapped, "level", 0.8f);
+                                    zone.pan = floatParam(mapped, "pan", 0.0f, -1.0f, 1.0f);
+                                    zone.startRatio = normalizedParam(mapped, "startRatio", 0.0f);
+                                    zone.endRatio = normalizedParam(mapped, "endRatio", 1.0f);
+                                    zone.loopEnabled = (bool) mapped.getProperty("loopEnabled", false);
+                                    zone.loopStartRatio = normalizedParam(mapped, "loopStartRatio", zone.startRatio);
+                                    zone.loopEndRatio = normalizedParam(mapped, "loopEndRatio", zone.endRatio);
+                                    if (zone.audioFileId.isNotEmpty()) instrument.aether.sampleSlot1.zones.push_back(std::move(zone));
+                                }
+                            }
+                            instrument.aether.sampleSlot1.enabled = requestedSlotEnabled
+                                && slotSchemaVersion <= 3
+                                && (instrument.aether.sampleSlot1.audioFileId.isNotEmpty()
+                                    || !instrument.aether.sampleSlot1.zones.empty());
                         }
                         instrument.aether.fxBusIds[0] = aether.getProperty("fxBus1Id", "").toString();
                         instrument.aether.fxBusIds[1] = aether.getProperty("fxBus2Id", "").toString();
