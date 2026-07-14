@@ -1267,6 +1267,29 @@
   min-width: 0;
 }
 
+.mappedSampleZone {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px;
+  border: var(--border-soft);
+  background: var(--surface-subtle);
+}
+
+.ampFilterWideGroup .mappedSampleZone .ampFilterShapeRow {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+.mappedSamplePlaybackRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 3px;
+  align-items: end;
+  min-width: 0;
+}
+
 .shapeControl {
   display: grid;
   justify-items: center;

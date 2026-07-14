@@ -1606,26 +1606,69 @@ function MappedSampleZoneRow(props: {
   onRemove: () => void;
 }) {
   const [assetOpen, setAssetOpen] = createSignal(false);
+  const patchStartRatio = (startRatio: number) => {
+    const loopStartRatio = Math.max(startRatio, props.zone.loopStartRatio);
+    props.onPatch({
+      startRatio,
+      loopStartRatio,
+      loopEndRatio: Math.max(loopStartRatio, props.zone.loopEndRatio),
+    });
+  };
+  const patchEndRatio = (endRatio: number) => {
+    const loopEndRatio = Math.min(endRatio, props.zone.loopEndRatio);
+    props.onPatch({
+      endRatio,
+      loopStartRatio: Math.min(props.zone.loopStartRatio, loopEndRatio),
+      loopEndRatio,
+    });
+  };
   return (
-    <div class={styles.ampFilterShapeRow} aria-label={`Sample map zone ${props.index + 1}`}>
-      <FloatingSelect
-        label={`Zone ${props.index + 1}`}
-        layout="inline"
-        value={props.zone.audioFileId}
-        ariaLabel={`Sample map zone ${props.index + 1} audio asset`}
-        options={props.audioFiles.map((file) => ({ value: file.id, label: file.name || file.id }))}
-        open={assetOpen()}
-        onOpenChange={setAssetOpen}
-        onChange={(audioFileId) => props.onPatch({ audioFileId })}
-      />
-      <NumberInput label="Root" layout="inline" value={props.zone.rootNote} min={0} max={127} step={1} onChange={(rootNote) => props.onPatch({ rootNote })} />
-      <NumberInput label="Key Low" layout="inline" value={props.zone.loNote} min={0} max={props.zone.hiNote} step={1} onChange={(loNote) => props.onPatch({ loNote })} />
-      <NumberInput label="Key High" layout="inline" value={props.zone.hiNote} min={props.zone.loNote} max={127} step={1} onChange={(hiNote) => props.onPatch({ hiNote })} />
-      <NumberInput label="Vel Low" layout="inline" value={props.zone.loVelocity} min={0} max={props.zone.hiVelocity} step={1} onChange={(loVelocity) => props.onPatch({ loVelocity })} />
-      <NumberInput label="Vel High" layout="inline" value={props.zone.hiVelocity} min={props.zone.loVelocity} max={127} step={1} onChange={(hiVelocity) => props.onPatch({ hiVelocity })} />
-      <Button iconOnly size="xs" variant="ghost" aria-label={`Remove sample map zone ${props.index + 1}`} onClick={props.onRemove}>
-        <Icon name="ph:trash" size={18} decorative />
-      </Button>
+    <div class={styles.mappedSampleZone} aria-label={`Sample map zone ${props.index + 1}`}>
+      <div class={styles.ampFilterShapeRow}>
+        <FloatingSelect
+          label={`Zone ${props.index + 1}`}
+          layout="inline"
+          value={props.zone.audioFileId}
+          ariaLabel={`Sample map zone ${props.index + 1} audio asset`}
+          options={props.audioFiles.map((file) => ({ value: file.id, label: file.name || file.id }))}
+          open={assetOpen()}
+          onOpenChange={setAssetOpen}
+          onChange={(audioFileId) => props.onPatch({ audioFileId })}
+        />
+        <NumberInput label="Root" layout="inline" value={props.zone.rootNote} min={0} max={127} step={1} onChange={(rootNote) => props.onPatch({ rootNote })} />
+        <NumberInput label="Key Low" layout="inline" value={props.zone.loNote} min={0} max={props.zone.hiNote} step={1} onChange={(loNote) => props.onPatch({ loNote })} />
+        <NumberInput label="Key High" layout="inline" value={props.zone.hiNote} min={props.zone.loNote} max={127} step={1} onChange={(hiNote) => props.onPatch({ hiNote })} />
+        <NumberInput label="Vel Low" layout="inline" value={props.zone.loVelocity} min={0} max={props.zone.hiVelocity} step={1} onChange={(loVelocity) => props.onPatch({ loVelocity })} />
+        <NumberInput label="Vel High" layout="inline" value={props.zone.hiVelocity} min={props.zone.loVelocity} max={127} step={1} onChange={(hiVelocity) => props.onPatch({ hiVelocity })} />
+        <Button iconOnly size="xs" variant="ghost" aria-label={`Remove sample map zone ${props.index + 1}`} onClick={props.onRemove}>
+          <Icon name="ph:trash" size={18} decorative />
+        </Button>
+      </div>
+      <div class={styles.mappedSamplePlaybackRow} aria-label={`Sample map zone ${props.index + 1} playback`}>
+        <NumberInput label="Zone Level" value={props.zone.level} min={0} max={1} step={0.01} onChange={(level) => props.onPatch({ level })} />
+        <NumberInput label="Zone Pan" value={props.zone.pan} min={-1} max={1} step={0.01} onChange={(pan) => props.onPatch({ pan })} />
+        <NumberInput label="Start" value={props.zone.startRatio} min={0} max={props.zone.endRatio} step={0.001} onChange={patchStartRatio} />
+        <NumberInput label="End" value={props.zone.endRatio} min={props.zone.startRatio} max={1} step={0.001} onChange={patchEndRatio} />
+        <Toggle label="Loop" checked={props.zone.loopEnabled} onChange={(loopEnabled) => props.onPatch({ loopEnabled })} />
+        <NumberInput
+          label="Loop Start"
+          value={props.zone.loopStartRatio}
+          min={props.zone.startRatio}
+          max={props.zone.loopEndRatio}
+          step={0.001}
+          disabled={!props.zone.loopEnabled}
+          onChange={(loopStartRatio) => props.onPatch({ loopStartRatio })}
+        />
+        <NumberInput
+          label="Loop End"
+          value={props.zone.loopEndRatio}
+          min={props.zone.loopStartRatio}
+          max={props.zone.endRatio}
+          step={0.001}
+          disabled={!props.zone.loopEnabled}
+          onChange={(loopEndRatio) => props.onPatch({ loopEndRatio })}
+        />
+      </div>
     </div>
   );
 }

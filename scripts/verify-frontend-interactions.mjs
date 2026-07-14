@@ -1337,8 +1337,14 @@ try {
       && synthEditorSource.includes('label="Key High"')
       && synthEditorSource.includes('label="Vel Low"')
       && synthEditorSource.includes('label="Vel High"')
+      && synthEditorSource.includes('aria-label={`Sample map zone ${props.index + 1} playback`}')
+      && synthEditorSource.includes('label="Zone Level"')
+      && synthEditorSource.includes('label="Zone Pan"')
+      && synthEditorSource.includes('checked={props.zone.loopEnabled}')
+      && synthEditorSource.includes('const loopStartRatio = Math.max(startRatio, props.zone.loopStartRatio)')
+      && synthEditorSource.includes('const loopEndRatio = Math.min(endRatio, props.zone.loopEndRatio)')
       && synthEditorSource.includes("zones.slice(0, 8)"),
-    "Aether Sample Slot 1 should expose slicing, looping, and bounded mapped-zone controls",
+    "Aether Sample Slot 1 should expose bounded mapped-zone selection and per-zone playback controls",
   );
   assert.ok(
     synthEditorSource.includes('aria-label="Aether MPE member zone"')

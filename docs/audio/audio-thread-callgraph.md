@@ -762,3 +762,14 @@ callback render
 ```
 
 Missing assets and malformed/future state are resolved before publication. The callback performs no decode, path access, allocation, container mutation, ownership destruction, or lock acquisition. Offline rendering uses the identical selection/render edge but is excluded from real-time interception.
+
+## Milestone C2D mapped-zone editor edge
+
+```text
+Solid editor NumberInput / Toggle
+  -> immutable zone patch in synth draft metadata
+  -> existing schema-v4 normalization and project conversion
+  -> existing C2C setup/publication edge
+```
+
+Slice endpoint edits clamp the draft's loop endpoints before normalization; loop-point editing is disabled while the loop switch is off. No new function is called from `audioDeviceIOCallbackWithContext`, `InstrumentVoice::renderNextBlock`, or offline rendering. The C2C callback graph and fixed eight-zone bound are unchanged.
