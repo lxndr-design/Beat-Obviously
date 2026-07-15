@@ -899,3 +899,21 @@ production callback / offline render
 ```
 
 C3A performs no sample existence check, decode, stream creation, route publication, schema mutation, or audio rendering. `parseSfzSubsetFile` is a control/import-thread wrapper and is not referenced by `AudioEngine` or the device callback. Unsupported headers and opcodes produce diagnostics rather than calling or emulating external implementations. C3B must introduce a separately reviewed sample-root and immutable region-index publication edge before playback exists.
+
+## Milestone C3B disconnected SFZ resolution edge
+
+```text
+future explicit import action (control thread only)
+  -> C3A parsed region model
+  -> canonical SFZ parent as sample root
+  -> canonicalize each referenced path
+  -> component-wise root-containment / regular-file / extension checks
+  -> per-file and aggregate byte budgets
+  -> immutable stable-order regions
+  -> fixed 128-note candidate index (maximum 32 entries per note)
+
+production callback / offline render
+  -> no C3B edge
+```
+
+The resolver opens no audio stream and publishes nothing into `AudioEngine`, `InstrumentVoice`, the streaming worker, or project state. File inspection is intentionally control-thread work and is outside the real-time instrumentation boundary. Future C3C decode must revalidate the selected file after opening it to close the remaining time-of-check/time-of-use window; it must also establish decoder-format support, destruction deferral, live/offline ownership, and callback-safe publication before this edge can reach playback.
