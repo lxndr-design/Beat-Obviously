@@ -32,6 +32,7 @@
 #include "../Source/Audio/Sampler/SfzSampleResolver.h"
 #include "../Source/Audio/Sampler/SfzSampleDecoder.h"
 #include "../Source/Audio/Sources/SampleSourceSlot.h"
+#include "../Source/Audio/Sources/SfzSourceSlot.h"
 #include "../Source/Audio/Sources/BoundedSamplePageCache.h"
 #include "../Source/Audio/Sources/MappedSampleSourceSlot.h"
 #include "../Source/Audio/Sources/SourceSlotRack.h"
@@ -10465,6 +10466,279 @@ namespace
         return passed;
     }
 
+    std::shared_ptr<beat::SfzDecodedInstrument> makeSfzSlotInstrument(
+        double tuneCents = 0.0, juce::String loopMode = "no_loop",
+        bool overlap = false)
+    {
+        constexpr int frames = 32768;
+        constexpr double sampleRate = 48000.0;
+        auto instrument = std::make_shared<beat::SfzDecodedInstrument>();
+        auto firstAudio = std::make_shared<juce::AudioBuffer<float>>(1, frames);
+        auto secondAudio = std::make_shared<juce::AudioBuffer<float>>(2, frames);
+        for (int frame = 0; frame < frames; ++frame)
+        {
+            const float first = 0.35f * std::sin(
+                juce::MathConstants<double>::twoPi * 440.0 * frame / sampleRate);
+            const float second = 0.3f * std::sin(
+                juce::MathConstants<double>::twoPi * 660.0 * frame / sampleRate);
+            firstAudio->setSample(0, frame, first);
+            secondAudio->setSample(0, frame, second);
+            secondAudio->setSample(1, frame, -second * 0.5f);
+        }
+        instrument->samples.push_back({ {}, firstAudio, sampleRate });
+        instrument->samples.push_back({ {}, secondAudio, sampleRate });
+
+        beat::SfzDecodedRegion first;
+        first.sampleIndex = 0;
+        first.stableRegionIndex = 0;
+        first.definition.samplePath = "first.wav";
+        first.definition.rootNote = 69;
+        first.definition.loNote = overlap ? 60 : 69;
+        first.definition.hiNote = overlap ? 72 : 69;
+        first.definition.loVelocity = 0;
+        first.definition.hiVelocity = overlap ? 100 : 127;
+        first.definition.tuneCents = tuneCents;
+        first.definition.offsetFrames = loopMode == "no_loop" ? 0 : 32;
+        first.definition.endFrame = loopMode == "no_loop" ? frames - 1 : 255;
+        first.definition.loopMode = loopMode;
+        first.definition.loopStartFrame = loopMode == "no_loop" ? 0 : 64;
+        first.definition.loopEndFrame = loopMode == "no_loop" ? 0 : 127;
+        first.definition.panPercent = overlap ? -100.0 : 0.0;
+        instrument->regions.push_back(first);
+
+        if (overlap)
+        {
+            beat::SfzDecodedRegion second;
+            second.sampleIndex = 1;
+            second.stableRegionIndex = 1;
+            second.definition.samplePath = "second.wav";
+            second.definition.rootNote = 69;
+            second.definition.loNote = 66;
+            second.definition.hiNote = 78;
+            second.definition.loVelocity = 64;
+            second.definition.hiVelocity = 127;
+            second.definition.endFrame = frames - 1;
+            second.definition.panPercent = 100.0;
+            instrument->regions.push_back(second);
+        }
+
+        for (size_t index = 0; index < instrument->regions.size(); ++index)
+        {
+            const auto& region = instrument->regions[index].definition;
+            for (int note = region.loNote; note <= region.hiNote; ++note)
+            {
+                auto& candidates = instrument->noteIndex[(size_t) note];
+                candidates.indices[candidates.count++] = (uint16_t) index;
+            }
+        }
+        instrument->totalDecodedBytes = frames * 3 * (int64_t) sizeof(float);
+        return instrument;
+    }
+
+    int positiveCrossings(const juce::AudioBuffer<float>& audio)
+    {
+        int crossings = 0;
+        for (int sample = 1; sample < audio.getNumSamples(); ++sample)
+            if (audio.getSample(0, sample - 1) <= 0.0f
+                && audio.getSample(0, sample) > 0.0f)
+                ++crossings;
+        return crossings;
+    }
+
+    bool stressSfzSourceSlot()
+    {
+        constexpr double sampleRate = 48000.0;
+        beat::SfzSourceSlot slot;
+        if (!slot.prepare({ sampleRate, 256, 2 })
+            || slot.prepare({ 0.0, 256, 2 }))
+            return false;
+
+        auto base = makeSfzSlotInstrument();
+        std::weak_ptr<const beat::SfzDecodedInstrument> baseLifetime = base;
+        if (!slot.publish(base) || slot.lifecycleState() != beat::SourceLifecycleState::ready)
+            return false;
+        base.reset();
+        if (!slot.noteOn({ 69, 1.0f, 9101 }) || slot.activeVoiceCount() != 1)
+            return false;
+
+        juce::AudioBuffer<float> normal(2, 2048);
+        normal.clear();
+        beat::test::beginRealtimeSafetyProbe();
+        slot.render(normal, 0, normal.getNumSamples());
+        const auto callbackViolations = beat::test::endRealtimeSafetyProbe();
+        const int normalCrossings = positiveCrossings(normal);
+        if (callbackViolations != 0 || normalCrossings < 16 || normalCrossings > 21
+            || !std::isfinite(normal.getMagnitude(0, normal.getNumSamples())))
+            return false;
+
+        auto tuned = makeSfzSlotInstrument(1200.0);
+        if (slot.publish(tuned) || baseLifetime.expired())
+            return false;
+        slot.allNotesOff(true);
+        if (slot.activeVoiceCount() != 0 || !slot.publish(tuned))
+            return false;
+        auto retired = slot.takeRetiredInstrument();
+        if (!retired || baseLifetime.expired())
+            return false;
+        retired.reset();
+        if (!baseLifetime.expired() || !slot.noteOn({ 69, 1.0f, 9102 }))
+            return false;
+        juce::AudioBuffer<float> octave(2, 2048);
+        octave.clear();
+        slot.render(octave, 0, octave.getNumSamples());
+        const int octaveCrossings = positiveCrossings(octave);
+        if (octaveCrossings < 34 || octaveCrossings > 40
+            || octaveCrossings < normalCrossings * 2 - 2)
+            return false;
+        slot.allNotesOff(true);
+
+        const auto renderBlocked = [](int blockSize)
+        {
+            beat::SfzSourceSlot renderedSlot;
+            juce::AudioBuffer<float> output(2, 2048);
+            output.clear();
+            if (!renderedSlot.prepare({ 48000.0, blockSize, 2 })
+                || !renderedSlot.publish(makeSfzSlotInstrument())
+                || !renderedSlot.noteOn({ 69, 1.0f, 9150 }))
+                return juce::AudioBuffer<float>();
+            for (int start = 0; start < output.getNumSamples(); start += blockSize)
+                renderedSlot.render(output, start,
+                    std::min(blockSize, output.getNumSamples() - start));
+            return output;
+        };
+        const auto blocked64 = renderBlocked(64);
+        const auto blocked257 = renderBlocked(257);
+        if (blocked64.getNumSamples() != blocked257.getNumSamples())
+            return false;
+        for (int channel = 0; channel < blocked64.getNumChannels(); ++channel)
+            for (int sample = 0; sample < blocked64.getNumSamples(); ++sample)
+                if (blocked64.getSample(channel, sample)
+                    != blocked257.getSample(channel, sample))
+                    return false;
+
+        for (const double rate : { 44100.0, 48000.0, 88200.0, 96000.0, 192000.0 })
+        {
+            beat::SfzSourceSlot rateSlot;
+            juce::AudioBuffer<float> rateRender(2, 8192);
+            rateRender.clear();
+            if (!rateSlot.prepare({ rate, 257, 2 })
+                || !rateSlot.publish(makeSfzSlotInstrument())
+                || !rateSlot.noteOn({ 69, 1.0f, (uint64_t) rate }))
+                return false;
+            rateSlot.render(rateRender, 0, rateRender.getNumSamples());
+            const int expected = (int) std::round(440.0 * rateRender.getNumSamples() / rate);
+            if (std::abs(positiveCrossings(rateRender) - expected) > 2)
+                return false;
+        }
+
+        auto overlap = makeSfzSlotInstrument(0.0, "no_loop", true);
+        if (!slot.publish(overlap)
+            || !slot.noteOn({ 69, 80.0f / 127.0f, 9201 })
+            || slot.activeVoiceCount() != 2)
+            return false;
+        juce::AudioBuffer<float> blended(2, 512);
+        blended.clear();
+        beat::test::beginRealtimeSafetyProbe();
+        slot.render(blended, 0, blended.getNumSamples());
+        const auto blendedViolations = beat::test::endRealtimeSafetyProbe();
+        if (blendedViolations != 0
+            || blended.getMagnitude(0, blended.getNumSamples()) <= 0.01f
+            || blended.getMagnitude(1, blended.getNumSamples()) <= 0.01f)
+            return false;
+        slot.allNotesOff(true);
+        if (slot.noteOn({ 20, 1.0f, 9202 }))
+            return false;
+
+        auto continuous = makeSfzSlotInstrument(0.0, "loop_continuous");
+        if (!slot.publish(continuous)) return false;
+        beat::test::beginRealtimeSafetyProbe();
+        bool noteOnAccepted = true;
+        for (int note = 0; note < beat::SfzSourceSlot::maximumVoices; ++note)
+            if (!slot.noteOn({ 69, 0.8f, (uint64_t) (9300 + note) }))
+                noteOnAccepted = false;
+        const auto noteOnViolations = beat::test::endRealtimeSafetyProbe();
+        if (!noteOnAccepted || noteOnViolations != 0
+            || slot.activeVoiceCount() != beat::SfzSourceSlot::maximumVoices
+            || slot.noteOn({ 69, 0.8f, 9400 }))
+            return false;
+        juce::AudioBuffer<float> looping(2, 1024);
+        looping.clear();
+        slot.render(looping, 0, looping.getNumSamples());
+        if (slot.activeVoiceCount() != beat::SfzSourceSlot::maximumVoices)
+            return false;
+        slot.allNotesOff(false);
+        juce::AudioBuffer<float> release(2, 512);
+        release.clear();
+        slot.render(release, 0, release.getNumSamples());
+        if (slot.activeVoiceCount() != 0)
+            return false;
+
+        auto sustain = makeSfzSlotInstrument(0.0, "loop_sustain");
+        if (!slot.publish(sustain) || !slot.noteOn({ 69, 0.8f, 9450 }))
+            return false;
+        looping.clear();
+        slot.render(looping, 0, looping.getNumSamples());
+        if (slot.activeVoiceCount() != 1)
+            return false;
+        slot.noteOff(9450);
+        release.clear();
+        slot.render(release, 0, release.getNumSamples());
+        if (slot.activeVoiceCount() != 0)
+            return false;
+
+        auto oneShot = makeSfzSlotInstrument(0.0, "one_shot");
+        if (!slot.publish(oneShot) || !slot.noteOn({ 69, 1.0f, 9501 }))
+            return false;
+        slot.noteOff(9501);
+        juce::AudioBuffer<float> shortRender(2, 100);
+        shortRender.clear();
+        slot.render(shortRender, 0, shortRender.getNumSamples());
+        if (slot.activeVoiceCount() != 1)
+            return false;
+        juce::AudioBuffer<float> finish(2, 256);
+        finish.clear();
+        slot.render(finish, 0, finish.getNumSamples());
+        if (slot.activeVoiceCount() != 0)
+            return false;
+
+        auto unsupported = makeSfzSlotInstrument();
+        unsupported->regions[0].definition.sequenceLength = 2;
+        unsupported->regions[0].definition.sequencePosition = 1;
+        if (slot.publish(unsupported))
+            return false;
+        unsupported = makeSfzSlotInstrument();
+        unsupported->regions[0].definition.trigger = "release";
+        if (slot.publish(unsupported))
+            return false;
+        unsupported = makeSfzSlotInstrument();
+        unsupported->regions[0].definition.group = 1;
+        if (slot.publish(unsupported))
+            return false;
+        unsupported = makeSfzSlotInstrument();
+        auto invalidAudio = std::make_shared<juce::AudioBuffer<float>>(
+            *unsupported->samples[0].audio);
+        invalidAudio->setSample(0, 4, std::numeric_limits<float>::quiet_NaN());
+        unsupported->samples[0].audio = invalidAudio;
+        if (slot.publish(unsupported))
+            return false;
+
+        const auto telemetry = slot.telemetry();
+        const auto sfzTelemetry = slot.sfzTelemetry();
+        return telemetry.acceptedNoteEvents >= 20
+            && telemetry.rejectedNoteEvents >= 2
+            && telemetry.renderedSamples > 0
+            && telemetry.renderedVoiceSamples > telemetry.renderedSamples
+            && slot.stateVersion() >= 5
+            && sfzTelemetry.candidateScans > 0
+            && sfzTelemetry.candidateScans
+                <= (telemetry.acceptedNoteEvents + telemetry.rejectedNoteEvents)
+                    * beat::SfzSourceSlot::maximumCandidatesPerNote
+            && sfzTelemetry.voicesStarted >= telemetry.acceptedNoteEvents
+            && sfzTelemetry.noteCapacityRejects == 1
+            && sfzTelemetry.publicationRejects >= 4
+            && sfzTelemetry.retiredPublications > 0;
+    }
+
     bool stressDecentSamplerFixtureImportAndPlayback()
     {
         const auto archiveFile = juce::File("/Users/alexcheng/Downloads/samples/109689_PercussionPalette_joshuameltzer_DecentSampler.zip");
@@ -17119,6 +17393,11 @@ int main()
     if (!stressSfzSampleDecoder())
     {
         std::cerr << "SFZ sample decoder stress failed\n";
+        return 1;
+    }
+    if (!stressSfzSourceSlot())
+    {
+        std::cerr << "SFZ source slot stress failed\n";
         return 1;
     }
     std::cerr << "sfz subset: done\n";

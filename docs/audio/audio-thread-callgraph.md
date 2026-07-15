@@ -953,3 +953,29 @@ production callback / offline render
 ```
 
 Symlink-swap, identity-mismatch, and post-read mutation hooks compile only into `BeatBackendStress`. Production does not contain those hooks. On unsupported non-POSIX platforms the decode fails closed. C3C2 establishes a trustworthy immutable decoded object but deliberately does not publish it; the next edge must specify control-thread handoff, active-voice replacement policy, heavyweight destruction deferral, and callback-safety probes before reaching `MappedSampleSourceSlot`.
+
+## Milestone C3D1 disconnected indexed SFZ playback edge
+
+```text
+control thread
+  -> validate immutable C3C2 instrument and finite decoded buffers
+  -> write inactive owner/raw-pointer bank
+  -> atomic published-bank switch
+  -> retire unpinned former bank on control thread
+
+note-on callback boundary
+  -> pin current publication bank
+  -> fixed per-note candidate list (maximum 32)
+  -> key/velocity specificity + at most two equal-power regions
+  -> reserve one or two of 16 fixed voice records
+
+sample callback boundary
+  -> scan 16 fixed voice records
+  -> immutable buffer interpolation / slice / loop / transition arithmetic
+  -> release voice bank pin (no shared-owner destruction)
+
+AudioEngine / project schema / product import
+  -> no C3D1 edge
+```
+
+Note-on and render contain no allocation, blocking lock, file/stream access, lazy initialization, or container growth. Candidate scans and active voice samples are observable bounded work. Publication refuses active replacement, and sequence, release-trigger, group, and off-by semantics refuse publication. `takeRetiredInstrument()` is a control-thread destruction boundary. The next integration slice must choose an explicit product routing/import contract and preserve this bank/retirement policy; it must not fall back to the 256-slot per-sample scan that C3D1 was designed to avoid.
