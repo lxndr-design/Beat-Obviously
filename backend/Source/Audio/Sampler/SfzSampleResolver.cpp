@@ -5,6 +5,10 @@
 #include <set>
 #include <system_error>
 
+#if JUCE_MAC || JUCE_LINUX
+#include <sys/stat.h>
+#endif
+
 namespace beat
 {
     namespace
@@ -49,6 +53,33 @@ namespace beat
                 || extension == ".aif" || extension == ".aiff"
                 || extension == ".flac" || extension == ".ogg"
                 || extension == ".mp3" || extension == ".m4a";
+        }
+
+        SfzNativeFileIdentity readNativeIdentity(const juce::File& file) noexcept
+        {
+            SfzNativeFileIdentity identity;
+#if JUCE_MAC || JUCE_LINUX
+            struct stat status {};
+            if (::stat(file.getFullPathName().toRawUTF8(), &status) != 0
+                || !S_ISREG(status.st_mode))
+                return identity;
+            identity.deviceId = (uint64_t) status.st_dev;
+            identity.inode = (uint64_t) status.st_ino;
+            identity.byteSize = (int64_t) status.st_size;
+#if JUCE_MAC
+            identity.modificationSeconds = status.st_mtimespec.tv_sec;
+            identity.modificationNanoseconds = status.st_mtimespec.tv_nsec;
+            identity.changeSeconds = status.st_ctimespec.tv_sec;
+            identity.changeNanoseconds = status.st_ctimespec.tv_nsec;
+#else
+            identity.modificationSeconds = status.st_mtim.tv_sec;
+            identity.modificationNanoseconds = status.st_mtim.tv_nsec;
+            identity.changeSeconds = status.st_ctim.tv_sec;
+            identity.changeNanoseconds = status.st_ctim.tv_nsec;
+#endif
+            identity.valid = true;
+#endif
+            return identity;
         }
 
         void inheritParserDiagnostics(const SfzSubsetImport& parsed,
@@ -162,6 +193,17 @@ namespace beat
                               definition.sourceLine, 1);
                 continue;
             }
+            const auto nativeIdentity = readNativeIdentity(juce::File(candidate.string()));
+#if JUCE_MAC || JUCE_LINUX
+            if (!nativeIdentity.valid || nativeIdentity.byteSize != (int64_t) rawSize)
+            {
+                addDiagnostic(result, limits, SfzDiagnosticSeverity::error,
+                              "sfz.resolve.native-identity",
+                              "Referenced sample native identity cannot be recorded",
+                              definition.sourceLine, 1);
+                continue;
+            }
+#endif
             if (uniqueSamples.insert(candidate).second)
             {
                 if (rawSize > (uintmax_t) (limits.maximumTotalUniqueSampleBytes
@@ -181,6 +223,7 @@ namespace beat
             next.sampleFile = juce::File(candidate.string());
             next.sampleFileBytes = (int64_t) rawSize;
             next.sampleLastWriteTimeTicks = (int64_t) lastWriteTime.time_since_epoch().count();
+            next.nativeIdentity = nativeIdentity;
             next.stableRegionIndex = (uint16_t) index;
             resolved->hasSequenceMetadata = resolved->hasSequenceMetadata
                 || definition.sequenceLength != 1 || definition.sequencePosition != 1;

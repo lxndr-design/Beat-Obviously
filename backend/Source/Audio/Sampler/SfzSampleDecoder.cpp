@@ -6,6 +6,13 @@
 #include <map>
 #include <system_error>
 
+#if JUCE_MAC || JUCE_LINUX
+#include <cerrno>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 namespace beat
 {
     namespace
@@ -48,6 +55,102 @@ namespace beat
                 && limits.maximumDecodedBytesPerSample > 0
                 && limits.maximumTotalDecodedBytes > 0;
         }
+
+#if JUCE_MAC || JUCE_LINUX
+        SfzNativeFileIdentity identityFromStatus(const struct stat& status) noexcept
+        {
+            SfzNativeFileIdentity identity;
+            if (!S_ISREG(status.st_mode))
+                return identity;
+            identity.deviceId = (uint64_t) status.st_dev;
+            identity.inode = (uint64_t) status.st_ino;
+            identity.byteSize = (int64_t) status.st_size;
+#if JUCE_MAC
+            identity.modificationSeconds = status.st_mtimespec.tv_sec;
+            identity.modificationNanoseconds = status.st_mtimespec.tv_nsec;
+            identity.changeSeconds = status.st_ctimespec.tv_sec;
+            identity.changeNanoseconds = status.st_ctimespec.tv_nsec;
+#else
+            identity.modificationSeconds = status.st_mtim.tv_sec;
+            identity.modificationNanoseconds = status.st_mtim.tv_nsec;
+            identity.changeSeconds = status.st_ctim.tv_sec;
+            identity.changeNanoseconds = status.st_ctim.tv_nsec;
+#endif
+            identity.valid = true;
+            return identity;
+        }
+
+        class SfzDescriptorInputStream final : public juce::InputStream
+        {
+        public:
+            explicit SfzDescriptorInputStream(const juce::File& file) noexcept
+                : descriptor(::open(file.getFullPathName().toRawUTF8(),
+                                    O_RDONLY | O_CLOEXEC | O_NOFOLLOW))
+            {
+                if (descriptor >= 0)
+                {
+                    struct stat status {};
+                    if (::fstat(descriptor, &status) == 0)
+                        openedIdentity = identityFromStatus(status);
+                    if (!openedIdentity.valid)
+                    {
+                        ::close(descriptor);
+                        descriptor = -1;
+                    }
+                }
+            }
+
+            ~SfzDescriptorInputStream() override
+            {
+                if (descriptor >= 0)
+                    ::close(descriptor);
+            }
+
+            bool openedOk() const noexcept { return descriptor >= 0 && openedIdentity.valid; }
+            int errorAtOpen() const noexcept { return openError; }
+            const SfzNativeFileIdentity& identityAtOpen() const noexcept { return openedIdentity; }
+
+            SfzNativeFileIdentity currentIdentity() const noexcept
+            {
+                struct stat status {};
+                return descriptor >= 0 && ::fstat(descriptor, &status) == 0
+                    ? identityFromStatus(status) : SfzNativeFileIdentity {};
+            }
+
+            juce::int64 getTotalLength() override { return openedIdentity.byteSize; }
+            bool isExhausted() override { return getPosition() >= getTotalLength(); }
+
+            int read(void* destination, int maximumBytes) override
+            {
+                if (descriptor < 0 || destination == nullptr || maximumBytes <= 0)
+                    return 0;
+                while (true)
+                {
+                    const auto bytes = ::read(descriptor, destination, (size_t) maximumBytes);
+                    if (bytes >= 0) return (int) bytes;
+                    if (errno != EINTR) return 0;
+                }
+            }
+
+            juce::int64 getPosition() override
+            {
+                if (descriptor < 0) return 0;
+                const auto position = ::lseek(descriptor, 0, SEEK_CUR);
+                return position >= 0 ? (juce::int64) position : 0;
+            }
+
+            bool setPosition(juce::int64 position) override
+            {
+                return descriptor >= 0 && position >= 0
+                    && ::lseek(descriptor, (off_t) position, SEEK_SET) == (off_t) position;
+            }
+
+        private:
+            int descriptor { -1 };
+            int openError { descriptor < 0 ? errno : 0 };
+            SfzNativeFileIdentity openedIdentity;
+        };
+#endif
     }
 
     SfzSampleDecodeResult decodeSfzResolvedInstrument(
@@ -66,6 +169,11 @@ namespace beat
                           "SFZ decode requires an accepted resolved instrument");
             return result;
         }
+#if !(JUCE_MAC || JUCE_LINUX)
+        addDiagnostic(result, limits, "sfz.decode.identity-platform",
+                      "Strong SFZ file identity is unavailable on this platform");
+        return result;
+#else
 
         std::error_code error;
         const auto canonicalRoot = std::filesystem::canonical(
@@ -113,11 +221,27 @@ namespace beat
                     continue;
                 }
 
-                auto input = std::make_unique<juce::FileInputStream>(region.sampleFile);
+#if BEAT_SFZ_DECODE_TESTING
+                if (limits.beforeDescriptorOpen != nullptr)
+                    limits.beforeDescriptorOpen(region.sampleFile);
+#endif
+                auto input = std::make_unique<SfzDescriptorInputStream>(region.sampleFile);
                 if (!input->openedOk())
                 {
-                    addDiagnostic(result, limits, "sfz.decode.open",
-                                  "Resolved sample cannot be opened",
+                    const bool symlinkRefused = input->errorAtOpen() == ELOOP;
+                    addDiagnostic(result, limits,
+                                  symlinkRefused ? "sfz.decode.no-follow" : "sfz.decode.open",
+                                  symlinkRefused
+                                      ? "Resolved sample became a symlink before descriptor open"
+                                      : "Resolved sample cannot be opened",
+                                  region.definition.sourceLine);
+                    continue;
+                }
+                if (!region.nativeIdentity.valid
+                    || input->identityAtOpen() != region.nativeIdentity)
+                {
+                    addDiagnostic(result, limits, "sfz.decode.descriptor-identity",
+                                  "Opened sample descriptor does not match the resolved file identity",
                                   region.definition.sourceLine);
                     continue;
                 }
@@ -143,6 +267,7 @@ namespace beat
                     continue;
                 }
 
+                auto* descriptorStream = input.get();
                 std::unique_ptr<juce::AudioFormatReader> reader(
                     formats.createReaderFor(std::move(input)));
                 if (!reader || reader->numChannels == 0
@@ -183,6 +308,17 @@ namespace beat
                                   region.definition.sourceLine);
                     continue;
                 }
+#if BEAT_SFZ_DECODE_TESTING
+                if (limits.afterDecodeBeforeIdentityCheck != nullptr)
+                    limits.afterDecodeBeforeIdentityCheck(region.sampleFile);
+#endif
+                if (descriptorStream->currentIdentity() != region.nativeIdentity)
+                {
+                    addDiagnostic(result, limits, "sfz.decode.descriptor-mutated",
+                                  "Opened sample changed while it was being decoded",
+                                  region.definition.sourceLine);
+                    continue;
+                }
 
                 sampleIndex = (uint16_t) decoded->samples.size();
                 sampleIndices.emplace(canonicalSample, sampleIndex);
@@ -199,5 +335,6 @@ namespace beat
         decoded->noteIndex = resolved->noteIndex;
         result.instrument = std::move(decoded);
         return result;
+#endif
     }
 }

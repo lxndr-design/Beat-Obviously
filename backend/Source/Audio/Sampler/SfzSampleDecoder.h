@@ -16,6 +16,10 @@ namespace beat
         int64_t maximumDecodedBytesPerSample { 256LL * 1024 * 1024 };
         int64_t maximumTotalDecodedBytes { 512LL * 1024 * 1024 };
         size_t maximumDiagnostics { 512 };
+#if BEAT_SFZ_DECODE_TESTING
+        void (*beforeDescriptorOpen)(const juce::File&) { nullptr };
+        void (*afterDecodeBeforeIdentityCheck)(const juce::File&) { nullptr };
+#endif
     };
 
     struct SfzDecodedSample

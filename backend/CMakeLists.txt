@@ -287,7 +287,10 @@ target_link_libraries(BeatBackendStress PRIVATE
 )
 
 target_compile_features(BeatBackendStress PRIVATE cxx_std_20)
-target_compile_definitions(BeatBackendStress PRIVATE BEAT_REALTIME_SAFETY_TESTING=1)
+target_compile_definitions(BeatBackendStress PRIVATE
+    BEAT_REALTIME_SAFETY_TESTING=1
+    BEAT_SFZ_DECODE_TESTING=1
+)
 
 add_executable(BeatAetherBaseline
     Tests/AetherBaseline.cpp

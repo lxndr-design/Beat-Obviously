@@ -935,3 +935,21 @@ production callback / offline render
 ```
 
 All file opens, format discovery, allocation, decoding, diagnostic growth, and destruction occur outside the callback. C3C1 neither starts the C2H worker nor publishes to a source slot. Metadata revalidation is not equivalent to descriptor-level identity; C3C2 must add a platform-safe opened-file identity or content-digest policy, control-thread publication, deferred destruction, and callback instrumentation before the decoded graph may become reachable from the production render path.
+
+## Milestone C3C2 strong descriptor identity edge
+
+```text
+control/import thread
+  -> C3B stat(canonical sample): device + inode + size + mtime + ctime
+  -> C3C open(canonical sample, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+  -> fstat(open descriptor) == recorded identity
+  -> existing path / containment / portable metadata checks
+  -> JUCE format reader owns the same descriptor stream
+  -> bounded immutable decode
+  -> fstat(same open descriptor) == recorded identity
+
+production callback / offline render
+  -> no C3C2 edge
+```
+
+Symlink-swap, identity-mismatch, and post-read mutation hooks compile only into `BeatBackendStress`. Production does not contain those hooks. On unsupported non-POSIX platforms the decode fails closed. C3C2 establishes a trustworthy immutable decoded object but deliberately does not publish it; the next edge must specify control-thread handoff, active-voice replacement policy, heavyweight destruction deferral, and callback-safety probes before reaching `MappedSampleSourceSlot`.

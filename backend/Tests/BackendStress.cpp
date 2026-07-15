@@ -10279,6 +10279,25 @@ namespace
         });
     }
 
+#if BEAT_SFZ_DECODE_TESTING
+    juce::File sfzDecodeHookTarget;
+    juce::File sfzDecodeHookOutside;
+
+    void replaceSfzTargetWithSymlink(const juce::File& file)
+    {
+        if (file != sfzDecodeHookTarget || !file.deleteFile()) return;
+        ::symlink(sfzDecodeHookOutside.getFullPathName().toRawUTF8(),
+                  file.getFullPathName().toRawUTF8());
+    }
+
+    void mutateSfzOpenDescriptor(const juce::File& file)
+    {
+        if (file != sfzDecodeHookTarget) return;
+        const char changed[] = "changed-after-decode";
+        file.replaceWithData(changed, sizeof(changed));
+    }
+#endif
+
     bool stressSfzSampleDecoder()
     {
         auto root = juce::File("/private/tmp").getChildFile("BeatBackendStress-sfz-decode");
@@ -10288,6 +10307,9 @@ namespace
         const auto sfzFile = root.getChildFile("instrument.sfz");
         const auto monoFile = root.getChildFile("mono.wav");
         const auto stereoFile = root.getChildFile("stereo.wav");
+        const auto outsideFile = juce::File("/private/tmp")
+            .getChildFile("BeatBackendStress-sfz-decode-outside.wav");
+        if (outsideFile.existsAsFile()) outsideFile.deleteFile();
         const auto writeWav = [](const juce::File& file, int channels, int frames,
                                  double sampleRate) {
             juce::AudioBuffer<float> audio(channels, frames);
@@ -10388,10 +10410,50 @@ namespace
                 || !missing.diagnostics.empty())
                 break;
 
+            auto tamperedIdentity = std::make_shared<beat::SfzResolvedInstrument>(
+                *resolved.instrument);
+            ++tamperedIdentity->regions[0].nativeIdentity.inode;
+            const auto tampered = beat::decodeSfzResolvedInstrument(tamperedIdentity);
+            if (!hasSfzDecodeDiagnostic(tampered, "sfz.decode.descriptor-identity"))
+                break;
+
+#if BEAT_SFZ_DECODE_TESTING
+            if (!writeWav(outsideFile, 1, 256, 48000.0)) break;
+            sfzDecodeHookTarget = monoFile;
+            sfzDecodeHookOutside = outsideFile;
+            beat::SfzSampleDecodeLimits noFollowLimits;
+            noFollowLimits.beforeDescriptorOpen = replaceSfzTargetWithSymlink;
+            const auto noFollow = beat::decodeSfzResolvedInstrument(
+                resolved.instrument, noFollowLimits);
+            sfzDecodeHookTarget = juce::File();
+            sfzDecodeHookOutside = juce::File();
+            if (!hasSfzDecodeDiagnostic(noFollow, "sfz.decode.no-follow"))
+                break;
+
+            if (!monoFile.deleteFile() || !writeWav(monoFile, 1, 256, 48000.0))
+                break;
+            const auto mutationResolved = beat::resolveSfzSubsetSamples(
+                beat::parseSfzSubsetText(source), sfzFile);
+            sfzDecodeHookTarget = monoFile;
+            beat::SfzSampleDecodeLimits mutationLimits;
+            mutationLimits.afterDecodeBeforeIdentityCheck = mutateSfzOpenDescriptor;
+            const auto mutatedDuringDecode = beat::decodeSfzResolvedInstrument(
+                mutationResolved.instrument, mutationLimits);
+            sfzDecodeHookTarget = juce::File();
+            if (!hasSfzDecodeDiagnostic(mutatedDuringDecode,
+                                        "sfz.decode.descriptor-mutated"))
+                break;
+#endif
+
+            if (!writeWav(monoFile, 1, 256, 48000.0)) break;
+            const auto changedResolved = beat::resolveSfzSubsetSamples(
+                beat::parseSfzSubsetText(source), sfzFile);
             const char changed[] = "changed";
             if (!monoFile.replaceWithData(changed, sizeof(changed))) break;
-            const auto changedIdentity = beat::decodeSfzResolvedInstrument(resolved.instrument);
-            if (!hasSfzDecodeDiagnostic(changedIdentity, "sfz.decode.identity-changed"))
+            const auto changedIdentity = beat::decodeSfzResolvedInstrument(
+                changedResolved.instrument);
+            if (!hasSfzDecodeDiagnostic(changedIdentity,
+                                        "sfz.decode.descriptor-identity"))
                 break;
 
             passed = true;
@@ -10399,6 +10461,7 @@ namespace
         while (false);
 
         root.deleteRecursively();
+        outsideFile.deleteFile();
         return passed;
     }
 

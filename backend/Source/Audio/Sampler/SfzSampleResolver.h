@@ -9,6 +9,20 @@
 
 namespace beat
 {
+    struct SfzNativeFileIdentity
+    {
+        uint64_t deviceId { 0 };
+        uint64_t inode { 0 };
+        int64_t byteSize { 0 };
+        int64_t modificationSeconds { 0 };
+        int64_t modificationNanoseconds { 0 };
+        int64_t changeSeconds { 0 };
+        int64_t changeNanoseconds { 0 };
+        bool valid { false };
+
+        bool operator==(const SfzNativeFileIdentity&) const noexcept = default;
+    };
+
     struct SfzSampleResolutionLimits
     {
         static constexpr size_t hardMaximumCandidatesPerNote = 32;
@@ -25,6 +39,7 @@ namespace beat
         juce::File sampleFile;
         int64_t sampleFileBytes { 0 };
         int64_t sampleLastWriteTimeTicks { 0 };
+        SfzNativeFileIdentity nativeIdentity;
         uint16_t stableRegionIndex { 0 };
     };
 
