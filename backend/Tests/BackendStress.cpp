@@ -28,6 +28,7 @@
 #include "../Source/Audio/Recording/RecordingSessionPlanner.h"
 #include "../Source/Audio/Rendering/TrackBouncePlanner.h"
 #include "../Source/Audio/Sampler/DecentSamplerImporter.h"
+#include "../Source/Audio/Sampler/SfzSubsetImporter.h"
 #include "../Source/Audio/Sources/SampleSourceSlot.h"
 #include "../Source/Audio/Sources/BoundedSamplePageCache.h"
 #include "../Source/Audio/Sources/MappedSampleSourceSlot.h"
@@ -9975,6 +9976,156 @@ namespace
         return ok;
     }
 
+    bool hasSfzDiagnostic(const beat::SfzSubsetImport& parsed,
+                          const juce::String& code,
+                          beat::SfzDiagnosticSeverity severity)
+    {
+        return std::any_of(parsed.diagnostics.begin(), parsed.diagnostics.end(),
+                           [&](const beat::SfzDiagnostic& diagnostic) {
+            return diagnostic.code == code && diagnostic.severity == severity;
+        });
+    }
+
+    bool stressSfzSubsetImporter()
+    {
+        const juce::String valid = R"sfz(
+// Beat-owned bounded subset fixture
+<control> default_path=Samples/Strings
+<global> volume=-3 tune=7
+<group> lokey=C3 hikey=B3 lovel=1 hivel=100 group=4 off_by=7
+<region> sample=Soft Strings.wav pitch_keycenter=C4 loop_mode=loop_continuous loop_start=128 loop_end=2048 seq_length=3 seq_position=2 mystery_opcode=9
+<group> lokey=C4 hikey=C5 lovel=101 hivel=127
+<region> sample="Hard Strings.wav" key=C5 volume=-1 trigger=release offset=32 end=4096
+)sfz";
+
+        const auto parsed = beat::parseSfzSubsetText(valid);
+        const auto repeated = beat::parseSfzSubsetText(valid);
+        if (!parsed.isAccepted() || parsed.regions.size() != 2
+            || parsed.defaultPath != "Samples/Strings"
+            || parsed.ignoredOpcodeCount != 1
+            || !hasSfzDiagnostic(parsed, "sfz.opcode.unsupported",
+                                 beat::SfzDiagnosticSeverity::warning)
+            || repeated.regions.size() != parsed.regions.size()
+            || repeated.diagnostics.size() != parsed.diagnostics.size())
+        {
+            std::cerr << "SFZ valid subset parse failed accepted=" << parsed.isAccepted()
+                      << " regions=" << parsed.regions.size()
+                      << " ignored=" << parsed.ignoredOpcodeCount
+                      << " diagnostics=" << parsed.diagnostics.size() << "\n";
+            return false;
+        }
+
+        const auto& soft = parsed.regions[0];
+        const auto& hard = parsed.regions[1];
+        if (soft.samplePath != "Samples/Strings/Soft Strings.wav"
+            || soft.rootNote != 60 || soft.loNote != 48 || soft.hiNote != 59
+            || soft.loVelocity != 1 || soft.hiVelocity != 100
+            || !near((float) soft.volumeDb, -3.0f) || !near((float) soft.tuneCents, 7.0f)
+            || soft.group != 4 || soft.offBy != 7
+            || soft.sequenceLength != 3 || soft.sequencePosition != 2
+            || soft.loopMode != "loop_continuous"
+            || soft.loopStartFrame != 128 || soft.loopEndFrame != 2048
+            || hard.samplePath != "Samples/Strings/Hard Strings.wav"
+            || hard.rootNote != 72 || hard.loNote != 60 || hard.hiNote != 72
+            || hard.loVelocity != 101 || hard.hiVelocity != 127
+            || !near((float) hard.volumeDb, -1.0f) || hard.trigger != "release"
+            || hard.offsetFrames != 32 || hard.endFrame != 4096)
+        {
+            std::cerr << "SFZ inheritance or normalization mismatch\n";
+            return false;
+        }
+
+        const juce::String malformed = R"sfz(
+<region> sample=../escape.wav
+<region> sample=ok.wav lokey=90 hikey=20
+<region> sample=ok2.wav loop_mode=loop_continuous loop_start=20 loop_end=10
+<region> sample=ok3.wav seq_length=2 seq_position=3
+<region> sample=ok4.wav trigger=cc
+)sfz";
+        const auto rejected = beat::parseSfzSubsetText(malformed);
+        if (rejected.isAccepted()
+            || !hasSfzDiagnostic(rejected, "sfz.path.unsafe", beat::SfzDiagnosticSeverity::error)
+            || !hasSfzDiagnostic(rejected, "sfz.region.range", beat::SfzDiagnosticSeverity::error)
+            || !hasSfzDiagnostic(rejected, "sfz.region.loop-range", beat::SfzDiagnosticSeverity::error)
+            || !hasSfzDiagnostic(rejected, "sfz.region.sequence", beat::SfzDiagnosticSeverity::error)
+            || !hasSfzDiagnostic(rejected, "sfz.trigger.unsupported", beat::SfzDiagnosticSeverity::error))
+        {
+            std::cerr << "SFZ malformed-input diagnostics failed count="
+                      << rejected.diagnostics.size() << "\n";
+            return false;
+        }
+
+        for (const auto& unsafe : {
+                 juce::String("<region> sample=/absolute.wav"),
+                 juce::String("<region> sample=C:\\drive.wav"),
+                 juce::String("<control> default_path=../escape <region> sample=ok.wav"),
+             })
+        {
+            const auto unsafeResult = beat::parseSfzSubsetText(unsafe);
+            if (!unsafeResult.hasErrors()
+                || !hasSfzDiagnostic(unsafeResult, "sfz.path.unsafe",
+                                     beat::SfzDiagnosticSeverity::error))
+                return false;
+        }
+
+        beat::SfzSubsetParseLimits sourceLimit;
+        sourceLimit.maximumSourceBytes = 8;
+        const auto sourceLimited = beat::parseSfzSubsetText("<region> sample=ok.wav", sourceLimit);
+        if (!hasSfzDiagnostic(sourceLimited, "sfz.limit.source",
+                              beat::SfzDiagnosticSeverity::error))
+            return false;
+
+        beat::SfzSubsetParseLimits opcodeLimit;
+        opcodeLimit.maximumOpcodes = 2;
+        const auto opcodeLimited = beat::parseSfzSubsetText(
+            "<region> sample=ok.wav key=60 volume=-2", opcodeLimit);
+        if (!hasSfzDiagnostic(opcodeLimited, "sfz.limit.opcodes",
+                              beat::SfzDiagnosticSeverity::error))
+            return false;
+
+        beat::SfzSubsetParseLimits regionLimit;
+        regionLimit.maximumRegions = 1;
+        const auto regionLimited = beat::parseSfzSubsetText(
+            "<region> sample=one.wav\n<region> sample=two.wav", regionLimit);
+        if (!hasSfzDiagnostic(regionLimited, "sfz.limit.regions",
+                              beat::SfzDiagnosticSeverity::error)
+            || regionLimited.regions.size() != 1)
+            return false;
+
+        const auto orphan = beat::parseSfzSubsetText("sample=orphan.wav");
+        if (!hasSfzDiagnostic(orphan, "sfz.opcode.orphan",
+                              beat::SfzDiagnosticSeverity::error))
+            return false;
+
+        const auto ignoredSection = beat::parseSfzSubsetText(
+            "<curve> v_000=0.0\n<region> sample=ok.wav");
+        if (!ignoredSection.isAccepted() || ignoredSection.ignoredOpcodeCount != 1
+            || !hasSfzDiagnostic(ignoredSection, "sfz.header.unsupported",
+                                 beat::SfzDiagnosticSeverity::warning)
+            || !hasSfzDiagnostic(ignoredSection, "sfz.opcode.unsupported-section",
+                                 beat::SfzDiagnosticSeverity::warning))
+            return false;
+
+        beat::SfzSubsetParseLimits diagnosticLimit;
+        diagnosticLimit.maximumDiagnostics = 0;
+        const auto diagnosticsSuppressed = beat::parseSfzSubsetText(
+            "<region> sample=../escape.wav", diagnosticLimit);
+        if (!diagnosticsSuppressed.hasErrors() || diagnosticsSuppressed.errorCount == 0
+            || !diagnosticsSuppressed.diagnostics.empty())
+            return false;
+
+        auto file = juce::File("/private/tmp").getChildFile("BeatBackendStress-subset.sfz");
+        if (file.existsAsFile()) file.deleteFile();
+        if (!file.replaceWithText(valid))
+            return false;
+        const auto fromFile = beat::parseSfzSubsetFile(file);
+        file.deleteFile();
+        const auto missing = beat::parseSfzSubsetFile(file);
+        return fromFile.isAccepted() && fromFile.sourceName == "BeatBackendStress-subset.sfz"
+            && missing.hasErrors()
+            && hasSfzDiagnostic(missing, "sfz.file.missing", beat::SfzDiagnosticSeverity::error);
+    }
+
     bool stressDecentSamplerFixtureImportAndPlayback()
     {
         const auto archiveFile = juce::File("/Users/alexcheng/Downloads/samples/109689_PercussionPalette_joshuameltzer_DecentSampler.zip");
@@ -16614,6 +16765,14 @@ int main()
         return 1;
     }
     std::cerr << "sample/export: done\n";
+
+    std::cerr << "sfz subset: start\n";
+    if (!stressSfzSubsetImporter())
+    {
+        std::cerr << "SFZ subset importer stress failed\n";
+        return 1;
+    }
+    std::cerr << "sfz subset: done\n";
 
     std::cerr << "decent sampler: start\n";
     if (!stressDecentSamplerFixtureImportAndPlayback())

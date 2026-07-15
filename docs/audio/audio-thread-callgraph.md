@@ -882,3 +882,20 @@ real file worker + instrumented render blocks
 ```
 
 Sleep, test-file creation, loader failure injection, telemetry formatting, and worker joins occur outside every real-time probe. The callback still performs only the C2H bounded scan, atomic request/telemetry operations, preallocated sample copies, and per-voice transition arithmetic. Offline rendering remains outside the probe and stays on the full-decode edge.
+
+## Milestone C3A disconnected SFZ parsing edge
+
+```text
+future explicit import action (control thread only)
+  -> selected .sfz file size check (maximum 1 MiB)
+  -> bounded lexer (maximum 4,096 opcodes)
+  -> control/global/group/region inheritance
+  -> path/range/loop/sequence validation
+  -> immutable-neutral region records (maximum 256)
+  -> diagnostics (maximum 512 stored; uncapped error/warning totals)
+
+production callback / offline render
+  -> no C3A edge
+```
+
+C3A performs no sample existence check, decode, stream creation, route publication, schema mutation, or audio rendering. `parseSfzSubsetFile` is a control/import-thread wrapper and is not referenced by `AudioEngine` or the device callback. Unsupported headers and opcodes produce diagnostics rather than calling or emulating external implementations. C3B must introduce a separately reviewed sample-root and immutable region-index publication edge before playback exists.
