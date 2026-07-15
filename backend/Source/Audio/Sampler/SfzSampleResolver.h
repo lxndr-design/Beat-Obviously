@@ -24,6 +24,7 @@ namespace beat
         SfzSubsetRegion definition;
         juce::File sampleFile;
         int64_t sampleFileBytes { 0 };
+        int64_t sampleLastWriteTimeTicks { 0 };
         uint16_t stableRegionIndex { 0 };
     };
 

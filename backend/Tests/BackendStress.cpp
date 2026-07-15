@@ -30,6 +30,7 @@
 #include "../Source/Audio/Sampler/DecentSamplerImporter.h"
 #include "../Source/Audio/Sampler/SfzSubsetImporter.h"
 #include "../Source/Audio/Sampler/SfzSampleResolver.h"
+#include "../Source/Audio/Sampler/SfzSampleDecoder.h"
 #include "../Source/Audio/Sources/SampleSourceSlot.h"
 #include "../Source/Audio/Sources/BoundedSamplePageCache.h"
 #include "../Source/Audio/Sources/MappedSampleSourceSlot.h"
@@ -10268,6 +10269,139 @@ namespace
         return passed;
     }
 
+    bool hasSfzDecodeDiagnostic(const beat::SfzSampleDecodeResult& decoded,
+                                const juce::String& code)
+    {
+        return std::any_of(decoded.diagnostics.begin(), decoded.diagnostics.end(),
+                           [&](const beat::SfzDiagnostic& diagnostic) {
+            return diagnostic.code == code
+                && diagnostic.severity == beat::SfzDiagnosticSeverity::error;
+        });
+    }
+
+    bool stressSfzSampleDecoder()
+    {
+        auto root = juce::File("/private/tmp").getChildFile("BeatBackendStress-sfz-decode");
+        if (root.exists()) root.deleteRecursively();
+        if (!root.createDirectory()) return false;
+
+        const auto sfzFile = root.getChildFile("instrument.sfz");
+        const auto monoFile = root.getChildFile("mono.wav");
+        const auto stereoFile = root.getChildFile("stereo.wav");
+        const auto writeWav = [](const juce::File& file, int channels, int frames,
+                                 double sampleRate) {
+            juce::AudioBuffer<float> audio(channels, frames);
+            for (int channel = 0; channel < channels; ++channel)
+                for (int frame = 0; frame < frames; ++frame)
+                    audio.setSample(channel, frame,
+                        0.25f * std::sin((float) frame * 0.031f + (float) channel));
+            juce::WavAudioFormat wav;
+            auto output = file.createOutputStream();
+            std::unique_ptr<juce::AudioFormatWriter> writer(output
+                ? wav.createWriterFor(output.get(), sampleRate, channels, 24, {}, 0)
+                : nullptr);
+            if (!writer) return false;
+            output.release();
+            return writer->writeFromAudioSampleBuffer(audio, 0, frames);
+        };
+
+        bool passed = false;
+        do
+        {
+            if (!writeWav(monoFile, 1, 256, 48000.0)
+                || !writeWav(stereoFile, 2, 128, 44100.0))
+                break;
+            const juce::String source = R"sfz(
+<region> sample=mono.wav key=C4
+<region> sample=mono.wav key=D4
+<region> sample=stereo.wav key=E4
+)sfz";
+            if (!sfzFile.replaceWithText(source)) break;
+            const auto resolved = beat::resolveSfzSubsetSamples(
+                beat::parseSfzSubsetText(source), sfzFile);
+            const auto decoded = beat::decodeSfzResolvedInstrument(resolved.instrument);
+            if (!decoded.isAccepted() || !decoded.instrument
+                || decoded.instrument->samples.size() != 2
+                || decoded.instrument->regions.size() != 3
+                || decoded.instrument->totalDecodedBytes != 2048
+                || decoded.instrument->regions[0].sampleIndex != 0
+                || decoded.instrument->regions[1].sampleIndex != 0
+                || decoded.instrument->regions[2].sampleIndex != 1
+                || decoded.instrument->samples[0].audio->getNumChannels() != 1
+                || decoded.instrument->samples[0].audio->getNumSamples() != 256
+                || decoded.instrument->samples[0].sourceSampleRate != 48000.0
+                || decoded.instrument->samples[1].audio->getNumChannels() != 2
+                || decoded.instrument->noteIndex[60].count != 1
+                || decoded.instrument->noteIndex[62].count != 1
+                || decoded.instrument->noteIndex[64].count != 1)
+            {
+                std::cerr << "SFZ decode failed accepted=" << decoded.isAccepted()
+                          << " errors=" << decoded.errorCount << "\n";
+                break;
+            }
+
+            const auto repeated = beat::decodeSfzResolvedInstrument(resolved.instrument);
+            if (!repeated.isAccepted()
+                || repeated.instrument->totalDecodedBytes != decoded.instrument->totalDecodedBytes
+                || repeated.instrument->samples[0].audio->getSample(0, 127)
+                    != decoded.instrument->samples[0].audio->getSample(0, 127))
+                break;
+
+            beat::SfzSampleDecodeLimits perSampleLimit;
+            perSampleLimit.maximumDecodedBytesPerSample = 1023;
+            const auto perSample = beat::decodeSfzResolvedInstrument(
+                resolved.instrument, perSampleLimit);
+            if (!hasSfzDecodeDiagnostic(perSample, "sfz.decode.sample-bytes"))
+                break;
+
+            beat::SfzSampleDecodeLimits aggregateLimit;
+            aggregateLimit.maximumTotalDecodedBytes = 1024;
+            const auto aggregate = beat::decodeSfzResolvedInstrument(
+                resolved.instrument, aggregateLimit);
+            if (!hasSfzDecodeDiagnostic(aggregate, "sfz.decode.total-bytes"))
+                break;
+
+            beat::SfzSampleDecodeLimits sampleCap;
+            sampleCap.maximumUniqueSamples = 1;
+            const auto capped = beat::decodeSfzResolvedInstrument(resolved.instrument, sampleCap);
+            if (!hasSfzDecodeDiagnostic(capped, "sfz.decode.sample-cap"))
+                break;
+
+            beat::SfzSampleDecodeLimits channelCap;
+            channelCap.maximumChannels = 1;
+            const auto channels = beat::decodeSfzResolvedInstrument(
+                resolved.instrument, channelCap);
+            if (!hasSfzDecodeDiagnostic(channels, "sfz.decode.format"))
+                break;
+
+            beat::SfzSampleDecodeLimits invalidLimits;
+            invalidLimits.maximumTotalDecodedBytes = 0;
+            const auto invalid = beat::decodeSfzResolvedInstrument(
+                resolved.instrument, invalidLimits);
+            if (!hasSfzDecodeDiagnostic(invalid, "sfz.decode.limit-config"))
+                break;
+
+            beat::SfzSampleDecodeLimits noDetails;
+            noDetails.maximumDiagnostics = 0;
+            const auto missing = beat::decodeSfzResolvedInstrument(nullptr, noDetails);
+            if (!missing.hasErrors() || missing.errorCount == 0
+                || !missing.diagnostics.empty())
+                break;
+
+            const char changed[] = "changed";
+            if (!monoFile.replaceWithData(changed, sizeof(changed))) break;
+            const auto changedIdentity = beat::decodeSfzResolvedInstrument(resolved.instrument);
+            if (!hasSfzDecodeDiagnostic(changedIdentity, "sfz.decode.identity-changed"))
+                break;
+
+            passed = true;
+        }
+        while (false);
+
+        root.deleteRecursively();
+        return passed;
+    }
+
     bool stressDecentSamplerFixtureImportAndPlayback()
     {
         const auto archiveFile = juce::File("/Users/alexcheng/Downloads/samples/109689_PercussionPalette_joshuameltzer_DecentSampler.zip");
@@ -16917,6 +17051,11 @@ int main()
     if (!stressSfzSampleResolver())
     {
         std::cerr << "SFZ sample resolver stress failed\n";
+        return 1;
+    }
+    if (!stressSfzSampleDecoder())
+    {
+        std::cerr << "SFZ sample decoder stress failed\n";
         return 1;
     }
     std::cerr << "sfz subset: done\n";

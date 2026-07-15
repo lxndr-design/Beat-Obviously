@@ -153,6 +153,15 @@ namespace beat
                               definition.sourceLine, 1);
                 continue;
             }
+            error.clear();
+            const auto lastWriteTime = std::filesystem::last_write_time(candidate, error);
+            if (error)
+            {
+                addDiagnostic(result, limits, SfzDiagnosticSeverity::error,
+                              "sfz.resolve.file-time", "Referenced sample identity cannot be recorded",
+                              definition.sourceLine, 1);
+                continue;
+            }
             if (uniqueSamples.insert(candidate).second)
             {
                 if (rawSize > (uintmax_t) (limits.maximumTotalUniqueSampleBytes
@@ -171,6 +180,7 @@ namespace beat
             next.definition = definition;
             next.sampleFile = juce::File(candidate.string());
             next.sampleFileBytes = (int64_t) rawSize;
+            next.sampleLastWriteTimeTicks = (int64_t) lastWriteTime.time_since_epoch().count();
             next.stableRegionIndex = (uint16_t) index;
             resolved->hasSequenceMetadata = resolved->hasSequenceMetadata
                 || definition.sequenceLength != 1 || definition.sequencePosition != 1;

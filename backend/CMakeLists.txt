@@ -81,6 +81,8 @@ target_sources(Beat PRIVATE
     Source/Audio/Sampler/SfzSubsetImporter.h
     Source/Audio/Sampler/SfzSampleResolver.cpp
     Source/Audio/Sampler/SfzSampleResolver.h
+    Source/Audio/Sampler/SfzSampleDecoder.cpp
+    Source/Audio/Sampler/SfzSampleDecoder.h
     Source/Audio/Sources/BoundedSamplePageCache.h
     Source/Audio/Sources/SampleStreamingSession.cpp
     Source/Audio/Sources/SampleStreamingSession.h
@@ -240,6 +242,8 @@ add_executable(BeatBackendStress
     Source/Audio/Sampler/SfzSubsetImporter.h
     Source/Audio/Sampler/SfzSampleResolver.cpp
     Source/Audio/Sampler/SfzSampleResolver.h
+    Source/Audio/Sampler/SfzSampleDecoder.cpp
+    Source/Audio/Sampler/SfzSampleDecoder.h
     Source/Audio/Sources/BoundedSamplePageCache.h
     Source/Audio/Sources/SampleStreamingSession.cpp
     Source/Audio/Sources/SampleStreamingSession.h

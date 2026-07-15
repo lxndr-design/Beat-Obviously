@@ -917,3 +917,21 @@ production callback / offline render
 ```
 
 The resolver opens no audio stream and publishes nothing into `AudioEngine`, `InstrumentVoice`, the streaming worker, or project state. File inspection is intentionally control-thread work and is outside the real-time instrumentation boundary. Future C3C decode must revalidate the selected file after opening it to close the remaining time-of-check/time-of-use window; it must also establish decoder-format support, destruction deferral, live/offline ownership, and callback-safe publication before this edge can reach playback.
+
+## Milestone C3C1 disconnected SFZ decode edge
+
+```text
+future explicit import action (control thread only)
+  -> accepted immutable C3B instrument
+  -> canonical root/sample revalidation
+  -> open one stream per unique sample
+  -> post-open path / containment / size / timestamp / stream-length checks
+  -> JUCE format reader metadata validation
+  -> decoded-memory budget check before allocation
+  -> immutable shared audio buffers + stable region/note index
+
+production callback / offline render
+  -> no C3C1 edge
+```
+
+All file opens, format discovery, allocation, decoding, diagnostic growth, and destruction occur outside the callback. C3C1 neither starts the C2H worker nor publishes to a source slot. Metadata revalidation is not equivalent to descriptor-level identity; C3C2 must add a platform-safe opened-file identity or content-digest policy, control-thread publication, deferred destruction, and callback instrumentation before the decoded graph may become reachable from the production render path.
