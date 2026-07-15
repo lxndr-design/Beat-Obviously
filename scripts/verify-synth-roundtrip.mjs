@@ -781,6 +781,18 @@ try {
   assert.equal(futureBassBenchmark?.patch.parameters["osc.a.unison.voices"], 8);
   assert.equal(progressiveHouseBenchmark?.patch.parameters["osc.a.unison.voices"], 7);
   assert.deepEqual(
+    ["macro.1", "macro.2", "macro.3", "macro.4"].map(
+      (id) => futureBassBenchmark?.patch.metadata.macros[id]?.label,
+    ),
+    ["Pump Motion", "Harmonic Color", "Envelope Shape", "Stereo Space"],
+  );
+  assert.deepEqual(
+    ["macro.1", "macro.2", "macro.3", "macro.4"].map(
+      (id) => progressiveHouseBenchmark?.patch.metadata.macros[id]?.label,
+    ),
+    ["Pulse Motion", "String Color", "Envelope Shape", "Hall Space"],
+  );
+  assert.deepEqual(
     futureBassBenchmark?.patch.effects.filters.map((effect) => effect.kind),
     ["chorus", "phaser", "saturator", "highpass", "compressor", "delay", "reverb"],
   );

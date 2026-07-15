@@ -12,7 +12,7 @@
       "intent": "Bright, animated future-bass string and supersaw hybrid with a saw-plus-square oscillator stack, tempo-synced amplitude and filter motion, chorus, phaser, saturation, delay, and bright room ambience.",
       "tags": ["benchmark", "strings", "future-bass", "edm", "chords", "supersaw", "rhythmic", "bright"],
       "role": "rhythmic synth string",
-      "auditionNote": "Audition with sustained future-bass chord stabs across C3-C5 and vary Motion, Color, Shape, and Space.",
+      "auditionNote": "Audition with sustained future-bass chord stabs across C3-C5 and vary Pump Motion, Harmonic Color, Envelope Shape, and Stereo Space.",
       "playMode": {"polyphony": 24, "mono": false, "legato": false, "glideMs": 0},
       "oscillators": {
         "oscA": {"enabled": true, "mode": "basic", "shape": "saw", "position": 0, "warpMode": "shape", "warp": 8, "octave": 0, "semitone": 0, "fineCents": 0, "phase": 0, "random": 90, "pan": 0, "level": 80},
@@ -29,10 +29,10 @@
         "lfo2": {"enabled": true, "shape": "saw", "sync": true, "rate": "1/4", "phase": 50, "smooth": 58, "random": 0, "oneShot": false, "retrigger": true, "bipolar": true}
       },
       "macros": [
-        {"slot": "motion", "label": "Motion", "default": 55},
-        {"slot": "color", "label": "Color", "default": 58},
-        {"slot": "shape", "label": "Shape", "default": 50},
-        {"slot": "space", "label": "Space", "default": 42}
+        {"slot": "motion", "label": "Pump Motion", "default": 55},
+        {"slot": "color", "label": "Harmonic Color", "default": 58},
+        {"slot": "shape", "label": "Envelope Shape", "default": 50},
+        {"slot": "space", "label": "Stereo Space", "default": 42}
       ],
       "modulationMatrix": [
         {"enabled": true, "source": "lfo1", "target": "oscA.fine", "amount": 5.5, "polarity": "bipolar"},
@@ -64,7 +64,7 @@
       "intent": "Warm, sustained progressive-house string pad built from layered saw oscillators, moderate unison, slow filter bloom, chorus, saturation, compression, and a large room.",
       "tags": ["benchmark", "strings", "progressive-house", "edm", "pad", "supersaw", "warm", "wide"],
       "role": "synth string ensemble",
-      "auditionNote": "Audition with sustained progressive-house chords across C3-C5 and vary Motion, Color, Shape, and Space.",
+      "auditionNote": "Audition with sustained progressive-house chords across C3-C5 and vary Pulse Motion, String Color, Envelope Shape, and Hall Space.",
       "playMode": {"polyphony": 24, "mono": false, "legato": false, "glideMs": 0},
       "oscillators": {
         "oscA": {"enabled": true, "mode": "basic", "shape": "saw", "position": 0, "warpMode": "shape", "warp": 4, "octave": 0, "semitone": 0, "fineCents": 0, "phase": 0, "random": 72, "pan": 0, "level": 82},
@@ -81,10 +81,10 @@
         "lfo2": {"enabled": true, "shape": "sine", "sync": false, "rateHz": 0.14, "phase": 25, "smooth": 70, "random": 18, "oneShot": false, "retrigger": false, "bipolar": true}
       },
       "macros": [
-        {"slot": "motion", "label": "Motion", "default": 35},
-        {"slot": "color", "label": "Color", "default": 45},
-        {"slot": "shape", "label": "Shape", "default": 40},
-        {"slot": "space", "label": "Space", "default": 55}
+        {"slot": "motion", "label": "Pulse Motion", "default": 35},
+        {"slot": "color", "label": "String Color", "default": 45},
+        {"slot": "shape", "label": "Envelope Shape", "default": 40},
+        {"slot": "space", "label": "Hall Space", "default": 55}
       ],
       "modulationMatrix": [
         {"enabled": true, "source": "lfo1", "target": "oscA.fine", "amount": 4.5, "polarity": "bipolar"},
