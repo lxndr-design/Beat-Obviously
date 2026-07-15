@@ -861,3 +861,24 @@ offline/export
 ```
 
 The callback does not call `AudioFormatReader`, `Thread::notify`, `Thread::wait`, loader code, or any ownership-changing operation. Worker file I/O is outside the thread-local real-time probe. Project replacement keeps the retired session alive until old routes are destroyed, publishes the new session under the project lock, then signals and joins the retired worker after releasing the lock. An asset shared with an audio segment or conventional sampler never enters this edge. If a page is unavailable, position/timing advance normally while the held source value fades to silence; recovery begins only after the fade-out reaches zero.
+
+## Milestone C2I streaming-pressure proof edge
+
+The production graph above is unchanged. Test-only coverage drives the existing boundaries in two ways:
+
+```text
+deterministic slow/failing test worker
+  -> 2 ms bounded loader delay + 64 declared failures
+  -> existing fixed request consumer and page publication
+
+instrumented simulated callback
+  -> 50,000 random cache reads across 128 pages
+  -> explicit queue saturation / zero-on-miss / recovery proof
+
+real file worker + instrumented render blocks
+  -> 16 SampleSourceSlot voices at divergent rates
+  -> non-sequential page churn + forward-loop wrap
+  -> more successful loads than resident page slots
+```
+
+Sleep, test-file creation, loader failure injection, telemetry formatting, and worker joins occur outside every real-time probe. The callback still performs only the C2H bounded scan, atomic request/telemetry operations, preallocated sample copies, and per-voice transition arithmetic. Offline rendering remains outside the probe and stays on the full-decode edge.

@@ -11731,6 +11731,53 @@ namespace
         std::atomic<uint64_t> calls { 0 };
     };
 
+    class StarvedSamplePageLoader final : public beat::SamplePageLoader
+    {
+    public:
+        StarvedSamplePageLoader(int64_t frames, int delayMicroseconds)
+            : totalFrames(frames), delay(delayMicroseconds)
+        {
+        }
+
+        void failNextLoads(int count) noexcept
+        {
+            failuresRemaining.store(std::max(0, count), std::memory_order_release);
+        }
+
+        int readFrames(int64_t firstFrame, int frameCount,
+                       float* left, float* right) noexcept override
+        {
+            calls.fetch_add(1, std::memory_order_relaxed);
+            if (delay.count() > 0)
+                std::this_thread::sleep_for(delay);
+
+            int remaining = failuresRemaining.load(std::memory_order_acquire);
+            while (remaining > 0)
+            {
+                if (failuresRemaining.compare_exchange_weak(
+                        remaining, remaining - 1,
+                        std::memory_order_acq_rel, std::memory_order_acquire))
+                    return 0;
+            }
+
+            if (firstFrame < 0 || firstFrame >= totalFrames || frameCount <= 0)
+                return 0;
+            const int available = (int) std::min<int64_t>(frameCount, totalFrames - firstFrame);
+            for (int index = 0; index < available; ++index)
+            {
+                const float value = DeterministicSamplePageLoader::expected(firstFrame + index);
+                left[index] = value;
+                right[index] = -value;
+            }
+            return available;
+        }
+
+        const int64_t totalFrames;
+        const std::chrono::microseconds delay;
+        std::atomic<int> failuresRemaining { 0 };
+        std::atomic<uint64_t> calls { 0 };
+    };
+
     bool stressBoundedSamplePageCache()
     {
         constexpr int64_t frameCount = (int64_t) beat::BoundedSamplePageCache::pageFrames * 96 + 17;
@@ -11843,9 +11890,110 @@ namespace
             && afterInvalid.requestsAccepted == beforeInvalid.requestsAccepted;
     }
 
+    bool stressBoundedSamplePageCacheStarvation()
+    {
+        constexpr int pageCount = 128;
+        constexpr int64_t frameCount =
+            (int64_t) beat::BoundedSamplePageCache::pageFrames * pageCount;
+        StarvedSamplePageLoader loader(frameCount, 2000);
+        beat::BoundedSamplePageCache cache(loader, frameCount);
+        if (!cache.preloadFrame(0))
+            return false;
+
+        loader.failNextLoads(64);
+        std::atomic<bool> callbackDone { false };
+        std::thread worker([&] {
+            while (!callbackDone.load(std::memory_order_acquire) || cache.hasPendingRequest())
+            {
+                if (!cache.serviceOneRequest())
+                    std::this_thread::yield();
+            }
+        });
+
+        const auto started = std::chrono::steady_clock::now();
+        beat::BoundedSamplePageCache::StereoFrame frame;
+        uint32_t random = 0x7f4a7c15u;
+        bool coherent = true;
+        uint64_t hits = 0;
+        beat::test::beginRealtimeSafetyProbe();
+        for (int iteration = 0; iteration < 50000; ++iteration)
+        {
+            random = random * 1664525u + 1013904223u;
+            const int64_t position = (int64_t) (random % (uint32_t) frameCount);
+            const bool available = cache.readStereoFrame(position, frame);
+            if (!std::isfinite(frame.left) || !std::isfinite(frame.right))
+            {
+                coherent = false;
+                break;
+            }
+            if (available)
+            {
+                ++hits;
+                if (!near(frame.left, DeterministicSamplePageLoader::expected(position), 0.000001f)
+                    || !near(frame.right, -frame.left, 0.000001f))
+                {
+                    coherent = false;
+                    break;
+                }
+            }
+            else if (frame.left != 0.0f || frame.right != 0.0f)
+            {
+                coherent = false;
+                break;
+            }
+        }
+        const size_t callbackViolations = beat::test::endRealtimeSafetyProbe();
+
+        bool starvationObserved = false;
+        for (int attempt = 0; attempt < 1000; ++attempt)
+        {
+            if (cache.telemetry().pageLoadsFailed >= 64)
+            {
+                starvationObserved = true;
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        loader.failNextLoads(0);
+        const int64_t recoveryPosition =
+            (int64_t) (pageCount - 1) * beat::BoundedSamplePageCache::pageFrames + 17;
+        bool recovered = false;
+        for (int attempt = 0; !recovered && attempt < 1000; ++attempt)
+        {
+            recovered = cache.readStereoFrame(recoveryPosition, frame);
+            if (!recovered)
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        callbackDone.store(true, std::memory_order_release);
+        worker.join();
+
+        const auto telemetry = cache.telemetry();
+        const double wallMs = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - started).count();
+        std::cerr << "streaming starvation: wallMs=" << wallMs
+                  << " hits=" << hits
+                  << " misses=" << telemetry.cacheMisses
+                  << " accepted=" << telemetry.requestsAccepted
+                  << " rejected=" << telemetry.requestsRejected
+                  << " dedup=" << telemetry.requestsDeduplicated
+                  << " loaded=" << telemetry.pagesLoaded
+                  << " failed=" << telemetry.pageLoadsFailed << "\n";
+
+        return coherent && callbackViolations == 0 && starvationObserved && recovered
+            && near(frame.left, DeterministicSamplePageLoader::expected(recoveryPosition), 0.000001f)
+            && telemetry.cacheMisses > 0
+            && telemetry.underflows == telemetry.cacheMisses
+            && telemetry.requestsAccepted > 0
+            && telemetry.requestsRejected > 0
+            && telemetry.requestsDeduplicated > 0
+            && telemetry.pagesLoaded >= 2
+            && telemetry.pageLoadsFailed >= 64
+            && wallMs < 5000.0;
+    }
+
     bool stressSampleStreamingSession()
     {
-        constexpr int sourceFrames = beat::BoundedSamplePageCache::pageFrames * 4;
+        constexpr int sourceFrames = beat::BoundedSamplePageCache::pageFrames * 48;
         constexpr double sourceRate = 48000.0;
         auto file = juce::File("/private/tmp").getChildFile("BeatBackendStress-streaming-source.wav");
         if (file.existsAsFile())
@@ -11916,9 +12064,63 @@ namespace
             if (recoveryViolations != 0 || recoveredPeak < 0.1f || maximumStep > 0.08f)
                 return false;
 
+            beat::SampleSourceSlot starvationSlot;
+            if (!starvationSlot.prepare({ sourceRate, 256, 2 })
+                || !starvationSlot.publish(source)
+                || !starvationSlot.noteOn({ 69, 1.0f, 5501 }))
+                return false;
+            float starvationPrevious = 0.0f;
+            float starvationMaximumStep = 0.0f;
+            float starvationTailPeak = 0.0f;
+            bool starvationFinite = true;
+            beat::test::beginRealtimeSafetyProbe();
+            for (int index = 0; index < beat::BoundedSamplePageCache::pageFrames + 128; ++index)
+            {
+                const auto frame = starvationSlot.renderFrame();
+                starvationFinite = starvationFinite
+                    && std::isfinite(frame.left) && std::isfinite(frame.right);
+                starvationMaximumStep = std::max(
+                    starvationMaximumStep, std::abs(frame.left - starvationPrevious));
+                starvationPrevious = frame.left;
+                if (index >= beat::BoundedSamplePageCache::pageFrames + 112)
+                    starvationTailPeak = std::max(starvationTailPeak, std::abs(frame.left));
+            }
+            const size_t starvationCallbackViolations = beat::test::endRealtimeSafetyProbe();
+            if (!session->preloadFrame(metadata->index,
+                                       beat::BoundedSamplePageCache::pageFrames + 128))
+                return false;
+            float starvationRecoveryPeak = 0.0f;
+            for (int index = 0; index < 192; ++index)
+            {
+                const auto frame = starvationSlot.renderFrame();
+                starvationFinite = starvationFinite
+                    && std::isfinite(frame.left) && std::isfinite(frame.right);
+                starvationMaximumStep = std::max(
+                    starvationMaximumStep, std::abs(frame.left - starvationPrevious));
+                starvationPrevious = frame.left;
+                starvationRecoveryPeak = std::max(starvationRecoveryPeak, std::abs(frame.left));
+            }
+            if (!starvationFinite || starvationCallbackViolations != 0
+                || starvationTailPeak > 0.000001f
+                || starvationRecoveryPeak < 0.1f
+                || starvationMaximumStep > 0.08f)
+                return false;
+
+            auto loopSource = std::make_shared<beat::ImmutableSampleSource>(*source);
+            loopSource->loopEnabled = true;
+            loopSource->loopStartRatio = 0.10f;
+            loopSource->loopEndRatio = 0.80f;
+            beat::SampleSourceSlot polyphonicSlot;
+            if (!polyphonicSlot.prepare({ sourceRate, 256, 2 })
+                || !polyphonicSlot.publish(loopSource))
+                return false;
+            for (int voice = 0; voice < beat::SampleSourceSlot::maximumVoices; ++voice)
+                if (!polyphonicSlot.noteOn({ 48 + voice * 2, 0.35f, (uint64_t) (6000 + voice) }))
+                    return false;
+
             if (!session->start())
                 return false;
-            const int64_t distantFrame = beat::BoundedSamplePageCache::pageFrames * 3 + 10;
+            const int64_t distantFrame = beat::BoundedSamplePageCache::pageFrames * 32 + 10;
             beat::BoundedSamplePageCache::StereoFrame streamed;
             beat::test::beginRealtimeSafetyProbe();
             const bool initiallyResident = session->readStereoFrame(metadata->index, distantFrame, streamed);
@@ -11929,12 +12131,47 @@ namespace
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 loaded = session->readStereoFrame(metadata->index, distantFrame, streamed);
             }
+
+            bool polyphonicFinite = true;
+            double polyphonicEnergy = 0.0;
+            size_t polyphonicCallbackViolations = 0;
+            const auto polyphonicStarted = std::chrono::steady_clock::now();
+            for (int block = 0; block < 320; ++block)
+            {
+                beat::test::beginRealtimeSafetyProbe();
+                for (int sampleIndex = 0; sampleIndex < 256; ++sampleIndex)
+                {
+                    const auto rendered = polyphonicSlot.renderFrame();
+                    if (!std::isfinite(rendered.left) || !std::isfinite(rendered.right))
+                    {
+                        polyphonicFinite = false;
+                        break;
+                    }
+                    polyphonicEnergy += (double) rendered.left * rendered.left
+                        + (double) rendered.right * rendered.right;
+                }
+                polyphonicCallbackViolations += beat::test::endRealtimeSafetyProbe();
+                if (!polyphonicFinite)
+                    break;
+                std::this_thread::yield();
+            }
+            const double polyphonicWallMs = std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - polyphonicStarted).count();
             session->stop();
             const auto telemetry = session->telemetry(metadata->index);
+            std::cerr << "streaming polyphony: wallMs=" << polyphonicWallMs
+                      << " energy=" << polyphonicEnergy
+                      << " hits=" << telemetry.cacheHits
+                      << " misses=" << telemetry.cacheMisses
+                      << " loaded=" << telemetry.pagesLoaded
+                      << " rejected=" << telemetry.requestsRejected << "\n";
             passed = !initiallyResident && requestViolations == 0 && loaded
                 && std::isfinite(streamed.left) && std::isfinite(streamed.right)
+                && polyphonicFinite && polyphonicEnergy > 0.0001
+                && polyphonicCallbackViolations == 0
                 && telemetry.cacheHits > 0 && telemetry.underflows > 0
-                && telemetry.requestsAccepted > 0 && telemetry.pagesLoaded >= 2;
+                && telemetry.requestsAccepted > 0
+                && telemetry.pagesLoaded > beat::BoundedSamplePageCache::residentPageCount;
         }
         file.deleteFile();
         return passed;
@@ -15692,6 +15929,11 @@ int main()
     if (!stressBoundedSamplePageCache())
     {
         std::cerr << "Bounded sample page-cache stress failed\n";
+        return 1;
+    }
+    if (!stressBoundedSamplePageCacheStarvation())
+    {
+        std::cerr << "Bounded sample page-cache starvation stress failed\n";
         return 1;
     }
     if (!stressSampleStreamingSession())
