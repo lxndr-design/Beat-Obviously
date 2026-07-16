@@ -32,6 +32,7 @@
 #include "../Source/Audio/Sampler/SfzSampleResolver.h"
 #include "../Source/Audio/Sampler/SfzSampleDecoder.h"
 #include "../Source/Audio/Sources/SampleSourceSlot.h"
+#include "../Source/Audio/Sources/GranularSourceSlot.h"
 #include "../Source/Audio/Sources/SfzSourceSlot.h"
 #include "../Source/Audio/Sources/BoundedSamplePageCache.h"
 #include "../Source/Audio/Sources/MappedSampleSourceSlot.h"
@@ -10955,6 +10956,128 @@ namespace
             && sfzTelemetry.retiredPublications > 0;
     }
 
+    bool stressGranularSourceSlot()
+    {
+        auto audio = std::make_shared<juce::AudioBuffer<float>>(2, 48000);
+        for (int sample = 0; sample < audio->getNumSamples(); ++sample)
+        {
+            const float value = 0.25f * std::sin(
+                juce::MathConstants<double>::twoPi * 220.0 * sample / 48000.0);
+            audio->setSample(0, sample, value);
+            audio->setSample(1, sample, -value * 0.75f);
+        }
+        auto source = std::make_shared<beat::ImmutableGranularSource>();
+        source->audio = audio;
+        source->sourceSampleRate = 48000.0;
+        source->rootNote = 60;
+        source->position = 0.35f;
+        source->positionSpread = 0.2f;
+        source->grainMilliseconds = 120.0f;
+        source->densityHz = 80.0f;
+        source->stereoSpread = 0.8f;
+        source->randomSeed = 0x12345678u;
+
+        const auto render = [&](int blockSize, double sampleRate)
+        {
+            beat::GranularSourceSlot slot;
+            juce::AudioBuffer<float> output(2, 16384);
+            output.clear();
+            if (!slot.prepare({ sampleRate, blockSize, 2 }) || !slot.publish(source)
+                || !slot.noteOn({ 60, 0.8f, 41 }))
+                return output;
+            for (int offset = 0; offset < output.getNumSamples(); offset += blockSize)
+                slot.render(output, offset, std::min(blockSize, output.getNumSamples() - offset));
+            return output;
+        };
+
+        const auto block64 = render(64, 48000.0);
+        const auto block257 = render(257, 48000.0);
+        bool exact = bufferEnergy(block64) > 0.0001;
+        for (int channel = 0; channel < 2 && exact; ++channel)
+            for (int sample = 0; sample < block64.getNumSamples(); ++sample)
+                exact = exact && std::isfinite(block64.getSample(channel, sample))
+                    && block64.getSample(channel, sample) == block257.getSample(channel, sample);
+
+        bool fiveRatesFinite = true;
+        for (double rate : { 44100.0, 48000.0, 88200.0, 96000.0, 192000.0 })
+        {
+            const auto rendered = render(128, rate);
+            fiveRatesFinite = fiveRatesFinite && bufferEnergy(rendered) > 0.000001;
+            for (int sample = 0; sample < rendered.getNumSamples(); ++sample)
+                fiveRatesFinite = fiveRatesFinite && std::isfinite(rendered.getSample(0, sample));
+        }
+
+        beat::GranularSourceSlot rateChange;
+        juce::AudioBuffer<float> rateChangeOutput(2, 2048);
+        rateChangeOutput.clear();
+        const bool rateChangeOk = rateChange.prepare({ 44100.0, 256, 2 })
+            && rateChange.publish(source)
+            && rateChange.noteOn({ 60, 1.0f, 777 });
+        rateChange.render(rateChangeOutput, 0, 1024);
+        const auto versionBeforeRateChange = rateChange.stateVersion();
+        const auto grainsBeforeRateChange = rateChange.granularTelemetry().grainsStarted;
+        const bool activeRateChangeOk = rateChangeOk
+            && rateChange.prepare({ 96000.0, 256, 2 })
+            && rateChange.stateVersion() == versionBeforeRateChange;
+        rateChange.render(rateChangeOutput, 1024, 1024);
+
+        beat::GranularSourceSlot pressure;
+        if (!pressure.prepare({ 48000.0, 256, 2 }) || !pressure.publish(source)) return false;
+        bool capacityOk = true;
+        for (int note = 0; note < beat::GranularSourceSlot::maximumEmitters; ++note)
+            capacityOk = capacityOk && pressure.noteOn({ 60 + note, 1.0f, (uint64_t) note + 1 });
+        capacityOk = capacityOk && !pressure.noteOn({ 72, 1.0f, 99 });
+        juce::AudioBuffer<float> probeOutput(2, 8192);
+        probeOutput.clear();
+        beat::test::beginRealtimeSafetyProbe();
+        for (int offset = 0; offset < probeOutput.getNumSamples(); offset += 256)
+            pressure.render(probeOutput, offset, std::min(256, probeOutput.getNumSamples() - offset));
+        const auto violations = beat::test::endRealtimeSafetyProbe();
+        const auto grainStats = pressure.granularTelemetry();
+        const auto baseStats = pressure.telemetry();
+        const bool activePublishRejected = !pressure.publish(source);
+        pressure.allNotesOff(false);
+        juce::AudioBuffer<float> tail(2, 8192);
+        tail.clear();
+        for (int offset = 0; offset < tail.getNumSamples(); offset += 256)
+            pressure.render(tail, offset, std::min(256, tail.getNumSamples() - offset));
+
+        auto invalid = std::make_shared<beat::ImmutableGranularSource>(*source);
+        invalid->densityHz = 0.0f;
+        beat::GranularSourceSlot invalidSlot;
+        const bool invalidRejected = invalidSlot.prepare({ 48000.0, 256, 2 })
+            && !invalidSlot.publish(invalid);
+        auto nonFinite = std::make_shared<beat::ImmutableGranularSource>(*source);
+        auto nonFiniteAudio = std::make_shared<juce::AudioBuffer<float>>(*audio);
+        nonFiniteAudio->setSample(0, 123, std::numeric_limits<float>::quiet_NaN());
+        nonFinite->audio = nonFiniteAudio;
+        beat::GranularSourceSlot nonFiniteSlot;
+        const bool nonFiniteRejected = nonFiniteSlot.prepare({ 48000.0, 256, 2 })
+            && !nonFiniteSlot.publish(nonFinite);
+
+        const bool ok = exact && fiveRatesFinite && activeRateChangeOk
+            && rateChange.granularTelemetry().grainsStarted >= grainsBeforeRateChange
+            && bufferEnergy(rateChangeOutput) > 0.000001
+            && capacityOk && violations == 0
+            && activePublishRejected && invalidRejected && nonFiniteRejected
+            && baseStats.acceptedNoteEvents == beat::GranularSourceSlot::maximumEmitters
+            && baseStats.rejectedNoteEvents == 1
+            && grainStats.grainsStarted > 0
+            && grainStats.grainsRejected > 0
+            && grainStats.grainsStarted <= grainStats.schedulerTicks
+            && grainStats.grainSamples <= (uint64_t) probeOutput.getNumSamples()
+                * beat::GranularSourceSlot::maximumGrains
+            && pressure.activeVoiceCount() == 0
+            && pressure.lifecycleState() == beat::SourceLifecycleState::ready;
+        if (!ok)
+            std::cerr << "Granular source slot failed exact=" << exact
+                      << " rates=" << fiveRatesFinite << " capacity=" << capacityOk
+                      << " violations=" << violations << " grains=" << grainStats.grainsStarted
+                      << " rejected=" << grainStats.grainsRejected
+                      << " active=" << pressure.activeVoiceCount() << "\n";
+        return ok;
+    }
+
     bool stressDecentSamplerFixtureImportAndPlayback()
     {
         const auto archiveFile = juce::File("/Users/alexcheng/Downloads/samples/109689_PercussionPalette_joshuameltzer_DecentSampler.zip");
@@ -17622,6 +17745,14 @@ int main()
         return 1;
     }
     std::cerr << "sfz subset: done\n";
+
+    std::cerr << "granular source: start\n";
+    if (!stressGranularSourceSlot())
+    {
+        std::cerr << "Granular source slot stress failed\n";
+        return 1;
+    }
+    std::cerr << "granular source: done\n";
 
     std::cerr << "decent sampler: start\n";
     if (!stressDecentSamplerFixtureImportAndPlayback())

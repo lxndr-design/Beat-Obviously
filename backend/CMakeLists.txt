@@ -87,6 +87,7 @@ target_sources(Beat PRIVATE
     Source/Audio/Sources/SampleStreamingSession.cpp
     Source/Audio/Sources/SampleStreamingSession.h
     Source/Audio/Sources/SampleSourceSlot.h
+    Source/Audio/Sources/GranularSourceSlot.h
     Source/Audio/Sources/SfzSourceSlot.h
     Source/Audio/Sources/SfzSourceSlot.cpp
     Source/Audio/Sources/SourceSlot.h
@@ -253,6 +254,7 @@ add_executable(BeatBackendStress
     Source/Audio/Sources/SampleStreamingSession.cpp
     Source/Audio/Sources/SampleStreamingSession.h
     Source/Audio/Sources/SampleSourceSlot.h
+    Source/Audio/Sources/GranularSourceSlot.h
     Source/Audio/Sources/SfzSourceSlot.h
     Source/Audio/Sources/SfzSourceSlot.cpp
     Source/Audio/Sources/SourceSlot.h
