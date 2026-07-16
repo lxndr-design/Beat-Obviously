@@ -451,3 +451,14 @@ tests, and audit updates are independently implemented Beat-owned work. The
 benchmark PCM is generated mathematically at runtime on the control thread and
 contains no copied audio, preset data, upstream code, external coefficient
 table, dependency, binary, asset, service, branding, or derived implementation.
+
+## D1A runtime-warp measurement — 2026-07-16
+
+`backend/Tests/AetherRuntimeWarpCorpus.{h,cpp}`, its CMake/stress-runner wiring,
+and documentation are independently implemented Beat-owned test code. The
+corpus reproduces equations already present in Beat solely to measure Beat's
+own behavior. Its generated sine fixtures, windowed-sinc reference, FFT
+comparison, hashes, and JSON use existing JUCE/standard-library facilities. No
+upstream source, acquired code, new dependency, external asset, preset,
+binary, service, branding, coefficient table, or derived implementation was
+introduced.

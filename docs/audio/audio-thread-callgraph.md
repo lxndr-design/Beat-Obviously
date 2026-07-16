@@ -1238,3 +1238,19 @@ audio callback
 Generation, analysis, allocation, cache initialization, and validation remain
 outside the callback. The warmed product callback probe reports zero realtime
 safety violations and zero deadline overruns.
+
+## D1A test-only runtime-warp corpus
+
+```text
+BeatBackendStress (ordinary test thread)
+  -> runAetherRuntimeWarpCorpus()
+    -> generate continuous sine fixtures
+    -> independently evaluate existing warp equations
+    -> test-only 1x/current-2x/ideal-2x/ideal-4x processing
+    -> compare magnitude spectra with test-only 16x reference
+    -> optional JSON report under caller-selected external path
+```
+
+No D1A edge reaches `AudioEngine`, `InstrumentVoice`, a device callback, or an
+offline product render. The corpus may allocate, perform FFTs, and write its
+optional report because it is test orchestration, not realtime audio work.

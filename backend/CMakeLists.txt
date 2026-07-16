@@ -186,6 +186,8 @@ target_link_libraries(Beat PRIVATE
 target_compile_features(Beat PRIVATE cxx_std_20)
 
 add_executable(BeatBackendStress
+    Tests/AetherRuntimeWarpCorpus.cpp
+    Tests/AetherRuntimeWarpCorpus.h
     Tests/RealtimeSafetyProbe.cpp
     Tests/RealtimeSafetyProbe.h
     Tests/BackendStress.cpp

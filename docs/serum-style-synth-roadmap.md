@@ -355,6 +355,9 @@ Rule:
 4. Aether structure:
    - Split `InstrumentVoice`.
    - Design better wavetable/custom-frame workflow.
+   - D1A runtime-warp measurement is complete without production DSP changes;
+     mirror-containing serial chains require an approved test-only D1B1
+     decimator/eight-times candidate study before production integration.
 5. Sampler/plugin:
    - Keymap editor and project asset copying.
    - Round-robin and choke-group editing UX.

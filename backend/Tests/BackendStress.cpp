@@ -55,6 +55,7 @@
 #include "../Source/Persistence/ManagedSpectralAsset.h"
 #include "../Source/Persistence/ProjectRepository.h"
 #include "RealtimeSafetyProbe.h"
+#include "AetherRuntimeWarpCorpus.h"
 
 #include <juce_cryptography/juce_cryptography.h>
 
@@ -19062,6 +19063,12 @@ namespace
 int main()
 {
     beat::test::prepareRealtimeSafetyInterposers();
+    if (std::getenv("AETHER_RUNTIME_WARP_D1A_ONLY") != nullptr)
+    {
+        const bool passed = beat::test::runAetherRuntimeWarpCorpus(
+            std::getenv("AETHER_RUNTIME_WARP_REPORT"));
+        return passed ? 0 : 1;
+    }
     if (std::getenv("AETHER_SPECTRAL_PLAYBACK_ONLY") != nullptr)
     {
         std::cerr << "spectral source: focused start\n";
@@ -19214,6 +19221,11 @@ int main()
     if (!stressAetherInteractionSpectralBaseline())
     {
         std::cerr << "Aether interaction spectral baseline failed\n";
+        return 1;
+    }
+    if (!beat::test::runAetherRuntimeWarpCorpus(nullptr))
+    {
+        std::cerr << "Aether runtime-warp D1A corpus failed\n";
         return 1;
     }
     if (!stressAetherTableStackRenderer())

@@ -132,5 +132,7 @@ Status legend:
 
 ## Near-Term Slice Order
 
-1. Continue runtime-warp oversampling/performance work under the broader Aether synth maturity backlog.
-2. Add conflict/repair policy UI under the broader DAW automation backlog.
+1. `[x]` Measure runtime-warp oversampling/performance under D1A without changing production DSP.
+   - The 135-scenario corpus rejects both the existing 2x path as spectrally closed and a blanket 4x switch; mirror-containing serial chains require a stronger candidate study.
+2. If approved, run D1B1 as a test-only higher-stop-band/8x candidate gate before any D1B2 production integration.
+3. Add conflict/repair policy UI under the broader DAW automation backlog.

@@ -881,3 +881,27 @@ Together with completed Sample Slot 1 and Granular Slot 2 foundations, this
 closes the planned Milestone C hybrid-source foundation. It does not claim a
 general spectral editor, arbitrary-duration streaming spectral playback,
 unbounded polyphony, broader SFZ compatibility, or later roadmap features.
+
+## Milestone D1A runtime-warp measurement — 2026-07-16
+
+A test-only 135-scenario corpus now compares the existing runtime-warp
+two-times equations with direct one-times and idealized two-/four-times
+candidates against a 16-times, long-filter reference. Five rates, three
+frequency regimes, all four modes, two amounts, and three serial combinations
+produce 540 rows with phase-insensitive spectral residual, DC, step, timing,
+work, and hash evidence. Two complete runs are sample/hash exact after removing
+descriptive wall time.
+
+Idealized four-times processing improves 133/135 scenarios, but mirror remains
+the limiting mode and fold-to-mirror reaches residual ratio `9.377265` even at
+four times versus `65.641430` for the current equations. Two high-rate mirror
+cases regress slightly. The result rejects both “current two-times is closed”
+and a blanket four-times production switch. The recommended next gate is a
+still-test-only realtime-feasible decimator/eight-times candidate study for
+mirror-containing and serial chains; production DSP remains unchanged.
+
+Full native/non-native suites and Release targets pass with only the existing
+TCC waiver. The 150-WAV normalized manifest remains
+`713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`,
+deadlines remain zero, and queue telemetry remains 64/16/16. Complete evidence
+is in `milestone-d1a-runtime-warp-measurement.md`.
