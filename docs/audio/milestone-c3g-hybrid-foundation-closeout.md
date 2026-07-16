@@ -105,3 +105,31 @@ No persistence, production DSP, Slot 1/2 schema, factory preset, baseline
 artifact, C3F review file, Slot 3 boundary, or `SourceSlotIndex::three` changed.
 No render difference is expected; no render hash or frozen artifact was
 updated.
+
+## C3G3 — factory benchmark render freeze
+
+The two user-requested factory string benchmarks now have a dedicated
+test-only objective render gate in addition to their existing discoverability,
+schema-roundtrip, and all-preset audibility checks. The gate resolves each
+factory record through the production synth-draft conversion and frontend
+render path, renders two seconds at C4 at 44.1, 48, and 96 kHz twice, and checks
+finite output, RMS, peak, sustained-tail RMS, DC mean, adjacent-sample
+discontinuity, inter-preset distinction, repeat determinism, and an explicit
+SHA-256 freeze. It has no record/update mode.
+
+The first capture intentionally failed because the expected-hash table was
+empty. Its six outputs were reviewed before being accepted as the initial
+freeze. Across the three rates:
+
+- `Benchmark - Future Bass Strings`: RMS 0.11557–0.11884, peak
+  0.53273–0.56388, absolute DC mean at most 0.0000335, maximum adjacent change
+  0.17653–0.30372, and tail RMS 0.04792–0.04957.
+- `Benchmark - Progressive House Strings`: RMS 0.13549–0.13885, peak
+  0.61169–0.63981, absolute DC mean at most 0.0000810, maximum adjacent change
+  0.31561–0.52140, and tail RMS 0.17457–0.17679.
+
+Accepted SHA-256 values are stored beside the verifier and keyed by stable
+preset ID plus sample rate. Any later difference fails with expected and actual
+hashes and must be investigated before the freeze changes. The verifier is part
+of `verify:non-native`; no production preset, renderer, DSP, project schema, or
+baseline artifact changed to establish this test-only freeze.
