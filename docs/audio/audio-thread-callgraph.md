@@ -1001,3 +1001,32 @@ Audio callback: device/offline render -> `InstrumentVoice::startNote()` -> fixed
 ## C3F proposed spectral boundary — 2026-07-15
 
 There is no new call-graph edge in C3F. The accepted-with-revisions boundary is: descriptor-safe decode and deterministic import resampling plus immutable L/R magnitude/phase-residual analysis, shared peak-region/transient detection, and validation on a worker/control side; manifest/hash/dimension validation and all FFT/WOLA/output-resampler construction before publication; then fixed-capacity identity-phase-locked synthesis, inverse transforms, overlap-add, time-domain stereo width, and canonical-to-host streaming resampling in the callback. File access, decoding, analysis, plan creation, allocation, worker signaling, container growth, repair, and ownership destruction are forbidden in render. This remains blocked until a human DSP specialist confirms the revised constants, pitch/position algorithm, filter geometry, deadline machine, and latency reference model.
+
+## C3G persistence and test boundaries — 2026-07-16
+
+There is no new audio-callback or offline-render edge in C3G.
+
+```text
+repository/control thread
+  ProjectRepository::loadWithDiagnostics()
+    -> JSON parse
+    -> validateHybridSourceDocument()
+    -> reject with stable diagnostics OR projectFromJson()
+
+project cleanup/message thread
+  MessageBridge::project.cleanupAssets
+    -> cleanupUnusedProjectSidecarAssets()
+    -> validateHybridSourceDocument()
+    -> blocked diagnostic with zero deletions OR collect references
+    -> protect complete referenced managed bundles
+    -> delete only proven-orphan sidecar files
+
+test process only
+  verify-aether-benchmark-renders.mjs
+    -> production factory record
+    -> synthDraftToPreviewInstrument()
+    -> production frontend render
+    -> finite/audibility/DC/discontinuity/determinism/hash checks
+```
+
+Slot accessibility and selector-keyboard changes are presentation/input behavior only. The 150-render native freeze remains byte-identical. Slot 3, `SourceSlotIndex::three`, and the proposed C3F boundary have no new caller or implementation.

@@ -81,3 +81,9 @@ Granular Slot 2 is product-reachable through a content-addressed, project-owned 
 ## Milestone C3F review update — 2026-07-15
 
 Slot 3 remains unimplemented. An AI technical DSP review accepted bounded STFT frame-bank Option B with revisions but did not provide specialist sign-off. The proposal now specifies exact WOLA reconstruction, identity phase locking and transient resets, independent L/R storage with shared analysis decisions, canonical-rate resampling targets, bounded position, resource/deadline accounting, validation constraints, and separate latency quantities. Pitch implementation constants, flux/refractory values, filter geometry, minimum-machine budget, and final alignment model still require human specialist confirmation. No source, schema, dependency, preset, factory asset, callback, or baseline changed.
+
+## Milestone C3G non-spectral closeout update — 2026-07-16
+
+Sample Slot 1 and Granular Slot 2 now fail visibly on malformed or future persistence instead of silently truncating, dropping, or disabling unknown data. Cleanup is fail-closed and retains complete referenced managed bundles. Slot controls expose keyboard navigation, focus restoration, labels, live source state, and disabled reasons. The two factory string benchmarks have repeat-deterministic finite/audible/DC/discontinuity/hash coverage at 44.1/48/96 kHz. Full native/non-native gates pass with only the existing `baseline.recent-project-exists` waiver, and the 150-render manifest remains `713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`.
+
+This completes the non-spectral hybrid foundation for Slots 1 and 2 only. It does not close Milestone C, spectral processing, Slot 3, C3F1–C3F3, realtime granular modulation, general SFZ compatibility, automatic relinking, or sample editing. The C3F contracts and reserved Slot 3 boundary are unchanged.

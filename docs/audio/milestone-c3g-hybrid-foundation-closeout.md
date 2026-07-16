@@ -1,7 +1,7 @@
 # Milestone C3G hybrid-foundation closeout
 
-Status: in progress. This document records only verified non-spectral closeout
-work. Milestone C and Slot 3 remain incomplete.
+Status: C3G non-spectral closeout complete. This document records only verified
+Slot 1/2 closeout work. Milestone C and Slot 3 remain incomplete.
 
 ## C3G1 — Slot 1/2 migration and managed-asset integrity
 
@@ -61,7 +61,7 @@ artifact, or C3F review file changed. No render difference was expected or
 observed by the native live/export coverage. The frozen 150-render baseline was
 not regenerated because this slice has no DSP path; no hash was updated.
 
-The remaining C3G areas are not complete. Accessibility/UI consistency,
+At the C3G1 checkpoint, the remaining C3G areas were not complete. Accessibility/UI consistency,
 migration breadth, benchmark objective-render coverage, documentation
 reconciliation, and final baseline maintenance remain separate later slices.
 Slot 3 behavior, schema, `SourceSlotIndex::three`, and the C3F review boundary
@@ -133,3 +133,26 @@ preset ID plus sample rate. Any later difference fails with expected and actual
 hashes and must be investigated before the freeze changes. The verifier is part
 of `verify:non-native`; no production preset, renderer, DSP, project schema, or
 baseline artifact changed to establish this test-only freeze.
+
+## C3G4 — final gates and stop state
+
+Release `Beat`, `BeatBackendStress`, and `BeatAetherBaseline` build from the
+source-matched branch. Full `verify:non-native` passes, including the new
+benchmark freeze. The unwaived native run stops only at the known
+`baseline.recent-project-exists` assertion. With that single approved TCC
+waiver, every native section passes in 9.41 s wall / 8.23 s user / 0.72 s
+system with 203,505,664-byte maximum RSS.
+
+The isolated matrix regenerated exactly 150 WAVs. The explicitly normalized
+manifest remains `713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`.
+Timing-bearing `baseline.json` SHA-256 is
+`7528de1d6f53c89e9c603d652d9365571f05e244610914b508886176022e8d3c`;
+render times are 12.74–16.36 ms (13.61 ms mean); process maximum RSS is
+15,450,112 bytes and harness-reported RSS is 14,974,976 bytes; deadline
+overruns are zero; queue telemetry remains 64 accepted / 16 rejected / 16
+overflow. No existing baseline artifact or expected native hash changed.
+
+C3G stops here. Sample Slot 1 and Granular Slot 2 are the completed
+hybrid-source foundation, but Milestone C and Slot 3 are not complete. C3F1,
+C3F2, and C3F3 remain paused. No C3F review-package file, Slot 3 behavior or
+schema, `SourceSlotIndex::three`, or production DSP behavior changed.
