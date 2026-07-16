@@ -111,8 +111,10 @@ deadline matrix. Pitch, resampler, alias, position distinction, capacity,
 sample-rate-change, block determinism, and malformed-publication tests pass.
 
 This advances the row to `Disconnected fixed-capacity playback foundation`; it
-does not close C3F2 or Slot 3. Active position smoothing/jump crossfades,
-overlap-phase replacement, complete sample-offset alignment, dynamic-position
-pressure, product latency compensation, managed import/persistence, UI/routing,
-and C3F3 remain open. Default-disconnected renders stay byte-identical and the
-only suite waiver remains `baseline.recent-project-exists`.
+does not close C3F2 or Slot 3. The approved 5 ms active-position transition,
+latest-request policy, active-rate-change behavior, block determinism, and
+dynamic-position deadline pressure now pass. Overlap-phase replacement,
+complete sample-offset alignment, product latency compensation, managed
+import/persistence, UI/routing, and C3F3 remain open. Default-disconnected
+renders stay byte-identical and the only suite waiver remains
+`baseline.recent-project-exists`.

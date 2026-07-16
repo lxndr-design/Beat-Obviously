@@ -381,3 +381,10 @@ Local files are `backend/Source/Audio/Spectral/SpectralSourceSlot.h`,
 `docs/audio/milestone-c3f2-playback-validation.md`. All PCM and artifacts used
 by tests are generated in memory. The slot remains disconnected from product
 schema, files, assets, routing, UI, services, and Slot 3.
+
+The active-position extension adds only Beat-owned fixed two-lane voice state,
+an atomic latest-request command, standard sine/cosine equal-power gain, and
+test-generated position fixtures. The four-voice/two-lane pool is allocated
+once during slot construction, before callback use; it never grows. No new
+external source, dependency, coefficient table, asset, preset, service, or
+provenance classification is introduced.

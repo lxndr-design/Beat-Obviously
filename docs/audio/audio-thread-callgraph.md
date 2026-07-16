@@ -1084,13 +1084,16 @@ test/control thread
 instrumented test callback only
   noteOn() -> admit one of four fixed Voice records
   render()
+    -> applyPositionRequests() reads one atomic latest-position command
+      -> reset/pre-roll the inactive fixed lane; no allocation
     -> scheduleSynthesis() with fixed hop budget and pre-roll
       -> synthesizeHop()
         -> predecessor-locked float64 peak phases
         -> relative-phase bins and bounded pitch deposition
         -> two fixed inverse transforms and overlap-add
       -> generateCanonicalHop() into fixed rings
-    -> renderVoiceSample() fixed 48 kHz bypass or fixed polyphase conversion
+    -> renderLaneSample() fixed 48 kHz bypass or fixed polyphase conversion
+    -> when ready, 5 ms equal-power old/new position-lane crossfade
     -> fixed mid/side, pan, level, release, and atomic/preallocated counters
 
 AudioEngine / InstrumentVoice / SourceSlotRack / offline engine / IPC
@@ -1100,5 +1103,7 @@ AudioEngine / InstrumentVoice / SourceSlotRack / offline engine / IPC
 The callback has no artifact decode/validation, allocation, ownership
 destruction, file/stream operation, lock, lazy initialization, or container
 growth. The extended matrix records zero detector violations and zero synthesis
-underflows. Active position-jump and replacement edges do not exist yet and are
-not implied by this call graph.
+underflows. Position requests received during pre-roll replace the pending
+target; requests received during an audible fade become the sole subsequent
+target. Active replacement still does not exist and is not implied by this call
+graph.

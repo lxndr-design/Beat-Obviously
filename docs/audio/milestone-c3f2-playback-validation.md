@@ -7,9 +7,9 @@ Date: 2026-07-16
 
 Branch: `codex/aether-c3f2-playback`
 
-Status: **disconnected fixed-capacity playback foundation passes its implemented
-gates; dynamic position motion/jump crossfades remain open, so C3F2 is not yet
-closed and C3F3 is not authorized by this report**
+Status: **disconnected fixed-capacity playback and active-position transition
+gates pass; replacement/alignment remain open, so C3F2 is not yet closed and
+C3F3 is not authorized by this report**
 
 ## Implemented boundary
 
@@ -50,6 +50,13 @@ telemetry and measured zero.
   chirp produce finite audible and materially distinct output
   (`L1 difference 1112.92`). Freeze and ordinary playback are exactly
   deterministic between block sizes 64 and 257.
+- Active position: a control-rate atomic request prepares a second fixed lane
+  through the existing 1024-canonical-sample pre-roll and then performs an
+  equal-power 5 ms crossfade. Three requests produce two completed transitions;
+  the second request deterministically supersedes the first pending pre-roll,
+  while a request during an audible fade becomes the sole next target. Output
+  is exactly equal at block sizes 64 and 257, maximum adjacent-sample change is
+  `0.0218091`, and an active 48-to-96 kHz change preserves/completes the fade.
 - Reported latency is 1691, 1792, 3341, 3631, and 7262 host samples at
   44.1, 48, 88.2, 96, and 192 kHz respectively. It includes scheduling
   pre-roll, WOLA alignment, and converter group delay.
@@ -59,17 +66,17 @@ telemetry and measured zero.
   container-growth violations are all zero around pressured note/render work.
 
 The opt-in extended matrix covers five rates, blocks 16/32/64/128/256/512/1024
-and irregular 257, zero through four frozen voices, and 1000 measured callbacks
-per cell. The final run reports worst `P99.9(U)=0.228996` and
-`max(U)=0.237996`, below the provisional 0.50/0.80 gates, with zero detector
-violations and zero synthesis underflows. These are single-machine development
-measurements, not a whole-engine budget claim.
+and irregular 257, zero through four frozen voices, three position requests per
+nonzero-voice cell, and 1000 measured callbacks per cell. The final run reports
+worst `P99.9(U)=0.330492` and `max(U)=0.414492`, below the provisional 0.50/0.80
+gates, with zero detector violations and zero synthesis underflows. These are
+single-machine development measurements, not a whole-engine budget claim.
 
 ## Repository gates and freeze
 
 - Focused playback and the extended matrix pass.
-- The complete source-matched native suite passes in 12.50 seconds wall /
-  11.13 seconds user / 0.71 seconds system with only the existing narrowly
+- The complete source-matched native suite passes in 13.25 seconds wall /
+  11.59 seconds user / 1.02 seconds system with only the existing narrowly
   scoped `baseline.recent-project-exists` macOS TCC waiver.
 - Full `verify:non-native` passes, including the two factory benchmark render
   freezes and the production frontend build.
@@ -78,18 +85,18 @@ measurements, not a whole-engine budget claim.
   LaunchServices registration still reports the pre-existing `-10822` warning.
 - The final disconnected baseline contains 150 WAVs and retains normalized
   manifest `713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`.
-  Its timing-bearing JSON SHA-256 is
-  `276d9ecea8de822fbb475e766ea0ad451c4d28fa60e1456b5746c963a97b352b`;
-  the run took 2.21 seconds, reported 15,581,184-byte peak RSS, zero deadlines,
+  Its latest timing-bearing JSON SHA-256 is
+  `bf1fcd9fadccaf9126df19789a6ce800386bb36377e4c3b382080badd2c9ca75`;
+  render times were 12.80–15.77 ms (13.64 ms mean), reported peak RSS was
+  15,171,584 bytes, deadlines were zero,
   and unchanged queue telemetry of 64 accepted / 16 rejected / 16 overflow.
 
 ## Remaining gate
 
-This slice validates fixed setup position and freeze but does not implement or
-claim active control-rate position smoothing or discontinuous position-jump
-crossfades. Replacement at every overlap phase, sample-offset note-event
-alignment, dynamic position pressure, product latency compensation, managed
-artifact import, and product live/offline integration also remain open. No
-baseline is updated to hide those omissions. The next implementation work may
-remain on the disconnected engine, but C3F2 must not be marked closed and C3F3
-must not begin until these items are resolved and reviewed.
+The active-position transition contract is now implemented and measured.
+Replacement at every overlap phase, sample-offset note-event alignment, product
+latency compensation, managed artifact import, and product live/offline
+integration remain open. No baseline is updated to hide those omissions. The
+next implementation work may remain on the disconnected engine, but C3F2 must
+not be marked closed and C3F3 must not begin until these items are resolved and
+reviewed.

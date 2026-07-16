@@ -11906,6 +11906,105 @@ namespace
         const bool fixedPositionContract = positionDifference > 1.0
             && bufferEnergy(earlyRender) > 0.000001 && bufferEnergy(lateRender) > 0.000001;
 
+        struct PositionMotionResult
+        {
+            juce::AudioBuffer<float> audio;
+            beat::SpectralRenderTelemetry telemetry;
+            uint64_t violations { 0 };
+            bool requestsAccepted { true };
+            bool invalidRejected { false };
+        };
+        const auto renderPositionMotion = [&](int blockSize)
+        {
+            PositionMotionResult result { juce::AudioBuffer<float>(2, 7200) };
+            result.audio.clear();
+            beat::SpectralSourceSlot slot;
+            if (!slot.prepare({ 48000.0, blockSize, 2 })
+                || !slot.publish(earlyPosition.source)
+                || !slot.noteOn({ 69, 0.8f, 8101 })) return result;
+            result.invalidRejected = !slot.requestPosition(-0.01f)
+                && !slot.requestPosition(std::numeric_limits<float>::quiet_NaN());
+            const std::array<std::pair<int, float>, 3> requests {{
+                { 2048, 0.5f }, { 2112, 0.7f }, { 3200, 0.9f }
+            }};
+            size_t requestIndex = 0;
+            beat::test::beginRealtimeSafetyProbe();
+            for (int offset = 0; offset < result.audio.getNumSamples();)
+            {
+                if (requestIndex < requests.size() && offset == requests[requestIndex].first)
+                {
+                    result.requestsAccepted = slot.requestPosition(requests[requestIndex].second)
+                        && result.requestsAccepted;
+                    ++requestIndex;
+                }
+                const int nextEvent = requestIndex < requests.size()
+                    ? requests[requestIndex].first : result.audio.getNumSamples();
+                const int count = std::min({ blockSize, nextEvent - offset,
+                                             result.audio.getNumSamples() - offset });
+                slot.render(result.audio, offset, count);
+                offset += count;
+            }
+            result.violations = beat::test::endRealtimeSafetyProbe();
+            result.telemetry = slot.spectralTelemetry();
+            return result;
+        };
+        auto positionMotion64 = renderPositionMotion(64);
+        auto positionMotion257 = renderPositionMotion(257);
+        bool positionMotionExact = positionMotion64.audio.getNumSamples()
+            == positionMotion257.audio.getNumSamples();
+        double positionMotionMaxJump = 0.0;
+        for (int channel = 0; channel < 2 && positionMotionExact; ++channel)
+            for (int sample = 0; sample < positionMotion64.audio.getNumSamples(); ++sample)
+            {
+                const float a = positionMotion64.audio.getSample(channel, sample);
+                const float b = positionMotion257.audio.getSample(channel, sample);
+                positionMotionExact = positionMotionExact && std::isfinite(a) && a == b;
+                if (sample > 0)
+                    positionMotionMaxJump = std::max(positionMotionMaxJump,
+                        std::abs((double) a - positionMotion64.audio.getSample(channel, sample - 1)));
+            }
+        const auto& positionStats = positionMotion64.telemetry;
+        const bool positionMotionContract = positionMotionExact
+            && positionMotion64.requestsAccepted && positionMotion64.invalidRejected
+            && positionMotion64.violations == 0 && positionMotion257.violations == 0
+            && positionStats.positionRequestsAccepted == 3
+            && positionStats.positionRequestsRejected == 2
+            && positionStats.positionRequestsSuperseded == 1
+            && positionStats.positionTransitionsStarted == 2
+            && positionStats.positionTransitionsCompleted == 2
+            && positionStats.synthesisUnderflows == 0
+            && positionMotionMaxJump < 0.35;
+        std::cerr << "spectral position motion exact=" << positionMotionExact
+                  << " maxJump=" << positionMotionMaxJump
+                  << " transitions=" << positionStats.positionTransitionsStarted
+                  << "/" << positionStats.positionTransitionsCompleted
+                  << " superseded=" << positionStats.positionRequestsSuperseded
+                  << " violations=" << positionMotion64.violations << "\n";
+
+        beat::SpectralSourceSlot positionRateChange;
+        juce::AudioBuffer<float> beforePositionRateChange(2, 3300);
+        beforePositionRateChange.clear();
+        bool positionRateChangeContract = positionRateChange.prepare({ 48000.0, 128, 2 })
+            && positionRateChange.publish(earlyPosition.source)
+            && positionRateChange.noteOn({ 69, 0.8f, 8201 });
+        positionRateChange.render(beforePositionRateChange, 0, 2200);
+        positionRateChangeContract = positionRateChangeContract
+            && positionRateChange.requestPosition(0.8f);
+        positionRateChange.render(beforePositionRateChange, 2200, 1100);
+        const auto transitionsBeforeRateChange = positionRateChange.spectralTelemetry();
+        positionRateChangeContract = positionRateChangeContract
+            && transitionsBeforeRateChange.positionTransitionsStarted == 1
+            && transitionsBeforeRateChange.positionTransitionsCompleted == 0
+            && positionRateChange.prepare({ 96000.0, 128, 2 });
+        juce::AudioBuffer<float> afterPositionRateChange(2, 4096);
+        afterPositionRateChange.clear();
+        positionRateChange.render(afterPositionRateChange, 0, afterPositionRateChange.getNumSamples());
+        const auto transitionsAfterRateChange = positionRateChange.spectralTelemetry();
+        positionRateChangeContract = positionRateChangeContract
+            && transitionsAfterRateChange.positionTransitionsCompleted == 1
+            && transitionsAfterRateChange.synthesisUnderflows == 0
+            && bufferEnergy(afterPositionRateChange) > 0.000001;
+
         auto nyquistBase = prepareTone(15000.0);
         if (!nyquistBase.source) return false;
         auto nyquistPitch = beat::prepareSpectralSource(
@@ -11945,34 +12044,44 @@ namespace
                         }
                         std::vector<double> utilization(1000);
                         beat::test::beginRealtimeSafetyProbe();
-                        for (double& value : utilization)
+                        for (size_t callbackIndex = 0; callbackIndex < utilization.size(); ++callbackIndex)
                         {
+                            if (voiceCount > 0 && callbackIndex == 64)
+                                deadlineMatrix = deadlineMatrix && measured.requestPosition(0.2f);
+                            if (voiceCount > 0 && callbackIndex == 68)
+                                deadlineMatrix = deadlineMatrix && measured.requestPosition(0.8f);
+                            if (voiceCount > 0 && callbackIndex == 160)
+                                deadlineMatrix = deadlineMatrix && measured.requestPosition(0.4f);
                             callback.clear();
                             const auto started = std::chrono::steady_clock::now();
                             measured.render(callback, 0, block);
                             const auto finished = std::chrono::steady_clock::now();
                             const double elapsed = std::chrono::duration<double>(finished - started).count();
-                            value = elapsed / ((double) block / rate);
+                            utilization[callbackIndex] = elapsed / ((double) block / rate);
                         }
                         const auto matrixViolations = beat::test::endRealtimeSafetyProbe();
+                        const auto matrixStats = measured.spectralTelemetry();
                         std::sort(utilization.begin(), utilization.end());
                         const double p999 = utilization[998];
                         const double maximum = utilization.back();
                         worstP999 = std::max(worstP999, p999);
                         worstMaximum = std::max(worstMaximum, maximum);
                         deadlineMatrix = deadlineMatrix && p999 < 0.50 && maximum < 0.80
-                            && matrixViolations == 0;
-                        if (p999 >= 0.50 || maximum >= 0.80 || matrixViolations != 0)
+                            && matrixViolations == 0 && matrixStats.synthesisUnderflows == 0;
+                        if (p999 >= 0.50 || maximum >= 0.80 || matrixViolations != 0
+                            || matrixStats.synthesisUnderflows != 0)
                             std::cerr << "spectral deadline rate=" << rate << " block=" << block
                                       << " voices=" << voiceCount << " p999=" << p999
-                                      << " max=" << maximum << " violations=" << matrixViolations << "\n";
+                                      << " max=" << maximum << " violations=" << matrixViolations
+                                      << " underflows=" << matrixStats.synthesisUnderflows << "\n";
                     }
             std::cerr << "spectral deadline worstP999=" << worstP999
                       << " worstMax=" << worstMaximum << "\n";
         }
 
         const bool ok = exact && ratesFinite && freezeExact && deadlineMatrix && resamplerQuality
-            && latencyContract && fixedPositionContract && nyquistContract
+            && latencyContract && fixedPositionContract && positionMotionContract
+            && positionRateChangeContract && nyquistContract
             && std::abs(1200.0 * std::log2(baseFrequency / 440.0)) < 8.0
             && std::abs(1200.0 * std::log2(pitchedFrequency / 880.0)) < 8.0
             && capacity && violations == 0 && activePublishRejected

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 namespace beat
 {
@@ -92,6 +93,7 @@ namespace beat
     }
 
     SpectralSourceSlot::SpectralSourceSlot()
+        : voices(std::make_unique<std::array<Voice, maximumVoices>>())
     {
         for (int n = 0; n < SpectralArtifact::fftSize; ++n)
             window[(size_t) n] = (float) std::sqrt(0.5 - 0.5 * std::cos(twoPi * n / SpectralArtifact::fftSize));
@@ -103,15 +105,54 @@ namespace beat
         if (!std::isfinite(spec.sampleRate) || spec.sampleRate <= 0.0
             || spec.maximumBlockSize <= 0 || spec.outputChannels <= 0) return false;
         const double previousRate = prepared.sampleRate;
+        const int previousPositionCrossfadeSamples = positionCrossfadeSamples;
         prepared = spec;
         canonicalPerHostSample = SpectralArtifact::sampleRate / prepared.sampleRate;
         releaseSamples = std::clamp((int) std::round(prepared.sampleRate * 0.004), 8, 2048);
+        positionCrossfadeSamples = std::clamp((int) std::round(prepared.sampleRate * 0.005), 8, 4096);
         if (previousRate > 0.0 && previousRate != prepared.sampleRate)
-            for (auto& voice : voices) if (voice.active && voice.releasing)
+            for (auto& voice : *voices) if (voice.active && voice.positionCrossfading)
+                voice.positionCrossfadeSample = std::clamp((int) std::round(
+                    (double) voice.positionCrossfadeSample * positionCrossfadeSamples
+                        / std::max(1, previousPositionCrossfadeSamples)),
+                    0, positionCrossfadeSamples - 1);
+        if (previousRate > 0.0 && previousRate != prepared.sampleRate)
+            for (auto& voice : *voices) if (voice.active && voice.releasing)
                 voice.releaseRemaining = std::clamp((int) std::round(
                     voice.releaseRemaining * prepared.sampleRate / previousRate), 1, releaseSamples);
         rebuildResampler();
         return true;
+    }
+
+    bool SpectralSourceSlot::requestPosition(float normalizedPosition) noexcept
+    {
+        if (!std::isfinite(normalizedPosition) || normalizedPosition < 0.0f
+            || normalizedPosition > 1.0f)
+        {
+            rejectedPositionRequests.fetch_add(1, std::memory_order_relaxed);
+            return false;
+        }
+        uint32_t bits = 0;
+        static_assert(sizeof(bits) == sizeof(normalizedPosition));
+        std::memcpy(&bits, &normalizedPosition, sizeof(bits));
+        uint64_t prior = requestedPositionCommand.load(std::memory_order_relaxed);
+        for (;;)
+        {
+            const uint32_t generation = (uint32_t) (prior >> 32u) + 1u;
+            const uint64_t next = ((uint64_t) generation << 32u) | bits;
+            if (requestedPositionCommand.compare_exchange_weak(
+                    prior, next, std::memory_order_release, std::memory_order_relaxed)) break;
+        }
+        acceptedPositionRequests.fetch_add(1, std::memory_order_relaxed);
+        return true;
+    }
+
+    SpectralRenderTelemetry SpectralSourceSlot::spectralTelemetry() const noexcept
+    {
+        auto snapshot = spectralStats;
+        snapshot.positionRequestsAccepted = acceptedPositionRequests.load(std::memory_order_relaxed);
+        snapshot.positionRequestsRejected = rejectedPositionRequests.load(std::memory_order_relaxed);
+        return snapshot;
     }
 
     bool SpectralSourceSlot::publish(std::shared_ptr<const PreparedSpectralSource> next) noexcept
@@ -128,18 +169,20 @@ namespace beat
 
     void SpectralSourceSlot::reset() noexcept
     {
-        voices = {};
+        *voices = {};
         baseTelemetry = {};
         spectralStats = {};
         schedulerCursor = 0;
+        acceptedPositionRequests.store(0, std::memory_order_relaxed);
+        rejectedPositionRequests.store(0, std::memory_order_relaxed);
     }
 
     bool SpectralSourceSlot::noteOn(const SourceNoteEvent& event) noexcept
     {
         if (!source || !source->isValid() || event.midiNote < 0 || event.midiNote > 127)
         { ++baseTelemetry.rejectedNoteEvents; return false; }
-        auto found = std::find_if(voices.begin(), voices.end(), [](const Voice& voice) { return !voice.active; });
-        if (found == voices.end())
+        auto found = std::find_if(voices->begin(), voices->end(), [](const Voice& voice) { return !voice.active; });
+        if (found == voices->end())
         {
             ++baseTelemetry.rejectedNoteEvents;
             ++spectralStats.capacityRejected;
@@ -150,21 +193,30 @@ namespace beat
         found->noteId = event.stableNoteId;
         found->midiNote = event.midiNote;
         found->velocity = std::clamp(event.velocity, 0.0f, 1.0f);
-        found->framePosition = source->position * std::max(0, source->artifact->frames - 1);
-        found->hostReadPosition = -schedulerPrerollSamples;
+        const uint64_t positionCommand = requestedPositionCommand.load(std::memory_order_acquire);
+        const uint64_t positionSerial = positionCommand >> 32u;
+        float initialPosition = source->position;
+        if (positionSerial != 0)
+        {
+            const uint32_t bits = (uint32_t) positionCommand;
+            std::memcpy(&initialPosition, &bits, sizeof(initialPosition));
+        }
+        found->lanes[0].framePosition = initialPosition * std::max(0, source->artifact->frames - 1);
+        found->lanes[0].hostReadPosition = -schedulerPrerollSamples;
+        found->appliedPositionSerial = positionSerial;
         ++baseTelemetry.acceptedNoteEvents;
         return true;
     }
 
     void SpectralSourceSlot::noteOff(uint64_t noteId) noexcept
     {
-        for (auto& voice : voices) if (voice.active && voice.noteId == noteId)
+        for (auto& voice : *voices) if (voice.active && voice.noteId == noteId)
         { voice.releasing = true; voice.releaseRemaining = releaseSamples; }
     }
 
     void SpectralSourceSlot::allNotesOff(bool immediate) noexcept
     {
-        for (auto& voice : voices)
+        for (auto& voice : *voices)
         {
             if (!voice.active) continue;
             if (immediate) voice = {};
@@ -177,22 +229,53 @@ namespace beat
         if (!source || count <= 0 || output.getNumChannels() <= 0) return;
         const int begin = std::clamp(start, 0, output.getNumSamples());
         const int end = std::clamp(begin + count, begin, output.getNumSamples());
+        applyPositionRequests();
         scheduleSynthesis(end - begin);
         const float leftPan = std::sqrt(0.5f * (1.0f - source->pan));
         const float rightPan = std::sqrt(0.5f * (1.0f + source->pan));
         for (int sample = begin; sample < end; ++sample)
         {
             float left = 0.0f, right = 0.0f;
-            for (auto& voice : voices) if (voice.active)
+            for (auto& voice : *voices) if (voice.active)
             {
-                const auto frame = renderVoiceSample(voice);
+                auto frame = renderLaneSample(voice.lanes[voice.audibleLane]);
+                if (voice.incomingPreparing || voice.positionCrossfading)
+                {
+                    const auto incoming = renderLaneSample(voice.lanes[voice.incomingLane]);
+                    if (voice.incomingPreparing
+                        && voice.lanes[voice.incomingLane].hostReadPosition >= 0.0)
+                    {
+                        voice.incomingPreparing = false;
+                        voice.positionCrossfading = true;
+                        voice.positionCrossfadeSample = 0;
+                        ++spectralStats.positionTransitionsStarted;
+                    }
+                    if (voice.positionCrossfading)
+                    {
+                        const float phase = std::clamp((float) voice.positionCrossfadeSample
+                            / std::max(1, positionCrossfadeSamples - 1), 0.0f, 1.0f);
+                        const float outgoingGain = std::cos(phase * juce::MathConstants<float>::halfPi);
+                        const float incomingGain = std::sin(phase * juce::MathConstants<float>::halfPi);
+                        frame[0] = frame[0] * outgoingGain + incoming[0] * incomingGain;
+                        frame[1] = frame[1] * outgoingGain + incoming[1] * incomingGain;
+                        if (++voice.positionCrossfadeSample >= positionCrossfadeSamples)
+                        {
+                            voice.positionCrossfading = false;
+                            std::swap(voice.audibleLane, voice.incomingLane);
+                            voice.appliedPositionSerial = voice.incomingPositionSerial;
+                            ++spectralStats.positionTransitionsCompleted;
+                            applyPositionRequests();
+                        }
+                    }
+                }
                 const float gain = source->level * voice.velocity * voice.releaseGain;
                 const float mid = (frame[0] + frame[1]) * 0.5f;
                 const float side = (frame[0] - frame[1]) * 0.5f * source->stereoWidth;
                 left += (mid + side) * gain * leftPan;
                 right += (mid - side) * gain * rightPan;
                 ++baseTelemetry.renderedVoiceSamples;
-                if (!voice.releasing && voice.hostReadPosition >= voice.sourceEndPosition)
+                const auto& audible = voice.lanes[voice.audibleLane];
+                if (!voice.releasing && audible.hostReadPosition >= audible.sourceEndPosition)
                 { voice.releasing = true; voice.releaseRemaining = releaseSamples; }
                 if (voice.releasing && --voice.releaseRemaining <= 0) voice = {};
                 else if (voice.releasing) voice.releaseGain = (float) voice.releaseRemaining / releaseSamples;
@@ -206,7 +289,7 @@ namespace beat
     SourceLifecycleState SpectralSourceSlot::lifecycleState() const noexcept
     {
         if (!source) return SourceLifecycleState::empty;
-        for (const auto& voice : voices) if (voice.active)
+        for (const auto& voice : *voices) if (voice.active)
             return voice.releasing ? SourceLifecycleState::releasing : SourceLifecycleState::active;
         return SourceLifecycleState::ready;
     }
@@ -222,7 +305,7 @@ namespace beat
 
     int SpectralSourceSlot::activeVoiceCount() const noexcept
     {
-        return (int) std::count_if(voices.begin(), voices.end(), [](const Voice& voice) { return voice.active; });
+        return (int) std::count_if(voices->begin(), voices->end(), [](const Voice& voice) { return voice.active; });
     }
 
     void SpectralSourceSlot::rebuildResampler() noexcept
@@ -258,10 +341,43 @@ namespace beat
         }
     }
 
-    void SpectralSourceSlot::synthesizeHop(Voice& voice) noexcept
+    void SpectralSourceSlot::applyPositionRequests() noexcept
+    {
+        const uint64_t command = requestedPositionCommand.load(std::memory_order_acquire);
+        const uint64_t serial = command >> 32u;
+        if (serial == 0) return;
+        const uint32_t bits = (uint32_t) command;
+        float position = 0.0f;
+        std::memcpy(&position, &bits, sizeof(position));
+        bool superseded = false;
+        for (auto& voice : *voices)
+        {
+            if (!voice.active || voice.positionCrossfading
+                || serial == voice.appliedPositionSerial
+                || serial == voice.incomingPositionSerial) continue;
+            superseded = superseded || voice.incomingPreparing;
+            beginPositionPreparation(voice, position, serial);
+        }
+        if (superseded) ++spectralStats.positionRequestsSuperseded;
+    }
+
+    void SpectralSourceSlot::beginPositionPreparation(Voice& voice, float position,
+                                                       uint64_t serial) noexcept
+    {
+        voice.lanes[voice.incomingLane] = {};
+        voice.lanes[voice.incomingLane].framePosition = position
+            * std::max(0, source->artifact->frames - 1);
+        voice.lanes[voice.incomingLane].hostReadPosition = -schedulerPrerollSamples;
+        voice.incomingPositionSerial = serial;
+        voice.incomingPreparing = true;
+        voice.positionCrossfading = false;
+        voice.positionCrossfadeSample = 0;
+    }
+
+    void SpectralSourceSlot::synthesizeHop(Voice& voice, RenderLane& lane) noexcept
     {
         const auto& artifact = *source->artifact;
-        const int frame = std::clamp((int) std::round(voice.framePosition), 0, artifact.frames - 1);
+        const int frame = std::clamp((int) std::round(lane.framePosition), 0, artifact.frames - 1);
         const double ratio = std::pow(2.0, ((double) voice.midiNote - source->rootNote
             + source->pitchSemitones) / 12.0);
         const uint32_t peakBegin = artifact.peakOffsets[(size_t) frame];
@@ -269,10 +385,10 @@ namespace beat
         const int peakCount = (int) (peakEnd - peakBegin);
         for (int channel = 0; channel < 2; ++channel)
         {
-            voice.fftData.fill(0.0f);
-            auto& synthesisPhases = channel == 0 ? voice.synthesisPhaseL : voice.synthesisPhaseR;
+            lane.fftData.fill(0.0f);
+            auto& synthesisPhases = channel == 0 ? lane.synthesisPhaseL : lane.synthesisPhaseR;
             auto& nextSynthesisPhases = channel == 0
-                ? voice.nextSynthesisPhaseL : voice.nextSynthesisPhaseR;
+                ? lane.nextSynthesisPhaseL : lane.nextSynthesisPhaseR;
             for (int localPeak = 0; localPeak < peakCount; ++localPeak)
             {
                 const size_t globalPeak = (size_t) peakBegin + localPeak;
@@ -283,9 +399,9 @@ namespace beat
                     / SpectralArtifact::fftSize;
                 const auto predecessor = artifact.peakPreviousIndices[globalPeak];
                 const bool transientReset = artifact.transientFrames[(size_t) frame] != 0u;
-                if (!voice.synthesisPhaseInitialized || transientReset)
+                if (!lane.synthesisPhaseInitialized || transientReset)
                     nextSynthesisPhases[(size_t) localPeak] = inputPhase;
-                else if (source->freeze && voice.synthesisFrame == frame)
+                else if (source->freeze && lane.synthesisFrame == frame)
                 {
                     const double residual = predecessor == SpectralArtifact::noPreviousPeak ? 0.0
                         : artifact.peakPhaseEvolution[
@@ -293,7 +409,7 @@ namespace beat
                     nextSynthesisPhases[(size_t) localPeak] = wrap(
                         synthesisPhases[(size_t) localPeak] + expectedTarget + residual * ratio);
                 }
-                else if (voice.synthesisFrame == frame - 1
+                else if (lane.synthesisFrame == frame - 1
                          && predecessor != SpectralArtifact::noPreviousPeak)
                 {
                     const double residual = artifact.peakPhaseEvolution[
@@ -321,9 +437,9 @@ namespace beat
                 const auto deposit = [&](int target, float gain)
                 {
                     if (target < 0 || target >= artifact.bins || gain <= 0.0f) return;
-                    voice.fftData[(size_t) target * 2u] += real * gain;
+                    lane.fftData[(size_t) target * 2u] += real * gain;
                     if (target != 0 && target != artifact.bins - 1)
-                        voice.fftData[(size_t) target * 2u + 1u] += imag * gain;
+                        lane.fftData[(size_t) target * 2u + 1u] += imag * gain;
                 };
                 deposit(low, 1.0f - fraction);
                 deposit(low + 1, fraction);
@@ -331,51 +447,51 @@ namespace beat
             }
             for (int bin = 0; bin < artifact.bins; ++bin)
             {
-                const double real = voice.fftData[(size_t) bin * 2u];
-                const double imag = voice.fftData[(size_t) bin * 2u + 1u];
+                const double real = lane.fftData[(size_t) bin * 2u];
+                const double imag = lane.fftData[(size_t) bin * 2u + 1u];
                 outputEnergy += real * real + imag * imag;
             }
             const float normalize = outputEnergy > 1.0e-20
                 ? (float) std::clamp(std::sqrt(inputEnergy / outputEnergy), 0.25, 4.0) : 1.0f;
-            for (auto& value : voice.fftData) value *= normalize;
-            inverseFft.performRealOnlyInverseTransform(voice.fftData.data());
-            auto& overlap = channel == 0 ? voice.overlapL : voice.overlapR;
+            for (auto& value : lane.fftData) value *= normalize;
+            inverseFft.performRealOnlyInverseTransform(lane.fftData.data());
+            auto& overlap = channel == 0 ? lane.overlapL : lane.overlapR;
             for (int n = 0; n < SpectralArtifact::fftSize; ++n)
             {
-                const size_t ring = (size_t) (voice.olaPosition + n) % overlapRingSize;
-                overlap[ring] += voice.fftData[(size_t) n] * window[(size_t) n] * 0.5f;
+                const size_t ring = (size_t) (lane.olaPosition + n) % overlapRingSize;
+                overlap[ring] += lane.fftData[(size_t) n] * window[(size_t) n] * 0.5f;
                 ++spectralStats.overlapSamples;
             }
             ++spectralStats.transforms;
             std::copy_n(nextSynthesisPhases.begin(), peakCount, synthesisPhases.begin());
         }
-        voice.synthesisPhaseInitialized = true;
-        voice.synthesisFrame = frame;
+        lane.synthesisPhaseInitialized = true;
+        lane.synthesisFrame = frame;
         ++spectralStats.framesSynthesized;
         if (!source->freeze)
         {
-            voice.framePosition += 1.0;
-            if (voice.framePosition >= artifact.frames)
+            lane.framePosition += 1.0;
+            if (lane.framePosition >= artifact.frames)
             {
-                voice.framePosition = artifact.frames - 1;
-                voice.sourceEnded = true;
-                voice.sourceEndPosition = voice.olaPosition + SpectralArtifact::fftSize;
+                lane.framePosition = artifact.frames - 1;
+                lane.sourceEnded = true;
+                lane.sourceEndPosition = lane.olaPosition + SpectralArtifact::fftSize;
             }
         }
     }
 
-    void SpectralSourceSlot::generateCanonicalHop(Voice& voice) noexcept
+    void SpectralSourceSlot::generateCanonicalHop(Voice& voice, RenderLane& lane) noexcept
     {
-        if (!voice.sourceEnded) synthesizeHop(voice);
+        if (!lane.sourceEnded) synthesizeHop(voice, lane);
         for (int emitted = 0; emitted < SpectralArtifact::hopSize; ++emitted)
         {
-            const size_t ola = (size_t) voice.olaPosition % overlapRingSize;
-            const size_t canonical = (size_t) voice.canonicalGenerated % canonicalRingSize;
-            voice.canonicalL[canonical] = voice.overlapL[ola];
-            voice.canonicalR[canonical] = voice.overlapR[ola];
-            voice.overlapL[ola] = voice.overlapR[ola] = 0.0f;
-            ++voice.olaPosition;
-            ++voice.canonicalGenerated;
+            const size_t ola = (size_t) lane.olaPosition % overlapRingSize;
+            const size_t canonical = (size_t) lane.canonicalGenerated % canonicalRingSize;
+            lane.canonicalL[canonical] = lane.overlapL[ola];
+            lane.canonicalR[canonical] = lane.overlapR[ola];
+            lane.overlapL[ola] = lane.overlapR[ola] = 0.0f;
+            ++lane.olaPosition;
+            ++lane.canonicalGenerated;
         }
     }
 
@@ -383,52 +499,64 @@ namespace beat
     {
         const double canonicalDemand = hostSamples * canonicalPerHostSample;
         const int hopBudget = std::max(1, (int) std::ceil(
-            canonicalDemand * maximumVoices / SpectralArtifact::hopSize));
+            canonicalDemand * maximumVoices * 2 / SpectralArtifact::hopSize));
         for (int work = 0; work < hopBudget; ++work)
         {
-            Voice* selected = nullptr;
+            Voice* selectedVoice = nullptr;
+            RenderLane* selectedLane = nullptr;
             int64_t selectedDeficit = 0;
             size_t selectedIndex = schedulerCursor;
-            for (size_t offset = 0; offset < voices.size(); ++offset)
+            for (size_t offset = 0; offset < voices->size(); ++offset)
             {
-                const size_t index = (schedulerCursor + offset) % voices.size();
-                auto& voice = voices[index];
+                const size_t index = (schedulerCursor + offset) % voices->size();
+                auto& voice = (*voices)[index];
                 if (!voice.active) continue;
-                const int64_t target = (int64_t) std::ceil(voice.hostReadPosition
-                    + schedulerPrerollSamples + canonicalDemand + activeSincTaps / 2.0);
-                const int64_t deficit = target - voice.canonicalGenerated;
-                if (deficit > selectedDeficit)
-                { selected = &voice; selectedDeficit = deficit; selectedIndex = index; }
+                for (int laneIndex = 0; laneIndex < 2; ++laneIndex)
+                {
+                    if (laneIndex != voice.audibleLane
+                        && !voice.incomingPreparing && !voice.positionCrossfading) continue;
+                    auto& lane = voice.lanes[(size_t) laneIndex];
+                    const int64_t target = (int64_t) std::ceil(lane.hostReadPosition
+                        + schedulerPrerollSamples + canonicalDemand + activeSincTaps / 2.0);
+                    const int64_t deficit = target - lane.canonicalGenerated;
+                    if (deficit > selectedDeficit)
+                    {
+                        selectedVoice = &voice;
+                        selectedLane = &lane;
+                        selectedDeficit = deficit;
+                        selectedIndex = index;
+                    }
+                }
             }
-            if (selected == nullptr) break;
-            generateCanonicalHop(*selected);
-            schedulerCursor = (selectedIndex + 1u) % voices.size();
+            if (selectedLane == nullptr) break;
+            generateCanonicalHop(*selectedVoice, *selectedLane);
+            schedulerCursor = (selectedIndex + 1u) % voices->size();
         }
     }
 
-    float SpectralSourceSlot::readCanonical(const Voice& voice, int channel, int64_t index) const noexcept
+    float SpectralSourceSlot::readCanonical(const RenderLane& lane, int channel, int64_t index) const noexcept
     {
-        if (index < 0 || index >= voice.canonicalGenerated
-            || voice.canonicalGenerated - index > canonicalRingSize) return 0.0f;
-        return (channel == 0 ? voice.canonicalL : voice.canonicalR)[(size_t) index % canonicalRingSize];
+        if (index < 0 || index >= lane.canonicalGenerated
+            || lane.canonicalGenerated - index > canonicalRingSize) return 0.0f;
+        return (channel == 0 ? lane.canonicalL : lane.canonicalR)[(size_t) index % canonicalRingSize];
     }
 
-    std::array<float, 2> SpectralSourceSlot::renderVoiceSample(Voice& voice) noexcept
+    std::array<float, 2> SpectralSourceSlot::renderLaneSample(RenderLane& lane) noexcept
     {
-        const int64_t center = (int64_t) std::floor(voice.hostReadPosition);
+        const int64_t center = (int64_t) std::floor(lane.hostReadPosition);
         if (canonicalPerHostSample == 1.0)
         {
-            if (center >= voice.canonicalGenerated && center >= 0) ++spectralStats.synthesisUnderflows;
-            ++voice.hostReadPosition;
-            return { readCanonical(voice, 0, center), readCanonical(voice, 1, center) };
+            if (center >= lane.canonicalGenerated && center >= 0) ++spectralStats.synthesisUnderflows;
+            ++lane.hostReadPosition;
+            return { readCanonical(lane, 0, center), readCanonical(lane, 1, center) };
         }
-        const double fraction = voice.hostReadPosition - center;
+        const double fraction = lane.hostReadPosition - center;
         const double phasePosition = fraction * sincPhases;
         const int phase = std::clamp((int) std::floor(phasePosition), 0, sincPhases - 1);
         const float phaseFraction = (float) (phasePosition - phase);
         const int nextPhase = (phase + 1) % sincPhases;
         const bool wrapsPhase = nextPhase == 0;
-        if (center + activeSincTaps / 2 + (wrapsPhase ? 2 : 1) >= voice.canonicalGenerated
+        if (center + activeSincTaps / 2 + (wrapsPhase ? 2 : 1) >= lane.canonicalGenerated
             && center >= 0)
             ++spectralStats.synthesisUnderflows;
         std::array<float, 2> result {};
@@ -438,21 +566,21 @@ namespace beat
             const float coefficient = sincTable[(size_t) phase * sincTaps + tap];
             if (phaseFraction <= 1.0e-7f)
             {
-                result[0] += readCanonical(voice, 0, index) * coefficient;
-                result[1] += readCanonical(voice, 1, index) * coefficient;
+                result[0] += readCanonical(lane, 0, index) * coefficient;
+                result[1] += readCanonical(lane, 1, index) * coefficient;
             }
             else
             {
                 const float nextCoefficient = sincTable[(size_t) nextPhase * sincTaps + tap];
                 const int64_t nextIndex = index + (wrapsPhase ? 1 : 0);
-                result[0] += readCanonical(voice, 0, index) * coefficient * (1.0f - phaseFraction)
-                    + readCanonical(voice, 0, nextIndex) * nextCoefficient * phaseFraction;
-                result[1] += readCanonical(voice, 1, index) * coefficient * (1.0f - phaseFraction)
-                    + readCanonical(voice, 1, nextIndex) * nextCoefficient * phaseFraction;
+                result[0] += readCanonical(lane, 0, index) * coefficient * (1.0f - phaseFraction)
+                    + readCanonical(lane, 0, nextIndex) * nextCoefficient * phaseFraction;
+                result[1] += readCanonical(lane, 1, index) * coefficient * (1.0f - phaseFraction)
+                    + readCanonical(lane, 1, nextIndex) * nextCoefficient * phaseFraction;
             }
             spectralStats.resamplerTaps += 2;
         }
-        voice.hostReadPosition += canonicalPerHostSample;
+        lane.hostReadPosition += canonicalPerHostSample;
         return result;
     }
 }

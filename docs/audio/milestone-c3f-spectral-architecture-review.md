@@ -445,7 +445,12 @@ direct pitch, fixed setup position/freeze, canonical-rate conversion, explicit
 latency, realtime-safety probes, and the complete rate/block/voice deadline
 matrix now pass while remaining unreachable from product rendering.
 
-The checkpoint does not close contract item 5: active control-rate position
-smoothing and discontinuous position-jump crossfades are not implemented.
-Replacement/alignment and product latency compensation also remain open.
-Accordingly C3F2 and Slot 3 remain incomplete, and C3F3 has not begun.
+The project owner subsequently approved the recommended active-position
+contract. A latest-wins atomic control request prepares a second fixed lane
+through the existing pre-roll, then crosses over with a 5 ms equal-power fade.
+Requests during pre-roll supersede the pending target; a request during an
+audible fade becomes the sole next target. Block determinism, discontinuity,
+active-rate-change, callback safety, underflow, and the full dynamic-position
+deadline matrix pass. Contract item 5 is closed for this disconnected engine.
+Replacement/alignment and product latency compensation remain open. Accordingly
+C3F2 and Slot 3 remain incomplete, and C3F3 has not begun.

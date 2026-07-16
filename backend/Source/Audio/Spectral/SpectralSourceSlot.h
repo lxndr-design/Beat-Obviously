@@ -55,6 +55,11 @@ namespace beat
         uint64_t capacityRejected { 0 };
         uint64_t invalidPublicationRejected { 0 };
         uint64_t synthesisUnderflows { 0 };
+        uint64_t positionRequestsAccepted { 0 };
+        uint64_t positionRequestsRejected { 0 };
+        uint64_t positionTransitionsStarted { 0 };
+        uint64_t positionTransitionsCompleted { 0 };
+        uint64_t positionRequestsSuperseded { 0 };
     };
 
     class SpectralSourceSlot final : public SourceSlot
@@ -71,6 +76,7 @@ namespace beat
         SpectralSourceSlot();
         bool prepare(const SourcePrepareSpec&) noexcept override;
         bool publish(std::shared_ptr<const PreparedSpectralSource>) noexcept;
+        bool requestPosition(float normalizedPosition) noexcept;
         void reset() noexcept override;
         bool noteOn(const SourceNoteEvent&) noexcept override;
         void noteOff(uint64_t stableNoteId) noexcept override;
@@ -82,18 +88,11 @@ namespace beat
         int activeVoiceCount() const noexcept override;
         uint64_t stateVersion() const noexcept override { return version.load(std::memory_order_acquire); }
         SourceRenderTelemetry telemetry() const noexcept override { return baseTelemetry; }
-        SpectralRenderTelemetry spectralTelemetry() const noexcept { return spectralStats; }
+        SpectralRenderTelemetry spectralTelemetry() const noexcept;
 
     private:
-        struct Voice
+        struct RenderLane
         {
-            bool active { false };
-            bool releasing { false };
-            uint64_t noteId { 0 };
-            int midiNote { 60 };
-            float velocity { 1.0f };
-            float releaseGain { 1.0f };
-            int releaseRemaining { 0 };
             double framePosition { 0.0 };
             double hostReadPosition { 0.0 };
             int64_t canonicalGenerated { 0 };
@@ -113,21 +112,46 @@ namespace beat
             std::array<float, SpectralArtifact::fftSize * 2> fftData {};
         };
 
+        struct Voice
+        {
+            bool active { false };
+            bool releasing { false };
+            uint64_t noteId { 0 };
+            int midiNote { 60 };
+            float velocity { 1.0f };
+            float releaseGain { 1.0f };
+            int releaseRemaining { 0 };
+            std::array<RenderLane, 2> lanes {};
+            uint8_t audibleLane { 0 };
+            uint8_t incomingLane { 1 };
+            bool incomingPreparing { false };
+            bool positionCrossfading { false };
+            int positionCrossfadeSample { 0 };
+            uint64_t appliedPositionSerial { 0 };
+            uint64_t incomingPositionSerial { 0 };
+        };
+
         void rebuildResampler() noexcept;
-        void synthesizeHop(Voice&) noexcept;
-        void generateCanonicalHop(Voice&) noexcept;
+        void applyPositionRequests() noexcept;
+        void beginPositionPreparation(Voice&, float position, uint64_t serial) noexcept;
+        void synthesizeHop(Voice&, RenderLane&) noexcept;
+        void generateCanonicalHop(Voice&, RenderLane&) noexcept;
         void scheduleSynthesis(int hostSamples) noexcept;
-        float readCanonical(const Voice&, int channel, int64_t index) const noexcept;
-        std::array<float, 2> renderVoiceSample(Voice&) noexcept;
+        float readCanonical(const RenderLane&, int channel, int64_t index) const noexcept;
+        std::array<float, 2> renderLaneSample(RenderLane&) noexcept;
         SourcePrepareSpec prepared;
         std::shared_ptr<const PreparedSpectralSource> source;
         juce::dsp::FFT inverseFft { 10 };
         std::array<float, SpectralArtifact::fftSize> window {};
         std::array<float, sincTaps * sincPhases> sincTable {};
-        std::array<Voice, maximumVoices> voices {};
+        std::unique_ptr<std::array<Voice, maximumVoices>> voices;
         int activeSincTaps { sincTaps };
         int releaseSamples { 192 };
+        int positionCrossfadeSamples { 240 };
         double canonicalPerHostSample { 48000.0 / 44100.0 };
+        std::atomic<uint64_t> requestedPositionCommand { 0 };
+        std::atomic<uint64_t> acceptedPositionRequests { 0 };
+        std::atomic<uint64_t> rejectedPositionRequests { 0 };
         std::atomic<uint64_t> version { 0 };
         SourceRenderTelemetry baseTelemetry;
         SpectralRenderTelemetry spectralStats;
