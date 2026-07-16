@@ -2279,7 +2279,7 @@ namespace
         return true;
     }
 
-    bool stressSpectralAnalyzer()
+    [[maybe_unused]] bool stressSpectralAnalyzerC3F1Historical()
     {
         constexpr int fixtureSamples = 8192;
         std::array<juce::AudioBuffer<float>, 7> fixtures {
@@ -2341,11 +2341,17 @@ namespace
             return false;
         }
         const auto& artifact = *first.artifact;
-        if (!beat::validateSpectralArtifact(artifact).ok
+        const auto artifactValidation = beat::validateSpectralArtifact(artifact);
+        if (!artifactValidation.ok
             || artifact.payloadSha256 != second.artifact->payloadSha256
             || artifact.sourcePcmSha256 != second.artifact->sourcePcmSha256
             || artifact.rootNote != 57 || artifact.deterministicSeed != 1234)
+        {
+            std::cerr << "spectral v2 deterministic validation failed code=" << artifactValidation.code
+                      << " firstHash=" << artifact.payloadSha256
+                      << " secondHash=" << second.artifact->payloadSha256 << "\n";
             return false;
+        }
 
         const double rawWolaDb = beat::SpectralAnalyzer::measureRawWolaErrorDbForTesting(input);
         if (!(std::isfinite(rawWolaDb) && rawWolaDb <= -120.0))
@@ -2403,9 +2409,277 @@ namespace
         if (beat::SpectralAnalyzer::analyze(tooLong).code != "spectral.input") return false;
 
         std::cerr << "spectral analyzer: frames=" << artifact.frames
-                  << " payload=" << artifact.payloadBytes()
+                  << " payload=" << artifact.serializedBytes()
                   << " rawWolaDb=" << rawWolaDb
                   << " artifactDb=" << relativeDb << "\n";
+        return true;
+    }
+
+    bool stressSpectralArtifactV2()
+    {
+        using Analyzer = beat::SpectralAnalyzer;
+        struct CorpusCase { std::string name; juce::AudioBuffer<float> audio; };
+        constexpr int samples = 96000;
+        std::vector<CorpusCase> corpus;
+        corpus.reserve(8);
+        auto addCase = [&corpus](const char* name, int channels)
+        {
+            corpus.push_back({ name, juce::AudioBuffer<float>(channels, samples) });
+            corpus.back().audio.clear();
+            return &corpus.back().audio;
+        };
+
+        auto* stationaryMono = addCase("stationary-mono", 1);
+        auto* stationaryStereo = addCase("stationary-stereo", 2);
+        auto* multiTone = addCase("multi-tone-stereo", 2);
+        auto* harmonic = addCase("harmonic-mono", 1);
+        auto* transient = addCase("transient-stereo", 2);
+        auto* noiseMono = addCase("noise-mono", 1);
+        auto* noiseStereo = addCase("noise-stereo", 2);
+        auto* transitions = addCase("peak-transitions-stereo", 2);
+        juce::Random monoNoise(0x4182);
+        juce::Random stereoNoise(0x7193);
+        for (int i = 0; i < samples; ++i)
+        {
+            const double time = (double) i / 48000.0;
+            stationaryMono->setSample(0, i, 0.55f * std::sin((float) (juce::MathConstants<double>::twoPi * 997.0 * time)));
+            stationaryStereo->setSample(0, i, 0.45f * std::sin((float) (juce::MathConstants<double>::twoPi * 440.0 * time)));
+            stationaryStereo->setSample(1, i, 0.32f * std::sin((float) (juce::MathConstants<double>::twoPi * 440.0 * time + 0.43)));
+            const float multiL = 0.27f * std::sin((float) (juce::MathConstants<double>::twoPi * 233.0 * time))
+                + 0.19f * std::sin((float) (juce::MathConstants<double>::twoPi * 911.0 * time + 0.2))
+                + 0.13f * std::sin((float) (juce::MathConstants<double>::twoPi * 3217.0 * time + 0.7));
+            multiTone->setSample(0, i, multiL);
+            multiTone->setSample(1, i, multiL * 0.7f + 0.11f * std::cos((float) (juce::MathConstants<double>::twoPi * 1511.0 * time)));
+            float harmonicValue = 0.0f;
+            for (int partial = 1; partial <= 12; ++partial)
+                harmonicValue += 0.34f / partial * std::sin((float) (juce::MathConstants<double>::twoPi * 110.0 * partial * time));
+            harmonic->setSample(0, i, harmonicValue);
+            const int midpoint = samples / 2;
+            const float envelope = i < 512 ? std::exp(-(float) i / 90.0f)
+                : (i >= midpoint && i < midpoint + 512 ? std::exp(-(float) (i - midpoint) / 55.0f) : 0.0f);
+            transient->setSample(0, i, envelope * (0.8f * std::sin((float) (juce::MathConstants<double>::twoPi * 1800.0 * time))));
+            transient->setSample(1, i, envelope * (0.6f * std::cos((float) (juce::MathConstants<double>::twoPi * 2700.0 * time))));
+            noiseMono->setSample(0, i, monoNoise.nextFloat() * 0.7f - 0.35f);
+            noiseStereo->setSample(0, i, stereoNoise.nextFloat() * 0.7f - 0.35f);
+            noiseStereo->setSample(1, i, stereoNoise.nextFloat() * 0.7f - 0.35f);
+
+            const int segment = std::min(7, i * 8 / samples);
+            float transitionL = 0.0f;
+            float transitionR = 0.0f;
+            if (segment <= 1 || segment == 4 || segment >= 6)
+            {
+                transitionL += 0.31f * std::sin((float) (juce::MathConstants<double>::twoPi * (420.0 + segment * 12.0) * time));
+                transitionR += 0.27f * std::sin((float) (juce::MathConstants<double>::twoPi * (420.0 + segment * 12.0) * time + 0.3));
+            }
+            if (segment >= 1 && segment <= 5)
+            {
+                transitionL += 0.29f * std::sin((float) (juce::MathConstants<double>::twoPi * (690.0 - segment * 18.0) * time + 0.2));
+                transitionR -= 0.22f * std::sin((float) (juce::MathConstants<double>::twoPi * (690.0 - segment * 18.0) * time));
+            }
+            transitions->setSample(0, i, transitionL);
+            transitions->setSample(1, i, transitionR);
+        }
+        transient->setSample(0, samples / 2, transient->getSample(0, samples / 2) + 0.9f);
+        transient->setSample(1, samples / 2, transient->getSample(1, samples / 2) - 0.7f);
+
+        for (const auto& entry : corpus)
+        {
+            const auto first = Analyzer::analyze(entry.audio, 60, 91);
+            const auto second = Analyzer::analyze(entry.audio, 60, 91);
+            if (!first.artifact || !second.artifact
+                || first.artifact->payloadSha256 != second.artifact->payloadSha256
+                || first.artifact->peakBins != second.artifact->peakBins
+                || first.artifact->peakAssignments != second.artifact->peakAssignments
+                || first.artifact->peakPreviousIndices != second.artifact->peakPreviousIndices)
+            {
+                std::cerr << "spectral v2 determinism failed case=" << entry.name << "\n";
+                return false;
+            }
+            const auto serialized = beat::serializeSpectralArtifact(*first.artifact);
+            const auto decoded = beat::decodeSpectralArtifact(serialized.getData(), serialized.getSize());
+            if (!decoded.artifact)
+            {
+                std::cerr << "spectral v2 decode failed case=" << entry.name << " code=" << decoded.code << "\n";
+                return false;
+            }
+            const auto serializedAgain = beat::serializeSpectralArtifact(*decoded.artifact);
+            if (serialized != serializedAgain)
+            {
+                std::cerr << "spectral v2 serialization idempotence failed case=" << entry.name << "\n";
+                return false;
+            }
+            const auto comparison = Analyzer::compareRepresentationsForTesting(entry.audio);
+            const double rawDb = Analyzer::measureRawWolaErrorDbForTesting(entry.audio);
+            if (!comparison || !(rawDb <= -120.0)
+                || !std::isfinite(comparison->peakPhaseV2.rmsError)
+                || !std::isfinite(comparison->peakPhaseV2.peakError)
+                || !std::isfinite(comparison->peakPhaseV2.errorDb)
+                || comparison->peakPhaseV2.errorDb > comparison->float32AllBinResiduals.errorDb - 6.0
+                || comparison->peakPhaseV2.errorDb > comparison->float64AllBinResiduals.errorDb + 3.0)
+            {
+                std::cerr << "spectral v2 comparison gate failed case=" << entry.name
+                          << " raw=" << rawDb
+                          << " v2=" << (comparison ? comparison->peakPhaseV2.errorDb : 0.0)
+                          << " f32=" << (comparison ? comparison->float32AllBinResiduals.errorDb : 0.0)
+                          << " f64=" << (comparison ? comparison->float64AllBinResiduals.errorDb : 0.0) << "\n";
+                return false;
+            }
+            std::cerr << "spectral-v2 case=" << entry.name
+                      << " rawDb=" << rawDb
+                      << " v2Db=" << comparison->peakPhaseV2.errorDb
+                      << " v2Rms=" << comparison->peakPhaseV2.rmsError
+                      << " v2Peak=" << comparison->peakPhaseV2.peakError
+                      << " f32Db=" << comparison->float32AllBinResiduals.errorDb
+                      << " f64Db=" << comparison->float64AllBinResiduals.errorDb
+                      << " bytes=" << serialized.getSize() << "\n";
+        }
+
+        const std::vector<float> equalReference { 0.0f, 0.1f, 0.2f, 1.0f, 0.3f, 0.2f, 0.4f, 1.0f, 0.2f };
+        const auto equalPeaks = Analyzer::detectSharedPeaksForTesting(equalReference);
+        if (equalPeaks != std::vector<uint16_t>({ 3, 7 })
+            || Analyzer::assignPeakForTesting(5, equalPeaks) != 0u)
+            return false;
+        const auto fallbackPeaks = Analyzer::detectSharedPeaksForTesting(std::vector<float>(9, 0.0f));
+        if (fallbackPeaks != std::vector<uint16_t>({ 0 })
+            || Analyzer::assignPeakForTesting(8, fallbackPeaks) != 0u)
+            return false;
+        const std::vector<uint16_t> previous { 10, 20 };
+        const std::vector<uint16_t> current { 14, 16, 30 };
+        const auto predecessors = Analyzer::matchPeakPredecessorsForTesting(previous, current);
+        if (predecessors != std::vector<uint16_t>({ 0, 1, beat::SpectralArtifact::noPreviousPeak })
+            || predecessors != Analyzer::matchPeakPredecessorsForTesting(previous, current))
+            return false;
+
+        const auto transitionArtifact = Analyzer::analyze(*transitions);
+        if (!transitionArtifact.artifact) return false;
+        size_t matched = 0;
+        size_t appeared = 0;
+        size_t disappeared = 0;
+        size_t peakCountChanges = 0;
+        size_t assignmentChanges = 0;
+        for (size_t frame = 1; frame < (size_t) transitionArtifact.artifact->frames; ++frame)
+        {
+            const auto previousBegin = transitionArtifact.artifact->peakOffsets[frame - 1u];
+            const auto previousEnd = transitionArtifact.artifact->peakOffsets[frame];
+            const auto currentBegin = transitionArtifact.artifact->peakOffsets[frame];
+            const auto currentEnd = transitionArtifact.artifact->peakOffsets[frame + 1u];
+            if (previousEnd - previousBegin != currentEnd - currentBegin) ++peakCountChanges;
+            std::vector<uint8_t> predecessorUsed(previousEnd - previousBegin, 0u);
+            for (uint32_t peak = transitionArtifact.artifact->peakOffsets[frame];
+                 peak < transitionArtifact.artifact->peakOffsets[frame + 1u]; ++peak)
+            {
+                const auto predecessor = transitionArtifact.artifact->peakPreviousIndices[peak];
+                if (predecessor == beat::SpectralArtifact::noPreviousPeak) ++appeared;
+                else { ++matched; predecessorUsed[predecessor] = 1u; }
+            }
+            for (const auto used : predecessorUsed) if (used == 0u) ++disappeared;
+            for (int bin = 0; bin < beat::SpectralArtifact::binCount; ++bin)
+            {
+                const auto previousAssignment = transitionArtifact.artifact->peakAssignments[
+                    (frame - 1u) * beat::SpectralArtifact::binCount + bin];
+                const auto currentAssignment = transitionArtifact.artifact->peakAssignments[
+                    frame * beat::SpectralArtifact::binCount + bin];
+                const auto currentPeak = currentBegin + currentAssignment;
+                const auto predecessor = transitionArtifact.artifact->peakPreviousIndices[currentPeak];
+                if (predecessor == beat::SpectralArtifact::noPreviousPeak
+                    || predecessor != previousAssignment)
+                    ++assignmentChanges;
+            }
+        }
+        if (matched == 0 || appeared == 0 || disappeared == 0
+            || peakCountChanges == 0 || assignmentChanges == 0) return false;
+        const auto transitionReconstruction = Analyzer::reconstructForTesting(*transitionArtifact.artifact);
+        if (!transitionReconstruction) return false;
+        const auto transitionMetrics = Analyzer::measureReconstructionForTesting(*transitions, *transitionReconstruction);
+        if (transitionMetrics.peakError > 2.0e-5 || transitionMetrics.errorDb > -110.0) return false;
+        double maxBoundaryErrorJump = 0.0;
+        for (int sample = beat::SpectralArtifact::hopSize;
+             sample < transitionReconstruction->getNumSamples(); sample += beat::SpectralArtifact::hopSize)
+            for (int channel = 0; channel < 2; ++channel)
+            {
+                const double before = transitions->getSample(channel, sample - 1)
+                    - transitionReconstruction->getSample(channel, sample - 1);
+                const double after = transitions->getSample(channel, sample)
+                    - transitionReconstruction->getSample(channel, sample);
+                maxBoundaryErrorJump = std::max(maxBoundaryErrorJump, std::abs(after - before));
+            }
+        if (maxBoundaryErrorJump > 2.0e-6) return false;
+        std::cerr << "spectral-v2 transitions matched=" << matched
+                  << " appeared=" << appeared
+                  << " disappeared=" << disappeared
+                  << " peakCountChanges=" << peakCountChanges
+                  << " assignmentChanges=" << assignmentChanges
+                  << " boundaryErrorJump=" << maxBoundaryErrorJump << "\n";
+
+        auto malformed = *transitionArtifact.artifact;
+        malformed.relativePhases[0] = std::numeric_limits<float>::quiet_NaN();
+        malformed.payloadSha256 = beat::computeSpectralPayloadSha256(malformed);
+        if (beat::validateSpectralArtifact(malformed).code != "spectral.relative-phase") return false;
+        malformed = *transitionArtifact.artifact;
+        malformed.peakPhaseEvolution[0] = std::numeric_limits<double>::infinity();
+        malformed.payloadSha256 = beat::computeSpectralPayloadSha256(malformed);
+        if (beat::validateSpectralArtifact(malformed).code != "spectral.peak-phase") return false;
+        malformed = *transitionArtifact.artifact;
+        malformed.peakAssignments[0] = 255u;
+        malformed.payloadSha256 = beat::computeSpectralPayloadSha256(malformed);
+        if (beat::validateSpectralArtifact(malformed).code != "spectral.peak-assignment") return false;
+        malformed = *transitionArtifact.artifact;
+        malformed.schema = 3;
+        const auto futureBytes = beat::serializeSpectralArtifact(malformed);
+        if (beat::decodeSpectralArtifact(futureBytes.getData(), futureBytes.getSize()).code != "spectral.schema") return false;
+        malformed = *transitionArtifact.artifact;
+        malformed.algorithm = 3;
+        const auto futureAlgorithmBytes = beat::serializeSpectralArtifact(malformed);
+        if (beat::decodeSpectralArtifact(futureAlgorithmBytes.getData(), futureAlgorithmBytes.getSize()).code
+            != "spectral.algorithm") return false;
+        const auto validBytes = beat::serializeSpectralArtifact(*transitionArtifact.artifact);
+        if (beat::decodeSpectralArtifact(validBytes.getData(), validBytes.getSize() - 1).artifact) return false;
+        std::atomic<bool> cancelled { true };
+        const auto cancelledResult = Analyzer::analyze(*transitions, 60, 0, &cancelled);
+        if (cancelledResult.artifact || cancelledResult.code != "spectral.cancelled") return false;
+        juce::AudioBuffer<float> tooLong(1, beat::SpectralArtifact::maxInputSamples + 1);
+        tooLong.clear();
+        if (Analyzer::analyze(tooLong).code != "spectral.input") return false;
+
+        auto measureWorstCase = [](int frames)
+        {
+            beat::SpectralArtifact artifact;
+            artifact.frames = frames;
+            artifact.sourceSamples = std::max(1, (frames - 3) * beat::SpectralArtifact::hopSize);
+            artifact.sourcePcmSha256.assign(64, '0');
+            artifact.payloadSha256.assign(64, '0');
+            const size_t plane = (size_t) frames * beat::SpectralArtifact::binCount;
+            const size_t peaks = (size_t) frames * 255u;
+            artifact.magnitudes.resize(plane * 2u);
+            artifact.relativePhases.resize(plane * 2u);
+            artifact.peakAssignments.resize(plane);
+            artifact.transientFrames.resize((size_t) frames);
+            artifact.peakOffsets.resize((size_t) frames + 1u);
+            artifact.peakBins.resize(peaks);
+            artifact.peakPreviousIndices.resize(peaks, beat::SpectralArtifact::noPreviousPeak);
+            artifact.peakPhaseEvolution.resize(peaks * 2u);
+            for (int frame = 0; frame <= frames; ++frame)
+                artifact.peakOffsets[(size_t) frame] = (uint32_t) frame * 255u;
+            for (int frame = 0; frame < frames; ++frame)
+                for (int peak = 0; peak < 255; ++peak)
+                {
+                    const size_t index = (size_t) frame * 255u + peak;
+                    artifact.peakBins[index] = (uint16_t) (peak * 2 + 1);
+                    if (frame > 0) artifact.peakPreviousIndices[index] = (uint16_t) peak;
+                }
+            artifact.payloadSha256 = beat::computeSpectralPayloadSha256(artifact);
+            return beat::serializeSpectralArtifact(artifact).getSize();
+        };
+        const int low = beat::SpectralArtifact::maxFrames;
+        const auto maxBytes = measureWorstCase(low);
+        const auto nextBytes = measureWorstCase(low + 1);
+        if (maxBytes > beat::SpectralArtifact::maxPayloadBytes
+            || nextBytes <= beat::SpectralArtifact::maxPayloadBytes)
+            return false;
+        std::cerr << "spectral-v2 worst-case frames=" << low
+                  << " samples=" << (low - 3) * beat::SpectralArtifact::hopSize
+                  << " seconds=" << (double) ((low - 3) * beat::SpectralArtifact::hopSize) / 48000.0
+                  << " bytes=" << maxBytes << " nextBytes=" << nextBytes << "\n";
         return true;
     }
 
@@ -17723,7 +17997,7 @@ int main()
         std::cerr << "FFT analyzer stress failed\n";
         return 1;
     }
-    if (!stressSpectralAnalyzer())
+    if (!stressSpectralArtifactV2())
     {
         std::cerr << "Spectral analyzer stress failed\n";
         return 1;

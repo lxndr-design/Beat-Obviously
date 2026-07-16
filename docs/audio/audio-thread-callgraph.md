@@ -1048,3 +1048,21 @@ audio callback / offline engine / project apply / IPC
 ```
 
 `SpectralAnalyzer` is compiled into native targets but unreachable from product behavior. It performs allocations, FFT preparation, hashing, and validation on its caller's non-realtime thread. C3F1 adds no callback instrumentation exemption and no offline-render edge.
+
+## C3F2 artifact-v2 representation boundary — 2026-07-16
+
+```text
+native test/control thread only
+  verified canonical PCM
+    -> SpectralAnalyzer::analyze()
+    -> artifact-v2 peak identity/evolution + relative phase
+    -> exact serialization/hash
+    -> decode with bounded counts
+    -> complete validation
+    -> test-only comparison inverse transforms
+
+AudioEngine / InstrumentVoice / SourceSlotRack / offline renderer / IPC
+  -> no C3F2 caller
+```
+
+Serialization, decoding, allocation, hashing, validation, FFT preparation, and comparison reconstruction remain outside realtime. No detector exemption, callback work, lazy initialization, file operation, source publication, or destruction edge was added.

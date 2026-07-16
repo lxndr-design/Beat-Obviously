@@ -400,6 +400,28 @@ playback-quality acceptance. C3F2 must resolve accumulated phase precision,
 identity phase-lock playback, pitch, resampling, latency, and callback budgets
 before any callback connection.
 
+## C3F2 representation decision — 2026-07-16
+
+The project owner approved artifact v2 with float64 phase evolution per detected
+L/R peak and float32 per-bin phase relative to the assigned peak, subject to
+measured comparison before playback integration. That representation passes the
+dedicated report in `milestone-c3f2-representation-validation.md`.
+
+V2 supersedes the C3F1 provisional per-bin float32 residual representation and
+its provisional 5,625-frame/29.984-second source limit. Exact materialized
+serialization under the unchanged 48 MiB cap guarantees 3,640 frames,
+931,072 source samples, or 19.397333 seconds at the worst legal density of 255
+peaks per frame. V2 reconstruction measures -138.468 to -140.310 dB across the
+required corpus, improves independently encoded float32 all-bin residuals by
+9.99–33.80 dB, and stays within 0.208 dB of independently encoded float64
+all-bin residuals. Float32 relative phase therefore
+remains accepted.
+
+This closes only the representation/serialization/validation portion of C3F2.
+The disconnected fixed-capacity playback engine remains unimplemented pending
+review of this report. Product import, schema/UI, managed assets, callback
+connection, and C3F3 remain later gates.
+
 The final C3F1 source-matched gates pass: full `verify:non-native`; Release
 `Beat`, `BeatBackendStress`, and `BeatAetherBaseline`; and the complete native
 suite with only the existing `baseline.recent-project-exists` TCC waiver. The
