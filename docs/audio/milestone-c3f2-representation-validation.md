@@ -124,3 +124,8 @@ Stop here before fixed-capacity playback. C3F2 playback still requires a
 separate implementation/review of fixed buffers, identity-phase-locked motion,
 pitch, position/freeze, resampling, latency, callback work ceilings, realtime
 instrumentation, and deadline pressure across all host rates and block sizes.
+
+Postscript, 2026-07-16: the project owner subsequently authorized that
+disconnected playback work. Its implementation and evidence are recorded in
+`milestone-c3f2-playback-validation.md`; this representation report remains the
+pre-playback approval record and its measurements are unchanged.

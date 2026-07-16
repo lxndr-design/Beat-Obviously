@@ -99,3 +99,20 @@ Full native/non-native gates and all Release targets pass with only the existing
 The disconnected spectral row now has artifact schema v2: deterministic one-to-one peak identities, float64 per-peak L/R phase evolution, float32 per-bin phase relative to the assigned peak, exact versioned serialization, bounded decoding, and fail-closed validation. Across stationary, multi-tone, harmonic, transient, noise, mono, stereo, and transition cases, v2 measures -138.468 to -140.310 dB and improves independently encoded float32 all-bin residuals by 9.99–33.80 dB while remaining within 0.208 dB of independently encoded float64 all-bin results. The unchanged 48 MiB cap guarantees 19.397333 seconds under worst-case 255-peak frames. Spectral playback, product reachability, pitch/position/freeze, host-rate conversion, latency, and realtime deadlines remain open.
 
 All Release/native/non-native gates pass with only the existing TCC waiver. The 150-render manifest remains `713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`, with zero deadline overruns and unchanged queue telemetry. Fixed-capacity spectral playback has not begun.
+
+## Milestone C3F2 disconnected playback update — 2026-07-16
+
+The spectral row now includes a disconnected four-voice playback foundation:
+immutable artifact-v2 preparation, float64 identity-locked peak synthesis,
+transient resets, fixed WOLA/rings, deterministic pitch and Nyquist policy,
+fixed setup position/freeze, canonical-rate conversion, reported latency,
+bounded telemetry, callback-safety proof, and the complete rate/block/voice
+deadline matrix. Pitch, resampler, alias, position distinction, capacity,
+sample-rate-change, block determinism, and malformed-publication tests pass.
+
+This advances the row to `Disconnected fixed-capacity playback foundation`; it
+does not close C3F2 or Slot 3. Active position smoothing/jump crossfades,
+overlap-phase replacement, complete sample-offset alignment, dynamic-position
+pressure, product latency compensation, managed import/persistence, UI/routing,
+and C3F3 remain open. Default-disconnected renders stay byte-identical and the
+only suite waiver remains `baseline.recent-project-exists`.

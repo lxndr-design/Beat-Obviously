@@ -434,3 +434,18 @@ render times were 12.63–21.83 ms (13.60 ms mean), harness peak RSS was
 15,138,816 bytes, deadline overruns were zero, and queue telemetry remained
 64 accepted / 16 rejected / 16 overflow. Timing and RSS are descriptive
 single-run observations. C3F1 introduces no new waiver.
+
+## C3F2 disconnected playback checkpoint — 2026-07-16
+
+After reviewing the artifact-v2 evidence, the project owner authorized the
+disconnected fixed-capacity playback slice. The implementation and measured
+results are recorded in `milestone-c3f2-playback-validation.md`. Four fixed
+voices, identity-locked float64 synthesis phase, fixed WOLA/rings, bounded
+direct pitch, fixed setup position/freeze, canonical-rate conversion, explicit
+latency, realtime-safety probes, and the complete rate/block/voice deadline
+matrix now pass while remaining unreachable from product rendering.
+
+The checkpoint does not close contract item 5: active control-rate position
+smoothing and discontinuous position-jump crossfades are not implemented.
+Replacement/alignment and product latency compensation also remain open.
+Accordingly C3F2 and Slot 3 remain incomplete, and C3F3 has not begun.

@@ -360,3 +360,24 @@ Local implementation files are `backend/Source/Audio/Spectral/SpectralArtifact.h
 C3F2 representation changes are independently implemented Beat-owned work from the user-approved phase contract and standard phase-vocoder/identity-phase-locking mathematics. They add deterministic bounded peak matching, float64 peak evolution, float32 relative phase, exact binary serialization, bounded decoding, idempotence checks, comparison measurements, and generated transition/corpus fixtures. JUCE's existing FFT, buffer, stream, memory-block, and SHA-256 APIs remain the only library facilities used.
 
 No external repository, acquired source, README, comment, workflow, coefficient table, preset, sample, binary, model, service, endpoint, new dependency, or upstream implementation was inspected, executed, copied, translated, adapted, imported, or linked. No file is Vital-derived and no repository-wide license or ownership declaration changed. Changed implementation files are the four existing files under `backend/Source/Audio/Spectral/`, `backend/Tests/BackendStress.cpp`, the four audit documents, and `docs/audio/milestone-c3f2-representation-validation.md`. All corpus audio is generated in memory; no artifact reaches persistence, product routing, or a callback.
+
+## Milestone C3F2 disconnected playback provenance
+
+The playback slot is independently implemented Beat-owned work from the
+approved artifact-v2 contract and standard STFT, phase-vocoder, windowed
+overlap-add, sinc interpolation, Kaiser-window, and equal-power arithmetic.
+JUCE's existing FFT and audio-buffer APIs are used without modification. The
+Kaiser coefficients are generated deterministically at preparation time from
+the recorded formula; no external coefficient table is embedded.
+
+No external repository, acquired source, README, source comment, workflow,
+build instruction, coefficient table, preset, sample, binary, model, service,
+endpoint, new dependency, or upstream implementation was inspected, executed,
+copied, translated, structurally adapted, imported, or linked. No file is
+Vital-derived and no repository-wide license or ownership declaration changed.
+Local files are `backend/Source/Audio/Spectral/SpectralSourceSlot.h`,
+`backend/Source/Audio/Spectral/SpectralSourceSlot.cpp`, `backend/CMakeLists.txt`,
+`backend/Tests/BackendStress.cpp`, the four audit documents, and
+`docs/audio/milestone-c3f2-playback-validation.md`. All PCM and artifacts used
+by tests are generated in memory. The slot remains disconnected from product
+schema, files, assets, routing, UI, services, and Slot 3.

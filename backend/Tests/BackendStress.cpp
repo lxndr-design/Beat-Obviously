@@ -4,6 +4,7 @@
 #include "../Source/Audio/Analysis/AudioFileAnalyzer.h"
 #include "../Source/Audio/Analysis/FftAnalyzer.h"
 #include "../Source/Audio/Spectral/SpectralAnalyzer.h"
+#include "../Source/Audio/Spectral/SpectralSourceSlot.h"
 #include "../Source/Audio/Envelope/EnvelopeShaper.h"
 #include "../Source/Audio/Filter/DriveStage.h"
 #include "../Source/Audio/Filter/FilterMath.h"
@@ -11674,6 +11675,328 @@ namespace
         return ok;
     }
 
+    bool stressSpectralSourceSlot()
+    {
+        constexpr int sourceSamples = 24000;
+        juce::AudioBuffer<float> pcm(2, sourceSamples);
+        for (int sample = 0; sample < sourceSamples; ++sample)
+        {
+            const float time = (float) sample / 48000.0f;
+            pcm.setSample(0, sample, 0.38f * std::sin(
+                juce::MathConstants<float>::twoPi * 440.0f * time));
+            pcm.setSample(1, sample, 0.31f * std::sin(
+                juce::MathConstants<float>::twoPi * 440.0f * time + 0.31f));
+        }
+        auto analysis = beat::SpectralAnalyzer::analyze(pcm, 69, 77);
+        if (!analysis.artifact) return false;
+        auto artifact = std::make_shared<const beat::SpectralArtifact>(std::move(*analysis.artifact));
+        auto prepared = beat::prepareSpectralSource(artifact, 69, 0.7f, 0.0f, 1.0f, 0.0f, 0.0f, false);
+        if (!prepared.source) return false;
+
+        const auto render = [&](int blockSize, double sampleRate,
+                                std::shared_ptr<const beat::PreparedSpectralSource> playback,
+                                int note = 69)
+        {
+            beat::SpectralSourceSlot slot;
+            const int outputSamples = (int) std::round(sampleRate * 0.28);
+            juce::AudioBuffer<float> output(2, outputSamples);
+            output.clear();
+            if (!slot.prepare({ sampleRate, blockSize, 2 }) || !slot.publish(std::move(playback))
+                || !slot.noteOn({ note, 0.8f, 3001 }))
+                return output;
+            for (int offset = 0; offset < outputSamples; offset += blockSize)
+                slot.render(output, offset, std::min(blockSize, outputSamples - offset));
+            return output;
+        };
+
+        const auto block64 = render(64, 48000.0, prepared.source);
+        const auto block257 = render(257, 48000.0, prepared.source);
+        bool exact = block64.getNumSamples() == block257.getNumSamples()
+            && bufferEnergy(block64) > 0.00001;
+        for (int channel = 0; channel < 2 && exact; ++channel)
+            for (int sample = 0; sample < block64.getNumSamples(); ++sample)
+                exact = exact && std::isfinite(block64.getSample(channel, sample))
+                    && block64.getSample(channel, sample) == block257.getSample(channel, sample);
+
+        bool ratesFinite = true;
+        for (double rate : { 44100.0, 48000.0, 88200.0, 96000.0, 192000.0 })
+        {
+            const auto rateOutput = render(127, rate, prepared.source);
+            ratesFinite = ratesFinite && bufferEnergy(rateOutput) > 0.000001;
+            for (int channel = 0; channel < 2; ++channel)
+                for (int sample = 0; sample < rateOutput.getNumSamples(); ++sample)
+                    ratesFinite = ratesFinite && std::isfinite(rateOutput.getSample(channel, sample));
+        }
+
+        auto pitched = beat::prepareSpectralSource(artifact, 69, 0.7f, 0.0f, 1.0f, 0.0f, 12.0f, false);
+        auto frozen = beat::prepareSpectralSource(artifact, 69, 0.7f, 0.0f, 1.0f, 0.4f, 0.0f, true);
+        if (!pitched.source || !frozen.source) return false;
+        const auto pitchedOutput = render(128, 48000.0, pitched.source);
+        const auto frozenOutputA = render(64, 48000.0, frozen.source);
+        const auto frozenOutputB = render(257, 48000.0, frozen.source);
+        const auto dominantFrequency = [](const juce::AudioBuffer<float>& audio,
+                                          double minimumHz, double maximumHz)
+        {
+            const int begin = std::min(2048, audio.getNumSamples());
+            const int count = std::min(8192, audio.getNumSamples() - begin);
+            double bestFrequency = 0.0;
+            double bestPower = -1.0;
+            for (double frequency = minimumHz; frequency <= maximumHz; frequency += 0.25)
+            {
+                const double phaseDelta = juce::MathConstants<double>::twoPi * frequency / 48000.0;
+                double real = 0.0, imaginary = 0.0;
+                for (int sample = 0; sample < count; ++sample)
+                {
+                    const double window = 0.5 - 0.5 * std::cos(
+                        juce::MathConstants<double>::twoPi * sample / std::max(1, count - 1));
+                    const double value = audio.getSample(0, begin + sample) * window;
+                    real += value * std::cos(phaseDelta * sample);
+                    imaginary -= value * std::sin(phaseDelta * sample);
+                }
+                const double power = real * real + imaginary * imaginary;
+                if (power > bestPower) { bestPower = power; bestFrequency = frequency; }
+            }
+            return bestFrequency;
+        };
+        const double baseFrequency = dominantFrequency(block64, 350.0, 520.0);
+        const double pitchedFrequency = dominantFrequency(pitchedOutput, 700.0, 1040.0);
+        bool freezeExact = frozenOutputA.getNumSamples() == frozenOutputB.getNumSamples();
+        for (int channel = 0; channel < 2 && freezeExact; ++channel)
+            for (int sample = 0; sample < frozenOutputA.getNumSamples(); ++sample)
+                freezeExact = frozenOutputA.getSample(channel, sample) == frozenOutputB.getSample(channel, sample);
+
+        beat::SpectralSourceSlot pressure;
+        if (!pressure.prepare({ 48000.0, 256, 2 }) || !pressure.publish(prepared.source)) return false;
+        beat::test::beginRealtimeSafetyProbe();
+        bool capacity = true;
+        for (int voice = 0; voice < beat::SpectralSourceSlot::maximumVoices; ++voice)
+            capacity = capacity && pressure.noteOn({ 69 + voice, 0.7f, (uint64_t) voice + 1 });
+        capacity = capacity && !pressure.noteOn({ 80, 0.7f, 99 });
+        juce::AudioBuffer<float> probe(2, 4096);
+        probe.clear();
+        for (int offset = 0; offset < probe.getNumSamples(); offset += 256)
+            pressure.render(probe, offset, std::min(256, probe.getNumSamples() - offset));
+        const auto violations = beat::test::endRealtimeSafetyProbe();
+        const bool activePublishRejected = !pressure.publish(prepared.source);
+        const auto stats = pressure.spectralTelemetry();
+        const auto baseStats = pressure.telemetry();
+
+        const auto versionBeforeRateChange = pressure.stateVersion();
+        const auto energyBeforeRateChange = bufferEnergy(probe);
+        const bool activeRateChange = pressure.prepare({ 96000.0, 256, 2 })
+            && pressure.stateVersion() == versionBeforeRateChange
+            && pressure.activeVoiceCount() == beat::SpectralSourceSlot::maximumVoices;
+        juce::AudioBuffer<float> afterRateChange(2, 4096);
+        afterRateChange.clear();
+        pressure.render(afterRateChange, 0, afterRateChange.getNumSamples());
+        pressure.allNotesOff(false);
+        juce::AudioBuffer<float> release(2, 4096);
+        release.clear();
+        pressure.render(release, 0, release.getNumSamples());
+
+        beat::SpectralSourceSlot invalid;
+        auto invalidPrepared = std::make_shared<beat::PreparedSpectralSource>(*prepared.source);
+        invalidPrepared->validated = false;
+        const bool invalidRejected = invalid.prepare({ 48000.0, 256, 2 })
+            && !invalid.publish(invalidPrepared);
+
+        beat::SpectralSourceSlot converterProbe;
+        juce::AudioBuffer<float> converted(2, 2048);
+        converted.clear();
+        const bool converterUsed = converterProbe.prepare({ 96000.0, 128, 2 })
+            && converterProbe.publish(prepared.source)
+            && converterProbe.noteOn({ 69, 0.7f, 7001 });
+        converterProbe.render(converted, 0, converted.getNumSamples());
+
+        const auto prepareTone = [](double frequency)
+        {
+            juce::AudioBuffer<float> tone(2, 24000);
+            for (int sample = 0; sample < tone.getNumSamples(); ++sample)
+            {
+                const float value = 0.3f * std::sin(juce::MathConstants<double>::twoPi
+                    * frequency * sample / 48000.0);
+                tone.setSample(0, sample, value);
+                tone.setSample(1, sample, value);
+            }
+            auto analyzed = beat::SpectralAnalyzer::analyze(tone, 69, 81);
+            if (!analyzed.artifact) return beat::SpectralPrepareResult {};
+            auto toneArtifact = std::make_shared<const beat::SpectralArtifact>(
+                std::move(*analyzed.artifact));
+            return beat::prepareSpectralSource(
+                toneArtifact, 69, 0.7f, 0.0f, 1.0f, 0.5f, 0.0f, true);
+        };
+        const auto toneAmplitude = [](const juce::AudioBuffer<float>& audio,
+                                      double rate, double frequency)
+        {
+            const int begin = std::min((int) std::round(rate * 0.08), audio.getNumSamples());
+            const int count = std::min((int) std::round(rate * 0.14), audio.getNumSamples() - begin);
+            double real = 0.0, imaginary = 0.0, windowSum = 0.0;
+            for (int sample = 0; sample < count; ++sample)
+            {
+                const double window = 0.5 - 0.5 * std::cos(
+                    juce::MathConstants<double>::twoPi * sample / std::max(1, count - 1));
+                const double phase = juce::MathConstants<double>::twoPi * frequency * sample / rate;
+                const double value = audio.getSample(0, begin + sample) * window;
+                real += value * std::cos(phase);
+                imaginary -= value * std::sin(phase);
+                windowSum += window;
+            }
+            return 2.0 * std::hypot(real, imaginary) / std::max(windowSum, 1.0e-20);
+        };
+        auto passbandTone = prepareTone(10000.0);
+        auto stopbandTone = prepareTone(23000.0);
+        if (!passbandTone.source || !stopbandTone.source) return false;
+        const auto pass48 = render(128, 48000.0, passbandTone.source);
+        const auto pass192 = render(128, 192000.0, passbandTone.source);
+        const auto stop48 = render(128, 48000.0, stopbandTone.source);
+        const auto stop441 = render(128, 44100.0, stopbandTone.source);
+        const double referencePass = toneAmplitude(pass48, 48000.0, 10000.0);
+        const double passGainDb = 20.0 * std::log10(
+            toneAmplitude(pass192, 192000.0, 10000.0) / std::max(referencePass, 1.0e-20));
+        double worstImageDb = -300.0;
+        for (double imageFrequency : { 38000.0, 58000.0, 86000.0 })
+            worstImageDb = std::max(worstImageDb, 20.0 * std::log10(
+                toneAmplitude(pass192, 192000.0, imageFrequency)
+                    / std::max(referencePass, 1.0e-20)));
+        const double referenceStop = toneAmplitude(stop48, 48000.0, 23000.0);
+        const double downsampleAliasDb = 20.0 * std::log10(
+            toneAmplitude(stop441, 44100.0, 21100.0) / std::max(referenceStop, 1.0e-20));
+        const bool resamplerQuality = std::abs(passGainDb) <= 0.01
+            && worstImageDb <= -100.0 && downsampleAliasDb <= -100.0;
+        std::cerr << "spectral resampler passDb=" << passGainDb
+                  << " worstImageDb=" << worstImageDb
+                  << " downsampleAliasDb=" << downsampleAliasDb << "\n";
+
+        bool latencyContract = true;
+        for (const auto [rate, expected] : std::array<std::pair<double, int>, 5> {{
+                 { 44100.0, 1691 }, { 48000.0, 1792 }, { 88200.0, 3341 },
+                 { 96000.0, 3631 }, { 192000.0, 7262 }
+             }})
+        {
+            beat::SpectralSourceSlot latency;
+            latencyContract = latencyContract && latency.prepare({ rate, 256, 2 })
+                && latency.latencySamples() == expected;
+        }
+
+        juce::AudioBuffer<float> moving(2, 24000);
+        double movingPhase = 0.0;
+        for (int sample = 0; sample < moving.getNumSamples(); ++sample)
+        {
+            const double progress = (double) sample / moving.getNumSamples();
+            movingPhase += juce::MathConstants<double>::twoPi * (220.0 + 1760.0 * progress) / 48000.0;
+            const float value = (float) (0.3 * std::sin(movingPhase));
+            moving.setSample(0, sample, value);
+            moving.setSample(1, sample, -value * 0.7f);
+        }
+        auto movingAnalysis = beat::SpectralAnalyzer::analyze(moving, 69, 91);
+        if (!movingAnalysis.artifact) return false;
+        auto movingArtifact = std::make_shared<const beat::SpectralArtifact>(
+            std::move(*movingAnalysis.artifact));
+        auto earlyPosition = beat::prepareSpectralSource(
+            movingArtifact, 69, 0.7f, 0.0f, 1.0f, 0.2f, 0.0f, true);
+        auto latePosition = beat::prepareSpectralSource(
+            movingArtifact, 69, 0.7f, 0.0f, 1.0f, 0.8f, 0.0f, true);
+        if (!earlyPosition.source || !latePosition.source) return false;
+        const auto earlyRender = render(64, 48000.0, earlyPosition.source);
+        const auto lateRender = render(257, 48000.0, latePosition.source);
+        double positionDifference = 0.0;
+        for (int sample = 0; sample < earlyRender.getNumSamples(); ++sample)
+            positionDifference += std::abs(earlyRender.getSample(0, sample)
+                - lateRender.getSample(0, sample));
+        const bool fixedPositionContract = positionDifference > 1.0
+            && bufferEnergy(earlyRender) > 0.000001 && bufferEnergy(lateRender) > 0.000001;
+
+        auto nyquistBase = prepareTone(15000.0);
+        if (!nyquistBase.source) return false;
+        auto nyquistPitch = beat::prepareSpectralSource(
+            nyquistBase.source->artifact, 69, 0.7f, 0.0f, 1.0f, 0.5f, 12.0f, true);
+        if (!nyquistPitch.source) return false;
+        const auto nyquistBaseRender = render(128, 48000.0, nyquistBase.source);
+        const auto nyquistDiscardRender = render(128, 48000.0, nyquistPitch.source);
+        const double nyquistDiscardDb = 10.0 * std::log10(
+            bufferEnergy(nyquistDiscardRender) / std::max(bufferEnergy(nyquistBaseRender), 1.0e-20));
+        const bool nyquistContract = nyquistDiscardDb <= -60.0;
+        std::cerr << "spectral positionDifference=" << positionDifference
+                  << " nyquistDiscardDb=" << nyquistDiscardDb << "\n";
+
+        bool deadlineMatrix = true;
+        double worstP999 = 0.0;
+        double worstMaximum = 0.0;
+        if (std::getenv("AETHER_SPECTRAL_PLAYBACK_BENCH") != nullptr)
+        {
+            auto frozenPressure = beat::prepareSpectralSource(
+                artifact, 69, 0.7f, 0.0f, 1.0f, 0.4f, 0.0f, true);
+            if (!frozenPressure.source) return false;
+            for (double rate : { 44100.0, 48000.0, 88200.0, 96000.0, 192000.0 })
+                for (int block : { 16, 32, 64, 128, 256, 512, 1024, 257 })
+                    for (int voiceCount : { 0, 1, 2, 3, 4 })
+                    {
+                        beat::SpectralSourceSlot measured;
+                        if (!measured.prepare({ rate, block, 2 })
+                            || !measured.publish(frozenPressure.source)) return false;
+                        for (int voice = 0; voice < voiceCount; ++voice)
+                            if (!measured.noteOn({ 57 + voice * 4, 0.65f, (uint64_t) voice + 9000 }))
+                                return false;
+                        juce::AudioBuffer<float> callback(2, block);
+                        for (int warmup = 0; warmup < 32; ++warmup)
+                        {
+                            callback.clear();
+                            measured.render(callback, 0, block);
+                        }
+                        std::vector<double> utilization(1000);
+                        beat::test::beginRealtimeSafetyProbe();
+                        for (double& value : utilization)
+                        {
+                            callback.clear();
+                            const auto started = std::chrono::steady_clock::now();
+                            measured.render(callback, 0, block);
+                            const auto finished = std::chrono::steady_clock::now();
+                            const double elapsed = std::chrono::duration<double>(finished - started).count();
+                            value = elapsed / ((double) block / rate);
+                        }
+                        const auto matrixViolations = beat::test::endRealtimeSafetyProbe();
+                        std::sort(utilization.begin(), utilization.end());
+                        const double p999 = utilization[998];
+                        const double maximum = utilization.back();
+                        worstP999 = std::max(worstP999, p999);
+                        worstMaximum = std::max(worstMaximum, maximum);
+                        deadlineMatrix = deadlineMatrix && p999 < 0.50 && maximum < 0.80
+                            && matrixViolations == 0;
+                        if (p999 >= 0.50 || maximum >= 0.80 || matrixViolations != 0)
+                            std::cerr << "spectral deadline rate=" << rate << " block=" << block
+                                      << " voices=" << voiceCount << " p999=" << p999
+                                      << " max=" << maximum << " violations=" << matrixViolations << "\n";
+                    }
+            std::cerr << "spectral deadline worstP999=" << worstP999
+                      << " worstMax=" << worstMaximum << "\n";
+        }
+
+        const bool ok = exact && ratesFinite && freezeExact && deadlineMatrix && resamplerQuality
+            && latencyContract && fixedPositionContract && nyquistContract
+            && std::abs(1200.0 * std::log2(baseFrequency / 440.0)) < 8.0
+            && std::abs(1200.0 * std::log2(pitchedFrequency / 880.0)) < 8.0
+            && capacity && violations == 0 && activePublishRejected
+            && activeRateChange && energyBeforeRateChange > 0.00001
+            && bufferEnergy(afterRateChange) > 0.000001
+            && invalidRejected && pressure.activeVoiceCount() == 0
+            && pressure.latencySamples() > 0
+            && baseStats.acceptedNoteEvents == beat::SpectralSourceSlot::maximumVoices
+            && baseStats.rejectedNoteEvents == 1
+            && stats.capacityRejected == 1
+            && stats.transforms > 0 && stats.binsProcessed > 0
+            && stats.overlapSamples > 0 && stats.resamplerTaps == 0
+            && stats.synthesisUnderflows == 0
+            && converterUsed && converterProbe.spectralTelemetry().resamplerTaps > 0;
+        if (!ok)
+            std::cerr << "Spectral slot failed exact=" << exact
+                      << " rates=" << ratesFinite << " freeze=" << freezeExact
+                      << " frequency=" << baseFrequency << "/" << pitchedFrequency
+                      << " violations=" << violations << " active=" << pressure.activeVoiceCount()
+                      << " transforms=" << stats.transforms
+                      << " underflows=" << stats.synthesisUnderflows << "\n";
+        return ok;
+    }
+
     bool stressManagedGranularAssetAndRouting()
     {
         const auto root = juce::File("/private/tmp")
@@ -17741,6 +18064,14 @@ namespace
 int main()
 {
     beat::test::prepareRealtimeSafetyInterposers();
+    if (std::getenv("AETHER_SPECTRAL_PLAYBACK_ONLY") != nullptr)
+    {
+        std::cerr << "spectral source: focused start\n";
+        const bool passed = stressSpectralSourceSlot();
+        std::cerr << (passed ? "spectral source: focused passed\n"
+                             : "spectral source: focused failed\n");
+        return passed ? 0 : 1;
+    }
     if (!stressRealtimeSafetyDetectorNegativeCases())
     {
         std::cerr << "Realtime safety detector negative-case stress failed\n";
@@ -18480,6 +18811,14 @@ int main()
         return 1;
     }
     std::cerr << "granular source: done\n";
+
+    std::cerr << "spectral source: start\n";
+    if (!stressSpectralSourceSlot())
+    {
+        std::cerr << "Spectral source slot stress failed\n";
+        return 1;
+    }
+    std::cerr << "spectral source: done\n";
 
     std::cerr << "managed granular: start\n";
     if (!stressManagedGranularAssetAndRouting())
