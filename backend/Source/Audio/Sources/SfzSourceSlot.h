@@ -28,6 +28,8 @@ namespace beat
             uint64_t retiredPublications { 0 };
         };
 
+        struct StereoFrame { float left { 0.0f }; float right { 0.0f }; };
+
         bool prepare(const SourcePrepareSpec& next) noexcept override
         {
             if (!std::isfinite(next.sampleRate) || next.sampleRate <= 0.0
@@ -169,13 +171,19 @@ namespace beat
                                              outputStart, output.getNumSamples());
             for (int outputSample = outputStart; outputSample < outputEnd; ++outputSample)
             {
-                const auto frame = renderFrame();
+                const auto frame = renderInternalFrame();
                 output.addSample(0, outputSample, frame.left);
                 if (output.getNumChannels() > 1)
                     output.addSample(1, outputSample, frame.right);
                 for (int channel = 2; channel < output.getNumChannels(); ++channel)
                     output.addSample(channel, outputSample, (frame.left + frame.right) * 0.5f);
             }
+        }
+
+        StereoFrame renderFrame() noexcept
+        {
+            const auto frame = renderInternalFrame();
+            return { frame.left, frame.right };
         }
 
         SourceLifecycleState lifecycleState() const noexcept override
@@ -212,8 +220,6 @@ namespace beat
         }
 
     private:
-        struct StereoFrame { float left { 0.0f }; float right { 0.0f }; };
-
         enum class LoopMode : uint8_t
         {
             none,
@@ -450,7 +456,7 @@ namespace beat
             voice.loopMode = mode;
         }
 
-        StereoFrame renderFrame() noexcept
+        StereoFrame renderInternalFrame() noexcept
         {
             StereoFrame result;
             for (auto& voice : voices)

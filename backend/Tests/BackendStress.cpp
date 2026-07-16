@@ -45,6 +45,7 @@
 #include "../Source/Persistence/ProjectIntegrityVerifier.h"
 #include "../Source/Persistence/AudioFileLibraryActions.h"
 #include "../Source/Persistence/Database.h"
+#include "../Source/Persistence/ManagedSfzAsset.h"
 #include "../Source/Persistence/ProjectRepository.h"
 #include "RealtimeSafetyProbe.h"
 
@@ -6546,6 +6547,41 @@ namespace
                 && sampleRefs->contains("instrument:sample-inst:sampleMap:0");
         }
 
+        const auto managedRoot = beat::projectSidecarFolderFor(projectFile)
+            .getChildFile("sfz").getChildFile("sfz-packaging-fixture");
+        const auto managedManifest = managedRoot.getChildFile("manifest.json");
+        const auto managedSource = managedRoot.getChildFile("source.sfz");
+        const auto managedSample = managedRoot.getChildFile("samples").getChildFile("tone.wav");
+        if (!managedSample.getParentDirectory().createDirectory()
+            || !managedManifest.replaceWithText("managed-manifest")
+            || !managedSource.replaceWithText("managed-source")
+            || !managedSample.replaceWithText("managed-sample"))
+        {
+            root.deleteRecursively();
+            return false;
+        }
+        juce::DynamicObject::Ptr managed = new juce::DynamicObject();
+        managed->setProperty("schemaVersion", 1);
+        managed->setProperty("assetId", "sfz-packaging-fixture");
+        managed->setProperty("displayName", "Packaging Fixture");
+        managed->setProperty("manifestPath", managedManifest.getFullPathName());
+        managed->setProperty("sourcePath", managedSource.getFullPathName());
+        managed->setProperty("samplePaths", juce::Array<juce::var> { managedSample.getFullPathName() });
+        juce::DynamicObject::Ptr slot = new juce::DynamicObject();
+        slot->setProperty("managedSfz", juce::var(managed.get()));
+        juce::DynamicObject::Ptr aether = new juce::DynamicObject();
+        aether->setProperty("sampleSlot1", juce::var(slot.get()));
+        instrument->setProperty("aether", juce::var(aether.get()));
+        if (auto* documentAssets = document.getProperty("assets", {}).getArray())
+        {
+            documentAssets->add(makeAsset("managed-manifest", "sample",
+                                          managedManifest.getFullPathName(), "bundled"));
+            documentAssets->add(makeAsset("managed-source", "sample",
+                                          managedSource.getFullPathName(), "bundled"));
+            documentAssets->add(makeAsset("managed-sample", "sample",
+                                          managedSample.getFullPathName(), "bundled"));
+        }
+
         juce::String error;
         const bool packaged = beat::packageExternalDocumentAssets(document, projectFile, error);
         if (!packaged)
@@ -6563,6 +6599,8 @@ namespace
         const auto packagedPluginPath = document.getProperty("plugins", {})[0].getProperty("sourcePath", {}).toString();
         const auto packagedPluginAssetPath = document.getProperty("assets", {})[2].getProperty("path", {}).toString();
         const auto packagedBundledAssetPath = document.getProperty("assets", {})[3].getProperty("path", {}).toString();
+        const auto packagedManaged = document.getProperty("instruments", {})[0]
+            .getProperty("aether", {}).getProperty("sampleSlot1", {}).getProperty("managedSfz", {});
 
         const bool relativePathsOk = packagedAudioPath.startsWith("./")
             && packagedSamplePath.startsWith("./")
@@ -6570,7 +6608,10 @@ namespace
             && packagedZonePath == packagedSamplePath
             && packagedPluginPath == pluginFile.getFullPathName()
             && packagedPluginAssetPath == pluginFile.getFullPathName()
-            && packagedBundledAssetPath == "/samples/factory.wav";
+            && packagedBundledAssetPath == "/samples/factory.wav"
+            && packagedManaged.getProperty("manifestPath", {}).toString().startsWith("./Portable Project Assets/sfz/")
+            && packagedManaged.getProperty("sourcePath", {}).toString().startsWith("./Portable Project Assets/sfz/")
+            && packagedManaged.getProperty("samplePaths", {})[0].toString().startsWith("./Portable Project Assets/sfz/");
 
         const auto copiedAudio = projectFile.getParentDirectory().getChildFile(packagedAudioPath);
         const auto copiedSample = projectFile.getParentDirectory().getChildFile(packagedSamplePath);
@@ -6584,10 +6625,15 @@ namespace
         beat::resolveDocumentAssetPaths(document, projectFile);
         const auto resolvedAudioPath = document.getProperty("audioFiles", {})[0].getProperty("path", {}).toString();
         const auto resolvedSamplePath = document.getProperty("instruments", {})[0].getProperty("sampleUrl", {}).toString();
+        const auto resolvedManaged = document.getProperty("instruments", {})[0]
+            .getProperty("aether", {}).getProperty("sampleSlot1", {}).getProperty("managedSfz", {});
         const bool resolvedOk = resolvedAudioPath.startsWith(root.getFullPathName())
             && resolvedSamplePath.startsWith(root.getFullPathName())
             && juce::File(resolvedAudioPath).existsAsFile()
-            && juce::File(resolvedSamplePath).existsAsFile();
+            && juce::File(resolvedSamplePath).existsAsFile()
+            && juce::File(resolvedManaged.getProperty("manifestPath", {}).toString()).existsAsFile()
+            && juce::File(resolvedManaged.getProperty("sourcePath", {}).toString()).existsAsFile()
+            && juce::File(resolvedManaged.getProperty("samplePaths", {})[0].toString()).existsAsFile();
         const auto resolvedZone = document.getProperty("instruments", {})[0].getProperty("sampleMap", {})[0];
         const bool zoneMetadataOk =
             (int) resolvedZone.getProperty("rootNote", -1) == 64
@@ -6614,6 +6660,9 @@ namespace
                       << " copied=" << copiedOk
                       << " resolved=" << resolvedOk
                       << " zoneMetadata=" << zoneMetadataOk
+                      << " managedManifest=" << packagedManaged.getProperty("manifestPath", {}).toString()
+                      << " managedSource=" << packagedManaged.getProperty("sourcePath", {}).toString()
+                      << " managedSample=" << packagedManaged.getProperty("samplePaths", {})[0].toString()
                       << "\n";
         }
         return ok;
@@ -7807,6 +7856,11 @@ namespace
             0.71f, -0.3f, 0.1f, 0.9f, true, 0.2f, 0.7f });
         instrument.aether.sampleSlot1.zones.push_back({ "sample-slot-high", 72, 64, 127, 32, 127,
             0.62f, 0.3f, 0.0f, 1.0f, false, 0.0f, 1.0f });
+        instrument.aether.sampleSlot1.managedSfz.assetId = "sfz-fixture";
+        instrument.aether.sampleSlot1.managedSfz.displayName = "Managed Fixture";
+        instrument.aether.sampleSlot1.managedSfz.manifestPath = "/tmp/managed/manifest.json";
+        instrument.aether.sampleSlot1.managedSfz.sourcePath = "/tmp/managed/source.sfz";
+        instrument.aether.sampleSlot1.managedSfz.samplePaths = { "/tmp/managed/sample.wav" };
         instrument.aether.fxBusIds = { "return-a", "return-b" };
         instrument.aether.runtimeWarp = 0.63f;
         instrument.aether.runtimeWarpMode = 1;
@@ -7916,7 +7970,7 @@ namespace
                 && near(loadedInstrument.aether.noise.color, 0.81f)
                 && near(loadedInstrument.aether.noise.fxSends[0], 0.13f)
                 && near(loadedInstrument.aether.noise.fxSends[1], 0.19f)
-                && loadedInstrument.aether.sampleSlot1.schemaVersion == 4
+                && loadedInstrument.aether.sampleSlot1.schemaVersion == 5
                 && loadedInstrument.aether.sampleSlot1.enabled
                 && loadedInstrument.aether.sampleSlot1.audioFileId == "sample-slot-asset"
                 && loadedInstrument.aether.sampleSlot1.rootNote == 57
@@ -7938,6 +7992,12 @@ namespace
                 && loadedInstrument.aether.sampleSlot1.zones[1].audioFileId == "sample-slot-high"
                 && loadedInstrument.aether.sampleSlot1.zones[1].loNote == 64
                 && loadedInstrument.aether.sampleSlot1.zones[1].loVelocity == 32
+                && loadedInstrument.aether.sampleSlot1.managedSfz.assetId == "sfz-fixture"
+                && loadedInstrument.aether.sampleSlot1.managedSfz.displayName == "Managed Fixture"
+                && loadedInstrument.aether.sampleSlot1.managedSfz.manifestPath == "/tmp/managed/manifest.json"
+                && loadedInstrument.aether.sampleSlot1.managedSfz.sourcePath == "/tmp/managed/source.sfz"
+                && loadedInstrument.aether.sampleSlot1.managedSfz.samplePaths.size() == 1
+                && loadedInstrument.aether.sampleSlot1.managedSfz.samplePaths[0] == "/tmp/managed/sample.wav"
                 && loadedInstrument.aether.fxBusIds[0] == "return-a"
                 && loadedInstrument.aether.fxBusIds[1] == "return-b"
                 && near(loadedInstrument.aether.runtimeWarp, 0.63f)
@@ -10463,6 +10523,162 @@ namespace
 
         root.deleteRecursively();
         outsideFile.deleteFile();
+        return passed;
+    }
+
+    bool stressManagedSfzAssetImport()
+    {
+        const auto root = juce::File("/private/tmp")
+            .getChildFile("BeatBackendStress-managed-sfz-" + juce::Uuid().toString());
+        const auto sourceRoot = root.getChildFile("source");
+        const auto projectFile = root.getChildFile("Managed Project.beat");
+        const auto sfzFile = sourceRoot.getChildFile("Keys.sfz");
+        const auto sampleFile = sourceRoot.getChildFile("tone.wav");
+        if (!sourceRoot.createDirectory()) return false;
+
+        juce::AudioBuffer<float> audio(1, 2048);
+        for (int frame = 0; frame < audio.getNumSamples(); ++frame)
+            audio.setSample(0, frame, 0.25f * std::sin(
+                (float) juce::MathConstants<double>::twoPi * 440.0f * frame / 48000.0f));
+        juce::WavAudioFormat wav;
+        auto output = sampleFile.createOutputStream();
+        std::unique_ptr<juce::AudioFormatWriter> writer(output
+            ? wav.createWriterFor(output.get(), 48000.0, 1, 24, {}, 0) : nullptr);
+        if (!writer)
+        {
+            root.deleteRecursively();
+            return false;
+        }
+        output.release();
+        if (!writer->writeFromAudioSampleBuffer(audio, 0, audio.getNumSamples()))
+        {
+            root.deleteRecursively();
+            return false;
+        }
+        writer.reset();
+        if (!sfzFile.replaceWithText(
+                "<region> sample=tone.wav pitch_keycenter=69 lokey=0 hikey=127 loop_mode=no_loop\n"))
+        {
+            root.deleteRecursively();
+            return false;
+        }
+
+        bool passed = false;
+        juce::String failureStep;
+        do
+        {
+            const auto unsaved = beat::importManagedSfzAsset(sfzFile, juce::File());
+            if (unsaved.ok() || !unsaved.error.containsIgnoreCase("save")) { failureStep = "unsaved guard"; break; }
+            if (!projectFile.replaceWithText("{}")) { failureStep = "saved project fixture"; break; }
+
+            const auto imported = beat::importManagedSfzAsset(sfzFile, projectFile);
+            if (!imported.ok() || !imported.manifestPath.startsWith("./")
+                || imported.sampleFiles.size() != 1)
+                { failureStep = "initial import: " + imported.error; break; }
+            const auto manifest = projectFile.getParentDirectory()
+                .getChildFile(imported.manifestPath);
+            const auto sourceCopy = projectFile.getParentDirectory()
+                .getChildFile(imported.sourcePath);
+            const auto sampleCopy = projectFile.getParentDirectory()
+                .getChildFile(imported.sampleFiles[0].path);
+            const auto loaded = beat::loadManagedSfzAsset(manifest);
+            if (!manifest.existsAsFile() || !sourceCopy.existsAsFile()
+                || !sampleCopy.existsAsFile() || !loaded.isAccepted()
+                || !loaded.instrument || loaded.instrument->samples.size() != 1
+                || loaded.instrument->regions.size() != 1)
+                { failureStep = "materialized verification"; break; }
+
+            const auto repeated = beat::importManagedSfzAsset(sfzFile, projectFile);
+            if (!repeated.ok() || repeated.assetId != imported.assetId
+                || repeated.manifestPath != imported.manifestPath)
+                { failureStep = "deterministic reuse: " + repeated.error; break; }
+
+            const auto originalManifestText = manifest.loadFileAsString();
+            auto unsafeManifest = juce::JSON::parse(originalManifestText);
+            auto* unsafeSamples = unsafeManifest.getProperty("samples", {}).getArray();
+            if (unsafeSamples == nullptr || unsafeSamples->isEmpty())
+                { failureStep = "security fixture manifest"; break; }
+            unsafeSamples->getReference(0).getDynamicObject()->setProperty("path", "../source.sfz");
+            if (!manifest.replaceWithText(juce::JSON::toString(unsafeManifest, true))
+                || !hasSfzDecodeDiagnostic(beat::loadManagedSfzAsset(manifest),
+                                           "sfz.managed.sample-integrity")
+                || !manifest.replaceWithText(originalManifestText))
+                { failureStep = "managed path traversal rejection"; break; }
+
+            const auto symlink = sampleCopy.getSiblingFile("managed-link.wav");
+            if (!sampleCopy.createSymbolicLink(symlink, false))
+                { failureStep = "security symlink fixture"; break; }
+            auto symlinkManifest = juce::JSON::parse(originalManifestText);
+            symlinkManifest.getProperty("samples", {}).getArray()->getReference(0)
+                .getDynamicObject()->setProperty("path", symlink.getRelativePathFrom(manifest.getParentDirectory()));
+            const bool symlinkRejected = manifest.replaceWithText(juce::JSON::toString(symlinkManifest, true))
+                && hasSfzDecodeDiagnostic(beat::loadManagedSfzAsset(manifest),
+                                          "sfz.managed.sample-integrity");
+            symlink.deleteFile();
+            if (!symlinkRejected || !manifest.replaceWithText(originalManifestText))
+                { failureStep = "managed symlink rejection"; break; }
+
+            auto project = makeDenseAetherProject();
+            auto& instrument = project.instruments.front();
+            instrument.aether.oscA.enabled = false;
+            instrument.aether.oscB.enabled = false;
+            instrument.aether.sub.enabled = false;
+            instrument.aether.noise.enabled = false;
+            instrument.aether.sampleSlot1 = {};
+            instrument.aether.sampleSlot1.enabled = true;
+            instrument.aether.sampleSlot1.managedSfz.assetId = imported.assetId;
+            instrument.aether.sampleSlot1.managedSfz.displayName = imported.displayName;
+            instrument.aether.sampleSlot1.managedSfz.manifestPath = manifest.getFullPathName();
+            const auto render64 = renderOfflineChunks(project, 8192, 64);
+            const auto render64Repeat = renderOfflineChunks(project, 8192, 64);
+            const auto render257 = renderOfflineChunks(project, 8192, 257);
+            const auto render257Repeat = renderOfflineChunks(project, 8192, 257);
+            if (bufferEnergy(render64) <= 0.0001
+                || render64.getNumSamples() != render257.getNumSamples())
+                { failureStep = "audible render"; break; }
+            bool repeatedRenderMatches = render64.getNumSamples() == render64Repeat.getNumSamples()
+                && render257.getNumSamples() == render257Repeat.getNumSamples();
+            for (int channel = 0; channel < render64.getNumChannels(); ++channel)
+                for (int sample = 0; sample < render64.getNumSamples(); ++sample)
+                {
+                    repeatedRenderMatches = repeatedRenderMatches
+                        && render64.getSample(channel, sample) == render64Repeat.getSample(channel, sample)
+                        && render257.getSample(channel, sample) == render257Repeat.getSample(channel, sample)
+                        && std::isfinite(render257.getSample(channel, sample));
+                }
+            if (!repeatedRenderMatches)
+            {
+                failureStep = "same-configuration render determinism";
+                break;
+            }
+
+            const auto rejectedFile = sourceRoot.getChildFile("Unsupported.sfz");
+            if (!rejectedFile.replaceWithText(
+                    "<region> sample=tone.wav key=69 trigger=release\n"))
+                { failureStep = "unsupported fixture write"; break; }
+            const auto beforeCount = beat::projectSidecarFolderFor(projectFile)
+                .getChildFile("sfz").getNumberOfChildFiles(juce::File::findDirectories);
+            const auto rejected = beat::importManagedSfzAsset(rejectedFile, projectFile);
+            const auto afterCount = beat::projectSidecarFolderFor(projectFile)
+                .getChildFile("sfz").getNumberOfChildFiles(juce::File::findDirectories);
+            if (rejected.ok() || !rejected.error.containsIgnoreCase("release")
+                || afterCount != beforeCount)
+                { failureStep = "unsupported semantics transaction: " + rejected.error; break; }
+
+            const char corruption[] = "tampered";
+            if (!sampleCopy.replaceWithData(corruption, sizeof(corruption))) { failureStep = "tamper fixture write"; break; }
+            const auto tampered = beat::loadManagedSfzAsset(manifest);
+            if (!hasSfzDecodeDiagnostic(tampered, "sfz.managed.sample-integrity"))
+                { failureStep = "tamper detection"; break; }
+
+            passed = true;
+        }
+        while (false);
+
+        if (!passed)
+            std::cerr << "Managed SFZ failure step: " << failureStep << "\n";
+
+        root.deleteRecursively();
         return passed;
     }
 
@@ -17393,6 +17609,11 @@ int main()
     if (!stressSfzSampleDecoder())
     {
         std::cerr << "SFZ sample decoder stress failed\n";
+        return 1;
+    }
+    if (!stressManagedSfzAssetImport())
+    {
+        std::cerr << "Managed SFZ asset import stress failed\n";
         return 1;
     }
     if (!stressSfzSourceSlot())

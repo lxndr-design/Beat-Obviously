@@ -196,6 +196,16 @@ namespace beat
 
         struct AetherSampleSlot
         {
+            struct ManagedSfz
+            {
+                int schemaVersion { 1 };
+                Id assetId;
+                juce::String displayName;
+                juce::String manifestPath;
+                juce::String sourcePath;
+                std::vector<juce::String> samplePaths;
+            };
+
             struct Zone
             {
                 Id audioFileId;
@@ -213,7 +223,7 @@ namespace beat
                 float loopEndRatio { 1.0f };
             };
 
-            int schemaVersion { 4 };
+            int schemaVersion { 5 };
             bool enabled { false };
             Id audioFileId;
             int rootNote { 60 };
@@ -226,6 +236,7 @@ namespace beat
             float loopStartRatio { 0.0f };
             float loopEndRatio { 1.0f };
             std::vector<Zone> zones;
+            ManagedSfz managedSfz;
             std::array<float, 2> fxSends {};
         };
 

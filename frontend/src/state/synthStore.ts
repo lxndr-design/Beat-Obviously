@@ -6,6 +6,7 @@ import type {
   EnvelopeCurve,
   Instrument,
   InstrumentTaxonomyAssignment,
+  ManagedSfzAssetConfig,
   SynthPatchSnapshot,
   SynthPatchMacroDefinition,
   TrackEffect,
@@ -359,6 +360,7 @@ export interface SynthDraftPatch {
     customWavetables?: Record<string, CustomWavetableDefinition>;
     oscillators: SynthOscillatorDefinition[];
     sampleSlot1Zones: AetherSampleZoneConfig[];
+    managedSfz?: ManagedSfzAssetConfig;
   };
 }
 
@@ -473,6 +475,24 @@ function normalizeAetherSampleZones(value: unknown): AetherSampleZoneConfig[] {
       loopEndRatio,
     }];
   });
+}
+
+function normalizeManagedSfz(value: unknown): ManagedSfzAssetConfig | undefined {
+  if (!isRecord(value)
+    || value.schemaVersion !== 1
+    || typeof value.assetId !== "string" || !value.assetId
+    || typeof value.manifestPath !== "string" || !value.manifestPath
+    || typeof value.sourcePath !== "string" || !value.sourcePath) return undefined;
+  return {
+    schemaVersion: 1,
+    assetId: value.assetId,
+    displayName: typeof value.displayName === "string" ? value.displayName.slice(0, 128) : value.assetId,
+    manifestPath: value.manifestPath,
+    sourcePath: value.sourcePath,
+    samplePaths: Array.isArray(value.samplePaths)
+      ? value.samplePaths.filter((path): path is string => typeof path === "string" && Boolean(path)).slice(0, 256)
+      : [],
+  };
 }
 export const CUSTOM_WAVETABLE_PARTIAL_COUNT = 16;
 const WAVEMAP_SCAN_ANCHOR_MARGIN = 0.01;
@@ -1482,6 +1502,7 @@ export function createDefaultSynthDraft(): SynthDraftPatch {
       customWavetables: { [DEFAULT_CUSTOM_WAVETABLE_ID]: createDefaultCustomWavetable() },
       oscillators: [{ id: "a", name: "Oscillator A" }, { id: "b", name: "Oscillator B" }],
       sampleSlot1Zones: [],
+      managedSfz: undefined,
     },
   };
 }
@@ -1570,6 +1591,7 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
       customWavetables: wavemaps,
       oscillators: normalizeOscillatorDefinitions(inputMetadata.oscillators),
       sampleSlot1Zones: normalizeAetherSampleZones(inputMetadata.sampleSlot1Zones),
+      managedSfz: normalizeManagedSfz(inputMetadata.managedSfz),
     },
   };
 }
@@ -2031,9 +2053,11 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         fxSends: [clamp01(getNumberParam(draft, "aether.noise.fxSend1")), clamp01(getNumberParam(draft, "aether.noise.fxSend2"))],
       },
       sampleSlot1: {
-        schemaVersion: 4,
+        schemaVersion: 5,
         enabled: getBooleanParam(draft, "aether.sample.1.enabled")
-          && (Boolean(getStringParam(draft, "aether.sample.1.audioFileId")) || draft.metadata.sampleSlot1Zones.length > 0),
+          && (Boolean(getStringParam(draft, "aether.sample.1.audioFileId"))
+            || draft.metadata.sampleSlot1Zones.length > 0
+            || Boolean(draft.metadata.managedSfz?.manifestPath)),
         audioFileId: getStringParam(draft, "aether.sample.1.audioFileId"),
         rootNote: Math.max(0, Math.min(127, Math.round(getNumberParam(draft, "aether.sample.1.rootNote")))),
         level: clamp01(getNumberParam(draft, "aether.sample.1.level")),
@@ -2046,6 +2070,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         loopEndRatio: clamp01(getNumberParam(draft, "aether.sample.1.loop.end")),
         fxSends: [clamp01(getNumberParam(draft, "aether.sample.1.fxSend1")), clamp01(getNumberParam(draft, "aether.sample.1.fxSend2"))],
         zones: draft.metadata.sampleSlot1Zones,
+        ...(draft.metadata.managedSfz ? { managedSfz: draft.metadata.managedSfz } : {}),
       },
       fxBusIds: [getStringParam(draft, "aether.fxBus1Id"), getStringParam(draft, "aether.fxBus2Id")],
       runtimeWarp: clamp01(getNumberParam(draft, "aether.runtimeWarp")),
@@ -2285,6 +2310,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["aether.sample.1.fxSend1"] = instrument.aether?.sampleSlot1?.fxSends?.[0] ?? 0;
   draft.parameters["aether.sample.1.fxSend2"] = instrument.aether?.sampleSlot1?.fxSends?.[1] ?? 0;
   draft.metadata.sampleSlot1Zones = normalizeAetherSampleZones(instrument.aether?.sampleSlot1?.zones);
+  draft.metadata.managedSfz = normalizeManagedSfz(instrument.aether?.sampleSlot1?.managedSfz);
   draft.parameters["aether.fxBus1Id"] = instrument.aether?.fxBusIds?.[0] ?? "";
   draft.parameters["aether.fxBus2Id"] = instrument.aether?.fxBusIds?.[1] ?? "";
   draft.parameters["aether.mpe.enabled"] = instrument.aether?.memberExpressionZone?.enabled ?? false;

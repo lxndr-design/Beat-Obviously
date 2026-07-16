@@ -4,6 +4,7 @@
 #include "Realtime/VoiceAutomationInbox.h"
 #include "VoiceAllocation.h"
 #include "Modulation/Lfo.h"
+#include "../Persistence/ManagedSfzAsset.h"
 
 #include <algorithm>
 #include <cmath>
@@ -747,11 +748,18 @@ namespace beat
             const juce::ScopedLock lock(sampleLock);
             for (auto& route : instrumentRenderStates)
             {
-                if (route.synth == nullptr) continue;
-                route.synth->setCurrentPlaybackSampleRate(sampleRate);
-                for (int i = 0; i < route.synth->getNumVoices(); ++i)
-                    if (auto* v = dynamic_cast<InstrumentVoice*>(route.synth->getVoice(i)))
-                        v->prepare(sampleRate, scratchBlock);
+                const auto prepareSynth = [this, scratchBlock](auto& routeSynth)
+                {
+                    if (routeSynth == nullptr)
+                        return;
+                    routeSynth->setCurrentPlaybackSampleRate(sampleRate);
+                    for (int i = 0; i < routeSynth->getNumVoices(); ++i)
+                        if (auto* v = dynamic_cast<InstrumentVoice*>(routeSynth->getVoice(i)))
+                            v->prepare(sampleRate, scratchBlock);
+                };
+                prepareSynth(route.synth);
+                for (auto& retiringSynth : route.retiringSynths)
+                    prepareSynth(retiringSynth);
             }
         }
 
@@ -781,10 +789,19 @@ namespace beat
                 voice->setProcessingQuality(quality);
         const juce::ScopedLock lock(sampleLock);
         for (auto& route : instrumentRenderStates)
-            if (route.synth != nullptr)
-                for (int i = 0; i < route.synth->getNumVoices(); ++i)
-                    if (auto* voice = dynamic_cast<InstrumentVoice*>(route.synth->getVoice(i)))
+        {
+            const auto setSynthQuality = [quality](auto& routeSynth)
+            {
+                if (routeSynth == nullptr)
+                    return;
+                for (int i = 0; i < routeSynth->getNumVoices(); ++i)
+                    if (auto* voice = dynamic_cast<InstrumentVoice*>(routeSynth->getVoice(i)))
                         voice->setProcessingQuality(quality);
+            };
+            setSynthQuality(route.synth);
+            for (auto& retiringSynth : route.retiringSynths)
+                setSynthQuality(retiringSynth);
+        }
     }
 
     bool AudioEngine::renderProjectToWav(Project project,
@@ -1581,8 +1598,12 @@ namespace beat
     {
         if (route.synth != nullptr)
             route.synth->allNotesOff(0, allowTailOff);
+        for (auto& retiringSynth : route.retiringSynths)
+            if (retiringSynth != nullptr)
+                retiringSynth->allNotesOff(0, allowTailOff);
 
         route.midi.clear();
+        route.retiringMidi.clear();
         route.noteAutomationContextCount = 0;
         route.gainDb = route.baseGainDb;
         route.pan = route.basePan;
@@ -1823,7 +1844,8 @@ namespace beat
 
     std::unique_ptr<juce::Synthesiser> AudioEngine::createInstrumentSynth(
         const InstrumentDefinition& instrument,
-        std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1)
+        std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1,
+        std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1)
     {
         auto instrumentSynth = std::make_unique<BeatSynthesiser>();
         instrumentSynth->configureMemberExpressionZone({
@@ -2090,8 +2112,10 @@ namespace beat
             instrument.aether.noise.fxSends,
         };
         params.aetherSampleSlot1 = {
-            instrument.aether.sampleSlot1.enabled && aetherSampleSlot1 != nullptr,
+            instrument.aether.sampleSlot1.enabled
+                && (aetherSampleSlot1 != nullptr || aetherSfzSlot1 != nullptr),
             std::move(aetherSampleSlot1),
+            std::move(aetherSfzSlot1),
             juce::jlimit(0, 3, instrument.aether.sampleSlot1.routing),
             instrument.aether.sampleSlot1.fxSends,
         };
@@ -2395,10 +2419,17 @@ namespace beat
             if (routeInstrument != nullptr)
             {
                 std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1;
+                std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1;
                 const auto& slot = routeInstrument->aether.sampleSlot1;
                 auto sampleIdentity = juce::String();
                 if (routeInstrument->hasAether && slot.enabled)
                 {
+                    if (slot.managedSfz.manifestPath.isNotEmpty())
+                    {
+                        const auto loaded = loadManagedSfzAsset(juce::File(slot.managedSfz.manifestPath));
+                        if (loaded.isAccepted())
+                            aetherSfzSlot1 = loaded.instrument;
+                    }
                     auto map = std::make_shared<ImmutableMappedSampleSource>();
                     const auto addZone = [&](const Id& audioFileId, int rootNote, int loNote, int hiNote,
                                              int loVelocity, int hiVelocity, float level, float pan,
@@ -2477,14 +2508,17 @@ namespace beat
                                     zone.loVelocity, zone.hiVelocity, zone.level, zone.pan,
                                     zone.startRatio, zone.endRatio, zone.loopEnabled,
                                     zone.loopStartRatio, zone.loopEndRatio);
-                    if (map->zoneCount > 0)
+                    if (!aetherSfzSlot1 && map->zoneCount > 0)
                         aetherSampleSlot1 = std::move(map);
                 }
-                route.synth = createInstrumentSynth(*routeInstrument, std::move(aetherSampleSlot1));
+                route.synth = createInstrumentSynth(*routeInstrument,
+                    std::move(aetherSampleSlot1), std::move(aetherSfzSlot1));
                 route.sourceFxBusIds = routeInstrument->aether.fxBusIds;
                 route.aetherSampleSlot1Identity = slot.enabled
                     ? juce::String(slot.routing) + ":" + juce::String(slot.fxSends[0], 6) + ":"
-                        + juce::String(slot.fxSends[1], 6) + ":" + sampleIdentity
+                        + juce::String(slot.fxSends[1], 6) + ":"
+                        + (slot.managedSfz.assetId.isNotEmpty()
+                            ? "sfz:" + slot.managedSfz.assetId : sampleIdentity)
                     : juce::String();
             }
 
@@ -2536,7 +2570,7 @@ namespace beat
         std::shared_ptr<SampleStreamingSession> retiredStreamingSession;
         {
             const juce::ScopedLock lock(sampleLock);
-            const auto armEffectTransitions = [this](auto& nextRoutes, const auto& currentRoutes)
+            const auto armEffectTransitions = [this](auto& nextRoutes, auto& currentRoutes)
             {
                 for (auto& nextRoute : nextRoutes)
                 {
@@ -2547,6 +2581,29 @@ namespace beat
                         && (!equivalentEffectGraphs(found->effects, nextRoute.effects)
                             || found->aetherSampleSlot1Identity != nextRoute.aetherSampleSlot1Identity))
                         nextRoute.effectGraphTransition.beginFrom(found->lastEffectGraphOutput);
+
+                    if (found == currentRoutes.end())
+                        continue;
+
+                    size_t retiringIndex = 0;
+                    const auto retainForRelease = [&](std::unique_ptr<juce::Synthesiser>& candidate)
+                    {
+                        if (candidate == nullptr || countActiveSynthVoices(*candidate) == 0)
+                            return;
+                        candidate->allNotesOff(0, true);
+                        if (retiringIndex < nextRoute.retiringSynths.size())
+                            nextRoute.retiringSynths[retiringIndex++] = std::move(candidate);
+                        else
+                        {
+                            candidate->allNotesOff(0, false);
+                            blockEventOverflows.fetch_add(1, std::memory_order_relaxed);
+                        }
+                    };
+
+                    for (auto& retiringSynth : found->retiringSynths)
+                        retainForRelease(retiringSynth);
+                    if (found->aetherSampleSlot1Identity != nextRoute.aetherSampleSlot1Identity)
+                        retainForRelease(found->synth);
                 }
             };
             armEffectTransitions(nextRenderStates, instrumentRenderStates);
@@ -4752,6 +4809,21 @@ namespace beat
                         voiceTicks += ticksBetween(voiceStartTicks, markTicks());
                         activeSynthVoiceCount += countActiveSynthVoices(*route.synth);
                         VoiceAutomationInbox::clearPending();
+                    }
+
+                    route.retiringMidi.clear();
+                    for (auto& retiringSynth : route.retiringSynths)
+                    {
+                        if (retiringSynth == nullptr || countActiveSynthVoices(*retiringSynth) == 0)
+                            continue;
+                        voiceStartTicks = markTicks();
+                        const AetherSourceBusContext::ScopedTargets sourceBusTargets({
+                            &route.sourceFxBuffers[0],
+                            &route.sourceFxBuffers[1],
+                        });
+                        retiringSynth->renderNextBlock(routeBuf, route.retiringMidi, 0, numSamples);
+                        voiceTicks += ticksBetween(voiceStartTicks, markTicks());
+                        activeSynthVoiceCount += countActiveSynthVoices(*retiringSynth);
                     }
 
                     addAetherSourceSendsLocked(route, 0, numSamples);

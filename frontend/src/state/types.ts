@@ -469,7 +469,7 @@ export interface AetherNoiseConfig {
 }
 
 export interface AetherSampleSlotConfig {
-  schemaVersion: 4;
+  schemaVersion: 5;
   enabled: boolean;
   audioFileId: Id;
   rootNote: number;
@@ -483,6 +483,16 @@ export interface AetherSampleSlotConfig {
   loopEndRatio: number;
   fxSends?: [number, number];
   zones?: AetherSampleZoneConfig[];
+  managedSfz?: ManagedSfzAssetConfig;
+}
+
+export interface ManagedSfzAssetConfig {
+  schemaVersion: 1;
+  assetId: string;
+  displayName: string;
+  manifestPath: string;
+  sourcePath: string;
+  samplePaths: string[];
 }
 
 export interface AetherSampleZoneConfig {
@@ -643,6 +653,7 @@ export interface SynthPatchSnapshot {
     /** Legacy alias for older Aether patches. New code writes both keys. */
     customWavetables?: Record<string, CustomWavetableDefinition>;
     sampleSlot1Zones?: AetherSampleZoneConfig[];
+    managedSfz?: ManagedSfzAssetConfig;
   };
 }
 

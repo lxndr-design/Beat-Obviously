@@ -63,3 +63,9 @@ dependency approvals remain separate.
 - No Vital factory content, branding, services, or preset data.
 - No granular/spectral release blocker for the first production wavetable milestone.
 - No automatic quality degradation under load; use deterministic budgets and user-selected modes.
+
+## Milestone C3D2 update — 2026-07-15
+
+The first bounded hybrid source is product-reachable: a saved Beat project can transactionally import the approved internal SFZ subset into a content-addressed project asset, persist and relocate all provenance paths, verify and decode it off-thread, and route it through Aether Sample Slot 1. Active replacement is bounded: new notes use the newly verified instrument while previous voices tail from pinned immutable data, with destruction deferred to a control-side rebuild. Tamper, traversal, symlink, rollback, packaging, persistence, routing, repeat-determinism, and callback-boundary coverage is green.
+
+This closes the Sample Slot 1 import/routing and active-replacement row only for the explicitly supported attack-trigger subset. It is not broad SFZ compatibility. Sequence/round-robin/random selection, release-trigger regions, group/off-by choking, unsupported opcodes, external relinking, sample editing, Slots 2–3, granular playback, and spectral playback remain open. No upstream implementation or dependency was approved or used. The 150 default-off renders remain byte-identical, and the only suite waiver remains `baseline.recent-project-exists`.

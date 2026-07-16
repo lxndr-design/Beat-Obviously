@@ -168,6 +168,14 @@ try {
       sampleUrl: "/Users/alex/Snare.wav",
       sampleUrls: ["/Users/alex/Snare.wav", "/samples/Bundled Hat.wav"],
       sampleMap: [{ id: "zone-a", name: "Kick Zone", path: "/Users/alex/Kick.wav", rootNote: 36, loNote: 36, hiNote: 36, loVel: 1, hiVel: 127 }],
+      aether: { sampleSlot1: { managedSfz: {
+        schemaVersion: 1,
+        assetId: "sfz-managed-a",
+        displayName: "Managed A",
+        manifestPath: "./Portable Project Assets/sfz/sfz-managed-a/manifest.json",
+        sourcePath: "./Portable Project Assets/sfz/sfz-managed-a/source.sfz",
+        samplePaths: ["./Portable Project Assets/sfz/sfz-managed-a/samples/tone.wav"],
+      } } },
     }],
     plugins: [{ id: "plugin-a", name: "DS Pack", sourcePath: "/Users/alex/Pack.dspreset" }],
     project: {
@@ -178,7 +186,7 @@ try {
       }],
     },
   });
-  assert.equal(assetManifest.length, 5, "asset manifest should de-duplicate repeated sample references");
+  assert.equal(assetManifest.length, 8, "asset manifest should de-duplicate repeated sample references and retain managed SFZ files");
   assert.deepEqual(
     assetManifest.find((asset) => asset.path === "/Users/alex/Loop.wav").references,
     ["audioFile:audio-a", "track:track-a:audioFileId", "track:track-a:segment:segment-a:audioFileId", "instrument:sampler-a:sampleIds:0"],
@@ -189,12 +197,18 @@ try {
     2,
     "asset manifest should preserve multiple references to the same sample path",
   );
+  assert.deepEqual(
+    assetManifest.find((asset) => asset.path.endsWith("/sfz-managed-a/manifest.json")).references,
+    ["instrument:sampler-a:managedSfz:manifest"],
+    "asset manifest should retain the managed SFZ provenance manifest",
+  );
   const assetRows = assetReferenceGraph.buildProjectAssetReferenceRows({ assets: assetManifest }, [
     { id: "missing-snare", kind: "sample", path: "/Users/alex/Snare.wav", policy: "external", references: [] },
   ]);
   assert.equal(assetRows[0].path, "/Users/alex/Snare.wav", "missing project assets should sort to the top of the asset browser");
   assert.equal(assetRows[0].state, "missing", "asset rows should expose missing state");
   assert.equal(assetRows.find((asset) => asset.path === "/samples/Bundled Hat.wav").managed, true, "asset rows should expose bundled/managed state");
+  assert.equal(assetRows.find((asset) => asset.path.endsWith("/sfz-managed-a/source.sfz")).managed, true, "managed SFZ source should remain project-owned");
   assert.equal(assetRows.find((asset) => asset.path === "/Users/alex/Pack.dspreset").state, "plugin", "plugin package assets should keep plugin state");
 
   assert.ok(exportStore.FACTORY_EXPORT_PRESETS.length >= 5, "export review should expose factory presets");

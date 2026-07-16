@@ -2003,7 +2003,7 @@ export function defaultAetherSynthConfig() {
       color: 0.45,
     },
     sampleSlot1: {
-      schemaVersion: 4,
+      schemaVersion: 5,
       enabled: false,
       audioFileId: "",
       rootNote: 60,

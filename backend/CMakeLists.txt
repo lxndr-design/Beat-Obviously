@@ -119,6 +119,8 @@ target_sources(Beat PRIVATE
     Source/Persistence/ProjectRepository.h
     Source/Persistence/InstrumentRepository.cpp
     Source/Persistence/InstrumentRepository.h
+    Source/Persistence/ManagedSfzAsset.cpp
+    Source/Persistence/ManagedSfzAsset.h
     Source/Persistence/ProjectAssetPackage.cpp
     Source/Persistence/ProjectAssetPackage.h
     Source/Persistence/ProjectDocumentBackup.cpp
@@ -155,6 +157,7 @@ target_link_libraries(Beat PRIVATE
     juce::juce_audio_processors
     juce::juce_audio_utils
     juce::juce_core
+    juce::juce_cryptography
     juce::juce_data_structures
     juce::juce_dsp
     juce::juce_events
@@ -266,6 +269,8 @@ add_executable(BeatBackendStress
     Source/Audio/Wavetable/WavetableVoiceCache.h
     Source/Persistence/ProjectAssetPackage.cpp
     Source/Persistence/ProjectAssetPackage.h
+    Source/Persistence/ManagedSfzAsset.cpp
+    Source/Persistence/ManagedSfzAsset.h
     Source/Persistence/ProjectDocumentBackup.cpp
     Source/Persistence/ProjectDocumentBackup.h
     Source/Persistence/ProjectIntegrityVerifier.cpp
@@ -285,6 +290,7 @@ target_link_libraries(BeatBackendStress PRIVATE
     juce::juce_audio_processors
     juce::juce_audio_utils
     juce::juce_core
+    juce::juce_cryptography
     juce::juce_dsp
     juce::juce_events
     SQLite3::SQLite3

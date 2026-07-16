@@ -407,6 +407,17 @@ namespace beat
                 mappedZones.add(juce::var(mapped.get()));
             }
             sampleSlot1->setProperty("zones", juce::var(mappedZones));
+            juce::DynamicObject::Ptr managedSfz = new juce::DynamicObject();
+            managedSfz->setProperty("schemaVersion", aether.sampleSlot1.managedSfz.schemaVersion);
+            managedSfz->setProperty("assetId", aether.sampleSlot1.managedSfz.assetId);
+            managedSfz->setProperty("displayName", aether.sampleSlot1.managedSfz.displayName);
+            managedSfz->setProperty("manifestPath", aether.sampleSlot1.managedSfz.manifestPath);
+            managedSfz->setProperty("sourcePath", aether.sampleSlot1.managedSfz.sourcePath);
+            juce::Array<juce::var> managedSamplePaths;
+            for (const auto& path : aether.sampleSlot1.managedSfz.samplePaths)
+                managedSamplePaths.add(path);
+            managedSfz->setProperty("samplePaths", managedSamplePaths);
+            sampleSlot1->setProperty("managedSfz", juce::var(managedSfz.get()));
             o->setProperty("sampleSlot1", juce::var(sampleSlot1.get()));
             o->setProperty("fxBus1Id", aether.fxBusIds[0]);
             o->setProperty("fxBus2Id", aether.fxBusIds[1]);
@@ -461,7 +472,7 @@ namespace beat
             if (sampleSlot1.isObject())
             {
                 const int sourceSchemaVersion = juce::jmax(0, (int) sampleSlot1.getProperty("schemaVersion", 0));
-                config.sampleSlot1.schemaVersion = 4;
+                config.sampleSlot1.schemaVersion = 5;
                 const bool requestedSlotEnabled = (bool) sampleSlot1.getProperty("enabled", false);
                 config.sampleSlot1.enabled = requestedSlotEnabled;
                 config.sampleSlot1.audioFileId = sampleSlot1.getProperty("audioFileId", "").toString();
@@ -516,9 +527,24 @@ namespace beat
                         if (zone.audioFileId.isNotEmpty()) config.sampleSlot1.zones.push_back(std::move(zone));
                     }
                 }
+                const auto managedSfz = sampleSlot1.getProperty("managedSfz", {});
+                if (managedSfz.isObject()
+                    && (int) managedSfz.getProperty("schemaVersion", 0) <= 1)
+                {
+                    config.sampleSlot1.managedSfz.assetId = managedSfz.getProperty("assetId", {}).toString();
+                    config.sampleSlot1.managedSfz.displayName = managedSfz.getProperty("displayName", {}).toString();
+                    config.sampleSlot1.managedSfz.manifestPath = managedSfz.getProperty("manifestPath", {}).toString();
+                    config.sampleSlot1.managedSfz.sourcePath = managedSfz.getProperty("sourcePath", {}).toString();
+                    if (const auto* paths = managedSfz.getProperty("samplePaths", {}).getArray())
+                        for (const auto& path : *paths)
+                            if (path.toString().isNotEmpty())
+                                config.sampleSlot1.managedSfz.samplePaths.push_back(path.toString());
+                }
                 config.sampleSlot1.enabled = requestedSlotEnabled
                     && sourceSchemaVersion <= config.sampleSlot1.schemaVersion
-                    && (config.sampleSlot1.audioFileId.isNotEmpty() || !config.sampleSlot1.zones.empty());
+                    && (config.sampleSlot1.audioFileId.isNotEmpty()
+                        || !config.sampleSlot1.zones.empty()
+                        || config.sampleSlot1.managedSfz.manifestPath.isNotEmpty());
             }
             config.fxBusIds[0] = aetherVar.getProperty("fxBus1Id", config.fxBusIds[0]).toString();
             config.fxBusIds[1] = aetherVar.getProperty("fxBus2Id", config.fxBusIds[1]).toString();

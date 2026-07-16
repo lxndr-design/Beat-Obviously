@@ -979,3 +979,11 @@ AudioEngine / project schema / product import
 ```
 
 Note-on and render contain no allocation, blocking lock, file/stream access, lazy initialization, or container growth. Candidate scans and active voice samples are observable bounded work. Publication refuses active replacement, and sequence, release-trigger, group, and off-by semantics refuse publication. `takeRetiredInstrument()` is a control-thread destruction boundary. The next integration slice must choose an explicit product routing/import contract and preserve this bank/retirement policy; it must not fall back to the 256-slot per-sample scan that C3D1 was designed to avoid.
+
+## C3D2 managed SFZ product and callback boundary — 2026-07-15
+
+Control/message thread: `MessageBridge::instrument.importSfz` -> `importManagedSfzAsset()` -> C3A parse -> C3B resolution -> C3C descriptor decode -> SHA-256 inventory -> staging copy/verification -> manifest write -> atomic managed-directory publication. No callback or live route is touched before publication completes.
+
+Project apply/control thread: `AudioEngine::applyProject()` -> `rebuildSampleInstruments()` -> `loadManagedSfzAsset()` -> manifest/path/hash/symlink verification -> resolve/decode -> `createInstrumentSynth()` -> `InstrumentVoice::prepare()` -> `SfzSourceSlot::publishInstrument()`. File I/O, hashing, allocation, decoding, route construction, and retirement/destruction remain outside the callback.
+
+Audio callback: `audioDeviceIOCallbackWithContext()` -> route synth -> `InstrumentVoice::renderNextBlock()` -> `SfzSourceSlot::renderFrame()` -> fixed candidate scan -> pinned immutable sample reads -> existing source routing, filters, sends, effects, master DC blocker, and limiter. Replacement adds a fixed scan of at most two tailing synths with a pre-existing empty MIDI buffer; they accept no new notes. This branch performs no manifest access, file/stream operation, hash, decode, allocation, container growth, blocking lock, publication destruction, or lazy initialization.

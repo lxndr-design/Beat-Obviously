@@ -237,6 +237,14 @@ try {
       "lfo.10.phase": 0.3,
     },
     metadata: {
+      managedSfz: {
+        schemaVersion: 1,
+        assetId: "sfz-roundtrip-fixture",
+        displayName: "Roundtrip Keys",
+        manifestPath: "./Roundtrip Assets/sfz/sfz-roundtrip-fixture/manifest.json",
+        sourcePath: "./Roundtrip Assets/sfz/sfz-roundtrip-fixture/source.sfz",
+        samplePaths: ["./Roundtrip Assets/sfz/sfz-roundtrip-fixture/samples/tone.wav"],
+      },
       sampleSlot1Zones: [
         { audioFileId: "audio-low", rootNote: 48, loNote: 0, hiNote: 63, loVelocity: 0, hiVelocity: 127,
           level: 0.8, pan: -0.2, startRatio: 0.1, endRatio: 0.9, loopEnabled: true, loopStartRatio: 0.2, loopEndRatio: 0.7 },
@@ -265,7 +273,7 @@ try {
   assert.deepEqual(independentUnisonPreview.aether.noise.fxSends, [0.19, 0.29]);
   assert.deepEqual(independentUnisonPreview.aether.fxBusIds, ["return-a", "return-b"]);
   assert.deepEqual(independentUnisonPreview.aether.sampleSlot1, {
-    schemaVersion: 4,
+    schemaVersion: 5,
     enabled: true,
     audioFileId: "audio-fixture-1",
     rootNote: 57,
@@ -278,6 +286,7 @@ try {
     loopStartRatio: 0.25,
     loopEndRatio: 0.72,
     fxSends: [0.37, 0.53],
+    managedSfz: independentUnisonDraft.metadata.managedSfz,
     zones: independentUnisonDraft.metadata.sampleSlot1Zones,
   });
   assert.deepEqual(independentUnisonPreview.sampleIds, ["audio-fixture-1", "audio-low", "audio-high"]);

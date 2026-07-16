@@ -95,6 +95,14 @@ export function buildAssetManifest(input: Pick<BeatProjectDocument, "instruments
     instrument.sampleMap?.forEach((zone, index) => {
       addAsset("sample", zone.path, `instrument:${instrument.id}:sampleMap:${index}`, zone.name ?? instrument.name);
     });
+    const managedSfz = instrument.aether?.sampleSlot1?.managedSfz;
+    if (managedSfz) {
+      addAsset("sample", managedSfz.manifestPath, `instrument:${instrument.id}:managedSfz:manifest`, instrument.name);
+      addAsset("sample", managedSfz.sourcePath, `instrument:${instrument.id}:managedSfz:source`, instrument.name);
+      managedSfz.samplePaths.forEach((path, index) => {
+        addAsset("sample", path, `instrument:${instrument.id}:managedSfz:sample:${index}`, instrument.name);
+      });
+    }
   }
   for (const plugin of input.plugins ?? []) {
     addAsset("plugin", plugin.sourcePath ?? plugin.sourceFileName, `plugin:${plugin.id}:sourcePath`, plugin.name);
@@ -124,7 +132,8 @@ function audioFileIdFromSegmentPayload(payload: SegmentPayload): string | null {
 
 export function assetPolicy(path: string, kind: BeatProjectAssetKind): BeatProjectAssetPolicy {
   if (kind === "plugin") return "plugin";
-  return path.startsWith("/samples/") ? "bundled" : "external";
+  return path.startsWith("/samples/") || path.includes(" Assets/sfz/")
+    ? "bundled" : "external";
 }
 
 export function stableAssetId(kind: BeatProjectAssetKind, path: string): string {

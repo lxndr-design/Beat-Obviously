@@ -385,7 +385,7 @@ private:
                     };
                 }
             }
-            addAndMakeVisible(startupSplash);
+            addAndMakeVisible(&startupSplash);
 
             // Full-screen on first launch; resizable.
             setResizable(true, true);

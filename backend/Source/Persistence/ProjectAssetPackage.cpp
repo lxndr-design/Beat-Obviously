@@ -147,6 +147,29 @@ namespace beat
                 }
                 instrument->setProperty("sampleMap", sampleMapVar);
             }
+
+            auto aetherVar = instrument->getProperty("aether");
+            if (auto* aether = aetherVar.getDynamicObject())
+            {
+                auto slotVar = aether->getProperty("sampleSlot1");
+                if (auto* slot = slotVar.getDynamicObject())
+                {
+                    auto managedVar = slot->getProperty("managedSfz");
+                    if (auto* managed = managedVar.getDynamicObject())
+                    {
+                        rewriteObjectPath(managed, rewrites, "manifestPath");
+                        rewriteObjectPath(managed, rewrites, "sourcePath");
+                        auto pathsVar = managed->getProperty("samplePaths");
+                        if (auto* paths = pathsVar.getArray())
+                            for (int i = 0; i < paths->size(); ++i)
+                                paths->set(i, rewrittenAssetPath(rewrites, paths->getReference(i).toString()));
+                        managed->setProperty("samplePaths", pathsVar);
+                        slot->setProperty("managedSfz", managedVar);
+                    }
+                    aether->setProperty("sampleSlot1", slotVar);
+                }
+                instrument->setProperty("aether", aetherVar);
+            }
         }
 
         void resolveInstrumentAssetPaths(juce::DynamicObject* instrument, const juce::File& projectFile)
@@ -176,6 +199,29 @@ namespace beat
                     }
                 }
                 instrument->setProperty("sampleMap", sampleMapVar);
+            }
+
+            auto aetherVar = instrument->getProperty("aether");
+            if (auto* aether = aetherVar.getDynamicObject())
+            {
+                auto slotVar = aether->getProperty("sampleSlot1");
+                if (auto* slot = slotVar.getDynamicObject())
+                {
+                    auto managedVar = slot->getProperty("managedSfz");
+                    if (auto* managed = managedVar.getDynamicObject())
+                    {
+                        resolveObjectPath(managed, projectFile, "manifestPath");
+                        resolveObjectPath(managed, projectFile, "sourcePath");
+                        auto pathsVar = managed->getProperty("samplePaths");
+                        if (auto* paths = pathsVar.getArray())
+                            for (int i = 0; i < paths->size(); ++i)
+                                paths->set(i, resolveProjectRelativePath(projectFile, paths->getReference(i).toString()));
+                        managed->setProperty("samplePaths", pathsVar);
+                        slot->setProperty("managedSfz", managedVar);
+                    }
+                    aether->setProperty("sampleSlot1", slotVar);
+                }
+                instrument->setProperty("aether", aetherVar);
             }
         }
 
@@ -220,7 +266,8 @@ namespace beat
         {
             if (kind == "plugin")
                 return "plugin";
-            return path.startsWith("/samples/") ? "bundled" : "external";
+            return path.startsWith("/samples/") || path.contains(" Assets/sfz/")
+                ? "bundled" : "external";
         }
 
         struct ManifestAsset
@@ -334,6 +381,14 @@ namespace beat
                             recordObjectPathUsage(zone, projectFile, "sampleUrl", usedSidecarFiles);
                         }
                     }
+
+                    const auto managed = instrument.getProperty("aether", {})
+                        .getProperty("sampleSlot1", {}).getProperty("managedSfz", {});
+                    recordObjectPathUsage(managed, projectFile, "manifestPath", usedSidecarFiles);
+                    recordObjectPathUsage(managed, projectFile, "sourcePath", usedSidecarFiles);
+                    if (auto* paths = managed.getProperty("samplePaths", {}).getArray())
+                        for (const auto& path : *paths)
+                            recordSidecarUsage(projectFile, path.toString(), usedSidecarFiles);
                 }
             }
 
@@ -511,6 +566,17 @@ namespace beat
                                          zoneName);
                     }
                 }
+
+                const auto managed = instrument.getProperty("aether", {})
+                    .getProperty("sampleSlot1", {}).getProperty("managedSfz", {});
+                addManifestAsset(assets, "sample", managed.getProperty("manifestPath", {}).toString(),
+                                 referenceBase + ":managedSfz:manifest", instrumentName);
+                addManifestAsset(assets, "sample", managed.getProperty("sourcePath", {}).toString(),
+                                 referenceBase + ":managedSfz:source", instrumentName);
+                if (auto* paths = managed.getProperty("samplePaths", {}).getArray())
+                    for (int i = 0; i < paths->size(); ++i)
+                        addManifestAsset(assets, "sample", paths->getReference(i).toString(),
+                                         referenceBase + ":managedSfz:sample:" + juce::String(i), instrumentName);
             }
         }
 
@@ -586,14 +652,20 @@ namespace beat
             if (kind.isEmpty())
                 kind = "sample";
 
+            const juce::File source(path);
+            if (isAbsoluteFilePath(path)
+                && normalizedPathStartsWith(source.getFullPathName(), sidecarRoot.getFullPathName()))
+            {
+                rewrites.set(path, pathRelativeToProject(projectFile, source));
+                continue;
+            }
+
             if (path.isEmpty()
                 || path.startsWith("/samples/")
                 || isEphemeralAssetPath(path)
                 || policy == "bundled"
                 || policy == "plugin")
                 continue;
-
-            const juce::File source(path);
             if (!source.existsAsFile())
                 continue;
 

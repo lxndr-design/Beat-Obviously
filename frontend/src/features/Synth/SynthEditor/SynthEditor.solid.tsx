@@ -1,7 +1,8 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { previewFrequency, renderAetherOutputPreviewSamples, renderedInstrumentBuffer } from "../../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../../audio/synthWorkletPreview";
-import { Button, FieldActionButton, FloatingSelect, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, Slider, TextInput, Toggle } from "../../../solid-ui";
+import { appAlert, Button, FieldActionButton, FloatingSelect, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, Slider, TextInput, Toggle } from "../../../solid-ui";
+import { send } from "../../../ipc/bridge";
 import { useContextualHotkey } from "../../../solid-utils/contextualHotkeys.solid";
 import { createStoreSelector } from "../../../solid-utils/store";
 import {
@@ -44,7 +45,7 @@ import {
   type SynthParameterId,
 } from "../../../state/synthStore";
 import { ANALYZER_BAND_COUNT, useAnalyzerStore, type AnalyzerSnapshot } from "../../../state/analyzerStore";
-import { useAudioFileStore, useInstrumentStore, useProjectStore, useUiStore } from "../../../state/store";
+import { useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore, useUiStore } from "../../../state/store";
 import {
   firstInstrumentTaxonomyIdForCategory,
   INSTRUMENT_TAXONOMY_CATEGORY_OPTIONS,
@@ -1331,15 +1332,47 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   const [fxBus2Open, setFxBus2Open] = createSignal(false);
   const [sampleAssetOpen, setSampleAssetOpen] = createSignal(false);
   const [sampleRouteOpen, setSampleRouteOpen] = createSignal(false);
+  const [importingSfz, setImportingSfz] = createSignal(false);
   const fxBusOptions = createMemo(() => [
     { value: "", label: "Off" },
     ...returnBuses().filter((bus) => !bus.mute).map((bus) => ({ value: bus.id, label: bus.name || bus.id })),
   ]);
   const mappedZones = createMemo(() => draft().metadata.sampleSlot1Zones ?? []);
+  const managedSfz = createMemo(() => draft().metadata.managedSfz);
   const commitMappedZones = (zones: AetherSampleZoneConfig[]) => setDraft({
     ...draft(),
     metadata: { ...draft().metadata, sampleSlot1Zones: zones.slice(0, 8) },
   });
+  const importSfz = async () => {
+    const projectPath = useDocumentStore.getState().currentFilePath;
+    if (!projectPath) {
+      await appAlert("Save this project to a .beat file before importing an SFZ instrument.");
+      return;
+    }
+    setImportingSfz(true);
+    try {
+      const result = await send({ kind: "instrument.importSfz", projectPath });
+      if (result.error) throw new Error(result.error);
+      if (!result.managedSfz) return;
+      setDraft({
+        ...draft(),
+        parameters: {
+          ...draft().parameters,
+          "aether.sample.1.enabled": true,
+          "aether.sample.1.audioFileId": "",
+        },
+        metadata: {
+          ...draft().metadata,
+          sampleSlot1Zones: [],
+          managedSfz: result.managedSfz,
+        },
+      });
+    } catch (error) {
+      await appAlert(error instanceof Error ? error.message : "SFZ import failed.");
+    } finally {
+      setImportingSfz(false);
+    }
+  };
   const baseZone = (): AetherSampleZoneConfig => ({
     audioFileId: String(draft().parameters["aether.sample.1.audioFileId"] ?? ""),
     rootNote: getNumberParam(draft(), "aether.sample.1.rootNote"),
@@ -1483,7 +1516,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             <Toggle
               label="Enabled"
               checked={draft().parameters["aether.sample.1.enabled"] === true}
-              disabled={!String(draft().parameters["aether.sample.1.audioFileId"] ?? "")}
+              disabled={!String(draft().parameters["aether.sample.1.audioFileId"] ?? "") && !managedSfz()}
               onChange={(value) => setBooleanParameter("aether.sample.1.enabled", value)}
             />
             <FloatingSelect
@@ -1500,6 +1533,10 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               onChange={(value) => {
                 setParameter("aether.sample.1.audioFileId", value);
                 setBooleanParameter("aether.sample.1.enabled", Boolean(value));
+                if (value && managedSfz()) setDraft({
+                  ...useSynthStore.getState().draft,
+                  metadata: { ...useSynthStore.getState().draft.metadata, managedSfz: undefined },
+                });
               }}
             />
             <FloatingSelect
@@ -1517,6 +1554,16 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               onOpenChange={setSampleRouteOpen}
               onChange={(value) => setParameter("aether.sample.1.route", value)}
             />
+            <Button size="xs" onClick={() => void importSfz()} disabled={importingSfz()}>
+              {importingSfz() ? "Importing…" : managedSfz() ? `SFZ · ${managedSfz()!.displayName}` : "Import SFZ"}
+            </Button>
+            <Show when={managedSfz()}>
+              <Button size="xs" variant="ghost" onClick={() => setDraft({
+                ...draft(),
+                parameters: { ...draft().parameters, "aether.sample.1.enabled": false },
+                metadata: { ...draft().metadata, managedSfz: undefined },
+              })}>Remove SFZ</Button>
+            </Show>
           </div>
           <div class={styles.knobCluster}>
             <NumberInput

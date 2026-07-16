@@ -17,6 +17,7 @@
 #include "Realtime/VoiceNoteAutomation.h"
 #include "Realtime/VoiceNoteAutomationState.h"
 #include "Sources/MappedSampleSourceSlot.h"
+#include "Sources/SfzSourceSlot.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
 #include "Wavetable/WavetableUnisonPlan.h"
@@ -140,6 +141,7 @@ namespace beat
             {
                 bool enabled { false };
                 std::shared_ptr<const ImmutableMappedSampleSource> source;
+                std::shared_ptr<const SfzDecodedInstrument> sfzSource;
                 int routing { 0 };
                 std::array<float, 2> fxSends {};
             };
@@ -406,6 +408,7 @@ namespace beat
         WavetableUnisonPlan aetherUnisonPlanB;
         AetherTableStackRenderer::InteractionState aetherInteractionState;
         MappedSampleSourceSlot aetherSampleSlot1;
+        SfzSourceSlot aetherSfzSlot1;
         VoiceAetherCache::PanGains cachedPanGains;
         VoiceAetherCache::PitchRates cachedPitchRates;
         DynamicModulation::TargetActivityFlags cachedDynamicTargets;

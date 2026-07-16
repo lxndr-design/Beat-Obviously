@@ -8,6 +8,7 @@
 #include "../Audio/Rendering/TrackBouncePlanner.h"
 #include "../Audio/Sampler/DecentSamplerImporter.h"
 #include "../Persistence/AudioFileLibraryActions.h"
+#include "../Persistence/ManagedSfzAsset.h"
 #include "../Persistence/ProjectAssetPackage.h"
 #include "../Persistence/ProjectDocumentBackup.h"
 #include "../Persistence/ProjectIntegrityVerifier.h"
@@ -25,6 +26,7 @@ namespace beat
     {
         constexpr const char* audioImportWildcard = "*.wav;*.aif;*.aiff;*.mp3;*.flac;*.ogg;*.m4a";
         constexpr const char* decentImportWildcard = "*.dspreset;*.zip";
+        constexpr const char* sfzImportWildcard = "*.sfz";
 
         void setFiniteProperty(juce::DynamicObject& object, const juce::Identifier& name, double value)
         {
@@ -2220,7 +2222,7 @@ namespace beat
                         if (sampleSlot1.isObject())
                         {
                             const int slotSchemaVersion = juce::jmax(0, (int) sampleSlot1.getProperty("schemaVersion", 0));
-                            instrument.aether.sampleSlot1.schemaVersion = 4;
+                            instrument.aether.sampleSlot1.schemaVersion = 5;
                             const bool requestedSlotEnabled = (bool) sampleSlot1.getProperty("enabled", false);
                             instrument.aether.sampleSlot1.enabled = requestedSlotEnabled;
                             instrument.aether.sampleSlot1.audioFileId = sampleSlot1.getProperty("audioFileId", "").toString();
@@ -2277,10 +2279,24 @@ namespace beat
                                     if (zone.audioFileId.isNotEmpty()) instrument.aether.sampleSlot1.zones.push_back(std::move(zone));
                                 }
                             }
+                            const auto managedSfz = sampleSlot1.getProperty("managedSfz", {});
+                            if (managedSfz.isObject()
+                                && (int) managedSfz.getProperty("schemaVersion", 0) <= 1)
+                            {
+                                instrument.aether.sampleSlot1.managedSfz.assetId = managedSfz.getProperty("assetId", {}).toString();
+                                instrument.aether.sampleSlot1.managedSfz.displayName = managedSfz.getProperty("displayName", {}).toString();
+                                instrument.aether.sampleSlot1.managedSfz.manifestPath = managedSfz.getProperty("manifestPath", {}).toString();
+                                instrument.aether.sampleSlot1.managedSfz.sourcePath = managedSfz.getProperty("sourcePath", {}).toString();
+                                if (const auto* paths = managedSfz.getProperty("samplePaths", {}).getArray())
+                                    for (const auto& path : *paths)
+                                        if (path.toString().isNotEmpty())
+                                            instrument.aether.sampleSlot1.managedSfz.samplePaths.push_back(path.toString());
+                            }
                             instrument.aether.sampleSlot1.enabled = requestedSlotEnabled
-                                && slotSchemaVersion <= 4
+                                && slotSchemaVersion <= 5
                                 && (instrument.aether.sampleSlot1.audioFileId.isNotEmpty()
-                                    || !instrument.aether.sampleSlot1.zones.empty());
+                                    || !instrument.aether.sampleSlot1.zones.empty()
+                                    || instrument.aether.sampleSlot1.managedSfz.manifestPath.isNotEmpty());
                         }
                         instrument.aether.fxBusIds[0] = aether.getProperty("fxBus1Id", "").toString();
                         instrument.aether.fxBusIds[1] = aether.getProperty("fxBus2Id", "").toString();
@@ -3901,6 +3917,62 @@ namespace beat
             auto presetFile = resolveDecentSamplerPreset(chooser.getResult(), importRoot);
             auto preset = presetFile.existsAsFile() ? parseDecentSamplerPreset(presetFile) : std::nullopt;
             response->setProperty("preset", preset ? makeDecentSamplerImport(database, *preset) : juce::var());
+            return juce::var(response.get());
+        }
+
+        if (kind == INSTRUMENT_IMPORT_SFZ)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto projectPath = payload.getProperty("projectPath", {}).toString();
+            if (projectPath.isEmpty())
+            {
+                response->setProperty("error", "Save the project to a .beat file before importing an SFZ instrument.");
+                return juce::var(response.get());
+            }
+
+            auto pathHint = payload.getProperty("pathHint", {}).toString();
+            juce::File selected;
+            if (pathHint.isNotEmpty() && juce::File(pathHint).existsAsFile())
+                selected = juce::File(pathHint);
+            else
+            {
+                const auto start = pathHint.isNotEmpty() ? juce::File(pathHint) : juce::File();
+                juce::FileChooser chooser("Import SFZ into Aether Sample Slot 1", start, sfzImportWildcard, true);
+                if (!chooser.browseForFileToOpen())
+                    return juce::var(response.get());
+                selected = chooser.getResult();
+            }
+
+            const auto imported = importManagedSfzAsset(selected, juce::File(projectPath));
+            if (!imported.ok())
+            {
+                response->setProperty("error", imported.error);
+                juce::Array<juce::var> diagnostics;
+                for (const auto& diagnostic : imported.diagnostics)
+                {
+                    juce::DynamicObject::Ptr item = new juce::DynamicObject();
+                    item->setProperty("severity", diagnostic.severity == SfzDiagnosticSeverity::error ? "error" : "warning");
+                    item->setProperty("code", diagnostic.code);
+                    item->setProperty("message", diagnostic.message);
+                    item->setProperty("line", diagnostic.line);
+                    item->setProperty("column", diagnostic.column);
+                    diagnostics.add(juce::var(item.get()));
+                }
+                response->setProperty("diagnostics", diagnostics);
+                return juce::var(response.get());
+            }
+
+            juce::DynamicObject::Ptr managed = new juce::DynamicObject();
+            managed->setProperty("schemaVersion", 1);
+            managed->setProperty("assetId", imported.assetId);
+            managed->setProperty("displayName", imported.displayName);
+            managed->setProperty("manifestPath", resolveProjectRelativePath(juce::File(projectPath), imported.manifestPath));
+            managed->setProperty("sourcePath", resolveProjectRelativePath(juce::File(projectPath), imported.sourcePath));
+            juce::Array<juce::var> samplePaths;
+            for (const auto& sample : imported.sampleFiles)
+                samplePaths.add(resolveProjectRelativePath(juce::File(projectPath), sample.path));
+            managed->setProperty("samplePaths", samplePaths);
+            response->setProperty("managedSfz", juce::var(managed.get()));
             return juce::var(response.get());
         }
 
