@@ -1079,7 +1079,8 @@ test/control thread
   SpectralSourceSlot::prepare()
     -> FFT/window already constructed
     -> build fixed Kaiser phase table
-  SpectralSourceSlot::publish() while inactive
+  SpectralSourceSlot::publish() -> one of three reader-free ownership banks
+  SpectralSourceSlot::takeRetiredSource() -> control-side destruction boundary
 
 instrumented test callback only
   noteOn() -> admit one of four fixed Voice records
@@ -1094,6 +1095,9 @@ instrumented test callback only
       -> generateCanonicalHop() into fixed rings
     -> renderLaneSample() fixed 48 kHz bypass or fixed polyphase conversion
     -> when ready, 5 ms equal-power old/new position-lane crossfade
+    -> applyReplacementRequests() prioritizes the newest immutable source
+      -> incoming lane pins its source bank and pre-rolls
+      -> same 5 ms fade; outgoing lane releases its bank after completion
     -> fixed mid/side, pan, level, release, and atomic/preallocated counters
 
 AudioEngine / InstrumentVoice / SourceSlotRack / offline engine / IPC
@@ -1105,5 +1109,7 @@ destruction, file/stream operation, lock, lazy initialization, or container
 growth. The extended matrix records zero detector violations and zero synthesis
 underflows. Position requests received during pre-roll replace the pending
 target; requests received during an audible fade become the sole subsequent
-target. Active replacement still does not exist and is not implied by this call
-graph.
+target. Replacement uses three fixed ownership banks for outgoing, incoming,
+and one latest waiting publication. A position still in pre-roll is superseded
+by replacement and applies to the final source afterward. Bank ownership is
+never destroyed in render.

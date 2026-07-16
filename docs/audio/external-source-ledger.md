@@ -388,3 +388,10 @@ test-generated position fixtures. The four-voice/two-lane pool is allocated
 once during slot construction, before callback use; it never grows. No new
 external source, dependency, coefficient table, asset, preset, service, or
 provenance classification is introduced.
+
+The active-replacement extension adds Beat-owned three-bank immutable
+ownership, fixed reader counters, lane source pinning, deterministic
+replacement/position arbitration, and control-side retirement handoff. It
+reuses the measured 5 ms equal-power transition and introduces no external
+implementation, dependency, asset, preset, binary, coefficient source, service,
+or derived code.

@@ -60,6 +60,11 @@ namespace beat
         uint64_t positionTransitionsStarted { 0 };
         uint64_t positionTransitionsCompleted { 0 };
         uint64_t positionRequestsSuperseded { 0 };
+        uint64_t replacementRequestsAccepted { 0 };
+        uint64_t replacementRequestsRejected { 0 };
+        uint64_t replacementTransitionsStarted { 0 };
+        uint64_t replacementTransitionsCompleted { 0 };
+        uint64_t retiredPublications { 0 };
     };
 
     class SpectralSourceSlot final : public SourceSlot
@@ -76,6 +81,7 @@ namespace beat
         SpectralSourceSlot();
         bool prepare(const SourcePrepareSpec&) noexcept override;
         bool publish(std::shared_ptr<const PreparedSpectralSource>) noexcept;
+        std::shared_ptr<const PreparedSpectralSource> takeRetiredSource() noexcept;
         bool requestPosition(float normalizedPosition) noexcept;
         void reset() noexcept override;
         bool noteOn(const SourceNoteEvent&) noexcept override;
@@ -110,6 +116,8 @@ namespace beat
             std::array<float, canonicalRingSize> canonicalL {};
             std::array<float, canonicalRingSize> canonicalR {};
             std::array<float, SpectralArtifact::fftSize * 2> fftData {};
+            uint8_t sourceBank { 0 };
+            const PreparedSpectralSource* pinnedSource { nullptr };
         };
 
         struct Voice
@@ -126,6 +134,7 @@ namespace beat
             uint8_t incomingLane { 1 };
             bool incomingPreparing { false };
             bool positionCrossfading { false };
+            bool replacementCrossfading { false };
             int positionCrossfadeSample { 0 };
             uint64_t appliedPositionSerial { 0 };
             uint64_t incomingPositionSerial { 0 };
@@ -133,14 +142,25 @@ namespace beat
 
         void rebuildResampler() noexcept;
         void applyPositionRequests() noexcept;
+        void applyReplacementRequests() noexcept;
         void beginPositionPreparation(Voice&, float position, uint64_t serial) noexcept;
+        void beginReplacementPreparation(Voice&, uint8_t sourceBank) noexcept;
+        void stopLane(RenderLane&) noexcept;
+        bool acquirePublishedSource(uint8_t& bank, const PreparedSpectralSource*& source) noexcept;
+        void releaseSource(uint8_t bank) noexcept;
+        void retireBank(uint8_t bank) noexcept;
         void synthesizeHop(Voice&, RenderLane&) noexcept;
         void generateCanonicalHop(Voice&, RenderLane&) noexcept;
         void scheduleSynthesis(int hostSamples) noexcept;
         float readCanonical(const RenderLane&, int channel, int64_t index) const noexcept;
         std::array<float, 2> renderLaneSample(RenderLane&) noexcept;
         SourcePrepareSpec prepared;
-        std::shared_ptr<const PreparedSpectralSource> source;
+        static constexpr int sourceBankCount = 3;
+        std::array<std::shared_ptr<const PreparedSpectralSource>, sourceBankCount> sourceOwners {};
+        std::array<std::atomic<const PreparedSpectralSource*>, sourceBankCount> sourcePointers {};
+        std::array<std::atomic<uint32_t>, sourceBankCount> sourceReaders {};
+        std::atomic<uint8_t> publishedSourceBank { 0 };
+        std::shared_ptr<const PreparedSpectralSource> retiredSource;
         juce::dsp::FFT inverseFft { 10 };
         std::array<float, SpectralArtifact::fftSize> window {};
         std::array<float, sincTaps * sincPhases> sincTable {};

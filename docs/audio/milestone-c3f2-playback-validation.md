@@ -7,9 +7,9 @@ Date: 2026-07-16
 
 Branch: `codex/aether-c3f2-playback`
 
-Status: **disconnected fixed-capacity playback and active-position transition
-gates pass; replacement/alignment remain open, so C3F2 is not yet closed and
-C3F3 is not authorized by this report**
+Status: **disconnected fixed-capacity playback, active-position, and active
+source-replacement gates pass; alignment remains open, so C3F2 is not yet
+closed and C3F3 is not authorized by this report**
 
 ## Implemented boundary
 
@@ -32,7 +32,7 @@ change.
 The canonical 48 kHz timeline feeds a fixed 2048-phase, maximum-96-tap Kaiser
 converter with beta 10.5 and linear coefficient-phase interpolation. Exact
 48 kHz bypasses the converter. Active taps are 96 at 44.1 kHz, 53 at 88.2 kHz,
-and 48 at 96/192 kHz. A 1024-canonical-sample scheduling pre-roll distributes
+48 at 96 kHz, and 16 at 192 kHz. A 1024-canonical-sample scheduling pre-roll distributes
 indivisible inverse transforms across small callbacks. Underflow is explicit
 telemetry and measured zero.
 
@@ -40,8 +40,8 @@ telemetry and measured zero.
 
 - Pitch: the stationary reference measures 440.00 Hz; plus 12 semitones
   measures 880.00 Hz with the 0.25 Hz test estimator.
-- Resampling: 10 kHz passband delta at 192 kHz is `+0.00000467 dB`; worst
-  measured 192 kHz image is `-129.147 dB`; a 23 kHz input downsampled to
+- Resampling: 10 kHz passband delta at 192 kHz is `+0.00001405 dB`; worst
+  measured 192 kHz image is `-116.734 dB`; a 23 kHz input downsampled to
   44.1 kHz produces a 21.1 kHz alias at `-112.636 dB` relative to the 48 kHz
   reference.
 - Nyquist: pitching the 15 kHz fixture up one octave at 48 kHz is discarded at
@@ -57,26 +57,37 @@ telemetry and measured zero.
   while a request during an audible fade becomes the sole next target. Output
   is exactly equal at block sizes 64 and 257, maximum adjacent-sample change is
   `0.0218091`, and an active 48-to-96 kHz change preserves/completes the fade.
-- Reported latency is 1691, 1792, 3341, 3631, and 7262 host samples at
+- Active replacement: three fixed ownership banks allow an immutable source to
+  remain pinned by the outgoing lane, a replacement to render in the incoming
+  lane, and one latest source to wait during the fade. Replacement supersedes a
+  position still in pre-roll; a position request remains pending and applies to
+  the final source afterward. Two replacements plus the deferred position are
+  exactly equal at block sizes 64 and 257, maximum adjacent-sample change is
+  `0.0126168`; waveform, level, pan, and stereo-width changes share the same
+  fade. Retired ownership is returned only through the control-side
+  `takeRetiredSource()` boundary.
+- Reported latency is 1691, 1792, 3341, 3631, and 7198 host samples at
   44.1, 48, 88.2, 96, and 192 kHz respectively. It includes scheduling
   pre-roll, WOLA alignment, and converter group delay.
 - Capacity: four voices are accepted and the fifth is deterministically
-  rejected. Active publication and invalid prepared data are rejected.
+  rejected. Active publication is accepted while a reader-free ownership bank
+  remains; a fourth publication during the pressured two-replacement fixture is
+  rejected when all three banks are occupied. Invalid prepared data is rejected.
 - Realtime safety: allocation, blocking lock, file/stream, lazy-init, and
   container-growth violations are all zero around pressured note/render work.
 
 The opt-in extended matrix covers five rates, blocks 16/32/64/128/256/512/1024
-and irregular 257, zero through four frozen voices, three position requests per
-nonzero-voice cell, and 1000 measured callbacks per cell. The final run reports
-worst `P99.9(U)=0.330492` and `max(U)=0.414492`, below the provisional 0.50/0.80
+and irregular 257, zero through four frozen voices, active replacement plus
+three position requests per nonzero-voice cell, and 1000 measured callbacks per
+cell. The final run reports worst `P99.9(U)=0.276000` and `max(U)=0.385254`, below the provisional 0.50/0.80
 gates, with zero detector violations and zero synthesis underflows. These are
 single-machine development measurements, not a whole-engine budget claim.
 
 ## Repository gates and freeze
 
 - Focused playback and the extended matrix pass.
-- The complete source-matched native suite passes in 13.25 seconds wall /
-  11.59 seconds user / 1.02 seconds system with only the existing narrowly
+- The complete source-matched native suite passes in 12.89 seconds wall /
+  11.46 seconds user / 0.86 seconds system with only the existing narrowly
   scoped `baseline.recent-project-exists` macOS TCC waiver.
 - Full `verify:non-native` passes, including the two factory benchmark render
   freezes and the production frontend build.
@@ -86,15 +97,16 @@ single-machine development measurements, not a whole-engine budget claim.
 - The final disconnected baseline contains 150 WAVs and retains normalized
   manifest `713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`.
   Its latest timing-bearing JSON SHA-256 is
-  `bf1fcd9fadccaf9126df19789a6ce800386bb36377e4c3b382080badd2c9ca75`;
-  render times were 12.80–15.77 ms (13.64 ms mean), reported peak RSS was
-  15,171,584 bytes, deadlines were zero,
+  `a3c8efcac3aa3453d47de861061d3de5c7f3ae93023dcf4e39d95c53a63c6cc8`;
+  render times were 12.81–15.74 ms (13.45 ms mean), reported peak RSS was
+  14,925,824 bytes, deadlines were zero,
   and unchanged queue telemetry of 64 accepted / 16 rejected / 16 overflow.
 
 ## Remaining gate
 
-The active-position transition contract is now implemented and measured.
-Replacement at every overlap phase, sample-offset note-event alignment, product
+The active-position and active-source-replacement contracts are now implemented
+and measured. Replacement-at-every-overlap-phase coverage, sample-offset
+note-event alignment, product
 latency compensation, managed artifact import, and product live/offline
 integration remain open. No baseline is updated to hide those omissions. The
 next implementation work may remain on the disconnected engine, but C3F2 must
