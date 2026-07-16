@@ -1376,6 +1376,8 @@ try {
       && synthEditorSource.includes('aria-describedby="aether-spectral-slot-3-source-status"')
       && synthEditorSource.includes('id="aether.spectral.3.fxSend1"')
       && synthEditorSource.includes('id="aether.spectral.3.fxSend2"')
+      && synthEditorSource.includes('"aether.spectral.3.builtinSource": "benchmark"')
+      && synthEditorSource.includes('>Use Benchmark</Button>')
       && synthEditorSource.includes('aria-busy={importingSfz()}')
       && synthEditorSource.includes('aria-busy={importingGranular()}')
       && synthEditorSource.includes('aria-busy={importingSpectral()}')

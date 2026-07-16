@@ -282,6 +282,7 @@ namespace beat
 
             int schemaVersion { 1 };
             bool enabled { false };
+            juce::String builtinSource;
             int rootNote { 60 };
             float level { 0.7f };
             float pan { 0.0f };

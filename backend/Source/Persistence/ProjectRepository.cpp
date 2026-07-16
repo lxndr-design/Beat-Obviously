@@ -446,6 +446,7 @@ namespace beat
             juce::DynamicObject::Ptr spectralSlot3 = new juce::DynamicObject();
             spectralSlot3->setProperty("schemaVersion", aether.spectralSlot3.schemaVersion);
             spectralSlot3->setProperty("enabled", aether.spectralSlot3.enabled);
+            spectralSlot3->setProperty("builtinSource", aether.spectralSlot3.builtinSource);
             spectralSlot3->setProperty("rootNote", aether.spectralSlot3.rootNote);
             spectralSlot3->setProperty("level", aether.spectralSlot3.level);
             spectralSlot3->setProperty("pan", aether.spectralSlot3.pan);
@@ -633,6 +634,8 @@ namespace beat
                 auto& slot = config.spectralSlot3;
                 slot.schemaVersion = 1;
                 const bool requestedEnabled = (bool) spectralSlot3.getProperty("enabled", false);
+                slot.builtinSource = spectralSlot3.getProperty("builtinSource", {}).toString();
+                if (slot.builtinSource != "benchmark") slot.builtinSource.clear();
                 slot.rootNote = juce::jlimit(0, 127,
                     (int) spectralSlot3.getProperty("rootNote", 60));
                 slot.level = juce::jlimit(0.0f, 1.0f,
@@ -662,7 +665,8 @@ namespace beat
                     slot.managedAsset.artifactPath = managed.getProperty("artifactPath", {}).toString();
                 }
                 slot.enabled = requestedEnabled && sourceSchemaVersion <= slot.schemaVersion
-                    && slot.managedAsset.manifestPath.isNotEmpty();
+                    && (slot.builtinSource.isNotEmpty()
+                        || slot.managedAsset.manifestPath.isNotEmpty());
             }
             config.fxBusIds[0] = aetherVar.getProperty("fxBus1Id", config.fxBusIds[0]).toString();
             config.fxBusIds[1] = aetherVar.getProperty("fxBus2Id", config.fxBusIds[1]).toString();

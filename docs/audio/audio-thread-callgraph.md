@@ -1213,3 +1213,28 @@ No allocation, resizing, destruction, lock, file/stream operation, validation,
 or latency recomputation occurs in the callback. Rejected or missing managed
 sources leave the internal delay disabled and report zero spectral route
 latency.
+
+## C3F3F built-in benchmark edge
+
+```text
+factory preset / editor (message thread)
+  -> spectralSlot3.builtinSource = "benchmark"
+  -> native IPC or SynthPatchContract validates the stable ID
+
+project/control rebuild, first use only
+  -> sharedSpectralBenchmarkArtifact()
+    -> generate deterministic Beat-owned 48 kHz stereo PCM
+    -> SpectralAnalyzer::analyze()
+    -> validate artifact-v2 and publish immutable cached ownership
+  -> prepareSpectralSource() with persisted controls
+
+subsequent rebuilds
+  -> reuse immutable cached artifact
+
+audio callback
+  -> unchanged C3F3C renderer + C3F3E alignment path
+```
+
+Generation, analysis, allocation, cache initialization, and validation remain
+outside the callback. The warmed product callback probe reports zero realtime
+safety violations and zero deadline overruns.

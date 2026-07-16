@@ -220,6 +220,11 @@ namespace beat
             }
             validateVersion(slot, spectralSlot3SchemaVersion,
                 "aether.spectral-slot-3", slotPath, diagnostics);
+            const auto builtin = slot.getProperty("builtinSource", {}).toString();
+            if (builtin.isNotEmpty() && builtin != "benchmark")
+                add(diagnostics, "aether.spectral-slot-3.builtin-unsupported",
+                    slotPath + ".builtinSource",
+                    "builtinSource is not supported by this version.");
             const auto managed = slot.getProperty("managedAsset", {});
             if (hasProperty(slot, "managedAsset"))
             {
@@ -245,10 +250,11 @@ namespace beat
                 }
             }
             if ((bool) slot.getProperty("enabled", false)
+                && builtin.isEmpty()
                 && (!managed.isObject()
                     || managed.getProperty("manifestPath", {}).toString().isEmpty()))
                 add(diagnostics, "aether.spectral-slot-3.source-missing", slotPath,
-                    "Enabled spectralSlot3 has no managed source.");
+                    "Enabled spectralSlot3 has no built-in or managed source.");
         }
     }
 

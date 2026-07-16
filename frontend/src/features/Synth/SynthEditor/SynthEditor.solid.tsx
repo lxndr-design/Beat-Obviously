@@ -1353,7 +1353,8 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   const managedSpectral = createMemo(() => draft().metadata.managedSpectral);
   const sampleSourceAvailable = createMemo(() => Boolean(String(draft().parameters["aether.sample.1.audioFileId"] ?? "") || managedSfz()));
   const granularSourceAvailable = createMemo(() => Boolean(managedGranular() || draft().parameters["aether.granular.2.builtinSource"] === "benchmark"));
-  const spectralSourceAvailable = createMemo(() => Boolean(managedSpectral()));
+  const spectralSourceAvailable = createMemo(() => Boolean(
+    managedSpectral() || draft().parameters["aether.spectral.3.builtinSource"] === "benchmark"));
   const sampleSourceDescription = createMemo(() => managedSfz()
     ? `Managed SFZ source: ${managedSfz()!.displayName}.`
     : String(draft().parameters["aether.sample.1.audioFileId"] ?? "")
@@ -1366,7 +1367,9 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
       : "No source selected. Import audio or choose the benchmark source before enabling this slot.");
   const spectralSourceDescription = createMemo(() => managedSpectral()
     ? `Managed spectral source: ${managedSpectral()!.displayName}. Analysis and validation complete.`
-    : "No source selected. Import bounded mono or stereo 48 kHz audio before enabling this slot.");
+    : draft().parameters["aether.spectral.3.builtinSource"] === "benchmark"
+      ? "Built-in Beat spectral benchmark selected. Analysis and validation complete."
+      : "No source selected. Import bounded mono or stereo 48 kHz audio or choose the benchmark before enabling this slot.");
   const commitMappedZones = (zones: AetherSampleZoneConfig[]) => setDraft({
     ...draft(),
     metadata: { ...draft().metadata, sampleSlot1Zones: zones.slice(0, 8) },
@@ -1446,7 +1449,11 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
       if (!result.managedSpectral) return;
       setDraft({
         ...draft(),
-        parameters: { ...draft().parameters, "aether.spectral.3.enabled": true },
+        parameters: {
+          ...draft().parameters,
+          "aether.spectral.3.enabled": true,
+          "aether.spectral.3.builtinSource": "",
+        },
         metadata: { ...draft().metadata, managedSpectral: result.managedSpectral },
       });
       queueMicrotask(() => spectralSourceStatus?.focus());
@@ -1849,11 +1856,29 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             >
               {importingSpectral() ? "Analyzing…" : managedSpectral() ? `Audio · ${managedSpectral()!.displayName}` : "Import 48 kHz Audio"}
             </Button>
-            <Show when={managedSpectral()}>
+            <Button
+              size="xs"
+              variant="ghost"
+              aria-pressed={draft().parameters["aether.spectral.3.builtinSource"] === "benchmark"}
+              onClick={() => setDraft({
+                ...draft(),
+                parameters: {
+                  ...draft().parameters,
+                  "aether.spectral.3.enabled": true,
+                  "aether.spectral.3.builtinSource": "benchmark",
+                },
+                metadata: { ...draft().metadata, managedSpectral: undefined },
+              })}
+            >Use Benchmark</Button>
+            <Show when={spectralSourceAvailable()}>
               <Button size="xs" variant="ghost" aria-label="Remove Spectral Slot 3 source" onClick={() => {
                 setDraft({
                   ...draft(),
-                  parameters: { ...draft().parameters, "aether.spectral.3.enabled": false },
+                  parameters: {
+                    ...draft().parameters,
+                    "aether.spectral.3.enabled": false,
+                    "aether.spectral.3.builtinSource": "",
+                  },
                   metadata: { ...draft().metadata, managedSpectral: undefined },
                 });
                 queueMicrotask(() => spectralImportButton?.focus());

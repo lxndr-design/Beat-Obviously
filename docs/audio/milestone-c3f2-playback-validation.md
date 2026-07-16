@@ -140,3 +140,17 @@ mean absolute difference `6.846e-11`.
 This addendum closes product latency/parity only. C3F3 still requires the
 audible factory spectral benchmark and final closeout matrix; Slot 3 and
 Milestone C remain incomplete.
+
+## C3F3F final product addendum — 2026-07-16
+
+The remaining product benchmark and closeout gates now pass. A deterministic
+Beat-owned generated source is factory-discoverable as `Benchmark - Spectral
+Motion`, roundtrips through repository/native/frontend contracts, and renders
+repeat-exact audible hashes at 44.1/48/96 kHz. The warmed product callback has
+zero realtime-safety violations and deadline overruns. Full native/non-native
+and frozen-matrix gates remain green with only the established TCC waiver.
+
+This supersedes the prior remaining-gate statements: C3F3 and the bounded Slot
+3 product foundation are complete. It does not expand the representation,
+48 MiB artifact cap, pitch range, fixed voice capacity, or documented product
+scope.

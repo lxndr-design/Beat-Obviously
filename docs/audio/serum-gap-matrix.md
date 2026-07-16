@@ -172,3 +172,21 @@ the default-disconnected 150-WAV manifest remains
 `713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`.
 The audible factory spectral benchmark and final C3F3 closeout matrix remain
 open, so Slot 3 and Milestone C are not yet complete.
+
+## Milestone C3F3F closeout — 2026-07-16
+
+`Benchmark - Spectral Motion` supplies a Beat-owned, locally generated,
+control-thread-analyzed factory source with repository/native/frontend
+roundtrip and accessible selection/removal. Product renders at 44.1/48/96 kHz
+are repeat-exact, finite, audible, low-DC, continuous, and pinned to explicit
+hashes. A warmed engine callback has zero safety violations and deadline
+overruns. The missing native IPC and synth-patch Slot 3 conversion edges found
+during closeout are corrected and covered.
+
+C3F3 and the bounded Spectral Slot 3 product foundation are complete. Sample
+Slot 1, Granular Slot 2, and Spectral Slot 3 therefore close the planned
+Milestone C hybrid-source foundation. This remains a bounded foundation, not a
+claim of general spectral editing/streaming, unbounded spectral polyphony,
+general SFZ compatibility, or completion of later roadmap work. All full gates
+pass with only the existing TCC waiver, and the frozen 150-WAV manifest remains
+`713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`.

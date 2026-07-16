@@ -6,6 +6,7 @@
 #include "Realtime/VoiceAutomationInbox.h"
 #include "VoiceAllocation.h"
 #include "Modulation/Lfo.h"
+#include "Spectral/SpectralBenchmarkSource.h"
 #include "../Persistence/ManagedSfzAsset.h"
 
 #include <algorithm>
@@ -2568,14 +2569,20 @@ namespace beat
                     }
                 }
                 const auto& spectral = routeInstrument->aether.spectralSlot3;
-                if (routeInstrument->hasAether && spectral.enabled
-                    && spectral.managedAsset.manifestPath.isNotEmpty())
+                if (routeInstrument->hasAether && spectral.enabled)
                 {
-                    const auto loaded = loadManagedSpectralAsset(
-                        juce::File(spectral.managedAsset.manifestPath));
-                    if (loaded.ok())
+                    std::shared_ptr<const SpectralArtifact> artifact;
+                    if (spectral.builtinSource == "benchmark")
+                        artifact = sharedSpectralBenchmarkArtifact();
+                    else if (spectral.managedAsset.manifestPath.isNotEmpty())
                     {
-                        auto preparedSpectral = prepareSpectralSource(loaded.artifact,
+                        const auto loaded = loadManagedSpectralAsset(
+                            juce::File(spectral.managedAsset.manifestPath));
+                        if (loaded.ok()) artifact = loaded.artifact;
+                    }
+                    if (artifact)
+                    {
+                        auto preparedSpectral = prepareSpectralSource(std::move(artifact),
                             spectral.rootNote, spectral.level, spectral.pan,
                             spectral.stereoWidth, spectral.position,
                             spectral.pitchSemitones, spectral.freeze);
@@ -2608,7 +2615,8 @@ namespace beat
                         + juce::String(granular.fxSends[1], 6);
                 if (spectral.enabled)
                     route.aetherSampleSlot1Identity += "|spectral:"
-                        + spectral.managedAsset.assetId + ":" + juce::String(spectral.rootNote) + ":"
+                        + spectral.builtinSource + ":" + spectral.managedAsset.assetId + ":"
+                        + juce::String(spectral.rootNote) + ":"
                         + juce::String(spectral.level, 6) + ":" + juce::String(spectral.pan, 6) + ":"
                         + juce::String(spectral.stereoWidth, 6) + ":" + juce::String(spectral.position, 6) + ":"
                         + juce::String(spectral.pitchSemitones, 3) + ":" + juce::String((int) spectral.freeze) + ":"

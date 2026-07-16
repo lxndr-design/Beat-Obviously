@@ -160,6 +160,7 @@ export type SynthParameterId =
   | "aether.granular.2.fxSend1"
   | "aether.granular.2.fxSend2"
   | "aether.spectral.3.enabled"
+  | "aether.spectral.3.builtinSource"
   | "aether.spectral.3.rootNote"
   | "aether.spectral.3.level"
   | "aether.spectral.3.pan"
@@ -1311,6 +1312,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "aether.granular.2.fxSend1": 0,
   "aether.granular.2.fxSend2": 0,
   "aether.spectral.3.enabled": false,
+  "aether.spectral.3.builtinSource": "",
   "aether.spectral.3.rootNote": 60,
   "aether.spectral.3.level": 0.7,
   "aether.spectral.3.pan": 0,
@@ -1497,6 +1499,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "aether.granular.2.fxSend1": "Granular Slot 2 FX Send 1",
   "aether.granular.2.fxSend2": "Granular Slot 2 FX Send 2",
   "aether.spectral.3.enabled": "Spectral Slot 3 Enabled",
+  "aether.spectral.3.builtinSource": "Spectral Slot 3 Built-in Source",
   "aether.spectral.3.rootNote": "Spectral Slot 3 Root Note",
   "aether.spectral.3.level": "Spectral Slot 3 Level",
   "aether.spectral.3.pan": "Spectral Slot 3 Pan",
@@ -2253,7 +2256,10 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
       spectralSlot3: {
         schemaVersion: 1,
         enabled: getBooleanParam(draft, "aether.spectral.3.enabled")
-          && Boolean(draft.metadata.managedSpectral?.manifestPath),
+          && (getStringParam(draft, "aether.spectral.3.builtinSource") === "benchmark"
+            || Boolean(draft.metadata.managedSpectral?.manifestPath)),
+        ...(getStringParam(draft, "aether.spectral.3.builtinSource") === "benchmark"
+          ? { builtinSource: "benchmark" as const } : {}),
         rootNote: Math.max(0, Math.min(127, Math.round(getNumberParam(draft, "aether.spectral.3.rootNote")))),
         level: clamp01(getNumberParam(draft, "aether.spectral.3.level")),
         pan: clampBipolar(getNumberParam(draft, "aether.spectral.3.pan")),
@@ -2551,6 +2557,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["aether.granular.2.fxSend2"] = instrument.aether?.granularSlot2?.fxSends?.[1] ?? 0;
   draft.metadata.managedGranular = normalizeManagedGranular(instrument.aether?.granularSlot2?.managedAsset);
   draft.parameters["aether.spectral.3.enabled"] = instrument.aether?.spectralSlot3?.enabled ?? false;
+  draft.parameters["aether.spectral.3.builtinSource"] = instrument.aether?.spectralSlot3?.builtinSource ?? "";
   draft.parameters["aether.spectral.3.rootNote"] = instrument.aether?.spectralSlot3?.rootNote ?? 60;
   draft.parameters["aether.spectral.3.level"] = instrument.aether?.spectralSlot3?.level ?? 0.7;
   draft.parameters["aether.spectral.3.pan"] = instrument.aether?.spectralSlot3?.pan ?? 0;
@@ -3264,6 +3271,43 @@ function createFactorySynthPresetsFromGuide(): SynthFactoryPresetRecord[] {
     family: "Granular",
     role: "texture benchmark",
     auditionNote: "Hold a low chord to review grain density, position spread, stereo motion, and release tails.",
+  });
+  const spectral = normalizeSynthDraftPatch({
+    name: "Benchmark - Spectral Motion",
+    parameters: {
+      "osc.a.wavetable": "basic.sine",
+      "osc.a.level": 0.08,
+      "osc.b.enabled": false,
+      "aether.sub.enabled": false,
+      "aether.noise.enabled": false,
+      "aether.spectral.3.enabled": true,
+      "aether.spectral.3.builtinSource": "benchmark",
+      "aether.spectral.3.rootNote": 45,
+      "aether.spectral.3.level": 0.74,
+      "aether.spectral.3.pan": 0,
+      "aether.spectral.3.stereoWidth": 1.3,
+      "aether.spectral.3.position": 0.38,
+      "aether.spectral.3.pitchSemitones": 0,
+      "aether.spectral.3.freeze": false,
+      "aether.spectral.3.route": "direct",
+      "env.1.attack": 0.02,
+      "env.1.decay": 0.5,
+      "env.1.sustain": 0.9,
+      "env.1.release": 1.4,
+    },
+    modulation: [],
+    metadata: { createdBy: "Beat", tags: ["factory", "benchmark", "spectral", "motion"] },
+  } as unknown as Partial<SynthDraftPatch>);
+  presets.push({
+    id: "factory.benchmark-spectral-motion",
+    name: spectral.name,
+    patch: spectral,
+    tags: ["factory", "benchmark", "spectral", "motion"],
+    category: "Texture",
+    description: "Deterministic Beat-owned spectral benchmark generated locally from a bounded canonical source.",
+    family: "Spectral",
+    role: "spectral motion benchmark",
+    auditionNote: "Hold a low chord to review spectral motion, stereo coherence, pitch tracking, and the fixed-latency onset.",
   });
   return presets;
 }

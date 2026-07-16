@@ -442,3 +442,12 @@ audit updates are independently implemented Beat-owned work. They use existing
 Beat/JUCE primitives and introduce no upstream source, copied or adapted code,
 runtime dependency, external asset, preset, binary, service, branding,
 coefficient data, or derived implementation.
+
+## C3F3F spectral benchmark and closeout — 2026-07-16
+
+`backend/Source/Audio/Spectral/SpectralBenchmarkSource.{h,cpp}`, the built-in
+source plumbing, native/frontend conversion fixes, factory preset, UI controls,
+tests, and audit updates are independently implemented Beat-owned work. The
+benchmark PCM is generated mathematically at runtime on the control thread and
+contains no copied audio, preset data, upstream code, external coefficient
+table, dependency, binary, asset, service, branding, or derived implementation.

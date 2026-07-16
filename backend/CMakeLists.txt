@@ -54,6 +54,8 @@ target_sources(Beat PRIVATE
     Source/Audio/Spectral/SpectralArtifact.h
     Source/Audio/Spectral/SpectralAnalyzer.cpp
     Source/Audio/Spectral/SpectralAnalyzer.h
+    Source/Audio/Spectral/SpectralBenchmarkSource.cpp
+    Source/Audio/Spectral/SpectralBenchmarkSource.h
     Source/Audio/Spectral/SpectralSourceSlot.cpp
     Source/Audio/Spectral/SpectralSourceSlot.h
     Source/Audio/Parameters/ParameterIds.h
@@ -233,6 +235,8 @@ add_executable(BeatBackendStress
     Source/Audio/Spectral/SpectralArtifact.h
     Source/Audio/Spectral/SpectralAnalyzer.cpp
     Source/Audio/Spectral/SpectralAnalyzer.h
+    Source/Audio/Spectral/SpectralBenchmarkSource.cpp
+    Source/Audio/Spectral/SpectralBenchmarkSource.h
     Source/Audio/Spectral/SpectralSourceSlot.cpp
     Source/Audio/Spectral/SpectralSourceSlot.h
     Source/Audio/Parameters/ParameterIds.h

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -11,6 +11,13 @@ const outDir = join(tmpdir(), `beat-synth-roundtrip-${Date.now()}`);
 mkdirSync(outDir, { recursive: true });
 
 try {
+  const messageBridgeSource = readFileSync(
+    join(repoRoot, "backend/Source/Ipc/MessageBridge.cpp"),
+    "utf8",
+  );
+  assert.match(messageBridgeSource, /const auto spectralSlot3 = aether\.getProperty\("spectralSlot3"/);
+  assert.match(messageBridgeSource, /slot\.builtinSource = spectralSlot3\.getProperty\("builtinSource"/);
+  assert.match(messageBridgeSource, /slot\.managedAsset\.artifactPath = managed\.getProperty\("artifactPath"/);
   const esbuild = join(repoRoot, "frontend", "node_modules", ".bin", "esbuild");
   execFileSync(
     esbuild,
@@ -458,6 +465,16 @@ try {
   assert.ok(granularBenchmark);
   assert.equal(granularBenchmark.patch.parameters["aether.granular.2.enabled"], true);
   assert.equal(granularBenchmark.patch.parameters["aether.granular.2.builtinSource"], "benchmark");
+  const spectralBenchmark = synthStore.FACTORY_SYNTH_PRESETS.find((preset) => preset.id === "factory.benchmark-spectral-motion");
+  assert.ok(spectralBenchmark);
+  assert.equal(spectralBenchmark.name, "Benchmark - Spectral Motion");
+  assert.equal(spectralBenchmark.patch.parameters["aether.spectral.3.enabled"], true);
+  assert.equal(spectralBenchmark.patch.parameters["aether.spectral.3.builtinSource"], "benchmark");
+  const spectralBenchmarkInstrument = synthStore.synthDraftToPreviewInstrument(
+    spectralBenchmark.patch,
+  );
+  assert.equal(spectralBenchmarkInstrument.aether.spectralSlot3.enabled, true);
+  assert.equal(spectralBenchmarkInstrument.aether.spectralSlot3.builtinSource, "benchmark");
   assert.equal(independentUnisonPreview.aether.runtimeWarp, 0.24);
   assert.equal(independentUnisonPreview.aether.runtimeWarpMode, "fold");
   assert.equal(independentUnisonPreview.aether.runtimeWarp2, 0.41);

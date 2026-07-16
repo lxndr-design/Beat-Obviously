@@ -566,6 +566,40 @@ namespace beat
         }
         granular.enabled = synthNumberParam(params, "aether.granular.2.enabled", 0.0) >= 0.5
             && (granular.builtinSource.isNotEmpty() || granular.managedAsset.manifestPath.isNotEmpty());
+        auto& spectral = instrument.aether.spectralSlot3;
+        spectral.schemaVersion = 1;
+        spectral.builtinSource = synthStringParam(params, "aether.spectral.3.builtinSource", "");
+        if (spectral.builtinSource != "benchmark") spectral.builtinSource.clear();
+        spectral.rootNote = juce::jlimit(0, 127,
+            (int) std::round(synthNumberParam(params, "aether.spectral.3.rootNote", 60.0)));
+        spectral.level = juce::jlimit(0.0f, 1.0f,
+            (float) synthNumberParam(params, "aether.spectral.3.level", 0.7));
+        spectral.pan = juce::jlimit(-1.0f, 1.0f,
+            (float) synthNumberParam(params, "aether.spectral.3.pan", 0.0));
+        spectral.stereoWidth = juce::jlimit(0.0f, 2.0f,
+            (float) synthNumberParam(params, "aether.spectral.3.stereoWidth", 1.0));
+        spectral.position = juce::jlimit(0.0f, 1.0f,
+            (float) synthNumberParam(params, "aether.spectral.3.position", 0.0));
+        spectral.pitchSemitones = juce::jlimit(-12.0f, 12.0f,
+            (float) synthNumberParam(params, "aether.spectral.3.pitchSemitones", 0.0));
+        spectral.freeze = synthNumberParam(params, "aether.spectral.3.freeze", 0.0) >= 0.5;
+        spectral.routing = sourceRoute(synthStringParam(params, "aether.spectral.3.route", "filter"));
+        spectral.fxSends[0] = juce::jlimit(0.0f, 1.0f,
+            (float) synthNumberParam(params, "aether.spectral.3.fxSend1", 0.0));
+        spectral.fxSends[1] = juce::jlimit(0.0f, 1.0f,
+            (float) synthNumberParam(params, "aether.spectral.3.fxSend2", 0.0));
+        const auto managedSpectral = objectProperty(metadata, "managedSpectral", {});
+        if (managedSpectral.isObject() && (int) managedSpectral.getProperty("schemaVersion", 0) <= 1)
+        {
+            spectral.managedAsset.assetId = managedSpectral.getProperty("assetId", {}).toString();
+            spectral.managedAsset.displayName = managedSpectral.getProperty("displayName", {}).toString();
+            spectral.managedAsset.manifestPath = managedSpectral.getProperty("manifestPath", {}).toString();
+            spectral.managedAsset.sourcePath = managedSpectral.getProperty("sourcePath", {}).toString();
+            spectral.managedAsset.artifactPath = managedSpectral.getProperty("artifactPath", {}).toString();
+        }
+        spectral.enabled = synthNumberParam(params, "aether.spectral.3.enabled", 0.0) >= 0.5
+            && (spectral.builtinSource.isNotEmpty()
+                || spectral.managedAsset.manifestPath.isNotEmpty());
         instrument.aether.sub.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.sub.fxSend1", 0.0));
         instrument.aether.sub.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.sub.fxSend2", 0.0));
         instrument.aether.noise.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.noise.fxSend1", 0.0));

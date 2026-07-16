@@ -837,3 +837,47 @@ Timing-bearing JSON SHA-256 is
 render times are 12.83–15.54 ms (13.43 ms mean), harness peak RSS is
 14,974,976 bytes, deadlines are zero, and queue telemetry remains 64 accepted /
 16 rejected / 16 overflow. No frozen render or waiver changed.
+
+## Milestone C3F3F spectral benchmark and product closeout — 2026-07-16
+
+Factory content now includes `Benchmark - Spectral Motion`. Its source is
+Beat-owned PCM generated deterministically in `SpectralBenchmarkSource`, then
+analyzed once on the control thread into the existing validated artifact-v2
+representation and cached as immutable ownership. No audio file, preset from an
+external product, network source, runtime dependency, or callback analysis is
+introduced. The editor can select/remove this built-in source with the same
+label, focus, disabled-state, and status behavior as managed Slot 3 audio.
+
+End-to-end tracing also exposed a C3F3D integration omission: the full spectral
+slot object was persisted and produced by the frontend but was absent from one
+native IPC project-conversion path and from the native synth-patch converter.
+Both now parse every approved Slot 3 field, reject unsupported built-in IDs,
+and preserve managed or built-in source identity. Repository, native patch,
+frontend patch, factory discoverability, and UI contract tests cover the path.
+
+The isolated spectral renderer remains exact at blocks 64/257. Product renders
+are repeat-exact, finite, low-DC, continuous, and hash-frozen:
+
+- 44.1 kHz: energy `0.612248`, DC `-9.40765e-06`, max step `0.00145870`,
+  SHA-256 `a76dc9e2c76daabd3b8c87c3ca2dbfa0942c6719bd80de23dda5ef94786b4ca2`.
+- 48 kHz: energy `0.564716`, DC `-1.40973e-05`, max step `0.00134966`,
+  SHA-256 `b71acd00cde9434ab3d255c7bb691777e5672c1970b052a6c4f4ead7f1c2b0b3`.
+- 96 kHz: energy `0.384280`, DC `-3.90644e-05`, max step `0.000671615`,
+  SHA-256 `8c2164ee4369519bf3677aaab3d62e4abc50bc130f441a44bfa4b61236b9a5e0`.
+
+A warmed product callback reports zero realtime-safety violations, `0.301083`
+ms total work in the focused observation, an active synth voice, and zero
+deadline overruns. Full native stress and `verify:non-native` pass with only
+`baseline.recent-project-exists` waived; Release targets build. The regenerated
+150 default-disconnected WAVs retain normalized manifest
+`713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`.
+Timing JSON SHA-256 is
+`1097ee67af6593265814b0ec9d53e9cdca69984b2996e27581480057e5f78cc8`;
+render times are 12.66–15.27 ms (13.35 ms mean), harness peak RSS is
+14,942,208 bytes, deadlines are zero, and queue telemetry is 64/16/16.
+
+C3F3 and the bounded Slot 3 product foundation are complete at this boundary.
+Together with completed Sample Slot 1 and Granular Slot 2 foundations, this
+closes the planned Milestone C hybrid-source foundation. It does not claim a
+general spectral editor, arbitrary-duration streaming spectral playback,
+unbounded polyphony, broader SFZ compatibility, or later roadmap features.

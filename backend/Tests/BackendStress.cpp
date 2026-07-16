@@ -4,6 +4,7 @@
 #include "../Source/Audio/Analysis/AudioFileAnalyzer.h"
 #include "../Source/Audio/Analysis/FftAnalyzer.h"
 #include "../Source/Audio/Spectral/SpectralAnalyzer.h"
+#include "../Source/Audio/Spectral/SpectralBenchmarkSource.h"
 #include "../Source/Audio/Spectral/SpectralSourceSlot.h"
 #include "../Source/Audio/Envelope/EnvelopeShaper.h"
 #include "../Source/Audio/Filter/DriveStage.h"
@@ -12822,6 +12823,143 @@ namespace
         return passed;
     }
 
+    bool stressSpectralBenchmarkSource()
+    {
+        const auto artifact = beat::sharedSpectralBenchmarkArtifact();
+        if (!artifact || artifact != beat::sharedSpectralBenchmarkArtifact()
+            || !beat::validateSpectralArtifact(*artifact).ok)
+            return false;
+
+        auto prepared = beat::prepareSpectralSource(
+            artifact, 45, 0.74f, 0.0f, 1.3f, 0.38f, 0.0f, false);
+        if (!prepared.source) return false;
+
+        const auto renderSlot = [&](int blockSize)
+        {
+            beat::SpectralSourceSlot slot(1);
+            juce::AudioBuffer<float> output(2, 16000);
+            output.clear();
+            if (!slot.prepare({ 48000.0, blockSize, 2 })
+                || !slot.publish(prepared.source)
+                || !slot.noteOn({ 45, 0.8f, 70001 }))
+                return output;
+            for (int offset = 0; offset < output.getNumSamples(); offset += blockSize)
+                slot.render(output, offset,
+                    std::min(blockSize, output.getNumSamples() - offset));
+            return output;
+        };
+        const auto slot64 = renderSlot(64);
+        const auto slot257 = renderSlot(257);
+        bool slotExact = bufferEnergy(slot64) > 0.00001;
+        for (int channel = 0; channel < slot64.getNumChannels() && slotExact; ++channel)
+            for (int sample = 0; sample < slot64.getNumSamples(); ++sample)
+                slotExact = slot64.getSample(channel, sample)
+                    == slot257.getSample(channel, sample);
+        if (!slotExact) return false;
+
+        auto project = makeDenseAetherProject();
+        auto& instrument = project.instruments.front();
+        instrument.aether.oscA.enabled = false;
+        instrument.aether.oscB.enabled = false;
+        instrument.aether.sub.enabled = false;
+        instrument.aether.noise.enabled = false;
+        instrument.aether.sampleSlot1 = {};
+        instrument.aether.granularSlot2 = {};
+        auto& spectral = instrument.aether.spectralSlot3;
+        spectral = {};
+        spectral.enabled = true;
+        spectral.builtinSource = "benchmark";
+        spectral.rootNote = 45;
+        spectral.level = 0.74f;
+        spectral.stereoWidth = 1.3f;
+        spectral.position = 0.38f;
+        spectral.routing = 1;
+
+        bool productOk = true;
+        const std::array<std::pair<double, juce::String>, 3> expectedHashes {{
+            { 44100.0, "a76dc9e2c76daabd3b8c87c3ca2dbfa0942c6719bd80de23dda5ef94786b4ca2" },
+            { 48000.0, "b71acd00cde9434ab3d255c7bb691777e5672c1970b052a6c4f4ead7f1c2b0b3" },
+            { 96000.0, "8c2164ee4369519bf3677aaab3d62e4abc50bc130f441a44bfa4b61236b9a5e0" },
+        }};
+        for (const auto& [rate, expectedHash] : expectedHashes)
+        {
+            const auto first = renderOfflineChunks(project, 16000, 64, rate);
+            const auto repeat = renderOfflineChunks(project, 16000, 64, rate);
+            juce::MemoryOutputStream bytes;
+            double energy = 0.0;
+            double dc = 0.0;
+            double maximumStep = 0.0;
+            bool exact = true;
+            for (int channel = 0; channel < first.getNumChannels(); ++channel)
+            {
+                bytes.write(first.getReadPointer(channel),
+                    (size_t) first.getNumSamples() * sizeof(float));
+                for (int sample = 0; sample < first.getNumSamples(); ++sample)
+                {
+                    const double value = first.getSample(channel, sample);
+                    exact = exact && std::isfinite(value)
+                        && first.getSample(channel, sample) == repeat.getSample(channel, sample);
+                    energy += value * value;
+                    dc += value;
+                    if (sample > 0)
+                        maximumStep = std::max(maximumStep, std::abs(value
+                            - first.getSample(channel, sample - 1)));
+                }
+            }
+            const auto hash = juce::SHA256(bytes.getData(), bytes.getDataSize()).toHexString();
+            dc /= std::max(1, first.getNumChannels() * first.getNumSamples());
+            std::cerr << "spectral benchmark rate=" << rate
+                      << " energy=" << energy << " dc=" << dc
+                      << " maxStep=" << maximumStep << " hash=" << hash << "\n";
+            productOk = productOk && exact && energy > 0.00001
+                && std::abs(dc) < 0.01 && maximumStep < 1.0
+                && hash == expectedHash;
+        }
+
+        const auto persistenceRoot = juce::File("/private/tmp").getChildFile(
+            "BeatBackendStress-spectral-benchmark-" + juce::Uuid().toString());
+        if (!persistenceRoot.createDirectory()) return false;
+        project.id = "spectral-benchmark-roundtrip";
+        {
+            beat::Database database(persistenceRoot.getChildFile("benchmark.sqlite"));
+            beat::ProjectRepository repository(database);
+            repository.save(project);
+            const auto loaded = repository.load(project.id);
+            productOk = productOk && loaded.has_value()
+                && !loaded->instruments.empty()
+                && loaded->instruments.front().aether.spectralSlot3.enabled
+                && loaded->instruments.front().aether.spectralSlot3.builtinSource == "benchmark"
+                && bufferEnergy(renderOfflineChunks(*loaded, 16000, 64, 48000.0)) > 0.00001;
+        }
+        persistenceRoot.deleteRecursively();
+
+        beat::AudioEngine callbackEngine;
+        callbackEngine.prepareForOffline(48000.0, 256, 2);
+        callbackEngine.applyProject(project);
+        callbackEngine.requestPlay();
+        for (int block = 0; block < 8; ++block)
+            (void) renderEngineBlock(callbackEngine, 256);
+        juce::AudioBuffer<float> callbackBuffer(2, 256);
+        callbackBuffer.clear();
+        std::array<float*, 2> callbackOutputs {
+            callbackBuffer.getWritePointer(0), callbackBuffer.getWritePointer(1),
+        };
+        juce::AudioIODeviceCallbackContext callbackContext;
+        beat::test::beginRealtimeSafetyProbe();
+        callbackEngine.audioDeviceIOCallbackWithContext(
+            nullptr, 0, callbackOutputs.data(), 2, callbackBuffer.getNumSamples(), callbackContext);
+        const auto callbackViolations = beat::test::endRealtimeSafetyProbe();
+        beat::AudioEngine::RenderTimingSnapshot timing;
+        const bool timingAvailable = callbackEngine.pullRenderTimingSnapshot(timing);
+        std::cerr << "spectral benchmark callback violations=" << callbackViolations
+                  << " totalMs=" << timing.totalMs
+                  << " deadlines=" << timing.deadlineOverruns << "\n";
+        productOk = productOk && callbackViolations == 0 && timingAvailable
+            && std::isfinite(timing.totalMs) && timing.totalMs > 0.0
+            && timing.activeSynthVoices > 0 && timing.deadlineOverruns == 0;
+        return productOk;
+    }
+
     bool stressManagedGranularAssetAndRouting()
     {
         const auto root = juce::File("/private/tmp")
@@ -17376,6 +17514,41 @@ namespace
             || !near(macroInstrument.dynamicModulation.filterDrive.macro8, 0.37f))
             return false;
 
+        const auto spectralPatch = juce::JSON::parse(R"json(
+        {
+          "instrumentType": "wavetable-synth",
+          "parameters": {
+            "aether.spectral.3.enabled": true,
+            "aether.spectral.3.builtinSource": "benchmark",
+            "aether.spectral.3.rootNote": 45,
+            "aether.spectral.3.level": 0.74,
+            "aether.spectral.3.pan": -0.2,
+            "aether.spectral.3.stereoWidth": 1.3,
+            "aether.spectral.3.position": 0.38,
+            "aether.spectral.3.pitchSemitones": 3.5,
+            "aether.spectral.3.freeze": true,
+            "aether.spectral.3.route": "direct",
+            "aether.spectral.3.fxSend1": 0.2,
+            "aether.spectral.3.fxSend2": 0.4
+          }
+        }
+        )json");
+        beat::InstrumentDefinition spectralInstrument;
+        if (!beat::applySynthPatchContract(spectralPatch, spectralInstrument)
+            || !spectralInstrument.aether.spectralSlot3.enabled
+            || spectralInstrument.aether.spectralSlot3.builtinSource != "benchmark"
+            || spectralInstrument.aether.spectralSlot3.rootNote != 45
+            || !near(spectralInstrument.aether.spectralSlot3.level, 0.74f)
+            || !near(spectralInstrument.aether.spectralSlot3.pan, -0.2f)
+            || !near(spectralInstrument.aether.spectralSlot3.stereoWidth, 1.3f)
+            || !near(spectralInstrument.aether.spectralSlot3.position, 0.38f)
+            || !near(spectralInstrument.aether.spectralSlot3.pitchSemitones, 3.5f)
+            || !spectralInstrument.aether.spectralSlot3.freeze
+            || spectralInstrument.aether.spectralSlot3.routing != 1
+            || !near(spectralInstrument.aether.spectralSlot3.fxSends[0], 0.2f)
+            || !near(spectralInstrument.aether.spectralSlot3.fxSends[1], 0.4f))
+            return false;
+
         return true;
     }
 
@@ -18897,6 +19070,14 @@ int main()
                              : "spectral source: focused failed\n");
         return passed ? 0 : 1;
     }
+    if (std::getenv("AETHER_SPECTRAL_BENCHMARK_ONLY") != nullptr)
+    {
+        std::cerr << "spectral benchmark: focused start\n";
+        const bool passed = stressSpectralBenchmarkSource();
+        std::cerr << (passed ? "spectral benchmark: focused passed\n"
+                             : "spectral benchmark: focused failed\n");
+        return passed ? 0 : 1;
+    }
     if (!stressRealtimeSafetyDetectorNegativeCases())
     {
         std::cerr << "Realtime safety detector negative-case stress failed\n";
@@ -19660,6 +19841,14 @@ int main()
         return 1;
     }
     std::cerr << "managed spectral: done\n";
+
+    std::cerr << "spectral benchmark: start\n";
+    if (!stressSpectralBenchmarkSource())
+    {
+        std::cerr << "Spectral benchmark source stress failed\n";
+        return 1;
+    }
+    std::cerr << "spectral benchmark: done\n";
 
     std::cerr << "decent sampler: start\n";
     if (!stressDecentSamplerFixtureImportAndPlayback())

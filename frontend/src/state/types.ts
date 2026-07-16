@@ -533,6 +533,7 @@ export interface ManagedSpectralAssetConfig {
 export interface AetherSpectralSlotConfig {
   schemaVersion: 1;
   enabled: boolean;
+  builtinSource?: "benchmark";
   rootNote: number;
   level: number;
   pan: number;
