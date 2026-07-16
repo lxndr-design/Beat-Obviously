@@ -1030,3 +1030,21 @@ test process only
 ```
 
 Slot accessibility and selector-keyboard changes are presentation/input behavior only. The 150-render native freeze remains byte-identical. Slot 3, `SourceSlotIndex::three`, and the proposed C3F boundary have no new caller or implementation.
+
+## C3F1 disconnected analysis boundary — 2026-07-16
+
+```text
+native test/control thread only
+  locally generated verified 48 kHz AudioBuffer
+    -> SpectralAnalyzer::analyze()
+       -> bounded window/forward FFT
+       -> independent L/R magnitude + phase residual planes
+       -> shared peak/transient decisions
+       -> payload hash + complete artifact validation
+       -> complete immutable value OR diagnosable failure/cancellation
+
+audio callback / offline engine / project apply / IPC
+  -> no C3F1 caller
+```
+
+`SpectralAnalyzer` is compiled into native targets but unreachable from product behavior. It performs allocations, FFT preparation, hashing, and validation on its caller's non-realtime thread. C3F1 adds no callback instrumentation exemption and no offline-render edge.

@@ -50,6 +50,10 @@ target_sources(Beat PRIVATE
     Source/Audio/Analysis/FftAnalyzer.h
     Source/Audio/Analysis/AudioFileAnalyzer.cpp
     Source/Audio/Analysis/AudioFileAnalyzer.h
+    Source/Audio/Spectral/SpectralArtifact.cpp
+    Source/Audio/Spectral/SpectralArtifact.h
+    Source/Audio/Spectral/SpectralAnalyzer.cpp
+    Source/Audio/Spectral/SpectralAnalyzer.h
     Source/Audio/Parameters/ParameterIds.h
     Source/Audio/Parameters/ParameterPolicy.h
     Source/Audio/Parameters/SynthPatchContract.cpp
@@ -221,6 +225,10 @@ add_executable(BeatBackendStress
     Source/Audio/Analysis/FftAnalyzer.h
     Source/Audio/Analysis/AudioFileAnalyzer.cpp
     Source/Audio/Analysis/AudioFileAnalyzer.h
+    Source/Audio/Spectral/SpectralArtifact.cpp
+    Source/Audio/Spectral/SpectralArtifact.h
+    Source/Audio/Spectral/SpectralAnalyzer.cpp
+    Source/Audio/Spectral/SpectralAnalyzer.h
     Source/Audio/Parameters/ParameterIds.h
     Source/Audio/Parameters/ParameterPolicy.h
     Source/Audio/Parameters/SynthPatchContract.cpp

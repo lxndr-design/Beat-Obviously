@@ -3,13 +3,13 @@
 > Private personal GPLv3-constrained build only. Do not distribute, publish,
 > share with testers or collaborators, sell, or convey source or binaries.
 
-Date: 2026-07-15
+Date: 2026-07-15; owner authorization updated 2026-07-16
 
-Branch: `codex/aether-c3f-review`
+Branch: `codex/aether-c3f-review`; C3F1 implementation: `codex/aether-c3f1`
 
 Reviewed implementation head: `aace6c1b`
 
-Status: **accepted with revisions — specialist DSP sign-off incomplete**
+Status: **C3F1 owner-authorized; specialist credential requirement explicitly waived by the project owner**
 
 ## Outcome
 
@@ -20,11 +20,13 @@ frame bank with exact WOLA reconstruction, identity phase locking, shared
 stereo analysis decisions, explicit canonical-rate resampling, latency, and
 measurable deadline budgets.
 
-This checkpoint does not approve or implement spectral DSP. It adds no product
-schema, parameter, asset, callback, dependency, preset, factory content, or
-render change. An AI technical DSP review accepted the architecture with the
-revisions recorded here, but explicitly declined specialist sign-off. A human
-DSP specialist must still confirm the contracts before C3F1 begins.
+The original checkpoint did not approve or implement spectral DSP. On
+2026-07-16 the project owner explicitly directed Beat to treat the attached
+technical review as sufficient authorization and proceed. The reviewer remains
+accurately identified as AI technical assistance; the record does not relabel
+it as a human-authored review. The owner waived the specialist-credential gate
+and authorized C3F1 only. Product schema, playback, callback connection,
+factory content, C3F2, and C3F3 remain separate gates.
 
 ## Current architecture evidence
 
@@ -308,7 +310,9 @@ changes, live/offline alignment, and plugin delay-compensation reporting.
 Reviewer: OpenAI GPT-5.6 Thinking, technical DSP review assistance; not a human
 credentialed signatory. Review date: 2026-07-15. Outcome: **accept with
 revisions**. Option B remains recommended. Specialist DSP sign-off: **no**.
-Human authorization to begin C3F1: **not recorded**.
+Project-owner authorization to begin C3F1: **recorded 2026-07-16**. The owner
+explicitly waived the specialist-signatory prerequisite. This changes project
+authorization, not the factual identity or credentials of the AI reviewer.
 
 The review accepted the 48 kHz canonical timeline and provisionally accepted
 the four-voice, 48 MiB and 1024-point limits subject to complete payload
@@ -361,7 +365,50 @@ silently replacing hashes.
 
 ## Stop condition
 
-Milestone C3F is accepted with revisions but blocked before implementation. Do
-not add an analyzer, spectral artifact, FFT playback code, Slot 3 schema/UI,
-factory spectral asset, or upstream implementation until the specialist DSP
-decisions and human implementation approval above are recorded.
+C3F1 is authorized as a disconnected analyzer and artifact validator using
+locally generated test PCM. Do not add FFT playback, a callback edge, Slot 3
+schema/UI, a managed or factory spectral asset, or upstream implementation in
+C3F1. C3F2 and C3F3 require their own review of measured C3F1 evidence.
+
+## C3F1 measured contract update — 2026-07-16
+
+C3F1 fixes analysis version 1 at 48 kHz, `N=1024`, `H=256`, periodic
+square-root Hann analysis/synthesis windows, an inverse-transform-normalized
+overlap gain of `1/2`, independent L/R magnitude and wrapped phase residuals,
+shared root-mean-square stereo reference magnitudes, stable local-peak regions,
+normalized positive-flux threshold `0.35`, and a four-frame refractory period.
+The 5,625-frame ceiling includes three leading and three trailing overlap
+positions; the exact fully reconstructed source ceiling is therefore 1,439,232
+samples, or 29.984 seconds, rather than the contradictory provisional 30.000
+seconds.
+
+The disconnected analyzer accepts only already-verified immutable in-memory
+PCM at the canonical rate. It publishes nothing on cancellation or failure.
+The artifact accounts for both L/R magnitude and phase planes, shared peak
+assignments/bins, transient flags, indexes, and fixed manifest/alignment
+overhead under the 48 MiB cap. Validation recomputes the payload SHA-256 and
+checks schema/algorithm/window, overflow-safe shapes, finite/ranged values,
+phase bounds, peak termination/order/assignment, binary transients, and
+Parseval energy agreement.
+
+Raw float32 WOLA reconstruction measures `-139.333 dB` on the mixed stereo
+fixture and passes the `-120 dB` gate across impulse, DC, Nyquist, coherent
+sine, swept sine, white noise, and deterministic finite random fixtures. The
+version-1 magnitude/float32-phase-residual artifact round trip measures
+`-91.7453 dB`; that value is frozen as analysis evidence and is not a C3F2
+playback-quality acceptance. C3F2 must resolve accumulated phase precision,
+identity phase-lock playback, pitch, resampling, latency, and callback budgets
+before any callback connection.
+
+The final C3F1 source-matched gates pass: full `verify:non-native`; Release
+`Beat`, `BeatBackendStress`, and `BeatAetherBaseline`; and the complete native
+suite with only the existing `baseline.recent-project-exists` TCC waiver. The
+native run took 9.92 seconds wall / 8.18 user / 0.74 system with 229,376,000-byte
+maximum RSS. The external baseline regenerated 150 WAVs with unchanged
+normalized manifest `713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`.
+Timing-bearing JSON SHA-256 is
+`2979d34da05091f33cccba4d54392d62d0719f7b1d55788cff1692644b1ff024`;
+render times were 12.63–21.83 ms (13.60 ms mean), harness peak RSS was
+15,138,816 bytes, deadline overruns were zero, and queue telemetry remained
+64 accepted / 16 rejected / 16 overflow. Timing and RSS are descriptive
+single-run observations. C3F1 introduces no new waiver.

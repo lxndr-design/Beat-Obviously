@@ -3,6 +3,7 @@
 #include "../Source/Audio/BeatSynthesiser.h"
 #include "../Source/Audio/Analysis/AudioFileAnalyzer.h"
 #include "../Source/Audio/Analysis/FftAnalyzer.h"
+#include "../Source/Audio/Spectral/SpectralAnalyzer.h"
 #include "../Source/Audio/Envelope/EnvelopeShaper.h"
 #include "../Source/Audio/Filter/DriveStage.h"
 #include "../Source/Audio/Filter/FilterMath.h"
@@ -2275,6 +2276,136 @@ namespace
                 return false;
         }
 
+        return true;
+    }
+
+    bool stressSpectralAnalyzer()
+    {
+        constexpr int fixtureSamples = 8192;
+        std::array<juce::AudioBuffer<float>, 7> fixtures {
+            juce::AudioBuffer<float>(2, fixtureSamples), juce::AudioBuffer<float>(2, fixtureSamples),
+            juce::AudioBuffer<float>(2, fixtureSamples), juce::AudioBuffer<float>(2, fixtureSamples),
+            juce::AudioBuffer<float>(2, fixtureSamples), juce::AudioBuffer<float>(2, fixtureSamples),
+            juce::AudioBuffer<float>(2, fixtureSamples)
+        };
+        for (auto& fixture : fixtures) fixture.clear();
+        fixtures[0].setSample(0, fixtureSamples / 2, 1.0f); // impulse
+        fixtures[0].setSample(1, fixtureSamples / 2, -0.5f);
+        for (int i = 0; i < fixtureSamples; ++i)
+        {
+            fixtures[1].setSample(0, i, 0.25f); // DC
+            fixtures[1].setSample(1, i, -0.125f);
+            fixtures[2].setSample(0, i, (i & 1) == 0 ? 0.3f : -0.3f); // Nyquist
+            fixtures[2].setSample(1, i, (i & 1) == 0 ? -0.2f : 0.2f);
+            fixtures[3].setSample(0, i, 0.5f * std::sin(juce::MathConstants<float>::twoPi * 997.0f * i / 48000.0f));
+            fixtures[3].setSample(1, i, 0.4f * std::sin(juce::MathConstants<float>::twoPi * 997.0f * i / 48000.0f + 0.2f));
+            const float sweepPhase = juce::MathConstants<float>::twoPi * (80.0f * i / 48000.0f
+                + (9000.0f - 80.0f) * i * i / (2.0f * 48000.0f * fixtureSamples));
+            fixtures[4].setSample(0, i, 0.4f * std::sin(sweepPhase));
+            fixtures[4].setSample(1, i, 0.3f * std::cos(sweepPhase));
+        }
+        juce::Random white(0x513f);
+        juce::Random randomFinite(0x91a7);
+        for (int i = 0; i < fixtureSamples; ++i)
+            for (int channel = 0; channel < 2; ++channel)
+            {
+                fixtures[5].setSample(channel, i, white.nextFloat() * 0.8f - 0.4f);
+                fixtures[6].setSample(channel, i, std::tanh(randomFinite.nextFloat() * 6.0f - 3.0f) * 0.45f);
+            }
+        for (const auto& fixture : fixtures)
+        {
+            const double fixtureDb = beat::SpectralAnalyzer::measureRawWolaErrorDbForTesting(fixture);
+            if (!(fixtureDb <= -120.0))
+            {
+                std::cerr << "spectral WOLA fixture failed db=" << fixtureDb << "\n";
+                return false;
+            }
+        }
+
+        constexpr int samples = 24000;
+        juce::AudioBuffer<float> input(2, samples);
+        for (int i = 0; i < samples; ++i)
+        {
+            const float time = (float) i / 48000.0f;
+            input.setSample(0, i, 0.55f * std::sin(juce::MathConstants<float>::twoPi * 440.0f * time));
+            input.setSample(1, i, 0.31f * std::sin(juce::MathConstants<float>::twoPi * 660.0f * time + 0.37f));
+        }
+        input.setSample(0, 12000, input.getSample(0, 12000) + 0.4f);
+        input.setSample(1, 12000, input.getSample(1, 12000) - 0.25f);
+
+        const auto first = beat::SpectralAnalyzer::analyze(input, 57, 1234);
+        const auto second = beat::SpectralAnalyzer::analyze(input, 57, 1234);
+        if (!first.artifact || !second.artifact)
+        {
+            std::cerr << "spectral analysis failed code=" << first.code << " message=" << first.message << "\n";
+            return false;
+        }
+        const auto& artifact = *first.artifact;
+        if (!beat::validateSpectralArtifact(artifact).ok
+            || artifact.payloadSha256 != second.artifact->payloadSha256
+            || artifact.sourcePcmSha256 != second.artifact->sourcePcmSha256
+            || artifact.rootNote != 57 || artifact.deterministicSeed != 1234)
+            return false;
+
+        const double rawWolaDb = beat::SpectralAnalyzer::measureRawWolaErrorDbForTesting(input);
+        if (!(std::isfinite(rawWolaDb) && rawWolaDb <= -120.0))
+        {
+            std::cerr << "spectral raw WOLA relative error failed db=" << rawWolaDb << "\n";
+            return false;
+        }
+
+        const auto reconstructed = beat::SpectralAnalyzer::reconstructForTesting(artifact);
+        if (!reconstructed) return false;
+        double error = 0.0;
+        double energy = 0.0;
+        for (int channel = 0; channel < 2; ++channel)
+            for (int i = 0; i < samples; ++i)
+            {
+                const double original = input.getSample(channel, i);
+                const double delta = original - reconstructed->getSample(channel, i);
+                error += delta * delta;
+                energy += original * original;
+            }
+        const double relativeDb = 10.0 * std::log10(error / std::max(energy, 1.0e-30));
+        if (!(std::isfinite(relativeDb) && relativeDb <= -85.0))
+        {
+            std::cerr << "spectral WOLA relative error failed db=" << relativeDb << "\n";
+            return false;
+        }
+
+        auto malformed = artifact;
+        malformed.magnitudes[0] = std::numeric_limits<float>::quiet_NaN();
+        malformed.payloadSha256 = beat::computeSpectralPayloadSha256(malformed);
+        if (beat::validateSpectralArtifact(malformed).code != "spectral.magnitude") return false;
+        malformed = artifact;
+        malformed.schema = 99;
+        if (beat::validateSpectralArtifact(malformed).code != "spectral.schema") return false;
+        malformed = artifact;
+        malformed.peakAssignments[0] = 255;
+        malformed.payloadSha256 = beat::computeSpectralPayloadSha256(malformed);
+        if (beat::validateSpectralArtifact(malformed).code != "spectral.peak-assignment") return false;
+        malformed = artifact;
+        malformed.magnitudes[0] *= 0.5f;
+        if (beat::validateSpectralArtifact(malformed).code != "spectral.payload-hash") return false;
+        malformed = artifact;
+        malformed.spectralEnergy *= 1.1;
+        if (beat::validateSpectralArtifact(malformed).code != "spectral.energy-match") return false;
+
+        juce::AudioBuffer<float> nonFinite(1, 16);
+        nonFinite.clear();
+        nonFinite.setSample(0, 4, std::numeric_limits<float>::infinity());
+        if (beat::SpectralAnalyzer::analyze(nonFinite).code != "spectral.input-finite") return false;
+        std::atomic<bool> cancelled { true };
+        const auto cancelledResult = beat::SpectralAnalyzer::analyze(input, 60, 0, &cancelled);
+        if (cancelledResult.artifact || cancelledResult.code != "spectral.cancelled") return false;
+        juce::AudioBuffer<float> tooLong(1, beat::SpectralArtifact::maxInputSamples + 1);
+        tooLong.clear();
+        if (beat::SpectralAnalyzer::analyze(tooLong).code != "spectral.input") return false;
+
+        std::cerr << "spectral analyzer: frames=" << artifact.frames
+                  << " payload=" << artifact.payloadBytes()
+                  << " rawWolaDb=" << rawWolaDb
+                  << " artifactDb=" << relativeDb << "\n";
         return true;
     }
 
@@ -17590,6 +17721,11 @@ int main()
     if (!stressFftAnalyzer())
     {
         std::cerr << "FFT analyzer stress failed\n";
+        return 1;
+    }
+    if (!stressSpectralAnalyzer())
+    {
+        std::cerr << "Spectral analyzer stress failed\n";
         return 1;
     }
     if (!stressAudioFileAnalyzer())
