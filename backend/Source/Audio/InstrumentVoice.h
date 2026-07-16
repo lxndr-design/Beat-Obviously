@@ -30,6 +30,7 @@
 #include <array>
 #include <memory>
 #include <string_view>
+#include <vector>
 
 namespace beat
 {
@@ -308,6 +309,7 @@ namespace beat
             {
                 bool enabled { false };
                 std::shared_ptr<const PreparedSpectralSource> source;
+                int latencySamples { 0 };
                 int routing { 0 };
                 std::array<float, 2> fxSends {};
             } aetherSpectralSlot3;
@@ -365,6 +367,23 @@ namespace beat
 
     private:
         using StereoSample = DriveStage::StereoFrame;
+
+        struct SpectralAlignmentDelay
+        {
+            std::array<std::vector<StereoSample>, 4> mainLanes;
+            std::array<std::vector<StereoSample>, AetherSourceBusContext::busCount> sendLanes;
+            size_t mainCursor { 0 };
+            size_t sendCursor { 0 };
+            size_t mainWritten { 0 };
+            size_t sendWritten { 0 };
+
+            void prepare(int maximumDelaySamples);
+            void reset() noexcept;
+            StereoSample processMain(size_t lane, StereoSample input, int delaySamples) noexcept;
+            StereoSample processSend(size_t lane, StereoSample input, int delaySamples) noexcept;
+            void advanceMain() noexcept;
+            void advanceSend() noexcept;
+        };
 
         using WavetableUnisonPlan = WavetableUnison::Plan;
 
@@ -428,6 +447,7 @@ namespace beat
         SfzSourceSlot aetherSfzSlot1;
         GranularSourceSlot aetherGranularSlot2;
         SpectralSourceSlot aetherSpectralSlot3 { 1 };
+        SpectralAlignmentDelay spectralAlignmentDelay;
         VoiceAetherCache::PanGains cachedPanGains;
         VoiceAetherCache::PitchRates cachedPitchRates;
         DynamicModulation::TargetActivityFlags cachedDynamicTargets;

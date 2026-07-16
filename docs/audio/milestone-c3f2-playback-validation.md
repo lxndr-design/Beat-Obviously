@@ -124,3 +124,19 @@ items are separately approved, resolved, and reviewed.
 The owner subsequently approved C3F3. Its first managed-asset slice is tracked
 in the four audit documents; it does not change the disconnected C3F2 playback
 measurements or make Slot 3 product-reachable.
+
+## C3F3E product latency integration addendum — 2026-07-16
+
+The previously open product-latency item is now implemented without changing
+the disconnected renderer contract. Accepted Slot 3 sources delay all
+non-spectral instrument and source-send lanes to the renderer's exact
+host-rate latency, and the route reports source plus insert latency for project
+compensation. Missing/rejected sources report zero spectral latency. Focused
+five-rate, exact initial-silence, post-latency audibility, 64/257 block,
+callback-safety, route-reporting, and product live/offline parity gates pass.
+The product comparison measures maximum absolute difference `2.32831e-10` and
+mean absolute difference `6.846e-11`.
+
+This addendum closes product latency/parity only. C3F3 still requires the
+audible factory spectral benchmark and final closeout matrix; Slot 3 and
+Milestone C remain incomplete.

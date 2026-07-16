@@ -158,3 +158,17 @@ focus, label, live-status, busy-state, and disabled-reason coverage. Import and
 analysis remain off callback. Product latency compensation, explicit
 live/offline parity, audible factory benchmark, and final deadline/freeze gates
 remain open.
+
+## Milestone C3F3E update — 2026-07-16
+
+Validated Slot 3 sources now align all non-spectral instrument lanes and both
+source-send lanes to the fixed spectral latency before shared routing, while
+route compensation includes accepted source latency plus insert latency.
+Missing/rejected assets contribute zero latency. Five-rate latency, callback
+safety, initial-silence/audibility, exact block segmentation, accepted/rejected
+route reporting, and product live/offline WAV parity pass. Full native and
+non-native gates and Release targets pass with only the existing TCC waiver;
+the default-disconnected 150-WAV manifest remains
+`713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`.
+The audible factory spectral benchmark and final C3F3 closeout matrix remain
+open, so Slot 3 and Milestone C are not yet complete.

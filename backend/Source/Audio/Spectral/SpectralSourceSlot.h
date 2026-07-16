@@ -93,6 +93,7 @@ namespace beat
         StereoFrame renderFrame() noexcept;
         SourceLifecycleState lifecycleState() const noexcept override;
         SourceComplexity complexity() const noexcept override { return SourceComplexity::spectral; }
+        static int latencySamplesForRate(double sampleRate) noexcept;
         int latencySamples() const noexcept override;
         int activeVoiceCount() const noexcept override;
         uint64_t stateVersion() const noexcept override { return version.load(std::memory_order_acquire); }

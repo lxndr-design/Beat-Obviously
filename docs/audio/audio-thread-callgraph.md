@@ -1187,3 +1187,29 @@ C3F3D adds a message-thread import edge from the editor to
 hashing, and project-relative path creation remain outside `AudioEngine` and
 the callback. Editor parameter changes continue through the existing project
 rebuild boundary; no file or artifact work is added to realtime parameter IPC.
+
+## C3F3E latency-aligned product edge
+
+```text
+project/control rebuild
+  -> validate and prepare managed spectral source
+  -> accepted source latency + route insert latency
+  -> recompute project maximum and allocate route compensation delays
+
+InstrumentVoice::prepare()/setParams() (control thread)
+  -> allocate fixed stereo alignment rings for 4 source lanes + 2 send lanes
+  -> clear/reset rings; publish exact host-rate latency
+
+audio callback, only when accepted Slot 3 source is active
+  -> render oscillator/sub/noise/sample/granular frames
+  -> fixed indexed delay of main/direct/filter-1/filter-2 lanes
+  -> render naturally delayed spectral frame and mix by destination
+  -> fixed indexed delay of non-spectral source sends
+  -> add spectral sends
+  -> existing filters/effects and route compensation delay
+```
+
+No allocation, resizing, destruction, lock, file/stream operation, validation,
+or latency recomputation occurs in the callback. Rejected or missing managed
+sources leave the internal delay disabled and report zero spectral route
+latency.

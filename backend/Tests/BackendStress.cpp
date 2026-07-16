@@ -12012,8 +12012,93 @@ namespace
         {
             beat::SpectralSourceSlot latency;
             latencyContract = latencyContract && latency.prepare({ rate, 256, 2 })
-                && latency.latencySamples() == expected;
+                && latency.latencySamples() == expected
+                && beat::SpectralSourceSlot::latencySamplesForRate(rate) == expected;
         }
+
+        auto silentSpectral = std::make_shared<beat::PreparedSpectralSource>(*prepared.source);
+        silentSpectral->level = 0.0f;
+        const auto renderAlignedVoice = [&](int blockSize, uint64_t* violations,
+                                             double* retriggerPreLatencyEnergy)
+        {
+            beat::InstrumentVoice::Params params;
+            params.hasAether = true;
+            params.ampLevel = 1.0f;
+            params.attackMs = 0.0f;
+            params.decayMs = 1.0f;
+            params.sustain = 1.0f;
+            params.releaseMs = 1.0f;
+            params.cutoff01 = 1.0f;
+            params.aetherOscA.enabled = true;
+            params.aetherOscA.waveform = 0;
+            params.aetherOscA.level = 1.0f;
+            params.aetherOscA.routing = 1;
+            params.aetherOscB.enabled = false;
+            params.aetherSub.enabled = false;
+            params.aetherNoise.enabled = false;
+            params.aetherSpectralSlot3.enabled = true;
+            params.aetherSpectralSlot3.source = silentSpectral;
+            params.aetherSpectralSlot3.latencySamples = 1792;
+            params.aetherSpectralSlot3.routing = 1;
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, blockSize);
+            voice.setParams(params);
+            voice.startNote(69, 0.8f, nullptr, 8192);
+            juce::AudioBuffer<float> output(2, 4096);
+            output.clear();
+            juce::AudioBuffer<float> retriggered;
+            if (retriggerPreLatencyEnergy != nullptr)
+            {
+                retriggered.setSize(2, 1792);
+                retriggered.clear();
+            }
+            if (violations != nullptr) beat::test::beginRealtimeSafetyProbe();
+            for (int offset = 0; offset < output.getNumSamples(); offset += blockSize)
+                voice.renderNextBlock(output, offset,
+                    std::min(blockSize, output.getNumSamples() - offset));
+            if (retriggerPreLatencyEnergy != nullptr)
+            {
+                voice.stopNote(0.0f, false);
+                voice.startNote(69, 0.8f, nullptr, 8192);
+                for (int offset = 0; offset < retriggered.getNumSamples(); offset += blockSize)
+                    voice.renderNextBlock(retriggered, offset,
+                        std::min(blockSize, retriggered.getNumSamples() - offset));
+                for (int channel = 0; channel < retriggered.getNumChannels(); ++channel)
+                    for (int sample = 0; sample < retriggered.getNumSamples(); ++sample)
+                    {
+                        const double value = retriggered.getSample(channel, sample);
+                        *retriggerPreLatencyEnergy += value * value;
+                    }
+            }
+            if (violations != nullptr) *violations = beat::test::endRealtimeSafetyProbe();
+            return output;
+        };
+        uint64_t alignmentViolations = 0;
+        double retriggerPreLatencyEnergy = 0.0;
+        const auto aligned64 = renderAlignedVoice(
+            64, &alignmentViolations, &retriggerPreLatencyEnergy);
+        const auto aligned257 = renderAlignedVoice(257, nullptr, nullptr);
+        double preLatencyEnergy = 0.0;
+        double postLatencyEnergy = 0.0;
+        bool alignedBlockExact = true;
+        for (int channel = 0; channel < aligned64.getNumChannels(); ++channel)
+            for (int sample = 0; sample < aligned64.getNumSamples(); ++sample)
+            {
+                const double value = aligned64.getSample(channel, sample);
+                if (sample < 1792) preLatencyEnergy += value * value;
+                else postLatencyEnergy += value * value;
+                alignedBlockExact = alignedBlockExact
+                    && aligned64.getSample(channel, sample) == aligned257.getSample(channel, sample);
+            }
+        const bool internalAlignment = preLatencyEnergy == 0.0
+            && retriggerPreLatencyEnergy == 0.0
+            && postLatencyEnergy > 0.00001 && alignedBlockExact
+            && alignmentViolations == 0;
+        std::cerr << "spectral internal alignment preEnergy=" << preLatencyEnergy
+                  << " postEnergy=" << postLatencyEnergy
+                  << " retriggerPreEnergy=" << retriggerPreLatencyEnergy
+                  << " blockExact=" << alignedBlockExact
+                  << " violations=" << alignmentViolations << "\n";
 
         juce::AudioBuffer<float> moving(2, 24000);
         double movingPhase = 0.0;
@@ -12456,7 +12541,8 @@ namespace
         }
 
         const bool ok = exact && ratesFinite && freezeExact && deadlineMatrix && resamplerQuality
-            && latencyContract && fixedPositionContract && positionMotionContract
+            && latencyContract && internalAlignment
+            && fixedPositionContract && positionMotionContract
             && replacementContract && exhaustiveAlignment
             && positionRateChangeContract && nyquistContract
             && std::abs(1200.0 * std::log2(baseFrequency / 440.0)) < 8.0
@@ -12479,7 +12565,11 @@ namespace
                       << " frequency=" << baseFrequency << "/" << pitchedFrequency
                       << " violations=" << violations << " active=" << pressure.activeVoiceCount()
                       << " transforms=" << stats.transforms
-                      << " underflows=" << stats.synthesisUnderflows << "\n";
+                      << " underflows=" << stats.synthesisUnderflows
+                      << " alignment=" << internalAlignment
+                      << " preEnergy=" << preLatencyEnergy
+                      << " postEnergy=" << postLatencyEnergy
+                      << " alignmentViolations=" << alignmentViolations << "\n";
         return ok;
     }
 
@@ -12618,6 +12708,53 @@ namespace
                     + juce::String(routeBlockDifference, 9);
                 break;
             }
+
+            const auto parityFile = root.getChildFile("spectral-live-offline-parity.wav");
+            juce::String parityError;
+            if (!beat::AudioEngine::renderProjectToWav(
+                    project, parityFile, 44100.0, 64, 2, &parityError, {}, 32))
+                { failureStep = "live/offline export: " + parityError; break; }
+            const auto exported = readWavPrefix(parityFile, route64.getNumSamples());
+            parityFile.deleteFile();
+            double paritySumDifference = 0.0;
+            double parityMaximumDifference = 0.0;
+            bool parityFinite = exported.getNumChannels() == route64.getNumChannels()
+                && exported.getNumSamples() >= route64.getNumSamples();
+            for (int channel = 0; channel < route64.getNumChannels() && parityFinite; ++channel)
+                for (int sample = 0; sample < route64.getNumSamples(); ++sample)
+                {
+                    const double difference = std::abs((double) route64.getSample(channel, sample)
+                        - exported.getSample(channel, sample));
+                    parityFinite = parityFinite && std::isfinite(difference);
+                    paritySumDifference += difference;
+                    parityMaximumDifference = std::max(parityMaximumDifference, difference);
+                }
+            const double parityMeanDifference = paritySumDifference
+                / std::max(1, route64.getNumChannels() * route64.getNumSamples());
+            std::cerr << "managed spectral parity maxDiff=" << parityMaximumDifference
+                      << " meanDiff=" << parityMeanDifference << "\n";
+            if (!parityFinite || parityMaximumDifference > 0.00008
+                || parityMeanDifference > 0.00002)
+            {
+                failureStep = "live/offline parity max="
+                    + juce::String(parityMaximumDifference, 9) + " mean="
+                    + juce::String(parityMeanDifference, 9);
+                break;
+            }
+
+            beat::AudioEngine latencyEngine;
+            latencyEngine.prepareForOffline(48000.0, 256, 2);
+            latencyEngine.applyProject(project);
+            if (latencyEngine.getProjectLatencySamples() != 1792)
+                { failureStep = "prepared route latency"; break; }
+            auto missingProject = project;
+            missingProject.instruments.front().aether.spectralSlot3.managedAsset.manifestPath =
+                manifest.getSiblingFile("missing.manifest.json").getFullPathName();
+            beat::AudioEngine missingLatencyEngine;
+            missingLatencyEngine.prepareForOffline(48000.0, 256, 2);
+            missingLatencyEngine.applyProject(missingProject);
+            if (missingLatencyEngine.getProjectLatencySamples() != 0)
+                { failureStep = "rejected asset latency isolation"; break; }
 
             const auto originalManifest = manifest.loadFileAsString();
             auto futureManifest = juce::JSON::parse(originalManifest);

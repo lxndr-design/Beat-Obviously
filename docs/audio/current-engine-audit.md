@@ -800,3 +800,40 @@ JSON SHA-256 is
 `d89e9af8fbf309e832dd0d01ca562784d2c69d6129638c1c6126c94edf331b82`,
 render times are 12.75–15.96 ms (13.63 ms mean), and peak RSS is 15,466,496
 bytes. Deadlines and queue telemetry remain unchanged.
+
+## Milestone C3F3E spectral latency and live/offline parity — 2026-07-16
+
+Slot 3's fixed synthesis latency is now part of both instrument-internal and
+project-route timing. When a validated prepared spectral source is active,
+each `InstrumentVoice` delays oscillator, sub/noise, Sample Slot 1, Granular
+Slot 2, direct, filter-1, filter-2, and source-send lanes by the exact spectral
+latency before mixing the naturally delayed spectral output. The stereo delay
+banks are allocated and cleared during voice preparation/configuration; the
+callback performs only bounded indexed reads/writes. A missing, rejected, or
+disabled managed spectral source contributes no delay and cannot misalign an
+otherwise valid instrument.
+
+The route reports source latency plus insert-effect latency. Project
+compensation is recalculated after managed assets are validated and prepared,
+then existing track delay lines align shorter routes to the longest accepted
+route. The shared latency formula is 1691, 1792, 3341, 3631, and 7198 host
+samples at 44.1, 48, 88.2, 96, and 192 kHz. Focused coverage proves exact
+silence before sample 1792 at 48 kHz on initial note and retrigger, audible
+output afterward, exact 64/257 block equality, zero callback-safety violations,
+accepted-source route latency, and zero source latency for a rejected asset. A
+32-bit product WAV comparison
+also passes with maximum absolute difference `2.32831e-10` and mean absolute
+difference `6.846e-11`.
+
+Release `Beat`, `BeatBackendStress`, and `BeatAetherBaseline` build, and full
+`verify:non-native` passes. The complete native test body reaches `Backend
+stress passed` with only `baseline.recent-project-exists` waived; a sandboxed
+`/usr/bin/time -l` wrapper subsequently failed its unrelated `kern.clockrate`
+query, so final pass/fail is also verified without that wrapper. The external
+freeze contains 150 WAVs with unchanged normalized manifest
+`713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`.
+Timing-bearing JSON SHA-256 is
+`ff2b0ac5e641e2466f5d2765fdf7a6485b948cbb2b6d0de4c9b738e6e8e88dba`;
+render times are 12.83–15.54 ms (13.43 ms mean), harness peak RSS is
+14,974,976 bytes, deadlines are zero, and queue telemetry remains 64 accepted /
+16 rejected / 16 overflow. No frozen render or waiver changed.

@@ -376,11 +376,21 @@ namespace beat
 
     int SpectralSourceSlot::latencySamples() const noexcept
     {
-        const double resamplerDelay = canonicalPerHostSample == 1.0
-            ? 0.0 : (activeSincTaps - 1) * 0.5;
+        return latencySamplesForRate(prepared.sampleRate);
+    }
+
+    int SpectralSourceSlot::latencySamplesForRate(double sampleRate) noexcept
+    {
+        if (!std::isfinite(sampleRate) || sampleRate <= 0.0)
+            return 0;
+        const double outputRatio = sampleRate / SpectralArtifact::sampleRate;
+        const int taps = outputRatio >= 3.5 ? 16 : (outputRatio > 1.0
+            ? std::clamp((int) std::ceil(sincTaps / outputRatio), 16, sincTaps)
+            : sincTaps);
+        const double resamplerDelay = outputRatio == 1.0 ? 0.0 : (taps - 1) * 0.5;
         return (int) std::ceil((schedulerPrerollSamples
             + SpectralArtifact::fftSize - SpectralArtifact::hopSize + resamplerDelay)
-            * prepared.sampleRate / SpectralArtifact::sampleRate);
+            * sampleRate / SpectralArtifact::sampleRate);
     }
 
     int SpectralSourceSlot::activeVoiceCount() const noexcept

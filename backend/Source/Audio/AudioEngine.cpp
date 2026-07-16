@@ -2130,9 +2130,12 @@ namespace beat
             juce::jlimit(0, 3, instrument.aether.granularSlot2.routing),
             instrument.aether.granularSlot2.fxSends,
         };
+        const int spectralLatencySamples = aetherSpectralSlot3 != nullptr
+            ? SpectralSourceSlot::latencySamplesForRate(sampleRate) : 0;
         params.aetherSpectralSlot3 = {
             instrument.aether.spectralSlot3.enabled && aetherSpectralSlot3 != nullptr,
             std::move(aetherSpectralSlot3),
+            spectralLatencySamples,
             juce::jlimit(0, 3, instrument.aether.spectralSlot3.routing),
             instrument.aether.spectralSlot3.fxSends,
         };
@@ -2443,6 +2446,7 @@ namespace beat
                 std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1;
                 std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2;
                 std::shared_ptr<const PreparedSpectralSource> aetherSpectralSlot3;
+                int spectralSourceLatencySamples = 0;
                 const auto& slot = routeInstrument->aether.sampleSlot1;
                 auto sampleIdentity = juce::String();
                 if (routeInstrument->hasAether && slot.enabled)
@@ -2576,9 +2580,13 @@ namespace beat
                             spectral.stereoWidth, spectral.position,
                             spectral.pitchSemitones, spectral.freeze);
                         if (preparedSpectral.source)
+                        {
                             aetherSpectralSlot3 = std::move(preparedSpectral.source);
+                            spectralSourceLatencySamples = SpectralSourceSlot::latencySamplesForRate(sampleRate);
+                        }
                     }
                 }
+                route.routeLatencySamples += spectralSourceLatencySamples;
                 route.synth = createInstrumentSynth(*routeInstrument,
                     std::move(aetherSampleSlot1), std::move(aetherSfzSlot1),
                     std::move(aetherGranularSlot2), std::move(aetherSpectralSlot3));
@@ -2614,11 +2622,22 @@ namespace beat
                 sourceFxBuffer.clear();
             }
 
-            prepareRouteEffects(route);
             if (nextRenderStates.size() < RenderBudgets::instrumentRoutes)
                 nextRenderStates.push_back(std::move(route));
             else
                 blockEventOverflows.fetch_add(1, std::memory_order_relaxed);
+        }
+
+        int actualProjectLatencySamples = estimateProjectLatencySamples(project);
+        for (const auto& route : nextRenderStates)
+            actualProjectLatencySamples = juce::jmax(
+                actualProjectLatencySamples, route.routeLatencySamples);
+        projectLatencySamples = actualProjectLatencySamples;
+        for (auto& route : nextRenderStates)
+        {
+            route.routeCompensationSamples = juce::jmax(
+                0, projectLatencySamples - route.routeLatencySamples);
+            prepareRouteEffects(route);
         }
 
         for (const auto& bus : project.returnBuses)

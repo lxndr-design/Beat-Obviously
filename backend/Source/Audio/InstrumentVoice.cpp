@@ -90,6 +90,62 @@ namespace beat
         return VoiceRenderStats::consume();
     }
 
+    void InstrumentVoice::SpectralAlignmentDelay::prepare(int maximumDelaySamples)
+    {
+        const size_t size = (size_t) juce::jmax(1, maximumDelaySamples + 1);
+        for (auto& lane : mainLanes) lane.assign(size, {});
+        for (auto& lane : sendLanes) lane.assign(size, {});
+        reset();
+    }
+
+    void InstrumentVoice::SpectralAlignmentDelay::reset() noexcept
+    {
+        mainCursor = 0;
+        sendCursor = 0;
+        mainWritten = 0;
+        sendWritten = 0;
+    }
+
+    InstrumentVoice::StereoSample InstrumentVoice::SpectralAlignmentDelay::processMain(
+        size_t lane, StereoSample input, int delaySamples) noexcept
+    {
+        auto& buffer = mainLanes[lane];
+        if (buffer.empty()) return input;
+        const size_t delay = (size_t) juce::jlimit(0, (int) buffer.size() - 1, delaySamples);
+        buffer[mainCursor] = input;
+        if (mainWritten < delay) return {};
+        return buffer[(mainCursor + buffer.size() - delay) % buffer.size()];
+    }
+
+    InstrumentVoice::StereoSample InstrumentVoice::SpectralAlignmentDelay::processSend(
+        size_t lane, StereoSample input, int delaySamples) noexcept
+    {
+        auto& buffer = sendLanes[lane];
+        if (buffer.empty()) return input;
+        const size_t delay = (size_t) juce::jlimit(0, (int) buffer.size() - 1, delaySamples);
+        buffer[sendCursor] = input;
+        if (sendWritten < delay) return {};
+        return buffer[(sendCursor + buffer.size() - delay) % buffer.size()];
+    }
+
+    void InstrumentVoice::SpectralAlignmentDelay::advanceMain() noexcept
+    {
+        if (!mainLanes.front().empty())
+        {
+            mainCursor = (mainCursor + 1) % mainLanes.front().size();
+            mainWritten = std::min(mainWritten + 1, mainLanes.front().size());
+        }
+    }
+
+    void InstrumentVoice::SpectralAlignmentDelay::advanceSend() noexcept
+    {
+        if (!sendLanes.front().empty())
+        {
+            sendCursor = (sendCursor + 1) % sendLanes.front().size();
+            sendWritten = std::min(sendWritten + 1, sendLanes.front().size());
+        }
+    }
+
     void InstrumentVoice::prepare(double sr, int blockSize)
     {
         sampleRate = std::isfinite(sr) && sr > 0.0 ? sr : 44100.0;
@@ -116,6 +172,7 @@ namespace beat
         aetherSfzSlot1.prepare({ sampleRate, blockSize, 2 });
         aetherGranularSlot2.prepare({ sampleRate, blockSize, 2 });
         aetherSpectralSlot3.prepare({ sampleRate, blockSize, 2 });
+        spectralAlignmentDelay.prepare(SpectralSourceSlot::latencySamplesForRate(sampleRate));
     }
 
     void InstrumentVoice::setProcessingQuality(AudioQuality quality) noexcept
@@ -205,6 +262,7 @@ namespace beat
         aetherSpectralSlot3.takeRetiredSource();
         aetherSpectralSlot3.publish(params.aetherSpectralSlot3.enabled ? params.aetherSpectralSlot3.source : nullptr);
         aetherSpectralSlot3.takeRetiredSource();
+        spectralAlignmentDelay.reset();
         adsrParams.attack  = juce::jmax(0.001f, p.attackMs  * 0.001f);
         adsrParams.decay   = juce::jmax(0.001f, p.decayMs   * 0.001f);
         adsrParams.sustain = juce::jlimit(0.0f, 1.0f, p.sustain);
@@ -419,6 +477,7 @@ namespace beat
         aetherSfzSlot1.allNotesOff(true);
         aetherGranularSlot2.allNotesOff(true);
         aetherSpectralSlot3.allNotesOff(true);
+        spectralAlignmentDelay.reset();
         if (params.hasAether && params.aetherSampleSlot1.enabled)
         {
             if (params.aetherSampleSlot1.sfzSource)
@@ -830,6 +889,17 @@ namespace beat
                         raw.left += granularLeft; raw.right += granularRight;
                     }
                 }
+                const int spectralLatency = params.aetherSpectralSlot3.enabled
+                    && params.aetherSpectralSlot3.source
+                    ? params.aetherSpectralSlot3.latencySamples : 0;
+                if (spectralLatency > 0)
+                {
+                    raw = spectralAlignmentDelay.processMain(0, raw, spectralLatency);
+                    directRaw = spectralAlignmentDelay.processMain(1, directRaw, spectralLatency);
+                    filter1Raw = spectralAlignmentDelay.processMain(2, filter1Raw, spectralLatency);
+                    filter2Raw = spectralAlignmentDelay.processMain(3, filter2Raw, spectralLatency);
+                    spectralAlignmentDelay.advanceMain();
+                }
                 if (params.aetherSpectralSlot3.enabled && params.aetherSpectralSlot3.source)
                 {
                     const auto spectral = aetherSpectralSlot3.renderFrame();
@@ -1091,6 +1161,13 @@ namespace beat
                     const float granularSendGain = VoiceMath::clamp01(params.aetherGranularSlot2.fxSends[bus]);
                     send.left += granularSourceFrame.left * granularSendGain;
                     send.right += granularSourceFrame.right * granularSendGain;
+                    if (params.aetherSpectralSlot3.enabled && params.aetherSpectralSlot3.source
+                        && params.aetherSpectralSlot3.latencySamples > 0)
+                    {
+                        const auto delayed = spectralAlignmentDelay.processSend(
+                            bus, { send.left, send.right }, params.aetherSpectralSlot3.latencySamples);
+                        send = { delayed.left, delayed.right };
+                    }
                     const float spectralSendGain = VoiceMath::clamp01(params.aetherSpectralSlot3.fxSends[bus]);
                     send.left += spectralSourceFrame.left * spectralSendGain;
                     send.right += spectralSourceFrame.right * spectralSendGain;
@@ -1102,6 +1179,9 @@ namespace beat
                         VoiceMath::denormalSafe(transitionedSend.left),
                         VoiceMath::denormalSafe(transitionedSend.right));
                 }
+                if (params.aetherSpectralSlot3.enabled && params.aetherSpectralSlot3.source
+                    && params.aetherSpectralSlot3.latencySamples > 0)
+                    spectralAlignmentDelay.advanceSend();
             }
 
             phase += currentPhaseDelta;
