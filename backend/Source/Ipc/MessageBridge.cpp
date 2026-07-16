@@ -10,6 +10,7 @@
 #include "../Persistence/AudioFileLibraryActions.h"
 #include "../Persistence/ManagedSfzAsset.h"
 #include "../Persistence/ManagedGranularAsset.h"
+#include "../Persistence/ManagedSpectralAsset.h"
 #include "../Persistence/ProjectAssetPackage.h"
 #include "../Persistence/ProjectDocumentBackup.h"
 #include "../Persistence/ProjectIntegrityVerifier.h"
@@ -4058,6 +4059,50 @@ namespace beat
             managed->setProperty("manifestPath", resolveProjectRelativePath(juce::File(projectPath), imported.manifestPath));
             managed->setProperty("audioPath", resolveProjectRelativePath(juce::File(projectPath), imported.audioPath));
             response->setProperty("managedGranular", juce::var(managed.get()));
+            return juce::var(response.get());
+        }
+
+        if (kind == INSTRUMENT_IMPORT_SPECTRAL)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto projectPath = payload.getProperty("projectPath", {}).toString();
+            if (projectPath.isEmpty())
+            {
+                response->setProperty("error", "Save the project to a .beat file before importing spectral audio.");
+                return juce::var(response.get());
+            }
+            auto pathHint = payload.getProperty("pathHint", {}).toString();
+            juce::File selected;
+            if (pathHint.isNotEmpty() && juce::File(pathHint).existsAsFile())
+                selected = juce::File(pathHint);
+            else
+            {
+                const auto start = pathHint.isNotEmpty() ? juce::File(pathHint) : juce::File();
+                juce::FileChooser chooser("Import 48 kHz audio into Aether Spectral Slot 3",
+                    start, granularImportWildcard, true);
+                if (!chooser.browseForFileToOpen()) return juce::var(response.get());
+                selected = chooser.getResult();
+            }
+            const int rootNote = juce::jlimit(0, 127,
+                (int) payload.getProperty("rootNote", 60));
+            const auto imported = importManagedSpectralAsset(selected,
+                juce::File(projectPath), rootNote, 0u);
+            if (!imported.ok())
+            {
+                response->setProperty("error", imported.error);
+                return juce::var(response.get());
+            }
+            juce::DynamicObject::Ptr managed = new juce::DynamicObject();
+            managed->setProperty("schemaVersion", 1);
+            managed->setProperty("assetId", imported.assetId);
+            managed->setProperty("displayName", imported.displayName);
+            managed->setProperty("manifestPath", resolveProjectRelativePath(
+                juce::File(projectPath), imported.manifestPath));
+            managed->setProperty("sourcePath", resolveProjectRelativePath(
+                juce::File(projectPath), imported.sourcePath));
+            managed->setProperty("artifactPath", resolveProjectRelativePath(
+                juce::File(projectPath), imported.artifactPath));
+            response->setProperty("managedSpectral", juce::var(managed.get()));
             return juce::var(response.get());
         }
 

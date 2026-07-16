@@ -771,3 +771,32 @@ timing JSON SHA-256 is
 `1109a701773a24c47bc78370c94cf89b9d1379d3482f1950539690434785a745`,
 render times are 12.42–15.35 ms (13.18 ms mean), harness peak RSS is
 14,991,360 bytes, deadlines are zero, and queue telemetry is unchanged.
+
+## Milestone C3F3D Slot 3 import and accessible editor — 2026-07-16
+
+The native/frontend IPC contract adds `instrument.importSpectral`. It requires
+a saved project, opens only the existing bounded audio extensions, carries the
+selected root note into analysis, and returns project-relative manifest,
+source, and artifact paths. Import remains synchronous on the message/control
+thread and never enters the audio callback.
+
+The Aether editor exposes source status, import/replace/remove, enable, freeze,
+route, root, level, pan, width, position, pitch, and both FX sends. Enable and
+freeze are disabled with an explicit described reason until a source exists;
+import reports busy/analyzing state; success focuses the live status; removal
+restores focus to Import. Shared keyboard-capable Toggle/FloatingSelect controls
+retain their existing focus and Escape/arrow behavior. The interaction verifier
+asserts labels, descriptions, busy state, send controls, and focus restoration.
+Granular Slot 2's already-persisted/rendered FX sends are now also visible in
+the shared Source FX group.
+
+Full native stress passes in 18.48 seconds wall / 16.52 seconds user / 1.12
+seconds system with only the TCC waiver. Full non-native verification and all
+Release targets pass. The first isolated baseline run had one 46.24 ms timing
+outlier; an immediate repeat contained no row above 20 ms, confirming host
+scheduling noise rather than a render change. The repeat's 150-WAV manifest is
+unchanged at `713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`;
+JSON SHA-256 is
+`d89e9af8fbf309e832dd0d01ca562784d2c69d6129638c1c6126c94edf331b82`,
+render times are 12.75–15.96 ms (13.63 ms mean), and peak RSS is 15,466,496
+bytes. Deadlines and queue telemetry remain unchanged.

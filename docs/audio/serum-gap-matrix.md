@@ -149,3 +149,12 @@ bounded retiring-synth replacement bridge. Repeat determinism and finite,
 audible product output pass. IPC import, editor UI/accessibility, product
 latency compensation, live/offline parity, benchmark content, and final
 deadline/freeze gates remain open.
+
+## Milestone C3F3D update — 2026-07-16
+
+Spectral import is product-reachable through a saved-project-only native IPC
+command, and the editor exposes the approved Slot 3 controls with keyboard,
+focus, label, live-status, busy-state, and disabled-reason coverage. Import and
+analysis remain off callback. Product latency compensation, explicit
+live/offline parity, audible factory benchmark, and final deadline/freeze gates
+remain open.

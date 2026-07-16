@@ -1323,6 +1323,8 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   let sampleSourceStatus: HTMLParagraphElement | undefined;
   let granularImportButton: HTMLButtonElement | undefined;
   let granularSourceStatus: HTMLParagraphElement | undefined;
+  let spectralImportButton: HTMLButtonElement | undefined;
+  let spectralSourceStatus: HTMLParagraphElement | undefined;
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const returnBuses = createStoreSelector(useProjectStore, (state) => state.project.returnBuses);
   const audioFiles = createStoreSelector(useAudioFileStore, (state) => state.files);
@@ -1339,6 +1341,8 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   const [importingSfz, setImportingSfz] = createSignal(false);
   const [importingGranular, setImportingGranular] = createSignal(false);
   const [granularRouteOpen, setGranularRouteOpen] = createSignal(false);
+  const [importingSpectral, setImportingSpectral] = createSignal(false);
+  const [spectralRouteOpen, setSpectralRouteOpen] = createSignal(false);
   const fxBusOptions = createMemo(() => [
     { value: "", label: "Off" },
     ...returnBuses().filter((bus) => !bus.mute).map((bus) => ({ value: bus.id, label: bus.name || bus.id })),
@@ -1346,8 +1350,10 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   const mappedZones = createMemo(() => draft().metadata.sampleSlot1Zones ?? []);
   const managedSfz = createMemo(() => draft().metadata.managedSfz);
   const managedGranular = createMemo(() => draft().metadata.managedGranular);
+  const managedSpectral = createMemo(() => draft().metadata.managedSpectral);
   const sampleSourceAvailable = createMemo(() => Boolean(String(draft().parameters["aether.sample.1.audioFileId"] ?? "") || managedSfz()));
   const granularSourceAvailable = createMemo(() => Boolean(managedGranular() || draft().parameters["aether.granular.2.builtinSource"] === "benchmark"));
+  const spectralSourceAvailable = createMemo(() => Boolean(managedSpectral()));
   const sampleSourceDescription = createMemo(() => managedSfz()
     ? `Managed SFZ source: ${managedSfz()!.displayName}.`
     : String(draft().parameters["aether.sample.1.audioFileId"] ?? "")
@@ -1358,6 +1364,9 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
     : draft().parameters["aether.granular.2.builtinSource"] === "benchmark"
       ? "Built-in benchmark source selected."
       : "No source selected. Import audio or choose the benchmark source before enabling this slot.");
+  const spectralSourceDescription = createMemo(() => managedSpectral()
+    ? `Managed spectral source: ${managedSpectral()!.displayName}. Analysis and validation complete.`
+    : "No source selected. Import bounded mono or stereo 48 kHz audio before enabling this slot.");
   const commitMappedZones = (zones: AetherSampleZoneConfig[]) => setDraft({
     ...draft(),
     metadata: { ...draft().metadata, sampleSlot1Zones: zones.slice(0, 8) },
@@ -1418,6 +1427,33 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
       await appAlert(error instanceof Error ? error.message : "Granular audio import failed.");
     } finally {
       setImportingGranular(false);
+    }
+  };
+  const importSpectral = async () => {
+    const projectPath = useDocumentStore.getState().currentFilePath;
+    if (!projectPath) {
+      await appAlert("Save this project to a .beat file before importing spectral audio.");
+      return;
+    }
+    setImportingSpectral(true);
+    try {
+      const result = await send({
+        kind: "instrument.importSpectral",
+        projectPath,
+        rootNote: Math.round(getNumberParam(draft(), "aether.spectral.3.rootNote")),
+      });
+      if (result.error) throw new Error(result.error);
+      if (!result.managedSpectral) return;
+      setDraft({
+        ...draft(),
+        parameters: { ...draft().parameters, "aether.spectral.3.enabled": true },
+        metadata: { ...draft().metadata, managedSpectral: result.managedSpectral },
+      });
+      queueMicrotask(() => spectralSourceStatus?.focus());
+    } catch (error) {
+      await appAlert(error instanceof Error ? error.message : "Spectral audio import failed.");
+    } finally {
+      setImportingSpectral(false);
     }
   };
   const baseZone = (): AetherSampleZoneConfig => ({
@@ -1760,6 +1796,79 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             <NumberInput label="Seed" layout="inline" value={getNumberParam(draft(), "aether.granular.2.randomSeed")} min={1} max={4294967295} step={1} ariaLabel="Granular deterministic seed" onChange={(value) => setNumericParameter("aether.granular.2.randomSeed", value)} />
           </div>
         </section>
+        <section class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup} ${styles.sourceSlotGroup}`} aria-labelledby="aether-spectral-slot-3-title">
+          <h3 id="aether-spectral-slot-3-title" class={styles.ampFilterGroupTitle}>Spectral Slot 3</h3>
+          <p
+            ref={spectralSourceStatus}
+            id="aether-spectral-slot-3-source-status"
+            class={styles.sourceSlotStatus}
+            role="status"
+            aria-live="polite"
+            tabindex="-1"
+          >{spectralSourceDescription()}</p>
+          <div class={styles.ampFilterShapeRow}>
+            <Toggle
+              label="Enabled"
+              aria-label="Enable Aether spectral slot 3"
+              aria-describedby="aether-spectral-slot-3-source-status"
+              checked={draft().parameters["aether.spectral.3.enabled"] === true}
+              disabled={!spectralSourceAvailable()}
+              onChange={(value) => setBooleanParameter("aether.spectral.3.enabled", value)}
+            />
+            <Toggle
+              label="Freeze"
+              aria-label="Freeze Aether spectral slot 3 position"
+              aria-describedby="aether-spectral-slot-3-source-status"
+              checked={draft().parameters["aether.spectral.3.freeze"] === true}
+              disabled={!spectralSourceAvailable()}
+              onChange={(value) => setBooleanParameter("aether.spectral.3.freeze", value)}
+            />
+            <FloatingSelect
+              label="Route"
+              layout="inline"
+              value={String(draft().parameters["aether.spectral.3.route"] ?? "filter")}
+              ariaLabel="Aether spectral slot 3 route"
+              ariaDescribedBy="aether-spectral-slot-3-source-status"
+              options={[
+                { value: "filter", label: "Filter" },
+                { value: "filter1", label: "Filter 1" },
+                { value: "filter2", label: "Filter 2" },
+                { value: "direct", label: "Direct" },
+              ]}
+              open={spectralRouteOpen()}
+              onOpenChange={setSpectralRouteOpen}
+              onChange={(value) => setParameter("aether.spectral.3.route", value)}
+            />
+            <Button
+              ref={spectralImportButton}
+              size="xs"
+              aria-label={managedSpectral() ? `Replace spectral audio ${managedSpectral()!.displayName}` : "Import 48 kHz audio for Spectral Slot 3"}
+              aria-busy={importingSpectral()}
+              onClick={() => void importSpectral()}
+              disabled={importingSpectral()}
+            >
+              {importingSpectral() ? "Analyzing…" : managedSpectral() ? `Audio · ${managedSpectral()!.displayName}` : "Import 48 kHz Audio"}
+            </Button>
+            <Show when={managedSpectral()}>
+              <Button size="xs" variant="ghost" aria-label="Remove Spectral Slot 3 source" onClick={() => {
+                setDraft({
+                  ...draft(),
+                  parameters: { ...draft().parameters, "aether.spectral.3.enabled": false },
+                  metadata: { ...draft().metadata, managedSpectral: undefined },
+                });
+                queueMicrotask(() => spectralImportButton?.focus());
+              }}>Remove</Button>
+            </Show>
+          </div>
+          <div class={styles.knobCluster}>
+            <NumberInput label="Root" layout="inline" value={getNumberParam(draft(), "aether.spectral.3.rootNote")} min={0} max={127} step={1} ariaLabel="Spectral root MIDI note" onChange={(value) => setNumericParameter("aether.spectral.3.rootNote", value)} />
+            <SynthParameterKnob id="aether.spectral.3.level" label="Level" defaultValue={0.7} onChange={setNumericParameter} />
+            <NumberInput label="Pan" layout="inline" value={getNumberParam(draft(), "aether.spectral.3.pan")} min={-1} max={1} step={0.01} ariaLabel="Spectral stereo pan" onChange={(value) => setNumericParameter("aether.spectral.3.pan", value)} />
+            <NumberInput label="Width" layout="inline" value={getNumberParam(draft(), "aether.spectral.3.stereoWidth")} min={0} max={2} step={0.01} ariaLabel="Spectral stereo width" onChange={(value) => setNumericParameter("aether.spectral.3.stereoWidth", value)} />
+            <SynthParameterKnob id="aether.spectral.3.position" label="Position" defaultValue={0} onChange={setNumericParameter} />
+            <NumberInput label="Pitch" layout="inline" value={getNumberParam(draft(), "aether.spectral.3.pitchSemitones")} min={-12} max={12} step={0.1} ariaLabel="Spectral pitch semitones" onChange={(value) => setNumericParameter("aether.spectral.3.pitchSemitones", value)} />
+          </div>
+        </section>
         <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label="Aether shared FX buses">
           <div class={styles.ampFilterGroupTitle}>Source FX</div>
           <div class={styles.ampFilterShapeRow}>
@@ -1791,6 +1900,10 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             <SynthParameterKnob id="aether.noise.fxSend2" label="Noise 2" defaultValue={0} onChange={setNumericParameter} />
             <SynthParameterKnob id="aether.sample.1.fxSend1" label="Sample 1" defaultValue={0} onChange={setNumericParameter} />
             <SynthParameterKnob id="aether.sample.1.fxSend2" label="Sample 2" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.granular.2.fxSend1" label="Granular 1" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.granular.2.fxSend2" label="Granular 2" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.spectral.3.fxSend1" label="Spectral 1" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.spectral.3.fxSend2" label="Spectral 2" defaultValue={0} onChange={setNumericParameter} />
           </div>
         </div>
       </div>

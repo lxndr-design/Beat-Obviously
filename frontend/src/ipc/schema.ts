@@ -16,6 +16,7 @@ import type {
   Instrument,
   ManagedSfzAssetConfig,
   ManagedGranularAssetConfig,
+  ManagedSpectralAssetConfig,
   InstrumentSet,
   PluginAdapter,
   Project,
@@ -305,6 +306,7 @@ export type OutboundRequest =
   | { kind: "instrument.importDecent"; pathHint?: string }
   | { kind: "instrument.importSfz"; projectPath: string; pathHint?: string }
   | { kind: "instrument.importGranular"; projectPath: string; pathHint?: string }
+  | { kind: "instrument.importSpectral"; projectPath: string; pathHint?: string; rootNote?: number }
   | { kind: "instrument.renderPreview"; instrument: Instrument; note?: number; velocity?: number; bpm?: number; durationBeats?: Beats; bucketCount?: number; includeAudio?: boolean }
   | { kind: "instrument.resynthesizeWavemap"; audioFile: Pick<AudioFile, "id" | "name" | "path" | "sampleRate">; wavemapId?: string; name?: string; selection?: WavemapResynthesisSelection }
   // Audio files -----------------------------------------------------------
@@ -362,6 +364,7 @@ export type ResponseFor<R extends OutboundRequest> =
   R extends { kind: "instrument.importDecent" } ? { preset: DecentSamplerImport | null } :
   R extends { kind: "instrument.importSfz" } ? { managedSfz?: ManagedSfzAssetConfig; diagnostics?: Array<{ severity: "warning" | "error"; code: string; message: string; line: number; column: number }>; error?: string } :
   R extends { kind: "instrument.importGranular" } ? { managedGranular?: ManagedGranularAssetConfig; error?: string } :
+  R extends { kind: "instrument.importSpectral" } ? { managedSpectral?: ManagedSpectralAssetConfig; error?: string } :
   R extends { kind: "instrument.renderPreview" } ? { analysis?: AudioRenderAnalysis; waveform?: AudioWaveformSummary | null; audioDataUrl?: string; durationBeats?: Beats; note?: number; velocity?: number; error?: string } :
   R extends { kind: "instrument.resynthesizeWavemap" } ? { wavemap?: WavemapDefinition; error?: string } :
   R extends { kind: "audio.import" }   ? { file: AudioFile | null } :

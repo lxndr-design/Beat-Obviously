@@ -1369,11 +1369,20 @@ try {
       && synthEditorSource.includes('id="aether-granular-slot-2-source-status"')
       && synthEditorSource.includes('aria-label="Enable Aether granular slot 2"')
       && synthEditorSource.includes('aria-describedby="aether-granular-slot-2-source-status"')
+      && synthEditorSource.includes('aria-labelledby="aether-spectral-slot-3-title"')
+      && synthEditorSource.includes('id="aether-spectral-slot-3-source-status"')
+      && synthEditorSource.includes('aria-label="Enable Aether spectral slot 3"')
+      && synthEditorSource.includes('aria-label="Freeze Aether spectral slot 3 position"')
+      && synthEditorSource.includes('aria-describedby="aether-spectral-slot-3-source-status"')
+      && synthEditorSource.includes('id="aether.spectral.3.fxSend1"')
+      && synthEditorSource.includes('id="aether.spectral.3.fxSend2"')
       && synthEditorSource.includes('aria-busy={importingSfz()}')
       && synthEditorSource.includes('aria-busy={importingGranular()}')
+      && synthEditorSource.includes('aria-busy={importingSpectral()}')
       && synthEditorSource.includes('queueMicrotask(() => sampleImportButton?.focus())')
-      && synthEditorSource.includes('queueMicrotask(() => granularImportButton?.focus())'),
-    "Aether Slot 1/2 controls should expose source state, disabled reasons, busy state, and deterministic focus restoration",
+      && synthEditorSource.includes('queueMicrotask(() => granularImportButton?.focus())')
+      && synthEditorSource.includes('queueMicrotask(() => spectralImportButton?.focus())'),
+    "Aether Slot 1/2/3 controls should expose source state, disabled reasons, busy state, and deterministic focus restoration",
   );
   assert.ok(
     floatingSelectSource.includes('event.key === "Escape"')

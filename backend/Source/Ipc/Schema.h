@@ -58,6 +58,7 @@ namespace beat::ipc
         constexpr const char* INSTRUMENT_IMPORT_DECENT = "instrument.importDecent";
         constexpr const char* INSTRUMENT_IMPORT_SFZ = "instrument.importSfz";
         constexpr const char* INSTRUMENT_IMPORT_GRANULAR = "instrument.importGranular";
+        constexpr const char* INSTRUMENT_IMPORT_SPECTRAL = "instrument.importSpectral";
         constexpr const char* INSTRUMENT_RENDER_PREVIEW = "instrument.renderPreview";
         constexpr const char* INSTRUMENT_RESYNTHESIZE_WAVEMAP = "instrument.resynthesizeWavemap";
 

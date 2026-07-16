@@ -1181,3 +1181,9 @@ control-side route replacement
 The shared resampler cache mutex and table construction are reachable only from
 `prepare()`, never `renderFrame()`. Frame storage, voice storage, and the
 single-sample bridge buffer are allocated before callback use.
+
+C3F3D adds a message-thread import edge from the editor to
+`importManagedSpectralAsset()`. File choosing, decode, analysis, serialization,
+hashing, and project-relative path creation remain outside `AudioEngine` and
+the callback. Editor parameter changes continue through the existing project
+rebuild boundary; no file or artifact work is added to realtime parameter IPC.
