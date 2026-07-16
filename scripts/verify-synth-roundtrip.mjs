@@ -220,6 +220,17 @@ try {
       "aether.granular.2.randomSeed": 123456,
       "aether.granular.2.fxSend1": 0.22,
       "aether.granular.2.fxSend2": 0.39,
+      "aether.spectral.3.enabled": true,
+      "aether.spectral.3.rootNote": 57,
+      "aether.spectral.3.level": 0.61,
+      "aether.spectral.3.pan": -0.24,
+      "aether.spectral.3.stereoWidth": 1.37,
+      "aether.spectral.3.position": 0.42,
+      "aether.spectral.3.pitchSemitones": 5.5,
+      "aether.spectral.3.freeze": true,
+      "aether.spectral.3.route": "direct",
+      "aether.spectral.3.fxSend1": 0.31,
+      "aether.spectral.3.fxSend2": 0.47,
       "aether.runtimeWarp": 0.24,
       "aether.runtimeWarpMode": "fold",
       "aether.runtimeWarp2": 0.41,
@@ -265,6 +276,14 @@ try {
         displayName: "Roundtrip Texture",
         manifestPath: "./Roundtrip Assets/granular/granular-roundtrip-fixture/manifest.json",
         audioPath: "./Roundtrip Assets/granular/granular-roundtrip-fixture/source.wav",
+      },
+      managedSpectral: {
+        schemaVersion: 1,
+        assetId: "spectral-roundtrip-fixture",
+        displayName: "Roundtrip Spectrum",
+        manifestPath: "./Roundtrip Assets/spectral/spectral-roundtrip-fixture/manifest.json",
+        sourcePath: "./Roundtrip Assets/spectral/spectral-roundtrip-fixture/source.wav",
+        artifactPath: "./Roundtrip Assets/spectral/spectral-roundtrip-fixture/artifact.aetherspectral",
       },
       sampleSlot1Zones: [
         { audioFileId: "audio-low", rootNote: 48, loNote: 0, hiNote: 63, loVelocity: 0, hiVelocity: 127,
@@ -326,13 +345,27 @@ try {
     fxSends: [0.22, 0.39],
     managedAsset: independentUnisonDraft.metadata.managedGranular,
   });
+  assert.deepEqual(independentUnisonPreview.aether.spectralSlot3, {
+    schemaVersion: 1,
+    enabled: true,
+    rootNote: 57,
+    level: 0.61,
+    pan: -0.24,
+    stereoWidth: 1.37,
+    position: 0.42,
+    pitchSemitones: 5.5,
+    freeze: true,
+    route: "direct",
+    fxSends: [0.31, 0.47],
+    managedAsset: independentUnisonDraft.metadata.managedSpectral,
+  });
   assert.deepEqual(independentUnisonPreview.sampleIds, ["audio-fixture-1", "audio-low", "audio-high"]);
-  assert.equal(independentUnisonDraft.schemaVersion, 5);
+  assert.equal(independentUnisonDraft.schemaVersion, 6);
   const migratedSampleSlotDraft = synthStore.normalizeSynthDraftPatch({
     schemaVersion: 1,
     parameters: { "osc.a.level": 0.42 },
   });
-  assert.equal(migratedSampleSlotDraft.schemaVersion, 5);
+  assert.equal(migratedSampleSlotDraft.schemaVersion, 6);
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.enabled"], false);
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.audioFileId"], "");
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.start"], 0);
@@ -347,6 +380,9 @@ try {
   assert.equal(migratedSampleSlotDraft.parameters["aether.granular.2.grainMilliseconds"], 80);
   assert.equal(migratedSampleSlotDraft.parameters["aether.granular.2.densityHz"], 12);
   assert.equal(migratedSampleSlotDraft.metadata.managedGranular, undefined);
+  assert.equal(migratedSampleSlotDraft.parameters["aether.spectral.3.enabled"], false);
+  assert.equal(migratedSampleSlotDraft.parameters["aether.spectral.3.position"], 0);
+  assert.equal(migratedSampleSlotDraft.metadata.managedSpectral, undefined);
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
       metadata: {
@@ -380,11 +416,35 @@ try {
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
       metadata: {
+        managedSpectral: {
+          schemaVersion: 2,
+          assetId: "future-spectral",
+          manifestPath: "Future Assets/spectral/manifest.json",
+          sourcePath: "Future Assets/spectral/source.wav",
+          artifactPath: "Future Assets/spectral/artifact.aetherspectral",
+        },
+      },
+    }),
+    (error) => error instanceof synthStore.HybridSourceMigrationError
+      && error.code === "aether.spectral-slot-3.managed-asset.schema-future"
+      && error.path === "metadata.managedSpectral.schemaVersion",
+  );
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch({
+      metadata: {
         sampleSlot1Zones: Array.from({ length: 9 }, (_, index) => ({ audioFileId: `zone-${index}` })),
       },
     }),
     (error) => error instanceof synthStore.HybridSourceMigrationError
       && error.code === "aether.sample-slot-1.zones-capacity",
+  );
+  const futureSpectralInstrument = structuredClone(independentUnisonPreview);
+  futureSpectralInstrument.aether.spectralSlot3.schemaVersion = 2;
+  assert.throws(
+    () => synthStore.synthDraftFromInstrument(futureSpectralInstrument),
+    (error) => error instanceof synthStore.HybridSourceMigrationError
+      && error.code === "aether.spectral-slot-3.schema-future"
+      && error.path === "instrument.aether.spectralSlot3.schemaVersion",
   );
   const futureSlotInstrument = structuredClone(independentUnisonPreview);
   futureSlotInstrument.aether.sampleSlot1.schemaVersion = 6;

@@ -7,6 +7,7 @@ namespace beat
     {
         constexpr int sampleSlot1SchemaVersion = 5;
         constexpr int granularSlot2SchemaVersion = 1;
+        constexpr int spectralSlot3SchemaVersion = 1;
         constexpr int managedAssetSchemaVersion = 1;
 
         bool hasProperty(const juce::var& value, const juce::Identifier& property)
@@ -203,6 +204,52 @@ namespace beat
                         "Enabled granularSlot2 has no built-in or managed source.");
             }
         }
+
+        void validateSpectralSlot(const juce::var& aether,
+                                  const juce::String& path,
+                                  std::vector<HybridSourceDocumentDiagnostic>& diagnostics)
+        {
+            if (!hasProperty(aether, "spectralSlot3")) return;
+            const auto slot = aether.getProperty("spectralSlot3", {});
+            const auto slotPath = path + ".spectralSlot3";
+            if (!slot.isObject())
+            {
+                add(diagnostics, "aether.spectral-slot-3.shape", slotPath,
+                    "spectralSlot3 must be an object when present.");
+                return;
+            }
+            validateVersion(slot, spectralSlot3SchemaVersion,
+                "aether.spectral-slot-3", slotPath, diagnostics);
+            const auto managed = slot.getProperty("managedAsset", {});
+            if (hasProperty(slot, "managedAsset"))
+            {
+                const auto managedPath = slotPath + ".managedAsset";
+                if (!managed.isObject())
+                    add(diagnostics, "aether.spectral-slot-3.managed-asset.shape", managedPath,
+                        "managedAsset must be an object when present.");
+                else
+                {
+                    validateVersion(managed, managedAssetSchemaVersion,
+                        "aether.spectral-slot-3.managed-asset", managedPath, diagnostics);
+                    const bool hasContent = managed.getProperty("assetId", {}).toString().isNotEmpty()
+                        || managed.getProperty("manifestPath", {}).toString().isNotEmpty()
+                        || managed.getProperty("sourcePath", {}).toString().isNotEmpty()
+                        || managed.getProperty("artifactPath", {}).toString().isNotEmpty();
+                    if (hasContent
+                        && (managed.getProperty("assetId", {}).toString().isEmpty()
+                            || managed.getProperty("manifestPath", {}).toString().isEmpty()
+                            || managed.getProperty("sourcePath", {}).toString().isEmpty()
+                            || managed.getProperty("artifactPath", {}).toString().isEmpty()))
+                        add(diagnostics, "aether.spectral-slot-3.managed-asset.fields-missing",
+                            managedPath, "A non-empty managedAsset requires assetId, manifestPath, sourcePath, and artifactPath.");
+                }
+            }
+            if ((bool) slot.getProperty("enabled", false)
+                && (!managed.isObject()
+                    || managed.getProperty("manifestPath", {}).toString().isEmpty()))
+                add(diagnostics, "aether.spectral-slot-3.source-missing", slotPath,
+                    "Enabled spectralSlot3 has no managed source.");
+        }
     }
 
     std::vector<HybridSourceDocumentDiagnostic> validateHybridSourceDocument(const juce::var& document)
@@ -221,6 +268,7 @@ namespace beat
             const auto path = "instruments[" + juce::String(index) + "].aether";
             validateSampleSlot(aether, path, diagnostics);
             validateGranularSlot(aether, path, diagnostics);
+            validateSpectralSlot(aether, path, diagnostics);
         }
         return diagnostics;
     }

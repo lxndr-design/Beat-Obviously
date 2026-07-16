@@ -410,3 +410,11 @@ project-sidecar helper, JUCE file/JSON/SHA-256 APIs, and standard-library code.
 No upstream repository, acquired code, new dependency, external asset, preset,
 binary, service, branding, coefficient table, or derived implementation was
 used. The test audio is generated locally in memory.
+
+## C3F3B Slot 3 persistence and asset integrity — 2026-07-16
+
+The TrackModel, repository, hybrid validator, project packaging/cleanup,
+frontend types/store/reference graph, verifier, tests, and audit changes are
+independently implemented Beat-owned schema and orchestration code. They use no
+new dependency, upstream source, external asset, preset, binary, service,
+branding, coefficient data, or derived implementation.

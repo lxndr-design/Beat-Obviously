@@ -181,6 +181,19 @@ namespace beat
                     }
                     aether->setProperty("granularSlot2", granularVar);
                 }
+                auto spectralVar = aether->getProperty("spectralSlot3");
+                if (auto* spectral = spectralVar.getDynamicObject())
+                {
+                    auto managedVar = spectral->getProperty("managedAsset");
+                    if (auto* managed = managedVar.getDynamicObject())
+                    {
+                        rewriteObjectPath(managed, rewrites, "manifestPath");
+                        rewriteObjectPath(managed, rewrites, "sourcePath");
+                        rewriteObjectPath(managed, rewrites, "artifactPath");
+                        spectral->setProperty("managedAsset", managedVar);
+                    }
+                    aether->setProperty("spectralSlot3", spectralVar);
+                }
                 instrument->setProperty("aether", aetherVar);
             }
         }
@@ -245,6 +258,19 @@ namespace beat
                         granular->setProperty("managedAsset", managedVar);
                     }
                     aether->setProperty("granularSlot2", granularVar);
+                }
+                auto spectralVar = aether->getProperty("spectralSlot3");
+                if (auto* spectral = spectralVar.getDynamicObject())
+                {
+                    auto managedVar = spectral->getProperty("managedAsset");
+                    if (auto* managed = managedVar.getDynamicObject())
+                    {
+                        resolveObjectPath(managed, projectFile, "manifestPath");
+                        resolveObjectPath(managed, projectFile, "sourcePath");
+                        resolveObjectPath(managed, projectFile, "artifactPath");
+                        spectral->setProperty("managedAsset", managedVar);
+                    }
+                    aether->setProperty("spectralSlot3", spectralVar);
                 }
                 instrument->setProperty("aether", aetherVar);
             }
@@ -439,6 +465,11 @@ namespace beat
                         .getProperty("granularSlot2", {}).getProperty("managedAsset", {});
                     recordManagedBundleUsage(managedGranular, projectFile, "manifestPath", usedSidecarFiles);
                     recordObjectPathUsage(managedGranular, projectFile, "audioPath", usedSidecarFiles);
+                    const auto managedSpectral = instrument.getProperty("aether", {})
+                        .getProperty("spectralSlot3", {}).getProperty("managedAsset", {});
+                    recordManagedBundleUsage(managedSpectral, projectFile, "manifestPath", usedSidecarFiles);
+                    recordObjectPathUsage(managedSpectral, projectFile, "sourcePath", usedSidecarFiles);
+                    recordObjectPathUsage(managedSpectral, projectFile, "artifactPath", usedSidecarFiles);
                 }
             }
 
@@ -633,6 +664,14 @@ namespace beat
                                  referenceBase + ":managedGranular:manifest", instrumentName);
                 addManifestAsset(assets, "sample", managedGranular.getProperty("audioPath", {}).toString(),
                                  referenceBase + ":managedGranular:audio", instrumentName);
+                const auto managedSpectral = instrument.getProperty("aether", {})
+                    .getProperty("spectralSlot3", {}).getProperty("managedAsset", {});
+                addManifestAsset(assets, "sample", managedSpectral.getProperty("manifestPath", {}).toString(),
+                                 referenceBase + ":managedSpectral:manifest", instrumentName);
+                addManifestAsset(assets, "sample", managedSpectral.getProperty("sourcePath", {}).toString(),
+                                 referenceBase + ":managedSpectral:source", instrumentName);
+                addManifestAsset(assets, "sample", managedSpectral.getProperty("artifactPath", {}).toString(),
+                                 referenceBase + ":managedSpectral:artifact", instrumentName);
             }
         }
 

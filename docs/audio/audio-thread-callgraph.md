@@ -1145,3 +1145,8 @@ control/import thread only
 audio callback / AudioEngine / Slot 3 / IPC / UI
   -> no caller in C3F3A
 ```
+
+C3F3B adds only database/frontend serialization, validation, portable path
+rewriting, asset references, and cleanup retention for the three-file bundle.
+These control/document paths still have no edge to `AudioEngine`,
+`InstrumentVoice`, `SpectralSourceSlot`, or the callback.

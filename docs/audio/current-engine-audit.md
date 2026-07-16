@@ -712,3 +712,28 @@ timing JSON SHA-256 is
 render times are 12.65–15.64 ms (13.60 ms mean), harness peak RSS is
 15,122,432 bytes, deadlines are zero, and queue telemetry remains 64/16/16.
 No render hash changed.
+
+## Milestone C3F3B Slot 3 persistence and asset integrity — 2026-07-16
+
+Slot 3 now has a version-1 saved configuration containing enable, root note,
+level, pan, stereo width, position, plus/minus-12-semitone pitch, freeze,
+routing, two FX sends, and its managed bundle reference. The frontend synth
+patch advances from v5 to v6; v1–v5 patches receive disabled Slot 3 defaults,
+while v6 roundtrips every field and stable parameter ID. Future, malformed,
+partial, or source-less data fails with stable backend/frontend diagnostics.
+
+Project packaging rewrites and resolves manifest/source/artifact paths as one
+bundle. Backend and frontend reference graphs retain all three files, and
+fail-closed cleanup tests prove a referenced spectral bundle survives while an
+unreferenced sibling is removed. Database, portable packaging, cleanup,
+future-version, partial-asset, and frontend instrument/patch tests pass. This
+slice adds no `AudioEngine`, voice, callback, IPC import, editor UI, latency, or
+audible route.
+
+Full native/non-native suites and all Release targets pass with only the TCC
+waiver. The 150-WAV manifest remains
+`713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`;
+timing JSON SHA-256 is
+`24516151de79862367a77486b5d294f386220f676b9b4d3739ffc13e2f778453`,
+render times are 12.79–15.83 ms (13.55 ms mean), harness peak RSS is
+14,876,672 bytes, deadlines are zero, and queue telemetry is unchanged.

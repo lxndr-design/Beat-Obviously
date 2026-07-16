@@ -443,6 +443,28 @@ namespace beat
             managedGranular->setProperty("audioPath", aether.granularSlot2.managedAsset.audioPath);
             granularSlot2->setProperty("managedAsset", juce::var(managedGranular.get()));
             o->setProperty("granularSlot2", juce::var(granularSlot2.get()));
+            juce::DynamicObject::Ptr spectralSlot3 = new juce::DynamicObject();
+            spectralSlot3->setProperty("schemaVersion", aether.spectralSlot3.schemaVersion);
+            spectralSlot3->setProperty("enabled", aether.spectralSlot3.enabled);
+            spectralSlot3->setProperty("rootNote", aether.spectralSlot3.rootNote);
+            spectralSlot3->setProperty("level", aether.spectralSlot3.level);
+            spectralSlot3->setProperty("pan", aether.spectralSlot3.pan);
+            spectralSlot3->setProperty("stereoWidth", aether.spectralSlot3.stereoWidth);
+            spectralSlot3->setProperty("position", aether.spectralSlot3.position);
+            spectralSlot3->setProperty("pitchSemitones", aether.spectralSlot3.pitchSemitones);
+            spectralSlot3->setProperty("freeze", aether.spectralSlot3.freeze);
+            spectralSlot3->setProperty("routing", aether.spectralSlot3.routing);
+            spectralSlot3->setProperty("fxSend1", aether.spectralSlot3.fxSends[0]);
+            spectralSlot3->setProperty("fxSend2", aether.spectralSlot3.fxSends[1]);
+            juce::DynamicObject::Ptr managedSpectral = new juce::DynamicObject();
+            managedSpectral->setProperty("schemaVersion", aether.spectralSlot3.managedAsset.schemaVersion);
+            managedSpectral->setProperty("assetId", aether.spectralSlot3.managedAsset.assetId);
+            managedSpectral->setProperty("displayName", aether.spectralSlot3.managedAsset.displayName);
+            managedSpectral->setProperty("manifestPath", aether.spectralSlot3.managedAsset.manifestPath);
+            managedSpectral->setProperty("sourcePath", aether.spectralSlot3.managedAsset.sourcePath);
+            managedSpectral->setProperty("artifactPath", aether.spectralSlot3.managedAsset.artifactPath);
+            spectralSlot3->setProperty("managedAsset", juce::var(managedSpectral.get()));
+            o->setProperty("spectralSlot3", juce::var(spectralSlot3.get()));
             o->setProperty("fxBus1Id", aether.fxBusIds[0]);
             o->setProperty("fxBus2Id", aether.fxBusIds[1]);
             o->setProperty("runtimeWarp", aether.runtimeWarp);
@@ -602,6 +624,45 @@ namespace beat
                     && sourceSchemaVersion <= config.granularSlot2.schemaVersion
                     && (config.granularSlot2.builtinSource.isNotEmpty()
                         || config.granularSlot2.managedAsset.manifestPath.isNotEmpty());
+            }
+            const auto spectralSlot3 = aetherVar.getProperty("spectralSlot3", {});
+            if (spectralSlot3.isObject())
+            {
+                const int sourceSchemaVersion = juce::jmax(0,
+                    (int) spectralSlot3.getProperty("schemaVersion", 0));
+                auto& slot = config.spectralSlot3;
+                slot.schemaVersion = 1;
+                const bool requestedEnabled = (bool) spectralSlot3.getProperty("enabled", false);
+                slot.rootNote = juce::jlimit(0, 127,
+                    (int) spectralSlot3.getProperty("rootNote", 60));
+                slot.level = juce::jlimit(0.0f, 1.0f,
+                    (float) (double) spectralSlot3.getProperty("level", 0.7));
+                slot.pan = juce::jlimit(-1.0f, 1.0f,
+                    (float) (double) spectralSlot3.getProperty("pan", 0.0));
+                slot.stereoWidth = juce::jlimit(0.0f, 2.0f,
+                    (float) (double) spectralSlot3.getProperty("stereoWidth", 1.0));
+                slot.position = juce::jlimit(0.0f, 1.0f,
+                    (float) (double) spectralSlot3.getProperty("position", 0.0));
+                slot.pitchSemitones = juce::jlimit(-12.0f, 12.0f,
+                    (float) (double) spectralSlot3.getProperty("pitchSemitones", 0.0));
+                slot.freeze = (bool) spectralSlot3.getProperty("freeze", false);
+                slot.routing = juce::jlimit(0, 3,
+                    (int) spectralSlot3.getProperty("routing", 0));
+                slot.fxSends[0] = juce::jlimit(0.0f, 1.0f,
+                    (float) (double) spectralSlot3.getProperty("fxSend1", 0.0));
+                slot.fxSends[1] = juce::jlimit(0.0f, 1.0f,
+                    (float) (double) spectralSlot3.getProperty("fxSend2", 0.0));
+                const auto managed = spectralSlot3.getProperty("managedAsset", {});
+                if (managed.isObject() && (int) managed.getProperty("schemaVersion", 0) <= 1)
+                {
+                    slot.managedAsset.assetId = managed.getProperty("assetId", {}).toString();
+                    slot.managedAsset.displayName = managed.getProperty("displayName", {}).toString();
+                    slot.managedAsset.manifestPath = managed.getProperty("manifestPath", {}).toString();
+                    slot.managedAsset.sourcePath = managed.getProperty("sourcePath", {}).toString();
+                    slot.managedAsset.artifactPath = managed.getProperty("artifactPath", {}).toString();
+                }
+                slot.enabled = requestedEnabled && sourceSchemaVersion <= slot.schemaVersion
+                    && slot.managedAsset.manifestPath.isNotEmpty();
             }
             config.fxBusIds[0] = aetherVar.getProperty("fxBus1Id", config.fxBusIds[0]).toString();
             config.fxBusIds[1] = aetherVar.getProperty("fxBus2Id", config.fxBusIds[1]).toString();

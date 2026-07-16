@@ -6995,6 +6995,28 @@ namespace
         slot->setProperty("managedSfz", juce::var(managed.get()));
         juce::DynamicObject::Ptr aether = new juce::DynamicObject();
         aether->setProperty("sampleSlot1", juce::var(slot.get()));
+        const auto spectralRoot = beat::projectSidecarFolderFor(projectFile)
+            .getChildFile("spectral").getChildFile("spectral-packaging-fixture");
+        const auto spectralManifest = spectralRoot.getChildFile("manifest.json");
+        const auto spectralSource = spectralRoot.getChildFile("source.wav");
+        const auto spectralArtifact = spectralRoot.getChildFile("artifact.aetherspectral");
+        if (!spectralRoot.createDirectory()
+            || !spectralManifest.replaceWithText("spectral-manifest")
+            || !spectralSource.replaceWithText("spectral-source")
+            || !spectralArtifact.replaceWithText("spectral-artifact"))
+        {
+            root.deleteRecursively();
+            return false;
+        }
+        juce::DynamicObject::Ptr managedSpectral = new juce::DynamicObject();
+        managedSpectral->setProperty("schemaVersion", 1);
+        managedSpectral->setProperty("assetId", "spectral-packaging-fixture");
+        managedSpectral->setProperty("manifestPath", spectralManifest.getFullPathName());
+        managedSpectral->setProperty("sourcePath", spectralSource.getFullPathName());
+        managedSpectral->setProperty("artifactPath", spectralArtifact.getFullPathName());
+        juce::DynamicObject::Ptr spectralSlot = new juce::DynamicObject();
+        spectralSlot->setProperty("managedAsset", juce::var(managedSpectral.get()));
+        aether->setProperty("spectralSlot3", juce::var(spectralSlot.get()));
         instrument->setProperty("aether", juce::var(aether.get()));
         if (auto* documentAssets = document.getProperty("assets", {}).getArray())
         {
@@ -7004,6 +7026,12 @@ namespace
                                           managedSource.getFullPathName(), "bundled"));
             documentAssets->add(makeAsset("managed-sample", "sample",
                                           managedSample.getFullPathName(), "bundled"));
+            documentAssets->add(makeAsset("spectral-manifest", "sample",
+                                          spectralManifest.getFullPathName(), "bundled"));
+            documentAssets->add(makeAsset("spectral-source", "sample",
+                                          spectralSource.getFullPathName(), "bundled"));
+            documentAssets->add(makeAsset("spectral-artifact", "sample",
+                                          spectralArtifact.getFullPathName(), "bundled"));
         }
 
         juce::String error;
@@ -7025,6 +7053,8 @@ namespace
         const auto packagedBundledAssetPath = document.getProperty("assets", {})[3].getProperty("path", {}).toString();
         const auto packagedManaged = document.getProperty("instruments", {})[0]
             .getProperty("aether", {}).getProperty("sampleSlot1", {}).getProperty("managedSfz", {});
+        const auto packagedSpectral = document.getProperty("instruments", {})[0]
+            .getProperty("aether", {}).getProperty("spectralSlot3", {}).getProperty("managedAsset", {});
 
         const bool relativePathsOk = packagedAudioPath.startsWith("./")
             && packagedSamplePath.startsWith("./")
@@ -7035,7 +7065,10 @@ namespace
             && packagedBundledAssetPath == "/samples/factory.wav"
             && packagedManaged.getProperty("manifestPath", {}).toString().startsWith("./Portable Project Assets/sfz/")
             && packagedManaged.getProperty("sourcePath", {}).toString().startsWith("./Portable Project Assets/sfz/")
-            && packagedManaged.getProperty("samplePaths", {})[0].toString().startsWith("./Portable Project Assets/sfz/");
+            && packagedManaged.getProperty("samplePaths", {})[0].toString().startsWith("./Portable Project Assets/sfz/")
+            && packagedSpectral.getProperty("manifestPath", {}).toString().startsWith("./Portable Project Assets/spectral/")
+            && packagedSpectral.getProperty("sourcePath", {}).toString().startsWith("./Portable Project Assets/spectral/")
+            && packagedSpectral.getProperty("artifactPath", {}).toString().startsWith("./Portable Project Assets/spectral/");
 
         const auto copiedAudio = projectFile.getParentDirectory().getChildFile(packagedAudioPath);
         const auto copiedSample = projectFile.getParentDirectory().getChildFile(packagedSamplePath);
@@ -7051,13 +7084,18 @@ namespace
         const auto resolvedSamplePath = document.getProperty("instruments", {})[0].getProperty("sampleUrl", {}).toString();
         const auto resolvedManaged = document.getProperty("instruments", {})[0]
             .getProperty("aether", {}).getProperty("sampleSlot1", {}).getProperty("managedSfz", {});
+        const auto resolvedSpectral = document.getProperty("instruments", {})[0]
+            .getProperty("aether", {}).getProperty("spectralSlot3", {}).getProperty("managedAsset", {});
         const bool resolvedOk = resolvedAudioPath.startsWith(root.getFullPathName())
             && resolvedSamplePath.startsWith(root.getFullPathName())
             && juce::File(resolvedAudioPath).existsAsFile()
             && juce::File(resolvedSamplePath).existsAsFile()
             && juce::File(resolvedManaged.getProperty("manifestPath", {}).toString()).existsAsFile()
             && juce::File(resolvedManaged.getProperty("sourcePath", {}).toString()).existsAsFile()
-            && juce::File(resolvedManaged.getProperty("samplePaths", {})[0].toString()).existsAsFile();
+            && juce::File(resolvedManaged.getProperty("samplePaths", {})[0].toString()).existsAsFile()
+            && juce::File(resolvedSpectral.getProperty("manifestPath", {}).toString()).existsAsFile()
+            && juce::File(resolvedSpectral.getProperty("sourcePath", {}).toString()).existsAsFile()
+            && juce::File(resolvedSpectral.getProperty("artifactPath", {}).toString()).existsAsFile();
         const auto resolvedZone = document.getProperty("instruments", {})[0].getProperty("sampleMap", {})[0];
         const bool zoneMetadataOk =
             (int) resolvedZone.getProperty("rootNote", -1) == 64
@@ -8301,6 +8339,21 @@ namespace
         instrument.aether.granularSlot2.managedAsset.displayName = "Granular Fixture";
         instrument.aether.granularSlot2.managedAsset.manifestPath = "/tmp/granular/manifest.json";
         instrument.aether.granularSlot2.managedAsset.audioPath = "/tmp/granular/source.wav";
+        instrument.aether.spectralSlot3.enabled = true;
+        instrument.aether.spectralSlot3.rootNote = 57;
+        instrument.aether.spectralSlot3.level = 0.61f;
+        instrument.aether.spectralSlot3.pan = -0.24f;
+        instrument.aether.spectralSlot3.stereoWidth = 1.37f;
+        instrument.aether.spectralSlot3.position = 0.42f;
+        instrument.aether.spectralSlot3.pitchSemitones = 5.5f;
+        instrument.aether.spectralSlot3.freeze = true;
+        instrument.aether.spectralSlot3.routing = 3;
+        instrument.aether.spectralSlot3.fxSends = { 0.31f, 0.47f };
+        instrument.aether.spectralSlot3.managedAsset.assetId = "spectral-fixture";
+        instrument.aether.spectralSlot3.managedAsset.displayName = "Spectral Fixture";
+        instrument.aether.spectralSlot3.managedAsset.manifestPath = "/tmp/spectral/manifest.json";
+        instrument.aether.spectralSlot3.managedAsset.sourcePath = "/tmp/spectral/source.wav";
+        instrument.aether.spectralSlot3.managedAsset.artifactPath = "/tmp/spectral/artifact.aetherspectral";
         instrument.aether.fxBusIds = { "return-a", "return-b" };
         instrument.aether.runtimeWarp = 0.63f;
         instrument.aether.runtimeWarpMode = 1;
@@ -8456,6 +8509,23 @@ namespace
                 && loadedInstrument.aether.granularSlot2.managedAsset.displayName == "Granular Fixture"
                 && loadedInstrument.aether.granularSlot2.managedAsset.manifestPath == "/tmp/granular/manifest.json"
                 && loadedInstrument.aether.granularSlot2.managedAsset.audioPath == "/tmp/granular/source.wav"
+                && loadedInstrument.aether.spectralSlot3.schemaVersion == 1
+                && loadedInstrument.aether.spectralSlot3.enabled
+                && loadedInstrument.aether.spectralSlot3.rootNote == 57
+                && near(loadedInstrument.aether.spectralSlot3.level, 0.61f)
+                && near(loadedInstrument.aether.spectralSlot3.pan, -0.24f)
+                && near(loadedInstrument.aether.spectralSlot3.stereoWidth, 1.37f)
+                && near(loadedInstrument.aether.spectralSlot3.position, 0.42f)
+                && near(loadedInstrument.aether.spectralSlot3.pitchSemitones, 5.5f)
+                && loadedInstrument.aether.spectralSlot3.freeze
+                && loadedInstrument.aether.spectralSlot3.routing == 3
+                && near(loadedInstrument.aether.spectralSlot3.fxSends[0], 0.31f)
+                && near(loadedInstrument.aether.spectralSlot3.fxSends[1], 0.47f)
+                && loadedInstrument.aether.spectralSlot3.managedAsset.assetId == "spectral-fixture"
+                && loadedInstrument.aether.spectralSlot3.managedAsset.displayName == "Spectral Fixture"
+                && loadedInstrument.aether.spectralSlot3.managedAsset.manifestPath == "/tmp/spectral/manifest.json"
+                && loadedInstrument.aether.spectralSlot3.managedAsset.sourcePath == "/tmp/spectral/source.wav"
+                && loadedInstrument.aether.spectralSlot3.managedAsset.artifactPath == "/tmp/spectral/artifact.aetherspectral"
                 && loadedInstrument.aether.fxBusIds[0] == "return-a"
                 && loadedInstrument.aether.fxBusIds[1] == "return-b"
                 && near(loadedInstrument.aether.runtimeWarp, 0.63f)
@@ -8503,14 +8573,21 @@ namespace
         const auto manifest = bundle.getChildFile("manifest.json");
         const auto source = bundle.getChildFile("source.sfz");
         const auto sample = bundle.getChildFile("sample.wav");
+        const auto spectralBundle = sidecar.getChildFile("spectral").getChildFile("shared");
+        const auto spectralManifest = spectralBundle.getChildFile("manifest.json");
+        const auto spectralSource = spectralBundle.getChildFile("source.wav");
+        const auto spectralArtifact = spectralBundle.getChildFile("artifact.aetherspectral");
         const auto orphan = sidecar.getChildFile("samples").getChildFile("orphan.wav");
 
-        if (!bundle.createDirectory()
+        if (!bundle.createDirectory() || !spectralBundle.createDirectory()
             || !orphan.getParentDirectory().createDirectory()
             || !projectFile.replaceWithText("{}")
             || !manifest.replaceWithText("{}")
             || !source.replaceWithText("<region> sample=sample.wav")
             || !sample.replaceWithText("sample")
+            || !spectralManifest.replaceWithText("{}")
+            || !spectralSource.replaceWithText("source")
+            || !spectralArtifact.replaceWithText("artifact")
             || !orphan.replaceWithText("orphan"))
         {
             std::cerr << "Could not create hybrid migration safety fixture\n";
@@ -8533,9 +8610,21 @@ namespace
         granularSlot->setProperty("schemaVersion", 1);
         granularSlot->setProperty("enabled", false);
 
+        juce::DynamicObject::Ptr managedSpectral = new juce::DynamicObject();
+        managedSpectral->setProperty("schemaVersion", 1);
+        managedSpectral->setProperty("assetId", "shared-spectral");
+        managedSpectral->setProperty("manifestPath", "Hybrid Assets/spectral/shared/manifest.json");
+        managedSpectral->setProperty("sourcePath", "Hybrid Assets/spectral/shared/source.wav");
+        managedSpectral->setProperty("artifactPath", "Hybrid Assets/spectral/shared/artifact.aetherspectral");
+        juce::DynamicObject::Ptr spectralSlot = new juce::DynamicObject();
+        spectralSlot->setProperty("schemaVersion", 1);
+        spectralSlot->setProperty("enabled", true);
+        spectralSlot->setProperty("managedAsset", juce::var(managedSpectral.get()));
+
         juce::DynamicObject::Ptr aether = new juce::DynamicObject();
         aether->setProperty("sampleSlot1", juce::var(sampleSlot.get()));
         aether->setProperty("granularSlot2", juce::var(granularSlot.get()));
+        aether->setProperty("spectralSlot3", juce::var(spectralSlot.get()));
 
         juce::DynamicObject::Ptr instrument = new juce::DynamicObject();
         instrument->setProperty("id", "hybrid-safety");
@@ -8552,6 +8641,8 @@ namespace
             && manifest.existsAsFile()
             && source.existsAsFile()
             && sample.existsAsFile();
+        ok = ok && spectralManifest.existsAsFile() && spectralSource.existsAsFile()
+            && spectralArtifact.existsAsFile();
 
         const auto blockedOrphan = sidecar.getChildFile("samples").getChildFile("blocked-orphan.wav");
         if (!blockedOrphan.getParentDirectory().createDirectory()
@@ -8584,6 +8675,17 @@ namespace
         granularSlot->setProperty("managedAsset", juce::var(partialManagedGranular.get()));
         const auto malformedDiagnostics = beat::validateHybridSourceDocument(document);
         ok = ok && hasDiagnostic(malformedDiagnostics, "aether.granular-slot-2.managed-asset.fields-missing");
+        spectralSlot->setProperty("schemaVersion", 2);
+        const auto futureSpectralDiagnostics = beat::validateHybridSourceDocument(document);
+        ok = ok && hasDiagnostic(futureSpectralDiagnostics, "aether.spectral-slot-3.schema-future");
+        spectralSlot->setProperty("schemaVersion", 1);
+        juce::DynamicObject::Ptr partialManagedSpectral = new juce::DynamicObject();
+        partialManagedSpectral->setProperty("schemaVersion", 1);
+        partialManagedSpectral->setProperty("assetId", "partial-spectral");
+        spectralSlot->setProperty("managedAsset", juce::var(partialManagedSpectral.get()));
+        const auto malformedSpectralDiagnostics = beat::validateHybridSourceDocument(document);
+        ok = ok && hasDiagnostic(malformedSpectralDiagnostics,
+            "aether.spectral-slot-3.managed-asset.fields-missing");
 
         const auto dbFile = root.getChildFile("projects.sqlite");
         auto project = makeDenseAetherProject();
@@ -8618,6 +8720,38 @@ namespace
                 ok = ok
                     && !load.project.has_value()
                     && hasDiagnostic(load.diagnostics, "aether.sample-slot-1.schema-future");
+            }
+        }
+
+        auto spectralProject = makeDenseAetherProject();
+        spectralProject.id = "spectral-migration-rejection";
+        auto& persistedSpectralConfig = spectralProject.instruments.front().aether.spectralSlot3;
+        persistedSpectralConfig.enabled = true;
+        persistedSpectralConfig.managedAsset.assetId = "spectral-migration";
+        persistedSpectralConfig.managedAsset.manifestPath = "/tmp/spectral/manifest.json";
+        persistedSpectralConfig.managedAsset.sourcePath = "/tmp/spectral/source.wav";
+        persistedSpectralConfig.managedAsset.artifactPath = "/tmp/spectral/artifact.aetherspectral";
+        repository.save(spectralProject);
+        beat::Statement selectSpectral(db, "SELECT json_blob FROM projects WHERE id = ?");
+        selectSpectral.bind(1, spectralProject.id);
+        if (!selectSpectral.step()) ok = false;
+        else
+        {
+            auto persisted = juce::JSON::parse(selectSpectral.columnText(0));
+            auto* instruments = persisted.getProperty("instruments", {}).getArray();
+            if (instruments == nullptr || instruments->isEmpty()) ok = false;
+            else
+            {
+                auto spectral = instruments->getReference(0).getProperty("aether", {})
+                    .getProperty("spectralSlot3", {});
+                spectral.getDynamicObject()->setProperty("schemaVersion", 2);
+                beat::Statement update(db, "UPDATE projects SET json_blob = ? WHERE id = ?");
+                update.bind(1, juce::JSON::toString(persisted, false));
+                update.bind(2, spectralProject.id);
+                update.step();
+                const auto load = repository.loadWithDiagnostics(spectralProject.id);
+                ok = ok && !load.project.has_value()
+                    && hasDiagnostic(load.diagnostics, "aether.spectral-slot-3.schema-future");
             }
         }
 

@@ -521,6 +521,30 @@ export interface AetherGranularSlotConfig {
   managedAsset?: ManagedGranularAssetConfig;
 }
 
+export interface ManagedSpectralAssetConfig {
+  schemaVersion: 1;
+  assetId: string;
+  displayName: string;
+  manifestPath: string;
+  sourcePath: string;
+  artifactPath: string;
+}
+
+export interface AetherSpectralSlotConfig {
+  schemaVersion: 1;
+  enabled: boolean;
+  rootNote: number;
+  level: number;
+  pan: number;
+  stereoWidth: number;
+  position: number;
+  pitchSemitones: number;
+  freeze: boolean;
+  route?: "filter" | "both" | "filter1" | "filter2" | "direct";
+  fxSends?: [number, number];
+  managedAsset?: ManagedSpectralAssetConfig;
+}
+
 export interface AetherSampleZoneConfig {
   audioFileId: Id;
   rootNote: number;
@@ -546,8 +570,10 @@ export interface AetherSynthConfig {
   noise: AetherNoiseConfig;
   /** First hybrid source slot. */
   sampleSlot1?: AetherSampleSlotConfig;
-  /** Bounded granular source slot. Slot 3 remains reserved. */
+  /** Bounded granular source slot. */
   granularSlot2?: AetherGranularSlotConfig;
+  /** Managed spectral source slot. */
+  spectralSlot3?: AetherSpectralSlotConfig;
   /** Project return-bus ids targeted by the two fixed per-source buses. */
   fxBusIds?: [string, string];
   /** 0..1 opt-in runtime nonlinear warp applied after Aether oscillator mixing. */
@@ -662,8 +688,8 @@ export interface SynthPatchMacroDefinition {
 }
 
 export interface SynthPatchSnapshot {
-  /** v2 adds Sample Slot 1; v3 slicing/looping; v4 bounded mapped zones; v5 sample-source FX sends. */
-  schemaVersion: 1 | 2 | 3 | 4 | 5;
+  /** v2 Sample Slot 1; v3 slicing; v4 zones; v5 source sends; v6 Spectral Slot 3. */
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6;
   instrumentType: "wavetable-synth";
   namespace: "synth";
   name: string;
@@ -683,6 +709,7 @@ export interface SynthPatchSnapshot {
     sampleSlot1Zones?: AetherSampleZoneConfig[];
     managedSfz?: ManagedSfzAssetConfig;
     managedGranular?: ManagedGranularAssetConfig;
+    managedSpectral?: ManagedSpectralAssetConfig;
   };
 }
 

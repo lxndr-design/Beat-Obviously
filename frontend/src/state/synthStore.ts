@@ -8,6 +8,7 @@ import type {
   InstrumentTaxonomyAssignment,
   ManagedSfzAssetConfig,
   ManagedGranularAssetConfig,
+  ManagedSpectralAssetConfig,
   SynthPatchSnapshot,
   SynthPatchMacroDefinition,
   TrackEffect,
@@ -23,7 +24,7 @@ import benchmarkAetherStrings from "../data/aether_benchmark_strings_bank.json";
 import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
-export const SYNTH_PATCH_SCHEMA_VERSION = 5;
+export const SYNTH_PATCH_SCHEMA_VERSION = 6;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
 export const SYNTH_INSTRUMENT_TYPE = "wavetable-synth";
 export const DEFAULT_CUSTOM_WAVETABLE_ID = "user.custom";
@@ -158,6 +159,17 @@ export type SynthParameterId =
   | "aether.granular.2.randomSeed"
   | "aether.granular.2.fxSend1"
   | "aether.granular.2.fxSend2"
+  | "aether.spectral.3.enabled"
+  | "aether.spectral.3.rootNote"
+  | "aether.spectral.3.level"
+  | "aether.spectral.3.pan"
+  | "aether.spectral.3.stereoWidth"
+  | "aether.spectral.3.position"
+  | "aether.spectral.3.pitchSemitones"
+  | "aether.spectral.3.freeze"
+  | "aether.spectral.3.route"
+  | "aether.spectral.3.fxSend1"
+  | "aether.spectral.3.fxSend2"
   | "aether.fxBus1Id"
   | "aether.fxBus2Id"
   | "aether.mpe.enabled"
@@ -377,6 +389,7 @@ export interface SynthDraftPatch {
     sampleSlot1Zones: AetherSampleZoneConfig[];
     managedSfz?: ManagedSfzAssetConfig;
     managedGranular?: ManagedGranularAssetConfig;
+    managedSpectral?: ManagedSpectralAssetConfig;
   };
 }
 
@@ -560,6 +573,30 @@ function normalizeManagedGranular(value: unknown): ManagedGranularAssetConfig | 
     displayName: typeof value.displayName === "string" ? value.displayName.slice(0, 128) : value.assetId,
     manifestPath: value.manifestPath,
     audioPath: value.audioPath,
+  };
+}
+
+function normalizeManagedSpectral(value: unknown): ManagedSpectralAssetConfig | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value))
+    hybridMigrationFailure("aether.spectral-slot-3.managed-asset.shape", "metadata.managedSpectral", "Expected an object.");
+  if (typeof value.schemaVersion !== "number" || !Number.isInteger(value.schemaVersion) || value.schemaVersion < 0)
+    hybridMigrationFailure("aether.spectral-slot-3.managed-asset.schema-invalid", "metadata.managedSpectral.schemaVersion", "Expected a non-negative integer.");
+  if (value.schemaVersion > 1)
+    hybridMigrationFailure("aether.spectral-slot-3.managed-asset.schema-future", "metadata.managedSpectral.schemaVersion", "Version is newer than supported version 1.");
+  if (value.schemaVersion !== 1
+    || typeof value.assetId !== "string" || !value.assetId
+    || typeof value.manifestPath !== "string" || !value.manifestPath
+    || typeof value.sourcePath !== "string" || !value.sourcePath
+    || typeof value.artifactPath !== "string" || !value.artifactPath)
+    hybridMigrationFailure("aether.spectral-slot-3.managed-asset.shape", "metadata.managedSpectral", "Required managed spectral fields are missing.");
+  return {
+    schemaVersion: 1,
+    assetId: value.assetId,
+    displayName: typeof value.displayName === "string" ? value.displayName.slice(0, 128) : value.assetId,
+    manifestPath: value.manifestPath,
+    sourcePath: value.sourcePath,
+    artifactPath: value.artifactPath,
   };
 }
 export const CUSTOM_WAVETABLE_PARTIAL_COUNT = 16;
@@ -1273,6 +1310,17 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "aether.granular.2.randomSeed": 1,
   "aether.granular.2.fxSend1": 0,
   "aether.granular.2.fxSend2": 0,
+  "aether.spectral.3.enabled": false,
+  "aether.spectral.3.rootNote": 60,
+  "aether.spectral.3.level": 0.7,
+  "aether.spectral.3.pan": 0,
+  "aether.spectral.3.stereoWidth": 1,
+  "aether.spectral.3.position": 0,
+  "aether.spectral.3.pitchSemitones": 0,
+  "aether.spectral.3.freeze": false,
+  "aether.spectral.3.route": "filter",
+  "aether.spectral.3.fxSend1": 0,
+  "aether.spectral.3.fxSend2": 0,
   "aether.fxBus1Id": "",
   "aether.fxBus2Id": "",
   "aether.mpe.enabled": false,
@@ -1448,6 +1496,17 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "aether.granular.2.randomSeed": "Granular Slot 2 Seed",
   "aether.granular.2.fxSend1": "Granular Slot 2 FX Send 1",
   "aether.granular.2.fxSend2": "Granular Slot 2 FX Send 2",
+  "aether.spectral.3.enabled": "Spectral Slot 3 Enabled",
+  "aether.spectral.3.rootNote": "Spectral Slot 3 Root Note",
+  "aether.spectral.3.level": "Spectral Slot 3 Level",
+  "aether.spectral.3.pan": "Spectral Slot 3 Pan",
+  "aether.spectral.3.stereoWidth": "Spectral Slot 3 Stereo Width",
+  "aether.spectral.3.position": "Spectral Slot 3 Position",
+  "aether.spectral.3.pitchSemitones": "Spectral Slot 3 Pitch",
+  "aether.spectral.3.freeze": "Spectral Slot 3 Freeze",
+  "aether.spectral.3.route": "Spectral Slot 3 Route",
+  "aether.spectral.3.fxSend1": "Spectral Slot 3 FX Send 1",
+  "aether.spectral.3.fxSend2": "Spectral Slot 3 FX Send 2",
   "aether.fxBus1Id": "Aether FX Bus 1",
   "aether.fxBus2Id": "Aether FX Bus 2",
   "aether.mpe.enabled": "MPE Zone Enabled",
@@ -1600,6 +1659,7 @@ export function createDefaultSynthDraft(): SynthDraftPatch {
       sampleSlot1Zones: [],
       managedSfz: undefined,
       managedGranular: undefined,
+      managedSpectral: undefined,
     },
   };
 }
@@ -1690,6 +1750,7 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
       sampleSlot1Zones: normalizeAetherSampleZones(inputMetadata.sampleSlot1Zones),
       managedSfz: normalizeManagedSfz(inputMetadata.managedSfz),
       managedGranular: normalizeManagedGranular(inputMetadata.managedGranular),
+      managedSpectral: normalizeManagedSpectral(inputMetadata.managedSpectral),
     },
   };
 }
@@ -2189,6 +2250,21 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         fxSends: [clamp01(getNumberParam(draft, "aether.granular.2.fxSend1")), clamp01(getNumberParam(draft, "aether.granular.2.fxSend2"))],
         ...(draft.metadata.managedGranular ? { managedAsset: draft.metadata.managedGranular } : {}),
       },
+      spectralSlot3: {
+        schemaVersion: 1,
+        enabled: getBooleanParam(draft, "aether.spectral.3.enabled")
+          && Boolean(draft.metadata.managedSpectral?.manifestPath),
+        rootNote: Math.max(0, Math.min(127, Math.round(getNumberParam(draft, "aether.spectral.3.rootNote")))),
+        level: clamp01(getNumberParam(draft, "aether.spectral.3.level")),
+        pan: clampBipolar(getNumberParam(draft, "aether.spectral.3.pan")),
+        stereoWidth: Math.max(0, Math.min(2, getNumberParam(draft, "aether.spectral.3.stereoWidth"))),
+        position: clamp01(getNumberParam(draft, "aether.spectral.3.position")),
+        pitchSemitones: Math.max(-12, Math.min(12, getNumberParam(draft, "aether.spectral.3.pitchSemitones"))),
+        freeze: getBooleanParam(draft, "aether.spectral.3.freeze"),
+        route: sourceRouteFromId(getStringParam(draft, "aether.spectral.3.route")),
+        fxSends: [clamp01(getNumberParam(draft, "aether.spectral.3.fxSend1")), clamp01(getNumberParam(draft, "aether.spectral.3.fxSend2"))],
+        ...(draft.metadata.managedSpectral ? { managedAsset: draft.metadata.managedSpectral } : {}),
+      },
       fxBusIds: [getStringParam(draft, "aether.fxBus1Id"), getStringParam(draft, "aether.fxBus2Id")],
       runtimeWarp: clamp01(getNumberParam(draft, "aether.runtimeWarp")),
       runtimeWarpMode: isWavetableWarpMode(draft.parameters["aether.runtimeWarpMode"])
@@ -2394,6 +2470,15 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
       if (granularSlot.schemaVersion > 1)
         hybridMigrationFailure("aether.granular-slot-2.schema-future", "instrument.aether.granularSlot2.schemaVersion", "Version is newer than supported version 1.");
     }
+    const spectralSlot: unknown = runtimeAether.spectralSlot3;
+    if (spectralSlot !== undefined) {
+      if (!isRecord(spectralSlot))
+        hybridMigrationFailure("aether.spectral-slot-3.shape", "instrument.aether.spectralSlot3", "Expected an object.");
+      if (typeof spectralSlot.schemaVersion !== "number" || !Number.isInteger(spectralSlot.schemaVersion) || spectralSlot.schemaVersion < 0)
+        hybridMigrationFailure("aether.spectral-slot-3.schema-invalid", "instrument.aether.spectralSlot3.schemaVersion", "Expected a non-negative integer.");
+      if (spectralSlot.schemaVersion > 1)
+        hybridMigrationFailure("aether.spectral-slot-3.schema-future", "instrument.aether.spectralSlot3.schemaVersion", "Version is newer than supported version 1.");
+    }
   }
 
   if (instrument.synthPatch) {
@@ -2465,6 +2550,18 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["aether.granular.2.fxSend1"] = instrument.aether?.granularSlot2?.fxSends?.[0] ?? 0;
   draft.parameters["aether.granular.2.fxSend2"] = instrument.aether?.granularSlot2?.fxSends?.[1] ?? 0;
   draft.metadata.managedGranular = normalizeManagedGranular(instrument.aether?.granularSlot2?.managedAsset);
+  draft.parameters["aether.spectral.3.enabled"] = instrument.aether?.spectralSlot3?.enabled ?? false;
+  draft.parameters["aether.spectral.3.rootNote"] = instrument.aether?.spectralSlot3?.rootNote ?? 60;
+  draft.parameters["aether.spectral.3.level"] = instrument.aether?.spectralSlot3?.level ?? 0.7;
+  draft.parameters["aether.spectral.3.pan"] = instrument.aether?.spectralSlot3?.pan ?? 0;
+  draft.parameters["aether.spectral.3.stereoWidth"] = instrument.aether?.spectralSlot3?.stereoWidth ?? 1;
+  draft.parameters["aether.spectral.3.position"] = instrument.aether?.spectralSlot3?.position ?? 0;
+  draft.parameters["aether.spectral.3.pitchSemitones"] = instrument.aether?.spectralSlot3?.pitchSemitones ?? 0;
+  draft.parameters["aether.spectral.3.freeze"] = instrument.aether?.spectralSlot3?.freeze ?? false;
+  draft.parameters["aether.spectral.3.route"] = instrument.aether?.spectralSlot3?.route ?? "filter";
+  draft.parameters["aether.spectral.3.fxSend1"] = instrument.aether?.spectralSlot3?.fxSends?.[0] ?? 0;
+  draft.parameters["aether.spectral.3.fxSend2"] = instrument.aether?.spectralSlot3?.fxSends?.[1] ?? 0;
+  draft.metadata.managedSpectral = normalizeManagedSpectral(instrument.aether?.spectralSlot3?.managedAsset);
   draft.parameters["aether.fxBus1Id"] = instrument.aether?.fxBusIds?.[0] ?? "";
   draft.parameters["aether.fxBus2Id"] = instrument.aether?.fxBusIds?.[1] ?? "";
   draft.parameters["aether.mpe.enabled"] = instrument.aether?.memberExpressionZone?.enabled ?? false;
@@ -2774,6 +2871,9 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (id === "aether.granular.2.densityHz") return Math.max(0.1, Math.min(200, value));
   if (id === "aether.granular.2.pitchSemitones") return Math.max(-48, Math.min(48, value));
   if (id === "aether.granular.2.randomSeed") return Math.max(1, Math.min(0xffffffff, Math.round(value)));
+  if (id === "aether.spectral.3.rootNote") return Math.max(0, Math.min(127, Math.round(value)));
+  if (id === "aether.spectral.3.stereoWidth") return Math.max(0, Math.min(2, value));
+  if (id === "aether.spectral.3.pitchSemitones") return Math.max(-12, Math.min(12, value));
   if (id.includes(".pan")) return Math.max(-1, Math.min(1, value));
   if (id.includes(".attack") || id.includes(".decay") || id.includes(".release")) return Math.max(0, Math.min(30, value));
   return Math.max(0, Math.min(1, value));

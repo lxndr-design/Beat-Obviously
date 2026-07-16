@@ -108,6 +108,12 @@ export function buildAssetManifest(input: Pick<BeatProjectDocument, "instruments
       addAsset("sample", managedGranular.manifestPath, `instrument:${instrument.id}:managedGranular:manifest`, instrument.name);
       addAsset("sample", managedGranular.audioPath, `instrument:${instrument.id}:managedGranular:audio`, instrument.name);
     }
+    const managedSpectral = instrument.aether?.spectralSlot3?.managedAsset;
+    if (managedSpectral) {
+      addAsset("sample", managedSpectral.manifestPath, `instrument:${instrument.id}:managedSpectral:manifest`, instrument.name);
+      addAsset("sample", managedSpectral.sourcePath, `instrument:${instrument.id}:managedSpectral:source`, instrument.name);
+      addAsset("sample", managedSpectral.artifactPath, `instrument:${instrument.id}:managedSpectral:artifact`, instrument.name);
+    }
   }
   for (const plugin of input.plugins ?? []) {
     addAsset("plugin", plugin.sourcePath ?? plugin.sourceFileName, `plugin:${plugin.id}:sourcePath`, plugin.name);

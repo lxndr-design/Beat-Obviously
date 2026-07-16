@@ -129,3 +129,12 @@ source-PCM identity, mutation, deterministic reuse, and future-version failure
 paths are covered. This is not yet a persisted Slot 3 reference or product
 import: project packaging/cleanup, migrations, routing, UI, latency
 compensation, audible benchmark, and product live/offline parity remain open.
+
+## Milestone C3F3B update — 2026-07-16
+
+Slot 3 schema v1 and synth-patch schema v6 preserve the managed bundle and all
+approved playback controls through backend/frontend roundtrips. Stable
+diagnostics reject future or partial data. Portable packaging and both cleanup
+reference graphs cover manifest, source, and artifact, including retention of
+a complete referenced bundle. DSP routing, IPC import, editor UI, latency
+compensation, audible validation, and product parity remain open.
