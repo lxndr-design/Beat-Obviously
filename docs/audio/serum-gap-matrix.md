@@ -77,3 +77,7 @@ The granular row now has a disconnected bounded engine foundation: immutable fin
 ## Milestone C3E2 update — 2026-07-15
 
 Granular Slot 2 is product-reachable through a content-addressed, project-owned managed audio asset or the deterministic Beat-owned benchmark source. Persistence, relocation, tamper/path/symlink rejection, bounded decoding, stable parameters, editor controls, main/filter/direct routing, FX sends, active replacement tails, and an audible factory benchmark are covered. This closes the bounded desktop granular foundation/product-path row only: there is no realtime granular modulation, automatic source analysis, external relinking, sample editing, transient detection, tempo warping, spectral processing, or Slot 3 implementation. The isolated 150 default-off renders remain byte-identical, and the only suite waiver remains `baseline.recent-project-exists`.
+
+## Milestone C3F review update — 2026-07-15
+
+Slot 3 remains unimplemented. The architecture review recommends bounded STFT frame-bank playback and separates descriptor-safe managed decode/analysis from immutable fixed-capacity callback rendering. It does not claim spectral readiness: reconstruction window/hop, phase locking, stereo representation, canonical-rate resampling, memory/polyphony budgets, and latency compensation still require named specialist DSP approval. No source, schema, dependency, preset, factory asset, callback, or baseline changed.
