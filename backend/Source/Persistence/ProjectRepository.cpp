@@ -419,6 +419,30 @@ namespace beat
             managedSfz->setProperty("samplePaths", managedSamplePaths);
             sampleSlot1->setProperty("managedSfz", juce::var(managedSfz.get()));
             o->setProperty("sampleSlot1", juce::var(sampleSlot1.get()));
+            juce::DynamicObject::Ptr granularSlot2 = new juce::DynamicObject();
+            granularSlot2->setProperty("schemaVersion", aether.granularSlot2.schemaVersion);
+            granularSlot2->setProperty("enabled", aether.granularSlot2.enabled);
+            granularSlot2->setProperty("builtinSource", aether.granularSlot2.builtinSource);
+            granularSlot2->setProperty("rootNote", aether.granularSlot2.rootNote);
+            granularSlot2->setProperty("level", aether.granularSlot2.level);
+            granularSlot2->setProperty("routing", aether.granularSlot2.routing);
+            granularSlot2->setProperty("position", aether.granularSlot2.position);
+            granularSlot2->setProperty("positionSpread", aether.granularSlot2.positionSpread);
+            granularSlot2->setProperty("grainMilliseconds", aether.granularSlot2.grainMilliseconds);
+            granularSlot2->setProperty("densityHz", aether.granularSlot2.densityHz);
+            granularSlot2->setProperty("pitchSemitones", aether.granularSlot2.pitchSemitones);
+            granularSlot2->setProperty("stereoSpread", aether.granularSlot2.stereoSpread);
+            granularSlot2->setProperty("randomSeed", (double) aether.granularSlot2.randomSeed);
+            granularSlot2->setProperty("fxSend1", aether.granularSlot2.fxSends[0]);
+            granularSlot2->setProperty("fxSend2", aether.granularSlot2.fxSends[1]);
+            juce::DynamicObject::Ptr managedGranular = new juce::DynamicObject();
+            managedGranular->setProperty("schemaVersion", aether.granularSlot2.managedAsset.schemaVersion);
+            managedGranular->setProperty("assetId", aether.granularSlot2.managedAsset.assetId);
+            managedGranular->setProperty("displayName", aether.granularSlot2.managedAsset.displayName);
+            managedGranular->setProperty("manifestPath", aether.granularSlot2.managedAsset.manifestPath);
+            managedGranular->setProperty("audioPath", aether.granularSlot2.managedAsset.audioPath);
+            granularSlot2->setProperty("managedAsset", juce::var(managedGranular.get()));
+            o->setProperty("granularSlot2", juce::var(granularSlot2.get()));
             o->setProperty("fxBus1Id", aether.fxBusIds[0]);
             o->setProperty("fxBus2Id", aether.fxBusIds[1]);
             o->setProperty("runtimeWarp", aether.runtimeWarp);
@@ -545,6 +569,39 @@ namespace beat
                     && (config.sampleSlot1.audioFileId.isNotEmpty()
                         || !config.sampleSlot1.zones.empty()
                         || config.sampleSlot1.managedSfz.manifestPath.isNotEmpty());
+            }
+            const auto granularSlot2 = aetherVar.getProperty("granularSlot2", {});
+            if (granularSlot2.isObject())
+            {
+                const int sourceSchemaVersion = juce::jmax(0, (int) granularSlot2.getProperty("schemaVersion", 0));
+                config.granularSlot2.schemaVersion = 1;
+                const bool requestedEnabled = (bool) granularSlot2.getProperty("enabled", false);
+                config.granularSlot2.builtinSource = granularSlot2.getProperty("builtinSource", {}).toString();
+                if (config.granularSlot2.builtinSource != "benchmark") config.granularSlot2.builtinSource.clear();
+                config.granularSlot2.rootNote = juce::jlimit(0, 127, (int) granularSlot2.getProperty("rootNote", 60));
+                config.granularSlot2.level = juce::jlimit(0.0f, 1.0f, (float) (double) granularSlot2.getProperty("level", 0.7));
+                config.granularSlot2.routing = juce::jlimit(0, 3, (int) granularSlot2.getProperty("routing", 0));
+                config.granularSlot2.position = juce::jlimit(0.0f, 1.0f, (float) (double) granularSlot2.getProperty("position", 0.5));
+                config.granularSlot2.positionSpread = juce::jlimit(0.0f, 1.0f, (float) (double) granularSlot2.getProperty("positionSpread", 0.1));
+                config.granularSlot2.grainMilliseconds = juce::jlimit(2.0f, 1000.0f, (float) (double) granularSlot2.getProperty("grainMilliseconds", 80.0));
+                config.granularSlot2.densityHz = juce::jlimit(0.1f, 200.0f, (float) (double) granularSlot2.getProperty("densityHz", 12.0));
+                config.granularSlot2.pitchSemitones = juce::jlimit(-48.0f, 48.0f, (float) (double) granularSlot2.getProperty("pitchSemitones", 0.0));
+                config.granularSlot2.stereoSpread = juce::jlimit(0.0f, 1.0f, (float) (double) granularSlot2.getProperty("stereoSpread", 0.5));
+                config.granularSlot2.randomSeed = (uint32_t) juce::jlimit(1.0, 4294967295.0, (double) granularSlot2.getProperty("randomSeed", 1.0));
+                config.granularSlot2.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) (double) granularSlot2.getProperty("fxSend1", 0.0));
+                config.granularSlot2.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) (double) granularSlot2.getProperty("fxSend2", 0.0));
+                const auto managed = granularSlot2.getProperty("managedAsset", {});
+                if (managed.isObject() && (int) managed.getProperty("schemaVersion", 0) <= 1)
+                {
+                    config.granularSlot2.managedAsset.assetId = managed.getProperty("assetId", {}).toString();
+                    config.granularSlot2.managedAsset.displayName = managed.getProperty("displayName", {}).toString();
+                    config.granularSlot2.managedAsset.manifestPath = managed.getProperty("manifestPath", {}).toString();
+                    config.granularSlot2.managedAsset.audioPath = managed.getProperty("audioPath", {}).toString();
+                }
+                config.granularSlot2.enabled = requestedEnabled
+                    && sourceSchemaVersion <= config.granularSlot2.schemaVersion
+                    && (config.granularSlot2.builtinSource.isNotEmpty()
+                        || config.granularSlot2.managedAsset.manifestPath.isNotEmpty());
             }
             config.fxBusIds[0] = aetherVar.getProperty("fxBus1Id", config.fxBusIds[0]).toString();
             config.fxBusIds[1] = aetherVar.getProperty("fxBus2Id", config.fxBusIds[1]).toString();

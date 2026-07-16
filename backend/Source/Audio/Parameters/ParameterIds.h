@@ -68,6 +68,24 @@ namespace beat::params
         inline constexpr std::string_view pan { "amp.pan" };
     }
 
+    namespace granular
+    {
+        inline constexpr std::string_view enabled { "aether.granular.2.enabled" };
+        inline constexpr std::string_view builtinSource { "aether.granular.2.builtinSource" };
+        inline constexpr std::string_view rootNote { "aether.granular.2.rootNote" };
+        inline constexpr std::string_view level { "aether.granular.2.level" };
+        inline constexpr std::string_view route { "aether.granular.2.route" };
+        inline constexpr std::string_view position { "aether.granular.2.position" };
+        inline constexpr std::string_view positionSpread { "aether.granular.2.positionSpread" };
+        inline constexpr std::string_view grainMilliseconds { "aether.granular.2.grainMilliseconds" };
+        inline constexpr std::string_view densityHz { "aether.granular.2.densityHz" };
+        inline constexpr std::string_view pitchSemitones { "aether.granular.2.pitchSemitones" };
+        inline constexpr std::string_view stereoSpread { "aether.granular.2.stereoSpread" };
+        inline constexpr std::string_view randomSeed { "aether.granular.2.randomSeed" };
+        inline constexpr std::string_view fxSend1 { "aether.granular.2.fxSend1" };
+        inline constexpr std::string_view fxSend2 { "aether.granular.2.fxSend2" };
+    }
+
     namespace lfo
     {
         inline constexpr std::string_view rate1 { "lfo.1.rate" };

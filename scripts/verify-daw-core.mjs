@@ -168,14 +168,23 @@ try {
       sampleUrl: "/Users/alex/Snare.wav",
       sampleUrls: ["/Users/alex/Snare.wav", "/samples/Bundled Hat.wav"],
       sampleMap: [{ id: "zone-a", name: "Kick Zone", path: "/Users/alex/Kick.wav", rootNote: 36, loNote: 36, hiNote: 36, loVel: 1, hiVel: 127 }],
-      aether: { sampleSlot1: { managedSfz: {
-        schemaVersion: 1,
-        assetId: "sfz-managed-a",
-        displayName: "Managed A",
-        manifestPath: "./Portable Project Assets/sfz/sfz-managed-a/manifest.json",
-        sourcePath: "./Portable Project Assets/sfz/sfz-managed-a/source.sfz",
-        samplePaths: ["./Portable Project Assets/sfz/sfz-managed-a/samples/tone.wav"],
-      } } },
+      aether: {
+        sampleSlot1: { managedSfz: {
+          schemaVersion: 1,
+          assetId: "sfz-managed-a",
+          displayName: "Managed A",
+          manifestPath: "./Portable Project Assets/sfz/sfz-managed-a/manifest.json",
+          sourcePath: "./Portable Project Assets/sfz/sfz-managed-a/source.sfz",
+          samplePaths: ["./Portable Project Assets/sfz/sfz-managed-a/samples/tone.wav"],
+        } },
+        granularSlot2: { managedAsset: {
+          schemaVersion: 1,
+          assetId: "granular-managed-a",
+          displayName: "Managed Texture",
+          manifestPath: "./Portable Project Assets/granular/granular-managed-a/manifest.json",
+          audioPath: "./Portable Project Assets/granular/granular-managed-a/source.wav",
+        } },
+      },
     }],
     plugins: [{ id: "plugin-a", name: "DS Pack", sourcePath: "/Users/alex/Pack.dspreset" }],
     project: {
@@ -186,11 +195,16 @@ try {
       }],
     },
   });
-  assert.equal(assetManifest.length, 8, "asset manifest should de-duplicate repeated sample references and retain managed SFZ files");
+  assert.equal(assetManifest.length, 10, "asset manifest should retain managed SFZ and granular files");
   assert.deepEqual(
     assetManifest.find((asset) => asset.path === "/Users/alex/Loop.wav").references,
     ["audioFile:audio-a", "track:track-a:audioFileId", "track:track-a:segment:segment-a:audioFileId", "instrument:sampler-a:sampleIds:0"],
     "asset manifest should expose audio library, track, segment, and instrument sample-id references for safe cleanup decisions",
+  );
+  assert.deepEqual(
+    assetManifest.find((asset) => asset.path.endsWith("/granular-managed-a/manifest.json")).references,
+    ["instrument:sampler-a:managedGranular:manifest"],
+    "asset manifest should retain the managed granular provenance manifest",
   );
   assert.equal(
     assetManifest.find((asset) => asset.path === "/Users/alex/Snare.wav").references.length,

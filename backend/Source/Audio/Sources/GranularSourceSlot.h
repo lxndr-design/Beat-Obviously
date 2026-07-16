@@ -53,6 +53,7 @@ namespace beat
     public:
         static constexpr int maximumEmitters = 8;
         static constexpr int maximumGrains = 32;
+        struct StereoFrame { float left { 0.0f }; float right { 0.0f }; };
 
         bool prepare(const SourcePrepareSpec& next) noexcept override
         {
@@ -116,38 +117,43 @@ namespace beat
             const int end = std::clamp(begin + numSamples, begin, output.getNumSamples());
             for (int sample = begin; sample < end; ++sample)
             {
-                schedule();
-                float left = 0.0f, right = 0.0f;
-                for (auto& grain : grains)
-                {
-                    if (!grain.active) continue;
-                    const int index = std::clamp((int) grain.position, 0, source->audio->getNumSamples() - 2);
-                    const float fraction = (float) (grain.position - (double) index);
-                    const auto read = [&](int channel) {
-                        const int ch = std::min(channel, source->audio->getNumChannels() - 1);
-                        const float a = source->audio->getSample(ch, index);
-                        const float b = source->audio->getSample(ch, index + 1);
-                        return a + (b - a) * fraction;
-                    };
-                    const float phase = (float) grain.age / (float) std::max(1, grain.length - 1);
-                    const float window = 0.5f - 0.5f * std::cos(juce::MathConstants<float>::twoPi * phase);
-                    const float monoLeft = read(0) * window * grain.gain;
-                    const float monoRight = read(1) * window * grain.gain;
-                    left += monoLeft * grain.leftPan;
-                    right += monoRight * grain.rightPan;
-                    grain.position += grain.rate;
-                    ++grain.age;
-                    ++grainTelemetry.grainSamples;
-                    ++baseTelemetry.renderedVoiceSamples;
-                    if (grain.age >= grain.length || grain.position >= source->audio->getNumSamples() - 1)
-                        grain = {};
-                }
-                output.addSample(0, sample, left);
-                if (output.getNumChannels() > 1) output.addSample(1, sample, right);
+                const auto frame = renderFrame();
+                output.addSample(0, sample, frame.left);
+                if (output.getNumChannels() > 1) output.addSample(1, sample, frame.right);
                 for (int channel = 2; channel < output.getNumChannels(); ++channel)
-                    output.addSample(channel, sample, (left + right) * 0.5f);
-                ++baseTelemetry.renderedSamples;
+                    output.addSample(channel, sample, (frame.left + frame.right) * 0.5f);
             }
+        }
+
+        StereoFrame renderFrame() noexcept
+        {
+            if (!source || !source->isValid()) return {};
+            schedule();
+            StereoFrame frame;
+            for (auto& grain : grains)
+            {
+                if (!grain.active) continue;
+                const int index = std::clamp((int) grain.position, 0, source->audio->getNumSamples() - 2);
+                const float fraction = (float) (grain.position - (double) index);
+                const auto read = [&](int channel) {
+                    const int ch = std::min(channel, source->audio->getNumChannels() - 1);
+                    const float a = source->audio->getSample(ch, index);
+                    const float b = source->audio->getSample(ch, index + 1);
+                    return a + (b - a) * fraction;
+                };
+                const float phase = (float) grain.age / (float) std::max(1, grain.length - 1);
+                const float window = 0.5f - 0.5f * std::cos(juce::MathConstants<float>::twoPi * phase);
+                frame.left += read(0) * window * grain.gain * grain.leftPan;
+                frame.right += read(1) * window * grain.gain * grain.rightPan;
+                grain.position += grain.rate;
+                ++grain.age;
+                ++grainTelemetry.grainSamples;
+                ++baseTelemetry.renderedVoiceSamples;
+                if (grain.age >= grain.length || grain.position >= source->audio->getNumSamples() - 1)
+                    grain = {};
+            }
+            ++baseTelemetry.renderedSamples;
+            return frame;
         }
 
         SourceLifecycleState lifecycleState() const noexcept override

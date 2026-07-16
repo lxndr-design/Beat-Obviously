@@ -240,6 +240,34 @@ namespace beat
             std::array<float, 2> fxSends {};
         };
 
+        struct AetherGranularSlot
+        {
+            struct ManagedAsset
+            {
+                int schemaVersion { 1 };
+                Id assetId;
+                juce::String displayName;
+                juce::String manifestPath;
+                juce::String audioPath;
+            };
+
+            int schemaVersion { 1 };
+            bool enabled { false };
+            juce::String builtinSource;
+            int rootNote { 60 };
+            float level { 0.7f };
+            int routing { 0 };
+            float position { 0.5f };
+            float positionSpread { 0.1f };
+            float grainMilliseconds { 80.0f };
+            float densityHz { 12.0f };
+            float pitchSemitones { 0.0f };
+            float stereoSpread { 0.5f };
+            uint32_t randomSeed { 1 };
+            ManagedAsset managedAsset;
+            std::array<float, 2> fxSends {};
+        };
+
         struct AetherConfig
         {
             struct MemberExpressionZone
@@ -256,6 +284,7 @@ namespace beat
             AetherSub sub;
             AetherNoise noise;
             AetherSampleSlot sampleSlot1;
+            AetherGranularSlot granularSlot2;
             std::array<Id, 2> fxBusIds {};
             float runtimeWarp { 0.0f };
             int runtimeWarpMode { 0 };

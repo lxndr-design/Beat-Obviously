@@ -7,6 +7,7 @@ import type {
   Instrument,
   InstrumentTaxonomyAssignment,
   ManagedSfzAssetConfig,
+  ManagedGranularAssetConfig,
   SynthPatchSnapshot,
   SynthPatchMacroDefinition,
   TrackEffect,
@@ -143,6 +144,20 @@ export type SynthParameterId =
   | "aether.sample.1.loop.end"
   | "aether.sample.1.fxSend1"
   | "aether.sample.1.fxSend2"
+  | "aether.granular.2.enabled"
+  | "aether.granular.2.builtinSource"
+  | "aether.granular.2.rootNote"
+  | "aether.granular.2.level"
+  | "aether.granular.2.route"
+  | "aether.granular.2.position"
+  | "aether.granular.2.positionSpread"
+  | "aether.granular.2.grainMilliseconds"
+  | "aether.granular.2.densityHz"
+  | "aether.granular.2.pitchSemitones"
+  | "aether.granular.2.stereoSpread"
+  | "aether.granular.2.randomSeed"
+  | "aether.granular.2.fxSend1"
+  | "aether.granular.2.fxSend2"
   | "aether.fxBus1Id"
   | "aether.fxBus2Id"
   | "aether.mpe.enabled"
@@ -361,6 +376,7 @@ export interface SynthDraftPatch {
     oscillators: SynthOscillatorDefinition[];
     sampleSlot1Zones: AetherSampleZoneConfig[];
     managedSfz?: ManagedSfzAssetConfig;
+    managedGranular?: ManagedGranularAssetConfig;
   };
 }
 
@@ -492,6 +508,21 @@ function normalizeManagedSfz(value: unknown): ManagedSfzAssetConfig | undefined 
     samplePaths: Array.isArray(value.samplePaths)
       ? value.samplePaths.filter((path): path is string => typeof path === "string" && Boolean(path)).slice(0, 256)
       : [],
+  };
+}
+
+function normalizeManagedGranular(value: unknown): ManagedGranularAssetConfig | undefined {
+  if (!isRecord(value)
+    || value.schemaVersion !== 1
+    || typeof value.assetId !== "string" || !value.assetId
+    || typeof value.manifestPath !== "string" || !value.manifestPath
+    || typeof value.audioPath !== "string" || !value.audioPath) return undefined;
+  return {
+    schemaVersion: 1,
+    assetId: value.assetId,
+    displayName: typeof value.displayName === "string" ? value.displayName.slice(0, 128) : value.assetId,
+    manifestPath: value.manifestPath,
+    audioPath: value.audioPath,
   };
 }
 export const CUSTOM_WAVETABLE_PARTIAL_COUNT = 16;
@@ -1191,6 +1222,20 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "aether.sample.1.loop.end": 1,
   "aether.sample.1.fxSend1": 0,
   "aether.sample.1.fxSend2": 0,
+  "aether.granular.2.enabled": false,
+  "aether.granular.2.builtinSource": "",
+  "aether.granular.2.rootNote": 60,
+  "aether.granular.2.level": 0.7,
+  "aether.granular.2.route": "filter",
+  "aether.granular.2.position": 0.5,
+  "aether.granular.2.positionSpread": 0.1,
+  "aether.granular.2.grainMilliseconds": 80,
+  "aether.granular.2.densityHz": 12,
+  "aether.granular.2.pitchSemitones": 0,
+  "aether.granular.2.stereoSpread": 0.5,
+  "aether.granular.2.randomSeed": 1,
+  "aether.granular.2.fxSend1": 0,
+  "aether.granular.2.fxSend2": 0,
   "aether.fxBus1Id": "",
   "aether.fxBus2Id": "",
   "aether.mpe.enabled": false,
@@ -1352,6 +1397,20 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "aether.sample.1.loop.end": "Sample Slot 1 Loop End",
   "aether.sample.1.fxSend1": "Sample Slot 1 FX Send 1",
   "aether.sample.1.fxSend2": "Sample Slot 1 FX Send 2",
+  "aether.granular.2.enabled": "Granular Slot 2 Enabled",
+  "aether.granular.2.builtinSource": "Granular Slot 2 Built-in Source",
+  "aether.granular.2.rootNote": "Granular Slot 2 Root Note",
+  "aether.granular.2.level": "Granular Slot 2 Level",
+  "aether.granular.2.route": "Granular Slot 2 Route",
+  "aether.granular.2.position": "Granular Slot 2 Position",
+  "aether.granular.2.positionSpread": "Granular Slot 2 Position Spread",
+  "aether.granular.2.grainMilliseconds": "Granular Slot 2 Grain Size",
+  "aether.granular.2.densityHz": "Granular Slot 2 Density",
+  "aether.granular.2.pitchSemitones": "Granular Slot 2 Pitch",
+  "aether.granular.2.stereoSpread": "Granular Slot 2 Stereo Spread",
+  "aether.granular.2.randomSeed": "Granular Slot 2 Seed",
+  "aether.granular.2.fxSend1": "Granular Slot 2 FX Send 1",
+  "aether.granular.2.fxSend2": "Granular Slot 2 FX Send 2",
   "aether.fxBus1Id": "Aether FX Bus 1",
   "aether.fxBus2Id": "Aether FX Bus 2",
   "aether.mpe.enabled": "MPE Zone Enabled",
@@ -1503,6 +1562,7 @@ export function createDefaultSynthDraft(): SynthDraftPatch {
       oscillators: [{ id: "a", name: "Oscillator A" }, { id: "b", name: "Oscillator B" }],
       sampleSlot1Zones: [],
       managedSfz: undefined,
+      managedGranular: undefined,
     },
   };
 }
@@ -1592,6 +1652,7 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
       oscillators: normalizeOscillatorDefinitions(inputMetadata.oscillators),
       sampleSlot1Zones: normalizeAetherSampleZones(inputMetadata.sampleSlot1Zones),
       managedSfz: normalizeManagedSfz(inputMetadata.managedSfz),
+      managedGranular: normalizeManagedGranular(inputMetadata.managedGranular),
     },
   };
 }
@@ -2072,6 +2133,25 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         zones: draft.metadata.sampleSlot1Zones,
         ...(draft.metadata.managedSfz ? { managedSfz: draft.metadata.managedSfz } : {}),
       },
+      granularSlot2: {
+        schemaVersion: 1,
+        enabled: getBooleanParam(draft, "aether.granular.2.enabled")
+          && (getStringParam(draft, "aether.granular.2.builtinSource") === "benchmark"
+            || Boolean(draft.metadata.managedGranular?.manifestPath)),
+        ...(getStringParam(draft, "aether.granular.2.builtinSource") === "benchmark" ? { builtinSource: "benchmark" as const } : {}),
+        rootNote: Math.max(0, Math.min(127, Math.round(getNumberParam(draft, "aether.granular.2.rootNote")))),
+        level: clamp01(getNumberParam(draft, "aether.granular.2.level")),
+        route: sourceRouteFromId(getStringParam(draft, "aether.granular.2.route")),
+        position: clamp01(getNumberParam(draft, "aether.granular.2.position")),
+        positionSpread: clamp01(getNumberParam(draft, "aether.granular.2.positionSpread")),
+        grainMilliseconds: Math.max(2, Math.min(1000, getNumberParam(draft, "aether.granular.2.grainMilliseconds"))),
+        densityHz: Math.max(0.1, Math.min(200, getNumberParam(draft, "aether.granular.2.densityHz"))),
+        pitchSemitones: Math.max(-48, Math.min(48, getNumberParam(draft, "aether.granular.2.pitchSemitones"))),
+        stereoSpread: clamp01(getNumberParam(draft, "aether.granular.2.stereoSpread")),
+        randomSeed: Math.max(1, Math.min(0xffffffff, Math.round(getNumberParam(draft, "aether.granular.2.randomSeed")))),
+        fxSends: [clamp01(getNumberParam(draft, "aether.granular.2.fxSend1")), clamp01(getNumberParam(draft, "aether.granular.2.fxSend2"))],
+        ...(draft.metadata.managedGranular ? { managedAsset: draft.metadata.managedGranular } : {}),
+      },
       fxBusIds: [getStringParam(draft, "aether.fxBus1Id"), getStringParam(draft, "aether.fxBus2Id")],
       runtimeWarp: clamp01(getNumberParam(draft, "aether.runtimeWarp")),
       runtimeWarpMode: isWavetableWarpMode(draft.parameters["aether.runtimeWarpMode"])
@@ -2311,6 +2391,21 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["aether.sample.1.fxSend2"] = instrument.aether?.sampleSlot1?.fxSends?.[1] ?? 0;
   draft.metadata.sampleSlot1Zones = normalizeAetherSampleZones(instrument.aether?.sampleSlot1?.zones);
   draft.metadata.managedSfz = normalizeManagedSfz(instrument.aether?.sampleSlot1?.managedSfz);
+  draft.parameters["aether.granular.2.enabled"] = instrument.aether?.granularSlot2?.enabled ?? false;
+  draft.parameters["aether.granular.2.builtinSource"] = instrument.aether?.granularSlot2?.builtinSource ?? "";
+  draft.parameters["aether.granular.2.rootNote"] = instrument.aether?.granularSlot2?.rootNote ?? 60;
+  draft.parameters["aether.granular.2.level"] = instrument.aether?.granularSlot2?.level ?? 0.7;
+  draft.parameters["aether.granular.2.route"] = instrument.aether?.granularSlot2?.route ?? "filter";
+  draft.parameters["aether.granular.2.position"] = instrument.aether?.granularSlot2?.position ?? 0.5;
+  draft.parameters["aether.granular.2.positionSpread"] = instrument.aether?.granularSlot2?.positionSpread ?? 0.1;
+  draft.parameters["aether.granular.2.grainMilliseconds"] = instrument.aether?.granularSlot2?.grainMilliseconds ?? 80;
+  draft.parameters["aether.granular.2.densityHz"] = instrument.aether?.granularSlot2?.densityHz ?? 12;
+  draft.parameters["aether.granular.2.pitchSemitones"] = instrument.aether?.granularSlot2?.pitchSemitones ?? 0;
+  draft.parameters["aether.granular.2.stereoSpread"] = instrument.aether?.granularSlot2?.stereoSpread ?? 0.5;
+  draft.parameters["aether.granular.2.randomSeed"] = instrument.aether?.granularSlot2?.randomSeed ?? 1;
+  draft.parameters["aether.granular.2.fxSend1"] = instrument.aether?.granularSlot2?.fxSends?.[0] ?? 0;
+  draft.parameters["aether.granular.2.fxSend2"] = instrument.aether?.granularSlot2?.fxSends?.[1] ?? 0;
+  draft.metadata.managedGranular = normalizeManagedGranular(instrument.aether?.granularSlot2?.managedAsset);
   draft.parameters["aether.fxBus1Id"] = instrument.aether?.fxBusIds?.[0] ?? "";
   draft.parameters["aether.fxBus2Id"] = instrument.aether?.fxBusIds?.[1] ?? "";
   draft.parameters["aether.mpe.enabled"] = instrument.aether?.memberExpressionZone?.enabled ?? false;
@@ -2615,6 +2710,11 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (id === "glide.ms") return Math.max(0, Math.min(5000, Math.round(value)));
   if (id.startsWith("aether.mpe.") && id.endsWith("Channel")) return clampMidiChannel(value);
   if (id === "aether.sample.1.rootNote") return Math.max(0, Math.min(127, Math.round(value)));
+  if (id === "aether.granular.2.rootNote") return Math.max(0, Math.min(127, Math.round(value)));
+  if (id === "aether.granular.2.grainMilliseconds") return Math.max(2, Math.min(1000, value));
+  if (id === "aether.granular.2.densityHz") return Math.max(0.1, Math.min(200, value));
+  if (id === "aether.granular.2.pitchSemitones") return Math.max(-48, Math.min(48, value));
+  if (id === "aether.granular.2.randomSeed") return Math.max(1, Math.min(0xffffffff, Math.round(value)));
   if (id.includes(".pan")) return Math.max(-1, Math.min(1, value));
   if (id.includes(".attack") || id.includes(".decay") || id.includes(".release")) return Math.max(0, Math.min(30, value));
   return Math.max(0, Math.min(1, value));
@@ -2961,10 +3061,52 @@ const FACTORY_GUIDE_MOD_TARGETS: Record<string, ModulationTargetId> = {
 
 function createFactorySynthPresetsFromGuide(): SynthFactoryPresetRecord[] {
   const guides = [factoryAetherGuide, benchmarkAetherStrings] as Array<{ patches?: FactoryGuidePatch[] }>;
-  return guides
+  const presets = guides
     .flatMap((guide) => guide.patches ?? [])
     .filter((patch) => patch.name && patch.category)
     .map(createFactorySynthPresetFromGuide);
+  const granular = normalizeSynthDraftPatch({
+    name: "Benchmark - Granular Drift",
+    parameters: {
+      "osc.a.wavetable": "basic.sine",
+      "osc.a.level": 0.12,
+      "osc.b.enabled": false,
+      "aether.sub.enabled": false,
+      "aether.noise.enabled": false,
+      "aether.granular.2.enabled": true,
+      "aether.granular.2.builtinSource": "benchmark",
+      "aether.granular.2.rootNote": 45,
+      "aether.granular.2.level": 0.62,
+      "aether.granular.2.route": "filter",
+      "aether.granular.2.position": 0.46,
+      "aether.granular.2.positionSpread": 0.28,
+      "aether.granular.2.grainMilliseconds": 145,
+      "aether.granular.2.densityHz": 24,
+      "aether.granular.2.pitchSemitones": 0,
+      "aether.granular.2.stereoSpread": 0.82,
+      "aether.granular.2.randomSeed": 271828,
+      "filter.cutoff": 9200,
+      "filter.resonance": 0.12,
+      "env.1.attack": 0.04,
+      "env.1.decay": 0.8,
+      "env.1.sustain": 0.82,
+      "env.1.release": 1.6,
+    },
+    modulation: [],
+    metadata: { createdBy: "Beat", tags: ["factory", "benchmark", "granular", "texture"] },
+  } as unknown as Partial<SynthDraftPatch>);
+  presets.push({
+    id: "factory.benchmark-granular-drift",
+    name: granular.name,
+    patch: granular,
+    tags: ["factory", "benchmark", "granular", "texture"],
+    category: "Texture",
+    description: "Deterministic Beat-owned granular benchmark using a locally generated immutable source and a quiet sine audition pilot.",
+    family: "Granular",
+    role: "texture benchmark",
+    auditionNote: "Hold a low chord to review grain density, position spread, stereo motion, and release tails.",
+  });
+  return presets;
 }
 
 function createFactorySynthPresetFromGuide(patch: FactoryGuidePatch): SynthFactoryPresetRecord {

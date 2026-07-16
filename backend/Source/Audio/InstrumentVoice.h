@@ -18,6 +18,7 @@
 #include "Realtime/VoiceNoteAutomationState.h"
 #include "Sources/MappedSampleSourceSlot.h"
 #include "Sources/SfzSourceSlot.h"
+#include "Sources/GranularSourceSlot.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
 #include "Wavetable/WavetableUnisonPlan.h"
@@ -294,6 +295,14 @@ namespace beat
             AetherSub aetherSub;
             AetherNoise aetherNoise;
             AetherSampleSlot aetherSampleSlot1;
+            struct AetherGranularSlot
+            {
+                bool enabled { false };
+                std::shared_ptr<const ImmutableGranularSource> source;
+                float level { 0.7f };
+                int routing { 0 };
+                std::array<float, 2> fxSends {};
+            } aetherGranularSlot2;
             float aetherRuntimeWarp { 0.0f };
             int aetherRuntimeWarpMode { 0 };
             float aetherRuntimeWarp2 { 0.0f };
@@ -409,6 +418,7 @@ namespace beat
         AetherTableStackRenderer::InteractionState aetherInteractionState;
         MappedSampleSourceSlot aetherSampleSlot1;
         SfzSourceSlot aetherSfzSlot1;
+        GranularSourceSlot aetherGranularSlot2;
         VoiceAetherCache::PanGains cachedPanGains;
         VoiceAetherCache::PitchRates cachedPitchRates;
         DynamicModulation::TargetActivityFlags cachedDynamicTargets;

@@ -1333,12 +1333,15 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   const [sampleAssetOpen, setSampleAssetOpen] = createSignal(false);
   const [sampleRouteOpen, setSampleRouteOpen] = createSignal(false);
   const [importingSfz, setImportingSfz] = createSignal(false);
+  const [importingGranular, setImportingGranular] = createSignal(false);
+  const [granularRouteOpen, setGranularRouteOpen] = createSignal(false);
   const fxBusOptions = createMemo(() => [
     { value: "", label: "Off" },
     ...returnBuses().filter((bus) => !bus.mute).map((bus) => ({ value: bus.id, label: bus.name || bus.id })),
   ]);
   const mappedZones = createMemo(() => draft().metadata.sampleSlot1Zones ?? []);
   const managedSfz = createMemo(() => draft().metadata.managedSfz);
+  const managedGranular = createMemo(() => draft().metadata.managedGranular);
   const commitMappedZones = (zones: AetherSampleZoneConfig[]) => setDraft({
     ...draft(),
     metadata: { ...draft().metadata, sampleSlot1Zones: zones.slice(0, 8) },
@@ -1371,6 +1374,32 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
       await appAlert(error instanceof Error ? error.message : "SFZ import failed.");
     } finally {
       setImportingSfz(false);
+    }
+  };
+  const importGranular = async () => {
+    const projectPath = useDocumentStore.getState().currentFilePath;
+    if (!projectPath) {
+      await appAlert("Save this project to a .beat file before importing granular audio.");
+      return;
+    }
+    setImportingGranular(true);
+    try {
+      const result = await send({ kind: "instrument.importGranular", projectPath });
+      if (result.error) throw new Error(result.error);
+      if (!result.managedGranular) return;
+      setDraft({
+        ...draft(),
+        parameters: {
+          ...draft().parameters,
+          "aether.granular.2.enabled": true,
+          "aether.granular.2.builtinSource": "",
+        },
+        metadata: { ...draft().metadata, managedGranular: result.managedGranular },
+      });
+    } catch (error) {
+      await appAlert(error instanceof Error ? error.message : "Granular audio import failed.");
+    } finally {
+      setImportingGranular(false);
     }
   };
   const baseZone = (): AetherSampleZoneConfig => ({
@@ -1608,6 +1637,68 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               onRemove={() => commitMappedZones(mappedZones().filter((_, zoneIndex) => zoneIndex !== index()))}
             />
           )}</For>
+        </div>
+        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label="Aether granular source slot 2">
+          <div class={styles.ampFilterGroupTitle}>Granular Slot 2</div>
+          <div class={styles.ampFilterShapeRow}>
+            <Toggle
+              label="Enabled"
+              checked={draft().parameters["aether.granular.2.enabled"] === true}
+              disabled={!managedGranular() && draft().parameters["aether.granular.2.builtinSource"] !== "benchmark"}
+              onChange={(value) => setBooleanParameter("aether.granular.2.enabled", value)}
+            />
+            <FloatingSelect
+              label="Route"
+              layout="inline"
+              value={String(draft().parameters["aether.granular.2.route"] ?? "filter")}
+              ariaLabel="Aether granular slot 2 route"
+              options={[
+                { value: "filter", label: "Filter" },
+                { value: "filter1", label: "Filter 1" },
+                { value: "filter2", label: "Filter 2" },
+                { value: "direct", label: "Direct" },
+              ]}
+              open={granularRouteOpen()}
+              onOpenChange={setGranularRouteOpen}
+              onChange={(value) => setParameter("aether.granular.2.route", value)}
+            />
+            <Button size="xs" onClick={() => void importGranular()} disabled={importingGranular()}>
+              {importingGranular() ? "Importing…" : managedGranular() ? `Audio · ${managedGranular()!.displayName}` : "Import Audio"}
+            </Button>
+            <Button size="xs" variant="ghost" onClick={() => setDraft({
+              ...draft(),
+              parameters: {
+                ...draft().parameters,
+                "aether.granular.2.enabled": true,
+                "aether.granular.2.builtinSource": "benchmark",
+              },
+              metadata: { ...draft().metadata, managedGranular: undefined },
+            })}>Benchmark Source</Button>
+            <Show when={managedGranular() || draft().parameters["aether.granular.2.builtinSource"] === "benchmark"}>
+              <Button size="xs" variant="ghost" onClick={() => setDraft({
+                ...draft(),
+                parameters: {
+                  ...draft().parameters,
+                  "aether.granular.2.enabled": false,
+                  "aether.granular.2.builtinSource": "",
+                },
+                metadata: { ...draft().metadata, managedGranular: undefined },
+              })}>Remove</Button>
+            </Show>
+          </div>
+          <div class={styles.knobCluster}>
+            <NumberInput label="Root" layout="inline" value={getNumberParam(draft(), "aether.granular.2.rootNote")} min={0} max={127} step={1} ariaLabel="Granular root MIDI note" onChange={(value) => setNumericParameter("aether.granular.2.rootNote", value)} />
+            <SynthParameterKnob id="aether.granular.2.level" label="Level" defaultValue={0.7} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.granular.2.position" label="Position" defaultValue={0.5} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.granular.2.positionSpread" label="Position Spread" defaultValue={0.1} onChange={setNumericParameter} />
+            <SynthParameterKnob id="aether.granular.2.stereoSpread" label="Stereo" defaultValue={0.5} onChange={setNumericParameter} />
+          </div>
+          <div class={styles.ampFilterShapeRow}>
+            <NumberInput label="Grain ms" layout="inline" value={getNumberParam(draft(), "aether.granular.2.grainMilliseconds")} min={2} max={1000} step={1} ariaLabel="Granular grain duration milliseconds" onChange={(value) => setNumericParameter("aether.granular.2.grainMilliseconds", value)} />
+            <NumberInput label="Density" layout="inline" value={getNumberParam(draft(), "aether.granular.2.densityHz")} min={0.1} max={200} step={0.1} ariaLabel="Granular density hertz" onChange={(value) => setNumericParameter("aether.granular.2.densityHz", value)} />
+            <NumberInput label="Pitch" layout="inline" value={getNumberParam(draft(), "aether.granular.2.pitchSemitones")} min={-48} max={48} step={0.1} ariaLabel="Granular pitch semitones" onChange={(value) => setNumericParameter("aether.granular.2.pitchSemitones", value)} />
+            <NumberInput label="Seed" layout="inline" value={getNumberParam(draft(), "aether.granular.2.randomSeed")} min={1} max={4294967295} step={1} ariaLabel="Granular deterministic seed" onChange={(value) => setNumericParameter("aether.granular.2.randomSeed", value)} />
+          </div>
         </div>
         <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label="Aether shared FX buses">
           <div class={styles.ampFilterGroupTitle}>Source FX</div>

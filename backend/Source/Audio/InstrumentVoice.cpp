@@ -114,6 +114,7 @@ namespace beat
             transition.prepare(sampleRate);
         aetherSampleSlot1.prepare({ sampleRate, blockSize, 2 });
         aetherSfzSlot1.prepare({ sampleRate, blockSize, 2 });
+        aetherGranularSlot2.prepare({ sampleRate, blockSize, 2 });
     }
 
     void InstrumentVoice::setProcessingQuality(AudioQuality quality) noexcept
@@ -197,6 +198,8 @@ namespace beat
         aetherSampleSlot1.publish(params.aetherSampleSlot1.enabled ? params.aetherSampleSlot1.source : nullptr);
         aetherSfzSlot1.allNotesOff(true);
         aetherSfzSlot1.publish(params.aetherSampleSlot1.enabled ? params.aetherSampleSlot1.sfzSource : nullptr);
+        aetherGranularSlot2.allNotesOff(true);
+        aetherGranularSlot2.publish(params.aetherGranularSlot2.enabled ? params.aetherGranularSlot2.source : nullptr);
         adsrParams.attack  = juce::jmax(0.001f, p.attackMs  * 0.001f);
         adsrParams.decay   = juce::jmax(0.001f, p.decayMs   * 0.001f);
         adsrParams.sustain = juce::jlimit(0.0f, 1.0f, p.sustain);
@@ -409,6 +412,7 @@ namespace beat
         pitchWheelMoved(currentPitchWheel == 0 ? 8192 : currentPitchWheel);
         aetherSampleSlot1.allNotesOff(true);
         aetherSfzSlot1.allNotesOff(true);
+        aetherGranularSlot2.allNotesOff(true);
         if (params.hasAether && params.aetherSampleSlot1.enabled)
         {
             if (params.aetherSampleSlot1.sfzSource)
@@ -416,6 +420,8 @@ namespace beat
             else if (params.aetherSampleSlot1.source)
                 aetherSampleSlot1.noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
         }
+        if (params.hasAether && params.aetherGranularSlot2.enabled && params.aetherGranularSlot2.source)
+            aetherGranularSlot2.noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
 
         if (legatoRetune)
         {
@@ -549,11 +555,13 @@ namespace beat
         {
             aetherSampleSlot1.noteOff((uint64_t) stableVoiceId);
             aetherSfzSlot1.noteOff((uint64_t) stableVoiceId);
+            aetherGranularSlot2.noteOff((uint64_t) stableVoiceId);
         }
         else
         {
             aetherSampleSlot1.allNotesOff(true);
             aetherSfzSlot1.allNotesOff(true);
+            aetherGranularSlot2.allNotesOff(true);
         }
         if (allowTailOff)
         {
@@ -719,6 +727,7 @@ namespace beat
             StereoSample filter1Raw;
             StereoSample filter2Raw;
             AetherTableStackRenderer::StereoFrame sampleSourceFrame {};
+            AetherTableStackRenderer::StereoFrame granularSourceFrame {};
             std::array<AetherTableStackRenderer::StereoFrame, 4> sourceFrames {};
             if (params.hasAether)
             {
@@ -785,6 +794,29 @@ namespace beat
                     else
                     {
                         raw.left += sampleLeft; raw.right += sampleRight;
+                    }
+                }
+                if (params.aetherGranularSlot2.enabled && params.aetherGranularSlot2.source)
+                {
+                    const auto granular = aetherGranularSlot2.renderFrame();
+                    const float granularLeft = granular.left * params.aetherGranularSlot2.level;
+                    const float granularRight = granular.right * params.aetherGranularSlot2.level;
+                    granularSourceFrame = { granularLeft, granularRight };
+                    if (params.aetherGranularSlot2.routing == 1)
+                    {
+                        directRaw.left += granularLeft; directRaw.right += granularRight;
+                    }
+                    else if (params.aetherGranularSlot2.routing == 2)
+                    {
+                        filter1Raw.left += granularLeft; filter1Raw.right += granularRight;
+                    }
+                    else if (params.aetherGranularSlot2.routing == 3)
+                    {
+                        filter2Raw.left += granularLeft; filter2Raw.right += granularRight;
+                    }
+                    else
+                    {
+                        raw.left += granularLeft; raw.right += granularRight;
                     }
                 }
             }
@@ -1024,6 +1056,9 @@ namespace beat
                     const float sampleSendGain = VoiceMath::clamp01(params.aetherSampleSlot1.fxSends[bus]);
                     send.left += sampleSourceFrame.left * sampleSendGain;
                     send.right += sampleSourceFrame.right * sampleSendGain;
+                    const float granularSendGain = VoiceMath::clamp01(params.aetherGranularSlot2.fxSends[bus]);
+                    send.left += granularSourceFrame.left * granularSendGain;
+                    send.right += granularSourceFrame.right * granularSendGain;
                     send.left *= leftGain * voiceGain;
                     send.right *= rightGain * voiceGain;
                     const auto transitionedSend = sourceSendTransitions[bus].process(send);

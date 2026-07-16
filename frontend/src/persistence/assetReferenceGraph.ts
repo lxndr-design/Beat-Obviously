@@ -103,6 +103,11 @@ export function buildAssetManifest(input: Pick<BeatProjectDocument, "instruments
         addAsset("sample", path, `instrument:${instrument.id}:managedSfz:sample:${index}`, instrument.name);
       });
     }
+    const managedGranular = instrument.aether?.granularSlot2?.managedAsset;
+    if (managedGranular) {
+      addAsset("sample", managedGranular.manifestPath, `instrument:${instrument.id}:managedGranular:manifest`, instrument.name);
+      addAsset("sample", managedGranular.audioPath, `instrument:${instrument.id}:managedGranular:audio`, instrument.name);
+    }
   }
   for (const plugin of input.plugins ?? []) {
     addAsset("plugin", plugin.sourcePath ?? plugin.sourceFileName, `plugin:${plugin.id}:sourcePath`, plugin.name);

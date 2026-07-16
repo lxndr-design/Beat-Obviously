@@ -62,6 +62,23 @@ namespace beat::ParameterPolicy
         Metadata { params::modulation::sourceMacro8, 0.0f, 1.0f, RateClass::sampleAccurateControl, Smoothing::callerRamp, false },
     };
 
+    // C3E2 applies these on the control thread by rebuilding and crossfading
+    // the bounded synth route. They are deliberately not realtime-modulatable.
+    inline constexpr std::array sourceRebuildParameters {
+        Metadata { params::granular::enabled, 0.0f, 1.0f, RateClass::discrete, Smoothing::none, false },
+        Metadata { params::granular::rootNote, 0.0f, 127.0f, RateClass::discrete, Smoothing::none, false },
+        Metadata { params::granular::level, 0.0f, 1.0f, RateClass::discrete, Smoothing::none, false },
+        Metadata { params::granular::position, 0.0f, 1.0f, RateClass::discrete, Smoothing::none, false },
+        Metadata { params::granular::positionSpread, 0.0f, 1.0f, RateClass::discrete, Smoothing::none, false },
+        Metadata { params::granular::grainMilliseconds, 2.0f, 1000.0f, RateClass::discrete, Smoothing::none, false },
+        Metadata { params::granular::densityHz, 0.1f, 200.0f, RateClass::discrete, Smoothing::none, false },
+        Metadata { params::granular::pitchSemitones, -48.0f, 48.0f, RateClass::discrete, Smoothing::none, false },
+        Metadata { params::granular::stereoSpread, 0.0f, 1.0f, RateClass::discrete, Smoothing::none, false },
+        Metadata { params::granular::randomSeed, 1.0f, 4294967295.0f, RateClass::discrete, Smoothing::none, false },
+        Metadata { params::granular::fxSend1, 0.0f, 1.0f, RateClass::discrete, Smoothing::none, false },
+        Metadata { params::granular::fxSend2, 0.0f, 1.0f, RateClass::discrete, Smoothing::none, false },
+    };
+
     inline constexpr const Metadata* metadataAt(size_t index) noexcept
     {
         return index < realtimeVoiceParameters.size() ? &realtimeVoiceParameters[index] : nullptr;

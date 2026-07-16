@@ -73,3 +73,7 @@ This closes the Sample Slot 1 import/routing and active-replacement row only for
 ## Milestone C3E1 update — 2026-07-15
 
 The granular row now has a disconnected bounded engine foundation: immutable finite stereo input, deterministic scheduling, eight emitters, 32 grains, fixed parameter/source limits, five-rate and exact block tests, pool-pressure telemetry, and a clean callback-safety probe. It is compiled but unreachable from product rendering. Product routing, schema/UI, source import, replacement, modulation, audible review, and presets remain open and require the next approval; spectral work remains untouched.
+
+## Milestone C3E2 update — 2026-07-15
+
+Granular Slot 2 is product-reachable through a content-addressed, project-owned managed audio asset or the deterministic Beat-owned benchmark source. Persistence, relocation, tamper/path/symlink rejection, bounded decoding, stable parameters, editor controls, main/filter/direct routing, FX sends, active replacement tails, and an audible factory benchmark are covered. This closes the bounded desktop granular foundation/product-path row only: there is no realtime granular modulation, automatic source analysis, external relinking, sample editing, transient detection, tempo warping, spectral processing, or Slot 3 implementation. The isolated 150 default-off renders remain byte-identical, and the only suite waiver remains `baseline.recent-project-exists`.

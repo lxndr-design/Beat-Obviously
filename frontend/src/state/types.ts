@@ -495,6 +495,32 @@ export interface ManagedSfzAssetConfig {
   samplePaths: string[];
 }
 
+export interface ManagedGranularAssetConfig {
+  schemaVersion: 1;
+  assetId: string;
+  displayName: string;
+  manifestPath: string;
+  audioPath: string;
+}
+
+export interface AetherGranularSlotConfig {
+  schemaVersion: 1;
+  enabled: boolean;
+  builtinSource?: "benchmark";
+  rootNote: number;
+  level: number;
+  route?: "filter" | "both" | "filter1" | "filter2" | "direct";
+  position: number;
+  positionSpread: number;
+  grainMilliseconds: number;
+  densityHz: number;
+  pitchSemitones: number;
+  stereoSpread: number;
+  randomSeed: number;
+  fxSends?: [number, number];
+  managedAsset?: ManagedGranularAssetConfig;
+}
+
 export interface AetherSampleZoneConfig {
   audioFileId: Id;
   rootNote: number;
@@ -518,8 +544,10 @@ export interface AetherSynthConfig {
   oscillators?: Array<AetherOscillatorConfig & { id: string; name: string }>;
   sub: AetherSubConfig;
   noise: AetherNoiseConfig;
-  /** First hybrid source slot. Slots 2-3 remain reserved. */
+  /** First hybrid source slot. */
   sampleSlot1?: AetherSampleSlotConfig;
+  /** Bounded granular source slot. Slot 3 remains reserved. */
+  granularSlot2?: AetherGranularSlotConfig;
   /** Project return-bus ids targeted by the two fixed per-source buses. */
   fxBusIds?: [string, string];
   /** 0..1 opt-in runtime nonlinear warp applied after Aether oscillator mixing. */
@@ -654,6 +682,7 @@ export interface SynthPatchSnapshot {
     customWavetables?: Record<string, CustomWavetableDefinition>;
     sampleSlot1Zones?: AetherSampleZoneConfig[];
     managedSfz?: ManagedSfzAssetConfig;
+    managedGranular?: ManagedGranularAssetConfig;
   };
 }
 

@@ -1,4 +1,5 @@
 #include "AudioEngine.h"
+#include "../Persistence/ManagedGranularAsset.h"
 #include "RealtimeSafetyHooks.h"
 #include "Effects/TrackEffectDefaults.h"
 #include "Realtime/VoiceAutomationInbox.h"
@@ -1845,7 +1846,8 @@ namespace beat
     std::unique_ptr<juce::Synthesiser> AudioEngine::createInstrumentSynth(
         const InstrumentDefinition& instrument,
         std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1,
-        std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1)
+        std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1,
+        std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2)
     {
         auto instrumentSynth = std::make_unique<BeatSynthesiser>();
         instrumentSynth->configureMemberExpressionZone({
@@ -2119,6 +2121,13 @@ namespace beat
             juce::jlimit(0, 3, instrument.aether.sampleSlot1.routing),
             instrument.aether.sampleSlot1.fxSends,
         };
+        params.aetherGranularSlot2 = {
+            instrument.aether.granularSlot2.enabled && aetherGranularSlot2 != nullptr,
+            std::move(aetherGranularSlot2),
+            instrument.aether.granularSlot2.level,
+            juce::jlimit(0, 3, instrument.aether.granularSlot2.routing),
+            instrument.aether.granularSlot2.fxSends,
+        };
         params.hasAetherSourceSends = [&instrument]
         {
             for (size_t bus = 0; bus < instrument.aether.fxBusIds.size(); ++bus)
@@ -2129,7 +2138,9 @@ namespace beat
                         || instrument.aether.sub.fxSends[bus] > 0.0001f
                         || instrument.aether.noise.fxSends[bus] > 0.0001f
                         || (instrument.aether.sampleSlot1.enabled
-                            && instrument.aether.sampleSlot1.fxSends[bus] > 0.0001f)))
+                            && instrument.aether.sampleSlot1.fxSends[bus] > 0.0001f)
+                        || (instrument.aether.granularSlot2.enabled
+                            && instrument.aether.granularSlot2.fxSends[bus] > 0.0001f)))
                     return true;
             }
             return false;
@@ -2420,6 +2431,7 @@ namespace beat
             {
                 std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1;
                 std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1;
+                std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2;
                 const auto& slot = routeInstrument->aether.sampleSlot1;
                 auto sampleIdentity = juce::String();
                 if (routeInstrument->hasAether && slot.enabled)
@@ -2511,8 +2523,37 @@ namespace beat
                     if (!aetherSfzSlot1 && map->zoneCount > 0)
                         aetherSampleSlot1 = std::move(map);
                 }
+                const auto& granular = routeInstrument->aether.granularSlot2;
+                if (routeInstrument->hasAether && granular.enabled)
+                {
+                    ManagedGranularLoadResult loaded;
+                    if (granular.builtinSource == "benchmark")
+                    {
+                        loaded.audio = makeGranularBenchmarkAudio();
+                        loaded.sourceSampleRate = 48000.0;
+                    }
+                    else if (granular.managedAsset.manifestPath.isNotEmpty())
+                    {
+                        loaded = loadManagedGranularAsset(juce::File(granular.managedAsset.manifestPath));
+                    }
+                    if (loaded.ok())
+                    {
+                        auto source = std::make_shared<ImmutableGranularSource>();
+                        source->audio = std::move(loaded.audio);
+                        source->sourceSampleRate = loaded.sourceSampleRate;
+                        source->rootNote = granular.rootNote;
+                        source->position = granular.position;
+                        source->positionSpread = granular.positionSpread;
+                        source->grainMilliseconds = granular.grainMilliseconds;
+                        source->densityHz = granular.densityHz;
+                        source->pitchSemitones = granular.pitchSemitones;
+                        source->stereoSpread = granular.stereoSpread;
+                        source->randomSeed = granular.randomSeed;
+                        if (source->isValid()) aetherGranularSlot2 = std::move(source);
+                    }
+                }
                 route.synth = createInstrumentSynth(*routeInstrument,
-                    std::move(aetherSampleSlot1), std::move(aetherSfzSlot1));
+                    std::move(aetherSampleSlot1), std::move(aetherSfzSlot1), std::move(aetherGranularSlot2));
                 route.sourceFxBusIds = routeInstrument->aether.fxBusIds;
                 route.aetherSampleSlot1Identity = slot.enabled
                     ? juce::String(slot.routing) + ":" + juce::String(slot.fxSends[0], 6) + ":"
@@ -2520,6 +2561,15 @@ namespace beat
                         + (slot.managedSfz.assetId.isNotEmpty()
                             ? "sfz:" + slot.managedSfz.assetId : sampleIdentity)
                     : juce::String();
+                if (granular.enabled)
+                    route.aetherSampleSlot1Identity += "|granular:" + granular.builtinSource + ":"
+                        + granular.managedAsset.assetId + ":" + juce::String(granular.rootNote) + ":"
+                        + juce::String(granular.position, 6) + ":" + juce::String(granular.positionSpread, 6) + ":"
+                        + juce::String(granular.grainMilliseconds, 3) + ":" + juce::String(granular.densityHz, 3) + ":"
+                        + juce::String(granular.pitchSemitones, 3) + ":" + juce::String(granular.stereoSpread, 6) + ":"
+                        + juce::String((int64_t) granular.randomSeed) + ":" + juce::String(granular.level, 6) + ":"
+                        + juce::String(granular.routing) + ":" + juce::String(granular.fxSends[0], 6) + ":"
+                        + juce::String(granular.fxSends[1], 6);
             }
 
             for (auto& sourceFxBuffer : route.sourceFxBuffers)

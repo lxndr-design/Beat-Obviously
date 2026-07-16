@@ -636,7 +636,8 @@ namespace beat
         std::unique_ptr<juce::Synthesiser> createInstrumentSynth(
             const InstrumentDefinition& instrument,
             std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1 = nullptr,
-            std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1 = nullptr);
+            std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1 = nullptr,
+            std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2 = nullptr);
         void rebuildSampleInstruments(const Project& project);
         InstrumentRenderState* findInstrumentRenderState(const Id& instrumentId);
         InstrumentRenderState* findTrackRenderState(const Id& trackId, const Id& instrumentId);

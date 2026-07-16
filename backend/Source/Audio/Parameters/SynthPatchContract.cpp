@@ -539,6 +539,33 @@ namespace beat
         instrument.aether.sampleSlot1.enabled = requestedSampleSlotEnabled
             && (instrument.aether.sampleSlot1.audioFileId.isNotEmpty()
                 || !instrument.aether.sampleSlot1.zones.empty());
+        auto& granular = instrument.aether.granularSlot2;
+        granular.schemaVersion = 1;
+        granular.builtinSource = synthStringParam(params, "aether.granular.2.builtinSource", "");
+        if (granular.builtinSource != "benchmark") granular.builtinSource.clear();
+        granular.rootNote = juce::jlimit(0, 127, (int) std::round(synthNumberParam(params, "aether.granular.2.rootNote", 60.0)));
+        granular.level = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.granular.2.level", 0.7));
+        granular.routing = sourceRoute(synthStringParam(params, "aether.granular.2.route", "filter"));
+        granular.position = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.granular.2.position", 0.5));
+        granular.positionSpread = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.granular.2.positionSpread", 0.1));
+        granular.grainMilliseconds = juce::jlimit(2.0f, 1000.0f, (float) synthNumberParam(params, "aether.granular.2.grainMilliseconds", 80.0));
+        granular.densityHz = juce::jlimit(0.1f, 200.0f, (float) synthNumberParam(params, "aether.granular.2.densityHz", 12.0));
+        granular.pitchSemitones = juce::jlimit(-48.0f, 48.0f, (float) synthNumberParam(params, "aether.granular.2.pitchSemitones", 0.0));
+        granular.stereoSpread = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.granular.2.stereoSpread", 0.5));
+        granular.randomSeed = (uint32_t) juce::jlimit(1.0, 4294967295.0,
+            synthNumberParam(params, "aether.granular.2.randomSeed", 1.0));
+        granular.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.granular.2.fxSend1", 0.0));
+        granular.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.granular.2.fxSend2", 0.0));
+        const auto managedGranular = objectProperty(metadata, "managedGranular", {});
+        if (managedGranular.isObject() && (int) managedGranular.getProperty("schemaVersion", 0) <= 1)
+        {
+            granular.managedAsset.assetId = managedGranular.getProperty("assetId", {}).toString();
+            granular.managedAsset.displayName = managedGranular.getProperty("displayName", {}).toString();
+            granular.managedAsset.manifestPath = managedGranular.getProperty("manifestPath", {}).toString();
+            granular.managedAsset.audioPath = managedGranular.getProperty("audioPath", {}).toString();
+        }
+        granular.enabled = synthNumberParam(params, "aether.granular.2.enabled", 0.0) >= 0.5
+            && (granular.builtinSource.isNotEmpty() || granular.managedAsset.manifestPath.isNotEmpty());
         instrument.aether.sub.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.sub.fxSend1", 0.0));
         instrument.aether.sub.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.sub.fxSend2", 0.0));
         instrument.aether.noise.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.noise.fxSend1", 0.0));

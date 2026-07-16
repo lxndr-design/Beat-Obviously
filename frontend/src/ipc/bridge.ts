@@ -171,6 +171,8 @@ async function mockResponse<R extends OutboundRequest>(
       return { preset: null } as unknown as ResponseFor<R>;
     case "instrument.importSfz":
       return { error: "SFZ import is only available in the native app." } as unknown as ResponseFor<R>;
+    case "instrument.importGranular":
+      return { error: "Granular import is only available in the native app." } as unknown as ResponseFor<R>;
     case "instrument.renderPreview":
       return {
         waveform: {

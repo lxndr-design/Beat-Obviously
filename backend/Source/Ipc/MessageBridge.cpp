@@ -9,6 +9,7 @@
 #include "../Audio/Sampler/DecentSamplerImporter.h"
 #include "../Persistence/AudioFileLibraryActions.h"
 #include "../Persistence/ManagedSfzAsset.h"
+#include "../Persistence/ManagedGranularAsset.h"
 #include "../Persistence/ProjectAssetPackage.h"
 #include "../Persistence/ProjectDocumentBackup.h"
 #include "../Persistence/ProjectIntegrityVerifier.h"
@@ -27,6 +28,7 @@ namespace beat
         constexpr const char* audioImportWildcard = "*.wav;*.aif;*.aiff;*.mp3;*.flac;*.ogg;*.m4a";
         constexpr const char* decentImportWildcard = "*.dspreset;*.zip";
         constexpr const char* sfzImportWildcard = "*.sfz";
+        constexpr const char* granularImportWildcard = "*.wav;*.aif;*.aiff;*.flac";
 
         void setFiniteProperty(juce::DynamicObject& object, const juce::Identifier& name, double value)
         {
@@ -2298,6 +2300,42 @@ namespace beat
                                     || !instrument.aether.sampleSlot1.zones.empty()
                                     || instrument.aether.sampleSlot1.managedSfz.manifestPath.isNotEmpty());
                         }
+                        const auto granularSlot2 = aether.getProperty("granularSlot2", {});
+                        if (granularSlot2.isObject())
+                        {
+                            const int slotSchemaVersion = juce::jmax(0, (int) granularSlot2.getProperty("schemaVersion", 0));
+                            auto& slot = instrument.aether.granularSlot2;
+                            slot.schemaVersion = 1;
+                            const bool requestedEnabled = (bool) granularSlot2.getProperty("enabled", false);
+                            slot.builtinSource = granularSlot2.getProperty("builtinSource", {}).toString();
+                            if (slot.builtinSource != "benchmark") slot.builtinSource.clear();
+                            slot.rootNote = juce::jlimit(0, 127, (int) granularSlot2.getProperty("rootNote", 60));
+                            slot.level = normalizedParam(granularSlot2, "level", 0.7f);
+                            slot.routing = parseSourceRoute(granularSlot2.getProperty("route", "filter"));
+                            slot.position = normalizedParam(granularSlot2, "position", 0.5f);
+                            slot.positionSpread = normalizedParam(granularSlot2, "positionSpread", 0.1f);
+                            slot.grainMilliseconds = floatParam(granularSlot2, "grainMilliseconds", 80.0f, 2.0f, 1000.0f);
+                            slot.densityHz = floatParam(granularSlot2, "densityHz", 12.0f, 0.1f, 200.0f);
+                            slot.pitchSemitones = floatParam(granularSlot2, "pitchSemitones", 0.0f, -48.0f, 48.0f);
+                            slot.stereoSpread = normalizedParam(granularSlot2, "stereoSpread", 0.5f);
+                            slot.randomSeed = (uint32_t) juce::jlimit(1.0, 4294967295.0,
+                                (double) granularSlot2.getProperty("randomSeed", 1.0));
+                            if (const auto* sends = granularSlot2.getProperty("fxSends", {}).getArray())
+                            {
+                                if (!sends->isEmpty()) slot.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) (double) sends->getReference(0));
+                                if (sends->size() > 1) slot.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) (double) sends->getReference(1));
+                            }
+                            const auto managed = granularSlot2.getProperty("managedAsset", {});
+                            if (managed.isObject() && (int) managed.getProperty("schemaVersion", 0) <= 1)
+                            {
+                                slot.managedAsset.assetId = managed.getProperty("assetId", {}).toString();
+                                slot.managedAsset.displayName = managed.getProperty("displayName", {}).toString();
+                                slot.managedAsset.manifestPath = managed.getProperty("manifestPath", {}).toString();
+                                slot.managedAsset.audioPath = managed.getProperty("audioPath", {}).toString();
+                            }
+                            slot.enabled = requestedEnabled && slotSchemaVersion <= slot.schemaVersion
+                                && (slot.builtinSource.isNotEmpty() || slot.managedAsset.manifestPath.isNotEmpty());
+                        }
                         instrument.aether.fxBusIds[0] = aether.getProperty("fxBus1Id", "").toString();
                         instrument.aether.fxBusIds[1] = aether.getProperty("fxBus2Id", "").toString();
                         instrument.aether.runtimeWarp = normalizedParam(aether, "runtimeWarp", 0.0f);
@@ -3973,6 +4011,42 @@ namespace beat
                 samplePaths.add(resolveProjectRelativePath(juce::File(projectPath), sample.path));
             managed->setProperty("samplePaths", samplePaths);
             response->setProperty("managedSfz", juce::var(managed.get()));
+            return juce::var(response.get());
+        }
+
+        if (kind == INSTRUMENT_IMPORT_GRANULAR)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const auto projectPath = payload.getProperty("projectPath", {}).toString();
+            if (projectPath.isEmpty())
+            {
+                response->setProperty("error", "Save the project to a .beat file before importing granular audio.");
+                return juce::var(response.get());
+            }
+            auto pathHint = payload.getProperty("pathHint", {}).toString();
+            juce::File selected;
+            if (pathHint.isNotEmpty() && juce::File(pathHint).existsAsFile())
+                selected = juce::File(pathHint);
+            else
+            {
+                const auto start = pathHint.isNotEmpty() ? juce::File(pathHint) : juce::File();
+                juce::FileChooser chooser("Import audio into Aether Granular Slot 2", start, granularImportWildcard, true);
+                if (!chooser.browseForFileToOpen()) return juce::var(response.get());
+                selected = chooser.getResult();
+            }
+            const auto imported = importManagedGranularAsset(selected, juce::File(projectPath));
+            if (!imported.ok())
+            {
+                response->setProperty("error", imported.error);
+                return juce::var(response.get());
+            }
+            juce::DynamicObject::Ptr managed = new juce::DynamicObject();
+            managed->setProperty("schemaVersion", 1);
+            managed->setProperty("assetId", imported.assetId);
+            managed->setProperty("displayName", imported.displayName);
+            managed->setProperty("manifestPath", resolveProjectRelativePath(juce::File(projectPath), imported.manifestPath));
+            managed->setProperty("audioPath", resolveProjectRelativePath(juce::File(projectPath), imported.audioPath));
+            response->setProperty("managedGranular", juce::var(managed.get()));
             return juce::var(response.get());
         }
 

@@ -206,6 +206,20 @@ try {
       "aether.sample.1.loop.enabled": true,
       "aether.sample.1.loop.start": 0.25,
       "aether.sample.1.loop.end": 0.72,
+      "aether.granular.2.enabled": true,
+      "aether.granular.2.builtinSource": "",
+      "aether.granular.2.rootNote": 45,
+      "aether.granular.2.level": 0.64,
+      "aether.granular.2.route": "filter1",
+      "aether.granular.2.position": 0.43,
+      "aether.granular.2.positionSpread": 0.24,
+      "aether.granular.2.grainMilliseconds": 137,
+      "aether.granular.2.densityHz": 31,
+      "aether.granular.2.pitchSemitones": -7,
+      "aether.granular.2.stereoSpread": 0.78,
+      "aether.granular.2.randomSeed": 123456,
+      "aether.granular.2.fxSend1": 0.22,
+      "aether.granular.2.fxSend2": 0.39,
       "aether.runtimeWarp": 0.24,
       "aether.runtimeWarpMode": "fold",
       "aether.runtimeWarp2": 0.41,
@@ -244,6 +258,13 @@ try {
         manifestPath: "./Roundtrip Assets/sfz/sfz-roundtrip-fixture/manifest.json",
         sourcePath: "./Roundtrip Assets/sfz/sfz-roundtrip-fixture/source.sfz",
         samplePaths: ["./Roundtrip Assets/sfz/sfz-roundtrip-fixture/samples/tone.wav"],
+      },
+      managedGranular: {
+        schemaVersion: 1,
+        assetId: "granular-roundtrip-fixture",
+        displayName: "Roundtrip Texture",
+        manifestPath: "./Roundtrip Assets/granular/granular-roundtrip-fixture/manifest.json",
+        audioPath: "./Roundtrip Assets/granular/granular-roundtrip-fixture/source.wav",
       },
       sampleSlot1Zones: [
         { audioFileId: "audio-low", rootNote: 48, loNote: 0, hiNote: 63, loVelocity: 0, hiVelocity: 127,
@@ -289,6 +310,22 @@ try {
     managedSfz: independentUnisonDraft.metadata.managedSfz,
     zones: independentUnisonDraft.metadata.sampleSlot1Zones,
   });
+  assert.deepEqual(independentUnisonPreview.aether.granularSlot2, {
+    schemaVersion: 1,
+    enabled: true,
+    rootNote: 45,
+    level: 0.64,
+    route: "filter1",
+    position: 0.43,
+    positionSpread: 0.24,
+    grainMilliseconds: 137,
+    densityHz: 31,
+    pitchSemitones: -7,
+    stereoSpread: 0.78,
+    randomSeed: 123456,
+    fxSends: [0.22, 0.39],
+    managedAsset: independentUnisonDraft.metadata.managedGranular,
+  });
   assert.deepEqual(independentUnisonPreview.sampleIds, ["audio-fixture-1", "audio-low", "audio-high"]);
   assert.equal(independentUnisonDraft.schemaVersion, 5);
   const migratedSampleSlotDraft = synthStore.normalizeSynthDraftPatch({
@@ -306,6 +343,14 @@ try {
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.fxSend1"], 0);
   assert.equal(migratedSampleSlotDraft.parameters["aether.sample.1.fxSend2"], 0);
   assert.deepEqual(migratedSampleSlotDraft.metadata.sampleSlot1Zones, []);
+  assert.equal(migratedSampleSlotDraft.parameters["aether.granular.2.enabled"], false);
+  assert.equal(migratedSampleSlotDraft.parameters["aether.granular.2.grainMilliseconds"], 80);
+  assert.equal(migratedSampleSlotDraft.parameters["aether.granular.2.densityHz"], 12);
+  assert.equal(migratedSampleSlotDraft.metadata.managedGranular, undefined);
+  const granularBenchmark = synthStore.FACTORY_SYNTH_PRESETS.find((preset) => preset.id === "factory.benchmark-granular-drift");
+  assert.ok(granularBenchmark);
+  assert.equal(granularBenchmark.patch.parameters["aether.granular.2.enabled"], true);
+  assert.equal(granularBenchmark.patch.parameters["aether.granular.2.builtinSource"], "benchmark");
   assert.equal(independentUnisonPreview.aether.runtimeWarp, 0.24);
   assert.equal(independentUnisonPreview.aether.runtimeWarpMode, "fold");
   assert.equal(independentUnisonPreview.aether.runtimeWarp2, 0.41);

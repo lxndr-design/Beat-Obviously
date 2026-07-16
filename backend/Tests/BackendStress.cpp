@@ -47,6 +47,7 @@
 #include "../Source/Persistence/AudioFileLibraryActions.h"
 #include "../Source/Persistence/Database.h"
 #include "../Source/Persistence/ManagedSfzAsset.h"
+#include "../Source/Persistence/ManagedGranularAsset.h"
 #include "../Source/Persistence/ProjectRepository.h"
 #include "RealtimeSafetyProbe.h"
 
@@ -2633,6 +2634,18 @@ namespace
             return false;
         if (metadataFor("unknown.parameter") != nullptr || indexForStableId("unknown.parameter") != -1)
             return false;
+        for (size_t first = 0; first < sourceRebuildParameters.size(); ++first)
+        {
+            const auto& metadata = sourceRebuildParameters[first];
+            if (metadata.stableId.empty() || !(metadata.minimum < metadata.maximum)
+                || metadata.rateClass != RateClass::discrete
+                || metadata.smoothing != Smoothing::none
+                || metadata.modulationEligible)
+                return false;
+            for (size_t second = first + 1; second < sourceRebuildParameters.size(); ++second)
+                if (metadata.stableId == sourceRebuildParameters[second].stableId)
+                    return false;
+        }
         return true;
     }
 
@@ -7862,6 +7875,22 @@ namespace
         instrument.aether.sampleSlot1.managedSfz.manifestPath = "/tmp/managed/manifest.json";
         instrument.aether.sampleSlot1.managedSfz.sourcePath = "/tmp/managed/source.sfz";
         instrument.aether.sampleSlot1.managedSfz.samplePaths = { "/tmp/managed/sample.wav" };
+        instrument.aether.granularSlot2.enabled = true;
+        instrument.aether.granularSlot2.rootNote = 45;
+        instrument.aether.granularSlot2.level = 0.64f;
+        instrument.aether.granularSlot2.routing = 2;
+        instrument.aether.granularSlot2.position = 0.43f;
+        instrument.aether.granularSlot2.positionSpread = 0.24f;
+        instrument.aether.granularSlot2.grainMilliseconds = 137.0f;
+        instrument.aether.granularSlot2.densityHz = 31.0f;
+        instrument.aether.granularSlot2.pitchSemitones = -7.0f;
+        instrument.aether.granularSlot2.stereoSpread = 0.78f;
+        instrument.aether.granularSlot2.randomSeed = 123456u;
+        instrument.aether.granularSlot2.fxSends = { 0.22f, 0.39f };
+        instrument.aether.granularSlot2.managedAsset.assetId = "granular-fixture";
+        instrument.aether.granularSlot2.managedAsset.displayName = "Granular Fixture";
+        instrument.aether.granularSlot2.managedAsset.manifestPath = "/tmp/granular/manifest.json";
+        instrument.aether.granularSlot2.managedAsset.audioPath = "/tmp/granular/source.wav";
         instrument.aether.fxBusIds = { "return-a", "return-b" };
         instrument.aether.runtimeWarp = 0.63f;
         instrument.aether.runtimeWarpMode = 1;
@@ -7999,6 +8028,24 @@ namespace
                 && loadedInstrument.aether.sampleSlot1.managedSfz.sourcePath == "/tmp/managed/source.sfz"
                 && loadedInstrument.aether.sampleSlot1.managedSfz.samplePaths.size() == 1
                 && loadedInstrument.aether.sampleSlot1.managedSfz.samplePaths[0] == "/tmp/managed/sample.wav"
+                && loadedInstrument.aether.granularSlot2.schemaVersion == 1
+                && loadedInstrument.aether.granularSlot2.enabled
+                && loadedInstrument.aether.granularSlot2.rootNote == 45
+                && near(loadedInstrument.aether.granularSlot2.level, 0.64f)
+                && loadedInstrument.aether.granularSlot2.routing == 2
+                && near(loadedInstrument.aether.granularSlot2.position, 0.43f)
+                && near(loadedInstrument.aether.granularSlot2.positionSpread, 0.24f)
+                && near(loadedInstrument.aether.granularSlot2.grainMilliseconds, 137.0f)
+                && near(loadedInstrument.aether.granularSlot2.densityHz, 31.0f)
+                && near(loadedInstrument.aether.granularSlot2.pitchSemitones, -7.0f)
+                && near(loadedInstrument.aether.granularSlot2.stereoSpread, 0.78f)
+                && loadedInstrument.aether.granularSlot2.randomSeed == 123456u
+                && near(loadedInstrument.aether.granularSlot2.fxSends[0], 0.22f)
+                && near(loadedInstrument.aether.granularSlot2.fxSends[1], 0.39f)
+                && loadedInstrument.aether.granularSlot2.managedAsset.assetId == "granular-fixture"
+                && loadedInstrument.aether.granularSlot2.managedAsset.displayName == "Granular Fixture"
+                && loadedInstrument.aether.granularSlot2.managedAsset.manifestPath == "/tmp/granular/manifest.json"
+                && loadedInstrument.aether.granularSlot2.managedAsset.audioPath == "/tmp/granular/source.wav"
                 && loadedInstrument.aether.fxBusIds[0] == "return-a"
                 && loadedInstrument.aether.fxBusIds[1] == "return-b"
                 && near(loadedInstrument.aether.runtimeWarp, 0.63f)
@@ -11076,6 +11123,127 @@ namespace
                       << " rejected=" << grainStats.grainsRejected
                       << " active=" << pressure.activeVoiceCount() << "\n";
         return ok;
+    }
+
+    bool stressManagedGranularAssetAndRouting()
+    {
+        const auto root = juce::File("/private/tmp")
+            .getChildFile("BeatBackendStress-managed-granular-" + juce::Uuid().toString());
+        const auto sourceRoot = root.getChildFile("source");
+        const auto projectFile = root.getChildFile("Granular Project.beat");
+        const auto sourceFile = sourceRoot.getChildFile("texture.wav");
+        if (!sourceRoot.createDirectory()) return false;
+
+        juce::AudioBuffer<float> sourceAudio(2, 48000);
+        for (int frame = 0; frame < sourceAudio.getNumSamples(); ++frame)
+        {
+            const float value = 0.24f * std::sin(
+                (float) juce::MathConstants<double>::twoPi * 180.0f * frame / 48000.0f);
+            sourceAudio.setSample(0, frame, value);
+            sourceAudio.setSample(1, frame, -value * 0.6f);
+        }
+        juce::WavAudioFormat wav;
+        auto output = sourceFile.createOutputStream();
+        std::unique_ptr<juce::AudioFormatWriter> writer(output
+            ? wav.createWriterFor(output.get(), 48000.0, 2, 24, {}, 0) : nullptr);
+        if (!writer)
+        {
+            root.deleteRecursively();
+            return false;
+        }
+        output.release();
+        const bool wrote = writer->writeFromAudioSampleBuffer(sourceAudio, 0, sourceAudio.getNumSamples());
+        writer.reset();
+        if (!wrote)
+        {
+            root.deleteRecursively();
+            return false;
+        }
+
+        bool passed = false;
+        juce::String failureStep;
+        do
+        {
+            const auto unsaved = beat::importManagedGranularAsset(sourceFile, {});
+            if (unsaved.ok() || !unsaved.error.containsIgnoreCase("save"))
+                { failureStep = "unsaved guard"; break; }
+            if (!projectFile.replaceWithText("{}")) { failureStep = "project fixture"; break; }
+            const auto imported = beat::importManagedGranularAsset(sourceFile, projectFile);
+            if (!imported.ok() || !imported.manifestPath.startsWith("./")
+                || !imported.audioPath.startsWith("./"))
+                { failureStep = "initial import: " + imported.error; break; }
+            const auto manifest = projectFile.getParentDirectory().getChildFile(imported.manifestPath);
+            const auto managedAudio = projectFile.getParentDirectory().getChildFile(imported.audioPath);
+            const auto loaded = beat::loadManagedGranularAsset(manifest);
+            if (!manifest.existsAsFile() || !managedAudio.existsAsFile() || !loaded.ok()
+                || loaded.audio->getNumChannels() != 2 || loaded.audio->getNumSamples() != 48000
+                || std::abs(loaded.sourceSampleRate - 48000.0) > 0.01)
+                { failureStep = "materialized load: " + loaded.error; break; }
+            const auto repeated = beat::importManagedGranularAsset(sourceFile, projectFile);
+            if (!repeated.ok() || repeated.assetId != imported.assetId
+                || repeated.manifestPath != imported.manifestPath)
+                { failureStep = "deterministic reuse"; break; }
+
+            const auto originalManifest = manifest.loadFileAsString();
+            auto unsafeManifest = juce::JSON::parse(originalManifest);
+            unsafeManifest.getDynamicObject()->setProperty("audioPath", "../texture.wav");
+            if (!manifest.replaceWithText(juce::JSON::toString(unsafeManifest, true))
+                || beat::loadManagedGranularAsset(manifest).ok()
+                || !manifest.replaceWithText(originalManifest))
+                { failureStep = "traversal rejection"; break; }
+
+            const auto symlink = managedAudio.getSiblingFile("linked.wav");
+            if (!managedAudio.createSymbolicLink(symlink, false))
+                { failureStep = "symlink fixture"; break; }
+            auto linkedManifest = juce::JSON::parse(originalManifest);
+            linkedManifest.getDynamicObject()->setProperty("audioPath", symlink.getFileName());
+            const bool symlinkRejected = manifest.replaceWithText(juce::JSON::toString(linkedManifest, true))
+                && !beat::loadManagedGranularAsset(manifest).ok();
+            symlink.deleteFile();
+            if (!symlinkRejected || !manifest.replaceWithText(originalManifest))
+                { failureStep = "symlink rejection"; break; }
+
+            auto project = makeDenseAetherProject();
+            auto& instrument = project.instruments.front();
+            instrument.aether.oscA.enabled = false;
+            instrument.aether.oscB.enabled = false;
+            instrument.aether.sub.enabled = false;
+            instrument.aether.noise.enabled = false;
+            instrument.aether.sampleSlot1 = {};
+            instrument.aether.granularSlot2.enabled = true;
+            instrument.aether.granularSlot2.builtinSource = "benchmark";
+            instrument.aether.granularSlot2.rootNote = 45;
+            instrument.aether.granularSlot2.position = 0.46f;
+            instrument.aether.granularSlot2.positionSpread = 0.28f;
+            instrument.aether.granularSlot2.grainMilliseconds = 145.0f;
+            instrument.aether.granularSlot2.densityHz = 24.0f;
+            instrument.aether.granularSlot2.stereoSpread = 0.82f;
+            instrument.aether.granularSlot2.randomSeed = 271828u;
+            const auto render64 = renderOfflineChunks(project, 16384, 64);
+            const auto repeat64 = renderOfflineChunks(project, 16384, 64);
+            const auto render257 = renderOfflineChunks(project, 16384, 257);
+            const auto repeat257 = renderOfflineChunks(project, 16384, 257);
+            bool deterministic = bufferEnergy(render64) > 0.0001 && bufferEnergy(render257) > 0.0001;
+            for (int channel = 0; channel < render64.getNumChannels() && deterministic; ++channel)
+                for (int sample = 0; sample < render64.getNumSamples(); ++sample)
+                    deterministic = deterministic
+                        && std::isfinite(render64.getSample(channel, sample))
+                        && std::isfinite(render257.getSample(channel, sample))
+                        && render64.getSample(channel, sample) == repeat64.getSample(channel, sample)
+                        && render257.getSample(channel, sample) == repeat257.getSample(channel, sample);
+            if (!deterministic) { failureStep = "audible deterministic routing"; break; }
+
+            const char corruption[] = "tampered";
+            if (!managedAudio.replaceWithData(corruption, sizeof(corruption))
+                || beat::loadManagedGranularAsset(manifest).ok())
+                { failureStep = "tamper rejection"; break; }
+            passed = true;
+        }
+        while (false);
+
+        if (!passed) std::cerr << "Managed granular failure step: " << failureStep << "\n";
+        root.deleteRecursively();
+        return passed;
     }
 
     bool stressDecentSamplerFixtureImportAndPlayback()
@@ -17753,6 +17921,14 @@ int main()
         return 1;
     }
     std::cerr << "granular source: done\n";
+
+    std::cerr << "managed granular: start\n";
+    if (!stressManagedGranularAssetAndRouting())
+    {
+        std::cerr << "Managed granular asset/routing stress failed\n";
+        return 1;
+    }
+    std::cerr << "managed granular: done\n";
 
     std::cerr << "decent sampler: start\n";
     if (!stressDecentSamplerFixtureImportAndPlayback())

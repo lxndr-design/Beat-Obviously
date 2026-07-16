@@ -168,6 +168,18 @@ namespace beat
                     }
                     aether->setProperty("sampleSlot1", slotVar);
                 }
+                auto granularVar = aether->getProperty("granularSlot2");
+                if (auto* granular = granularVar.getDynamicObject())
+                {
+                    auto managedVar = granular->getProperty("managedAsset");
+                    if (auto* managed = managedVar.getDynamicObject())
+                    {
+                        rewriteObjectPath(managed, rewrites, "manifestPath");
+                        rewriteObjectPath(managed, rewrites, "audioPath");
+                        granular->setProperty("managedAsset", managedVar);
+                    }
+                    aether->setProperty("granularSlot2", granularVar);
+                }
                 instrument->setProperty("aether", aetherVar);
             }
         }
@@ -220,6 +232,18 @@ namespace beat
                         slot->setProperty("managedSfz", managedVar);
                     }
                     aether->setProperty("sampleSlot1", slotVar);
+                }
+                auto granularVar = aether->getProperty("granularSlot2");
+                if (auto* granular = granularVar.getDynamicObject())
+                {
+                    auto managedVar = granular->getProperty("managedAsset");
+                    if (auto* managed = managedVar.getDynamicObject())
+                    {
+                        resolveObjectPath(managed, projectFile, "manifestPath");
+                        resolveObjectPath(managed, projectFile, "audioPath");
+                        granular->setProperty("managedAsset", managedVar);
+                    }
+                    aether->setProperty("granularSlot2", granularVar);
                 }
                 instrument->setProperty("aether", aetherVar);
             }
@@ -389,6 +413,10 @@ namespace beat
                     if (auto* paths = managed.getProperty("samplePaths", {}).getArray())
                         for (const auto& path : *paths)
                             recordSidecarUsage(projectFile, path.toString(), usedSidecarFiles);
+                    const auto managedGranular = instrument.getProperty("aether", {})
+                        .getProperty("granularSlot2", {}).getProperty("managedAsset", {});
+                    recordObjectPathUsage(managedGranular, projectFile, "manifestPath", usedSidecarFiles);
+                    recordObjectPathUsage(managedGranular, projectFile, "audioPath", usedSidecarFiles);
                 }
             }
 
@@ -577,6 +605,12 @@ namespace beat
                     for (int i = 0; i < paths->size(); ++i)
                         addManifestAsset(assets, "sample", paths->getReference(i).toString(),
                                          referenceBase + ":managedSfz:sample:" + juce::String(i), instrumentName);
+                const auto managedGranular = instrument.getProperty("aether", {})
+                    .getProperty("granularSlot2", {}).getProperty("managedAsset", {});
+                addManifestAsset(assets, "sample", managedGranular.getProperty("manifestPath", {}).toString(),
+                                 referenceBase + ":managedGranular:manifest", instrumentName);
+                addManifestAsset(assets, "sample", managedGranular.getProperty("audioPath", {}).toString(),
+                                 referenceBase + ":managedGranular:audio", instrumentName);
             }
         }
 
