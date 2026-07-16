@@ -457,6 +457,8 @@ banks pin outgoing/incoming lanes and retain one latest publication;
 replacement uses the same 5 ms fade, takes priority over position pre-roll, and
 returns retired ownership only to the control side. Block determinism,
 latest-source behavior, deferred position, discontinuity, safety, and combined
-deadline gates pass. Exhaustive overlap-phase alignment and product latency
-compensation remain open. Accordingly C3F2 and Slot 3 remain incomplete, and
-C3F3 has not begun.
+deadline gates pass. The subsequent exhaustive fixture proves exact caller-split
+note-on/off placement at every hop offset and exact replacement at every WOLA
+overlap phase with zero callback violations or underflows. Product latency
+compensation and product integration remain open. Accordingly C3F2 and Slot 3
+remain incomplete, and C3F3 has not begun.

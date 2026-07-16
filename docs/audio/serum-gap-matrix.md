@@ -114,8 +114,8 @@ This advances the row to `Disconnected fixed-capacity playback foundation`; it
 does not close C3F2 or Slot 3. The approved 5 ms active-position and immutable
 source-replacement transitions, latest-request policy, active-rate-change
 behavior, block determinism, and combined deadline pressure now pass.
-Exhaustive overlap-phase replacement,
-complete sample-offset alignment, product latency compensation, managed
-import/persistence, UI/routing, and C3F3 remain open. Default-disconnected
-renders stay byte-identical and the only suite waiver remains
-`baseline.recent-project-exists`.
+All 256 caller-split note-on/off offsets and all 256 WOLA replacement phases
+also pass exact alignment, discontinuity, underflow, and callback-safety gates.
+Product latency compensation, managed import/persistence, UI/routing, and C3F3
+remain open. Default-disconnected renders stay byte-identical and the only
+suite waiver remains `baseline.recent-project-exists`.

@@ -8,8 +8,9 @@ Date: 2026-07-16
 Branch: `codex/aether-c3f2-playback`
 
 Status: **disconnected fixed-capacity playback, active-position, and active
-source-replacement gates pass; alignment remains open, so C3F2 is not yet
-closed and C3F3 is not authorized by this report**
+source-replacement gates pass, including exhaustive disconnected alignment;
+product latency/integration remains open, so C3F2 is not yet closed and C3F3
+is not authorized by this report**
 
 ## Implemented boundary
 
@@ -66,6 +67,15 @@ telemetry and measured zero.
   `0.0126168`; waveform, level, pan, and stereo-width changes share the same
   fade. Retired ownership is returned only through the control-side
   `takeRetiredSource()` boundary.
+- Alignment: an opt-in exhaustive fixture renders note-on and note-off at all
+  256 offsets within the canonical hop. Every shifted result is sample-exact
+  against the zero-offset reference across 64/257-sample segmentation. A
+  separate fixture publishes a parameter-distinct replacement at every one of
+  the 256 WOLA overlap phases; every render is block-exact, all transitions
+  complete, maximum adjacent-sample change is `0.00836817`, and allocation,
+  lock, file/stream, lazy-init, growth, and synthesis-underflow counts are zero.
+  The fixture completes in 7.70 seconds wall / 7.29 seconds user / 0.06 seconds
+  system on the recorded development machine.
 - Reported latency is 1691, 1792, 3341, 3631, and 7198 host samples at
   44.1, 48, 88.2, 96, and 192 kHz respectively. It includes scheduling
   pre-roll, WOLA alignment, and converter group delay.
@@ -86,8 +96,8 @@ single-machine development measurements, not a whole-engine budget claim.
 ## Repository gates and freeze
 
 - Focused playback and the extended matrix pass.
-- The complete source-matched native suite passes in 12.89 seconds wall /
-  11.46 seconds user / 0.86 seconds system with only the existing narrowly
+- The complete source-matched native suite passes in 12.91 seconds wall /
+  11.26 seconds user / 0.93 seconds system with only the existing narrowly
   scoped `baseline.recent-project-exists` macOS TCC waiver.
 - Full `verify:non-native` passes, including the two factory benchmark render
   freezes and the production frontend build.
@@ -104,11 +114,9 @@ single-machine development measurements, not a whole-engine budget claim.
 
 ## Remaining gate
 
-The active-position and active-source-replacement contracts are now implemented
-and measured. Replacement-at-every-overlap-phase coverage, sample-offset
-note-event alignment, product
+The active-position, active-source-replacement, overlap-phase replacement, and
+sample-offset note-event contracts are now implemented and measured. Product
 latency compensation, managed artifact import, and product live/offline
-integration remain open. No baseline is updated to hide those omissions. The
-next implementation work may remain on the disconnected engine, but C3F2 must
-not be marked closed and C3F3 must not begin until these items are resolved and
-reviewed.
+integration remain open. No baseline is updated to hide those omissions. C3F2
+must not be marked closed and C3F3 must not begin until those product-facing
+items are separately approved, resolved, and reviewed.

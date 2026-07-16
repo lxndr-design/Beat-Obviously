@@ -395,3 +395,8 @@ replacement/position arbitration, and control-side retirement handoff. It
 reuses the measured 5 ms equal-power transition and introduces no external
 implementation, dependency, asset, preset, binary, coefficient source, service,
 or derived code.
+
+The exhaustive sample-offset and overlap-phase fixtures add only Beat-owned
+test orchestration around the same disconnected slot and generated in-memory
+artifacts. They introduce no external implementation, dependency, file, asset,
+preset, binary, service, coefficient source, or derived work.

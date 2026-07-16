@@ -12071,6 +12071,149 @@ namespace
                   << "/" << replacementStats.positionTransitionsCompleted
                   << " violations=" << replacement64.violations << "\n";
 
+        bool exhaustiveAlignment = true;
+        if (std::getenv("AETHER_SPECTRAL_ALIGNMENT_BENCH") != nullptr)
+        {
+            struct AlignmentResult
+            {
+                juce::AudioBuffer<float> audio;
+                beat::SpectralRenderTelemetry telemetry;
+                uint64_t violations { 0 };
+                bool eventsAccepted { true };
+                bool replacementPublished { true };
+                bool retired { false };
+            };
+            const auto renderAlignedNote = [&](int eventOffset, int blockSize)
+            {
+                constexpr int referenceSamples = 5000;
+                constexpr int noteOffSample = 3200;
+                AlignmentResult result {
+                    juce::AudioBuffer<float>(2, referenceSamples + eventOffset)
+                };
+                result.audio.clear();
+                beat::SpectralSourceSlot slot;
+                if (!slot.prepare({ 48000.0, blockSize, 2 })
+                    || !slot.publish(earlyPosition.source))
+                { result.eventsAccepted = false; return result; }
+                int offset = 0;
+                bool noteStarted = false;
+                bool noteReleased = false;
+                while (offset < result.audio.getNumSamples())
+                {
+                    if (!noteStarted && offset == eventOffset)
+                    {
+                        result.eventsAccepted = slot.noteOn({ 69, 0.8f, 8401 });
+                        noteStarted = true;
+                    }
+                    if (!noteReleased && offset == eventOffset + noteOffSample)
+                    {
+                        slot.noteOff(8401);
+                        noteReleased = true;
+                    }
+                    int next = result.audio.getNumSamples();
+                    if (!noteStarted) next = eventOffset;
+                    else if (!noteReleased) next = eventOffset + noteOffSample;
+                    const int count = std::min({ blockSize, next - offset,
+                                                 result.audio.getNumSamples() - offset });
+                    beat::test::beginRealtimeSafetyProbe();
+                    slot.render(result.audio, offset, count);
+                    result.violations += beat::test::endRealtimeSafetyProbe();
+                    offset += count;
+                }
+                result.telemetry = slot.spectralTelemetry();
+                return result;
+            };
+            const auto noteReference = renderAlignedNote(0, 64);
+            uint64_t noteAlignmentViolations = noteReference.violations;
+            for (int sampleOffset = 0; sampleOffset < beat::SpectralArtifact::hopSize;
+                 ++sampleOffset)
+            {
+                const auto shifted = renderAlignedNote(sampleOffset, 257);
+                noteAlignmentViolations += shifted.violations;
+                exhaustiveAlignment = exhaustiveAlignment && shifted.eventsAccepted
+                    && shifted.telemetry.synthesisUnderflows == 0;
+                for (int channel = 0; channel < 2 && exhaustiveAlignment; ++channel)
+                    for (int sample = 0; sample < noteReference.audio.getNumSamples(); ++sample)
+                        exhaustiveAlignment = exhaustiveAlignment
+                            && noteReference.audio.getSample(channel, sample)
+                                == shifted.audio.getSample(channel, sample + sampleOffset);
+            }
+
+            const auto renderOverlapReplacement = [&](int overlapPhase, int blockSize)
+            {
+                const int replacementSample = 2048 + overlapPhase;
+                AlignmentResult result {
+                    juce::AudioBuffer<float>(2, replacementSample + 2500)
+                };
+                result.audio.clear();
+                beat::SpectralSourceSlot slot;
+                if (!slot.prepare({ 48000.0, blockSize, 2 })
+                    || !slot.publish(earlyPosition.source)
+                    || !slot.noteOn({ 69, 0.8f, 8501 }))
+                { result.eventsAccepted = false; return result; }
+                bool replaced = false;
+                for (int offset = 0; offset < result.audio.getNumSamples();)
+                {
+                    if (!replaced && offset == replacementSample)
+                    {
+                        result.replacementPublished = slot.publish(replacementPosition.source);
+                        replaced = true;
+                    }
+                    const int next = replaced ? result.audio.getNumSamples() : replacementSample;
+                    const int count = std::min({ blockSize, next - offset,
+                                                 result.audio.getNumSamples() - offset });
+                    beat::test::beginRealtimeSafetyProbe();
+                    slot.render(result.audio, offset, count);
+                    result.violations += beat::test::endRealtimeSafetyProbe();
+                    offset += count;
+                }
+                result.telemetry = slot.spectralTelemetry();
+                result.retired = slot.takeRetiredSource() != nullptr;
+                return result;
+            };
+            double worstOverlapJump = 0.0;
+            uint64_t replacementAlignmentViolations = 0;
+            for (int overlapPhase = 0; overlapPhase < beat::SpectralArtifact::hopSize;
+                 ++overlapPhase)
+            {
+                const auto block64Replacement = renderOverlapReplacement(overlapPhase, 64);
+                const auto block257Replacement = renderOverlapReplacement(overlapPhase, 257);
+                replacementAlignmentViolations += block64Replacement.violations
+                    + block257Replacement.violations;
+                exhaustiveAlignment = exhaustiveAlignment
+                    && block64Replacement.eventsAccepted
+                    && block64Replacement.replacementPublished
+                    && block64Replacement.retired
+                    && block257Replacement.eventsAccepted
+                    && block257Replacement.replacementPublished
+                    && block257Replacement.retired
+                    && block64Replacement.telemetry.replacementTransitionsCompleted == 1
+                    && block257Replacement.telemetry.replacementTransitionsCompleted == 1
+                    && block64Replacement.telemetry.synthesisUnderflows == 0
+                    && block257Replacement.telemetry.synthesisUnderflows == 0;
+                for (int channel = 0; channel < 2 && exhaustiveAlignment; ++channel)
+                    for (int sample = 0;
+                         sample < block64Replacement.audio.getNumSamples(); ++sample)
+                    {
+                        const float value = block64Replacement.audio.getSample(channel, sample);
+                        exhaustiveAlignment = exhaustiveAlignment && std::isfinite(value)
+                            && value == block257Replacement.audio.getSample(channel, sample);
+                        if (sample > 0)
+                            worstOverlapJump = std::max(worstOverlapJump,
+                                std::abs((double) value - block64Replacement.audio.getSample(
+                                    channel, sample - 1)));
+                    }
+            }
+            exhaustiveAlignment = exhaustiveAlignment && noteAlignmentViolations == 0
+                && replacementAlignmentViolations == 0 && worstOverlapJump < 0.35;
+            std::cerr << "spectral alignment noteOffsets="
+                      << beat::SpectralArtifact::hopSize
+                      << " replacementPhases=" << beat::SpectralArtifact::hopSize
+                      << " maxJump=" << worstOverlapJump
+                      << " noteViolations=" << noteAlignmentViolations
+                      << " replacementViolations=" << replacementAlignmentViolations << "\n";
+        }
+
         beat::SpectralSourceSlot positionRateChange;
         juce::AudioBuffer<float> beforePositionRateChange(2, 3300);
         beforePositionRateChange.clear();
@@ -12177,7 +12320,8 @@ namespace
 
         const bool ok = exact && ratesFinite && freezeExact && deadlineMatrix && resamplerQuality
             && latencyContract && fixedPositionContract && positionMotionContract
-            && replacementContract && positionRateChangeContract && nyquistContract
+            && replacementContract && exhaustiveAlignment
+            && positionRateChangeContract && nyquistContract
             && std::abs(1200.0 * std::log2(baseFrequency / 440.0)) < 8.0
             && std::abs(1200.0 * std::log2(pitchedFrequency / 880.0)) < 8.0
             && capacity && violations == 0 && activePublishAccepted

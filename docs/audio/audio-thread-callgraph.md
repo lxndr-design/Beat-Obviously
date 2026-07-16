@@ -1113,3 +1113,10 @@ target. Replacement uses three fixed ownership banks for outgoing, incoming,
 and one latest waiting publication. A position still in pre-roll is superseded
 by replacement and applies to the final source afterward. Bank ownership is
 never destroyed in render.
+
+The opt-in alignment fixture splits callback rendering exactly at each of the
+256 note-on/off offsets in a canonical hop and at each of the 256 replacement
+overlap phases. Shifted note renders and 64/257-sample replacement renders are
+sample-exact; all replacement fades complete and the callback probe remains
+zero. Events remain caller-split boundaries: no queue, allocation, or new
+sample-offset field is added to `SourceNoteEvent`.
