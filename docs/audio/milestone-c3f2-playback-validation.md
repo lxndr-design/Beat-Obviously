@@ -120,3 +120,7 @@ latency compensation, managed artifact import, and product live/offline
 integration remain open. No baseline is updated to hide those omissions. C3F2
 must not be marked closed and C3F3 must not begin until those product-facing
 items are separately approved, resolved, and reviewed.
+
+The owner subsequently approved C3F3. Its first managed-asset slice is tracked
+in the four audit documents; it does not change the disconnected C3F2 playback
+measurements or make Slot 3 product-reachable.

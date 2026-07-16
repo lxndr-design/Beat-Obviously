@@ -400,3 +400,13 @@ The exhaustive sample-offset and overlap-phase fixtures add only Beat-owned
 test orchestration around the same disconnected slot and generated in-memory
 artifacts. They introduce no external implementation, dependency, file, asset,
 preset, binary, service, coefficient source, or derived work.
+
+## C3F3A managed spectral asset boundary — 2026-07-16
+
+`backend/Source/Persistence/ManagedSpectralAsset.{h,cpp}`, its CMake entries,
+tests, and audit updates are independently implemented Beat-owned work using
+the existing Beat spectral artifact/analyzer, descriptor-validated decoder,
+project-sidecar helper, JUCE file/JSON/SHA-256 APIs, and standard-library code.
+No upstream repository, acquired code, new dependency, external asset, preset,
+binary, service, branding, coefficient table, or derived implementation was
+used. The test audio is generated locally in memory.

@@ -51,8 +51,11 @@
 #include "../Source/Persistence/Database.h"
 #include "../Source/Persistence/ManagedSfzAsset.h"
 #include "../Source/Persistence/ManagedGranularAsset.h"
+#include "../Source/Persistence/ManagedSpectralAsset.h"
 #include "../Source/Persistence/ProjectRepository.h"
 #include "RealtimeSafetyProbe.h"
+
+#include <juce_cryptography/juce_cryptography.h>
 
 #include <algorithm>
 #include <array>
@@ -12346,6 +12349,151 @@ namespace
         return ok;
     }
 
+    bool stressManagedSpectralAsset()
+    {
+        const auto root = juce::File("/private/tmp")
+            .getChildFile("BeatBackendStress-managed-spectral-" + juce::Uuid().toString());
+        const auto sourceRoot = root.getChildFile("source");
+        const auto projectFile = root.getChildFile("Spectral Project.beat");
+        const auto sourceFile = sourceRoot.getChildFile("voice.wav");
+        const auto wrongRateFile = sourceRoot.getChildFile("wrong-rate.wav");
+        const auto alternateFile = sourceRoot.getChildFile("alternate.wav");
+        if (!sourceRoot.createDirectory()) return false;
+
+        const auto writeFixture = [&](const juce::File& file, double rate, double frequency)
+        {
+            juce::AudioBuffer<float> audio(2, 8192);
+            for (int frame = 0; frame < audio.getNumSamples(); ++frame)
+            {
+                const float phase = (float) (juce::MathConstants<double>::twoPi
+                    * frequency * frame / rate);
+                audio.setSample(0, frame, 0.3f * std::sin(phase));
+                audio.setSample(1, frame, 0.24f * std::sin(phase + 0.31f));
+            }
+            juce::WavAudioFormat wav;
+            auto output = file.createOutputStream();
+            std::unique_ptr<juce::AudioFormatWriter> writer(output
+                ? wav.createWriterFor(output.get(), rate, 2, 24, {}, 0) : nullptr);
+            if (!writer) return false;
+            output.release();
+            const bool wrote = writer->writeFromAudioSampleBuffer(audio, 0,
+                audio.getNumSamples());
+            writer.reset();
+            return wrote;
+        };
+        if (!writeFixture(sourceFile, 48000.0, 220.0)
+            || !writeFixture(wrongRateFile, 44100.0, 220.0)
+            || !writeFixture(alternateFile, 48000.0, 330.0))
+        {
+            root.deleteRecursively();
+            return false;
+        }
+
+        bool passed = false;
+        juce::String failureStep;
+        do
+        {
+            const auto unsaved = beat::importManagedSpectralAsset(sourceFile, {});
+            if (unsaved.ok() || !unsaved.error.containsIgnoreCase("save"))
+                { failureStep = "unsaved guard"; break; }
+            if (!projectFile.replaceWithText("{}"))
+                { failureStep = "project fixture"; break; }
+            const auto wrongRate = beat::importManagedSpectralAsset(
+                wrongRateFile, projectFile);
+            if (wrongRate.ok() || !wrongRate.error.containsIgnoreCase("48 kHz"))
+                { failureStep = "canonical-rate guard"; break; }
+            const auto imported = beat::importManagedSpectralAsset(
+                sourceFile, projectFile, 57, 424242u);
+            if (!imported.ok() || !imported.manifestPath.startsWith("./")
+                || !imported.sourcePath.startsWith("./")
+                || !imported.artifactPath.startsWith("./")
+                || imported.artifactBytes <= 0
+                || imported.artifactBytes > (int64_t) beat::SpectralArtifact::maxPayloadBytes)
+                { failureStep = "initial import: " + imported.error; break; }
+            const auto base = projectFile.getParentDirectory();
+            const auto manifest = base.getChildFile(imported.manifestPath);
+            const auto managedSource = base.getChildFile(imported.sourcePath);
+            const auto artifactFile = base.getChildFile(imported.artifactPath);
+            const auto loaded = beat::loadManagedSpectralAsset(manifest);
+            if (!manifest.existsAsFile() || !managedSource.existsAsFile()
+                || !artifactFile.existsAsFile() || !loaded.ok()
+                || loaded.artifact->rootNote != 57
+                || loaded.artifact->deterministicSeed != 424242u
+                || loaded.artifact->sourceSamples != 8192)
+                { failureStep = "materialized load: " + loaded.error; break; }
+            const auto repeated = beat::importManagedSpectralAsset(
+                sourceFile, projectFile, 57, 424242u);
+            if (!repeated.ok() || repeated.assetId != imported.assetId
+                || repeated.manifestPath != imported.manifestPath
+                || repeated.artifactSha256 != imported.artifactSha256)
+                { failureStep = "deterministic reuse"; break; }
+
+            const auto originalManifest = manifest.loadFileAsString();
+            auto futureManifest = juce::JSON::parse(originalManifest);
+            futureManifest.getDynamicObject()->setProperty("schemaVersion", 2);
+            if (!manifest.replaceWithText(juce::JSON::toString(futureManifest, true))
+                || beat::loadManagedSpectralAsset(manifest).ok()
+                || !manifest.replaceWithText(originalManifest))
+                { failureStep = "future manifest rejection"; break; }
+            auto unsafeManifest = juce::JSON::parse(originalManifest);
+            unsafeManifest.getDynamicObject()->setProperty("artifactPath", "../artifact.aetherspectral");
+            if (!manifest.replaceWithText(juce::JSON::toString(unsafeManifest, true))
+                || beat::loadManagedSpectralAsset(manifest).ok()
+                || !manifest.replaceWithText(originalManifest))
+                { failureStep = "traversal rejection"; break; }
+
+            const auto symlink = artifactFile.getSiblingFile("linked.aetherspectral");
+            if (!artifactFile.createSymbolicLink(symlink, false))
+                { failureStep = "symlink fixture"; break; }
+            auto linkedManifest = juce::JSON::parse(originalManifest);
+            linkedManifest.getDynamicObject()->setProperty("artifactPath", symlink.getFileName());
+            const bool symlinkRejected = manifest.replaceWithText(
+                juce::JSON::toString(linkedManifest, true))
+                && !beat::loadManagedSpectralAsset(manifest).ok();
+            symlink.deleteFile();
+            if (!symlinkRejected || !manifest.replaceWithText(originalManifest))
+                { failureStep = "symlink rejection"; break; }
+
+            juce::MemoryBlock originalArtifact;
+            if (!artifactFile.loadFileAsData(originalArtifact))
+                { failureStep = "artifact fixture read"; break; }
+            const char corruption[] = "tampered";
+            if (!artifactFile.replaceWithData(corruption, sizeof(corruption))
+                || beat::loadManagedSpectralAsset(manifest).ok()
+                || !artifactFile.replaceWithData(originalArtifact.getData(), originalArtifact.getSize()))
+                { failureStep = "artifact tamper rejection"; break; }
+
+            juce::MemoryBlock originalSource, alternateSource;
+            if (!managedSource.loadFileAsData(originalSource)
+                || !alternateFile.loadFileAsData(alternateSource)
+                || !managedSource.replaceWithData(alternateSource.getData(), alternateSource.getSize()))
+                { failureStep = "source-pair fixture"; break; }
+            const auto alternateHash = juce::SHA256(alternateFile).toHexString();
+            auto mismatchedManifest = juce::JSON::parse(originalManifest);
+            auto* mismatchedObject = mismatchedManifest.getDynamicObject();
+            mismatchedObject->setProperty("sourceSha256", alternateHash);
+            mismatchedObject->setProperty("sourceBytes", (double) alternateFile.getSize());
+            mismatchedObject->setProperty("assetId", "spectral-"
+                + alternateHash.substring(0, 16) + "-"
+                + imported.artifactSha256.substring(0, 8));
+            const bool mismatchedPairRejected = manifest.replaceWithText(
+                juce::JSON::toString(mismatchedManifest, true))
+                && !beat::loadManagedSpectralAsset(manifest).ok();
+            if (!managedSource.replaceWithData(originalSource.getData(), originalSource.getSize())
+                || !manifest.replaceWithText(originalManifest) || !mismatchedPairRejected)
+                { failureStep = "source/artifact PCM identity rejection"; break; }
+            if (!managedSource.replaceWithData(corruption, sizeof(corruption))
+                || beat::loadManagedSpectralAsset(manifest).ok())
+                { failureStep = "source tamper rejection"; break; }
+            passed = true;
+        }
+        while (false);
+
+        if (!passed) std::cerr << "Managed spectral failure step: " << failureStep << "\n";
+        root.deleteRecursively();
+        return passed;
+    }
+
     bool stressManagedGranularAssetAndRouting()
     {
         const auto root = juce::File("/private/tmp")
@@ -19176,6 +19324,14 @@ int main()
         return 1;
     }
     std::cerr << "managed granular: done\n";
+
+    std::cerr << "managed spectral: start\n";
+    if (!stressManagedSpectralAsset())
+    {
+        std::cerr << "Managed spectral asset stress failed\n";
+        return 1;
+    }
+    std::cerr << "managed spectral: done\n";
 
     std::cerr << "decent sampler: start\n";
     if (!stressDecentSamplerFixtureImportAndPlayback())

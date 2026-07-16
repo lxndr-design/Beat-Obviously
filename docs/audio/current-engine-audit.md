@@ -682,3 +682,33 @@ Focused results are 440/880 Hz for base/octave tuning; +0.00001405 dB 10 kHz pas
 Full non-native verification and embedded-frontend Release targets pass. The final source-matched native suite passes in 12.91 seconds wall / 11.26 seconds user / 0.93 seconds system with only the existing TCC waiver. Packaging creates the root app but local LaunchServices registration retains the unrelated `-10822` warning. The final 150-WAV default-disconnected matrix remains byte-identical with normalized manifest `713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`; JSON SHA-256 is `a3c8efcac3aa3453d47de861061d3de5c7f3ae93023dcf4e39d95c53a63c6cc8`, render times 12.81–15.74 ms (13.45 ms mean), harness peak RSS 14,925,824 bytes, zero deadlines, and unchanged 64/16/16 queue telemetry.
 
 This does not close C3F2. Active position transitions, source replacement, combined pressure, exhaustive overlap-phase replacement, and sample-offset alignment are now closed for the disconnected engine. Product latency compensation, managed import, and live/offline product integration remain open and require separate approval. C3F3 remains unstarted.
+
+## Milestone C3F3A managed spectral asset boundary — 2026-07-16
+
+The approved C3F3 product-path work begins with a still-disconnected managed
+asset boundary. `ManagedSpectralAsset` accepts only regular, non-symlink,
+bounded mono/stereo source files that decode at the analyzer's canonical 48 kHz
+rate. It descriptor-validates and decodes the source, runs artifact-v2 analysis
+off callback, and transactionally publishes the original source, serialized
+artifact, and versioned manifest into a content-addressed project sidecar.
+
+Load verifies containment, regular-file identity, size and SHA-256 for both
+files, the 48 MiB artifact cap, artifact decoding and validation, manifest
+metadata, and the decoded canonical PCM hash embedded in the artifact. A final
+hash pass rejects mutation during verification. Tests cover the unsaved-project
+guard, canonical-rate rejection, deterministic reuse, future manifest,
+traversal, symlink, artifact corruption, source corruption, and a separately
+valid but mismatched source/artifact pair. No callback, `AudioEngine`, project
+schema, Slot 3 route, IPC, UI, cleanup graph, migration, preset, or factory
+asset reaches this boundary yet.
+
+Full native stress passes in 13.83 seconds wall / 11.66 seconds user / 1.02
+seconds system with only `baseline.recent-project-exists` waived. Full
+non-native verification and Release `Beat`, `BeatBackendStress`, and
+`BeatAetherBaseline` builds pass. The disconnected 150-WAV normalized manifest
+remains `713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`;
+timing JSON SHA-256 is
+`170d4763923a40415bed9b7f3b3f73d2180bf4c26f1602466c1524a266572a57`,
+render times are 12.65–15.64 ms (13.60 ms mean), harness peak RSS is
+15,122,432 bytes, deadlines are zero, and queue telemetry remains 64/16/16.
+No render hash changed.

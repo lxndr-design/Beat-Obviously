@@ -119,3 +119,13 @@ also pass exact alignment, discontinuity, underflow, and callback-safety gates.
 Product latency compensation, managed import/persistence, UI/routing, and C3F3
 remain open. Default-disconnected renders stay byte-identical and the only
 suite waiver remains `baseline.recent-project-exists`.
+
+## Milestone C3F3A update — 2026-07-16
+
+The managed spectral asset boundary now transactionally analyzes canonical
+48 kHz source audio and stores a content-addressed source/artifact-v2 bundle.
+Path containment, symlink, size, dual-file hash, artifact validation,
+source-PCM identity, mutation, deterministic reuse, and future-version failure
+paths are covered. This is not yet a persisted Slot 3 reference or product
+import: project packaging/cleanup, migrations, routing, UI, latency
+compensation, audible benchmark, and product live/offline parity remain open.

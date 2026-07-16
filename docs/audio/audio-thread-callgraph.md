@@ -1120,3 +1120,28 @@ overlap phases. Shifted note renders and 64/257-sample replacement renders are
 sample-exact; all replacement fades complete and the callback probe remains
 zero. Events remain caller-split boundaries: no queue, allocation, or new
 sample-offset field is added to `SourceNoteEvent`.
+
+## C3F3A managed spectral asset control path
+
+```text
+control/import thread only
+  importManagedSpectralAsset(source, savedProject)
+    -> reject non-regular/symlink/non-audio/unsaved input
+    -> descriptor-validated bounded decode at canonical 48 kHz
+    -> SpectralAnalyzer::analyze() off callback
+    -> serialize validated artifact-v2 within 48 MiB
+    -> copy/hash source + write/hash artifact in staging directory
+    -> atomically rename complete content-addressed bundle
+    -> loadManagedSpectralAsset() verification pass
+
+  loadManagedSpectralAsset(manifest)
+    -> contained regular-file resolution
+    -> size/SHA-256 checks for source and artifact
+    -> bounded artifact decode + structural/payload validation
+    -> canonical source decode and artifact source-PCM identity check
+    -> final mutation-detection hashes
+    -> immutable SpectralArtifact return
+
+audio callback / AudioEngine / Slot 3 / IPC / UI
+  -> no caller in C3F3A
+```
