@@ -19,6 +19,7 @@
 #include "Sources/MappedSampleSourceSlot.h"
 #include "Sources/SfzSourceSlot.h"
 #include "Sources/GranularSourceSlot.h"
+#include "Spectral/SpectralSourceSlot.h"
 #include "Wavetable/WavetableFactory.h"
 #include "Wavetable/WavetableOscillator.h"
 #include "Wavetable/WavetableUnisonPlan.h"
@@ -303,6 +304,13 @@ namespace beat
                 int routing { 0 };
                 std::array<float, 2> fxSends {};
             } aetherGranularSlot2;
+            struct AetherSpectralSlot
+            {
+                bool enabled { false };
+                std::shared_ptr<const PreparedSpectralSource> source;
+                int routing { 0 };
+                std::array<float, 2> fxSends {};
+            } aetherSpectralSlot3;
             float aetherRuntimeWarp { 0.0f };
             int aetherRuntimeWarpMode { 0 };
             float aetherRuntimeWarp2 { 0.0f };
@@ -419,6 +427,7 @@ namespace beat
         MappedSampleSourceSlot aetherSampleSlot1;
         SfzSourceSlot aetherSfzSlot1;
         GranularSourceSlot aetherGranularSlot2;
+        SpectralSourceSlot aetherSpectralSlot3 { 1 };
         VoiceAetherCache::PanGains cachedPanGains;
         VoiceAetherCache::PitchRates cachedPitchRates;
         DynamicModulation::TargetActivityFlags cachedDynamicTargets;

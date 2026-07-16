@@ -12562,6 +12562,63 @@ namespace
                 || repeated.artifactSha256 != imported.artifactSha256)
                 { failureStep = "deterministic reuse"; break; }
 
+            auto project = makeDenseAetherProject();
+            auto& instrument = project.instruments.front();
+            instrument.aether.oscA.enabled = false;
+            instrument.aether.oscB.enabled = false;
+            instrument.aether.sub.enabled = false;
+            instrument.aether.noise.enabled = false;
+            instrument.aether.sampleSlot1 = {};
+            instrument.aether.granularSlot2 = {};
+            auto& slot = instrument.aether.spectralSlot3;
+            slot.enabled = true;
+            slot.rootNote = 57;
+            slot.level = 0.72f;
+            slot.pan = -0.18f;
+            slot.stereoWidth = 1.25f;
+            slot.position = 0.2f;
+            slot.pitchSemitones = 0.0f;
+            slot.freeze = false;
+            slot.routing = 1;
+            slot.managedAsset.assetId = imported.assetId;
+            slot.managedAsset.displayName = imported.displayName;
+            slot.managedAsset.manifestPath = manifest.getFullPathName();
+            slot.managedAsset.sourcePath = managedSource.getFullPathName();
+            slot.managedAsset.artifactPath = artifactFile.getFullPathName();
+            const auto route64 = renderOfflineChunks(project, 16000, 64);
+            const auto repeat64 = renderOfflineChunks(project, 16000, 64);
+            const auto route257 = renderOfflineChunks(project, 16000, 257);
+            const auto repeat257 = renderOfflineChunks(project, 16000, 257);
+            const double routeEnergy = bufferEnergy(route64);
+            double routeBlockDifference = 0.0;
+            double routeRepeatDifference = 0.0;
+            double route257RepeatDifference = 0.0;
+            bool productRouteExact = routeEnergy > 0.00001 && bufferEnergy(route257) > 0.00001
+                && route64.getNumSamples() == route257.getNumSamples();
+            for (int channel = 0; channel < route64.getNumChannels() && productRouteExact; ++channel)
+                for (int sample = 0; sample < route64.getNumSamples(); ++sample)
+                {
+                    const float value = route64.getSample(channel, sample);
+                    routeRepeatDifference += std::abs((double) value
+                        - repeat64.getSample(channel, sample));
+                    routeBlockDifference += std::abs((double) value
+                        - route257.getSample(channel, sample));
+                    route257RepeatDifference += std::abs((double)
+                        route257.getSample(channel, sample)
+                        - repeat257.getSample(channel, sample));
+                    productRouteExact = productRouteExact && std::isfinite(value);
+                }
+            productRouteExact = productRouteExact && routeRepeatDifference == 0.0
+                && route257RepeatDifference == 0.0 && std::isfinite(routeBlockDifference);
+            if (!productRouteExact)
+            {
+                failureStep = "audible deterministic product route energy="
+                    + juce::String(routeEnergy, 9) + " repeatDiff="
+                    + juce::String(routeRepeatDifference + route257RepeatDifference, 9) + " blockDiff="
+                    + juce::String(routeBlockDifference, 9);
+                break;
+            }
+
             const auto originalManifest = manifest.loadFileAsString();
             auto futureManifest = juce::JSON::parse(originalManifest);
             futureManifest.getDynamicObject()->setProperty("schemaVersion", 2);

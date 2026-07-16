@@ -737,3 +737,37 @@ timing JSON SHA-256 is
 `24516151de79862367a77486b5d294f386220f676b9b4d3739ffc13e2f778453`,
 render times are 12.79–15.83 ms (13.55 ms mean), harness peak RSS is
 14,876,672 bytes, deadlines are zero, and queue telemetry is unchanged.
+
+## Milestone C3F3C bounded Slot 3 product routing — 2026-07-16
+
+Verified managed artifacts now prepare into immutable spectral sources during
+route construction and reach `InstrumentVoice` through a fixed one-spectral-
+voice instance. The standalone `SpectralSourceSlot` retains its four-voice
+default; a capacity constructor prevents four redundant spectral voices inside
+each already allocated synth voice. Kaiser resampler coefficients moved from a
+786 KiB inline member to an immutable sample-rate-keyed shared table created
+under a control-thread mutex during preparation. The callback only dereferences
+that table and the preallocated one-voice renderer.
+
+Spectral output follows the same main/direct/filter-1/filter-2 and two FX-send
+paths as Sample Slot 1 and Granular Slot 2. Source level, pan, width, position,
+pitch, and freeze are captured in the prepared immutable source. Route identity
+includes every spectral field, so the existing bounded retiring-synth bridge
+preserves old-note tails and defers destruction on replacement. Note start,
+release, hard stop, sample-rate preparation, and source publication are wired
+through the existing voice lifecycle.
+
+The managed product fixture is finite, audible (`energy=0.905150143`), and
+exactly repeat-deterministic at both 64- and 257-sample blocks. The existing
+whole-engine envelope/effect path differs across those block sizes by finite
+`L1=3.547828817`; the underlying spectral slot remains sample-exact. Product
+live/offline parity and latency compensation remain later C3F3 gates.
+
+Full native stress passes in 17.87 seconds wall / 16.08 seconds user / 1.09
+seconds system with only the TCC waiver. Full non-native verification and all
+Release targets pass. The default-off 150-WAV manifest remains
+`713ed72937dc82df0a0d845ebff1d48aee8a8d87ab4af877cabc895c6bee5ba5`;
+timing JSON SHA-256 is
+`1109a701773a24c47bc78370c94cf89b9d1379d3482f1950539690434785a745`,
+render times are 12.42–15.35 ms (13.18 ms mean), harness peak RSS is
+14,991,360 bytes, deadlines are zero, and queue telemetry is unchanged.

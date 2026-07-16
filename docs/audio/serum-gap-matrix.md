@@ -138,3 +138,14 @@ diagnostics reject future or partial data. Portable packaging and both cleanup
 reference graphs cover manifest, source, and artifact, including retention of
 a complete referenced bundle. DSP routing, IPC import, editor UI, latency
 compensation, audible validation, and product parity remain open.
+
+## Milestone C3F3C update — 2026-07-16
+
+Managed Spectral Slot 3 is now audible through main/direct/two-filter routing
+and two FX sends. Each existing synth voice embeds one fixed spectral voice;
+standalone capacity remains four. Immutable resampler tables are shared by
+sample rate and built only during prepare. Complete route identity reuses the
+bounded retiring-synth replacement bridge. Repeat determinism and finite,
+audible product output pass. IPC import, editor UI/accessibility, product
+latency compensation, live/offline parity, benchmark content, and final
+deadline/freeze gates remain open.

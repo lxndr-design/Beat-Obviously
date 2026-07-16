@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <map>
+#include <mutex>
 
 namespace beat
 {
@@ -92,8 +94,9 @@ namespace beat
         return { std::move(prepared), {}, {} };
     }
 
-    SpectralSourceSlot::SpectralSourceSlot()
-        : voices(std::make_unique<std::array<Voice, maximumVoices>>())
+    SpectralSourceSlot::SpectralSourceSlot(int voiceCapacity)
+        : voices(std::make_unique<std::vector<Voice>>(
+            (size_t) std::clamp(voiceCapacity, 1, maximumVoices)))
     {
         for (int n = 0; n < SpectralArtifact::fftSize; ++n)
             window[(size_t) n] = (float) std::sqrt(0.5 - 0.5 * std::cos(twoPi * n / SpectralArtifact::fftSize));
@@ -198,8 +201,10 @@ namespace beat
     void SpectralSourceSlot::reset() noexcept
     {
         for (auto& voice : *voices)
+        {
             for (auto& lane : voice.lanes) stopLane(lane);
-        *voices = {};
+            voice = {};
+        }
         baseTelemetry = {};
         spectralStats = {};
         schedulerCursor = 0;
@@ -353,6 +358,13 @@ namespace beat
         }
     }
 
+    SpectralSourceSlot::StereoFrame SpectralSourceSlot::renderFrame() noexcept
+    {
+        frameBuffer.clear();
+        render(frameBuffer, 0, 1);
+        return { frameBuffer.getSample(0, 0), frameBuffer.getSample(1, 0) };
+    }
+
     SourceLifecycleState SpectralSourceSlot::lifecycleState() const noexcept
     {
         if (sourcePointers[publishedSourceBank.load(std::memory_order_acquire)].load(std::memory_order_acquire) == nullptr)
@@ -378,12 +390,27 @@ namespace beat
 
     void SpectralSourceSlot::rebuildResampler() noexcept
     {
+        static std::mutex cacheMutex;
+        static std::map<int64_t, std::weak_ptr<const ResamplerTable>> cache;
+        const int64_t cacheKey = (int64_t) std::llround(prepared.sampleRate * 1000.0);
+        {
+            const std::lock_guard<std::mutex> guard(cacheMutex);
+            if (const auto found = cache.find(cacheKey); found != cache.end())
+                if (auto shared = found->second.lock())
+                {
+                    sincTable = std::move(shared);
+                    activeSincTaps = sincTable->activeTaps;
+                    return;
+                }
+        }
         constexpr double beta = 10.5;
         const double stopEdge = std::min(1.0, prepared.sampleRate / SpectralArtifact::sampleRate);
         const double outputRatio = prepared.sampleRate / SpectralArtifact::sampleRate;
         activeSincTaps = outputRatio >= 3.5 ? 16 : (outputRatio > 1.0
             ? std::clamp((int) std::ceil(sincTaps / outputRatio), 16, sincTaps)
             : sincTaps);
+        auto table = std::make_shared<ResamplerTable>();
+        table->activeTaps = activeSincTaps;
         const double cutoff = outputRatio >= 1.0 ? 1.0 : 0.88 * stopEdge;
         const double denominator = besselI0(beta);
         for (int phase = 0; phase < sincPhases; ++phase)
@@ -399,14 +426,17 @@ namespace beat
                 const double windowValue = besselI0(beta * std::sqrt(std::max(0.0, 1.0 - normalized * normalized)))
                     / denominator;
                 const float coefficient = (float) (sinc * windowValue);
-                sincTable[(size_t) phase * sincTaps + tap] = coefficient;
+                table->coefficients[(size_t) phase * sincTaps + tap] = coefficient;
                 sum += coefficient;
             }
             for (int tap = activeSincTaps; tap < sincTaps; ++tap)
-                sincTable[(size_t) phase * sincTaps + tap] = 0.0f;
+                table->coefficients[(size_t) phase * sincTaps + tap] = 0.0f;
             for (int tap = 0; tap < activeSincTaps; ++tap)
-                sincTable[(size_t) phase * sincTaps + tap] /= (float) sum;
+                table->coefficients[(size_t) phase * sincTaps + tap] /= (float) sum;
         }
+        sincTable = table;
+        const std::lock_guard<std::mutex> guard(cacheMutex);
+        cache[cacheKey] = std::move(table);
     }
 
     void SpectralSourceSlot::applyPositionRequests() noexcept
@@ -713,7 +743,7 @@ namespace beat
         for (int tap = 0; tap < activeSincTaps; ++tap)
         {
             const int64_t index = center + tap - (activeSincTaps / 2 - 1);
-            const float coefficient = sincTable[(size_t) phase * sincTaps + tap];
+            const float coefficient = sincTable->coefficients[(size_t) phase * sincTaps + tap];
             if (phaseFraction <= 1.0e-7f)
             {
                 result[0] += readCanonical(lane, 0, index) * coefficient;
@@ -721,7 +751,7 @@ namespace beat
             }
             else
             {
-                const float nextCoefficient = sincTable[(size_t) nextPhase * sincTaps + tap];
+                const float nextCoefficient = sincTable->coefficients[(size_t) nextPhase * sincTaps + tap];
                 const int64_t nextIndex = index + (wrapsPhase ? 1 : 0);
                 result[0] += readCanonical(lane, 0, index) * coefficient * (1.0f - phaseFraction)
                     + readCanonical(lane, 0, nextIndex) * nextCoefficient * phaseFraction;

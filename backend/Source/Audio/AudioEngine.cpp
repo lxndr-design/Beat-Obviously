@@ -1,5 +1,6 @@
 #include "AudioEngine.h"
 #include "../Persistence/ManagedGranularAsset.h"
+#include "../Persistence/ManagedSpectralAsset.h"
 #include "RealtimeSafetyHooks.h"
 #include "Effects/TrackEffectDefaults.h"
 #include "Realtime/VoiceAutomationInbox.h"
@@ -1847,7 +1848,8 @@ namespace beat
         const InstrumentDefinition& instrument,
         std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1,
         std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1,
-        std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2)
+        std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2,
+        std::shared_ptr<const PreparedSpectralSource> aetherSpectralSlot3)
     {
         auto instrumentSynth = std::make_unique<BeatSynthesiser>();
         instrumentSynth->configureMemberExpressionZone({
@@ -2128,6 +2130,12 @@ namespace beat
             juce::jlimit(0, 3, instrument.aether.granularSlot2.routing),
             instrument.aether.granularSlot2.fxSends,
         };
+        params.aetherSpectralSlot3 = {
+            instrument.aether.spectralSlot3.enabled && aetherSpectralSlot3 != nullptr,
+            std::move(aetherSpectralSlot3),
+            juce::jlimit(0, 3, instrument.aether.spectralSlot3.routing),
+            instrument.aether.spectralSlot3.fxSends,
+        };
         params.hasAetherSourceSends = [&instrument]
         {
             for (size_t bus = 0; bus < instrument.aether.fxBusIds.size(); ++bus)
@@ -2140,7 +2148,9 @@ namespace beat
                         || (instrument.aether.sampleSlot1.enabled
                             && instrument.aether.sampleSlot1.fxSends[bus] > 0.0001f)
                         || (instrument.aether.granularSlot2.enabled
-                            && instrument.aether.granularSlot2.fxSends[bus] > 0.0001f)))
+                            && instrument.aether.granularSlot2.fxSends[bus] > 0.0001f)
+                        || (instrument.aether.spectralSlot3.enabled
+                            && instrument.aether.spectralSlot3.fxSends[bus] > 0.0001f)))
                     return true;
             }
             return false;
@@ -2432,6 +2442,7 @@ namespace beat
                 std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1;
                 std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1;
                 std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2;
+                std::shared_ptr<const PreparedSpectralSource> aetherSpectralSlot3;
                 const auto& slot = routeInstrument->aether.sampleSlot1;
                 auto sampleIdentity = juce::String();
                 if (routeInstrument->hasAether && slot.enabled)
@@ -2552,8 +2563,25 @@ namespace beat
                         if (source->isValid()) aetherGranularSlot2 = std::move(source);
                     }
                 }
+                const auto& spectral = routeInstrument->aether.spectralSlot3;
+                if (routeInstrument->hasAether && spectral.enabled
+                    && spectral.managedAsset.manifestPath.isNotEmpty())
+                {
+                    const auto loaded = loadManagedSpectralAsset(
+                        juce::File(spectral.managedAsset.manifestPath));
+                    if (loaded.ok())
+                    {
+                        auto preparedSpectral = prepareSpectralSource(loaded.artifact,
+                            spectral.rootNote, spectral.level, spectral.pan,
+                            spectral.stereoWidth, spectral.position,
+                            spectral.pitchSemitones, spectral.freeze);
+                        if (preparedSpectral.source)
+                            aetherSpectralSlot3 = std::move(preparedSpectral.source);
+                    }
+                }
                 route.synth = createInstrumentSynth(*routeInstrument,
-                    std::move(aetherSampleSlot1), std::move(aetherSfzSlot1), std::move(aetherGranularSlot2));
+                    std::move(aetherSampleSlot1), std::move(aetherSfzSlot1),
+                    std::move(aetherGranularSlot2), std::move(aetherSpectralSlot3));
                 route.sourceFxBusIds = routeInstrument->aether.fxBusIds;
                 route.aetherSampleSlot1Identity = slot.enabled
                     ? juce::String(slot.routing) + ":" + juce::String(slot.fxSends[0], 6) + ":"
@@ -2570,6 +2598,14 @@ namespace beat
                         + juce::String((int64_t) granular.randomSeed) + ":" + juce::String(granular.level, 6) + ":"
                         + juce::String(granular.routing) + ":" + juce::String(granular.fxSends[0], 6) + ":"
                         + juce::String(granular.fxSends[1], 6);
+                if (spectral.enabled)
+                    route.aetherSampleSlot1Identity += "|spectral:"
+                        + spectral.managedAsset.assetId + ":" + juce::String(spectral.rootNote) + ":"
+                        + juce::String(spectral.level, 6) + ":" + juce::String(spectral.pan, 6) + ":"
+                        + juce::String(spectral.stereoWidth, 6) + ":" + juce::String(spectral.position, 6) + ":"
+                        + juce::String(spectral.pitchSemitones, 3) + ":" + juce::String((int) spectral.freeze) + ":"
+                        + juce::String(spectral.routing) + ":" + juce::String(spectral.fxSends[0], 6) + ":"
+                        + juce::String(spectral.fxSends[1], 6);
             }
 
             for (auto& sourceFxBuffer : route.sourceFxBuffers)

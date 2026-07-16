@@ -418,3 +418,11 @@ frontend types/store/reference graph, verifier, tests, and audit changes are
 independently implemented Beat-owned schema and orchestration code. They use no
 new dependency, upstream source, external asset, preset, binary, service,
 branding, coefficient data, or derived implementation.
+
+## C3F3C bounded Slot 3 product routing — 2026-07-16
+
+The spectral capacity option, shared immutable resampler cache, InstrumentVoice
+route/send integration, AudioEngine managed-source preparation, lifecycle
+wiring, tests, and audit changes are independently implemented Beat-owned work.
+No external source, dependency, asset, preset, binary, service, branding,
+coefficient table, or derived implementation was introduced.

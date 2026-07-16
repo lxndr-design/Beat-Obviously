@@ -115,6 +115,7 @@ namespace beat
         aetherSampleSlot1.prepare({ sampleRate, blockSize, 2 });
         aetherSfzSlot1.prepare({ sampleRate, blockSize, 2 });
         aetherGranularSlot2.prepare({ sampleRate, blockSize, 2 });
+        aetherSpectralSlot3.prepare({ sampleRate, blockSize, 2 });
     }
 
     void InstrumentVoice::setProcessingQuality(AudioQuality quality) noexcept
@@ -200,6 +201,10 @@ namespace beat
         aetherSfzSlot1.publish(params.aetherSampleSlot1.enabled ? params.aetherSampleSlot1.sfzSource : nullptr);
         aetherGranularSlot2.allNotesOff(true);
         aetherGranularSlot2.publish(params.aetherGranularSlot2.enabled ? params.aetherGranularSlot2.source : nullptr);
+        aetherSpectralSlot3.allNotesOff(true);
+        aetherSpectralSlot3.takeRetiredSource();
+        aetherSpectralSlot3.publish(params.aetherSpectralSlot3.enabled ? params.aetherSpectralSlot3.source : nullptr);
+        aetherSpectralSlot3.takeRetiredSource();
         adsrParams.attack  = juce::jmax(0.001f, p.attackMs  * 0.001f);
         adsrParams.decay   = juce::jmax(0.001f, p.decayMs   * 0.001f);
         adsrParams.sustain = juce::jlimit(0.0f, 1.0f, p.sustain);
@@ -413,6 +418,7 @@ namespace beat
         aetherSampleSlot1.allNotesOff(true);
         aetherSfzSlot1.allNotesOff(true);
         aetherGranularSlot2.allNotesOff(true);
+        aetherSpectralSlot3.allNotesOff(true);
         if (params.hasAether && params.aetherSampleSlot1.enabled)
         {
             if (params.aetherSampleSlot1.sfzSource)
@@ -422,6 +428,8 @@ namespace beat
         }
         if (params.hasAether && params.aetherGranularSlot2.enabled && params.aetherGranularSlot2.source)
             aetherGranularSlot2.noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
+        if (params.hasAether && params.aetherSpectralSlot3.enabled && params.aetherSpectralSlot3.source)
+            aetherSpectralSlot3.noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
 
         if (legatoRetune)
         {
@@ -556,12 +564,14 @@ namespace beat
             aetherSampleSlot1.noteOff((uint64_t) stableVoiceId);
             aetherSfzSlot1.noteOff((uint64_t) stableVoiceId);
             aetherGranularSlot2.noteOff((uint64_t) stableVoiceId);
+            aetherSpectralSlot3.noteOff((uint64_t) stableVoiceId);
         }
         else
         {
             aetherSampleSlot1.allNotesOff(true);
             aetherSfzSlot1.allNotesOff(true);
             aetherGranularSlot2.allNotesOff(true);
+            aetherSpectralSlot3.allNotesOff(true);
         }
         if (allowTailOff)
         {
@@ -728,6 +738,7 @@ namespace beat
             StereoSample filter2Raw;
             AetherTableStackRenderer::StereoFrame sampleSourceFrame {};
             AetherTableStackRenderer::StereoFrame granularSourceFrame {};
+            AetherTableStackRenderer::StereoFrame spectralSourceFrame {};
             std::array<AetherTableStackRenderer::StereoFrame, 4> sourceFrames {};
             if (params.hasAether)
             {
@@ -817,6 +828,27 @@ namespace beat
                     else
                     {
                         raw.left += granularLeft; raw.right += granularRight;
+                    }
+                }
+                if (params.aetherSpectralSlot3.enabled && params.aetherSpectralSlot3.source)
+                {
+                    const auto spectral = aetherSpectralSlot3.renderFrame();
+                    spectralSourceFrame = { spectral.left, spectral.right };
+                    if (params.aetherSpectralSlot3.routing == 1)
+                    {
+                        directRaw.left += spectral.left; directRaw.right += spectral.right;
+                    }
+                    else if (params.aetherSpectralSlot3.routing == 2)
+                    {
+                        filter1Raw.left += spectral.left; filter1Raw.right += spectral.right;
+                    }
+                    else if (params.aetherSpectralSlot3.routing == 3)
+                    {
+                        filter2Raw.left += spectral.left; filter2Raw.right += spectral.right;
+                    }
+                    else
+                    {
+                        raw.left += spectral.left; raw.right += spectral.right;
                     }
                 }
             }
@@ -1059,6 +1091,9 @@ namespace beat
                     const float granularSendGain = VoiceMath::clamp01(params.aetherGranularSlot2.fxSends[bus]);
                     send.left += granularSourceFrame.left * granularSendGain;
                     send.right += granularSourceFrame.right * granularSendGain;
+                    const float spectralSendGain = VoiceMath::clamp01(params.aetherSpectralSlot3.fxSends[bus]);
+                    send.left += spectralSourceFrame.left * spectralSendGain;
+                    send.right += spectralSourceFrame.right * spectralSendGain;
                     send.left *= leftGain * voiceGain;
                     send.right *= rightGain * voiceGain;
                     const auto transitionedSend = sourceSendTransitions[bus].process(send);

@@ -78,7 +78,9 @@ namespace beat
         static constexpr int canonicalRingSize = 8192;
         static constexpr int schedulerPrerollSamples = 1024;
 
-        SpectralSourceSlot();
+        struct StereoFrame { float left { 0.0f }; float right { 0.0f }; };
+
+        explicit SpectralSourceSlot(int voiceCapacity = maximumVoices);
         bool prepare(const SourcePrepareSpec&) noexcept override;
         bool publish(std::shared_ptr<const PreparedSpectralSource>) noexcept;
         std::shared_ptr<const PreparedSpectralSource> takeRetiredSource() noexcept;
@@ -88,6 +90,7 @@ namespace beat
         void noteOff(uint64_t stableNoteId) noexcept override;
         void allNotesOff(bool immediate) noexcept override;
         void render(juce::AudioBuffer<float>&, int startSample, int numSamples) noexcept override;
+        StereoFrame renderFrame() noexcept;
         SourceLifecycleState lifecycleState() const noexcept override;
         SourceComplexity complexity() const noexcept override { return SourceComplexity::spectral; }
         int latencySamples() const noexcept override;
@@ -163,8 +166,14 @@ namespace beat
         std::shared_ptr<const PreparedSpectralSource> retiredSource;
         juce::dsp::FFT inverseFft { 10 };
         std::array<float, SpectralArtifact::fftSize> window {};
-        std::array<float, sincTaps * sincPhases> sincTable {};
-        std::unique_ptr<std::array<Voice, maximumVoices>> voices;
+        struct ResamplerTable
+        {
+            int activeTaps { sincTaps };
+            std::array<float, sincTaps * sincPhases> coefficients {};
+        };
+        std::shared_ptr<const ResamplerTable> sincTable;
+        std::unique_ptr<std::vector<Voice>> voices;
+        juce::AudioBuffer<float> frameBuffer { 2, 1 };
         int activeSincTaps { sincTaps };
         int releaseSamples { 192 };
         int positionCrossfadeSamples { 240 };

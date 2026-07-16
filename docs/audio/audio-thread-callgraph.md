@@ -1150,3 +1150,34 @@ C3F3B adds only database/frontend serialization, validation, portable path
 rewriting, asset references, and cleanup retention for the three-file bundle.
 These control/document paths still have no edge to `AudioEngine`,
 `InstrumentVoice`, `SpectralSourceSlot`, or the callback.
+
+## C3F3C Slot 3 product render edge
+
+```text
+project/control rebuild
+  loadManagedSpectralAsset() -> verified immutable artifact
+  prepareSpectralSource() -> immutable playback source
+  createInstrumentSynth()
+    -> each InstrumentVoice owns SpectralSourceSlot(capacity=1)
+    -> prepare() obtains shared immutable resampler table off callback
+    -> publish() pins source ownership
+
+audio callback
+  InstrumentVoice::startNote()/stopNote()
+    -> spectral noteOn()/noteOff()
+  InstrumentVoice::renderNextBlock()
+    -> SpectralSourceSlot::renderFrame()
+      -> fixed scheduler/WOLA/resampler work
+    -> main/direct/filter-1/filter-2 route
+    -> fixed two-bus send accumulation
+
+control-side route replacement
+  -> complete route identity changes
+  -> new synth receives new notes
+  -> bounded retiring synth renders old-note tail
+  -> destruction remains outside callback
+```
+
+The shared resampler cache mutex and table construction are reachable only from
+`prepare()`, never `renderFrame()`. Frame storage, voice storage, and the
+single-sample bridge buffer are allocated before callback use.
