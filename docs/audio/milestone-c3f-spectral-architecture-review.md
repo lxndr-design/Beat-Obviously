@@ -9,20 +9,22 @@ Branch: `codex/aether-c3f-review`
 
 Reviewed implementation head: `aace6c1b`
 
-Status: **proposal only — specialist DSP sign-off and human approval required**
+Status: **accepted with revisions — specialist DSP sign-off incomplete**
 
 ## Outcome
 
 Slot 3 should use a bounded immutable spectral-frame asset, analyzed entirely
 outside the realtime callback and rendered by a fixed-capacity source slot.
-The recommended representation is Option B below: a phase-vocoder/STFT frame
-bank with explicit phase evolution, overlap-add, latency, resampling, and work
-budgets.
+The selected representation is revised Option B below: a phase-vocoder/STFT
+frame bank with exact WOLA reconstruction, identity phase locking, shared
+stereo analysis decisions, explicit canonical-rate resampling, latency, and
+measurable deadline budgets.
 
 This checkpoint does not approve or implement spectral DSP. It adds no product
 schema, parameter, asset, callback, dependency, preset, factory content, or
-render change. It is the review package a DSP specialist must evaluate before
-the first disconnected implementation slice.
+render change. An AI technical DSP review accepted the architecture with the
+revisions recorded here, but explicitly declined specialist sign-off. A human
+DSP specialist must still confirm the contracts before C3F1 begins.
 
 ## Current architecture evidence
 
@@ -43,12 +45,14 @@ the first disconnected implementation slice.
 | Option | Model | Strength | Material cost/risk | Decision |
 | --- | --- | --- | --- | --- |
 | A | Fixed sinusoidal partial tracks | Device-rate-independent, naturally bounded, inexpensive for tonal sources | Loses noise and transient identity unless a residual model is added | Reject for first general spectral source |
-| B | Immutable STFT magnitude plus phase-evolution frames, fixed-window overlap-add | Preserves tonal/noise content, supports independent position and pitch, has measurable reconstruction behavior | Requires an explicit phase, stereo, resampling, latency, and polyphony policy | **Recommended, pending specialist review** |
+| B | Immutable L/R STFT magnitude plus phase-evolution frames, exact WOLA and identity phase locking | Preserves tonal/noise content, supports bounded position and pitch, has measurable reconstruction behavior | Requires the revised contracts below and human specialist confirmation | **Accepted with revisions; recommended** |
 | C | Magnitude-only spectrogram with generated phase | Small artifact and simple editing model | Unstable identity, smeared attacks, weak deterministic reconstruction | Reject as production playback model |
 
 Option B is recommended because it is the narrowest architecture that can be
 judged against the original signal without pretending a partial-only model is
-general-purpose. The recommendation is not implementation authorization.
+general-purpose. The attached AI technical review accepted Option B with the
+revisions below; this is not specialist sign-off or implementation
+authorization.
 
 ## Proposed ownership and thread boundary
 
@@ -91,26 +95,114 @@ include at least:
 - payload byte count and SHA-256;
 - finite-value and range-validation result.
 
-The recommended first representation is two bounded spectral planes carrying
-magnitude and phase evolution. The stereo plane choice is deliberately open
-for specialist review: independent L/R is simple but can damage image
-coherence; mid/side can preserve a controllable image but needs explicit side
-energy and phase rules.
+The C3F representation is independent L/R magnitude and wrapped phase-evolution
+data. Peak regions and transient markers derive from one shared stereo reference
+spectrum, while magnitudes and phases remain channel-specific. Stereo width is
+applied only after time-domain reconstruction.
 
 Provisional review limits, not yet accepted implementation constants:
 
 - one managed source per Slot 3 instance;
 - decoded input: at most two channels and 30 seconds;
 - canonical analysis rate: 48 kHz;
-- FFT size: 1024; hop: 256; periodic Hann-derived perfect-reconstruction pair;
+- FFT size: 1024; analysis/synthesis hop: 256; exact square-root periodic Hann
+  WOLA pair and scaling defined below;
 - at most 5,625 frames and 513 bins per plane;
 - spectral payload: at most 48 MiB;
 - active spectral voices: four;
 - no realtime analysis, adaptive FFT size, unbounded frame cache, or automatic
   quality degradation.
 
-Every limit must fail closed before allocation and be encoded into the artifact
-version so a later policy cannot silently reinterpret old data.
+The 48 MiB cap covers the complete uncompressed validated artifact, including
+both quantities, both channels, alignment, frame metadata, transient flags,
+peak regions, and internal indexes. Every limit must fail closed before
+allocation and be encoded into the artifact version so a later policy cannot
+silently reinterpret old data.
+
+## Standard STFT and reconstruction contract
+
+Standard mode uses transform length `N = 1024`, analysis and synthesis hop
+`H_a = H_s = 256`, and overlap factor four. The periodic Hann is exactly:
+
+```text
+wH[n] = 0.5 - 0.5 cos(2 pi n / N),  0 <= n < N
+wa[n] = ws[n] = sqrt(wH[n])
+```
+
+For fourfold overlap, the shifted products sum to two. WOLA therefore applies
+gain `1/2` after an inverse transform normalized by the transform size, or
+`1/(2N)` when the inverse FFT is unnormalized. The analysis-algorithm version
+must record the exact forward/inverse scaling, periodic window formula,
+separate analysis/synthesis windows, overlap gain, real-spectrum DC/Nyquist
+handling, left/center frame alignment, edge padding, and startup/pre-roll
+policy.
+
+Unmodified float32-spectrum analysis/resynthesis must measure relative error:
+
+```text
+Erel = 10 log10(sum((x - xhat)^2) / (sum(x^2) + epsilon)) <= -120 dB
+```
+
+The measured gate covers impulse, DC, Nyquist, coherent sine, swept sine, white
+noise, and deterministic random finite signals. Any excluded boundary samples
+must be fixed by the alignment contract and reported explicitly.
+
+## Phase, peak, and transient contract
+
+For bin `k` and frame `m`, the artifact stores magnitude `M[k,m]` and wrapped
+instantaneous-frequency residual:
+
+```text
+deltaPhi[k,m] = princarg(phi[k,m] - phi[k,m-1] - (2 pi k / N) Ha)
+omegaHat[k,m] = (2 pi k / N) + deltaPhi[k,m] / Ha
+theta[k,m] = theta[k,m-1] + omegaHat[k,m] Hs
+```
+
+Synthesis phase accumulation uses float64. Standard playback requires bounded,
+deterministic identity phase locking: local-magnitude peaks are detected from
+the shared stereo reference spectrum; every bin is assigned to one peak region
+with stable tie-breaking; peak phases propagate from instantaneous frequency;
+and each assigned bin preserves its analysis-relative phase to that peak.
+
+Offline analysis marks bounded transient frames using versioned normalized
+positive spectral flux and a fixed refractory interval. At a transient, both
+channels synchronously reset to analysis-relative phases, interpolation across
+the boundary is suppressed, and the reset rule is deterministic. Exact flux
+threshold and refractory constants remain specialist-confirmation items; until
+accepted, C3F cannot claim general transient preservation.
+
+## Stereo contract
+
+The shared detection magnitude is:
+
+```text
+Mref[k,m] = sqrt((ML[k,m]^2 + MR[k,m]^2) / 2)
+```
+
+Both channels use the same peak regions and transient decisions but retain
+their own magnitude and phase-evolution data. After time-domain reconstruction,
+bounded stereo width uses `mid = (L+R)/2`, `side = (L-R)/2`, then
+`L' = mid + width*side`, `R' = mid - width*side`. Required coherence fixtures
+include mono, dual mono, polarity-inverted stereo, hard-panned impulse,
+coherent sine, decorrelated noise, moving stereo, and side-only input under
+freeze and pitch motion. Tests record L/R correlation, interchannel level
+difference, and controlled-tone phase difference.
+
+## Canonical-rate resampling contract
+
+Import performs a deterministic versioned band-limited conversion from the
+verified source rate to 48 kHz. Playback remains on a canonical 48 kHz spectral
+timeline and feeds a fixed-capacity streaming converter to the host rate, so
+transform cadence does not increase at 88.2, 96, or 192 kHz.
+
+The converter version must define phase accumulator, phase-table geometry, tap
+count, passband/transition band, coefficient-phase interpolation, group delay,
+startup/flushing, and sample-rate-change state mapping. Standard targets are at
+least 100 dB stopband attenuation, no more than 0.01 dB passband ripple, and no
+image/alias component above -100 dBFS outside the declared transition band for
+an amplitude-limited sweep. A host-rate change is a control-side reprepare that
+maps canonical time and accumulated phase into freshly prepared resampler
+state; it never preserves stale raw buffer indexes.
 
 ## Playback and musical contract
 
@@ -120,8 +212,17 @@ main route, and two fixed FX sends. Stable IDs and migration defaults are
 required. Source replacement and analysis-structural changes are control-side
 rebuild parameters, not realtime modulation targets.
 
-Position and musical pitch must be independent. A held note must not reset
-phase on sample-rate changes unless the source lifecycle explicitly resets.
+Position is a smoothed control-rate source trajectory; arbitrary audio-rate
+motion is excluded. Discontinuous jumps perform a bounded phase reset with a
+short fixed crossfade. Negative traversal is excluded from C3F. Pitch range,
+collision and Nyquist policy remain specialist-confirmation constants. The
+implementation must choose and version one complete algorithm: direct spectral
+frequency/bin scaling with interpolation and energy/collision rules, or
+phase-vocoder time scaling followed by bounded resampling. Pitch transposition
+`q` uses ratio `2^(q/12)` and must not silently change requested duration.
+
+A held note must not reset phase on sample-rate changes unless the source
+lifecycle explicitly resets.
 Live and offline Standard rendering must share the same state transitions and
 produce deterministic output. Offline HQ may use a separately declared quality
 mode only after Standard parity is frozen.
@@ -146,14 +247,41 @@ Required callback telemetry:
 - active voices and retired publications;
 - deadline/queue counters through the existing engine telemetry.
 
-The implementation must define a hard transform-per-block ceiling for every
-supported block size. Pool or work exhaustion rejects work deterministically;
-it must not allocate, block, read a file, start a worker, grow a container, or
-silently reduce quality.
+One transform is accounted as one real inverse transform for one channel; a
+complete stereo synthesis hop therefore accounts as two transforms unless a
+later packed implementation changes the named accounting unit. Four steady
+voices at 48 kHz and hop 256 require 750 stereo hops, or 1,500 channel inverse
+transforms, per second. The implementation must derive a hard per-callback loop
+ceiling from elapsed canonical frames and maximum legal resampler demand. Pool
+or work exhaustion rejects work deterministically; it must not allocate, block,
+read a file, start a worker, grow a container, or silently reduce quality.
 
-Reported latency must be derived from the accepted analysis/synthesis window,
-hop, and output-resampler delay. Note/event timing, offline export trimming,
-plugin compensation, and replacement fades must be tested against that value.
+Deadline testing covers rates 44.1/48/88.2/96/192 kHz; blocks 16, 32, 64, 128,
+256, 512, 1024 and irregular legal sizes; zero through four voices; position
+motion, pitch extrema, freeze, replacement, sends, and denormal-prone tails.
+For callback utilization `U = callback_time / (block_samples / sample_rate)`,
+each declared minimum supported machine must achieve `P99.9(U) < 0.50` and
+`max(U) < 0.80` in an extended isolated run, with zero deadlines, allocations,
+blocking operations, lazy initialization, non-finite samples, or silent quality
+fallback. These provisional engineering gates remain subject to whole-engine
+budget confirmation.
+
+## Latency and alignment contract
+
+The implementation separately defines event latency (note event to first
+intended causal output), steady-state alignment delay (requested canonical
+position to synthesized reference sample), output-resampler group delay, and
+host-reported fixed latency. For a linear-phase FIR of length `Lr`, converter
+delay is `(Lr - 1)/2` at the tap operating rate and is converted explicitly to
+host samples.
+
+Frame centering or left alignment, negative-time padding, first-frame pre-roll,
+overlap-ring phase, note-event placement, output startup, replacement-fade
+alignment, export trimming, and end flushing are versioned contracts. The same
+reference sample is used for live and offline Standard rendering. Tests cover
+note-on/off at every sample offset, first impulse, source start/end, frozen
+start, replacement at every overlap phase, export start/tail, host-rate
+changes, live/offline alignment, and plugin delay-compensation reporting.
 
 ## Security and artifact validation
 
@@ -165,25 +293,44 @@ plugin compensation, and replacement fades must be tested against that value.
   size/hash mismatch, unknown windows, inconsistent dimensions, non-finite or
   negative magnitudes, invalid phase evolution, excessive energy, and decoded
   metadata mismatch.
+- Require `0 <= M[k,m] <= Mmax`; finite phase residuals in `[-pi, pi)`; real
+  DC/Nyquist constraints; bounded spectral energy versus analyzed PCM; in-range,
+  terminating peak regions; bounded transient counts; and overflow-safe
+  dimension multiplication before allocation. Revalidate every artifact-derived
+  loop bound during construction even after hash verification.
 - Analysis cancellation and failure must leave no published partial asset.
   Stage, fsync where required by the existing policy, verify, then rename.
 - Acquired repositories, binaries, models, presets, services, and external
   runtime dependencies remain prohibited without their separate human gates.
+
+## Technical review decision record
+
+Reviewer: OpenAI GPT-5.6 Thinking, technical DSP review assistance; not a human
+credentialed signatory. Review date: 2026-07-15. Outcome: **accept with
+revisions**. Option B remains recommended. Specialist DSP sign-off: **no**.
+Human authorization to begin C3F1: **not recorded**.
+
+The review accepted the 48 kHz canonical timeline and provisionally accepted
+the four-voice, 48 MiB and 1024-point limits subject to complete payload
+accounting and measured deadline gates. It required the exact reconstruction,
+phase-locking/transient, L/R stereo, pitch/position, resampling, resource, and
+latency contracts now recorded above.
 
 ## Required specialist DSP decisions
 
 A qualified DSP reviewer must explicitly accept or replace all of these before
 spectral implementation begins:
 
-1. STFT window/hop pair and the reconstruction-normalization proof.
-2. Phase propagation and whether identity/transient phase locking is required.
-3. L/R versus mid/side representation and stereo-coherence tests.
-4. Canonical-rate analysis plus fixed output-resampling policy across 44.1,
-   48, 88.2, 96, and 192 kHz.
-5. Four-voice/48-MiB/1024-point provisional budgets and measured CPU/deadline
-   acceptance thresholds.
-6. Latency definition and compensation behavior for note start, live render,
-   offline export, and source replacement.
+1. Confirm the exact square-root periodic Hann/WOLA and FFT scaling contract.
+2. Confirm deterministic identity phase locking, spectral-flux threshold,
+   refractory interval, and stereo-synchronous reset behavior.
+3. Confirm independent L/R storage, shared peak/transient decisions, and the
+   coherence gates.
+4. Confirm the versioned import/output resampler design and filter constants.
+5. Confirm pitch range/algorithm, Nyquist/collision/energy behavior, position
+   smoothing, jump crossfade, and the lack of negative traversal.
+6. Confirm complete 48 MiB accounting, transform unit, minimum supported
+   machine, utilization gates, latency reference model, and compensation.
 
 Review approval must name the reviewer, date, accepted option, any changed
 constants, and the evidence used. A generic “continue” is sufficient to keep
@@ -214,7 +361,7 @@ silently replacing hashes.
 
 ## Stop condition
 
-Milestone C3F is blocked at architecture review. Do not add an analyzer,
-spectral artifact, FFT playback code, Slot 3 schema/UI, factory spectral asset,
-or upstream implementation until the specialist DSP decisions and human
-implementation approval above are recorded.
+Milestone C3F is accepted with revisions but blocked before implementation. Do
+not add an analyzer, spectral artifact, FFT playback code, Slot 3 schema/UI,
+factory spectral asset, or upstream implementation until the specialist DSP
+decisions and human implementation approval above are recorded.
