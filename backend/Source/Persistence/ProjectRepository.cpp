@@ -1798,10 +1798,21 @@ namespace beat
 
     std::optional<Project> ProjectRepository::load(const Id& id)
     {
+        return loadWithDiagnostics(id).project;
+    }
+
+    ProjectRepository::LoadResult ProjectRepository::loadWithDiagnostics(const Id& id)
+    {
         Statement stmt(db, "SELECT json_blob FROM projects WHERE id = ?");
         stmt.bind(1, id);
-        if (!stmt.step()) return std::nullopt;
-        return projectFromJson(stmt.columnText(0));
+        if (!stmt.step()) return {};
+
+        const auto json = stmt.columnText(0);
+        const auto parsed = juce::JSON::parse(json);
+        auto diagnostics = validateHybridSourceDocument(parsed);
+        if (!diagnostics.empty())
+            return { std::nullopt, std::move(diagnostics) };
+        return { projectFromJson(json), {} };
     }
 
     std::vector<ProjectRepository::Summary> ProjectRepository::list()

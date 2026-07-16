@@ -347,6 +347,53 @@ try {
   assert.equal(migratedSampleSlotDraft.parameters["aether.granular.2.grainMilliseconds"], 80);
   assert.equal(migratedSampleSlotDraft.parameters["aether.granular.2.densityHz"], 12);
   assert.equal(migratedSampleSlotDraft.metadata.managedGranular, undefined);
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch({
+      metadata: {
+        managedSfz: {
+          schemaVersion: 2,
+          assetId: "future-sfz",
+          manifestPath: "Future Assets/sfz/manifest.json",
+          sourcePath: "Future Assets/sfz/source.sfz",
+        },
+      },
+    }),
+    (error) => error instanceof synthStore.HybridSourceMigrationError
+      && error.code === "aether.sample-slot-1.managed-sfz.schema-future"
+      && error.path === "metadata.managedSfz.schemaVersion",
+  );
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch({
+      metadata: {
+        managedGranular: {
+          schemaVersion: 2,
+          assetId: "future-granular",
+          manifestPath: "Future Assets/granular/manifest.json",
+          audioPath: "Future Assets/granular/source.wav",
+        },
+      },
+    }),
+    (error) => error instanceof synthStore.HybridSourceMigrationError
+      && error.code === "aether.granular-slot-2.managed-asset.schema-future"
+      && error.path === "metadata.managedGranular.schemaVersion",
+  );
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch({
+      metadata: {
+        sampleSlot1Zones: Array.from({ length: 9 }, (_, index) => ({ audioFileId: `zone-${index}` })),
+      },
+    }),
+    (error) => error instanceof synthStore.HybridSourceMigrationError
+      && error.code === "aether.sample-slot-1.zones-capacity",
+  );
+  const futureSlotInstrument = structuredClone(independentUnisonPreview);
+  futureSlotInstrument.aether.sampleSlot1.schemaVersion = 6;
+  assert.throws(
+    () => synthStore.synthDraftFromInstrument(futureSlotInstrument),
+    (error) => error instanceof synthStore.HybridSourceMigrationError
+      && error.code === "aether.sample-slot-1.schema-future"
+      && error.path === "instrument.aether.sampleSlot1.schemaVersion",
+  );
   const granularBenchmark = synthStore.FACTORY_SYNTH_PRESETS.find((preset) => preset.id === "factory.benchmark-granular-drift");
   assert.ok(granularBenchmark);
   assert.equal(granularBenchmark.patch.parameters["aether.granular.2.enabled"], true);

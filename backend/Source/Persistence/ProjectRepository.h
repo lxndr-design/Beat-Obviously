@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Database.h"
+#include "HybridSourceDocumentValidation.h"
 #include "../Audio/TrackModel.h"
 #include <vector>
 #include <optional>
@@ -24,6 +25,14 @@ namespace beat
         explicit ProjectRepository(Database& db) : db(db) {}
 
         void save(const Project& p);
+        struct LoadResult
+        {
+            std::optional<Project> project;
+            std::vector<HybridSourceDocumentDiagnostic> diagnostics;
+
+            bool ok() const noexcept { return project.has_value() && diagnostics.empty(); }
+        };
+        LoadResult loadWithDiagnostics(const Id& id);
         std::optional<Project> load(const Id& id);
         /** Lightweight listing — id/name/saved_at only. */
         struct Summary { Id id; juce::String name; juce::int64 savedAt; };

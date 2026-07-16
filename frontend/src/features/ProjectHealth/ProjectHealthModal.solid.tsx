@@ -119,7 +119,7 @@ export function ProjectHealthModal() {
     const errors = integrityReport()?.errorCount ?? 0;
     const warnings = integrityReport()?.warningCount ?? 0;
     if (errors > 0) return { label: "Blocked", tone: "bad" as const };
-    if (warnings > 0 || missingAssets().length > 0 || (cleanupReport()?.failedFiles ?? 0) > 0) {
+    if (warnings > 0 || missingAssets().length > 0 || cleanupReport()?.blocked || (cleanupReport()?.failedFiles ?? 0) > 0) {
       return { label: "Needs Attention", tone: "warn" as const };
     }
     return { label: "Clean", tone: "good" as const };
@@ -138,10 +138,15 @@ export function ProjectHealthModal() {
       if (result.error) throw new Error(result.error);
       useDocumentStore.getState().setCleanupReport(result.report);
       await rescanHealth({ throwOnError: true });
+      const blockedDiagnostic = result.report.diagnostics?.[0];
       setMessage({
-        tone: result.report.failedFiles > 0 ? "error" : "good",
-        title: result.report.failedFiles > 0 ? "Sidecar cleanup finished with failures." : "Sidecar cleanup finished.",
-        body: `${result.report.deletedFiles} deleted / ${result.report.failedFiles} failed`,
+        tone: result.report.blocked || result.report.failedFiles > 0 ? "error" : "good",
+        title: result.report.blocked
+          ? "Sidecar cleanup was blocked safely."
+          : result.report.failedFiles > 0 ? "Sidecar cleanup finished with failures." : "Sidecar cleanup finished.",
+        body: result.report.blocked && blockedDiagnostic
+          ? `${blockedDiagnostic.code}: ${blockedDiagnostic.message} (${blockedDiagnostic.path})`
+          : `${result.report.deletedFiles} deleted / ${result.report.failedFiles} failed`,
       });
     } catch (error) {
       setMessage({
@@ -561,6 +566,10 @@ function buildTrustCategories(
   categoryMap.get("sidecars")?.cleanupRows.push(
     ...(cleanupReport?.deletedPaths.map((path) => ({ status: "Deleted", path })) ?? []),
     ...(cleanupReport?.failedPaths.map((path) => ({ status: "Failed", path })) ?? []),
+    ...(cleanupReport?.diagnostics.map((diagnostic) => ({
+      status: "Failed",
+      path: `${diagnostic.code}: ${diagnostic.message} (${diagnostic.path})`,
+    })) ?? []),
   );
 
   return TRUST_CATEGORIES.map((definition) => categoryMap.get(definition.id)).filter(Boolean) as TrustCategory[];

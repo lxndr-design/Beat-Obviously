@@ -459,14 +459,34 @@ function normalizeOscillatorDefinitions(value: unknown): SynthOscillatorDefiniti
   return unique;
 }
 
+export class HybridSourceMigrationError extends Error {
+  constructor(
+    public readonly code: string,
+    public readonly path: string,
+    message: string,
+  ) {
+    super(`${code} at ${path}: ${message}`);
+    this.name = "HybridSourceMigrationError";
+  }
+}
+
+function hybridMigrationFailure(code: string, path: string, message: string): never {
+  throw new HybridSourceMigrationError(code, path, message);
+}
+
 function normalizeAetherSampleZones(value: unknown): AetherSampleZoneConfig[] {
-  if (!Array.isArray(value)) return [];
+  if (value === undefined) return [];
+  if (!Array.isArray(value))
+    hybridMigrationFailure("aether.sample-slot-1.zones-shape", "metadata.sampleSlot1Zones", "Expected an array.");
+  if (value.length > 8)
+    hybridMigrationFailure("aether.sample-slot-1.zones-capacity", "metadata.sampleSlot1Zones", "At most 8 zones are supported.");
   const number = (entry: Record<string, unknown>, key: string, fallback: number) =>
     typeof entry[key] === "number" && Number.isFinite(entry[key]) ? Number(entry[key]) : fallback;
   const midi = (entry: Record<string, unknown>, key: string, fallback: number) =>
     Math.max(0, Math.min(127, Math.round(number(entry, key, fallback))));
-  return value.slice(0, 8).flatMap((entry) => {
-    if (!isRecord(entry) || typeof entry.audioFileId !== "string" || !entry.audioFileId) return [];
+  return value.map((entry, index) => {
+    if (!isRecord(entry) || typeof entry.audioFileId !== "string" || !entry.audioFileId)
+      hybridMigrationFailure("aether.sample-slot-1.zone-shape", `metadata.sampleSlot1Zones[${index}]`, "Expected an object with audioFileId.");
     const loNote = midi(entry, "loNote", 0);
     const hiNote = Math.max(loNote, midi(entry, "hiNote", 127));
     const loVelocity = midi(entry, "loVelocity", 0);
@@ -475,7 +495,7 @@ function normalizeAetherSampleZones(value: unknown): AetherSampleZoneConfig[] {
     const endRatio = Math.max(startRatio, clamp01(number(entry, "endRatio", 1)));
     const loopStartRatio = Math.max(startRatio, Math.min(endRatio, number(entry, "loopStartRatio", startRatio)));
     const loopEndRatio = Math.max(loopStartRatio, Math.min(endRatio, number(entry, "loopEndRatio", endRatio)));
-    return [{
+    return {
       audioFileId: entry.audioFileId,
       rootNote: midi(entry, "rootNote", 60),
       loNote,
@@ -489,34 +509,51 @@ function normalizeAetherSampleZones(value: unknown): AetherSampleZoneConfig[] {
       loopEnabled: entry.loopEnabled === true && loopEndRatio > loopStartRatio,
       loopStartRatio,
       loopEndRatio,
-    }];
+    };
   });
 }
 
 function normalizeManagedSfz(value: unknown): ManagedSfzAssetConfig | undefined {
-  if (!isRecord(value)
-    || value.schemaVersion !== 1
+  if (value === undefined) return undefined;
+  if (!isRecord(value))
+    hybridMigrationFailure("aether.sample-slot-1.managed-sfz.shape", "metadata.managedSfz", "Expected an object.");
+  if (typeof value.schemaVersion !== "number" || !Number.isInteger(value.schemaVersion) || value.schemaVersion < 0)
+    hybridMigrationFailure("aether.sample-slot-1.managed-sfz.schema-invalid", "metadata.managedSfz.schemaVersion", "Expected a non-negative integer.");
+  if (value.schemaVersion > 1)
+    hybridMigrationFailure("aether.sample-slot-1.managed-sfz.schema-future", "metadata.managedSfz.schemaVersion", "Version is newer than supported version 1.");
+  if (value.schemaVersion !== 1
     || typeof value.assetId !== "string" || !value.assetId
     || typeof value.manifestPath !== "string" || !value.manifestPath
-    || typeof value.sourcePath !== "string" || !value.sourcePath) return undefined;
+    || typeof value.sourcePath !== "string" || !value.sourcePath)
+    hybridMigrationFailure("aether.sample-slot-1.managed-sfz.shape", "metadata.managedSfz", "Required managed SFZ fields are missing.");
+  if (value.samplePaths !== undefined && !Array.isArray(value.samplePaths))
+    hybridMigrationFailure("aether.sample-slot-1.managed-sfz.sample-paths-shape", "metadata.managedSfz.samplePaths", "Expected an array.");
+  if (Array.isArray(value.samplePaths)
+    && (value.samplePaths.length > 256 || value.samplePaths.some((path) => typeof path !== "string" || !path)))
+    hybridMigrationFailure("aether.sample-slot-1.managed-sfz.sample-paths-invalid", "metadata.managedSfz.samplePaths", "Expected at most 256 non-empty paths.");
   return {
     schemaVersion: 1,
     assetId: value.assetId,
     displayName: typeof value.displayName === "string" ? value.displayName.slice(0, 128) : value.assetId,
     manifestPath: value.manifestPath,
     sourcePath: value.sourcePath,
-    samplePaths: Array.isArray(value.samplePaths)
-      ? value.samplePaths.filter((path): path is string => typeof path === "string" && Boolean(path)).slice(0, 256)
-      : [],
+    samplePaths: Array.isArray(value.samplePaths) ? value.samplePaths as string[] : [],
   };
 }
 
 function normalizeManagedGranular(value: unknown): ManagedGranularAssetConfig | undefined {
-  if (!isRecord(value)
-    || value.schemaVersion !== 1
+  if (value === undefined) return undefined;
+  if (!isRecord(value))
+    hybridMigrationFailure("aether.granular-slot-2.managed-asset.shape", "metadata.managedGranular", "Expected an object.");
+  if (typeof value.schemaVersion !== "number" || !Number.isInteger(value.schemaVersion) || value.schemaVersion < 0)
+    hybridMigrationFailure("aether.granular-slot-2.managed-asset.schema-invalid", "metadata.managedGranular.schemaVersion", "Expected a non-negative integer.");
+  if (value.schemaVersion > 1)
+    hybridMigrationFailure("aether.granular-slot-2.managed-asset.schema-future", "metadata.managedGranular.schemaVersion", "Version is newer than supported version 1.");
+  if (value.schemaVersion !== 1
     || typeof value.assetId !== "string" || !value.assetId
     || typeof value.manifestPath !== "string" || !value.manifestPath
-    || typeof value.audioPath !== "string" || !value.audioPath) return undefined;
+    || typeof value.audioPath !== "string" || !value.audioPath)
+    hybridMigrationFailure("aether.granular-slot-2.managed-asset.shape", "metadata.managedGranular", "Required managed granular fields are missing.");
   return {
     schemaVersion: 1,
     assetId: value.assetId,
@@ -2337,6 +2374,28 @@ export function synthDraftToPreviewInstrument(draft: SynthDraftPatch): Instrumen
 }
 
 export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatch {
+  const runtimeAether: unknown = instrument.aether;
+  if (isRecord(runtimeAether)) {
+    const sampleSlot: unknown = runtimeAether.sampleSlot1;
+    if (sampleSlot !== undefined) {
+      if (!isRecord(sampleSlot))
+        hybridMigrationFailure("aether.sample-slot-1.shape", "instrument.aether.sampleSlot1", "Expected an object.");
+      if (typeof sampleSlot.schemaVersion !== "number" || !Number.isInteger(sampleSlot.schemaVersion) || sampleSlot.schemaVersion < 0)
+        hybridMigrationFailure("aether.sample-slot-1.schema-invalid", "instrument.aether.sampleSlot1.schemaVersion", "Expected a non-negative integer.");
+      if (sampleSlot.schemaVersion > 5)
+        hybridMigrationFailure("aether.sample-slot-1.schema-future", "instrument.aether.sampleSlot1.schemaVersion", "Version is newer than supported version 5.");
+    }
+    const granularSlot: unknown = runtimeAether.granularSlot2;
+    if (granularSlot !== undefined) {
+      if (!isRecord(granularSlot))
+        hybridMigrationFailure("aether.granular-slot-2.shape", "instrument.aether.granularSlot2", "Expected an object.");
+      if (typeof granularSlot.schemaVersion !== "number" || !Number.isInteger(granularSlot.schemaVersion) || granularSlot.schemaVersion < 0)
+        hybridMigrationFailure("aether.granular-slot-2.schema-invalid", "instrument.aether.granularSlot2.schemaVersion", "Expected a non-negative integer.");
+      if (granularSlot.schemaVersion > 1)
+        hybridMigrationFailure("aether.granular-slot-2.schema-future", "instrument.aether.granularSlot2.schemaVersion", "Version is newer than supported version 1.");
+    }
+  }
+
   if (instrument.synthPatch) {
     const draft = normalizeSynthDraftPatch(instrument.synthPatch as SynthDraftPatch);
     if (instrument.icon) draft.metadata.icon = instrument.icon;

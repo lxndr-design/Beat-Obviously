@@ -197,8 +197,10 @@ export interface RecentProjectEntry {
 export interface ProjectSidecarCleanupReport {
   deletedFiles: number;
   failedFiles: number;
+  blocked: boolean;
   deletedPaths: string[];
   failedPaths: string[];
+  diagnostics: Array<{ code: string; path: string; message: string }>;
 }
 
 export interface DecentSamplerImportSample {

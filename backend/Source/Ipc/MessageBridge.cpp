@@ -314,8 +314,19 @@ namespace beat
             juce::DynamicObject::Ptr object = new juce::DynamicObject();
             object->setProperty("deletedFiles", report.deletedFiles);
             object->setProperty("failedFiles", report.failedFiles);
+            object->setProperty("blocked", report.blocked);
             object->setProperty("deletedPaths", makeStringArrayVar(report.deletedPaths));
             object->setProperty("failedPaths", makeStringArrayVar(report.failedPaths));
+            juce::Array<juce::var> diagnostics;
+            for (const auto& diagnostic : report.diagnostics)
+            {
+                juce::DynamicObject::Ptr item = new juce::DynamicObject();
+                item->setProperty("code", diagnostic.code);
+                item->setProperty("path", diagnostic.path);
+                item->setProperty("message", diagnostic.message);
+                diagnostics.add(juce::var(item.get()));
+            }
+            object->setProperty("diagnostics", diagnostics);
             return juce::var(object.get());
         }
 

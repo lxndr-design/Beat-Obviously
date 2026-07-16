@@ -124,6 +124,8 @@ target_sources(Beat PRIVATE
     Source/Persistence/ManagedSfzAsset.h
     Source/Persistence/ManagedGranularAsset.cpp
     Source/Persistence/ManagedGranularAsset.h
+    Source/Persistence/HybridSourceDocumentValidation.cpp
+    Source/Persistence/HybridSourceDocumentValidation.h
     Source/Persistence/ProjectAssetPackage.cpp
     Source/Persistence/ProjectAssetPackage.h
     Source/Persistence/ProjectDocumentBackup.cpp
@@ -277,6 +279,8 @@ add_executable(BeatBackendStress
     Source/Persistence/ManagedSfzAsset.h
     Source/Persistence/ManagedGranularAsset.cpp
     Source/Persistence/ManagedGranularAsset.h
+    Source/Persistence/HybridSourceDocumentValidation.cpp
+    Source/Persistence/HybridSourceDocumentValidation.h
     Source/Persistence/ProjectDocumentBackup.cpp
     Source/Persistence/ProjectDocumentBackup.h
     Source/Persistence/ProjectIntegrityVerifier.cpp

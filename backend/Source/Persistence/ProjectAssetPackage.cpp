@@ -1,4 +1,5 @@
 #include "ProjectAssetPackage.h"
+#include "HybridSourceDocumentValidation.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -375,6 +376,27 @@ namespace beat
             recordSidecarUsage(projectFile, value.getProperty(key, {}).toString(), usedSidecarFiles);
         }
 
+        void recordManagedBundleUsage(const juce::var& value,
+                                      const juce::File& projectFile,
+                                      const juce::Identifier& manifestKey,
+                                      juce::StringArray& usedSidecarFiles)
+        {
+            const auto manifestPath = value.getProperty(manifestKey, {}).toString();
+            recordSidecarUsage(projectFile, manifestPath, usedSidecarFiles);
+            if (manifestPath.isEmpty())
+                return;
+
+            const auto sidecarRoot = projectSidecarFolderFor(projectFile);
+            const auto manifest = juce::File(resolveProjectRelativePath(projectFile, manifestPath));
+            if (!normalizedPathStartsWith(manifest.getFullPathName(), sidecarRoot.getFullPathName()))
+                return;
+
+            juce::Array<juce::File> bundleFiles;
+            manifest.getParentDirectory().findChildFiles(bundleFiles, juce::File::findFiles, true);
+            for (const auto& file : bundleFiles)
+                usedSidecarFiles.addIfNotAlreadyThere(file.getFullPathName());
+        }
+
         void collectDocumentSidecarUsage(const juce::var& document,
                                          const juce::File& projectFile,
                                          juce::StringArray& usedSidecarFiles)
@@ -408,14 +430,14 @@ namespace beat
 
                     const auto managed = instrument.getProperty("aether", {})
                         .getProperty("sampleSlot1", {}).getProperty("managedSfz", {});
-                    recordObjectPathUsage(managed, projectFile, "manifestPath", usedSidecarFiles);
+                    recordManagedBundleUsage(managed, projectFile, "manifestPath", usedSidecarFiles);
                     recordObjectPathUsage(managed, projectFile, "sourcePath", usedSidecarFiles);
                     if (auto* paths = managed.getProperty("samplePaths", {}).getArray())
                         for (const auto& path : *paths)
                             recordSidecarUsage(projectFile, path.toString(), usedSidecarFiles);
                     const auto managedGranular = instrument.getProperty("aether", {})
                         .getProperty("granularSlot2", {}).getProperty("managedAsset", {});
-                    recordObjectPathUsage(managedGranular, projectFile, "manifestPath", usedSidecarFiles);
+                    recordManagedBundleUsage(managedGranular, projectFile, "manifestPath", usedSidecarFiles);
                     recordObjectPathUsage(managedGranular, projectFile, "audioPath", usedSidecarFiles);
                 }
             }
@@ -736,6 +758,13 @@ namespace beat
         const auto sidecarRoot = projectSidecarFolderFor(projectFile);
         if (!sidecarRoot.isDirectory())
             return report;
+
+        report.diagnostics = validateHybridSourceDocument(document);
+        if (!report.diagnostics.empty())
+        {
+            report.blocked = true;
+            return report;
+        }
 
         juce::StringArray usedSidecarFiles;
         collectDocumentSidecarUsage(document, projectFile, usedSidecarFiles);

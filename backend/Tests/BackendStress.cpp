@@ -43,6 +43,7 @@
 #include "../Source/Audio/Wavetable/WavetableOscillator.h"
 #include "../Source/Persistence/ProjectAssetPackage.h"
 #include "../Source/Persistence/ProjectDocumentBackup.h"
+#include "../Source/Persistence/HybridSourceDocumentValidation.h"
 #include "../Source/Persistence/ProjectIntegrityVerifier.h"
 #include "../Source/Persistence/AudioFileLibraryActions.h"
 #include "../Source/Persistence/Database.h"
@@ -8080,6 +8081,149 @@ namespace
                       << " loaded=" << loaded.has_value()
                       << "\n";
         }
+        return ok;
+    }
+
+    bool stressHybridSourceMigrationAndCleanupSafety()
+    {
+        const auto root = juce::File("/private/tmp")
+            .getChildFile("BeatBackendStress-hybrid-migration-safety-" + juce::Uuid().toString());
+        const auto projectFile = root.getChildFile("Hybrid.beat");
+        const auto sidecar = beat::projectSidecarFolderFor(projectFile);
+        const auto bundle = sidecar.getChildFile("sfz").getChildFile("shared");
+        const auto manifest = bundle.getChildFile("manifest.json");
+        const auto source = bundle.getChildFile("source.sfz");
+        const auto sample = bundle.getChildFile("sample.wav");
+        const auto orphan = sidecar.getChildFile("samples").getChildFile("orphan.wav");
+
+        if (!bundle.createDirectory()
+            || !orphan.getParentDirectory().createDirectory()
+            || !projectFile.replaceWithText("{}")
+            || !manifest.replaceWithText("{}")
+            || !source.replaceWithText("<region> sample=sample.wav")
+            || !sample.replaceWithText("sample")
+            || !orphan.replaceWithText("orphan"))
+        {
+            std::cerr << "Could not create hybrid migration safety fixture\n";
+            root.deleteRecursively();
+            return false;
+        }
+
+        juce::DynamicObject::Ptr managed = new juce::DynamicObject();
+        managed->setProperty("schemaVersion", 1);
+        managed->setProperty("assetId", "shared-sfz");
+        managed->setProperty("manifestPath", "Hybrid Assets/sfz/shared/manifest.json");
+        managed->setProperty("sourcePath", "Hybrid Assets/sfz/shared/source.sfz");
+
+        juce::DynamicObject::Ptr sampleSlot = new juce::DynamicObject();
+        sampleSlot->setProperty("schemaVersion", 5);
+        sampleSlot->setProperty("enabled", true);
+        sampleSlot->setProperty("managedSfz", juce::var(managed.get()));
+
+        juce::DynamicObject::Ptr granularSlot = new juce::DynamicObject();
+        granularSlot->setProperty("schemaVersion", 1);
+        granularSlot->setProperty("enabled", false);
+
+        juce::DynamicObject::Ptr aether = new juce::DynamicObject();
+        aether->setProperty("sampleSlot1", juce::var(sampleSlot.get()));
+        aether->setProperty("granularSlot2", juce::var(granularSlot.get()));
+
+        juce::DynamicObject::Ptr instrument = new juce::DynamicObject();
+        instrument->setProperty("id", "hybrid-safety");
+        instrument->setProperty("aether", juce::var(aether.get()));
+        juce::Array<juce::var> instruments { juce::var(instrument.get()) };
+        juce::DynamicObject::Ptr documentObject = new juce::DynamicObject();
+        documentObject->setProperty("instruments", instruments);
+        const juce::var document(documentObject.get());
+
+        const auto cleanup = beat::cleanupUnusedProjectSidecarAssets(document, projectFile);
+        bool ok = cleanup.ok()
+            && cleanup.deletedFiles == 1
+            && !orphan.existsAsFile()
+            && manifest.existsAsFile()
+            && source.existsAsFile()
+            && sample.existsAsFile();
+
+        const auto blockedOrphan = sidecar.getChildFile("samples").getChildFile("blocked-orphan.wav");
+        if (!blockedOrphan.getParentDirectory().createDirectory()
+            || !blockedOrphan.replaceWithText("blocked"))
+            ok = false;
+        sampleSlot->setProperty("schemaVersion", 99);
+        const auto blockedCleanup = beat::cleanupUnusedProjectSidecarAssets(document, projectFile);
+        const auto hasDiagnostic = [](const auto& diagnostics, const juce::String& code)
+        {
+            return std::any_of(diagnostics.begin(), diagnostics.end(), [&](const auto& diagnostic)
+            {
+                return diagnostic.code == code && diagnostic.path.isNotEmpty() && diagnostic.message.isNotEmpty();
+            });
+        };
+        ok = ok
+            && blockedCleanup.blocked
+            && !blockedCleanup.ok()
+            && blockedCleanup.deletedFiles == 0
+            && blockedOrphan.existsAsFile()
+            && hasDiagnostic(blockedCleanup.diagnostics, "aether.sample-slot-1.schema-future");
+
+        sampleSlot->setProperty("schemaVersion", 5);
+        granularSlot->setProperty("schemaVersion", 2);
+        const auto granularDiagnostics = beat::validateHybridSourceDocument(document);
+        ok = ok && hasDiagnostic(granularDiagnostics, "aether.granular-slot-2.schema-future");
+        granularSlot->setProperty("schemaVersion", 1);
+        juce::DynamicObject::Ptr partialManagedGranular = new juce::DynamicObject();
+        partialManagedGranular->setProperty("schemaVersion", 1);
+        partialManagedGranular->setProperty("assetId", "partial");
+        granularSlot->setProperty("managedAsset", juce::var(partialManagedGranular.get()));
+        const auto malformedDiagnostics = beat::validateHybridSourceDocument(document);
+        ok = ok && hasDiagnostic(malformedDiagnostics, "aether.granular-slot-2.managed-asset.fields-missing");
+
+        const auto dbFile = root.getChildFile("projects.sqlite");
+        auto project = makeDenseAetherProject();
+        project.id = "hybrid-migration-rejection";
+        project.instruments.front().aether.sampleSlot1.enabled = true;
+        project.instruments.front().aether.sampleSlot1.audioFileId = "fixture";
+        beat::Database db(dbFile);
+        beat::ProjectRepository repository(db);
+        repository.save(project);
+
+        beat::Statement select(db, "SELECT json_blob FROM projects WHERE id = ?");
+        select.bind(1, project.id);
+        if (!select.step())
+            ok = false;
+        else
+        {
+            auto persisted = juce::JSON::parse(select.columnText(0));
+            auto* persistedInstruments = persisted.getProperty("instruments", {}).getArray();
+            if (persistedInstruments == nullptr || persistedInstruments->isEmpty())
+                ok = false;
+            else
+            {
+                auto persistedAether = persistedInstruments->getReference(0).getProperty("aether", {});
+                auto persistedSlot = persistedAether.getProperty("sampleSlot1", {});
+                persistedSlot.getDynamicObject()->setProperty("schemaVersion", 99);
+                beat::Statement update(db, "UPDATE projects SET json_blob = ? WHERE id = ?");
+                update.bind(1, juce::JSON::toString(persisted, false));
+                update.bind(2, project.id);
+                update.step();
+
+                const auto load = repository.loadWithDiagnostics(project.id);
+                ok = ok
+                    && !load.project.has_value()
+                    && hasDiagnostic(load.diagnostics, "aether.sample-slot-1.schema-future");
+            }
+        }
+
+        if (!ok)
+        {
+            std::cerr << "Hybrid migration/cleanup safety failed cleanupOk=" << cleanup.ok()
+                      << " deleted=" << cleanup.deletedFiles
+                      << " blocked=" << blockedCleanup.blocked
+                      << " blockedDeleted=" << blockedCleanup.deletedFiles
+                      << " blockedOrphan=" << blockedOrphan.existsAsFile()
+                      << " diagnostics=" << blockedCleanup.diagnostics.size()
+                      << " granularDiagnostics=" << granularDiagnostics.size()
+                      << " malformedDiagnostics=" << malformedDiagnostics.size() << "\n";
+        }
+        root.deleteRecursively();
         return ok;
     }
 
@@ -17562,6 +17706,11 @@ int main()
     if (!stressProjectRepositoryAetherInstrumentRoundtrip())
     {
         std::cerr << "Project repository Aether instrument roundtrip stress failed\n";
+        return 1;
+    }
+    if (!stressHybridSourceMigrationAndCleanupSafety())
+    {
+        std::cerr << "Hybrid source migration/cleanup safety stress failed\n";
         return 1;
     }
     if (!stressProjectRepositoryAudioFileRoundtrip())

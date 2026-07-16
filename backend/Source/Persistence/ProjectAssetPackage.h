@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include "HybridSourceDocumentValidation.h"
 
 namespace beat
 {
@@ -8,10 +9,12 @@ namespace beat
     {
         int deletedFiles { 0 };
         int failedFiles { 0 };
+        bool blocked { false };
         juce::StringArray deletedPaths;
         juce::StringArray failedPaths;
+        std::vector<HybridSourceDocumentDiagnostic> diagnostics;
 
-        bool ok() const noexcept { return failedFiles == 0; }
+        bool ok() const noexcept { return !blocked && failedFiles == 0; }
     };
 
     juce::File projectSidecarFolderFor(const juce::File& projectFile);
