@@ -1319,6 +1319,10 @@ function selectedOptionLabel(
 }
 
 function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEditorTarget | null }) {
+  let sampleImportButton: HTMLButtonElement | undefined;
+  let sampleSourceStatus: HTMLParagraphElement | undefined;
+  let granularImportButton: HTMLButtonElement | undefined;
+  let granularSourceStatus: HTMLParagraphElement | undefined;
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const returnBuses = createStoreSelector(useProjectStore, (state) => state.project.returnBuses);
   const audioFiles = createStoreSelector(useAudioFileStore, (state) => state.files);
@@ -1342,6 +1346,18 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   const mappedZones = createMemo(() => draft().metadata.sampleSlot1Zones ?? []);
   const managedSfz = createMemo(() => draft().metadata.managedSfz);
   const managedGranular = createMemo(() => draft().metadata.managedGranular);
+  const sampleSourceAvailable = createMemo(() => Boolean(String(draft().parameters["aether.sample.1.audioFileId"] ?? "") || managedSfz()));
+  const granularSourceAvailable = createMemo(() => Boolean(managedGranular() || draft().parameters["aether.granular.2.builtinSource"] === "benchmark"));
+  const sampleSourceDescription = createMemo(() => managedSfz()
+    ? `Managed SFZ source: ${managedSfz()!.displayName}.`
+    : String(draft().parameters["aether.sample.1.audioFileId"] ?? "")
+      ? "Project audio source selected."
+      : "No source selected. Choose a project audio asset or import an SFZ before enabling this slot.");
+  const granularSourceDescription = createMemo(() => managedGranular()
+    ? `Managed granular source: ${managedGranular()!.displayName}.`
+    : draft().parameters["aether.granular.2.builtinSource"] === "benchmark"
+      ? "Built-in benchmark source selected."
+      : "No source selected. Import audio or choose the benchmark source before enabling this slot.");
   const commitMappedZones = (zones: AetherSampleZoneConfig[]) => setDraft({
     ...draft(),
     metadata: { ...draft().metadata, sampleSlot1Zones: zones.slice(0, 8) },
@@ -1370,6 +1386,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
           managedSfz: result.managedSfz,
         },
       });
+      queueMicrotask(() => sampleSourceStatus?.focus());
     } catch (error) {
       await appAlert(error instanceof Error ? error.message : "SFZ import failed.");
     } finally {
@@ -1396,6 +1413,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
         },
         metadata: { ...draft().metadata, managedGranular: result.managedGranular },
       });
+      queueMicrotask(() => granularSourceStatus?.focus());
     } catch (error) {
       await appAlert(error instanceof Error ? error.message : "Granular audio import failed.");
     } finally {
@@ -1539,13 +1557,23 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             />
           </div>
         </div>
-        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label="Aether sample source slot 1">
-          <div class={styles.ampFilterGroupTitle}>Sample Slot 1</div>
+        <section class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup} ${styles.sourceSlotGroup}`} aria-labelledby="aether-sample-slot-1-title">
+          <h3 id="aether-sample-slot-1-title" class={styles.ampFilterGroupTitle}>Sample Slot 1</h3>
+          <p
+            ref={sampleSourceStatus}
+            id="aether-sample-slot-1-source-status"
+            class={styles.sourceSlotStatus}
+            role="status"
+            aria-live="polite"
+            tabindex="-1"
+          >{sampleSourceDescription()}</p>
           <div class={styles.ampFilterShapeRow}>
             <Toggle
               label="Enabled"
+              aria-label="Enable Aether sample slot 1"
+              aria-describedby="aether-sample-slot-1-source-status"
               checked={draft().parameters["aether.sample.1.enabled"] === true}
-              disabled={!String(draft().parameters["aether.sample.1.audioFileId"] ?? "") && !managedSfz()}
+              disabled={!sampleSourceAvailable()}
               onChange={(value) => setBooleanParameter("aether.sample.1.enabled", value)}
             />
             <FloatingSelect
@@ -1553,6 +1581,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               layout="inline"
               value={String(draft().parameters["aether.sample.1.audioFileId"] ?? "")}
               ariaLabel="Aether sample slot 1 audio asset"
+              ariaDescribedBy="aether-sample-slot-1-source-status"
               options={[
                 { value: "", label: "No sample" },
                 ...audioFiles().map((file) => ({ value: file.id, label: file.name || file.id })),
@@ -1583,15 +1612,25 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               onOpenChange={setSampleRouteOpen}
               onChange={(value) => setParameter("aether.sample.1.route", value)}
             />
-            <Button size="xs" onClick={() => void importSfz()} disabled={importingSfz()}>
+            <Button
+              ref={sampleImportButton}
+              size="xs"
+              aria-label={managedSfz() ? `Replace managed SFZ ${managedSfz()!.displayName}` : "Import SFZ for Sample Slot 1"}
+              aria-busy={importingSfz()}
+              onClick={() => void importSfz()}
+              disabled={importingSfz()}
+            >
               {importingSfz() ? "Importing…" : managedSfz() ? `SFZ · ${managedSfz()!.displayName}` : "Import SFZ"}
             </Button>
             <Show when={managedSfz()}>
-              <Button size="xs" variant="ghost" onClick={() => setDraft({
-                ...draft(),
-                parameters: { ...draft().parameters, "aether.sample.1.enabled": false },
-                metadata: { ...draft().metadata, managedSfz: undefined },
-              })}>Remove SFZ</Button>
+              <Button size="xs" variant="ghost" aria-label={`Remove managed SFZ ${managedSfz()!.displayName}`} onClick={() => {
+                setDraft({
+                  ...draft(),
+                  parameters: { ...draft().parameters, "aether.sample.1.enabled": false },
+                  metadata: { ...draft().metadata, managedSfz: undefined },
+                });
+                queueMicrotask(() => sampleImportButton?.focus());
+              }}>Remove SFZ</Button>
             </Show>
           </div>
           <div class={styles.knobCluster}>
@@ -1637,14 +1676,24 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               onRemove={() => commitMappedZones(mappedZones().filter((_, zoneIndex) => zoneIndex !== index()))}
             />
           )}</For>
-        </div>
-        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label="Aether granular source slot 2">
-          <div class={styles.ampFilterGroupTitle}>Granular Slot 2</div>
+        </section>
+        <section class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup} ${styles.sourceSlotGroup}`} aria-labelledby="aether-granular-slot-2-title">
+          <h3 id="aether-granular-slot-2-title" class={styles.ampFilterGroupTitle}>Granular Slot 2</h3>
+          <p
+            ref={granularSourceStatus}
+            id="aether-granular-slot-2-source-status"
+            class={styles.sourceSlotStatus}
+            role="status"
+            aria-live="polite"
+            tabindex="-1"
+          >{granularSourceDescription()}</p>
           <div class={styles.ampFilterShapeRow}>
             <Toggle
               label="Enabled"
+              aria-label="Enable Aether granular slot 2"
+              aria-describedby="aether-granular-slot-2-source-status"
               checked={draft().parameters["aether.granular.2.enabled"] === true}
-              disabled={!managedGranular() && draft().parameters["aether.granular.2.builtinSource"] !== "benchmark"}
+              disabled={!granularSourceAvailable()}
               onChange={(value) => setBooleanParameter("aether.granular.2.enabled", value)}
             />
             <FloatingSelect
@@ -1652,6 +1701,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               layout="inline"
               value={String(draft().parameters["aether.granular.2.route"] ?? "filter")}
               ariaLabel="Aether granular slot 2 route"
+              ariaDescribedBy="aether-granular-slot-2-source-status"
               options={[
                 { value: "filter", label: "Filter" },
                 { value: "filter1", label: "Filter 1" },
@@ -1662,10 +1712,17 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               onOpenChange={setGranularRouteOpen}
               onChange={(value) => setParameter("aether.granular.2.route", value)}
             />
-            <Button size="xs" onClick={() => void importGranular()} disabled={importingGranular()}>
+            <Button
+              ref={granularImportButton}
+              size="xs"
+              aria-label={managedGranular() ? `Replace granular audio ${managedGranular()!.displayName}` : "Import audio for Granular Slot 2"}
+              aria-busy={importingGranular()}
+              onClick={() => void importGranular()}
+              disabled={importingGranular()}
+            >
               {importingGranular() ? "Importing…" : managedGranular() ? `Audio · ${managedGranular()!.displayName}` : "Import Audio"}
             </Button>
-            <Button size="xs" variant="ghost" onClick={() => setDraft({
+            <Button size="xs" variant="ghost" aria-pressed={draft().parameters["aether.granular.2.builtinSource"] === "benchmark"} onClick={() => setDraft({
               ...draft(),
               parameters: {
                 ...draft().parameters,
@@ -1675,15 +1732,18 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               metadata: { ...draft().metadata, managedGranular: undefined },
             })}>Benchmark Source</Button>
             <Show when={managedGranular() || draft().parameters["aether.granular.2.builtinSource"] === "benchmark"}>
-              <Button size="xs" variant="ghost" onClick={() => setDraft({
-                ...draft(),
-                parameters: {
-                  ...draft().parameters,
-                  "aether.granular.2.enabled": false,
-                  "aether.granular.2.builtinSource": "",
-                },
-                metadata: { ...draft().metadata, managedGranular: undefined },
-              })}>Remove</Button>
+              <Button size="xs" variant="ghost" aria-label="Remove Granular Slot 2 source" onClick={() => {
+                setDraft({
+                  ...draft(),
+                  parameters: {
+                    ...draft().parameters,
+                    "aether.granular.2.enabled": false,
+                    "aether.granular.2.builtinSource": "",
+                  },
+                  metadata: { ...draft().metadata, managedGranular: undefined },
+                });
+                queueMicrotask(() => granularImportButton?.focus());
+              }}>Remove</Button>
             </Show>
           </div>
           <div class={styles.knobCluster}>
@@ -1699,7 +1759,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             <NumberInput label="Pitch" layout="inline" value={getNumberParam(draft(), "aether.granular.2.pitchSemitones")} min={-48} max={48} step={0.1} ariaLabel="Granular pitch semitones" onChange={(value) => setNumericParameter("aether.granular.2.pitchSemitones", value)} />
             <NumberInput label="Seed" layout="inline" value={getNumberParam(draft(), "aether.granular.2.randomSeed")} min={1} max={4294967295} step={1} ariaLabel="Granular deterministic seed" onChange={(value) => setNumericParameter("aether.granular.2.randomSeed", value)} />
           </div>
-        </div>
+        </section>
         <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label="Aether shared FX buses">
           <div class={styles.ampFilterGroupTitle}>Source FX</div>
           <div class={styles.ampFilterShapeRow}>

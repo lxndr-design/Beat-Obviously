@@ -61,3 +61,17 @@
   text-transform: none;
   letter-spacing: 0;
 }
+
+.disabled {
+  cursor: not-allowed;
+}
+
+.disabled .box,
+.disabled .label {
+  opacity: 0.45;
+}
+
+.disabled:hover .box,
+.disabled:active .box {
+  background: var(--color-bg);
+}

@@ -6,6 +6,7 @@ export interface ToggleProps {
   onChange: (v: boolean) => void;
   label?: string;
   "aria-label"?: string;
+  "aria-describedby"?: string;
   disabled?: boolean;
   class?: string;
   className?: string;
@@ -14,12 +15,13 @@ export interface ToggleProps {
 
 export function Toggle(props: ToggleProps) {
   return (
-    <label class={[styles.wrap, props.class, props.className].filter(Boolean).join(" ")}>
+    <label class={[styles.wrap, props.disabled && styles.disabled, props.class, props.className].filter(Boolean).join(" ")}>
       <button
         type="button"
         role="switch"
         aria-checked={props.checked}
         aria-label={props["aria-label"]}
+        aria-describedby={props["aria-describedby"]}
         disabled={props.disabled}
         onClick={() => props.onChange(!props.checked)}
         class={`${styles.box} ${props.checked ? styles.on : ""}`}

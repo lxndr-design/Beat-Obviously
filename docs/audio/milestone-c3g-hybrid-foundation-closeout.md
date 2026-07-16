@@ -66,3 +66,42 @@ migration breadth, benchmark objective-render coverage, documentation
 reconciliation, and final baseline maintenance remain separate later slices.
 Slot 3 behavior, schema, `SourceSlotIndex::three`, and the C3F review boundary
 remain untouched.
+
+## C3G2 — Slot 1/2 accessibility and UI consistency
+
+Verified 2026-07-16 on `codex/aether-c3g1` after C3G1.
+
+The Sample Slot 1 and Granular Slot 2 panels are labelled sections with visible
+live source-status text. Each enable switch has a specific accessible name and
+references that status as its disabled explanation. Import actions expose busy
+state and source-specific names; source removal restores focus to the
+corresponding import action; successful imports move focus to the updated live
+status; and the benchmark-source action exposes its pressed state.
+
+The shared floating selector now moves focus into its portal menu, supports
+Arrow Up/Down, Home, End, and Escape for both searchable and non-searchable
+lists, and restores focus to its trigger after selection or cancellation.
+Disabled shared switches now have a visible disabled treatment and a
+not-allowed cursor while retaining their accessible description.
+
+Focused tests exercise every navigation-key index boundary, including empty
+and initially unfocused lists. Source-contract checks require both slot
+sections, source descriptions, enable names, disabled descriptions, import
+busy states, removal focus restoration, selector focus entry/return, and the
+shared switch disabled hook. TypeScript, the interaction verifier, and the
+design-system verifier pass. The complete `npm run verify:non-native` aggregate
+also passes every verifier and the production frontend build; only the existing
+intentional local synth-generation fallback and Vite chunk-size warning are
+informational. A source-matched Release `Beat` build with the Solid frontend
+embedded also passes; JUCE emits the existing 20 HarfBuzz third-party warnings.
+
+An attempted rendered focus inspection did not reach Beat because the in-app
+browser runtime rejected an unrelated workspace root containing a literal
+question mark as an invalid filesystem glob. No live-browser claim is made for
+this slice. This is recorded as a tooling limitation, not an application
+failure or waiver.
+
+No persistence, production DSP, Slot 1/2 schema, factory preset, baseline
+artifact, C3F review file, Slot 3 boundary, or `SourceSlotIndex::three` changed.
+No render difference is expected; no render hash or frozen artifact was
+updated.

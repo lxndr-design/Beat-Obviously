@@ -22,6 +22,7 @@ try {
       join(repoRoot, "frontend/src/automation/aetherArrangementAutomation.ts"),
       join(repoRoot, "frontend/src/automation/aetherAutomationConflicts.ts"),
       join(repoRoot, "frontend/src/state/components.ts"),
+      join(repoRoot, "frontend/src/solid-ui/FloatingSelect/floatingSelectKeyboard.ts"),
       "--bundle",
       "--format=esm",
       "--platform=node",
@@ -37,6 +38,7 @@ try {
   const arrangementAutomation = await import(pathToFileURL(join(outDir, "automation/aetherArrangementAutomation.js")));
   const automationConflicts = await import(pathToFileURL(join(outDir, "automation/aetherAutomationConflicts.js")));
   const componentState = await import(pathToFileURL(join(outDir, "state/components.js")));
+  const floatingSelectKeyboard = await import(pathToFileURL(join(outDir, "solid-ui/FloatingSelect/floatingSelectKeyboard.js")));
   const pianoRollSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.solid.tsx"), "utf8");
   const pianoRollCss = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.module.css"), "utf8");
   const midiTransportSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/MidiTransport.solid.tsx"), "utf8");
@@ -74,6 +76,8 @@ try {
   const nodeGraphSource = readFileSync(join(repoRoot, "frontend/src/features/NodeInstrumentEditor/nodeGraph.ts"), "utf8");
   const synthPreviewSource = readFileSync(join(repoRoot, "frontend/src/audio/synthPreview.ts"), "utf8");
   const synthEditorSource = readFileSync(join(repoRoot, "frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx"), "utf8");
+  const floatingSelectSource = readFileSync(join(repoRoot, "frontend/src/solid-ui/FloatingSelect/FloatingSelect.solid.tsx"), "utf8");
+  const toggleSource = readFileSync(join(repoRoot, "frontend/src/solid-ui/Toggle/Toggle.solid.tsx"), "utf8");
   const oscillatorPanelSource = readFileSync(join(repoRoot, "frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx"), "utf8");
   const patternsPageSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/PatternsPage.solid.tsx"), "utf8");
   const instrumentsPageSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/InstrumentsPage.solid.tsx"), "utf8");
@@ -84,6 +88,13 @@ try {
   const devHooksSource = readFileSync(join(repoRoot, "frontend/src/testing/devHooks.ts"), "utf8");
 
   assert.equal(runner.snapBeat(1.12, 0.25), 1, "snapBeat should snap to nearest grid");
+  assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("ArrowDown", -1, 3), 0);
+  assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("ArrowDown", 2, 3), 2);
+  assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("ArrowUp", -1, 3), 2);
+  assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("ArrowUp", 0, 3), 0);
+  assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("Home", 2, 3), 0);
+  assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("End", 0, 3), 2);
+  assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("ArrowDown", 0, 0), null);
   componentState.useComponentStore.getState().hydrate([], []);
   const componentFolderId = componentState.useComponentStore.getState().addFolder("Sketches");
   const componentId = componentState.useComponentStore.getState().add({
@@ -1348,6 +1359,31 @@ try {
       && synthEditorSource.includes("overlaps crossfade")
       && synthEditorSource.includes("zones.slice(0, 8)"),
     "Aether Sample Slot 1 should expose bounded mapped-zone selection and per-zone playback controls",
+  );
+  assert.ok(
+    synthEditorSource.includes('aria-labelledby="aether-sample-slot-1-title"')
+      && synthEditorSource.includes('id="aether-sample-slot-1-source-status"')
+      && synthEditorSource.includes('aria-label="Enable Aether sample slot 1"')
+      && synthEditorSource.includes('aria-describedby="aether-sample-slot-1-source-status"')
+      && synthEditorSource.includes('aria-labelledby="aether-granular-slot-2-title"')
+      && synthEditorSource.includes('id="aether-granular-slot-2-source-status"')
+      && synthEditorSource.includes('aria-label="Enable Aether granular slot 2"')
+      && synthEditorSource.includes('aria-describedby="aether-granular-slot-2-source-status"')
+      && synthEditorSource.includes('aria-busy={importingSfz()}')
+      && synthEditorSource.includes('aria-busy={importingGranular()}')
+      && synthEditorSource.includes('queueMicrotask(() => sampleImportButton?.focus())')
+      && synthEditorSource.includes('queueMicrotask(() => granularImportButton?.focus())'),
+    "Aether Slot 1/2 controls should expose source state, disabled reasons, busy state, and deterministic focus restoration",
+  );
+  assert.ok(
+    floatingSelectSource.includes('event.key === "Escape"')
+      && floatingSelectSource.includes('["ArrowDown", "ArrowUp", "Home", "End"]')
+      && floatingSelectSource.includes("closeAndRestoreFocus")
+      && floatingSelectSource.includes("searchElement?.focus()")
+      && floatingSelectSource.includes("target?.focus()")
+      && toggleSource.includes('aria-describedby={props["aria-describedby"]}')
+      && toggleSource.includes("props.disabled && styles.disabled"),
+    "shared source selectors and switches should preserve keyboard focus and expose disabled context",
   );
   assert.ok(
     synthEditorSource.includes('aria-label="Aether MPE member zone"')

@@ -1239,6 +1239,7 @@
 }
 
 .ampFilterGroupTitle {
+  margin: 0;
   min-width: 0;
   overflow: hidden;
   color: var(--color-fg);
@@ -1248,6 +1249,28 @@
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sourceSlotStatus {
+  margin: 0;
+  color: color-mix(in srgb, var(--color-fg) 66%, transparent);
+  font-size: var(--font-size-1);
+  line-height: 1.35;
+}
+
+.sourceSlotGroup .sourceSlotStatus {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.sourceSlotGroup .ampFilterShapeRow,
+.sourceSlotGroup .knobCluster {
+  grid-row: 3;
+}
+
+.sourceSlotStatus:focus-visible {
+  outline: 0;
+  box-shadow: var(--interaction-focus-ring);
 }
 
 .ampFilterShapeRow,

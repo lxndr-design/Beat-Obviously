@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Icon } from "../Icon";
+import { nextFloatingSelectOptionIndex, type FloatingSelectNavigationKey } from "./floatingSelectKeyboard";
 import styles from "./FloatingSelect.module.css";
 
 export interface FloatingSelectOption {
@@ -19,6 +20,7 @@ export interface FloatingSelectProps {
   label?: string;
   layout?: "default" | "inline" | "bare";
   ariaLabel?: string;
+  ariaDescribedBy?: string;
   disabled?: boolean;
   searchable?: boolean;
   searchPlaceholder?: string;
@@ -28,6 +30,9 @@ export interface FloatingSelectProps {
 
 export function FloatingSelect(props: FloatingSelectProps) {
   let rootElement: HTMLDivElement | undefined;
+  let triggerElement: HTMLButtonElement | undefined;
+  let searchElement: HTMLInputElement | undefined;
+  let optionElements: HTMLButtonElement[] = [];
   const [internalOpen, setInternalOpen] = createSignal(false);
   const [menuRect, setMenuRect] = createSignal<{ left: number; top: number; width: number; maxHeight: number } | null>(null, { equals: false });
   const [query, setQuery] = createSignal("");
@@ -76,6 +81,46 @@ export function FloatingSelect(props: FloatingSelectProps) {
     });
   });
 
+  createEffect(() => {
+    if (!open() || !menuRect()) return;
+    queueMicrotask(() => {
+      optionElements = optionElements.filter((element) => element.isConnected);
+      if (props.searchable) {
+        searchElement?.focus();
+        return;
+      }
+      const selectedIndex = filteredOptions().findIndex((option) => option.value === selected()?.value && !option.disabled);
+      const target = optionElements[selectedIndex >= 0 ? selectedIndex : 0]
+        ?? optionElements.find((element) => !element.disabled);
+      target?.focus();
+    });
+  });
+
+  const closeAndRestoreFocus = () => {
+    setOpen(false);
+    queueMicrotask(() => triggerElement?.focus());
+  };
+
+  const onMenuKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeAndRestoreFocus();
+      return;
+    }
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const enabled = optionElements.filter((element) => element.isConnected && !element.disabled);
+    if (!enabled.length) return;
+    const activeIndex = enabled.indexOf(document.activeElement as HTMLButtonElement);
+    const nextIndex = nextFloatingSelectOptionIndex(
+      event.key as FloatingSelectNavigationKey,
+      activeIndex,
+      enabled.length,
+    );
+    if (nextIndex !== null) enabled[nextIndex]?.focus();
+  };
+
   const wrapClass = () => [
     styles.wrap,
     props.className,
@@ -97,10 +142,12 @@ export function FloatingSelect(props: FloatingSelectProps) {
     <div ref={rootElement} class={wrapClass()} data-floating-layer>
       <Show when={props.label}><span class={styles.label}>{props.label}</span></Show>
       <button
+        ref={triggerElement}
         type="button"
         class={[styles.trigger, props.triggerClassName].filter(Boolean).join(" ")}
         onClick={() => setOpen(!open())}
         aria-label={props.ariaLabel}
+        aria-describedby={props.ariaDescribedBy}
         aria-haspopup="listbox"
         aria-expanded={open()}
         disabled={props.disabled}
@@ -115,22 +162,29 @@ export function FloatingSelect(props: FloatingSelectProps) {
               class={styles.menu}
               style={menuStyle(rect())}
               role="listbox"
+              aria-label={props.ariaLabel}
+              onKeyDown={onMenuKeyDown}
               data-floating-layer
             >
               <Show when={props.searchable}>
                 <input
+                  ref={searchElement}
                   class={styles.search}
                   type="search"
                   value={query()}
                   placeholder={props.searchPlaceholder ?? "Search"}
                   onInput={(event) => setQuery(event.currentTarget.value)}
-                  onKeyDown={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => {
+                    onMenuKeyDown(event);
+                    event.stopPropagation();
+                  }}
                 />
               </Show>
               <Show when={filteredOptions().length > 0} fallback={<div class={styles.empty}>No matches</div>}>
               <For each={filteredOptions()}>
-                {(option) => (
+                {(option, index) => (
                   <button
+                    ref={(element) => { optionElements[index()] = element; }}
                     type="button"
                     role="option"
                     aria-selected={option.value === selected()?.value}
@@ -139,7 +193,7 @@ export function FloatingSelect(props: FloatingSelectProps) {
                     onClick={() => {
                       if (option.disabled) return;
                       props.onChange(option.value);
-                      setOpen(false);
+                      closeAndRestoreFocus();
                     }}
                   >
                     {option.label}
