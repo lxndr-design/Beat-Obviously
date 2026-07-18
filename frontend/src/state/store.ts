@@ -978,6 +978,43 @@ export const useProjectStore = create<ProjectSlice>()(
               right.fadeInBeats = clampFade(right.fadeInBeats ?? 0, rightLength);
               right.fadeOutBeats = clampFade(right.fadeOutBeats ?? 0, rightLength);
 
+              const splitTimedItems = <T extends { startBeat: Beats; lengthBeats: Beats }>(items: T[]) => {
+                const left: T[] = [];
+                const rightItems: T[] = [];
+                for (const item of items) {
+                  const itemStart = item.startBeat;
+                  const itemEnd = item.startBeat + Math.max(0, item.lengthBeats);
+                  if (itemStart < leftLength) {
+                    const clippedEnd = Math.min(itemEnd, leftLength);
+                    if (clippedEnd > itemStart)
+                      left.push({ ...cloneProjectData(item), lengthBeats: clippedEnd - itemStart });
+                  }
+                  if (itemEnd > leftLength) {
+                    const clippedStart = Math.max(itemStart, leftLength);
+                    const clippedEnd = Math.min(itemEnd, leftLength + rightLength);
+                    if (clippedEnd > clippedStart) {
+                      rightItems.push({
+                        ...cloneProjectData(item),
+                        startBeat: clippedStart - leftLength,
+                        lengthBeats: clippedEnd - clippedStart,
+                      });
+                    }
+                  }
+                }
+                return { left, right: rightItems };
+              };
+
+              if ((segment.payload.kind === "midi" || segment.payload.kind === "mixed")
+                  && (right.payload.kind === "midi" || right.payload.kind === "mixed")) {
+                const split = splitTimedItems(segment.payload.notes);
+                segment.payload.notes = split.left;
+                right.payload.notes = split.right;
+              } else if (segment.payload.kind === "drumpad" && right.payload.kind === "drumpad") {
+                const split = splitTimedItems(segment.payload.hits);
+                segment.payload.hits = split.left;
+                right.payload.hits = split.right;
+              }
+
               segment.lengthBeats = leftLength;
               segment.repeats = 0;
               segment.fadeInBeats = clampFade(segment.fadeInBeats ?? 0, leftLength);
@@ -1209,6 +1246,26 @@ function applySegmentWindow(
   const newLengthBeats = Math.max(MIN_SEGMENT_LENGTH_BEATS, nextLengthBeats);
   const localStart = Math.max(0, newStartBeat - oldStartBeat);
   if (origin?.payload) segment.payload = cloneProjectData(origin.payload);
+  const clipTimedItems = <T extends { startBeat: Beats; lengthBeats: Beats }>(items: T[]): T[] => {
+    const windowEnd = localStart + newLengthBeats;
+    const clipped: T[] = [];
+    for (const item of items) {
+      const itemEnd = item.startBeat + Math.max(0, item.lengthBeats);
+      const clippedStart = Math.max(item.startBeat, localStart);
+      const clippedEnd = Math.min(itemEnd, windowEnd);
+      if (clippedEnd <= clippedStart) continue;
+      clipped.push({
+        ...cloneProjectData(item),
+        startBeat: clippedStart - localStart,
+        lengthBeats: clippedEnd - clippedStart,
+      });
+    }
+    return clipped;
+  };
+  if (segment.payload.kind === "midi" || segment.payload.kind === "mixed")
+    segment.payload.notes = clipTimedItems(segment.payload.notes);
+  else if (segment.payload.kind === "drumpad")
+    segment.payload.hits = clipTimedItems(segment.payload.hits);
   if (segment.payload.kind === "drum" && segment.payload.sourceLengthBeats == null) {
     segment.payload.sourceLengthBeats = oldLengthBeats;
   }
