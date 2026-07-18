@@ -6,11 +6,13 @@ import { defaultTrackEffectParams } from "./effects";
 import { pruneDevFixtureInstruments } from "./instrumentLibraryGuards";
 import { normalizeInstrumentTaxonomy } from "./instrumentTaxonomy";
 import { normalizeSampleMap } from "./sampleZones";
-import { canSetAudioBusOutput, canSetAudioBusSend } from "./audioBusRouting";
+import { audioBusExists, canSetAudioBusOutput, canSetAudioBusSend } from "./audioBusRouting";
+import { AUDIO_BUS_SCHEMA_VERSION } from "./types";
 import type { BeatProjectAsset, BeatProjectIntegrityReport, ProjectSidecarCleanupReport, RecentProjectEntry } from "../ipc/schema";
 import type {
   Beats,
   AudioFile,
+  AudioBusCreateOptions,
   Id,
   Instrument,
   InstrumentSet,
@@ -66,9 +68,10 @@ interface ProjectSlice {
    *   - Unmuting another track while solo is active clears solo and leaves the
    *     remaining auto-muted tracks muted. */
   setTrackMute: (id: Id, value: boolean) => void;
-  upsertTrackSend: (trackId: Id, busId: Id, patch: Partial<TrackSend>) => void;
+  upsertTrackSend: (trackId: Id, busId: Id, patch: Partial<TrackSend>) => boolean;
   removeTrackSend: (trackId: Id, busId: Id) => void;
   addReturnBus: (name?: string) => Id;
+  addAudioBus: (options?: AudioBusCreateOptions) => Id;
   updateReturnBus: (busId: Id, patch: Partial<ReturnBus>) => void;
   removeReturnBus: (busId: Id) => void;
   setTrackOutputBus: (trackId: Id, busId?: Id, outputEnabled?: boolean) => boolean;
@@ -290,6 +293,16 @@ function normalizeSettingsSnapshot(value: unknown): SettingsSnapshot {
 
 function clampNumber(value: number | undefined, min: number, max: number, fallback: number) {
   return Number.isFinite(value) ? Math.max(min, Math.min(max, value as number)) : fallback;
+}
+
+function normalizedTrackSend(busId: Id, source: Partial<TrackSend>): TrackSend {
+  return {
+    busId,
+    gainDb: clampNumber(source.gainDb, -120, 24, -12),
+    pan: clampNumber(source.pan, -1, 1, 0),
+    enabled: source.enabled !== false,
+    preFader: source.preFader === true,
+  };
 }
 
 function normalizeString(value: string | undefined) {
@@ -569,17 +582,22 @@ export const useProjectStore = create<ProjectSlice>()(
         }),
 
       upsertTrackSend: (trackId, busId, patch) =>
+      {
+        let changed = false;
         set((s) => {
           const track = s.project.tracks.find((candidate) => candidate.id === trackId);
-          if (!track) return;
+          if (!track || !busId || !audioBusExists(s.project.returnBuses, busId)) return;
           if (!track.sends) track.sends = [];
           let send = track.sends.find((candidate) => candidate.busId === busId);
           if (!send) {
-            send = { busId, gainDb: -12, pan: 0, enabled: true };
+            send = normalizedTrackSend(busId, {});
             track.sends.push(send);
           }
-          Object.assign(send, patch, { busId });
-        }),
+          Object.assign(send, normalizedTrackSend(busId, { ...send, ...patch }));
+          changed = true;
+        });
+        return changed;
+      },
 
       removeTrackSend: (trackId, busId) =>
         set((s) => {
@@ -588,14 +606,16 @@ export const useProjectStore = create<ProjectSlice>()(
           track.sends = track.sends.filter((send) => send.busId !== busId);
         }),
 
-      addReturnBus: (name) => {
+      addReturnBus: (name) => useProjectStore.getState().addAudioBus({ name }),
+
+      addAudioBus: (options = {}) => {
         const id = nanoid();
         set((s) => {
           const index = s.project.returnBuses.length + 1;
           s.project.returnBuses.push({
-            schemaVersion: 1,
+            schemaVersion: AUDIO_BUS_SCHEMA_VERSION,
             id,
-            name: name?.trim() || `Bus ${index}`,
+            name: options.name?.trim() || `Bus ${index}`,
             channelLayout: "stereo",
             outputEnabled: true,
             inputTrimDb: 0,
@@ -608,6 +628,12 @@ export const useProjectStore = create<ProjectSlice>()(
             sends: [],
             effects: { filters: [] },
           });
+          const trackIds = new Set(options.trackIds ?? []);
+          for (const track of s.project.tracks) {
+            if (!trackIds.has(track.id)) continue;
+            track.outputBusId = id;
+            track.outputEnabled = true;
+          }
         });
         return id;
       },
@@ -616,8 +642,21 @@ export const useProjectStore = create<ProjectSlice>()(
         set((s) => {
           const bus = s.project.returnBuses.find((candidate) => candidate.id === busId);
           if (!bus) return;
-          const { outputBusId: _outputBusId, outputEnabled: _outputEnabled, sends: _sends, ...safePatch } = patch;
+          const {
+            id: _id,
+            schemaVersion: _schemaVersion,
+            outputBusId: _outputBusId,
+            outputEnabled: _outputEnabled,
+            sends: _sends,
+            ...safePatch
+          } = patch;
           Object.assign(bus, safePatch);
+          bus.name = bus.name.trim() || "Bus";
+          bus.channelLayout = bus.channelLayout === "mono" ? "mono" : "stereo";
+          bus.inputTrimDb = clampNumber(bus.inputTrimDb, -96, 24, 0);
+          bus.gainDb = clampNumber(bus.gainDb, -96, 24, 0);
+          bus.pan = clampNumber(bus.pan, -1, 1, 0);
+          bus.mixerOrder = Math.max(0, Math.trunc(clampNumber(bus.mixerOrder, 0, 100000, 0)));
         }),
 
       removeReturnBus: (busId) =>
@@ -643,7 +682,7 @@ export const useProjectStore = create<ProjectSlice>()(
         let changed = false;
         set((s) => {
           const track = s.project.tracks.find((candidate) => candidate.id === trackId);
-          if (!track) return;
+          if (!track || (outputEnabled && busId && !audioBusExists(s.project.returnBuses, busId))) return;
           track.outputBusId = busId;
           track.outputEnabled = outputEnabled;
           changed = true;
@@ -655,7 +694,7 @@ export const useProjectStore = create<ProjectSlice>()(
         let changed = false;
         set((s) => {
           const bus = s.project.returnBuses.find((candidate) => candidate.id === busId);
-          if (!bus || (outputEnabled && destinationBusId && !canSetAudioBusOutput(s.project.returnBuses, busId, destinationBusId))) return;
+          if (!bus || (outputEnabled && !canSetAudioBusOutput(s.project.returnBuses, busId, destinationBusId))) return;
           bus.outputBusId = destinationBusId;
           bus.outputEnabled = outputEnabled;
           changed = true;
@@ -671,10 +710,10 @@ export const useProjectStore = create<ProjectSlice>()(
           if (!bus.sends) bus.sends = [];
           let send = bus.sends.find((candidate) => candidate.busId === destinationBusId);
           if (!send) {
-            send = { busId: destinationBusId, gainDb: -12, pan: 0, enabled: true, preFader: false };
+            send = normalizedTrackSend(destinationBusId, {});
             bus.sends.push(send);
           }
-          Object.assign(send, patch, { busId: destinationBusId });
+          Object.assign(send, normalizedTrackSend(destinationBusId, { ...send, ...patch }));
           changed = true;
         });
         return changed;

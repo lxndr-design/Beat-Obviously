@@ -6,6 +6,10 @@ export interface AudioBusRoutingIssue {
   destinationBusId: Id;
 }
 
+export function audioBusExists(buses: ReturnBus[], busId: Id | undefined): boolean {
+  return !busId || buses.some((bus) => bus.id === busId);
+}
+
 export function audioBusDestinations(bus: ReturnBus): Id[] {
   const destinations: Id[] = [];
   if (bus.outputEnabled !== false && bus.outputBusId) destinations.push(bus.outputBusId);
@@ -48,6 +52,7 @@ export function validateAudioBusRouting(buses: ReturnBus[]): AudioBusRoutingIssu
 }
 
 export function canSetAudioBusOutput(buses: ReturnBus[], busId: Id, destinationBusId?: Id): boolean {
+  if (!buses.some((bus) => bus.id === busId) || !audioBusExists(buses, destinationBusId)) return false;
   const next = buses.map((bus) => bus.id === busId ? { ...bus, outputBusId: destinationBusId } : bus);
   return validateAudioBusRouting(next).length === 0;
 }
@@ -58,6 +63,7 @@ export function canSetAudioBusSend(
   destinationBusId: Id,
   patch: Partial<TrackSend>,
 ): boolean {
+  if (!destinationBusId || !buses.some((bus) => bus.id === busId) || !audioBusExists(buses, destinationBusId)) return false;
   const next = buses.map((bus) => {
     if (bus.id !== busId) return bus;
     const sends = [...(bus.sends ?? [])];

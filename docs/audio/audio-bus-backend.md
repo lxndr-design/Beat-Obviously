@@ -29,16 +29,19 @@ Latency compensation is calculated for Track/Bus primary outputs and sends at ea
 
 The future tabbed main-editor UI can create/delete buses with `addReturnBus` and `removeReturnBus`, update non-routing properties with `updateReturnBus`, and use these cycle-safe routing operations:
 
+- `addAudioBus({ name, trackIds })` creates a Bus and atomically routes the selected valid Tracks to it; `addReturnBus(name)` remains the compatibility alias.
 - `setTrackOutputBus`
 - `setAudioBusOutput`
 - `upsertTrackSend` / `removeTrackSend`
 - `upsertAudioBusSend` / `removeAudioBusSend`
 
-Routing fields are intentionally excluded from generic `updateReturnBus` patches so UI code cannot bypass graph validation.
+New UI-created routes must target an existing Bus. Missing destinations loaded from older or externally edited projects remain preserved and diagnosable, but interactive edits cannot create new dangling routes. Routing fields, stable IDs, and schema versions are intentionally excluded from generic `updateReturnBus` patches so UI code cannot bypass graph validation or break existing references. Bus and send ranges are normalized at the store boundary before native graph preparation.
+
+The integrity verifier diagnoses unsupported Bus schema versions, empty names, unsupported channel layouts, invalid trim/gain/pan values, malformed send collections, missing or duplicate send destinations, and invalid send gain/pan values. Future Bus schema data is rejected as unsupported rather than being silently interpreted as version 1.
 
 ## Verification
 
-- `npm run verify:audio-bus` checks creation, nested routing, cycle rejection, sends, and safe deletion.
-- `build-native/bin/BeatBackendStress --audio-bus` checks persistence, integrity diagnostics, summing, nested routing, missing/cyclic fail-closed behavior, trim automation, solo isolation, offline rendering, and latency-compensated parallel paths.
+- `npm run verify:audio-bus` checks atomic selected-track creation, stable-ID protection, value normalization, destination validation, nested routing, cycle rejection, sends, and safe deletion.
+- `build-native/bin/BeatBackendStress --audio-bus` checks persistence, malformed/future Bus diagnostics, summing, nested routing, missing/cyclic fail-closed behavior, trim automation, solo isolation, offline rendering, and latency-compensated parallel paths.
 
 The tab UI is intentionally not part of this backend slice.

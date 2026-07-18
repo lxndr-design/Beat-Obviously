@@ -6072,6 +6072,104 @@ namespace
             return false;
         }
 
+        auto badAudioBusDocument = juce::JSON::parse(juce::JSON::toString(document));
+        if (auto* badAudioBusProject = badAudioBusDocument.getProperty("project", {}).getDynamicObject())
+        {
+            const auto makeBusSend = [](const juce::String& busId, double gainDb, double pan)
+            {
+                juce::DynamicObject::Ptr send = new juce::DynamicObject();
+                send->setProperty("busId", busId);
+                send->setProperty("gainDb", gainDb);
+                send->setProperty("pan", pan);
+                send->setProperty("enabled", true);
+                return juce::var(send.get());
+            };
+            const auto makeBus = [](const juce::String& id, const juce::String& name)
+            {
+                juce::DynamicObject::Ptr bus = new juce::DynamicObject();
+                bus->setProperty("schemaVersion", 1);
+                bus->setProperty("id", id);
+                bus->setProperty("name", name);
+                bus->setProperty("channelLayout", "stereo");
+                bus->setProperty("gainDb", 0.0);
+                bus->setProperty("pan", 0.0);
+                bus->setProperty("mute", false);
+                juce::DynamicObject::Ptr effects = new juce::DynamicObject();
+                effects->setProperty("filters", juce::Array<juce::var> {});
+                bus->setProperty("effects", juce::var(effects.get()));
+                return bus;
+            };
+
+            auto firstBus = makeBus("bus-a", "");
+            firstBus->setProperty("schemaVersion", 99);
+            firstBus->setProperty("channelLayout", "surround");
+            firstBus->setProperty("inputTrimDb", -200.0);
+            firstBus->setProperty("gainDb", 50.0);
+            firstBus->setProperty("pan", 2.0);
+            juce::Array<juce::var> sends;
+            sends.add(makeBusSend({}, -12.0, 0.0));
+            sends.add(makeBusSend("missing-bus", -12.0, 0.0));
+            sends.add(makeBusSend("bus-b", -9.0, 0.0));
+            sends.add(makeBusSend("bus-b", 48.0, -2.0));
+            firstBus->setProperty("sends", sends);
+
+            auto secondBus = makeBus("bus-b", "Bus B");
+            secondBus->setProperty("sends", juce::Array<juce::var> {});
+            auto thirdBus = makeBus("bus-c", "Bus C");
+            thirdBus->setProperty("sends", "invalid");
+            juce::Array<juce::var> buses;
+            buses.add(juce::var(firstBus.get()));
+            buses.add(juce::var(secondBus.get()));
+            buses.add(juce::var(thirdBus.get()));
+            badAudioBusProject->setProperty("returnBuses", buses);
+        }
+        const auto badAudioBusReport = beat::verifyProjectDocumentIntegrity(badAudioBusDocument, projectFile);
+        const bool badAudioBusOk = reportContainsIssueCode(badAudioBusReport,
+                                                           "audioBus.schema.unsupported",
+                                                           beat::ProjectIntegritySeverity::Error)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.name.empty",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.channelLayout.invalid",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.inputTrim.invalid",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.gain.invalid",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.pan.invalid",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.send.bus.empty",
+                                       beat::ProjectIntegritySeverity::Error)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.send.bus.missing",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.send.bus.duplicate",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.send.gain.invalid",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.send.pan.invalid",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.sends.invalid",
+                                       beat::ProjectIntegritySeverity::Error)
+            && beat::hasFatalProjectDocumentIntegrityErrors(badAudioBusReport);
+        if (!badAudioBusOk)
+        {
+            std::cerr << "Malformed audio bus state was not fully diagnosed errors="
+                      << badAudioBusReport.errorCount()
+                      << " warnings=" << badAudioBusReport.warningCount() << "\n";
+            root.deleteRecursively();
+            return false;
+        }
+
         auto invalidSendsDocument = juce::JSON::parse(juce::JSON::toString(document));
         if (auto* invalidSendsProject = invalidSendsDocument.getProperty("project", {}).getDynamicObject())
         {

@@ -2,6 +2,7 @@
 
 #include "ProjectAssetPackage.h"
 
+#include <cmath>
 #include <map>
 #include <functional>
 #include <set>
@@ -444,6 +445,56 @@ namespace beat
                                    stringProperty(bus, "id"),
                                    "returnBus",
                                    busPath);
+                    const auto busSchemaVersion = (int) doubleProperty(bus, "schemaVersion", 1.0);
+                    if (busSchemaVersion > supportedSchemaVersion)
+                        addIssue(report,
+                                 ProjectIntegritySeverity::Error,
+                                 "audioBus.schema.unsupported",
+                                 "Audio bus schema is newer than this version of Beat: " + juce::String(busSchemaVersion),
+                                 propertyPath(busPath, "schemaVersion"));
+                    else if (busSchemaVersion < 1)
+                        addIssue(report,
+                                 ProjectIntegritySeverity::Warning,
+                                 "audioBus.schema.invalid",
+                                 "Audio bus schema version is invalid and will be migrated as version 1.",
+                                 propertyPath(busPath, "schemaVersion"));
+
+                    if (stringProperty(bus, "name").trim().isEmpty())
+                        addIssue(report,
+                                 ProjectIntegritySeverity::Warning,
+                                 "audioBus.name.empty",
+                                 "Audio bus has no display name.",
+                                 propertyPath(busPath, "name"));
+
+                    const auto channelLayout = stringProperty(bus, "channelLayout");
+                    if (channelLayout.isNotEmpty() && channelLayout != "mono" && channelLayout != "stereo")
+                        addIssue(report,
+                                 ProjectIntegritySeverity::Warning,
+                                 "audioBus.channelLayout.invalid",
+                                 "Audio bus channel layout is unsupported and will use stereo.",
+                                 propertyPath(busPath, "channelLayout"));
+
+                    const auto inputTrimDb = doubleProperty(bus, "inputTrimDb", 0.0);
+                    const auto gainDb = doubleProperty(bus, "gainDb", 0.0);
+                    const auto pan = doubleProperty(bus, "pan", 0.0);
+                    if (!std::isfinite(inputTrimDb) || inputTrimDb < -96.0 || inputTrimDb > 24.0)
+                        addIssue(report,
+                                 ProjectIntegritySeverity::Warning,
+                                 "audioBus.inputTrim.invalid",
+                                 "Audio bus input trim is outside the supported range and will be clamped.",
+                                 propertyPath(busPath, "inputTrimDb"));
+                    if (!std::isfinite(gainDb) || gainDb < -96.0 || gainDb > 24.0)
+                        addIssue(report,
+                                 ProjectIntegritySeverity::Warning,
+                                 "audioBus.gain.invalid",
+                                 "Audio bus gain is outside the supported range and will be clamped.",
+                                 propertyPath(busPath, "gainDb"));
+                    if (!std::isfinite(pan) || pan < -1.0 || pan > 1.0)
+                        addIssue(report,
+                                 ProjectIntegritySeverity::Warning,
+                                 "audioBus.pan.invalid",
+                                 "Audio bus pan is outside the supported range and will be clamped.",
+                                 propertyPath(busPath, "pan"));
                     verifyEffectList(report,
                                      bus.getProperty("effects", {}),
                                      pluginIds,
@@ -460,10 +511,61 @@ namespace beat
                     const auto outputBusId = stringProperty(bus, "outputBusId");
                     if ((bool) bus.getProperty("outputEnabled", true) && outputBusId.isNotEmpty())
                         destinations.addIfNotAlreadyThere(outputBusId);
-                    if (const auto* sends = arrayOf(bus.getProperty("sends", {})))
-                        for (const auto& send : *sends)
-                            if ((bool) send.getProperty("enabled", true))
-                                destinations.addIfNotAlreadyThere(stringProperty(send, "busId"));
+                    const auto sendsVar = bus.getProperty("sends", {});
+                    if (const auto* sends = arrayOf(sendsVar))
+                    {
+                        juce::StringArray sendBusIds;
+                        for (int sendIndex = 0; sendIndex < sends->size(); ++sendIndex)
+                        {
+                            const auto& send = sends->getReference(sendIndex);
+                            const auto sendPath = propertyPath("project.returnBuses[" + juce::String(busIndex) + "]",
+                                                               "sends[" + juce::String(sendIndex) + "]");
+                            const auto destinationBusId = stringProperty(send, "busId");
+                            if (destinationBusId.isEmpty())
+                                addIssue(report,
+                                         ProjectIntegritySeverity::Error,
+                                         "audioBus.send.bus.empty",
+                                         "Audio bus send has no destination.",
+                                         propertyPath(sendPath, "busId"));
+                            else if (!returnBusIds.contains(destinationBusId))
+                                addIssue(report,
+                                         ProjectIntegritySeverity::Warning,
+                                         "audioBus.send.bus.missing",
+                                         "Audio bus send references a missing destination: " + destinationBusId,
+                                         propertyPath(sendPath, "busId"));
+                            else if (sendBusIds.contains(destinationBusId))
+                                addIssue(report,
+                                         ProjectIntegritySeverity::Warning,
+                                         "audioBus.send.bus.duplicate",
+                                         "Audio bus has multiple sends to the same destination: " + destinationBusId,
+                                         sendPath);
+                            sendBusIds.addIfNotAlreadyThere(destinationBusId);
+
+                            const auto sendGainDb = doubleProperty(send, "gainDb", -12.0);
+                            const auto sendPan = doubleProperty(send, "pan", 0.0);
+                            if (!std::isfinite(sendGainDb) || sendGainDb < -120.0 || sendGainDb > 24.0)
+                                addIssue(report,
+                                         ProjectIntegritySeverity::Warning,
+                                         "audioBus.send.gain.invalid",
+                                         "Audio bus send gain is outside the supported range and will be clamped.",
+                                         propertyPath(sendPath, "gainDb"));
+                            if (!std::isfinite(sendPan) || sendPan < -1.0 || sendPan > 1.0)
+                                addIssue(report,
+                                         ProjectIntegritySeverity::Warning,
+                                         "audioBus.send.pan.invalid",
+                                         "Audio bus send pan is outside the supported range and will be clamped.",
+                                         propertyPath(sendPath, "pan"));
+
+                            if ((bool) send.getProperty("enabled", true) && destinationBusId.isNotEmpty())
+                                destinations.addIfNotAlreadyThere(destinationBusId);
+                        }
+                    }
+                    else if (!sendsVar.isVoid())
+                        addIssue(report,
+                                 ProjectIntegritySeverity::Error,
+                                 "audioBus.sends.invalid",
+                                 "Audio bus sends are not an array.",
+                                 propertyPath("project.returnBuses[" + juce::String(busIndex) + "]", "sends"));
                     for (const auto& destination : destinations)
                     {
                         if (destination.isEmpty()) continue;

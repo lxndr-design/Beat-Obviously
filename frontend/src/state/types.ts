@@ -203,6 +203,14 @@ export interface TrackSend {
   preFader?: boolean;
 }
 
+export const AUDIO_BUS_SCHEMA_VERSION = 1;
+
+export interface AudioBusCreateOptions {
+  name?: string;
+  /** Tracks routed here atomically when the Bus is created. Unknown ids are ignored. */
+  trackIds?: Id[];
+}
+
 export interface TrackFreezeSource {
   sourceTrackId: Id;
   sourceTrackName?: string;
