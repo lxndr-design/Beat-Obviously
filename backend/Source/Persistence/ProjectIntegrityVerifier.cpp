@@ -3,6 +3,7 @@
 #include "ProjectAssetPackage.h"
 
 #include <map>
+#include <functional>
 #include <set>
 #include <vector>
 
@@ -448,6 +449,54 @@ namespace beat
                                      pluginIds,
                                      propertyPath(busPath, "effects"));
                 }
+
+                std::map<juce::String, juce::StringArray> busGraph;
+                for (int busIndex = 0; busIndex < returnBuses->size(); ++busIndex)
+                {
+                    const auto& bus = returnBuses->getReference(busIndex);
+                    const auto busId = stringProperty(bus, "id");
+                    if (busId.isEmpty()) continue;
+                    auto& destinations = busGraph[busId];
+                    const auto outputBusId = stringProperty(bus, "outputBusId");
+                    if ((bool) bus.getProperty("outputEnabled", true) && outputBusId.isNotEmpty())
+                        destinations.addIfNotAlreadyThere(outputBusId);
+                    if (const auto* sends = arrayOf(bus.getProperty("sends", {})))
+                        for (const auto& send : *sends)
+                            if ((bool) send.getProperty("enabled", true))
+                                destinations.addIfNotAlreadyThere(stringProperty(send, "busId"));
+                    for (const auto& destination : destinations)
+                    {
+                        if (destination.isEmpty()) continue;
+                        if (!returnBusIds.contains(destination))
+                            addIssue(report,
+                                     ProjectIntegritySeverity::Warning,
+                                     "audioBus.destination.missing",
+                                     "Audio bus references a missing destination and will remain silent on that route: " + destination,
+                                     "project.returnBuses[" + juce::String(busIndex) + "]");
+                    }
+                }
+
+                std::map<juce::String, int> visitState;
+                std::function<bool(const juce::String&)> visitBus = [&](const juce::String& busId) {
+                    if (visitState[busId] == 1) return true;
+                    if (visitState[busId] == 2) return false;
+                    visitState[busId] = 1;
+                    for (const auto& destination : busGraph[busId])
+                        if (busGraph.find(destination) != busGraph.end() && visitBus(destination))
+                            return true;
+                    visitState[busId] = 2;
+                    return false;
+                };
+                for (const auto& entry : busGraph)
+                    if (visitBus(entry.first))
+                    {
+                        addIssue(report,
+                                 ProjectIntegritySeverity::Error,
+                                 "audioBus.route.cycle",
+                                 "Audio bus routing contains a feedback cycle. Cyclic buses will not be installed in the realtime graph.",
+                                 "project.returnBuses");
+                        break;
+                    }
             }
             else if (!returnBusesVar.isVoid())
             {
@@ -511,6 +560,13 @@ namespace beat
                 const auto trackPath = "project.tracks[" + juce::String(trackIndex) + "]";
                 const auto trackId = stringProperty(track, "id");
                 verifyUniqueId(report, trackIds, trackId, "track", trackPath);
+                const auto outputBusId = stringProperty(track, "outputBusId");
+                if (outputBusId.isNotEmpty() && !returnBusIds.contains(outputBusId))
+                    addIssue(report,
+                             ProjectIntegritySeverity::Warning,
+                             "track.output.bus.missing",
+                             "Track primary output references a missing bus and will remain silent: " + outputBusId,
+                             propertyPath(trackPath, "outputBusId"));
                 trackParentRefs.push_back({
                     trackId,
                     stringProperty(track, "parentTrackId"),
@@ -633,7 +689,7 @@ namespace beat
                         else if (!returnBusIds.contains(busId))
                         {
                             addIssue(report,
-                                     ProjectIntegritySeverity::Error,
+                                     ProjectIntegritySeverity::Warning,
                                      "track.send.bus.missing",
                                      "Track send references a missing return bus: " + busId,
                                      propertyPath(sendPath, "busId"));

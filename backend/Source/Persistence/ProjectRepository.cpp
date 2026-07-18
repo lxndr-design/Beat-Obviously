@@ -140,6 +140,7 @@ namespace beat
             o->setProperty("gainDb", send.gainDb);
             o->setProperty("pan", send.pan);
             o->setProperty("enabled", send.enabled);
+            o->setProperty("preFader", send.preFader);
             return juce::var(o.get());
         }
 
@@ -509,10 +510,44 @@ namespace beat
         {
             juce::DynamicObject::Ptr o = new juce::DynamicObject();
             o->setProperty("id", bus.id);
+            o->setProperty("schemaVersion", bus.schemaVersion);
             o->setProperty("name", bus.name);
+            o->setProperty("color", bus.color);
+            o->setProperty("icon", bus.icon);
+            o->setProperty("channelLayout", bus.channelLayout);
+            o->setProperty("outputBusId", bus.outputBusId);
+            o->setProperty("outputEnabled", bus.outputEnabled);
+            o->setProperty("inputTrimDb", bus.inputTrimDb);
             o->setProperty("gainDb", bus.gainDb);
             o->setProperty("pan", bus.pan);
             o->setProperty("mute", bus.mute);
+            o->setProperty("solo", bus.solo);
+            o->setProperty("soloSafe", bus.soloSafe);
+            o->setProperty("mixerOrder", bus.mixerOrder);
+
+            juce::Array<juce::var> sendArr;
+            for (const auto& send : bus.sends)
+                sendArr.add(trackSendToVar(send));
+            o->setProperty("sends", sendArr);
+
+            juce::Array<juce::var> automationArr;
+            for (const auto& lane : bus.automation)
+            {
+                juce::DynamicObject::Ptr laneObject = new juce::DynamicObject();
+                laneObject->setProperty("target", lane.target);
+                juce::Array<juce::var> pointsArr;
+                for (const auto& point : lane.points)
+                {
+                    juce::DynamicObject::Ptr pointObject = new juce::DynamicObject();
+                    pointObject->setProperty("beat", point.beat);
+                    pointObject->setProperty("value", point.value);
+                    pointObject->setProperty("curve", (int) point.curve);
+                    pointsArr.add(juce::var(pointObject.get()));
+                }
+                laneObject->setProperty("points", pointsArr);
+                automationArr.add(juce::var(laneObject.get()));
+            }
+            o->setProperty("automation", automationArr);
 
             juce::Array<juce::var> effectArr;
             for (const auto& effect : bus.effects)
@@ -533,6 +568,7 @@ namespace beat
             send.gainDb = juce::jlimit(-96.0f, 24.0f, (float) (double) sendVar.getProperty("gainDb", -96.0));
             send.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) sendVar.getProperty("pan", 0.0));
             send.enabled = (bool) sendVar.getProperty("enabled", true);
+            send.preFader = (bool) sendVar.getProperty("preFader", false);
             return send;
         }
 
@@ -599,10 +635,46 @@ namespace beat
                 return bus;
 
             bus.id = busVar.getProperty("id", "").toString();
+            bus.schemaVersion = juce::jmax(1, (int) busVar.getProperty("schemaVersion", 1));
             bus.name = busVar.getProperty("name", "").toString();
+            bus.color = busVar.getProperty("color", "").toString();
+            bus.icon = busVar.getProperty("icon", "").toString();
+            bus.channelLayout = busVar.getProperty("channelLayout", "stereo").toString();
+            bus.outputBusId = busVar.getProperty("outputBusId", "").toString();
+            bus.outputEnabled = (bool) busVar.getProperty("outputEnabled", true);
+            bus.inputTrimDb = juce::jlimit(-96.0f, 24.0f, (float) (double) busVar.getProperty("inputTrimDb", 0.0));
             bus.gainDb = juce::jlimit(-96.0f, 24.0f, (float) (double) busVar.getProperty("gainDb", 0.0));
             bus.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) busVar.getProperty("pan", 0.0));
             bus.mute = (bool) busVar.getProperty("mute", false);
+            bus.solo = (bool) busVar.getProperty("solo", false);
+            bus.soloSafe = (bool) busVar.getProperty("soloSafe", false);
+            bus.mixerOrder = juce::jmax(0, (int) busVar.getProperty("mixerOrder", 0));
+
+            if (auto* sends = busVar.getProperty("sends", {}).getArray())
+                for (const auto& sv : *sends)
+                {
+                    auto send = trackSendFromVar(sv);
+                    if (send.busId.isNotEmpty()) bus.sends.push_back(send);
+                }
+
+            if (auto* lanes = busVar.getProperty("automation", {}).getArray())
+                for (const auto& lv : *lanes)
+                {
+                    if (!lv.isObject()) continue;
+                    MidiAutomationLane lane;
+                    lane.target = lv.getProperty("target", lv.getProperty("param", "")).toString();
+                    if (auto* points = lv.getProperty("points", {}).getArray())
+                        for (const auto& pv : *points)
+                        {
+                            if (!pv.isObject()) continue;
+                            MidiAutomationPoint point;
+                            point.beat = (double) pv.getProperty("beat", 0.0);
+                            point.value = (float) (double) pv.getProperty("value", 0.0);
+                            point.curve = (AutomationCurve) (int) pv.getProperty("curve", (int) AutomationCurve::Linear);
+                            if (std::isfinite(point.beat) && std::isfinite(point.value)) lane.points.push_back(point);
+                        }
+                    if (!lane.target.isEmpty() && !lane.points.empty()) bus.automation.push_back(std::move(lane));
+                }
 
             if (auto* filters = busVar.getProperty("effects", {}).getProperty("filters", {}).getArray())
             {
@@ -625,6 +697,8 @@ namespace beat
             o->setProperty("instrumentId", t.instrumentId);
             o->setProperty("audioFileId",  t.audioFileId);
             o->setProperty("parentTrackId", t.parentTrackId);
+            o->setProperty("outputBusId", t.outputBusId);
+            o->setProperty("outputEnabled", t.outputEnabled);
             o->setProperty("gainDb",    t.gainDb);
             o->setProperty("pan",       t.pan);
             o->setProperty("mute",      t.mute);
@@ -1272,6 +1346,8 @@ namespace beat
                     t.instrumentId = tv.getProperty("instrumentId", "").toString();
                     t.audioFileId  = tv.getProperty("audioFileId", "").toString();
                     t.parentTrackId = tv.getProperty("parentTrackId", "").toString();
+                    t.outputBusId = tv.getProperty("outputBusId", "").toString();
+                    t.outputEnabled = (bool) tv.getProperty("outputEnabled", true);
                     t.gainDb = (float) (double) tv.getProperty("gainDb", 0.0);
                     t.pan    = (float) (double) tv.getProperty("pan", 0.0);
                     t.mute   = (bool) tv.getProperty("mute", false);

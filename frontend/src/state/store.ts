@@ -6,6 +6,7 @@ import { defaultTrackEffectParams } from "./effects";
 import { pruneDevFixtureInstruments } from "./instrumentLibraryGuards";
 import { normalizeInstrumentTaxonomy } from "./instrumentTaxonomy";
 import { normalizeSampleMap } from "./sampleZones";
+import { canSetAudioBusOutput, canSetAudioBusSend } from "./audioBusRouting";
 import type { BeatProjectAsset, BeatProjectIntegrityReport, ProjectSidecarCleanupReport, RecentProjectEntry } from "../ipc/schema";
 import type {
   Beats,
@@ -70,6 +71,10 @@ interface ProjectSlice {
   addReturnBus: (name?: string) => Id;
   updateReturnBus: (busId: Id, patch: Partial<ReturnBus>) => void;
   removeReturnBus: (busId: Id) => void;
+  setTrackOutputBus: (trackId: Id, busId?: Id, outputEnabled?: boolean) => boolean;
+  setAudioBusOutput: (busId: Id, destinationBusId?: Id, outputEnabled?: boolean) => boolean;
+  upsertAudioBusSend: (busId: Id, destinationBusId: Id, patch: Partial<TrackSend>) => boolean;
+  removeAudioBusSend: (busId: Id, destinationBusId: Id) => void;
   addReturnBusEffect: (busId: Id, kind?: TrackEffect["kind"]) => Id;
   updateReturnBusEffect: (busId: Id, effectId: Id, patch: Partial<TrackEffect>) => void;
   removeReturnBusEffect: (busId: Id, effectId: Id) => void;
@@ -351,6 +356,7 @@ function defaultTrack(): Track {
     inputChannelStart: 0,
     inputChannelCount: settings.defaultInputChannelCount,
     recordGainDb: 0,
+    outputEnabled: true,
     effects: { filters: [] },
     segments: [],
     rowHeight: "normal",
@@ -587,11 +593,19 @@ export const useProjectStore = create<ProjectSlice>()(
         set((s) => {
           const index = s.project.returnBuses.length + 1;
           s.project.returnBuses.push({
+            schemaVersion: 1,
             id,
-            name: name?.trim() || `Return ${index}`,
+            name: name?.trim() || `Bus ${index}`,
+            channelLayout: "stereo",
+            outputEnabled: true,
+            inputTrimDb: 0,
             gainDb: 0,
             pan: 0,
             mute: false,
+            solo: false,
+            soloSafe: false,
+            mixerOrder: index - 1,
+            sends: [],
             effects: { filters: [] },
           });
         });
@@ -601,7 +615,9 @@ export const useProjectStore = create<ProjectSlice>()(
       updateReturnBus: (busId, patch) =>
         set((s) => {
           const bus = s.project.returnBuses.find((candidate) => candidate.id === busId);
-          if (bus) Object.assign(bus, patch);
+          if (!bus) return;
+          const { outputBusId: _outputBusId, outputEnabled: _outputEnabled, sends: _sends, ...safePatch } = patch;
+          Object.assign(bus, safePatch);
         }),
 
       removeReturnBus: (busId) =>
@@ -609,7 +625,65 @@ export const useProjectStore = create<ProjectSlice>()(
           s.project.returnBuses = s.project.returnBuses.filter((candidate) => candidate.id !== busId);
           for (const track of s.project.tracks) {
             if (track.sends) track.sends = track.sends.filter((send) => send.busId !== busId);
+            if (track.outputBusId === busId) {
+              track.outputBusId = undefined;
+              track.outputEnabled = false;
+            }
           }
+          for (const bus of s.project.returnBuses) {
+            if (bus.sends) bus.sends = bus.sends.filter((send) => send.busId !== busId);
+            if (bus.outputBusId === busId) {
+              bus.outputBusId = undefined;
+              bus.outputEnabled = false;
+            }
+          }
+        }),
+
+      setTrackOutputBus: (trackId, busId, outputEnabled = true) => {
+        let changed = false;
+        set((s) => {
+          const track = s.project.tracks.find((candidate) => candidate.id === trackId);
+          if (!track) return;
+          track.outputBusId = busId;
+          track.outputEnabled = outputEnabled;
+          changed = true;
+        });
+        return changed;
+      },
+
+      setAudioBusOutput: (busId, destinationBusId, outputEnabled = true) => {
+        let changed = false;
+        set((s) => {
+          const bus = s.project.returnBuses.find((candidate) => candidate.id === busId);
+          if (!bus || (outputEnabled && destinationBusId && !canSetAudioBusOutput(s.project.returnBuses, busId, destinationBusId))) return;
+          bus.outputBusId = destinationBusId;
+          bus.outputEnabled = outputEnabled;
+          changed = true;
+        });
+        return changed;
+      },
+
+      upsertAudioBusSend: (busId, destinationBusId, patch) => {
+        let changed = false;
+        set((s) => {
+          const bus = s.project.returnBuses.find((candidate) => candidate.id === busId);
+          if (!bus || !canSetAudioBusSend(s.project.returnBuses, busId, destinationBusId, patch)) return;
+          if (!bus.sends) bus.sends = [];
+          let send = bus.sends.find((candidate) => candidate.busId === destinationBusId);
+          if (!send) {
+            send = { busId: destinationBusId, gainDb: -12, pan: 0, enabled: true, preFader: false };
+            bus.sends.push(send);
+          }
+          Object.assign(send, patch, { busId: destinationBusId });
+          changed = true;
+        });
+        return changed;
+      },
+
+      removeAudioBusSend: (busId, destinationBusId) =>
+        set((s) => {
+          const bus = s.project.returnBuses.find((candidate) => candidate.id === busId);
+          if (bus?.sends) bus.sends = bus.sends.filter((send) => send.busId !== destinationBusId);
         }),
 
       addReturnBusEffect: (busId, kind = "reverb") => {

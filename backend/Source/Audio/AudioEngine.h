@@ -434,14 +434,24 @@ namespace beat
             Id trackId;
             Id instrumentId;
             Id parentTrackId;
+            Id outputBusId;
+            bool outputEnabled { true };
+            float inputTrimDb { 0.0f };
+            bool mute { false };
+            bool audible { true };
             std::unique_ptr<juce::Synthesiser> synth;
             juce::MidiBuffer midi;
             float gainDb { 0.0f };
             float pan { 0.0f };
             std::vector<TrackEffect> effects;
             std::vector<TrackSend> sends;
+            std::vector<int> sendCompensationSamples;
+            std::vector<std::unique_ptr<DelayEffectState>> sendCompensationStates;
             float baseGainDb { 0.0f };
             float basePan { 0.0f };
+            float baseInputTrimDb { 0.0f };
+            bool baseMute { false };
+            std::vector<TrackSend> baseSends;
             std::vector<TrackEffect> baseEffects;
             std::vector<std::unique_ptr<juce::dsp::StateVariableTPTFilter<float>>> filterStates;
             std::vector<std::unique_ptr<juce::Reverb>> reverbStates;
@@ -597,6 +607,7 @@ namespace beat
         InstrumentRenderState* findTrackRenderState(const Id& trackId, const Id& instrumentId);
         InstrumentRenderState* findTrackRouteState(const Id& trackId);
         InstrumentRenderState* findGroupRenderState(const Id& trackId);
+        InstrumentRenderState* findReturnBusRenderState(const Id& busId);
         TrackMeterState* findTrackMeterState(const Id& trackId) noexcept;
         bool startSampleVoiceLocked(const Sequencer::TriggerEvent& ev);
         bool startAudioClipVoiceLocked(const Sequencer::AudioClipEvent& ev);
@@ -620,6 +631,15 @@ namespace beat
                                    juce::AudioBuffer<float>& route,
                                    int startSample,
                                    int numSamples) noexcept;
+        void addRouteToBusLocked(InstrumentRenderState& routeState,
+                                 juce::AudioBuffer<float>& route,
+                                 const Id& busId,
+                                 int startSample,
+                                 int numSamples) noexcept;
+        void addRouteToOutputLocked(InstrumentRenderState& routeState,
+                                    juce::AudioBuffer<float>& route,
+                                    int startSample,
+                                    int numSamples) noexcept;
         void addRouteSendsLocked(InstrumentRenderState& routeState,
                                  juce::AudioBuffer<float>& route,
                                  int startSample,

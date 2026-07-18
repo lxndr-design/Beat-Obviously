@@ -7,12 +7,112 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <map>
 #include <utility>
 
 namespace beat
 {
     namespace
     {
+        bool busRoutesTo(const ReturnBus& bus, const Id& destination) noexcept
+        {
+            if (bus.outputEnabled && bus.outputBusId == destination)
+                return true;
+            return std::any_of(bus.sends.begin(), bus.sends.end(), [&](const TrackSend& send) {
+                return send.enabled && send.busId == destination;
+            });
+        }
+
+        const ReturnBus* findProjectBus(const Project& project, const Id& id) noexcept
+        {
+            for (const auto& bus : project.returnBuses)
+                if (bus.id == id) return &bus;
+            return nullptr;
+        }
+
+        bool busCanReach(const Project& project, const Id& sourceId, const Id& targetId, juce::StringArray& visited)
+        {
+            if (sourceId == targetId) return true;
+            if (sourceId.isEmpty() || visited.contains(sourceId)) return false;
+            visited.add(sourceId);
+            const auto* source = findProjectBus(project, sourceId);
+            if (source == nullptr) return false;
+            if (source->outputEnabled && source->outputBusId.isNotEmpty()
+                && busCanReach(project, source->outputBusId, targetId, visited)) return true;
+            for (const auto& send : source->sends)
+                if (send.enabled && send.busId.isNotEmpty()
+                    && busCanReach(project, send.busId, targetId, visited)) return true;
+            return false;
+        }
+
+        bool routeFeedsSoloTarget(const Project& project, const Id& destination)
+        {
+            if (destination.isEmpty()) return false;
+            for (const auto& target : project.returnBuses)
+            {
+                if (!target.solo && !target.soloSafe) continue;
+                juce::StringArray visited;
+                if (busCanReach(project, destination, target.id, visited)) return true;
+            }
+            return false;
+        }
+
+        bool busIsOnSoloPath(const Project& project, const Id& busId)
+        {
+            for (const auto& target : project.returnBuses)
+            {
+                if (!target.solo && !target.soloSafe) continue;
+                juce::StringArray upstreamVisited;
+                juce::StringArray downstreamVisited;
+                if (busCanReach(project, busId, target.id, upstreamVisited)
+                    || busCanReach(project, target.id, busId, downstreamVisited)) return true;
+            }
+            return false;
+        }
+
+        bool busIsSoloOrDownstream(const Project& project, const Id& busId)
+        {
+            for (const auto& target : project.returnBuses)
+            {
+                if (!target.solo && !target.soloSafe) continue;
+                juce::StringArray visited;
+                if (busCanReach(project, target.id, busId, visited)) return true;
+            }
+            return false;
+        }
+
+        std::vector<const ReturnBus*> orderedAudioBuses(const Project& project)
+        {
+            std::vector<const ReturnBus*> remaining;
+            for (const auto& bus : project.returnBuses)
+                if (bus.id.isNotEmpty()) remaining.push_back(&bus);
+
+            std::vector<const ReturnBus*> ordered;
+            ordered.reserve(remaining.size());
+            while (!remaining.empty())
+            {
+                auto candidate = remaining.end();
+                for (auto it = remaining.begin(); it != remaining.end(); ++it)
+                {
+                    if (busRoutesTo(**it, (*it)->id))
+                        continue;
+                    const auto incoming = std::any_of(remaining.begin(), remaining.end(), [&](const ReturnBus* source) {
+                        return source != *it && busRoutesTo(*source, (*it)->id);
+                    });
+                    if (incoming) continue;
+                    if (candidate == remaining.end()
+                        || (*it)->mixerOrder < (*candidate)->mixerOrder
+                        || ((*it)->mixerOrder == (*candidate)->mixerOrder && (*it)->id < (*candidate)->id))
+                        candidate = it;
+                }
+                if (candidate == remaining.end())
+                    break; // Cyclic buses fail closed and are not installed in the realtime graph.
+                ordered.push_back(*candidate);
+                remaining.erase(candidate);
+            }
+            return ordered;
+        }
+
         // Sound that matches any note — InstrumentVoice handles the actual sound.
         struct PassSound : public juce::SynthesiserSound
         {
@@ -210,17 +310,17 @@ namespace beat
             return fallback;
         }
 
-        void setTrackEffectParam(TrackEffect& effect, const juce::String& key, float value)
+        bool setTrackEffectParam(TrackEffect& effect, const juce::String& key, float value) noexcept
         {
             for (auto& param : effect.params)
             {
                 if (param.key == key)
                 {
                     param.value = value;
-                    return;
+                    return true;
                 }
             }
-            effect.params.push_back({ key, value });
+            return false; // Unknown parameters are rejected without allocating on the callback.
         }
 
         bool isRouteAutomationTarget(const juce::String& target) noexcept
@@ -228,6 +328,12 @@ namespace beat
             return target == "track.gainDb"
                 || target == "track.gain"
                 || target == "track.pan"
+                || target == "bus.gainDb"
+                || target == "bus.gain"
+                || target == "bus.pan"
+                || target == "bus.inputTrimDb"
+                || target == "bus.mute"
+                || target.startsWith("send.")
                 || target.startsWith("effect.")
                 || target.startsWith("effects.");
         }
@@ -1509,6 +1615,9 @@ namespace beat
         route.noteAutomationContextCount = 0;
         route.gainDb = route.baseGainDb;
         route.pan = route.basePan;
+        route.inputTrimDb = route.baseInputTrimDb;
+        route.mute = route.baseMute;
+        route.sends = route.baseSends;
         route.effects = route.baseEffects;
 
         for (auto& filter : route.filterStates)
@@ -1575,6 +1684,12 @@ namespace beat
             route.compensationDelayState->buffer.clear();
             route.compensationDelayState->writePosition = 0;
         }
+        for (auto& delay : route.sendCompensationStates)
+            if (delay != nullptr)
+            {
+                delay->buffer.clear();
+                delay->writePosition = 0;
+            }
 
         for (auto& compressor : route.compressorStates)
             compressor.envelope = 0.0f;
@@ -2098,6 +2213,8 @@ namespace beat
         nextMeterStates.reserve(project.tracks.size());
         std::vector<MonitoredMidiExpressionTarget> nextMidiExpressionTargets;
         std::vector<Id> retainedMidiExpressionInstrumentIds;
+        const bool anyAudioBusSolo = std::any_of(project.returnBuses.begin(), project.returnBuses.end(),
+                                                 [](const ReturnBus& bus) { return bus.solo; });
         for (const auto& track : project.tracks)
         {
             if (track.id.isNotEmpty())
@@ -2108,17 +2225,31 @@ namespace beat
                 InstrumentRenderState route;
                 route.trackId = track.id;
                 route.parentTrackId = track.parentTrackId;
+                route.outputBusId = track.outputBusId;
+                route.outputEnabled = track.outputEnabled;
+                route.mute = track.mute;
                 route.gainDb = track.gainDb;
                 route.pan = track.pan;
                 route.effects = track.effects;
                 route.sends = track.sends;
+                if (anyAudioBusSolo)
+                {
+                    for (auto& send : route.sends)
+                        send.enabled = send.enabled && routeFeedsSoloTarget(project, send.busId);
+                    const bool primaryFeedsSolo = route.outputBusId.isNotEmpty() && routeFeedsSoloTarget(project, route.outputBusId);
+                    route.outputEnabled = route.outputEnabled && primaryFeedsSolo;
+                    route.audible = primaryFeedsSolo || std::any_of(route.sends.begin(), route.sends.end(),
+                                                                   [](const TrackSend& send) { return send.enabled; });
+                }
                 route.baseGainDb = track.gainDb;
                 route.basePan = track.pan;
+                route.baseMute = track.mute;
+                route.baseSends = route.sends;
                 route.baseEffects = track.effects;
                 route.groupBus = true;
                 route.groupBuffer.setSize(routeBuf.getNumChannels(), routeBuf.getNumSamples(), false, false, true);
                 route.groupBuffer.clear();
-                prepareRouteEffects(route);
+                route.routeLatencySamples = routeEffectsLatencySamples(project, route.effects);
                 nextGroupStates.push_back(std::move(route));
                 continue;
             }
@@ -2127,6 +2258,9 @@ namespace beat
             route.trackId = track.id;
             route.instrumentId = track.instrumentId;
             route.parentTrackId = track.parentTrackId;
+            route.outputBusId = track.outputBusId;
+            route.outputEnabled = track.outputEnabled;
+            route.mute = track.mute;
             route.gainDb = track.gainDb;
             route.pan = track.pan;
 
@@ -2158,37 +2292,139 @@ namespace beat
 
             route.effects = composeRouteEffects(routeInstrument, track.effects);
             route.sends = track.sends;
+            if (anyAudioBusSolo)
+            {
+                for (auto& send : route.sends)
+                    send.enabled = send.enabled && routeFeedsSoloTarget(project, send.busId);
+                const bool primaryFeedsSolo = route.outputBusId.isNotEmpty() && routeFeedsSoloTarget(project, route.outputBusId);
+                route.outputEnabled = route.outputEnabled && primaryFeedsSolo;
+                route.audible = primaryFeedsSolo || std::any_of(route.sends.begin(), route.sends.end(),
+                                                               [](const TrackSend& send) { return send.enabled; });
+            }
             route.baseGainDb = track.gainDb;
             route.basePan = track.pan;
+            route.baseMute = track.mute;
+            route.baseSends = route.sends;
             route.baseEffects = route.effects;
             route.routeLatencySamples = routeEffectsLatencySamples(project, route.effects);
-            route.routeCompensationSamples = juce::jmax(0, projectLatencySamples - route.routeLatencySamples);
 
             if (routeInstrument != nullptr)
                 route.synth = createInstrumentSynth(*routeInstrument);
 
-            prepareRouteEffects(route);
             nextRenderStates.push_back(std::move(route));
         }
 
-        for (const auto& bus : project.returnBuses)
+        for (const auto* busPtr : orderedAudioBuses(project))
         {
-            if (bus.id.isEmpty() || bus.mute)
-                continue;
+            const auto& bus = *busPtr;
 
             InstrumentRenderState route;
             route.trackId = bus.id;
+            route.outputBusId = bus.outputBusId;
+            route.outputEnabled = bus.outputEnabled;
+            route.inputTrimDb = bus.inputTrimDb;
+            route.mute = bus.mute;
             route.gainDb = bus.gainDb;
             route.pan = bus.pan;
             route.effects = bus.effects;
+            route.sends = bus.sends;
+            if (anyAudioBusSolo)
+            {
+                route.audible = busIsOnSoloPath(project, bus.id);
+                for (auto& send : route.sends)
+                    send.enabled = send.enabled && busIsOnSoloPath(project, send.busId);
+                if (route.outputBusId.isNotEmpty())
+                    route.outputEnabled = route.outputEnabled && busIsOnSoloPath(project, route.outputBusId);
+                else
+                    route.outputEnabled = route.outputEnabled && busIsSoloOrDownstream(project, bus.id);
+            }
             route.baseGainDb = bus.gainDb;
             route.basePan = bus.pan;
+            route.baseInputTrimDb = bus.inputTrimDb;
+            route.baseMute = bus.mute;
+            route.baseSends = route.sends;
             route.baseEffects = bus.effects;
+            route.routeLatencySamples = routeEffectsLatencySamples(project, route.effects);
             route.returnBus = true;
             route.returnBuffer.setSize(routeBuf.getNumChannels(), routeBuf.getNumSamples(), false, false, true);
             route.returnBuffer.clear();
-            prepareRouteEffects(route);
             nextReturnStates.push_back(std::move(route));
+            nextMeterStates.emplace_back(bus.id);
+        }
+
+        std::map<Id, int> busInputLatency;
+        std::map<Id, int> busOutputLatency;
+        const auto routeSendsTo = [](const InstrumentRenderState& route, const Id& busId) {
+            return std::any_of(route.sends.begin(), route.sends.end(), [&](const TrackSend& send) {
+                return send.enabled && send.busId == busId;
+            });
+        };
+        for (auto& bus : nextReturnStates)
+        {
+            int inputLatency = 0;
+            for (const auto& track : nextRenderStates)
+                if ((track.outputEnabled && track.outputBusId == bus.trackId) || routeSendsTo(track, bus.trackId))
+                    inputLatency = juce::jmax(inputLatency, track.routeLatencySamples);
+            for (const auto& group : nextGroupStates)
+                if ((group.outputEnabled && group.outputBusId == bus.trackId) || routeSendsTo(group, bus.trackId))
+                    inputLatency = juce::jmax(inputLatency, group.routeLatencySamples);
+            for (const auto& source : nextReturnStates)
+            {
+                const auto found = busOutputLatency.find(source.trackId);
+                if (found == busOutputLatency.end()) continue;
+                if ((source.outputEnabled && source.outputBusId == bus.trackId) || routeSendsTo(source, bus.trackId))
+                    inputLatency = juce::jmax(inputLatency, found->second);
+            }
+            busInputLatency[bus.trackId] = inputLatency;
+            busOutputLatency[bus.trackId] = inputLatency + bus.routeLatencySamples;
+        }
+
+        int masterInputLatency = 0;
+        for (const auto& track : nextRenderStates)
+            if (track.outputEnabled && track.outputBusId.isEmpty() && track.parentTrackId.isEmpty())
+                masterInputLatency = juce::jmax(masterInputLatency, track.routeLatencySamples);
+        for (const auto& group : nextGroupStates)
+            if (group.outputEnabled && group.outputBusId.isEmpty() && group.parentTrackId.isEmpty())
+                masterInputLatency = juce::jmax(masterInputLatency, group.routeLatencySamples);
+        for (const auto& bus : nextReturnStates)
+            if (bus.outputEnabled && bus.outputBusId.isEmpty())
+                masterInputLatency = juce::jmax(masterInputLatency, busOutputLatency[bus.trackId]);
+        projectLatencySamples = masterInputLatency;
+
+        const auto configureCompensation = [&](InstrumentRenderState& route, int sourceLatency) {
+            const auto destination = route.outputBusId.isNotEmpty()
+                ? busInputLatency.find(route.outputBusId)
+                : busInputLatency.end();
+            const int outputTargetLatency = destination != busInputLatency.end()
+                ? destination->second
+                : masterInputLatency;
+            route.routeCompensationSamples = route.outputEnabled
+                ? juce::jmax(0, outputTargetLatency - sourceLatency)
+                : 0;
+            route.sendCompensationSamples.clear();
+            route.sendCompensationSamples.reserve(route.sends.size());
+            for (const auto& send : route.sends)
+            {
+                const auto target = busInputLatency.find(send.busId);
+                route.sendCompensationSamples.push_back(target == busInputLatency.end()
+                    ? 0
+                    : juce::jmax(0, target->second - sourceLatency));
+            }
+        };
+        for (auto& route : nextRenderStates)
+        {
+            configureCompensation(route, route.routeLatencySamples);
+            prepareRouteEffects(route);
+        }
+        for (auto& route : nextGroupStates)
+        {
+            configureCompensation(route, route.routeLatencySamples);
+            prepareRouteEffects(route);
+        }
+        for (auto& route : nextReturnStates)
+        {
+            configureCompensation(route, busOutputLatency[route.trackId]);
+            prepareRouteEffects(route);
         }
 
         const juce::ScopedLock lock(sampleLock);
@@ -2198,7 +2434,21 @@ namespace beat
         groupRenderStates = std::move(nextGroupStates);
         returnRenderStates = std::move(nextReturnStates);
         trackMeterStates = std::move(nextMeterStates);
-        seq.setProject(project);
+        Project sequencerProject = project;
+        for (const auto& bus : project.returnBuses)
+        {
+            for (const auto& lane : bus.automation)
+                sequencerProject.automation.push_back({ bus.id, {}, lane.target, lane.points });
+            for (const auto& effect : bus.effects)
+                for (const auto& lane : effect.automation)
+                    sequencerProject.automation.push_back({
+                        bus.id,
+                        {},
+                        juce::String("effect.") + effect.id + "." + lane.target,
+                        lane.points,
+                    });
+        }
+        seq.setProject(sequencerProject);
         activeSampleVoices.clear();
         activeAudioClipVoices.clear();
         pendingNoteOffs.clear();
@@ -2265,6 +2515,14 @@ namespace beat
             if (state.trackId == trackId)
                 return &state;
         }
+        return nullptr;
+    }
+
+    AudioEngine::InstrumentRenderState* AudioEngine::findReturnBusRenderState(const Id& busId)
+    {
+        if (busId.isEmpty()) return nullptr;
+        for (auto& state : returnRenderStates)
+            if (state.trackId == busId) return &state;
         return nullptr;
     }
 
@@ -2800,32 +3058,97 @@ namespace beat
         if (routeChannels <= 0 || numSamples <= 0)
             return;
 
-        for (const auto& send : routeState.sends)
+        for (size_t sendIndex = 0; sendIndex < routeState.sends.size(); ++sendIndex)
         {
+            const auto& send = routeState.sends[sendIndex];
             if (!send.enabled || send.busId.isEmpty() || send.gainDb <= -96.0f)
                 continue;
 
-            auto found = std::find_if(returnRenderStates.begin(),
-                                      returnRenderStates.end(),
-                                      [&](const InstrumentRenderState& bus) { return bus.trackId == send.busId; });
-            if (found == returnRenderStates.end())
+            auto* bus = findReturnBusRenderState(send.busId);
+            if (bus == nullptr)
+                continue;
+            if (bus->returnBuffer.getNumSamples() < startSample + numSamples)
                 continue;
 
-            auto& bus = *found;
-            if (bus.returnBuffer.getNumSamples() < startSample + numSamples)
-                continue;
+            const auto routeGainDb = send.preFader ? 0.0f : routeState.gainDb;
+            const auto routePan = send.preFader ? 0.0f : routeState.pan;
+            const float gain = juce::Decibels::decibelsToGain(juce::jlimit(-96.0f, 24.0f, routeGainDb + send.gainDb));
+            const auto panGains = equalPowerPan(juce::jlimit(-1.0f, 1.0f, routePan + send.pan));
+            const int busChannels = bus->returnBuffer.getNumChannels();
 
-            const float gain = juce::Decibels::decibelsToGain(juce::jlimit(-96.0f, 24.0f, routeState.gainDb + send.gainDb));
-            const auto panGains = equalPowerPan(juce::jlimit(-1.0f, 1.0f, routeState.pan + send.pan));
-            const int busChannels = bus.returnBuffer.getNumChannels();
-
-            for (int ch = 0; ch < busChannels; ++ch)
+            const int delaySamples = sendIndex < routeState.sendCompensationSamples.size()
+                ? routeState.sendCompensationSamples[sendIndex]
+                : 0;
+            auto* delay = sendIndex < routeState.sendCompensationStates.size()
+                ? routeState.sendCompensationStates[sendIndex].get()
+                : nullptr;
+            if (delaySamples > 0 && delay != nullptr && delay->buffer.getNumSamples() > delaySamples)
             {
-                const int sourceCh = juce::jmin(ch, routeChannels - 1);
-                const float panGain = ch == 0 ? panGains.left : ch == 1 ? panGains.right : 1.0f;
-                bus.returnBuffer.addFrom(ch, startSample, route, sourceCh, startSample, numSamples, gain * panGain);
+                const int capacity = delay->buffer.getNumSamples();
+                for (int i = 0; i < numSamples; ++i)
+                {
+                    const int readPosition = (delay->writePosition - delaySamples + capacity) % capacity;
+                    for (int ch = 0; ch < busChannels; ++ch)
+                    {
+                        const int sourceCh = juce::jmin(ch, routeChannels - 1);
+                        const int delayCh = juce::jmin(ch, delay->buffer.getNumChannels() - 1);
+                        delay->buffer.setSample(delayCh, delay->writePosition, route.getSample(sourceCh, startSample + i));
+                        const float panGain = ch == 0 ? panGains.left : ch == 1 ? panGains.right : 1.0f;
+                        bus->returnBuffer.addSample(ch, startSample + i,
+                                                    delay->buffer.getSample(delayCh, readPosition) * gain * panGain);
+                    }
+                    delay->writePosition = (delay->writePosition + 1) % capacity;
+                }
+            }
+            else
+            {
+                for (int ch = 0; ch < busChannels; ++ch)
+                {
+                    const int sourceCh = juce::jmin(ch, routeChannels - 1);
+                    const float panGain = ch == 0 ? panGains.left : ch == 1 ? panGains.right : 1.0f;
+                    bus->returnBuffer.addFrom(ch, startSample, route, sourceCh, startSample, numSamples, gain * panGain);
+                }
             }
         }
+    }
+
+    void AudioEngine::addRouteToBusLocked(InstrumentRenderState& routeState,
+                                          juce::AudioBuffer<float>& route,
+                                          const Id& busId,
+                                          int startSample,
+                                          int numSamples) noexcept
+    {
+        auto* bus = findReturnBusRenderState(busId);
+        if (bus == nullptr || bus->returnBuffer.getNumSamples() < startSample + numSamples)
+            return; // Missing destinations are intentionally silent; never fall back to Master.
+        if (routeState.routeCompensationSamples > 0 && routeState.compensationDelayState != nullptr)
+            processDelayLineLocked(*routeState.compensationDelayState,
+                                   route,
+                                   startSample,
+                                   numSamples,
+                                   routeState.routeCompensationSamples);
+        const auto gain = juce::Decibels::decibelsToGain(routeState.gainDb);
+        const auto panGains = routeState.returnBus ? stereoBalancePan(routeState.pan) : equalPowerPan(routeState.pan);
+        const int routeChannels = route.getNumChannels();
+        for (int ch = 0; ch < bus->returnBuffer.getNumChannels(); ++ch)
+        {
+            const int sourceCh = juce::jmin(ch, routeChannels - 1);
+            const float panGain = ch == 0 ? panGains.left : ch == 1 ? panGains.right : 1.0f;
+            bus->returnBuffer.addFrom(ch, startSample, route, sourceCh, startSample, numSamples, gain * panGain);
+        }
+    }
+
+    void AudioEngine::addRouteToOutputLocked(InstrumentRenderState& routeState,
+                                             juce::AudioBuffer<float>& route,
+                                             int startSample,
+                                             int numSamples) noexcept
+    {
+        if (!routeState.outputEnabled || routeState.mute || !routeState.audible)
+            return;
+        if (routeState.outputBusId.isNotEmpty())
+            addRouteToBusLocked(routeState, route, routeState.outputBusId, startSample, numSamples);
+        else
+            addRouteToMixLocked(routeState, route, startSample, numSamples);
     }
 
     void AudioEngine::addRouteToGroupLocked(InstrumentRenderState& routeState,
@@ -2882,15 +3205,7 @@ namespace beat
             if (bus.returnBuffer.getNumSamples() < numSamples)
                 continue;
 
-            const auto effectStartTicks = juce::Time::getHighResolutionTicks();
-            processRouteEffectsLocked(bus, bus.returnBuffer, 0, numSamples, routeEffectWork);
-            if (routeEffectTicks != nullptr)
-            {
-                *routeEffectTicks += juce::jmax<int64_t>(
-                    0,
-                    juce::Time::getHighResolutionTicks() - effectStartTicks);
-            }
-            addRouteToMixLocked(bus, bus.returnBuffer, 0, numSamples);
+            processRouteAutomationLocked(bus, bus.returnBuffer, numSamples, routeEffectTicks, routeEffectWork);
         }
     }
 
@@ -2905,6 +3220,7 @@ namespace beat
             route.chorusStates.clear();
             route.phaserStates.clear();
             route.compensationDelayState.reset();
+            route.sendCompensationStates.clear();
             route.compressorStates.clear();
             route.filterStates.reserve(route.effects.size());
         route.reverbStates.reserve(route.effects.size());
@@ -3018,6 +3334,23 @@ namespace beat
             const int channels = juce::jmax(2, routeBuf.getNumChannels());
             route.compensationDelayState->buffer.setSize(channels, route.routeCompensationSamples + 1);
             route.compensationDelayState->buffer.clear();
+        }
+        route.sendCompensationStates.reserve(route.sends.size());
+        for (size_t index = 0; index < route.sends.size(); ++index)
+        {
+            const int delaySamples = index < route.sendCompensationSamples.size()
+                ? route.sendCompensationSamples[index]
+                : 0;
+            if (delaySamples <= 0)
+            {
+                route.sendCompensationStates.push_back(nullptr);
+                continue;
+            }
+            auto delay = std::make_unique<InstrumentRenderState::DelayEffectState>();
+            const int channels = juce::jmax(2, routeBuf.getNumChannels());
+            delay->buffer.setSize(channels, delaySamples + 1);
+            delay->buffer.clear();
+            route.sendCompensationStates.push_back(std::move(delay));
         }
     }
 
@@ -3541,16 +3874,45 @@ namespace beat
                                                 const RouteParameterAutomationEvent& event) noexcept
     {
         const auto& target = event.parameterId;
-        if (target == "track.gainDb" || target == "track.gain")
+        if (target == "track.gainDb" || target == "track.gain" || target == "bus.gainDb" || target == "bus.gain")
         {
             route.gainDb = juce::jlimit(-96.0f, 24.0f, event.value);
             return true;
         }
 
-        if (target == "track.pan")
+        if (target == "track.pan" || target == "bus.pan")
         {
             route.pan = juce::jlimit(-1.0f, 1.0f, event.value);
             return true;
+        }
+
+        if (target == "bus.inputTrimDb")
+        {
+            route.inputTrimDb = juce::jlimit(-96.0f, 24.0f, event.value);
+            return true;
+        }
+
+        if (target == "bus.mute")
+        {
+            route.mute = event.value >= 0.5f;
+            return true;
+        }
+
+        if (target.startsWith("send."))
+        {
+            const auto rest = target.substring(5);
+            const auto busId = rest.upToFirstOccurrenceOf(".", false, false);
+            const auto param = rest.fromFirstOccurrenceOf(".", false, false);
+            for (auto& send : route.sends)
+            {
+                if (send.busId != busId) continue;
+                if (param == "gainDb" || param == "gain") send.gainDb = juce::jlimit(-96.0f, 24.0f, event.value);
+                else if (param == "pan") send.pan = juce::jlimit(-1.0f, 1.0f, event.value);
+                else if (param == "enabled") send.enabled = event.value >= 0.5f;
+                else return false;
+                return true;
+            }
+            return false;
         }
 
         const bool singular = target.startsWith("effect.");
@@ -3569,8 +3931,12 @@ namespace beat
         {
             if (effect.id == effectId)
             {
-                setTrackEffectParam(effect, param, event.value);
-                return true;
+                if (param == "bypass" || param == "bypassed")
+                {
+                    effect.bypassed = event.value >= 0.5f;
+                    return true;
+                }
+                return setTrackEffectParam(effect, param, event.value);
             }
         }
 
@@ -3602,6 +3968,8 @@ namespace beat
             const int chunkSamples = nextOffset - cursor;
             if (chunkSamples > 0)
             {
+                if (route.returnBus && route.inputTrimDb != 0.0f)
+                    buffer.applyGain(cursor, chunkSamples, juce::Decibels::decibelsToGain(route.inputTrimDb));
                 const auto effectStartTicks = juce::Time::getHighResolutionTicks();
                 processRouteEffectsLocked(route, buffer, cursor, chunkSamples, routeEffectWork);
                 if (routeEffectTicks != nullptr)
@@ -3611,11 +3979,12 @@ namespace beat
                         juce::Time::getHighResolutionTicks() - effectStartTicks);
                 }
                 accumulateTrackMeterLocked(route.trackId, buffer, cursor, chunkSamples, route.gainDb, route.pan);
-                addRouteSendsLocked(route, buffer, cursor, chunkSamples);
-                if (route.parentTrackId.isNotEmpty())
+                if (!route.mute && route.audible)
+                    addRouteSendsLocked(route, buffer, cursor, chunkSamples);
+                if (route.parentTrackId.isNotEmpty() && route.outputEnabled && !route.mute && route.audible)
                     addRouteToGroupLocked(route, buffer, cursor, chunkSamples);
                 else
-                    addRouteToMixLocked(route, buffer, cursor, chunkSamples);
+                    addRouteToOutputLocked(route, buffer, cursor, chunkSamples);
             }
 
             cursor = nextOffset;
@@ -4270,7 +4639,7 @@ namespace beat
                 processReturnBusesLocked(numSamples, &routeEffectTicks, &routeEffectWork);
                 activeSampleVoiceCount = (int) activeSampleVoices.size();
                 activeAudioClipVoiceCount = (int) activeAudioClipVoices.size();
-                routeCount = (int) instrumentRenderStates.size() + (int) groupRenderStates.size();
+                routeCount = (int) instrumentRenderStates.size() + (int) groupRenderStates.size() + (int) returnRenderStates.size();
                 automationEventCount = (int) blockRealtimeParameterEvents.size()
                     + (int) blockRouteParameterEvents.size()
                     + (int) pendingParameterAutomation.size();
