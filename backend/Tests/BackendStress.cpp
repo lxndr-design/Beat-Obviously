@@ -4391,7 +4391,10 @@ namespace
         return project;
     }
 
-    beat::Project makeSampleLoopOfflineProject(const juce::File& file, bool loopEnabled, bool oneShot)
+    beat::Project makeSampleLoopOfflineProject(const juce::File& file,
+                                               bool loopEnabled,
+                                               bool oneShot,
+                                               beat::SegmentPayloadKind segmentKind = beat::SegmentPayloadKind::Midi)
     {
         beat::Project project;
         project.id = "offline-sample-loop-project";
@@ -4432,7 +4435,7 @@ namespace
         beat::Segment segment;
         segment.id = "sample-loop-segment";
         segment.trackId = track.id;
-        segment.kind = beat::SegmentPayloadKind::Midi;
+        segment.kind = segmentKind;
         segment.instrumentId = "sample-loop-instrument";
         segment.startBeat = 0.0;
         segment.lengthBeats = 2.0;
@@ -4487,7 +4490,7 @@ namespace
         beat::Segment segment;
         segment.id = "sample-choke-segment";
         segment.trackId = track.id;
-        segment.kind = beat::SegmentPayloadKind::Midi;
+        segment.kind = beat::SegmentPayloadKind::Drum;
         segment.instrumentId = "sample-choke-instrument";
         segment.startBeat = 0.0;
         segment.lengthBeats = 1.0;
@@ -4923,6 +4926,23 @@ namespace
             }
         }
         return energy;
+    }
+
+    bool stressAudioEngineMissingExplicitInstrumentIsSilent()
+    {
+        auto project = makeTinyOfflineProject();
+        auto& segment = project.tracks.front().segments.front();
+        segment.instrumentId = "missing-instrument";
+        segment.notes.front().instrumentId = "missing-instrument";
+        const auto rendered = renderOfflineBlock(std::move(project), 4096);
+        const double energy = bufferEnergy(rendered);
+        if (!std::isfinite(energy) || energy > 1.0e-12)
+        {
+            std::cerr << "Explicit missing instrument unexpectedly used default synth energy="
+                      << energy << "\n";
+            return false;
+        }
+        return true;
     }
 
     bool stressAudioEngineExtraLfoTempoSync()
@@ -9688,27 +9708,47 @@ namespace
             return false;
 
         auto looped = renderOfflineBlock(makeSampleLoopOfflineProject(sampleFile, true, false), 36000);
-        auto oneShot = renderOfflineBlock(makeSampleLoopOfflineProject(sampleFile, false, true), 16000);
+        auto midiOneShot = renderOfflineBlock(makeSampleLoopOfflineProject(sampleFile, false, true), 16000);
+        auto drumpadOneShot = renderOfflineBlock(
+            makeSampleLoopOfflineProject(sampleFile, false, true, beat::SegmentPayloadKind::Drumpad), 16000);
+        auto drumOneShot = renderOfflineBlock(
+            makeSampleLoopOfflineProject(sampleFile, false, true, beat::SegmentPayloadKind::Drum), 16000);
 
         const double loopEarlyEnergy = bufferWindowEnergy(looped, 0, 4000);
         const double loopLateEnergy = bufferWindowEnergy(looped, 26000, 4000);
-        const double oneShotEarlyEnergy = bufferWindowEnergy(oneShot, 0, 1200);
-        const double oneShotLateEnergy = bufferWindowEnergy(oneShot, 7000, 2000);
+        const double midiOneShotEarlyEnergy = bufferWindowEnergy(midiOneShot, 0, 700);
+        const double midiOneShotLateEnergy = bufferWindowEnergy(midiOneShot, 7000, 2000);
+        const double drumpadOneShotEarlyEnergy = bufferWindowEnergy(drumpadOneShot, 0, 700);
+        const double drumpadOneShotLateEnergy = bufferWindowEnergy(drumpadOneShot, 7000, 2000);
+        const double drumOneShotEarlyEnergy = bufferWindowEnergy(drumOneShot, 0, 1200);
+        const double drumOneShotLateEnergy = bufferWindowEnergy(drumOneShot, 7000, 2000);
 
         sampleFile.deleteFile();
         const bool ok = std::isfinite(loopEarlyEnergy)
             && std::isfinite(loopLateEnergy)
-            && std::isfinite(oneShotEarlyEnergy)
-            && std::isfinite(oneShotLateEnergy)
+            && std::isfinite(midiOneShotEarlyEnergy)
+            && std::isfinite(midiOneShotLateEnergy)
+            && std::isfinite(drumpadOneShotEarlyEnergy)
+            && std::isfinite(drumpadOneShotLateEnergy)
+            && std::isfinite(drumOneShotEarlyEnergy)
+            && std::isfinite(drumOneShotLateEnergy)
             && loopEarlyEnergy > 0.0001
             && loopLateEnergy > loopEarlyEnergy * 0.05
-            && oneShotEarlyEnergy > 0.0001
-            && oneShotLateEnergy > oneShotEarlyEnergy * 0.01;
+            && midiOneShotEarlyEnergy > 0.0001
+            && midiOneShotLateEnergy < midiOneShotEarlyEnergy * 0.001
+            && drumpadOneShotEarlyEnergy > 0.0001
+            && drumpadOneShotLateEnergy < drumpadOneShotEarlyEnergy * 0.001
+            && drumOneShotEarlyEnergy > 0.0001
+            && drumOneShotLateEnergy > drumOneShotEarlyEnergy * 0.01;
         if (!ok)
             std::cerr << "Sample loop/one-shot loopEarly=" << loopEarlyEnergy
                       << " loopLate=" << loopLateEnergy
-                      << " oneShotEarly=" << oneShotEarlyEnergy
-                      << " oneShotLate=" << oneShotLateEnergy << "\n";
+                      << " midiOneShotEarly=" << midiOneShotEarlyEnergy
+                      << " midiOneShotLate=" << midiOneShotLateEnergy
+                      << " drumpadOneShotEarly=" << drumpadOneShotEarlyEnergy
+                      << " drumpadOneShotLate=" << drumpadOneShotLateEnergy
+                      << " drumOneShotEarly=" << drumOneShotEarlyEnergy
+                      << " drumOneShotLate=" << drumOneShotLateEnergy << "\n";
         return ok;
     }
 
@@ -19525,6 +19565,12 @@ int main()
     if (!stressAudioEngineTrackGainPanRender())
     {
         std::cerr << "Audio engine track gain/pan render stress failed\n";
+        return 1;
+    }
+    std::cerr << "  missing explicit instrument silence\n";
+    if (!stressAudioEngineMissingExplicitInstrumentIsSilent())
+    {
+        std::cerr << "Audio engine missing explicit instrument silence stress failed\n";
         return 1;
     }
     std::cerr << "  extra LFO tempo sync\n";

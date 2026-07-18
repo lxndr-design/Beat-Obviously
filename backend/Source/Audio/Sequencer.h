@@ -67,6 +67,7 @@ namespace beat
             float  trackGainDb { 0.0f };
             float  trackPan { 0.0f };
             float  segmentGainDb { 0.0f };
+            SegmentPayloadKind segmentKind { SegmentPayloadKind::Midi };
             const MidiNote* sourceNote { nullptr };
             int    noteIndex { -1 };
             int    glideTargetPitch { -1 };

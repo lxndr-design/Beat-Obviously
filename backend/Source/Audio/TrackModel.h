@@ -12,7 +12,7 @@ namespace beat
     using Id = juce::String;
     using Beats = double;
 
-    enum class SegmentPayloadKind { Audio, Midi, Drum, Mixed };
+    enum class SegmentPayloadKind { Audio, Midi, Drum, Mixed, Drumpad };
     enum class TrackKind          { Audio, Midi, Mixed, Group };
     enum class TrackEffectKind    { Bitcrush, Lowpass, Highpass, Saturator, Reverb, Delay, Compressor, Plugin, Unknown, Chorus, Phaser, Flanger, Distortion };
     enum class AutomationCurve    { Hold, Linear, Quadratic, Cubic, EaseIn, EaseOut, Smoothstep };

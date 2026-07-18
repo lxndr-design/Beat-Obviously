@@ -472,7 +472,8 @@ namespace beat
 
                         if (seg.kind == SegmentPayloadKind::Midi
                             || seg.kind == SegmentPayloadKind::Mixed
-                            || seg.kind == SegmentPayloadKind::Drum)
+                            || seg.kind == SegmentPayloadKind::Drum
+                            || seg.kind == SegmentPayloadKind::Drumpad)
                         {
                             for (size_t noteIndex = 0; noteIndex < seg.notes.size(); ++noteIndex)
                             {
@@ -518,6 +519,7 @@ namespace beat
                                         track.gainDb,
                                         track.pan,
                                         seg.audioGainDb,
+                                        seg.kind,
                                         &note,
                                         (int) noteIndex,
                                         glideTargetPitch,

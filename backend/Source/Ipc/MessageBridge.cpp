@@ -1357,6 +1357,7 @@ namespace beat
                 const auto kind = value.toString();
                 if (kind == "midi") return SegmentPayloadKind::Midi;
                 if (kind == "drum") return SegmentPayloadKind::Drum;
+                if (kind == "drumpad") return SegmentPayloadKind::Drumpad;
                 if (kind == "mixed") return SegmentPayloadKind::Mixed;
                 return SegmentPayloadKind::Audio;
             }
@@ -1806,6 +1807,7 @@ namespace beat
                 {
                     if (!trackVar.isObject()) continue;
                     Track t;
+                    std::vector<Track> drumpadChildTracks;
                     t.id = trackVar.getProperty("id", "").toString();
                     t.name = trackVar.getProperty("name", "").toString();
                     t.kind = parseTrackKind(trackVar.getProperty("kind", "audio"));
@@ -1888,6 +1890,16 @@ namespace beat
                         for (const auto& segmentVar : *segments)
                         {
                             if (!segmentVar.isObject()) continue;
+                            struct ParsedDrumpadLane
+                            {
+                                Id id;
+                                juce::String name;
+                                Id instrumentId;
+                                int pitch { 60 };
+                                std::vector<MidiNote> notes;
+                            };
+                            std::vector<ParsedDrumpadLane> drumpadLanes;
+                            bool isDrumpadSegment = false;
                             Segment s;
                             s.id = segmentVar.getProperty("id", "").toString();
                             s.trackId = t.id;
@@ -1904,10 +1916,55 @@ namespace beat
                             const auto payload = segmentVar.getProperty("payload", {});
                             if (payload.isObject())
                             {
-                                s.kind = parseSegmentKind(payload.getProperty("kind", "midi"));
+                                const auto payloadKind = payload.getProperty("kind", "midi").toString();
+                                isDrumpadSegment = payloadKind == "drumpad";
+                                s.kind = parseSegmentKind(payloadKind);
                                 s.audioFileId = payload.getProperty("audioFileId", "").toString();
                                 s.audioGainDb = (float) (double) payload.getProperty("gainDb", 0.0);
-                                if (s.kind == SegmentPayloadKind::Drum)
+                                if (isDrumpadSegment)
+                                {
+                                    if (auto* lanes = payload.getProperty("lanes", {}).getArray())
+                                    {
+                                        drumpadLanes.reserve((size_t) lanes->size());
+                                        for (const auto& laneVar : *lanes)
+                                        {
+                                            if (!laneVar.isObject() || (bool) laneVar.getProperty("muted", false)) continue;
+                                            ParsedDrumpadLane lane;
+                                            lane.id = laneVar.getProperty("id", "").toString();
+                                            lane.name = laneVar.getProperty("name", "Drumpad lane").toString();
+                                            lane.instrumentId = laneVar.getProperty("instrumentId", s.instrumentId).toString();
+                                            lane.pitch = juce::jlimit(0, 127, (int) laneVar.getProperty("pitch", 60));
+                                            if (lane.instrumentId.isEmpty()) lane.instrumentId = t.instrumentId;
+                                            if (lane.id.isNotEmpty() && lane.instrumentId.isNotEmpty())
+                                                drumpadLanes.push_back(std::move(lane));
+                                        }
+                                    }
+
+                                    if (auto* hits = payload.getProperty("hits", {}).getArray())
+                                    {
+                                        for (const auto& hitVar : *hits)
+                                        {
+                                            if (!hitVar.isObject()) continue;
+                                            const auto laneId = hitVar.getProperty("laneId", "").toString();
+                                            auto lane = std::find_if(drumpadLanes.begin(), drumpadLanes.end(),
+                                                [&](const ParsedDrumpadLane& candidate) { return candidate.id == laneId; });
+                                            if (lane == drumpadLanes.end()) continue;
+
+                                            const double startBeat = (double) hitVar.getProperty("startBeat", 0.0);
+                                            const double lengthBeats = (double) hitVar.getProperty("lengthBeats", 0.25);
+                                            if (!std::isfinite(startBeat) || !std::isfinite(lengthBeats) || lengthBeats <= 0.0) continue;
+
+                                            MidiNote note;
+                                            note.instrumentId = lane->instrumentId;
+                                            note.pitch = lane->pitch;
+                                            note.velocity = juce::jlimit(0, 127, (int) hitVar.getProperty("velocity", 110));
+                                            note.startBeat = juce::jmax(0.0, startBeat);
+                                            note.lengthBeats = lengthBeats;
+                                            lane->notes.push_back(std::move(note));
+                                        }
+                                    }
+                                }
+                                else if (s.kind == SegmentPayloadKind::Drum)
                                 {
                                     const int stepCount = juce::jmax(1, (int) payload.getProperty("stepCount", 16));
                                     const double speed = juce::jmax(0.1, (double) payload.getProperty("speed", 4.0));
@@ -2067,10 +2124,75 @@ namespace beat
                                 s.kind = parseSegmentKind(segmentVar.getProperty("kind", 1));
                             }
 
-                            t.segments.push_back(std::move(s));
+                            if (isDrumpadSegment)
+                            {
+                                for (auto& lane : drumpadLanes)
+                                {
+                                    if (lane.notes.empty()) continue;
+                                    const auto childId = t.id + "::drumpad::" + lane.id + "::" + lane.instrumentId;
+                                    auto child = std::find_if(drumpadChildTracks.begin(), drumpadChildTracks.end(),
+                                        [&](const Track& candidate) { return candidate.id == childId; });
+                                    if (child == drumpadChildTracks.end())
+                                    {
+                                        Track laneTrack = t;
+                                        laneTrack.id = childId;
+                                        laneTrack.name = t.name + " / " + lane.name;
+                                        laneTrack.kind = TrackKind::Midi;
+                                        laneTrack.instrumentId = lane.instrumentId;
+                                        laneTrack.parentTrackId = t.id;
+                                        laneTrack.gainDb = 0.0f;
+                                        laneTrack.pan = 0.0f;
+                                        laneTrack.recordArmed = false;
+                                        laneTrack.inputMonitoring = false;
+                                        laneTrack.sends.clear();
+                                        laneTrack.effects.clear();
+                                        laneTrack.segments.clear();
+                                        drumpadChildTracks.push_back(std::move(laneTrack));
+                                        child = std::prev(drumpadChildTracks.end());
+                                    }
+
+                                    Segment laneSegment = s;
+                                    laneSegment.id = s.id + "::" + lane.id;
+                                    laneSegment.trackId = child->id;
+                                    laneSegment.instrumentId = lane.instrumentId;
+                                    laneSegment.notes = std::move(lane.notes);
+                                    child->segments.push_back(std::move(laneSegment));
+                                }
+                            }
+                            else
+                            {
+                                t.segments.push_back(std::move(s));
+                            }
                         }
                     }
-                    p.tracks.push_back(std::move(t));
+                    if (drumpadChildTracks.empty())
+                    {
+                        p.tracks.push_back(std::move(t));
+                    }
+                    else
+                    {
+                        Track group = t;
+                        group.kind = TrackKind::Group;
+                        group.instrumentId = {};
+                        group.recordArmed = false;
+                        group.inputMonitoring = false;
+                        group.segments.clear();
+                        p.tracks.push_back(std::move(group));
+
+                        if (!t.segments.empty() || t.recordArmed || t.inputMonitoring)
+                        {
+                            t.id += "::content";
+                            t.parentTrackId = p.tracks.back().id;
+                            t.gainDb = 0.0f;
+                            t.pan = 0.0f;
+                            t.sends.clear();
+                            t.effects.clear();
+                            for (auto& segment : t.segments) segment.trackId = t.id;
+                            p.tracks.push_back(std::move(t));
+                        }
+                        for (auto& child : drumpadChildTracks)
+                            p.tracks.push_back(std::move(child));
+                    }
                 }
             }
 

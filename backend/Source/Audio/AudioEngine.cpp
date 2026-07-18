@@ -4378,6 +4378,7 @@ namespace beat
             }
         }
 
+        const bool useOneShotPlayback = zone.oneShot && ev.segmentKind == SegmentPayloadKind::Drum;
         activeSampleVoices.push_back({
             ev.trackId,
             ev.instrumentId,
@@ -4387,7 +4388,7 @@ namespace beat
             juce::jlimit(0.0f, 1.0f, ev.velocity / 127.0f) * 0.7f * voiceGain,
             juce::jlimit(-1.0f, 1.0f, zone.pan),
             ev.sampleOffset,
-            zone.oneShot ? juce::jmax(1, zoneEnd - zoneStart) : juce::jmax(1, ev.lengthSamples),
+            useOneShotPlayback ? juce::jmax(1, zoneEnd - zoneStart) : juce::jmax(1, ev.lengthSamples),
             0,
             msToSamples(instrument.attackMs),
             msToSamples(instrument.releaseMs),
@@ -4396,7 +4397,7 @@ namespace beat
             loopEnabled,
             loopEnabled ? zone.loopStart : 0,
             loopEnabled ? zone.loopEnd : 0,
-            zone.oneShot,
+            useOneShotPlayback,
             zone.chokeGroup,
             zoneEnd,
         });
@@ -4819,6 +4820,11 @@ namespace beat
                                juce::MidiBuffer* targetMidi = &midi;
                                if (auto* route = findTrackRenderState(ev.trackId, ev.instrumentId))
                                    targetMidi = &route->midi;
+                               else if (ev.instrumentId.isNotEmpty())
+                               {
+                                   if (onSegmentTriggered) onSegmentTriggered(ev);
+                                   return;
+                               }
 
                                targetMidi->addEvent(juce::MidiMessage::noteOn(1, ev.pitch, (juce::uint8) ev.velocity),
                                                     ev.sampleOffset);
@@ -4868,6 +4874,8 @@ namespace beat
                 blockRouteParameterEvents.clear();
                 defaultNoteAutomationContextCount = 0;
                 seq.render(numSamples, [&](const Sequencer::TriggerEvent& ev) {
+                    if (ev.instrumentId.isNotEmpty())
+                        return;
                     midi.addEvent(juce::MidiMessage::noteOn(1, ev.pitch, (juce::uint8) ev.velocity),
                                   ev.sampleOffset);
                     midi.addEvent(juce::MidiMessage::noteOff(1, ev.pitch),

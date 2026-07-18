@@ -18,6 +18,7 @@ try {
       join(repoRoot, "frontend/src/testing/interactionRunner.ts"),
       join(repoRoot, "frontend/src/features/MidiEditor/pianoRollInteraction.ts"),
       join(repoRoot, "frontend/src/features/SegmentEditor/midiLiveRecording.ts"),
+      join(repoRoot, "frontend/src/features/DrumpadEditor/drumpadPlayback.ts"),
       join(repoRoot, "frontend/src/automation/aetherNoteAutomation.ts"),
       join(repoRoot, "frontend/src/automation/aetherArrangementAutomation.ts"),
       join(repoRoot, "frontend/src/automation/aetherAutomationConflicts.ts"),
@@ -34,6 +35,7 @@ try {
   const runner = await import(pathToFileURL(join(outDir, "testing/interactionRunner.js")));
   const midiInteraction = await import(pathToFileURL(join(outDir, "features/MidiEditor/pianoRollInteraction.js")));
   const midiLiveRecording = await import(pathToFileURL(join(outDir, "features/SegmentEditor/midiLiveRecording.js")));
+  const drumpadPlayback = await import(pathToFileURL(join(outDir, "features/DrumpadEditor/drumpadPlayback.js")));
   const noteAutomation = await import(pathToFileURL(join(outDir, "automation/aetherNoteAutomation.js")));
   const arrangementAutomation = await import(pathToFileURL(join(outDir, "automation/aetherArrangementAutomation.js")));
   const automationConflicts = await import(pathToFileURL(join(outDir, "automation/aetherAutomationConflicts.js")));
@@ -88,6 +90,21 @@ try {
   const devHooksSource = readFileSync(join(repoRoot, "frontend/src/testing/devHooks.ts"), "utf8");
 
   assert.equal(runner.snapBeat(1.12, 0.25), 1, "snapBeat should snap to nearest grid");
+  assert.equal(
+    drumpadPlayback.drumpadHitLengthBeats(120),
+    0.36,
+    "new Drumpad hits should persist the same duration heard during immediate audition",
+  );
+  assert.equal(
+    drumpadPlayback.drumpadHitDurationSeconds(0.36, 120),
+    0.18,
+    "Drumpad editor playback should recover the persisted hit duration",
+  );
+  assert.deepEqual(
+    drumpadPlayback.preservedDrumpadRecordingView(28, 16, 80),
+    { startBeat: 28, lengthBeats: 16 },
+    "stopping Drumpad recording should preserve its live window instead of zooming to the full segment",
+  );
   assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("ArrowDown", -1, 3), 0);
   assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("ArrowDown", 2, 3), 2);
   assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("ArrowUp", -1, 3), 2);
@@ -262,6 +279,14 @@ try {
       && drumpadEditorSource.includes("triggerKeyCode(key.code, { record: recording() })")
       && drumpadEditorSource.includes('aria-label={playing() ? "Pause" : "Play"}'),
     "drumpad editor should expose playback and immediate key/hit audition feedback",
+  );
+  assert.ok(
+    ipcBackendBridgeSource.includes('payloadKind == "drumpad"')
+      && ipcBackendBridgeSource.includes('payload.getProperty("lanes", {})')
+      && ipcBackendBridgeSource.includes('payload.getProperty("hits", {})')
+      && ipcBackendBridgeSource.includes('laneSegment.instrumentId = lane.instrumentId')
+      && ipcBackendBridgeSource.includes('group.kind = TrackKind::Group'),
+    "native Drumpad playback should parse hits and route each lane instrument through the owning track mix",
   );
   assert.ok(
     drumpadEditorSource.includes("<FloatingSelect")

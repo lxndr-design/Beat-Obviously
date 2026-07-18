@@ -7,6 +7,12 @@ import { createStoreSelector } from "../../solid-utils/store";
 import { selectSegment } from "../../state/selectors";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";
 import type { DrumpadHit, DrumpadLane, DrumpadPayload, Id, Instrument, Segment } from "../../state/types";
+import {
+  DRUMPAD_HIT_PREVIEW_SECONDS,
+  drumpadHitDurationSeconds,
+  drumpadHitLengthBeats,
+  preservedDrumpadRecordingView,
+} from "./drumpadPlayback";
 import styles from "./DrumpadEditorModal.module.css";
 
 interface Props {
@@ -69,7 +75,6 @@ const WINDOWS_KEYS: KeyDef[][] = [
 const LIVE_WINDOW_SECONDS = 8;
 const MIN_DRUMPAD_LENGTH_BEATS = 4;
 const DRUMPAD_LANE_HEAD_WIDTH_PX = 240;
-const DRUMPAD_HIT_PREVIEW_SECONDS = 0.18;
 const MIN_DRUMPAD_VIEW_BEATS = 1;
 const DRUMPAD_WHEEL_ZOOM_FACTOR = 0.002;
 const DRUMPAD_FINE_TICKS_PER_BEAT = 8;
@@ -424,12 +429,11 @@ export function DrumpadEditorModal(props: Props) {
     return instruments().find((instrument) => instrument.id === lane.instrumentId);
   }
 
-  function auditionLane(lane: DrumpadLane, velocity = 110, atTimeS?: number) {
+  function auditionLane(lane: DrumpadLane, velocity = 110, atTimeS?: number, durationS = DRUMPAD_HIT_PREVIEW_SECONDS) {
     if (lane.muted) return;
     const instrument = laneInstrument(lane);
     if (!instrument) return;
     const audioCtx = previewContext();
-    const durationS = DRUMPAD_HIT_PREVIEW_SECONDS;
     const startTimeS = Math.max(atTimeS ?? audioCtx.currentTime, audioCtx.currentTime + 0.001);
     const source = createInstrumentBufferSource(
       audioCtx,
@@ -470,7 +474,7 @@ export function DrumpadEditorModal(props: Props) {
     const seconds = Math.max(0, (performance.now() - recordStartedAt) / 1000);
     const quantizedSeconds = Math.round(seconds / current.quantizeSeconds) * current.quantizeSeconds;
     const startBeat = recordStartBeat + quantizedSeconds * (project().bpm / 60);
-    const lengthBeats = Math.max(0.03125, 0.08 * (project().bpm / 60));
+    const lengthBeats = drumpadHitLengthBeats(project().bpm);
     const hit: DrumpadHit = {
       id: nano(),
       laneId: lane.id,
@@ -520,7 +524,12 @@ export function DrumpadEditorModal(props: Props) {
       const lane = lanes().find((candidate) => candidate.id === hit.laneId);
       if (!lane) continue;
       const delayS = (hit.startBeat - positionBeat) / beatsPerSecond;
-      auditionLane(lane, hit.velocity, audioCtx.currentTime + delayS);
+      auditionLane(
+        lane,
+        hit.velocity,
+        audioCtx.currentTime + delayS,
+        drumpadHitDurationSeconds(hit.lengthBeats, project().bpm),
+      );
       playbackScheduled.add(hit.id);
     }
   }
@@ -619,6 +628,13 @@ export function DrumpadEditorModal(props: Props) {
   }
 
   function stopRecording() {
+    const view = preservedDrumpadRecordingView(
+      visibleStartBeat(),
+      visibleLengthBeats(),
+      timelineLengthBeats(),
+    );
+    setTrackViewStartBeat(view.startBeat);
+    setTrackViewLengthBeats(view.lengthBeats);
     setRecording(false);
     if (recordRaf) window.cancelAnimationFrame(recordRaf);
   }

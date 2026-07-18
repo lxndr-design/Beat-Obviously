@@ -183,8 +183,8 @@ export function TimelineMidiPlayback() {
               if (noteStart < currentBeat - 0.05 || noteStart > currentBeat + lookaheadBeats) continue;
               const instrument =
                 currentInstruments.find((candidate) => candidate.id === lane.instrumentId) ??
-                currentInstruments.find((candidate) => candidate.id === seg.instrumentId) ??
-                fallbackInstrument;
+                currentInstruments.find((candidate) => candidate.id === seg.instrumentId);
+              if (!instrument) continue;
               const key = `${seg.id}:${occ.repetition}:${hit.id}:${hit.startBeat}:${hit.lengthBeats}:${sourceStartBeat}`;
               if (scheduled.has(key)) continue;
               const delayS = Math.max(0, (noteStart - currentBeat) / beatsPerSecond);
