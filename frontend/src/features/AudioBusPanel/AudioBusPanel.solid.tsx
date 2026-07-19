@@ -1,12 +1,13 @@
 import { createEffect, createMemo, createSignal, For, Show, type JSX } from "solid-js";
-import { appConfirm, Button, FloatingSelect, HoverInfo, Icon, MicroButton, Slider, TextInput } from "../../solid-ui";
+import { appConfirm, Button, FloatingSelect, HoverInfo, Icon, Knob, MicroButton, Slider, TextInput } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { useAnalyzerStore } from "../../state/analyzerStore";
 import { canSetAudioBusOutput, canSetAudioBusSend } from "../../state/audioBusRouting";
-import { EFFECT_LABELS, EFFECT_OPTIONS, type EffectKind } from "../../state/effects";
+import { EFFECT_DEFAULT_PARAMS, EFFECT_LABELS, EFFECT_OPTIONS, EFFECT_PARAM_SPECS, type EffectKind, type EffectParamSpec } from "../../state/effects";
 import { useProjectStore } from "../../state/store";
-import type { Id, ReturnBus, TrackEffect, TrackSend } from "../../state/types";
+import type { Id, ReturnBus, Track, TrackEffect, TrackSend } from "../../state/types";
 import { MasterEqPanel } from "../Eq/MasterEqPanel.solid";
+import { SynthCurvePreview } from "../Synth/CurvePreview/SynthCurvePreview.solid";
 import styles from "./AudioBusPanel.module.css";
 
 const MASTER_TAB_ID = "master";
@@ -130,9 +131,47 @@ function BusTabs(props: BusTabsProps) {
 interface BusEditorPanelProps {
   bus: ReturnBus;
   buses: ReturnBus[];
-  tracks: Array<{ id: Id; outputBusId?: Id; outputEnabled?: boolean; sends?: Array<{ busId: Id; enabled: boolean }> }>;
+  tracks: Track[];
   header: JSX.Element;
   onDeleted: () => void;
+}
+
+interface BusInputSource {
+  id: string;
+  meterId: Id;
+  name: string;
+  detail: string;
+}
+
+function SectionTitle(props: { title: string; meta?: string }) {
+  return (
+    <header class={styles.sectionTitle}>
+      <strong>{props.title}</strong>
+      <Show when={props.meta}><span>{props.meta}</span></Show>
+    </header>
+  );
+}
+
+function BusInputRow(props: { source: BusInputSource }) {
+  const meter = createStoreSelector(useAnalyzerStore, (state) => state.trackMeters[props.source.meterId]);
+  const peak = () => clamp01(Math.max(meter()?.leftPeak ?? meter()?.peak ?? 0, meter()?.rightPeak ?? meter()?.peak ?? 0));
+  return (
+    <div class={styles.inputRow} title={`${props.source.name} · ${props.source.detail}`}>
+      <span class={styles.inputIdentity}>
+        <strong>{props.source.name}</strong>
+        <small>{props.source.detail}</small>
+      </span>
+      <span
+        class={styles.inputMeter}
+        role="meter"
+        aria-label={`${props.source.name} level`}
+        aria-valuemin="0"
+        aria-valuemax="1"
+        aria-valuenow={peak()}
+        style={{ background: `conic-gradient(var(--color-fg) ${Math.round(peak() * 360)}deg, var(--surface-subtle) 0deg)` }}
+      ><span /></span>
+    </div>
+  );
 }
 
 function BusEditorPanel(props: BusEditorPanelProps) {
@@ -146,6 +185,20 @@ function BusEditorPanel(props: BusEditorPanelProps) {
     ...props.tracks.flatMap((track) => track.sends ?? []),
     ...props.buses.flatMap((bus) => bus.sends ?? []),
   ].filter((send) => send.enabled && send.busId === props.bus.id).length;
+  const inputSources = createMemo<BusInputSource[]>(() => [
+    ...props.tracks
+      .filter((track) => track.outputEnabled !== false && track.outputBusId === props.bus.id)
+      .map((track) => ({ id: `track:${track.id}`, meterId: track.id, name: track.name, detail: "Track" })),
+    ...props.buses
+      .filter((bus) => bus.id !== props.bus.id && bus.outputEnabled !== false && bus.outputBusId === props.bus.id)
+      .map((bus) => ({ id: `bus:${bus.id}`, meterId: bus.id, name: bus.name, detail: "Bus" })),
+    ...props.tracks
+      .filter((track) => (track.sends ?? []).some((send) => send.enabled && send.busId === props.bus.id))
+      .map((track) => ({ id: `track-send:${track.id}`, meterId: track.id, name: track.name, detail: "Track send" })),
+    ...props.buses
+      .filter((bus) => bus.id !== props.bus.id && (bus.sends ?? []).some((send) => send.enabled && send.busId === props.bus.id))
+      .map((bus) => ({ id: `bus-send:${bus.id}`, meterId: bus.id, name: bus.name, detail: "Bus send" })),
+  ]);
   const outputValue = () => props.bus.outputEnabled === false
     ? NO_OUTPUT_VALUE
     : props.bus.outputBusId ?? MASTER_TAB_ID;
@@ -230,89 +283,30 @@ function BusEditorPanel(props: BusEditorPanelProps) {
       </header>
 
       <div class={styles.busBody}>
-        <div class={styles.identityColumn}>
-          <TextInput
-            label="Name"
-            layout="inline"
-            value={props.bus.name}
-            onChange={(event) => updateBus({ name: event.currentTarget.value })}
-            aria-label="Audio bus name"
-          />
-          <FloatingSelect
-            label="Output"
-            layout="inline"
-            value={outputValue()}
-            options={outputOptions()}
-            onChange={setOutput}
-            ariaLabel={`${props.bus.name} output destination`}
-          />
-          <FloatingSelect
-            label="Mode"
-            layout="inline"
-            value={props.bus.channelLayout ?? "stereo"}
-            options={[
-              { value: "stereo", label: "Stereo" },
-              { value: "mono", label: "Mono" },
-            ]}
-            onChange={(channelLayout) => updateBus({ channelLayout: channelLayout === "mono" ? "mono" : "stereo" })}
-            ariaLabel={`${props.bus.name} channel mode`}
-          />
-          <div class={styles.inputSummary} aria-label={`${props.bus.name} input summary`}>
-            {primaryTrackInputs()} tracks · {primaryBusInputs()} buses · {sendInputs()} sends
+        <section class={styles.inputSection} aria-label={`${props.bus.name} inputs`}>
+          <SectionTitle title="Inputs" meta={`${primaryTrackInputs()} tracks · ${primaryBusInputs()} buses · ${sendInputs()} sends`} />
+          <div class={styles.inputRows}>
+            <Show when={inputSources().length > 0} fallback={<span class={styles.emptyState}>No routed inputs</span>}>
+              <For each={inputSources()}>{(source) => <BusInputRow source={source} />}</For>
+            </Show>
           </div>
-        </div>
+        </section>
 
-        <div class={styles.meterColumn} aria-label={`${props.bus.name} stereo meter`} role="meter" aria-valuemin="0" aria-valuemax="1" aria-valuenow={Math.max(meter()?.leftPeak ?? 0, meter()?.rightPeak ?? 0)}>
-          <span class={styles.meterLane}><span class={styles.meterFill} style={{ transform: `scaleX(${clamp01(meter()?.leftPeak ?? meter()?.peak ?? 0)})` }} /></span>
-          <span class={styles.meterLane}><span class={styles.meterFill} style={{ transform: `scaleX(${clamp01(meter()?.rightPeak ?? meter()?.peak ?? 0)})` }} /></span>
-        </div>
-
-        <div class={styles.controlGrid}>
-          <Slider
-            label="Trim"
-            layout="inline"
-            min={-24}
-            max={24}
-            step={0.1}
-            value={props.bus.inputTrimDb ?? 0}
-            onChange={(inputTrimDb) => updateBus({ inputTrimDb })}
-            readout={<span class={styles.readout}>{formatDb(props.bus.inputTrimDb ?? 0)}</span>}
-          />
-          <Slider
-            label="Level"
-            layout="inline"
-            min={-48}
-            max={12}
-            step={0.1}
-            value={props.bus.gainDb}
-            onChange={(gainDb) => updateBus({ gainDb })}
-            readout={<span class={styles.readout}>{formatDb(props.bus.gainDb)}</span>}
-          />
-          <Slider
-            label="Pan"
-            layout="inline"
-            min={-1}
-            max={1}
-            step={0.01}
-            value={props.bus.pan}
-            onChange={(pan) => updateBus({ pan })}
-            readout={<span class={styles.readout}>{formatPan(props.bus.pan)}</span>}
-          />
-        </div>
-
-        <div class={styles.stateColumn}>
+        <section class={styles.parametersSection} aria-label={`${props.bus.name} parameters`}>
+          <SectionTitle title="Parameters" />
+          <div class={styles.knobStack}>
+            <Knob size="sm" label="Input Trim" min={-24} max={24} step={0.1} value={props.bus.inputTrimDb ?? 0} defaultValue={0} unit="dB" formatValue={formatCompact} onChange={(inputTrimDb) => updateBus({ inputTrimDb })} />
+            <Knob size="sm" label="Pan" min={-1} max={1} step={0.01} value={props.bus.pan} defaultValue={0} bipolar formatValue={formatPan} onChange={(pan) => updateBus({ pan })} />
+            <Knob size="sm" label="Fader" min={-48} max={12} step={0.1} value={props.bus.gainDb} defaultValue={0} unit="dB" formatValue={formatCompact} onChange={(gainDb) => updateBus({ gainDb })} />
+          </div>
           <div class={styles.stateButtons} aria-label={`${props.bus.name} channel state`}>
             <MicroButton active={props.bus.solo === true} onClick={() => updateBus({ solo: !props.bus.solo })} aria-label={`Solo ${props.bus.name}`}>S</MicroButton>
             <MicroButton active={props.bus.mute} onClick={() => updateBus({ mute: !props.bus.mute })} aria-label={`Mute ${props.bus.name}`}>M</MicroButton>
             <MicroButton active={props.bus.soloSafe === true} onClick={() => updateBus({ soloSafe: !props.bus.soloSafe })} aria-label={`Solo-safe ${props.bus.name}`}>Safe</MicroButton>
           </div>
-          <div class={styles.busMeta}>
-            <span>{props.bus.effects.filters.length} inserts</span>
-            <span>{props.bus.sends?.filter((send) => send.enabled).length ?? 0} active sends</span>
-          </div>
-        </div>
+        </section>
 
-        <section class={styles.rack} aria-label={`${props.bus.name} inserts`}>
+        <section class={styles.insertSection} aria-label={`${props.bus.name} inserts`}>
           <div class={styles.rackHeader}>
             <span class={styles.rackTitle}>Inserts</span>
             <FloatingSelect
@@ -324,11 +318,11 @@ function BusEditorPanel(props: BusEditorPanelProps) {
             />
             <Button size="xs" class={styles.rackAdd} onClick={addInsert}>Add</Button>
           </div>
-          <div class={styles.rackRows}>
-            <Show when={props.bus.effects.filters.length > 0} fallback={<span class={styles.rackEmpty}>No inserts</span>}>
+          <div class={styles.insertCards}>
+            <Show when={props.bus.effects.filters.length > 0} fallback={<span class={styles.emptyState}>No inserts</span>}>
               <For each={props.bus.effects.filters}>
                 {(effect, index) => (
-                  <InsertRow
+                  <InsertCard
                     busId={props.bus.id}
                     effect={effect}
                     index={index()}
@@ -340,8 +334,16 @@ function BusEditorPanel(props: BusEditorPanelProps) {
           </div>
         </section>
 
-        <section class={styles.rack} aria-label={`${props.bus.name} sends`}>
-          <div class={styles.rackHeader}>
+        <section class={styles.outputSection} aria-label={`${props.bus.name} output`}>
+          <SectionTitle title="Output" />
+          <TextInput label="Name" layout="inline" value={props.bus.name} onChange={(event) => updateBus({ name: event.currentTarget.value })} aria-label="Audio bus name" />
+          <FloatingSelect label="Bus to" layout="inline" value={outputValue()} options={outputOptions()} onChange={setOutput} ariaLabel={`${props.bus.name} output destination`} />
+          <FloatingSelect label="Mode" layout="inline" value={props.bus.channelLayout ?? "stereo"} options={[{ value: "stereo", label: "Stereo" }, { value: "mono", label: "Mono" }]} onChange={(channelLayout) => updateBus({ channelLayout: channelLayout === "mono" ? "mono" : "stereo" })} ariaLabel={`${props.bus.name} channel mode`} />
+          <div class={styles.outputMeter} aria-label={`${props.bus.name} stereo meter`} role="meter" aria-valuemin="0" aria-valuemax="1" aria-valuenow={Math.max(meter()?.leftPeak ?? 0, meter()?.rightPeak ?? 0)}>
+            <span class={styles.meterLane}><span class={styles.meterFill} style={{ transform: `scaleX(${clamp01(meter()?.leftPeak ?? meter()?.peak ?? 0)})` }} /></span>
+            <span class={styles.meterLane}><span class={styles.meterFill} style={{ transform: `scaleX(${clamp01(meter()?.rightPeak ?? meter()?.peak ?? 0)})` }} /></span>
+          </div>
+          <div class={styles.sendHeader}>
             <span class={styles.rackTitle}>Sends</span>
             <FloatingSelect
               layout="bare"
@@ -353,8 +355,8 @@ function BusEditorPanel(props: BusEditorPanelProps) {
             />
             <Button size="xs" class={styles.rackAdd} onClick={addSend} disabled={!newSendDestinationId()}>Add</Button>
           </div>
-          <div class={styles.rackRows}>
-            <Show when={(props.bus.sends?.length ?? 0) > 0} fallback={<span class={styles.rackEmpty}>No sends</span>}>
+          <div class={styles.sendRows}>
+            <Show when={(props.bus.sends?.length ?? 0) > 0} fallback={<span class={styles.emptyState}>No sends</span>}>
               <For each={props.bus.sends ?? []}>
                 {(send) => <SendRow bus={props.bus} send={send} buses={props.buses} />}
               </For>
@@ -366,37 +368,52 @@ function BusEditorPanel(props: BusEditorPanelProps) {
   );
 }
 
-interface InsertRowProps {
+interface InsertCardProps {
   busId: Id;
   effect: TrackEffect;
   index: number;
   count: number;
 }
 
-function InsertRow(props: InsertRowProps) {
+function InsertCard(props: InsertCardProps) {
   const store = () => useProjectStore.getState();
+  const patchParam = (key: string, value: number) => store().updateReturnBusEffect(props.busId, props.effect.id, { params: { ...props.effect.params, [key]: value } });
   return (
-    <div class={`${styles.rackRow} ${props.effect.bypassed ? styles.rackRowBypassed : ""}`}>
-      <Button
-        size="xs"
-        variant="ghost"
-        selected={!props.effect.bypassed}
-        class={styles.rackName}
-        aria-pressed={!props.effect.bypassed}
-        onClick={() => store().updateReturnBusEffect(props.busId, props.effect.id, { bypassed: !props.effect.bypassed })}
-      >
-        {EFFECT_LABELS[props.effect.kind]}
-      </Button>
-      <Button iconOnly size="xs" variant="ghost" onClick={() => store().moveReturnBusEffect(props.busId, props.effect.id, -1)} disabled={props.index === 0} aria-label="Move insert up">
-        <Icon name="ph:caret-up" size={18} decorative />
-      </Button>
-      <Button iconOnly size="xs" variant="ghost" onClick={() => store().moveReturnBusEffect(props.busId, props.effect.id, 1)} disabled={props.index === props.count - 1} aria-label="Move insert down">
-        <Icon name="ph:caret-down" size={18} decorative />
-      </Button>
-      <Button iconOnly size="xs" variant="ghost" onClick={() => store().removeReturnBusEffect(props.busId, props.effect.id)} aria-label="Remove insert">
-        <Icon name="ph:x" size={18} decorative />
-      </Button>
-    </div>
+    <article class={`${styles.insertCard} ${props.effect.bypassed ? styles.insertCardBypassed : ""}`}>
+      <header class={styles.insertCardHeader}>
+        <MicroButton active={!props.effect.bypassed} onClick={() => store().updateReturnBusEffect(props.busId, props.effect.id, { bypassed: !props.effect.bypassed })} aria-label={`${props.effect.bypassed ? "Enable" : "Bypass"} ${EFFECT_LABELS[props.effect.kind]}`}>{props.effect.bypassed ? "Off" : "On"}</MicroButton>
+        <strong>{EFFECT_LABELS[props.effect.kind]}</strong>
+        <div class={styles.insertActions}>
+          <Button iconOnly size="xs" variant="ghost" onClick={() => store().moveReturnBusEffect(props.busId, props.effect.id, -1)} disabled={props.index === 0} aria-label="Move insert earlier"><Icon name="ph:caret-up" size={18} decorative /></Button>
+          <Button iconOnly size="xs" variant="ghost" onClick={() => store().moveReturnBusEffect(props.busId, props.effect.id, 1)} disabled={props.index === props.count - 1} aria-label="Move insert later"><Icon name="ph:caret-down" size={18} decorative /></Button>
+          <Button iconOnly size="xs" variant="ghost" onClick={() => store().removeReturnBusEffect(props.busId, props.effect.id)} aria-label="Remove insert"><Icon name="ph:x" size={18} decorative /></Button>
+        </div>
+      </header>
+      <div class={styles.insertGraph}>
+        <SynthCurvePreview samples={effectResponseSamples(props.effect)} label={`${EFFECT_LABELS[props.effect.kind]} parameter response preview`} filled />
+      </div>
+      <div class={styles.effectParameters}>
+        <For each={EFFECT_PARAM_SPECS[props.effect.kind]}>{(param) => <EffectKnob effect={props.effect} param={param} onChange={(value) => patchParam(param.key, value)} />}</For>
+      </div>
+    </article>
+  );
+}
+
+function EffectKnob(props: { effect: TrackEffect; param: EffectParamSpec; onChange: (value: number) => void }) {
+  const value = () => props.effect.params[props.param.key] ?? EFFECT_DEFAULT_PARAMS[props.effect.kind][props.param.key] ?? props.param.min;
+  return (
+    <Knob
+      size="sm"
+      label={props.param.label}
+      min={props.param.min}
+      max={props.param.max}
+      step={props.param.step}
+      value={value()}
+      defaultValue={EFFECT_DEFAULT_PARAMS[props.effect.kind][props.param.key] ?? props.param.min}
+      unit={props.param.unit}
+      formatValue={(next) => formatEffectValue(next, props.param)}
+      onChange={props.onChange}
+    />
   );
 }
 
@@ -454,4 +471,74 @@ function formatDb(value: number): string {
 function formatPan(value: number): string {
   if (Math.abs(value) < 0.01) return "C";
   return `${value < 0 ? "L" : "R"}${Math.round(Math.abs(value) * 100)}`;
+}
+
+function formatCompact(value: number): string {
+  if (Math.abs(value) < 0.05) return "0";
+  return Math.abs(value) >= 10 ? value.toFixed(0) : value.toFixed(1);
+}
+
+function formatEffectValue(value: number, param: EffectParamSpec): string {
+  if (param.unit === "Hz" && value >= 1000) return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`;
+  if (Number.isInteger(param.step)) return Math.round(value).toString();
+  return Math.abs(value) >= 100 ? value.toFixed(0) : value.toFixed(1);
+}
+
+function effectResponseSamples(effect: TrackEffect, count = 64): number[] {
+  const p = (key: string) => effect.params[key] ?? EFFECT_DEFAULT_PARAMS[effect.kind][key] ?? 0;
+  return Array.from({ length: count }, (_, index) => {
+    const x = index / Math.max(1, count - 1);
+    switch (effect.kind) {
+      case "lowpass": {
+        const cutoff = log01(p("cutoffHz"), 20, 20000);
+        const slope = 1 / (1 + Math.exp((x - cutoff) * 24));
+        return slope * 1.5 - 0.75;
+      }
+      case "highpass": {
+        const cutoff = log01(p("cutoffHz"), 20, 20000);
+        const slope = 1 / (1 + Math.exp((cutoff - x) * 24));
+        return slope * 1.5 - 0.75;
+      }
+      case "compressor": {
+        const threshold = clamp01((p("thresholdDb") + 60) / 60);
+        const ratio = Math.max(1, p("ratio"));
+        const output = x <= threshold ? x : threshold + (x - threshold) / ratio;
+        return output * 1.6 - 0.8;
+      }
+      case "reverb": {
+        const room = clamp01(p("roomSize") / 100);
+        const damping = clamp01(p("damping") / 100);
+        return Math.exp(-x * (1.5 + (1 - room) * 5)) * (0.8 - damping * x * 0.35) * 1.7 - 0.72;
+      }
+      case "delay": {
+        const feedback = clamp01(p("feedback") / 100);
+        const repeats = 3 + Math.round(feedback * 7);
+        const phase = (x * repeats) % 1;
+        return (phase < 0.08 ? Math.pow(feedback || 0.15, Math.floor(x * repeats)) : 0) * 1.5 - 0.65;
+      }
+      case "chorus":
+      case "phaser":
+      case "flanger": {
+        const depth = clamp01((p("depthMs") || p("depthOct") || 1) / (effect.kind === "phaser" ? 4 : effect.kind === "flanger" ? 8 : 25));
+        return Math.sin(x * Math.PI * (effect.kind === "phaser" ? 8 : 4)) * (0.18 + depth * 0.58);
+      }
+      case "saturator":
+      case "distortion": {
+        const drive = 1 + clamp01(p("drive") / 100) * 8;
+        return Math.tanh((x * 2 - 1) * drive) * 0.76;
+      }
+      case "bitcrush": {
+        const steps = Math.max(2, Math.round(p("bits")));
+        return (Math.round((x * 2 - 1) * steps) / steps) * 0.76;
+      }
+      case "plugin":
+      default:
+        return (x * 2 - 1) * 0.72;
+    }
+  });
+}
+
+function log01(value: number, min: number, max: number): number {
+  const safe = Math.max(min, Math.min(max, value));
+  return (Math.log(safe) - Math.log(min)) / (Math.log(max) - Math.log(min));
 }

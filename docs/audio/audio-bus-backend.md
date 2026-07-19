@@ -27,7 +27,7 @@ Latency compensation is calculated for Track/Bus primary outputs and sends at ea
 
 ## Main-editor integration
 
-The bottom main-editor panel exposes an accessible horizontal tab list for Master and every Audio Bus. Users can create a Bus, switch tabs by pointer or Left/Right/Home/End keys, rename and meter the selected Bus, choose a cycle-safe output, select mono or stereo operation, adjust input trim/level/pan, and control mute/solo/solo-safe state. The selected Bus also exposes its insert chain (add, bypass, reorder, and remove) and cycle-safe sends (add, enable, level, pre/post-fader, and remove). Bus deletion remains confirmation-gated. The Master tab retains the existing EQ, presets, and automation entry point.
+The bottom main-editor panel exposes an accessible horizontal tab list for Master and every Audio Bus. Users can create a Bus, switch tabs by pointer or Left/Right/Home/End keys, and inspect the selected Bus in four stable columns: routed inputs, channel parameters, insert cards, and output/send routing. Input rows identify primary Track/Bus routes and send routes. Channel controls reuse the same keyboard-accessible Knob used by Aether. Insert cards expose bypass, reorder, removal, editable parameters, and the shared Aether curve-preview component; these curves are deterministic parameter-response illustrations, not measured spectrum or transfer telemetry. The output column owns rename, mono/stereo mode, cycle-safe primary output, metering, and cycle-safe sends (add, enable, level, pre/post-fader, and remove). Bus deletion remains confirmation-gated. The Master tab retains the existing EQ, presets, and automation entry point.
 
 The UI can create/delete buses with `addReturnBus` and `removeReturnBus`, update non-routing properties with `updateReturnBus`, and use these cycle-safe routing operations:
 
@@ -43,7 +43,7 @@ The integrity verifier diagnoses unsupported Bus schema versions, empty names, u
 
 ## Verification
 
-- `npm run verify:audio-bus` checks atomic selected-track creation, stable-ID protection, value normalization, destination validation, nested routing, cycle rejection, sends, insert-chain operations, channel mode, and safe deletion.
+- `npm run verify:audio-bus` checks atomic selected-track creation, stable-ID protection, value normalization, destination validation, nested routing, cycle rejection, sends, insert-chain operations, channel mode, safe deletion, routed-input presentation, shared synth controls/graphs, and editable insert parameters.
 - `npm run verify:design-system` checks that the shared Slider delegates continuous pointer dragging to the native range control and keeps its label on the compact field-label scale.
 - `build-native/bin/BeatBackendStress --audio-bus` checks persistence, malformed/future Bus diagnostics, summing, nested routing, missing/cyclic fail-closed behavior, trim automation, solo isolation, offline rendering, and latency-compensated parallel paths.
 

@@ -23,6 +23,10 @@ try {
   assert.ok(panelSource.includes("canSetAudioBusSend") && panelSource.includes("upsertAudioBusSend"), "Bus send controls should use cycle-safe routing APIs");
   assert.ok(panelSource.includes("moveReturnBusEffect") && panelSource.includes("removeReturnBusEffect"), "Bus insert rack should support reorder and removal");
   assert.ok(panelSource.includes('label="Mode"') && panelSource.includes("channelLayout"), "Bus panel should expose mono/stereo channel mode");
+  assert.ok(panelSource.includes("BusInputRow") && panelSource.includes('title="Inputs"'), "Bus panel should identify routed track, bus, and send inputs");
+  assert.ok(panelSource.includes("<Knob") && panelSource.includes('label="Input Trim"') && panelSource.includes('label="Fader"'), "Bus parameters should reuse the synth knob controls");
+  assert.ok(panelSource.includes("SynthCurvePreview") && panelSource.includes("effectResponseSamples"), "Bus insert cards should reuse the Aether synth curve preview language");
+  assert.ok(panelSource.includes("EFFECT_PARAM_SPECS") && panelSource.includes("patchParam"), "Bus insert cards should expose editable effect parameters");
 
   execFileSync(join(repoRoot, "frontend/node_modules/.bin/esbuild"), [
     join(repoRoot, "frontend/src/state/store.ts"),
@@ -67,6 +71,15 @@ try {
   assert.equal(project.tracks[0].outputBusId, drumBus);
   assert.equal(project.returnBuses.find((bus) => bus.id === drumBus)?.outputBusId, rhythmBus);
   assert.equal(project.returnBuses.find((bus) => bus.id === drumBus)?.sends?.[0]?.preFader, true);
+
+  const compressorId = state().addReturnBusEffect(drumBus, "compressor");
+  const filterId = state().addReturnBusEffect(drumBus, "lowpass");
+  state().updateReturnBusEffect(drumBus, compressorId, { params: { thresholdDb: -24, ratio: 6, attackMs: 8, releaseMs: 160, makeupDb: 1, mix: 100 } });
+  assert.equal(state().project.returnBuses.find((bus) => bus.id === drumBus)?.effects.filters[0]?.params.thresholdDb, -24, "Bus insert parameter edits should persist");
+  state().moveReturnBusEffect(drumBus, filterId, -1);
+  assert.equal(state().project.returnBuses.find((bus) => bus.id === drumBus)?.effects.filters[0]?.id, filterId, "Bus insert cards should reorder the persisted chain");
+  state().removeReturnBusEffect(drumBus, filterId);
+  assert.deepEqual(state().project.returnBuses.find((bus) => bus.id === drumBus)?.effects.filters.map((effect) => effect.id), [compressorId], "Bus insert removal should retain unrelated effects");
 
   state().updateReturnBus(drumBus, {
     id: "mutated-id",

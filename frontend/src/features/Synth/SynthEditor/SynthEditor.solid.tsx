@@ -54,6 +54,7 @@ import {
 import type { EnvelopeCurve, Instrument, TrackEffect } from "../../../state/types";
 import { ModulationMatrix } from "../ModulationMatrix/ModulationMatrix.solid";
 import { OscillatorPanel } from "../OscillatorPanel/OscillatorPanel.solid";
+import { SynthCurvePreview } from "../CurvePreview/SynthCurvePreview.solid";
 import styles from "./SynthEditor.module.css";
 
 const AUDITION_SECONDS = 1.4;
@@ -621,15 +622,9 @@ function InstrumentOutputPreview(props: {
   playing: boolean;
   onToggle: () => void;
 }) {
-  const path = createMemo(() => makeOutputPreviewPath(props.samples));
   return (
     <div class={styles.identityPreview} aria-label="Aether output preview">
-      <svg class={styles.identityPreviewSvg} viewBox="0 0 100 48" preserveAspectRatio="none" aria-hidden="true">
-        <line class={styles.identityPreviewZero} x1="0" y1="24" x2="100" y2="24" />
-        <Show when={path()}>
-          <path class={styles.identityPreviewPath} d={path()} />
-        </Show>
-      </svg>
+      <SynthCurvePreview samples={props.samples} label="Aether output waveform" />
       <div class={styles.identityPreviewActions}>
         <Button size="xs" variant="ghost" selected={props.playing} onClick={props.onToggle}>
           <Icon name={props.playing ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
@@ -1779,16 +1774,6 @@ function mixStereoToMono(left: Float32Array, right: Float32Array): Float32Array 
   const mono = new Float32Array(length);
   for (let i = 0; i < length; i += 1) mono[i] = (left[i] + right[i]) * 0.5;
   return mono;
-}
-
-function makeOutputPreviewPath(samples: number[]): string {
-  if (samples.length <= 1) return "";
-  const last = samples.length - 1;
-  return samples.map((sample, index) => {
-    const x = (index / last) * 100;
-    const y = 24 - clamp(sample, -1, 1) * 18;
-    return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
-  }).join(" ");
 }
 
 function makeFftBands(samples: Float32Array): number[] {
