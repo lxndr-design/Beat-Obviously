@@ -20,6 +20,9 @@ try {
   assert.ok(panelSource.includes("removeReturnBus(props.bus.id)") && panelSource.includes("appConfirm"), "Bus deletion should require confirmation and use reference-safe cleanup");
   assert.ok(panelSource.includes('event.key === "ArrowRight"') && panelSource.includes('event.key === "ArrowLeft"'), "Bus tabs should support keyboard navigation");
   assert.ok(panelSource.includes("canSetAudioBusOutput") && panelSource.includes("setAudioBusOutput"), "Bus output menus should use cycle-safe routing APIs");
+  assert.ok(panelSource.includes("canSetAudioBusSend") && panelSource.includes("upsertAudioBusSend"), "Bus send controls should use cycle-safe routing APIs");
+  assert.ok(panelSource.includes("moveReturnBusEffect") && panelSource.includes("removeReturnBusEffect"), "Bus insert rack should support reorder and removal");
+  assert.ok(panelSource.includes('label="Mode"') && panelSource.includes("channelLayout"), "Bus panel should expose mono/stereo channel mode");
 
   execFileSync(join(repoRoot, "frontend/node_modules/.bin/esbuild"), [
     join(repoRoot, "frontend/src/state/store.ts"),

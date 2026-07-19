@@ -2,9 +2,10 @@ import { createEffect, createMemo, createSignal, For, Show, type JSX } from "sol
 import { appConfirm, Button, FloatingSelect, HoverInfo, Icon, MicroButton, Slider, TextInput } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { useAnalyzerStore } from "../../state/analyzerStore";
-import { canSetAudioBusOutput } from "../../state/audioBusRouting";
+import { canSetAudioBusOutput, canSetAudioBusSend } from "../../state/audioBusRouting";
+import { EFFECT_LABELS, EFFECT_OPTIONS, type EffectKind } from "../../state/effects";
 import { useProjectStore } from "../../state/store";
-import type { Id, ReturnBus } from "../../state/types";
+import type { Id, ReturnBus, TrackEffect, TrackSend } from "../../state/types";
 import { MasterEqPanel } from "../Eq/MasterEqPanel.solid";
 import styles from "./AudioBusPanel.module.css";
 
@@ -136,6 +137,8 @@ interface BusEditorPanelProps {
 
 function BusEditorPanel(props: BusEditorPanelProps) {
   const meter = createStoreSelector(useAnalyzerStore, (state) => state.trackMeters[props.bus.id]);
+  const [newEffectKind, setNewEffectKind] = createSignal<EffectKind>("reverb");
+  const [newSendDestinationId, setNewSendDestinationId] = createSignal<Id>("");
   const updateBus = (patch: Partial<ReturnBus>) => useProjectStore.getState().updateReturnBus(props.bus.id, patch);
   const primaryTrackInputs = () => props.tracks.filter((track) => track.outputEnabled !== false && track.outputBusId === props.bus.id).length;
   const primaryBusInputs = () => props.buses.filter((bus) => bus.outputEnabled !== false && bus.outputBusId === props.bus.id).length;
@@ -160,6 +163,21 @@ function BusEditorPanel(props: BusEditorPanelProps) {
       ? [{ value: props.bus.outputBusId, label: `Missing: ${props.bus.outputBusId}`, disabled: true }]
       : []),
   ];
+  const sendDestinations = () => props.buses.filter((candidate) => (
+    candidate.id !== props.bus.id
+    && !(props.bus.sends ?? []).some((send) => send.busId === candidate.id)
+    && canSetAudioBusSend(props.buses, props.bus.id, candidate.id, { enabled: true })
+  ));
+  const sendDestinationOptions = () => sendDestinations().length > 0
+    ? sendDestinations().map((candidate) => ({ value: candidate.id, label: candidate.name }))
+    : [{ value: "", label: "No destination", disabled: true }];
+
+  createEffect(() => {
+    const available = sendDestinations();
+    if (!available.some((candidate) => candidate.id === newSendDestinationId())) {
+      setNewSendDestinationId(available[0]?.id ?? "");
+    }
+  });
 
   function setOutput(value: string) {
     if (value === NO_OUTPUT_VALUE) {
@@ -167,6 +185,21 @@ function BusEditorPanel(props: BusEditorPanelProps) {
       return;
     }
     useProjectStore.getState().setAudioBusOutput(props.bus.id, value === MASTER_TAB_ID ? undefined : value, true);
+  }
+
+  function addInsert() {
+    useProjectStore.getState().addReturnBusEffect(props.bus.id, newEffectKind());
+  }
+
+  function addSend() {
+    const destinationId = newSendDestinationId();
+    if (!destinationId) return;
+    useProjectStore.getState().upsertAudioBusSend(props.bus.id, destinationId, {
+      enabled: true,
+      gainDb: -12,
+      pan: 0,
+      preFader: false,
+    });
   }
 
   async function removeBus() {
@@ -188,9 +221,6 @@ function BusEditorPanel(props: BusEditorPanelProps) {
       <header class={styles.ribbon}>
         {props.header}
         <div class={styles.ribbonActions}>
-          <Button size="xs" class={styles.actionButton} onClick={() => useProjectStore.getState().addReturnBusEffect(props.bus.id)}>
-            Add Insert
-          </Button>
           <HoverInfo content={`Delete ${props.bus.name}`}>
             <Button iconOnly size="xs" class={styles.iconAction} onClick={() => void removeBus()} aria-label={`Delete ${props.bus.name}`}>
               <Icon name="ph:trash" size={18} decorative />
@@ -215,6 +245,17 @@ function BusEditorPanel(props: BusEditorPanelProps) {
             options={outputOptions()}
             onChange={setOutput}
             ariaLabel={`${props.bus.name} output destination`}
+          />
+          <FloatingSelect
+            label="Mode"
+            layout="inline"
+            value={props.bus.channelLayout ?? "stereo"}
+            options={[
+              { value: "stereo", label: "Stereo" },
+              { value: "mono", label: "Mono" },
+            ]}
+            onChange={(channelLayout) => updateBus({ channelLayout: channelLayout === "mono" ? "mono" : "stereo" })}
+            ariaLabel={`${props.bus.name} channel mode`}
           />
           <div class={styles.inputSummary} aria-label={`${props.bus.name} input summary`}>
             {primaryTrackInputs()} tracks · {primaryBusInputs()} buses · {sendInputs()} sends
@@ -270,8 +311,128 @@ function BusEditorPanel(props: BusEditorPanelProps) {
             <span>{props.bus.sends?.filter((send) => send.enabled).length ?? 0} active sends</span>
           </div>
         </div>
+
+        <section class={styles.rack} aria-label={`${props.bus.name} inserts`}>
+          <div class={styles.rackHeader}>
+            <span class={styles.rackTitle}>Inserts</span>
+            <FloatingSelect
+              layout="bare"
+              value={newEffectKind()}
+              options={EFFECT_OPTIONS}
+              onChange={(value) => setNewEffectKind(value as EffectKind)}
+              ariaLabel="New insert type"
+            />
+            <Button size="xs" class={styles.rackAdd} onClick={addInsert}>Add</Button>
+          </div>
+          <div class={styles.rackRows}>
+            <Show when={props.bus.effects.filters.length > 0} fallback={<span class={styles.rackEmpty}>No inserts</span>}>
+              <For each={props.bus.effects.filters}>
+                {(effect, index) => (
+                  <InsertRow
+                    busId={props.bus.id}
+                    effect={effect}
+                    index={index()}
+                    count={props.bus.effects.filters.length}
+                  />
+                )}
+              </For>
+            </Show>
+          </div>
+        </section>
+
+        <section class={styles.rack} aria-label={`${props.bus.name} sends`}>
+          <div class={styles.rackHeader}>
+            <span class={styles.rackTitle}>Sends</span>
+            <FloatingSelect
+              layout="bare"
+              value={newSendDestinationId()}
+              options={sendDestinationOptions()}
+              onChange={setNewSendDestinationId}
+              ariaLabel="New send destination"
+              disabled={sendDestinations().length === 0}
+            />
+            <Button size="xs" class={styles.rackAdd} onClick={addSend} disabled={!newSendDestinationId()}>Add</Button>
+          </div>
+          <div class={styles.rackRows}>
+            <Show when={(props.bus.sends?.length ?? 0) > 0} fallback={<span class={styles.rackEmpty}>No sends</span>}>
+              <For each={props.bus.sends ?? []}>
+                {(send) => <SendRow bus={props.bus} send={send} buses={props.buses} />}
+              </For>
+            </Show>
+          </div>
+        </section>
       </div>
     </section>
+  );
+}
+
+interface InsertRowProps {
+  busId: Id;
+  effect: TrackEffect;
+  index: number;
+  count: number;
+}
+
+function InsertRow(props: InsertRowProps) {
+  const store = () => useProjectStore.getState();
+  return (
+    <div class={`${styles.rackRow} ${props.effect.bypassed ? styles.rackRowBypassed : ""}`}>
+      <Button
+        size="xs"
+        variant="ghost"
+        selected={!props.effect.bypassed}
+        class={styles.rackName}
+        aria-pressed={!props.effect.bypassed}
+        onClick={() => store().updateReturnBusEffect(props.busId, props.effect.id, { bypassed: !props.effect.bypassed })}
+      >
+        {EFFECT_LABELS[props.effect.kind]}
+      </Button>
+      <Button iconOnly size="xs" variant="ghost" onClick={() => store().moveReturnBusEffect(props.busId, props.effect.id, -1)} disabled={props.index === 0} aria-label="Move insert up">
+        <Icon name="ph:caret-up" size={18} decorative />
+      </Button>
+      <Button iconOnly size="xs" variant="ghost" onClick={() => store().moveReturnBusEffect(props.busId, props.effect.id, 1)} disabled={props.index === props.count - 1} aria-label="Move insert down">
+        <Icon name="ph:caret-down" size={18} decorative />
+      </Button>
+      <Button iconOnly size="xs" variant="ghost" onClick={() => store().removeReturnBusEffect(props.busId, props.effect.id)} aria-label="Remove insert">
+        <Icon name="ph:x" size={18} decorative />
+      </Button>
+    </div>
+  );
+}
+
+interface SendRowProps {
+  bus: ReturnBus;
+  send: TrackSend;
+  buses: ReturnBus[];
+}
+
+function SendRow(props: SendRowProps) {
+  const destination = () => props.buses.find((candidate) => candidate.id === props.send.busId);
+  const updateSend = (patch: Partial<TrackSend>) => useProjectStore.getState().upsertAudioBusSend(props.bus.id, props.send.busId, patch);
+  return (
+    <div class={styles.sendRow}>
+      <MicroButton active={props.send.enabled} onClick={() => updateSend({ enabled: !props.send.enabled })} aria-label={`Enable send to ${destination()?.name ?? "missing bus"}`}>
+        {props.send.enabled ? "On" : "Off"}
+      </MicroButton>
+      <span class={styles.sendName} title={destination()?.name ?? props.send.busId}>{destination()?.name ?? "Missing bus"}</span>
+      <Slider
+        layout="bare"
+        min={-96}
+        max={12}
+        step={0.1}
+        value={props.send.gainDb}
+        disabled={!props.send.enabled}
+        onChange={(gainDb) => updateSend({ gainDb })}
+        ariaLabel={`Send level to ${destination()?.name ?? "missing bus"}`}
+        readout={<span class={styles.readout}>{formatDb(props.send.gainDb)}</span>}
+      />
+      <MicroButton active={props.send.preFader === true} onClick={() => updateSend({ preFader: !props.send.preFader })} aria-label={`Use pre-fader send to ${destination()?.name ?? "missing bus"}`}>
+        {props.send.preFader ? "Pre" : "Post"}
+      </MicroButton>
+      <Button iconOnly size="xs" variant="ghost" onClick={() => useProjectStore.getState().removeAudioBusSend(props.bus.id, props.send.busId)} aria-label="Remove send">
+        <Icon name="ph:x" size={18} decorative />
+      </Button>
+    </div>
   );
 }
 
