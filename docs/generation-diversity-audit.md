@@ -11,28 +11,30 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 
 - Prompt: novel dynamic synth patch, not a preset, surprising macro identity
 - Unique fingerprints: 20
-- Numeric pairwise distance: 0.245
-- Categorical pairwise distance: 0.708
-- Kinds: `{"sampler":2,"synth":4,"wavetable":10,"hybrid":4}`
-- Waveforms: `{"sample":2,"triangle":2,"wavetable":10,"sine":1,"noise":2,"saw":2,"square":1}`
-- Samples: `{"/audio/noisy-foley.wav":1,"none":18,"/samples/flute.wav":1}`
+- Numeric pairwise distance: 0.214
+- Categorical pairwise distance: 0.692
+- Schema coverage: `{"total":20,"targetKindMatches":20,"aetherEligible":20,"aetherStackComplete":20,"canonicalSynthPatch":20,"finiteCoreValues":20}`
+- Kinds: `{"wavetable":20}`
+- Waveforms: `{"wavetable":20}`
+- Samples: `{"none":20}`
 - Name prefixes: `{"Glass":5,"Flux":6,"Wide":1,"Bent":2,"Rift":3,"Bloom":1,"Phase":1,"Prism":1}`
-- Ranges: `{"attackMs":{"min":3,"max":4170,"avg":741.9},"releaseMs":{"min":30,"max":11449,"avg":2673.85},"cutoff":{"min":0.225,"max":0.964,"avg":0.688},"drive":{"min":0.1,"max":0.854,"avg":0.464},"lfoDepth":{"min":0.121,"max":0.938,"avg":0.579},"lfoToPitch":{"min":0,"max":7,"avg":1.15},"glideMs":{"min":0,"max":370,"avg":83.25}}`
+- Ranges: `{"attackMs":{"min":3,"max":3289,"avg":567.35},"releaseMs":{"min":30,"max":11449,"avg":2515.05},"cutoff":{"min":0.306,"max":1,"avg":0.693},"drive":{"min":0.1,"max":0.854,"avg":0.428},"lfoDepth":{"min":0.093,"max":0.9,"avg":0.581},"lfoToPitch":{"min":0,"max":5,"avg":0.85},"glideMs":{"min":0,"max":370,"avg":80.15}}`
 - Flags: none
-- Examples: `[{"name":"Glass novel dynamic synth patch, not a preset, s","kind":"sampler","waveform":"sample","sampleUrl":"/audio/noisy-foley.wav","envelope":{"attackMs":16,"decayMs":501,"sustain":0.3001854422037422,"releaseMs":764},"knobs":{"cutoff":0.22493511366422062,"resonance":0.604488004839275,"drive":0.24183354226561896,"color":0.6692538886963175}},{"name":"Flux novel dynamic synth patch, not a preset, su","kind":"synth","waveform":"triangle","envelope":{"attackMs":35,"decayMs":354,"sustain":0.11235727714950092,"releaseMs":734},"knobs":{"cutoff":0.863099743241025,"resonance":0.5604525612110517,"drive":0.6736831021663654,"color":0.8273415650012165}},{"name":"Flux novel dynamic synth patch, not a preset, su","kind":"wavetable","waveform":"wavetable","envelope":{"attackMs":16,"decayMs":136,"sustain":0.2925381909741732,"releaseMs":30},"knobs":{"cutoff":0.9637189794255974,"resonance":0.49605738959091594,"drive":0.5097238878594823,"color":0.931948798672505}}]`
+- Examples: `[{"name":"Glass novel dynamic synth patch, not a preset, s","kind":"wavetable","waveform":"wavetable","envelope":{"attackMs":32,"decayMs":322,"sustain":0.21538149802730489,"releaseMs":611},"knobs":{"cutoff":0.30565834180249757,"resonance":0.5264263540536287,"drive":0.10010444977861106,"color":0.8447444270976094}},{"name":"Flux novel dynamic synth patch, not a preset, su","kind":"wavetable","waveform":"wavetable","envelope":{"attackMs":35,"decayMs":354,"sustain":0.11235727714950092,"releaseMs":734},"knobs":{"cutoff":0.863099743241025,"resonance":0.5604525612110517,"drive":0.6736831021663654,"color":0.8273415650012165}},{"name":"Flux novel dynamic synth patch, not a preset, su","kind":"wavetable","waveform":"wavetable","envelope":{"attackMs":16,"decayMs":136,"sustain":0.2925381909741732,"releaseMs":30},"knobs":{"cutoff":0.9637189794255974,"resonance":0.49605738959091594,"drive":0.5097238878594823,"color":0.931948798672505}}]`
 
 
 ### wavetable
 
 - Prompt: novel wide aggressive evolving bass lead, strange oscillator movement
 - Unique fingerprints: 20
-- Numeric pairwise distance: 0.256
-- Categorical pairwise distance: 0.722
-- Kinds: `{"wavetable":14,"sampler":6}`
-- Waveforms: `{"wavetable":14,"sample":6}`
-- Samples: `{"none":14,"/samples/vocal-chop.wav":1,"/audio/vocal-texture.wav":1,"/samples/guiro.wav":2,"/samples/clap.wav":1,"/audio/flute-phrase.wav":1}`
+- Numeric pairwise distance: 0.199
+- Categorical pairwise distance: 0.664
+- Schema coverage: `{"total":20,"targetKindMatches":20,"aetherEligible":20,"aetherStackComplete":20,"canonicalSynthPatch":20,"finiteCoreValues":20}`
+- Kinds: `{"wavetable":20}`
+- Waveforms: `{"wavetable":20}`
+- Samples: `{"none":20}`
 - Name prefixes: `{"Prism":3,"Wide":2,"Glass":2,"Bent":4,"Volt":3,"Bloom":2,"Rift":1,"Flux":2,"Dust":1}`
-- Ranges: `{"attackMs":{"min":13,"max":3946,"avg":742.4},"releaseMs":{"min":191,"max":16684,"avg":3354.15},"cutoff":{"min":0.466,"max":1,"avg":0.797},"drive":{"min":0.003,"max":0.796,"avg":0.345},"lfoDepth":{"min":0.088,"max":0.887,"avg":0.451},"lfoToPitch":{"min":0,"max":9,"avg":2.1},"glideMs":{"min":0,"max":366,"avg":160.05}}`
+- Ranges: `{"attackMs":{"min":33,"max":3901,"avg":715.2},"releaseMs":{"min":191,"max":10901,"avg":2611.8},"cutoff":{"min":0.5,"max":1,"avg":0.826},"drive":{"min":0.003,"max":0.796,"avg":0.336},"lfoDepth":{"min":0.145,"max":0.854,"avg":0.487},"lfoToPitch":{"min":0,"max":5,"avg":1.4},"glideMs":{"min":0,"max":386,"avg":139.95}}`
 - Flags: none
 - Examples: `[{"name":"Prism novel wide aggressive evolving bass lead, ","kind":"wavetable","waveform":"wavetable","envelope":{"attackMs":214,"decayMs":650,"sustain":0.4144111696325295,"releaseMs":954},"knobs":{"cutoff":1,"resonance":0.6094971444967655,"drive":0.09251445195405486,"color":0.4364383216947029}},{"name":"Wide novel wide aggressive evolving bass lead, s","kind":"wavetable","waveform":"wavetable","envelope":{"attackMs":102,"decayMs":861,"sustain":0.7010866339230383,"releaseMs":781},"knobs":{"cutoff":0.49974193515244025,"resonance":0.7367737357489643,"drive":0.10801254879800254,"color":1}},{"name":"Glass novel wide aggressive evolving bass lead, ","kind":"wavetable","waveform":"wavetable","envelope":{"attackMs":3901,"decayMs":6226,"sustain":0.33458428314634797,"releaseMs":7388},"knobs":{"cutoff":0.9773467386967254,"resonance":0.3596907782460054,"drive":0.10088674689242001,"color":0.6706935213088028}}]`
 
@@ -41,13 +43,14 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 
 - Prompt: hybrid punchy sampled transient with synthetic metallic tail
 - Unique fingerprints: 20
-- Numeric pairwise distance: 0.196
-- Categorical pairwise distance: 0.649
-- Kinds: `{"hybrid":14,"sampler":6}`
+- Numeric pairwise distance: 0.184
+- Categorical pairwise distance: 0.633
+- Schema coverage: `{"total":20,"targetKindMatches":20,"aetherEligible":0,"aetherStackComplete":0,"canonicalSynthPatch":0,"finiteCoreValues":20}`
+- Kinds: `{"hybrid":20}`
 - Waveforms: `{"saw":5,"triangle":3,"sine":2,"square":2,"sample":6,"noise":2}`
 - Samples: `{"none":14,"/samples/kick.wav":6}`
 - Name prefixes: `{"Phase":2,"Rift":1,"Prism":5,"Flux":2,"Bent":2,"Volt":3,"Wide":2,"Dust":1,"Bloom":2}`
-- Ranges: `{"attackMs":{"min":9,"max":5358,"avg":894.05},"releaseMs":{"min":114,"max":9876,"avg":2594.45},"cutoff":{"min":0.254,"max":1,"avg":0.682},"drive":{"min":0.085,"max":0.683,"avg":0.345},"lfoDepth":{"min":0.068,"max":0.796,"avg":0.485},"lfoToPitch":{"min":0,"max":8,"avg":3.45},"glideMs":{"min":0,"max":384,"avg":94.6}}`
+- Ranges: `{"attackMs":{"min":9,"max":5358,"avg":769.8},"releaseMs":{"min":114,"max":9876,"avg":2528.2},"cutoff":{"min":0.254,"max":1,"avg":0.69},"drive":{"min":0,"max":0.733,"avg":0.351},"lfoDepth":{"min":0.221,"max":0.822,"avg":0.536},"lfoToPitch":{"min":0,"max":8,"avg":2.55},"glideMs":{"min":0,"max":350,"avg":101.35}}`
 - Flags: none
 - Examples: `[{"name":"Phase hybrid punchy sampled transient with synth","kind":"hybrid","waveform":"saw","envelope":{"attackMs":1672,"decayMs":1174,"sustain":0.36120084620136805,"releaseMs":3508},"knobs":{"cutoff":0.7212649540795316,"resonance":0.4414935663535695,"drive":0.6827090300979135,"color":0.9215128567577399}},{"name":"Rift hybrid punchy sampled transient with synthe","kind":"hybrid","waveform":"triangle","envelope":{"attackMs":32,"decayMs":549,"sustain":0.3294586780245689,"releaseMs":303},"knobs":{"cutoff":1,"resonance":0.25526051024685636,"drive":0.2561186346056027,"color":0.7361210779355005}},{"name":"Prism hybrid punchy sampled transient with synth","kind":"hybrid","waveform":"sine","envelope":{"attackMs":147,"decayMs":376,"sustain":0.7177005540010056,"releaseMs":2138},"knobs":{"cutoff":1,"resonance":0.6642030311209164,"drive":0.10515989647696722,"color":0.24378244465276713}}]`
 
@@ -56,13 +59,14 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 
 - Prompt: dusty sampled flute bell vocal texture with unusual attack
 - Unique fingerprints: 20
-- Numeric pairwise distance: 0.198
-- Categorical pairwise distance: 0.603
+- Numeric pairwise distance: 0.207
+- Categorical pairwise distance: 0.606
+- Schema coverage: `{"total":20,"targetKindMatches":20,"aetherEligible":0,"aetherStackComplete":0,"canonicalSynthPatch":0,"finiteCoreValues":20}`
 - Kinds: `{"sampler":20}`
 - Waveforms: `{"sample":20}`
 - Samples: `{"/audio/flute-phrase.wav":4,"/samples/flute.wav":5,"/samples/glass-bell.wav":5,"/samples/vocal-chop.wav":2,"/audio/vocal-texture.wav":2,"/samples/cowbell.wav":2}`
 - Name prefixes: `{"Wide":2,"Volt":3,"Rift":3,"Dust":3,"Glass":4,"Bent":1,"Phase":1,"Prism":1,"Flux":1,"Bloom":1}`
-- Ranges: `{"attackMs":{"min":5,"max":4114,"avg":708.75},"releaseMs":{"min":77,"max":6063,"avg":2055.4},"cutoff":{"min":0.203,"max":1,"avg":0.62},"drive":{"min":0.028,"max":0.644,"avg":0.359},"lfoDepth":{"min":0.206,"max":0.834,"avg":0.527},"lfoToPitch":{"min":0,"max":11,"avg":3.9},"glideMs":{"min":0,"max":292,"avg":81.4}}`
+- Ranges: `{"attackMs":{"min":5,"max":4114,"avg":708.75},"releaseMs":{"min":77,"max":6063,"avg":2055.4},"cutoff":{"min":0.203,"max":1,"avg":0.62},"drive":{"min":0.028,"max":0.644,"avg":0.359},"lfoDepth":{"min":0.097,"max":0.884,"avg":0.513},"lfoToPitch":{"min":0,"max":12,"avg":4.4},"glideMs":{"min":0,"max":292,"avg":81.4}}`
 - Flags: none
 - Examples: `[{"name":"Wide dusty sampled flute bell vocal texture with","kind":"sampler","waveform":"sample","sampleUrl":"/audio/flute-phrase.wav","envelope":{"attackMs":3773,"decayMs":5061,"sustain":0.9350197147089148,"releaseMs":3837},"knobs":{"cutoff":0.20337821816717191,"resonance":0.5261632879852147,"drive":0.2919829165909825,"color":0.5288647119013429}},{"name":"Volt dusty sampled flute bell vocal texture with","kind":"sampler","waveform":"sample","sampleUrl":"/samples/flute.wav","envelope":{"attackMs":3212,"decayMs":5151,"sustain":0.35288440255116876,"releaseMs":6063},"knobs":{"cutoff":0.2184597092161233,"resonance":0.5928181306984359,"drive":0.14090101856011944,"color":0.55466293568032}},{"name":"Rift dusty sampled flute bell vocal texture with","kind":"sampler","waveform":"sample","sampleUrl":"/samples/glass-bell.wav","envelope":{"attackMs":23,"decayMs":83,"sustain":0.12790918021831157,"releaseMs":77},"knobs":{"cutoff":0.6566259220273356,"resonance":0.42504182200182317,"drive":0.46705661337615767,"color":0.7839822730093646}}]`
 

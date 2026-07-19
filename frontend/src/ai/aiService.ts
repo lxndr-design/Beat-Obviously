@@ -484,14 +484,14 @@ function generateLocalInstrumentPatch(opts: GenerateInstrumentOptions): Partial<
   const brass = /\b(brass|horn|trumpet|trombone)\b/.test(lower);
   const bell = /\b(bell|glass|mallet|chime)\b/.test(lower);
   const pluck = /\b(pluck|pizzicato|harp|short)\b/.test(lower);
-  const kind: Instrument["kind"] = sample && lane.sampleBias > 0.45
-    ? "sampler"
-    : targetKind === "wavetable"
+  const kind: Instrument["kind"] = targetKind === "wavetable" || targetKind === "synth"
     ? "wavetable"
     : targetKind === "sampler"
     ? "sampler"
     : targetKind === "hybrid"
     ? "hybrid"
+    : sample && lane.sampleBias > 0.45
+    ? "sampler"
     : lane.kind === "synth"
     ? "wavetable"
     : lane.kind === "wavetable"
@@ -557,7 +557,9 @@ function generateLocalInstrumentPatch(opts: GenerateInstrumentOptions): Partial<
         noise: { enabled: noisy || bright && rnd() > 0.42, level: 0.035 + rnd() * 0.18, color: 0.2 + rnd() * 0.75 },
       }, opts.current.aether),
     } : {}),
-    ...(sample?.sampleUrl ? { sampleUrl: sample.sampleUrl, sampleIds: [], source: { kind: "derived", label: sample.sourceLabel, url: sample.sampleUrl, edited: false } } : {}),
+    ...(sample?.sampleUrl && (kind === "sampler" || kind === "hybrid")
+      ? { sampleUrl: sample.sampleUrl, sampleIds: [], source: { kind: "derived", label: sample.sourceLabel, url: sample.sampleUrl, edited: false } }
+      : {}),
   };
 
   return withAetherSynthPatch(patch, opts);

@@ -24,10 +24,12 @@
     "verify:track-interactions": "node ../scripts/verify-track-interactions.mjs",
     "verify:drums": "node ../scripts/verify-drum-generation.mjs",
     "verify:interactions": "node ../scripts/verify-frontend-interactions.mjs",
-    "verify:non-native": "npm run verify:version && npm run verify:design-system && npm run verify:audio-boundary && npm run verify:sampler-zones && npm run typecheck && npm run verify:synth && npm run verify:benchmark-instruments && npm run verify:daw && npm run verify:documents && npm run verify:track-interactions && npm run verify:interactions && npm run verify:node-instrument && npm run verify:drums && npm run build",
+    "verify:non-native": "npm run verify:version && npm run verify:design-system && npm run verify:audio-boundary && npm run verify:sampler-zones && npm run typecheck && npm run verify:synth && npm run verify:benchmark-instruments && npm run audit:generation && npm run verify:daw && npm run verify:documents && npm run verify:track-interactions && npm run verify:interactions && npm run verify:node-instrument && npm run verify:drums && npm run build",
     "visualize:codebase": "node ../scripts/generate-codebase-visualizer.mjs",
     "generate:icons": "node ../scripts/generate-icon-subset.mjs",
     "audit:aether-presets": "node ../scripts/audit-aether-presets.mjs",
+    "benchmark:aether-serum": "node ../scripts/benchmark-aether-serum.mjs",
+    "audit:generation": "node ../scripts/audit-generation-diversity.mjs",
     "benchmark:midi-stress": "node ../scripts/benchmark-dense-midi.mjs"
   },
   "dependencies": {

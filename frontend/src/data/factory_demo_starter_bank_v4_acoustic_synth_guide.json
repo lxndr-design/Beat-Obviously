@@ -5041,6 +5041,128 @@
         "The xylophone patch relies on short amp decay, bright transient scanning, high keytrack, and velocity to attack brightness.",
         "For more realistic mallets later, add per-oscillator envelopes or a small click/noise transient source."
       ]
+    },
+    {
+      "name": "Benchmark - Future Bass Strings",
+      "category": "Synth String",
+      "family": "Benchmark Strings",
+      "role": "rhythmic future-bass string stack",
+      "intent": "Bright, animated future-bass string and supersaw hybrid with a saw-plus-square oscillator stack, tempo-synced amplitude and filter motion, chorus, phaser, saturation, delay, and bright room ambience.",
+      "auditionNote": "Audition syncopated four-note chords from C3 through C5; the pumping motion should remain audible while attacks stay smooth and the upper octave avoids brittle aliasing.",
+      "tags": ["benchmark", "strings", "future-bass", "edm", "chords", "supersaw", "rhythmic", "bright"],
+      "playMode": { "polyphony": 24, "mono": false, "legato": false, "glideMs": 0 },
+      "oscillators": {
+        "oscA": {
+          "enabled": true, "mode": "basic", "shape": "saw", "position": 0,
+          "warpMode": "shape", "warp": 8, "octave": 0, "semitone": 0,
+          "fineCents": 0, "phase": 0, "random": 90, "pan": 0, "level": 80
+        },
+        "oscB": {
+          "enabled": true, "mode": "basic", "shape": "square", "position": 0,
+          "warpMode": "shape", "warp": 16, "octave": 1, "semitone": 0,
+          "fineCents": 3, "phase": 25, "random": 95, "pan": 0, "level": 28
+        }
+      },
+      "voiceStack": { "enabled": true, "voices": 9, "detune": 18, "blend": 68, "spread": 95, "max": 24 },
+      "filter": { "enabled": true, "type": "LP12", "cutoffHz": 6500, "resonance": 14, "drive": 12, "keytrack": 42 },
+      "amp": { "level": 86, "pan": 0 },
+      "runtimeWarp": { "enabled": true, "mode": "shape", "amount": 8 },
+      "envelopes": {
+        "ampEnv": { "attackMs": 65, "decayMs": 700, "sustain": 78, "releaseMs": 1100, "attackCurve": "linear", "decayCurve": "exp", "releaseCurve": "exp" },
+        "modEnv": { "attackMs": 50, "decayMs": 650, "sustain": 32, "releaseMs": 750, "attackCurve": "linear", "decayCurve": "exp", "releaseCurve": "exp" }
+      },
+      "lfos": {
+        "lfo1": { "enabled": true, "shape": "sine", "sync": false, "rateHz": 5.4, "phase": 0, "smooth": 15, "random": 4, "oneShot": false, "retrigger": false },
+        "lfo2": { "enabled": true, "shape": "saw", "sync": true, "rate": "1/4", "phase": 50, "smooth": 58, "random": 0, "oneShot": false, "retrigger": true }
+      },
+      "macros": [
+        { "slot": "motion", "label": "Pump", "default": 38 },
+        { "slot": "color", "label": "Brightness", "default": 58 },
+        { "slot": "shape", "label": "Bite", "default": 50 },
+        { "slot": "space", "label": "Space", "default": 42 }
+      ],
+      "modulationMatrix": [
+        { "enabled": true, "source": "lfo1", "target": "oscA.fine", "amount": 3, "polarity": "bipolar" },
+        { "enabled": true, "source": "lfo1", "target": "oscB.fine", "amount": 3, "polarity": "bipolar" },
+        { "enabled": true, "source": "lfo2", "target": "amp.level", "amount": 24, "polarity": "unipolar" },
+        { "enabled": true, "source": "lfo2", "target": "filter.cutoffHz", "amount": 10, "polarity": "unipolar" },
+        { "enabled": true, "source": "velocity", "target": "amp.level", "amount": 34, "polarity": "unipolar" },
+        { "enabled": true, "source": "velocity", "target": "filter.cutoffHz", "amount": 25, "polarity": "unipolar" },
+        { "enabled": true, "source": "velocity", "target": "oscB.level", "amount": 10, "polarity": "unipolar" },
+        { "enabled": true, "source": "macro.motion", "target": "filter.cutoffHz", "amount": 12, "polarity": "unipolar" },
+        { "enabled": true, "source": "macro.color", "target": "filter.cutoffHz", "amount": 38, "polarity": "unipolar" },
+        { "enabled": true, "source": "macro.color", "target": "oscB.level", "amount": 16, "polarity": "unipolar" },
+        { "enabled": true, "source": "macro.shape", "target": "oscA.warp", "amount": 18, "polarity": "unipolar" },
+        { "enabled": true, "source": "macro.space", "target": "unison.spread", "amount": 12, "polarity": "unipolar" }
+      ],
+      "fxChain": [
+        { "type": "Chorus", "params": { "rateHz": 0.52, "depthMs": 5.5, "delayMs": 15, "feedback": 7, "mix": 25 } },
+        { "type": "Phaser", "params": { "rateHz": 0.12, "centerHz": 1150, "depthOctaves": 1.2, "feedback": 8, "mix": 8 } },
+        { "type": "Saturator", "params": { "drive": 14, "tone": 50, "mix": 42 } },
+        { "type": "High-pass", "params": { "cutoffHz": 170, "resonance": 0 } },
+        { "type": "Compressor", "params": { "thresholdDb": -20, "ratio": 3, "attackMs": 8, "releaseMs": 180, "makeupDb": 2, "mix": 70 } },
+        { "type": "Delay", "params": { "timeMs": 375, "feedback": 18, "mix": 8 } },
+        { "type": "Reverb / Room", "params": { "size": 72, "damping": 35, "mix": 20 } }
+      ]
+    },
+    {
+      "name": "Benchmark - Progressive House Strings",
+      "category": "Synth String",
+      "family": "Benchmark Strings",
+      "role": "sustained progressive-house string pad",
+      "intent": "Warm, sustained progressive-house string pad built from layered saw oscillators, moderate unison, slow filter bloom, chorus, saturation, compression, and a large room.",
+      "auditionNote": "Audition held triads from C2 through C5 and overlapping chord changes; the swell should stay warm, wide, coherent, and free of clicks across long releases.",
+      "tags": ["benchmark", "strings", "progressive-house", "edm", "pad", "supersaw", "warm", "wide"],
+      "playMode": { "polyphony": 24, "mono": false, "legato": false, "glideMs": 0 },
+      "oscillators": {
+        "oscA": {
+          "enabled": true, "mode": "basic", "shape": "saw", "position": 0,
+          "warpMode": "shape", "warp": 4, "octave": 0, "semitone": 0,
+          "fineCents": 0, "phase": 0, "random": 72, "pan": 0, "level": 82
+        },
+        "oscB": {
+          "enabled": true, "mode": "basic", "shape": "saw", "position": 0,
+          "warpMode": "shape", "warp": 8, "octave": 1, "semitone": 0,
+          "fineCents": -4, "phase": 0, "random": 88, "pan": 0, "level": 24
+        }
+      },
+      "voiceStack": { "enabled": true, "voices": 7, "detune": 12, "blend": 62, "spread": 82, "max": 24 },
+      "filter": { "enabled": true, "type": "LP12", "cutoffHz": 4700, "resonance": 8, "drive": 6, "keytrack": 30 },
+      "amp": { "level": 88, "pan": 0 },
+      "runtimeWarp": { "enabled": false, "mode": "shape", "amount": 0 },
+      "envelopes": {
+        "ampEnv": { "attackMs": 240, "decayMs": 1800, "sustain": 82, "releaseMs": 2600, "attackCurve": "linear", "decayCurve": "exp", "releaseCurve": "exp" },
+        "modEnv": { "attackMs": 650, "decayMs": 2600, "sustain": 45, "releaseMs": 2200, "attackCurve": "linear", "decayCurve": "exp", "releaseCurve": "exp" }
+      },
+      "lfos": {
+        "lfo1": { "enabled": true, "shape": "sine", "sync": false, "rateHz": 5.1, "phase": 0, "smooth": 20, "random": 5, "oneShot": false, "retrigger": false },
+        "lfo2": { "enabled": true, "shape": "sine", "sync": false, "rateHz": 0.14, "phase": 25, "smooth": 70, "random": 18, "oneShot": false, "retrigger": false }
+      },
+      "macros": [
+        { "slot": "motion", "label": "Drift", "default": 35 },
+        { "slot": "color", "label": "Warmth", "default": 45 },
+        { "slot": "shape", "label": "Bloom", "default": 40 },
+        { "slot": "space", "label": "Hall", "default": 55 }
+      ],
+      "modulationMatrix": [
+        { "enabled": true, "source": "lfo1", "target": "oscA.fine", "amount": 4.5, "polarity": "bipolar" },
+        { "enabled": true, "source": "lfo1", "target": "oscB.fine", "amount": 4.5, "polarity": "bipolar" },
+        { "enabled": true, "source": "lfo2", "target": "filter.cutoffHz", "amount": 7, "polarity": "bipolar" },
+        { "enabled": true, "source": "velocity", "target": "amp.level", "amount": 22, "polarity": "unipolar" },
+        { "enabled": true, "source": "velocity", "target": "filter.cutoffHz", "amount": 12, "polarity": "unipolar" },
+        { "enabled": true, "source": "macro.motion", "target": "filter.cutoffHz", "amount": 18, "polarity": "unipolar" },
+        { "enabled": true, "source": "macro.color", "target": "filter.cutoffHz", "amount": 32, "polarity": "unipolar" },
+        { "enabled": true, "source": "macro.color", "target": "oscB.level", "amount": 10, "polarity": "unipolar" },
+        { "enabled": true, "source": "macro.shape", "target": "oscA.warp", "amount": 12, "polarity": "unipolar" },
+        { "enabled": true, "source": "macro.space", "target": "unison.spread", "amount": 14, "polarity": "unipolar" }
+      ],
+      "fxChain": [
+        { "type": "Chorus", "params": { "rateHz": 0.33, "depthMs": 4.5, "delayMs": 18, "feedback": 8, "mix": 28 } },
+        { "type": "Saturator", "params": { "drive": 8, "tone": 50, "mix": 35 } },
+        { "type": "High-pass", "params": { "cutoffHz": 140, "resonance": 0 } },
+        { "type": "Compressor", "params": { "thresholdDb": -18, "ratio": 2, "attackMs": 20, "releaseMs": 260, "makeupDb": 1.5, "mix": 60 } },
+        { "type": "Reverb / Room", "params": { "size": 82, "damping": 58, "mix": 26 } }
+      ]
     }
   ],
   "expansionNotes": {
@@ -5075,10 +5197,14 @@
       "Resin Violin Lead - stylized bowed string/violin lead",
       "Block Felt Piano - soft synthetic felt-piano approximation",
       "Toy Xylophone - synthetic wooden mallet/xylophone patch"
+    ],
+    "addedBenchmarks": [
+      "Benchmark - Future Bass Strings - rhythmic bright string/supersaw reference",
+      "Benchmark - Progressive House Strings - sustained warm string-pad reference"
     ]
   },
   "patchSummary": {
-    "totalPatchCount": 17,
+    "totalPatchCount": 19,
     "categories": {
       "Poly Keys": 1,
       "Arp Pluck": 1,
@@ -5094,7 +5220,7 @@
       "Crunch Lead": 1,
       "Vocal Pad": 1,
       "Vocal Pluck": 1,
-      "Synth String": 1,
+      "Synth String": 3,
       "Keys / Synth Piano": 1,
       "Mallet": 1
     }

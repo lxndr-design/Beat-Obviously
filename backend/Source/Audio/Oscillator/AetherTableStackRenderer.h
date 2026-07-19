@@ -183,6 +183,23 @@ namespace beat::AetherTableStackRenderer
             levelSum += safeLevel;
         };
 
+        const auto addStereo = [&](float leftValue, float rightValue, float level, int routing, StereoFrame& sourceFrame)
+        {
+            const float safeLevel = VoiceMath::clamp01(level);
+            auto& destinationLeft = routing == 1 ? directLeftSum : routing == 2 ? filter1LeftSum : routing == 3 ? filter2LeftSum : leftSum;
+            auto& destinationRight = routing == 1 ? directRightSum : routing == 2 ? filter1RightSum : routing == 3 ? filter2RightSum : rightSum;
+            const float sourceLeft = leftValue * safeLevel;
+            const float sourceRight = rightValue * safeLevel;
+            destinationLeft += sourceLeft;
+            destinationRight += sourceRight;
+            if (params.hasAetherSourceSends)
+            {
+                sourceFrame.left += sourceLeft;
+                sourceFrame.right += sourceRight;
+            }
+            levelSum += safeLevel;
+        };
+
         const auto renderOsc = [&](
             const auto& osc,
             std::array<WavetableOscillator, 8>& oscillators,
@@ -244,6 +261,7 @@ namespace beat::AetherTableStackRenderer
             float value = 0.0f;
             float oscillatorDetuneMod = 0.0f;
             float oscillatorSpreadMod = 0.0f;
+            bool stereoAdded = false;
             if (osc.waveform == 5)
             {
                 oscillatorDetuneMod = useDynamicModulation && unisonDetuneIsDynamic
@@ -252,7 +270,7 @@ namespace beat::AetherTableStackRenderer
                 oscillatorSpreadMod = useDynamicModulation && unisonSpreadIsDynamic
                     ? DynamicModulation::targetOffset(unisonSpreadTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f)
                     : 0.0f;
-                const auto tableResult = WavetableOscillatorBank::render(
+                const auto tableResult = WavetableOscillatorBank::renderStereo(
                     oscillators,
                     unisonPlan,
                     osc.wavetable,
@@ -261,8 +279,11 @@ namespace beat::AetherTableStackRenderer
                     sampleRate,
                     positionMod,
                     unisonDetuneMod + oscillatorDetuneMod,
-                    unisonSpreadMod + oscillatorSpreadMod);
-                value = tableResult.sample;
+                    unisonSpreadMod + oscillatorSpreadMod,
+                    modulatedPan);
+                addStereo(tableResult.left, tableResult.right, modulatedLevel, osc.routing, sourceFrame);
+                value = (tableResult.left + tableResult.right) * 0.5f;
+                stereoAdded = true;
                 result.work.wavetableVoiceSamples += tableResult.voiceSamples;
                 result.work.wavetableFrequencyUpdates += tableResult.frequencyUpdates;
                 result.work.wavetablePositionUpdates += tableResult.positionUpdates;
@@ -278,7 +299,8 @@ namespace beat::AetherTableStackRenderer
             rendered = { value, modulatedLevel, leftGain, rightGain, osc.routing, true,
                          rate, positionMod, unisonDetuneMod + oscillatorDetuneMod,
                          unisonSpreadMod + oscillatorSpreadMod };
-            add(value, modulatedLevel, modulatedPan, staticPanGains, panIsDynamic, osc.routing, sourceFrame);
+            if (!stereoAdded)
+                add(value, modulatedLevel, modulatedPan, staticPanGains, panIsDynamic, osc.routing, sourceFrame);
         };
 
         renderOsc(

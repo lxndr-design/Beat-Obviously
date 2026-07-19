@@ -28,6 +28,10 @@ const REQUIRED_FAMILIES = [
   "Vocal Pad",
   "Vocal Pluck",
 ];
+const REQUIRED_BENCHMARK_PRESETS = [
+  "Benchmark - Future Bass Strings",
+  "Benchmark - Progressive House Strings",
+];
 const MIN_RMS = 0.005;
 const MIN_PEAK = 0.02;
 const MAX_PEAK = 0.99;
@@ -290,6 +294,11 @@ try {
   if (missingFamilies.length > 0) {
     throw new Error(`Factory Aether presets are missing required families: ${missingFamilies.join(", ")}`);
   }
+  const presetNames = new Set(rows.map((row) => row.name));
+  const missingBenchmarks = REQUIRED_BENCHMARK_PRESETS.filter((name) => !presetNames.has(name));
+  if (missingBenchmarks.length > 0) {
+    throw new Error(`Factory Aether presets are missing required benchmark instruments: ${missingBenchmarks.join(", ")}`);
+  }
 
   console.log(JSON.stringify({
     ok: true,
@@ -301,6 +310,7 @@ try {
     },
     families: [...new Set(rows.map((row) => row.family))].sort(),
     auditionLogComplete: true,
+    benchmarkPresetsComplete: true,
     presets: rows,
   }, null, 2));
 } finally {

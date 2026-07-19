@@ -119,7 +119,7 @@ Current implementation focus:
    - Done: in-app browser replay now covers node creation, cable routing, warning transitions, parameter editing, undo/redo, play/audition, and apply through `?beatDevFixture=node-interaction`.
    - Continue realtime allocation/polish hardening, user-facing node descriptions, editor ergonomics, and broader save/open browser smoke.
 8. `[~]` Generation and musical intelligence.
-   - Measure Aether-aware instrument generation against the current Aether schema.
+   - Done: deterministic local generation audit measures requested-kind fidelity, Aether stack completeness, canonical synth-patch creation, finite values, and cross-seed diversity against the current schema.
    - Add structured beat/pattern generation with phrase sections, fills, rests, density maps, accents, ghost notes, and editable provenance.
    - Add genre/invariant tests and training/export loops that preserve accepted user edits.
 9. `[~]` UI coherence and framework cleanup.
@@ -353,7 +353,9 @@ Current implementation focus:
 
 ## Generation
 
-- `[~]` Measure Aether-aware instrument generation against the current Aether schema.
+- `[x]` Measure Aether-aware instrument generation against the current Aether schema.
+  - Done: `npm run audit:generation -- --runs=20` produced 20/20 requested-kind matches, complete Aether stacks, canonical synth patches, and finite core values for both Synth and Wavetable cohorts; explicit target kind now remains authoritative instead of random sample bias changing a requested Aether instrument into a sampler.
+  - The schema checks are hard failures in `verify:non-native`; diversity distances and convergence flags remain diagnostic rather than invented release thresholds.
 - `[ ]` Generated pattern structure: sections, fills, rests, density maps, ghost notes, accents.
 - `[ ]` Complexity as musical density/variation, not instrument count.
 - `[ ]` Drummer-like constraints: limb independence, backbeat anchors, phrase length, fills into transitions.

@@ -2021,6 +2021,188 @@ namespace
         return project;
     }
 
+    beat::TrackEffect makeSerumBenchmarkEffect(
+        const juce::String& id,
+        beat::TrackEffectKind kind,
+        std::initializer_list<beat::TrackEffectParam> params)
+    {
+        beat::TrackEffect effect;
+        effect.id = id;
+        effect.kind = kind;
+        effect.params.assign(params.begin(), params.end());
+        return effect;
+    }
+
+    beat::Project makeSerumBenchmarkProject(bool futureBass, bool includeEffects = true)
+    {
+        beat::Project project;
+        project.id = futureBass ? "serum-1-future-bass-benchmark" : "serum-1-progressive-house-benchmark";
+        project.name = futureBass ? "Benchmark - Future Bass Strings" : "Benchmark - Progressive House Strings";
+        project.bpm = futureBass ? 128.0 : 126.0;
+        project.lengthBeats = 8.0;
+
+        const auto cutoffTo01 = [] (float hz)
+        {
+            return juce::jlimit(0.0f, 1.0f, std::log(hz / 20.0f) / std::log(1000.0f));
+        };
+
+        beat::InstrumentDefinition instrument;
+        instrument.id = futureBass ? "serum-1-future-bass" : "serum-1-progressive-house";
+        instrument.kind = "wavetable";
+        instrument.waveform = 5;
+        instrument.hasAether = true;
+        instrument.maxVoices = 24;
+        instrument.cutoff01 = cutoffTo01(futureBass ? 6500.0f : 4700.0f);
+        instrument.filterKeytrack = futureBass ? 0.42f : 0.30f;
+        instrument.resonance01 = futureBass ? 0.14f : 0.08f;
+        instrument.drive01 = futureBass ? 0.12f : 0.06f;
+        instrument.filterType = 0;
+        instrument.attackMs = futureBass ? 65.0f : 240.0f;
+        instrument.decayMs = futureBass ? 700.0f : 1800.0f;
+        instrument.sustain = futureBass ? 0.78f : 0.82f;
+        instrument.releaseMs = futureBass ? 1100.0f : 2600.0f;
+        instrument.attackCurve = 0;
+        instrument.decayCurve = 1;
+        instrument.releaseCurve = 1;
+        instrument.env2AttackMs = futureBass ? 50.0f : 650.0f;
+        instrument.env2DecayMs = futureBass ? 650.0f : 2600.0f;
+        instrument.env2Sustain = futureBass ? 0.32f : 0.45f;
+        instrument.env2ReleaseMs = futureBass ? 750.0f : 2200.0f;
+        instrument.env2DecayCurve = 1;
+        instrument.env2ReleaseCurve = 1;
+        instrument.ampLevel = futureBass ? 0.86f : 0.88f;
+        instrument.lfoWaveform = 0;
+        instrument.lfoRateHz = futureBass ? 5.4f : 5.1f;
+        instrument.lfoDepth = 1.0f;
+        instrument.lfoSmoothing = futureBass ? 0.15f : 0.20f;
+        instrument.lfoRandomPhase = futureBass ? 0.04f : 0.05f;
+        instrument.lfoRetrigger = false;
+        instrument.lfo2Enabled = true;
+        instrument.lfo2Waveform = futureBass ? 2 : 0;
+        instrument.lfo2RateHz = futureBass ? (project.bpm / 60.0f) : 0.14f;
+        instrument.lfo2Sync = futureBass;
+        instrument.lfo2SyncedRate = "1/4";
+        instrument.lfo2Smoothing = futureBass ? 0.58f : 0.70f;
+        instrument.lfo2RandomPhase = futureBass ? 0.0f : 0.18f;
+        instrument.lfo2PhaseOffset = futureBass ? 0.5f : 0.25f;
+        instrument.lfo2Retrigger = futureBass;
+        instrument.macroValues = futureBass
+            ? std::array<float, 8> { 0.38f, 0.58f, 0.50f, 0.42f, 0.0f, 0.0f, 0.0f, 0.0f }
+            : std::array<float, 8> { 0.35f, 0.45f, 0.40f, 0.55f, 0.0f, 0.0f, 0.0f, 0.0f };
+
+        const int unisonVoices = futureBass ? 8 : 7;
+        const float unisonDetune = futureBass ? 18.0f : 12.0f;
+        const float unisonSpread = futureBass ? 0.95f : 0.82f;
+        instrument.wavetableBank = 0;
+        instrument.wavetableUnison = unisonVoices;
+        instrument.wavetableDetuneCents = unisonDetune;
+        instrument.wavetableBlend = unisonSpread;
+
+        auto& oscA = instrument.aether.oscA;
+        oscA.enabled = true;
+        oscA.level = futureBass ? 0.80f : 0.82f;
+        oscA.randomPhase = futureBass ? 0.90f : 0.72f;
+        oscA.wavetable.bank = 0;
+        oscA.wavetable.warp = futureBass ? 0.08f : 0.04f;
+        oscA.wavetable.unison = unisonVoices;
+        oscA.wavetable.detuneCents = unisonDetune;
+        oscA.wavetable.blend = unisonSpread;
+
+        auto& oscB = instrument.aether.oscB;
+        oscB.enabled = true;
+        oscB.level = futureBass ? 0.28f : 0.24f;
+        oscB.octave = 1;
+        oscB.fineCents = futureBass ? 3.0f : -4.0f;
+        oscB.phase = futureBass ? 0.25f : 0.0f;
+        oscB.randomPhase = futureBass ? 0.95f : 0.88f;
+        oscB.wavetable.bank = futureBass ? 2 : 0;
+        oscB.wavetable.warp = futureBass ? 0.16f : 0.08f;
+        oscB.wavetable.unison = unisonVoices;
+        oscB.wavetable.detuneCents = unisonDetune;
+        oscB.wavetable.blend = unisonSpread;
+        instrument.aether.runtimeWarp = futureBass ? 0.08f : 0.0f;
+        instrument.aether.runtimeWarpMode = 0;
+
+        auto& modulation = instrument.dynamicModulation;
+        modulation.active = true;
+        modulation.oscAFine.lfo = futureBass ? 0.03f : 0.045f;
+        modulation.oscBFine.lfo = futureBass ? 0.03f : 0.045f;
+        modulation.ampLevel.velocity = futureBass ? 0.34f : 0.22f;
+        modulation.filterCutoff.velocity = futureBass ? 0.25f : 0.12f;
+        modulation.filterCutoff.lfo2 = futureBass ? 0.10f : 0.07f;
+        modulation.filterCutoff.lfo2Bipolar = !futureBass;
+        modulation.filterCutoff.macro1 = futureBass ? 0.12f : 0.18f;
+        modulation.filterCutoff.macro2 = futureBass ? 0.38f : 0.32f;
+        modulation.oscBLevel.velocity = futureBass ? 0.10f : 0.0f;
+        modulation.oscBLevel.macro2 = futureBass ? 0.16f : 0.10f;
+        modulation.unisonSpread.macro4 = futureBass ? 0.12f : 0.14f;
+        if (futureBass)
+        {
+            modulation.ampLevel.lfo2 = 0.24f;
+            modulation.ampLevel.lfo2Bipolar = false;
+        }
+
+        if (includeEffects)
+        {
+            instrument.effects.push_back(makeSerumBenchmarkEffect("benchmark-chorus", beat::TrackEffectKind::Chorus,
+                { { "rateHz", futureBass ? 0.52f : 0.33f }, { "depthMs", futureBass ? 5.5f : 4.5f },
+                  { "delayMs", futureBass ? 15.0f : 18.0f }, { "feedback", futureBass ? 7.0f : 8.0f },
+                  { "mix", futureBass ? 25.0f : 28.0f } }));
+            if (futureBass)
+            {
+                instrument.effects.push_back(makeSerumBenchmarkEffect("benchmark-phaser", beat::TrackEffectKind::Phaser,
+                    { { "rateHz", 0.12f }, { "centerHz", 1150.0f }, { "depthOct", 1.2f },
+                      { "feedback", 8.0f }, { "mix", 8.0f } }));
+            }
+            instrument.effects.push_back(makeSerumBenchmarkEffect("benchmark-saturator", beat::TrackEffectKind::Saturator,
+                { { "drive", futureBass ? 14.0f : 8.0f }, { "mix", futureBass ? 42.0f : 35.0f } }));
+            instrument.effects.push_back(makeSerumBenchmarkEffect("benchmark-highpass", beat::TrackEffectKind::Highpass,
+                { { "cutoffHz", futureBass ? 170.0f : 140.0f }, { "resonance", 0.0f } }));
+            instrument.effects.push_back(makeSerumBenchmarkEffect("benchmark-compressor", beat::TrackEffectKind::Compressor,
+                { { "thresholdDb", futureBass ? -20.0f : -18.0f }, { "ratio", futureBass ? 3.0f : 2.0f },
+                  { "attackMs", futureBass ? 8.0f : 20.0f }, { "releaseMs", futureBass ? 180.0f : 260.0f },
+                  { "makeupDb", futureBass ? 2.0f : 1.5f }, { "mix", futureBass ? 70.0f : 60.0f } }));
+            if (futureBass)
+            {
+                instrument.effects.push_back(makeSerumBenchmarkEffect("benchmark-delay", beat::TrackEffectKind::Delay,
+                    { { "timeMs", 375.0f }, { "feedback", 18.0f }, { "mix", 8.0f } }));
+            }
+            instrument.effects.push_back(makeSerumBenchmarkEffect("benchmark-reverb", beat::TrackEffectKind::Reverb,
+                { { "roomSize", futureBass ? 72.0f : 82.0f }, { "damping", futureBass ? 35.0f : 58.0f },
+                  { "mix", futureBass ? 20.0f : 26.0f } }));
+        }
+
+        project.instruments.push_back(instrument);
+
+        beat::Track track;
+        track.id = instrument.id + "-track";
+        track.name = project.name;
+        track.kind = beat::TrackKind::Midi;
+        track.instrumentId = instrument.id;
+        track.gainDb = -6.0f;
+
+        beat::Segment segment;
+        segment.id = instrument.id + "-segment";
+        segment.trackId = track.id;
+        segment.kind = beat::SegmentPayloadKind::Midi;
+        segment.instrumentId = instrument.id;
+        segment.lengthBeats = 8.0;
+        constexpr std::array<int, 4> chord { 48, 55, 60, 64 };
+        for (const int pitch : chord)
+        {
+            beat::MidiNote note;
+            note.instrumentId = instrument.id;
+            note.pitch = pitch;
+            note.velocity = 108;
+            note.startBeat = futureBass ? 0.25 : 0.0;
+            note.lengthBeats = futureBass ? 5.5 : 6.0;
+            segment.notes.push_back(note);
+        }
+        track.segments.push_back(segment);
+        project.tracks.push_back(track);
+        return project;
+    }
+
     beat::Project makeMaxUnisonAetherProject()
     {
         auto project = makeDenseAetherProject();
@@ -15484,6 +15666,174 @@ namespace
             44100.0);
     }
 
+    bool stressAudioEngineSerum1Benchmarks()
+    {
+        struct StereoStats
+        {
+            bool finite { true };
+            double midEnergy { 0.0 };
+            double sideEnergy { 0.0 };
+            float peak { 0.0f };
+        };
+
+        const auto stereoStats = [] (const juce::AudioBuffer<float>& buffer)
+        {
+            StereoStats stats;
+            if (buffer.getNumChannels() < 2)
+            {
+                stats.finite = false;
+                return stats;
+            }
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+            {
+                const float left = buffer.getSample(0, i);
+                const float right = buffer.getSample(1, i);
+                if (!std::isfinite(left) || !std::isfinite(right))
+                {
+                    stats.finite = false;
+                    break;
+                }
+                const double mid = 0.5 * ((double) left + (double) right);
+                const double side = 0.5 * ((double) left - (double) right);
+                stats.midEnergy += mid * mid;
+                stats.sideEnergy += side * side;
+                stats.peak = juce::jmax(stats.peak, juce::jmax(std::abs(left), std::abs(right)));
+            }
+            return stats;
+        };
+
+        for (const bool futureBass : { true, false })
+        {
+            const char* label = futureBass ? "Serum 1 Future Bass benchmark" : "Serum 1 Progressive House benchmark";
+            auto wetProject = makeSerumBenchmarkProject(futureBass, true);
+            const auto dryProject = makeSerumBenchmarkProject(futureBass, false);
+            const auto wet = renderOfflineChunks(wetProject, 96000, 257, 48000.0);
+            const auto dry = renderOfflineChunks(dryProject, 96000, 257, 48000.0);
+            const auto stats = stereoStats(wet);
+            const auto wetDry = bufferResidualStats(dry, wet, 96000);
+            const double sideToMid = stats.midEnergy > 0.0
+                ? stats.sideEnergy / stats.midEnergy
+                : 0.0;
+            const double wetDryRatio = wetDry.sourceEnergy > 0.0
+                ? wetDry.residualEnergy / wetDry.sourceEnergy
+                : 0.0;
+
+            if (!stats.finite
+                || stats.midEnergy <= 0.0001
+                || sideToMid <= 0.01
+                || !wetDry.ok
+                || wetDryRatio <= 0.00001
+                || !(stats.peak > 0.0f && stats.peak <= 1.0001f))
+            {
+                std::cerr << label << " signal validation failed"
+                          << " finite=" << stats.finite
+                          << " midEnergy=" << stats.midEnergy
+                          << " sideToMid=" << sideToMid
+                          << " wetDryRatio=" << wetDryRatio
+                          << " peak=" << stats.peak << "\n";
+                return false;
+            }
+
+            if (!stressAudioEngineAetherDeterministicNullExportFamily(
+                    wetProject,
+                    label,
+                    futureBass
+                        ? "BeatBackendStress-serum-1-future-bass.wav"
+                        : "BeatBackendStress-serum-1-progressive-house.wav",
+                    96000,
+                    257,
+                    48000.0))
+                return false;
+
+            double slowestRealtimeFactor = std::numeric_limits<double>::infinity();
+            double maximumCallbackLoadPercent = 0.0;
+            int deadlineOverrunBlocks = 0;
+            int64_t maximumWavetableVoiceSamples = 0;
+            int64_t maximumRouteEffectSamples = 0;
+            int64_t observedCacheHits = 0;
+            int64_t observedCacheMisses = 0;
+            int observedCacheSize = 0;
+            for (const double sampleRate : { 44100.0, 48000.0, 96000.0 })
+            {
+                for (const int blockSize : { 64, 256, 1024 })
+                {
+                    const int samples = (int) std::round(sampleRate * 0.6);
+                    beat::AudioEngine engine;
+                    engine.prepareForOffline(sampleRate, blockSize, 2);
+                    engine.applyProject(wetProject);
+                    engine.requestSeek(0.0);
+                    engine.requestPlay();
+                    juce::AudioBuffer<float> matrixRender(2, samples);
+                    juce::AudioBuffer<float> block(2, blockSize);
+                    matrixRender.clear();
+                    juce::AudioIODeviceCallbackContext context;
+                    const double startedMs = juce::Time::getMillisecondCounterHiRes();
+                    int written = 0;
+                    while (written < samples)
+                    {
+                        const int samplesThisBlock = juce::jmin(blockSize, samples - written);
+                        block.setSize(2, samplesThisBlock, false, false, true);
+                        block.clear();
+                        std::array<float*, 2> outputs {
+                            block.getWritePointer(0),
+                            block.getWritePointer(1),
+                        };
+                        engine.audioDeviceIOCallbackWithContext(nullptr, 0, outputs.data(), 2, samplesThisBlock, context);
+                        for (int ch = 0; ch < 2; ++ch)
+                            matrixRender.copyFrom(ch, written, block, ch, 0, samplesThisBlock);
+
+                        beat::AudioEngine::RenderTimingSnapshot timing;
+                        if (engine.pullRenderTimingSnapshot(timing))
+                        {
+                            maximumCallbackLoadPercent = juce::jmax(maximumCallbackLoadPercent, timing.loadPercent);
+                            const double deadlineMs = sampleRate > 0.0
+                                ? (double) samplesThisBlock * 1000.0 / sampleRate
+                                : std::numeric_limits<double>::infinity();
+                            if (timing.totalMs > deadlineMs)
+                                ++deadlineOverrunBlocks;
+                            maximumWavetableVoiceSamples = juce::jmax(maximumWavetableVoiceSamples, timing.wavetableVoiceSamples);
+                            maximumRouteEffectSamples = juce::jmax(maximumRouteEffectSamples, timing.routeEffectSamples);
+                            observedCacheHits = juce::jmax(observedCacheHits, timing.wavetableCacheHits);
+                            observedCacheMisses = juce::jmax(observedCacheMisses, timing.wavetableCacheMisses);
+                            observedCacheSize = juce::jmax(observedCacheSize, timing.wavetableCacheSize);
+                        }
+                        written += samplesThisBlock;
+                    }
+                    engine.requestStop();
+                    const double elapsedSeconds = juce::jmax(
+                        0.000001,
+                        (juce::Time::getMillisecondCounterHiRes() - startedMs) / 1000.0);
+                    const double realtimeFactor = ((double) samples / sampleRate) / elapsedSeconds;
+                    const auto matrixStats = stereoStats(matrixRender);
+                    if (!matrixStats.finite || matrixStats.midEnergy <= 0.000001 || !std::isfinite(realtimeFactor))
+                    {
+                        std::cerr << label << " matrix failed sampleRate=" << sampleRate
+                                  << " blockSize=" << blockSize
+                                  << " realtimeFactor=" << realtimeFactor << "\n";
+                        return false;
+                    }
+                    slowestRealtimeFactor = juce::jmin(slowestRealtimeFactor, realtimeFactor);
+                }
+            }
+
+            std::cerr << label
+                      << " metrics sideToMid=" << sideToMid
+                      << " wetDryResidualRatio=" << wetDryRatio
+                      << " peak=" << stats.peak
+                      << " slowestRealtimeFactor=" << slowestRealtimeFactor
+                      << " maxCallbackLoadPercent=" << maximumCallbackLoadPercent
+                      << " deadlineOverrunBlocks=" << deadlineOverrunBlocks
+                      << " maxWavetableVoiceSamplesPerBlock=" << maximumWavetableVoiceSamples
+                      << " maxRouteEffectSamplesPerBlock=" << maximumRouteEffectSamples
+                      << " cacheHits=" << observedCacheHits
+                      << " cacheMisses=" << observedCacheMisses
+                      << " cacheSize=" << observedCacheSize
+                      << " renderedUnison=" << (futureBass ? 8 : 7)
+                      << "\n";
+        }
+        return true;
+    }
+
     bool stressWavetableOscillator()
     {
         static_assert(beat::params::patchSchemaVersion == 1);
@@ -17476,6 +17826,38 @@ namespace
         if (!(fullLeftEnergy > 0.0 && fullRightEnergy > 0.0 && std::abs(fullLeftEnergy - fullRightEnergy) > fullEnergy * 0.02))
             return false;
 
+        auto centeredWideParams = params;
+        centeredWideParams.drive01 = 0.0f;
+        centeredWideParams.aetherOscA.pan = 0.0f;
+        centeredWideParams.aetherOscA.wavetable.unison = 5;
+        centeredWideParams.aetherOscA.wavetable.detuneCents = 12.0f;
+        centeredWideParams.aetherOscA.wavetable.blend = 0.85f;
+        centeredWideParams.aetherOscB.enabled = false;
+        centeredWideParams.aetherSub.enabled = false;
+        centeredWideParams.aetherNoise.enabled = false;
+        auto centeredWide = render(centeredWideParams);
+        auto centeredNarrowParams = centeredWideParams;
+        centeredNarrowParams.aetherOscA.wavetable.blend = 0.0f;
+        auto centeredNarrow = render(centeredNarrowParams);
+        double wideSideEnergy = 0.0;
+        double narrowSideEnergy = 0.0;
+        double wideMidEnergy = 0.0;
+        for (int i = 0; i < centeredWide.getNumSamples(); ++i)
+        {
+            const double wideLeft = centeredWide.getSample(0, i);
+            const double wideRight = centeredWide.getSample(1, i);
+            const double narrowLeft = centeredNarrow.getSample(0, i);
+            const double narrowRight = centeredNarrow.getSample(1, i);
+            const double wideSide = 0.5 * (wideLeft - wideRight);
+            const double wideMid = 0.5 * (wideLeft + wideRight);
+            const double narrowSide = 0.5 * (narrowLeft - narrowRight);
+            wideSideEnergy += wideSide * wideSide;
+            wideMidEnergy += wideMid * wideMid;
+            narrowSideEnergy += narrowSide * narrowSide;
+        }
+        if (!(wideSideEnergy > wideMidEnergy * 0.01 && narrowSideEnergy < wideSideEnergy * 0.001))
+            return false;
+
         auto inertDynamicParams = params;
         inertDynamicParams.dynamicModulation.active = true;
         beat::InstrumentVoice::consumeRenderWorkStats();
@@ -18992,6 +19374,11 @@ int main(int argc, char** argv)
     if (!stressAudioEngineFxHeavyAetherDeterministicNullExport())
     {
         std::cerr << "Audio engine FX-heavy Aether deterministic null export stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineSerum1Benchmarks())
+    {
+        std::cerr << "Audio engine Serum 1 benchmark stress failed\n";
         return 1;
     }
     if (!stressAudioEngineVariableBlockSizes())

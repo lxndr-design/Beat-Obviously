@@ -856,6 +856,17 @@ try {
   for (const family of requiredPresetFamilies) {
     assert.ok(presetFamilies.has(family), `expected factory Aether preset family ${family}`);
   }
+  const benchmarkPresets = synthStore.FACTORY_SYNTH_PRESETS.filter((preset) => preset.tags.includes("benchmark"));
+  assert.deepEqual(
+    benchmarkPresets.map((preset) => preset.name).sort(),
+    ["Benchmark - Future Bass Strings", "Benchmark - Progressive House Strings"],
+  );
+  for (const preset of benchmarkPresets) {
+    assert.equal(preset.family, "Benchmark Strings");
+    assert.equal(preset.category, "Synth String");
+    assert.ok(preset.patch.effects.filters.length >= 5, `${preset.name} should preserve its benchmark FX chain`);
+    assert.ok(Number(preset.patch.parameters["unison.voices"]) >= 7, `${preset.name} should preserve its dense unison stack`);
+  }
   assert.equal(
     synthStore.FACTORY_SYNTH_PRESETS.some((preset) => /^Breakcore\b/i.test(preset.name)),
     false,
@@ -998,6 +1009,13 @@ try {
   const glassPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { search: "glass" });
   assert.ok(glassPresetResults.some((entry) => entry.id === "factory.glass-runner"), "search should match factory descriptions");
   assert.ok(glassPresetResults.some((entry) => entry.id === "instrument-glass-user"), "search should match user instrument tags");
+  assert.deepEqual(
+    aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { search: "benchmark strings" })
+      .map((entry) => entry.name)
+      .sort(),
+    ["Benchmark - Future Bass Strings", "Benchmark - Progressive House Strings"],
+    "benchmark factory instruments should be discoverable through the shared preset library",
+  );
   const macroUserPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, {
     search: "macro user preset",
   });
