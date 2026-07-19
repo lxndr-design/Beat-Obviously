@@ -17,7 +17,7 @@ Status legend:
   - Done: `npm run audit:aether-presets` now enforces required family coverage, non-placeholder descriptions/audition notes, non-init family-specific macro labels, macro route assignments, finite/non-silent/non-clipped render output, and explicit threshold reporting.
   - Keep generated/default instruments on the Aether wavetable path; sampler and DecentSampler instruments remain source-backed exceptions.
 - `[x]` Better default instrument families.
-  - Done: expanded factory Aether coverage from 9 to 17 render-audited presets across 10 families.
+  - Done: expanded factory Aether coverage from 9 to 19 render-audited presets, including two dedicated Serum-class string benchmark instruments.
   - Done: added musically distinct Aether starting points for synthetic kick, snare, closed hat, detuned bass, acid mono line, hollow lead, warm string pad, and transition FX.
   - Done: factory preset metadata now carries category, family, role, tags, description, audition note, modulation complexity, macro layout, and instrument FX complexity.
   - Done: non-init factory presets now get family-specific macro labels and default macro route assignments instead of generic Cut/Res/Drive/Shape-style defaults.
@@ -99,10 +99,10 @@ Status legend:
 
 - `[x]` Solid synth editor shell with analyzer, oscillator, modulation, LFO, macro, and filter controls.
 - `[x]` Browser/native preview paths for current core Aether parameters.
-- `[~]` Aether editor layout conventions.
-  - `Instrument Details - Aether Engine` is the outer/root identity header for the editor. It should be bold, unencapsulated, and should not use a nested ribbon/header container.
-  - Section labels such as `Oscillators`, `LFO`, `Instrument FX`, and `Envelopes` are standard section headers/ribbons and should use the shared bordered section treatment.
-  - Do not wrap root identity rows in section chrome for visual consistency; that adds extra nesting and makes the editor drift away from the intended diagram.
+- `[x]` Aether editor layout conventions.
+  - Done: both Aether launch paths use `Instrument Details - Aether Engine` as the bold outer Modal identity header, while the identity controls remain in an unencapsulated root section without a nested ribbon.
+  - Done: section labels such as `Oscillators`, `LFO`, `Instrument FX`, and `Envelopes` retain the shared bordered section treatment rather than borrowing the root identity style.
+  - Proof: the frontend interaction verifier requires the canonical Aether root title and the Synth Editor continues to expose its identity region independently of the bordered section headers; the UI specimen uses the same canonical title.
 - `[x]` Fast editing workflow.
   - Done: added a shared Solid `Select` primitive with catalog/demo coverage and migrated the Aether preset library filters, preset chooser, macro curve chooser, FX preset/add-effect controls, and Modulation Matrix source chooser off direct one-off native select markup; added a shared Solid `Slider` primitive with catalog/demo coverage and migrated Modulation Matrix route strength off its one-off range markup while preserving amount/range/state readouts; extended shared `NumberInput` for compact bare/aria-labelled fields and migrated Aether macro min/max range fields off one-off text-number inputs; added typed macro at-a-glance state summaries and compact macro-card status badges for assignment count, conflict count, and output value; true browser fixture sweep now covers preset restore/save-delete, oscillator, FX rack, macro summary, macro assignment, wavemap editor, wavemap pointer draw, wavemap import, envelope handles, amp/filter, LFO, performance, and automation surfaces through the live editor.
   - Remaining: none for the current Aether fast-editing scope; add new shared primitives and preview coverage alongside future synth surfaces.

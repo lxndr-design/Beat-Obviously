@@ -13,12 +13,15 @@ namespace beat::WavetableUnison
         float detuneCents { -1.0f };
         float spread { -1.0f };
         float weightSum { 1.0f };
+        float appliedBasePan { 2.0f };
         std::array<double, 8> rates {};
         std::array<double, 8> appliedFrequencyHz {};
         std::array<float, 8> centered {};
         std::array<float, 8> weights {};
         std::array<float, 8> phaseSpread {};
         std::array<float, 8> appliedPosition {};
+        std::array<float, 8> leftGains {};
+        std::array<float, 8> rightGains {};
     };
 
     inline void invalidate(Plan& plan) noexcept
@@ -49,6 +52,7 @@ namespace beat::WavetableUnison
         plan.detuneCents = detuneCents;
         plan.spread = spread;
         plan.weightSum = 0.0f;
+        plan.appliedBasePan = 2.0f;
 
         for (int voice = 0; voice < (int) plan.rates.size(); ++voice)
         {

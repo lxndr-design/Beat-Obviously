@@ -123,7 +123,7 @@ namespace beat::AetherTableStackRenderer
             float value = 0.0f;
             if (osc.waveform == 5)
             {
-                const auto tableResult = WavetableOscillatorBank::render(
+                const auto tableResult = WavetableOscillatorBank::renderStereo(
                     oscillators,
                     unisonPlan,
                     osc.wavetable,
@@ -132,12 +132,16 @@ namespace beat::AetherTableStackRenderer
                     sampleRate,
                     positionMod,
                     unisonDetuneMod,
-                    unisonSpreadMod);
-                value = tableResult.sample;
+                    unisonSpreadMod,
+                    modulatedPan);
+                leftSum += tableResult.left * modulatedLevel;
+                rightSum += tableResult.right * modulatedLevel;
+                levelSum += modulatedLevel;
                 result.work.wavetableVoiceSamples += tableResult.voiceSamples;
                 result.work.wavetableFrequencyUpdates += tableResult.frequencyUpdates;
                 result.work.wavetablePositionUpdates += tableResult.positionUpdates;
                 componentSampleCounter += tableResult.voiceSamples;
+                return;
             }
             else
             {

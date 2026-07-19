@@ -1095,6 +1095,11 @@ function aetherStackStereoSample(
     right += value * level * rightGain;
     levelSum += level;
   };
+  const addStereo = (value: { left: number; right: number }, level: number) => {
+    left += value.left * level;
+    right += value.right * level;
+    levelSum += level;
+  };
 
   const addOsc = (
     osc: NonNullable<Instrument["aether"]>["oscA"],
@@ -1112,8 +1117,9 @@ function aetherStackStereoSample(
     const unisonDetuneOffset = modulationTargetOffset(modulation, "unison.detune");
     const unisonSpreadOffset = modulationTargetOffset(modulation, "unison.spread");
     const phaseOffset = oscillatorPhaseOffset(osc, key) + modulationTargetOffset(modulation, `osc.${key}.phase`);
-    const sourceSample = waveform === "wavetable"
-      ? wavetableOscillatorSample(
+    const pan = clampBipolar(osc.pan + modulationTargetOffset(modulation, `osc.${key}.pan`));
+    if (waveform === "wavetable") {
+      addStereo(wavetableOscillatorStereoSample(
           instrument,
           state.phase * rate + phaseOffset,
           sampleRate,
@@ -1122,11 +1128,14 @@ function aetherStackStereoSample(
           wavetableOffset,
           unisonDetuneOffset,
           unisonSpreadOffset,
-        )
-      : waveform === "noise"
+          pan,
+        ), level);
+      return;
+    }
+    const sourceSample = waveform === "noise"
       ? mode === "audio" ? Math.random() * 2 - 1 : whiteNoiseSample(state.index + Math.round(rate * 97))
       : oscillatorSample(waveform, state.phase * rate + phaseOffset, clamp01(instrument.knobs.color));
-    add(sourceSample, level, osc.pan + modulationTargetOffset(modulation, `osc.${key}.pan`));
+    add(sourceSample, level, pan);
   };
 
   const oscillators = config.oscillators?.length ? config.oscillators : [{ ...config.oscA, id: "a" }, { ...config.oscB, id: "b" }];
@@ -1189,6 +1198,56 @@ function wavetableOscillatorSample(
     ) * voicePlan.weights[voice];
   }
   return clamp(sum / Math.max(1, voicePlan.weightSum), -1, 1);
+}
+
+function wavetableOscillatorStereoSample(
+  instrument: Instrument,
+  phase: number,
+  sampleRate: number,
+  frequency: number,
+  override?: NonNullable<Instrument["wavetable"]>,
+  positionOffset = 0,
+  detuneCentsOffset = 0,
+  spreadOffset = 0,
+  basePan = 0,
+): { left: number; right: number } {
+  const config = override ?? instrument.wavetable ?? {
+    bank: "aether",
+    position: 0.35,
+    warp: 0.2,
+    warpMode: "shape",
+    unison: 1,
+    detuneCents: 12,
+    blend: 0.5,
+  };
+  const unison = Math.max(1, Math.min(8, Math.round(config.unison)));
+  const detune = Math.max(0, Math.min(100, config.detuneCents + detuneCentsOffset));
+  const spread = clamp01(config.blend + spreadOffset);
+  const voicePlan = unisonVoicePlan(unison, detune, spread);
+  let left = 0;
+  let right = 0;
+  for (let voice = 0; voice < unison; voice += 1) {
+    const rate = voicePlan.rates[voice];
+    const sample = wavetableFrameMorph(
+      instrument,
+      config,
+      phase * rate + voicePlan.phaseOffsets[voice],
+      sampleRate,
+      frequency * rate,
+      clamp01(config.position + positionOffset),
+      config.warp,
+      config.warpMode ?? "shape",
+    ) * voicePlan.weights[voice];
+    const centered = unison === 1 ? 0 : (voice / (unison - 1)) * 2 - 1;
+    const [leftGain, rightGain] = panGains(clampBipolar(basePan + centered * spread));
+    left += sample * leftGain;
+    right += sample * rightGain;
+  }
+  const normalizer = Math.max(1, voicePlan.weightSum);
+  return {
+    left: clamp(left / normalizer, -1, 1),
+    right: clamp(right / normalizer, -1, 1),
+  };
 }
 
 function wavetableFrameMorph(

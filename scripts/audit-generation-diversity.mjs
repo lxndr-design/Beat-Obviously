@@ -101,15 +101,20 @@ try {
     midiResults,
   });
   writeFileSync(reportPath, report);
+  const schemaFailures = instrumentResults.flatMap((result) => instrumentSchemaFailures(result));
+  if (schemaFailures.length > 0) {
+    throw new Error(`Instrument schema audit failed:\n${schemaFailures.map((failure) => `- ${failure}`).join("\n")}`);
+  }
   console.log(JSON.stringify({
     ok: true,
     mode: localOnly ? "local" : "ollama-allowed",
     runsPerCategory,
     reportPath,
-    instruments: instrumentResults.map(({ category, uniqueFingerprints, pairwiseDistance, flags }) => ({
+    instruments: instrumentResults.map(({ category, uniqueFingerprints, pairwiseDistance, schemaCoverage, flags }) => ({
       category,
       uniqueFingerprints,
       pairwiseDistance,
+      schemaCoverage,
       flags,
     })),
     beats: beatResults.map(({ category, uniqueFingerprints, rhythmDistance, flags }) => ({
@@ -230,18 +235,23 @@ function summarizeInstrumentBatch(category, prompt, outputs) {
   const numericVectors = patches.map(instrumentVector);
   const pairwiseDistance = avgPairwise(numericVectors, vectorDistance);
   const categoricalDistance = avgPairwise(fingerprints.map((fp) => fp.split("|")), jaccardArrayDistance);
+  const schemaCoverage = instrumentSchemaCoverage(category, patches);
   const flags = [];
   if (new Set(fingerprints).size < Math.ceil(outputs.length * 0.8)) flags.push("low exact uniqueness");
   if (pairwiseDistance < 0.18) flags.push("low numeric movement");
-  if (Object.keys(kinds).length < 2 && category !== "sampler") flags.push("kind converges");
-  if (Object.keys(waveforms).length < 3 && category !== "sampler" && category !== "wavetable") flags.push("waveform converges");
+  if (category === "hybrid" && Object.keys(waveforms).length < 3) flags.push("hybrid waveform converges");
   if (category === "sampler" && Object.keys(sampleUrls).filter((key) => key !== "none").length < 2) flags.push("sample choice converges");
+  if (schemaCoverage.targetKindMatches !== schemaCoverage.total) flags.push("target kind mismatch");
+  if (schemaCoverage.aetherEligible > 0 && schemaCoverage.aetherStackComplete !== schemaCoverage.aetherEligible) flags.push("incomplete Aether stack");
+  if (schemaCoverage.aetherEligible > 0 && schemaCoverage.canonicalSynthPatch !== schemaCoverage.aetherEligible) flags.push("missing canonical synth patch");
+  if (schemaCoverage.finiteCoreValues !== schemaCoverage.total) flags.push("non-finite core values");
   return {
     category,
     prompt,
     uniqueFingerprints: new Set(fingerprints).size,
     pairwiseDistance: round(pairwiseDistance),
     categoricalDistance: round(categoricalDistance),
+    schemaCoverage,
     kinds,
     waveforms,
     sampleUrls,
@@ -265,6 +275,69 @@ function summarizeInstrumentBatch(category, prompt, outputs) {
     })),
     flags,
   };
+}
+
+function instrumentSchemaFailures(result) {
+  const coverage = result.schemaCoverage;
+  const failures = [];
+  if (coverage.targetKindMatches !== coverage.total) failures.push(`${result.category}: requested kind ${coverage.targetKindMatches}/${coverage.total}`);
+  if (coverage.aetherEligible > 0 && coverage.aetherStackComplete !== coverage.aetherEligible) failures.push(`${result.category}: Aether stack ${coverage.aetherStackComplete}/${coverage.aetherEligible}`);
+  if (coverage.aetherEligible > 0 && coverage.canonicalSynthPatch !== coverage.aetherEligible) failures.push(`${result.category}: canonical synth patch ${coverage.canonicalSynthPatch}/${coverage.aetherEligible}`);
+  if (coverage.finiteCoreValues !== coverage.total) failures.push(`${result.category}: finite core values ${coverage.finiteCoreValues}/${coverage.total}`);
+  return failures;
+}
+
+function instrumentSchemaCoverage(category, patches) {
+  const expectedKind = category === "synth" ? "wavetable" : category;
+  const aetherPatches = patches.filter((patch) => patch.kind === "wavetable");
+  return {
+    total: patches.length,
+    targetKindMatches: patches.filter((patch) => patch.kind === expectedKind).length,
+    aetherEligible: aetherPatches.length,
+    aetherStackComplete: aetherPatches.filter((patch) => (
+      patch.waveform === "wavetable"
+      && patch.aether?.oscA?.enabled === true
+      && patch.aether?.oscA?.wavetable
+      && patch.wavetable
+    )).length,
+    canonicalSynthPatch: aetherPatches.filter((patch) => (
+      patch.synthPatch
+      && typeof patch.synthPatch === "object"
+      && patch.synthPatch.parameters
+      && typeof patch.synthPatch.parameters === "object"
+      && patch.synthPatch.parameters["osc.a.enabled"] === true
+    )).length,
+    finiteCoreValues: patches.filter(hasFiniteInstrumentCore).length,
+  };
+}
+
+function hasFiniteInstrumentCore(patch) {
+  const values = [
+    patch.envelope?.attackMs,
+    patch.envelope?.decayMs,
+    patch.envelope?.sustain,
+    patch.envelope?.releaseMs,
+    patch.knobs?.cutoff,
+    patch.knobs?.resonance,
+    patch.knobs?.drive,
+    patch.knobs?.color,
+    patch.detuneCents,
+    patch.octave,
+    patch.glideMs,
+    patch.lfoRateHz,
+    patch.lfoDepth,
+  ];
+  if (patch.kind === "wavetable") {
+    values.push(
+      patch.wavetable?.position,
+      patch.wavetable?.warp,
+      patch.wavetable?.unison,
+      patch.aether?.oscA?.level,
+      patch.aether?.oscA?.pan,
+      patch.aether?.oscA?.fineCents,
+    );
+  }
+  return values.every((value) => Number.isFinite(value));
 }
 
 function instrumentFingerprint(patch) {
@@ -515,6 +588,7 @@ function renderInstrumentResult(result) {
 - Unique fingerprints: ${result.uniqueFingerprints}
 - Numeric pairwise distance: ${result.pairwiseDistance}
 - Categorical pairwise distance: ${result.categoricalDistance}
+- Schema coverage: ${jsonInline(result.schemaCoverage)}
 - Kinds: ${jsonInline(result.kinds)}
 - Waveforms: ${jsonInline(result.waveforms)}
 - Samples: ${jsonInline(result.sampleUrls)}

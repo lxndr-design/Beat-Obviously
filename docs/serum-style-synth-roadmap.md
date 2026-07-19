@@ -287,7 +287,7 @@ Checklist:
 - `[x]` Genre-informed drum generation exists.
 - `[x]` Complexity has been corrected away from “fill every cell and add instruments.”
 - `[~]` Genre rules include rock/pop/rap/trap/drill/breakcore/DnB/house/reggae/funk guidance.
-- `[~]` Aether-aware instrument generation exists, but should be measured against the current Aether schema.
+- `[x]` Aether-aware instrument generation is measured against the current schema. The deterministic 20-seed audit requires requested-kind fidelity, complete Aether oscillator stacks, canonical synth patches, and finite core values; diversity metrics remain diagnostic.
 - `[ ]` Add generated pattern structure: sections, fills, rests, density maps, ghost notes, accents.
 - `[ ]` Add complexity as musical density/variation, not instrument count.
 - `[ ]` Add drummer-like constraints: limb independence, backbeat anchors, phrase length, fills into transitions.

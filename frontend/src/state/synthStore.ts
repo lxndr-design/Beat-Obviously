@@ -2304,6 +2304,10 @@ type FactoryGuidePatch = {
   name: string;
   category: string;
   intent?: string;
+  tags?: string[];
+  family?: string;
+  role?: string;
+  auditionNote?: string;
   playMode?: {
     polyphony?: number;
     mono?: boolean;
@@ -2329,6 +2333,15 @@ type FactoryGuidePatch = {
     resonance?: number;
     drive?: number;
     keytrack?: number;
+  };
+  amp?: {
+    level?: number;
+    pan?: number;
+  };
+  runtimeWarp?: {
+    enabled?: boolean;
+    mode?: string;
+    amount?: number;
   };
   envelopes?: {
     ampEnv?: FactoryGuideEnvelope;
@@ -2482,6 +2495,7 @@ function createFactorySynthPresetFromGuide(patch: FactoryGuidePatch): SynthFacto
   applyFactoryGuideOscillator(parameters, customWavetables, id, "b", patch.oscillators?.oscB);
   applyFactoryGuideVoice(parameters, patch);
   applyFactoryGuideFilter(parameters, patch.filter);
+  applyFactoryGuideAmpAndRuntimeWarp(parameters, patch);
   applyFactoryGuideEnvelope(parameters, "env.1", patch.envelopes?.ampEnv);
   applyFactoryGuideEnvelope(parameters, "env.2", patch.envelopes?.modEnv);
   applyFactoryGuideLfo(parameters, "lfo.1", patch.lfos?.lfo1);
@@ -2499,7 +2513,13 @@ function createFactorySynthPresetFromGuide(patch: FactoryGuidePatch): SynthFacto
   const modulation = [...importedModulation, ...guideFallbackMacroRoutes(id, patch.category, importedModulation)];
   const effects = { filters: guideEffects(id, patch.fxChain) };
   const taxonomy = taxonomyAssignmentForInstrumentId(FACTORY_GUIDE_CATEGORY_TAXONOMY[patch.category] ?? "wavetable_synth");
-  const tags = ["factory", "aether", "guide", patch.category.toLowerCase().replaceAll(" ", "-").replaceAll("/", "-")];
+  const tags = [...new Set([
+    "factory",
+    "aether",
+    "guide",
+    patch.category.toLowerCase().replaceAll(" ", "-").replaceAll("/", "-"),
+    ...(patch.tags ?? []),
+  ])];
   const normalized = normalizeSynthDraftPatch({
     name: patch.name,
     taxonomy,
@@ -2524,9 +2544,9 @@ function createFactorySynthPresetFromGuide(patch: FactoryGuidePatch): SynthFacto
     tags,
     category: patch.category,
     description: patch.intent ?? `${patch.name} Aether factory patch.`,
-    family: patch.category,
-    role: patch.category.toLowerCase(),
-    auditionNote: `${patch.category} patch built from the v4 Aether factory guide.`,
+    family: patch.family ?? patch.category,
+    role: patch.role ?? patch.category.toLowerCase(),
+    auditionNote: patch.auditionNote ?? `${patch.category} patch built from the v4 Aether factory guide.`,
   };
 }
 
@@ -2768,6 +2788,22 @@ function applyFactoryGuideFilter(parameters: Partial<Record<SynthParameterId, Sy
   parameters["filter.resonance"] = guidePercent(filter.resonance, 0);
   parameters["filter.drive"] = guidePercent(filter.drive, 0);
   parameters["filter.keytrack"] = guidePercent(filter.keytrack, 0);
+}
+
+function applyFactoryGuideAmpAndRuntimeWarp(
+  parameters: Partial<Record<SynthParameterId, SynthParameterValue>>,
+  patch: FactoryGuidePatch,
+) {
+  if (patch.amp) {
+    parameters["amp.level"] = guidePercent(patch.amp.level, 80);
+    parameters["amp.pan"] = guideBipolarPercent(patch.amp.pan, 0);
+  }
+  if (patch.runtimeWarp) {
+    parameters["aether.runtimeWarp"] = patch.runtimeWarp.enabled === false
+      ? 0
+      : guidePercent(patch.runtimeWarp.amount, 0);
+    parameters["aether.runtimeWarpMode"] = guideWarpMode(patch.runtimeWarp.mode);
+  }
 }
 
 function applyFactoryGuideEnvelope(
