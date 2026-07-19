@@ -1,4 +1,5 @@
 import type { AudioFile, Instrument, MidiNote } from "../state/types";
+import { AETHER_MAX_UNISON_VOICES, clampAetherUnisonVoices } from "../audio/aetherLimits";
 import { synthDraftFromInstrument } from "../state/synthStore";
 import {
   DRUM_GENRE_GUIDELINES,
@@ -274,7 +275,7 @@ function buildInstrumentPrompt(opts: GenerateInstrumentOptions): string {
         bank: ["aether", "glass", "vocal", "organ", "fm"],
         position: "0..1",
         warp: "0..1",
-        unison: "1..8 integer",
+        unison: `1..${AETHER_MAX_UNISON_VOICES} integer`,
         detuneCents: "0..100",
         blend: "0..1",
       },
@@ -388,7 +389,7 @@ function sanitizeWavetable(value: unknown, fallback?: Instrument["wavetable"]): 
     position: clamp(record.position, 0, 1, fallback?.position ?? 0.35),
     warp: clamp(record.warp, 0, 1, fallback?.warp ?? 0.2),
     warpMode: record.warpMode === "fold" || record.warpMode === "pinch" ? record.warpMode : fallback?.warpMode ?? "shape",
-    unison: Math.round(clamp(record.unison, 1, 8, fallback?.unison ?? 1)),
+    unison: clampAetherUnisonVoices(clamp(record.unison, 1, AETHER_MAX_UNISON_VOICES, fallback?.unison ?? 1)),
     detuneCents: clamp(record.detuneCents, 0, 100, fallback?.detuneCents ?? 12),
     blend: clamp(record.blend, 0, 1, fallback?.blend ?? 0.5),
   };

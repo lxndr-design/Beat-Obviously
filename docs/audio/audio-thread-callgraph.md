@@ -1080,3 +1080,21 @@ sequencer route automation event
 ```
 
 No substring, temporary `juce::String`, heap allocation, container growth, file operation, blocking lock, or lazy initialization occurs on this edge. JUCE IDs entering the fixed realtime parameter queue are encoded directly into its preallocated arrays. Offline rendering continues to use the same automation semantics but is not classified as a realtime callback. The focused streaming callback detector and complete native suite cover this boundary.
+
+## Serum 1 fixed-unison-capacity closeout — 2026-07-19
+
+```text
+control / project / IPC
+  -> clamp oscillator unison to 1..16
+  -> prepare/configure fixed WavetableOscillatorBank::Bank
+  -> publish existing immutable wavetable handle
+
+audio callback or offline render
+  InstrumentVoice::renderNextBlock()
+    -> AetherTableStackRenderer::render()
+       -> WavetableUnison::update(preallocated Plan)
+       -> bounded loop over active voices, maximum 16
+       -> existing oscillator render, weighting, pan, routing, and counters
+```
+
+`WavetableUnisonConfig.h` defines one native capacity and phase-array type. Voice-owned oscillator banks, interaction banks, phase-memory arrays, plan coefficient arrays, and maximum-unison tests all use it. Increasing the compile-time storage from eight to 16 adds no allocation, container growth, lock, file/stream, lazy initialization, publication, or destruction edge. Offline rendering follows the same fixed loop but remains excluded from realtime detector classification. The full production native fixture renders the authored nine-voice Future Bass benchmark with zero deadline overruns; the 150-render harness exercises the full 16-voice ceiling across every supported sample-rate/block-size combination.

@@ -1,4 +1,5 @@
 #include "SynthPatchContract.h"
+#include "../Wavetable/WavetableUnisonConfig.h"
 
 #include <cmath>
 #include <utility>
@@ -214,7 +215,7 @@ namespace beat
             fallback.warpMode = synthWavetableWarpModeForId(synthStringParam(params, prefix + "warpMode", "shape"));
             fallback.unison = juce::jlimit(
                 1,
-                8,
+                WavetableUnison::maxVoices,
                 (int) std::round(synthNumberParam(params, prefix + "unison.voices", fallback.unison)));
             fallback.detuneCents = juce::jlimit(
                 0.0f,
@@ -434,7 +435,7 @@ namespace beat
         instrument.wavetableWarpMode = synthWavetableWarpModeForId(synthStringParam(params, "osc.a.warpMode", "shape"));
         const bool unisonEnabled = synthNumberParam(params, "unison.enabled", 0.0) >= 0.5;
         instrument.wavetableUnison = unisonEnabled
-            ? juce::jlimit(1, 8, (int) std::round(synthNumberParam(params, "unison.voices", instrument.wavetableUnison)))
+            ? juce::jlimit(1, WavetableUnison::maxVoices, (int) std::round(synthNumberParam(params, "unison.voices", instrument.wavetableUnison)))
             : 1;
         instrument.wavetableDetuneCents = unisonEnabled
             ? juce::jlimit(

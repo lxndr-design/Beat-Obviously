@@ -1,5 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { renderAetherOutputPreviewSamples } from "../../../audio/synthPreview";
+import { AETHER_MAX_UNISON_VOICES } from "../../../audio/aetherLimits";
 import { Button, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, TextInput } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
 import type { CustomWavetableFrame, WavemapDefinition, WavetableWarpMode } from "../../../state/types";
@@ -861,10 +862,10 @@ function WaveformPreview(props: {
 }) {
   const path = createMemo(() => makeWaveformPath(props.samples));
   const secondaryPath = createMemo(() => (props.voices ?? 1) > 1
-    ? makeWaveformPath(props.samples, Math.min(8, Math.max(2, props.voices ?? 1)) * 0.16 * (props.spread ?? 0))
+    ? makeWaveformPath(props.samples, Math.min(AETHER_MAX_UNISON_VOICES, Math.max(2, props.voices ?? 1)) * 0.08 * (props.spread ?? 0))
     : "");
   const tertiaryPath = createMemo(() => (props.voices ?? 1) > 2
-    ? makeWaveformPath(props.samples, -Math.min(8, Math.max(2, props.voices ?? 1)) * 0.12 * (props.spread ?? 0))
+    ? makeWaveformPath(props.samples, -Math.min(AETHER_MAX_UNISON_VOICES, Math.max(2, props.voices ?? 1)) * 0.06 * (props.spread ?? 0))
     : "");
 
   return (

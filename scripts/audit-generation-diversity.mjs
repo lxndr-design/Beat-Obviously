@@ -385,7 +385,7 @@ function instrumentVector(patch) {
     normalize((patch.envToFilter ?? 0) + 1, 2),
     patch.wavetable?.position ?? 0,
     patch.wavetable?.warp ?? 0,
-    normalize(patch.wavetable?.unison ?? 0, 8),
+    normalize(patch.wavetable?.unison ?? 0, 16),
     patch.wavetable?.blend ?? 0,
   ];
 }

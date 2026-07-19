@@ -143,7 +143,7 @@ namespace beat
         params.wavetable.blend = params.wavetableBlend;
         if (legacyWavetableNeedsSetup())
         {
-            activeWavetableUnison = juce::jlimit(1, 8, params.wavetable.unison);
+            activeWavetableUnison = juce::jlimit(1, WavetableUnison::maxVoices, params.wavetable.unison);
             auto nextTable = WavetableVoiceCache::sharedTableForConfig(params.wavetable);
             if (nextTable.get() != wavetableTable.get())
             {
@@ -448,8 +448,8 @@ namespace beat
         refreshCachedPanGains();
         refreshCachedDynamicModulationFlags();
 
-        std::array<double, 8> rememberedAetherPhasesA {};
-        std::array<double, 8> rememberedAetherPhasesB {};
+        WavetableUnison::PhaseArray rememberedAetherPhasesA {};
+        WavetableUnison::PhaseArray rememberedAetherPhasesB {};
         for (size_t index = 0; index < rememberedAetherPhasesA.size(); ++index)
         {
             rememberedAetherPhasesA[index] = aetherOscillatorsA[index].getPhase();
@@ -530,8 +530,8 @@ namespace beat
         }
         else
             WavetableOscillatorBank::clear(aetherOscillatorsB, aetherUnisonPlanB);
-        std::array<double, 8> interactionPhasesA {};
-        std::array<double, 8> interactionPhasesB {};
+        WavetableUnison::PhaseArray interactionPhasesA {};
+        WavetableUnison::PhaseArray interactionPhasesB {};
         for (size_t index = 0; index < interactionPhasesA.size(); ++index)
         {
             interactionPhasesA[index] = aetherOscillatorsA[index].getPhase();
@@ -1161,7 +1161,7 @@ namespace beat
     {
         WavetableOscillatorBank::configure(wavetableOscillators, wavetableTable.get(), params.wavetable, sampleRate, frequencyHz);
         WavetableUnison::invalidate(wavetableUnisonPlan);
-        activeWavetableUnison = juce::jlimit(1, 8, params.wavetable.unison);
+        activeWavetableUnison = juce::jlimit(1, WavetableUnison::maxVoices, params.wavetable.unison);
     }
 
     bool InstrumentVoice::legacyWavetableNeedsSetup() const noexcept

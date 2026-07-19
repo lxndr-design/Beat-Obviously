@@ -17,8 +17,8 @@ const BENCHMARK_NAMES = [
 ];
 const FROZEN_AUDITION_HASHES = {
   "Benchmark - Future Bass Strings": {
-    float: "df257e579097f5988c06c32201daf796ee9352a8b5c21fdc8bd039520d23c366",
-    wav: "eaf6aeff4a3d604312d0575e2c8d90555eaa7a89aff1bc65ad57e2db792e437c",
+    float: "4ea7b303e5c13ea958f305b8a8a3f6f05d3a2a6e7535fe802f6926022d436260",
+    wav: "332214986ae9652812529ad0a038d4bd8f96526db86f13f4f364a18d7ed2a3fa",
   },
   "Benchmark - Progressive House Strings": {
     float: "a30b0196e0d2d4d153ccd0370cddcd3f54009b5c5581ddcf2ef049033da248f6",

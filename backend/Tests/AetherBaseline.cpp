@@ -1,6 +1,7 @@
 #include "../Source/Audio/Realtime/RealtimeParameterQueue.h"
 #include "../Source/Audio/Wavetable/WavetableFactory.h"
 #include "../Source/Audio/Wavetable/WavetableOscillator.h"
+#include "../Source/Audio/Wavetable/WavetableOscillatorBank.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_dsp/juce_dsp.h>
@@ -31,7 +32,7 @@ namespace
         const int samples = juce::jmax(1, (int) std::round(sampleRate * seconds));
         const auto table = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.55f,
                                                                beat::WavetableWarpMode::Fold, 8, 2048);
-        std::array<beat::WavetableOscillator, 8> oscillators;
+        beat::WavetableOscillatorBank::Bank oscillators;
         for (int voice = 0; voice < unison; ++voice)
         {
             auto& oscillator = oscillators[(size_t) voice];
@@ -167,7 +168,7 @@ int main(int argc, char** argv)
     const struct Scenario { const char* name; double frequency; float position; int unison; bool automate; } scenarios[] {
         { "initialization", 440.0, 0.0f, 1, false },
         { "dense-modulation", 261.625565, 0.65f, 4, true },
-        { "maximum-unison", 220.0, 0.4f, 8, false },
+        { "maximum-unison", 220.0, 0.4f, beat::WavetableUnison::maxVoices, false },
         { "rapid-automation", 329.627557, 0.2f, 2, true },
         { "high-note-sweep", 7040.0, 0.8f, 1, false },
         { "live-offline-parity", 523.251131, 0.5f, 2, false },

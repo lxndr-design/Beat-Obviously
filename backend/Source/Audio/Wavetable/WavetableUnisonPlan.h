@@ -1,5 +1,7 @@
 #pragma once
 
+#include "WavetableUnisonConfig.h"
+
 #include <juce_core/juce_core.h>
 
 #include <array>
@@ -14,14 +16,14 @@ namespace beat::WavetableUnison
         float spread { -1.0f };
         float weightSum { 1.0f };
         float appliedBasePan { 2.0f };
-        std::array<double, 8> rates {};
-        std::array<double, 8> appliedFrequencyHz {};
-        std::array<float, 8> centered {};
-        std::array<float, 8> weights {};
-        std::array<float, 8> phaseSpread {};
-        std::array<float, 8> appliedPosition {};
-        std::array<float, 8> leftGains {};
-        std::array<float, 8> rightGains {};
+        std::array<double, capacity> rates {};
+        std::array<double, capacity> appliedFrequencyHz {};
+        std::array<float, capacity> centered {};
+        std::array<float, capacity> weights {};
+        std::array<float, capacity> phaseSpread {};
+        std::array<float, capacity> appliedPosition {};
+        std::array<float, capacity> leftGains {};
+        std::array<float, capacity> rightGains {};
     };
 
     inline void invalidate(Plan& plan) noexcept
@@ -37,7 +39,7 @@ namespace beat::WavetableUnison
                         float detuneCentsMod,
                         float spreadMod) noexcept
     {
-        const int unison = juce::jlimit(1, 8, configUnison);
+        const int unison = juce::jlimit(1, maxVoices, configUnison);
         const float rawDetuneCents = juce::jlimit(0.0f, 100.0f, configDetuneCents + detuneCentsMod);
         const float rawSpread = juce::jlimit(0.0f, 1.0f, configBlend + spreadMod);
         const float detuneCents = std::round(rawDetuneCents * 10.0f) * 0.1f;

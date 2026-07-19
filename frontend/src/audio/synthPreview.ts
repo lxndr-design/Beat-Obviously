@@ -1,4 +1,5 @@
 import { evaluateAutomationCurve } from "../automation/curves";
+import { clampAetherUnisonVoices } from "./aetherLimits";
 import type { AutomationCurve, CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, WavetableConfig } from "../state/types";
 import { sampleZoneStableId } from "../state/sampleZones";
 
@@ -775,7 +776,7 @@ function oscillatorRate(
 }
 
 function unisonVoicePlan(unison: number, detuneCents: number, blend: number): UnisonVoicePlan {
-  const voiceCount = Math.max(1, Math.min(8, Math.round(unison)));
+  const voiceCount = clampAetherUnisonVoices(unison);
   const detune = quantizeKeyNumber(clamp(detuneCents, 0, 100), 0.01);
   const spread = quantizeKeyNumber(clamp01(blend), 0.001);
   const key = `${voiceCount}|${detune}|${spread}`;
@@ -1418,7 +1419,7 @@ function wavetableOscillatorSample(
     detuneCents: 12,
     blend: 0.5,
   };
-  const unison = Math.max(1, Math.min(8, Math.round(config.unison)));
+  const unison = clampAetherUnisonVoices(config.unison);
   const detune = Math.max(0, Math.min(100, config.detuneCents + detuneCentsOffset));
   const blend = clamp01(config.blend + spreadOffset);
   const voicePlan = unisonVoicePlan(unison, detune, blend);
@@ -1459,7 +1460,7 @@ function wavetableOscillatorStereoSample(
     detuneCents: 12,
     blend: 0.5,
   };
-  const unison = Math.max(1, Math.min(8, Math.round(config.unison)));
+  const unison = clampAetherUnisonVoices(config.unison);
   const detune = Math.max(0, Math.min(100, config.detuneCents + detuneCentsOffset));
   const spread = clamp01(config.blend + spreadOffset);
   const voicePlan = unisonVoicePlan(unison, detune, spread);

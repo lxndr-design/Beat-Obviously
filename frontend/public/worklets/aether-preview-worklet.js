@@ -164,9 +164,11 @@ function renderAetherStack(instrument, state, frequency, modulation) {
   return { left: clamp(left / normalizer, -1, 1), right: clamp(right / normalizer, -1, 1) };
 }
 
+const AETHER_MAX_UNISON_VOICES = 16;
+
 function wavetableOscillatorSample(instrument, state, phase, frequency, config, positionOffset, warpOffset, detuneOffset, spreadOffset) {
   const tableConfig = config || instrument.wavetable || { bank: "aether", position: 0.35, warp: 0.2, warpMode: "shape", unison: 1, detuneCents: 12, blend: 0.5 };
-  const unison = Math.max(1, Math.min(8, Math.round(tableConfig.unison || 1)));
+  const unison = Math.max(1, Math.min(AETHER_MAX_UNISON_VOICES, Math.round(tableConfig.unison || 1)));
   const detune = Math.max(0, Math.min(100, (tableConfig.detuneCents || 0) + (detuneOffset || 0)));
   const blend = clamp01((tableConfig.blend || 0) + (spreadOffset || 0));
   const plan = unisonVoicePlan(unison, detune, blend);

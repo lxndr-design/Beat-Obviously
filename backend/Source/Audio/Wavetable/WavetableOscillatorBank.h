@@ -12,7 +12,7 @@
 
 namespace beat::WavetableOscillatorBank
 {
-    using Bank = std::array<WavetableOscillator, 8>;
+    using Bank = std::array<WavetableOscillator, WavetableUnison::capacity>;
 
     struct RenderResult
     {
@@ -39,7 +39,7 @@ namespace beat::WavetableOscillatorBank
         double sampleRate,
         double frequencyHz) noexcept
     {
-        const int unison = juce::jlimit(1, 8, config.unison);
+        const int unison = juce::jlimit(1, WavetableUnison::maxVoices, config.unison);
         const float detuneCents = juce::jlimit(0.0f, 100.0f, config.detuneCents);
         const float blend = VoiceMath::clamp01(config.blend);
         const float position = VoiceMath::clamp01(config.position);

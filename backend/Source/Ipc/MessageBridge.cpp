@@ -3,6 +3,7 @@
 #include "../Audio/Analysis/AudioFileAnalyzer.h"
 #include "../Audio/Effects/TrackEffectDefaults.h"
 #include "../Audio/Parameters/SynthPatchContract.h"
+#include "../Audio/Wavetable/WavetableUnisonConfig.h"
 #include "../Audio/Recording/RecordingPlanner.h"
 #include "../Audio/Recording/RecordingSessionPlanner.h"
 #include "../Audio/Rendering/TrackBouncePlanner.h"
@@ -1513,7 +1514,7 @@ namespace beat
                 "smoothInterpolation",
                 value.getProperty("interpolation", fallback.smoothInterpolation ? "smooth" : "linear").toString() == "smooth");
             fallback.morph = normalizedParam(value, "morph", fallback.morph);
-            fallback.unison = juce::jlimit(1, 8, (int) value.getProperty("unison", fallback.unison));
+            fallback.unison = juce::jlimit(1, WavetableUnison::maxVoices, (int) value.getProperty("unison", fallback.unison));
             fallback.detuneCents = floatParam(value, "detuneCents", fallback.detuneCents, 0.0f, 100.0f);
             fallback.blend = normalizedParam(value, "blend", fallback.blend);
             return fallback;
@@ -2176,7 +2177,7 @@ namespace beat
                         instrument.wavetablePosition = normalizedParam(wavetable, "position", instrument.wavetablePosition);
                         instrument.wavetableWarp = normalizedParam(wavetable, "warp", instrument.wavetableWarp);
                         instrument.wavetableWarpMode = parseWavetableWarpMode(wavetable.getProperty("warpMode", instrument.wavetableWarpMode));
-                        instrument.wavetableUnison = juce::jlimit(1, 8, (int) wavetable.getProperty("unison", instrument.wavetableUnison));
+                        instrument.wavetableUnison = juce::jlimit(1, WavetableUnison::maxVoices, (int) wavetable.getProperty("unison", instrument.wavetableUnison));
                         instrument.wavetableDetuneCents = floatParam(wavetable, "detuneCents", instrument.wavetableDetuneCents, 0.0f, 100.0f);
                         instrument.wavetableBlend = normalizedParam(wavetable, "blend", instrument.wavetableBlend);
                     }

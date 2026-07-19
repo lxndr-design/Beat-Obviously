@@ -36,28 +36,28 @@ Both hashes were intentionally revised again when the confirmed dual-mono unison
 
 ## Findings
 
-1. The dual-mono unison defect is corrected. The tuned Future Bass and Progressive House renders now measure side/mid ratios of `0.637907` and `0.554533` respectively.
-2. The tuned four-note Future Bass reference render ran at `0.972x` realtime on the measured machine. The Progressive House render ran at `1.036x`. These are development-renderer timings, not native callback timings, but the Future Bass result remains too close to the realtime boundary.
-3. The 48-to-96 kHz downsample comparison produced residuals of `-12.759 dB` for Future Bass and `-17.262 dB` for Progressive House. Modulation, filter behavior, stereo unison, and the intentionally simple downsampler contribute to this residual, so it is a regression baseline rather than a pure oscillator error figure.
-4. At MIDI note 84 and 48 kHz, high-Nyquist-band energy ratios were `0.039255611` and `0.046867417`. At 96 kHz they fell to `0.000100552` and `0.003967191`. This is sufficient evidence to prioritize alias/performance refinement, but not sufficient to label the measured energy as aliasing without a reference-subtraction test.
+1. The dual-mono unison defect is corrected. The final nine-voice Future Bass and seven-voice Progressive House renders measure side/mid ratios of `0.622889` and `0.554533` respectively.
+2. The final four-note Future Bass development renderer ran at `0.591x` realtime on the measured machine. Progressive House ran at `0.684x` in the same closeout run. These are deliberately unoptimized browser reference-render timings, not native callback timings; production native evidence is recorded separately below.
+3. The 48-to-96 kHz downsample comparison produced residuals of `-12.510 dB` for Future Bass and `-17.262 dB` for Progressive House. Modulation, filter behavior, stereo unison, and the intentionally simple downsampler contribute to this residual, so it is a regression baseline rather than a pure oscillator error figure.
+4. At MIDI note 84 and 48 kHz, high-Nyquist-band energy ratios were `0.023780485` and `0.037721045`. At 96 kHz they fell to `0.000071513` and `0.003051646`. This is a risk diagnostic, not a claim that all measured energy is folded aliasing.
 5. The scripted reference renderer measures the Aether core preview and does not apply the persisted instrument FX chain. A separate native fixture now maps both exact benchmark descriptions into the production Aether engine and applies every supported authored insert in order. The saturator's descriptive `tone` field remains a schema-to-engine gap because the current saturator has no tone parameter.
 
 The schema-v2 report also includes a deterministic oscillator-isolated reference subtraction. It disables modulation, Filter 1 processing, envelopes, random phase, and FX while retaining each benchmark oscillator stack, then compares the direct 48 kHz MIDI-84 render with a deterministic 192 kHz render decimated 4:1 through a 513-tap Hann-windowed sinc low-pass. The report also records direct/reference RMS, correlation, fitted gain, and gain-fitted residual so an amplitude or alignment defect cannot be mistaken for alias energy.
 
 | Oscillator alias probe | Direct 48 kHz SHA-256 | 192 kHz reference SHA-256 | Residual RMS | Peak residual | Residual / signal | Relative level |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
-| Future Bass | `56fa06dcda363aaf8a655b726d7a548020de656a6521c5ba70fe0ace2d2cc753` | `76a5d490e2ac23460acaf36a4b44ec0aa144a0f4a099a8d7231f4f29f33fe91f` | 0.002317 | 0.009656 | 0.002409913 | -26.180 dB |
+| Future Bass | `5bda6d04159a22809ab2f33cf1c19be854cf350fd140a232626f7d5b5b10951d` | `10b899568d45fb855bd147834010847b79191ae1eb105d6ee72d44ec7421ca0b` | 0.002083 | 0.010508 | 0.002402411 | -26.194 dB |
 | Progressive House | `ab7a5a5c3f9f937585967072f7a025ecfecbfa94f208198d649b1680de8dc59d` | `9f147091619e6d01cc0517700dc0ddeed9b95be4eac7377ef46ea2ce0d40c338` | 0.001411 | 0.005663 | 0.002326419 | -26.333 dB |
 
 The former `-6.878 / -6.424 dB` result was invalid as an oscillator-only claim: changing `synthPatch.parameters["filter.enabled"]` after the preview object had been constructed did not bypass the runtime filter, and the preview model had no explicit Filter 1 bypass field. The probe therefore compared sample-rate-dependent filter realizations. The fixed preview model carries `filterEnabled`, bypasses Filter 1 and its drive when disabled, and uses a full-band frame normalization shared by every pitch-derived harmonic truncation. A focused test proves that cutoff, resonance, and drive cannot alter a disabled-filter render. Missing `filterEnabled` remains enabled for backward compatibility.
 
-The corrected probe improves by 19.30 dB for Future Bass and 19.91 dB for Progressive House, with direct/reference correlations of `0.998794650` and `0.998836236` and fitted gains of `1.000817972` and `1.000496997`. The frozen audition hashes and all six C4 hashes remain unchanged because those renders use enabled filters and do not cross the affected high-note harmonic boundary. The remaining approximately `-26 dB` result is a deterministic band-edge/mip-transition residual and is not yet a pure folded-alias measurement or a Serum 1 closeout threshold.
+The corrected probe improves by 19.32 dB for Future Bass and 19.91 dB for Progressive House over the invalid filter-contaminated values, with direct/reference correlations of `0.998798418` and `0.998836236` and fitted gains of `1.000832949` and `1.000496997`. The later Future Bass hash changes are wholly attributable to restoring its ninth voice; Progressive House remains exact. The approximately `-26 dB` result is a deterministic band-edge/mip-transition residual, not a pure folded-alias measurement, and the project owner accepted it as the Serum 1 Nyquist-edge policy.
 
 | Residual band | Future Bass residual/signal | Future residual share | Progressive residual/signal | Progressive residual share |
 | --- | ---: | ---: | ---: | ---: |
-| 0–8 kHz | -60.497 dB | 0.0261% | -68.529 dB | 0.0050% |
-| 8–16 kHz | -51.190 dB | 0.0483% | -56.706 dB | 0.0131% |
-| 16–24 kHz | -13.979 dB | 99.9256% | -14.468 dB | 99.9819% |
+| 0–8 kHz | -61.392 dB | 0.0386% | -68.529 dB | 0.0050% |
+| 8–16 kHz | -50.813 dB | 0.0779% | -56.706 dB | 0.0131% |
+| 16–24 kHz | -14.711 dB | 99.8834% | -14.468 dB | 99.9819% |
 
 The residual is therefore not a broad lower-band alias failure: more than 99.9% is confined to the 16–24 kHz transition band where the direct pitch-derived harmonic cutoff and reference low-pass have intentionally different edge responses. Changing that edge now would intentionally alter high-note brightness and requires a reviewed timbral policy, not a silent baseline update.
 
@@ -77,12 +77,18 @@ Measured on 2026-07-19:
 
 | Native fixture | Side/mid energy | Wet/dry residual ratio | Peak | Slowest render / realtime | Maximum callback load | Deadline overruns | Max wavetable voice samples/block | Max route-effect samples/block |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Benchmark - Future Bass Strings | 0.442070 | 1.19003 | 0.231432 | 8.488x | 26.4688% | 0 | 65,536 | 14,336 |
+| Benchmark - Future Bass Strings | 0.415804 | 1.36333 | 0.253380 | 8.454x | 24.5250% | 0 | 73,728 | 14,336 |
 | Benchmark - Progressive House Strings | 0.408087 | 2.55622 | 0.201444 | 9.194x | 24.6250% | 0 | 57,344 | 10,240 |
 
-The integrated Release run ended with 2,004 cache hits / 9 misses / 9 entries after Future Bass and 2,675 hits / 10 misses / 10 entries after Progressive House. These cache values are process-cumulative observations, while the per-block work values are maxima across the benchmark matrix. The complete Release stress suite passed in 15.10 s wall / 13.30 s user / 0.90 s system with zero benchmark deadline overruns.
+The final Release run ended with 2,004 cache hits / 9 misses / 9 entries after Future Bass and 2,675 hits / 10 misses / 10 entries after Progressive House. These cache values are process-cumulative observations, while the per-block work values are maxima across the benchmark matrix. The complete Release stress suite passed in 14.86 s wall / 12.93 s user / 0.89 s system with zero benchmark deadline overruns.
 
-The Future Bass description requests nine unison voices. The current browser and native playback contracts both cap unison at eight, so this fixture explicitly records and renders eight. Raising that limit is a remaining Serum 1.0 compatibility and performance decision; the benchmark does not relabel eight-voice output as nine-voice output.
+### Reviewed 16-voice capacity change
+
+The project owner accepted the measured Nyquist-edge residual as the Serum 1 timbral boundary and approved replacing the mismatched eight-voice caps with one fixed 16-voice contract. Native live/offline rendering, patch conversion, IPC, persistence, browser preview, worklet preview, AI sanitization, and editor normalization now use that bound. The factory Future Bass description therefore stores and renders its authored nine voices rather than relabelling an eight-voice approximation.
+
+This intentionally changes only Future Bass benchmark output; Progressive House remains at seven voices. Before any frozen expectation was changed, the repeated C4 renders proved that all three Progressive House hashes remained byte-identical and that all three Future Bass renders changed deterministically. The nine-voice Future Bass output remained finite and audible, with peak below `0.709`, absolute DC mean below `0.000087`, and maximum adjacent-sample discontinuity below `0.534` across 44.1/48/96 kHz. The reviewed new C4 hashes are listed below; the former values remain in Git history and in the preceding integration record.
+
+The final standalone audition hashes are float `4ea7b303e5c13ea958f305b8a8a3f6f05d3a2a6e7535fe802f6926022d436260` and WAV `332214986ae9652812529ad0a038d4bd8f96526db86f13f4f364a18d7ed2a3fa` for Future Bass. Progressive House remains float `a30b0196e0d2d4d153ccd0370cddcd3f54009b5c5581ddcf2ef049033da248f6` and WAV `17a26d0df7702e6525485fd7669757bfee81ef05ed65cdc705368449882f8ea8`.
 
 ## Integrated factory-render freeze
 
@@ -92,10 +98,10 @@ The accepted integrated C4 float hashes are:
 
 | Preset | 44.1 kHz | 48 kHz | 96 kHz |
 | --- | --- | --- | --- |
-| Benchmark - Future Bass Strings | `3b7a16c8a03c69167501836515a5e12a47eb049f1fb95c6c056a4a9dab5762dc` | `6acf60e7ceb29c4090fe02de05f2e9ff9a8bca50d041d0f41e76b5a2a8aa0392` | `abdfc817fe31489e70ab5ba5bf0cfe064f6ac650f93c711f43d5bf2de38d00c7` |
+| Benchmark - Future Bass Strings | `a5bfd0d3f47dd2b6368042fb649f3c3f55933ce4e9aa507be8c3cf3e9a5ec752` | `ba0c2e4cbd3730f8e7bb785f99cdf13376539505b1d091284753564473a08af5` | `1e8e8add621ef4f7438847603b3853bb58c6c7214a4131b670df64a7a6d01ef9` |
 | Benchmark - Progressive House Strings | `1397453a4578c86211206e4230a5a351ec467f14d459edc70ec63e1e407964a9` | `ad36495fa5321471891136df4e4485c8613368fb653f2518c4639746816fc000` | `d287fd1128f43f4c3b3b3ad11eb47203e8580be07277007bd229c881b4694bf8` |
 
-The Future Bass guide now stores eight voices, matching the renderer's fixed capacity and making repeated preset normalization idempotent. Rendering already clamped the prior value of nine to eight, so the standalone float/WAV hashes did not change.
+The Future Bass guide now stores nine voices, within the renderer's fixed 16-voice capacity, and repeated preset normalization remains idempotent. Its former eight-voice C4 hashes changed for this explained reason only; the seven-voice Progressive House output did not change.
 
 ## Branch reconciliation — complete
 
@@ -105,6 +111,6 @@ The full non-native gate, production targets, focused streaming callback test, a
 
 ## Acceptance Boundary
 
-The factory-instrument, repeatable preview render, exact native full-chain harnesses, branch reconciliation, deterministic preset normalization, and integrated render freeze are implemented and green. Serum 1.0 remains open only for the corrected `-26.180 / -26.333 dB` band-edge/mip-transition residual and the explicit decision whether to raise the fixed eight-voice unison capacity. Serum 2 feature comparisons should begin only after those Serum 1 boundaries are either corrected or explicitly accepted.
+The project owner accepted the corrected `-26.180 / -26.333 dB` band-edge/mip-transition residual as the Serum 1 Nyquist-edge policy and selected the fixed 16-voice capacity. Serum 1 closeout is pending only the complete post-change native/non-native verification and final recorded metrics; Serum 2 work has not begun.
 
 Changed hashes must be explained in this document before the frozen values are updated.

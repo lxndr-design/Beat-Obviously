@@ -11,7 +11,7 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 
 - Prompt: novel dynamic synth patch, not a preset, surprising macro identity
 - Unique fingerprints: 20
-- Numeric pairwise distance: 0.214
+- Numeric pairwise distance: 0.208
 - Categorical pairwise distance: 0.692
 - Schema coverage: `{"total":20,"targetKindMatches":20,"aetherEligible":20,"aetherStackComplete":20,"canonicalSynthPatch":20,"finiteCoreValues":20}`
 - Kinds: `{"wavetable":20}`
@@ -27,7 +27,7 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 
 - Prompt: novel wide aggressive evolving bass lead, strange oscillator movement
 - Unique fingerprints: 20
-- Numeric pairwise distance: 0.199
+- Numeric pairwise distance: 0.194
 - Categorical pairwise distance: 0.664
 - Schema coverage: `{"total":20,"targetKindMatches":20,"aetherEligible":20,"aetherStackComplete":20,"canonicalSynthPatch":20,"finiteCoreValues":20}`
 - Kinds: `{"wavetable":20}`

@@ -288,6 +288,19 @@ try {
   assert.equal(independentUnisonPreview.aether.oscB.route, "filter1");
   assert.equal(independentUnisonPreview.aether.sub.route, "filter2");
   assert.equal(independentUnisonPreview.aether.noise.route, "direct");
+  const maximumUnisonDraft = synthStore.normalizeSynthDraftPatch({
+    parameters: {
+      "unison.voices": 99,
+      "osc.a.unison.voices": 16,
+      "osc.b.unison.voices": 17,
+    },
+  });
+  assert.equal(maximumUnisonDraft.parameters["unison.voices"], 16);
+  assert.equal(maximumUnisonDraft.parameters["osc.a.unison.voices"], 16);
+  assert.equal(maximumUnisonDraft.parameters["osc.b.unison.voices"], 16);
+  const maximumUnisonPreview = synthStore.synthDraftToPreviewInstrument(maximumUnisonDraft);
+  assert.equal(maximumUnisonPreview.aether.oscA.wavetable.unison, 16);
+  assert.equal(maximumUnisonPreview.aether.oscB.wavetable.unison, 16);
   assert.deepEqual(independentUnisonPreview.aether.oscA.fxSends, [0.61, 0.17]);
   assert.deepEqual(independentUnisonPreview.aether.oscB.fxSends, [0.23, 0.71]);
   assert.deepEqual(independentUnisonPreview.aether.sub.fxSends, [0.31, 0.41]);
@@ -936,8 +949,8 @@ try {
   assert.equal(progressiveHouseBenchmark?.patch.parameters["osc.b.wavetable"], "basic.saw");
   assert.equal(futureBassBenchmark?.patch.parameters["filter.cutoff"], 6500);
   assert.equal(progressiveHouseBenchmark?.patch.parameters["filter.cutoff"], 4700);
-  assert.equal(futureBassBenchmark?.patch.parameters["unison.voices"], 8);
-  assert.equal(futureBassBenchmark?.patch.parameters["osc.a.unison.voices"], 8);
+  assert.equal(futureBassBenchmark?.patch.parameters["unison.voices"], 9);
+  assert.equal(futureBassBenchmark?.patch.parameters["osc.a.unison.voices"], 9);
   assert.equal(progressiveHouseBenchmark?.patch.parameters["osc.a.unison.voices"], 7);
   assert.deepEqual(
     ["macro.1", "macro.2", "macro.3", "macro.4"].map(

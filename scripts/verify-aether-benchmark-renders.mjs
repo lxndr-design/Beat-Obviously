@@ -19,9 +19,9 @@ const sampleRates = [44100, 48000, 96000];
 // benchmark instruments. Changes must be investigated and documented before
 // updating them; the verifier intentionally has no record/update mode.
 const expectedHashes = {
-  "factory.benchmark-future-bass-strings@44100": "3b7a16c8a03c69167501836515a5e12a47eb049f1fb95c6c056a4a9dab5762dc",
-  "factory.benchmark-future-bass-strings@48000": "6acf60e7ceb29c4090fe02de05f2e9ff9a8bca50d041d0f41e76b5a2a8aa0392",
-  "factory.benchmark-future-bass-strings@96000": "abdfc817fe31489e70ab5ba5bf0cfe064f6ac650f93c711f43d5bf2de38d00c7",
+  "factory.benchmark-future-bass-strings@44100": "a5bfd0d3f47dd2b6368042fb649f3c3f55933ce4e9aa507be8c3cf3e9a5ec752",
+  "factory.benchmark-future-bass-strings@48000": "ba0c2e4cbd3730f8e7bb785f99cdf13376539505b1d091284753564473a08af5",
+  "factory.benchmark-future-bass-strings@96000": "1e8e8add621ef4f7438847603b3853bb58c6c7214a4131b670df64a7a6d01ef9",
   "factory.benchmark-progressive-house-strings@44100": "1397453a4578c86211206e4230a5a351ec467f14d459edc70ec63e1e407964a9",
   "factory.benchmark-progressive-house-strings@48000": "ad36495fa5321471891136df4e4485c8613368fb653f2518c4639746816fc000",
   "factory.benchmark-progressive-house-strings@96000": "d287fd1128f43f4c3b3b3ad11eb47203e8580be07277007bd229c881b4694bf8",

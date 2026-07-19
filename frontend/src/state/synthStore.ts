@@ -19,6 +19,7 @@ import type {
   WavetableWarpMode,
 } from "./types";
 import factoryAetherGuide from "../data/factory_demo_starter_bank_v4_acoustic_synth_guide.json";
+import { clampAetherUnisonVoices } from "../audio/aetherLimits";
 import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
@@ -2764,8 +2765,8 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (id.endsWith(".tuning.numerator") || id.endsWith(".tuning.denominator")) return Math.max(0.001, Math.min(64, value));
   if (id.endsWith(".tuning.step")) return Math.max(-96, Math.min(96, Math.round(value)));
   if (id.endsWith(".tuning.divisions")) return Math.max(1, Math.min(96, Math.round(value)));
-  if (id === "unison.voices") return Math.max(1, Math.min(16, Math.round(value)));
-  if (id.endsWith(".unison.voices")) return Math.max(1, Math.min(8, Math.round(value)));
+  if (id === "unison.voices") return clampAetherUnisonVoices(value);
+  if (id.endsWith(".unison.voices")) return clampAetherUnisonVoices(value);
   if (id === "maxVoices") return Math.max(1, Math.min(32, Math.round(value)));
   if (id === "glide.ms") return Math.max(0, Math.min(5000, Math.round(value)));
   if (id.startsWith("aether.mpe.") && id.endsWith("Channel")) return clampMidiChannel(value);

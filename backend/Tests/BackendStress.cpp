@@ -1042,8 +1042,8 @@ namespace
         params.dynamicModulation.unisonDetune.lfo = 0.1f;
         params.dynamicModulation.unisonSpread.env = 0.1f;
 
-        std::array<beat::WavetableOscillator, 8> oscillatorsA;
-        std::array<beat::WavetableOscillator, 8> oscillatorsB;
+        beat::WavetableOscillatorBank::Bank oscillatorsA;
+        beat::WavetableOscillatorBank::Bank oscillatorsB;
         for (auto& oscillator : oscillatorsA)
             oscillator.prepare(48000.0);
         for (auto& oscillator : oscillatorsB)
@@ -1051,6 +1051,11 @@ namespace
 
         beat::WavetableUnison::Plan unisonPlanA;
         beat::WavetableUnison::Plan unisonPlanB;
+        if (beat::WavetableUnison::update(unisonPlanA, 99, 12.0f, 0.5f, 0.0f, 0.0f).unison
+                != beat::WavetableUnison::maxVoices
+            || unisonPlanA.rates.size() != beat::WavetableUnison::capacity)
+            return false;
+        beat::WavetableUnison::invalidate(unisonPlanA);
         juce::uint32 noiseState = 0x12345678u;
         const auto panGains = beat::VoiceAetherCache::panGainsFor(params);
         const auto pitchRates = beat::VoiceAetherCache::pitchRatesFor(params);
@@ -2090,7 +2095,7 @@ namespace
             ? std::array<float, 8> { 0.38f, 0.58f, 0.50f, 0.42f, 0.0f, 0.0f, 0.0f, 0.0f }
             : std::array<float, 8> { 0.35f, 0.45f, 0.40f, 0.55f, 0.0f, 0.0f, 0.0f, 0.0f };
 
-        const int unisonVoices = futureBass ? 8 : 7;
+        const int unisonVoices = futureBass ? 9 : 7;
         const float unisonDetune = futureBass ? 18.0f : 12.0f;
         const float unisonSpread = futureBass ? 0.95f : 0.82f;
         instrument.wavetableBank = 0;
@@ -15828,7 +15833,7 @@ namespace
                       << " cacheHits=" << observedCacheHits
                       << " cacheMisses=" << observedCacheMisses
                       << " cacheSize=" << observedCacheSize
-                      << " renderedUnison=" << (futureBass ? 8 : 7)
+                  << " renderedUnison=" << (futureBass ? 9 : 7)
                       << "\n";
         }
         return true;

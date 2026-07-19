@@ -38,8 +38,8 @@ namespace beat::AetherTableStackRenderer
     struct InteractionState
     {
         AetherInteractionStage::State downsampler;
-        std::array<WavetableOscillator, 8> oscillatorsA;
-        std::array<WavetableOscillator, 8> oscillatorsB;
+        WavetableOscillatorBank::Bank oscillatorsA;
+        WavetableOscillatorBank::Bank oscillatorsB;
         WavetableUnison::Plan unisonPlanA;
         WavetableUnison::Plan unisonPlanB;
         juce::uint32 noiseStateA { 1 };
@@ -84,8 +84,8 @@ namespace beat::AetherTableStackRenderer
             WavetableUnison::invalidate(unisonPlanB);
         }
 
-        void setPhases(const std::array<double, 8>& phasesA,
-                       const std::array<double, 8>& phasesB,
+        void setPhases(const WavetableUnison::PhaseArray& phasesA,
+                       const WavetableUnison::PhaseArray& phasesB,
                        juce::uint32 noiseSeed) noexcept
         {
             for (size_t index = 0; index < oscillatorsA.size(); ++index)
@@ -105,8 +105,8 @@ namespace beat::AetherTableStackRenderer
         const TargetActivityFlags& targets,
         const VoiceAetherCache::PanGains& panGains,
         const VoiceAetherCache::PitchRates& pitchRates,
-        std::array<WavetableOscillator, 8>& oscillatorsA,
-        std::array<WavetableOscillator, 8>& oscillatorsB,
+        WavetableOscillatorBank::Bank& oscillatorsA,
+        WavetableOscillatorBank::Bank& oscillatorsB,
         WavetableUnison::Plan& unisonPlanA,
         WavetableUnison::Plan& unisonPlanB,
         double frequencyHz,
@@ -202,7 +202,7 @@ namespace beat::AetherTableStackRenderer
 
         const auto renderOsc = [&](
             const auto& osc,
-            std::array<WavetableOscillator, 8>& oscillators,
+            WavetableOscillatorBank::Bank& oscillators,
             WavetableUnison::Plan& unisonPlan,
             const auto& positionTarget,
             const auto& fineTarget,
@@ -359,7 +359,7 @@ namespace beat::AetherTableStackRenderer
                 const double oversampledRate = sampleRate * (double) interactionState->downsampler.factor;
                 const auto renderInteractionOscillator = [&](const auto& osc,
                                                              const RenderedOscillator& rendered,
-                                                             std::array<WavetableOscillator, 8>& oscillators,
+                                                             WavetableOscillatorBank::Bank& oscillators,
                                                              WavetableUnison::Plan& plan,
                                                              juce::uint32& interactionNoiseState,
                                                              int64_t& componentSampleCounter,
