@@ -26,6 +26,8 @@ const instrumentEditorCssPath = join(frontendSrc, "features", "InstrumentEditor"
 const waveformPickerPath = join(frontendSrc, "features", "InstrumentEditor", "WaveformPicker.solid.tsx");
 const waveformPickerCssPath = join(frontendSrc, "features", "InstrumentEditor", "WaveformPicker.module.css");
 const knobPath = join(frontendSrc, "solid-ui", "Knob", "Knob.solid.tsx");
+const sliderPath = join(frontendSrc, "solid-ui", "Slider", "Slider.solid.tsx");
+const sliderCssPath = join(frontendSrc, "solid-ui", "Slider", "Slider.module.css");
 const preferencesPath = join(frontendSrc, "features", "Preferences", "PreferencesModal.solid.tsx");
 const preferencesCssPath = join(frontendSrc, "features", "Preferences", "PreferencesModal.module.css");
 const oscillatorPanelPath = join(frontendSrc, "features", "Synth", "OscillatorPanel", "OscillatorPanel.solid.tsx");
@@ -426,6 +428,21 @@ if (/\.active\b/.test(waveformPickerCssSource)) {
 const knobSource = existsSync(knobPath) ? readFileSync(knobPath, "utf8") : "";
 if (!knobSource.includes("onDialKeyDown") || !knobSource.includes("aria-valuetext")) {
   fail("Shared Knob must keep keyboard slider support and aria-valuetext.");
+}
+
+const sliderSource = existsSync(sliderPath) ? readFileSync(sliderPath, "utf8") : "";
+const sliderCssSource = existsSync(sliderCssPath) ? readFileSync(sliderCssPath, "utf8") : "";
+if (!sliderSource.includes('type="range"') || !sliderSource.includes("onInput")) {
+  fail("Shared Slider must keep the native range input and continuous input events.");
+}
+if (sliderSource.includes("setPointerCapture") || sliderCssSource.includes("pointer-events: none")) {
+  fail("Shared Slider must not replace native human drag behavior with wrapper pointer capture.");
+}
+if (!sliderCssSource.includes("font-size: var(--font-size-field-label)")) {
+  fail("Shared Slider labels must use the compact field-label typography token.");
+}
+if (sliderSource.includes('styles.label} ds-field-label')) {
+  fail("Shared Slider labels must not inherit the oversized editorial field-label class.");
 }
 
 const preferencesSource = existsSync(preferencesPath) ? readFileSync(preferencesPath, "utf8") : "";

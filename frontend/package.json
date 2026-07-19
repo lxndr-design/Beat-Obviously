@@ -10,6 +10,7 @@
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint . --ext .ts,.tsx",
     "verify:daw": "node ../scripts/verify-daw-core.mjs",
+    "verify:audio-bus": "node ../scripts/verify-audio-bus.mjs",
     "verify:documents": "node ../scripts/verify-document-roundtrip.mjs",
     "verify:native-doc": "node ../scripts/verify-native-document-registration.mjs",
     "verify:native-toolchain": "node ../scripts/verify-native-toolchain.mjs",

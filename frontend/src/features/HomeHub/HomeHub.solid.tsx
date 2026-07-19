@@ -71,6 +71,7 @@ export function HomeHub(props: HomeHubProps) {
         <HomeHeader
           title="Beat"
           onHome={props.onHome}
+          onSettings={props.onSettings}
           onQuit={() => void quitBeat()}
           disableHome
         />
@@ -153,6 +154,7 @@ export function HomeHub(props: HomeHubProps) {
 interface HomeHeaderProps {
   title: string;
   onHome: () => void;
+  onSettings?: () => void;
   onQuit: () => void;
   disableHome?: boolean;
 }
@@ -162,7 +164,13 @@ function HomeHeader(props: HomeHeaderProps) {
     <div class={styles.header}>
       <Show
         when={!props.disableHome}
-        fallback={<span class={styles.headerSpacer} aria-hidden="true" />}
+        fallback={(
+          <HoverInfo content="Settings" placement="right">
+            <Button iconOnly size="md" onClick={props.onSettings} aria-label="Settings">
+              <Icon name="ph:gear" size={18} decorative />
+            </Button>
+          </HoverInfo>
+        )}
       >
         <h1 class={styles.breadcrumb}>
           <Button variant="ghost" class={styles.breadcrumbHome} onClick={props.onHome}>Beat</Button>

@@ -82,17 +82,32 @@ namespace beat
         float gainDb { -96.0f };
         float pan { 0.0f };
         bool enabled { true };
+        bool preFader { false };
     };
 
     struct ReturnBus
     {
+        int schemaVersion { 1 };
         Id id;
         juce::String name;
+        juce::String color;
+        juce::String icon;
+        juce::String channelLayout { "stereo" };
+        Id outputBusId;
+        bool outputEnabled { true };
+        float inputTrimDb { 0.0f };
         float gainDb { 0.0f };
         float pan { 0.0f };
         bool mute { false };
+        bool solo { false };
+        bool soloSafe { false };
+        int mixerOrder { 0 };
+        std::vector<TrackSend> sends;
         std::vector<TrackEffect> effects;
+        std::vector<MidiAutomationLane> automation;
     };
+
+    using AudioBus = ReturnBus;
 
     struct Segment
     {
@@ -498,6 +513,8 @@ namespace beat
         Id     instrumentId;
         Id     audioFileId;
         Id     parentTrackId;
+        Id     outputBusId;
+        bool   outputEnabled { true };
         float  gainDb { 0.0f };
         float  pan    { 0.0f };
         bool   mute   { false };

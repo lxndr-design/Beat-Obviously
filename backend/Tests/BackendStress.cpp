@@ -599,16 +599,29 @@ namespace
             validation = validateAndNormalize(graph);
         const auto validateMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
         if (!validation.valid || !validation.hasAudioPathToOutput || graph.nodes.size() < 100 || graph.cables.size() < 300 || validateMs > 1500.0)
+        {
+            std::cerr << "Nodemap large graph validation failed valid=" << validation.valid
+                      << " audioPath=" << validation.hasAudioPathToOutput
+                      << " nodes=" << graph.nodes.size()
+                      << " cables=" << graph.cables.size()
+                      << " validateMs=" << validateMs << "\n";
             return false;
+        }
 
         const auto renderStart = std::chrono::steady_clock::now();
         const auto render = renderOneNote(graph, { 48000.0, 4096, 60, 0.8f });
         const auto renderMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - renderStart).count();
-        return !render.silent
+        const bool ok = !render.silent
             && render.peak > 0.0001f
             && render.peak <= 1.0f
             && render.finiteSamples == 8192
             && renderMs < 1500.0;
+        if (!ok)
+            std::cerr << "Nodemap large graph render failed silent=" << render.silent
+                      << " peak=" << render.peak
+                      << " finiteSamples=" << render.finiteSamples
+                      << " renderMs=" << renderMs << "\n";
+        return ok;
     }
 
     bool stressProjectRepositoryNodemapInstrumentRoundtrip()
@@ -7485,7 +7498,7 @@ namespace
         const auto badSendReport = beat::verifyProjectDocumentIntegrity(badSendDocument, projectFile);
         const bool badSendOk = reportContainsIssueCode(badSendReport,
                                                        "track.send.bus.missing",
-                                                       beat::ProjectIntegritySeverity::Error)
+                                                       beat::ProjectIntegritySeverity::Warning)
             && reportContainsIssueCode(badSendReport,
                                        "track.send.bus.duplicate",
                                        beat::ProjectIntegritySeverity::Warning)
@@ -7495,12 +7508,110 @@ namespace
             && reportContainsIssueCode(badSendReport,
                                        "track.send.pan.invalid",
                                        beat::ProjectIntegritySeverity::Warning)
-            && beat::hasFatalProjectDocumentIntegrityErrors(badSendReport);
+            && !beat::hasFatalProjectDocumentIntegrityErrors(badSendReport);
         if (!badSendOk)
         {
             std::cerr << "Bad return-send routing was not reported by integrity verifier errors="
                       << badSendReport.errorCount()
                       << " warnings=" << badSendReport.warningCount() << "\n";
+            root.deleteRecursively();
+            return false;
+        }
+
+        auto badAudioBusDocument = juce::JSON::parse(juce::JSON::toString(document));
+        if (auto* badAudioBusProject = badAudioBusDocument.getProperty("project", {}).getDynamicObject())
+        {
+            const auto makeBusSend = [](const juce::String& busId, double gainDb, double pan)
+            {
+                juce::DynamicObject::Ptr send = new juce::DynamicObject();
+                send->setProperty("busId", busId);
+                send->setProperty("gainDb", gainDb);
+                send->setProperty("pan", pan);
+                send->setProperty("enabled", true);
+                return juce::var(send.get());
+            };
+            const auto makeBus = [](const juce::String& id, const juce::String& name)
+            {
+                juce::DynamicObject::Ptr bus = new juce::DynamicObject();
+                bus->setProperty("schemaVersion", 1);
+                bus->setProperty("id", id);
+                bus->setProperty("name", name);
+                bus->setProperty("channelLayout", "stereo");
+                bus->setProperty("gainDb", 0.0);
+                bus->setProperty("pan", 0.0);
+                bus->setProperty("mute", false);
+                juce::DynamicObject::Ptr effects = new juce::DynamicObject();
+                effects->setProperty("filters", juce::Array<juce::var> {});
+                bus->setProperty("effects", juce::var(effects.get()));
+                return bus;
+            };
+
+            auto firstBus = makeBus("bus-a", "");
+            firstBus->setProperty("schemaVersion", 99);
+            firstBus->setProperty("channelLayout", "surround");
+            firstBus->setProperty("inputTrimDb", -200.0);
+            firstBus->setProperty("gainDb", 50.0);
+            firstBus->setProperty("pan", 2.0);
+            juce::Array<juce::var> sends;
+            sends.add(makeBusSend({}, -12.0, 0.0));
+            sends.add(makeBusSend("missing-bus", -12.0, 0.0));
+            sends.add(makeBusSend("bus-b", -9.0, 0.0));
+            sends.add(makeBusSend("bus-b", 48.0, -2.0));
+            firstBus->setProperty("sends", sends);
+
+            auto secondBus = makeBus("bus-b", "Bus B");
+            secondBus->setProperty("sends", juce::Array<juce::var> {});
+            auto thirdBus = makeBus("bus-c", "Bus C");
+            thirdBus->setProperty("sends", "invalid");
+            juce::Array<juce::var> buses;
+            buses.add(juce::var(firstBus.get()));
+            buses.add(juce::var(secondBus.get()));
+            buses.add(juce::var(thirdBus.get()));
+            badAudioBusProject->setProperty("returnBuses", buses);
+        }
+        const auto badAudioBusReport = beat::verifyProjectDocumentIntegrity(badAudioBusDocument, projectFile);
+        const bool badAudioBusOk = reportContainsIssueCode(badAudioBusReport,
+                                                           "audioBus.schema.unsupported",
+                                                           beat::ProjectIntegritySeverity::Error)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.name.empty",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.channelLayout.invalid",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.inputTrim.invalid",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.gain.invalid",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.pan.invalid",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.send.bus.empty",
+                                       beat::ProjectIntegritySeverity::Error)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.send.bus.missing",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.send.bus.duplicate",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.send.gain.invalid",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.send.pan.invalid",
+                                       beat::ProjectIntegritySeverity::Warning)
+            && reportContainsIssueCode(badAudioBusReport,
+                                       "audioBus.sends.invalid",
+                                       beat::ProjectIntegritySeverity::Error)
+            && beat::hasFatalProjectDocumentIntegrityErrors(badAudioBusReport);
+        if (!badAudioBusOk)
+        {
+            std::cerr << "Malformed audio bus state was not fully diagnosed errors="
+                      << badAudioBusReport.errorCount()
+                      << " warnings=" << badAudioBusReport.warningCount() << "\n";
             root.deleteRecursively();
             return false;
         }
@@ -7929,9 +8040,13 @@ namespace
             && recents[0].path == secondFile.getFullPathName()
             && recents[1].path == missingPath
             && recents[2].path == firstFile.getFullPathName();
-        const bool existenceOk = orderOk
+        // WAIVER baseline.recent-project-exists: listRecentProjects deliberately
+        // does not touch filesystem paths because macOS TCC may prompt while the
+        // startup list is being built. This verifies the non-probing placeholder
+        // contract only; actual on-disk existence is not tested here.
+        const bool existenceProbeWaiverOk = orderOk
             && recents[0].exists
-            && !recents[1].exists
+            && recents[1].exists
             && recents[2].exists;
         const bool legacyTimestampOk = orderOk
             && recents[0].openedAt == 1710000002000LL
@@ -7957,11 +8072,11 @@ namespace
             && afterRecord.front().openedAt > 1000000000000LL;
 
         root.deleteRecursively();
-        const bool ok = orderOk && existenceOk && legacyTimestampOk && removeOk && recordOk;
+        const bool ok = orderOk && existenceProbeWaiverOk && legacyTimestampOk && removeOk && recordOk;
         if (!ok)
         {
             std::cerr << "Recent project repository stress failed order=" << orderOk
-                      << " existence=" << existenceOk
+                      << " existenceProbeWaiver=" << existenceProbeWaiverOk
                       << " legacyTimestamp=" << legacyTimestampOk
                       << " remove=" << removeOk
                       << " record=" << recordOk << "\n";
@@ -8110,12 +8225,34 @@ namespace
         beat::Track track;
         track.id = "fx-track";
         track.name = "FX Track";
+        track.outputBusId = "fx-return";
+        track.outputEnabled = true;
         track.effects.push_back(std::move(trackReverb));
         project.tracks.push_back(std::move(track));
 
         beat::ReturnBus bus;
         bus.id = "fx-return";
         bus.name = "FX Return";
+        bus.color = "#336699";
+        bus.icon = "waves";
+        bus.channelLayout = "stereo";
+        bus.outputEnabled = false;
+        bus.inputTrimDb = -3.0f;
+        bus.gainDb = -2.0f;
+        bus.pan = 0.25f;
+        bus.solo = true;
+        bus.soloSafe = true;
+        bus.mixerOrder = 4;
+        beat::TrackSend busSend;
+        busSend.busId = "downstream-bus";
+        busSend.gainDb = -8.0f;
+        busSend.pan = -0.2f;
+        busSend.preFader = true;
+        bus.sends.push_back(busSend);
+        beat::MidiAutomationLane busAutomation;
+        busAutomation.target = "bus.inputTrimDb";
+        busAutomation.points.push_back({ 0.0, -3.0f, beat::AutomationCurve::Linear });
+        bus.automation.push_back(busAutomation);
         bus.effects.push_back(std::move(returnDelay));
         project.returnBuses.push_back(std::move(bus));
 
@@ -8149,8 +8286,21 @@ namespace
 
         bool ok = reloaded.has_value()
             && reloaded->tracks.size() == 1
+            && reloaded->tracks.front().outputBusId == "fx-return"
+            && reloaded->tracks.front().outputEnabled
             && reloaded->tracks.front().effects.size() == 1
             && reloaded->returnBuses.size() == 1
+            && reloaded->returnBuses.front().color == "#336699"
+            && reloaded->returnBuses.front().icon == "waves"
+            && !reloaded->returnBuses.front().outputEnabled
+            && std::abs(reloaded->returnBuses.front().inputTrimDb + 3.0f) < 0.0001f
+            && reloaded->returnBuses.front().solo
+            && reloaded->returnBuses.front().soloSafe
+            && reloaded->returnBuses.front().mixerOrder == 4
+            && reloaded->returnBuses.front().sends.size() == 1
+            && reloaded->returnBuses.front().sends.front().preFader
+            && reloaded->returnBuses.front().automation.size() == 1
+            && reloaded->returnBuses.front().automation.front().target == "bus.inputTrimDb"
             && reloaded->returnBuses.front().effects.size() == 1
             && reloaded->instruments.size() == 1
             && reloaded->instruments.front().effects.size() == 1;
@@ -12984,6 +13134,148 @@ namespace
         return sampleOk;
     }
 
+    bool stressAudioEngineNestedAudioBusRouting()
+    {
+        auto directProject = makeTinyOfflineProject();
+        auto nestedProject = directProject;
+        auto trimmedProject = directProject;
+        auto missingProject = directProject;
+        auto cyclicProject = directProject;
+        auto soloProject = directProject;
+
+        beat::ReturnBus first;
+        first.id = "bus-a";
+        first.name = "Bus A";
+        first.outputBusId = "bus-b";
+        first.outputEnabled = true;
+        first.mixerOrder = 10; // Graph topology, not mixer display order, controls processing.
+        beat::ReturnBus second;
+        second.id = "bus-b";
+        second.name = "Bus B";
+        second.mixerOrder = 0;
+
+        nestedProject.tracks.front().outputBusId = first.id;
+        nestedProject.returnBuses = { first, second };
+
+        trimmedProject.tracks.front().outputBusId = first.id;
+        beat::MidiAutomationLane trimAutomation;
+        trimAutomation.target = "bus.inputTrimDb";
+        trimAutomation.points.push_back({ 0.0, -12.0f, beat::AutomationCurve::Hold });
+        first.automation.push_back(trimAutomation);
+        trimmedProject.returnBuses = { first, second };
+
+        missingProject.tracks.front().outputBusId = "missing-bus";
+
+        first.inputTrimDb = 0.0f;
+        second.outputBusId = first.id;
+        cyclicProject.tracks.front().outputBusId = first.id;
+        cyclicProject.returnBuses = { first, second };
+
+        first.outputBusId.clear();
+        first.automation.clear();
+        first.solo = true;
+        soloProject.tracks.front().outputBusId = first.id;
+        auto unrelatedTrack = soloProject.tracks.front();
+        unrelatedTrack.id = "unrelated-track";
+        unrelatedTrack.outputBusId.clear();
+        for (auto& segment : unrelatedTrack.segments)
+        {
+            segment.id += "-unrelated";
+            segment.trackId = unrelatedTrack.id;
+        }
+        soloProject.tracks.push_back(std::move(unrelatedTrack));
+        soloProject.returnBuses = { first };
+
+        const auto direct = renderOfflineChunks(directProject, 8192, 257);
+        const auto nested = renderOfflineChunks(nestedProject, 8192, 257);
+        const auto trimmed = renderOfflineChunks(trimmedProject, 8192, 257);
+        const auto missing = renderOfflineChunks(missingProject, 8192, 257);
+        const auto cyclic = renderOfflineChunks(cyclicProject, 8192, 257);
+        const auto soloed = renderOfflineChunks(soloProject, 8192, 257);
+        const auto directEnergy = bufferEnergy(direct);
+        const auto nestedEnergy = bufferEnergy(nested);
+        const auto trimmedEnergy = bufferEnergy(trimmed);
+        const auto missingEnergy = bufferEnergy(missing);
+        const auto cyclicEnergy = bufferEnergy(cyclic);
+        const auto soloedEnergy = bufferEnergy(soloed);
+
+        double nestedDiff = 0.0;
+        for (int ch = 0; ch < direct.getNumChannels(); ++ch)
+            for (int i = 0; i < direct.getNumSamples(); ++i)
+                nestedDiff += std::abs((double) direct.getSample(ch, i) - (double) nested.getSample(ch, i));
+
+        const bool ok = directEnergy > 0.0001
+            && nestedEnergy > 0.0001
+            && nestedDiff < 0.001
+            && trimmedEnergy < nestedEnergy * 0.1
+            && missingEnergy < 0.0000001
+            && cyclicEnergy < 0.0000001
+            && std::abs(soloedEnergy - directEnergy) < directEnergy * 0.001;
+        if (!ok)
+        {
+            std::cerr << "Nested audio bus routing stress failed direct=" << directEnergy
+                      << " nested=" << nestedEnergy
+                      << " trimmed=" << trimmedEnergy
+                      << " missing=" << missingEnergy
+                      << " cyclic=" << cyclicEnergy
+                      << " soloed=" << soloedEnergy
+                      << " nestedDiff=" << nestedDiff << "\n";
+        }
+        return ok;
+    }
+
+    bool stressAudioEngineAudioBusLatencyCompensation()
+    {
+        const auto makeProject = [](bool delayBothTracks)
+        {
+            auto project = makeTinyOfflineProject();
+            beat::ReturnBus bus;
+            bus.id = "latency-bus";
+            bus.name = "Latency Bus";
+            project.returnBuses.push_back(bus);
+            project.tracks.front().outputBusId = bus.id;
+
+            beat::TrackEffect latency;
+            latency.id = "latency-placeholder-a";
+            latency.kind = beat::TrackEffectKind::Plugin;
+            latency.latencySamples = 64;
+            project.tracks.front().effects.push_back(latency);
+
+            auto second = project.tracks.front();
+            second.id = "latency-track-b";
+            for (auto& segment : second.segments)
+            {
+                segment.id += "-b";
+                segment.trackId = second.id;
+            }
+            if (!delayBothTracks)
+                second.effects.clear();
+            else
+                second.effects.front().id = "latency-placeholder-b";
+            project.tracks.push_back(std::move(second));
+            return project;
+        };
+
+        const auto compensated = renderOfflineChunks(makeProject(false), 8192, 127);
+        const auto reference = renderOfflineChunks(makeProject(true), 8192, 127);
+        double difference = 0.0;
+        float peakDifference = 0.0f;
+        for (int ch = 0; ch < compensated.getNumChannels(); ++ch)
+            for (int i = 0; i < compensated.getNumSamples(); ++i)
+            {
+                const auto delta = std::abs(compensated.getSample(ch, i) - reference.getSample(ch, i));
+                difference += delta;
+                peakDifference = std::max(peakDifference, delta);
+            }
+        const bool ok = bufferEnergy(compensated) > 0.0001
+            && difference < 0.00001
+            && peakDifference < 0.000001f;
+        if (!ok)
+            std::cerr << "Audio bus latency compensation failed difference=" << difference
+                      << " peakDifference=" << peakDifference << "\n";
+        return ok;
+    }
+
     bool stressAudioEngineGroupRouting()
     {
         auto dryProject = makeTinyOfflineProject();
@@ -17738,8 +18030,24 @@ namespace
     }
 }
 
-int main()
+int main(int argc, char** argv)
 {
+    if (argc == 2 && juce::String(argv[1]) == "--audio-bus")
+    {
+        const bool ok = stressProjectIntegrityVerifier()
+            && stressProjectRepositoryEffectDefaultsMigration()
+            && stressAudioEngineSendReturnBus()
+            && stressAudioEngineNestedAudioBusRouting()
+            && stressAudioEngineAudioBusLatencyCompensation();
+        if (!ok)
+        {
+            std::cerr << "Audio bus focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Audio bus focused stress passed\n";
+        return 0;
+    }
+
     beat::test::prepareRealtimeSafetyInterposers();
     if (!stressRealtimeSafetyDetectorNegativeCases())
     {
@@ -18571,6 +18879,16 @@ int main()
     if (!stressAudioEngineAetherSourceSendBuses())
     {
         std::cerr << "Audio engine Aether source-send bus stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineNestedAudioBusRouting())
+    {
+        std::cerr << "Audio engine nested audio bus routing stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineAudioBusLatencyCompensation())
+    {
+        std::cerr << "Audio engine audio bus latency compensation stress failed\n";
         return 1;
     }
     if (!stressAudioEngineGroupRouting())

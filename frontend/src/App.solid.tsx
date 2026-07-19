@@ -26,7 +26,7 @@ import { HomeHub } from "./features/HomeHub/HomeHub.solid";
 import { TopBar } from "./features/TopBar/TopBar.solid";
 import { Sidebar } from "./features/Sidebar/Sidebar.solid";
 import { TrackList } from "./features/Tracks/TrackList.solid";
-import { MasterEqPanel } from "./features/Eq/MasterEqPanel.solid";
+import { AudioBusPanel } from "./features/AudioBusPanel/AudioBusPanel.solid";
 import { EditorHost } from "./features/EditorHost/EditorHost.solid";
 import { AppDialogHost } from "./solid-ui/AppDialog";
 import { ModalStackOverlay } from "./solid-ui/Modal";
@@ -76,6 +76,7 @@ export function App() {
 
   const shouldMountEditorHost = createStoreSelector(useUiStore, (s) => s.openEditors.length > 0 || Boolean(s.trackEffectsEditorTrackId));
   const themeContrastLevel = createStoreSelector(useSettingsStore, (s) => s.themeContrastLevel);
+  const themeMode = createStoreSelector(useSettingsStore, (s) => s.themeMode);
   const [showHome, setShowHome] = createSignal(true);
   const [startupReadiness, setStartupReadiness] = createSignal<Record<StartupReadinessKey, boolean>>(initialStartupReadiness(), { equals: false });
   const [startupMinimumElapsed, setStartupMinimumElapsed] = createSignal(false);
@@ -122,6 +123,7 @@ export function App() {
 
   createEffect(() => {
     document.documentElement.dataset.themeContrast = themeContrastLevel();
+    document.documentElement.dataset.theme = themeMode();
   });
 
   onMount(() => {
@@ -562,7 +564,7 @@ export function App() {
             <Sidebar />
             <div class="main-col">
               <TrackBlock />
-              <MasterEqPanel />
+              <AudioBusPanel />
             </div>
           </main>
         </div>

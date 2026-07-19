@@ -143,7 +143,7 @@ export async function startInstrumentSampleZoneAudition(
   return startInstrumentPreviewAudition(instrument, durationS, gainValue, bpm, velocity, onEnded, sampleSelection);
 }
 
-function getBrowserPreviewAudioContext(): AudioContext {
+export function getBrowserPreviewAudioContext(): AudioContext {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Ctor = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
   if (!browserPreviewAudioContext || browserPreviewAudioContext.state === "closed") browserPreviewAudioContext = new Ctor();

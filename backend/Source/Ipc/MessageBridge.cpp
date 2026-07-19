@@ -1681,6 +1681,7 @@ namespace beat
             send.gainDb = juce::jlimit(-96.0f, 24.0f, (float) (double) sendVar.getProperty("gainDb", -96.0));
             send.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) sendVar.getProperty("pan", 0.0));
             send.enabled = (bool) sendVar.getProperty("enabled", true);
+            send.preFader = (bool) sendVar.getProperty("preFader", false);
             return send;
         }
 
@@ -1811,6 +1812,8 @@ namespace beat
                     t.instrumentId = trackVar.getProperty("instrumentId", "").toString();
                     t.audioFileId = trackVar.getProperty("audioFileId", "").toString();
                     t.parentTrackId = trackVar.getProperty("parentTrackId", "").toString();
+                    t.outputBusId = trackVar.getProperty("outputBusId", "").toString();
+                    t.outputEnabled = (bool) trackVar.getProperty("outputEnabled", true);
                     t.gainDb = (float) (double) trackVar.getProperty("gainDb", 0.0);
                     t.pan = (float) (double) trackVar.getProperty("pan", 0.0);
                     t.mute = (bool) trackVar.getProperty("mute", false);
@@ -2079,11 +2082,49 @@ namespace beat
                 {
                     if (!busVar.isObject()) continue;
                     ReturnBus bus;
+                    bus.schemaVersion = juce::jmax(1, (int) busVar.getProperty("schemaVersion", 1));
                     bus.id = busVar.getProperty("id", "").toString();
                     bus.name = busVar.getProperty("name", "").toString();
+                    bus.color = busVar.getProperty("color", "").toString();
+                    bus.icon = busVar.getProperty("icon", "").toString();
+                    bus.channelLayout = busVar.getProperty("channelLayout", "stereo").toString();
+                    bus.outputBusId = busVar.getProperty("outputBusId", "").toString();
+                    bus.outputEnabled = (bool) busVar.getProperty("outputEnabled", true);
+                    bus.inputTrimDb = juce::jlimit(-96.0f, 24.0f, (float) (double) busVar.getProperty("inputTrimDb", 0.0));
                     bus.gainDb = juce::jlimit(-96.0f, 24.0f, (float) (double) busVar.getProperty("gainDb", 0.0));
                     bus.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) busVar.getProperty("pan", 0.0));
                     bus.mute = (bool) busVar.getProperty("mute", false);
+                    bus.solo = (bool) busVar.getProperty("solo", false);
+                    bus.soloSafe = (bool) busVar.getProperty("soloSafe", false);
+                    bus.mixerOrder = juce::jmax(0, (int) busVar.getProperty("mixerOrder", 0));
+                    if (auto* sends = busVar.getProperty("sends", {}).getArray())
+                    {
+                        for (const auto& sendVar : *sends)
+                        {
+                            auto send = parseTrackSend(sendVar);
+                            if (send.busId.isNotEmpty()) bus.sends.push_back(send);
+                        }
+                    }
+                    if (auto* lanes = busVar.getProperty("automation", {}).getArray())
+                    {
+                        for (const auto& laneVar : *lanes)
+                        {
+                            if (!laneVar.isObject()) continue;
+                            MidiAutomationLane lane;
+                            lane.target = laneVar.getProperty("target", laneVar.getProperty("param", "")).toString();
+                            if (auto* points = laneVar.getProperty("points", {}).getArray())
+                                for (const auto& pointVar : *points)
+                                {
+                                    if (!pointVar.isObject()) continue;
+                                    MidiAutomationPoint point;
+                                    point.beat = (double) pointVar.getProperty("beat", 0.0);
+                                    point.value = (float) (double) pointVar.getProperty("value", 0.0);
+                                    point.curve = parseAutomationCurve(pointVar.getProperty("curve", "linear"));
+                                    if (std::isfinite(point.beat) && std::isfinite(point.value)) lane.points.push_back(point);
+                                }
+                            if (!lane.target.isEmpty() && !lane.points.empty()) bus.automation.push_back(std::move(lane));
+                        }
+                    }
                     if (auto* filters = busVar.getProperty("effects", {}).getProperty("filters", {}).getArray())
                     {
                         for (const auto& effectVar : *filters)

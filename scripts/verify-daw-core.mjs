@@ -154,9 +154,19 @@ try {
   assert.equal(mixerProject.tracks[0].sends?.[0]?.busId, returnBusId, "mixer store should create track sends to return buses");
   assert.equal(mixerProject.tracks[0].sends?.[0]?.gainDb, -9, "mixer store should update send gain");
   assert.equal(mixerProject.tracks[0].sends?.[0]?.pan, 0.25, "mixer store should update send pan");
+  const nestedBusId = store.useProjectStore.getState().addReturnBus("Nested Bus");
+  assert.equal(store.useProjectStore.getState().setTrackOutputBus(mixerTrackId, returnBusId), true, "mixer store should route a track primary output to a bus");
+  assert.equal(store.useProjectStore.getState().setAudioBusOutput(returnBusId, nestedBusId), true, "mixer store should route a bus to a downstream bus");
+  assert.equal(store.useProjectStore.getState().setAudioBusOutput(nestedBusId, returnBusId), false, "mixer store should reject a primary-output cycle");
+  assert.equal(store.useProjectStore.getState().upsertAudioBusSend(nestedBusId, returnBusId, { enabled: true }), false, "mixer store should reject a send cycle");
+  assert.equal(store.useProjectStore.getState().upsertAudioBusSend(returnBusId, nestedBusId, { enabled: true, preFader: true, gainDb: -6 }), true, "mixer store should create pre-fader bus sends");
+  assert.equal(store.useProjectStore.getState().project.returnBuses[0].sends?.[0]?.preFader, true, "mixer store should preserve pre-fader bus-send mode");
   store.useProjectStore.getState().removeReturnBus(returnBusId);
-  assert.equal(store.useProjectStore.getState().project.returnBuses.length, 0, "removing a return bus should remove it from the project");
+  assert.equal(store.useProjectStore.getState().project.returnBuses.length, 1, "removing a return bus should preserve unrelated buses");
   assert.equal(store.useProjectStore.getState().project.tracks[0].sends?.length ?? 0, 0, "removing a return bus should remove dependent track sends");
+  assert.equal(store.useProjectStore.getState().project.tracks[0].outputEnabled, false, "removing a primary destination should explicitly disconnect the track");
+  assert.equal(store.useProjectStore.getState().project.tracks[0].outputBusId, undefined, "removing a primary destination should clear its stale ID");
+  store.useProjectStore.getState().removeReturnBus(nestedBusId);
 
   const assetManifest = assetReferenceGraph.buildAssetManifest({
     audioFiles: [{ id: "audio-a", name: "Loop.wav", path: "/Users/alex/Loop.wav", durationSeconds: 1, sampleRate: 44100 }],

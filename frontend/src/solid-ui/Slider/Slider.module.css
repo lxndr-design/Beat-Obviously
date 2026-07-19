@@ -25,7 +25,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--font-size-ui);
+  font-size: var(--font-size-field-label);
   line-height: 1;
   text-transform: none;
   letter-spacing: 0;
@@ -63,7 +63,7 @@
   background-repeat: no-repeat;
   background-size: calc(100% - var(--slider-thumb-hit-width)) var(--slider-track-height);
   cursor: ew-resize;
-  pointer-events: none;
+  pointer-events: auto;
   touch-action: none;
   user-select: none;
 }

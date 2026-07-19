@@ -204,6 +204,15 @@ export interface TrackSend {
   gainDb: number;
   pan: number;
   enabled: boolean;
+  preFader?: boolean;
+}
+
+export const AUDIO_BUS_SCHEMA_VERSION = 1;
+
+export interface AudioBusCreateOptions {
+  name?: string;
+  /** Tracks routed here atomically when the Bus is created. Unknown ids are ignored. */
+  trackIds?: Id[];
 }
 
 export interface TrackFreezeSource {
@@ -218,13 +227,28 @@ export interface TrackFreezeSource {
 }
 
 export interface ReturnBus {
+  schemaVersion?: number;
   id: Id;
   name: string;
+  color?: string;
+  icon?: string;
+  channelLayout?: "mono" | "stereo";
+  /** Empty/undefined routes to Master. A missing non-empty ID must remain silent. */
+  outputBusId?: Id;
+  outputEnabled?: boolean;
+  inputTrimDb?: number;
   gainDb: number;
   pan: number;
   mute: boolean;
+  solo?: boolean;
+  soloSafe?: boolean;
+  mixerOrder?: number;
+  sends?: TrackSend[];
   effects: TrackEffectChain;
+  automation?: MidiAutomationLane[];
 }
+
+export type AudioBus = ReturnBus;
 
 export interface Track {
   id: Id;
@@ -236,6 +260,10 @@ export interface Track {
   audioFileId?: Id;
   /** Optional parent group/folder route. Missing parent falls back to master. */
   parentTrackId?: Id;
+  /** Primary mixer output. Empty/undefined routes to Master. */
+  outputBusId?: Id;
+  /** False is an explicit no-output route and must never fall back to Master. */
+  outputEnabled?: boolean;
   gainDb: number;
   pan: number; // -1..1
   mute: boolean;

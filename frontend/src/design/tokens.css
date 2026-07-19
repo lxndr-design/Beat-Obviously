@@ -251,7 +251,7 @@
   --height-track-row-compact: 39px;
   --height-track-header: 27px;
   --height-timeline: 33px;
-  --height-eq-panel: 159px;
+  --height-eq-panel: 360px;
 
   /* === Z-index scale ================================================== */
   --z-base: 0;
@@ -294,12 +294,53 @@
   --segment-radius: 0; /* hard edges everywhere */
 }
 
+html[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: #ffffff;
+  --color-fg: #000000;
+  --color-bg-inverse: #000000;
+  --color-fg-inverse: #ffffff;
+  --color-scrim: rgba(0, 0, 0, 0.34);
+  --color-highlight: #000000;
+  --color-highlight-fg: #ffffff;
+  --color-fg-hover: rgba(24, 24, 24, 0.82);
+  --grid-line-faint: rgba(0, 0, 0, 0.08);
+  --grid-line-soft: rgba(0, 0, 0, 0.12);
+  --grid-line-mid: rgba(0, 0, 0, 0.16);
+  --grid-line-bold: rgba(0, 0, 0, 0.45);
+  --interaction-mesh-a:
+    radial-gradient(circle at 18% 12%, rgba(0, 0, 0, 0.14), transparent 30%),
+    radial-gradient(circle at 86% 80%, rgba(0, 0, 0, 0.07), transparent 36%),
+    linear-gradient(135deg, rgba(0, 0, 0, 0.035), rgba(0, 0, 0, 0.09));
+  --interaction-mesh-b:
+    radial-gradient(circle at 78% 20%, rgba(0, 0, 0, 0.12), transparent 34%),
+    radial-gradient(circle at 16% 88%, rgba(0, 0, 0, 0.06), transparent 38%),
+    linear-gradient(45deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.08));
+  --interaction-mesh-c:
+    radial-gradient(circle at 52% 10%, rgba(0, 0, 0, 0.10), transparent 28%),
+    radial-gradient(circle at 10% 62%, rgba(0, 0, 0, 0.06), transparent 42%),
+    linear-gradient(160deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.085));
+  --interaction-mesh-d:
+    radial-gradient(circle at 8% 22%, rgba(0, 0, 0, 0.09), transparent 32%),
+    radial-gradient(circle at 92% 52%, rgba(0, 0, 0, 0.08), transparent 34%),
+    linear-gradient(100deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.08));
+  --interaction-pressed-bg:
+    var(--interaction-mesh-current),
+    linear-gradient(rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.06));
+  --interaction-selected-bg:
+    var(--interaction-mesh-current),
+    linear-gradient(rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0.14));
+  --interaction-selected-hover-bg:
+    var(--interaction-mesh-current),
+    linear-gradient(rgba(0, 0, 0, 0.20), rgba(0, 0, 0, 0.20));
+}
+
 html[data-theme-contrast="low"] {
-  --color-fg-hover: rgba(255, 255, 255, 0.92);
-  --grid-line-faint: rgba(255, 255, 255, 0.14);
-  --grid-line-soft:  rgba(255, 255, 255, 0.18);
-  --grid-line-mid:   rgba(255, 255, 255, 0.24);
-  --grid-line-bold:  rgba(255, 255, 255, 0.58);
+  --color-fg-hover: color-mix(in srgb, var(--color-fg) 92%, transparent);
+  --grid-line-faint: color-mix(in srgb, var(--color-fg) 14%, transparent);
+  --grid-line-soft: color-mix(in srgb, var(--color-fg) 18%, transparent);
+  --grid-line-mid: color-mix(in srgb, var(--color-fg) 24%, transparent);
+  --grid-line-bold: color-mix(in srgb, var(--color-fg) 58%, transparent);
   --surface-subtle: color-mix(in srgb, var(--color-fg) 14%, var(--color-bg));
   --surface-hover: color-mix(in srgb, var(--color-fg) 20%, var(--color-bg));
   --surface-selected: color-mix(in srgb, var(--color-fg) 42%, var(--color-bg));
@@ -309,11 +350,11 @@ html[data-theme-contrast="low"] {
 }
 
 html[data-theme-contrast="high"] {
-  --color-fg-hover: rgba(210, 210, 210, 0.72);
-  --grid-line-faint: rgba(255, 255, 255, 0.05);
-  --grid-line-soft:  rgba(255, 255, 255, 0.09);
-  --grid-line-mid:   rgba(255, 255, 255, 0.14);
-  --grid-line-bold:  rgba(255, 255, 255, 0.52);
+  --color-fg-hover: color-mix(in srgb, var(--color-fg) 72%, transparent);
+  --grid-line-faint: color-mix(in srgb, var(--color-fg) 5%, transparent);
+  --grid-line-soft: color-mix(in srgb, var(--color-fg) 9%, transparent);
+  --grid-line-mid: color-mix(in srgb, var(--color-fg) 14%, transparent);
+  --grid-line-bold: color-mix(in srgb, var(--color-fg) 52%, transparent);
   --surface-subtle: color-mix(in srgb, var(--color-fg) 5%, var(--color-bg));
   --surface-hover: color-mix(in srgb, var(--color-fg) 11%, var(--color-bg));
   --surface-selected: color-mix(in srgb, var(--color-fg) 30%, var(--color-bg));

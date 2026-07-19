@@ -57,6 +57,8 @@ Compact DAW UI tokens:
 - `--structural-muted-opacity`: 54%, shared opacity for non-interactive block titles and borders.
 
 `LibrarySearch` is the full-width filtering row placed directly below library section ribbons.
+
+App themes are selected with `html[data-theme="dark|light"]`. Dark is the default token set; light mode overrides palette and interaction tokens without changing component CSS.
 - `--font-size-ui-lg`: 14px, larger dense controls.
 - `--font-size-section`: 16px, section labels and standard readable text.
 - `--font-size-title`: 18px, compact modal and panel titles.

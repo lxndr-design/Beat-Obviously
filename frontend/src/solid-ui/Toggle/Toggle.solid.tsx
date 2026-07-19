@@ -14,21 +14,30 @@ export interface ToggleProps {
 }
 
 export function Toggle(props: ToggleProps) {
+  const toggle = () => {
+    if (!props.disabled) props.onChange(!props.checked);
+  };
+
   return (
-    <label class={[styles.wrap, props.disabled && styles.disabled, props.class, props.className].filter(Boolean).join(" ")}>
+    <span class={[styles.wrap, props.disabled && styles.disabled, props.class, props.className].filter(Boolean).join(" ")}>
       <button
         type="button"
         role="switch"
         aria-checked={props.checked}
-        aria-label={props["aria-label"]}
+        aria-label={props["aria-label"] ?? props.label}
         aria-describedby={props["aria-describedby"]}
         disabled={props.disabled}
-        onClick={() => props.onChange(!props.checked)}
+        onClick={toggle}
         class={`${styles.box} ${props.checked ? styles.on : ""}`}
       />
       <Show when={props.label}>
-        <span class={[styles.label, props.labelClassName].filter(Boolean).join(" ")}>{props.label}</span>
+        <span
+          class={[styles.label, props.labelClassName].filter(Boolean).join(" ")}
+          onClick={toggle}
+        >
+          {props.label}
+        </span>
       </Show>
-    </label>
+    </span>
   );
 }

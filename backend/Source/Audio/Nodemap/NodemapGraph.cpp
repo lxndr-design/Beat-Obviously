@@ -22,25 +22,24 @@ namespace beat::Nodemap
 
         struct EvalContext
         {
+            struct IncomingPort
+            {
+                const Node* destination { nullptr };
+                std::string portId;
+                std::vector<const Cable*> cables;
+            };
+
             const Graph& graph;
             const AuditionOptions& options;
             double timeSeconds { 0.0 };
             double noteFrequency { 261.6255653005986 };
             std::unordered_map<std::string, const Node*> nodesById;
-            std::unordered_map<std::string, std::vector<const Cable*>> incoming;
-            std::unordered_map<std::string, StereoFrame> audioMemo;
-            std::unordered_map<std::string, float> cvMemo;
-            std::unordered_set<std::string> audioVisiting;
-            std::unordered_set<std::string> cvVisiting;
+            std::vector<IncomingPort> incoming;
+            std::unordered_map<const Node*, StereoFrame> audioMemo;
+            std::unordered_map<const Node*, float> cvMemo;
+            std::unordered_set<const Node*> audioVisiting;
+            std::unordered_set<const Node*> cvVisiting;
         };
-
-        std::string portKey(std::string_view nodeId, std::string_view portId)
-        {
-            std::string key(nodeId);
-            key.push_back(':');
-            key.append(portId);
-            return key;
-        }
 
         float clamp01(float value) noexcept
         {
@@ -54,8 +53,9 @@ namespace beat::Nodemap
 
         float param(const Node& node, std::string_view id, float fallback) noexcept
         {
-            const auto found = node.params.find(std::string(id));
-            return found == node.params.end() ? fallback : found->second;
+            for (const auto& [key, value] : node.params)
+                if (key == id) return value;
+            return fallback;
         }
 
         uint32_t hashString(std::string_view value) noexcept
@@ -128,10 +128,12 @@ namespace beat::Nodemap
             return found == definition.ports.end() ? nullptr : &*found;
         }
 
-        std::vector<const Cable*> incomingCables(EvalContext& context, const Node& node, std::string_view portId)
+        const std::vector<const Cable*>& incomingCables(const EvalContext& context, const Node& node, std::string_view portId)
         {
-            const auto found = context.incoming.find(portKey(node.id, portId));
-            return found == context.incoming.end() ? std::vector<const Cable*> {} : found->second;
+            static const std::vector<const Cable*> empty;
+            for (const auto& incoming : context.incoming)
+                if (incoming.destination == &node && incoming.portId == portId) return incoming.cables;
+            return empty;
         }
 
         float evalCv(EvalContext& context, const Node& node, std::string_view portId);
@@ -195,7 +197,7 @@ namespace beat::Nodemap
 
         float evalCv(EvalContext& context, const Node& node, std::string_view portId)
         {
-            const auto key = portKey(node.id, portId);
+            const auto* key = &node;
             if (const auto found = context.cvMemo.find(key); found != context.cvMemo.end())
                 return found->second;
             if (context.cvVisiting.contains(key))
@@ -269,7 +271,7 @@ namespace beat::Nodemap
 
         StereoFrame evalAudio(EvalContext& context, const Node& node, std::string_view portId)
         {
-            const auto key = portKey(node.id, portId);
+            const auto* key = &node;
             if (const auto found = context.audioMemo.find(key); found != context.audioMemo.end())
                 return found->second;
             if (context.audioVisiting.contains(key))
@@ -759,15 +761,38 @@ namespace beat::Nodemap
         const double frequency = 440.0 * std::pow(2.0, ((double) options.midiNote - 69.0) / 12.0);
         double energy = 0.0;
 
+        EvalContext context { validation.graph, options };
+        context.noteFrequency = frequency;
+        context.nodesById.reserve(validation.graph.nodes.size());
+        context.incoming.reserve(validation.graph.cables.size());
+        context.audioMemo.reserve(validation.graph.nodes.size());
+        context.cvMemo.reserve(validation.graph.nodes.size());
+        context.audioVisiting.reserve(validation.graph.nodes.size());
+        context.cvVisiting.reserve(validation.graph.nodes.size());
+        for (const auto& node : validation.graph.nodes)
+            context.nodesById[node.id] = &node;
+        for (const auto& cable : validation.graph.cables)
+        {
+            const auto destination = context.nodesById.find(cable.toNodeId);
+            if (destination == context.nodesById.end()) continue;
+            auto incoming = std::find_if(context.incoming.begin(), context.incoming.end(), [&](const EvalContext::IncomingPort& entry) {
+                return entry.destination == destination->second && entry.portId == cable.toPortId;
+            });
+            if (incoming == context.incoming.end())
+            {
+                context.incoming.push_back({ destination->second, cable.toPortId, {} });
+                incoming = std::prev(context.incoming.end());
+            }
+            incoming->cables.push_back(&cable);
+        }
+
         for (int sample = 0; sample < options.sampleCount; ++sample)
         {
-            EvalContext context { validation.graph, options };
             context.timeSeconds = (double) sample / options.sampleRate;
-            context.noteFrequency = frequency;
-            for (const auto& node : validation.graph.nodes)
-                context.nodesById[node.id] = &node;
-            for (const auto& cable : validation.graph.cables)
-                context.incoming[portKey(cable.toNodeId, cable.toPortId)].push_back(&cable);
+            context.audioMemo.clear();
+            context.cvMemo.clear();
+            context.audioVisiting.clear();
+            context.cvVisiting.clear();
 
             const auto frame = evalAudio(context, *output, "audio-in");
             result.left[(size_t) sample] = frame.left;

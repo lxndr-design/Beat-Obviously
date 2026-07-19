@@ -6,10 +6,13 @@ import { defaultTrackEffectParams } from "./effects";
 import { pruneDevFixtureInstruments } from "./instrumentLibraryGuards";
 import { normalizeInstrumentTaxonomy } from "./instrumentTaxonomy";
 import { normalizeSampleMap } from "./sampleZones";
+import { audioBusExists, canSetAudioBusOutput, canSetAudioBusSend } from "./audioBusRouting";
+import { AUDIO_BUS_SCHEMA_VERSION } from "./types";
 import type { BeatProjectAsset, BeatProjectIntegrityReport, ProjectSidecarCleanupReport, RecentProjectEntry } from "../ipc/schema";
 import type {
   Beats,
   AudioFile,
+  AudioBusCreateOptions,
   Id,
   Instrument,
   InstrumentSet,
@@ -65,11 +68,16 @@ interface ProjectSlice {
    *   - Unmuting another track while solo is active clears solo and leaves the
    *     remaining auto-muted tracks muted. */
   setTrackMute: (id: Id, value: boolean) => void;
-  upsertTrackSend: (trackId: Id, busId: Id, patch: Partial<TrackSend>) => void;
+  upsertTrackSend: (trackId: Id, busId: Id, patch: Partial<TrackSend>) => boolean;
   removeTrackSend: (trackId: Id, busId: Id) => void;
   addReturnBus: (name?: string) => Id;
+  addAudioBus: (options?: AudioBusCreateOptions) => Id;
   updateReturnBus: (busId: Id, patch: Partial<ReturnBus>) => void;
   removeReturnBus: (busId: Id) => void;
+  setTrackOutputBus: (trackId: Id, busId?: Id, outputEnabled?: boolean) => boolean;
+  setAudioBusOutput: (busId: Id, destinationBusId?: Id, outputEnabled?: boolean) => boolean;
+  upsertAudioBusSend: (busId: Id, destinationBusId: Id, patch: Partial<TrackSend>) => boolean;
+  removeAudioBusSend: (busId: Id, destinationBusId: Id) => void;
   addReturnBusEffect: (busId: Id, kind?: TrackEffect["kind"]) => Id;
   updateReturnBusEffect: (busId: Id, effectId: Id, patch: Partial<TrackEffect>) => void;
   removeReturnBusEffect: (busId: Id, effectId: Id) => void;
@@ -185,6 +193,7 @@ export type MemoryCachePreset = "conservative" | "balanced" | "performance";
 export type StartupProjectBehavior = "home" | "restore-last" | "new-project";
 export type AudioLatencyMode = "reported" | "low" | "balanced" | "safe";
 export type ThemeContrastLevel = "low" | "normal" | "high";
+export type ThemeMode = "dark" | "light";
 
 interface SettingsSnapshot {
   resizeSnapSeconds: number;
@@ -194,6 +203,7 @@ interface SettingsSnapshot {
   timelineSubdivision: 2 | 4 | 8 | 16;
   midiSubdivision: 2 | 4 | 8 | 16;
   themeContrastLevel: ThemeContrastLevel;
+  themeMode: ThemeMode;
   preferredAudioTypeName: string;
   preferredInputDeviceName: string;
   preferredOutputDeviceName: string;
@@ -219,6 +229,7 @@ const DEFAULT_SETTINGS: SettingsSnapshot = {
   timelineSubdivision: 4,
   midiSubdivision: 4,
   themeContrastLevel: "normal",
+  themeMode: "dark",
   preferredAudioTypeName: "",
   preferredInputDeviceName: "",
   preferredOutputDeviceName: "",
@@ -261,6 +272,7 @@ function normalizeSettingsSnapshot(value: unknown): SettingsSnapshot {
     timelineSubdivision: normalizeSubdivision(source.timelineSubdivision, DEFAULT_SETTINGS.timelineSubdivision),
     midiSubdivision: normalizeSubdivision(source.midiSubdivision, DEFAULT_SETTINGS.midiSubdivision),
     themeContrastLevel: normalizeThemeContrastLevel(source.themeContrastLevel),
+    themeMode: normalizeThemeMode(source.themeMode),
     preferredAudioTypeName: normalizeString(source.preferredAudioTypeName),
     preferredInputDeviceName: normalizeString(source.preferredInputDeviceName),
     preferredOutputDeviceName: normalizeString(source.preferredOutputDeviceName),
@@ -281,6 +293,16 @@ function normalizeSettingsSnapshot(value: unknown): SettingsSnapshot {
 
 function clampNumber(value: number | undefined, min: number, max: number, fallback: number) {
   return Number.isFinite(value) ? Math.max(min, Math.min(max, value as number)) : fallback;
+}
+
+function normalizedTrackSend(busId: Id, source: Partial<TrackSend>): TrackSend {
+  return {
+    busId,
+    gainDb: clampNumber(source.gainDb, -120, 24, -12),
+    pan: clampNumber(source.pan, -1, 1, 0),
+    enabled: source.enabled !== false,
+    preFader: source.preFader === true,
+  };
 }
 
 function normalizeString(value: string | undefined) {
@@ -305,6 +327,10 @@ function normalizeStartupProjectBehavior(value: StartupProjectBehavior | undefin
 
 function normalizeThemeContrastLevel(value: ThemeContrastLevel | undefined): ThemeContrastLevel {
   return value === "low" || value === "normal" || value === "high" ? value : DEFAULT_SETTINGS.themeContrastLevel;
+}
+
+function normalizeThemeMode(value: ThemeMode | undefined): ThemeMode {
+  return value === "light" || value === "dark" ? value : DEFAULT_SETTINGS.themeMode;
 }
 
 function normalizeSampleRate(value: number | undefined): number {
@@ -343,6 +369,7 @@ function defaultTrack(): Track {
     inputChannelStart: 0,
     inputChannelCount: settings.defaultInputChannelCount,
     recordGainDb: 0,
+    outputEnabled: true,
     effects: { filters: [] },
     segments: [],
     rowHeight: "normal",
@@ -555,17 +582,22 @@ export const useProjectStore = create<ProjectSlice>()(
         }),
 
       upsertTrackSend: (trackId, busId, patch) =>
+      {
+        let changed = false;
         set((s) => {
           const track = s.project.tracks.find((candidate) => candidate.id === trackId);
-          if (!track) return;
+          if (!track || !busId || !audioBusExists(s.project.returnBuses, busId)) return;
           if (!track.sends) track.sends = [];
           let send = track.sends.find((candidate) => candidate.busId === busId);
           if (!send) {
-            send = { busId, gainDb: -12, pan: 0, enabled: true };
+            send = normalizedTrackSend(busId, {});
             track.sends.push(send);
           }
-          Object.assign(send, patch, { busId });
-        }),
+          Object.assign(send, normalizedTrackSend(busId, { ...send, ...patch }));
+          changed = true;
+        });
+        return changed;
+      },
 
       removeTrackSend: (trackId, busId) =>
         set((s) => {
@@ -574,18 +606,34 @@ export const useProjectStore = create<ProjectSlice>()(
           track.sends = track.sends.filter((send) => send.busId !== busId);
         }),
 
-      addReturnBus: (name) => {
+      addReturnBus: (name) => useProjectStore.getState().addAudioBus({ name }),
+
+      addAudioBus: (options = {}) => {
         const id = nanoid();
         set((s) => {
           const index = s.project.returnBuses.length + 1;
           s.project.returnBuses.push({
+            schemaVersion: AUDIO_BUS_SCHEMA_VERSION,
             id,
-            name: name?.trim() || `Return ${index}`,
+            name: options.name?.trim() || `Bus ${index}`,
+            channelLayout: "stereo",
+            outputEnabled: true,
+            inputTrimDb: 0,
             gainDb: 0,
             pan: 0,
             mute: false,
+            solo: false,
+            soloSafe: false,
+            mixerOrder: index - 1,
+            sends: [],
             effects: { filters: [] },
           });
+          const trackIds = new Set(options.trackIds ?? []);
+          for (const track of s.project.tracks) {
+            if (!trackIds.has(track.id)) continue;
+            track.outputBusId = id;
+            track.outputEnabled = true;
+          }
         });
         return id;
       },
@@ -593,7 +641,22 @@ export const useProjectStore = create<ProjectSlice>()(
       updateReturnBus: (busId, patch) =>
         set((s) => {
           const bus = s.project.returnBuses.find((candidate) => candidate.id === busId);
-          if (bus) Object.assign(bus, patch);
+          if (!bus) return;
+          const {
+            id: _id,
+            schemaVersion: _schemaVersion,
+            outputBusId: _outputBusId,
+            outputEnabled: _outputEnabled,
+            sends: _sends,
+            ...safePatch
+          } = patch;
+          Object.assign(bus, safePatch);
+          bus.name = bus.name.trim() || "Bus";
+          bus.channelLayout = bus.channelLayout === "mono" ? "mono" : "stereo";
+          bus.inputTrimDb = clampNumber(bus.inputTrimDb, -96, 24, 0);
+          bus.gainDb = clampNumber(bus.gainDb, -96, 24, 0);
+          bus.pan = clampNumber(bus.pan, -1, 1, 0);
+          bus.mixerOrder = Math.max(0, Math.trunc(clampNumber(bus.mixerOrder, 0, 100000, 0)));
         }),
 
       removeReturnBus: (busId) =>
@@ -601,7 +664,65 @@ export const useProjectStore = create<ProjectSlice>()(
           s.project.returnBuses = s.project.returnBuses.filter((candidate) => candidate.id !== busId);
           for (const track of s.project.tracks) {
             if (track.sends) track.sends = track.sends.filter((send) => send.busId !== busId);
+            if (track.outputBusId === busId) {
+              track.outputBusId = undefined;
+              track.outputEnabled = false;
+            }
           }
+          for (const bus of s.project.returnBuses) {
+            if (bus.sends) bus.sends = bus.sends.filter((send) => send.busId !== busId);
+            if (bus.outputBusId === busId) {
+              bus.outputBusId = undefined;
+              bus.outputEnabled = false;
+            }
+          }
+        }),
+
+      setTrackOutputBus: (trackId, busId, outputEnabled = true) => {
+        let changed = false;
+        set((s) => {
+          const track = s.project.tracks.find((candidate) => candidate.id === trackId);
+          if (!track || (outputEnabled && busId && !audioBusExists(s.project.returnBuses, busId))) return;
+          track.outputBusId = busId;
+          track.outputEnabled = outputEnabled;
+          changed = true;
+        });
+        return changed;
+      },
+
+      setAudioBusOutput: (busId, destinationBusId, outputEnabled = true) => {
+        let changed = false;
+        set((s) => {
+          const bus = s.project.returnBuses.find((candidate) => candidate.id === busId);
+          if (!bus || (outputEnabled && !canSetAudioBusOutput(s.project.returnBuses, busId, destinationBusId))) return;
+          bus.outputBusId = destinationBusId;
+          bus.outputEnabled = outputEnabled;
+          changed = true;
+        });
+        return changed;
+      },
+
+      upsertAudioBusSend: (busId, destinationBusId, patch) => {
+        let changed = false;
+        set((s) => {
+          const bus = s.project.returnBuses.find((candidate) => candidate.id === busId);
+          if (!bus || !canSetAudioBusSend(s.project.returnBuses, busId, destinationBusId, patch)) return;
+          if (!bus.sends) bus.sends = [];
+          let send = bus.sends.find((candidate) => candidate.busId === destinationBusId);
+          if (!send) {
+            send = normalizedTrackSend(destinationBusId, {});
+            bus.sends.push(send);
+          }
+          Object.assign(send, normalizedTrackSend(destinationBusId, { ...send, ...patch }));
+          changed = true;
+        });
+        return changed;
+      },
+
+      removeAudioBusSend: (busId, destinationBusId) =>
+        set((s) => {
+          const bus = s.project.returnBuses.find((candidate) => candidate.id === busId);
+          if (bus?.sends) bus.sends = bus.sends.filter((send) => send.busId !== destinationBusId);
         }),
 
       addReturnBusEffect: (busId, kind = "reverb") => {
@@ -902,6 +1023,10 @@ export const useProjectStore = create<ProjectSlice>()(
                 if (right.payload.kind === "midi" || right.payload.kind === "mixed") {
                   right.payload.notes = clipMidiNotesToWindow(originalNotes, leftLength, rightLength);
                 }
+              } else if (segment.payload.kind === "drumpad" && right.payload.kind === "drumpad") {
+                const originalHits = cloneProjectData(segment.payload.hits);
+                segment.payload.hits = clipMidiNotesToWindow(originalHits, 0, leftLength);
+                right.payload.hits = clipMidiNotesToWindow(originalHits, leftLength, rightLength);
               }
 
               segment.lengthBeats = leftLength;
@@ -1137,6 +1262,8 @@ function applySegmentWindow(
   if (origin?.payload) segment.payload = cloneProjectData(origin.payload);
   if (segment.payload.kind === "midi" || segment.payload.kind === "mixed")
     segment.payload.notes = clipMidiNotesToWindow(segment.payload.notes, localStart, newLengthBeats);
+  else if (segment.payload.kind === "drumpad")
+    segment.payload.hits = clipMidiNotesToWindow(segment.payload.hits, localStart, newLengthBeats);
   if (segment.payload.kind === "drum" && segment.payload.sourceLengthBeats == null) {
     segment.payload.sourceLengthBeats = oldLengthBeats;
   }
@@ -1255,6 +1382,7 @@ interface SettingsSlice {
   timelineSubdivision: 2 | 4 | 8 | 16;
   midiSubdivision: 2 | 4 | 8 | 16;
   themeContrastLevel: ThemeContrastLevel;
+  themeMode: ThemeMode;
   preferredAudioTypeName: string;
   preferredInputDeviceName: string;
   preferredOutputDeviceName: string;
@@ -1277,6 +1405,7 @@ interface SettingsSlice {
   setTimelineSubdivision: (subdivision: 2 | 4 | 8 | 16) => void;
   setMidiSubdivision: (subdivision: 2 | 4 | 8 | 16) => void;
   setThemeContrastLevel: (level: ThemeContrastLevel) => void;
+  setThemeMode: (mode: ThemeMode) => void;
   setPreferredInputDevice: (typeName: string, deviceName: string) => void;
   setPreferredOutputDevice: (typeName: string, deviceName: string) => void;
   setPreferredSampleRate: (sampleRate: number) => void;
@@ -1327,6 +1456,11 @@ export const useSettingsStore = create<SettingsSlice>()((set) => ({
     const normalized = normalizeThemeContrastLevel(themeContrastLevel);
     writeSettingsPatch({ themeContrastLevel: normalized });
     set({ themeContrastLevel: normalized });
+  },
+  setThemeMode: (themeMode) => {
+    const normalized = normalizeThemeMode(themeMode);
+    writeSettingsPatch({ themeMode: normalized });
+    set({ themeMode: normalized });
   },
   setPreferredInputDevice: (preferredAudioTypeName, preferredInputDeviceName) => {
     writeSettingsPatch({ preferredAudioTypeName, preferredInputDeviceName });

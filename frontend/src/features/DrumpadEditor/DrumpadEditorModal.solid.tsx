@@ -86,7 +86,6 @@ export function DrumpadEditorModal(props: Props) {
   let playbackStartBeat = 0;
   let recordStartedAt = 0;
   let recordStartBeat = 0;
-  let previewCtx: AudioContext | null = null;
   const activePreviewSources = new Set<AudioBufferSourceNode>();
   const activePreviewGains = new Set<GainNode>();
   let playbackScheduled = new Set<Id>();
@@ -138,7 +137,6 @@ export function DrumpadEditorModal(props: Props) {
     if (keyboardLinkRaf) window.cancelAnimationFrame(keyboardLinkRaf);
     if (keyboardLinkRetryRaf) window.cancelAnimationFrame(keyboardLinkRetryRaf);
     stopPreviewAudio();
-    if (previewCtx) void previewCtx.close();
     window.removeEventListener("keydown", onWindowKeyDown, true);
     window.removeEventListener("keyup", onWindowKeyUp, true);
     window.removeEventListener("pointermove", onWindowPointerMove);
@@ -389,11 +387,9 @@ export function DrumpadEditorModal(props: Props) {
   }
 
   function previewContext(): AudioContext {
-    if (!previewCtx) {
-      previewCtx = getTimelineAudioContext();
-    }
-    if (previewCtx.state === "suspended") void previewCtx.resume().catch(() => undefined);
-    return previewCtx;
+    const context = getTimelineAudioContext();
+    if (context.state === "suspended") void context.resume().catch(() => undefined);
+    return context;
   }
 
   function stopPreviewAudio() {

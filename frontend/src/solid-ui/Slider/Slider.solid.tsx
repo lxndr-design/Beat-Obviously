@@ -21,9 +21,6 @@ export interface SliderProps {
 }
 
 export function Slider(allProps: SliderProps) {
-  let fieldFrameRef: HTMLSpanElement | undefined;
-  let inputRef: HTMLInputElement | undefined;
-  let activePointerId: number | null = null;
   const [local] = splitProps(allProps, [
     "value",
     "min",
@@ -64,63 +61,13 @@ export function Slider(allProps: SliderProps) {
     return clamp(Number(stepped.toFixed(8)), local.min, local.max);
   }
 
-  function valueFromPointer(clientX: number): number | null {
-    const rect = fieldFrameRef?.getBoundingClientRect();
-    if (!rect || rect.width <= 0) return null;
-    const thumbHitWidth = inputRef
-      ? Number.parseFloat(window.getComputedStyle(inputRef).getPropertyValue("--slider-thumb-hit-width"))
-      : 0;
-    const safeThumbHitWidth = Number.isFinite(thumbHitWidth) ? Math.min(thumbHitWidth, rect.width) : 0;
-    const railLeft = rect.left + safeThumbHitWidth / 2;
-    const railWidth = Math.max(1, rect.width - safeThumbHitWidth);
-    const ratio = clamp((clientX - railLeft) / railWidth, 0, 1);
-    return normalizeValue(local.min + ratio * (local.max - local.min));
-  }
-
-  function updateFromPointer(clientX: number) {
-    const next = valueFromPointer(clientX);
-    if (next !== null) local.onChange(next);
-  }
-
-  function handlePointerDown(event: PointerEvent) {
-    if (local.disabled) return;
-    const target = event.currentTarget as HTMLSpanElement | null;
-    activePointerId = event.pointerId;
-    target?.setPointerCapture?.(event.pointerId);
-    inputRef?.focus({ preventScroll: true });
-    event.preventDefault();
-    updateFromPointer(event.clientX);
-  }
-
-  function handlePointerMove(event: PointerEvent) {
-    if (local.disabled || activePointerId !== event.pointerId) return;
-    event.preventDefault();
-    updateFromPointer(event.clientX);
-  }
-
-  function endPointerDrag(event: PointerEvent) {
-    if (activePointerId !== event.pointerId) return;
-    const target = event.currentTarget as HTMLSpanElement | null;
-    activePointerId = null;
-    target?.releasePointerCapture?.(event.pointerId);
-  }
-
   return (
     <label class={cls()}>
       <Show when={local.label}>
-        <span class={`${styles.label} ds-field-label`}>{local.label}</span>
+        <span class={styles.label}>{local.label}</span>
       </Show>
-      <span
-        ref={fieldFrameRef}
-        class={styles.fieldFrame}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={endPointerDrag}
-        onPointerCancel={endPointerDrag}
-        onLostPointerCapture={() => { activePointerId = null; }}
-      >
+      <span class={styles.fieldFrame}>
         <input
-          ref={inputRef}
           id={local.id}
           name={local.name}
           class={[styles.input, "ds-range", local.inputClassName].filter(Boolean).join(" ")}
