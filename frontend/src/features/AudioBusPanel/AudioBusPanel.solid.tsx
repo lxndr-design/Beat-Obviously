@@ -4,7 +4,7 @@ import { createStoreSelector } from "../../solid-utils/store";
 import { useAnalyzerStore } from "../../state/analyzerStore";
 import { canSetAudioBusOutput, canSetAudioBusSend } from "../../state/audioBusRouting";
 import { EFFECT_DEFAULT_PARAMS, EFFECT_LABELS, EFFECT_OPTIONS, EFFECT_PARAM_SPECS, type EffectKind, type EffectParamSpec } from "../../state/effects";
-import { useProjectStore } from "../../state/store";
+import { useProjectStore, useUiStore } from "../../state/store";
 import type { Id, ReturnBus, Track, TrackEffect, TrackSend } from "../../state/types";
 import { MasterEqPanel } from "../Eq/MasterEqPanel.solid";
 import { SynthCurvePreview } from "../Synth/CurvePreview/SynthCurvePreview.solid";
@@ -41,7 +41,7 @@ export function AudioBusPanel() {
   return (
     <Show
       when={activeBus()}
-      fallback={<MasterEqPanel header={tabs()} panelId="audio-bus-panel-master" labelledBy="audio-bus-tab-master" />}
+      fallback={<MasterEditorPanel buses={buses()} tracks={project().tracks} header={tabs()} />}
     >
       {(bus) => (
         <BusEditorPanel
@@ -100,31 +100,124 @@ function BusTabs(props: BusTabsProps) {
         >
           Master
         </Button>
+        <Show when={props.buses.length === 0}><AddBusTabButton onAdd={props.onAdd} /></Show>
         <For each={props.buses}>
-          {(bus) => (
-            <Button
-              role="tab"
-              id={`audio-bus-tab-${bus.id}`}
-              data-audio-bus-tab={bus.id}
-              aria-controls={`audio-bus-panel-${bus.id}`}
-              aria-selected={props.activeId === bus.id}
-              tabIndex={props.activeId === bus.id ? 0 : -1}
-              class={`${styles.tab} ${props.activeId === bus.id ? styles.tabActive : ""}`}
-              onClick={() => props.onSelect(bus.id)}
-              onKeyDown={(event) => onTabKeyDown(event, bus.id)}
-              title={bus.name}
-            >
-              {bus.name}
-            </Button>
+          {(bus, index) => (
+            <>
+              <Show when={index() === props.buses.length - 1}><AddBusTabButton onAdd={props.onAdd} /></Show>
+              <Button
+                role="tab"
+                id={`audio-bus-tab-${bus.id}`}
+                data-audio-bus-tab={bus.id}
+                aria-controls={`audio-bus-panel-${bus.id}`}
+                aria-selected={props.activeId === bus.id}
+                tabIndex={props.activeId === bus.id ? 0 : -1}
+                class={`${styles.tab} ${props.activeId === bus.id ? styles.tabActive : ""}`}
+                onClick={() => props.onSelect(bus.id)}
+                onKeyDown={(event) => onTabKeyDown(event, bus.id)}
+                title={bus.name}
+              >
+                {bus.name}
+              </Button>
+            </>
           )}
         </For>
       </div>
-      <HoverInfo content="Create audio bus">
-        <Button iconOnly size="xs" class={styles.addTab} onClick={props.onAdd} aria-label="Create audio bus">
-          <Icon name="ph:plus" size={18} decorative />
-        </Button>
-      </HoverInfo>
     </div>
+  );
+}
+
+function AddBusTabButton(props: { onAdd: () => void }) {
+  return (
+    <Button iconOnly size="xs" class={styles.addTab} onClick={props.onAdd} aria-label="Create audio bus" title="Create audio bus">
+      <Icon name="ph:plus" size={18} decorative />
+    </Button>
+  );
+}
+
+function MasterEditorPanel(props: { buses: ReturnBus[]; tracks: Track[]; header: JSX.Element }) {
+  const master = createStoreSelector(useProjectStore, (state) => state.project.masterChain);
+  const updateMaster = (patch: Partial<ReturnType<typeof master>>) => useProjectStore.getState().updateMasterChain(patch);
+  const inputSources = createMemo<BusInputSource[]>(() => [
+    ...props.tracks
+      .filter((track) => track.outputEnabled !== false && !track.outputBusId)
+      .map((track) => ({ id: `track:${track.id}`, meterId: track.id, name: track.name, detail: "Track" })),
+    ...props.buses
+      .filter((bus) => bus.outputEnabled !== false && !bus.outputBusId)
+      .map((bus) => ({ id: `bus:${bus.id}`, meterId: bus.id, name: bus.name, detail: "Bus" })),
+  ]);
+  const compressorEffect = createMemo<TrackEffect>(() => ({
+    id: "master-compressor",
+    kind: "compressor",
+    bypassed: !master().compressorEnabled,
+    params: {
+      thresholdDb: master().compressorThresholdDb,
+      ratio: master().compressorRatio,
+      attackMs: master().compressorAttackMs,
+      releaseMs: master().compressorReleaseMs,
+      makeupDb: master().compressorMakeupDb,
+      mix: master().compressorMix,
+    },
+  }));
+
+  function updateCompressorParam(key: string, value: number) {
+    if (key === "thresholdDb") updateMaster({ compressorThresholdDb: value });
+    else if (key === "ratio") updateMaster({ compressorRatio: value });
+    else if (key === "attackMs") updateMaster({ compressorAttackMs: value });
+    else if (key === "releaseMs") updateMaster({ compressorReleaseMs: value });
+    else if (key === "makeupDb") updateMaster({ compressorMakeupDb: value });
+    else if (key === "mix") updateMaster({ compressorMix: value });
+  }
+
+  return (
+    <section class={styles.panel} id="audio-bus-panel-master" role="tabpanel" aria-labelledby="audio-bus-tab-master">
+      <header class={styles.ribbon}>{props.header}</header>
+      <div class={`${styles.busBody} ${styles.masterBody}`}>
+        <section class={styles.inputSection} aria-label="Master inputs">
+          <SectionTitle title="Inputs" meta={`${inputSources().length} direct`} />
+          <div class={styles.inputRows}>
+            <Show when={inputSources().length > 0} fallback={<span class={styles.emptyState}>No direct inputs</span>}>
+              <For each={inputSources()}>{(source) => <BusInputRow source={source} />}</For>
+            </Show>
+          </div>
+        </section>
+
+        <section class={styles.parametersSection} aria-label="Master parameters">
+          <SectionTitle title="Parameters" />
+          <div class={`${styles.knobStack} ${styles.masterKnobs}`}>
+            <Knob size="sm" label="Input Trim" min={-24} max={24} step={0.1} value={master().inputGainDb} defaultValue={0} unit="dB" formatValue={formatCompact} onChange={(inputGainDb) => updateMaster({ inputGainDb })} />
+            <Knob size="sm" label="Fader" min={-48} max={12} step={0.1} value={master().outputGainDb} defaultValue={0} unit="dB" formatValue={formatCompact} onChange={(outputGainDb) => updateMaster({ outputGainDb })} />
+          </div>
+        </section>
+
+        <section class={`${styles.insertSection} ${styles.masterInserts}`} aria-label="Master inserts">
+          <div class={styles.rackHeader}><span class={styles.rackTitle}>Inserts</span></div>
+          <div class={styles.insertCards}>
+            <article class={`${styles.insertCard} ${styles.masterEqCard}`}>
+              <header class={styles.insertCardHeader}>
+                <MicroButton active disabled aria-label="Master EQ enabled">On</MicroButton>
+                <strong>EQ</strong>
+                <div class={styles.insertActions}>
+                  <Button iconOnly size="xs" variant="ghost" onClick={() => useUiStore.getState().openEditor({ kind: "eq" })} aria-label="Edit EQ automation"><Icon name="ph:pencil-simple" size={18} decorative /></Button>
+                </div>
+              </header>
+              <div class={styles.masterEqGraph}><MasterEqPanel embedded /></div>
+            </article>
+
+            <article class={`${styles.insertCard} ${!master().compressorEnabled ? styles.insertCardBypassed : ""}`}>
+              <header class={styles.insertCardHeader}>
+                <MicroButton active={master().compressorEnabled} onClick={() => updateMaster({ compressorEnabled: !master().compressorEnabled })} aria-label={`${master().compressorEnabled ? "Bypass" : "Enable"} Master compressor`}>{master().compressorEnabled ? "On" : "Off"}</MicroButton>
+                <strong>Compressor</strong>
+              </header>
+              <div class={styles.insertGraph}><SynthCurvePreview samples={effectResponseSamples(compressorEffect())} label="Master compressor parameter response preview" filled /></div>
+              <div class={styles.effectParameters}>
+                <For each={EFFECT_PARAM_SPECS.compressor}>{(param) => <EffectKnob effect={compressorEffect()} param={param} onChange={(value) => updateCompressorParam(param.key, value)} />}</For>
+              </div>
+            </article>
+          </div>
+        </section>
+      </div>
+    </section>
   );
 }
 

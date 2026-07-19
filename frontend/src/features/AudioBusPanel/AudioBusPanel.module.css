@@ -18,6 +18,17 @@
   border-bottom: var(--border-fg);
 }
 
+.ribbon::after {
+  position: absolute;
+  z-index: 3;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-bottom: var(--border-fg);
+  content: "";
+  pointer-events: none;
+}
+
 .tabHeader {
   display: flex;
   min-width: 0;
@@ -72,6 +83,7 @@
   min-height: 100%;
   border: 0;
   border-right: var(--border-fg);
+  border-radius: 0;
 }
 
 .ribbonActions {
@@ -107,6 +119,18 @@
   min-height: 0;
   flex-direction: column;
   border-right: var(--border-fg);
+}
+
+.masterBody {
+  grid-template-columns: minmax(180px, 0.72fr) minmax(174px, 0.62fr) minmax(540px, 2.6fr);
+}
+
+.masterInserts {
+  border-right: 0;
+}
+
+.masterKnobs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .outputSection {
@@ -297,6 +321,17 @@
   padding: 6px;
 }
 
+.masterEqCard {
+  min-width: 390px;
+  max-width: 540px;
+  grid-template-rows: 30px minmax(0, 1fr);
+}
+
+.masterEqGraph {
+  min-height: 0;
+  padding: 6px;
+}
+
 .effectParameters {
   display: flex;
   min-height: 96px;
@@ -374,5 +409,9 @@
 @media (max-width: 900px) {
   .busBody {
     grid-template-columns: 180px 174px minmax(390px, 1fr) 228px;
+  }
+
+  .masterBody {
+    grid-template-columns: 180px 174px minmax(540px, 1fr);
   }
 }

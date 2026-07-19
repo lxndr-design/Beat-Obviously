@@ -13,6 +13,8 @@ mkdirSync(outDir, { recursive: true });
 try {
   const appSource = readFileSync(join(repoRoot, "frontend/src/App.solid.tsx"), "utf8");
   const panelSource = readFileSync(join(repoRoot, "frontend/src/features/AudioBusPanel/AudioBusPanel.solid.tsx"), "utf8");
+  const panelCss = readFileSync(join(repoRoot, "frontend/src/features/AudioBusPanel/AudioBusPanel.module.css"), "utf8");
+  const masterEqSource = readFileSync(join(repoRoot, "frontend/src/features/Eq/MasterEqPanel.solid.tsx"), "utf8");
   assert.ok(appSource.includes("<AudioBusPanel />"), "main editor should mount the Bus/Master tab panel");
   assert.ok(!appSource.includes("<MasterEqPanel />"), "main editor should not bypass the Bus/Master tab panel");
   assert.ok(panelSource.includes('role="tablist"') && panelSource.includes('role="tab"') && panelSource.includes('role="tabpanel"'), "Bus/Master navigation should expose accessible tab semantics");
@@ -27,6 +29,12 @@ try {
   assert.ok(panelSource.includes("<Knob") && panelSource.includes('label="Input Trim"') && panelSource.includes('label="Fader"'), "Bus parameters should reuse the synth knob controls");
   assert.ok(panelSource.includes("SynthCurvePreview") && panelSource.includes("effectResponseSamples"), "Bus insert cards should reuse the Aether synth curve preview language");
   assert.ok(panelSource.includes("EFFECT_PARAM_SPECS") && panelSource.includes("patchParam"), "Bus insert cards should expose editable effect parameters");
+  const masterPanelSource = panelSource.slice(panelSource.indexOf("function MasterEditorPanel"), panelSource.indexOf("interface BusEditorPanelProps"));
+  assert.ok(masterPanelSource.includes('title="Inputs"') && masterPanelSource.includes('title="Parameters"') && masterPanelSource.includes("masterInserts"), "Master should use the same Inputs, Parameters, and Inserts workspace as Buses");
+  assert.ok(!masterPanelSource.includes("styles.outputSection"), "Master workspace should not expose a redundant Output section");
+  assert.ok(!masterEqSource.includes("Presets") && !masterEqSource.includes("FACTORY_PRESETS"), "Master EQ presets should not remain in the interface");
+  assert.ok(panelSource.includes("index() === props.buses.length - 1") && panelSource.indexOf("<AddBusTabButton") < panelSource.indexOf('role="tab"', panelSource.indexOf("<For each={props.buses}")), "Create Bus should sit immediately before the final Bus tab");
+  assert.ok(panelCss.includes(".ribbon::after") && panelCss.includes("border-bottom: var(--border-fg)"), "Bus tab ribbon should preserve a continuous bottom rule");
 
   execFileSync(join(repoRoot, "frontend/node_modules/.bin/esbuild"), [
     join(repoRoot, "frontend/src/state/store.ts"),
