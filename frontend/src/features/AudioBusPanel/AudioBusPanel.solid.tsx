@@ -195,7 +195,9 @@ function MasterEditorPanel(props: { buses: ReturnBus[]; tracks: Track[]; header:
           <div class={styles.insertCards}>
             <article class={`${styles.insertCard} ${styles.masterEqCard}`}>
               <header class={styles.insertCardHeader}>
-                <MicroButton active disabled aria-label="Master EQ enabled">On</MicroButton>
+                <Button iconOnly size="xs" variant="ghost" selected disabled className={styles.insertPower} aria-label="Master EQ enabled">
+                  <Icon name="ph:power-fill" size={18} decorative />
+                </Button>
                 <strong>EQ</strong>
                 <div class={styles.insertActions}>
                   <Button iconOnly size="xs" variant="ghost" onClick={() => useUiStore.getState().openEditor({ kind: "eq" })} aria-label="Edit EQ automation"><Icon name="ph:pencil-simple" size={18} decorative /></Button>
@@ -206,7 +208,9 @@ function MasterEditorPanel(props: { buses: ReturnBus[]; tracks: Track[]; header:
 
             <article class={`${styles.insertCard} ${!master().compressorEnabled ? styles.insertCardBypassed : ""}`}>
               <header class={styles.insertCardHeader}>
-                <MicroButton active={master().compressorEnabled} onClick={() => updateMaster({ compressorEnabled: !master().compressorEnabled })} aria-label={`${master().compressorEnabled ? "Bypass" : "Enable"} Master compressor`}>{master().compressorEnabled ? "On" : "Off"}</MicroButton>
+                <Button iconOnly size="xs" variant="ghost" selected={master().compressorEnabled} className={styles.insertPower} onClick={() => updateMaster({ compressorEnabled: !master().compressorEnabled })} aria-label={`${master().compressorEnabled ? "Bypass" : "Enable"} Master compressor`}>
+                  <Icon name={master().compressorEnabled ? "ph:power-fill" : "ph:power"} size={18} decorative />
+                </Button>
                 <strong>Compressor</strong>
               </header>
               <div class={styles.insertGraph}><SynthCurvePreview samples={effectResponseSamples(compressorEffect())} label="Master compressor parameter response preview" filled /></div>
@@ -474,7 +478,9 @@ function InsertCard(props: InsertCardProps) {
   return (
     <article class={`${styles.insertCard} ${props.effect.bypassed ? styles.insertCardBypassed : ""}`}>
       <header class={styles.insertCardHeader}>
-        <MicroButton active={!props.effect.bypassed} onClick={() => store().updateReturnBusEffect(props.busId, props.effect.id, { bypassed: !props.effect.bypassed })} aria-label={`${props.effect.bypassed ? "Enable" : "Bypass"} ${EFFECT_LABELS[props.effect.kind]}`}>{props.effect.bypassed ? "Off" : "On"}</MicroButton>
+        <Button iconOnly size="xs" variant="ghost" selected={!props.effect.bypassed} className={styles.insertPower} onClick={() => store().updateReturnBusEffect(props.busId, props.effect.id, { bypassed: !props.effect.bypassed })} aria-label={`${props.effect.bypassed ? "Enable" : "Bypass"} ${EFFECT_LABELS[props.effect.kind]}`}>
+          <Icon name={props.effect.bypassed ? "ph:power" : "ph:power-fill"} size={18} decorative />
+        </Button>
         <strong>{EFFECT_LABELS[props.effect.kind]}</strong>
         <div class={styles.insertActions}>
           <Button iconOnly size="xs" variant="ghost" onClick={() => store().moveReturnBusEffect(props.busId, props.effect.id, -1)} disabled={props.index === 0} aria-label="Move insert earlier"><Icon name="ph:caret-up" size={18} decorative /></Button>

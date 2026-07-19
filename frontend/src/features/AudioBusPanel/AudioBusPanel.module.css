@@ -273,20 +273,24 @@
   display: flex;
   min-height: 0;
   flex: 1 1 auto;
+  flex-direction: column;
   align-items: stretch;
   gap: 9px;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 9px;
+  overscroll-behavior: contain;
 }
 
 .insertCard {
   display: grid;
-  min-width: 300px;
-  max-width: 390px;
-  height: 100%;
-  flex: 1 0 300px;
-  grid-template-rows: 30px minmax(75px, 1fr) auto;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  min-height: 300px;
+  height: auto;
+  flex: 0 0 auto;
+  grid-template-rows: 30px minmax(120px, 1fr) auto;
   overflow: hidden;
   border: var(--border-fg);
 }
@@ -310,6 +314,15 @@
   white-space: nowrap;
 }
 
+.insertPower.insertPower {
+  width: 30px !important;
+  min-width: 30px;
+  height: 30px !important;
+  min-height: 30px;
+  border-right: var(--border-fg);
+  border-radius: 0;
+}
+
 .insertActions {
   display: flex;
   align-self: stretch;
@@ -322,8 +335,10 @@
 }
 
 .masterEqCard {
-  min-width: 390px;
-  max-width: 540px;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  min-height: 240px;
   grid-template-rows: 30px minmax(0, 1fr);
 }
 

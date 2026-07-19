@@ -35,6 +35,9 @@ try {
   assert.ok(!masterEqSource.includes("Presets") && !masterEqSource.includes("FACTORY_PRESETS"), "Master EQ presets should not remain in the interface");
   assert.ok(panelSource.includes("index() === props.buses.length - 1") && panelSource.indexOf("<AddBusTabButton") < panelSource.indexOf('role="tab"', panelSource.indexOf("<For each={props.buses}")), "Create Bus should sit immediately before the final Bus tab");
   assert.ok(panelCss.includes(".ribbon::after") && panelCss.includes("border-bottom: var(--border-fg)"), "Bus tab ribbon should preserve a continuous bottom rule");
+  assert.ok(panelSource.includes("styles.insertPower") && panelSource.includes('"ph:power-fill"') && panelSource.includes('"ph:power"'), "Insert bypass controls should reuse the existing selected power button");
+  assert.ok(panelCss.includes("flex-direction: column") && panelCss.includes("overflow-y: auto") && panelCss.includes("overscroll-behavior: contain"), "Insert cards should form an independently scrollable vertical stack");
+  assert.ok(panelCss.includes("width: 100%") && panelCss.includes("max-width: none"), "Insert cards should fill the insert-column width");
 
   execFileSync(join(repoRoot, "frontend/node_modules/.bin/esbuild"), [
     join(repoRoot, "frontend/src/state/store.ts"),
