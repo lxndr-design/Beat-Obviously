@@ -148,6 +148,45 @@ function downsampleFourToOne(reference192, radius = 256) {
   return output;
 }
 
+function residualBandDiagnostics(directLeft, directRight, referenceLeft, referenceRight, start, sampleRate, size = 2048) {
+  const length = Math.min(size, directLeft.length - start, referenceLeft.length - start);
+  const bands = [
+    { id: "0-8k", minHz: 0, maxHz: 8000, signal: 0, residual: 0 },
+    { id: "8-16k", minHz: 8000, maxHz: 16000, signal: 0, residual: 0 },
+    { id: "16-24k", minHz: 16000, maxHz: sampleRate * 0.5, signal: 0, residual: 0 },
+  ];
+  for (const [direct, reference] of [[directLeft, referenceLeft], [directRight, referenceRight]]) {
+    for (let bin = 1; bin < length / 2; bin += 1) {
+      const frequencyHz = (bin * sampleRate) / length;
+      const band = bands.find((candidate) => frequencyHz >= candidate.minHz && frequencyHz < candidate.maxHz);
+      if (!band) continue;
+      let signalReal = 0;
+      let signalImag = 0;
+      let residualReal = 0;
+      let residualImag = 0;
+      for (let index = 0; index < length; index += 1) {
+        const window = 0.5 - 0.5 * Math.cos((2 * Math.PI * index) / (length - 1));
+        const phase = (2 * Math.PI * bin * index) / length;
+        const cosine = Math.cos(phase);
+        const sine = Math.sin(phase);
+        const signal = direct[start + index] * window;
+        const residual = (direct[start + index] - reference[start + index]) * window;
+        signalReal += signal * cosine;
+        signalImag -= signal * sine;
+        residualReal += residual * cosine;
+        residualImag -= residual * sine;
+      }
+      band.signal += signalReal * signalReal + signalImag * signalImag;
+      band.residual += residualReal * residualReal + residualImag * residualImag;
+    }
+  }
+  const totalResidual = bands.reduce((sum, band) => sum + band.residual, 0);
+  return Object.fromEntries(bands.map((band) => [band.id, {
+    residualToSignalDb: round(10 * Math.log10(Math.max(band.residual, 1e-20) / Math.max(band.signal, 1e-20)), 3),
+    residualEnergyShare: round(band.residual / Math.max(totalResidual, 1e-20), 6),
+  }]));
+}
+
 function referenceSubtractedResidual(reference48, reference192, sampleRate = 48000) {
   const downsampledLeft = downsampleFourToOne(reference192.left);
   const downsampledRight = downsampleFourToOne(reference192.right);
@@ -199,6 +238,14 @@ function referenceSubtractedResidual(reference48, reference192, sampleRate = 480
     correlation: round(correlation, 9),
     fittedReferenceGain: round(fittedGain, 9),
     gainFittedRelativeDb: round(20 * Math.log10(Math.max(gainFittedRms, 1e-12) / Math.max(signalRms, 1e-12)), 3),
+    residualBands: residualBandDiagnostics(
+      reference48.left,
+      reference48.right,
+      downsampledLeft,
+      downsampledRight,
+      analysisStart,
+      sampleRate,
+    ),
     residualToSignalRatio: round(residualSquares / Math.max(signalSquares, 1e-20), 9),
     relativeDb: round(20 * Math.log10(Math.max(rms, 1e-12) / Math.max(signalRms, 1e-12)), 3),
   };

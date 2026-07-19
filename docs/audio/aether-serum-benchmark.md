@@ -53,6 +53,14 @@ The former `-6.878 / -6.424 dB` result was invalid as an oscillator-only claim: 
 
 The corrected probe improves by 19.30 dB for Future Bass and 19.91 dB for Progressive House, with direct/reference correlations of `0.998794650` and `0.998836236` and fitted gains of `1.000817972` and `1.000496997`. The frozen audition hashes and all six C4 hashes remain unchanged because those renders use enabled filters and do not cross the affected high-note harmonic boundary. The remaining approximately `-26 dB` result is a deterministic band-edge/mip-transition residual and is not yet a pure folded-alias measurement or a Serum 1 closeout threshold.
 
+| Residual band | Future Bass residual/signal | Future residual share | Progressive residual/signal | Progressive residual share |
+| --- | ---: | ---: | ---: | ---: |
+| 0–8 kHz | -60.497 dB | 0.0261% | -68.529 dB | 0.0050% |
+| 8–16 kHz | -51.190 dB | 0.0483% | -56.706 dB | 0.0131% |
+| 16–24 kHz | -13.979 dB | 99.9256% | -14.468 dB | 99.9819% |
+
+The residual is therefore not a broad lower-band alias failure: more than 99.9% is confined to the 16–24 kHz transition band where the direct pitch-derived harmonic cutoff and reference low-pass have intentionally different edge responses. Changing that edge now would intentionally alter high-note brightness and requires a reviewed timbral policy, not a silent baseline update.
+
 ## Native Full-Chain Gate
 
 `BeatBackendStress` now includes exact, independently named native projects for both benchmark instruments. Each fixture covers the authored oscillator sources and tuning, amp and modulation envelopes, LFO 1/2 routes, velocity and macro routes, stereo unison, filter, and full supported insert chain. It requires:
