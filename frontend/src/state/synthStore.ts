@@ -2105,6 +2105,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
       drive: clamp01(getNumberParam(draft, "filter.drive")),
       color: clamp01(getNumberParam(draft, "osc.a.position")),
     },
+    filterEnabled,
     filterType: filterTypeFromDraft(draft),
     filter2: {
       enabled: getBooleanParam(draft, "filter.2.enabled"),
@@ -2408,6 +2409,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.taxonomy = instrument.taxonomy ?? draft.taxonomy;
   draft.metadata.icon = instrument.icon ?? draft.metadata.icon;
   draft.effects = normalizeTrackEffectChain(instrument.effects);
+  draft.parameters["filter.enabled"] = instrument.filterEnabled !== false;
   draft.parameters["filter.cutoff"] = normalizedCutoffToHz(instrument.knobs.cutoff);
   draft.parameters["filter.keytrack"] = instrument.filterKeytrack ?? 0;
   draft.parameters["filter.resonance"] = instrument.knobs.resonance;

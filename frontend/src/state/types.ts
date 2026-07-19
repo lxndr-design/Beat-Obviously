@@ -318,6 +318,8 @@ export interface Instrument {
     drive: number;      // 0..1, displayed as %
     color: number;      // 0..1, displayed as Shape % — waveform morph
   };
+  /** Explicit preview/runtime bypass. Missing means enabled for older instruments. */
+  filterEnabled?: boolean;
   filterType?: "lowpass" | "bandpass" | "highpass";
   filter2?: {
     enabled: boolean;

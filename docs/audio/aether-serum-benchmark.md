@@ -42,14 +42,16 @@ Both hashes were intentionally revised again when the confirmed dual-mono unison
 4. At MIDI note 84 and 48 kHz, high-Nyquist-band energy ratios were `0.039255611` and `0.046867417`. At 96 kHz they fell to `0.000100552` and `0.003967191`. This is sufficient evidence to prioritize alias/performance refinement, but not sufficient to label the measured energy as aliasing without a reference-subtraction test.
 5. The scripted reference renderer measures the Aether core preview and does not apply the persisted instrument FX chain. A separate native fixture now maps both exact benchmark descriptions into the production Aether engine and applies every supported authored insert in order. The saturator's descriptive `tone` field remains a schema-to-engine gap because the current saturator has no tone parameter.
 
-The schema-v2 report also includes a deterministic oscillator-isolated reference subtraction. It disables modulation, filtering, envelopes, random phase, and FX while retaining each benchmark oscillator stack, then compares the direct 48 kHz MIDI-84 render with a deterministic 192 kHz render decimated 4:1 through a 65-tap Hann-windowed sinc low-pass.
+The schema-v2 report also includes a deterministic oscillator-isolated reference subtraction. It disables modulation, Filter 1 processing, envelopes, random phase, and FX while retaining each benchmark oscillator stack, then compares the direct 48 kHz MIDI-84 render with a deterministic 192 kHz render decimated 4:1 through a 513-tap Hann-windowed sinc low-pass. The report also records direct/reference RMS, correlation, fitted gain, and gain-fitted residual so an amplitude or alignment defect cannot be mistaken for alias energy.
 
 | Oscillator alias probe | Direct 48 kHz SHA-256 | 192 kHz reference SHA-256 | Residual RMS | Peak residual | Residual / signal | Relative level |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
-| Future Bass | `4bb8e26dc22acbd949aac7cc74e431bd410f2a3b6e14178fb5f16149ef7a69f3` | `ff333418f149fcdd60a6643d9e3c16bc375cb5666984dbc496011d27c496ea1d` | 0.022749 | 0.128207 | 0.205231425 | -6.878 dB |
-| Progressive House | `a93f3e8a747e58684ef55a1c19089a069dda9e25b3985706d66e6411676cd085` | `32952c4c597be9a80f0c67c672927ba57c9daa54395b150032ac4a42254d62df` | 0.015447 | 0.075477 | 0.227818576 | -6.424 dB |
+| Future Bass | `56fa06dcda363aaf8a655b726d7a548020de656a6521c5ba70fe0ace2d2cc753` | `76a5d490e2ac23460acaf36a4b44ec0aa144a0f4a099a8d7231f4f29f33fe91f` | 0.002317 | 0.009656 | 0.002409913 | -26.180 dB |
+| Progressive House | `ab7a5a5c3f9f937585967072f7a025ecfecbfa94f208198d649b1680de8dc59d` | `9f147091619e6d01cc0517700dc0ddeed9b95be4eac7377ef46ea2ce0d40c338` | 0.001411 | 0.005663 | 0.002326419 | -26.333 dB |
 
-This is a substantial deterministic cross-rate mismatch, not an acceptable alias closeout result. It includes amplitude/mip-selection differences as well as folded content and therefore must be treated as a broad oscillator sample-rate error measurement, not a pure alias-energy percentage.
+The former `-6.878 / -6.424 dB` result was invalid as an oscillator-only claim: changing `synthPatch.parameters["filter.enabled"]` after the preview object had been constructed did not bypass the runtime filter, and the preview model had no explicit Filter 1 bypass field. The probe therefore compared sample-rate-dependent filter realizations. The fixed preview model carries `filterEnabled`, bypasses Filter 1 and its drive when disabled, and uses a full-band frame normalization shared by every pitch-derived harmonic truncation. A focused test proves that cutoff, resonance, and drive cannot alter a disabled-filter render. Missing `filterEnabled` remains enabled for backward compatibility.
+
+The corrected probe improves by 19.30 dB for Future Bass and 19.91 dB for Progressive House, with direct/reference correlations of `0.998794650` and `0.998836236` and fitted gains of `1.000817972` and `1.000496997`. The frozen audition hashes and all six C4 hashes remain unchanged because those renders use enabled filters and do not cross the affected high-note harmonic boundary. The remaining approximately `-26 dB` result is a deterministic band-edge/mip-transition residual and is not yet a pure folded-alias measurement or a Serum 1 closeout threshold.
 
 ## Native Full-Chain Gate
 
@@ -95,6 +97,6 @@ The full non-native gate, production targets, focused streaming callback test, a
 
 ## Acceptance Boundary
 
-The factory-instrument, repeatable preview render, exact native full-chain harnesses, branch reconciliation, deterministic preset normalization, and integrated render freeze are implemented and green. Serum 1.0 remains open only for the measured reference-subtracted oscillator cross-rate residual and the explicit decision whether to raise the fixed eight-voice unison capacity. Serum 2 feature comparisons should begin only after those Serum 1 boundaries are either corrected or explicitly accepted.
+The factory-instrument, repeatable preview render, exact native full-chain harnesses, branch reconciliation, deterministic preset normalization, and integrated render freeze are implemented and green. Serum 1.0 remains open only for the corrected `-26.180 / -26.333 dB` band-edge/mip-transition residual and the explicit decision whether to raise the fixed eight-voice unison capacity. Serum 2 feature comparisons should begin only after those Serum 1 boundaries are either corrected or explicitly accepted.
 
 Changed hashes must be explained in this document before the frozen values are updated.

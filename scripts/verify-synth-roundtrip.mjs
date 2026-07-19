@@ -328,6 +328,51 @@ try {
   });
   assert.deepEqual(independentUnisonPreview.sampleIds, ["audio-fixture-1", "audio-low", "audio-high"]);
   assert.equal(independentUnisonDraft.schemaVersion, 5);
+
+  const disabledFilterQuietSettings = synthStore.synthDraftToPreviewInstrument(synthStore.normalizeSynthDraftPatch({
+    ...draft,
+    parameters: {
+      ...draft.parameters,
+      "filter.enabled": false,
+      "filter.cutoff": 120,
+      "filter.resonance": 0,
+      "filter.drive": 0,
+    },
+  }));
+  const disabledFilterExtremeSettings = synthStore.synthDraftToPreviewInstrument(synthStore.normalizeSynthDraftPatch({
+    ...draft,
+    parameters: {
+      ...draft.parameters,
+      "filter.enabled": false,
+      "filter.cutoff": 18000,
+      "filter.resonance": 1,
+      "filter.drive": 1,
+    },
+  }));
+  assert.equal(disabledFilterQuietSettings.filterEnabled, false);
+  assert.equal(disabledFilterExtremeSettings.filterEnabled, false);
+  const disabledFilterQuietLeft = new Float32Array(4096);
+  const disabledFilterQuietRight = new Float32Array(4096);
+  const disabledFilterExtremeLeft = new Float32Array(4096);
+  const disabledFilterExtremeRight = new Float32Array(4096);
+  synthPreview.renderInstrumentStereoSamples(
+    disabledFilterQuietSettings,
+    disabledFilterQuietLeft,
+    disabledFilterQuietRight,
+    48000,
+    440,
+    "audio",
+  );
+  synthPreview.renderInstrumentStereoSamples(
+    disabledFilterExtremeSettings,
+    disabledFilterExtremeLeft,
+    disabledFilterExtremeRight,
+    48000,
+    440,
+    "audio",
+  );
+  assert.deepEqual(disabledFilterExtremeLeft, disabledFilterQuietLeft, "disabled Filter 1 must bypass cutoff, resonance, and drive on the left channel");
+  assert.deepEqual(disabledFilterExtremeRight, disabledFilterQuietRight, "disabled Filter 1 must bypass cutoff, resonance, and drive on the right channel");
   const migratedSampleSlotDraft = synthStore.normalizeSynthDraftPatch({
     schemaVersion: 1,
     parameters: { "osc.a.level": 0.42 },

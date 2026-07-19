@@ -925,7 +925,10 @@ export function renderInstrumentSample(
       + modulationTargetOffset(modulation, "filter.cutoff"),
   );
   const resonance = clamp01(instrument.knobs.resonance + modulationTargetOffset(modulation, "filter.resonance"));
-  const drive = clamp01(instrument.knobs.drive + modulationTargetOffset(modulation, "filter.drive"));
+  const filterEnabled = instrument.filterEnabled !== false;
+  const drive = filterEnabled
+    ? clamp01(instrument.knobs.drive + modulationTargetOffset(modulation, "filter.drive"))
+    : 0;
   const color = clamp01(instrument.knobs.color);
   const sub = instrument.aether ? 0 : clamp01(instrument.subOscLevel ?? 0);
 
@@ -959,7 +962,9 @@ export function renderInstrumentSample(
     v = Math.tanh(v * amount) / Math.tanh(amount);
   }
 
-  let filtered = resonantFilter(v, state, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass");
+  let filtered = filterEnabled
+    ? resonantFilter(v, state, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass")
+    : v;
   if (instrument.filter2?.enabled) {
     let branch = instrument.filterRouting === "parallel" ? filterInput : filtered;
     if (instrument.filter2.drive > 0) {
@@ -973,7 +978,9 @@ export function renderInstrumentSample(
   if (aetherBuses?.filter1) {
     let branch = aetherBuses.filter1;
     if (drive > 0) { const amount = 1 + drive * 10; branch = Math.tanh(branch * amount) / Math.tanh(amount); }
-    filtered += resonantFilter(branch, state, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass", 2);
+    filtered += filterEnabled
+      ? resonantFilter(branch, state, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass", 2)
+      : branch;
   }
   if (aetherBuses?.filter2) {
     let branch = aetherBuses.filter2;
@@ -1006,7 +1013,10 @@ function renderInstrumentStereoSample(
       + modulationTargetOffset(modulation, "filter.cutoff"),
   );
   const resonance = clamp01(instrument.knobs.resonance + modulationTargetOffset(modulation, "filter.resonance"));
-  const drive = clamp01(instrument.knobs.drive + modulationTargetOffset(modulation, "filter.drive"));
+  const filterEnabled = instrument.filterEnabled !== false;
+  const drive = filterEnabled
+    ? clamp01(instrument.knobs.drive + modulationTargetOffset(modulation, "filter.drive"))
+    : 0;
   const raw = aetherStackStereoSample(instrument, phaseState, sampleRate, frequency, mode, modulation);
   const warped = applyRuntimeWarpStereo(instrument, raw.left, raw.right);
   const directWarped = applyRuntimeWarpStereo(instrument, raw.directLeft, raw.directRight);
@@ -1022,8 +1032,10 @@ function renderInstrumentStereoSample(
     right = Math.tanh(right * amount) / normalizer;
   }
 
-  left = resonantFilter(left, leftFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass");
-  right = resonantFilter(right, rightFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass");
+  if (filterEnabled) {
+    left = resonantFilter(left, leftFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass");
+    right = resonantFilter(right, rightFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass");
+  }
   if (instrument.filter2?.enabled) {
     let branchLeft = instrument.filterRouting === "parallel" ? warped.left : left;
     let branchRight = instrument.filterRouting === "parallel" ? warped.right : right;
@@ -1046,8 +1058,12 @@ function renderInstrumentStereoSample(
     }
   }
   if (filter1Warped.left !== 0 || filter1Warped.right !== 0) {
-    left += resonantFilter(filter1Warped.left, leftFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass", 2);
-    right += resonantFilter(filter1Warped.right, rightFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass", 2);
+    left += filterEnabled
+      ? resonantFilter(filter1Warped.left, leftFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass", 2)
+      : filter1Warped.left;
+    right += filterEnabled
+      ? resonantFilter(filter1Warped.right, rightFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass", 2)
+      : filter1Warped.right;
   }
   if (filter2Warped.left !== 0 || filter2Warped.right !== 0) {
     left += resonantFilter(filter2Warped.left, leftFilterState, sampleRate, clamp01(instrument.filter2?.cutoff ?? 1),
@@ -1567,12 +1583,19 @@ function createPreviewWavetable(
   for (let frame = 0; frame < frameCount; frame++) {
     const normalizedFrame = frame / Math.max(1, frameCount - 1);
     const customFrame = custom ? interpolatePreviewCustomFrame(custom.frames, normalizedFrame, smoothCustom, customMorph) : null;
+    let fullBandNormalizer = 0;
+    for (let harmonic = 1; harmonic <= 32; harmonic++) {
+      const amp = customFrame
+        ? customWavetableHarmonicAmplitude(customFrame, harmonic, clamp01(warp), warpMode)
+        : wavetableHarmonicAmplitude(config.bank, harmonic, normalizedFrame, clamp01(warp), warpMode);
+      if (amp > 0.0001) fullBandNormalizer += amp;
+    }
+    const commonGainDivisor = Math.max(1, fullBandNormalizer * 0.72);
     let peak = 0;
     const frameStart = frame * frameSize;
     for (let index = 0; index < frameSize; index++) {
       const phase = index / frameSize;
       let sample = 0;
-      let normalizer = 0;
       for (let harmonic = 1; harmonic <= harmonicLimit; harmonic++) {
         const amp = customFrame
           ? customWavetableHarmonicAmplitude(customFrame, harmonic, clamp01(warp), warpMode)
@@ -1582,9 +1605,8 @@ function createPreviewWavetable(
           ? customWavetableHarmonicPhase(customFrame, harmonic, clamp01(warp), warpMode)
           : wavetableHarmonicPhase(config.bank, harmonic, normalizedFrame, clamp01(warp), warpMode);
         sample += Math.sin(phase * Math.PI * 2 * harmonic + harmonicPhase) * amp;
-        normalizer += amp;
       }
-      const normalized = normalizer > 0 ? sample / Math.max(1, normalizer * 0.72) : 0;
+      const normalized = sample / commonGainDivisor;
       samples[frameStart + index] = normalized;
       peak = Math.max(peak, Math.abs(normalized));
     }

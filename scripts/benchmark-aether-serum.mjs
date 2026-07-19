@@ -124,7 +124,7 @@ function sampleRateResidual(reference48, reference96) {
   };
 }
 
-function downsampleFourToOne(reference192, radius = 32) {
+function downsampleFourToOne(reference192, radius = 256) {
   const outputLength = Math.floor(reference192.length / 4);
   const output = new Float64Array(outputLength);
   const cutoff = 0.1175;
@@ -151,11 +151,13 @@ function downsampleFourToOne(reference192, radius = 32) {
 function referenceSubtractedResidual(reference48, reference192, sampleRate = 48000) {
   const downsampledLeft = downsampleFourToOne(reference192.left);
   const downsampledRight = downsampleFourToOne(reference192.right);
-  const edge = 16;
+  const edge = 64;
   const analysisStart = Math.max(edge, Math.floor(sampleRate * 0.08));
   const analysisEnd = Math.min(reference48.left.length, downsampledLeft.length) - edge;
   let signalSquares = 0;
+  let referenceSquares = 0;
   let residualSquares = 0;
+  let crossProduct = 0;
   let peak = 0;
   for (let index = analysisStart; index < analysisEnd; index += 1) {
     for (const [direct, downsampled] of [
@@ -164,6 +166,8 @@ function referenceSubtractedResidual(reference48, reference192, sampleRate = 480
     ]) {
       const residual = direct[index] - downsampled[index];
       signalSquares += direct[index] * direct[index];
+      referenceSquares += downsampled[index] * downsampled[index];
+      crossProduct += direct[index] * downsampled[index];
       residualSquares += residual * residual;
       peak = Math.max(peak, Math.abs(residual));
     }
@@ -171,8 +175,17 @@ function referenceSubtractedResidual(reference48, reference192, sampleRate = 480
   const samples = Math.max(1, (analysisEnd - analysisStart) * 2);
   const rms = Math.sqrt(residualSquares / samples);
   const signalRms = Math.sqrt(signalSquares / samples);
+  const referenceRms = Math.sqrt(referenceSquares / samples);
+  const correlation = crossProduct / Math.sqrt(Math.max(signalSquares * referenceSquares, 1e-20));
+  const fittedGain = crossProduct / Math.max(referenceSquares, 1e-20);
+  let gainFittedResidualSquares = 0;
+  for (let index = analysisStart; index < analysisEnd; index += 1) {
+    gainFittedResidualSquares += Math.pow(reference48.left[index] - downsampledLeft[index] * fittedGain, 2);
+    gainFittedResidualSquares += Math.pow(reference48.right[index] - downsampledRight[index] * fittedGain, 2);
+  }
+  const gainFittedRms = Math.sqrt(gainFittedResidualSquares / samples);
   return {
-    method: "modulation/filter/FX-isolated oscillator stack at 48 kHz minus deterministic 192 kHz render decimated 4:1 with a 65-tap Hann-windowed sinc low-pass",
+    method: "modulation/filter/FX-isolated oscillator stack at 48 kHz minus deterministic 192 kHz render decimated 4:1 with a 513-tap Hann-windowed sinc low-pass",
     note: 84,
     velocity: 118,
     direct48Hash: hashStereo(reference48.left, reference48.right),
@@ -181,6 +194,11 @@ function referenceSubtractedResidual(reference48, reference192, sampleRate = 480
     comparedSamples: samples,
     rms: round(rms),
     peak: round(peak),
+    directRms: round(signalRms),
+    downsampledReferenceRms: round(referenceRms),
+    correlation: round(correlation, 9),
+    fittedReferenceGain: round(fittedGain, 9),
+    gainFittedRelativeDb: round(20 * Math.log10(Math.max(gainFittedRms, 1e-12) / Math.max(signalRms, 1e-12)), 3),
     residualToSignalRatio: round(residualSquares / Math.max(signalSquares, 1e-20), 9),
     relativeDb: round(20 * Math.log10(Math.max(rms, 1e-12) / Math.max(signalRms, 1e-12)), 3),
   };
@@ -238,6 +256,7 @@ function makeOscillatorAliasProbeInstrument(instrument) {
   const probe = structuredClone(instrument);
   probe.envelope = { attackMs: 0, decayMs: 0, sustain: 1, releaseMs: 0 };
   probe.knobs = { ...probe.knobs, cutoff: 1, resonance: 0, drive: 0 };
+  probe.filterEnabled = false;
   probe.filterKeytrack = 0;
   probe.lfoDepth = 0;
   probe.lfoToPitch = 0;
