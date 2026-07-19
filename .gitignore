@@ -1,6 +1,7 @@
 # Build
 build/
 build-native/
+build-native-*/
 cmake-build-*/
 out/
 *.o

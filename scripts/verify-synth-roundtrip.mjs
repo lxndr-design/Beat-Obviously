@@ -848,7 +848,6 @@ try {
     "Vocal Pad",
     "Vocal Pluck",
     "Synth String",
-    "Strings",
     "Keys / Synth Piano",
     "Mallet",
   ];
@@ -856,7 +855,9 @@ try {
   for (const family of requiredPresetFamilies) {
     assert.ok(presetFamilies.has(family), `expected factory Aether preset family ${family}`);
   }
-  const benchmarkPresets = synthStore.FACTORY_SYNTH_PRESETS.filter((preset) => preset.tags.includes("benchmark"));
+  const benchmarkPresets = synthStore.FACTORY_SYNTH_PRESETS.filter(
+    (preset) => preset.tags.includes("benchmark") && preset.family === "Benchmark Strings",
+  );
   assert.deepEqual(
     benchmarkPresets.map((preset) => preset.name).sort(),
     ["Benchmark - Future Bass Strings", "Benchmark - Progressive House Strings"],
@@ -880,8 +881,8 @@ try {
   );
   assert.equal(futureBassBenchmark?.name, "Benchmark - Future Bass Strings");
   assert.equal(progressiveHouseBenchmark?.name, "Benchmark - Progressive House Strings");
-  assert.equal(futureBassBenchmark?.category, "Strings");
-  assert.equal(progressiveHouseBenchmark?.category, "Strings");
+  assert.equal(futureBassBenchmark?.category, "Synth String");
+  assert.equal(progressiveHouseBenchmark?.category, "Synth String");
   assert.ok(futureBassBenchmark?.tags.includes("benchmark"));
   assert.ok(progressiveHouseBenchmark?.tags.includes("benchmark"));
   assert.equal(futureBassBenchmark?.patch.parameters["osc.a.wavetable"], "basic.saw");
@@ -890,19 +891,20 @@ try {
   assert.equal(progressiveHouseBenchmark?.patch.parameters["osc.b.wavetable"], "basic.saw");
   assert.equal(futureBassBenchmark?.patch.parameters["filter.cutoff"], 6500);
   assert.equal(progressiveHouseBenchmark?.patch.parameters["filter.cutoff"], 4700);
+  assert.equal(futureBassBenchmark?.patch.parameters["unison.voices"], 8);
   assert.equal(futureBassBenchmark?.patch.parameters["osc.a.unison.voices"], 8);
   assert.equal(progressiveHouseBenchmark?.patch.parameters["osc.a.unison.voices"], 7);
   assert.deepEqual(
     ["macro.1", "macro.2", "macro.3", "macro.4"].map(
       (id) => futureBassBenchmark?.patch.metadata.macros[id]?.label,
     ),
-    ["Pump Motion", "Harmonic Color", "Envelope Shape", "Stereo Space"],
+    ["Pump", "Brightness", "Bite", "Space"],
   );
   assert.deepEqual(
     ["macro.1", "macro.2", "macro.3", "macro.4"].map(
       (id) => progressiveHouseBenchmark?.patch.metadata.macros[id]?.label,
     ),
-    ["Pulse Motion", "String Color", "Envelope Shape", "Hall Space"],
+    ["Drift", "Warmth", "Bloom", "Hall"],
   );
   assert.deepEqual(
     futureBassBenchmark?.patch.effects.filters.map((effect) => effect.kind),

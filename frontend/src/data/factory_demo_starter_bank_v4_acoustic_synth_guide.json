@@ -5063,7 +5063,7 @@
           "fineCents": 3, "phase": 25, "random": 95, "pan": 0, "level": 28
         }
       },
-      "voiceStack": { "enabled": true, "voices": 9, "detune": 18, "blend": 68, "spread": 95, "max": 24 },
+      "voiceStack": { "enabled": true, "voices": 8, "detune": 18, "blend": 68, "spread": 95, "max": 24 },
       "filter": { "enabled": true, "type": "LP12", "cutoffHz": 6500, "resonance": 14, "drive": 12, "keytrack": 42 },
       "amp": { "level": 86, "pan": 0 },
       "runtimeWarp": { "enabled": true, "mode": "shape", "amount": 8 },

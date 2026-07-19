@@ -1066,3 +1066,17 @@ AudioEngine / InstrumentVoice / SourceSlotRack / offline renderer / IPC
 ```
 
 Serialization, decoding, allocation, hashing, validation, FFT preparation, and comparison reconstruction remain outside realtime. No detector exemption, callback work, lazy initialization, file operation, source publication, or destruction edge was added.
+
+## Serum 1 integration realtime-string boundary — 2026-07-19
+
+```text
+sequencer route automation event
+  -> preallocated blockRouteParameterEvents
+  -> AudioEngine::applyRouteParameterLocked()
+     -> bounded target-prefix and separator scan
+     -> in-place bus/effect/parameter region comparison
+     -> scalar route/effect state update
+  -> existing route effect processing
+```
+
+No substring, temporary `juce::String`, heap allocation, container growth, file operation, blocking lock, or lazy initialization occurs on this edge. JUCE IDs entering the fixed realtime parameter queue are encoded directly into its preallocated arrays. Offline rendering continues to use the same automation semantics but is not classified as a realtime callback. The focused streaming callback detector and complete native suite cover this boundary.

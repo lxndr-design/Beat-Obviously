@@ -19,6 +19,65 @@ namespace beat
 {
     namespace
     {
+        template <size_t Capacity>
+        void copyJuceStringToFixedUtf8(std::array<char, Capacity>& destination,
+                                      const juce::String& source) noexcept
+        {
+            destination.fill('\0');
+            size_t write = 0;
+            for (int index = 0; index < source.length(); ++index)
+            {
+                const auto codePoint = static_cast<uint32_t>(source[index]);
+                std::array<char, 4> encoded {};
+                size_t encodedSize = 0;
+                if (codePoint <= 0x7f)
+                {
+                    encoded[0] = static_cast<char>(codePoint);
+                    encodedSize = 1;
+                }
+                else if (codePoint <= 0x7ff)
+                {
+                    encoded[0] = static_cast<char>(0xc0u | (codePoint >> 6u));
+                    encoded[1] = static_cast<char>(0x80u | (codePoint & 0x3fu));
+                    encodedSize = 2;
+                }
+                else if (codePoint <= 0xffff)
+                {
+                    encoded[0] = static_cast<char>(0xe0u | (codePoint >> 12u));
+                    encoded[1] = static_cast<char>(0x80u | ((codePoint >> 6u) & 0x3fu));
+                    encoded[2] = static_cast<char>(0x80u | (codePoint & 0x3fu));
+                    encodedSize = 3;
+                }
+                else if (codePoint <= 0x10ffff)
+                {
+                    encoded[0] = static_cast<char>(0xf0u | (codePoint >> 18u));
+                    encoded[1] = static_cast<char>(0x80u | ((codePoint >> 12u) & 0x3fu));
+                    encoded[2] = static_cast<char>(0x80u | ((codePoint >> 6u) & 0x3fu));
+                    encoded[3] = static_cast<char>(0x80u | (codePoint & 0x3fu));
+                    encodedSize = 4;
+                }
+                if (encodedSize == 0 || write + encodedSize >= Capacity)
+                    break;
+                for (size_t byte = 0; byte < encodedSize; ++byte)
+                    destination[write++] = encoded[byte];
+            }
+        }
+
+        RealtimeParameterChange makeRealtimeParameterChangeFromJuce(
+            const juce::String* instrumentId,
+            const juce::String* parameterId,
+            float value,
+            int sampleOffset = 0,
+            int rampSamples = 0) noexcept
+        {
+            auto change = makeRealtimeParameterChange({}, {}, value, sampleOffset, rampSamples);
+            if (instrumentId != nullptr)
+                copyJuceStringToFixedUtf8(change.instrumentId, *instrumentId);
+            if (parameterId != nullptr)
+                copyJuceStringToFixedUtf8(change.parameterId, *parameterId);
+            return change;
+        }
+
         bool busRoutesTo(const ReturnBus& bus, const Id& destination) noexcept
         {
             if (bus.outputEnabled && bus.outputBusId == destination)
@@ -288,6 +347,20 @@ namespace beat
             return true;
         }
 
+        bool stringRegionEqualsAscii(const juce::String& text,
+                                     int start,
+                                     int length,
+                                     std::string_view expected) noexcept
+        {
+            if (length != static_cast<int>(expected.size()) || start < 0 || start + length > text.length())
+                return false;
+            for (int index = 0; index < length; ++index)
+                if (text[start + index] != static_cast<juce::juce_wchar>(
+                        static_cast<unsigned char>(expected[static_cast<size_t>(index)])))
+                    return false;
+            return true;
+        }
+
         bool setTrackEffectParam(TrackEffect& effect, const juce::String& key, float value) noexcept
         {
             for (auto& param : effect.params)
@@ -299,6 +372,23 @@ namespace beat
                 }
             }
             return false; // Unknown parameters are rejected without allocating on the callback.
+        }
+
+        bool setTrackEffectParamRegion(TrackEffect& effect,
+                                       const juce::String& target,
+                                       int start,
+                                       int length,
+                                       float value) noexcept
+        {
+            for (auto& param : effect.params)
+            {
+                if (stringRegionEquals(target, start, length, param.key))
+                {
+                    param.value = value;
+                    return true;
+                }
+            }
+            return false;
         }
 
         bool isRouteAutomationTarget(const juce::String& target) noexcept
@@ -1339,11 +1429,8 @@ namespace beat
                                                    int sampleOffset,
                                                    int rampSamples) noexcept
     {
-        const bool accepted = realtimeParameterChanges.push(makeRealtimeParameterChange(instrumentId.toRawUTF8(),
-                                                                                         parameterId.toRawUTF8(),
-                                                                                         value,
-                                                                                         sampleOffset,
-                                                                                         rampSamples));
+        const bool accepted = realtimeParameterChanges.push(makeRealtimeParameterChangeFromJuce(
+            &instrumentId, &parameterId, value, sampleOffset, rampSamples));
         (accepted ? realtimeQueueAccepted : realtimeQueueRejected).fetch_add(1, std::memory_order_relaxed);
         return accepted;
     }
@@ -3355,18 +3442,15 @@ namespace beat
             ++context.pitchEventCount;
         };
 
-        const auto pushVoiceChange = [&](std::string_view target,
+        const auto pushVoiceChange = [&](const juce::String& target,
                                          float value,
                                          int samplesFromNoteStart,
                                          int rampSamples) noexcept
         {
-            if (target.empty() || target == std::string_view("pitch")) return;
+            if (target.isEmpty() || target == "pitch") return;
             if (context.eventCount >= (int) VoiceNoteAutomation::maxEvents) return;
-            context.events[(size_t) context.eventCount] = makeRealtimeParameterChange(std::string_view {},
-                                                                                      target,
-                                                                                      value,
-                                                                                      juce::jmax(0, samplesFromNoteStart),
-                                                                                      juce::jmax(0, rampSamples));
+            context.events[(size_t) context.eventCount] = makeRealtimeParameterChangeFromJuce(
+                nullptr, &target, value, juce::jmax(0, samplesFromNoteStart), juce::jmax(0, rampSamples));
             ++context.eventCount;
         };
 
@@ -3411,7 +3495,6 @@ namespace beat
         for (const auto& lane : note->automation)
         {
             if (lane.target.isEmpty() || lane.points.empty()) continue;
-            const auto target = std::string_view(lane.target.toRawUTF8());
             bool emittedInitialValue = false;
 
             for (size_t i = 0; i < lane.points.size(); ++i)
@@ -3424,7 +3507,7 @@ namespace beat
 
                 if (!emittedInitialValue)
                 {
-                    pushVoiceChange(target, point.value, pointOffset, 0);
+                    pushVoiceChange(lane.target, point.value, pointOffset, 0);
                     emittedInitialValue = true;
                 }
 
@@ -3442,7 +3525,7 @@ namespace beat
                     continue;
 
                 const int nextOffset = (int) std::round((nextPoint->beat - note->startBeat) * samplesPerBeat);
-                pushVoiceChange(target,
+                pushVoiceChange(lane.target,
                                 nextPoint->value,
                                 pointOffset,
                                 juce::jmax(0, nextOffset - pointOffset));
@@ -4436,15 +4519,21 @@ namespace beat
 
         if (target.startsWith("send."))
         {
-            const auto rest = target.substring(5);
-            const auto busId = rest.upToFirstOccurrenceOf(".", false, false);
-            const auto param = rest.fromFirstOccurrenceOf(".", false, false);
+            const int separator = target.indexOfChar(5, '.');
+            if (separator <= 5 || separator >= target.length() - 1)
+                return false;
+            const int parameterStart = separator + 1;
+            const int parameterLength = target.length() - parameterStart;
             for (auto& send : route.sends)
             {
-                if (send.busId != busId) continue;
-                if (param == "gainDb" || param == "gain") send.gainDb = juce::jlimit(-96.0f, 24.0f, event.value);
-                else if (param == "pan") send.pan = juce::jlimit(-1.0f, 1.0f, event.value);
-                else if (param == "enabled") send.enabled = event.value >= 0.5f;
+                if (!stringRegionEquals(target, 5, separator - 5, send.busId)) continue;
+                if (stringRegionEqualsAscii(target, parameterStart, parameterLength, "gainDb")
+                    || stringRegionEqualsAscii(target, parameterStart, parameterLength, "gain"))
+                    send.gainDb = juce::jlimit(-96.0f, 24.0f, event.value);
+                else if (stringRegionEqualsAscii(target, parameterStart, parameterLength, "pan"))
+                    send.pan = juce::jlimit(-1.0f, 1.0f, event.value);
+                else if (stringRegionEqualsAscii(target, parameterStart, parameterLength, "enabled"))
+                    send.enabled = event.value >= 0.5f;
                 else return false;
                 return true;
             }
@@ -4460,18 +4549,20 @@ namespace beat
         const int separator = target.indexOfChar(prefixLength, '.');
         if (separator <= prefixLength || separator >= target.length() - 1)
             return false;
-        const auto param = target.substring(separator + 1);
+        const int parameterStart = separator + 1;
+        const int parameterLength = target.length() - parameterStart;
 
         for (auto& effect : route.effects)
         {
             if (!stringRegionEquals(target, prefixLength, separator - prefixLength, effect.id))
                 continue;
-            if (param == "bypass" || param == "bypassed")
+            if (stringRegionEqualsAscii(target, parameterStart, parameterLength, "bypass")
+                || stringRegionEqualsAscii(target, parameterStart, parameterLength, "bypassed"))
             {
                 effect.bypassed = event.value >= 0.5f;
                 return true;
             }
-            return setTrackEffectParam(effect, param, event.value);
+            return setTrackEffectParamRegion(effect, target, parameterStart, parameterLength, event.value);
         }
 
         return false;
@@ -5123,12 +5214,8 @@ namespace beat
                         blockEventOverflows.fetch_add(1, std::memory_order_relaxed);
                         return;
                     }
-                    blockRealtimeParameterEvents.push_back(
-                        makeRealtimeParameterChange(ev.instrumentId.toRawUTF8(),
-                                                    ev.parameterId.toRawUTF8(),
-                                                    ev.value,
-                                                    ev.sampleOffset,
-                                                    ev.rampSamples));
+                    blockRealtimeParameterEvents.push_back(makeRealtimeParameterChangeFromJuce(
+                        &ev.instrumentId, &ev.parameterId, ev.value, ev.sampleOffset, ev.rampSamples));
                 };
 
                 seq.render(numSamples,
@@ -5242,8 +5329,10 @@ namespace beat
                             &route.sourceFxBuffers[0],
                             &route.sourceFxBuffers[1],
                         });
+                        const auto realtimeRouteId = makeRealtimeParameterChangeFromJuce(
+                            &route.instrumentId, nullptr, 0.0f);
                         renderSynthWithRealtimeParametersLocked(*route.synth, routeBuf, route.midi,
-                            route.instrumentId.toRawUTF8(), numSamples);
+                            realtimeRouteId.instrumentIdView(), numSamples);
                         voiceTicks += ticksBetween(voiceStartTicks, markTicks());
                         activeSynthVoiceCount += countActiveSynthVoices(*route.synth);
                         VoiceAutomationInbox::clearPending();

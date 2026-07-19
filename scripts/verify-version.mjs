@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
@@ -79,17 +79,24 @@ assertVersion(
   version,
 );
 
-const appPlistPath = join(repoRoot, "Beat.app", "Contents", "Info.plist");
-const appPlist = readText(appPlistPath);
+const appPlistPath = [
+  join(repoRoot, "Beat.app", "Contents", "Info.plist"),
+  join(repoRoot, "build-native-release", "backend", "Beat_artefacts", "Release", "Beat.app", "Contents", "Info.plist"),
+  join(repoRoot, "build-native", "backend", "Beat_artefacts", "Release", "Beat.app", "Contents", "Info.plist"),
+  join(repoRoot, "build-native", "backend", "Beat_artefacts", "Debug", "Beat.app", "Contents", "Info.plist"),
+].find(existsSync);
+if (!appPlistPath)
+  fail("Beat.app Info.plist was not found in the packaged app or a supported native build directory");
+const appPlist = appPlistPath ? readText(appPlistPath) : "";
 assertVersion(
   "Beat.app CFBundleShortVersionString",
-  appPlistPath,
+  appPlistPath ?? repoRoot,
   appPlist.match(/<key>CFBundleShortVersionString<\/key>\s*<string>([^<]+)<\/string>/)?.[1],
   version,
 );
 assertVersion(
   "Beat.app CFBundleVersion",
-  appPlistPath,
+  appPlistPath ?? repoRoot,
   appPlist.match(/<key>CFBundleVersion<\/key>\s*<string>([^<]+)<\/string>/)?.[1],
   version,
 );

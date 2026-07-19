@@ -18414,6 +18414,18 @@ namespace
 
 int main(int argc, char** argv)
 {
+    if (argc == 2 && juce::String(argv[1]) == "--aether-sample-streaming")
+    {
+        beat::test::prepareRealtimeSafetyInterposers();
+        if (!stressAudioEngineAetherSampleSlotLiveExportParity())
+        {
+            std::cerr << "Aether sample streaming focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Aether sample streaming focused stress passed\n";
+        return 0;
+    }
+
     if (argc == 2 && juce::String(argv[1]) == "--audio-bus")
     {
         const bool ok = stressProjectIntegrityVerifier()

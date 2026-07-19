@@ -19,12 +19,12 @@ const sampleRates = [44100, 48000, 96000];
 // benchmark instruments. Changes must be investigated and documented before
 // updating them; the verifier intentionally has no record/update mode.
 const expectedHashes = {
-  "factory.benchmark-future-bass-strings@44100": "83ea6ab647f7f5edc7a4149e92636161505e9b89f0ae4685e1caf824c3a47c8d",
-  "factory.benchmark-future-bass-strings@48000": "270a4e390e6bd0795b582484d7bb70de15aceb215e7e5ff3b8ec674a354c5137",
-  "factory.benchmark-future-bass-strings@96000": "0a7322e18956696b93a308ff7e9a54b0d228ebc04b5a7cdf9812d261e33dc6b9",
-  "factory.benchmark-progressive-house-strings@44100": "7c2b033c5213ea88bc7b7663fdd2bfc9900cfee15f529c67bf458256a3f65631",
-  "factory.benchmark-progressive-house-strings@48000": "f61237b9fec7a1e91acd0f60f233c2e94604be34599647cb50a73389698dfaad",
-  "factory.benchmark-progressive-house-strings@96000": "9a2d40fe8535b9567bb9c5d4d56c33874224d11f42844fc57b3651fbeeb77afe",
+  "factory.benchmark-future-bass-strings@44100": "3b7a16c8a03c69167501836515a5e12a47eb049f1fb95c6c056a4a9dab5762dc",
+  "factory.benchmark-future-bass-strings@48000": "6acf60e7ceb29c4090fe02de05f2e9ff9a8bca50d041d0f41e76b5a2a8aa0392",
+  "factory.benchmark-future-bass-strings@96000": "abdfc817fe31489e70ab5ba5bf0cfe064f6ac650f93c711f43d5bf2de38d00c7",
+  "factory.benchmark-progressive-house-strings@44100": "1397453a4578c86211206e4230a5a351ec467f14d459edc70ec63e1e407964a9",
+  "factory.benchmark-progressive-house-strings@48000": "ad36495fa5321471891136df4e4485c8613368fb653f2518c4639746816fc000",
+  "factory.benchmark-progressive-house-strings@96000": "d287fd1128f43f4c3b3b3ad11eb47203e8580be07277007bd229c881b4694bf8",
 };
 
 function renderMetrics(samples) {

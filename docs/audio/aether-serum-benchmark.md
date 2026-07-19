@@ -67,21 +67,34 @@ Measured on 2026-07-19:
 
 | Native fixture | Side/mid energy | Wet/dry residual ratio | Peak | Slowest render / realtime | Maximum callback load | Deadline overruns | Max wavetable voice samples/block | Max route-effect samples/block |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Benchmark - Future Bass Strings | 0.442078 | 1.19029 | 0.230468 | 14.168x | 22.8813% | 0 | 65,536 | 14,336 |
-| Benchmark - Progressive House Strings | 0.408128 | 2.55696 | 0.201706 | 14.757x | 15.4000% | 0 | 57,344 | 10,240 |
+| Benchmark - Future Bass Strings | 0.442070 | 1.19003 | 0.231432 | 8.488x | 26.4688% | 0 | 65,536 | 14,336 |
+| Benchmark - Progressive House Strings | 0.408087 | 2.55622 | 0.201444 | 9.194x | 24.6250% | 0 | 57,344 | 10,240 |
 
-The run ended with 1,550 cache hits / 9 misses / 9 entries after Future Bass and 2,221 hits / 10 misses / 10 entries after Progressive House. These cache values are process-cumulative observations, while the per-block work values are maxima across the benchmark matrix.
+The integrated Release run ended with 2,004 cache hits / 9 misses / 9 entries after Future Bass and 2,675 hits / 10 misses / 10 entries after Progressive House. These cache values are process-cumulative observations, while the per-block work values are maxima across the benchmark matrix. The complete Release stress suite passed in 15.10 s wall / 13.30 s user / 0.90 s system with zero benchmark deadline overruns.
 
 The Future Bass description requests nine unison voices. The current browser and native playback contracts both cap unison at eight, so this fixture explicitly records and renders eight. Raising that limit is a remaining Serum 1.0 compatibility and performance decision; the benchmark does not relabel eight-voice output as nine-voice output.
 
-## Branch Reconciliation Blocker
+## Integrated factory-render freeze
 
-The benchmark work currently sits on `codex/audio-bus-backend`. Git ancestry inspection on 2026-07-19 confirmed that this branch and `codex/aether-serum-foundation` diverge at `062413553930fb102a81658063966c34500bf8a9`. The current branch does not contain commit `505672e3` (`feat: add immutable wavetable mip foundation`) or the later Aether milestones. Its native `WavetableOscillator::updateFrameCache()` still constrains playback position using the pitch-derived harmonic limit.
+The Aether foundation previously froze a separate, older adaptation of the same two supplied presets. Integration correctly failed all six legacy C4 render hashes after the newer factory-guide records became authoritative. The changed output is attributable to reviewed preset-data differences: the tuned Future Bass motion/vibrato defaults, explicit amp level, runtime warp, updated macro labels/routes, and the corresponding current Progressive House guide record. Renderer code did not change during this hash decision, and the standalone Serum benchmark audition hashes above remained exact.
 
-The Serum 1.0 results above are valid for the current audio-bus branch, but they are not a valid freeze of the newer Aether foundation. Do not reimplement the missing foundation here or declare the cross-rate result final. Reconcile the branches on a dedicated integration branch, preserve both histories, rerun the benchmark against the integrated engine, and explain every changed hash.
+The accepted integrated C4 float hashes are:
+
+| Preset | 44.1 kHz | 48 kHz | 96 kHz |
+| --- | --- | --- | --- |
+| Benchmark - Future Bass Strings | `3b7a16c8a03c69167501836515a5e12a47eb049f1fb95c6c056a4a9dab5762dc` | `6acf60e7ceb29c4090fe02de05f2e9ff9a8bca50d041d0f41e76b5a2a8aa0392` | `abdfc817fe31489e70ab5ba5bf0cfe064f6ac650f93c711f43d5bf2de38d00c7` |
+| Benchmark - Progressive House Strings | `1397453a4578c86211206e4230a5a351ec467f14d459edc70ec63e1e407964a9` | `ad36495fa5321471891136df4e4485c8613368fb653f2518c4639746816fc000` | `d287fd1128f43f4c3b3b3ad11eb47203e8580be07277007bd229c881b4694bf8` |
+
+The Future Bass guide now stores eight voices, matching the renderer's fixed capacity and making repeated preset normalization idempotent. Rendering already clamped the prior value of nine to eight, so the standalone float/WAV hashes did not change.
+
+## Branch reconciliation — complete
+
+The divergent `codex/audio-bus-backend` and `codex/aether-serum-foundation` histories were reconciled on `codex/serum1-integration`. Merge commit `7edcb310` preserves the Aether foundation and audio-bus history; `d18a6112` applies the Serum 1 benchmark gate on top. The integrated engine includes the immutable wavetable mip foundation and the later Aether milestones.
+
+The full non-native gate, production targets, focused streaming callback test, and complete Release native stress suite are green on the integration branch with only the existing `baseline.recent-project-exists` platform waiver. Integration exposed and fixed a route-automation callback allocation: JUCE substring construction was replaced by bounded in-place region comparison, with no parameter or DSP semantic change.
 
 ## Acceptance Boundary
 
-The factory-instrument, repeatable preview render, and exact native full-chain harnesses are implemented and green on the current branch. The Serum 1.0 benchmark remains open because the reference-subtracted oscillator result is not acceptable, the authored nine-voice Future Bass stack exceeds the current cap, and the audio-bus/Aether branch histories must be reconciled before a canonical freeze. Serum 2 feature comparisons begin only after the integrated Serum 1.0 boundary is measured and frozen.
+The factory-instrument, repeatable preview render, exact native full-chain harnesses, branch reconciliation, deterministic preset normalization, and integrated render freeze are implemented and green. Serum 1.0 remains open only for the measured reference-subtracted oscillator cross-rate residual and the explicit decision whether to raise the fixed eight-voice unison capacity. Serum 2 feature comparisons should begin only after those Serum 1 boundaries are either corrected or explicitly accepted.
 
 Changed hashes must be explained in this document before the frozen values are updated.

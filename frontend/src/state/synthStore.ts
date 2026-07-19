@@ -19,7 +19,6 @@ import type {
   WavetableWarpMode,
 } from "./types";
 import factoryAetherGuide from "../data/factory_demo_starter_bank_v4_acoustic_synth_guide.json";
-import benchmarkAetherStrings from "../data/aether_benchmark_strings_bank.json";
 import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
@@ -3129,9 +3128,8 @@ const FACTORY_GUIDE_MOD_TARGETS: Record<string, ModulationTargetId> = {
 };
 
 function createFactorySynthPresetsFromGuide(): SynthFactoryPresetRecord[] {
-  const guides = [factoryAetherGuide, benchmarkAetherStrings] as Array<{ patches?: FactoryGuidePatch[] }>;
-  const presets = guides
-    .flatMap((guide) => guide.patches ?? [])
+  const guide = factoryAetherGuide as { patches?: FactoryGuidePatch[] };
+  const presets = (guide.patches ?? [])
     .filter((patch) => patch.name && patch.category)
     .map(createFactorySynthPresetFromGuide);
   const granular = normalizeSynthDraftPatch({
@@ -3161,8 +3159,23 @@ function createFactorySynthPresetsFromGuide(): SynthFactoryPresetRecord[] {
       "env.1.sustain": 0.82,
       "env.1.release": 1.6,
     },
-    modulation: [],
-    metadata: { createdBy: "Beat", tags: ["factory", "benchmark", "granular", "texture"] },
+    modulation: [
+      { id: "factory.benchmark-granular-drift.macro.tone", source: "macro.1", target: "filter.cutoff", amount: 0.2, bipolar: false, enabled: true },
+      { id: "factory.benchmark-granular-drift.macro.resonance", source: "macro.2", target: "filter.resonance", amount: 0.14, bipolar: false, enabled: true },
+      { id: "factory.benchmark-granular-drift.macro.output", source: "macro.3", target: "amp.level", amount: 0.18, bipolar: false, enabled: true },
+      { id: "factory.benchmark-granular-drift.macro.drive", source: "macro.4", target: "filter.drive", amount: 0.16, bipolar: false, enabled: true },
+    ],
+    metadata: {
+      createdBy: "Beat",
+      tags: ["factory", "benchmark", "granular", "texture"],
+      macros: {
+        ...cloneDefaultMacros(),
+        "macro.1": { ...DEFAULT_MACROS["macro.1"], label: "Texture Tone" },
+        "macro.2": { ...DEFAULT_MACROS["macro.2"], label: "Resonance" },
+        "macro.3": { ...DEFAULT_MACROS["macro.3"], label: "Output" },
+        "macro.4": { ...DEFAULT_MACROS["macro.4"], label: "Drive" },
+      },
+    },
   } as unknown as Partial<SynthDraftPatch>);
   presets.push({
     id: "factory.benchmark-granular-drift",
