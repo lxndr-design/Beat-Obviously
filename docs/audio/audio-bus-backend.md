@@ -25,9 +25,11 @@ Solo preparation retains the upstream sources and downstream buses needed to hea
 
 Latency compensation is calculated for Track/Bus primary outputs and sends at each Bus summing boundary and at Master. Delay storage is allocated during graph preparation, never in the audio callback.
 
-## UI integration API
+## Main-editor integration
 
-The future tabbed main-editor UI can create/delete buses with `addReturnBus` and `removeReturnBus`, update non-routing properties with `updateReturnBus`, and use these cycle-safe routing operations:
+The bottom main-editor panel exposes an accessible horizontal tab list for Master and every Audio Bus. Users can create a Bus, switch tabs by pointer or Left/Right/Home/End keys, rename and meter the selected Bus, choose a cycle-safe output, adjust input trim/level/pan, control mute/solo/solo-safe state, add inserts, and delete with confirmation. The Master tab retains the existing EQ, presets, and automation entry point.
+
+The UI can create/delete buses with `addReturnBus` and `removeReturnBus`, update non-routing properties with `updateReturnBus`, and use these cycle-safe routing operations:
 
 - `addAudioBus({ name, trackIds })` creates a Bus and atomically routes the selected valid Tracks to it; `addReturnBus(name)` remains the compatibility alias.
 - `setTrackOutputBus`
@@ -44,4 +46,4 @@ The integrity verifier diagnoses unsupported Bus schema versions, empty names, u
 - `npm run verify:audio-bus` checks atomic selected-track creation, stable-ID protection, value normalization, destination validation, nested routing, cycle rejection, sends, and safe deletion.
 - `build-native/bin/BeatBackendStress --audio-bus` checks persistence, malformed/future Bus diagnostics, summing, nested routing, missing/cyclic fail-closed behavior, trim automation, solo isolation, offline rendering, and latency-compensated parallel paths.
 
-The tab UI is intentionally not part of this backend slice.
+The full-screen Mixer remains available for detailed Track channel strips. Further visual refinement can build on the main-editor tabs without changing the routing contract.

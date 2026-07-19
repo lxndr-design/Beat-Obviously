@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show, type JSX } from "solid-js";
 import { appPrompt } from "../../solid-ui";
 import { send } from "../../ipc/bridge";
 import { createStoreSelector } from "../../solid-utils/store";
@@ -8,7 +8,13 @@ import { EQ_BAND_COUNT, type EqAutomationPoint } from "../../state/types";
 import { EqGraph } from "./EqGraph.solid";
 import styles from "./MasterEqPanel.module.css";
 
-export function MasterEqPanel() {
+export interface MasterEqPanelProps {
+  header?: JSX.Element;
+  panelId?: string;
+  labelledBy?: string;
+}
+
+export function MasterEqPanel(props: MasterEqPanelProps = {}) {
   const automation = createStoreSelector(useProjectStore, (state) => state.project.masterEqAutomation);
   const project = createStoreSelector(useProjectStore, (state) => state.project);
   const position = createStoreSelector(useTransportStore, (state) => state.positionBeat);
@@ -60,9 +66,17 @@ export function MasterEqPanel() {
   }
 
   return (
-    <section class={styles.panel} aria-label="Global Mastering">
+    <section
+      class={styles.panel}
+      id={props.panelId}
+      role={props.labelledBy ? "tabpanel" : undefined}
+      aria-label={props.labelledBy ? undefined : "Global Mastering"}
+      aria-labelledby={props.labelledBy}
+    >
       <header class={styles.ribbon}>
-        <span class={styles.title}>Global Mastering</span>
+        <Show when={props.header} fallback={<span class={styles.title}>Global Mastering</span>}>
+          {props.header}
+        </Show>
         <div class={styles.ribbonActions}>
           <div class={styles.presetWrap}>
             <Button class={styles.presetButton} size="xs" onClick={() => setPresetOpen((open) => !open)}>

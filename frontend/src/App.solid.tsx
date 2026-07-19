@@ -26,7 +26,7 @@ import { HomeHub } from "./features/HomeHub/HomeHub.solid";
 import { TopBar } from "./features/TopBar/TopBar.solid";
 import { Sidebar } from "./features/Sidebar/Sidebar.solid";
 import { TrackList } from "./features/Tracks/TrackList.solid";
-import { MasterEqPanel } from "./features/Eq/MasterEqPanel.solid";
+import { AudioBusPanel } from "./features/AudioBusPanel/AudioBusPanel.solid";
 import { EditorHost } from "./features/EditorHost/EditorHost.solid";
 import { AppDialogHost } from "./solid-ui/AppDialog";
 import { ModalStackOverlay } from "./solid-ui/Modal";
@@ -562,7 +562,7 @@ export function App() {
             <Sidebar />
             <div class="main-col">
               <TrackBlock />
-              <MasterEqPanel />
+              <AudioBusPanel />
             </div>
           </main>
         </div>

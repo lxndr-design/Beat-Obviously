@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -11,6 +11,16 @@ const outDir = join(tmpdir(), `beat-audio-bus-${Date.now()}`);
 mkdirSync(outDir, { recursive: true });
 
 try {
+  const appSource = readFileSync(join(repoRoot, "frontend/src/App.solid.tsx"), "utf8");
+  const panelSource = readFileSync(join(repoRoot, "frontend/src/features/AudioBusPanel/AudioBusPanel.solid.tsx"), "utf8");
+  assert.ok(appSource.includes("<AudioBusPanel />"), "main editor should mount the Bus/Master tab panel");
+  assert.ok(!appSource.includes("<MasterEqPanel />"), "main editor should not bypass the Bus/Master tab panel");
+  assert.ok(panelSource.includes('role="tablist"') && panelSource.includes('role="tab"') && panelSource.includes('role="tabpanel"'), "Bus/Master navigation should expose accessible tab semantics");
+  assert.ok(panelSource.includes('aria-label="Create audio bus"') && panelSource.includes("addAudioBus()"), "Bus panel should expose creation");
+  assert.ok(panelSource.includes("removeReturnBus(props.bus.id)") && panelSource.includes("appConfirm"), "Bus deletion should require confirmation and use reference-safe cleanup");
+  assert.ok(panelSource.includes('event.key === "ArrowRight"') && panelSource.includes('event.key === "ArrowLeft"'), "Bus tabs should support keyboard navigation");
+  assert.ok(panelSource.includes("canSetAudioBusOutput") && panelSource.includes("setAudioBusOutput"), "Bus output menus should use cycle-safe routing APIs");
+
   execFileSync(join(repoRoot, "frontend/node_modules/.bin/esbuild"), [
     join(repoRoot, "frontend/src/state/store.ts"),
     "--bundle",
