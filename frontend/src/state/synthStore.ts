@@ -24,7 +24,8 @@ import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 5;
-export const LUMUS_PATCH_SCHEMA_VERSION = 1;
+export const LUMUS_PATCH_SCHEMA_VERSION = 2;
+const LEGACY_LUMUS_PATCH_SCHEMA_VERSION = 1;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
 export const SYNTH_INSTRUMENT_TYPE = "wavetable-synth";
 export const LUMUS_PARAMETER_NAMESPACE = "lumus";
@@ -67,6 +68,14 @@ export interface WavemapManualRange {
 
 export type OscillatorKey = string;
 export interface SynthOscillatorDefinition { id: OscillatorKey; name: string }
+export interface LumusSourceRackDescriptor {
+  schemaVersion: 1;
+  slots: [
+    { id: "a"; mode: "wavetable" },
+    { id: "b"; mode: "wavetable" },
+    { id: "c"; mode: "wavetable" },
+  ];
+}
 export type OscillatorParamSuffix =
   | "enabled"
   | "wavetable"
@@ -377,6 +386,7 @@ export interface SynthDraftPatch {
     wavemaps?: Record<string, WavemapDefinition>;
     customWavetables?: Record<string, CustomWavetableDefinition>;
     oscillators: SynthOscillatorDefinition[];
+    lumusSourceRack?: LumusSourceRackDescriptor;
     sampleSlot1Zones: AetherSampleZoneConfig[];
     managedSfz?: ManagedSfzAssetConfig;
     managedGranular?: ManagedGranularAssetConfig;
@@ -460,6 +470,35 @@ function normalizeOscillatorDefinitions(value: unknown): SynthOscillatorDefiniti
   const unique = definitions.filter((entry, index) => definitions.findIndex((candidate) => candidate.id === entry.id) === index);
   if (!unique.some((entry) => entry.id === "a")) unique.unshift({ id: "a", name: "Oscillator A" });
   return unique;
+}
+
+function normalizeLumusOscillatorDefinitions(value: unknown): SynthOscillatorDefinition[] {
+  const supplied = normalizeOscillatorDefinitions(value);
+  const nameFor = (id: "a" | "b" | "c") =>
+    supplied.find((entry) => entry.id === id)?.name ?? `Source ${id.toUpperCase()}`;
+  return (["a", "b", "c"] as const).map((id) => ({ id, name: nameFor(id) }));
+}
+
+function normalizeLumusSourceRack(value: unknown, patchVersion: unknown): LumusSourceRackDescriptor {
+  const canonical: LumusSourceRackDescriptor = {
+    schemaVersion: 1,
+    slots: [
+      { id: "a", mode: "wavetable" },
+      { id: "b", mode: "wavetable" },
+      { id: "c", mode: "wavetable" },
+    ],
+  };
+  if (patchVersion === LEGACY_LUMUS_PATCH_SCHEMA_VERSION && value === undefined) return canonical;
+  if (!isRecord(value) || value.schemaVersion !== 1 || !Array.isArray(value.slots))
+    throw new SynthPatchIdentityError("lumus.source-rack.malformed", "Lumus v2 requires source-rack schema 1.");
+  if (value.slots.length !== canonical.slots.length)
+    throw new SynthPatchIdentityError("lumus.source-rack.capacity", "Lumus requires exactly three source slots.");
+  for (let index = 0; index < canonical.slots.length; index += 1) {
+    const slot = value.slots[index];
+    if (!isRecord(slot) || slot.id !== canonical.slots[index].id || slot.mode !== "wavetable")
+      throw new SynthPatchIdentityError("lumus.source-rack.slot-invalid", `Invalid Lumus source slot at index ${index}.`);
+  }
+  return canonical;
 }
 
 export class HybridSourceMigrationError extends Error {
@@ -1614,16 +1653,44 @@ export function createDefaultSynthDraft(): SynthDraftPatch {
  */
 export function createDefaultLumusDraft(): SynthDraftPatch {
   const draft = createDefaultSynthDraft();
+  const parameters = { ...draft.parameters };
+  for (const [suffix, value] of Object.entries(DEFAULT_ADDED_OSCILLATOR_PARAMETERS))
+    parameters[`osc.c.${suffix}`] = suffix === "enabled" ? false : value;
+  parameters["osc.c.tuning.mode"] = "semitone";
+  parameters["osc.c.tuning.harmonic"] = 1;
+  parameters["osc.c.tuning.numerator"] = 1;
+  parameters["osc.c.tuning.denominator"] = 1;
+  parameters["osc.c.tuning.step"] = 0;
+  parameters["osc.c.tuning.divisions"] = 12;
+  parameters["osc.c.phaseMode"] = "retrigger";
+  parameters["osc.c.route"] = "filter";
+  parameters["osc.c.unison.voices"] = 1;
+  parameters["osc.c.unison.detune"] = 0.12;
+  parameters["osc.c.unison.spread"] = 0.5;
   return {
     ...draft,
     schemaVersion: LUMUS_PATCH_SCHEMA_VERSION,
     instrumentType: LUMUS_INSTRUMENT_TYPE,
     namespace: LUMUS_PARAMETER_NAMESPACE,
     name: "Lumus Init",
+    parameters,
     metadata: {
       ...draft.metadata,
       icon: "ph:sparkle",
       tags: ["lumus", "hybrid"],
+      oscillators: [
+        { id: "a", name: "Source A" },
+        { id: "b", name: "Source B" },
+        { id: "c", name: "Source C" },
+      ],
+      lumusSourceRack: {
+        schemaVersion: 1,
+        slots: [
+          { id: "a", mode: "wavetable" },
+          { id: "b", mode: "wavetable" },
+          { id: "c", mode: "wavetable" },
+        ],
+      },
     },
   };
 }
@@ -1641,7 +1708,7 @@ function parameterPatch(id: SynthParameterId, value: SynthParameterValue): Recor
 export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | SynthPatchSnapshot): SynthDraftPatch {
   const isLumus = validateSynthPatchIdentity(input);
   const base = isLumus ? createDefaultLumusDraft() : createDefaultSynthDraft();
-  const parameters: SynthDraftPatch["parameters"] = { ...DEFAULT_SYNTH_PARAMETERS };
+  const parameters: SynthDraftPatch["parameters"] = { ...base.parameters };
 
   if (isRecord(input.parameters)) {
     for (const [id, value] of Object.entries(input.parameters)) {
@@ -1711,7 +1778,10 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
       macros: normalizeMacroDefinitions(inputMetadata.macros),
       wavemaps,
       customWavetables: wavemaps,
-      oscillators: normalizeOscillatorDefinitions(inputMetadata.oscillators),
+      oscillators: isLumus
+        ? normalizeLumusOscillatorDefinitions(inputMetadata.oscillators)
+        : normalizeOscillatorDefinitions(inputMetadata.oscillators),
+      ...(isLumus ? { lumusSourceRack: normalizeLumusSourceRack(inputMetadata.lumusSourceRack, input.schemaVersion) } : {}),
       sampleSlot1Zones: normalizeAetherSampleZones(inputMetadata.sampleSlot1Zones),
       managedSfz: normalizeManagedSfz(inputMetadata.managedSfz),
       managedGranular: normalizeManagedGranular(inputMetadata.managedGranular),
@@ -1744,8 +1814,9 @@ function validateSynthPatchIdentity(input: Partial<SynthDraftPatch> | SynthPatch
   if (type === LUMUS_INSTRUMENT_TYPE) {
     if (namespace !== LUMUS_PARAMETER_NAMESPACE)
       throw new SynthPatchIdentityError("lumus.identity.namespace-mismatch", "Lumus patches must use the lumus namespace.");
-    if (input.schemaVersion !== LUMUS_PATCH_SCHEMA_VERSION)
-      throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
+    if (input.schemaVersion !== LEGACY_LUMUS_PATCH_SCHEMA_VERSION
+        && input.schemaVersion !== LUMUS_PATCH_SCHEMA_VERSION)
+      throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema ${LEGACY_LUMUS_PATCH_SCHEMA_VERSION} or ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
     return true;
   }
   throw new SynthPatchIdentityError("synth.identity.type-unknown", `Unsupported synth instrument type: ${String(type)}`);
@@ -2630,6 +2701,7 @@ export const useSynthStore = create<SynthStoreState>((set) => ({
   setDraft: (draft) => set({ draft: normalizeSynthDraftPatch(draft) }),
   resetDraft: () => set({ draft: createDefaultSynthDraft(), selectedOscillator: "a" }),
   addOscillator: () => set((state) => {
+    if (state.draft.instrumentType === LUMUS_INSTRUMENT_TYPE) return state;
     const used = new Set(state.draft.metadata.oscillators.map((oscillator) => oscillator.id));
     let index = 1;
     let id = oscillatorIdForIndex(index);
@@ -2645,7 +2717,7 @@ export const useSynthStore = create<SynthStoreState>((set) => ({
     };
   }),
   removeOscillator: (id) => set((state) => {
-    if (id === "a") return state;
+    if (id === "a" || state.draft.instrumentType === LUMUS_INSTRUMENT_TYPE) return state;
     const parameters = Object.fromEntries(Object.entries(state.draft.parameters).filter(([key]) => !key.startsWith(`osc.${id}.`))) as SynthDraftPatch["parameters"];
     return {
       selectedOscillator: state.selectedOscillator === id ? "a" : state.selectedOscillator,

@@ -13,12 +13,14 @@ namespace beat::VoiceAetherCache
         std::pair<float, float> amp { 1.0f, 1.0f };
         std::pair<float, float> oscA { 1.0f, 1.0f };
         std::pair<float, float> oscB { 1.0f, 1.0f };
+        std::pair<float, float> oscC { 1.0f, 1.0f };
     };
 
     struct PitchRates
     {
         double oscA { 1.0 };
         double oscB { 1.0 };
+        double oscC { 1.0 };
         double sub { 0.5 };
     };
 
@@ -29,6 +31,7 @@ namespace beat::VoiceAetherCache
             VoiceMath::equalPowerPanGains(params.ampPan),
             VoiceMath::equalPowerPanGains(params.aetherOscA.pan),
             VoiceMath::equalPowerPanGains(params.aetherOscB.pan),
+            VoiceMath::equalPowerPanGains(params.lumusOscC.pan),
         };
     }
 
@@ -58,6 +61,7 @@ namespace beat::VoiceAetherCache
         return {
             oscillatorRate(params.aetherOscA),
             oscillatorRate(params.aetherOscB),
+            oscillatorRate(params.lumusOscC),
             std::exp2((double) params.aetherSub.octave),
         };
     }

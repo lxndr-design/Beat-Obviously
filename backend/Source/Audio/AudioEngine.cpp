@@ -2282,6 +2282,7 @@ namespace beat
             instrument.wavetableBlend,
         });
         params.hasAether = instrument.hasAether;
+        params.hasLumus = instrument.synthEngine == InstrumentDefinition::SynthEngine::Lumus;
         params.aetherOscA = {
             instrument.aether.oscA.enabled,
             instrument.aether.oscA.level,
@@ -2324,6 +2325,27 @@ namespace beat
             instrument.aether.oscB.fxSends,
             copyWavetable(instrument.aether.oscB.wavetable),
         };
+        params.lumusOscC = {
+            instrument.lumus.oscC.enabled,
+            instrument.lumus.oscC.level,
+            instrument.lumus.oscC.pan,
+            instrument.lumus.oscC.waveform,
+            instrument.lumus.oscC.octave,
+            instrument.lumus.oscC.semitone,
+            instrument.lumus.oscC.fineCents,
+            instrument.lumus.oscC.tuningMode,
+            instrument.lumus.oscC.harmonic,
+            instrument.lumus.oscC.ratioNumerator,
+            instrument.lumus.oscC.ratioDenominator,
+            instrument.lumus.oscC.tuningStep,
+            instrument.lumus.oscC.tuningDivisions,
+            instrument.lumus.oscC.phaseMode,
+            instrument.lumus.oscC.routing,
+            instrument.lumus.oscC.phase,
+            instrument.lumus.oscC.randomPhase,
+            instrument.lumus.oscC.fxSends,
+            copyWavetable(instrument.lumus.oscC.wavetable),
+        };
         params.aetherSub = {
             instrument.aether.sub.enabled,
             instrument.aether.sub.level,
@@ -2361,6 +2383,7 @@ namespace beat
                 if (instrument.aether.fxBusIds[bus].isNotEmpty()
                     && (instrument.aether.oscA.fxSends[bus] > 0.0001f
                         || instrument.aether.oscB.fxSends[bus] > 0.0001f
+                        || instrument.lumus.oscC.fxSends[bus] > 0.0001f
                         || instrument.aether.sub.fxSends[bus] > 0.0001f
                         || instrument.aether.noise.fxSends[bus] > 0.0001f
                         || (instrument.aether.sampleSlot1.enabled

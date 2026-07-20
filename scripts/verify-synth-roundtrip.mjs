@@ -169,8 +169,10 @@ try {
   const lumusDraft = synthStore.createDefaultLumusDraft();
   assert.equal(lumusDraft.instrumentType, "lumus-hybrid-synth", "Lumus must have an independent instrument identity");
   assert.equal(lumusDraft.namespace, "lumus", "Lumus must not serialize into Aether's namespace");
-  assert.equal(lumusDraft.schemaVersion, 1, "Lumus must begin with its own schema version");
+  assert.equal(lumusDraft.schemaVersion, 2, "Lumus must use the three-slot source-rack schema");
   assert.equal(lumusDraft.name, "Lumus Init");
+  assert.deepEqual(lumusDraft.metadata.oscillators.map(({ id }) => id), ["a", "b", "c"], "Lumus must expose exactly three stable source identities");
+  assert.equal(lumusDraft.parameters["osc.c.enabled"], false, "Slot C must migrate in silently disabled");
   const normalizedLumus = synthStore.normalizeSynthDraftPatch(structuredClone(lumusDraft));
   assert.equal(normalizedLumus.instrumentType, "lumus-hybrid-synth", "normalization must preserve Lumus identity");
   assert.equal(normalizedLumus.namespace, "lumus", "normalization must preserve the Lumus namespace");
@@ -198,8 +200,51 @@ try {
   const lumusInitRight = new Float32Array(2048);
   synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(aetherInit), aetherInitLeft, aetherInitRight, 48000, 261.625565, "audio");
   synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(lumusDraft), lumusInitLeft, lumusInitRight, 48000, 261.625565, "audio");
-  assert.deepEqual(lumusInitLeft, aetherInitLeft, "Lumus v1 must begin from the frozen Aether renderer without altering it");
-  assert.deepEqual(lumusInitRight, aetherInitRight, "Lumus v1 must begin from the frozen Aether stereo renderer without altering it");
+  assert.deepEqual(lumusInitLeft, aetherInitLeft, "Disabled Lumus Slot C must preserve the frozen Aether renderer");
+  assert.deepEqual(lumusInitRight, aetherInitRight, "Disabled Lumus Slot C must preserve the frozen Aether stereo renderer");
+
+  const migratedLumusV1 = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumusDraft),
+    schemaVersion: 1,
+    metadata: { ...structuredClone(lumusDraft.metadata), lumusSourceRack: undefined, oscillators: [{ id: "a", name: "A" }, { id: "b", name: "B" }] },
+    parameters: Object.fromEntries(Object.entries(lumusDraft.parameters).filter(([id]) => !id.startsWith("osc.c."))),
+  });
+  assert.equal(migratedLumusV1.schemaVersion, 2, "Lumus v1 must deterministically migrate to v2");
+  assert.deepEqual(migratedLumusV1.metadata.oscillators.map(({ id }) => id), ["a", "b", "c"]);
+  assert.equal(migratedLumusV1.parameters["osc.c.enabled"], false);
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch({
+      ...structuredClone(lumusDraft),
+      metadata: {
+        ...structuredClone(lumusDraft.metadata),
+        lumusSourceRack: { schemaVersion: 1, slots: [
+          { id: "a", mode: "wavetable" },
+          { id: "c", mode: "wavetable" },
+          { id: "b", mode: "wavetable" },
+        ] },
+      },
+    }),
+    /lumus\.source-rack\.slot-invalid/,
+    "Malformed fixed-slot identities must fail before playback preparation",
+  );
+
+  const audibleLumus = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumusDraft),
+    parameters: {
+      ...lumusDraft.parameters,
+      "osc.c.enabled": true,
+      "osc.c.wavetable": "basic.square",
+      "osc.c.level": 0.5,
+      "osc.c.pan": 0.7,
+      "osc.c.semitone": 7,
+      "osc.c.unison.voices": 3,
+    },
+  });
+  const audibleLeft = new Float32Array(2048);
+  const audibleRight = new Float32Array(2048);
+  synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(audibleLumus), audibleLeft, audibleRight, 48000, 261.625565, "audio");
+  assert.notDeepEqual(audibleLeft, lumusInitLeft, "Enabled Slot C must make an audible deterministic contribution");
+  assert.notDeepEqual(audibleRight, lumusInitRight, "Slot C pan must affect the stereo render");
 
   const independentUnisonDraft = synthStore.normalizeSynthDraftPatch({
     parameters: {

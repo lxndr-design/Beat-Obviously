@@ -8,14 +8,15 @@ Beat instrument
     wavetable-synth       -> Aether identity -> frozen Aether contract
     lumus-hybrid-synth    -> Lumus identity  -> Lumus versioned contract
 
-Lumus v1 adapter
+Lumus v2 adapter
   Lumus patch/namespace
-    -> validated shared foundational parameters
-    -> existing prepared Aether renderer
-    -> identical initial output
+    -> fixed source identities A / B / C
+    -> A/B through the frozen Aether renderer
+    -> C through Lumus-owned wavetable state
+    -> identical initial output while C is disabled
 
-Future Lumus renderer
-  three fixed source slots
+Current Lumus renderer
+  three fixed wavetable source slots
     -> source-mode interface
     -> per-source routing and sends
     -> shared modulation policy
@@ -30,8 +31,9 @@ The adapter is an intentional bootstrap boundary. It lets Lumus start audible an
 - `frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx`: explicit Create Lumus entry.
 - `frontend/src/features/EditorHost/EditorHost.solid.tsx`: Lumus editor identity and modal lifecycle.
 - `backend/Source/Audio/Parameters/ParameterIds.h`: stable native instrument type.
-- `backend/Source/Audio/Parameters/SynthPatchContract.cpp`: validated v1 adapter into the existing renderer.
-- `backend/Source/Audio/TrackModel.h`: engine identity retained independently of the shared foundational DSP state.
+- `backend/Source/Audio/Parameters/SynthPatchContract.cpp`: validated v1 migration and v2 A/B/C contract.
+- `backend/Source/Audio/TrackModel.h`: engine identity and Lumus-owned Slot C state retained independently of Aether.
+- `backend/Source/Audio/InstrumentVoice.{h,cpp}`: prepared fixed-capacity Slot C wavetable state and routing; its branch is unreachable for Aether.
 
 ## Non-negotiable compatibility rules
 

@@ -117,9 +117,11 @@ export function OscillatorPanel() {
     <section class={`${styles.panel} ${styles.majorSection}`} aria-label="Oscillator">
       <div class={styles.majorSectionTitleRow}>
         <div class={styles.majorSectionTitle}>Oscillators</div>
-        <Button size="xs" onClick={addOscillator} aria-label="Add oscillator">
-          <Icon name="ph:plus" size={18} decorative /> Add Oscillator
-        </Button>
+        <Show when={draft().instrumentType !== "lumus-hybrid-synth"}>
+          <Button size="xs" onClick={addOscillator} aria-label="Add oscillator">
+            <Icon name="ph:plus" size={18} decorative /> Add Oscillator
+          </Button>
+        </Show>
       </div>
       <div class={styles.body}>
         <For each={draft().metadata.oscillators}>
@@ -277,7 +279,7 @@ function OscillatorRow(props: {
           />
           <span>{selectedWavetableLabel(selectedWavetable())}</span>
         </div>
-        <Show when={props.oscillator !== "a"}>
+        <Show when={draft().instrumentType !== "lumus-hybrid-synth" && props.oscillator !== "a"}>
           <Button iconOnly size="xs" className={styles.removeOscillatorButton} aria-label={`Remove ${label()}`} onClick={() => removeOscillator(props.oscillator)}>
             <Icon name="ph:trash" size={18} decorative />
           </Button>

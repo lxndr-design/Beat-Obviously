@@ -100,6 +100,8 @@ namespace beat
             osc.prepare(sampleRate);
         for (auto& osc : aetherOscillatorsB)
             osc.prepare(sampleRate);
+        for (auto& osc : lumusOscillatorsC)
+            osc.prepare(sampleRate);
         aetherInteractionState.prepare(sampleRate, processingQuality);
         adsr.setSampleRate(sr);
         env2Adsr.setSampleRate(sr);
@@ -123,6 +125,7 @@ namespace beat
         for (auto& oscillator : wavetableOscillators) oscillator.setQuality(quality);
         for (auto& oscillator : aetherOscillatorsA) oscillator.setQuality(quality);
         for (auto& oscillator : aetherOscillatorsB) oscillator.setQuality(quality);
+        for (auto& oscillator : lumusOscillatorsC) oscillator.setQuality(quality);
         aetherInteractionState.prepare(sampleRate, quality);
     }
 
@@ -190,6 +193,22 @@ namespace beat
         {
             retiredAetherTableB = std::move(aetherTableB);
             WavetableOscillatorBank::clear(aetherOscillatorsB, aetherUnisonPlanB);
+        }
+        if (params.hasLumus && aetherOscillatorNeedsWavetable(params.lumusOscC))
+        {
+            auto nextTable = WavetableVoiceCache::sharedTableForConfig(params.lumusOscC.wavetable);
+            if (nextTable.get() != lumusTableC.get())
+            {
+                retiredLumusTableC = std::move(lumusTableC);
+                lumusTableC = std::move(nextTable);
+            }
+            WavetableOscillatorBank::configure(lumusOscillatorsC, lumusTableC.get(),
+                params.lumusOscC.wavetable, sampleRate, baseFrequencyHz);
+        }
+        else
+        {
+            retiredLumusTableC = std::move(lumusTableC);
+            WavetableOscillatorBank::clear(lumusOscillatorsC, lumusUnisonPlanC);
         }
         aetherInteractionState.configure(aetherTableA.get(), params.aetherOscA,
                                          aetherTableB.get(), params.aetherOscB,
@@ -450,10 +469,12 @@ namespace beat
 
         WavetableUnison::PhaseArray rememberedAetherPhasesA {};
         WavetableUnison::PhaseArray rememberedAetherPhasesB {};
+        WavetableUnison::PhaseArray rememberedLumusPhasesC {};
         for (size_t index = 0; index < rememberedAetherPhasesA.size(); ++index)
         {
             rememberedAetherPhasesA[index] = aetherOscillatorsA[index].getPhase();
             rememberedAetherPhasesB[index] = aetherOscillatorsB[index].getPhase();
+            rememberedLumusPhasesC[index] = lumusOscillatorsC[index].getPhase();
         }
         phase     = 0.0;
         noiseState = (juce::uint32) (midiNoteNumber * 747796405u + 2891336453u);
@@ -468,6 +489,12 @@ namespace beat
             aetherOscBBasePhase = 0.0;
             aetherOscBPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscB.phase)
                 + VoiceMath::deterministicPhaseJitter(noiseState ^ 0x6c8e9cf5u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscB.randomPhase);
+        }
+        if (params.hasLumus && params.lumusOscC.phaseMode == 0)
+        {
+            lumusOscCPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.lumusOscC.phase)
+                + VoiceMath::deterministicPhaseJitter(noiseState ^ 0xd4e12b87u)
+                    * juce::jlimit(0.0, 1.0, (double) params.lumusOscC.randomPhase);
         }
         if (params.lfoRetrigger)
             lfoPhase = std::fmod(juce::jlimit(0.0, 1.0, (double) params.lfoPhaseOffset)
@@ -530,6 +557,17 @@ namespace beat
         }
         else
             WavetableOscillatorBank::clear(aetherOscillatorsB, aetherUnisonPlanB);
+        if (params.hasLumus && aetherOscillatorNeedsWavetable(params.lumusOscC))
+        {
+            WavetableOscillatorBank::configure(lumusOscillatorsC, lumusTableC.get(),
+                params.lumusOscC.wavetable, sampleRate, baseFrequencyHz);
+            for (size_t index = 0; index < lumusOscillatorsC.size(); ++index)
+                lumusOscillatorsC[index].setPhase(params.lumusOscC.phaseMode == 1
+                    ? rememberedLumusPhasesC[index]
+                    : lumusOscCPhaseOffset);
+        }
+        else
+            WavetableOscillatorBank::clear(lumusOscillatorsC, lumusUnisonPlanC);
         WavetableUnison::PhaseArray interactionPhasesA {};
         WavetableUnison::PhaseArray interactionPhasesB {};
         for (size_t index = 0; index < interactionPhasesA.size(); ++index)
@@ -728,6 +766,7 @@ namespace beat
             StereoSample filter2Raw;
             AetherTableStackRenderer::StereoFrame sampleSourceFrame {};
             AetherTableStackRenderer::StereoFrame granularSourceFrame {};
+            AetherTableStackRenderer::StereoFrame lumusSourceFrameC {};
             std::array<AetherTableStackRenderer::StereoFrame, 4> sourceFrames {};
             if (params.hasAether)
             {
@@ -768,6 +807,47 @@ namespace beat
                 filter2Raw = { aetherResult.filter2Frame.left, aetherResult.filter2Frame.right };
                 sourceFrames = aetherResult.sourceFrames;
                 currentBlockWork.add(aetherResult.work);
+                if (params.hasLumus && params.lumusOscC.enabled && params.lumusOscC.level > 0.0f)
+                {
+                    const auto tableResult = WavetableOscillatorBank::renderStereo(
+                        lumusOscillatorsC,
+                        lumusUnisonPlanC,
+                        params.lumusOscC.wavetable,
+                        currentFrequency * cachedPitchRates.oscC,
+                        baseFrequencyHz,
+                        sampleRate,
+                        0.0f,
+                        0.0f,
+                        0.0f,
+                        params.lumusOscC.pan);
+                    const float sourceLevel = VoiceMath::clamp01(params.lumusOscC.level);
+                    lumusSourceFrameC = {
+                        tableResult.left * sourceLevel,
+                        tableResult.right * sourceLevel,
+                    };
+                    currentBlockWork.addWavetableRender(tableResult.voiceSamples,
+                        tableResult.frequencyUpdates, tableResult.positionUpdates);
+                    if (params.lumusOscC.routing == 1)
+                    {
+                        directRaw.left += lumusSourceFrameC.left;
+                        directRaw.right += lumusSourceFrameC.right;
+                    }
+                    else if (params.lumusOscC.routing == 2)
+                    {
+                        filter1Raw.left += lumusSourceFrameC.left;
+                        filter1Raw.right += lumusSourceFrameC.right;
+                    }
+                    else if (params.lumusOscC.routing == 3)
+                    {
+                        filter2Raw.left += lumusSourceFrameC.left;
+                        filter2Raw.right += lumusSourceFrameC.right;
+                    }
+                    else
+                    {
+                        raw.left += lumusSourceFrameC.left;
+                        raw.right += lumusSourceFrameC.right;
+                    }
+                }
                 if (params.aetherSampleSlot1.enabled
                     && (params.aetherSampleSlot1.source || params.aetherSampleSlot1.sfzSource))
                 {
@@ -1059,6 +1139,9 @@ namespace beat
                     const float granularSendGain = VoiceMath::clamp01(params.aetherGranularSlot2.fxSends[bus]);
                     send.left += granularSourceFrame.left * granularSendGain;
                     send.right += granularSourceFrame.right * granularSendGain;
+                    const float lumusSendGain = VoiceMath::clamp01(params.lumusOscC.fxSends[bus]);
+                    send.left += lumusSourceFrameC.left * lumusSendGain;
+                    send.right += lumusSourceFrameC.right * lumusSendGain;
                     send.left *= leftGain * voiceGain;
                     send.right *= rightGain * voiceGain;
                     const auto transitionedSend = sourceSendTransitions[bus].process(send);

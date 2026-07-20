@@ -16347,10 +16347,63 @@ namespace
         if (!beat::applySynthPatchContract(lumusFoundationPatch, lumusFoundation))
             return false;
         if (!lumusFoundation.hasAether
-            || lumusFoundation.synthEngine != beat::InstrumentDefinition::SynthEngine::Lumus)
+            || lumusFoundation.synthEngine != beat::InstrumentDefinition::SynthEngine::Lumus
+            || lumusFoundation.lumus.oscC.enabled)
+            return false;
+        const auto lumusThreeSlotPatch = juce::JSON::parse(R"json(
+        {
+          "schemaVersion": 2,
+          "instrumentType": "lumus-hybrid-synth",
+          "namespace": "lumus",
+          "parameters": {
+            "osc.c.enabled": true,
+            "osc.c.wavetable": "basic.square",
+            "osc.c.level": 0.47,
+            "osc.c.pan": 0.65,
+            "osc.c.semitone": 7,
+            "osc.c.unison.voices": 3
+          },
+          "metadata": {
+            "lumusSourceRack": {
+              "schemaVersion": 1,
+              "slots": [
+                { "id": "a", "mode": "wavetable" },
+                { "id": "b", "mode": "wavetable" },
+                { "id": "c", "mode": "wavetable" }
+              ]
+            }
+          },
+          "modulation": []
+        }
+        )json");
+        beat::InstrumentDefinition lumusThreeSlot;
+        if (!beat::applySynthPatchContract(lumusThreeSlotPatch, lumusThreeSlot)
+            || !lumusThreeSlot.lumus.oscC.enabled
+            || std::abs(lumusThreeSlot.lumus.oscC.level - 0.47f) > 0.0001f
+            || std::abs(lumusThreeSlot.lumus.oscC.pan - 0.65f) > 0.0001f
+            || lumusThreeSlot.lumus.oscC.semitone != 7
+            || lumusThreeSlot.lumus.oscC.wavetable.bank != 2
+            || lumusThreeSlot.lumus.oscC.wavetable.unison != 3)
+            return false;
+        const auto malformedLumusRack = juce::JSON::parse(R"json(
+        {
+          "schemaVersion": 2,
+          "instrumentType": "lumus-hybrid-synth",
+          "namespace": "lumus",
+          "parameters": {},
+          "metadata": { "lumusSourceRack": { "schemaVersion": 1, "slots": [
+            { "id": "a", "mode": "wavetable" },
+            { "id": "c", "mode": "wavetable" },
+            { "id": "b", "mode": "wavetable" }
+          ] } },
+          "modulation": []
+        }
+        )json");
+        beat::InstrumentDefinition rejectedMalformedRack;
+        if (beat::applySynthPatchContract(malformedLumusRack, rejectedMalformedRack))
             return false;
         const auto futureLumusPatch = juce::JSON::parse(R"json(
-        { "schemaVersion": 2, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
+        { "schemaVersion": 3, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
         )json");
         beat::InstrumentDefinition rejectedFutureLumus;
         if (beat::applySynthPatchContract(futureLumusPatch, rejectedFutureLumus))
@@ -17981,6 +18034,65 @@ namespace
         return silentEnergy < 0.000001;
     }
 
+    bool stressInstrumentVoiceLumusThreeSlotRack()
+    {
+        beat::InstrumentVoice::Params base;
+        base.hasAether = true;
+        base.hasLumus = true;
+        base.waveform = 5;
+        base.cutoff01 = 1.0f;
+        base.attackMs = 1.0f;
+        base.decayMs = 20.0f;
+        base.sustain = 1.0f;
+        base.releaseMs = 20.0f;
+        base.ampLevel = 0.8f;
+        base.aetherOscA.enabled = true;
+        base.aetherOscA.level = 0.65f;
+        base.aetherOscA.waveform = 5;
+        base.aetherOscA.wavetable.bank = 0;
+        base.aetherOscB.enabled = false;
+        base.lumusOscC.enabled = false;
+        base.lumusOscC.waveform = 5;
+        base.lumusOscC.level = 0.5f;
+        base.lumusOscC.pan = 0.7f;
+        base.lumusOscC.semitone = 7;
+        base.lumusOscC.wavetable.bank = 1;
+        base.lumusOscC.wavetable.unison = 3;
+        base.lumusOscC.wavetable.detuneCents = 6.0f;
+        base.lumusOscC.wavetable.blend = 0.6f;
+
+        const auto render = [](const beat::InstrumentVoice::Params& params)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 256);
+            voice.setParams(params);
+            voice.startNote(60, 0.9f, nullptr, 8192);
+            juce::AudioBuffer<float> output(2, 4096);
+            output.clear();
+            voice.renderNextBlock(output, 0, output.getNumSamples());
+            return output;
+        };
+
+        const auto withoutC = render(base);
+        auto withCParams = base;
+        withCParams.lumusOscC.enabled = true;
+        const auto withC = render(withCParams);
+        double difference = 0.0;
+        double leftEnergy = 0.0;
+        double rightEnergy = 0.0;
+        for (int sample = 0; sample < withC.getNumSamples(); ++sample)
+        {
+            const float left = withC.getSample(0, sample);
+            const float right = withC.getSample(1, sample);
+            if (!std::isfinite(left) || !std::isfinite(right)) return false;
+            difference += std::abs((double) left - withoutC.getSample(0, sample));
+            difference += std::abs((double) right - withoutC.getSample(1, sample));
+            leftEnergy += (double) left * left;
+            rightEnergy += (double) right * right;
+        }
+        return difference > 0.1 && rightEnergy > leftEnergy * 1.02;
+    }
+
     bool stressInstrumentVoiceAetherPolyphony()
     {
         beat::InstrumentVoice::Params params;
@@ -18678,6 +18790,11 @@ int main(int argc, char** argv)
     if (!stressInstrumentVoiceAetherPath())
     {
         std::cerr << "Instrument voice Aether stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceLumusThreeSlotRack())
+    {
+        std::cerr << "Instrument voice Lumus three-slot rack stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceAetherPolyphony())

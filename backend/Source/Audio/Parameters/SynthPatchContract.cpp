@@ -423,7 +423,8 @@ namespace beat
         {
             const auto schemaVersion = objectProperty(patch, "schemaVersion", {});
             if ((!schemaVersion.isInt() && !schemaVersion.isInt64())
-                || (int) schemaVersion != params::lumusPatchSchemaVersion
+                || ((int) schemaVersion != params::lumusLegacyPatchSchemaVersion
+                    && (int) schemaVersion != params::lumusPatchSchemaVersion)
                 || patchNamespace.toString() != "lumus")
                 return false;
         }
@@ -437,6 +438,24 @@ namespace beat
         if (!params.isObject()) return false;
         const auto modulation = objectProperty(patch, "modulation", {});
         const auto metadata = objectProperty(patch, "metadata", {});
+        if (isLumus && (int) objectProperty(patch, "schemaVersion", 0) >= params::lumusPatchSchemaVersion)
+        {
+            const auto rack = objectProperty(metadata, "lumusSourceRack", {});
+            const auto slots = objectProperty(rack, "slots", {});
+            const auto* slotArray = slots.getArray();
+            static constexpr std::array<const char*, 3> requiredIds {{ "a", "b", "c" }};
+            if (!rack.isObject() || (int) objectProperty(rack, "schemaVersion", 0) != 1
+                || slotArray == nullptr || slotArray->size() != (int) requiredIds.size())
+                return false;
+            for (int index = 0; index < slotArray->size(); ++index)
+            {
+                const auto& slot = slotArray->getReference(index);
+                if (!slot.isObject()
+                    || objectProperty(slot, "id", {}).toString() != requiredIds[(size_t) index]
+                    || objectProperty(slot, "mode", {}).toString() != "wavetable")
+                    return false;
+            }
+        }
         const auto customWavetables = mergedWavemapMetadata(metadata);
 
         instrument.kind = "wavetable";
@@ -497,6 +516,24 @@ namespace beat
         instrument.hasAether = true;
         instrument.aether.oscA = synthOscillatorConfig(params, modulation, metadata, customWavetables, "a", oscA);
         instrument.aether.oscB = synthOscillatorConfig(params, modulation, metadata, customWavetables, "b", oscB);
+        if (isLumus && (int) objectProperty(patch, "schemaVersion", 0) >= params::lumusPatchSchemaVersion)
+        {
+            InstrumentDefinition::AetherOscillator oscC;
+            oscC.enabled = false;
+            oscC.level = 0.6f;
+            oscC.wavetable = baseWavetable;
+            applyCustomWavetableFrames(oscC.wavetable, customWavetables,
+                synthStringParam(params, "osc.c.wavetable", "basic.saw"));
+            if (!oscC.wavetable.custom)
+                oscC.wavetable.bank = synthWavetableBankForId(synthStringParam(params, "osc.c.wavetable", "basic.saw"));
+            instrument.lumus.oscC = synthOscillatorConfig(params, modulation, metadata,
+                customWavetables, "c", oscC);
+        }
+        else
+        {
+            // Deterministic v1 migration: the new third slot exists but remains silent.
+            instrument.lumus.oscC = {};
+        }
         const auto sourceRoute = [](const juce::String& route) { return route == "direct" ? 1 : route == "filter1" ? 2 : route == "filter2" ? 3 : 0; };
         instrument.aether.sub.routing = sourceRoute(synthStringParam(params, "aether.sub.route", "filter"));
         instrument.aether.noise.routing = sourceRoute(synthStringParam(params, "aether.noise.route", "filter"));

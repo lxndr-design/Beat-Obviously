@@ -317,6 +317,14 @@ namespace beat
             MemberExpressionZone memberExpressionZone;
         };
 
+        // Lumus-owned source rack extension. Aether remains a fixed A/B engine;
+        // Lumus v2 adds an independently configured wavetable-only Slot C.
+        struct LumusConfig
+        {
+            int sourceRackSchemaVersion { 1 };
+            AetherOscillator oscC;
+        };
+
         struct DynamicModTarget
         {
             float lfo { 0.0f };
@@ -506,6 +514,7 @@ namespace beat
         bool hasAether { false };
         SynthEngine synthEngine { SynthEngine::None };
         AetherConfig aether;
+        LumusConfig lumus;
         std::optional<Nodemap::Graph> nodeGraph;
         juce::var taxonomy;
         std::vector<TrackEffect> effects;
