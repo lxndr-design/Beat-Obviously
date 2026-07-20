@@ -18,6 +18,7 @@ import { SegmentEditorModal } from "../SegmentEditor/SegmentEditorModal.solid";
 import { SynthEditor } from "../Synth/SynthEditor/SynthEditor.solid";
 import { TrackDetailsModal } from "../TrackDetails/TrackDetailsModal.solid";
 import { TrackEffectsPanel } from "../TrackEffects/TrackEffectsPanel.solid";
+import { AurumEditor } from "../Aurum/AurumEditor.solid";
 
 export function EditorHost() {
   const openEditors = createStoreSelector(useUiStore, (state) => state.openEditors);
@@ -47,7 +48,7 @@ export function EditorHost() {
               return (
                 <Modal
                   open
-                  title={instrument()?.nodeGraph ? instrument()?.name ?? "Nodemap" : "Instrument - Aether Engine"}
+                  title={instrument()?.nodeGraph ? instrument()?.name ?? "Nodemap" : instrument()?.aurum ? "Instrument - Aurum Engine" : "Instrument - Aether Engine"}
                   width="editor"
                   scopeId={scopeId}
                   flushBody
@@ -61,6 +62,16 @@ export function EditorHost() {
                         else addInstrument(saved);
                         closeEditor({ kind: "synthInstrument", instrumentId: editor.instrumentId });
                       }}
+                    />
+                  ) : instrument()?.aurum ? (
+                    <AurumEditor
+                      instrument={instrument()!}
+                      onCommit={(saved) => {
+                        if (instruments().some((candidate) => candidate.id === saved.id)) updateInstrument(saved.id, saved);
+                        else addInstrument(saved);
+                        closeEditor({ kind: "synthInstrument", instrumentId: editor.instrumentId });
+                      }}
+                      onClose={() => closeEditor({ kind: "synthInstrument", instrumentId: editor.instrumentId })}
                     />
                   ) : (
                     <SynthEditor instrumentId={editor.instrumentId} hotkeyScopeId={scopeId} />

@@ -2182,6 +2182,7 @@ export function snapshotInstrument(instrument: Instrument): InstrumentSnapshot {
     ampPan: instrument.ampPan,
     wavetable: instrument.wavetable ? structuredClone(instrument.wavetable) : undefined,
     aether: instrument.aether ? structuredClone(instrument.aether) : undefined,
+    aurum: instrument.aurum ? structuredClone(instrument.aurum) : undefined,
     synthPatch: instrument.synthPatch ? structuredClone(instrument.synthPatch) : undefined,
     nodeGraph: instrument.nodeGraph ? structuredClone(instrument.nodeGraph) : undefined,
     lfoWaveform: instrument.lfoWaveform,
@@ -2275,6 +2276,9 @@ function defaultInstrumentForPatch(patch?: Partial<Instrument>): Instrument {
 }
 
 function aetherizeCreatedInstrumentPatch(patch: Partial<Instrument> = {}): Partial<Instrument> {
+  if (patch.aurum) {
+    return { ...patch, kind: "synth", waveform: "sine", wavetable: undefined, aether: undefined };
+  }
   if (!shouldUseAetherForCreatedInstrument(patch)) return patch;
   return {
     ...patch,

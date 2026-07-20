@@ -336,6 +336,8 @@ export interface Instrument {
   wavetable?: WavetableConfig;
   /** Serum-style multi-oscillator stack for Aether WT instruments. */
   aether?: AetherSynthConfig;
+  /** Six-operator FM/additive engine used by Aurum instruments. */
+  aurum?: AurumSynthConfig;
   /** Exact synth-editor patch contract. Preserves modulation/macro state. */
   synthPatch?: SynthPatchSnapshot;
   /** Visual node-editor graph for synth-style instruments. */
@@ -481,6 +483,33 @@ export interface AetherSynthConfig {
   runtimeWarp?: number;
   /** Runtime warp curve. Reuses table-generation warp labels for UI continuity. */
   runtimeWarpMode?: WavetableWarpMode;
+}
+
+export type AurumOperatorWaveform = "sine" | "triangle" | "saw" | "square";
+
+export interface AurumOperatorConfig {
+  id: string;
+  name: string;
+  enabled: boolean;
+  waveform: AurumOperatorWaveform;
+  ratio: number;
+  coarse: number;
+  fineCents: number;
+  level: number;
+  phase: number;
+  envelope: AdsrEnvelope;
+}
+
+/** Six-operator FM/additive instrument. Matrix rows are sources; columns 0..5
+ * are FM destinations and column 6 is direct output. Diagonal values are
+ * operator feedback. */
+export interface AurumSynthConfig {
+  version: 1;
+  operators: AurumOperatorConfig[];
+  matrix: number[][];
+  unison: number;
+  detuneCents: number;
+  stereoSpread: number;
 }
 
 export type SynthPatchParameterValue = boolean | number | string;
@@ -772,6 +801,7 @@ export interface InstrumentSnapshot {
   ampPan?: number;
   wavetable?: WavetableConfig;
   aether?: AetherSynthConfig;
+  aurum?: AurumSynthConfig;
   synthPatch?: SynthPatchSnapshot;
   nodeGraph?: InstrumentNodeGraph;
   lfoWaveform?: Instrument["lfoWaveform"];

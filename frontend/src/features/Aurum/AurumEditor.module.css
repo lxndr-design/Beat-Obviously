@@ -1,0 +1,140 @@
+.editor {
+  min-height: min(780px, calc(100vh - 54px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.header {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px;
+  border-bottom: var(--border-fg);
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.identity h2,
+.identity p,
+.operatorHeading h3,
+.sectionTitle h3,
+.sectionTitle p,
+.globalSection h3 {
+  margin: 0;
+}
+
+.identity h2 { font-size: var(--font-size-title); }
+.identity p,
+.sectionTitle p { font-size: var(--font-size-ui); opacity: var(--structural-muted-opacity); }
+
+.mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: var(--border-fg);
+  background: color-mix(in srgb, var(--aurum-accent) 22%, var(--color-bg));
+  font-weight: 800;
+}
+
+.nameInput { width: min(390px, 42vw); }
+
+.body {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(330px, 0.78fr) minmax(540px, 1.22fr);
+  align-content: start;
+}
+
+.operatorSection,
+.matrixSection,
+.globalSection { min-width: 0; }
+
+.operatorSection { border-right: var(--border-soft); }
+.operatorTabs { display: grid; grid-template-columns: repeat(6, 1fr); border-bottom: var(--border-soft); }
+.operatorTabs > button { border-top: 0; border-bottom: 0; border-left: 0; }
+.operatorTabs > button:last-child { border-right: 0; }
+.operatorActive { box-shadow: inset 0 -3px 0 var(--aurum-accent); }
+.operatorMuted { opacity: 0.48; }
+
+.operatorPanel,
+.matrixSection,
+.globalSection { padding: 6px; }
+.operatorHeading,
+.sectionTitle { min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.operatorHeading h3,
+.sectionTitle h3,
+.globalSection h3 { font-size: var(--font-size-field-label); }
+
+.controlGrid,
+.envelopeGrid,
+.globalGrid { display: grid; gap: 6px; }
+.controlGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.envelopeGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 6px; padding-top: 6px; border-top: var(--border-soft); }
+
+.matrixSection { overflow: auto; }
+.matrix {
+  display: grid;
+  grid-template-columns: 48px repeat(7, minmax(57px, 1fr));
+  border-top: var(--border-soft);
+  border-left: var(--border-soft);
+}
+
+.matrixHeader,
+.matrixRowLabel,
+.matrixCell {
+  min-width: 0;
+  min-height: 51px;
+  border: 0;
+  border-right: var(--border-soft);
+  border-bottom: var(--border-soft);
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.matrixHeader { display: grid; place-items: center; font-size: var(--font-size-ui); font-weight: 700; }
+.matrixRowLabel { font: inherit; font-size: var(--font-size-ui); cursor: pointer; }
+.outputHeader,
+.outputCell { background: color-mix(in srgb, var(--aurum-accent) 10%, var(--color-bg)); }
+.feedbackCell { background: var(--surface-subtle); }
+
+.matrixCell {
+  position: relative;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 3px;
+}
+
+.matrixCell[data-active="true"] { box-shadow: inset 0 0 0 1px var(--aurum-accent); }
+.matrixCell > span { text-align: center; font-family: var(--font-family-mono); font-size: var(--font-size-hint); opacity: 0.72; }
+
+.globalSection { grid-column: 1 / -1; border-top: var(--border-soft); }
+.globalSection h3 { min-height: 30px; display: flex; align-items: center; }
+.globalGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.footer {
+  min-height: 42px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  border-top: var(--border-fg);
+}
+.footer > button { border-top: 0; border-bottom: 0; border-left: 0; }
+.footerActions { display: flex; }
+.footerActions > button { border-top: 0; border-bottom: 0; border-right: 0; }
+
+@media (max-width: 960px) {
+  .body { grid-template-columns: 1fr; }
+  .operatorSection { border-right: 0; border-bottom: var(--border-soft); }
+  .globalGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

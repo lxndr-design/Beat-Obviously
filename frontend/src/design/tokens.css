@@ -68,6 +68,7 @@
   --aether-bridge-tone-mid: color-mix(in srgb, var(--color-fg) 48%, transparent);
   --aether-bridge-tone-soft: color-mix(in srgb, var(--color-fg) 34%, transparent);
   --aether-bridge-tone-warm: color-mix(in srgb, var(--color-fg) 56%, transparent);
+  --aurum-accent: color-mix(in srgb, var(--color-fg) 72%, var(--color-bg));
   --aether-bridge-depth-low: color-mix(in srgb, var(--color-fg) 9%, var(--color-bg));
   --aether-bridge-depth-mid: color-mix(in srgb, var(--color-fg) 14%, var(--color-bg));
   --aether-bridge-depth-high: color-mix(in srgb, var(--color-fg) 20%, var(--color-bg));

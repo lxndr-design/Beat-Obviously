@@ -13,6 +13,8 @@ export interface SynthRenderState {
   filterResonance: number;
   filterF: number;
   filterDamping: number;
+  aurumPhases: number[];
+  aurumOutputs: number[];
 }
 
 interface RenderModulation {
@@ -167,7 +169,18 @@ interface UnisonVoicePlan {
 }
 
 export function createSynthRenderState(): SynthRenderState {
-  return { phase: 0, index: 0, low: 0, band: 0, filterCutoff: -1, filterResonance: -1, filterF: 0, filterDamping: 1 };
+  return {
+    phase: 0,
+    index: 0,
+    low: 0,
+    band: 0,
+    filterCutoff: -1,
+    filterResonance: -1,
+    filterF: 0,
+    filterDamping: 1,
+    aurumPhases: Array(48).fill(0),
+    aurumOutputs: Array(48).fill(0),
+  };
 }
 
 export function noteFrequency(midiPitch: number, instrument?: Instrument): number {
@@ -795,6 +808,7 @@ function renderRelevantInstrumentState(instrument: Instrument) {
     ampPan: instrument.ampPan,
     wavetable: instrument.wavetable,
     aether: instrument.aether,
+    aurum: instrument.aurum,
     lfoWaveform: instrument.lfoWaveform,
     lfoRateHz: instrument.lfoRateHz,
     lfoSyncedRate: instrument.lfoSyncedRate,
@@ -888,9 +902,11 @@ export function renderInstrumentSample(
   const resonance = clamp01(instrument.knobs.resonance + modulationTargetOffset(modulation, "filter.resonance"));
   const drive = clamp01(instrument.knobs.drive + modulationTargetOffset(modulation, "filter.drive"));
   const color = clamp01(instrument.knobs.color);
-  const sub = instrument.aether ? 0 : clamp01(instrument.subOscLevel ?? 0);
+  const sub = instrument.aether || instrument.aurum ? 0 : clamp01(instrument.subOscLevel ?? 0);
 
-  let v = instrument.kind === "wavetable" && instrument.aether
+  let v = instrument.aurum
+    ? aurumMatrixSample(instrument, state, sampleRate, frequency)
+    : instrument.kind === "wavetable" && instrument.aether
     ? aetherStackSample(instrument, state, sampleRate, frequency, mode, modulation)
     : instrument.kind === "wavetable" || instrument.waveform === "wavetable"
     ? wavetableOscillatorSample(
@@ -921,6 +937,59 @@ export function renderInstrumentSample(
   state.phase += frequency / sampleRate;
   state.index += 1;
   return clamp(filtered * level * clamp01(modulation.ampEnvelope ?? 1), -1, 1);
+}
+
+function aurumMatrixSample(instrument: Instrument, state: SynthRenderState, sampleRate: number, frequency: number): number {
+  const config = instrument.aurum;
+  if (!config) return 0;
+  const operatorCount = Math.min(6, config.operators.length);
+  const voiceCount = Math.max(1, Math.min(8, Math.round(config.unison)));
+  const detune = clamp(config.detuneCents, 0, 100);
+  const nextOutputs = Array(48).fill(0);
+  const timeMs = (state.index / sampleRate) * 1000;
+  let mixedOutput = 0;
+
+  for (let voice = 0; voice < voiceCount; voice += 1) {
+    const voiceOffset = voice * 6;
+    const centered = voiceCount === 1 ? 0 : (voice / (voiceCount - 1)) * 2 - 1;
+    const voiceRate = Math.pow(2, (centered * detune) / 1200);
+    for (let target = 0; target < operatorCount; target += 1) {
+      const operator = config.operators[target];
+      if (!operator.enabled) continue;
+      let modulation = 0;
+      for (let source = 0; source < operatorCount; source += 1) {
+        modulation += (state.aurumOutputs[voiceOffset + source] ?? 0) * clamp01(config.matrix[source]?.[target] ?? 0);
+      }
+      const stateIndex = voiceOffset + target;
+      if (state.index === 0) state.aurumPhases[stateIndex] = (clamp01(operator.phase) + voice * 0.071) % 1;
+      const ratio = Math.max(0.125, Math.min(32, operator.ratio));
+      const tuning = Math.pow(2, operator.coarse / 12 + operator.fineCents / 1200);
+      const phase = state.aurumPhases[stateIndex] + modulation * 1.9;
+      const envelope = aurumOperatorEnvelope(operator.envelope, timeMs);
+      nextOutputs[stateIndex] = oscillatorSample(operator.waveform, phase, 0.5) * clamp01(operator.level) * envelope;
+      state.aurumPhases[stateIndex] = (state.aurumPhases[stateIndex] + (frequency * voiceRate * ratio * tuning) / sampleRate) % 1;
+    }
+
+    let voiceOutput = 0;
+    let outputWeight = 0;
+    for (let source = 0; source < operatorCount; source += 1) {
+      const amount = clamp01(config.matrix[source]?.[6] ?? 0);
+      voiceOutput += nextOutputs[voiceOffset + source] * amount;
+      outputWeight += amount;
+    }
+    if (outputWeight > 0) mixedOutput += voiceOutput / Math.max(1, Math.sqrt(outputWeight));
+  }
+  state.aurumOutputs = nextOutputs;
+  return mixedOutput / Math.sqrt(voiceCount);
+}
+
+function aurumOperatorEnvelope(envelope: Instrument["envelope"], timeMs: number): number {
+  const attack = Math.max(0, envelope.attackMs);
+  if (attack > 0 && timeMs < attack) return timeMs / attack;
+  const decayTime = timeMs - attack;
+  const decay = Math.max(0, envelope.decayMs);
+  if (decay > 0 && decayTime < decay) return 1 + (clamp01(envelope.sustain) - 1) * (decayTime / decay);
+  return clamp01(envelope.sustain);
 }
 
 function renderInstrumentStereoSample(
