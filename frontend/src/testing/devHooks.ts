@@ -1,6 +1,7 @@
 import type { DecentSamplerUiControl } from "../ipc/schema";
 import { db } from "../persistence/dexie";
 import type { AetherEffectPresetRecord } from "../state/effectPresets";
+import { createAurumInstrument } from "../state/aurum";
 import {
   createDefaultCustomWavetable,
   createDefaultSynthDraft,
@@ -58,6 +59,8 @@ const DEV_AETHER_LFO_INSTRUMENT_ID_MARKER = "Aether LFO editor dev fixture";
 const DEV_AETHER_PERFORMANCE_INSTRUMENT_ID = "dev-aether-performance-host";
 const DEV_AETHER_PERFORMANCE_INSTRUMENT_ID_MARKER = "Aether performance editor dev fixture";
 const DEV_AETHER_AUTOMATION_INSTRUMENT_ID_MARKER = "Aether automation dev fixture";
+const DEV_AURUM_EDITOR_INSTRUMENT_ID = "dev-aurum-editor-host";
+const DEV_AURUM_EDITOR_INSTRUMENT_ID_MARKER = "Aurum editor dev fixture";
 const DEV_AETHER_AUTOMATION_TRACK_ID = "dev-aether-automation-track";
 const DEV_AETHER_AUTOMATION_SEGMENT_ID = "dev-aether-automation-segment";
 const DEV_DRUMPAD_LINKS_TRACK_ID = "dev-drumpad-links-track";
@@ -1107,6 +1110,43 @@ export function installBeatDevHooks() {
     useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: nextInstrumentId });
     await waitForEditorPanel("Oscillator");
     return { instrumentId: nextInstrumentId };
+  };
+
+  const installAurumEditorFixture = () => {
+    const instrumentStore = useInstrumentStore.getState();
+    for (const instrument of instrumentStore.instruments) {
+      if ((instrument.id === DEV_AURUM_EDITOR_INSTRUMENT_ID || instrument.source?.label === DEV_AURUM_EDITOR_INSTRUMENT_ID_MARKER) && instrument.userCreated) {
+        instrumentStore.removeInstrument(instrument.id);
+      }
+    }
+
+    const fixture = createAurumInstrument(DEV_AURUM_EDITOR_INSTRUMENT_ID, "Aurum Matrix Study");
+    if (fixture.aurum) {
+      fixture.aurum.operators[1] = {
+        ...fixture.aurum.operators[1],
+        enabled: true,
+        waveform: "triangle",
+        ratio: 2,
+        level: 0.72,
+      };
+      fixture.aurum.operators[2] = {
+        ...fixture.aurum.operators[2],
+        enabled: true,
+        waveform: "saw",
+        ratio: 3,
+        level: 0.38,
+      };
+      fixture.aurum.matrix[1][0] = 0.48;
+      fixture.aurum.matrix[2][1] = 0.26;
+      fixture.aurum.unison = 3;
+      fixture.aurum.detuneCents = 11;
+      fixture.aurum.stereoSpread = 0.55;
+    }
+    fixture.source = { kind: "created", label: DEV_AURUM_EDITOR_INSTRUMENT_ID_MARKER };
+
+    const instrumentId = instrumentStore.addInstrument(fixture);
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId });
+    return { instrumentId };
   };
 
   const exerciseAetherOscillatorEditorFlow = async (): Promise<DevAetherOscillatorExerciseState> => {
@@ -2322,6 +2362,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "aether-oscillator") {
     window.setTimeout(() => {
       void exerciseAetherOscillatorEditorFlow();
+    }, 0);
+  } else if (fixture === "aurum-editor") {
+    window.setTimeout(() => {
+      installAurumEditorFixture();
     }, 0);
   } else if (fixture === "aether-fx-rack") {
     window.setTimeout(() => {

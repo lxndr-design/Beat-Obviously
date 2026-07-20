@@ -27,6 +27,8 @@ The editor keeps the routing matrix visible while the left workspace switches be
 
 Existing Beat controls are used for commands, selection, numeric entry, sliders, toggles, and matrix knobs. The waveform scope and routing-cell composition are Aurum-specific because the shared UI kit has no equivalent synthesis visual.
 
+For a deterministic browser review, open `?beatDevFixture=aurum-editor`. The fixture loads a three-operator routing example and opens the Aurum editor directly.
+
 ## Current boundary
 
 Aurum version 1 is an instrument foundation, not a clone of another synthesizer. It does not yet include per-operator filters, waveshaping editors, keyboard-mapped modulation curves, or a preset browser. Operator release values persist with the patch; note-off is currently governed by Beat's shared amplitude release path.
