@@ -26,8 +26,7 @@
 .identity p,
 .operatorHeading h3,
 .sectionTitle h3,
-.sectionTitle p,
-.globalSection h3 {
+.sectionTitle p {
   margin: 0;
 }
 
@@ -56,30 +55,69 @@
 }
 
 .operatorSection,
-.matrixSection,
-.globalSection { min-width: 0; }
+.matrixSection { min-width: 0; }
 
 .operatorSection { border-right: var(--border-soft); }
-.operatorTabs { display: grid; grid-template-columns: repeat(6, 1fr); border-bottom: var(--border-soft); }
+.operatorTabs { display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: var(--border-soft); }
 .operatorTabs > button { border-top: 0; border-bottom: 0; border-left: 0; }
 .operatorTabs > button:last-child { border-right: 0; }
 .operatorActive { box-shadow: inset 0 -3px 0 var(--aurum-accent); }
 .operatorMuted { opacity: 0.48; }
 
-.operatorPanel,
-.matrixSection,
-.globalSection { padding: 6px; }
+.matrixSection { padding: 6px; }
 .operatorHeading,
 .sectionTitle { min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .operatorHeading h3,
 .sectionTitle h3,
-.globalSection h3 { font-size: var(--font-size-field-label); }
+.panelTitle h3 { font-size: var(--font-size-field-label); }
 
 .controlGrid,
-.envelopeGrid,
-.globalGrid { display: grid; gap: 6px; }
+.envelopeGrid { display: grid; gap: 6px; }
 .controlGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.envelopeGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 6px; padding-top: 6px; border-top: var(--border-soft); }
+.envelopeGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.mainPanel,
+.operatorPanel { padding: 6px; }
+
+.panelTitle,
+.operatorHeading {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.panelTitle h3,
+.panelTitle p,
+.operatorHeading h3,
+.operatorHeading p,
+.controlBlock h4 { margin: 0; }
+
+.panelTitle p,
+.operatorHeading p { font-size: var(--font-size-ui); opacity: var(--structural-muted-opacity); }
+
+.controlBlock { padding-top: 6px; margin-top: 6px; border-top: var(--border-soft); }
+.controlBlock h4 { min-height: 24px; font-size: var(--font-size-ui); }
+
+.waveRow {
+  display: grid;
+  grid-template-columns: minmax(144px, 0.85fr) minmax(180px, 1.15fr);
+  gap: 6px;
+}
+
+.waveControls { display: grid; align-content: start; gap: 6px; }
+
+.waveformScope {
+  min-height: 126px;
+  padding: 6px;
+  border: var(--border-soft);
+  background: var(--surface-subtle);
+}
+
+.waveformScope svg { width: 100%; height: 100%; display: block; }
+.waveformScope line { stroke: color-mix(in srgb, var(--color-fg) 24%, transparent); stroke-width: 1; }
+.waveformScope polyline { fill: none; stroke: var(--color-fg); stroke-width: 2; vector-effect: non-scaling-stroke; }
 
 .matrixSection { overflow: auto; }
 .matrix {
@@ -111,16 +149,11 @@
   position: relative;
   display: grid;
   align-content: center;
-  gap: 3px;
   padding: 3px;
 }
 
 .matrixCell[data-active="true"] { box-shadow: inset 0 0 0 1px var(--aurum-accent); }
-.matrixCell > span { text-align: center; font-family: var(--font-family-mono); font-size: var(--font-size-hint); opacity: 0.72; }
-
-.globalSection { grid-column: 1 / -1; border-top: var(--border-soft); }
-.globalSection h3 { min-height: 30px; display: flex; align-items: center; }
-.globalGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.matrixKnob :global([data-knob-label]) { display: none; }
 
 .footer {
   min-height: 42px;
@@ -136,5 +169,4 @@
 @media (max-width: 960px) {
   .body { grid-template-columns: 1fr; }
   .operatorSection { border-right: 0; border-bottom: var(--border-soft); }
-  .globalGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

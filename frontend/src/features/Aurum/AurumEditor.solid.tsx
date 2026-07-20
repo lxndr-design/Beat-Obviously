@@ -1,5 +1,5 @@
-import { createMemo, createSignal, For, onCleanup } from "solid-js";
-import { Button, FloatingSelect, Icon, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
+import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { Button, FloatingSelect, Icon, Knob, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
 import { startInstrumentPreviewAudition, type InstrumentPreviewAuditionHandle } from "../../audio/synthPreview";
 import { AURUM_OPERATOR_COUNT, AURUM_OUTPUT_COLUMN, normalizedAurumConfig } from "../../state/aurum";
 import type { AurumOperatorConfig, AurumOperatorWaveform, Instrument } from "../../state/types";
@@ -19,6 +19,7 @@ export interface AurumEditorProps {
 export function AurumEditor(props: AurumEditorProps) {
   const [draft, setDraft] = createSignal(cloneInstrument(props.instrument), { equals: false });
   const [selectedOperator, setSelectedOperator] = createSignal(0);
+  const [selectedPage, setSelectedPage] = createSignal<"main" | "operator">("operator");
   const [waveformOpen, setWaveformOpen] = createSignal(false);
   const [auditioning, setAuditioning] = createSignal(false);
   let audition: InstrumentPreviewAuditionHandle | null = null;
@@ -98,46 +99,97 @@ export function AurumEditor(props: AurumEditorProps) {
       <main class={styles.body}>
         <section class={styles.operatorSection}>
           <div class={styles.operatorTabs} role="tablist" aria-label="Aurum operators">
+            <Button
+              size="sm"
+              selected={selectedPage() === "main"}
+              onClick={() => setSelectedPage("main")}
+            >
+              Main
+            </Button>
             <For each={aurum().operators}>{(candidate, index) => (
               <Button
                 size="sm"
-                selected={selectedOperator() === index()}
+                selected={selectedPage() === "operator" && selectedOperator() === index()}
                 className={candidate.enabled ? styles.operatorActive : styles.operatorMuted}
-                onClick={() => setSelectedOperator(index())}
+                onClick={() => {
+                  setSelectedOperator(index());
+                  setSelectedPage("operator");
+                }}
               >
                 {candidate.name}
               </Button>
             )}</For>
           </div>
 
-          <div class={styles.operatorPanel}>
-            <div class={styles.operatorHeading}>
-              <h3>{operator().name}</h3>
-              <Toggle label="Enabled" checked={operator().enabled} onChange={(enabled) => updateOperator({ enabled })} />
+          <Show when={selectedPage() === "operator"} fallback={
+            <div class={styles.mainPanel}>
+              <div class={styles.panelTitle}>
+                <div>
+                  <h3>Main</h3>
+                  <p>Voice, output, and filter controls</p>
+                </div>
+              </div>
+              <div class={styles.controlBlock}>
+                <h4>Unison</h4>
+                <div class={styles.controlGrid}>
+                  <NumberInput label="Voices" layout="inline" min={1} max={8} step={1} value={aurum().unison} onChange={(unison) => updateAurum((config) => ({ ...config, unison: Math.round(unison) }))} />
+                  <NumberInput label="Detune" layout="inline" min={0} max={100} step={1} unit="ct" value={aurum().detuneCents} onChange={(detuneCents) => updateAurum((config) => ({ ...config, detuneCents }))} />
+                  <Slider label="Spread" layout="inline" min={0} max={1} step={0.01} value={aurum().stereoSpread} readout={<span>{Math.round(aurum().stereoSpread * 100)}%</span>} onChange={(stereoSpread) => updateAurum((config) => ({ ...config, stereoSpread }))} />
+                </div>
+              </div>
+              <div class={styles.controlBlock}>
+                <h4>Output filter</h4>
+                <div class={styles.controlGrid}>
+                  <Slider label="Cutoff" layout="inline" min={0} max={1} step={0.01} value={draft().knobs.cutoff} readout={<span>{Math.round(draft().knobs.cutoff * 100)}%</span>} onChange={(cutoff) => setDraft((current) => ({ ...current, knobs: { ...current.knobs, cutoff } }))} />
+                  <Slider label="Resonance" layout="inline" min={0} max={1} step={0.01} value={draft().knobs.resonance} readout={<span>{Math.round(draft().knobs.resonance * 100)}%</span>} onChange={(resonance) => setDraft((current) => ({ ...current, knobs: { ...current.knobs, resonance } }))} />
+                  <Slider label="Drive" layout="inline" min={0} max={1} step={0.01} value={draft().knobs.drive} readout={<span>{Math.round(draft().knobs.drive * 100)}%</span>} onChange={(drive) => setDraft((current) => ({ ...current, knobs: { ...current.knobs, drive } }))} />
+                </div>
+              </div>
             </div>
-            <div class={styles.controlGrid}>
-              <FloatingSelect
-                label="Wave"
-                layout="inline"
-                value={operator().waveform}
-                options={WAVEFORM_OPTIONS}
-                open={waveformOpen()}
-                onOpenChange={setWaveformOpen}
-                onChange={(waveform) => updateOperator({ waveform: waveform as AurumOperatorWaveform })}
-              />
-              <NumberInput label="Ratio" layout="inline" min={0.125} max={32} step={0.125} value={operator().ratio} onChange={(ratio) => updateOperator({ ratio })} />
-              <NumberInput label="Coarse" layout="inline" min={-48} max={48} step={1} unit="st" value={operator().coarse} onChange={(coarse) => updateOperator({ coarse })} />
-              <NumberInput label="Fine" layout="inline" min={-100} max={100} step={1} unit="ct" value={operator().fineCents} onChange={(fineCents) => updateOperator({ fineCents })} />
-              <Slider label="Level" layout="inline" min={0} max={1} step={0.01} value={operator().level} readout={<span>{Math.round(operator().level * 100)}%</span>} onChange={(level) => updateOperator({ level })} />
-              <Slider label="Phase" layout="inline" min={0} max={1} step={0.01} value={operator().phase} readout={<span>{Math.round(operator().phase * 360)}°</span>} onChange={(phase) => updateOperator({ phase })} />
+          }>
+            <div class={styles.operatorPanel}>
+              <div class={styles.operatorHeading}>
+                <div>
+                  <h3>{operator().name}</h3>
+                  <p>Oscillator and amplitude articulation</p>
+                </div>
+                <Toggle label="Enabled" checked={operator().enabled} onChange={(enabled) => updateOperator({ enabled })} />
+              </div>
+              <div class={styles.waveRow}>
+                <WaveformScope waveform={operator().waveform} phase={operator().phase} />
+                <div class={styles.waveControls}>
+                  <FloatingSelect
+                    label="Wave"
+                    layout="inline"
+                    value={operator().waveform}
+                    options={WAVEFORM_OPTIONS}
+                    open={waveformOpen()}
+                    onOpenChange={setWaveformOpen}
+                    onChange={(waveform) => updateOperator({ waveform: waveform as AurumOperatorWaveform })}
+                  />
+                  <Slider label="Phase" layout="inline" min={0} max={1} step={0.01} value={operator().phase} readout={<span>{Math.round(operator().phase * 360)}°</span>} onChange={(phase) => updateOperator({ phase })} />
+                </div>
+              </div>
+              <div class={styles.controlBlock}>
+                <h4>Tuning and level</h4>
+                <div class={styles.controlGrid}>
+                  <NumberInput label="Ratio" layout="inline" min={0.125} max={32} step={0.125} value={operator().ratio} onChange={(ratio) => updateOperator({ ratio })} />
+                  <NumberInput label="Coarse" layout="inline" min={-48} max={48} step={1} unit="st" value={operator().coarse} onChange={(coarse) => updateOperator({ coarse })} />
+                  <NumberInput label="Fine" layout="inline" min={-100} max={100} step={1} unit="ct" value={operator().fineCents} onChange={(fineCents) => updateOperator({ fineCents })} />
+                  <Slider label="Level" layout="inline" min={0} max={1} step={0.01} value={operator().level} readout={<span>{Math.round(operator().level * 100)}%</span>} onChange={(level) => updateOperator({ level })} />
+                </div>
+              </div>
+              <div class={styles.controlBlock}>
+                <h4>Amplitude envelope</h4>
+                <div class={styles.envelopeGrid}>
+                  <NumberInput label="Attack" layout="inline" min={0} max={10000} step={1} unit="ms" value={operator().envelope.attackMs} onChange={(attackMs) => updateEnvelope({ attackMs })} />
+                  <NumberInput label="Decay" layout="inline" min={0} max={10000} step={1} unit="ms" value={operator().envelope.decayMs} onChange={(decayMs) => updateEnvelope({ decayMs })} />
+                  <Slider label="Sustain" layout="inline" min={0} max={1} step={0.01} value={operator().envelope.sustain} readout={<span>{Math.round(operator().envelope.sustain * 100)}%</span>} onChange={(sustain) => updateEnvelope({ sustain })} />
+                  <NumberInput label="Release" layout="inline" min={0} max={10000} step={1} unit="ms" value={operator().envelope.releaseMs} onChange={(releaseMs) => updateEnvelope({ releaseMs })} />
+                </div>
+              </div>
             </div>
-            <div class={styles.envelopeGrid}>
-              <NumberInput label="Attack" layout="inline" min={0} max={10000} step={1} unit="ms" value={operator().envelope.attackMs} onChange={(attackMs) => updateEnvelope({ attackMs })} />
-              <NumberInput label="Decay" layout="inline" min={0} max={10000} step={1} unit="ms" value={operator().envelope.decayMs} onChange={(decayMs) => updateEnvelope({ decayMs })} />
-              <Slider label="Sustain" layout="inline" min={0} max={1} step={0.01} value={operator().envelope.sustain} readout={<span>{Math.round(operator().envelope.sustain * 100)}%</span>} onChange={(sustain) => updateEnvelope({ sustain })} />
-              <NumberInput label="Release" layout="inline" min={0} max={10000} step={1} unit="ms" value={operator().envelope.releaseMs} onChange={(releaseMs) => updateEnvelope({ releaseMs })} />
-            </div>
-          </div>
+          </Show>
         </section>
 
         <section class={styles.matrixSection}>
@@ -158,7 +210,10 @@ export function AurumEditor(props: AurumEditorProps) {
                   variant="ghost"
                   selected={selectedOperator() === sourceIndex()}
                   className={styles.matrixRowLabel}
-                  onClick={() => setSelectedOperator(sourceIndex())}
+                  onClick={() => {
+                    setSelectedOperator(sourceIndex());
+                    setSelectedPage("operator");
+                  }}
                 >
                   {source.name}
                 </Button>
@@ -168,16 +223,18 @@ export function AurumEditor(props: AurumEditorProps) {
                   const output = () => targetIndex() === AURUM_OUTPUT_COLUMN;
                   return (
                     <div class={`${styles.matrixCell} ${feedback() ? styles.feedbackCell : ""} ${output() ? styles.outputCell : ""}`} data-active={value() > 0.001}>
-                      <Slider
-                        layout="bare"
+                      <Knob
+                        className={styles.matrixKnob}
+                        size="sm"
                         min={0}
                         max={1}
                         step={0.01}
                         value={value()}
-                        ariaLabel={`${source.name} ${feedback() ? "feedback" : output() ? "to output" : `to ${aurum().operators[targetIndex()].name}`}`}
+                        label={`${source.name} ${feedback() ? "feedback" : output() ? "to output" : `to ${aurum().operators[targetIndex()].name}`}`}
+                        formatValue={(next) => `${Math.round(next * 100)}`}
+                        defaultValue={0}
                         onChange={(next) => updateMatrix(sourceIndex(), targetIndex(), next)}
                       />
-                      <span>{Math.round(value() * 100)}</span>
                     </div>
                   );
                 }}</For>
@@ -186,17 +243,6 @@ export function AurumEditor(props: AurumEditorProps) {
           </div>
         </section>
 
-        <section class={styles.globalSection}>
-          <h3>Global</h3>
-          <div class={styles.globalGrid}>
-            <NumberInput label="Voices" layout="inline" min={1} max={8} step={1} value={aurum().unison} onChange={(unison) => updateAurum((config) => ({ ...config, unison: Math.round(unison) }))} />
-            <NumberInput label="Detune" layout="inline" min={0} max={100} step={1} unit="ct" value={aurum().detuneCents} onChange={(detuneCents) => updateAurum((config) => ({ ...config, detuneCents }))} />
-            <Slider label="Spread" layout="inline" min={0} max={1} step={0.01} value={aurum().stereoSpread} readout={<span>{Math.round(aurum().stereoSpread * 100)}%</span>} onChange={(stereoSpread) => updateAurum((config) => ({ ...config, stereoSpread }))} />
-            <Slider label="Cutoff" layout="inline" min={0} max={1} step={0.01} value={draft().knobs.cutoff} readout={<span>{Math.round(draft().knobs.cutoff * 100)}%</span>} onChange={(cutoff) => setDraft((current) => ({ ...current, knobs: { ...current.knobs, cutoff } }))} />
-            <Slider label="Resonance" layout="inline" min={0} max={1} step={0.01} value={draft().knobs.resonance} readout={<span>{Math.round(draft().knobs.resonance * 100)}%</span>} onChange={(resonance) => setDraft((current) => ({ ...current, knobs: { ...current.knobs, resonance } }))} />
-            <Slider label="Drive" layout="inline" min={0} max={1} step={0.01} value={draft().knobs.drive} readout={<span>{Math.round(draft().knobs.drive * 100)}%</span>} onChange={(drive) => setDraft((current) => ({ ...current, knobs: { ...current.knobs, drive } }))} />
-          </div>
-        </section>
       </main>
 
       <footer class={styles.footer}>
@@ -211,6 +257,31 @@ export function AurumEditor(props: AurumEditorProps) {
       </footer>
     </div>
   );
+}
+
+function WaveformScope(props: { waveform: AurumOperatorWaveform; phase: number }) {
+  const points = createMemo(() => Array.from({ length: 73 }, (_, index) => {
+    const x = index / 72;
+    const phase = (x + props.phase) % 1;
+    const sample = waveformSample(props.waveform, phase);
+    return `${(x * 144).toFixed(1)},${(36 - sample * 27).toFixed(1)}`;
+  }).join(" "));
+
+  return (
+    <div class={styles.waveformScope} aria-label={`${props.waveform} waveform preview`}>
+      <svg viewBox="0 0 144 72" preserveAspectRatio="none" aria-hidden="true">
+        <line x1="0" y1="36" x2="144" y2="36" />
+        <polyline points={points()} />
+      </svg>
+    </div>
+  );
+}
+
+function waveformSample(waveform: AurumOperatorWaveform, phase: number) {
+  if (waveform === "triangle") return 1 - 4 * Math.abs(phase - 0.5);
+  if (waveform === "saw") return phase * 2 - 1;
+  if (waveform === "square") return phase < 0.5 ? 1 : -1;
+  return Math.sin(phase * Math.PI * 2);
 }
 
 function cloneInstrument(instrument: Instrument): Instrument {

@@ -21,6 +21,12 @@ The frontend stores Aurum configuration under `instrument.aurum`. Native parsing
 
 Matrix rows are modulation sources. Columns `0..5` target operators 1 through 6, and column `6` routes that source to the audible output.
 
+## Editor structure
+
+The editor keeps the routing matrix visible while the left workspace switches between Main and OP 1 through OP 6. Main contains shared unison and output-filter controls. Operator pages combine a live waveform scope, tuning and level controls, and the operator amplitude envelope.
+
+Existing Beat controls are used for commands, selection, numeric entry, sliders, toggles, and matrix knobs. The waveform scope and routing-cell composition are Aurum-specific because the shared UI kit has no equivalent synthesis visual.
+
 ## Current boundary
 
 Aurum version 1 is an instrument foundation, not a clone of another synthesizer. It does not yet include per-operator filters, waveshaping editors, keyboard-mapped modulation curves, or a preset browser. Operator release values persist with the patch; note-off is currently governed by Beat's shared amplitude release path.
