@@ -42,6 +42,16 @@ try {
   const difference = baseline.reduce((sum, sample, index) => sum + Math.abs(sample - dry[index]), 0) / baseline.length;
   assert.ok(difference > 0.005, `FM routing must alter the rendered waveform, got mean difference ${difference}`);
 
+  const stereoPatch = structuredClone(instrument);
+  stereoPatch.aurum.unison = 3;
+  stereoPatch.aurum.detuneCents = 14;
+  stereoPatch.aurum.stereoSpread = 0.8;
+  const left = new Float32Array(4096);
+  const right = new Float32Array(4096);
+  preview.renderInstrumentStereoSamples(stereoPatch, left, right, 48000, 220, "visual", true);
+  const stereoDifference = left.reduce((sum, sample, index) => sum + Math.abs(sample - right[index]), 0) / left.length;
+  assert.ok(stereoDifference > 0.005, `Aurum spread must create stereo separation, got mean difference ${stereoDifference}`);
+
   const malformed = aurum.normalizedAurumConfig({ ...instrument.aurum, operators: instrument.aurum.operators.slice(0, 1), matrix: [[4]] });
   assert.equal(malformed.operators.length, 6, "Normalization must restore missing operators");
   assert.equal(malformed.matrix[0][0], 1, "Normalization must clamp matrix values");
