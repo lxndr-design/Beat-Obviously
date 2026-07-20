@@ -1,0 +1,33 @@
+{
+  "schema": "beat.lumus-serum2-capability-matrix.v1",
+  "reviewedAt": "2026-07-19",
+  "reference": {
+    "product": "Serum 2",
+    "vendor": "Xfer Records",
+    "sourcePolicy": "Official public product page and official public manual only; behavior reference, no source or asset reuse.",
+    "urls": [
+      "https://www.xferrecords.com/products/serum-2",
+      "https://xferrecords.com/web-manual/serum-2/exploring-sound-design-in-serum",
+      "https://xferrecords.com/web-manual/serum-2/routing-an-oscillator-or-filter",
+      "https://xferrecords.com/web-manual/serum-2/exploring-serum",
+      "https://support.xferrecords.com/article/58-how-to-upgrade-from-serum-1-to-serum-2"
+    ]
+  },
+  "comparisonMode": "feature-contract",
+  "directAudioComparison": {
+    "status": "blocked-no-local-reference-renderer",
+    "reason": "No locally installed Serum 2 AU, VST3, AAX, or application was found. No reference audio or performance result is inferred."
+  },
+  "rows": [
+    { "id": "product.identity", "reference": "Serum 2 installs alongside Serum 1 and does not automatically replace existing projects.", "lumus": "Independent lumus-hybrid-synth identity and lumus namespace; Aether remains wavetable-synth.", "status": "foundation-complete" },
+    { "id": "oscillator.slots", "reference": "Three main oscillator slots A-C plus dedicated sub and noise.", "lumus": "Begins with Aether A/B plus dedicated sub/noise and fixed sample/granular slots.", "status": "gap" },
+    { "id": "oscillator.types", "reference": "Wavetable, multisample, sample, granular, and spectral modes are selectable in main oscillator slots.", "lumus": "Wavetable is production-ready; sample/multisample and granular foundations exist but are not interchangeable main slots; spectral remains incomplete.", "status": "partial" },
+    { "id": "wavetable.dual-warp", "reference": "Dual warps and smooth wavetable interpolation.", "lumus": "Two serial runtime warp stages and immutable timbral-frame interpolation exist in the inherited renderer.", "status": "partial" },
+    { "id": "routing.sources", "reference": "Each oscillator/filter can target Filter 1/2 mix, Main, Direct, None, and Bus 1/2 sends.", "lumus": "Dual filters, direct path, main inserts, and two sends exist; per-source routing is not yet generalized across three interchangeable source slots.", "status": "partial" },
+    { "id": "routing.effects", "reference": "Main plus two routable FX busses.", "lumus": "Inherits two source FX sends and Beat-owned bus infrastructure; Lumus-specific graph contract is not yet frozen.", "status": "partial" },
+    { "id": "modulation.foundation", "reference": "Configurable envelopes/LFOs and broad modulation assignment.", "lumus": "Inherits four envelopes, ten LFO slots, eight macros, performance/MPE sources, and deterministic route ordering.", "status": "meets-foundation" },
+    { "id": "sequencing.arp-clip", "reference": "Integrated arpeggiator and MIDI clip sequencer with key, scale, and swing context.", "lumus": "No synth-owned arpeggiator or clip sequencer.", "status": "gap" },
+    { "id": "compatibility.aether", "reference": "Serum 1 presets load in Serum 2, while Serum 2 presets do not load in Serum 1.", "lumus": "No implicit migration. A future explicit one-way Aether-to-Lumus conversion must clone data and preserve the original Aether instrument.", "status": "planned" },
+    { "id": "performance.equivalent-patch", "reference": "Official guidance states equivalent Serum 1 patches should use the same or less CPU in Serum 2.", "lumus": "Foundation output is bit-identical to Aether and must not regress Aether or exceed its equivalent-patch budget without a documented reason.", "status": "gate-defined" }
+  ]
+}

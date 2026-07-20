@@ -15843,6 +15843,7 @@ namespace
     {
         static_assert(beat::params::patchSchemaVersion == 1);
         static_assert(beat::params::instrumentTypeWavetableSynth == std::string_view("wavetable-synth"));
+        static_assert(beat::params::instrumentTypeLumusHybridSynth == std::string_view("lumus-hybrid-synth"));
         static_assert(beat::params::oscillator::a::position == std::string_view("osc.a.position"));
         static_assert(beat::params::modulation::sourceLfo1 == std::string_view("lfo.1"));
         static_assert(beat::params::modulation::targetUnisonSpread == std::string_view("unison.spread"));
@@ -16333,6 +16334,28 @@ namespace
         if (untouched.kind != "synth" || untouched.waveform != 1)
             return false;
 
+        const auto lumusFoundationPatch = juce::JSON::parse(R"json(
+        {
+          "schemaVersion": 1,
+          "instrumentType": "lumus-hybrid-synth",
+          "namespace": "lumus",
+          "parameters": {},
+          "modulation": []
+        }
+        )json");
+        beat::InstrumentDefinition lumusFoundation;
+        if (!beat::applySynthPatchContract(lumusFoundationPatch, lumusFoundation))
+            return false;
+        if (!lumusFoundation.hasAether
+            || lumusFoundation.synthEngine != beat::InstrumentDefinition::SynthEngine::Lumus)
+            return false;
+        const auto futureLumusPatch = juce::JSON::parse(R"json(
+        { "schemaVersion": 2, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
+        )json");
+        beat::InstrumentDefinition rejectedFutureLumus;
+        if (beat::applySynthPatchContract(futureLumusPatch, rejectedFutureLumus))
+            return false;
+
         const auto patch = juce::JSON::parse(R"json(
         {
           "schemaVersion": 1,
@@ -16509,7 +16532,8 @@ namespace
         if (!beat::applySynthPatchContract(patch, instrument))
             return false;
 
-        if (instrument.kind != "wavetable" || instrument.waveform != 5 || !instrument.hasAether)
+        if (instrument.kind != "wavetable" || instrument.waveform != 5 || !instrument.hasAether
+            || instrument.synthEngine != beat::InstrumentDefinition::SynthEngine::Aether)
             return false;
         if (instrument.wavetableBank != 4 || !near(instrument.wavetablePosition, 0.25f))
             return false;

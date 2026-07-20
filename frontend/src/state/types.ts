@@ -694,8 +694,8 @@ export interface SynthPatchMacroDefinition {
 export interface SynthPatchSnapshot {
   /** v2 adds Sample Slot 1; v3 slicing/looping; v4 bounded mapped zones; v5 sample-source FX sends. */
   schemaVersion: 1 | 2 | 3 | 4 | 5;
-  instrumentType: "wavetable-synth";
-  namespace: "synth";
+  instrumentType: "wavetable-synth" | "lumus-hybrid-synth";
+  namespace: "synth" | "lumus";
   name: string;
   taxonomy?: InstrumentTaxonomyAssignment;
   parameters: Record<string, SynthPatchParameterValue>;
@@ -1065,6 +1065,7 @@ export interface UiState {
     | { kind: "samplerInstrument"; instrumentId: Id; draftInstrument?: Instrument }
     | { kind: "synthInstrument"; instrumentId: Id; draftInstrument?: Instrument }
     | { kind: "synth" }
+    | { kind: "lumus" }
     | { kind: "track"; trackId: Id }
     | { kind: "segment"; segmentId: Id; discardIfUntouched?: boolean }
     | { kind: "component"; componentId: Id }

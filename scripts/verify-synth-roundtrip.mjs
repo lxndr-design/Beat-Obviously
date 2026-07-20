@@ -165,6 +165,42 @@ try {
   assert.equal(draft.parameters["osc.b.unison.detune"], 0.27);
   assert.equal(draft.parameters["osc.a.unison.spread"], 0.5);
   assert.equal(draft.parameters["osc.b.unison.spread"], 0.5);
+
+  const lumusDraft = synthStore.createDefaultLumusDraft();
+  assert.equal(lumusDraft.instrumentType, "lumus-hybrid-synth", "Lumus must have an independent instrument identity");
+  assert.equal(lumusDraft.namespace, "lumus", "Lumus must not serialize into Aether's namespace");
+  assert.equal(lumusDraft.schemaVersion, 1, "Lumus must begin with its own schema version");
+  assert.equal(lumusDraft.name, "Lumus Init");
+  const normalizedLumus = synthStore.normalizeSynthDraftPatch(structuredClone(lumusDraft));
+  assert.equal(normalizedLumus.instrumentType, "lumus-hybrid-synth", "normalization must preserve Lumus identity");
+  assert.equal(normalizedLumus.namespace, "lumus", "normalization must preserve the Lumus namespace");
+  const lumusInstrumentPatch = synthStore.synthDraftToInstrumentPatch(normalizedLumus);
+  assert.equal(lumusInstrumentPatch.synthPatch.instrumentType, "lumus-hybrid-synth", "instrument conversion must preserve Lumus identity");
+  assert.equal(lumusInstrumentPatch.synthPatch.namespace, "lumus", "instrument conversion must preserve the Lumus namespace");
+  const restoredLumus = synthStore.synthDraftFromInstrument({ id: "lumus-roundtrip", ...lumusInstrumentPatch });
+  assert.equal(restoredLumus.instrumentType, "lumus-hybrid-synth", "instrument roundtrip must not migrate Lumus into Aether");
+  assert.equal(restoredLumus.namespace, "lumus");
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch({ ...lumusDraft, namespace: "synth" }),
+    /lumus\.identity\.namespace-mismatch/,
+    "Lumus namespace mismatches must fail diagnostically",
+  );
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch({ ...lumusDraft, schemaVersion: 5 }),
+    /lumus\.schema\.unsupported/,
+    "future or inconsistent Lumus schemas must not be silently normalized",
+  );
+
+  const aetherInit = synthStore.createDefaultSynthDraft();
+  const aetherInitLeft = new Float32Array(2048);
+  const aetherInitRight = new Float32Array(2048);
+  const lumusInitLeft = new Float32Array(2048);
+  const lumusInitRight = new Float32Array(2048);
+  synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(aetherInit), aetherInitLeft, aetherInitRight, 48000, 261.625565, "audio");
+  synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(lumusDraft), lumusInitLeft, lumusInitRight, 48000, 261.625565, "audio");
+  assert.deepEqual(lumusInitLeft, aetherInitLeft, "Lumus v1 must begin from the frozen Aether renderer without altering it");
+  assert.deepEqual(lumusInitRight, aetherInitRight, "Lumus v1 must begin from the frozen Aether stereo renderer without altering it");
+
   const independentUnisonDraft = synthStore.normalizeSynthDraftPatch({
     parameters: {
       "osc.a.unison.voices": 3,

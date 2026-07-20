@@ -24,8 +24,11 @@ import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 5;
+export const LUMUS_PATCH_SCHEMA_VERSION = 1;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
 export const SYNTH_INSTRUMENT_TYPE = "wavetable-synth";
+export const LUMUS_PARAMETER_NAMESPACE = "lumus";
+export const LUMUS_INSTRUMENT_TYPE = "lumus-hybrid-synth";
 export const DEFAULT_CUSTOM_WAVETABLE_ID = "user.custom";
 
 export type WavetableId =
@@ -357,9 +360,9 @@ export interface SynthEnvelopeEditorSummary {
 }
 
 export interface SynthDraftPatch {
-  schemaVersion: typeof SYNTH_PATCH_SCHEMA_VERSION;
-  instrumentType: typeof SYNTH_INSTRUMENT_TYPE;
-  namespace: typeof SYNTH_PARAMETER_NAMESPACE;
+  schemaVersion: typeof SYNTH_PATCH_SCHEMA_VERSION | typeof LUMUS_PATCH_SCHEMA_VERSION;
+  instrumentType: typeof SYNTH_INSTRUMENT_TYPE | typeof LUMUS_INSTRUMENT_TYPE;
+  namespace: typeof SYNTH_PARAMETER_NAMESPACE | typeof LUMUS_PARAMETER_NAMESPACE;
   name: string;
   taxonomy?: InstrumentTaxonomyAssignment;
   parameters: Record<SynthParameterId, SynthParameterValue> & Record<string, SynthParameterValue>;
@@ -1604,6 +1607,27 @@ export function createDefaultSynthDraft(): SynthDraftPatch {
   };
 }
 
+/**
+ * Lumus starts from Aether's verified parameter set but has an independent
+ * product identity and namespace. Future Lumus schema revisions must preserve
+ * this boundary rather than changing Aether patches in place.
+ */
+export function createDefaultLumusDraft(): SynthDraftPatch {
+  const draft = createDefaultSynthDraft();
+  return {
+    ...draft,
+    schemaVersion: LUMUS_PATCH_SCHEMA_VERSION,
+    instrumentType: LUMUS_INSTRUMENT_TYPE,
+    namespace: LUMUS_PARAMETER_NAMESPACE,
+    name: "Lumus Init",
+    metadata: {
+      ...draft.metadata,
+      icon: "ph:sparkle",
+      tags: ["lumus", "hybrid"],
+    },
+  };
+}
+
 function parameterPatch(id: SynthParameterId, value: SynthParameterValue): Record<string, SynthParameterValue> {
   if (id === "unison.voices")
     return { [id]: value, "osc.a.unison.voices": value, "osc.b.unison.voices": value };
@@ -1615,7 +1639,8 @@ function parameterPatch(id: SynthParameterId, value: SynthParameterValue): Recor
 }
 
 export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | SynthPatchSnapshot): SynthDraftPatch {
-  const base = createDefaultSynthDraft();
+  const isLumus = validateSynthPatchIdentity(input);
+  const base = isLumus ? createDefaultLumusDraft() : createDefaultSynthDraft();
   const parameters: SynthDraftPatch["parameters"] = { ...DEFAULT_SYNTH_PARAMETERS };
 
   if (isRecord(input.parameters)) {
@@ -1667,9 +1692,9 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
   const inputTaxonomy = isRecord(input.taxonomy) ? taxonomyAssignmentForInstrumentId(String(input.taxonomy.instrumentId ?? "")) : undefined;
 
   return {
-    schemaVersion: SYNTH_PATCH_SCHEMA_VERSION,
-    instrumentType: SYNTH_INSTRUMENT_TYPE,
-    namespace: SYNTH_PARAMETER_NAMESPACE,
+    schemaVersion: base.schemaVersion,
+    instrumentType: base.instrumentType,
+    namespace: base.namespace,
     name: typeof input.name === "string" && input.name.trim() ? input.name.trim() : base.name,
     taxonomy: inputTaxonomy ?? base.taxonomy,
     parameters,
@@ -1692,6 +1717,38 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
       managedGranular: normalizeManagedGranular(inputMetadata.managedGranular),
     },
   };
+}
+
+export class SynthPatchIdentityError extends Error {
+  constructor(readonly code: string, message: string) {
+    super(`${code}: ${message}`);
+    this.name = "SynthPatchIdentityError";
+  }
+}
+
+function validateSynthPatchIdentity(input: Partial<SynthDraftPatch> | SynthPatchSnapshot): boolean {
+  const type = input.instrumentType;
+  const namespace = input.namespace;
+  if (type === undefined) {
+    if (namespace === LUMUS_PARAMETER_NAMESPACE)
+      throw new SynthPatchIdentityError("lumus.identity.type-missing", "A Lumus namespace requires the Lumus instrument type.");
+    if (namespace !== undefined && namespace !== SYNTH_PARAMETER_NAMESPACE)
+      throw new SynthPatchIdentityError("synth.identity.namespace-unknown", `Unsupported synth namespace: ${String(namespace)}`);
+    return false;
+  }
+  if (type === SYNTH_INSTRUMENT_TYPE) {
+    if (namespace !== undefined && namespace !== SYNTH_PARAMETER_NAMESPACE)
+      throw new SynthPatchIdentityError("aether.identity.namespace-mismatch", "Aether patches must use the synth namespace.");
+    return false;
+  }
+  if (type === LUMUS_INSTRUMENT_TYPE) {
+    if (namespace !== LUMUS_PARAMETER_NAMESPACE)
+      throw new SynthPatchIdentityError("lumus.identity.namespace-mismatch", "Lumus patches must use the lumus namespace.");
+    if (input.schemaVersion !== LUMUS_PATCH_SCHEMA_VERSION)
+      throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
+    return true;
+  }
+  throw new SynthPatchIdentityError("synth.identity.type-unknown", `Unsupported synth instrument type: ${String(type)}`);
 }
 
 export function getNumberParam(draft: SynthDraftPatch, id: SynthParameterId): number {

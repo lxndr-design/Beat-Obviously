@@ -1,4 +1,5 @@
 #include "SynthPatchContract.h"
+#include "ParameterIds.h"
 #include "../Wavetable/WavetableUnisonConfig.h"
 
 #include <cmath>
@@ -413,7 +414,24 @@ namespace beat
     bool applySynthPatchContract(const juce::var& patch, InstrumentDefinition& instrument)
     {
         if (!patch.isObject()) return false;
-        if (objectProperty(patch, "instrumentType", {}).toString() != "wavetable-synth") return false;
+        const auto instrumentType = objectProperty(patch, "instrumentType", {}).toString();
+        const bool isAether = instrumentType == params::instrumentTypeWavetableSynth.data();
+        const bool isLumus = instrumentType == params::instrumentTypeLumusHybridSynth.data();
+        if (!isAether && !isLumus) return false;
+        const auto patchNamespace = objectProperty(patch, "namespace", {});
+        if (isLumus)
+        {
+            const auto schemaVersion = objectProperty(patch, "schemaVersion", {});
+            if ((!schemaVersion.isInt() && !schemaVersion.isInt64())
+                || (int) schemaVersion != params::lumusPatchSchemaVersion
+                || patchNamespace.toString() != "lumus")
+                return false;
+        }
+        else if (!patchNamespace.isVoid() && patchNamespace.toString().isNotEmpty()
+                 && patchNamespace.toString() != params::synthNamespace.data())
+        {
+            return false;
+        }
 
         const auto params = objectProperty(patch, "parameters", {});
         if (!params.isObject()) return false;
@@ -422,6 +440,9 @@ namespace beat
         const auto customWavetables = mergedWavemapMetadata(metadata);
 
         instrument.kind = "wavetable";
+        instrument.synthEngine = isLumus
+            ? InstrumentDefinition::SynthEngine::Lumus
+            : InstrumentDefinition::SynthEngine::Aether;
         instrument.waveform = 5;
         instrument.maxVoices = juce::jlimit(1, 32, (int) std::round(synthNumberParam(params, "maxVoices", instrument.maxVoices)));
         instrument.mono = synthNumberParam(params, "mono.enabled", instrument.mono ? 1.0 : 0.0) >= 0.5;

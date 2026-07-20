@@ -133,6 +133,13 @@ namespace beat
 
     struct InstrumentDefinition
     {
+        enum class SynthEngine
+        {
+            None,
+            Aether,
+            Lumus,
+        };
+
         struct WavetableConfig
         {
             struct CustomFrame
@@ -497,6 +504,7 @@ namespace beat
         std::array<float, 8> macroValues {};
         DynamicModulation dynamicModulation;
         bool hasAether { false };
+        SynthEngine synthEngine { SynthEngine::None };
         AetherConfig aether;
         std::optional<Nodemap::Graph> nodeGraph;
         juce::var taxonomy;

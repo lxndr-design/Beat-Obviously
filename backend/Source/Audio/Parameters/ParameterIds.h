@@ -6,7 +6,9 @@
 namespace beat::params
 {
     inline constexpr int patchSchemaVersion = 1;
+    inline constexpr int lumusPatchSchemaVersion = 1;
     inline constexpr std::string_view instrumentTypeWavetableSynth { "wavetable-synth" };
+    inline constexpr std::string_view instrumentTypeLumusHybridSynth { "lumus-hybrid-synth" };
     inline constexpr std::string_view synthNamespace { "synth" };
 
     namespace oscillator

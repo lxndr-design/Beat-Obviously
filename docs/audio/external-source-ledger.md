@@ -194,6 +194,12 @@ The optional export-quality field, legacy/default normalization, Export Review s
 
 The release report and corresponding audit pointers summarize already-recorded Beat-owned implementation and measured evidence. They add no implementation, external-derived work, dependency, binary, asset, preset, branding, service, or licensing/ownership change. Local modified files are `docs/audio/milestone-b-release-report.md` and these four audit documents; none is Vital-derived.
 
+## Lumus Serum 2 behavior-reference benchmark — 2026-07-19
+
+Lumus uses Xfer Records' public Serum 2 product page and web manual only to define a high-level behavior/capability comparison. Reviewed canonical pages are `https://www.xferrecords.com/products/serum-2`, `https://xferrecords.com/web-manual/serum-2/exploring-sound-design-in-serum`, `https://xferrecords.com/web-manual/serum-2/routing-an-oscillator-or-filter`, `https://xferrecords.com/web-manual/serum-2/exploring-serum`, and `https://support.xferrecords.com/article/58-how-to-upgrade-from-serum-1-to-serum-2`. Classification is reference-derived requirements only. No source code, preset, wavetable, sample, preview audio, artwork, branding, executable, service integration, or dependency was copied, adapted, imported, or executed.
+
+Local destinations are `docs/audio/lumus-serum2-benchmark.md`, `docs/audio/lumus-serum2-capability-matrix.json`, and `docs/audio/lumus-architecture.md`. The Lumus identity/schema implementation is independently implemented Beat-owned code. Its v1 renderer adapter deliberately reuses Beat's existing Aether implementation as an internal starting point while preserving distinct `lumus-hybrid-synth` / `lumus` persistence identity. This entry does not claim a direct Serum 2 audio or CPU comparison because no locally installed reference renderer was available.
+
 ## Milestone B29 benchmark factory-preset provenance
 
 Two user-supplied local preset documents were structurally adapted into Beat's existing factory-guide representation:

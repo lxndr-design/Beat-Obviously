@@ -119,7 +119,7 @@ export interface SynthEditorProps {
   hotkeyScopeId?: string;
 }
 
-export function SynthEditor(props: SynthEditorProps) {
+export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "lumus" }) {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const boundInstrumentId = createStoreSelector(useSynthStore, (state) => state.boundInstrumentId);
   const liveExpressionActivities = createStoreSelector(useSynthStore, (state) => state.expressionActivityByInstrument);
@@ -417,12 +417,12 @@ export function SynthEditor(props: SynthEditorProps) {
   async function onSaveInstrument() {
     await saveDraftToInstrument();
     if (props.instrumentId) closeEditor({ kind: "synthInstrument", instrumentId: props.instrumentId });
-    else closeEditor({ kind: "synth" });
+    else closeEditor({ kind: props.editorKind ?? "synth" });
   }
 
   function onCancelInstrument() {
     if (props.instrumentId) closeEditor({ kind: "synthInstrument", instrumentId: props.instrumentId });
-    else closeEditor({ kind: "synth" });
+    else closeEditor({ kind: props.editorKind ?? "synth" });
   }
 
   function setInstrumentTaxonomyById(instrumentId: string) {

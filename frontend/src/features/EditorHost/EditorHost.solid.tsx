@@ -47,7 +47,11 @@ export function EditorHost() {
               return (
                 <Modal
                   open
-                  title={instrument()?.nodeGraph ? instrument()?.name ?? "Nodemap" : "Instrument - Aether Engine"}
+                  title={instrument()?.nodeGraph
+                    ? instrument()?.name ?? "Nodemap"
+                    : instrument()?.synthPatch?.instrumentType === "lumus-hybrid-synth"
+                      ? "Instrument - Lumus Engine"
+                      : "Instrument - Aether Engine"}
                   width="editor"
                   scopeId={scopeId}
                   flushBody
@@ -79,6 +83,19 @@ export function EditorHost() {
                   onClose={() => closeEditor({ kind: "synth" })}
                 >
                   <SynthEditor hotkeyScopeId="synth-editor" />
+                </Modal>
+              );
+            case "lumus":
+              return (
+                <Modal
+                  open
+                  title="Instrument - Lumus Engine"
+                  width="editor"
+                  scopeId="lumus-editor"
+                  flushBody
+                  onClose={() => closeEditor({ kind: "lumus" })}
+                >
+                  <SynthEditor hotkeyScopeId="lumus-editor" editorKind="lumus" />
                 </Modal>
               );
             case "track":

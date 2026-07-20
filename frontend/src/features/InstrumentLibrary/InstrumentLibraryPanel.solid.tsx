@@ -5,6 +5,7 @@ import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, use
 import { instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
 import {
   FACTORY_SYNTH_PRESETS,
+  createDefaultLumusDraft,
   createDefaultSynthDraft,
   synthDraftToInstrumentPatch,
   useSynthStore,
@@ -32,10 +33,12 @@ interface WavetableStarter {
   icon: string;
   presetId: string;
   fallbackNameBase: string;
+  engine: "aether" | "lumus";
 }
 
 const WAVETABLE_STARTERS: WavetableStarter[] = [
-  { label: "Create Aether", icon: "ph:cube", presetId: "factory.init", fallbackNameBase: "Aether Patch" },
+  { label: "Create Aether", icon: "ph:cube", presetId: "factory.init", fallbackNameBase: "Aether Patch", engine: "aether" },
+  { label: "Create Lumus", icon: "ph:sparkle", presetId: "", fallbackNameBase: "Lumus Patch", engine: "lumus" },
 ];
 
 function createDraftId() {
@@ -100,6 +103,11 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
       label: "Create Aether",
       icon: "ph:cube",
       onSelect: () => createWavetable(WAVETABLE_STARTERS[0]),
+    },
+    {
+      label: "Create Lumus",
+      icon: "ph:sparkle",
+      onSelect: () => createWavetable(WAVETABLE_STARTERS[1]),
     },
     {
       label: "Create Sampler",
@@ -195,7 +203,7 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
 
   function createWavetable(starter: WavetableStarter) {
     const preset = FACTORY_SYNTH_PRESETS.find((candidate) => candidate.id === starter.presetId);
-    const draft = preset?.patch ?? createDefaultSynthDraft();
+    const draft = starter.engine === "lumus" ? createDefaultLumusDraft() : preset?.patch ?? createDefaultSynthDraft();
     const instrumentName = nextInstrumentName(instruments(), starter.fallbackNameBase);
     const namedDraft: SynthDraftPatch = {
       ...structuredClone(draft),
@@ -203,7 +211,9 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
     };
     useSynthStore.getState().bindInstrument(null);
     useSynthStore.getState().setDraft(namedDraft);
-    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: createDraftId() });
+    useUiStore.getState().openEditor(starter.engine === "lumus"
+      ? { kind: "lumus" }
+      : { kind: "synthInstrument", instrumentId: createDraftId() });
   }
 
   function createNewGroup() {
