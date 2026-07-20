@@ -236,6 +236,7 @@ try {
       "osc.c.wavetable": "basic.square",
       "osc.c.level": 0.5,
       "osc.c.pan": 0.7,
+      "osc.c.route": "filter2",
       "osc.c.semitone": 7,
       "osc.c.unison.voices": 3,
     },
@@ -245,6 +246,24 @@ try {
   synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(audibleLumus), audibleLeft, audibleRight, 48000, 261.625565, "audio");
   assert.notDeepEqual(audibleLeft, lumusInitLeft, "Enabled Slot C must make an audible deterministic contribution");
   assert.notDeepEqual(audibleRight, lumusInitRight, "Slot C pan must affect the stereo render");
+  const audibleInstrument = synthStore.synthDraftToPreviewInstrument(audibleLumus);
+  assert.equal(audibleInstrument.aether.oscillators.find(({ id }) => id === "c")?.route, "filter2", "Slot C routing must survive conversion");
+
+  const modulatedLumus = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(audibleLumus),
+    parameters: { ...audibleLumus.parameters, "macro.1": 1 },
+    modulation: [
+      ...audibleLumus.modulation,
+      { id: "lumus-c-position", source: "macro.1", target: "osc.c.position", amount: 0.65, bipolar: false, enabled: true },
+      { id: "lumus-c-fine", source: "macro.1", target: "osc.c.fine", amount: 0.2, bipolar: false, enabled: true },
+      { id: "lumus-c-pan", source: "macro.1", target: "osc.c.pan", amount: -0.5, bipolar: false, enabled: true },
+    ],
+  });
+  const modulatedLeft = new Float32Array(2048);
+  const modulatedRight = new Float32Array(2048);
+  synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(modulatedLumus), modulatedLeft, modulatedRight, 48000, 261.625565, "audio");
+  assert.notDeepEqual(modulatedLeft, audibleLeft, "Slot C modulation must alter the deterministic preview render");
+  assert.notDeepEqual(modulatedRight, audibleRight, "Slot C pan modulation must alter the stereo preview render");
 
   const independentUnisonDraft = synthStore.normalizeSynthDraftPatch({
     parameters: {

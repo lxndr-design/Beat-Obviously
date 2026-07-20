@@ -389,6 +389,6 @@ function midiAutomationToSynthLanes(note: MidiNote, durationS: number): SynthAut
     .filter((lane) => lane.points.length > 0);
 }
 
-function isSynthAutomationTarget(target: MidiAutomationTarget): target is SynthAutomationTarget {
+function isSynthAutomationTarget(target: MidiAutomationTarget): target is Exclude<MidiAutomationTarget, "pitch"> {
   return target !== "pitch";
 }

@@ -807,20 +807,40 @@ namespace beat
                 filter2Raw = { aetherResult.filter2Frame.left, aetherResult.filter2Frame.right };
                 sourceFrames = aetherResult.sourceFrames;
                 currentBlockWork.add(aetherResult.work);
-                if (params.hasLumus && params.lumusOscC.enabled && params.lumusOscC.level > 0.0f)
+                if (params.hasLumus && params.lumusOscC.enabled)
                 {
+                    const auto targetOffset = [&](const auto& target, float scale)
+                    {
+                        return DynamicModulation::targetOffset(target, rawLfo, rawLfo2, rawExtraLfos,
+                            env, env2, env3, env4, level, noteKeytrack, modWheel, pressure, timbre,
+                            params.macroValues, scale);
+                    };
+                    const float sourceLevel = VoiceMath::clamp01(params.lumusOscC.level
+                        + (useDynamicModulation && cachedDynamicTargets.oscCLevel
+                            ? targetOffset(params.dynamicModulation.oscCLevel, 1.0f) : 0.0f));
+                    const float sourcePan = juce::jlimit(-1.0f, 1.0f, params.lumusOscC.pan
+                        + (useDynamicModulation && cachedDynamicTargets.oscCPan
+                            ? targetOffset(params.dynamicModulation.oscCPan, 1.0f) : 0.0f));
+                    double sourceRate = cachedPitchRates.oscC;
+                    if (useDynamicModulation && cachedDynamicTargets.oscCFine)
+                        sourceRate *= std::exp2((double) targetOffset(params.dynamicModulation.oscCFine, 100.0f) / 1200.0);
+                    const float positionMod = useDynamicModulation && cachedDynamicTargets.oscCPosition
+                        ? targetOffset(params.dynamicModulation.oscCPosition, 1.0f) : 0.0f;
+                    const float detuneMod = useDynamicModulation && cachedDynamicTargets.oscCUnisonDetune
+                        ? targetOffset(params.dynamicModulation.oscCUnisonDetune, 100.0f) : 0.0f;
+                    const float spreadMod = useDynamicModulation && cachedDynamicTargets.oscCUnisonSpread
+                        ? targetOffset(params.dynamicModulation.oscCUnisonSpread, 1.0f) : 0.0f;
                     const auto tableResult = WavetableOscillatorBank::renderStereo(
                         lumusOscillatorsC,
                         lumusUnisonPlanC,
                         params.lumusOscC.wavetable,
-                        currentFrequency * cachedPitchRates.oscC,
+                        currentFrequency * sourceRate,
                         baseFrequencyHz,
                         sampleRate,
-                        0.0f,
-                        0.0f,
-                        0.0f,
-                        params.lumusOscC.pan);
-                    const float sourceLevel = VoiceMath::clamp01(params.lumusOscC.level);
+                        positionMod,
+                        detuneMod,
+                        spreadMod,
+                        sourcePan);
                     lumusSourceFrameC = {
                         tableResult.left * sourceLevel,
                         tableResult.right * sourceLevel,

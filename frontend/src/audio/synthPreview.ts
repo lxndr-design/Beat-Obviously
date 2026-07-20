@@ -33,7 +33,8 @@ interface RenderModulation {
 }
 
 type DirectRuntimeModulationTarget =
-  | `osc.${"a" | "b"}.${"position" | "warp" | "fine" | "level" | "pan" | "phase"}`
+  | `osc.${"a" | "b" | "c"}.${"position" | "warp" | "fine" | "level" | "pan" | "phase"}`
+  | `osc.${"a" | "b" | "c"}.unison.${"detune" | "spread"}`
   | "filter.cutoff"
   | "filter.resonance"
   | "filter.drive"
@@ -2084,6 +2085,8 @@ function baseAutomationValue(instrument: Instrument, target: RuntimeModulationTa
       return instrument.aether?.oscA.wavetable.position ?? instrument.wavetable?.position ?? 0;
     case "osc.b.position":
       return instrument.aether?.oscB.wavetable.position ?? instrument.wavetable?.position ?? 0;
+    case "osc.c.position":
+      return instrument.aether?.oscillators?.find((oscillator) => oscillator.id === "c")?.wavetable.position ?? 0;
     case "osc.a.warp":
       return instrument.aether?.oscA.wavetable.warp ?? instrument.wavetable?.warp ?? 0;
     case "osc.b.warp":
@@ -2092,14 +2095,20 @@ function baseAutomationValue(instrument: Instrument, target: RuntimeModulationTa
       return instrument.aether?.oscA.fineCents ?? 0;
     case "osc.b.fine":
       return instrument.aether?.oscB.fineCents ?? 0;
+    case "osc.c.fine":
+      return instrument.aether?.oscillators?.find((oscillator) => oscillator.id === "c")?.fineCents ?? 0;
     case "osc.a.level":
       return instrument.aether?.oscA.level ?? 0;
     case "osc.b.level":
       return instrument.aether?.oscB.level ?? 0;
+    case "osc.c.level":
+      return instrument.aether?.oscillators?.find((oscillator) => oscillator.id === "c")?.level ?? 0;
     case "osc.a.pan":
       return instrument.aether?.oscA.pan ?? 0;
     case "osc.b.pan":
       return instrument.aether?.oscB.pan ?? 0;
+    case "osc.c.pan":
+      return instrument.aether?.oscillators?.find((oscillator) => oscillator.id === "c")?.pan ?? 0;
     case "osc.a.phase":
       return instrument.aether?.oscA.phase ?? 0;
     case "osc.b.phase":
@@ -2344,6 +2353,16 @@ function isDirectRuntimeModulationTarget(value: unknown): value is DirectRuntime
     "osc.b.level",
     "osc.b.pan",
     "osc.b.phase",
+    "osc.c.position",
+    "osc.c.fine",
+    "osc.c.level",
+    "osc.c.pan",
+    "osc.a.unison.detune",
+    "osc.a.unison.spread",
+    "osc.b.unison.detune",
+    "osc.b.unison.spread",
+    "osc.c.unison.detune",
+    "osc.c.unison.spread",
     "filter.cutoff",
     "filter.resonance",
     "filter.drive",

@@ -103,6 +103,13 @@ const PHASE_MODE_OPTIONS = [
   { value: "memory", label: "Memory" },
 ];
 
+const OSCILLATOR_ROUTE_OPTIONS = [
+  { value: "filter", label: "Filters" },
+  { value: "filter1", label: "Filter 1" },
+  { value: "filter2", label: "Filter 2" },
+  { value: "direct", label: "Direct" },
+];
+
 type WavemapEditMode = "freehand" | "additive";
 type WavemapAnalysisView = "compact" | "details";
 
@@ -438,6 +445,7 @@ function AdvancedOscillatorControls(props: {
   const stepId = `osc.${props.oscillator}.tuning.step` as OscillatorTuningParameterId;
   const divisionsId = `osc.${props.oscillator}.tuning.divisions` as OscillatorTuningParameterId;
   const phaseModeId = `osc.${props.oscillator}.phaseMode` as SynthParameterId;
+  const routeId = `osc.${props.oscillator}.route` as SynthParameterId;
   const tuningMode = () => getStringParam(props.draft, tuningModeId);
 
   return (
@@ -518,6 +526,14 @@ function AdvancedOscillatorControls(props: {
         value={getStringParam(props.draft, phaseModeId)}
         options={PHASE_MODE_OPTIONS}
         onChange={(value) => props.onStringChange(phaseModeId, value)}
+      />
+      <FloatingSelect
+        layout="inline"
+        label="Route"
+        ariaLabel={`${props.oscillator.toUpperCase()} output route`}
+        value={getStringParam(props.draft, routeId)}
+        options={OSCILLATOR_ROUTE_OPTIONS}
+        onChange={(value) => props.onStringChange(routeId, value)}
       />
     </div>
   );
@@ -1192,6 +1208,16 @@ const MODULATABLE_TARGETS = new Set<string>([
   "osc.b.fine",
   "osc.b.level",
   "osc.b.pan",
+  "osc.c.position",
+  "osc.c.fine",
+  "osc.c.level",
+  "osc.c.pan",
+  "osc.a.unison.detune",
+  "osc.a.unison.spread",
+  "osc.b.unison.detune",
+  "osc.b.unison.spread",
+  "osc.c.unison.detune",
+  "osc.c.unison.spread",
   "unison.detune",
   "unison.spread",
 ]);

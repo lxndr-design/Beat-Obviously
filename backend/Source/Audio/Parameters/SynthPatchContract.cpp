@@ -341,7 +341,8 @@ namespace beat
             InstrumentDefinition::DynamicModulation& dynamicModulation,
             const juce::var& modulation,
             bool lfoEnabled,
-            bool lfo2Enabled)
+            bool lfo2Enabled,
+            bool includeLumusTargets)
         {
             dynamicModulation = {};
             bool active = false;
@@ -357,6 +358,15 @@ namespace beat
             active |= configureDynamicTarget(dynamicModulation.oscAUnisonSpread, modulation, "osc.a.unison.spread", lfoEnabled, lfo2Enabled);
             active |= configureDynamicTarget(dynamicModulation.oscBUnisonDetune, modulation, "osc.b.unison.detune", lfoEnabled, lfo2Enabled);
             active |= configureDynamicTarget(dynamicModulation.oscBUnisonSpread, modulation, "osc.b.unison.spread", lfoEnabled, lfo2Enabled);
+            if (includeLumusTargets)
+            {
+                active |= configureDynamicTarget(dynamicModulation.oscCPosition, modulation, "osc.c.position", lfoEnabled, lfo2Enabled);
+                active |= configureDynamicTarget(dynamicModulation.oscCFine, modulation, "osc.c.fine", lfoEnabled, lfo2Enabled);
+                active |= configureDynamicTarget(dynamicModulation.oscCLevel, modulation, "osc.c.level", lfoEnabled, lfo2Enabled);
+                active |= configureDynamicTarget(dynamicModulation.oscCPan, modulation, "osc.c.pan", lfoEnabled, lfo2Enabled);
+                active |= configureDynamicTarget(dynamicModulation.oscCUnisonDetune, modulation, "osc.c.unison.detune", lfoEnabled, lfo2Enabled);
+                active |= configureDynamicTarget(dynamicModulation.oscCUnisonSpread, modulation, "osc.c.unison.spread", lfoEnabled, lfo2Enabled);
+            }
             active |= configureDynamicTarget(dynamicModulation.filterCutoff, modulation, "filter.cutoff", lfoEnabled, lfo2Enabled);
             active |= configureDynamicTarget(dynamicModulation.filterResonance, modulation, "filter.resonance", lfoEnabled, lfo2Enabled);
             active |= configureDynamicTarget(dynamicModulation.filterDrive, modulation, "filter.drive", lfoEnabled, lfo2Enabled);
@@ -755,7 +765,7 @@ namespace beat
             macroSourceValue(params, metadata, "macro.7"),
             macroSourceValue(params, metadata, "macro.8"),
         };
-        configureDynamicModulation(instrument.dynamicModulation, modulation, lfoEnabled, instrument.lfo2Enabled);
+        configureDynamicModulation(instrument.dynamicModulation, modulation, lfoEnabled, instrument.lfo2Enabled, isLumus);
         return true;
     }
 }

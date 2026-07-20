@@ -23,6 +23,7 @@ const library = read("frontend/src/features/InstrumentLibrary/InstrumentLibraryP
 const host = read("frontend/src/features/EditorHost/EditorHost.solid.tsx");
 const params = read("backend/Source/Audio/Parameters/ParameterIds.h");
 const contract = read("backend/Source/Audio/Parameters/SynthPatchContract.cpp");
+const oscillatorPanel = read("frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx");
 
 assert.ok(types.includes('"wavetable-synth" | "lumus-hybrid-synth"'));
 assert.ok(types.includes('"synth" | "lumus"'));
@@ -38,5 +39,9 @@ assert.ok(params.includes('instrumentTypeLumusHybridSynth { "lumus-hybrid-synth"
 assert.ok(params.includes("lumusPatchSchemaVersion = 2"));
 assert.ok(contract.includes("InstrumentDefinition::SynthEngine::Lumus"));
 assert.ok(contract.includes('customWavetables, "c", oscC'));
+assert.ok(contract.includes('"osc.c.position"'));
+assert.ok(contract.includes('"osc.c.unison.spread"'));
+assert.ok(oscillatorPanel.includes('label="Route"'));
+assert.ok(oscillatorPanel.includes("<FloatingSelect"), "Lumus route UI must reuse the existing selector component");
 
 console.log(`Lumus foundation verification passed (${matrix.rows.length} benchmark rows).`);

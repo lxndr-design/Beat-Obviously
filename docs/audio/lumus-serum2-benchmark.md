@@ -18,14 +18,14 @@ This equality is a starting-line invariant, not a permanent goal. Every future d
 
 Lumus schema v2 freezes three stable source identities: A, B, and C. The existing generalized oscillator editor now presents exactly those three rows for Lumus and disables structural add/remove actions. Slot C owns its own enable state, wavetable, tuning, phase, unison, level, pan, routing, and two send values. It is disabled in the default and in deterministic v1-to-v2 migration, preserving the initial Aether-equivalent render. Enabling it produces a separately measured, finite stereo contribution in both the browser preview and native voice.
 
-Only wavetable mode is implemented. Sample, multisample, granular, and spectral selection are not exposed as placeholder choices, and modulation targeting for Slot C is not claimed in this slice.
+Only wavetable mode is implemented. Sample, multisample, granular, and spectral selection are not exposed as placeholder choices. Slot C now participates in the existing modulation contract for position, fine tuning, level, pan, unison detune, and unison spread. Each oscillator exposes its existing Filter, Filter 1, Filter 2, and Direct destinations through Beat's shared `FloatingSelect`; the editor adds no Lumus-specific typography, spacing, or selector implementation.
 
 ### Verified 2026-07-20
 
 - Complete non-native verification and production frontend build: passed.
 - Release `Beat` and `BeatBackendStress` targets: built successfully.
 - Complete native stress suite: passed with only the existing `baseline.recent-project-exists` TCC waiver enabled.
-- Lumus v1 migration, v2 roundtrip, malformed/future rack rejection, fixed UI identities, browser audibility, native audibility, stereo pan, finite output, and deterministic rendering: passed.
+- Lumus v1 migration, v2 roundtrip, malformed/future rack rejection, fixed UI identities, browser/native audibility, stereo pan, per-source route conversion, Slot C modulation, finite output, and deterministic rendering: passed.
 - Frozen Aether benchmark renders at 44.1, 48, and 96 kHz retained their recorded SHA-256 values; no baseline was updated.
 
 ## Benchmark lanes
@@ -43,4 +43,4 @@ A direct Serum 2 comparison may be added later only from a locally licensed inst
 
 ## Current conclusion
 
-Lumus has a clean identity boundary, a bit-stable Aether-derived starting renderer, and a fixed A/B/C wavetable rack. The largest verified architectural gaps against the official Serum 2 contract are interchangeable non-wavetable modes in those slots, Slot C modulation coverage, synth-owned arp/clip sequencing, and the remaining routing choices. Spectral work remains incomplete and is not implied ready by this benchmark.
+Lumus has a clean identity boundary, a bit-stable Aether-derived starting renderer, and a fixed A/B/C wavetable rack with verified Slot C modulation and four production routing destinations. The largest verified architectural gaps against the official Serum 2 contract are interchangeable non-wavetable modes in those slots, synth-owned arp/clip sequencing, and the remaining None routing choice. Spectral work remains incomplete and is not implied ready by this benchmark.

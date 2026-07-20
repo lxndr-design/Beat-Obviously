@@ -2258,10 +2258,16 @@ namespace beat
         params.dynamicModulation.oscBFine = copyDynamicTarget(instrument.dynamicModulation.oscBFine);
         params.dynamicModulation.oscBLevel = copyDynamicTarget(instrument.dynamicModulation.oscBLevel);
         params.dynamicModulation.oscBPan = copyDynamicTarget(instrument.dynamicModulation.oscBPan);
+        params.dynamicModulation.oscCPosition = copyDynamicTarget(instrument.dynamicModulation.oscCPosition);
+        params.dynamicModulation.oscCFine = copyDynamicTarget(instrument.dynamicModulation.oscCFine);
+        params.dynamicModulation.oscCLevel = copyDynamicTarget(instrument.dynamicModulation.oscCLevel);
+        params.dynamicModulation.oscCPan = copyDynamicTarget(instrument.dynamicModulation.oscCPan);
         params.dynamicModulation.oscAUnisonDetune = copyDynamicTarget(instrument.dynamicModulation.oscAUnisonDetune);
         params.dynamicModulation.oscAUnisonSpread = copyDynamicTarget(instrument.dynamicModulation.oscAUnisonSpread);
         params.dynamicModulation.oscBUnisonDetune = copyDynamicTarget(instrument.dynamicModulation.oscBUnisonDetune);
         params.dynamicModulation.oscBUnisonSpread = copyDynamicTarget(instrument.dynamicModulation.oscBUnisonSpread);
+        params.dynamicModulation.oscCUnisonDetune = copyDynamicTarget(instrument.dynamicModulation.oscCUnisonDetune);
+        params.dynamicModulation.oscCUnisonSpread = copyDynamicTarget(instrument.dynamicModulation.oscCUnisonSpread);
         params.dynamicModulation.filterCutoff = copyDynamicTarget(instrument.dynamicModulation.filterCutoff);
         params.dynamicModulation.filterResonance = copyDynamicTarget(instrument.dynamicModulation.filterResonance);
         params.dynamicModulation.filterDrive = copyDynamicTarget(instrument.dynamicModulation.filterDrive);

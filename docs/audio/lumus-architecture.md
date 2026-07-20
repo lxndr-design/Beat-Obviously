@@ -27,13 +27,14 @@ The adapter is an intentional bootstrap boundary. It lets Lumus start audible an
 
 ## Ownership
 
-- `frontend/src/state/synthStore.ts`: current type/namespace identity and initial draft factory; later this should delegate Lumus-owned schema work to `frontend/src/state/lumusStore.ts`.
+- `frontend/src/state/synthStore.ts`: current type/namespace identity, initial draft factory, and stable Slot C modulation target IDs; later this should delegate Lumus-owned schema work to `frontend/src/state/lumusStore.ts`.
+- `frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx`: shared oscillator layout, knobs, and `FloatingSelect` routing control used unchanged by Aether and Lumus.
 - `frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx`: explicit Create Lumus entry.
 - `frontend/src/features/EditorHost/EditorHost.solid.tsx`: Lumus editor identity and modal lifecycle.
 - `backend/Source/Audio/Parameters/ParameterIds.h`: stable native instrument type.
 - `backend/Source/Audio/Parameters/SynthPatchContract.cpp`: validated v1 migration and v2 A/B/C contract.
 - `backend/Source/Audio/TrackModel.h`: engine identity and Lumus-owned Slot C state retained independently of Aether.
-- `backend/Source/Audio/InstrumentVoice.{h,cpp}`: prepared fixed-capacity Slot C wavetable state and routing; its branch is unreachable for Aether.
+- `backend/Source/Audio/InstrumentVoice.{h,cpp}`: prepared fixed-capacity Slot C wavetable state, routing, and bounded modulation evaluation; its branch is unreachable for Aether.
 
 ## Non-negotiable compatibility rules
 

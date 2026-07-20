@@ -16360,6 +16360,7 @@ namespace
             "osc.c.wavetable": "basic.square",
             "osc.c.level": 0.47,
             "osc.c.pan": 0.65,
+            "osc.c.route": "filter2",
             "osc.c.semitone": 7,
             "osc.c.unison.voices": 3
           },
@@ -16373,7 +16374,14 @@ namespace
               ]
             }
           },
-          "modulation": []
+          "modulation": [
+            { "source": "macro.1", "target": "osc.c.position", "amount": 0.31, "enabled": true },
+            { "source": "macro.2", "target": "osc.c.fine", "amount": -0.22, "enabled": true },
+            { "source": "macro.3", "target": "osc.c.level", "amount": 0.17, "enabled": true },
+            { "source": "macro.4", "target": "osc.c.pan", "amount": -0.26, "enabled": true },
+            { "source": "macro.5", "target": "osc.c.unison.detune", "amount": 0.19, "enabled": true },
+            { "source": "macro.6", "target": "osc.c.unison.spread", "amount": -0.14, "enabled": true }
+          ]
         }
         )json");
         beat::InstrumentDefinition lumusThreeSlot;
@@ -16381,9 +16389,16 @@ namespace
             || !lumusThreeSlot.lumus.oscC.enabled
             || std::abs(lumusThreeSlot.lumus.oscC.level - 0.47f) > 0.0001f
             || std::abs(lumusThreeSlot.lumus.oscC.pan - 0.65f) > 0.0001f
+            || lumusThreeSlot.lumus.oscC.routing != 3
             || lumusThreeSlot.lumus.oscC.semitone != 7
             || lumusThreeSlot.lumus.oscC.wavetable.bank != 2
-            || lumusThreeSlot.lumus.oscC.wavetable.unison != 3)
+            || lumusThreeSlot.lumus.oscC.wavetable.unison != 3
+            || std::abs(lumusThreeSlot.dynamicModulation.oscCPosition.macro1 - 0.31f) > 0.0001f
+            || std::abs(lumusThreeSlot.dynamicModulation.oscCFine.macro2 + 0.22f) > 0.0001f
+            || std::abs(lumusThreeSlot.dynamicModulation.oscCLevel.macro3 - 0.17f) > 0.0001f
+            || std::abs(lumusThreeSlot.dynamicModulation.oscCPan.macro4 + 0.26f) > 0.0001f
+            || std::abs(lumusThreeSlot.dynamicModulation.oscCUnisonDetune.macro5 - 0.19f) > 0.0001f
+            || std::abs(lumusThreeSlot.dynamicModulation.oscCUnisonSpread.macro6 + 0.14f) > 0.0001f)
             return false;
         const auto malformedLumusRack = juce::JSON::parse(R"json(
         {
@@ -18077,7 +18092,18 @@ namespace
         auto withCParams = base;
         withCParams.lumusOscC.enabled = true;
         const auto withC = render(withCParams);
+        auto modulatedCParams = withCParams;
+        modulatedCParams.dynamicModulation.active = true;
+        modulatedCParams.macroValues[0] = 0.8f;
+        modulatedCParams.dynamicModulation.oscCPosition.macro1 = 0.45f;
+        modulatedCParams.dynamicModulation.oscCFine.macro1 = 0.18f;
+        modulatedCParams.dynamicModulation.oscCLevel.macro1 = -0.2f;
+        modulatedCParams.dynamicModulation.oscCPan.macro1 = -0.6f;
+        modulatedCParams.dynamicModulation.oscCUnisonDetune.macro1 = 0.12f;
+        modulatedCParams.dynamicModulation.oscCUnisonSpread.macro1 = -0.25f;
+        const auto modulatedC = render(modulatedCParams);
         double difference = 0.0;
+        double modulationDifference = 0.0;
         double leftEnergy = 0.0;
         double rightEnergy = 0.0;
         for (int sample = 0; sample < withC.getNumSamples(); ++sample)
@@ -18087,10 +18113,12 @@ namespace
             if (!std::isfinite(left) || !std::isfinite(right)) return false;
             difference += std::abs((double) left - withoutC.getSample(0, sample));
             difference += std::abs((double) right - withoutC.getSample(1, sample));
+            modulationDifference += std::abs((double) left - modulatedC.getSample(0, sample));
+            modulationDifference += std::abs((double) right - modulatedC.getSample(1, sample));
             leftEnergy += (double) left * left;
             rightEnergy += (double) right * right;
         }
-        return difference > 0.1 && rightEnergy > leftEnergy * 1.02;
+        return difference > 0.1 && modulationDifference > 0.1 && rightEnergy > leftEnergy * 1.02;
     }
 
     bool stressInstrumentVoiceAetherPolyphony()
