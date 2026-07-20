@@ -67,7 +67,7 @@ const sampleBufferCache = new Map<string, AudioBuffer>();
 const sampleLoadPromises = new Map<string, Promise<void>>();
 const sampleRoundRobinIndex = new Map<string, number>();
 const renderedInstrumentBufferCache = new Map<string, AudioBuffer>();
-const unisonVoicePlanCache = new Map<string, UnisonVoicePlan>();
+const unisonVoicePlanCache = new Map<number, UnisonVoicePlan>();
 const oscillatorRateCache = new Map<string, number>();
 let browserPreviewAudioContext: AudioContext | null = null;
 
@@ -172,7 +172,9 @@ interface UnisonVoicePlan {
   rates: number[];
   phaseOffsets: number[];
   weights: number[];
+  centered: number[];
   weightSum: number;
+  stereoGains: Map<number, Map<number, { left: number[]; right: number[] }>>;
 }
 
 export function createSynthRenderState(): SynthRenderState {
@@ -779,13 +781,16 @@ function unisonVoicePlan(unison: number, detuneCents: number, blend: number): Un
   const voiceCount = clampAetherUnisonVoices(unison);
   const detune = quantizeKeyNumber(clamp(detuneCents, 0, 100), 0.01);
   const spread = quantizeKeyNumber(clamp01(blend), 0.001);
-  const key = `${voiceCount}|${detune}|${spread}`;
+  const detuneKey = Math.round(detune * 100);
+  const spreadKey = Math.round(spread * 1000);
+  const key = ((voiceCount * 10001) + detuneKey) * 1001 + spreadKey;
   const cached = unisonVoicePlanCache.get(key);
   if (cached) return cached;
 
   const rates: number[] = [];
   const phaseOffsets: number[] = [];
   const weights: number[] = [];
+  const centeredValues: number[] = [];
   let weightSum = 0;
   for (let voice = 0; voice < voiceCount; voice++) {
     const centered = voiceCount === 1 ? 0 : (voice / (voiceCount - 1)) * 2 - 1;
@@ -793,13 +798,38 @@ function unisonVoicePlan(unison: number, detuneCents: number, blend: number): Un
     rates.push(Math.pow(2, (centered * detune) / 1200));
     phaseOffsets.push(voice * 0.071 * spread);
     weights.push(weight);
+    centeredValues.push(centered);
     weightSum += weight;
   }
 
-  const plan = { rates, phaseOffsets, weights, weightSum };
+  const plan = { rates, phaseOffsets, weights, centered: centeredValues, weightSum, stereoGains: new Map() };
   unisonVoicePlanCache.set(key, plan);
   trimCache(unisonVoicePlanCache, MAX_UNISON_VOICE_PLANS);
   return plan;
+}
+
+function unisonStereoGains(plan: UnisonVoicePlan, spread: number, basePan: number) {
+  let spreadCache = plan.stereoGains.get(spread);
+  if (!spreadCache) {
+    spreadCache = new Map();
+    plan.stereoGains.set(spread, spreadCache);
+    trimCache(plan.stereoGains, 16);
+  }
+  const safeBasePan = clampBipolar(basePan);
+  const cached = spreadCache.get(safeBasePan);
+  if (cached) return cached;
+  const left: number[] = [];
+  const right: number[] = [];
+  for (const centered of plan.centered) {
+    const normalizedPan = (clampBipolar(safeBasePan + centered * spread) + 1) * 0.5;
+    const panAngle = normalizedPan * Math.PI * 0.5;
+    left.push(Math.cos(panAngle));
+    right.push(Math.sin(panAngle));
+  }
+  const gains = { left, right };
+  spreadCache.set(safeBasePan, gains);
+  trimCache(spreadCache, 16);
+  return gains;
 }
 
 function trimCache<K, V>(cache: Map<K, V>, maxEntries: number) {
@@ -1147,6 +1177,7 @@ interface CachedPreviewWavetable {
 }
 
 const previewWavetableCache = new Map<string, CachedPreviewWavetable>();
+const builtInPreviewWavetableCache = new WeakMap<WavetableConfig, Map<number, CachedPreviewWavetable>>();
 
 function aetherStackSample(
   instrument: Instrument,
@@ -1188,7 +1219,6 @@ function aetherStackBuses(
     const legacyPositionOffset = key === "a" ? modulation.positionOffset : 0;
     const wavetableOffset = legacyPositionOffset + modulationTargetOffset(modulation, `osc.${key}.position`);
     const warpOffset = modulationTargetOffset(modulation, `osc.${key}.warp`);
-    const wavetable = warpOffset === 0 ? osc.wavetable : { ...osc.wavetable, warp: clamp01(osc.wavetable.warp + warpOffset) };
     const unisonDetuneOffset = modulationTargetOffset(modulation, "unison.detune")
       + modulationTargetOffset(modulation, `osc.${key}.unison.detune`);
     const unisonSpreadOffset = modulationTargetOffset(modulation, "unison.spread")
@@ -1200,10 +1230,11 @@ function aetherStackBuses(
           state.phase * rate + phaseOffset,
           sampleRate,
           frequency * rate,
-          wavetable,
+          osc.wavetable,
           wavetableOffset,
           unisonDetuneOffset,
           unisonSpreadOffset,
+          warpOffset,
         )
       : waveform === "noise"
       ? mode === "audio" ? Math.random() * 2 - 1 : whiteNoiseSample(state.index + Math.round(rate * 97))
@@ -1327,7 +1358,6 @@ function aetherStackStereoSample(
     const legacyPositionOffset = key === "a" ? modulation.positionOffset : 0;
     const wavetableOffset = legacyPositionOffset + modulationTargetOffset(modulation, `osc.${key}.position`);
     const warpOffset = modulationTargetOffset(modulation, `osc.${key}.warp`);
-    const wavetable = warpOffset === 0 ? osc.wavetable : { ...osc.wavetable, warp: clamp01(osc.wavetable.warp + warpOffset) };
     const unisonDetuneOffset = modulationTargetOffset(modulation, "unison.detune")
       + modulationTargetOffset(modulation, `osc.${key}.unison.detune`);
     const unisonSpreadOffset = modulationTargetOffset(modulation, "unison.spread")
@@ -1340,11 +1370,12 @@ function aetherStackStereoSample(
           state.phase * rate + phaseOffset,
           sampleRate,
           frequency * rate,
-          wavetable,
+          osc.wavetable,
           wavetableOffset,
           unisonDetuneOffset,
           unisonSpreadOffset,
           pan,
+          warpOffset,
         );
       const interactionSample = (stereo.left + stereo.right) * 0.5;
       if (key === "a") {
@@ -1409,6 +1440,7 @@ function wavetableOscillatorSample(
   positionOffset = 0,
   detuneCentsOffset = 0,
   spreadOffset = 0,
+  warpOffset = 0,
 ): number {
   const config = override ?? instrument.wavetable ?? {
     bank: "aether",
@@ -1422,6 +1454,7 @@ function wavetableOscillatorSample(
   const unison = clampAetherUnisonVoices(config.unison);
   const detune = Math.max(0, Math.min(100, config.detuneCents + detuneCentsOffset));
   const blend = clamp01(config.blend + spreadOffset);
+  const effectiveWarp = clamp01(config.warp + warpOffset);
   const voicePlan = unisonVoicePlan(unison, detune, blend);
   let sum = 0;
   for (let voice = 0; voice < unison; voice++) {
@@ -1433,7 +1466,7 @@ function wavetableOscillatorSample(
       sampleRate,
       frequency * rate,
       clamp01(config.position + positionOffset),
-      config.warp,
+      effectiveWarp,
       config.warpMode ?? "shape",
     ) * voicePlan.weights[voice];
   }
@@ -1450,6 +1483,7 @@ function wavetableOscillatorStereoSample(
   detuneCentsOffset = 0,
   spreadOffset = 0,
   basePan = 0,
+  warpOffset = 0,
 ): { left: number; right: number } {
   const config = override ?? instrument.wavetable ?? {
     bank: "aether",
@@ -1463,7 +1497,9 @@ function wavetableOscillatorStereoSample(
   const unison = clampAetherUnisonVoices(config.unison);
   const detune = Math.max(0, Math.min(100, config.detuneCents + detuneCentsOffset));
   const spread = clamp01(config.blend + spreadOffset);
+  const effectiveWarp = clamp01(config.warp + warpOffset);
   const voicePlan = unisonVoicePlan(unison, detune, spread);
+  const stereoGains = unisonStereoGains(voicePlan, spread, basePan);
   let left = 0;
   let right = 0;
   for (let voice = 0; voice < unison; voice += 1) {
@@ -1475,13 +1511,11 @@ function wavetableOscillatorStereoSample(
       sampleRate,
       frequency * rate,
       clamp01(config.position + positionOffset),
-      config.warp,
+      effectiveWarp,
       config.warpMode ?? "shape",
     ) * voicePlan.weights[voice];
-    const centered = unison === 1 ? 0 : (voice / (unison - 1)) * 2 - 1;
-    const [leftGain, rightGain] = panGains(clampBipolar(basePan + centered * spread));
-    left += sample * leftGain;
-    right += sample * rightGain;
+    left += sample * stereoGains.left[voice];
+    right += sample * stereoGains.right[voice];
   }
   const normalizer = Math.max(1, voicePlan.weightSum);
   return {
@@ -1520,6 +1554,22 @@ function getPreviewWavetable(
 ): CachedPreviewWavetable {
   const custom = config.bank === "custom" ? customWavetableForInstrument(instrument, config.customId) : null;
   const harmonicLimit = Math.min(32, Math.max(1, Math.floor((sampleRate * 0.48) / Math.max(20, frequency))));
+  if (custom == null) {
+    const warpKey = Math.round(clamp01(warp) * 1000);
+    const modeKey = warpMode === "fold" ? 1 : warpMode === "pinch" ? 2 : warpMode === "mirror" ? 3 : 0;
+    const key = ((modeKey * 33) + harmonicLimit) * 1001 + warpKey;
+    let configCache = builtInPreviewWavetableCache.get(config);
+    if (!configCache) {
+      configCache = new Map<number, CachedPreviewWavetable>();
+      builtInPreviewWavetableCache.set(config, configCache);
+    }
+    const cached = configCache.get(key);
+    if (cached) return cached;
+    const table = createPreviewWavetable(config, null, harmonicLimit, warpKey / 1000, warpMode);
+    configCache.set(key, table);
+    trimCache(configCache, MAX_WAVETABLE_CACHE_ENTRIES);
+    return table;
+  }
   const key = previewWavetableKey(config, custom, harmonicLimit, warp, warpMode);
   const cached = previewWavetableCache.get(key);
   if (cached) return cached;

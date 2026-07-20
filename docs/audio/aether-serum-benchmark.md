@@ -37,7 +37,7 @@ Both hashes were intentionally revised again when the confirmed dual-mono unison
 ## Findings
 
 1. The dual-mono unison defect is corrected. The final nine-voice Future Bass and seven-voice Progressive House renders measure side/mid ratios of `0.622889` and `0.554533` respectively.
-2. The final four-note Future Bass development renderer ran at `0.591x` realtime on the measured machine. Progressive House ran at `0.684x` in the same closeout run. These are deliberately unoptimized browser reference-render timings, not native callback timings; production native evidence is recorded separately below.
+2. The final four-note browser reference renderer runs at `1.033x` realtime for Future Bass (`2323.145 ms` wall) and `1.051x` for Progressive House (`2282.651 ms` wall) on the measured machine. The pre-optimization nine-voice Future Bass run was `0.591x` (`4059.317 ms`), so the browser-only wall time fell 42.8% without changing any float, WAV, C4, or alias-probe hash. A controlled same-process comparison showed that the ninth voice added only about 6–9%; the dominant cost was repeated string-key construction and lookup, temporary per-sample warp configurations, and repeated stereo-pan trigonometry in the TypeScript reference path. Production native evidence remains separate below.
 3. The 48-to-96 kHz downsample comparison produced residuals of `-12.510 dB` for Future Bass and `-17.262 dB` for Progressive House. Modulation, filter behavior, stereo unison, and the intentionally simple downsampler contribute to this residual, so it is a regression baseline rather than a pure oscillator error figure.
 4. At MIDI note 84 and 48 kHz, high-Nyquist-band energy ratios were `0.023780485` and `0.037721045`. At 96 kHz they fell to `0.000071513` and `0.003051646`. This is a risk diagnostic, not a claim that all measured energy is folded aliasing.
 5. The scripted reference renderer measures the Aether core preview and does not apply the persisted instrument FX chain. A separate native fixture now maps both exact benchmark descriptions into the production Aether engine and applies every supported authored insert in order. The saturator's descriptive `tone` field remains a schema-to-engine gap because the current saturator has no tone parameter.
@@ -111,6 +111,6 @@ The full non-native gate, production targets, focused streaming callback test, a
 
 ## Acceptance Boundary
 
-The project owner accepted the corrected `-26.180 / -26.333 dB` band-edge/mip-transition residual as the Serum 1 Nyquist-edge policy and selected the fixed 16-voice capacity. Serum 1 closeout is pending only the complete post-change native/non-native verification and final recorded metrics; Serum 2 work has not begun.
+The project owner accepted the corrected `-26.180 / -26.333 dB` band-edge/mip-transition residual as the Serum 1 Nyquist-edge policy and selected the fixed 16-voice capacity. Complete post-change native/non-native verification is green with only the existing TCC waiver, and the browser reference-render optimization preserved every frozen audio hash. Serum 1.0 is closed; Serum 2 work has not begun.
 
 Changed hashes must be explained in this document before the frozen values are updated.
