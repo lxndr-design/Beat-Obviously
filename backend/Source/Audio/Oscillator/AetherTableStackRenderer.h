@@ -149,6 +149,7 @@ namespace beat::AetherTableStackRenderer
         float filter2LeftSum = 0.0f;
         float filter2RightSum = 0.0f;
         float levelSum = 0.0f;
+        float sourceLevelSum = 0.0f;
 
         struct RenderedOscillator
         {
@@ -169,35 +170,43 @@ namespace beat::AetherTableStackRenderer
         {
             const float safeLevel = VoiceMath::clamp01(level);
             const auto [leftGain, rightGain] = panIsDynamic ? VoiceMath::equalPowerPanGains(pan) : staticPanGains;
-            auto& destinationLeft = routing == 1 ? directLeftSum : routing == 2 ? filter1LeftSum : routing == 3 ? filter2LeftSum : leftSum;
-            auto& destinationRight = routing == 1 ? directRightSum : routing == 2 ? filter1RightSum : routing == 3 ? filter2RightSum : rightSum;
             const float sourceLeft = value * safeLevel * leftGain;
             const float sourceRight = value * safeLevel * rightGain;
-            destinationLeft += sourceLeft;
-            destinationRight += sourceRight;
+            if (routing != 4)
+            {
+                auto& destinationLeft = routing == 1 ? directLeftSum : routing == 2 ? filter1LeftSum : routing == 3 ? filter2LeftSum : leftSum;
+                auto& destinationRight = routing == 1 ? directRightSum : routing == 2 ? filter1RightSum : routing == 3 ? filter2RightSum : rightSum;
+                destinationLeft += sourceLeft;
+                destinationRight += sourceRight;
+                levelSum += safeLevel;
+            }
             if (params.hasAetherSourceSends)
             {
                 sourceFrame.left += sourceLeft;
                 sourceFrame.right += sourceRight;
             }
-            levelSum += safeLevel;
+            sourceLevelSum += safeLevel;
         };
 
         const auto addStereo = [&](float leftValue, float rightValue, float level, int routing, StereoFrame& sourceFrame)
         {
             const float safeLevel = VoiceMath::clamp01(level);
-            auto& destinationLeft = routing == 1 ? directLeftSum : routing == 2 ? filter1LeftSum : routing == 3 ? filter2LeftSum : leftSum;
-            auto& destinationRight = routing == 1 ? directRightSum : routing == 2 ? filter1RightSum : routing == 3 ? filter2RightSum : rightSum;
             const float sourceLeft = leftValue * safeLevel;
             const float sourceRight = rightValue * safeLevel;
-            destinationLeft += sourceLeft;
-            destinationRight += sourceRight;
+            if (routing != 4)
+            {
+                auto& destinationLeft = routing == 1 ? directLeftSum : routing == 2 ? filter1LeftSum : routing == 3 ? filter2LeftSum : leftSum;
+                auto& destinationRight = routing == 1 ? directRightSum : routing == 2 ? filter1RightSum : routing == 3 ? filter2RightSum : rightSum;
+                destinationLeft += sourceLeft;
+                destinationRight += sourceRight;
+                levelSum += safeLevel;
+            }
             if (params.hasAetherSourceSends)
             {
                 sourceFrame.left += sourceLeft;
                 sourceFrame.right += sourceRight;
             }
-            levelSum += safeLevel;
+            sourceLevelSum += safeLevel;
         };
 
         const auto renderOsc = [&](
@@ -424,10 +433,13 @@ namespace beat::AetherTableStackRenderer
             const float delta = std::isfinite(interacted)
                 ? (interacted - renderedA.value) * interactionAmount
                 : 0.0f;
-            auto& destinationLeft = renderedA.routing == 1 ? directLeftSum : renderedA.routing == 2 ? filter1LeftSum : renderedA.routing == 3 ? filter2LeftSum : leftSum;
-            auto& destinationRight = renderedA.routing == 1 ? directRightSum : renderedA.routing == 2 ? filter1RightSum : renderedA.routing == 3 ? filter2RightSum : rightSum;
-            destinationLeft += delta * renderedA.level * renderedA.leftGain;
-            destinationRight += delta * renderedA.level * renderedA.rightGain;
+            if (renderedA.routing != 4)
+            {
+                auto& destinationLeft = renderedA.routing == 1 ? directLeftSum : renderedA.routing == 2 ? filter1LeftSum : renderedA.routing == 3 ? filter2LeftSum : leftSum;
+                auto& destinationRight = renderedA.routing == 1 ? directRightSum : renderedA.routing == 2 ? filter1RightSum : renderedA.routing == 3 ? filter2RightSum : rightSum;
+                destinationLeft += delta * renderedA.level * renderedA.leftGain;
+                destinationRight += delta * renderedA.level * renderedA.rightGain;
+            }
             if (params.hasAetherSourceSends)
             {
                 result.sourceFrames[0].left += delta * renderedA.level * renderedA.leftGain;
@@ -457,7 +469,7 @@ namespace beat::AetherTableStackRenderer
                 0.0f, VoiceMath::centerPanGains, false, params.aetherNoise.routing, result.sourceFrames[3]);
         }
 
-        if (levelSum <= 0.0f)
+        if (levelSum <= 0.0f && sourceLevelSum <= 0.0f)
             return result;
 
         const float normalizer = juce::jmax(0.35f, levelSum);
@@ -473,8 +485,9 @@ namespace beat::AetherTableStackRenderer
         {
             for (auto& sourceFrame : result.sourceFrames)
             {
-                sourceFrame.left = juce::jlimit(-1.0f, 1.0f, sourceFrame.left / normalizer);
-                sourceFrame.right = juce::jlimit(-1.0f, 1.0f, sourceFrame.right / normalizer);
+                const float sourceNormalizer = juce::jmax(0.35f, sourceLevelSum);
+                sourceFrame.left = juce::jlimit(-1.0f, 1.0f, sourceFrame.left / sourceNormalizer);
+                sourceFrame.right = juce::jlimit(-1.0f, 1.0f, sourceFrame.right / sourceNormalizer);
             }
         }
         result.frame.left = juce::jlimit(-1.0f, 1.0f, result.filteredFrame.left + result.filter1Frame.left + result.filter2Frame.left + result.directFrame.left);

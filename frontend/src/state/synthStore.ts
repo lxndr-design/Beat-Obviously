@@ -5051,8 +5051,8 @@ function applyOscillatorToDraft(draft: SynthDraftPatch, oscillator: OscillatorKe
   applyWavetableToDraft(draft, oscillator, source.wavetable, oscillator === "a");
 }
 
-function sourceRouteFromId(route: string): "both" | "filter1" | "filter2" | "direct" {
-  if (route === "direct" || route === "filter1" || route === "filter2") return route;
+function sourceRouteFromId(route: string): "both" | "filter1" | "filter2" | "direct" | "none" {
+  if (route === "direct" || route === "filter1" || route === "filter2" || route === "none") return route;
   return "both";
 }
 

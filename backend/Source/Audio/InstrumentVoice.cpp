@@ -862,7 +862,7 @@ namespace beat
                         filter2Raw.left += lumusSourceFrameC.left;
                         filter2Raw.right += lumusSourceFrameC.right;
                     }
-                    else
+                    else if (params.lumusOscC.routing != 4)
                     {
                         raw.left += lumusSourceFrameC.left;
                         raw.right += lumusSourceFrameC.right;

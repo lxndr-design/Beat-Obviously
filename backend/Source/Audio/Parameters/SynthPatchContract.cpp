@@ -263,7 +263,7 @@ namespace beat
             fallback.tuningDivisions = juce::jlimit(1, 96, (int) std::round(synthNumberParam(params, prefix + "tuning.divisions", fallback.tuningDivisions)));
             fallback.phaseMode = synthStringParam(params, prefix + "phaseMode", "retrigger") == "memory" ? 1 : 0;
             const auto route = synthStringParam(params, prefix + "route", "filter");
-            fallback.routing = route == "direct" ? 1 : route == "filter1" ? 2 : route == "filter2" ? 3 : 0;
+            fallback.routing = route == "direct" ? 1 : route == "filter1" ? 2 : route == "filter2" ? 3 : route == "none" ? 4 : 0;
             fallback.phase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "phase", fallback.phase));
             fallback.randomPhase = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "randomPhase", fallback.randomPhase));
             fallback.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "fxSend1", fallback.fxSends[0]));
@@ -544,7 +544,7 @@ namespace beat
             // Deterministic v1 migration: the new third slot exists but remains silent.
             instrument.lumus.oscC = {};
         }
-        const auto sourceRoute = [](const juce::String& route) { return route == "direct" ? 1 : route == "filter1" ? 2 : route == "filter2" ? 3 : 0; };
+        const auto sourceRoute = [](const juce::String& route) { return route == "direct" ? 1 : route == "filter1" ? 2 : route == "filter2" ? 3 : route == "none" ? 4 : 0; };
         instrument.aether.sub.routing = sourceRoute(synthStringParam(params, "aether.sub.route", "filter"));
         instrument.aether.noise.routing = sourceRoute(synthStringParam(params, "aether.noise.route", "filter"));
         instrument.aether.sampleSlot1.schemaVersion = 4;

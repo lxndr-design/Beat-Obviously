@@ -473,7 +473,7 @@ export interface AetherOscillatorConfig {
   tuningStep?: number;
   tuningDivisions?: number;
   phaseMode?: "retrigger" | "memory";
-  route?: "filter" | "both" | "filter1" | "filter2" | "direct";
+  route?: "filter" | "both" | "filter1" | "filter2" | "direct" | "none";
   phase: number;
   randomPhase: number;
   /** Linear send levels into the two fixed shared Aether FX buses. */
@@ -486,7 +486,7 @@ export interface AetherSubConfig {
   level: number;
   octave: number;
   waveform: "sine" | "square" | "triangle";
-  route?: "filter" | "both" | "filter1" | "filter2" | "direct";
+  route?: "filter" | "both" | "filter1" | "filter2" | "direct" | "none";
   fxSends?: [number, number];
 }
 
@@ -494,7 +494,7 @@ export interface AetherNoiseConfig {
   enabled: boolean;
   level: number;
   color: number;
-  route?: "filter" | "both" | "filter1" | "filter2" | "direct";
+  route?: "filter" | "both" | "filter1" | "filter2" | "direct" | "none";
   fxSends?: [number, number];
 }
 
@@ -505,7 +505,7 @@ export interface AetherSampleSlotConfig {
   rootNote: number;
   level: number;
   pan: number;
-  route?: "filter" | "both" | "filter1" | "filter2" | "direct";
+  route?: "filter" | "both" | "filter1" | "filter2" | "direct" | "none";
   startRatio: number;
   endRatio: number;
   loopEnabled: boolean;
@@ -539,7 +539,7 @@ export interface AetherGranularSlotConfig {
   builtinSource?: "benchmark";
   rootNote: number;
   level: number;
-  route?: "filter" | "both" | "filter1" | "filter2" | "direct";
+  route?: "filter" | "both" | "filter1" | "filter2" | "direct" | "none";
   position: number;
   positionSpread: number;
   grainMilliseconds: number;

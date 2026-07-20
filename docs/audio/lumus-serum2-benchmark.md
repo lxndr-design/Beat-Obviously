@@ -43,4 +43,4 @@ A direct Serum 2 comparison may be added later only from a locally licensed inst
 
 ## Current conclusion
 
-Lumus has a clean identity boundary, a bit-stable Aether-derived starting renderer, and a fixed A/B/C wavetable rack with verified Slot C modulation and four production routing destinations. The largest verified architectural gaps against the official Serum 2 contract are interchangeable non-wavetable modes in those slots, synth-owned arp/clip sequencing, and the remaining None routing choice. Spectral work remains incomplete and is not implied ready by this benchmark.
+Lumus has a clean identity boundary, a bit-stable Aether-derived starting renderer, and a fixed A/B/C wavetable rack with verified Slot C modulation and five production routing destinations, including a silent-main `None` path that preserves source sends. The largest verified architectural gaps against the official Serum 2 contract are interchangeable non-wavetable modes in those slots and synth-owned arp/clip sequencing. Spectral work remains incomplete and is not implied ready by this benchmark.

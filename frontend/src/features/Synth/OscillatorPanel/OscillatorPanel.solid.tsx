@@ -108,6 +108,7 @@ const OSCILLATOR_ROUTE_OPTIONS = [
   { value: "filter1", label: "Filter 1" },
   { value: "filter2", label: "Filter 2" },
   { value: "direct", label: "Direct" },
+  { value: "none", label: "None" },
 ];
 
 type WavemapEditMode = "freehand" | "additive";

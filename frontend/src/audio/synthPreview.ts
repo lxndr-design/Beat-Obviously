@@ -1243,6 +1243,7 @@ function aetherStackBuses(
     if (key === "a") {
       interactionA.sample = sourceSample; interactionA.level = level; interactionA.route = osc.route; interactionA.active = true;
     } else if (key === "b") { interactionB.sample = sourceSample; interactionB.active = true; }
+    if (osc.route === "none") return;
     if (osc.route === "direct") directSum += sourceSample * level;
     else if (osc.route === "filter1") filter1Sum += sourceSample * level;
     else if (osc.route === "filter2") filter2Sum += sourceSample * level;
@@ -1257,7 +1258,8 @@ function aetherStackBuses(
       ? interactionA.sample * (0.5 + 0.5 * interactionB.sample)
       : interactionA.sample * interactionB.sample;
     const delta = Number.isFinite(interacted) ? (interacted - interactionA.sample) * amount * interactionA.level : 0;
-    if (interactionA.route === "direct") directSum += delta;
+    if (interactionA.route === "none") { /* source remains available to interaction, but has no main destination */ }
+    else if (interactionA.route === "direct") directSum += delta;
     else if (interactionA.route === "filter1") filter1Sum += delta;
     else if (interactionA.route === "filter2") filter2Sum += delta;
     else sum += delta;
@@ -1316,8 +1318,9 @@ function aetherStackStereoSample(
   const interactionA: { sample: number; level: number; pan: number; route: NonNullable<Instrument["aether"]>["oscA"]["route"]; active: boolean } = { sample: 0, level: 0, pan: 0, route: "filter", active: false };
   const interactionB = { sample: 0, active: false };
 
-  const add = (value: number, level: number, pan: number, route: "filter" | "both" | "filter1" | "filter2" | "direct" = "filter") => {
+  const add = (value: number, level: number, pan: number, route: "filter" | "both" | "filter1" | "filter2" | "direct" | "none" = "filter") => {
     const [leftGain, rightGain] = panGains(pan);
+    if (route === "none") return;
     if (route === "direct") {
       directLeft += value * level * leftGain;
       directRight += value * level * rightGain;
@@ -1329,7 +1332,8 @@ function aetherStackStereoSample(
     }
     levelSum += level;
   };
-  const addStereo = (value: { left: number; right: number }, level: number, route: "filter" | "both" | "filter1" | "filter2" | "direct" = "filter") => {
+  const addStereo = (value: { left: number; right: number }, level: number, route: "filter" | "both" | "filter1" | "filter2" | "direct" | "none" = "filter") => {
+    if (route === "none") return;
     if (route === "direct") {
       directLeft += value.left * level;
       directRight += value.right * level;
@@ -1403,7 +1407,8 @@ function aetherStackStereoSample(
       : interactionA.sample * interactionB.sample;
     const delta = Number.isFinite(interacted) ? (interacted - interactionA.sample) * amount * interactionA.level : 0;
     const [leftGain, rightGain] = panGains(interactionA.pan);
-    if (interactionA.route === "direct") { directLeft += delta * leftGain; directRight += delta * rightGain; }
+    if (interactionA.route === "none") { /* no main destination */ }
+    else if (interactionA.route === "direct") { directLeft += delta * leftGain; directRight += delta * rightGain; }
     else if (interactionA.route === "filter1") { filter1Left += delta * leftGain; filter1Right += delta * rightGain; }
     else if (interactionA.route === "filter2") { filter2Left += delta * leftGain; filter2Right += delta * rightGain; }
     else { left += delta * leftGain; right += delta * rightGain; }

@@ -18102,8 +18102,13 @@ namespace
         modulatedCParams.dynamicModulation.oscCUnisonDetune.macro1 = 0.12f;
         modulatedCParams.dynamicModulation.oscCUnisonSpread.macro1 = -0.25f;
         const auto modulatedC = render(modulatedCParams);
+        auto noneRoutedCParams = withCParams;
+        noneRoutedCParams.aetherOscA.enabled = false;
+        noneRoutedCParams.lumusOscC.routing = 4;
+        const auto noneRoutedC = render(noneRoutedCParams);
         double difference = 0.0;
         double modulationDifference = 0.0;
+        double noneRoutedEnergy = 0.0;
         double leftEnergy = 0.0;
         double rightEnergy = 0.0;
         for (int sample = 0; sample < withC.getNumSamples(); ++sample)
@@ -18115,10 +18120,13 @@ namespace
             difference += std::abs((double) right - withoutC.getSample(1, sample));
             modulationDifference += std::abs((double) left - modulatedC.getSample(0, sample));
             modulationDifference += std::abs((double) right - modulatedC.getSample(1, sample));
+            noneRoutedEnergy += std::abs((double) noneRoutedC.getSample(0, sample));
+            noneRoutedEnergy += std::abs((double) noneRoutedC.getSample(1, sample));
             leftEnergy += (double) left * left;
             rightEnergy += (double) right * right;
         }
-        return difference > 0.1 && modulationDifference > 0.1 && rightEnergy > leftEnergy * 1.02;
+        return difference > 0.1 && modulationDifference > 0.1 && noneRoutedEnergy < 0.000001
+            && rightEnergy > leftEnergy * 1.02;
     }
 
     bool stressInstrumentVoiceAetherPolyphony()

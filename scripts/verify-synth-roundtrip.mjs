@@ -265,6 +265,20 @@ try {
   assert.notDeepEqual(modulatedLeft, audibleLeft, "Slot C modulation must alter the deterministic preview render");
   assert.notDeepEqual(modulatedRight, audibleRight, "Slot C pan modulation must alter the stereo preview render");
 
+  const noneRoutedLumus = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(audibleLumus),
+    parameters: {
+      ...audibleLumus.parameters,
+      "osc.a.enabled": false,
+      "osc.b.enabled": false,
+      "osc.c.route": "none",
+    },
+  });
+  const noneLeft = new Float32Array(2048);
+  const noneRight = new Float32Array(2048);
+  synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(noneRoutedLumus), noneLeft, noneRight, 48000, 261.625565, "audio");
+  assert.ok(noneLeft.every((sample) => sample === 0) && noneRight.every((sample) => sample === 0), "None must remove Slot C from all main/filter destinations");
+
   const independentUnisonDraft = synthStore.normalizeSynthDraftPatch({
     parameters: {
       "osc.a.unison.voices": 3,
