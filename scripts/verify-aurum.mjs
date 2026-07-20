@@ -15,6 +15,7 @@ try {
   execFileSync(esbuild, [
     join(repoRoot, "frontend/src/state/aurum.ts"),
     join(repoRoot, "frontend/src/audio/synthPreview.ts"),
+    join(repoRoot, "frontend/src/features/Aurum/aurumEditorInteraction.ts"),
     "--bundle",
     "--format=esm",
     "--platform=node",
@@ -23,6 +24,7 @@ try {
 
   const aurum = await import(pathToFileURL(join(outDir, "state/aurum.js")));
   const preview = await import(pathToFileURL(join(outDir, "audio/synthPreview.js")));
+  const interaction = await import(pathToFileURL(join(outDir, "features/Aurum/aurumEditorInteraction.js")));
   const instrument = aurum.createAurumInstrument("aurum-verifier", "Aurum Verifier");
 
   assert.equal(instrument.aurum.operators.length, 6, "Aurum must expose six operators");
@@ -56,6 +58,12 @@ try {
   assert.equal(malformed.operators.length, 6, "Normalization must restore missing operators");
   assert.equal(malformed.matrix[0][0], 1, "Normalization must clamp matrix values");
   assert.equal(malformed.matrix[5].length, 7, "Normalization must restore matrix geometry");
+
+  assert.equal(interaction.aurumTabIndexAfterKey(0, "ArrowRight"), 1, "Right arrow must advance from Main to OP 1");
+  assert.equal(interaction.aurumTabIndexAfterKey(6, "ArrowRight"), 0, "Right arrow must wrap from OP 6 to Main");
+  assert.equal(interaction.aurumTabIndexAfterKey(0, "ArrowLeft"), 6, "Left arrow must wrap from Main to OP 6");
+  assert.equal(interaction.aurumTabIndexAfterKey(3, "Home"), 0, "Home must select Main");
+  assert.equal(interaction.aurumTabIndexAfterKey(3, "End"), 6, "End must select OP 6");
 
   console.log("Aurum verifier passed.");
 } finally {

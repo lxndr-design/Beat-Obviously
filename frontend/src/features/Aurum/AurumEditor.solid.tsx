@@ -3,6 +3,7 @@ import { Button, FloatingSelect, Icon, Knob, NumberInput, Slider, TextInput, Tog
 import { startInstrumentPreviewAudition, type InstrumentPreviewAuditionHandle } from "../../audio/synthPreview";
 import { AURUM_OPERATOR_COUNT, AURUM_OUTPUT_COLUMN, normalizedAurumConfig } from "../../state/aurum";
 import type { AurumOperatorConfig, AurumOperatorWaveform, Instrument } from "../../state/types";
+import { aurumTabIndexAfterKey } from "./aurumEditorInteraction";
 import styles from "./AurumEditor.module.css";
 
 const WAVEFORM_OPTIONS = ["sine", "triangle", "saw", "square"].map((value) => ({
@@ -54,6 +55,23 @@ export function AurumEditor(props: AurumEditorProps) {
     }));
   }
 
+  function selectTab(index: number) {
+    if (index <= 0) {
+      setSelectedPage("main");
+      return;
+    }
+    setSelectedOperator(Math.min(AURUM_OPERATOR_COUNT - 1, index - 1));
+    setSelectedPage("operator");
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent, currentIndex: number) {
+    const nextIndex = aurumTabIndexAfterKey(currentIndex, event.key);
+    if (nextIndex === currentIndex && !["Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    selectTab(nextIndex);
+    queueMicrotask(() => document.querySelector<HTMLButtonElement>(`[data-aurum-tab="${nextIndex}"]`)?.focus());
+  }
+
   function toggleAudition() {
     if (audition) {
       stopAudition();
@@ -102,6 +120,12 @@ export function AurumEditor(props: AurumEditorProps) {
             <Button
               size="sm"
               selected={selectedPage() === "main"}
+              role="tab"
+              aria-selected={selectedPage() === "main"}
+              aria-controls="aurum-page-panel"
+              tabIndex={selectedPage() === "main" ? 0 : -1}
+              data-aurum-tab="0"
+              onKeyDown={(event) => handleTabKeyDown(event, 0)}
               onClick={() => setSelectedPage("main")}
             >
               Main
@@ -110,6 +134,12 @@ export function AurumEditor(props: AurumEditorProps) {
               <Button
                 size="sm"
                 selected={selectedPage() === "operator" && selectedOperator() === index()}
+                role="tab"
+                aria-selected={selectedPage() === "operator" && selectedOperator() === index()}
+                aria-controls="aurum-page-panel"
+                tabIndex={selectedPage() === "operator" && selectedOperator() === index() ? 0 : -1}
+                data-aurum-tab={`${index() + 1}`}
+                onKeyDown={(event) => handleTabKeyDown(event, index() + 1)}
                 className={candidate.enabled ? styles.operatorActive : styles.operatorMuted}
                 onClick={() => {
                   setSelectedOperator(index());
@@ -122,7 +152,7 @@ export function AurumEditor(props: AurumEditorProps) {
           </div>
 
           <Show when={selectedPage() === "operator"} fallback={
-            <div class={styles.mainPanel}>
+            <div id="aurum-page-panel" class={styles.mainPanel} role="tabpanel">
               <div class={styles.panelTitle}>
                 <div>
                   <h3>Main</h3>
@@ -147,7 +177,7 @@ export function AurumEditor(props: AurumEditorProps) {
               </div>
             </div>
           }>
-            <div class={styles.operatorPanel}>
+            <div id="aurum-page-panel" class={styles.operatorPanel} role="tabpanel">
               <div class={styles.operatorHeading}>
                 <div>
                   <h3>{operator().name}</h3>
