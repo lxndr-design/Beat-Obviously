@@ -206,6 +206,30 @@ namespace beat
             int runtimeWarpMode { 0 };
         };
 
+        struct AurumOperator
+        {
+            bool enabled { false };
+            int waveform { 0 };
+            float ratio { 1.0f };
+            int coarse { 0 };
+            float fineCents { 0.0f };
+            float level { 0.0f };
+            float phase { 0.0f };
+            float attackMs { 5.0f };
+            float decayMs { 500.0f };
+            float sustain { 0.7f };
+            float releaseMs { 300.0f };
+        };
+
+        struct AurumConfig
+        {
+            std::array<AurumOperator, 6> operators {};
+            std::array<std::array<float, 7>, 6> matrix {};
+            int unison { 1 };
+            float detuneCents { 8.0f };
+            float stereoSpread { 0.35f };
+        };
+
         struct DynamicModTarget
         {
             float lfo { 0.0f };
@@ -340,6 +364,8 @@ namespace beat
         DynamicModulation dynamicModulation;
         bool hasAether { false };
         AetherConfig aether;
+        bool hasAurum { false };
+        AurumConfig aurum;
         std::optional<Nodemap::Graph> nodeGraph;
         juce::var taxonomy;
         std::vector<TrackEffect> effects;

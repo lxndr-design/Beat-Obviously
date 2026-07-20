@@ -20,6 +20,7 @@
 #include <juce_dsp/juce_dsp.h>
 
 #include <array>
+#include <cstdint>
 #include <memory>
 #include <string_view>
 
@@ -114,6 +115,21 @@ namespace beat
                 bool enabled { false };
                 float level { 0.0f };
                 float color { 0.5f };
+            };
+
+            struct AurumOperator
+            {
+                bool enabled { false };
+                int waveform { 0 };
+                float ratio { 1.0f };
+                int coarse { 0 };
+                float fineCents { 0.0f };
+                float level { 0.0f };
+                float phase { 0.0f };
+                float attackMs { 5.0f };
+                float decayMs { 500.0f };
+                float sustain { 0.7f };
+                float releaseMs { 300.0f };
             };
 
             struct DynamicModTarget
@@ -230,6 +246,12 @@ namespace beat
             AetherNoise aetherNoise;
             float aetherRuntimeWarp { 0.0f };
             int aetherRuntimeWarpMode { 0 };
+            bool hasAurum { false };
+            std::array<AurumOperator, 6> aurumOperators {};
+            std::array<std::array<float, 7>, 6> aurumMatrix {};
+            int aurumUnison { 1 };
+            float aurumDetuneCents { 8.0f };
+            float aurumStereoSpread { 0.35f };
         };
 
         void setParams(const Params& p);
@@ -276,6 +298,9 @@ namespace beat
         double  lfo2Phase { 0.0 };
         double  aetherOscAPhaseOffset { 0.0 };
         double  aetherOscBPhaseOffset { 0.0 };
+        std::array<double, 48> aurumPhases {};
+        std::array<float, 48> aurumOutputs {};
+        int64_t aurumAgeSamples { 0 };
         float   level { 0.0f };
         float   noteKeytrack { 0.0f };
         float   modWheel { 0.0f };

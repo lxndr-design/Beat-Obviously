@@ -2056,6 +2056,28 @@ namespace beat
         };
         params.aetherRuntimeWarp = juce::jlimit(0.0f, 1.0f, instrument.aether.runtimeWarp);
         params.aetherRuntimeWarpMode = juce::jlimit(0, 3, instrument.aether.runtimeWarpMode);
+        params.hasAurum = instrument.hasAurum;
+        for (size_t index = 0; index < params.aurumOperators.size(); ++index)
+        {
+            const auto& source = instrument.aurum.operators[index];
+            params.aurumOperators[index] = {
+                source.enabled,
+                source.waveform,
+                source.ratio,
+                source.coarse,
+                source.fineCents,
+                source.level,
+                source.phase,
+                source.attackMs,
+                source.decayMs,
+                source.sustain,
+                source.releaseMs,
+            };
+            params.aurumMatrix[index] = instrument.aurum.matrix[index];
+        }
+        params.aurumUnison = juce::jlimit(1, 8, instrument.aurum.unison);
+        params.aurumDetuneCents = juce::jlimit(0.0f, 100.0f, instrument.aurum.detuneCents);
+        params.aurumStereoSpread = juce::jlimit(0.0f, 1.0f, instrument.aurum.stereoSpread);
 
         instrumentSynth->setNoteStealingEnabled(allocation.noteStealing);
         for (int i = 0; i < allocation.voiceCount; ++i)

@@ -330,6 +330,13 @@ namespace beat
             + VoiceMath::deterministicPhaseJitter(noiseState ^ 0xa9f14c31u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscA.randomPhase);
         aetherOscBPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscB.phase)
             + VoiceMath::deterministicPhaseJitter(noiseState ^ 0x6c8e9cf5u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscB.randomPhase);
+        aurumAgeSamples = 0;
+        aurumOutputs.fill(0.0f);
+        for (size_t index = 0; index < aurumPhases.size(); ++index)
+            aurumPhases[index] = std::fmod(
+                juce::jlimit(0.0, 1.0, (double) params.aurumOperators[index % 6].phase)
+                    + (double) (index / 6) * 0.071,
+                1.0);
         if (params.lfoRetrigger)
             lfoPhase = std::fmod(juce::jlimit(0.0, 1.0, (double) params.lfoPhaseOffset)
                 + VoiceMath::deterministicPhaseJitter(noiseState ^ 0x35a1d7bdu) * juce::jlimit(0.0, 1.0, (double) params.lfoRandomPhase),
@@ -492,7 +499,64 @@ namespace beat
 
             // Oscillator
             StereoSample raw;
-            if (params.hasAether)
+            if (params.hasAurum)
+            {
+                std::array<float, 48> nextOutputs {};
+                const float timeMs = (float) ((double) aurumAgeSamples * 1000.0 / sampleRate);
+                const int voiceCount = juce::jlimit(1, 8, params.aurumUnison);
+                float left = 0.0f;
+                float right = 0.0f;
+                for (int voice = 0; voice < voiceCount; ++voice)
+                {
+                    const size_t voiceOffset = (size_t) voice * 6;
+                    const float centered = voiceCount == 1 ? 0.0f : ((float) voice / (float) (voiceCount - 1)) * 2.0f - 1.0f;
+                    const double voiceRate = std::exp2((double) centered * params.aurumDetuneCents / 1200.0);
+                    for (size_t target = 0; target < 6; ++target)
+                    {
+                        const auto& op = params.aurumOperators[target];
+                        if (!op.enabled) continue;
+                        float fm = 0.0f;
+                        for (size_t source = 0; source < 6; ++source)
+                            fm += aurumOutputs[voiceOffset + source] * VoiceMath::clamp01(params.aurumMatrix[source][target]);
+
+                        const float attack = juce::jmax(0.0f, op.attackMs);
+                        const float decay = juce::jmax(0.0f, op.decayMs);
+                        const float sustain = VoiceMath::clamp01(op.sustain);
+                        const float opEnvelope = attack > 0.0f && timeMs < attack
+                            ? timeMs / attack
+                            : decay > 0.0f && timeMs - attack < decay
+                                ? 1.0f + (sustain - 1.0f) * ((timeMs - attack) / decay)
+                                : sustain;
+                        const double ratio = juce::jlimit(0.125, 32.0, (double) op.ratio);
+                        const double tuning = std::exp2((double) op.coarse / 12.0 + (double) op.fineCents / 1200.0);
+                        const double delta = currentFrequency * voiceRate * ratio * tuning / sampleRate;
+                        nextOutputs[voiceOffset + target] = BasicOscillator::sample(op.waveform, aurumPhases[voiceOffset + target] + fm * 1.9, delta)
+                            * VoiceMath::clamp01(op.level) * opEnvelope;
+                        aurumPhases[voiceOffset + target] = std::fmod(aurumPhases[voiceOffset + target] + delta, 1.0);
+                        currentBlockWork.addOscillatorSamples(1);
+                    }
+
+                    float voiceOutput = 0.0f;
+                    float outputWeight = 0.0f;
+                    for (size_t source = 0; source < 6; ++source)
+                    {
+                        const float amount = VoiceMath::clamp01(params.aurumMatrix[source][6]);
+                        voiceOutput += nextOutputs[voiceOffset + source] * amount;
+                        outputWeight += amount;
+                    }
+                    if (outputWeight > 0.0f)
+                        voiceOutput /= juce::jmax(1.0f, std::sqrt(outputWeight));
+                    const float pan = centered * params.aurumStereoSpread;
+                    const float angle = (pan + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
+                    left += voiceOutput * std::cos(angle);
+                    right += voiceOutput * std::sin(angle);
+                }
+                aurumOutputs = nextOutputs;
+                ++aurumAgeSamples;
+                const float normalization = 1.0f / std::sqrt((float) voiceCount);
+                raw = { left * normalization, right * normalization };
+            }
+            else if (params.hasAether)
             {
                 const auto aetherResult = AetherTableStackRenderer::render(
                     params,

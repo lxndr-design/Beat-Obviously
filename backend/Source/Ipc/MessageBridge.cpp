@@ -2238,6 +2238,46 @@ namespace beat
                         instrument.aether.runtimeWarpMode = parseWavetableWarpMode(aether.getProperty("runtimeWarpMode", 0));
                     }
 
+                    const auto aurum = instrumentVar.getProperty("aurum", {});
+                    if (aurum.isObject())
+                    {
+                        instrument.hasAurum = true;
+                        instrument.hasAether = false;
+                        if (auto* operators = aurum.getProperty("operators", {}).getArray())
+                        {
+                            const auto count = juce::jmin(6, operators->size());
+                            for (int index = 0; index < count; ++index)
+                            {
+                                const auto value = operators->getReference(index);
+                                if (!value.isObject()) continue;
+                                auto& op = instrument.aurum.operators[(size_t) index];
+                                op.enabled = (bool) value.getProperty("enabled", index < 2);
+                                op.waveform = parseWaveform(value.getProperty("waveform", "sine"), juce::String());
+                                op.ratio = floatParam(value, "ratio", index == 1 ? 2.0f : 1.0f, 0.125f, 32.0f);
+                                op.coarse = juce::jlimit(-48, 48, (int) value.getProperty("coarse", 0));
+                                op.fineCents = floatParam(value, "fineCents", 0.0f, -100.0f, 100.0f);
+                                op.level = normalizedParam(value, "level", index == 0 ? 0.78f : 0.55f);
+                                op.phase = normalizedParam(value, "phase", 0.0f);
+                                const auto envelope = value.getProperty("envelope", {});
+                                op.attackMs = floatParam(envelope, "attackMs", 5.0f, 0.0f, 10000.0f);
+                                op.decayMs = floatParam(envelope, "decayMs", 500.0f, 0.0f, 10000.0f);
+                                op.sustain = normalizedParam(envelope, "sustain", 0.7f);
+                                op.releaseMs = floatParam(envelope, "releaseMs", 300.0f, 0.0f, 10000.0f);
+                            }
+                        }
+                        if (auto* rows = aurum.getProperty("matrix", {}).getArray())
+                        {
+                            const auto rowCount = juce::jmin(6, rows->size());
+                            for (int source = 0; source < rowCount; ++source)
+                                if (auto* cells = rows->getReference(source).getArray())
+                                    for (int target = 0; target < juce::jmin(7, cells->size()); ++target)
+                                        instrument.aurum.matrix[(size_t) source][(size_t) target] = juce::jlimit(0.0f, 1.0f, (float) (double) cells->getReference(target));
+                        }
+                        instrument.aurum.unison = juce::jlimit(1, 8, (int) aurum.getProperty("unison", 1));
+                        instrument.aurum.detuneCents = floatParam(aurum, "detuneCents", 8.0f, 0.0f, 100.0f);
+                        instrument.aurum.stereoSpread = normalizedParam(aurum, "stereoSpread", 0.35f);
+                    }
+
                     if (auto* sampleUrls = instrumentVar.getProperty("sampleUrls", {}).getArray())
                     {
                         for (const auto& sampleUrl : *sampleUrls)

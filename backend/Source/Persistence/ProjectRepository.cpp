@@ -397,6 +397,101 @@ namespace beat
             return config;
         }
 
+        juce::String aurumWaveformName(int waveform)
+        {
+            switch (waveform)
+            {
+                case 1: return "saw";
+                case 2: return "square";
+                case 3: return "triangle";
+                default: return "sine";
+            }
+        }
+
+        int aurumWaveformFromVar(const juce::var& value)
+        {
+            const auto name = value.toString().toLowerCase();
+            if (name == "saw") return 1;
+            if (name == "square") return 2;
+            if (name == "triangle") return 3;
+            return value.isInt() ? juce::jlimit(0, 3, (int) value) : 0;
+        }
+
+        juce::var aurumConfigToVar(const InstrumentDefinition::AurumConfig& aurum)
+        {
+            juce::DynamicObject::Ptr object = new juce::DynamicObject();
+            object->setProperty("version", 1);
+            object->setProperty("unison", aurum.unison);
+            object->setProperty("detuneCents", aurum.detuneCents);
+            object->setProperty("stereoSpread", aurum.stereoSpread);
+            juce::Array<juce::var> operators;
+            for (size_t index = 0; index < aurum.operators.size(); ++index)
+            {
+                const auto& source = aurum.operators[index];
+                juce::DynamicObject::Ptr op = new juce::DynamicObject();
+                op->setProperty("id", "op-" + juce::String((int) index + 1));
+                op->setProperty("name", "OP " + juce::String((int) index + 1));
+                op->setProperty("enabled", source.enabled);
+                op->setProperty("waveform", aurumWaveformName(source.waveform));
+                op->setProperty("ratio", source.ratio);
+                op->setProperty("coarse", source.coarse);
+                op->setProperty("fineCents", source.fineCents);
+                op->setProperty("level", source.level);
+                op->setProperty("phase", source.phase);
+                juce::DynamicObject::Ptr envelope = new juce::DynamicObject();
+                envelope->setProperty("attackMs", source.attackMs);
+                envelope->setProperty("decayMs", source.decayMs);
+                envelope->setProperty("sustain", source.sustain);
+                envelope->setProperty("releaseMs", source.releaseMs);
+                op->setProperty("envelope", juce::var(envelope.get()));
+                operators.add(juce::var(op.get()));
+            }
+            object->setProperty("operators", operators);
+            juce::Array<juce::var> matrix;
+            for (const auto& source : aurum.matrix)
+            {
+                juce::Array<juce::var> row;
+                for (const auto amount : source) row.add(amount);
+                matrix.add(juce::var(row));
+            }
+            object->setProperty("matrix", matrix);
+            return juce::var(object.get());
+        }
+
+        InstrumentDefinition::AurumConfig aurumConfigFromVar(const juce::var& value)
+        {
+            InstrumentDefinition::AurumConfig config;
+            if (!value.isObject()) return config;
+            if (auto* operators = value.getProperty("operators", {}).getArray())
+                for (int index = 0; index < juce::jmin(6, operators->size()); ++index)
+                {
+                    const auto source = operators->getReference(index);
+                    if (!source.isObject()) continue;
+                    auto& op = config.operators[(size_t) index];
+                    op.enabled = (bool) source.getProperty("enabled", index < 2);
+                    op.waveform = aurumWaveformFromVar(source.getProperty("waveform", "sine"));
+                    op.ratio = juce::jlimit(0.125f, 32.0f, (float) (double) source.getProperty("ratio", index == 1 ? 2.0 : 1.0));
+                    op.coarse = juce::jlimit(-48, 48, (int) source.getProperty("coarse", 0));
+                    op.fineCents = juce::jlimit(-100.0f, 100.0f, (float) (double) source.getProperty("fineCents", 0.0));
+                    op.level = juce::jlimit(0.0f, 1.0f, (float) (double) source.getProperty("level", index == 0 ? 0.78 : 0.55));
+                    op.phase = juce::jlimit(0.0f, 1.0f, (float) (double) source.getProperty("phase", 0.0));
+                    const auto envelope = source.getProperty("envelope", {});
+                    op.attackMs = juce::jlimit(0.0f, 10000.0f, (float) (double) envelope.getProperty("attackMs", 5.0));
+                    op.decayMs = juce::jlimit(0.0f, 10000.0f, (float) (double) envelope.getProperty("decayMs", 500.0));
+                    op.sustain = juce::jlimit(0.0f, 1.0f, (float) (double) envelope.getProperty("sustain", 0.7));
+                    op.releaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) envelope.getProperty("releaseMs", 300.0));
+                }
+            if (auto* rows = value.getProperty("matrix", {}).getArray())
+                for (int source = 0; source < juce::jmin(6, rows->size()); ++source)
+                    if (auto* cells = rows->getReference(source).getArray())
+                        for (int target = 0; target < juce::jmin(7, cells->size()); ++target)
+                            config.matrix[(size_t) source][(size_t) target] = juce::jlimit(0.0f, 1.0f, (float) (double) cells->getReference(target));
+            config.unison = juce::jlimit(1, 8, (int) value.getProperty("unison", 1));
+            config.detuneCents = juce::jlimit(0.0f, 100.0f, (float) (double) value.getProperty("detuneCents", 8.0));
+            config.stereoSpread = juce::jlimit(0.0f, 1.0f, (float) (double) value.getProperty("stereoSpread", 0.35));
+            return config;
+        }
+
         juce::var dynamicModTargetToVar(const InstrumentDefinition::DynamicModTarget& target)
         {
             juce::DynamicObject::Ptr o = new juce::DynamicObject();
@@ -1010,6 +1105,9 @@ namespace beat
             o->setProperty("hasAether", instrument.hasAether);
             if (instrument.hasAether)
                 o->setProperty("aether", aetherConfigToVar(instrument.aether));
+            o->setProperty("hasAurum", instrument.hasAurum);
+            if (instrument.hasAurum)
+                o->setProperty("aurum", aurumConfigToVar(instrument.aurum));
             if (instrument.nodeGraph)
                 o->setProperty("nodeGraph", nodemapGraphToVar(*instrument.nodeGraph));
             if (!instrument.taxonomy.isVoid())
@@ -1212,6 +1310,14 @@ namespace beat
                     {
                         instrument.hasAether = true;
                         instrument.aether = aetherConfigFromVar(aether, globalWavetable);
+                    }
+                    instrument.hasAurum = (bool) iv.getProperty("hasAurum", false);
+                    const auto aurum = iv.getProperty("aurum", {});
+                    if (aurum.isObject() || instrument.hasAurum)
+                    {
+                        instrument.hasAurum = true;
+                        instrument.hasAether = false;
+                        instrument.aurum = aurumConfigFromVar(aurum);
                     }
                     instrument.nodeGraph = nodemapGraphFromVar(iv.getProperty("nodeGraph", {}));
 
