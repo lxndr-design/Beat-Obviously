@@ -998,7 +998,7 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
       if (!operator.enabled) continue;
       let modulation = 0;
       for (let source = 0; source < operatorCount; source += 1) {
-        modulation += (state.aurumOutputs[voiceOffset + source] ?? 0) * clamp01(config.matrix[source]?.[target] ?? 0);
+        modulation += (state.aurumOutputs[voiceOffset + source] ?? 0) * clampBipolar(config.matrix[source]?.[target] ?? 0);
       }
       const stateIndex = voiceOffset + target;
       if (state.index === 0) state.aurumPhases[stateIndex] = (clamp01(operator.phase) + voice * 0.071) % 1;
@@ -1013,9 +1013,9 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
     let voiceOutput = 0;
     let outputWeight = 0;
     for (let source = 0; source < operatorCount; source += 1) {
-      const amount = clamp01(config.matrix[source]?.[6] ?? 0);
+      const amount = clampBipolar(config.matrix[source]?.[6] ?? 0);
       voiceOutput += nextOutputs[voiceOffset + source] * amount;
-      outputWeight += amount;
+      outputWeight += Math.abs(amount);
     }
     if (outputWeight > 0) {
       voiceOutput /= Math.max(1, Math.sqrt(outputWeight));

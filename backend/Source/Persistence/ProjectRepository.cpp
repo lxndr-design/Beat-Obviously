@@ -485,7 +485,7 @@ namespace beat
                 for (int source = 0; source < juce::jmin(6, rows->size()); ++source)
                     if (auto* cells = rows->getReference(source).getArray())
                         for (int target = 0; target < juce::jmin(7, cells->size()); ++target)
-                            config.matrix[(size_t) source][(size_t) target] = juce::jlimit(0.0f, 1.0f, (float) (double) cells->getReference(target));
+                            config.matrix[(size_t) source][(size_t) target] = juce::jlimit(-1.0f, 1.0f, (float) (double) cells->getReference(target));
             config.unison = juce::jlimit(1, 8, (int) value.getProperty("unison", 1));
             config.detuneCents = juce::jlimit(0.0f, 100.0f, (float) (double) value.getProperty("detuneCents", 8.0));
             config.stereoSpread = juce::jlimit(0.0f, 1.0f, (float) (double) value.getProperty("stereoSpread", 0.35));

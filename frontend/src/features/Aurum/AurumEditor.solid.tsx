@@ -252,13 +252,14 @@ export function AurumEditor(props: AurumEditorProps) {
                   const feedback = () => sourceIndex() === targetIndex();
                   const output = () => targetIndex() === AURUM_OUTPUT_COLUMN;
                   return (
-                    <div class={`${styles.matrixCell} ${feedback() ? styles.feedbackCell : ""} ${output() ? styles.outputCell : ""}`} data-active={value() > 0.001}>
+                    <div class={`${styles.matrixCell} ${feedback() ? styles.feedbackCell : ""} ${output() ? styles.outputCell : ""}`} data-active={Math.abs(value()) > 0.001}>
                       <Knob
                         className={styles.matrixKnob}
                         size="sm"
-                        min={0}
+                        min={-1}
                         max={1}
                         step={0.01}
+                        bipolar
                         value={value()}
                         label={`${source.name} ${feedback() ? "feedback" : output() ? "to output" : `to ${aurum().operators[targetIndex()].name}`}`}
                         formatValue={(next) => `${Math.round(next * 100)}`}

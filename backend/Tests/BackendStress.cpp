@@ -7242,6 +7242,54 @@ namespace
         return ok;
     }
 
+    bool stressProjectRepositoryAurumInstrumentRoundtrip()
+    {
+        const auto root = juce::File("/private/tmp")
+            .getChildFile("BeatBackendStress-aurum-instrument-repository-" + juce::Uuid().toString());
+        const auto dbFile = root.getChildFile("projects.sqlite");
+        if (!root.createDirectory())
+            return false;
+
+        beat::Project project;
+        project.id = "aurum-instrument-repository-project";
+        project.name = "Aurum Instrument Repository Project";
+
+        beat::InstrumentDefinition instrument;
+        instrument.id = "aurum-bipolar-roundtrip";
+        instrument.hasAurum = true;
+        instrument.hasAether = false;
+        instrument.aurum.operators[0].enabled = true;
+        instrument.aurum.operators[0].level = 0.8f;
+        instrument.aurum.operators[1].enabled = true;
+        instrument.aurum.operators[1].ratio = 2.0f;
+        instrument.aurum.operators[1].level = 0.55f;
+        instrument.aurum.matrix[1][0] = -0.42f;
+        instrument.aurum.matrix[0][6] = -0.86f;
+        instrument.aurum.unison = 3;
+        instrument.aurum.detuneCents = 11.0f;
+        instrument.aurum.stereoSpread = 0.57f;
+        project.instruments.push_back(instrument);
+
+        beat::Database db(dbFile);
+        beat::ProjectRepository repo(db);
+        repo.save(project);
+        const auto loaded = repo.load(project.id);
+        const bool ok = loaded.has_value()
+            && loaded->instruments.size() == 1
+            && loaded->instruments.front().hasAurum
+            && !loaded->instruments.front().hasAether
+            && near(loaded->instruments.front().aurum.matrix[1][0], -0.42f)
+            && near(loaded->instruments.front().aurum.matrix[0][6], -0.86f)
+            && loaded->instruments.front().aurum.unison == 3
+            && near(loaded->instruments.front().aurum.detuneCents, 11.0f)
+            && near(loaded->instruments.front().aurum.stereoSpread, 0.57f);
+
+        root.deleteRecursively();
+        if (!ok)
+            std::cerr << "Project repository Aurum bipolar roundtrip failed loaded=" << loaded.has_value() << "\n";
+        return ok;
+    }
+
     bool stressProjectRepositoryAudioFileRoundtrip()
     {
         const auto root = juce::File("/private/tmp")
@@ -12220,6 +12268,70 @@ namespace
         return true;
     }
 
+    bool stressInstrumentVoiceAurumBipolarMatrix()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.drive01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 1.0f;
+        params.sustain = 1.0f;
+        params.releaseMs = 1.0f;
+        params.aurumOperators[0] = { true, 0, 1.0f, 0, 0.0f, 0.8f, 0.13f, 0.0f, 0.0f, 1.0f, 100.0f };
+        params.aurumOperators[1] = { true, 0, 2.0f, 0, 0.0f, 0.55f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
+        params.aurumMatrix[1][0] = 0.42f;
+        params.aurumMatrix[0][6] = 0.86f;
+
+        auto render = [](const beat::InstrumentVoice::Params& renderParams)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 256);
+            voice.setParams(renderParams);
+            voice.startNote(57, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        const auto positive = render(params);
+        auto negativeFmParams = params;
+        negativeFmParams.aurumMatrix[1][0] = -params.aurumMatrix[1][0];
+        const auto negativeFm = render(negativeFmParams);
+        auto negativeOutputParams = params;
+        negativeOutputParams.aurumMatrix[0][6] = -params.aurumMatrix[0][6];
+        const auto negativeOutput = render(negativeOutputParams);
+
+        double energy = 0.0;
+        double fmDifference = 0.0;
+        double inversionResidual = 0.0;
+        for (int channel = 0; channel < positive.getNumChannels(); ++channel)
+        {
+            for (int sampleIndex = 0; sampleIndex < positive.getNumSamples(); ++sampleIndex)
+            {
+                const auto positiveSample = (double) positive.getSample(channel, sampleIndex);
+                const auto negativeFmSample = (double) negativeFm.getSample(channel, sampleIndex);
+                const auto negativeOutputSample = (double) negativeOutput.getSample(channel, sampleIndex);
+                if (!std::isfinite(positiveSample) || !std::isfinite(negativeFmSample) || !std::isfinite(negativeOutputSample))
+                    return false;
+                energy += positiveSample * positiveSample;
+                fmDifference += std::abs(positiveSample - negativeFmSample);
+                inversionResidual += std::abs(positiveSample + negativeOutputSample);
+            }
+        }
+
+        const bool ok = energy > 0.001 && fmDifference > 0.1 && inversionResidual < 0.001;
+        if (!ok)
+            std::cerr << "Aurum bipolar voice stress failed energy=" << energy
+                      << " fmDifference=" << fmDifference
+                      << " inversionResidual=" << inversionResidual << "\n";
+        return ok;
+    }
+
     bool stressInstrumentVoiceWavetablePath()
     {
         beat::InstrumentVoice::Params params;
@@ -13679,6 +13791,11 @@ int main(int argc, char** argv)
         std::cerr << "Instrument voice wavetable stress failed\n";
         return 1;
     }
+    if (!stressInstrumentVoiceAurumBipolarMatrix())
+    {
+        std::cerr << "Instrument voice Aurum bipolar matrix stress failed\n";
+        return 1;
+    }
     if (!stressInstrumentVoiceBandlimitedBasicOscillators())
     {
         std::cerr << "Instrument voice bandlimited basic oscillator stress failed\n";
@@ -13851,6 +13968,11 @@ int main(int argc, char** argv)
     if (!stressProjectRepositoryAetherInstrumentRoundtrip())
     {
         std::cerr << "Project repository Aether instrument roundtrip stress failed\n";
+        return 1;
+    }
+    if (!stressProjectRepositoryAurumInstrumentRoundtrip())
+    {
+        std::cerr << "Project repository Aurum instrument roundtrip stress failed\n";
         return 1;
     }
     if (!stressProjectRepositoryAudioFileRoundtrip())

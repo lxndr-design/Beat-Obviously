@@ -44,6 +44,20 @@ try {
   const difference = baseline.reduce((sum, sample, index) => sum + Math.abs(sample - dry[index]), 0) / baseline.length;
   assert.ok(difference > 0.005, `FM routing must alter the rendered waveform, got mean difference ${difference}`);
 
+  const negativeFm = structuredClone(instrument);
+  negativeFm.aurum.matrix[1][0] = -instrument.aurum.matrix[1][0];
+  const negativeFmSamples = new Float32Array(4096);
+  preview.renderInstrumentSamples(negativeFm, negativeFmSamples, 48000, 220, "visual", true);
+  const bipolarFmDifference = baseline.reduce((sum, sample, index) => sum + Math.abs(sample - negativeFmSamples[index]), 0) / baseline.length;
+  assert.ok(bipolarFmDifference > 0.005, `Negative FM must invert modulation phase, got mean difference ${bipolarFmDifference}`);
+
+  const invertedOutput = structuredClone(instrument);
+  invertedOutput.aurum.matrix[0][6] = -instrument.aurum.matrix[0][6];
+  const invertedOutputSamples = new Float32Array(4096);
+  preview.renderInstrumentSamples(invertedOutput, invertedOutputSamples, 48000, 220, "visual", true);
+  const inversionResidual = baseline.reduce((sum, sample, index) => sum + Math.abs(sample + invertedOutputSamples[index]), 0) / baseline.length;
+  assert.ok(inversionResidual < 0.0001, `Negative output sends must phase-invert the rendered carrier, got residual ${inversionResidual}`);
+
   const stereoPatch = structuredClone(instrument);
   stereoPatch.aurum.unison = 3;
   stereoPatch.aurum.detuneCents = 14;
@@ -54,9 +68,10 @@ try {
   const stereoDifference = left.reduce((sum, sample, index) => sum + Math.abs(sample - right[index]), 0) / left.length;
   assert.ok(stereoDifference > 0.005, `Aurum spread must create stereo separation, got mean difference ${stereoDifference}`);
 
-  const malformed = aurum.normalizedAurumConfig({ ...instrument.aurum, operators: instrument.aurum.operators.slice(0, 1), matrix: [[4]] });
+  const malformed = aurum.normalizedAurumConfig({ ...instrument.aurum, operators: instrument.aurum.operators.slice(0, 1), matrix: [[4, -4]] });
   assert.equal(malformed.operators.length, 6, "Normalization must restore missing operators");
   assert.equal(malformed.matrix[0][0], 1, "Normalization must clamp matrix values");
+  assert.equal(malformed.matrix[0][1], -1, "Normalization must preserve and clamp negative matrix values");
   assert.equal(malformed.matrix[5].length, 7, "Normalization must restore matrix geometry");
 
   assert.equal(interaction.aurumTabIndexAfterKey(0, "ArrowRight"), 1, "Right arrow must advance from Main to OP 1");

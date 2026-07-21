@@ -72,10 +72,10 @@ export function normalizedAurumConfig(config: AurumSynthConfig | undefined): Aur
     ...config,
     version: 1,
     operators: fallback.operators.map((operator, index) => ({ ...operator, ...config.operators[index] })),
-    matrix: fallback.matrix.map((row, source) => row.map((value, target) => clamp01(config.matrix[source]?.[target] ?? value))),
+    matrix: fallback.matrix.map((row, source) => row.map((value, target) => clampBipolar(config.matrix[source]?.[target] ?? value))),
   };
 }
 
-function clamp01(value: number) {
-  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+function clampBipolar(value: number) {
+  return Math.max(-1, Math.min(1, Number.isFinite(value) ? value : 0));
 }

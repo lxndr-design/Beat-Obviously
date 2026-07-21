@@ -517,7 +517,7 @@ namespace beat
                         if (!op.enabled) continue;
                         float fm = 0.0f;
                         for (size_t source = 0; source < 6; ++source)
-                            fm += aurumOutputs[voiceOffset + source] * VoiceMath::clamp01(params.aurumMatrix[source][target]);
+                            fm += aurumOutputs[voiceOffset + source] * juce::jlimit(-1.0f, 1.0f, params.aurumMatrix[source][target]);
 
                         const float attack = juce::jmax(0.0f, op.attackMs);
                         const float decay = juce::jmax(0.0f, op.decayMs);
@@ -540,9 +540,9 @@ namespace beat
                     float outputWeight = 0.0f;
                     for (size_t source = 0; source < 6; ++source)
                     {
-                        const float amount = VoiceMath::clamp01(params.aurumMatrix[source][6]);
+                        const float amount = juce::jlimit(-1.0f, 1.0f, params.aurumMatrix[source][6]);
                         voiceOutput += nextOutputs[voiceOffset + source] * amount;
-                        outputWeight += amount;
+                        outputWeight += std::abs(amount);
                     }
                     if (outputWeight > 0.0f)
                         voiceOutput /= juce::jmax(1.0f, std::sqrt(outputWeight));

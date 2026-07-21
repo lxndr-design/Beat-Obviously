@@ -2,12 +2,14 @@
 
 Aurum is Beat's six-operator FM and additive instrument. It takes inspiration from matrix-based FM synthesizers while keeping Beat's own compact editor and data model.
 
+The staged implementation and release gates are tracked in [`aurum-roadmap.md`](aurum-roadmap.md).
+
 ## Version 1 scope
 
 - Six independently enabled operators
 - Sine, saw, square, and triangle operator waveforms
 - Ratio, coarse, fine, level, phase, and ADSR controls per operator
-- A 6 x 7 routing matrix: six operator destinations plus the audible output
+- A bipolar 6 x 7 routing matrix: six operator destinations plus the audible output
 - Self-routing for operator feedback
 - One-sample-delayed matrix feedback so cyclic routes remain bounded
 - One to eight unison voices with detune and stereo spread
