@@ -404,6 +404,38 @@ try {
         && !segmentEditorSource.includes('if (midiLiveMode() === "overwrite") updateMidi([])'),
       "MIDI live recording should preview held notes and avoid whole-clip clearing at overwrite start",
     );
+    assert.deepEqual(
+      midiLiveRecording.COMPUTER_PIANO_OCTAVES[0].whiteKeys.map((key) => key.label),
+      ["Z", "X", "C", "V", "B", "N", "M"],
+      "lower computer-piano white keys should use the Z through M row",
+    );
+    assert.deepEqual(
+      midiLiveRecording.COMPUTER_PIANO_OCTAVES[0].blackKeys.filter(Boolean).map((key) => key.label),
+      ["S", "D", "G", "H", "J"],
+      "lower computer-piano black keys should use S D G H J",
+    );
+    assert.deepEqual(
+      midiLiveRecording.COMPUTER_PIANO_OCTAVES[1].whiteKeys.map((key) => key.label),
+      ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+      "upper computer-piano white keys should use the Q through P row",
+    );
+    assert.deepEqual(
+      midiLiveRecording.COMPUTER_PIANO_OCTAVES[1].blackKeys.filter(Boolean).map((key) => key.label),
+      ["2", "3", "5", "6", "7", "9", "0"],
+      "upper computer-piano black keys should use the number-row accidentals",
+    );
+    assert.equal(midiLiveRecording.computerPianoPitch("KeyZ"), 60);
+    assert.equal(midiLiveRecording.computerPianoPitch("KeyZ", { shiftKey: true }), 72);
+    assert.equal(midiLiveRecording.computerPianoPitch("KeyZ", { ctrlKey: true }), 48);
+    assert.equal(midiLiveRecording.computerPianoPitch("KeyZ", { shiftKey: true, ctrlKey: true }), 60);
+    assert.equal(midiLiveRecording.computerPianoPitch("Digit2"), 73);
+    assert.equal(midiLiveRecording.computerPianoPitch("KeyA"), null);
+    assert.ok(
+      segmentEditorSource.includes("const key = event.code")
+        && segmentEditorSource.includes("const pitch = computerPianoPitch(key, event)")
+        && segmentEditorSource.includes("const heldKey = midiLiveHeldKeys()[key]"),
+      "live MIDI keyup should release the note stored for its physical key regardless of modifier changes",
+    );
   }
   assert.ok(
     trackHeaderSource.includes("leftPeak") && trackHeaderSource.includes("rightPeak"),

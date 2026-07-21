@@ -53,7 +53,9 @@ import { DrumSequencer } from "../DrumEditor/DrumSequencer.solid";
 import { PianoRoll } from "../MidiEditor/PianoRoll.solid";
 import { MidiTransport } from "../MidiEditor/MidiTransport.solid";
 import {
+  COMPUTER_PIANO_OCTAVES,
   MIDI_LIVE_MIN_LENGTH_BEATS,
+  computerPianoPitch,
   composeLiveMidiNotes,
   eraseMidiNotesOverlappingSweep,
   makeLiveMidiNote,
@@ -75,26 +77,6 @@ type AudioPayload = Extract<Segment["payload"], { kind: "audio" }>;
 // automation needs a separate opt-in surface instead of living under every MIDI clip.
 const SHOW_SEGMENT_AUTOMATION_PANEL = false;
 const MIDI_LIVE_BASE_BPM = 120;
-const MIDI_LIVE_KEY_MAP: Record<string, number> = {
-  a: 60,
-  w: 61,
-  s: 62,
-  e: 63,
-  d: 64,
-  f: 65,
-  t: 66,
-  g: 67,
-  y: 68,
-  h: 69,
-  u: 70,
-  j: 71,
-  k: 72,
-  o: 73,
-  l: 74,
-  p: 75,
-};
-const MIDI_LIVE_WHITE_KEYS = ["a", "s", "d", "f", "g", "h", "j", "k", "l"] as const;
-const MIDI_LIVE_BLACK_KEYS = ["w", "e", "", "t", "y", "u", "", "o", "p"] as const;
 
 export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const source = createStoreSelector(useProjectStore, () => selectSegment(props.segmentId));
@@ -348,12 +330,14 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
 
   function handleMidiLiveKeyDown(event: KeyboardEvent) {
     if (!isMidi() || !midiLiveRecording() || isEditableEventTarget(event.target)) return;
-    const key = event.key.toLowerCase();
-    const pitch = MIDI_LIVE_KEY_MAP[key];
-    if (pitch == null || event.repeat) return;
+    if (event.metaKey || event.altKey) return;
+    const key = event.code;
+    const pitch = computerPianoPitch(key, event);
+    if (pitch == null) return;
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
+    if (event.repeat) return;
     const startBeat = currentMidiLiveBeat();
     ensureMidiLiveLengthForBeat(startBeat);
     sweepMidiLiveOverwriteToBeat(startBeat);
@@ -366,8 +350,8 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   }
 
   function handleMidiLiveKeyUp(event: KeyboardEvent) {
-    if (!isMidi() || !midiLiveRecording() || isEditableEventTarget(event.target)) return;
-    const key = event.key.toLowerCase();
+    if (!isMidi() || !midiLiveRecording()) return;
+    const key = event.code;
     const heldKey = midiLiveHeldKeys()[key];
     if (!heldKey) return;
     event.preventDefault();
@@ -765,39 +749,48 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
               </div>
               <Show when={midiLiveRecording()}>
                 <div class={styles.midiLiveKeyboard} aria-label="Computer keyboard MIDI map">
-                  <div class={styles.midiLiveKeyboardRow} data-row="black">
-                    <For each={MIDI_LIVE_BLACK_KEYS}>
-                      {(key) => key
-                        ? (
-                          <span
-                            classList={{
-                              [styles.midiLiveKey]: true,
-                              [styles.midiLiveBlackKey]: true,
-                              [styles.midiLiveKeyActive]: midiLiveActiveKeys().has(key),
-                            }}
-                          >
-                            <span>{key.toUpperCase()}</span>
-                            <span>{midiPitchName(MIDI_LIVE_KEY_MAP[key])}</span>
-                          </span>
-                        )
-                        : <span class={styles.midiLiveKeySpacer} />}
-                    </For>
-                  </div>
-                  <div class={styles.midiLiveKeyboardRow} data-row="white">
-                    <For each={MIDI_LIVE_WHITE_KEYS}>
-                      {(key) => (
-                        <span
-                          classList={{
-                            [styles.midiLiveKey]: true,
-                            [styles.midiLiveKeyActive]: midiLiveActiveKeys().has(key),
-                          }}
-                        >
-                          <span>{key.toUpperCase()}</span>
-                          <span>{midiPitchName(MIDI_LIVE_KEY_MAP[key])}</span>
-                        </span>
+                  <div class={styles.midiLiveOctaves}>
+                    <For each={COMPUTER_PIANO_OCTAVES}>
+                      {(octave) => (
+                        <div class={styles.midiLiveOctave}>
+                          <div class={styles.midiLiveKeyboardRow} data-row="black">
+                            <For each={octave.blackKeys}>
+                              {(key) => key
+                                ? (
+                                  <span
+                                    classList={{
+                                      [styles.midiLiveKey]: true,
+                                      [styles.midiLiveBlackKey]: true,
+                                      [styles.midiLiveKeyActive]: midiLiveActiveKeys().has(key.code),
+                                    }}
+                                  >
+                                    <span>{key.label}</span>
+                                    <span>{midiPitchName(key.pitch)}</span>
+                                  </span>
+                                )
+                                : <span class={styles.midiLiveKeySpacer} />}
+                            </For>
+                          </div>
+                          <div class={styles.midiLiveKeyboardRow} data-row="white">
+                            <For each={octave.whiteKeys}>
+                              {(key) => (
+                                <span
+                                  classList={{
+                                    [styles.midiLiveKey]: true,
+                                    [styles.midiLiveKeyActive]: midiLiveActiveKeys().has(key.code),
+                                  }}
+                                >
+                                  <span>{key.label}</span>
+                                  <span>{midiPitchName(key.pitch)}</span>
+                                </span>
+                              )}
+                            </For>
+                          </div>
+                        </div>
                       )}
                     </For>
                   </div>
+                  <span class={styles.midiLiveOctaveHint}>Hold Shift +1 octave · Ctrl −1 octave</span>
                 </div>
               </Show>
             </div>

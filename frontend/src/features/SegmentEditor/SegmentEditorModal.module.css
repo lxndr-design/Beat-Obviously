@@ -112,6 +112,22 @@
   min-width: 0;
 }
 
+.midiLiveOctaves {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  min-width: 0;
+}
+
+.midiLiveOctave {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
 .midiLiveKeyboardRow {
   display: grid;
   grid-auto-flow: column;
@@ -156,6 +172,13 @@
   background: var(--color-fg);
   color: var(--color-bg);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-fg) 72%, transparent);
+}
+
+.midiLiveOctaveHint {
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-hint);
+  line-height: 1;
 }
 
 @media (max-width: 860px) {
