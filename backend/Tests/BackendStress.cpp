@@ -12692,6 +12692,140 @@ namespace
         return ok;
     }
 
+    bool stressInstrumentVoiceAurumDenseFeedbackStability()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.8f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.drive01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        params.releaseMs = 100.0f;
+        params.aurumUnison = 8;
+        params.aurumDetuneCents = 100.0f;
+        params.aurumStereoSpread = 1.0f;
+
+        for (size_t operatorIndex = 0; operatorIndex < params.aurumOperators.size(); ++operatorIndex)
+        {
+            auto& op = params.aurumOperators[operatorIndex];
+            op.enabled = true;
+            op.waveform = operatorIndex == 5 ? 4 : (int) (operatorIndex % 4);
+            op.ratio = 0.5f + (float) operatorIndex * 0.75f;
+            op.coarse = (int) operatorIndex - 2;
+            op.fineCents = (float) operatorIndex * 2.5f - 6.25f;
+            op.level = 1.0f;
+            op.attackMs = 0.0f;
+            op.decayMs = 0.0f;
+            op.sustain = 1.0f;
+            op.releaseMs = 100.0f + (float) operatorIndex * 20.0f;
+            if (op.waveform == 4)
+            {
+                op.harmonics.fill(1.0f);
+                op.harmonics[1] = 0.7f;
+                op.harmonics[3] = 0.4f;
+            }
+
+            params.aurumMatrix[operatorIndex][6] = operatorIndex % 2 == 0 ? 1.0f : -1.0f;
+            for (size_t target = 0; target < params.aurumOperators.size(); ++target)
+            {
+                const float polarity = (operatorIndex + target) % 2 == 0 ? 1.0f : -1.0f;
+                params.aurumMatrix[operatorIndex][target] = polarity;
+                params.aurumRmMatrix[operatorIndex][target] = polarity * 0.62f;
+            }
+        }
+
+        constexpr int totalSamples = 8192;
+        constexpr std::array<double, 3> sampleRates { 44100.0, 48000.0, 96000.0 };
+        constexpr std::array<int, 4> blockSizes { 1, 17, 257, 4096 };
+        constexpr int64_t expectedOscillatorSamples = (int64_t) totalSamples * 6 * 8;
+
+        auto render = [&](double sampleRate, int blockSize, const beat::InstrumentVoice::Params& renderParams)
+        {
+            beat::InstrumentVoice::consumeRenderWorkStats();
+            beat::InstrumentVoice voice;
+            voice.prepare(sampleRate, blockSize);
+            voice.setParams(renderParams);
+            voice.startNote(45, 1.0f, nullptr, 0);
+
+            juce::AudioBuffer<float> output(2, totalSamples);
+            output.clear();
+            int rendered = 0;
+            while (rendered < totalSamples)
+            {
+                const int samplesThisBlock = juce::jmin(blockSize, totalSamples - rendered);
+                voice.renderNextBlock(output, rendered, samplesThisBlock);
+                rendered += samplesThisBlock;
+            }
+            voice.stopNote(0.0f, false);
+            return std::pair { std::move(output), beat::InstrumentVoice::consumeRenderWorkStats() };
+        };
+
+        for (const double sampleRate : sampleRates)
+        {
+            juce::AudioBuffer<float> reference(2, totalSamples);
+            reference.clear();
+            bool hasReference = false;
+
+            for (const int blockSize : blockSizes)
+            {
+                auto [buffer, work] = render(sampleRate, blockSize, params);
+                const double energy = bufferEnergy(buffer);
+                const float peak = bufferPeak(buffer);
+                const int64_t expectedBlocks = (totalSamples + blockSize - 1) / blockSize;
+                bool blockInvariant = true;
+                float maxBlockDiff = 0.0f;
+                if (hasReference)
+                {
+                    const auto residual = bufferResidualStats(reference, buffer, totalSamples);
+                    blockInvariant = residual.ok && residual.maxAbsDiff <= 0.000001f;
+                    maxBlockDiff = residual.maxAbsDiff;
+                }
+                else
+                {
+                    reference.makeCopyOf(buffer);
+                    hasReference = true;
+                }
+
+                const bool ok = std::isfinite(energy)
+                    && energy > 0.000001
+                    && std::isfinite(peak)
+                    && peak > 0.000001f
+                    && peak <= 1.0f
+                    && !bufferHasSubnormalSamples(buffer)
+                    && blockInvariant
+                    && work.voiceBlocks == expectedBlocks
+                    && work.voiceSamples == totalSamples
+                    && work.oscillatorSamples == expectedOscillatorSamples
+                    && work.wavetableVoiceSamples == 0;
+                if (!ok)
+                {
+                    std::cerr << "Aurum dense feedback stability failed"
+                              << " sampleRate=" << sampleRate
+                              << " blockSize=" << blockSize
+                              << " energy=" << energy
+                              << " peak=" << peak
+                              << " maxBlockDiff=" << maxBlockDiff
+                              << " voiceBlocks=" << work.voiceBlocks
+                              << " voiceSamples=" << work.voiceSamples
+                              << " oscillatorSamples=" << work.oscillatorSamples
+                              << "\n";
+                    return false;
+                }
+            }
+        }
+
+        auto malformedParams = params;
+        malformedParams.aurumMatrix[0][0] = std::numeric_limits<float>::quiet_NaN();
+        malformedParams.aurumRmMatrix[1][2] = std::numeric_limits<float>::infinity();
+        auto [malformed, malformedWork] = render(48000.0, 257, malformedParams);
+        return std::isfinite(bufferEnergy(malformed))
+            && bufferPeak(malformed) <= 1.0f
+            && malformedWork.oscillatorSamples == expectedOscillatorSamples;
+    }
+
     bool stressInstrumentVoiceWavetablePath()
     {
         beat::InstrumentVoice::Params params;
@@ -14018,6 +14152,7 @@ int main(int argc, char** argv)
             && stressInstrumentVoiceAurumOperatorRelease()
             && stressInstrumentVoiceAurumRingMatrix()
             && stressInstrumentVoiceAurumAdditiveOperator()
+            && stressInstrumentVoiceAurumDenseFeedbackStability()
             && stressAudioEngineAurumCrossRateLiveExportParity()
             && stressProjectRepositoryAurumInstrumentRoundtrip();
         if (!ok)
@@ -14186,6 +14321,11 @@ int main(int argc, char** argv)
     if (!stressInstrumentVoiceAurumAdditiveOperator())
     {
         std::cerr << "Instrument voice Aurum additive operator stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumDenseFeedbackStability())
+    {
+        std::cerr << "Instrument voice Aurum dense feedback stability stress failed\n";
         return 1;
     }
     if (!stressAudioEngineAurumCrossRateLiveExportParity())

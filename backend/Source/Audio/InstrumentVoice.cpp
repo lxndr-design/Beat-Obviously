@@ -16,6 +16,26 @@ namespace beat
 {
     namespace
     {
+        constexpr float aurumMaximumRouteAmount = 1.0f;
+        constexpr float aurumMaximumFmSum = 6.0f;
+        constexpr float aurumMaximumRingGain = 1.0f;
+        constexpr float aurumMaximumFeedbackSample = 1.0f;
+        constexpr float aurumFmPhaseScale = 1.9f;
+
+        float aurumRouteAmount(float amount) noexcept
+        {
+            return std::isfinite(amount)
+                ? juce::jlimit(-aurumMaximumRouteAmount, aurumMaximumRouteAmount, amount)
+                : 0.0f;
+        }
+
+        float aurumFeedbackSample(float sample) noexcept
+        {
+            return std::isfinite(sample)
+                ? juce::jlimit(-aurumMaximumFeedbackSample, aurumMaximumFeedbackSample, sample)
+                : 0.0f;
+        }
+
         float aurumHeldEnvelope(const InstrumentVoice::Params::AurumOperator& op, float timeMs) noexcept
         {
             const float attack = juce::jmax(0.0f, op.attackMs);
@@ -572,7 +592,9 @@ namespace beat
                         if (!op.enabled) continue;
                         float fm = 0.0f;
                         for (size_t source = 0; source < 6; ++source)
-                            fm += aurumOutputs[voiceOffset + source] * juce::jlimit(-1.0f, 1.0f, params.aurumMatrix[source][target]);
+                            fm += aurumFeedbackSample(aurumOutputs[voiceOffset + source])
+                                * aurumRouteAmount(params.aurumMatrix[source][target]);
+                        fm = juce::jlimit(-aurumMaximumFmSum, aurumMaximumFmSum, fm);
 
                         float opEnvelope = aurumHeldEnvelope(op, timeMs);
                         if (aurumReleaseAgeSamples >= 0)
@@ -589,12 +611,15 @@ namespace beat
                         float rmGain = 1.0f;
                         for (size_t source = 0; source < 6; ++source)
                         {
-                            const float amount = juce::jlimit(-1.0f, 1.0f, params.aurumRmMatrix[source][target]);
+                            const float amount = aurumRouteAmount(params.aurumRmMatrix[source][target]);
                             if (std::abs(amount) <= 0.0001f) continue;
-                            rmGain *= 1.0f - std::abs(amount) + aurumOutputs[voiceOffset + source] * amount;
+                            rmGain *= 1.0f - std::abs(amount)
+                                + aurumFeedbackSample(aurumOutputs[voiceOffset + source]) * amount;
+                            rmGain = juce::jlimit(-aurumMaximumRingGain, aurumMaximumRingGain, rmGain);
                         }
-                        nextOutputs[voiceOffset + target] = aurumOperatorSample(op, aurumPhases[voiceOffset + target] + fm * 1.9, delta)
-                            * VoiceMath::clamp01(op.level) * opEnvelope * rmGain;
+                        nextOutputs[voiceOffset + target] = aurumFeedbackSample(
+                            aurumOperatorSample(op, aurumPhases[voiceOffset + target] + fm * aurumFmPhaseScale, delta)
+                                * VoiceMath::clamp01(op.level) * opEnvelope * rmGain);
                         aurumPhases[voiceOffset + target] = std::fmod(aurumPhases[voiceOffset + target] + delta, 1.0);
                         currentBlockWork.addOscillatorSamples(1);
                     }
@@ -603,7 +628,7 @@ namespace beat
                     float outputWeight = 0.0f;
                     for (size_t source = 0; source < 6; ++source)
                     {
-                        const float amount = juce::jlimit(-1.0f, 1.0f, params.aurumMatrix[source][6]);
+                        const float amount = aurumRouteAmount(params.aurumMatrix[source][6]);
                         voiceOutput += nextOutputs[voiceOffset + source] * amount;
                         outputWeight += std::abs(amount);
                     }
