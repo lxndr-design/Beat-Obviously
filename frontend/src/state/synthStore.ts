@@ -24,8 +24,8 @@ import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 5;
-export const LUMUS_PATCH_SCHEMA_VERSION = 2;
-const LEGACY_LUMUS_PATCH_SCHEMA_VERSION = 1;
+export const LUMUS_PATCH_SCHEMA_VERSION = 3;
+const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2] as const;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
 export const SYNTH_INSTRUMENT_TYPE = "wavetable-synth";
 export const LUMUS_PARAMETER_NAMESPACE = "lumus";
@@ -68,12 +68,13 @@ export interface WavemapManualRange {
 
 export type OscillatorKey = string;
 export interface SynthOscillatorDefinition { id: OscillatorKey; name: string }
+export type LumusSourceMode = "wavetable" | "sample";
 export interface LumusSourceRackDescriptor {
-  schemaVersion: 1;
+  schemaVersion: 2;
   slots: [
     { id: "a"; mode: "wavetable" },
     { id: "b"; mode: "wavetable" },
-    { id: "c"; mode: "wavetable" },
+    { id: "c"; mode: LumusSourceMode },
   ];
 }
 export type OscillatorParamSuffix =
@@ -485,24 +486,33 @@ function normalizeLumusOscillatorDefinitions(value: unknown): SynthOscillatorDef
   return (["a", "b", "c"] as const).map((id) => ({ id, name: nameFor(id) }));
 }
 
-function normalizeLumusSourceRack(value: unknown, patchVersion: unknown): LumusSourceRackDescriptor {
+function normalizeLumusSourceRack(value: unknown, patchVersion: unknown, legacySampleEnabled: boolean): LumusSourceRackDescriptor {
   const canonical: LumusSourceRackDescriptor = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     slots: [
       { id: "a", mode: "wavetable" },
       { id: "b", mode: "wavetable" },
       { id: "c", mode: "wavetable" },
     ],
   };
-  if (patchVersion === LEGACY_LUMUS_PATCH_SCHEMA_VERSION && value === undefined) return canonical;
-  if (!isRecord(value) || value.schemaVersion !== 1 || !Array.isArray(value.slots))
-    throw new SynthPatchIdentityError("lumus.source-rack.malformed", "Lumus v2 requires source-rack schema 1.");
+  if (patchVersion === 1 || patchVersion === 2) {
+    if (legacySampleEnabled)
+      throw new SynthPatchIdentityError("lumus.migration.source-conflict", "An older Lumus patch with an active auxiliary sample requires an explicit source assignment before migration.");
+    if (patchVersion === 1 && value === undefined) return canonical;
+    if (!isRecord(value) || value.schemaVersion !== 1 || !Array.isArray(value.slots))
+      throw new SynthPatchIdentityError("lumus.source-rack.malformed", "Legacy Lumus source-rack data is malformed.");
+  } else if (!isRecord(value) || value.schemaVersion !== 2 || !Array.isArray(value.slots)) {
+    throw new SynthPatchIdentityError("lumus.source-rack.malformed", "Lumus v3 requires source-rack schema 2.");
+  }
   if (value.slots.length !== canonical.slots.length)
     throw new SynthPatchIdentityError("lumus.source-rack.capacity", "Lumus requires exactly three source slots.");
   for (let index = 0; index < canonical.slots.length; index += 1) {
     const slot = value.slots[index];
-    if (!isRecord(slot) || slot.id !== canonical.slots[index].id || slot.mode !== "wavetable")
+    if (!isRecord(slot)
+        || slot.id !== canonical.slots[index].id
+        || (index < 2 ? slot.mode !== "wavetable" : slot.mode !== "wavetable" && slot.mode !== "sample"))
       throw new SynthPatchIdentityError("lumus.source-rack.slot-invalid", `Invalid Lumus source slot at index ${index}.`);
+    if (index === 2) canonical.slots[2].mode = slot.mode as LumusSourceMode;
   }
   return canonical;
 }
@@ -1696,7 +1706,7 @@ export function createDefaultLumusDraft(): SynthDraftPatch {
         { id: "c", name: "Source C" },
       ],
       lumusSourceRack: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         slots: [
           { id: "a", mode: "wavetable" },
           { id: "b", mode: "wavetable" },
@@ -1793,7 +1803,11 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
       oscillators: isLumus
         ? normalizeLumusOscillatorDefinitions(inputMetadata.oscillators)
         : normalizeOscillatorDefinitions(inputMetadata.oscillators),
-      ...(isLumus ? { lumusSourceRack: normalizeLumusSourceRack(inputMetadata.lumusSourceRack, input.schemaVersion) } : {}),
+      ...(isLumus ? { lumusSourceRack: normalizeLumusSourceRack(
+        inputMetadata.lumusSourceRack,
+        input.schemaVersion,
+        input.parameters?.["aether.sample.1.enabled"] === true,
+      ) } : {}),
       sampleSlot1Zones: normalizeAetherSampleZones(inputMetadata.sampleSlot1Zones),
       managedSfz: normalizeManagedSfz(inputMetadata.managedSfz),
       managedGranular: normalizeManagedGranular(inputMetadata.managedGranular),
@@ -1826,9 +1840,9 @@ function validateSynthPatchIdentity(input: Partial<SynthDraftPatch> | SynthPatch
   if (type === LUMUS_INSTRUMENT_TYPE) {
     if (namespace !== LUMUS_PARAMETER_NAMESPACE)
       throw new SynthPatchIdentityError("lumus.identity.namespace-mismatch", "Lumus patches must use the lumus namespace.");
-    if (input.schemaVersion !== LEGACY_LUMUS_PATCH_SCHEMA_VERSION
+    if (!LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2)
         && input.schemaVersion !== LUMUS_PATCH_SCHEMA_VERSION)
-      throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema ${LEGACY_LUMUS_PATCH_SCHEMA_VERSION} or ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
+      throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema 1, 2, or ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
     return true;
   }
   throw new SynthPatchIdentityError("synth.identity.type-unknown", `Unsupported synth instrument type: ${String(type)}`);
@@ -2228,6 +2242,9 @@ function formatSignedAmount(value: number): string {
 }
 
 export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Instrument> {
+  const lumusCMode = draft.instrumentType === LUMUS_INSTRUMENT_TYPE
+    ? draft.metadata.lumusSourceRack?.slots[2]?.mode ?? "wavetable"
+    : null;
   const wavetable = wavetableFromDraft(draft, "a");
   const oscA = oscillatorFromDraft(draft, "a", wavetable);
   const oscB = oscillatorFromDraft(draft, "b", wavetableFromDraft(draft, "b"));
@@ -2275,6 +2292,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         id,
         name,
         ...oscillatorFromDraft(draft, id, wavetableFromDraft(draft, id)),
+        ...(id === "c" && lumusCMode === "sample" ? { enabled: false } : {}),
       })),
       sub: {
         enabled: false,
@@ -2293,7 +2311,8 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
       },
       sampleSlot1: {
         schemaVersion: 5,
-        enabled: getBooleanParam(draft, "aether.sample.1.enabled")
+        enabled: (lumusCMode === null || lumusCMode === "sample")
+          && getBooleanParam(draft, "aether.sample.1.enabled")
           && (Boolean(getStringParam(draft, "aether.sample.1.audioFileId"))
             || draft.metadata.sampleSlot1Zones.length > 0
             || Boolean(draft.metadata.managedSfz?.manifestPath)),

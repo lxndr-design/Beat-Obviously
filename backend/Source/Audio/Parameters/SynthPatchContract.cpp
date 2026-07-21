@@ -434,6 +434,7 @@ namespace beat
             const auto schemaVersion = objectProperty(patch, "schemaVersion", {});
             if ((!schemaVersion.isInt() && !schemaVersion.isInt64())
                 || ((int) schemaVersion != params::lumusLegacyPatchSchemaVersion
+                    && (int) schemaVersion != params::lumusPreviousPatchSchemaVersion
                     && (int) schemaVersion != params::lumusPatchSchemaVersion)
                 || patchNamespace.toString() != "lumus")
                 return false;
@@ -448,22 +449,28 @@ namespace beat
         if (!params.isObject()) return false;
         const auto modulation = objectProperty(patch, "modulation", {});
         const auto metadata = objectProperty(patch, "metadata", {});
-        if (isLumus && (int) objectProperty(patch, "schemaVersion", 0) >= params::lumusPatchSchemaVersion)
+        bool lumusCSampleMode = false;
+        if (isLumus && (int) objectProperty(patch, "schemaVersion", 0) >= params::lumusPreviousPatchSchemaVersion)
         {
             const auto rack = objectProperty(metadata, "lumusSourceRack", {});
             const auto slots = objectProperty(rack, "slots", {});
             const auto* slotArray = slots.getArray();
             static constexpr std::array<const char*, 3> requiredIds {{ "a", "b", "c" }};
-            if (!rack.isObject() || (int) objectProperty(rack, "schemaVersion", 0) != 1
+            const int rackSchemaVersion = (int) objectProperty(rack, "schemaVersion", 0);
+            const int patchSchemaVersion = (int) objectProperty(patch, "schemaVersion", 0);
+            if (!rack.isObject()
+                || rackSchemaVersion != (patchSchemaVersion >= params::lumusPatchSchemaVersion ? 2 : 1)
                 || slotArray == nullptr || slotArray->size() != (int) requiredIds.size())
                 return false;
             for (int index = 0; index < slotArray->size(); ++index)
             {
                 const auto& slot = slotArray->getReference(index);
+                const auto mode = objectProperty(slot, "mode", {}).toString();
                 if (!slot.isObject()
                     || objectProperty(slot, "id", {}).toString() != requiredIds[(size_t) index]
-                    || objectProperty(slot, "mode", {}).toString() != "wavetable")
+                    || (index < 2 ? mode != "wavetable" : mode != "wavetable" && mode != "sample"))
                     return false;
+                if (index == 2) lumusCSampleMode = mode == "sample";
             }
         }
         const auto customWavetables = mergedWavemapMetadata(metadata);
@@ -526,7 +533,7 @@ namespace beat
         instrument.hasAether = true;
         instrument.aether.oscA = synthOscillatorConfig(params, modulation, metadata, customWavetables, "a", oscA);
         instrument.aether.oscB = synthOscillatorConfig(params, modulation, metadata, customWavetables, "b", oscB);
-        if (isLumus && (int) objectProperty(patch, "schemaVersion", 0) >= params::lumusPatchSchemaVersion)
+        if (isLumus && (int) objectProperty(patch, "schemaVersion", 0) >= params::lumusPreviousPatchSchemaVersion)
         {
             InstrumentDefinition::AetherOscillator oscC;
             oscC.enabled = false;
@@ -538,6 +545,7 @@ namespace beat
                 oscC.wavetable.bank = synthWavetableBankForId(synthStringParam(params, "osc.c.wavetable", "basic.saw"));
             instrument.lumus.oscC = synthOscillatorConfig(params, modulation, metadata,
                 customWavetables, "c", oscC);
+            if (lumusCSampleMode) instrument.lumus.oscC.enabled = false;
         }
         else
         {
@@ -608,6 +616,9 @@ namespace beat
         instrument.aether.sampleSlot1.enabled = requestedSampleSlotEnabled
             && (instrument.aether.sampleSlot1.audioFileId.isNotEmpty()
                 || !instrument.aether.sampleSlot1.zones.empty());
+        if (isLumus && (int) objectProperty(patch, "schemaVersion", 0) >= params::lumusPatchSchemaVersion
+            && !lumusCSampleMode)
+            instrument.aether.sampleSlot1.enabled = false;
         auto& granular = instrument.aether.granularSlot2;
         granular.schemaVersion = 1;
         granular.builtinSource = synthStringParam(params, "aether.granular.2.builtinSource", "");

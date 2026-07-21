@@ -8,15 +8,15 @@ Beat instrument
     wavetable-synth       -> Aether identity -> frozen Aether contract
     lumus-hybrid-synth    -> Lumus identity  -> Lumus versioned contract
 
-Lumus v2 adapter
+Lumus v3 adapter
   Lumus patch/namespace
     -> fixed source identities A / B / C
     -> A/B through the frozen Aether renderer
-    -> C through Lumus-owned wavetable state
+    -> C through Lumus-owned wavetable/sample mode selection
     -> identical initial output while C is disabled
 
 Current Lumus renderer
-  three fixed wavetable source slots
+  three fixed source slots
     -> source-mode interface
     -> per-source routing and sends
     -> shared modulation policy

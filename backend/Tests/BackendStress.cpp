@@ -16400,6 +16400,30 @@ namespace
             || std::abs(lumusThreeSlot.dynamicModulation.oscCUnisonDetune.macro5 - 0.19f) > 0.0001f
             || std::abs(lumusThreeSlot.dynamicModulation.oscCUnisonSpread.macro6 + 0.14f) > 0.0001f)
             return false;
+        const auto lumusSampleModePatch = juce::JSON::parse(R"json(
+        {
+          "schemaVersion": 3,
+          "instrumentType": "lumus-hybrid-synth",
+          "namespace": "lumus",
+          "parameters": {
+            "osc.c.enabled": true,
+            "aether.sample.1.enabled": true,
+            "aether.sample.1.audioFileId": "lumus-sample-fixture"
+          },
+          "metadata": { "lumusSourceRack": { "schemaVersion": 2, "slots": [
+            { "id": "a", "mode": "wavetable" },
+            { "id": "b", "mode": "wavetable" },
+            { "id": "c", "mode": "sample" }
+          ] } },
+          "modulation": []
+        }
+        )json");
+        beat::InstrumentDefinition lumusSampleMode;
+        if (!beat::applySynthPatchContract(lumusSampleModePatch, lumusSampleMode)
+            || lumusSampleMode.lumus.oscC.enabled
+            || !lumusSampleMode.aether.sampleSlot1.enabled
+            || lumusSampleMode.aether.sampleSlot1.audioFileId != "lumus-sample-fixture")
+            return false;
         const auto malformedLumusRack = juce::JSON::parse(R"json(
         {
           "schemaVersion": 2,
@@ -16418,7 +16442,7 @@ namespace
         if (beat::applySynthPatchContract(malformedLumusRack, rejectedMalformedRack))
             return false;
         const auto futureLumusPatch = juce::JSON::parse(R"json(
-        { "schemaVersion": 3, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
+        { "schemaVersion": 4, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
         )json");
         beat::InstrumentDefinition rejectedFutureLumus;
         if (beat::applySynthPatchContract(futureLumusPatch, rejectedFutureLumus))
@@ -18106,9 +18130,26 @@ namespace
         noneRoutedCParams.aetherOscA.enabled = false;
         noneRoutedCParams.lumusOscC.routing = 4;
         const auto noneRoutedC = render(noneRoutedCParams);
+        auto sampleModeParams = base;
+        sampleModeParams.aetherOscA.enabled = false;
+        sampleModeParams.lumusOscC.enabled = false;
+        auto sampleModeSource = std::make_shared<beat::ImmutableMappedSampleSource>();
+        auto sampleModeZone = std::make_shared<beat::ImmutableSampleSource>();
+        auto sampleModeAudio = std::make_shared<juce::AudioBuffer<float>>(1, 4096);
+        for (int sample = 0; sample < sampleModeAudio->getNumSamples(); ++sample)
+            sampleModeAudio->setSample(0, sample, std::sin((float) sample * 0.031f) * 0.4f);
+        sampleModeZone->audio = sampleModeAudio;
+        sampleModeZone->sourceSampleRate = 48000.0;
+        sampleModeZone->rootNote = 60;
+        sampleModeSource->zones[0] = sampleModeZone;
+        sampleModeSource->zoneCount = 1;
+        sampleModeParams.aetherSampleSlot1.enabled = true;
+        sampleModeParams.aetherSampleSlot1.source = sampleModeSource;
+        const auto sampleModeOutput = render(sampleModeParams);
         double difference = 0.0;
         double modulationDifference = 0.0;
         double noneRoutedEnergy = 0.0;
+        double sampleModeEnergy = 0.0;
         double leftEnergy = 0.0;
         double rightEnergy = 0.0;
         for (int sample = 0; sample < withC.getNumSamples(); ++sample)
@@ -18122,10 +18163,13 @@ namespace
             modulationDifference += std::abs((double) right - modulatedC.getSample(1, sample));
             noneRoutedEnergy += std::abs((double) noneRoutedC.getSample(0, sample));
             noneRoutedEnergy += std::abs((double) noneRoutedC.getSample(1, sample));
+            sampleModeEnergy += std::abs((double) sampleModeOutput.getSample(0, sample));
+            sampleModeEnergy += std::abs((double) sampleModeOutput.getSample(1, sample));
             leftEnergy += (double) left * left;
             rightEnergy += (double) right * right;
         }
         return difference > 0.1 && modulationDifference > 0.1 && noneRoutedEnergy < 0.000001
+            && sampleModeEnergy > 0.1
             && rightEnergy > leftEnergy * 1.02;
     }
 

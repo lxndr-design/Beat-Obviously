@@ -1342,6 +1342,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   const managedSfz = createMemo(() => draft().metadata.managedSfz);
   const managedGranular = createMemo(() => draft().metadata.managedGranular);
   const sampleSourceAvailable = createMemo(() => Boolean(String(draft().parameters["aether.sample.1.audioFileId"] ?? "") || managedSfz()));
+  const sampleSlotLabel = createMemo(() => draft().instrumentType === "lumus-hybrid-synth" ? "Source C Sample" : "Sample Slot 1");
   const granularSourceAvailable = createMemo(() => Boolean(managedGranular() || draft().parameters["aether.granular.2.builtinSource"] === "benchmark"));
   const sampleSourceDescription = createMemo(() => managedSfz()
     ? `Managed SFZ source: ${managedSfz()!.displayName}.`
@@ -1553,7 +1554,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
           </div>
         </div>
         <section class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup} ${styles.sourceSlotGroup}`} aria-labelledby="aether-sample-slot-1-title">
-          <h3 id="aether-sample-slot-1-title" class={styles.ampFilterGroupTitle}>Sample Slot 1</h3>
+          <h3 id="aether-sample-slot-1-title" class={styles.ampFilterGroupTitle}>{sampleSlotLabel()}</h3>
           <p
             ref={sampleSourceStatus}
             id="aether-sample-slot-1-source-status"
@@ -1565,7 +1566,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
           <div class={styles.ampFilterShapeRow}>
             <Toggle
               label="Enabled"
-              aria-label="Enable Aether sample slot 1"
+              aria-label={`Enable ${sampleSlotLabel()}`}
               aria-describedby="aether-sample-slot-1-source-status"
               checked={draft().parameters["aether.sample.1.enabled"] === true}
               disabled={!sampleSourceAvailable()}
@@ -1575,7 +1576,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               label="Asset"
               layout="inline"
               value={String(draft().parameters["aether.sample.1.audioFileId"] ?? "")}
-              ariaLabel="Aether sample slot 1 audio asset"
+              ariaLabel={`${sampleSlotLabel()} audio asset`}
               ariaDescribedBy="aether-sample-slot-1-source-status"
               options={[
                 { value: "", label: "No sample" },
@@ -1596,12 +1597,13 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               label="Route"
               layout="inline"
               value={String(draft().parameters["aether.sample.1.route"] ?? "filter")}
-              ariaLabel="Aether sample slot 1 route"
+              ariaLabel={`${sampleSlotLabel()} route`}
               options={[
                 { value: "filter", label: "Filter" },
                 { value: "filter1", label: "Filter 1" },
                 { value: "filter2", label: "Filter 2" },
                 { value: "direct", label: "Direct" },
+                { value: "none", label: "None" },
               ]}
               open={sampleRouteOpen()}
               onOpenChange={setSampleRouteOpen}

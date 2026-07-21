@@ -231,6 +231,7 @@ function OscillatorRow(props: {
   const setParameter = useSynthStore.getState().setParameter;
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
+  const setDraft = useSynthStore.getState().setDraft;
   const setWavemap = useSynthStore.getState().setWavemap;
   const updateCustomWavetableFrame = useSynthStore.getState().updateCustomWavetableFrame;
   const updateWavemapMetadata = useSynthStore.getState().updateWavemapMetadata;
@@ -240,7 +241,11 @@ function OscillatorRow(props: {
   const [analysisView, setAnalysisView] = createSignal<WavemapAnalysisView>("details");
   const [customEditorOpen, setCustomEditorOpen] = createSignal(true);
   const editMode = () => "additive" as WavemapEditMode;
-  const enabledId = createMemo(() => oscParam(props.oscillator, "enabled"));
+  const lumusSlotC = createMemo(() => draft().instrumentType === "lumus-hybrid-synth" && props.oscillator === "c");
+  const sourceMode = createMemo(() => lumusSlotC() ? draft().metadata.lumusSourceRack?.slots[2]?.mode ?? "wavetable" : "wavetable");
+  const sampleMode = createMemo(() => sourceMode() === "sample");
+  const sampleAvailable = createMemo(() => Boolean(getStringParam(draft(), "aether.sample.1.audioFileId") || draft().metadata.managedSfz));
+  const enabledId = createMemo(() => sampleMode() ? "aether.sample.1.enabled" as SynthParameterId : oscParam(props.oscillator, "enabled"));
   const enabled = createMemo(() => getBooleanParam(draft(), enabledId()));
   const wavetableId = createMemo(() => oscParam(props.oscillator, "wavetable"));
   const warpModeId = createMemo(() => oscParam(props.oscillator, "warpMode"));
@@ -259,6 +264,31 @@ function OscillatorRow(props: {
     setParameter(wavetableId(), next.id as WavetableId);
   }
 
+  function setSourceMode(mode: "wavetable" | "sample") {
+    if (!lumusSlotC()) return;
+    const current = draft();
+    setDraft({
+      ...current,
+      parameters: {
+        ...current.parameters,
+        ...(mode === "sample"
+          ? { "aether.sample.1.enabled": sampleAvailable() }
+          : { "aether.sample.1.enabled": false }),
+      },
+      metadata: {
+        ...current.metadata,
+        lumusSourceRack: {
+          schemaVersion: 2,
+          slots: [
+            { id: "a", mode: "wavetable" },
+            { id: "b", mode: "wavetable" },
+            { id: "c", mode },
+          ],
+        },
+      },
+    });
+  }
+
   return (
     <div class={`${styles.row} ${enabled() ? "" : styles.disabledRow}`} aria-label={`${label()} row`}>
       <div class={`ds-section-header ${styles.oscillatorHeader}`}>
@@ -267,6 +297,7 @@ function OscillatorRow(props: {
           size="xs"
           className={styles.oscillatorPowerButton}
           selected={enabled()}
+          disabled={sampleMode() && !sampleAvailable()}
           aria-label={`${enabled() ? "Disable" : "Enable"} ${label()}`}
           onClick={() => setBooleanParameter(enabledId(), !enabled())}
         >
@@ -279,20 +310,33 @@ function OscillatorRow(props: {
           value={props.name}
           onChange={(event) => renameOscillator(props.oscillator, event.currentTarget.value)}
         />
-        <div class={styles.headerWavetable}>
-          <WavetableShapeButtons
-            compact
-            value={selectedWavetable()}
-            onChange={(value) => setParameter(wavetableId(), value)}
+        <Show when={lumusSlotC()}>
+          <FloatingSelect
+            layout="inline"
+            label="Source"
+            ariaLabel="Source C mode"
+            value={sourceMode()}
+            options={[{ value: "wavetable", label: "Wavetable" }, { value: "sample", label: "Sample" }]}
+            onChange={(value) => setSourceMode(value as "wavetable" | "sample")}
           />
-          <span>{selectedWavetableLabel(selectedWavetable())}</span>
-        </div>
+        </Show>
+        <Show when={!sampleMode()}>
+          <div class={styles.headerWavetable}>
+            <WavetableShapeButtons
+              compact
+              value={selectedWavetable()}
+              onChange={(value) => setParameter(wavetableId(), value)}
+            />
+            <span>{selectedWavetableLabel(selectedWavetable())}</span>
+          </div>
+        </Show>
         <Show when={draft().instrumentType !== "lumus-hybrid-synth" && props.oscillator !== "a"}>
           <Button iconOnly size="xs" className={styles.removeOscillatorButton} aria-label={`Remove ${label()}`} onClick={() => removeOscillator(props.oscillator)}>
             <Icon name="ph:trash" size={18} decorative />
           </Button>
         </Show>
       </div>
+      <Show when={!sampleMode()} fallback={<div class={styles.rowMain}><span class={styles.tuningModeHint}>Sample controls are available in Sample Slot 1 below.</span></div>}>
       <div class={styles.rowMain}>
           <WaveformPreview label={`${label()} local oscillator preview`} samples={waveform()} disabled={!enabled()} />
           <div class={styles.settingsPane}>
@@ -429,6 +473,7 @@ function OscillatorRow(props: {
             </div>
           </Show>
       </div>
+      </Show>
     </div>
   );
 }

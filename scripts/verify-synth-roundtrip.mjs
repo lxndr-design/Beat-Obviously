@@ -169,7 +169,8 @@ try {
   const lumusDraft = synthStore.createDefaultLumusDraft();
   assert.equal(lumusDraft.instrumentType, "lumus-hybrid-synth", "Lumus must have an independent instrument identity");
   assert.equal(lumusDraft.namespace, "lumus", "Lumus must not serialize into Aether's namespace");
-  assert.equal(lumusDraft.schemaVersion, 2, "Lumus must use the three-slot source-rack schema");
+  assert.equal(lumusDraft.schemaVersion, 3, "Lumus must use the switchable-source schema");
+  assert.equal(lumusDraft.metadata.lumusSourceRack.schemaVersion, 2);
   assert.equal(lumusDraft.name, "Lumus Init");
   assert.deepEqual(lumusDraft.metadata.oscillators.map(({ id }) => id), ["a", "b", "c"], "Lumus must expose exactly three stable source identities");
   assert.equal(lumusDraft.parameters["osc.c.enabled"], false, "Slot C must migrate in silently disabled");
@@ -209,15 +210,28 @@ try {
     metadata: { ...structuredClone(lumusDraft.metadata), lumusSourceRack: undefined, oscillators: [{ id: "a", name: "A" }, { id: "b", name: "B" }] },
     parameters: Object.fromEntries(Object.entries(lumusDraft.parameters).filter(([id]) => !id.startsWith("osc.c."))),
   });
-  assert.equal(migratedLumusV1.schemaVersion, 2, "Lumus v1 must deterministically migrate to v2");
+  assert.equal(migratedLumusV1.schemaVersion, 3, "Lumus v1 must deterministically migrate to v3");
   assert.deepEqual(migratedLumusV1.metadata.oscillators.map(({ id }) => id), ["a", "b", "c"]);
   assert.equal(migratedLumusV1.parameters["osc.c.enabled"], false);
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
       ...structuredClone(lumusDraft),
+      schemaVersion: 2,
+      parameters: { ...lumusDraft.parameters, "aether.sample.1.enabled": true },
+      metadata: { ...structuredClone(lumusDraft.metadata), lumusSourceRack: {
+        schemaVersion: 1,
+        slots: [{ id: "a", mode: "wavetable" }, { id: "b", mode: "wavetable" }, { id: "c", mode: "wavetable" }],
+      } },
+    }),
+    /lumus\.migration\.source-conflict/,
+    "Ambiguous legacy sample ownership must fail instead of discarding data",
+  );
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch({
+      ...structuredClone(lumusDraft),
       metadata: {
         ...structuredClone(lumusDraft.metadata),
-        lumusSourceRack: { schemaVersion: 1, slots: [
+        lumusSourceRack: { schemaVersion: 2, slots: [
           { id: "a", mode: "wavetable" },
           { id: "c", mode: "wavetable" },
           { id: "b", mode: "wavetable" },
@@ -248,6 +262,23 @@ try {
   assert.notDeepEqual(audibleRight, lumusInitRight, "Slot C pan must affect the stereo render");
   const audibleInstrument = synthStore.synthDraftToPreviewInstrument(audibleLumus);
   assert.equal(audibleInstrument.aether.oscillators.find(({ id }) => id === "c")?.route, "filter2", "Slot C routing must survive conversion");
+
+  const sampleModeLumus = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumusDraft),
+    parameters: {
+      ...lumusDraft.parameters,
+      "osc.c.enabled": true,
+      "aether.sample.1.enabled": true,
+      "aether.sample.1.audioFileId": "lumus-sample-fixture",
+    },
+    metadata: { ...structuredClone(lumusDraft.metadata), lumusSourceRack: {
+      schemaVersion: 2,
+      slots: [{ id: "a", mode: "wavetable" }, { id: "b", mode: "wavetable" }, { id: "c", mode: "sample" }],
+    } },
+  });
+  const sampleModeInstrument = synthStore.synthDraftToPreviewInstrument(sampleModeLumus);
+  assert.equal(sampleModeInstrument.aether.oscillators.find(({ id }) => id === "c")?.enabled, false, "Sample mode must disable the Slot C wavetable renderer");
+  assert.equal(sampleModeInstrument.aether.sampleSlot1.enabled, true, "Sample mode must publish the existing bounded sample renderer as Slot C");
 
   const modulatedLumus = synthStore.normalizeSynthDraftPatch({
     ...structuredClone(audibleLumus),
