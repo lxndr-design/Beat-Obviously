@@ -16496,13 +16496,12 @@ namespace
             return false;
         const auto lumusGranularPatch = juce::JSON::parse(R"json(
         {
-          "schemaVersion": 5,
+          "schemaVersion": 6,
           "instrumentType": "lumus-hybrid-synth",
           "namespace": "lumus",
           "parameters": {
-            "lumus.source.a.granular.enabled": true,
-            "lumus.source.a.granular.builtinSource": "benchmark",
-            "lumus.source.a.granular.level": 0.42,
+            "lumus.source.a.sample.enabled": true,
+            "lumus.source.a.sample.audioFileId": "lumus-multisample-a",
             "lumus.source.b.granular.enabled": true,
             "lumus.source.b.granular.builtinSource": "benchmark",
             "lumus.source.c.granular.enabled": true,
@@ -16510,7 +16509,7 @@ namespace
           },
           "metadata": {
             "lumusSourceRack": { "schemaVersion": 2, "slots": [
-              { "id": "a", "mode": "granular" },
+              { "id": "a", "mode": "multisample" },
               { "id": "b", "mode": "granular" },
               { "id": "c", "mode": "granular" }
             ] },
@@ -16532,10 +16531,11 @@ namespace
         if (!beat::applySynthPatchContract(lumusGranularPatch, lumusGranular)
             || lumusGranular.aether.oscA.enabled || lumusGranular.aether.oscB.enabled
             || lumusGranular.lumus.oscC.enabled
-            || !lumusGranular.lumus.granularSlots[0].enabled
+            || !lumusGranular.lumus.sampleSlots[0].enabled
+            || lumusGranular.lumus.sampleSlots[0].audioFileId != "lumus-multisample-a"
+            || lumusGranular.lumus.granularSlots[0].enabled
             || !lumusGranular.lumus.granularSlots[1].enabled
-            || !lumusGranular.lumus.granularSlots[2].enabled
-            || std::abs(lumusGranular.lumus.granularSlots[0].level - 0.42f) > 0.0001f)
+            || !lumusGranular.lumus.granularSlots[2].enabled)
             return false;
         const auto malformedLumusRack = juce::JSON::parse(R"json(
         {
@@ -16555,7 +16555,7 @@ namespace
         if (beat::applySynthPatchContract(malformedLumusRack, rejectedMalformedRack))
             return false;
         const auto futureLumusPatch = juce::JSON::parse(R"json(
-        { "schemaVersion": 6, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
+        { "schemaVersion": 7, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
         )json");
         beat::InstrumentDefinition rejectedFutureLumus;
         if (beat::applySynthPatchContract(futureLumusPatch, rejectedFutureLumus))

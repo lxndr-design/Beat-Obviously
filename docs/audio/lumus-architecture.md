@@ -8,12 +8,12 @@ Beat instrument
     wavetable-synth       -> Aether identity -> frozen Aether contract
     lumus-hybrid-synth    -> Lumus identity  -> Lumus versioned contract
 
-Lumus v5 adapter
+Lumus v6 adapter
   Lumus patch/namespace
     -> fixed source identities A / B / C
     -> A/B through the frozen Aether renderer
     -> A/B/C own independent sample asset and playback metadata
-    -> A/B/C through Lumus-owned wavetable/sample mode selection
+    -> A/B/C through Lumus-owned wavetable/sample/multisample mode selection
     -> A/B/C own independent bounded granular state and assets
     -> identical initial output while C is disabled
 
@@ -29,7 +29,7 @@ The adapter is an intentional bootstrap boundary. It lets Lumus start audible an
 
 ## Ownership
 
-- `frontend/src/state/synthStore.ts`: current type/namespace identity, initial draft factory, stable Slot C modulation target IDs, and the v5 independent A/B/C sample/granular ownership schema; later this should delegate Lumus-owned schema work to `frontend/src/state/lumusStore.ts`.
+- `frontend/src/state/synthStore.ts`: current type/namespace identity, initial draft factory, stable Slot C modulation target IDs, and the v6 independent A/B/C sample/multisample/granular ownership schema; later this should delegate Lumus-owned schema work to `frontend/src/state/lumusStore.ts`.
 - `frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx`: shared oscillator layout, knobs, and `FloatingSelect` routing control used unchanged by Aether and Lumus.
 - `frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx`: explicit Create Lumus entry.
 - `frontend/src/features/EditorHost/EditorHost.solid.tsx`: Lumus editor identity and modal lifecycle.

@@ -24,8 +24,8 @@ import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 5;
-export const LUMUS_PATCH_SCHEMA_VERSION = 5;
-const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2, 3, 4] as const;
+export const LUMUS_PATCH_SCHEMA_VERSION = 6;
+const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2, 3, 4, 5] as const;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
 export const SYNTH_INSTRUMENT_TYPE = "wavetable-synth";
 export const LUMUS_PARAMETER_NAMESPACE = "lumus";
@@ -68,7 +68,7 @@ export interface WavemapManualRange {
 
 export type OscillatorKey = string;
 export interface SynthOscillatorDefinition { id: OscillatorKey; name: string }
-export type LumusSourceMode = "wavetable" | "sample" | "granular";
+export type LumusSourceMode = "wavetable" | "sample" | "multisample" | "granular";
 export type LumusSourceSlotId = "a" | "b" | "c";
 export interface LumusSampleSlotMetadata {
   schemaVersion: 1;
@@ -550,12 +550,14 @@ function normalizeLumusSourceRack(value: unknown, patchVersion: unknown, legacyS
     throw new SynthPatchIdentityError("lumus.source-rack.capacity", "Lumus requires exactly three source slots.");
   for (let index = 0; index < canonical.slots.length; index += 1) {
     const slot = value.slots[index];
-    const supportsSample = patchVersion === 3 || patchVersion === 4 || patchVersion === 5;
-    const supportsGranular = patchVersion === 5;
+    const supportsSample = patchVersion === 3 || patchVersion === 4 || patchVersion === 5 || patchVersion === 6;
+    const supportsGranular = patchVersion === 5 || patchVersion === 6;
+    const supportsMultisample = patchVersion === 6;
     if (!isRecord(slot)
         || slot.id !== canonical.slots[index].id
         || (slot.mode !== "wavetable"
           && (!supportsSample || slot.mode !== "sample")
+          && (!supportsMultisample || slot.mode !== "multisample")
           && (!supportsGranular || slot.mode !== "granular")))
       throw new SynthPatchIdentityError("lumus.source-rack.slot-invalid", `Invalid Lumus source slot at index ${index}.`);
     canonical.slots[index].mode = slot.mode as LumusSourceMode;
@@ -1960,9 +1962,9 @@ function validateSynthPatchIdentity(input: Partial<SynthDraftPatch> | SynthPatch
   if (type === LUMUS_INSTRUMENT_TYPE) {
     if (namespace !== LUMUS_PARAMETER_NAMESPACE)
       throw new SynthPatchIdentityError("lumus.identity.namespace-mismatch", "Lumus patches must use the lumus namespace.");
-    if (!LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3 | 4)
+    if (!LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3 | 4 | 5)
         && input.schemaVersion !== LUMUS_PATCH_SCHEMA_VERSION)
-      throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema 1, 2, 3, 4, or ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
+      throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema 1 through ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
     return true;
   }
   throw new SynthPatchIdentityError("synth.identity.type-unknown", `Unsupported synth instrument type: ${String(type)}`);

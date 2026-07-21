@@ -251,7 +251,7 @@ function OscillatorRow(props: {
       ? draft().metadata.lumusSourceRack?.slots[index as 0 | 1 | 2]?.mode ?? "wavetable"
       : "wavetable";
   });
-  const sampleMode = createMemo(() => sourceMode() === "sample");
+  const sampleMode = createMemo(() => sourceMode() === "sample" || sourceMode() === "multisample");
   const granularMode = createMemo(() => sourceMode() === "granular");
   const samplePrefix = createMemo(() => `lumus.source.${props.oscillator}.sample`);
   const sampleAvailable = createMemo(() => Boolean(
@@ -287,7 +287,7 @@ function OscillatorRow(props: {
     setParameter(wavetableId(), next.id as WavetableId);
   }
 
-  function setSourceMode(mode: "wavetable" | "sample" | "granular") {
+  function setSourceMode(mode: "wavetable" | "sample" | "multisample" | "granular") {
     if (!lumusSlot()) return;
     const current = draft();
     const slots = current.metadata.lumusSourceRack?.slots.map((slot, index) =>
@@ -297,7 +297,7 @@ function OscillatorRow(props: {
       ...current,
       parameters: {
         ...current.parameters,
-        ...(mode === "sample"
+        ...(mode === "sample" || mode === "multisample"
           ? { [`${samplePrefix()}.enabled`]: sampleAvailable() }
           : { [`${samplePrefix()}.enabled`]: false }),
         ...(mode === "granular"
@@ -308,7 +308,7 @@ function OscillatorRow(props: {
         ...current.metadata,
         lumusSourceRack: {
           schemaVersion: 2,
-          slots: slots as [{ id: "a"; mode: "wavetable" | "sample" | "granular" }, { id: "b"; mode: "wavetable" | "sample" | "granular" }, { id: "c"; mode: "wavetable" | "sample" | "granular" }],
+          slots: slots as [{ id: "a"; mode: "wavetable" | "sample" | "multisample" | "granular" }, { id: "b"; mode: "wavetable" | "sample" | "multisample" | "granular" }, { id: "c"; mode: "wavetable" | "sample" | "multisample" | "granular" }],
         },
       },
     });
@@ -341,8 +341,8 @@ function OscillatorRow(props: {
             label="Source"
             ariaLabel={`${label()} source mode`}
             value={sourceMode()}
-            options={[{ value: "wavetable", label: "Wavetable" }, { value: "sample", label: "Sample" }, { value: "granular", label: "Granular" }]}
-            onChange={(value) => setSourceMode(value as "wavetable" | "sample" | "granular")}
+            options={[{ value: "wavetable", label: "Wavetable" }, { value: "sample", label: "Sample" }, { value: "multisample", label: "Multisample" }, { value: "granular", label: "Granular" }]}
+            onChange={(value) => setSourceMode(value as "wavetable" | "sample" | "multisample" | "granular")}
           />
         </Show>
         <Show when={!sampleMode() && !granularMode()}>

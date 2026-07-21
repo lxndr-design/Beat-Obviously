@@ -16,9 +16,9 @@ This equality is a starting-line invariant, not a permanent goal. Every future d
 
 ## Three-slot source rack
 
-Lumus schema v5 freezes three stable source identities: A, B, and C, and gives each slot independent sample and granular parameters, managed assets, and Wavetable/Sample/Granular selection. The existing generalized oscillator editor presents exactly those rows and disables structural add/remove actions. Non-wavetable modes disable only the selected slot's wavetable renderer and publish an independent fixed-capacity sample/SFZ or granular renderer. V3 sample data migrates losslessly into C; v4 gains silent granular defaults while retaining its legacy auxiliary granular state, and v1/v2 remain wavetable-only and silent for C.
+Lumus schema v6 freezes three stable source identities: A, B, and C, and gives each slot independent sample and granular parameters, managed assets, and Wavetable/Sample/Multisample/Granular selection. Multisample is an explicit policy identity over the same bounded key-map/SFZ renderer rather than a duplicate DSP engine. The generalized oscillator editor presents exactly those rows and disables structural add/remove actions. Non-wavetable modes disable only the selected slot's wavetable renderer. V3 sample data migrates losslessly into C; v4 gains silent granular defaults while retaining its legacy auxiliary granular state, and v1/v2 remain wavetable-only and silent for C.
 
-Wavetable, sample, and bounded granular modes are implemented independently for A, B, and C. A shared A/B/C settings switch exposes each source asset and key map without creating a second component system. Multisample mapping remains available through Sample controls but is not yet claimed as a distinct rack mode; spectral remains paused rather than exposed as a placeholder. Slot C wavetable mode participates in the existing modulation contract. All source-mode and routing UI uses Beat's shared `FloatingSelect`, button, toggle, input, and knob components with no Lumus-specific typography or layout system.
+Wavetable, sample, multisample, and bounded granular modes are implemented independently for A, B, and C. A shared A/B/C settings switch exposes each source asset and key map without creating a second component system. Sample and Multisample deliberately share the verified renderer while retaining distinct serialized mode identity. Spectral remains paused rather than exposed as a placeholder. Slot C wavetable mode participates in the existing modulation contract. All source-mode and routing UI uses Beat's shared `FloatingSelect`, button, toggle, input, and knob components with no Lumus-specific typography or layout system.
 
 ### Verified 2026-07-20
 
@@ -43,4 +43,4 @@ A direct Serum 2 comparison may be added later only from a locally licensed inst
 
 ## Current conclusion
 
-Lumus has a clean identity boundary, a bit-stable Aether-derived starting renderer, and a fixed A/B/C rack with independently verified sample and granular playback in every slot. A distinct multisample rack mode remains pending, although bounded key-map playback exists inside Sample. Synth-owned arp/clip sequencing remains absent. Spectral work remains incomplete and is not implied ready by this benchmark.
+Lumus has a clean identity boundary, a bit-stable Aether-derived starting renderer, and a fixed A/B/C rack with independently verified sample, multisample, and granular playback in every slot. Synth-owned arp/clip sequencing remains absent. Spectral work remains incomplete and is not implied ready by this benchmark.

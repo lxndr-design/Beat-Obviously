@@ -437,6 +437,7 @@ namespace beat
                     && (int) schemaVersion != params::lumusPreviousPatchSchemaVersion
                     && (int) schemaVersion != params::lumusSampleModePatchSchemaVersion
                     && (int) schemaVersion != params::lumusSampleOwnershipPatchSchemaVersion
+                    && (int) schemaVersion != params::lumusGranularPatchSchemaVersion
                     && (int) schemaVersion != params::lumusPatchSchemaVersion)
                 || patchNamespace.toString() != "lumus")
                 return false;
@@ -472,9 +473,10 @@ namespace beat
                 if (!slot.isObject()
                     || objectProperty(slot, "id", {}).toString() != requiredIds[(size_t) index]
                     || (mode != "wavetable" && mode != "sample"
-                        && (patchSchemaVersion < params::lumusPatchSchemaVersion || mode != "granular")))
+                        && (patchSchemaVersion < params::lumusGranularPatchSchemaVersion || mode != "granular")
+                        && (patchSchemaVersion < params::lumusPatchSchemaVersion || mode != "multisample")))
                     return false;
-                lumusSampleModes[(size_t) index] = mode == "sample";
+                lumusSampleModes[(size_t) index] = mode == "sample" || mode == "multisample";
                 lumusGranularModes[(size_t) index] = mode == "granular";
             }
         }
@@ -705,7 +707,7 @@ namespace beat
         return true;
         };
         if (!parseGranularSlot(instrument.aether.granularSlot2, "aether.granular.2.", {})) return false;
-        if (isLumus && activeLumusSchema >= params::lumusPatchSchemaVersion)
+        if (isLumus && activeLumusSchema >= params::lumusGranularPatchSchemaVersion)
         {
             const auto granularMetadata = objectProperty(metadata, "lumusGranularSlots", {});
             if (!granularMetadata.isObject()) return false;
