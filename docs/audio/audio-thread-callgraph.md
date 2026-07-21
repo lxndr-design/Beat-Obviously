@@ -130,6 +130,7 @@ queue/sequencer note or arrangement event
      -> fixed held-note/channel/velocity arrays
      -> step samples from active sample rate + atomic sequencer tempo/speed
      -> optional schema v8 alternating long/short swing intervals with pair duration preserved
+     -> optional schema v9 fixed-mask key/scale quantization before deterministic note ordering
      -> pre-sized route MIDI output with sample-offset gate events
      -> no separate clock, file access, lock, or lazy initialization
   stable parameter ID + value + caller rampSamples

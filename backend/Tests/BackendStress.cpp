@@ -16495,9 +16495,79 @@ namespace
         if (splitSwung != expectedSwung) return false;
 
         arp.reset();
+        config.swing = 0.0f;
+        config.scale = beat::LumusArpeggiator::Scale::major;
+        config.rootPitchClass = 0;
+        arp.setConfig(config);
+        juce::MidiBuffer scaleChord;
+        scaleChord.addEvent(juce::MidiMessage::noteOn(2, 61, 0.8f), 0);
+        scaleChord.addEvent(juce::MidiMessage::noteOn(3, 63, 0.7f), 0);
+        scaleChord.addEvent(juce::MidiMessage::noteOn(4, 66, 0.6f), 0);
+        scaleChord.addEvent(juce::MidiMessage::noteOff(2, 61), 299);
+        scaleChord.addEvent(juce::MidiMessage::noteOff(3, 63), 299);
+        scaleChord.addEvent(juce::MidiMessage::noteOff(4, 66), 299);
+        beat::test::beginRealtimeSafetyProbe();
+        const auto& scaledBuffer = arp.process(scaleChord, 300);
+        const auto scaleRealtimeViolations = beat::test::endRealtimeSafetyProbe();
+        if (scaleRealtimeViolations != 0) return false;
+        const auto scaled = events(scaledBuffer);
+        const std::vector<std::tuple<int, bool, int>> expectedScaled {
+            { 0, true, 60 }, { 50, false, 60 },
+            { 100, true, 62 }, { 150, false, 62 },
+            { 200, true, 65 }, { 250, false, 65 },
+        };
+        if (scaled != expectedScaled) return false;
+        std::vector<int> scaledChannels;
+        for (const auto metadata : scaledBuffer)
+            if (metadata.getMessage().isNoteOn()) scaledChannels.push_back(metadata.getMessage().getChannel());
+        if (scaledChannels != std::vector<int> { 2, 3, 4 }) return false;
+        arp.reset();
+        arp.setConfig(config);
+        std::vector<std::tuple<int, bool, int>> splitScaled;
+        for (int block = 0; block < 3; ++block)
+        {
+            juce::MidiBuffer blockInput;
+            if (block == 0)
+            {
+                blockInput.addEvent(juce::MidiMessage::noteOn(2, 61, 0.8f), 0);
+                blockInput.addEvent(juce::MidiMessage::noteOn(3, 63, 0.7f), 0);
+                blockInput.addEvent(juce::MidiMessage::noteOn(4, 66, 0.6f), 0);
+            }
+            if (block == 2)
+            {
+                blockInput.addEvent(juce::MidiMessage::noteOff(2, 61), 99);
+                blockInput.addEvent(juce::MidiMessage::noteOff(3, 63), 99);
+                blockInput.addEvent(juce::MidiMessage::noteOff(4, 66), 99);
+            }
+            for (const auto& [offset, noteOn, note] : events(arp.process(blockInput, 100)))
+                splitScaled.emplace_back(block * 100 + offset, noteOn, note);
+        }
+        if (splitScaled != expectedScaled) return false;
+        const auto firstQuantizedNote = [&](beat::LumusArpeggiator::Scale scale, int root, int inputNote)
+        {
+            arp.reset();
+            config.scale = scale;
+            config.rootPitchClass = root;
+            arp.setConfig(config);
+            juce::MidiBuffer input;
+            input.addEvent(juce::MidiMessage::noteOn(1, inputNote, 0.8f), 0);
+            const auto result = events(arp.process(input, 1));
+            return result.empty() ? -1 : std::get<2>(result.front());
+        };
+        if (firstQuantizedNote(beat::LumusArpeggiator::Scale::chromatic, 0, 61) != 61
+            || firstQuantizedNote(beat::LumusArpeggiator::Scale::major, 0, 61) != 60
+            || firstQuantizedNote(beat::LumusArpeggiator::Scale::naturalMinor, 9, 61) != 60
+            || firstQuantizedNote(beat::LumusArpeggiator::Scale::majorPentatonic, 2, 65) != 64
+            || firstQuantizedNote(beat::LumusArpeggiator::Scale::blues, 7, 69) != 70
+            || firstQuantizedNote(beat::LumusArpeggiator::Scale::major, 0, 0) != 0
+            || firstQuantizedNote(beat::LumusArpeggiator::Scale::major, 0, 127) != 127)
+            return false;
+
+        arp.reset();
         config.gate = 0.75f;
         config.swing = 0.0f;
         config.octaves = 2;
+        config.scale = beat::LumusArpeggiator::Scale::chromatic;
         arp.setConfig(config);
         juce::MidiBuffer panic;
         panic.addEvent(juce::MidiMessage::noteOn(1, 60, 0.8f), 0);
@@ -16721,7 +16791,7 @@ namespace
             return false;
         const auto lumusArpeggiatorPatch = juce::JSON::parse(R"json(
         {
-          "schemaVersion": 8,
+          "schemaVersion": 9,
           "instrumentType": "lumus-hybrid-synth",
           "namespace": "lumus",
           "parameters": {
@@ -16730,7 +16800,9 @@ namespace
             "lumus.arp.rate": "1/8",
             "lumus.arp.gate": 0.63,
             "lumus.arp.swing": 0.82,
-            "lumus.arp.octaves": 3
+            "lumus.arp.octaves": 3,
+            "lumus.arp.key": "fSharp",
+            "lumus.arp.scale": "blues"
           },
           "metadata": {
             "lumusSourceRack": { "schemaVersion": 2, "slots": [
@@ -16759,7 +16831,15 @@ namespace
             || lumusArpeggiator.lumus.arpeggiator.rateDivision != 8
             || std::abs(lumusArpeggiator.lumus.arpeggiator.gate - 0.63f) > 0.0001f
             || std::abs(lumusArpeggiator.lumus.arpeggiator.swing - 0.75f) > 0.0001f
-            || lumusArpeggiator.lumus.arpeggiator.octaves != 3)
+            || lumusArpeggiator.lumus.arpeggiator.octaves != 3
+            || lumusArpeggiator.lumus.arpeggiator.rootPitchClass != 6
+            || lumusArpeggiator.lumus.arpeggiator.scale != 4)
+            return false;
+        auto invalidLumusScalePatch = lumusArpeggiatorPatch.clone();
+        if (auto* invalidParams = invalidLumusScalePatch.getProperty("parameters", {}).getDynamicObject())
+            invalidParams->setProperty("lumus.arp.scale", "dorian");
+        beat::InstrumentDefinition rejectedInvalidScale;
+        if (beat::applySynthPatchContract(invalidLumusScalePatch, rejectedInvalidScale))
             return false;
         const auto malformedLumusRack = juce::JSON::parse(R"json(
         {
@@ -16779,7 +16859,7 @@ namespace
         if (beat::applySynthPatchContract(malformedLumusRack, rejectedMalformedRack))
             return false;
         const auto futureLumusPatch = juce::JSON::parse(R"json(
-        { "schemaVersion": 9, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
+        { "schemaVersion": 10, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
         )json");
         beat::InstrumentDefinition rejectedFutureLumus;
         if (beat::applySynthPatchContract(futureLumusPatch, rejectedFutureLumus))
@@ -19028,6 +19108,19 @@ int main(int argc, char** argv)
             return 1;
         }
         std::cout << "Audio bus focused stress passed\n";
+        return 0;
+    }
+
+    if (argc == 2 && juce::String(argv[1]) == "--lumus-arpeggiator")
+    {
+        beat::test::prepareRealtimeSafetyInterposers();
+        const bool ok = stressLumusArpeggiator() && stressAudioEngineLumusArpeggiator();
+        if (!ok)
+        {
+            std::cerr << "Lumus arpeggiator focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Lumus arpeggiator focused stress passed\n";
         return 0;
     }
 

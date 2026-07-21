@@ -501,6 +501,28 @@ namespace beat
                     (float) synthNumberParam(params, "lumus.arp.swing", 0.0));
             instrument.lumus.arpeggiator.octaves = juce::jlimit(1, 4,
                 (int) std::round(synthNumberParam(params, "lumus.arp.octaves", 1.0)));
+            if ((int) objectProperty(patch, "schemaVersion", 0) >= params::lumusArpeggiatorScalePatchSchemaVersion)
+            {
+                const auto key = synthStringParam(params, "lumus.arp.key", "c");
+                const auto scale = synthStringParam(params, "lumus.arp.scale", "chromatic");
+                static constexpr std::array<const char*, 12> keys {{
+                    "c", "cSharp", "d", "dSharp", "e", "f",
+                    "fSharp", "g", "gSharp", "a", "aSharp", "b"
+                }};
+                auto keyIndex = -1;
+                for (int index = 0; index < (int) keys.size(); ++index)
+                    if (key == keys[(size_t) index]) { keyIndex = index; break; }
+                if (keyIndex < 0
+                    || (scale != "chromatic" && scale != "major" && scale != "naturalMinor"
+                        && scale != "majorPentatonic" && scale != "blues"))
+                    return false;
+                instrument.lumus.arpeggiator.rootPitchClass = keyIndex;
+                instrument.lumus.arpeggiator.scale = scale == "major" ? 1
+                    : scale == "naturalMinor" ? 2
+                    : scale == "majorPentatonic" ? 3
+                    : scale == "blues" ? 4
+                    : 0;
+            }
         }
         instrument.waveform = 5;
         instrument.maxVoices = juce::jlimit(1, 32, (int) std::round(synthNumberParam(params, "maxVoices", instrument.maxVoices)));

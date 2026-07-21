@@ -328,6 +328,8 @@ namespace beat
                 float gate { 0.75f };
                 float swing { 0.0f };
                 int octaves { 1 };
+                int rootPitchClass { 0 };
+                int scale { 0 }; // 0 chromatic, 1 major, 2 natural minor, 3 major pentatonic, 4 blues
             };
 
             int sourceRackSchemaVersion { 1 };

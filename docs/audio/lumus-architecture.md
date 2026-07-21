@@ -8,13 +8,13 @@ Beat instrument
     wavetable-synth       -> Aether identity -> frozen Aether contract
     lumus-hybrid-synth    -> Lumus identity  -> Lumus versioned contract
 
-Lumus v8 adapter
+Lumus v9 adapter
   Lumus patch/namespace
     -> fixed source identities A / B / C
     -> A/B through the frozen Aether renderer
     -> A/B/C own independent sample asset and playback metadata
     -> A/B/C through Lumus-owned wavetable/sample/multisample/granular mode selection
-    -> Lumus arpeggiator transforms route MIDI before the shared renderer, with optional pair-preserving swing
+    -> Lumus arpeggiator transforms route MIDI before the shared renderer, with optional pair-preserving swing and key/scale quantization
     -> A/B/C own independent bounded granular state and assets
     -> identical initial output while C is disabled
 
@@ -30,7 +30,7 @@ The adapter is an intentional bootstrap boundary. It lets Lumus start audible an
 
 ## Ownership
 
-- `frontend/src/state/synthStore.ts`: current type/namespace identity, initial draft factory, stable Slot C modulation target IDs, and the v8 A/B/C source plus arpeggiator/swing schema; later this should delegate Lumus-owned schema work to `frontend/src/state/lumusStore.ts`.
+- `frontend/src/state/synthStore.ts`: current type/namespace identity, initial draft factory, stable Slot C modulation target IDs, and the v9 A/B/C source plus arpeggiator/swing/key/scale schema; later this should delegate Lumus-owned schema work to `frontend/src/state/lumusStore.ts`.
 - `frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx`: shared oscillator layout, knobs, and `FloatingSelect` routing control used unchanged by Aether and Lumus.
 - `frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx`: Lumus-only arpeggiator controls composed from Beat's existing section, button, toggle, knob, and number-input components.
 - `frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx`: explicit Create Lumus entry.
@@ -38,7 +38,7 @@ The adapter is an intentional bootstrap boundary. It lets Lumus start audible an
 - `backend/Source/Audio/Parameters/ParameterIds.h`: stable native instrument type.
 - `backend/Source/Audio/Parameters/SynthPatchContract.cpp`: validated v1 migration and v2 A/B/C contract.
 - `backend/Source/Audio/TrackModel.h`: engine identity and Lumus-owned A/B/C sample state retained independently of Aether.
-- `backend/Source/Audio/Midi/LumusArpeggiator.h`: fixed-capacity held-note state, deterministic sample-offset note transformation, and alternating long/short swing intervals whose pair duration equals two straight steps. It owns no transport clock.
+- `backend/Source/Audio/Midi/LumusArpeggiator.h`: fixed-capacity held-note state, deterministic sample-offset note transformation, alternating long/short swing intervals whose pair duration equals two straight steps, and fixed-mask scale quantization before note ordering. It owns no transport clock.
 - `backend/Source/Audio/AudioEngine.cpp`: prepares the transform off the callback, derives step length from the active sample rate plus Sequencer tempo/speed, and inserts transformed MIDI immediately before the Lumus route synth render.
 - `backend/Source/Audio/InstrumentVoice.{h,cpp}`: prepared fixed-capacity A/B/C sample and granular state plus Slot C wavetable state, routing, and bounded modulation evaluation; these branches are unreachable for Aether.
 

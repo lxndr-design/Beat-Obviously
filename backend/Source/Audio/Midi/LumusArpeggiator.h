@@ -13,6 +13,7 @@ namespace beat
     {
     public:
         enum class Mode { up, down, upDown, random };
+        enum class Scale { chromatic, major, naturalMinor, majorPentatonic, blues };
         struct Config
         {
             bool enabled { false };
@@ -21,6 +22,8 @@ namespace beat
             float gate { 0.75f };
             float swing { 0.0f };
             int octaves { 1 };
+            int rootPitchClass { 0 };
+            Scale scale { Scale::chromatic };
         };
 
         void prepare(int maximumBlockSize)
@@ -38,6 +41,7 @@ namespace beat
             next.gate = juce::jlimit(0.05f, 1.0f, next.gate);
             next.swing = juce::jlimit(0.0f, 0.75f, next.swing);
             next.octaves = juce::jlimit(1, 4, next.octaves);
+            next.rootPitchClass = juce::jlimit(0, 11, next.rootPitchClass);
             if (config.enabled && !next.enabled) reset();
             config = next;
         }
@@ -145,9 +149,27 @@ namespace beat
 
         std::tuple<int, float, int> nextNote() noexcept
         {
-            std::array<int, 128> notes {};
+            std::array<int, 128> sourceNotes {};
+            std::array<int, 128> quantizedNotes {};
             int count = 0;
-            for (int note = 0; note < 128; ++note) if (held[(size_t) note]) notes[(size_t) count++] = note;
+            for (int note = 0; note < 128; ++note)
+            {
+                if (!held[(size_t) note]) continue;
+                const auto quantized = quantizeToScale(note);
+                int insertAt = count;
+                while (insertAt > 0
+                    && (quantizedNotes[(size_t) insertAt - 1] > quantized
+                        || (quantizedNotes[(size_t) insertAt - 1] == quantized
+                            && sourceNotes[(size_t) insertAt - 1] > note)))
+                {
+                    quantizedNotes[(size_t) insertAt] = quantizedNotes[(size_t) insertAt - 1];
+                    sourceNotes[(size_t) insertAt] = sourceNotes[(size_t) insertAt - 1];
+                    --insertAt;
+                }
+                quantizedNotes[(size_t) insertAt] = quantized;
+                sourceNotes[(size_t) insertAt] = note;
+                ++count;
+            }
             const int expandedCount = juce::jmax(1, count * config.octaves);
             int expandedIndex = 0;
             if (config.mode == Mode::random)
@@ -166,8 +188,40 @@ namespace beat
             else expandedIndex = sequenceIndex++ % expandedCount;
             const int baseIndex = expandedIndex % count;
             const int octave = expandedIndex / count;
-            const int note = juce::jlimit(0, 127, notes[(size_t) baseIndex] + octave * 12);
-            return { note, velocities[(size_t) notes[(size_t) baseIndex]], channels[(size_t) notes[(size_t) baseIndex]] };
+            const int sourceNote = sourceNotes[(size_t) baseIndex];
+            const int note = juce::jlimit(0, 127, quantizedNotes[(size_t) baseIndex] + octave * 12);
+            return { note, velocities[(size_t) sourceNote], channels[(size_t) sourceNote] };
+        }
+
+        bool pitchClassIsInScale(int pitchClass) const noexcept
+        {
+            const auto relative = (pitchClass - config.rootPitchClass + 12) % 12;
+            switch (config.scale)
+            {
+                case Scale::major: return relative == 0 || relative == 2 || relative == 4
+                    || relative == 5 || relative == 7 || relative == 9 || relative == 11;
+                case Scale::naturalMinor: return relative == 0 || relative == 2 || relative == 3
+                    || relative == 5 || relative == 7 || relative == 8 || relative == 10;
+                case Scale::majorPentatonic: return relative == 0 || relative == 2 || relative == 4
+                    || relative == 7 || relative == 9;
+                case Scale::blues: return relative == 0 || relative == 3 || relative == 5
+                    || relative == 6 || relative == 7 || relative == 10;
+                case Scale::chromatic: return true;
+            }
+            return true;
+        }
+
+        int quantizeToScale(int note) const noexcept
+        {
+            if (config.scale == Scale::chromatic) return note;
+            for (int distance = 0; distance < 12; ++distance)
+            {
+                const int lower = note - distance;
+                if (lower >= 0 && pitchClassIsInScale(lower % 12)) return lower;
+                const int upper = note + distance;
+                if (distance > 0 && upper <= 127 && pitchClassIsInScale(upper % 12)) return upper;
+            }
+            return note;
         }
 
         void emitNoteOff(int sample) noexcept

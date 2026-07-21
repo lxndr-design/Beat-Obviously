@@ -24,8 +24,10 @@ import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 5;
-export const LUMUS_PATCH_SCHEMA_VERSION = 8;
-const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7] as const;
+export const LUMUS_PATCH_SCHEMA_VERSION = 9;
+const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+const LUMUS_ARPEGGIATOR_KEYS = ["c", "cSharp", "d", "dSharp", "e", "f", "fSharp", "g", "gSharp", "a", "aSharp", "b"] as const;
+const LUMUS_ARPEGGIATOR_SCALES = ["chromatic", "major", "naturalMinor", "majorPentatonic", "blues"] as const;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
 export const SYNTH_INSTRUMENT_TYPE = "wavetable-synth";
 export const LUMUS_PARAMETER_NAMESPACE = "lumus";
@@ -193,6 +195,8 @@ export type SynthParameterId =
   | "lumus.arp.gate"
   | "lumus.arp.swing"
   | "lumus.arp.octaves"
+  | "lumus.arp.key"
+  | "lumus.arp.scale"
   | "amp.level"
   | "amp.pan"
   | "maxVoices"
@@ -1446,6 +1450,8 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "lumus.arp.gate": 0.75,
   "lumus.arp.swing": 0,
   "lumus.arp.octaves": 1,
+  "lumus.arp.key": "c",
+  "lumus.arp.scale": "chromatic",
   "amp.level": 0.8,
   "amp.pan": 0,
   maxVoices: 16,
@@ -1627,6 +1633,8 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "lumus.arp.gate": "Lumus Arpeggiator Gate",
   "lumus.arp.swing": "Lumus Arpeggiator Swing",
   "lumus.arp.octaves": "Lumus Arpeggiator Octaves",
+  "lumus.arp.key": "Lumus Arpeggiator Key",
+  "lumus.arp.scale": "Lumus Arpeggiator Scale",
   "amp.level": "Amp Level",
   "amp.pan": "Amp Pan",
   maxVoices: "Max Voices",
@@ -1816,6 +1824,8 @@ export function createDefaultLumusDraft(): SynthDraftPatch {
   parameters["lumus.arp.gate"] = 0.75;
   parameters["lumus.arp.swing"] = 0;
   parameters["lumus.arp.octaves"] = 1;
+  parameters["lumus.arp.key"] = "c";
+  parameters["lumus.arp.scale"] = "chromatic";
   return {
     ...draft,
     schemaVersion: LUMUS_PATCH_SCHEMA_VERSION,
@@ -1902,6 +1912,17 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
   }
   if (isLumus && Number(input.schemaVersion) < 8)
     parameters["lumus.arp.swing"] = 0;
+  if (isLumus && Number(input.schemaVersion) < 9) {
+    parameters["lumus.arp.key"] = "c";
+    parameters["lumus.arp.scale"] = "chromatic";
+  } else if (isLumus) {
+    const key = String(parameters["lumus.arp.key"]);
+    const scale = String(parameters["lumus.arp.scale"]);
+    if (!LUMUS_ARPEGGIATOR_KEYS.includes(key as (typeof LUMUS_ARPEGGIATOR_KEYS)[number]))
+      throw new SynthPatchIdentityError("lumus.arp.key-invalid", `Unsupported Lumus arpeggiator key: ${key}.`);
+    if (!LUMUS_ARPEGGIATOR_SCALES.includes(scale as (typeof LUMUS_ARPEGGIATOR_SCALES)[number]))
+      throw new SynthPatchIdentityError("lumus.arp.scale-invalid", `Unsupported Lumus arpeggiator scale: ${scale}.`);
+  }
 
   const mpeMaster = clampMidiChannel(Number(parameters["aether.mpe.masterChannel"]));
   const mpeFirst = clampMidiChannel(Number(parameters["aether.mpe.firstMemberChannel"]));
@@ -1989,7 +2010,7 @@ function validateSynthPatchIdentity(input: Partial<SynthDraftPatch> | SynthPatch
   if (type === LUMUS_INSTRUMENT_TYPE) {
     if (namespace !== LUMUS_PARAMETER_NAMESPACE)
       throw new SynthPatchIdentityError("lumus.identity.namespace-mismatch", "Lumus patches must use the lumus namespace.");
-    if (!LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3 | 4 | 5 | 6 | 7)
+    if (!LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8)
         && input.schemaVersion !== LUMUS_PATCH_SCHEMA_VERSION)
       throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema 1 through ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
     return true;

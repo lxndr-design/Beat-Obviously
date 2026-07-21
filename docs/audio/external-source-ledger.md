@@ -204,6 +204,8 @@ The Lumus v7 arpeggiator is independently implemented Beat-owned work using the 
 
 The Lumus v8 swing extension is likewise independently implemented Beat-owned work. It adds only a bounded alternating interval calculation, versioned persistence, shared-knob UI, and focused timing/migration tests within the same local boundaries. No upstream code, musical pattern, asset, executable, service, binary, or dependency was imported or executed.
 
+The Lumus v9 key/scale extension is independently implemented Beat-owned work using fixed pitch-class masks and deterministic nearest-note arithmetic. It adds no musical content, preset, third-party scale library, external code, executable, service, binary, or dependency. Its implementation remains inside the existing Lumus arpeggiator, versioned Lumus schema/parser, shared Beat selector UI, and focused tests.
+
 ## Milestone B29 benchmark factory-preset provenance
 
 Two user-supplied local preset documents were structurally adapted into Beat's existing factory-guide representation:

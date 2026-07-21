@@ -696,6 +696,42 @@ function LumusArpeggiatorPanel() {
             />
           </div>
         </div>
+        <div class={`${styles.ampFilterGroup} ${styles.ampFilterAmpGroup}`}>
+          <div class={styles.ampFilterGroupTitle}>Key &amp; Scale</div>
+          <div class={styles.taxonomyControls}>
+            <FloatingSelect
+              label="Key"
+              layout="inline"
+              className={styles.taxonomySelect}
+              value={String(draft().parameters["lumus.arp.key"] ?? "c")}
+              ariaLabel="Arpeggiator key"
+              options={[
+                { value: "c", label: "C" }, { value: "cSharp", label: "C♯ / D♭" },
+                { value: "d", label: "D" }, { value: "dSharp", label: "D♯ / E♭" },
+                { value: "e", label: "E" }, { value: "f", label: "F" },
+                { value: "fSharp", label: "F♯ / G♭" }, { value: "g", label: "G" },
+                { value: "gSharp", label: "G♯ / A♭" }, { value: "a", label: "A" },
+                { value: "aSharp", label: "A♯ / B♭" }, { value: "b", label: "B" },
+              ]}
+              onChange={(value) => setParameter("lumus.arp.key", value)}
+            />
+            <FloatingSelect
+              label="Scale"
+              layout="inline"
+              className={styles.taxonomySelect}
+              value={String(draft().parameters["lumus.arp.scale"] ?? "chromatic")}
+              ariaLabel="Arpeggiator scale"
+              options={[
+                { value: "chromatic", label: "Chromatic" },
+                { value: "major", label: "Major" },
+                { value: "naturalMinor", label: "Natural Minor" },
+                { value: "majorPentatonic", label: "Major Pentatonic" },
+                { value: "blues", label: "Blues" },
+              ]}
+              onChange={(value) => setParameter("lumus.arp.scale", value)}
+            />
+          </div>
+        </div>
       </div>
     </section>
   );

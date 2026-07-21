@@ -169,7 +169,7 @@ try {
   const lumusDraft = synthStore.createDefaultLumusDraft();
   assert.equal(lumusDraft.instrumentType, "lumus-hybrid-synth", "Lumus must have an independent instrument identity");
   assert.equal(lumusDraft.namespace, "lumus", "Lumus must not serialize into Aether's namespace");
-  assert.equal(lumusDraft.schemaVersion, 8, "Lumus must use the explicit arpeggiator swing schema");
+  assert.equal(lumusDraft.schemaVersion, 9, "Lumus must use the explicit arpeggiator key/scale schema");
   assert.equal(lumusDraft.metadata.lumusSourceRack.schemaVersion, 2);
   assert.equal(lumusDraft.name, "Lumus Init");
   assert.deepEqual(lumusDraft.metadata.oscillators.map(({ id }) => id), ["a", "b", "c"], "Lumus must expose exactly three stable source identities");
@@ -189,7 +189,7 @@ try {
     "Lumus namespace mismatches must fail diagnostically",
   );
   assert.throws(
-    () => synthStore.normalizeSynthDraftPatch({ ...lumusDraft, schemaVersion: 9 }),
+    () => synthStore.normalizeSynthDraftPatch({ ...lumusDraft, schemaVersion: 10 }),
     /lumus\.schema\.unsupported/,
     "future or inconsistent Lumus schemas must not be silently normalized",
   );
@@ -210,11 +210,13 @@ try {
     metadata: { ...structuredClone(lumusDraft.metadata), lumusSourceRack: undefined, oscillators: [{ id: "a", name: "A" }, { id: "b", name: "B" }] },
     parameters: Object.fromEntries(Object.entries(lumusDraft.parameters).filter(([id]) => !id.startsWith("osc.c."))),
   });
-  assert.equal(migratedLumusV1.schemaVersion, 8, "Lumus v1 must deterministically migrate to v8");
+  assert.equal(migratedLumusV1.schemaVersion, 9, "Lumus v1 must deterministically migrate to v9");
   assert.deepEqual(migratedLumusV1.metadata.oscillators.map(({ id }) => id), ["a", "b", "c"]);
   assert.equal(migratedLumusV1.parameters["osc.c.enabled"], false);
   assert.equal(migratedLumusV1.parameters["lumus.arp.enabled"], false, "legacy Lumus patches must migrate with the arpeggiator off");
   assert.equal(migratedLumusV1.parameters["lumus.arp.swing"], 0, "legacy Lumus patches must migrate with straight timing");
+  assert.equal(migratedLumusV1.parameters["lumus.arp.key"], "c");
+  assert.equal(migratedLumusV1.parameters["lumus.arp.scale"], "chromatic");
   const migratedLumusV3 = synthStore.normalizeSynthDraftPatch({
     ...structuredClone(lumusDraft),
     schemaVersion: 3,
@@ -244,7 +246,7 @@ try {
       }],
     },
   });
-  assert.equal(migratedLumusV3.schemaVersion, 8);
+  assert.equal(migratedLumusV3.schemaVersion, 9);
   assert.equal(migratedLumusV3.parameters["lumus.source.c.sample.enabled"], true);
   assert.equal(migratedLumusV3.parameters["lumus.source.c.sample.audioFileId"], "legacy-lumus-c");
   assert.equal(migratedLumusV3.parameters["lumus.source.c.sample.rootNote"], 65);
@@ -261,6 +263,8 @@ try {
       "lumus.arp.gate": 0.63,
       "lumus.arp.swing": 0.28,
       "lumus.arp.octaves": 3,
+      "lumus.arp.key": "gSharp",
+      "lumus.arp.scale": "naturalMinor",
     },
   });
   assert.equal(arpRoundtrip.parameters["lumus.arp.enabled"], true);
@@ -269,12 +273,35 @@ try {
   assert.equal(arpRoundtrip.parameters["lumus.arp.gate"], 0.63);
   assert.equal(arpRoundtrip.parameters["lumus.arp.swing"], 0.28);
   assert.equal(arpRoundtrip.parameters["lumus.arp.octaves"], 3);
+  assert.equal(arpRoundtrip.parameters["lumus.arp.key"], "gSharp");
+  assert.equal(arpRoundtrip.parameters["lumus.arp.scale"], "naturalMinor");
   const migratedLumusV7 = synthStore.normalizeSynthDraftPatch({
     ...structuredClone(lumusDraft),
     schemaVersion: 7,
     parameters: { ...lumusDraft.parameters, "lumus.arp.swing": 0.5 },
   });
   assert.equal(migratedLumusV7.parameters["lumus.arp.swing"], 0, "v7 must not activate a future swing field");
+  const migratedLumusV8 = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumusDraft),
+    schemaVersion: 8,
+    parameters: { ...lumusDraft.parameters, "lumus.arp.key": "b", "lumus.arp.scale": "blues" },
+  });
+  assert.equal(migratedLumusV8.parameters["lumus.arp.key"], "c", "v8 must not activate a future key field");
+  assert.equal(migratedLumusV8.parameters["lumus.arp.scale"], "chromatic", "v8 must not activate a future scale field");
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch({
+      ...structuredClone(lumusDraft),
+      parameters: { ...lumusDraft.parameters, "lumus.arp.key": "h" },
+    }),
+    /lumus\.arp\.key-invalid/,
+  );
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch({
+      ...structuredClone(lumusDraft),
+      parameters: { ...lumusDraft.parameters, "lumus.arp.scale": "dorian" },
+    }),
+    /lumus\.arp\.scale-invalid/,
+  );
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
       ...structuredClone(lumusDraft),

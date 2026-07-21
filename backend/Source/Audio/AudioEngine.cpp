@@ -2755,6 +2755,12 @@ namespace beat
                     route.lumusArpeggiatorConfig.gate = arp.gate;
                     route.lumusArpeggiatorConfig.swing = arp.swing;
                     route.lumusArpeggiatorConfig.octaves = arp.octaves;
+                    route.lumusArpeggiatorConfig.rootPitchClass = arp.rootPitchClass;
+                    route.lumusArpeggiatorConfig.scale = arp.scale == 1 ? LumusArpeggiator::Scale::major
+                        : arp.scale == 2 ? LumusArpeggiator::Scale::naturalMinor
+                        : arp.scale == 3 ? LumusArpeggiator::Scale::majorPentatonic
+                        : arp.scale == 4 ? LumusArpeggiator::Scale::blues
+                        : LumusArpeggiator::Scale::chromatic;
                     route.lumusArpeggiatorRateDivision = arp.rateDivision;
                     route.lumusArpeggiator.prepare(routeBuf.getNumSamples() > 0 ? routeBuf.getNumSamples() : 512);
                 }
