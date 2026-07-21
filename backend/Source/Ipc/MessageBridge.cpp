@@ -2259,6 +2259,7 @@ namespace beat
                                 op.fineCents = floatParam(value, "fineCents", 0.0f, -100.0f, 100.0f);
                                 op.level = normalizedParam(value, "level", index == 0 ? 0.78f : 0.55f);
                                 op.phase = normalizedParam(value, "phase", 0.0f);
+                                op.wavefold = normalizedParam(value, "wavefold", 0.0f);
                                 const auto envelope = value.getProperty("envelope", {});
                                 op.attackMs = floatParam(envelope, "attackMs", 5.0f, 0.0f, 10000.0f);
                                 op.decayMs = floatParam(envelope, "decayMs", 500.0f, 0.0f, 10000.0f);

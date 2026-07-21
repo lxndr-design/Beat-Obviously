@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { Button, FloatingSelect, Icon, Knob, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
-import { startInstrumentPreviewAudition, type InstrumentPreviewAuditionHandle } from "../../audio/synthPreview";
+import { sampleAurumOperatorWaveform, startInstrumentPreviewAudition, type InstrumentPreviewAuditionHandle } from "../../audio/synthPreview";
 import { AURUM_HARMONIC_COUNT, AURUM_OPERATOR_COUNT, AURUM_OUTPUT_COLUMN, drawAurumHarmonicLine, normalizedAurumConfig } from "../../state/aurum";
 import type { AurumOperatorConfig, AurumOperatorWaveform, Instrument } from "../../state/types";
 import { aurumTabIndexAfterKey } from "./aurumEditorInteraction";
@@ -192,7 +192,7 @@ export function AurumEditor(props: AurumEditorProps) {
                 <Toggle label="Enabled" checked={operator().enabled} onChange={(enabled) => updateOperator({ enabled })} />
               </div>
               <div class={styles.waveRow}>
-                <WaveformScope waveform={operator().waveform} phase={operator().phase} harmonics={operator().harmonics} />
+                <WaveformScope operator={operator()} />
                 <div class={styles.waveControls}>
                   <FloatingSelect
                     label="Wave"
@@ -204,6 +204,7 @@ export function AurumEditor(props: AurumEditorProps) {
                     onChange={(waveform) => updateOperator({ waveform: waveform as AurumOperatorWaveform })}
                   />
                   <Slider label="Phase" layout="inline" min={0} max={1} step={0.01} value={operator().phase} readout={<span>{Math.round(operator().phase * 360)}°</span>} onChange={(phase) => updateOperator({ phase })} />
+                  <Slider label="Fold" layout="inline" min={0} max={1} step={0.01} value={operator().wavefold} readout={<span>{Math.round(operator().wavefold * 100)}%</span>} onChange={(wavefold) => updateOperator({ wavefold })} />
                 </div>
               </div>
               <Show when={operator().waveform === "additive"}>
@@ -323,39 +324,22 @@ export function AurumEditor(props: AurumEditorProps) {
   );
 }
 
-function WaveformScope(props: { waveform: AurumOperatorWaveform; phase: number; harmonics: number[] }) {
+function WaveformScope(props: { operator: AurumOperatorConfig }) {
   const points = createMemo(() => Array.from({ length: 73 }, (_, index) => {
     const x = index / 72;
-    const phase = (x + props.phase) % 1;
-    const sample = waveformSample(props.waveform, phase, props.harmonics);
+    const phase = (x + props.operator.phase) % 1;
+    const sample = sampleAurumOperatorWaveform(props.operator, phase, 1 / 144);
     return `${(x * 144).toFixed(1)},${(36 - sample * 27).toFixed(1)}`;
   }).join(" "));
 
   return (
-    <div class={styles.waveformScope} aria-label={`${props.waveform} waveform preview`}>
+    <div class={styles.waveformScope} aria-label={`${props.operator.waveform} waveform preview at ${Math.round(props.operator.wavefold * 100)} percent fold`}>
       <svg viewBox="0 0 144 72" preserveAspectRatio="none" aria-hidden="true">
         <line x1="0" y1="36" x2="144" y2="36" />
         <polyline points={points()} />
       </svg>
     </div>
   );
-}
-
-function waveformSample(waveform: AurumOperatorWaveform, phase: number, harmonics: number[]) {
-  if (waveform === "additive") {
-    let sample = 0;
-    let weight = 0;
-    for (let index = 0; index < AURUM_HARMONIC_COUNT; index += 1) {
-      const amplitude = Math.max(0, Math.min(1, harmonics[index] ?? 0));
-      sample += Math.sin(phase * Math.PI * 2 * (index + 1)) * amplitude;
-      weight += amplitude;
-    }
-    return weight > 0 ? sample / weight : 0;
-  }
-  if (waveform === "triangle") return 1 - 4 * Math.abs(phase - 0.5);
-  if (waveform === "saw") return phase * 2 - 1;
-  if (waveform === "square") return phase < 0.5 ? 1 : -1;
-  return Math.sin(phase * Math.PI * 2);
 }
 
 function HarmonicEditor(props: { values: number[]; onChange: (values: number[]) => void }) {

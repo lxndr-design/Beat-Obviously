@@ -36,6 +36,16 @@ namespace beat
                 : 0.0f;
         }
 
+        float aurumWavefold(float sample, float amount) noexcept
+        {
+            const float depth = VoiceMath::clamp01(amount);
+            if (depth <= 0.0001f)
+                return sample;
+            const float driven = juce::jlimit(-1.0f, 1.0f, sample) * (1.0f + depth * 3.0f);
+            return std::asin(std::sin(driven * juce::MathConstants<float>::halfPi))
+                / juce::MathConstants<float>::halfPi;
+        }
+
         float aurumHeldEnvelope(const InstrumentVoice::Params::AurumOperator& op, float timeMs) noexcept
         {
             const float attack = juce::jmax(0.0f, op.attackMs);
@@ -54,7 +64,7 @@ namespace beat
             double phaseDelta) noexcept
         {
             if (op.waveform != 4)
-                return BasicOscillator::sample(op.waveform, phase, phaseDelta);
+                return aurumWavefold(BasicOscillator::sample(op.waveform, phase, phaseDelta), op.wavefold);
             float sample = 0.0f;
             float weight = 0.0f;
             for (size_t index = 0; index < op.harmonics.size(); ++index)
@@ -66,7 +76,7 @@ namespace beat
                 sample += std::sin(juce::MathConstants<double>::twoPi * phase * harmonic) * amplitude;
                 weight += amplitude;
             }
-            return weight > 0.0f ? sample / weight : 0.0f;
+            return aurumWavefold(weight > 0.0f ? sample / weight : 0.0f, op.wavefold);
         }
 
         float runtimeWarpShape(float input, float amount, int mode) noexcept

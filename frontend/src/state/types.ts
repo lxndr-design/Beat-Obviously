@@ -497,6 +497,7 @@ export interface AurumOperatorConfig {
   fineCents: number;
   level: number;
   phase: number;
+  wavefold: number;
   harmonics: number[];
   envelope: AdsrEnvelope;
 }
@@ -505,7 +506,7 @@ export interface AurumOperatorConfig {
  * are FM destinations and column 6 is direct output. Diagonal values are
  * operator feedback. */
 export interface AurumSynthConfig {
-  version: 3;
+  version: 4;
   operators: AurumOperatorConfig[];
   matrix: number[][];
   rmMatrix: number[][];

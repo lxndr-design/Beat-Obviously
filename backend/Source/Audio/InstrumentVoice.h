@@ -131,6 +131,7 @@ namespace beat
                 float sustain { 0.7f };
                 float releaseMs { 300.0f };
                 std::array<float, 16> harmonics {{ 1.0f }};
+                float wavefold { 0.0f };
             };
 
             struct DynamicModTarget

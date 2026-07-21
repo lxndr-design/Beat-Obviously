@@ -7354,12 +7354,14 @@ namespace
         instrument.aurum.operators[0].waveform = 4;
         instrument.aurum.operators[0].level = 0.8f;
         instrument.aurum.operators[0].releaseMs = 1234.0f;
+        instrument.aurum.operators[0].wavefold = 0.68f;
         instrument.aurum.operators[0].harmonics[2] = 0.64f;
         instrument.aurum.operators[0].harmonics[7] = 0.22f;
         instrument.aurum.operators[1].enabled = true;
         instrument.aurum.operators[1].ratio = 2.0f;
         instrument.aurum.operators[1].level = 0.55f;
         instrument.aurum.operators[1].releaseMs = 87.0f;
+        instrument.aurum.operators[1].wavefold = 0.21f;
         instrument.aurum.matrix[1][0] = -0.42f;
         instrument.aurum.matrix[0][6] = -0.86f;
         instrument.aurum.rmMatrix[1][0] = 0.73f;
@@ -7383,6 +7385,8 @@ namespace
             && near(loaded->instruments.front().aurum.rmMatrix[2][1], -0.31f)
             && near(loaded->instruments.front().aurum.operators[0].releaseMs, 1234.0f)
             && near(loaded->instruments.front().aurum.operators[1].releaseMs, 87.0f)
+            && near(loaded->instruments.front().aurum.operators[0].wavefold, 0.68f)
+            && near(loaded->instruments.front().aurum.operators[1].wavefold, 0.21f)
             && loaded->instruments.front().aurum.operators[0].waveform == 4
             && near(loaded->instruments.front().aurum.operators[0].harmonics[2], 0.64f)
             && near(loaded->instruments.front().aurum.operators[0].harmonics[7], 0.22f)
@@ -12692,6 +12696,74 @@ namespace
         return ok;
     }
 
+    bool stressInstrumentVoiceAurumWavefold()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.drive01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        params.releaseMs = 1.0f;
+        params.aurumOperators[0] = { true, 0, 1.0f, 0, 0.0f, 0.8f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
+        params.aurumMatrix[0][6] = 1.0f;
+
+        auto render = [](const beat::InstrumentVoice::Params& renderParams)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 4096);
+            voice.setParams(renderParams);
+            voice.startNote(57, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        const auto dry = render(params);
+        params.aurumOperators[0].wavefold = 0.72f;
+        const auto folded = render(params);
+        params.aurumOperators[0].wavefold = 1.0f;
+        const auto fullFold = render(params);
+        params.aurumOperators[0].wavefold = 4.0f;
+        const auto clampedFold = render(params);
+
+        double foldDifference = 0.0;
+        double clampResidual = 0.0;
+        double foldedEnergy = 0.0;
+        float peak = 0.0f;
+        for (int channel = 0; channel < dry.getNumChannels(); ++channel)
+            for (int sampleIndex = 0; sampleIndex < dry.getNumSamples(); ++sampleIndex)
+            {
+                const float drySample = dry.getSample(channel, sampleIndex);
+                const float foldedSample = folded.getSample(channel, sampleIndex);
+                const float fullFoldSample = fullFold.getSample(channel, sampleIndex);
+                const float clampedFoldSample = clampedFold.getSample(channel, sampleIndex);
+                if (!std::isfinite(drySample) || !std::isfinite(foldedSample)
+                    || !std::isfinite(fullFoldSample) || !std::isfinite(clampedFoldSample))
+                    return false;
+                foldDifference += std::abs((double) drySample - (double) foldedSample);
+                clampResidual += std::abs((double) fullFoldSample - (double) clampedFoldSample);
+                foldedEnergy += (double) foldedSample * (double) foldedSample;
+                peak = std::max(peak, std::abs(foldedSample));
+            }
+
+        const bool ok = foldDifference > 0.1
+            && clampResidual < 0.000001
+            && foldedEnergy > 0.001
+            && peak <= 1.0f;
+        if (!ok)
+            std::cerr << "Aurum wavefold stress failed difference=" << foldDifference
+                      << " clampResidual=" << clampResidual
+                      << " energy=" << foldedEnergy
+                      << " peak=" << peak << "\n";
+        return ok;
+    }
+
     bool stressInstrumentVoiceAurumDenseFeedbackStability()
     {
         beat::InstrumentVoice::Params params;
@@ -14152,6 +14224,7 @@ int main(int argc, char** argv)
             && stressInstrumentVoiceAurumOperatorRelease()
             && stressInstrumentVoiceAurumRingMatrix()
             && stressInstrumentVoiceAurumAdditiveOperator()
+            && stressInstrumentVoiceAurumWavefold()
             && stressInstrumentVoiceAurumDenseFeedbackStability()
             && stressAudioEngineAurumCrossRateLiveExportParity()
             && stressProjectRepositoryAurumInstrumentRoundtrip();
@@ -14321,6 +14394,11 @@ int main(int argc, char** argv)
     if (!stressInstrumentVoiceAurumAdditiveOperator())
     {
         std::cerr << "Instrument voice Aurum additive operator stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumWavefold())
+    {
+        std::cerr << "Instrument voice Aurum wavefold stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceAurumDenseFeedbackStability())

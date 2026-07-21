@@ -1122,6 +1122,10 @@ export function installBeatDevHooks() {
 
     const fixture = createAurumInstrument(DEV_AURUM_EDITOR_INSTRUMENT_ID, "Aurum Matrix Study");
     if (fixture.aurum) {
+      fixture.aurum.operators[0] = {
+        ...fixture.aurum.operators[0],
+        wavefold: 0.46,
+      };
       fixture.aurum.operators[1] = {
         ...fixture.aurum.operators[1],
         enabled: true,

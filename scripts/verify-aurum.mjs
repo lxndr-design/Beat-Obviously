@@ -31,9 +31,10 @@ try {
   assert.deepEqual(instrument.aurum.matrix.map((row) => row.length), [7, 7, 7, 7, 7, 7], "Aurum matrix must expose six destinations plus output");
   assert.equal(instrument.aurum.matrix[1][0], 0.42, "Default patch must route OP 2 into OP 1");
   assert.equal(instrument.aurum.matrix[0][6], 0.86, "Default patch must route OP 1 to output");
-  assert.equal(instrument.aurum.version, 3, "Aurum additive patches must use schema version 3");
+  assert.equal(instrument.aurum.version, 4, "Aurum waveshaping patches must use schema version 4");
   assert.deepEqual(instrument.aurum.rmMatrix.map((row) => row.length), [6, 6, 6, 6, 6, 6], "Aurum RM matrix must expose six operator destinations");
   assert.ok(instrument.aurum.operators.every((operator) => operator.harmonics.length === 16), "Every Aurum operator must expose 16 additive harmonics");
+  assert.ok(instrument.aurum.operators.every((operator) => operator.wavefold === 0), "Wavefold must default to exact identity");
 
   const baseline = new Float32Array(4096);
   preview.renderInstrumentSamples(instrument, baseline, 48000, 220, "visual", true);
@@ -118,6 +119,18 @@ try {
   const nyquistPeak = suppressedAboveNyquist.reduce((peakValue, sample) => Math.max(peakValue, Math.abs(sample)), 0);
   assert.ok(nyquistPeak < 0.000001, `Additive harmonics above Nyquist must be suppressed, got peak ${nyquistPeak}`);
 
+  const folded = structuredClone(dryRm);
+  folded.aurum.operators[0].wavefold = 0.72;
+  const foldedSamples = new Float32Array(4096);
+  preview.renderInstrumentSamples(folded, foldedSamples, 48000, 220, "visual", false);
+  const foldDifference = dryRmSamples.reduce((sum, sample, index) => sum + Math.abs(sample - foldedSamples[index]), 0) / dryRmSamples.length;
+  const foldPeak = foldedSamples.reduce((peakValue, sample) => Math.max(peakValue, Math.abs(sample)), 0);
+  assert.ok(foldDifference > 0.005, `Wavefold must alter the rendered operator waveform, got mean difference ${foldDifference}`);
+  assert.ok(foldPeak > 0.01 && foldPeak <= 1, `Wavefold rendering must remain audible and bounded, got peak ${foldPeak}`);
+  const sampledDry = preview.sampleAurumOperatorWaveform(dryRm.aurum.operators[0], 0.125, 1 / 144);
+  const sampledFolded = preview.sampleAurumOperatorWaveform(folded.aurum.operators[0], 0.125, 1 / 144);
+  assert.ok(Math.abs(sampledDry - sampledFolded) > 0.05, "The exported engine sampler must expose the folded waveform used by the editor scope");
+
   const stereoPatch = structuredClone(instrument);
   stereoPatch.aurum.unison = 3;
   stereoPatch.aurum.detuneCents = 14;
@@ -128,7 +141,7 @@ try {
   const stereoDifference = left.reduce((sum, sample, index) => sum + Math.abs(sample - right[index]), 0) / left.length;
   assert.ok(stereoDifference > 0.005, `Aurum spread must create stereo separation, got mean difference ${stereoDifference}`);
 
-  const malformedOperator = { ...instrument.aurum.operators[0], harmonics: [4, -4] };
+  const malformedOperator = { ...instrument.aurum.operators[0], wavefold: 4, harmonics: [4, -4] };
   const malformed = aurum.normalizedAurumConfig({ ...instrument.aurum, operators: [malformedOperator], matrix: [[4, -4]], rmMatrix: [[4, -4]] });
   assert.equal(malformed.operators.length, 6, "Normalization must restore missing operators");
   assert.equal(malformed.matrix[0][0], 1, "Normalization must clamp matrix values");
@@ -140,12 +153,19 @@ try {
   assert.equal(malformed.operators[0].harmonics[0], 1, "Normalization must clamp positive harmonic amplitudes");
   assert.equal(malformed.operators[0].harmonics[1], 0, "Normalization must clamp negative harmonic amplitudes");
   assert.equal(malformed.operators[0].harmonics.length, 16, "Normalization must restore harmonic geometry");
+  assert.equal(malformed.operators[0].wavefold, 1, "Normalization must clamp operator wavefold");
 
-  const legacyConfig = structuredClone(instrument.aurum);
+  const versionThreeConfig = structuredClone(instrument.aurum);
+  versionThreeConfig.version = 3;
+  versionThreeConfig.operators.forEach((operator) => delete operator.wavefold);
+  const versionThreeMigrated = aurum.normalizedAurumConfig(versionThreeConfig);
+  assert.equal(versionThreeMigrated.version, 4, "Version 3 Aurum patches must migrate to schema version 4");
+  assert.ok(versionThreeMigrated.operators.every((operator) => operator.wavefold === 0), "Version 3 operators must migrate with identity waveshaping");
+  const legacyConfig = structuredClone(versionThreeConfig);
   legacyConfig.version = 2;
   legacyConfig.operators.forEach((operator) => delete operator.harmonics);
   const migrated = aurum.normalizedAurumConfig(legacyConfig);
-  assert.equal(migrated.version, 3, "Version 2 Aurum patches must migrate to schema version 3");
+  assert.equal(migrated.version, 4, "Version 2 Aurum patches must migrate through additive support to schema version 4");
   assert.ok(migrated.operators.every((operator) => operator.harmonics[0] === 1 && operator.harmonics.slice(1).every((value) => value === 0)), "Migrated operators must add a fundamental-only spectrum without changing sound");
   const versionOneConfig = structuredClone(legacyConfig);
   versionOneConfig.version = 1;

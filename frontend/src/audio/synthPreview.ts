@@ -1018,7 +1018,7 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
         rmGain *= 1 - Math.abs(amount) + modulator * amount;
       }
       const phaseDelta = (frequency * voiceRate * ratio * tuning) / sampleRate;
-      nextOutputs[stateIndex] = aurumOscillatorSample(operator, phase, phaseDelta) * clamp01(operator.level) * envelope * rmGain;
+      nextOutputs[stateIndex] = sampleAurumOperatorWaveform(operator, phase, phaseDelta) * clamp01(operator.level) * envelope * rmGain;
       state.aurumPhases[stateIndex] = (state.aurumPhases[stateIndex] + phaseDelta) % 1;
     }
 
@@ -1084,8 +1084,8 @@ function aurumHeldEnvelope(envelope: Instrument["envelope"], timeMs: number): nu
   return clamp01(envelope.sustain);
 }
 
-function aurumOscillatorSample(operator: AurumOperatorConfig, phase: number, phaseDelta: number): number {
-  if (operator.waveform !== "additive") return oscillatorSample(operator.waveform, phase, 0.5);
+export function sampleAurumOperatorWaveform(operator: AurumOperatorConfig, phase: number, phaseDelta: number): number {
+  if (operator.waveform !== "additive") return applyAurumWavefold(oscillatorSample(operator.waveform, phase, 0.5), operator.wavefold);
   let sample = 0;
   let weight = 0;
   for (let index = 0; index < operator.harmonics.length; index += 1) {
@@ -1096,7 +1096,14 @@ function aurumOscillatorSample(operator: AurumOperatorConfig, phase: number, pha
     sample += Math.sin(Math.PI * 2 * phase * harmonic) * amplitude;
     weight += amplitude;
   }
-  return weight > 0 ? sample / weight : 0;
+  return applyAurumWavefold(weight > 0 ? sample / weight : 0, operator.wavefold);
+}
+
+function applyAurumWavefold(sample: number, amount: number): number {
+  const depth = clamp01(amount);
+  if (depth <= 0.0001) return sample;
+  const driven = clamp(sample, -1, 1) * (1 + depth * 3);
+  return Math.asin(Math.sin(driven * Math.PI * 0.5)) / (Math.PI * 0.5);
 }
 
 function aurumOperatorEnvelope(envelope: Instrument["envelope"], timeMs: number, noteOffMs: number): number {

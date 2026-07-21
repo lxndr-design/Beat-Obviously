@@ -2073,6 +2073,7 @@ namespace beat
                 source.sustain,
                 source.releaseMs,
                 source.harmonics,
+                source.wavefold,
             };
             params.aurumMatrix[index] = instrument.aurum.matrix[index];
             params.aurumRmMatrix[index] = instrument.aurum.rmMatrix[index];
