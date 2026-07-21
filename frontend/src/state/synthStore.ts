@@ -24,8 +24,8 @@ import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 5;
-export const LUMUS_PATCH_SCHEMA_VERSION = 4;
-const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2, 3] as const;
+export const LUMUS_PATCH_SCHEMA_VERSION = 5;
+const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2, 3, 4] as const;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
 export const SYNTH_INSTRUMENT_TYPE = "wavetable-synth";
 export const LUMUS_PARAMETER_NAMESPACE = "lumus";
@@ -68,12 +68,16 @@ export interface WavemapManualRange {
 
 export type OscillatorKey = string;
 export interface SynthOscillatorDefinition { id: OscillatorKey; name: string }
-export type LumusSourceMode = "wavetable" | "sample";
+export type LumusSourceMode = "wavetable" | "sample" | "granular";
 export type LumusSourceSlotId = "a" | "b" | "c";
 export interface LumusSampleSlotMetadata {
   schemaVersion: 1;
   zones: AetherSampleZoneConfig[];
   managedSfz?: ManagedSfzAssetConfig;
+}
+export interface LumusGranularSlotMetadata {
+  schemaVersion: 1;
+  managedAsset?: ManagedGranularAssetConfig;
 }
 export interface LumusSourceRackDescriptor {
   schemaVersion: 2;
@@ -401,6 +405,7 @@ export interface SynthDraftPatch {
     oscillators: SynthOscillatorDefinition[];
     lumusSourceRack?: LumusSourceRackDescriptor;
     lumusSampleSlots?: Partial<Record<LumusSourceSlotId, LumusSampleSlotMetadata>>;
+    lumusGranularSlots?: Partial<Record<LumusSourceSlotId, LumusGranularSlotMetadata>>;
     sampleSlot1Zones: AetherSampleZoneConfig[];
     managedSfz?: ManagedSfzAssetConfig;
     managedGranular?: ManagedGranularAssetConfig;
@@ -483,8 +488,18 @@ const DEFAULT_LUMUS_SAMPLE_PARAMETERS: Record<string, SynthParameterValue> = {
   fxSend2: 0,
 };
 
+const DEFAULT_LUMUS_GRANULAR_PARAMETERS: Record<string, SynthParameterValue> = {
+  enabled: false, builtinSource: "", rootNote: 60, level: 0.7, route: "filter",
+  position: 0.5, positionSpread: 0.1, grainMilliseconds: 80, densityHz: 12,
+  pitchSemitones: 0, stereoSpread: 0.5, randomSeed: 1, fxSend1: 0, fxSend2: 0,
+};
+
 function lumusSampleParameterId(slot: LumusSourceSlotId, suffix: string): SynthParameterId {
   return `lumus.source.${slot}.sample.${suffix}` as SynthParameterId;
+}
+
+function lumusGranularParameterId(slot: LumusSourceSlotId, suffix: string): SynthParameterId {
+  return `lumus.source.${slot}.granular.${suffix}` as SynthParameterId;
 }
 
 function oscillatorIdForIndex(index: number): string {
@@ -535,10 +550,13 @@ function normalizeLumusSourceRack(value: unknown, patchVersion: unknown, legacyS
     throw new SynthPatchIdentityError("lumus.source-rack.capacity", "Lumus requires exactly three source slots.");
   for (let index = 0; index < canonical.slots.length; index += 1) {
     const slot = value.slots[index];
-    const supportsSample = patchVersion === 3 || patchVersion === 4;
+    const supportsSample = patchVersion === 3 || patchVersion === 4 || patchVersion === 5;
+    const supportsGranular = patchVersion === 5;
     if (!isRecord(slot)
         || slot.id !== canonical.slots[index].id
-        || (slot.mode !== "wavetable" && (!supportsSample || slot.mode !== "sample")))
+        || (slot.mode !== "wavetable"
+          && (!supportsSample || slot.mode !== "sample")
+          && (!supportsGranular || slot.mode !== "granular")))
       throw new SynthPatchIdentityError("lumus.source-rack.slot-invalid", `Invalid Lumus source slot at index ${index}.`);
     canonical.slots[index].mode = slot.mode as LumusSourceMode;
   }
@@ -573,6 +591,22 @@ function normalizeLumusSampleSlots(
       zones: normalizeAetherSampleZones(entry.zones),
       managedSfz: normalizeManagedSfz(entry.managedSfz),
     };
+  }
+  return result;
+}
+
+function normalizeLumusGranularSlots(value: unknown, patchVersion: unknown): Record<LumusSourceSlotId, LumusGranularSlotMetadata> {
+  const empty = (): LumusGranularSlotMetadata => ({ schemaVersion: 1 });
+  if (patchVersion === 1 || patchVersion === 2 || patchVersion === 3 || patchVersion === 4)
+    return { a: empty(), b: empty(), c: empty() };
+  if (!isRecord(value))
+    throw new SynthPatchIdentityError("lumus.granular-slots.malformed", "Lumus v5 requires independent granular metadata for A, B, and C.");
+  const result: Record<LumusSourceSlotId, LumusGranularSlotMetadata> = { a: empty(), b: empty(), c: empty() };
+  for (const slot of ["a", "b", "c"] as const) {
+    const entry = value[slot];
+    if (!isRecord(entry) || entry.schemaVersion !== 1)
+      throw new SynthPatchIdentityError("lumus.granular-slot.invalid", `Invalid Lumus granular metadata for Slot ${slot.toUpperCase()}.`);
+    result[slot] = { schemaVersion: 1, managedAsset: normalizeManagedGranular(entry.managedAsset) };
   }
   return result;
 }
@@ -1752,6 +1786,9 @@ export function createDefaultLumusDraft(): SynthDraftPatch {
   for (const slot of ["a", "b", "c"] as const)
     for (const [suffix, value] of Object.entries(DEFAULT_LUMUS_SAMPLE_PARAMETERS))
       parameters[lumusSampleParameterId(slot, suffix)] = value;
+  for (const slot of ["a", "b", "c"] as const)
+    for (const [suffix, value] of Object.entries(DEFAULT_LUMUS_GRANULAR_PARAMETERS))
+      parameters[lumusGranularParameterId(slot, suffix)] = value;
   return {
     ...draft,
     schemaVersion: LUMUS_PATCH_SCHEMA_VERSION,
@@ -1780,6 +1817,9 @@ export function createDefaultLumusDraft(): SynthDraftPatch {
         a: { schemaVersion: 1, zones: [] },
         b: { schemaVersion: 1, zones: [] },
         c: { schemaVersion: 1, zones: [] },
+      },
+      lumusGranularSlots: {
+        a: { schemaVersion: 1 }, b: { schemaVersion: 1 }, c: { schemaVersion: 1 },
       },
     },
   };
@@ -1884,6 +1924,9 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
         inputMetadata.lumusSampleSlots,
         input.schemaVersion,
         inputMetadata,
+      ), lumusGranularSlots: normalizeLumusGranularSlots(
+        inputMetadata.lumusGranularSlots,
+        input.schemaVersion,
       ) } : {}),
       sampleSlot1Zones: normalizeAetherSampleZones(inputMetadata.sampleSlot1Zones),
       managedSfz: normalizeManagedSfz(inputMetadata.managedSfz),
@@ -1917,9 +1960,9 @@ function validateSynthPatchIdentity(input: Partial<SynthDraftPatch> | SynthPatch
   if (type === LUMUS_INSTRUMENT_TYPE) {
     if (namespace !== LUMUS_PARAMETER_NAMESPACE)
       throw new SynthPatchIdentityError("lumus.identity.namespace-mismatch", "Lumus patches must use the lumus namespace.");
-    if (!LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3)
+    if (!LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3 | 4)
         && input.schemaVersion !== LUMUS_PATCH_SCHEMA_VERSION)
-      throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema 1, 2, 3, or ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
+      throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema 1, 2, 3, 4, or ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
     return true;
   }
   throw new SynthPatchIdentityError("synth.identity.type-unknown", `Unsupported synth instrument type: ${String(type)}`);

@@ -169,7 +169,7 @@ try {
   const lumusDraft = synthStore.createDefaultLumusDraft();
   assert.equal(lumusDraft.instrumentType, "lumus-hybrid-synth", "Lumus must have an independent instrument identity");
   assert.equal(lumusDraft.namespace, "lumus", "Lumus must not serialize into Aether's namespace");
-  assert.equal(lumusDraft.schemaVersion, 4, "Lumus must use the independent sample-ownership schema");
+  assert.equal(lumusDraft.schemaVersion, 5, "Lumus must use the independent granular-ownership schema");
   assert.equal(lumusDraft.metadata.lumusSourceRack.schemaVersion, 2);
   assert.equal(lumusDraft.name, "Lumus Init");
   assert.deepEqual(lumusDraft.metadata.oscillators.map(({ id }) => id), ["a", "b", "c"], "Lumus must expose exactly three stable source identities");
@@ -189,7 +189,7 @@ try {
     "Lumus namespace mismatches must fail diagnostically",
   );
   assert.throws(
-    () => synthStore.normalizeSynthDraftPatch({ ...lumusDraft, schemaVersion: 5 }),
+    () => synthStore.normalizeSynthDraftPatch({ ...lumusDraft, schemaVersion: 6 }),
     /lumus\.schema\.unsupported/,
     "future or inconsistent Lumus schemas must not be silently normalized",
   );
@@ -210,7 +210,7 @@ try {
     metadata: { ...structuredClone(lumusDraft.metadata), lumusSourceRack: undefined, oscillators: [{ id: "a", name: "A" }, { id: "b", name: "B" }] },
     parameters: Object.fromEntries(Object.entries(lumusDraft.parameters).filter(([id]) => !id.startsWith("osc.c."))),
   });
-  assert.equal(migratedLumusV1.schemaVersion, 4, "Lumus v1 must deterministically migrate to v4");
+  assert.equal(migratedLumusV1.schemaVersion, 5, "Lumus v1 must deterministically migrate to v5");
   assert.deepEqual(migratedLumusV1.metadata.oscillators.map(({ id }) => id), ["a", "b", "c"]);
   assert.equal(migratedLumusV1.parameters["osc.c.enabled"], false);
   const migratedLumusV3 = synthStore.normalizeSynthDraftPatch({
@@ -242,7 +242,7 @@ try {
       }],
     },
   });
-  assert.equal(migratedLumusV3.schemaVersion, 4);
+  assert.equal(migratedLumusV3.schemaVersion, 5);
   assert.equal(migratedLumusV3.parameters["lumus.source.c.sample.enabled"], true);
   assert.equal(migratedLumusV3.parameters["lumus.source.c.sample.audioFileId"], "legacy-lumus-c");
   assert.equal(migratedLumusV3.parameters["lumus.source.c.sample.rootNote"], 65);
@@ -348,6 +348,41 @@ try {
   assert.equal(independentSampleSlots.parameters["lumus.source.b.sample.rootNote"], 60);
   assert.equal(independentSampleSlots.parameters["lumus.source.c.sample.rootNote"], 72);
   assert.deepEqual(independentSampleSlots.metadata.lumusSourceRack?.slots.map(({ mode }) => mode), ["sample", "sample", "sample"]);
+  const independentGranularSlots = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumusDraft),
+    parameters: {
+      ...lumusDraft.parameters,
+      "lumus.source.a.granular.enabled": true,
+      "lumus.source.a.granular.builtinSource": "benchmark",
+      "lumus.source.a.granular.rootNote": 48,
+      "lumus.source.b.granular.enabled": true,
+      "lumus.source.b.granular.builtinSource": "benchmark",
+      "lumus.source.b.granular.rootNote": 60,
+      "lumus.source.c.granular.enabled": true,
+      "lumus.source.c.granular.builtinSource": "benchmark",
+      "lumus.source.c.granular.rootNote": 72,
+    },
+    metadata: {
+      ...structuredClone(lumusDraft.metadata),
+      lumusSourceRack: { schemaVersion: 2, slots: [
+        { id: "a", mode: "granular" }, { id: "b", mode: "granular" }, { id: "c", mode: "granular" },
+      ] },
+    },
+  });
+  assert.deepEqual(independentGranularSlots.metadata.lumusSourceRack?.slots.map(({ mode }) => mode), ["granular", "granular", "granular"]);
+  assert.equal(independentGranularSlots.parameters["lumus.source.a.granular.rootNote"], 48);
+  assert.equal(independentGranularSlots.parameters["lumus.source.b.granular.rootNote"], 60);
+  assert.equal(independentGranularSlots.parameters["lumus.source.c.granular.rootNote"], 72);
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch({
+      ...structuredClone(lumusDraft),
+      metadata: { ...structuredClone(lumusDraft.metadata), lumusGranularSlots: {
+        a: { schemaVersion: 2 }, b: { schemaVersion: 1 }, c: { schemaVersion: 1 },
+      } },
+    }),
+    /lumus\.granular-slot\.invalid/,
+    "future per-slot granular metadata must be rejected diagnostically",
+  );
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
       ...structuredClone(lumusDraft),

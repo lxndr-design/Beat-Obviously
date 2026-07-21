@@ -2075,7 +2075,8 @@ namespace beat
         std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1,
         std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2,
         std::array<std::shared_ptr<const ImmutableMappedSampleSource>, 3> lumusSampleSlots,
-        std::array<std::shared_ptr<const SfzDecodedInstrument>, 3> lumusSfzSlots)
+        std::array<std::shared_ptr<const SfzDecodedInstrument>, 3> lumusSfzSlots,
+        std::array<std::shared_ptr<const ImmutableGranularSource>, 3> lumusGranularSlots)
     {
         auto instrumentSynth = std::make_unique<BeatSynthesiser>();
         instrumentSynth->configureMemberExpressionZone({
@@ -2396,6 +2397,15 @@ namespace beat
             juce::jlimit(0, 3, instrument.aether.granularSlot2.routing),
             instrument.aether.granularSlot2.fxSends,
         };
+        for (size_t index = 0; index < params.lumusGranularSlots.size(); ++index)
+        {
+            const auto& source = instrument.lumus.granularSlots[index];
+            params.lumusGranularSlots[index] = {
+                params.hasLumus && source.enabled && lumusGranularSlots[index] != nullptr,
+                std::move(lumusGranularSlots[index]), source.level,
+                juce::jlimit(0, 4, source.routing), source.fxSends,
+            };
+        }
         params.hasAetherSourceSends = [&instrument]
         {
             for (size_t bus = 0; bus < instrument.aether.fxBusIds.size(); ++bus)
@@ -2411,7 +2421,9 @@ namespace beat
                         || std::any_of(instrument.lumus.sampleSlots.begin(), instrument.lumus.sampleSlots.end(),
                             [bus](const auto& slot) { return slot.enabled && slot.fxSends[bus] > 0.0001f; })
                         || (instrument.aether.granularSlot2.enabled
-                            && instrument.aether.granularSlot2.fxSends[bus] > 0.0001f)))
+                            && instrument.aether.granularSlot2.fxSends[bus] > 0.0001f)
+                        || std::any_of(instrument.lumus.granularSlots.begin(), instrument.lumus.granularSlots.end(),
+                            [bus](const auto& slot) { return slot.enabled && slot.fxSends[bus] > 0.0001f; })))
                     return true;
             }
             return false;
@@ -2735,6 +2747,7 @@ namespace beat
                 std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1;
                 std::array<std::shared_ptr<const ImmutableMappedSampleSource>, 3> lumusSampleSlots;
                 std::array<std::shared_ptr<const SfzDecodedInstrument>, 3> lumusSfzSlots;
+                std::array<std::shared_ptr<const ImmutableGranularSource>, 3> lumusGranularSlots;
                 std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2;
                 const auto loadSampleSlot = [&](const InstrumentDefinition::AetherSampleSlot& slot,
                                                 std::shared_ptr<const ImmutableMappedSampleSource>& mappedOutput,
@@ -2840,9 +2853,10 @@ namespace beat
                     for (size_t index = 0; index < lumusSampleSlots.size(); ++index)
                         lumusSampleIdentities[index] = loadSampleSlot(routeInstrument->lumus.sampleSlots[index],
                             lumusSampleSlots[index], lumusSfzSlots[index]);
-                const auto& granular = routeInstrument->aether.granularSlot2;
-                if (routeInstrument->hasAether && granular.enabled)
+                const auto loadGranularSlot = [&](const InstrumentDefinition::AetherGranularSlot& granular)
                 {
+                    std::shared_ptr<const ImmutableGranularSource> result;
+                    if (!granular.enabled) return result;
                     ManagedGranularLoadResult loaded;
                     if (granular.builtinSource == "benchmark")
                     {
@@ -2866,12 +2880,18 @@ namespace beat
                         source->pitchSemitones = granular.pitchSemitones;
                         source->stereoSpread = granular.stereoSpread;
                         source->randomSeed = granular.randomSeed;
-                        if (source->isValid()) aetherGranularSlot2 = std::move(source);
+                        if (source->isValid()) result = std::move(source);
                     }
-                }
+                    return result;
+                };
+                const auto& granular = routeInstrument->aether.granularSlot2;
+                if (routeInstrument->hasAether) aetherGranularSlot2 = loadGranularSlot(granular);
+                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumus)
+                    for (size_t index = 0; index < lumusGranularSlots.size(); ++index)
+                        lumusGranularSlots[index] = loadGranularSlot(routeInstrument->lumus.granularSlots[index]);
                 route.synth = createInstrumentSynth(*routeInstrument,
                     std::move(aetherSampleSlot1), std::move(aetherSfzSlot1), std::move(aetherGranularSlot2),
-                    std::move(lumusSampleSlots), std::move(lumusSfzSlots));
+                    std::move(lumusSampleSlots), std::move(lumusSfzSlots), std::move(lumusGranularSlots));
                 route.sourceFxBusIds = routeInstrument->aether.fxBusIds;
                 route.aetherSampleSlot1Identity = slot.enabled
                     ? juce::String(slot.routing) + ":" + juce::String(slot.fxSends[0], 6) + ":"
@@ -2899,6 +2919,18 @@ namespace beat
                         + juce::String((int64_t) granular.randomSeed) + ":" + juce::String(granular.level, 6) + ":"
                         + juce::String(granular.routing) + ":" + juce::String(granular.fxSends[0], 6) + ":"
                         + juce::String(granular.fxSends[1], 6);
+                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumus)
+                    for (size_t index = 0; index < routeInstrument->lumus.granularSlots.size(); ++index)
+                    {
+                        const auto& source = routeInstrument->lumus.granularSlots[index];
+                        if (!source.enabled) continue;
+                        route.aetherSampleSlot1Identity += "|lumus-granular-" + juce::String((int) index) + ":"
+                            + source.builtinSource + ":" + source.managedAsset.assetId + ":"
+                            + juce::String(source.rootNote) + ":" + juce::String(source.position, 6) + ":"
+                            + juce::String(source.positionSpread, 6) + ":" + juce::String(source.grainMilliseconds, 3) + ":"
+                            + juce::String(source.densityHz, 3) + ":" + juce::String(source.pitchSemitones, 3) + ":"
+                            + juce::String(source.stereoSpread, 6) + ":" + juce::String((int64_t) source.randomSeed);
+                    }
             }
 
             for (auto& sourceFxBuffer : route.sourceFxBuffers)

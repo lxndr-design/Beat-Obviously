@@ -649,7 +649,8 @@ namespace beat
             std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1 = nullptr,
             std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2 = nullptr,
             std::array<std::shared_ptr<const ImmutableMappedSampleSource>, 3> lumusSampleSlots = {},
-            std::array<std::shared_ptr<const SfzDecodedInstrument>, 3> lumusSfzSlots = {});
+            std::array<std::shared_ptr<const SfzDecodedInstrument>, 3> lumusSfzSlots = {},
+            std::array<std::shared_ptr<const ImmutableGranularSource>, 3> lumusGranularSlots = {});
         void rebuildSampleInstruments(const Project& project);
         InstrumentRenderState* findInstrumentRenderState(const Id& instrumentId);
         InstrumentRenderState* findTrackRenderState(const Id& trackId, const Id& instrumentId);

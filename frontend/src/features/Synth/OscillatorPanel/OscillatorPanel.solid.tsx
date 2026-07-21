@@ -252,14 +252,23 @@ function OscillatorRow(props: {
       : "wavetable";
   });
   const sampleMode = createMemo(() => sourceMode() === "sample");
+  const granularMode = createMemo(() => sourceMode() === "granular");
   const samplePrefix = createMemo(() => `lumus.source.${props.oscillator}.sample`);
   const sampleAvailable = createMemo(() => Boolean(
     getStringParam(draft(), `${samplePrefix()}.audioFileId` as SynthParameterId)
       || draft().metadata.lumusSampleSlots?.[props.oscillator as "a" | "b" | "c"]?.managedSfz,
   ));
+  const granularPrefix = createMemo(() => `lumus.source.${props.oscillator}.granular`);
+  const granularAvailable = createMemo(() => Boolean(
+    getStringParam(draft(), `${granularPrefix()}.builtinSource` as SynthParameterId) === "benchmark"
+      || draft().metadata.lumusGranularSlots?.[props.oscillator as "a" | "b" | "c"]?.managedAsset,
+  ));
+  const sourceAvailable = createMemo(() => sampleMode() ? sampleAvailable() : granularMode() ? granularAvailable() : true);
   const enabledId = createMemo(() => sampleMode()
     ? `${samplePrefix()}.enabled` as SynthParameterId
-    : oscParam(props.oscillator, "enabled"));
+    : granularMode()
+      ? `${granularPrefix()}.enabled` as SynthParameterId
+      : oscParam(props.oscillator, "enabled"));
   const enabled = createMemo(() => getBooleanParam(draft(), enabledId()));
   const wavetableId = createMemo(() => oscParam(props.oscillator, "wavetable"));
   const warpModeId = createMemo(() => oscParam(props.oscillator, "warpMode"));
@@ -278,7 +287,7 @@ function OscillatorRow(props: {
     setParameter(wavetableId(), next.id as WavetableId);
   }
 
-  function setSourceMode(mode: "wavetable" | "sample") {
+  function setSourceMode(mode: "wavetable" | "sample" | "granular") {
     if (!lumusSlot()) return;
     const current = draft();
     const slots = current.metadata.lumusSourceRack?.slots.map((slot, index) =>
@@ -291,12 +300,15 @@ function OscillatorRow(props: {
         ...(mode === "sample"
           ? { [`${samplePrefix()}.enabled`]: sampleAvailable() }
           : { [`${samplePrefix()}.enabled`]: false }),
+        ...(mode === "granular"
+          ? { [`${granularPrefix()}.enabled`]: granularAvailable() }
+          : { [`${granularPrefix()}.enabled`]: false }),
       },
       metadata: {
         ...current.metadata,
         lumusSourceRack: {
           schemaVersion: 2,
-          slots: slots as [{ id: "a"; mode: "wavetable" | "sample" }, { id: "b"; mode: "wavetable" | "sample" }, { id: "c"; mode: "wavetable" | "sample" }],
+          slots: slots as [{ id: "a"; mode: "wavetable" | "sample" | "granular" }, { id: "b"; mode: "wavetable" | "sample" | "granular" }, { id: "c"; mode: "wavetable" | "sample" | "granular" }],
         },
       },
     });
@@ -310,7 +322,7 @@ function OscillatorRow(props: {
           size="xs"
           className={styles.oscillatorPowerButton}
           selected={enabled()}
-          disabled={sampleMode() && !sampleAvailable()}
+          disabled={!sourceAvailable()}
           aria-label={`${enabled() ? "Disable" : "Enable"} ${label()}`}
           onClick={() => setBooleanParameter(enabledId(), !enabled())}
         >
@@ -329,11 +341,11 @@ function OscillatorRow(props: {
             label="Source"
             ariaLabel={`${label()} source mode`}
             value={sourceMode()}
-            options={[{ value: "wavetable", label: "Wavetable" }, { value: "sample", label: "Sample" }]}
-            onChange={(value) => setSourceMode(value as "wavetable" | "sample")}
+            options={[{ value: "wavetable", label: "Wavetable" }, { value: "sample", label: "Sample" }, { value: "granular", label: "Granular" }]}
+            onChange={(value) => setSourceMode(value as "wavetable" | "sample" | "granular")}
           />
         </Show>
-        <Show when={!sampleMode()}>
+        <Show when={!sampleMode() && !granularMode()}>
           <div class={styles.headerWavetable}>
             <WavetableShapeButtons
               compact
@@ -349,7 +361,7 @@ function OscillatorRow(props: {
           </Button>
         </Show>
       </div>
-      <Show when={!sampleMode()} fallback={<div class={styles.rowMain}><span class={styles.tuningModeHint}>Sample controls are available in the source sample section below.</span></div>}>
+      <Show when={!sampleMode() && !granularMode()} fallback={<div class={styles.rowMain}><span class={styles.tuningModeHint}>{granularMode() ? "Granular controls are available in the source granular section below." : "Sample controls are available in the source sample section below."}</span></div>}>
       <div class={styles.rowMain}>
           <WaveformPreview label={`${label()} local oscillator preview`} samples={waveform()} disabled={!enabled()} />
           <div class={styles.settingsPane}>

@@ -324,6 +324,8 @@ namespace beat
             AetherOscillator oscC;
             std::array<AetherSampleSlot, 3> sampleSlots;
             std::array<bool, 3> sampleModes {};
+            std::array<AetherGranularSlot, 3> granularSlots;
+            std::array<bool, 3> granularModes {};
         };
 
         struct DynamicModTarget

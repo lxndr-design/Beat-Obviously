@@ -312,6 +312,7 @@ namespace beat
                 int routing { 0 };
                 std::array<float, 2> fxSends {};
             } aetherGranularSlot2;
+            std::array<AetherGranularSlot, 3> lumusGranularSlots;
             float aetherRuntimeWarp { 0.0f };
             int aetherRuntimeWarpMode { 0 };
             float aetherRuntimeWarp2 { 0.0f };
@@ -434,6 +435,7 @@ namespace beat
         SfzSourceSlot aetherSfzSlot1;
         std::array<MappedSampleSourceSlot, 3> lumusSampleSlots;
         std::array<SfzSourceSlot, 3> lumusSfzSlots;
+        std::array<GranularSourceSlot, 3> lumusGranularSlots;
         GranularSourceSlot aetherGranularSlot2;
         VoiceAetherCache::PanGains cachedPanGains;
         VoiceAetherCache::PitchRates cachedPitchRates;

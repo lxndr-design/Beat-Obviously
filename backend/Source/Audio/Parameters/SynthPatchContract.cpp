@@ -436,6 +436,7 @@ namespace beat
                 || ((int) schemaVersion != params::lumusLegacyPatchSchemaVersion
                     && (int) schemaVersion != params::lumusPreviousPatchSchemaVersion
                     && (int) schemaVersion != params::lumusSampleModePatchSchemaVersion
+                    && (int) schemaVersion != params::lumusSampleOwnershipPatchSchemaVersion
                     && (int) schemaVersion != params::lumusPatchSchemaVersion)
                 || patchNamespace.toString() != "lumus")
                 return false;
@@ -451,6 +452,7 @@ namespace beat
         const auto modulation = objectProperty(patch, "modulation", {});
         const auto metadata = objectProperty(patch, "metadata", {});
         std::array<bool, 3> lumusSampleModes {};
+        std::array<bool, 3> lumusGranularModes {};
         if (isLumus && (int) objectProperty(patch, "schemaVersion", 0) >= params::lumusPreviousPatchSchemaVersion)
         {
             const auto rack = objectProperty(metadata, "lumusSourceRack", {});
@@ -469,9 +471,11 @@ namespace beat
                 const auto mode = objectProperty(slot, "mode", {}).toString();
                 if (!slot.isObject()
                     || objectProperty(slot, "id", {}).toString() != requiredIds[(size_t) index]
-                    || (mode != "wavetable" && mode != "sample"))
+                    || (mode != "wavetable" && mode != "sample"
+                        && (patchSchemaVersion < params::lumusPatchSchemaVersion || mode != "granular")))
                     return false;
                 lumusSampleModes[(size_t) index] = mode == "sample";
+                lumusGranularModes[(size_t) index] = mode == "granular";
             }
         }
         const auto customWavetables = mergedWavemapMetadata(metadata);
@@ -558,7 +562,7 @@ namespace beat
         instrument.aether.noise.routing = sourceRoute(synthStringParam(params, "aether.noise.route", "filter"));
         const int activeLumusSchema = isLumus ? (int) objectProperty(patch, "schemaVersion", 0) : 0;
         juce::var lumusSampleMetadata;
-        if (isLumus && activeLumusSchema >= params::lumusPatchSchemaVersion)
+        if (isLumus && activeLumusSchema >= params::lumusSampleOwnershipPatchSchemaVersion)
         {
             lumusSampleMetadata = objectProperty(metadata, "lumusSampleSlots", {});
             if (!lumusSampleMetadata.isObject()) return false;
@@ -641,7 +645,7 @@ namespace beat
                 || !target.zones.empty() || target.managedSfz.manifestPath.isNotEmpty());
             return true;
         };
-        if (isLumus && activeLumusSchema >= params::lumusPatchSchemaVersion)
+        if (isLumus && activeLumusSchema >= params::lumusSampleOwnershipPatchSchemaVersion)
         {
             static constexpr std::array<const char*, 3> ids {{ "a", "b", "c" }};
             for (size_t index = 0; index < ids.size(); ++index)
@@ -664,33 +668,62 @@ namespace beat
             if (isLumus && activeLumusSchema >= params::lumusSampleModePatchSchemaVersion)
                 instrument.aether.sampleSlot1.enabled = instrument.aether.sampleSlot1.enabled && lumusSampleModes[2];
         }
-        auto& granular = instrument.aether.granularSlot2;
-        granular.schemaVersion = 1;
-        granular.builtinSource = synthStringParam(params, "aether.granular.2.builtinSource", "");
-        if (granular.builtinSource != "benchmark") granular.builtinSource.clear();
-        granular.rootNote = juce::jlimit(0, 127, (int) std::round(synthNumberParam(params, "aether.granular.2.rootNote", 60.0)));
-        granular.level = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.granular.2.level", 0.7));
-        granular.routing = sourceRoute(synthStringParam(params, "aether.granular.2.route", "filter"));
-        granular.position = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.granular.2.position", 0.5));
-        granular.positionSpread = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.granular.2.positionSpread", 0.1));
-        granular.grainMilliseconds = juce::jlimit(2.0f, 1000.0f, (float) synthNumberParam(params, "aether.granular.2.grainMilliseconds", 80.0));
-        granular.densityHz = juce::jlimit(0.1f, 200.0f, (float) synthNumberParam(params, "aether.granular.2.densityHz", 12.0));
-        granular.pitchSemitones = juce::jlimit(-48.0f, 48.0f, (float) synthNumberParam(params, "aether.granular.2.pitchSemitones", 0.0));
-        granular.stereoSpread = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.granular.2.stereoSpread", 0.5));
-        granular.randomSeed = (uint32_t) juce::jlimit(1.0, 4294967295.0,
-            synthNumberParam(params, "aether.granular.2.randomSeed", 1.0));
-        granular.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.granular.2.fxSend1", 0.0));
-        granular.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.granular.2.fxSend2", 0.0));
-        const auto managedGranular = objectProperty(metadata, "managedGranular", {});
-        if (managedGranular.isObject() && (int) managedGranular.getProperty("schemaVersion", 0) <= 1)
+        const auto parseGranularSlot = [&](InstrumentDefinition::AetherGranularSlot& granular,
+                                           const juce::String& prefix,
+                                           const juce::var& slotMetadata) -> bool
         {
+        granular = {};
+        granular.schemaVersion = 1;
+        granular.builtinSource = synthStringParam(params, prefix + "builtinSource", "");
+        if (granular.builtinSource != "benchmark") granular.builtinSource.clear();
+        granular.rootNote = juce::jlimit(0, 127, (int) std::round(synthNumberParam(params, prefix + "rootNote", 60.0)));
+        granular.level = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "level", 0.7));
+        granular.routing = sourceRoute(synthStringParam(params, prefix + "route", "filter"));
+        granular.position = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "position", 0.5));
+        granular.positionSpread = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "positionSpread", 0.1));
+        granular.grainMilliseconds = juce::jlimit(2.0f, 1000.0f, (float) synthNumberParam(params, prefix + "grainMilliseconds", 80.0));
+        granular.densityHz = juce::jlimit(0.1f, 200.0f, (float) synthNumberParam(params, prefix + "densityHz", 12.0));
+        granular.pitchSemitones = juce::jlimit(-48.0f, 48.0f, (float) synthNumberParam(params, prefix + "pitchSemitones", 0.0));
+        granular.stereoSpread = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "stereoSpread", 0.5));
+        granular.randomSeed = (uint32_t) juce::jlimit(1.0, 4294967295.0,
+            synthNumberParam(params, prefix + "randomSeed", 1.0));
+        granular.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "fxSend1", 0.0));
+        granular.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, prefix + "fxSend2", 0.0));
+        const auto managedGranular = slotMetadata.isObject()
+            ? objectProperty(slotMetadata, "managedAsset", {})
+            : objectProperty(metadata, "managedGranular", {});
+        if (!managedGranular.isVoid())
+        {
+            if (!managedGranular.isObject() || (int) managedGranular.getProperty("schemaVersion", 0) != 1) return false;
             granular.managedAsset.assetId = managedGranular.getProperty("assetId", {}).toString();
             granular.managedAsset.displayName = managedGranular.getProperty("displayName", {}).toString();
             granular.managedAsset.manifestPath = managedGranular.getProperty("manifestPath", {}).toString();
             granular.managedAsset.audioPath = managedGranular.getProperty("audioPath", {}).toString();
         }
-        granular.enabled = synthNumberParam(params, "aether.granular.2.enabled", 0.0) >= 0.5
+        granular.enabled = synthNumberParam(params, prefix + "enabled", 0.0) >= 0.5
             && (granular.builtinSource.isNotEmpty() || granular.managedAsset.manifestPath.isNotEmpty());
+        return true;
+        };
+        if (!parseGranularSlot(instrument.aether.granularSlot2, "aether.granular.2.", {})) return false;
+        if (isLumus && activeLumusSchema >= params::lumusPatchSchemaVersion)
+        {
+            const auto granularMetadata = objectProperty(metadata, "lumusGranularSlots", {});
+            if (!granularMetadata.isObject()) return false;
+            static constexpr std::array<const char*, 3> ids {{ "a", "b", "c" }};
+            for (size_t index = 0; index < ids.size(); ++index)
+            {
+                const auto slotMetadata = objectProperty(granularMetadata, ids[index], {});
+                if (!slotMetadata.isObject() || (int) objectProperty(slotMetadata, "schemaVersion", 0) != 1) return false;
+                if (!parseGranularSlot(instrument.lumus.granularSlots[index],
+                        "lumus.source." + juce::String(ids[index]) + ".granular.", slotMetadata)) return false;
+                instrument.lumus.granularModes[index] = lumusGranularModes[index];
+                instrument.lumus.granularSlots[index].enabled = instrument.lumus.granularSlots[index].enabled
+                    && lumusGranularModes[index];
+            }
+            if (lumusGranularModes[0]) instrument.aether.oscA.enabled = false;
+            if (lumusGranularModes[1]) instrument.aether.oscB.enabled = false;
+            if (lumusGranularModes[2]) instrument.lumus.oscC.enabled = false;
+        }
         instrument.aether.sub.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.sub.fxSend1", 0.0));
         instrument.aether.sub.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.sub.fxSend2", 0.0));
         instrument.aether.noise.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, "aether.noise.fxSend1", 0.0));

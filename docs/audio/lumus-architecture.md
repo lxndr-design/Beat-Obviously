@@ -8,12 +8,13 @@ Beat instrument
     wavetable-synth       -> Aether identity -> frozen Aether contract
     lumus-hybrid-synth    -> Lumus identity  -> Lumus versioned contract
 
-Lumus v4 adapter
+Lumus v5 adapter
   Lumus patch/namespace
     -> fixed source identities A / B / C
     -> A/B through the frozen Aether renderer
     -> A/B/C own independent sample asset and playback metadata
     -> A/B/C through Lumus-owned wavetable/sample mode selection
+    -> A/B/C own independent bounded granular state and assets
     -> identical initial output while C is disabled
 
 Current Lumus renderer
@@ -28,14 +29,14 @@ The adapter is an intentional bootstrap boundary. It lets Lumus start audible an
 
 ## Ownership
 
-- `frontend/src/state/synthStore.ts`: current type/namespace identity, initial draft factory, stable Slot C modulation target IDs, and the v4 independent A/B/C sample-ownership schema; later this should delegate Lumus-owned schema work to `frontend/src/state/lumusStore.ts`.
+- `frontend/src/state/synthStore.ts`: current type/namespace identity, initial draft factory, stable Slot C modulation target IDs, and the v5 independent A/B/C sample/granular ownership schema; later this should delegate Lumus-owned schema work to `frontend/src/state/lumusStore.ts`.
 - `frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx`: shared oscillator layout, knobs, and `FloatingSelect` routing control used unchanged by Aether and Lumus.
 - `frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx`: explicit Create Lumus entry.
 - `frontend/src/features/EditorHost/EditorHost.solid.tsx`: Lumus editor identity and modal lifecycle.
 - `backend/Source/Audio/Parameters/ParameterIds.h`: stable native instrument type.
 - `backend/Source/Audio/Parameters/SynthPatchContract.cpp`: validated v1 migration and v2 A/B/C contract.
 - `backend/Source/Audio/TrackModel.h`: engine identity and Lumus-owned A/B/C sample state retained independently of Aether.
-- `backend/Source/Audio/InstrumentVoice.{h,cpp}`: prepared fixed-capacity A/B/C sample state plus Slot C wavetable state, routing, and bounded modulation evaluation; these branches are unreachable for Aether.
+- `backend/Source/Audio/InstrumentVoice.{h,cpp}`: prepared fixed-capacity A/B/C sample and granular state plus Slot C wavetable state, routing, and bounded modulation evaluation; these branches are unreachable for Aether.
 
 ## Non-negotiable compatibility rules
 

@@ -16494,6 +16494,49 @@ namespace
         beat::InstrumentDefinition rejectedMalformedSamples;
         if (beat::applySynthPatchContract(malformedLumusSamples, rejectedMalformedSamples))
             return false;
+        const auto lumusGranularPatch = juce::JSON::parse(R"json(
+        {
+          "schemaVersion": 5,
+          "instrumentType": "lumus-hybrid-synth",
+          "namespace": "lumus",
+          "parameters": {
+            "lumus.source.a.granular.enabled": true,
+            "lumus.source.a.granular.builtinSource": "benchmark",
+            "lumus.source.a.granular.level": 0.42,
+            "lumus.source.b.granular.enabled": true,
+            "lumus.source.b.granular.builtinSource": "benchmark",
+            "lumus.source.c.granular.enabled": true,
+            "lumus.source.c.granular.builtinSource": "benchmark"
+          },
+          "metadata": {
+            "lumusSourceRack": { "schemaVersion": 2, "slots": [
+              { "id": "a", "mode": "granular" },
+              { "id": "b", "mode": "granular" },
+              { "id": "c", "mode": "granular" }
+            ] },
+            "lumusSampleSlots": {
+              "a": { "schemaVersion": 1, "zones": [] },
+              "b": { "schemaVersion": 1, "zones": [] },
+              "c": { "schemaVersion": 1, "zones": [] }
+            },
+            "lumusGranularSlots": {
+              "a": { "schemaVersion": 1 },
+              "b": { "schemaVersion": 1 },
+              "c": { "schemaVersion": 1 }
+            }
+          },
+          "modulation": []
+        }
+        )json");
+        beat::InstrumentDefinition lumusGranular;
+        if (!beat::applySynthPatchContract(lumusGranularPatch, lumusGranular)
+            || lumusGranular.aether.oscA.enabled || lumusGranular.aether.oscB.enabled
+            || lumusGranular.lumus.oscC.enabled
+            || !lumusGranular.lumus.granularSlots[0].enabled
+            || !lumusGranular.lumus.granularSlots[1].enabled
+            || !lumusGranular.lumus.granularSlots[2].enabled
+            || std::abs(lumusGranular.lumus.granularSlots[0].level - 0.42f) > 0.0001f)
+            return false;
         const auto malformedLumusRack = juce::JSON::parse(R"json(
         {
           "schemaVersion": 2,
@@ -16512,7 +16555,7 @@ namespace
         if (beat::applySynthPatchContract(malformedLumusRack, rejectedMalformedRack))
             return false;
         const auto futureLumusPatch = juce::JSON::parse(R"json(
-        { "schemaVersion": 5, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
+        { "schemaVersion": 6, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
         )json");
         beat::InstrumentDefinition rejectedFutureLumus;
         if (beat::applySynthPatchContract(futureLumusPatch, rejectedFutureLumus))
@@ -18222,10 +18265,32 @@ namespace
         sampleModeParams.lumusSampleSlots[2].source = sampleModeSource;
         sampleModeParams.lumusSampleSlots[2].routing = 3;
         const auto sampleModeOutput = render(sampleModeParams);
+        auto granularModeParams = base;
+        granularModeParams.aetherOscA.enabled = false;
+        granularModeParams.lumusOscC.enabled = false;
+        auto granularModeSource = std::make_shared<beat::ImmutableGranularSource>();
+        granularModeSource->audio = std::make_shared<juce::AudioBuffer<float>>(*sampleModeAudio);
+        granularModeSource->sourceSampleRate = 48000.0;
+        granularModeSource->rootNote = 60;
+        granularModeSource->position = 0.35f;
+        granularModeSource->positionSpread = 0.2f;
+        granularModeSource->grainMilliseconds = 90.0f;
+        granularModeSource->densityHz = 48.0f;
+        granularModeSource->stereoSpread = 0.7f;
+        granularModeSource->randomSeed = 0x12345678u;
+        for (size_t index = 0; index < granularModeParams.lumusGranularSlots.size(); ++index)
+        {
+            granularModeParams.lumusGranularSlots[index].enabled = true;
+            granularModeParams.lumusGranularSlots[index].source = granularModeSource;
+            granularModeParams.lumusGranularSlots[index].level = 0.25f;
+            granularModeParams.lumusGranularSlots[index].routing = (int) index + 1;
+        }
+        const auto granularModeOutput = render(granularModeParams);
         double difference = 0.0;
         double modulationDifference = 0.0;
         double noneRoutedEnergy = 0.0;
         double sampleModeEnergy = 0.0;
+        double granularModeEnergy = 0.0;
         double leftEnergy = 0.0;
         double rightEnergy = 0.0;
         for (int sample = 0; sample < withC.getNumSamples(); ++sample)
@@ -18241,11 +18306,14 @@ namespace
             noneRoutedEnergy += std::abs((double) noneRoutedC.getSample(1, sample));
             sampleModeEnergy += std::abs((double) sampleModeOutput.getSample(0, sample));
             sampleModeEnergy += std::abs((double) sampleModeOutput.getSample(1, sample));
+            granularModeEnergy += std::abs((double) granularModeOutput.getSample(0, sample));
+            granularModeEnergy += std::abs((double) granularModeOutput.getSample(1, sample));
             leftEnergy += (double) left * left;
             rightEnergy += (double) right * right;
         }
         return difference > 0.1 && modulationDifference > 0.1 && noneRoutedEnergy < 0.000001
             && sampleModeEnergy > 0.1
+            && granularModeEnergy > 0.1
             && rightEnergy > leftEnergy * 1.02;
     }
 
