@@ -33,7 +33,7 @@ try {
   assert.deepEqual(instrument.aurum.matrix.map((row) => row.length), [7, 7, 7, 7, 7, 7], "Aurum matrix must expose six destinations plus output");
   assert.equal(instrument.aurum.matrix[1][0], 0.42, "Default patch must route OP 2 into OP 1");
   assert.equal(instrument.aurum.matrix[0][6], 0.86, "Default patch must route OP 1 to output");
-  assert.equal(instrument.aurum.version, 9, "Aurum output-routing patches must use schema version 9");
+  assert.equal(instrument.aurum.version, 10, "Aurum operator-pan patches must use schema version 10");
   assert.equal(instrument.aurum.oversampling, 2, "New Aurum patches must default to 2x operator quality");
   assert.equal(instrument.aurum.filters.length, 2, "Aurum must expose two output filters");
   assert.equal(instrument.aurum.filters[0].enabled, true, "Filter A must preserve the prior output-filter path by default");
@@ -48,6 +48,7 @@ try {
   assert.ok(instrument.aurum.operators.every((operator) => operator.phaseEnvelopeDegrees === 0), "Phase envelopes must migrate and default to neutral depth");
   assert.ok(instrument.aurum.operators.every((operator) => operator.velocityCurve.every((value) => value === 1)), "Velocity curves must default to neutral gain");
   assert.ok(instrument.aurum.operators.every((operator) => operator.keytrackCurve.every((value) => value === 1)), "Keyboard curves must default to neutral gain");
+  assert.ok(instrument.aurum.operators.every((operator) => operator.pan === 0), "Aurum operators must default to centered pan");
   assert.equal(aurum.evaluateAurumResponseCurve([0, 0.25, 0.5, 0.75, 1], 0.375), 0.375, "Response curves must interpolate between fixed points");
 
   const defaultSignalFlow = diagnostics.analyzeAurumSignalFlow(instrument.aurum);
@@ -232,6 +233,23 @@ try {
   const stereoDifference = left.reduce((sum, sample, index) => sum + Math.abs(sample - right[index]), 0) / left.length;
   assert.ok(stereoDifference > 0.005, `Aurum spread must create stereo separation, got mean difference ${stereoDifference}`);
 
+  const operatorPanPatch = structuredClone(instrument);
+  operatorPanPatch.aurum.unison = 1;
+  operatorPanPatch.aurum.stereoSpread = 0;
+  operatorPanPatch.aurum.outputSends = Array.from({ length: 6 }, () => [0, 0, 0]);
+  operatorPanPatch.aurum.outputSends[0][2] = 1;
+  operatorPanPatch.aurum.operators[0].pan = -1;
+  const panLeft = new Float32Array(4096);
+  const panLeftOpposite = new Float32Array(4096);
+  preview.renderInstrumentStereoSamples(operatorPanPatch, panLeft, panLeftOpposite, 48000, 220, "visual", false);
+  operatorPanPatch.aurum.operators[0].pan = 1;
+  const panRightOpposite = new Float32Array(4096);
+  const panRight = new Float32Array(4096);
+  preview.renderInstrumentStereoSamples(operatorPanPatch, panRightOpposite, panRight, 48000, 220, "visual", false);
+  const channelEnergy = (samples) => samples.reduce((sum, sample) => sum + sample * sample, 0);
+  assert.ok(channelEnergy(panLeft) > 0.01 && channelEnergy(panLeftOpposite) < 0.000001, "Hard-left Aurum operator pan must isolate the left channel");
+  assert.ok(channelEnergy(panRight) > 0.01 && channelEnergy(panRightOpposite) < 0.000001, "Hard-right Aurum operator pan must isolate the right channel");
+
   const renderFilterPatch = (patch) => {
     const samples = new Float32Array(4096);
     preview.renderInstrumentSamples(patch, samples, 48000, 220, "visual", false);
@@ -266,7 +284,7 @@ try {
   const disconnectedOutput = renderFilterPatch(directPatch);
   assert.ok(disconnectedOutput.every((sample) => Math.abs(sample) < 0.000001), "A patch with no output sends must remain silent");
 
-  const malformedOperator = { ...instrument.aurum.operators[0], wavefold: 4, harmonics: [4, -4], pitchEnvelopeSemitones: 400, phaseEnvelopeDegrees: -400, velocityCurve: [4, -4], keytrackCurve: [-4, 4] };
+  const malformedOperator = { ...instrument.aurum.operators[0], pan: 4, wavefold: 4, harmonics: [4, -4], pitchEnvelopeSemitones: 400, phaseEnvelopeDegrees: -400, velocityCurve: [4, -4], keytrackCurve: [-4, 4] };
   const malformed = aurum.normalizedAurumConfig({ ...instrument.aurum, oversampling: 9, filterRouting: "sideways", filters: [{ enabled: true, type: "not-a-filter", cutoff: 4, resonance: -4, drive: 4 }], outputSends: [[4, -4]], operators: [malformedOperator], matrix: [[4, -4]], rmMatrix: [[4, -4]] });
   assert.equal(malformed.operators.length, 6, "Normalization must restore missing operators");
   assert.equal(malformed.matrix[0][0], 1, "Normalization must clamp matrix values");
@@ -279,6 +297,7 @@ try {
   assert.equal(malformed.operators[0].harmonics[1], 0, "Normalization must clamp negative harmonic amplitudes");
   assert.equal(malformed.operators[0].harmonics.length, 16, "Normalization must restore harmonic geometry");
   assert.equal(malformed.operators[0].wavefold, 1, "Normalization must clamp operator wavefold");
+  assert.equal(malformed.operators[0].pan, 1, "Normalization must clamp operator pan");
   assert.equal(malformed.operators[0].pitchEnvelopeSemitones, 48, "Normalization must clamp positive pitch envelope depth");
   assert.equal(malformed.operators[0].phaseEnvelopeDegrees, -180, "Normalization must clamp negative phase envelope depth");
   assert.deepEqual(malformed.operators[0].velocityCurve, [1, 0, 1, 1, 1], "Normalization must clamp and restore velocity curve geometry");
@@ -294,7 +313,7 @@ try {
   delete versionSixConfig.oversampling;
   const legacyFilter = { type: "bandpass", cutoff: 0.43, resonance: 0.27, drive: 0.19 };
   const versionSixMigrated = aurum.normalizedAurumConfig(versionSixConfig, legacyFilter);
-  assert.equal(versionSixMigrated.version, 9, "Version 6 Aurum patches must migrate to schema version 9");
+  assert.equal(versionSixMigrated.version, 10, "Version 6 Aurum patches must migrate to schema version 10");
   assert.equal(versionSixMigrated.oversampling, 1, "Version 6 Aurum patches must retain their 1x operator network sound");
   assert.deepEqual(versionSixMigrated.filters[0], { enabled: true, ...legacyFilter }, "Legacy Aurum patches must migrate their shared output filter into Filter A");
   assert.equal(versionSixMigrated.filters[1].enabled, false, "Legacy Aurum patches must migrate with Filter B bypassed");
@@ -307,6 +326,12 @@ try {
   const versionEightParallelMigrated = aurum.normalizedAurumConfig(versionEightParallel, legacyFilter);
   assert.deepEqual(versionEightParallelMigrated.outputSends[0], [versionEightParallel.matrix[0][6], versionEightParallel.matrix[0][6], 0], "Parallel v8 patches must preserve their shared input to both filters");
 
+  const versionNineConfig = structuredClone(instrument.aurum);
+  versionNineConfig.version = 9;
+  versionNineConfig.operators.forEach((operator) => delete operator.pan);
+  const versionNineMigrated = aurum.normalizedAurumConfig(versionNineConfig);
+  assert.ok(versionNineMigrated.operators.every((operator) => operator.pan === 0), "Version 9 operators must migrate to centered pan");
+
   const versionFiveConfig = structuredClone(versionSixConfig);
   versionFiveConfig.version = 5;
   versionFiveConfig.operators.forEach((operator) => {
@@ -314,7 +339,7 @@ try {
     delete operator.keytrackCurve;
   });
   const versionFiveMigrated = aurum.normalizedAurumConfig(versionFiveConfig);
-  assert.equal(versionFiveMigrated.version, 9, "Version 5 Aurum patches must migrate to schema version 9");
+  assert.equal(versionFiveMigrated.version, 10, "Version 5 Aurum patches must migrate to schema version 10");
   assert.ok(versionFiveMigrated.operators.every((operator) => operator.velocityCurve.every((value) => value === 1) && operator.keytrackCurve.every((value) => value === 1)), "Version 5 response curves must migrate at neutral gain");
 
   const versionFourConfig = structuredClone(versionFiveConfig);
@@ -326,20 +351,20 @@ try {
     delete operator.phaseEnvelopeDegrees;
   });
   const versionFourMigrated = aurum.normalizedAurumConfig(versionFourConfig);
-  assert.equal(versionFourMigrated.version, 9, "Version 4 Aurum patches must migrate to schema version 9");
+  assert.equal(versionFourMigrated.version, 10, "Version 4 Aurum patches must migrate to schema version 10");
   assert.ok(versionFourMigrated.operators.every((operator) => operator.pitchEnvelopeSemitones === 0 && operator.phaseEnvelopeDegrees === 0), "Version 4 articulation must migrate at neutral depth");
 
   const versionThreeConfig = structuredClone(versionFourConfig);
   versionThreeConfig.version = 3;
   versionThreeConfig.operators.forEach((operator) => delete operator.wavefold);
   const versionThreeMigrated = aurum.normalizedAurumConfig(versionThreeConfig);
-  assert.equal(versionThreeMigrated.version, 9, "Version 3 Aurum patches must migrate to schema version 9");
+  assert.equal(versionThreeMigrated.version, 10, "Version 3 Aurum patches must migrate to schema version 10");
   assert.ok(versionThreeMigrated.operators.every((operator) => operator.wavefold === 0), "Version 3 operators must migrate with identity waveshaping");
   const legacyConfig = structuredClone(versionThreeConfig);
   legacyConfig.version = 2;
   legacyConfig.operators.forEach((operator) => delete operator.harmonics);
   const migrated = aurum.normalizedAurumConfig(legacyConfig);
-  assert.equal(migrated.version, 9, "Version 2 Aurum patches must migrate through additive support to schema version 9");
+  assert.equal(migrated.version, 10, "Version 2 Aurum patches must migrate through additive support to schema version 10");
   assert.ok(migrated.operators.every((operator) => operator.harmonics[0] === 1 && operator.harmonics.slice(1).every((value) => value === 0)), "Migrated operators must add a fundamental-only spectrum without changing sound");
   const versionOneConfig = structuredClone(legacyConfig);
   versionOneConfig.version = 1;

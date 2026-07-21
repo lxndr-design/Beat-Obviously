@@ -37,6 +37,7 @@ function defaultOperator(index: number): AurumOperatorConfig {
     coarse: 0,
     fineCents: 0,
     level: index === 0 ? 0.78 : 0.55,
+    pan: 0,
     phase: 0,
     wavefold: 0,
     harmonics: Array.from({ length: AURUM_HARMONIC_COUNT }, (_, harmonic) => harmonic === 0 ? 1 : 0),
@@ -61,7 +62,7 @@ export function defaultAurumConfig(): AurumSynthConfig {
   matrix[0][AURUM_OUTPUT_COLUMN] = 0.86;
   matrix[1][0] = 0.42;
   return {
-    version: 9,
+    version: 10,
     operators: Array.from({ length: AURUM_OPERATOR_COUNT }, (_, index) => defaultOperator(index)),
     matrix,
     rmMatrix,
@@ -111,12 +112,13 @@ export function normalizedAurumConfig(config: AurumSynthConfig | undefined, lega
   return {
     ...fallback,
     ...config,
-    version: 9,
+    version: 10,
     operators: fallback.operators.map((operator, index) => {
       const incoming = config.operators?.[index];
       return {
         ...operator,
         ...incoming,
+        pan: clampBipolar(incoming?.pan ?? operator.pan),
         wavefold: clamp01(incoming?.wavefold ?? operator.wavefold),
         envelope: { ...operator.envelope, ...incoming?.envelope },
         pitchEnvelope: { ...operator.pitchEnvelope, ...incoming?.pitchEnvelope },

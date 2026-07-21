@@ -1240,6 +1240,7 @@ namespace
         carrier.waveform = 4;
         carrier.ratio = 1.0f;
         carrier.level = 0.76f;
+        carrier.pan = -0.22f;
         carrier.releaseMs = 180.0f;
         carrier.harmonics.fill(0.0f);
         carrier.harmonics[0] = 1.0f;
@@ -1267,6 +1268,15 @@ namespace
         instrument.aurum.unison = 3;
         instrument.aurum.detuneCents = 8.0f;
         instrument.aurum.stereoSpread = 0.62f;
+        beat::TrackEffect chorus;
+        chorus.id = "aurum-shared-chorus";
+        chorus.kind = beat::TrackEffectKind::Chorus;
+        chorus.params.push_back({ "rateHz", 0.8f });
+        chorus.params.push_back({ "depthMs", 8.0f });
+        chorus.params.push_back({ "delayMs", 12.0f });
+        chorus.params.push_back({ "feedback", 8.0f });
+        chorus.params.push_back({ "mix", 35.0f });
+        instrument.effects.push_back(std::move(chorus));
         project.instruments.push_back(std::move(instrument));
 
         beat::Track track;
@@ -7353,6 +7363,7 @@ namespace
         instrument.aurum.operators[0].enabled = true;
         instrument.aurum.operators[0].waveform = 4;
         instrument.aurum.operators[0].level = 0.8f;
+        instrument.aurum.operators[0].pan = -0.37f;
         instrument.aurum.operators[0].releaseMs = 1234.0f;
         instrument.aurum.operators[0].wavefold = 0.68f;
         instrument.aurum.operators[0].pitchAttackMs = 31.0f;
@@ -7387,6 +7398,11 @@ namespace
         instrument.aurum.filterRouting = 1;
         instrument.aurum.outputSends[0] = {{ -0.72f, 0.31f, 0.18f }};
         instrument.aurum.outputSends[2] = {{ 0.14f, -0.63f, 0.42f }};
+        beat::TrackEffect sharedEffect;
+        sharedEffect.id = "aurum-shared-effect";
+        sharedEffect.kind = beat::TrackEffectKind::Chorus;
+        sharedEffect.params.push_back({ "mix", 31.0f });
+        instrument.effects.push_back(std::move(sharedEffect));
         project.instruments.push_back(instrument);
 
         beat::Database db(dbFile);
@@ -7402,6 +7418,7 @@ namespace
             && near(loaded->instruments.front().aurum.rmMatrix[1][0], 0.73f)
             && near(loaded->instruments.front().aurum.rmMatrix[2][1], -0.31f)
             && near(loaded->instruments.front().aurum.operators[0].releaseMs, 1234.0f)
+            && near(loaded->instruments.front().aurum.operators[0].pan, -0.37f)
             && near(loaded->instruments.front().aurum.operators[1].releaseMs, 87.0f)
             && near(loaded->instruments.front().aurum.operators[0].wavefold, 0.68f)
             && near(loaded->instruments.front().aurum.operators[1].wavefold, 0.21f)
@@ -7438,7 +7455,9 @@ namespace
             && near(loaded->instruments.front().aurum.outputSends[0][2], 0.18f)
             && near(loaded->instruments.front().aurum.outputSends[2][0], 0.14f)
             && near(loaded->instruments.front().aurum.outputSends[2][1], -0.63f)
-            && near(loaded->instruments.front().aurum.outputSends[2][2], 0.42f);
+            && near(loaded->instruments.front().aurum.outputSends[2][2], 0.42f)
+            && loaded->instruments.front().effects.size() == 1
+            && loaded->instruments.front().effects.front().id == "aurum-shared-effect";
 
         root.deleteRecursively();
         if (!ok)
@@ -11344,8 +11363,12 @@ namespace
             auto project = makeAurumParityProject();
             auto liveA = renderOfflineChunks(project, samples, blockSize, sampleRate);
             auto liveB = renderOfflineChunks(project, samples, blockSize, sampleRate);
+            auto dryProject = project;
+            dryProject.instruments.front().effects.clear();
+            auto dry = renderOfflineChunks(dryProject, samples, blockSize, sampleRate);
             const auto liveNull = bufferResidualStats(liveA, liveB, samples);
             const float livePeak = bufferPeak(liveA);
+            const auto fxDifference = bufferResidualStats(liveA, dry, samples);
 
             const auto exportFile = juce::File("/private/tmp").getChildFile(
                 "BeatBackendStress-aurum-parity-" + juce::String((int) sampleRate) + ".wav");
@@ -11379,6 +11402,7 @@ namespace
                 && liveNull.ok
                 && exportNull.ok
                 && liveNull.sourceEnergy > 0.0001
+                && fxDifference.residualEnergy > 0.000001
                 && livePeak > 0.0001f
                 && livePeak <= 1.0f
                 && liveNull.residualEnergy <= 0.000000000001
@@ -11394,6 +11418,7 @@ namespace
                           << " liveOk=" << liveNull.ok
                           << " liveEnergy=" << liveNull.sourceEnergy
                           << " livePeak=" << livePeak
+                          << " fxDifference=" << fxDifference.residualEnergy
                           << " liveResidual=" << liveNull.residualEnergy
                           << " liveMaxDiff=" << liveNull.maxAbsDiff
                           << " exportOk=" << exportNull.ok
@@ -13020,12 +13045,24 @@ namespace
         const auto directNegative = render(directParams);
         directParams.aurumOutputSends[0][2] = 0.0f;
         const auto disconnected = render(directParams);
+        auto hardLeftParams = directParams;
+        hardLeftParams.aurumOutputSends[0][2] = 1.0f;
+        hardLeftParams.aurumStereoSpread = 0.0f;
+        hardLeftParams.aurumOperators[0].pan = -1.0f;
+        const auto hardLeft = render(hardLeftParams);
+        auto hardRightParams = hardLeftParams;
+        hardRightParams.aurumOperators[0].pan = 1.0f;
+        const auto hardRight = render(hardRightParams);
 
         double singleRoutingDifference = 0.0;
         double serialDifference = 0.0;
         double routingDifference = 0.0;
         double directInversionResidual = 0.0;
         double disconnectedEnergy = 0.0;
+        double hardLeftEnergy = 0.0;
+        double hardLeftOppositeEnergy = 0.0;
+        double hardRightEnergy = 0.0;
+        double hardRightOppositeEnergy = 0.0;
         float peak = 0.0f;
         for (int channel = 0; channel < 2; ++channel)
             for (int sample = 0; sample < filterAOnly.getNumSamples(); ++sample)
@@ -13041,6 +13078,16 @@ namespace
                 routingDifference += std::abs((double) serialSample - parallelSample);
                 directInversionResidual += std::abs((double) directPositive.getSample(channel, sample) + (double) directNegative.getSample(channel, sample));
                 disconnectedEnergy += std::abs((double) disconnected.getSample(channel, sample));
+                if (channel == 0)
+                {
+                    hardLeftEnergy += std::abs((double) hardLeft.getSample(channel, sample));
+                    hardRightOppositeEnergy += std::abs((double) hardRight.getSample(channel, sample));
+                }
+                else
+                {
+                    hardLeftOppositeEnergy += std::abs((double) hardLeft.getSample(channel, sample));
+                    hardRightEnergy += std::abs((double) hardRight.getSample(channel, sample));
+                }
                 peak = std::max(peak, std::max(std::abs(serialSample), std::abs(parallelSample)));
             }
 
@@ -13049,6 +13096,10 @@ namespace
             && routingDifference > 0.1
             && directInversionResidual < 0.000001
             && disconnectedEnergy < 0.000001
+            && hardLeftEnergy > 0.1
+            && hardLeftOppositeEnergy < 0.0001
+            && hardRightEnergy > 0.1
+            && hardRightOppositeEnergy < 0.0001
             && peak <= 1.0f;
         if (!ok)
             std::cerr << "Aurum dual-filter stress failed single=" << singleRoutingDifference
@@ -13056,6 +13107,8 @@ namespace
                       << " routing=" << routingDifference
                       << " directInverse=" << directInversionResidual
                       << " disconnected=" << disconnectedEnergy
+                      << " panLeft=" << hardLeftEnergy << "/" << hardLeftOppositeEnergy
+                      << " panRight=" << hardRightEnergy << "/" << hardRightOppositeEnergy
                       << " peak=" << peak << "\n";
         return ok;
     }

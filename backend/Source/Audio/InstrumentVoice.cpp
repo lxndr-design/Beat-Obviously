@@ -719,9 +719,12 @@ namespace beat
                         currentBlockWork.addOscillatorSamples(1);
                     }
 
-                        float voiceA = 0.0f;
-                        float voiceB = 0.0f;
-                        float voiceDirect = 0.0f;
+                        float voiceALeft = 0.0f;
+                        float voiceARight = 0.0f;
+                        float voiceBLeft = 0.0f;
+                        float voiceBRight = 0.0f;
+                        float voiceDirectLeft = 0.0f;
+                        float voiceDirectRight = 0.0f;
                         float weightA = 0.0f;
                         float weightB = 0.0f;
                         float weightDirect = 0.0f;
@@ -731,26 +734,29 @@ namespace beat
                             const float amountA = aurumRouteAmount(params.aurumOutputSends[source][0]);
                             const float amountB = aurumRouteAmount(params.aurumOutputSends[source][1]);
                             const float amountDirect = aurumRouteAmount(params.aurumOutputSends[source][2]);
-                            voiceA += output * amountA;
-                            voiceB += output * amountB;
-                            voiceDirect += output * amountDirect;
+                            const float pan = juce::jlimit(-1.0f, 1.0f, params.aurumOperators[source].pan + centered * params.aurumStereoSpread);
+                            const float angle = (pan + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
+                            const float leftGain = std::cos(angle);
+                            const float rightGain = std::sin(angle);
+                            voiceALeft += output * amountA * leftGain;
+                            voiceARight += output * amountA * rightGain;
+                            voiceBLeft += output * amountB * leftGain;
+                            voiceBRight += output * amountB * rightGain;
+                            voiceDirectLeft += output * amountDirect * leftGain;
+                            voiceDirectRight += output * amountDirect * rightGain;
                             weightA += std::abs(amountA);
                             weightB += std::abs(amountB);
                             weightDirect += std::abs(amountDirect);
                         }
-                        if (weightA > 0.0f) voiceA /= juce::jmax(1.0f, std::sqrt(weightA));
-                        if (weightB > 0.0f) voiceB /= juce::jmax(1.0f, std::sqrt(weightB));
-                        if (weightDirect > 0.0f) voiceDirect /= juce::jmax(1.0f, std::sqrt(weightDirect));
-                        const float pan = centered * params.aurumStereoSpread;
-                        const float angle = (pan + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
-                        const float leftGain = std::cos(angle);
-                        const float rightGain = std::sin(angle);
-                        aLeft += voiceA * leftGain;
-                        aRight += voiceA * rightGain;
-                        bLeft += voiceB * leftGain;
-                        bRight += voiceB * rightGain;
-                        directLeft += voiceDirect * leftGain;
-                        directRight += voiceDirect * rightGain;
+                        const float normalizationA = juce::jmax(1.0f, std::sqrt(weightA));
+                        const float normalizationB = juce::jmax(1.0f, std::sqrt(weightB));
+                        const float normalizationDirect = juce::jmax(1.0f, std::sqrt(weightDirect));
+                        aLeft += voiceALeft / normalizationA;
+                        aRight += voiceARight / normalizationA;
+                        bLeft += voiceBLeft / normalizationB;
+                        bRight += voiceBRight / normalizationB;
+                        directLeft += voiceDirectLeft / normalizationDirect;
+                        directRight += voiceDirectRight / normalizationDirect;
                     }
                     aurumOutputs = nextOutputs;
                     accumulatedALeft += aLeft;

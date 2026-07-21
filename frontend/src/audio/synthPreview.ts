@@ -1082,9 +1082,12 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
       state.aurumPhases[stateIndex] = (state.aurumPhases[stateIndex] + phaseDelta) % 1;
     }
 
-      let voiceA = 0;
-      let voiceB = 0;
-      let voiceDirect = 0;
+      let voiceALeft = 0;
+      let voiceARight = 0;
+      let voiceBLeft = 0;
+      let voiceBRight = 0;
+      let voiceDirectLeft = 0;
+      let voiceDirectRight = 0;
       let weightA = 0;
       let weightB = 0;
       let weightDirect = 0;
@@ -1093,23 +1096,26 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
         const amountA = clampBipolar(config.outputSends[source]?.[0] ?? 0);
         const amountB = clampBipolar(config.outputSends[source]?.[1] ?? 0);
         const amountDirect = clampBipolar(config.outputSends[source]?.[2] ?? 0);
-        voiceA += output * amountA;
-        voiceB += output * amountB;
-        voiceDirect += output * amountDirect;
+        const [leftGain, rightGain] = panGains(clampBipolar((config.operators[source]?.pan ?? 0) + centered * spread));
+        voiceALeft += output * amountA * leftGain;
+        voiceARight += output * amountA * rightGain;
+        voiceBLeft += output * amountB * leftGain;
+        voiceBRight += output * amountB * rightGain;
+        voiceDirectLeft += output * amountDirect * leftGain;
+        voiceDirectRight += output * amountDirect * rightGain;
         weightA += Math.abs(amountA);
         weightB += Math.abs(amountB);
         weightDirect += Math.abs(amountDirect);
       }
-      if (weightA > 0) voiceA /= Math.max(1, Math.sqrt(weightA));
-      if (weightB > 0) voiceB /= Math.max(1, Math.sqrt(weightB));
-      if (weightDirect > 0) voiceDirect /= Math.max(1, Math.sqrt(weightDirect));
-      const [leftGain, rightGain] = panGains(centered * spread);
-      mixedALeft += voiceA * leftGain;
-      mixedARight += voiceA * rightGain;
-      mixedBLeft += voiceB * leftGain;
-      mixedBRight += voiceB * rightGain;
-      mixedDirectLeft += voiceDirect * leftGain;
-      mixedDirectRight += voiceDirect * rightGain;
+      const normalizationA = Math.max(1, Math.sqrt(weightA));
+      const normalizationB = Math.max(1, Math.sqrt(weightB));
+      const normalizationDirect = Math.max(1, Math.sqrt(weightDirect));
+      mixedALeft += voiceALeft / normalizationA;
+      mixedARight += voiceARight / normalizationA;
+      mixedBLeft += voiceBLeft / normalizationB;
+      mixedBRight += voiceBRight / normalizationB;
+      mixedDirectLeft += voiceDirectLeft / normalizationDirect;
+      mixedDirectRight += voiceDirectRight / normalizationDirect;
     }
     state.aurumOutputs = nextOutputs;
     accumulatedALeft += mixedALeft;
@@ -1274,7 +1280,7 @@ function processAurumStereoBuses(
 
 function activeAurumFilterConfig(instrument: Instrument) {
   const config = instrument.aurum!;
-  return (config.version as number) >= 9 && config.filters?.length === 2 && config.outputSends?.length === 6
+  return (config.version as number) >= 10 && config.filters?.length === 2 && config.outputSends?.length === 6
     ? config
     : normalizedAurumConfigForInstrument(instrument);
 }

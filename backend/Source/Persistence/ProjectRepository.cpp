@@ -437,7 +437,7 @@ namespace beat
         juce::var aurumConfigToVar(const InstrumentDefinition::AurumConfig& aurum)
         {
             juce::DynamicObject::Ptr object = new juce::DynamicObject();
-            object->setProperty("version", 9);
+            object->setProperty("version", 10);
             object->setProperty("unison", aurum.unison);
             object->setProperty("detuneCents", aurum.detuneCents);
             object->setProperty("stereoSpread", aurum.stereoSpread);
@@ -468,6 +468,7 @@ namespace beat
                 op->setProperty("coarse", source.coarse);
                 op->setProperty("fineCents", source.fineCents);
                 op->setProperty("level", source.level);
+                op->setProperty("pan", source.pan);
                 op->setProperty("phase", source.phase);
                 op->setProperty("wavefold", source.wavefold);
                 juce::DynamicObject::Ptr envelope = new juce::DynamicObject();
@@ -578,6 +579,7 @@ namespace beat
                     op.coarse = juce::jlimit(-48, 48, (int) source.getProperty("coarse", 0));
                     op.fineCents = juce::jlimit(-100.0f, 100.0f, (float) (double) source.getProperty("fineCents", 0.0));
                     op.level = juce::jlimit(0.0f, 1.0f, (float) (double) source.getProperty("level", index == 0 ? 0.78 : 0.55));
+                    op.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) source.getProperty("pan", 0.0));
                     op.phase = juce::jlimit(0.0f, 1.0f, (float) (double) source.getProperty("phase", 0.0));
                     op.wavefold = juce::jlimit(0.0f, 1.0f, (float) (double) source.getProperty("wavefold", 0.0));
                     const auto envelope = source.getProperty("envelope", {});

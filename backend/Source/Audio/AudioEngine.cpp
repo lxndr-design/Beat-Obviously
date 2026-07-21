@@ -2086,6 +2086,7 @@ namespace beat
                 source.phaseEnvelopeDegrees,
                 source.velocityCurve,
                 source.keytrackCurve,
+                juce::jlimit(-1.0f, 1.0f, source.pan),
             };
             params.aurumMatrix[index] = instrument.aurum.matrix[index];
             params.aurumRmMatrix[index] = instrument.aurum.rmMatrix[index];

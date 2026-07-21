@@ -324,6 +324,7 @@ export function AurumEditor(props: AurumEditorProps) {
                   <NumberInput label="Coarse" layout="inline" min={-48} max={48} step={1} unit="st" value={operator().coarse} onChange={(coarse) => updateOperator({ coarse })} />
                   <NumberInput label="Fine" layout="inline" min={-100} max={100} step={1} unit="ct" value={operator().fineCents} onChange={(fineCents) => updateOperator({ fineCents })} />
                   <Slider label="Level" layout="inline" min={0} max={1} step={0.01} value={operator().level} readout={<span>{Math.round(operator().level * 100)}%</span>} onChange={(level) => updateOperator({ level })} />
+                  <Slider label="Pan" layout="inline" min={-1} max={1} step={0.01} value={operator().pan} readout={<span>{formatPan(operator().pan)}</span>} onChange={(pan) => updateOperator({ pan })} />
                 </div>
               </div>
               <div class={styles.controlBlock}>
@@ -514,6 +515,11 @@ function operatorSignalLabel(state: AurumOperatorSignalState) {
   if (state === "disconnected") return "NO PATH";
   if (state === "silent") return "0 LEVEL";
   return "OFF";
+}
+
+function formatPan(value: number) {
+  const amount = Math.round(Math.abs(value) * 100);
+  return amount === 0 ? "C" : `${value < 0 ? "L" : "R"}${amount}`;
 }
 
 function WaveformScope(props: { operator: AurumOperatorConfig }) {

@@ -505,6 +505,7 @@ export interface AurumOperatorConfig {
   coarse: number;
   fineCents: number;
   level: number;
+  pan: number;
   phase: number;
   wavefold: number;
   harmonics: number[];
@@ -521,7 +522,7 @@ export interface AurumOperatorConfig {
  * are FM destinations and column 6 is direct output. Diagonal values are
  * operator feedback. */
 export interface AurumSynthConfig {
-  version: 9;
+  version: 10;
   operators: AurumOperatorConfig[];
   matrix: number[][];
   rmMatrix: number[][];

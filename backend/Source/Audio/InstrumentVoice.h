@@ -144,6 +144,7 @@ namespace beat
                 float phaseEnvelopeDegrees { 0.0f };
                 std::array<float, 5> velocityCurve {{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }};
                 std::array<float, 5> keytrackCurve {{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }};
+                float pan { 0.0f };
             };
 
             struct AurumFilter

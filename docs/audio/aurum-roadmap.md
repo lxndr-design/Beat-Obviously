@@ -39,7 +39,7 @@ Exit gate: operator edits agree between waveform preview and rendered audio, and
 - `[x]` Two independently enabled multimode output filters expose cutoff, resonance, and drive in browser and native paths.
 - `[x]` Serial and Parallel filter routing persists in schema v8; legacy patches migrate their shared output filter into Filter A with Filter B bypassed.
 - `[x]` A dedicated 6 x 3 bipolar output matrix routes every operator to Filter A, Filter B, or Direct; Serial routing feeds Filter A into Filter B while Parallel keeps both filter buses independent.
-- `[ ]` Per-operator pan and shared Beat FX sends.
+- `[x]` Per-operator pan renders before Aurum bus filtering, while the completed stereo mix reuses Beat's instrument FX, track FX, and send/return routing.
 - `[x]` Live signal-flow diagnostics classify carriers, modulators, disconnected or zero-level operators, active output buses, and fully silent patches.
 
 Exit gate: every audible route is visible in the editor and covered by persistence plus live/export tests.
@@ -76,4 +76,5 @@ Exit gate: the release report distinguishes verified audio behavior, performance
 
 ## Immediate order
 
-1. Add per-operator pan and shared Beat FX sends.
+1. Add operator initialize, copy, paste, swap, and reset commands.
+2. Add algorithm templates for common FM topologies.

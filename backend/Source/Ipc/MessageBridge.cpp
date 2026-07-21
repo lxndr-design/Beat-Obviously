@@ -2287,6 +2287,7 @@ namespace beat
                                 op.coarse = juce::jlimit(-48, 48, (int) value.getProperty("coarse", 0));
                                 op.fineCents = floatParam(value, "fineCents", 0.0f, -100.0f, 100.0f);
                                 op.level = normalizedParam(value, "level", index == 0 ? 0.78f : 0.55f);
+                                op.pan = floatParam(value, "pan", 0.0f, -1.0f, 1.0f);
                                 op.phase = normalizedParam(value, "phase", 0.0f);
                                 op.wavefold = normalizedParam(value, "wavefold", 0.0f);
                                 const auto envelope = value.getProperty("envelope", {});
