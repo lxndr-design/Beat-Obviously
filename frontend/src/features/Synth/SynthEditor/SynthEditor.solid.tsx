@@ -1331,6 +1331,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   const [fxBus2Open, setFxBus2Open] = createSignal(false);
   const [sampleAssetOpen, setSampleAssetOpen] = createSignal(false);
   const [sampleRouteOpen, setSampleRouteOpen] = createSignal(false);
+  const [activeLumusSampleSlot, setActiveLumusSampleSlot] = createSignal<"a" | "b" | "c">("c");
   const [importingSfz, setImportingSfz] = createSignal(false);
   const [importingGranular, setImportingGranular] = createSignal(false);
   const [granularRouteOpen, setGranularRouteOpen] = createSignal(false);
@@ -1339,16 +1340,18 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
     ...returnBuses().filter((bus) => !bus.mute).map((bus) => ({ value: bus.id, label: bus.name || bus.id })),
   ]);
   const isLumus = createMemo(() => draft().instrumentType === "lumus-hybrid-synth");
-  const sampleParameterId = (suffix: string) => `${isLumus() ? "lumus.source.c.sample" : "aether.sample.1"}.${suffix}` as SynthParameterId;
+  const sampleParameterId = (suffix: string) => `${isLumus() ? `lumus.source.${activeLumusSampleSlot()}.sample` : "aether.sample.1"}.${suffix}` as SynthParameterId;
   const mappedZones = createMemo(() => isLumus()
-    ? draft().metadata.lumusSampleSlots?.c?.zones ?? []
+    ? draft().metadata.lumusSampleSlots?.[activeLumusSampleSlot()]?.zones ?? []
     : draft().metadata.sampleSlot1Zones ?? []);
   const managedSfz = createMemo(() => isLumus()
-    ? draft().metadata.lumusSampleSlots?.c?.managedSfz
+    ? draft().metadata.lumusSampleSlots?.[activeLumusSampleSlot()]?.managedSfz
     : draft().metadata.managedSfz);
   const managedGranular = createMemo(() => draft().metadata.managedGranular);
   const sampleSourceAvailable = createMemo(() => Boolean(String(draft().parameters[sampleParameterId("audioFileId")] ?? "") || managedSfz()));
-  const sampleSlotLabel = createMemo(() => draft().instrumentType === "lumus-hybrid-synth" ? "Source C Sample" : "Sample Slot 1");
+  const sampleSlotLabel = createMemo(() => draft().instrumentType === "lumus-hybrid-synth"
+    ? `Source ${activeLumusSampleSlot().toUpperCase()} Sample`
+    : "Sample Slot 1");
   const granularSourceAvailable = createMemo(() => Boolean(managedGranular() || draft().parameters["aether.granular.2.builtinSource"] === "benchmark"));
   const sampleSourceDescription = createMemo(() => managedSfz()
     ? `Managed SFZ source: ${managedSfz()!.displayName}.`
@@ -1366,7 +1369,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   ) => isLumus()
     ? { ...draft().metadata, lumusSampleSlots: {
         ...draft().metadata.lumusSampleSlots,
-        c: { schemaVersion: 1 as const, zones: zones.slice(0, 8), ...(nextManagedSfz ? { managedSfz: nextManagedSfz } : {}) },
+        [activeLumusSampleSlot()]: { schemaVersion: 1 as const, zones: zones.slice(0, 8), ...(nextManagedSfz ? { managedSfz: nextManagedSfz } : {}) },
       } }
     : { ...draft().metadata, sampleSlot1Zones: zones.slice(0, 8), managedSfz: nextManagedSfz ?? undefined };
   const commitMappedZones = (zones: AetherSampleZoneConfig[]) => setDraft({
@@ -1565,6 +1568,19 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
         </div>
         <section class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup} ${styles.sourceSlotGroup}`} aria-labelledby="aether-sample-slot-1-title">
           <h3 id="aether-sample-slot-1-title" class={styles.ampFilterGroupTitle}>{sampleSlotLabel()}</h3>
+          <Show when={isLumus()}>
+            <div class={styles.ampFilterShapeRow} role="tablist" aria-label="Lumus sample source settings">
+              <For each={["a", "b", "c"] as const}>{(slot) => (
+                <Button
+                  size="xs"
+                  selected={activeLumusSampleSlot() === slot}
+                  role="tab"
+                  aria-selected={activeLumusSampleSlot() === slot}
+                  onClick={() => setActiveLumusSampleSlot(slot)}
+                >Source {slot.toUpperCase()}</Button>
+              )}</For>
+            </div>
+          </Show>
           <p
             ref={sampleSourceStatus}
             id="aether-sample-slot-1-source-status"

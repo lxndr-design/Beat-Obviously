@@ -116,6 +116,8 @@ namespace beat
             transition.prepare(sampleRate);
         aetherSampleSlot1.prepare({ sampleRate, blockSize, 2 });
         aetherSfzSlot1.prepare({ sampleRate, blockSize, 2 });
+        for (auto& slot : lumusSampleSlots) slot.prepare({ sampleRate, blockSize, 2 });
+        for (auto& slot : lumusSfzSlots) slot.prepare({ sampleRate, blockSize, 2 });
         aetherGranularSlot2.prepare({ sampleRate, blockSize, 2 });
     }
 
@@ -217,6 +219,15 @@ namespace beat
         aetherSampleSlot1.publish(params.aetherSampleSlot1.enabled ? params.aetherSampleSlot1.source : nullptr);
         aetherSfzSlot1.allNotesOff(true);
         aetherSfzSlot1.publish(params.aetherSampleSlot1.enabled ? params.aetherSampleSlot1.sfzSource : nullptr);
+        for (size_t index = 0; index < lumusSampleSlots.size(); ++index)
+        {
+            lumusSampleSlots[index].allNotesOff(true);
+            lumusSampleSlots[index].publish(params.lumusSampleSlots[index].enabled
+                ? params.lumusSampleSlots[index].source : nullptr);
+            lumusSfzSlots[index].allNotesOff(true);
+            lumusSfzSlots[index].publish(params.lumusSampleSlots[index].enabled
+                ? params.lumusSampleSlots[index].sfzSource : nullptr);
+        }
         aetherGranularSlot2.allNotesOff(true);
         aetherGranularSlot2.publish(params.aetherGranularSlot2.enabled ? params.aetherGranularSlot2.source : nullptr);
         adsrParams.attack  = juce::jmax(0.001f, p.attackMs  * 0.001f);
@@ -431,6 +442,8 @@ namespace beat
         pitchWheelMoved(currentPitchWheel == 0 ? 8192 : currentPitchWheel);
         aetherSampleSlot1.allNotesOff(true);
         aetherSfzSlot1.allNotesOff(true);
+        for (auto& slot : lumusSampleSlots) slot.allNotesOff(true);
+        for (auto& slot : lumusSfzSlots) slot.allNotesOff(true);
         aetherGranularSlot2.allNotesOff(true);
         if (params.hasAether && params.aetherSampleSlot1.enabled)
         {
@@ -438,6 +451,16 @@ namespace beat
                 aetherSfzSlot1.noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
             else if (params.aetherSampleSlot1.source)
                 aetherSampleSlot1.noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
+        }
+        if (params.hasLumus)
+        {
+            for (size_t index = 0; index < lumusSampleSlots.size(); ++index)
+            {
+                const auto& slot = params.lumusSampleSlots[index];
+                if (!slot.enabled) continue;
+                if (slot.sfzSource) lumusSfzSlots[index].noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
+                else if (slot.source) lumusSampleSlots[index].noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
+            }
         }
         if (params.hasAether && params.aetherGranularSlot2.enabled && params.aetherGranularSlot2.source)
             aetherGranularSlot2.noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
@@ -593,12 +616,16 @@ namespace beat
         {
             aetherSampleSlot1.noteOff((uint64_t) stableVoiceId);
             aetherSfzSlot1.noteOff((uint64_t) stableVoiceId);
+            for (auto& slot : lumusSampleSlots) slot.noteOff((uint64_t) stableVoiceId);
+            for (auto& slot : lumusSfzSlots) slot.noteOff((uint64_t) stableVoiceId);
             aetherGranularSlot2.noteOff((uint64_t) stableVoiceId);
         }
         else
         {
             aetherSampleSlot1.allNotesOff(true);
             aetherSfzSlot1.allNotesOff(true);
+            for (auto& slot : lumusSampleSlots) slot.allNotesOff(true);
+            for (auto& slot : lumusSfzSlots) slot.allNotesOff(true);
             aetherGranularSlot2.allNotesOff(true);
         }
         if (allowTailOff)
@@ -765,6 +792,7 @@ namespace beat
             StereoSample filter1Raw;
             StereoSample filter2Raw;
             AetherTableStackRenderer::StereoFrame sampleSourceFrame {};
+            std::array<AetherTableStackRenderer::StereoFrame, 3> lumusSampleFrames {};
             AetherTableStackRenderer::StereoFrame granularSourceFrame {};
             AetherTableStackRenderer::StereoFrame lumusSourceFrameC {};
             std::array<AetherTableStackRenderer::StereoFrame, 4> sourceFrames {};
@@ -894,6 +922,38 @@ namespace beat
                     else
                     {
                         raw.left += sampleLeft; raw.right += sampleRight;
+                    }
+                }
+                if (params.hasLumus)
+                {
+                    for (size_t index = 0; index < params.lumusSampleSlots.size(); ++index)
+                    {
+                        const auto& slot = params.lumusSampleSlots[index];
+                        if (!slot.enabled || (!slot.source && !slot.sfzSource)) continue;
+                        const auto mappedFrame = slot.sfzSource
+                            ? SampleSourceSlot::StereoFrame {}
+                            : lumusSampleSlots[index].renderFrame();
+                        const auto sfzFrame = slot.sfzSource
+                            ? lumusSfzSlots[index].renderFrame() : SfzSourceSlot::StereoFrame {};
+                        const float sampleLeft = mappedFrame.left + sfzFrame.left;
+                        const float sampleRight = mappedFrame.right + sfzFrame.right;
+                        lumusSampleFrames[index] = { sampleLeft, sampleRight };
+                        if (slot.routing == 1)
+                        {
+                            directRaw.left += sampleLeft; directRaw.right += sampleRight;
+                        }
+                        else if (slot.routing == 2)
+                        {
+                            filter1Raw.left += sampleLeft; filter1Raw.right += sampleRight;
+                        }
+                        else if (slot.routing == 3)
+                        {
+                            filter2Raw.left += sampleLeft; filter2Raw.right += sampleRight;
+                        }
+                        else if (slot.routing != 4)
+                        {
+                            raw.left += sampleLeft; raw.right += sampleRight;
+                        }
                     }
                 }
                 if (params.aetherGranularSlot2.enabled && params.aetherGranularSlot2.source)
@@ -1156,6 +1216,15 @@ namespace beat
                     const float sampleSendGain = VoiceMath::clamp01(params.aetherSampleSlot1.fxSends[bus]);
                     send.left += sampleSourceFrame.left * sampleSendGain;
                     send.right += sampleSourceFrame.right * sampleSendGain;
+                    if (params.hasLumus)
+                    {
+                        for (size_t index = 0; index < lumusSampleFrames.size(); ++index)
+                        {
+                            const float gain = VoiceMath::clamp01(params.lumusSampleSlots[index].fxSends[bus]);
+                            send.left += lumusSampleFrames[index].left * gain;
+                            send.right += lumusSampleFrames[index].right * gain;
+                        }
+                    }
                     const float granularSendGain = VoiceMath::clamp01(params.aetherGranularSlot2.fxSends[bus]);
                     send.left += granularSourceFrame.left * granularSendGain;
                     send.right += granularSourceFrame.right * granularSendGain;

@@ -2073,7 +2073,9 @@ namespace beat
         const InstrumentDefinition& instrument,
         std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1,
         std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1,
-        std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2)
+        std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2,
+        std::array<std::shared_ptr<const ImmutableMappedSampleSource>, 3> lumusSampleSlots,
+        std::array<std::shared_ptr<const SfzDecodedInstrument>, 3> lumusSfzSlots)
     {
         auto instrumentSynth = std::make_unique<BeatSynthesiser>();
         instrumentSynth->configureMemberExpressionZone({
@@ -2368,13 +2370,25 @@ namespace beat
             instrument.aether.noise.fxSends,
         };
         params.aetherSampleSlot1 = {
-            instrument.aether.sampleSlot1.enabled
+            !params.hasLumus && instrument.aether.sampleSlot1.enabled
                 && (aetherSampleSlot1 != nullptr || aetherSfzSlot1 != nullptr),
             std::move(aetherSampleSlot1),
             std::move(aetherSfzSlot1),
             juce::jlimit(0, 3, instrument.aether.sampleSlot1.routing),
             instrument.aether.sampleSlot1.fxSends,
         };
+        for (size_t index = 0; index < params.lumusSampleSlots.size(); ++index)
+        {
+            const auto& source = instrument.lumus.sampleSlots[index];
+            params.lumusSampleSlots[index] = {
+                params.hasLumus && source.enabled
+                    && (lumusSampleSlots[index] != nullptr || lumusSfzSlots[index] != nullptr),
+                std::move(lumusSampleSlots[index]),
+                std::move(lumusSfzSlots[index]),
+                juce::jlimit(0, 4, source.routing),
+                source.fxSends,
+            };
+        }
         params.aetherGranularSlot2 = {
             instrument.aether.granularSlot2.enabled && aetherGranularSlot2 != nullptr,
             std::move(aetherGranularSlot2),
@@ -2394,6 +2408,8 @@ namespace beat
                         || instrument.aether.noise.fxSends[bus] > 0.0001f
                         || (instrument.aether.sampleSlot1.enabled
                             && instrument.aether.sampleSlot1.fxSends[bus] > 0.0001f)
+                        || std::any_of(instrument.lumus.sampleSlots.begin(), instrument.lumus.sampleSlots.end(),
+                            [bus](const auto& slot) { return slot.enabled && slot.fxSends[bus] > 0.0001f; })
                         || (instrument.aether.granularSlot2.enabled
                             && instrument.aether.granularSlot2.fxSends[bus] > 0.0001f)))
                     return true;
@@ -2450,18 +2466,20 @@ namespace beat
                 decodedAudioPaths.insert(path);
             for (const auto& zone : instrument.sampleZones)
                 decodedAudioPaths.insert(zone.path);
-            if (!instrument.hasAether || !instrument.aether.sampleSlot1.enabled)
-                continue;
-            const auto& slot = instrument.aether.sampleSlot1;
-            if (slot.zones.empty())
+            const auto collectSampleIds = [&](const InstrumentDefinition::AetherSampleSlot& slot)
             {
-                if (slot.audioFileId.isNotEmpty())
-                    aetherAudioFileIds.insert(slot.audioFileId);
-            }
-            else
-                for (const auto& zone : slot.zones)
-                    if (zone.audioFileId.isNotEmpty())
-                        aetherAudioFileIds.insert(zone.audioFileId);
+                if (!slot.enabled) return;
+                if (slot.zones.empty())
+                {
+                    if (slot.audioFileId.isNotEmpty()) aetherAudioFileIds.insert(slot.audioFileId);
+                }
+                else
+                    for (const auto& zone : slot.zones)
+                        if (zone.audioFileId.isNotEmpty()) aetherAudioFileIds.insert(zone.audioFileId);
+            };
+            if (instrument.hasAether) collectSampleIds(instrument.aether.sampleSlot1);
+            if (instrument.synthEngine == InstrumentDefinition::SynthEngine::Lumus)
+                for (const auto& slot : instrument.lumus.sampleSlots) collectSampleIds(slot);
         }
 
         const auto loadBuffer = [&](const juce::String& path) -> std::shared_ptr<SampleBuffer>
@@ -2715,16 +2733,20 @@ namespace beat
             {
                 std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1;
                 std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1;
+                std::array<std::shared_ptr<const ImmutableMappedSampleSource>, 3> lumusSampleSlots;
+                std::array<std::shared_ptr<const SfzDecodedInstrument>, 3> lumusSfzSlots;
                 std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2;
-                const auto& slot = routeInstrument->aether.sampleSlot1;
-                auto sampleIdentity = juce::String();
-                if (routeInstrument->hasAether && slot.enabled)
+                const auto loadSampleSlot = [&](const InstrumentDefinition::AetherSampleSlot& slot,
+                                                std::shared_ptr<const ImmutableMappedSampleSource>& mappedOutput,
+                                                std::shared_ptr<const SfzDecodedInstrument>& sfzOutput)
                 {
+                    auto sampleIdentity = juce::String();
+                    if (!slot.enabled) return sampleIdentity;
                     if (slot.managedSfz.manifestPath.isNotEmpty())
                     {
                         const auto loaded = loadManagedSfzAsset(juce::File(slot.managedSfz.manifestPath));
                         if (loaded.isAccepted())
-                            aetherSfzSlot1 = loaded.instrument;
+                            sfzOutput = loaded.instrument;
                     }
                     auto map = std::make_shared<ImmutableMappedSampleSource>();
                     const auto addZone = [&](const Id& audioFileId, int rootNote, int loNote, int hiNote,
@@ -2804,9 +2826,20 @@ namespace beat
                                     zone.loVelocity, zone.hiVelocity, zone.level, zone.pan,
                                     zone.startRatio, zone.endRatio, zone.loopEnabled,
                                     zone.loopStartRatio, zone.loopEndRatio);
-                    if (!aetherSfzSlot1 && map->zoneCount > 0)
-                        aetherSampleSlot1 = std::move(map);
-                }
+                    if (!sfzOutput && map->zoneCount > 0)
+                        mappedOutput = std::move(map);
+                    return sampleIdentity;
+                };
+                const auto& slot = routeInstrument->aether.sampleSlot1;
+                auto sampleIdentity = routeInstrument->hasAether
+                        && routeInstrument->synthEngine != InstrumentDefinition::SynthEngine::Lumus
+                    ? loadSampleSlot(slot, aetherSampleSlot1, aetherSfzSlot1)
+                    : juce::String();
+                std::array<juce::String, 3> lumusSampleIdentities;
+                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumus)
+                    for (size_t index = 0; index < lumusSampleSlots.size(); ++index)
+                        lumusSampleIdentities[index] = loadSampleSlot(routeInstrument->lumus.sampleSlots[index],
+                            lumusSampleSlots[index], lumusSfzSlots[index]);
                 const auto& granular = routeInstrument->aether.granularSlot2;
                 if (routeInstrument->hasAether && granular.enabled)
                 {
@@ -2837,7 +2870,8 @@ namespace beat
                     }
                 }
                 route.synth = createInstrumentSynth(*routeInstrument,
-                    std::move(aetherSampleSlot1), std::move(aetherSfzSlot1), std::move(aetherGranularSlot2));
+                    std::move(aetherSampleSlot1), std::move(aetherSfzSlot1), std::move(aetherGranularSlot2),
+                    std::move(lumusSampleSlots), std::move(lumusSfzSlots));
                 route.sourceFxBusIds = routeInstrument->aether.fxBusIds;
                 route.aetherSampleSlot1Identity = slot.enabled
                     ? juce::String(slot.routing) + ":" + juce::String(slot.fxSends[0], 6) + ":"
@@ -2845,6 +2879,17 @@ namespace beat
                         + (slot.managedSfz.assetId.isNotEmpty()
                             ? "sfz:" + slot.managedSfz.assetId : sampleIdentity)
                     : juce::String();
+                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumus)
+                    for (size_t index = 0; index < routeInstrument->lumus.sampleSlots.size(); ++index)
+                    {
+                        const auto& lumusSlot = routeInstrument->lumus.sampleSlots[index];
+                        if (!lumusSlot.enabled) continue;
+                        route.aetherSampleSlot1Identity += "|lumus-sample-" + juce::String((int) index) + ":"
+                            + juce::String(lumusSlot.routing) + ":" + juce::String(lumusSlot.fxSends[0], 6) + ":"
+                            + juce::String(lumusSlot.fxSends[1], 6) + ":"
+                            + (lumusSlot.managedSfz.assetId.isNotEmpty()
+                                ? "sfz:" + lumusSlot.managedSfz.assetId : lumusSampleIdentities[index]);
+                    }
                 if (granular.enabled)
                     route.aetherSampleSlot1Identity += "|granular:" + granular.builtinSource + ":"
                         + granular.managedAsset.assetId + ":" + juce::String(granular.rootNote) + ":"

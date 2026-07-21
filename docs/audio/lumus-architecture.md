@@ -13,7 +13,7 @@ Lumus v4 adapter
     -> fixed source identities A / B / C
     -> A/B through the frozen Aether renderer
     -> A/B/C own independent sample asset and playback metadata
-    -> C through Lumus-owned wavetable/sample mode selection
+    -> A/B/C through Lumus-owned wavetable/sample mode selection
     -> identical initial output while C is disabled
 
 Current Lumus renderer
@@ -34,8 +34,8 @@ The adapter is an intentional bootstrap boundary. It lets Lumus start audible an
 - `frontend/src/features/EditorHost/EditorHost.solid.tsx`: Lumus editor identity and modal lifecycle.
 - `backend/Source/Audio/Parameters/ParameterIds.h`: stable native instrument type.
 - `backend/Source/Audio/Parameters/SynthPatchContract.cpp`: validated v1 migration and v2 A/B/C contract.
-- `backend/Source/Audio/TrackModel.h`: engine identity and Lumus-owned Slot C state retained independently of Aether.
-- `backend/Source/Audio/InstrumentVoice.{h,cpp}`: prepared fixed-capacity Slot C wavetable state, routing, and bounded modulation evaluation; its branch is unreachable for Aether.
+- `backend/Source/Audio/TrackModel.h`: engine identity and Lumus-owned A/B/C sample state retained independently of Aether.
+- `backend/Source/Audio/InstrumentVoice.{h,cpp}`: prepared fixed-capacity A/B/C sample state plus Slot C wavetable state, routing, and bounded modulation evaluation; these branches are unreachable for Aether.
 
 ## Non-negotiable compatibility rules
 

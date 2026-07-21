@@ -44,5 +44,6 @@ assert.ok(contract.includes('"osc.c.position"'));
 assert.ok(contract.includes('"osc.c.unison.spread"'));
 assert.ok(oscillatorPanel.includes('label="Route"'));
 assert.ok(oscillatorPanel.includes("<FloatingSelect"), "Lumus route UI must reuse the existing selector component");
+assert.ok(oscillatorPanel.includes("lumusSlotIndex"), "All three Lumus slots must share the source-mode selector path");
 
 console.log(`Lumus foundation verification passed (${matrix.rows.length} benchmark rows).`);

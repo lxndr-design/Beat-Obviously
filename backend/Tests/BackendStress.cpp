@@ -16431,6 +16431,10 @@ namespace
           "namespace": "lumus",
           "parameters": {
             "osc.c.enabled": true,
+            "lumus.source.a.sample.enabled": true,
+            "lumus.source.a.sample.audioFileId": "lumus-a-sample",
+            "lumus.source.b.sample.enabled": true,
+            "lumus.source.b.sample.audioFileId": "lumus-b-sample",
             "lumus.source.c.sample.enabled": true,
             "lumus.source.c.sample.audioFileId": "lumus-canonical-sample",
             "lumus.source.c.sample.rootNote": 67,
@@ -16438,8 +16442,8 @@ namespace
           },
           "metadata": {
             "lumusSourceRack": { "schemaVersion": 2, "slots": [
-              { "id": "a", "mode": "wavetable" },
-              { "id": "b", "mode": "wavetable" },
+              { "id": "a", "mode": "sample" },
+              { "id": "b", "mode": "sample" },
               { "id": "c", "mode": "sample" }
             ] },
             "lumusSampleSlots": {
@@ -16453,7 +16457,14 @@ namespace
         )json");
         beat::InstrumentDefinition lumusIndependentSample;
         if (!beat::applySynthPatchContract(lumusIndependentSamplePatch, lumusIndependentSample)
+            || lumusIndependentSample.aether.oscA.enabled
+            || lumusIndependentSample.aether.oscB.enabled
             || lumusIndependentSample.lumus.oscC.enabled
+            || !lumusIndependentSample.lumus.sampleSlots[0].enabled
+            || !lumusIndependentSample.lumus.sampleSlots[1].enabled
+            || !lumusIndependentSample.lumus.sampleSlots[2].enabled
+            || lumusIndependentSample.lumus.sampleSlots[0].audioFileId != "lumus-a-sample"
+            || lumusIndependentSample.lumus.sampleSlots[1].audioFileId != "lumus-b-sample"
             || !lumusIndependentSample.aether.sampleSlot1.enabled
             || lumusIndependentSample.aether.sampleSlot1.audioFileId != "lumus-canonical-sample"
             || lumusIndependentSample.aether.sampleSlot1.rootNote != 67
@@ -18202,8 +18213,14 @@ namespace
         sampleModeZone->rootNote = 60;
         sampleModeSource->zones[0] = sampleModeZone;
         sampleModeSource->zoneCount = 1;
-        sampleModeParams.aetherSampleSlot1.enabled = true;
-        sampleModeParams.aetherSampleSlot1.source = sampleModeSource;
+        sampleModeParams.lumusSampleSlots[0].enabled = true;
+        sampleModeParams.lumusSampleSlots[0].source = sampleModeSource;
+        sampleModeParams.lumusSampleSlots[1].enabled = true;
+        sampleModeParams.lumusSampleSlots[1].source = sampleModeSource;
+        sampleModeParams.lumusSampleSlots[1].routing = 1;
+        sampleModeParams.lumusSampleSlots[2].enabled = true;
+        sampleModeParams.lumusSampleSlots[2].source = sampleModeSource;
+        sampleModeParams.lumusSampleSlots[2].routing = 3;
         const auto sampleModeOutput = render(sampleModeParams);
         double difference = 0.0;
         double modulationDifference = 0.0;

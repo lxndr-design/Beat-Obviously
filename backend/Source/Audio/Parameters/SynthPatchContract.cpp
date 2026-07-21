@@ -450,7 +450,7 @@ namespace beat
         if (!params.isObject()) return false;
         const auto modulation = objectProperty(patch, "modulation", {});
         const auto metadata = objectProperty(patch, "metadata", {});
-        bool lumusCSampleMode = false;
+        std::array<bool, 3> lumusSampleModes {};
         if (isLumus && (int) objectProperty(patch, "schemaVersion", 0) >= params::lumusPreviousPatchSchemaVersion)
         {
             const auto rack = objectProperty(metadata, "lumusSourceRack", {});
@@ -469,9 +469,9 @@ namespace beat
                 const auto mode = objectProperty(slot, "mode", {}).toString();
                 if (!slot.isObject()
                     || objectProperty(slot, "id", {}).toString() != requiredIds[(size_t) index]
-                    || (index < 2 ? mode != "wavetable" : mode != "wavetable" && mode != "sample"))
+                    || (mode != "wavetable" && mode != "sample"))
                     return false;
-                if (index == 2) lumusCSampleMode = mode == "sample";
+                lumusSampleModes[(size_t) index] = mode == "sample";
             }
         }
         const auto customWavetables = mergedWavemapMetadata(metadata);
@@ -546,7 +546,7 @@ namespace beat
                 oscC.wavetable.bank = synthWavetableBankForId(synthStringParam(params, "osc.c.wavetable", "basic.saw"));
             instrument.lumus.oscC = synthOscillatorConfig(params, modulation, metadata,
                 customWavetables, "c", oscC);
-            if (lumusCSampleMode) instrument.lumus.oscC.enabled = false;
+            if (lumusSampleModes[2]) instrument.lumus.oscC.enabled = false;
         }
         else
         {
@@ -557,67 +557,57 @@ namespace beat
         instrument.aether.sub.routing = sourceRoute(synthStringParam(params, "aether.sub.route", "filter"));
         instrument.aether.noise.routing = sourceRoute(synthStringParam(params, "aether.noise.route", "filter"));
         const int activeLumusSchema = isLumus ? (int) objectProperty(patch, "schemaVersion", 0) : 0;
-        const juce::String samplePrefix = isLumus && activeLumusSchema >= params::lumusPatchSchemaVersion
-            ? "lumus.source.c.sample."
-            : "aether.sample.1.";
-        const auto sampleParameter = [&samplePrefix](const char* suffix) { return samplePrefix + suffix; };
-        instrument.aether.sampleSlot1.schemaVersion = 4;
-        instrument.aether.sampleSlot1.audioFileId = synthStringParam(params, sampleParameter("audioFileId"), "");
-        const bool requestedSampleSlotEnabled = synthNumberParam(params, sampleParameter("enabled"), 0.0) >= 0.5;
-        instrument.aether.sampleSlot1.enabled = requestedSampleSlotEnabled
-            && instrument.aether.sampleSlot1.audioFileId.isNotEmpty();
-        instrument.aether.sampleSlot1.rootNote = juce::jlimit(0, 127,
-            (int) std::round(synthNumberParam(params, sampleParameter("rootNote"), 60.0)));
-        instrument.aether.sampleSlot1.level = juce::jlimit(0.0f, 1.0f,
-            (float) synthNumberParam(params, sampleParameter("level"), 0.8));
-        instrument.aether.sampleSlot1.pan = juce::jlimit(-1.0f, 1.0f,
-            (float) synthNumberParam(params, sampleParameter("pan"), 0.0));
-        instrument.aether.sampleSlot1.routing = sourceRoute(
-            synthStringParam(params, sampleParameter("route"), "filter"));
-        instrument.aether.sampleSlot1.startRatio = juce::jlimit(0.0f, 1.0f,
-            (float) synthNumberParam(params, sampleParameter("start"), 0.0));
-        instrument.aether.sampleSlot1.endRatio = juce::jlimit(0.0f, 1.0f,
-            (float) synthNumberParam(params, sampleParameter("end"), 1.0));
-        instrument.aether.sampleSlot1.loopEnabled = synthNumberParam(params, sampleParameter("loop.enabled"), 0.0) >= 0.5;
-        instrument.aether.sampleSlot1.loopStartRatio = juce::jlimit(0.0f, 1.0f,
-            (float) synthNumberParam(params, sampleParameter("loop.start"), 0.0));
-        instrument.aether.sampleSlot1.loopEndRatio = juce::jlimit(0.0f, 1.0f,
-            (float) synthNumberParam(params, sampleParameter("loop.end"), 1.0));
-        instrument.aether.sampleSlot1.fxSends[0] = juce::jlimit(0.0f, 1.0f,
-            (float) synthNumberParam(params, sampleParameter("fxSend1"), 0.0));
-        instrument.aether.sampleSlot1.fxSends[1] = juce::jlimit(0.0f, 1.0f,
-            (float) synthNumberParam(params, sampleParameter("fxSend2"), 0.0));
-        if (instrument.aether.sampleSlot1.endRatio <= instrument.aether.sampleSlot1.startRatio)
-        {
-            instrument.aether.sampleSlot1.startRatio = 0.0f;
-            instrument.aether.sampleSlot1.endRatio = 1.0f;
-        }
-        if (instrument.aether.sampleSlot1.loopStartRatio < instrument.aether.sampleSlot1.startRatio
-            || instrument.aether.sampleSlot1.loopEndRatio > instrument.aether.sampleSlot1.endRatio
-            || instrument.aether.sampleSlot1.loopEndRatio <= instrument.aether.sampleSlot1.loopStartRatio)
-            instrument.aether.sampleSlot1.loopEnabled = false;
-        juce::var mappedZoneData = objectProperty(metadata, "sampleSlot1Zones", {});
+        juce::var lumusSampleMetadata;
         if (isLumus && activeLumusSchema >= params::lumusPatchSchemaVersion)
         {
-            const auto sampleSlots = objectProperty(metadata, "lumusSampleSlots", {});
-            if (!sampleSlots.isObject()) return false;
+            lumusSampleMetadata = objectProperty(metadata, "lumusSampleSlots", {});
+            if (!lumusSampleMetadata.isObject()) return false;
             static constexpr std::array<const char*, 3> requiredSampleSlots {{ "a", "b", "c" }};
             for (const auto* slotId : requiredSampleSlots)
             {
-                const auto slot = objectProperty(sampleSlots, slotId, {});
+                const auto slot = objectProperty(lumusSampleMetadata, slotId, {});
                 const auto zones = objectProperty(slot, "zones", {});
                 if (!slot.isObject() || (int) objectProperty(slot, "schemaVersion", 0) != 1
                     || zones.getArray() == nullptr || zones.getArray()->size() > 8)
                     return false;
             }
-            mappedZoneData = objectProperty(objectProperty(sampleSlots, "c", {}), "zones", {});
         }
-        if (const auto* mappedZones = mappedZoneData.getArray())
+        const auto parseSampleSlot = [&](InstrumentDefinition::AetherSampleSlot& target,
+                                         const juce::String& prefix,
+                                         const juce::var& slotMetadata) -> bool
         {
-            for (int index = 0; index < juce::jmin(8, mappedZones->size()); ++index)
+            const auto parameter = [&prefix](const char* suffix) { return prefix + suffix; };
+            target = {};
+            target.schemaVersion = 5;
+            target.audioFileId = synthStringParam(params, parameter("audioFileId"), "");
+            const bool requestedEnabled = synthNumberParam(params, parameter("enabled"), 0.0) >= 0.5;
+            target.rootNote = juce::jlimit(0, 127, (int) std::round(synthNumberParam(params, parameter("rootNote"), 60.0)));
+            target.level = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, parameter("level"), 0.8));
+            target.pan = juce::jlimit(-1.0f, 1.0f, (float) synthNumberParam(params, parameter("pan"), 0.0));
+            target.routing = sourceRoute(synthStringParam(params, parameter("route"), "filter"));
+            target.startRatio = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, parameter("start"), 0.0));
+            target.endRatio = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, parameter("end"), 1.0));
+            target.loopEnabled = synthNumberParam(params, parameter("loop.enabled"), 0.0) >= 0.5;
+            target.loopStartRatio = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, parameter("loop.start"), 0.0));
+            target.loopEndRatio = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, parameter("loop.end"), 1.0));
+            target.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, parameter("fxSend1"), 0.0));
+            target.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) synthNumberParam(params, parameter("fxSend2"), 0.0));
+            if (target.endRatio <= target.startRatio)
+            {
+                target.startRatio = 0.0f;
+                target.endRatio = 1.0f;
+            }
+            if (target.loopStartRatio < target.startRatio || target.loopEndRatio > target.endRatio
+                || target.loopEndRatio <= target.loopStartRatio)
+                target.loopEnabled = false;
+            const auto zoneData = slotMetadata.isObject()
+                ? objectProperty(slotMetadata, "zones", {})
+                : objectProperty(metadata, "sampleSlot1Zones", {});
+            if (const auto* mappedZones = zoneData.getArray())
+            for (int index = 0; index < mappedZones->size(); ++index)
             {
                 const auto& mapped = mappedZones->getReference(index);
-                if (!mapped.isObject()) continue;
+                if (!mapped.isObject()) return false;
                 InstrumentDefinition::AetherSampleSlot::Zone zone;
                 zone.audioFileId = mapped.getProperty("audioFileId", "").toString();
                 zone.rootNote = juce::jlimit(0, 127, (int) mapped.getProperty("rootNote", 60));
@@ -632,15 +622,48 @@ namespace beat
                 zone.loopEnabled = (bool) mapped.getProperty("loopEnabled", false);
                 zone.loopStartRatio = juce::jlimit(zone.startRatio, zone.endRatio, (float) (double) mapped.getProperty("loopStartRatio", zone.startRatio));
                 zone.loopEndRatio = juce::jlimit(zone.loopStartRatio, zone.endRatio, (float) (double) mapped.getProperty("loopEndRatio", zone.endRatio));
-                if (zone.audioFileId.isNotEmpty()) instrument.aether.sampleSlot1.zones.push_back(std::move(zone));
+                if (zone.audioFileId.isNotEmpty()) target.zones.push_back(std::move(zone));
             }
+            const auto managed = slotMetadata.isObject() ? objectProperty(slotMetadata, "managedSfz", {}) : juce::var();
+            if (!managed.isVoid())
+            {
+                if (!managed.isObject() || (int) objectProperty(managed, "schemaVersion", 0) != 1) return false;
+                target.managedSfz.schemaVersion = 1;
+                target.managedSfz.assetId = objectProperty(managed, "assetId", {}).toString();
+                target.managedSfz.displayName = objectProperty(managed, "displayName", {}).toString();
+                target.managedSfz.manifestPath = objectProperty(managed, "manifestPath", {}).toString();
+                target.managedSfz.sourcePath = objectProperty(managed, "sourcePath", {}).toString();
+                if (const auto* paths = objectProperty(managed, "samplePaths", {}).getArray())
+                    for (const auto& path : *paths)
+                        if (path.isString() && path.toString().isNotEmpty()) target.managedSfz.samplePaths.push_back(path.toString());
+            }
+            target.enabled = requestedEnabled && (target.audioFileId.isNotEmpty()
+                || !target.zones.empty() || target.managedSfz.manifestPath.isNotEmpty());
+            return true;
+        };
+        if (isLumus && activeLumusSchema >= params::lumusPatchSchemaVersion)
+        {
+            static constexpr std::array<const char*, 3> ids {{ "a", "b", "c" }};
+            for (size_t index = 0; index < ids.size(); ++index)
+            {
+                if (!parseSampleSlot(instrument.lumus.sampleSlots[index],
+                        "lumus.source." + juce::String(ids[index]) + ".sample.",
+                        objectProperty(lumusSampleMetadata, ids[index], {})))
+                    return false;
+                instrument.lumus.sampleModes[index] = lumusSampleModes[index];
+                instrument.lumus.sampleSlots[index].enabled = instrument.lumus.sampleSlots[index].enabled
+                    && lumusSampleModes[index];
+            }
+            instrument.aether.sampleSlot1 = instrument.lumus.sampleSlots[2];
+            if (lumusSampleModes[0]) instrument.aether.oscA.enabled = false;
+            if (lumusSampleModes[1]) instrument.aether.oscB.enabled = false;
         }
-        instrument.aether.sampleSlot1.enabled = requestedSampleSlotEnabled
-            && (instrument.aether.sampleSlot1.audioFileId.isNotEmpty()
-                || !instrument.aether.sampleSlot1.zones.empty());
-        if (isLumus && activeLumusSchema >= params::lumusSampleModePatchSchemaVersion
-            && !lumusCSampleMode)
-            instrument.aether.sampleSlot1.enabled = false;
+        else
+        {
+            if (!parseSampleSlot(instrument.aether.sampleSlot1, "aether.sample.1.", {})) return false;
+            if (isLumus && activeLumusSchema >= params::lumusSampleModePatchSchemaVersion)
+                instrument.aether.sampleSlot1.enabled = instrument.aether.sampleSlot1.enabled && lumusSampleModes[2];
+        }
         auto& granular = instrument.aether.granularSlot2;
         granular.schemaVersion = 1;
         granular.builtinSource = synthStringParam(params, "aether.granular.2.builtinSource", "");

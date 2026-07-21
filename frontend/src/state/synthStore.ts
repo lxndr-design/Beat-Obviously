@@ -78,8 +78,8 @@ export interface LumusSampleSlotMetadata {
 export interface LumusSourceRackDescriptor {
   schemaVersion: 2;
   slots: [
-    { id: "a"; mode: "wavetable" },
-    { id: "b"; mode: "wavetable" },
+    { id: "a"; mode: LumusSourceMode },
+    { id: "b"; mode: LumusSourceMode },
     { id: "c"; mode: LumusSourceMode },
   ];
 }
@@ -535,11 +535,12 @@ function normalizeLumusSourceRack(value: unknown, patchVersion: unknown, legacyS
     throw new SynthPatchIdentityError("lumus.source-rack.capacity", "Lumus requires exactly three source slots.");
   for (let index = 0; index < canonical.slots.length; index += 1) {
     const slot = value.slots[index];
+    const supportsSample = patchVersion === 3 || patchVersion === 4;
     if (!isRecord(slot)
         || slot.id !== canonical.slots[index].id
-        || (index < 2 ? slot.mode !== "wavetable" : slot.mode !== "wavetable" && slot.mode !== "sample"))
+        || (slot.mode !== "wavetable" && (!supportsSample || slot.mode !== "sample")))
       throw new SynthPatchIdentityError("lumus.source-rack.slot-invalid", `Invalid Lumus source slot at index ${index}.`);
-    if (index === 2) canonical.slots[2].mode = slot.mode as LumusSourceMode;
+    canonical.slots[index].mode = slot.mode as LumusSourceMode;
   }
   return canonical;
 }

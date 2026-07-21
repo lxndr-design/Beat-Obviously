@@ -329,6 +329,11 @@ try {
     },
     metadata: {
       ...structuredClone(lumusDraft.metadata),
+      lumusSourceRack: { schemaVersion: 2, slots: [
+        { id: "a", mode: "sample" },
+        { id: "b", mode: "sample" },
+        { id: "c", mode: "sample" },
+      ] },
       lumusSampleSlots: {
         a: { schemaVersion: 1, zones: [] },
         b: { schemaVersion: 1, zones: [] },
@@ -342,6 +347,7 @@ try {
   assert.equal(independentSampleSlots.parameters["lumus.source.a.sample.rootNote"], 48);
   assert.equal(independentSampleSlots.parameters["lumus.source.b.sample.rootNote"], 60);
   assert.equal(independentSampleSlots.parameters["lumus.source.c.sample.rootNote"], 72);
+  assert.deepEqual(independentSampleSlots.metadata.lumusSourceRack?.slots.map(({ mode }) => mode), ["sample", "sample", "sample"]);
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
       ...structuredClone(lumusDraft),

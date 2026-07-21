@@ -303,6 +303,7 @@ namespace beat
             AetherSub aetherSub;
             AetherNoise aetherNoise;
             AetherSampleSlot aetherSampleSlot1;
+            std::array<AetherSampleSlot, 3> lumusSampleSlots;
             struct AetherGranularSlot
             {
                 bool enabled { false };
@@ -431,6 +432,8 @@ namespace beat
         AetherTableStackRenderer::InteractionState aetherInteractionState;
         MappedSampleSourceSlot aetherSampleSlot1;
         SfzSourceSlot aetherSfzSlot1;
+        std::array<MappedSampleSourceSlot, 3> lumusSampleSlots;
+        std::array<SfzSourceSlot, 3> lumusSfzSlots;
         GranularSourceSlot aetherGranularSlot2;
         VoiceAetherCache::PanGains cachedPanGains;
         VoiceAetherCache::PitchRates cachedPitchRates;

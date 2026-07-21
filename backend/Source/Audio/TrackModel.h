@@ -317,12 +317,13 @@ namespace beat
             MemberExpressionZone memberExpressionZone;
         };
 
-        // Lumus-owned source rack extension. Aether remains a fixed A/B engine;
-        // Lumus v2 adds an independently configured wavetable-only Slot C.
+        // Lumus-owned source rack extension. Aether remains a fixed A/B engine.
         struct LumusConfig
         {
             int sourceRackSchemaVersion { 1 };
             AetherOscillator oscC;
+            std::array<AetherSampleSlot, 3> sampleSlots;
+            std::array<bool, 3> sampleModes {};
         };
 
         struct DynamicModTarget
