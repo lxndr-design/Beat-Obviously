@@ -12,6 +12,7 @@ The staged implementation and release gates are tracked in [`aurum-roadmap.md`](
 - A bipolar 6 x 7 routing matrix: six operator destinations plus the audible output
 - Self-routing for operator feedback
 - One-sample-delayed matrix feedback so cyclic routes remain bounded
+- Independent operator note-off releases with native voice lifetime governed by the longest enabled operator tail
 - One to eight unison voices with detune and stereo spread
 - Shared Beat filter, resonance, drive, amplitude, and voice behavior
 - Browser audition and native-engine rendering
@@ -35,4 +36,4 @@ For a deterministic browser review, open `?beatDevFixture=aurum-editor`. The fix
 
 ## Current boundary
 
-Aurum version 1 is an instrument foundation, not a clone of another synthesizer. It does not yet include per-operator filters, waveshaping editors, keyboard-mapped modulation curves, or a preset browser. Operator release values persist with the patch; note-off is currently governed by Beat's shared amplitude release path.
+Aurum version 1 is an instrument foundation, not a clone of another synthesizer. It does not yet include per-operator filters, waveshaping editors, keyboard-mapped modulation curves, or a preset browser. Operator releases now govern their own note-off tails in browser and native rendering; the hidden shared amplitude envelope no longer reshapes Aurum's operator envelopes.

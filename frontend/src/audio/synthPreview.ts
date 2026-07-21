@@ -15,6 +15,7 @@ export interface SynthRenderState {
   filterDamping: number;
   aurumPhases: number[];
   aurumOutputs: number[];
+  aurumNoteOffMs: number;
 }
 
 interface RenderModulation {
@@ -180,6 +181,7 @@ export function createSynthRenderState(): SynthRenderState {
     filterDamping: 1,
     aurumPhases: Array(48).fill(0),
     aurumOutputs: Array(48).fill(0),
+    aurumNoteOffMs: Number.POSITIVE_INFINITY,
   };
 }
 
@@ -226,13 +228,14 @@ export function renderInstrumentSamples(
 ) {
   const state = createSynthRenderState();
   const durationS = out.length / sampleRate;
+  if (instrument.aurum && fade) state.aurumNoteOffMs = aurumPreviewNoteOffMs(instrument, durationS);
   const velocity01 = clamp01(velocity / 127);
   const sortedCurve = curve?.filter((point) => Number.isFinite(point.timeS) && Number.isFinite(point.frequency))
     .sort((a, b) => a.timeS - b.timeS);
 
   for (let i = 0; i < out.length; i++) {
     const t = i / sampleRate;
-    const amp = fade ? Math.min(1, t / 0.025, (durationS - t) / 0.08) : 1;
+    const amp = instrument.aurum ? 1 : fade ? Math.min(1, t / 0.025, (durationS - t) / 0.08) : 1;
     const baseFrequency = sortedCurve && sortedCurve.length > 1
       ? frequencyAtCurveTime(sortedCurve, t)
       : glideBaseFrequency(instrument, frequency, targetFrequency, t, durationS);
@@ -274,13 +277,14 @@ export function renderInstrumentStereoSamples(
     const leftFilterState = createSynthRenderState();
     const rightFilterState = createSynthRenderState();
     const durationS = length / sampleRate;
+    if (fade) phaseState.aurumNoteOffMs = aurumPreviewNoteOffMs(instrument, durationS);
     const velocity01 = clamp01(velocity / 127);
     const sortedCurve = curve?.filter((point) => Number.isFinite(point.timeS) && Number.isFinite(point.frequency))
       .sort((a, b) => a.timeS - b.timeS);
 
     for (let i = 0; i < length; i++) {
       const timeS = i / sampleRate;
-      const amp = fade ? Math.min(1, timeS / 0.025, (durationS - timeS) / 0.08) : 1;
+      const amp = 1;
       const baseFrequency = sortedCurve && sortedCurve.length > 1
         ? frequencyAtCurveTime(sortedCurve, timeS)
         : glideBaseFrequency(instrument, frequency, targetFrequency, timeS, durationS);
@@ -1005,7 +1009,7 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
       const ratio = Math.max(0.125, Math.min(32, operator.ratio));
       const tuning = Math.pow(2, operator.coarse / 12 + operator.fineCents / 1200);
       const phase = state.aurumPhases[stateIndex] + modulation * 1.9;
-      const envelope = aurumOperatorEnvelope(operator.envelope, timeMs);
+      const envelope = aurumOperatorEnvelope(operator.envelope, timeMs, state.aurumNoteOffMs);
       nextOutputs[stateIndex] = oscillatorSample(operator.waveform, phase, 0.5) * clamp01(operator.level) * envelope;
       state.aurumPhases[stateIndex] = (state.aurumPhases[stateIndex] + (frequency * voiceRate * ratio * tuning) / sampleRate) % 1;
     }
@@ -1063,13 +1067,29 @@ function renderAurumStereoSample(
   return { left: clamp(left * gain, -1, 1), right: clamp(right * gain, -1, 1) };
 }
 
-function aurumOperatorEnvelope(envelope: Instrument["envelope"], timeMs: number): number {
+function aurumHeldEnvelope(envelope: Instrument["envelope"], timeMs: number): number {
   const attack = Math.max(0, envelope.attackMs);
   if (attack > 0 && timeMs < attack) return timeMs / attack;
   const decayTime = timeMs - attack;
   const decay = Math.max(0, envelope.decayMs);
   if (decay > 0 && decayTime < decay) return 1 + (clamp01(envelope.sustain) - 1) * (decayTime / decay);
   return clamp01(envelope.sustain);
+}
+
+function aurumOperatorEnvelope(envelope: Instrument["envelope"], timeMs: number, noteOffMs: number): number {
+  if (timeMs < noteOffMs) return aurumHeldEnvelope(envelope, timeMs);
+  const releaseMs = Math.max(0, envelope.releaseMs);
+  if (releaseMs <= 0) return 0;
+  const releaseStart = aurumHeldEnvelope(envelope, noteOffMs);
+  return releaseStart * Math.max(0, 1 - (timeMs - noteOffMs) / releaseMs);
+}
+
+function aurumPreviewNoteOffMs(instrument: Instrument, durationS: number): number {
+  const durationMs = Math.max(0, durationS * 1000);
+  const longestReleaseMs = Math.max(0, ...instrument.aurum!.operators
+    .filter((operator) => operator.enabled)
+    .map((operator) => Math.max(0, operator.envelope.releaseMs)));
+  return Math.max(durationMs * 0.5, durationMs - longestReleaseMs);
 }
 
 function renderInstrumentStereoSample(

@@ -16,6 +16,18 @@ namespace beat
 {
     namespace
     {
+        float aurumHeldEnvelope(const InstrumentVoice::Params::AurumOperator& op, float timeMs) noexcept
+        {
+            const float attack = juce::jmax(0.0f, op.attackMs);
+            if (attack > 0.0f && timeMs < attack)
+                return timeMs / attack;
+            const float decay = juce::jmax(0.0f, op.decayMs);
+            const float decayTime = timeMs - attack;
+            if (decay > 0.0f && decayTime < decay)
+                return 1.0f + (VoiceMath::clamp01(op.sustain) - 1.0f) * (decayTime / decay);
+            return VoiceMath::clamp01(op.sustain);
+        }
+
         float runtimeWarpShape(float input, float amount, int mode) noexcept
         {
             const float drive = VoiceMath::clamp01(amount);
@@ -331,6 +343,8 @@ namespace beat
         aetherOscBPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscB.phase)
             + VoiceMath::deterministicPhaseJitter(noiseState ^ 0x6c8e9cf5u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscB.randomPhase);
         aurumAgeSamples = 0;
+        aurumReleaseAgeSamples = -1;
+        aurumReleaseLevels.fill(0.0f);
         aurumOutputs.fill(0.0f);
         for (size_t index = 0; index < aurumPhases.size(); ++index)
             aurumPhases[index] = std::fmod(
@@ -384,6 +398,13 @@ namespace beat
     {
         if (allowTailOff)
         {
+            if (params.hasAurum && aurumReleaseAgeSamples < 0)
+            {
+                const float timeMs = (float) ((double) aurumAgeSamples * 1000.0 / sampleRate);
+                for (size_t index = 0; index < aurumReleaseLevels.size(); ++index)
+                    aurumReleaseLevels[index] = aurumHeldEnvelope(params.aurumOperators[index], timeMs);
+                aurumReleaseAgeSamples = 0;
+            }
             if (params.env1Loop)
             {
                 const float value = env1LoopValue();
@@ -411,6 +432,8 @@ namespace beat
             env2Adsr.reset();
             env1LoopState.reset();
             env2LoopState.reset();
+            aurumReleaseAgeSamples = -1;
+            aurumReleaseLevels.fill(0.0f);
             clearCurrentNote();
         }
     }
@@ -419,7 +442,18 @@ namespace beat
                                           int startSample, int numSamples)
     {
         juce::ScopedNoDenormals noDenormals;
-        if (!adsr.isActive()) return;
+        if (params.hasAurum)
+        {
+            if (aurumReleaseAgeSamples >= 0 && !aurumReleaseTailActive())
+            {
+                clearCurrentNote();
+                return;
+            }
+        }
+        else if (!adsr.isActive())
+        {
+            return;
+        }
 
         const auto modulationPlan = DynamicModulation::makeRenderPlan(
             cachedDynamicTargets,
@@ -519,14 +553,15 @@ namespace beat
                         for (size_t source = 0; source < 6; ++source)
                             fm += aurumOutputs[voiceOffset + source] * juce::jlimit(-1.0f, 1.0f, params.aurumMatrix[source][target]);
 
-                        const float attack = juce::jmax(0.0f, op.attackMs);
-                        const float decay = juce::jmax(0.0f, op.decayMs);
-                        const float sustain = VoiceMath::clamp01(op.sustain);
-                        const float opEnvelope = attack > 0.0f && timeMs < attack
-                            ? timeMs / attack
-                            : decay > 0.0f && timeMs - attack < decay
-                                ? 1.0f + (sustain - 1.0f) * ((timeMs - attack) / decay)
-                                : sustain;
+                        float opEnvelope = aurumHeldEnvelope(op, timeMs);
+                        if (aurumReleaseAgeSamples >= 0)
+                        {
+                            const float releaseMs = juce::jmax(0.0f, op.releaseMs);
+                            const float releaseTimeMs = (float) ((double) aurumReleaseAgeSamples * 1000.0 / sampleRate);
+                            opEnvelope = releaseMs > 0.0f
+                                ? aurumReleaseLevels[target] * juce::jmax(0.0f, 1.0f - releaseTimeMs / releaseMs)
+                                : 0.0f;
+                        }
                         const double ratio = juce::jlimit(0.125, 32.0, (double) op.ratio);
                         const double tuning = std::exp2((double) op.coarse / 12.0 + (double) op.fineCents / 1200.0);
                         const double delta = currentFrequency * voiceRate * ratio * tuning / sampleRate;
@@ -553,6 +588,8 @@ namespace beat
                 }
                 aurumOutputs = nextOutputs;
                 ++aurumAgeSamples;
+                if (aurumReleaseAgeSamples >= 0)
+                    ++aurumReleaseAgeSamples;
                 const float normalization = 1.0f / std::sqrt((float) voiceCount);
                 raw = { left * normalization, right * normalization };
             }
@@ -661,7 +698,7 @@ namespace beat
                 ? juce::jlimit(-1.0f, 1.0f, params.ampPan + DynamicModulation::targetOffset(params.dynamicModulation.ampPan, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, params.macroValues, 1.0f))
                 : params.ampPan;
             const auto panGains = hasAmpPanMod ? VoiceMath::equalPowerPanGains(ampPan) : cachedPanGains.amp;
-            const float voiceGain = env * level * 0.4f * ampLevel;
+            const float voiceGain = (params.hasAurum ? 1.0f : env) * level * 0.4f * ampLevel;
             const auto [leftGain, rightGain] = panGains;
 
             for (int ch = 0; ch < out.getNumChannels(); ++ch)
@@ -692,10 +729,29 @@ namespace beat
             noteAutomationState.advanceSample();
         }
 
-        if (!adsr.isActive())
+        if (params.hasAurum)
+        {
+            if (aurumReleaseAgeSamples >= 0 && !aurumReleaseTailActive())
+                clearCurrentNote();
+        }
+        else if (!adsr.isActive())
+        {
             clearCurrentNote();
+        }
 
         VoiceRenderStats::recordBlock(currentBlockWork.snapshot());
+    }
+
+    bool InstrumentVoice::aurumReleaseTailActive() const noexcept
+    {
+        if (!params.hasAurum || aurumReleaseAgeSamples < 0 || sampleRate <= 0.0)
+            return false;
+        float longestReleaseMs = 0.0f;
+        for (const auto& op : params.aurumOperators)
+            if (op.enabled)
+                longestReleaseMs = juce::jmax(longestReleaseMs, juce::jmax(0.0f, op.releaseMs));
+        const auto releaseSamples = (int64_t) std::ceil((double) longestReleaseMs * sampleRate / 1000.0);
+        return aurumReleaseAgeSamples < releaseSamples;
     }
 
     float InstrumentVoice::shapedEnvelope(float rawEnvelope) noexcept

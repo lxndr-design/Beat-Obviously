@@ -37,6 +37,28 @@ try {
   const peak = baseline.reduce((value, sample) => Math.max(value, Math.abs(sample)), 0);
   assert.ok(peak > 0.01 && peak <= 1, `Aurum preview must be audible and bounded, got peak ${peak}`);
 
+  const releasePatch = structuredClone(instrument);
+  releasePatch.aurum.matrix = Array.from({ length: 6 }, () => Array(7).fill(0));
+  releasePatch.aurum.operators.forEach((operator) => { operator.enabled = false; });
+  releasePatch.aurum.operators[0].enabled = true;
+  releasePatch.aurum.operators[0].level = 0.8;
+  releasePatch.aurum.operators[0].envelope = { attackMs: 0, decayMs: 0, sustain: 1, releaseMs: 20 };
+  releasePatch.aurum.operators[1].enabled = true;
+  releasePatch.aurum.operators[1].level = 0;
+  releasePatch.aurum.operators[1].envelope = { attackMs: 0, decayMs: 0, sustain: 1, releaseMs: 200 };
+  releasePatch.aurum.matrix[0][6] = 1;
+  const shortRelease = new Float32Array(24000);
+  preview.renderInstrumentSamples(releasePatch, shortRelease, 48000, 220, "visual", true);
+  releasePatch.aurum.operators[0].envelope.releaseMs = 200;
+  const longRelease = new Float32Array(24000);
+  preview.renderInstrumentSamples(releasePatch, longRelease, 48000, 220, "visual", true);
+  const tailStart = 18000;
+  const tailEnd = 21000;
+  const shortTailEnergy = shortRelease.slice(tailStart, tailEnd).reduce((sum, sample) => sum + sample * sample, 0);
+  const longTailEnergy = longRelease.slice(tailStart, tailEnd).reduce((sum, sample) => sum + sample * sample, 0);
+  assert.ok(shortTailEnergy < 0.0001, `Short operator release must finish before the late tail, got energy ${shortTailEnergy}`);
+  assert.ok(longTailEnergy > 0.01, `Long operator release must remain audible in the late tail, got energy ${longTailEnergy}`);
+
   const carrierOnly = structuredClone(instrument);
   carrierOnly.aurum.matrix[1][0] = 0;
   const dry = new Float32Array(4096);

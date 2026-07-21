@@ -17,7 +17,7 @@ Lumus/Aether owns wavetable and hybrid synthesis concerns such as sample, granul
 - `[~]` Six operators and a 6 x 7 operator/output matrix render in browser and native paths.
 - `[x]` Bipolar FM and output sends support phase-inverted routing across UI, normalization, IPC, persistence, browser audio, and native audio.
 - `[ ]` Separate FM and ring/amplitude-modulation matrices.
-- `[ ]` Operator release values control note-off instead of relying only on the shared amplitude release.
+- `[x]` Operator release values control note-off independently in browser and native rendering; native voice lifetime follows the longest enabled operator tail.
 - `[ ]` Feedback behavior has explicit stability limits and sample-rate/block-size stress.
 - `[ ]` Aurum has native live/export parity fixtures at 44.1, 48, and 96 kHz.
 
@@ -76,8 +76,6 @@ Exit gate: the release report distinguishes verified audio behavior, performance
 
 ## Immediate order
 
-1. Finish bipolar matrix routing.
-2. Make operator release truthful.
-3. Add RM as a separate matrix mode.
-4. Add the additive harmonic editor.
-5. Add native Aurum live/export and cross-rate gates before expanding filters or content.
+1. Add RM as a separate matrix mode.
+2. Add the additive harmonic editor.
+3. Add native Aurum live/export and cross-rate gates before expanding filters or content.

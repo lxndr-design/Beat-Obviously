@@ -7260,9 +7260,11 @@ namespace
         instrument.hasAether = false;
         instrument.aurum.operators[0].enabled = true;
         instrument.aurum.operators[0].level = 0.8f;
+        instrument.aurum.operators[0].releaseMs = 1234.0f;
         instrument.aurum.operators[1].enabled = true;
         instrument.aurum.operators[1].ratio = 2.0f;
         instrument.aurum.operators[1].level = 0.55f;
+        instrument.aurum.operators[1].releaseMs = 87.0f;
         instrument.aurum.matrix[1][0] = -0.42f;
         instrument.aurum.matrix[0][6] = -0.86f;
         instrument.aurum.unison = 3;
@@ -7280,6 +7282,8 @@ namespace
             && !loaded->instruments.front().hasAether
             && near(loaded->instruments.front().aurum.matrix[1][0], -0.42f)
             && near(loaded->instruments.front().aurum.matrix[0][6], -0.86f)
+            && near(loaded->instruments.front().aurum.operators[0].releaseMs, 1234.0f)
+            && near(loaded->instruments.front().aurum.operators[1].releaseMs, 87.0f)
             && loaded->instruments.front().aurum.unison == 3
             && near(loaded->instruments.front().aurum.detuneCents, 11.0f)
             && near(loaded->instruments.front().aurum.stereoSpread, 0.57f);
@@ -12278,7 +12282,7 @@ namespace
         params.drive01 = 0.0f;
         params.attackMs = 0.0f;
         params.decayMs = 1.0f;
-        params.sustain = 1.0f;
+        params.sustain = 0.0f;
         params.releaseMs = 1.0f;
         params.aurumOperators[0] = { true, 0, 1.0f, 0, 0.0f, 0.8f, 0.13f, 0.0f, 0.0f, 1.0f, 100.0f };
         params.aurumOperators[1] = { true, 0, 2.0f, 0, 0.0f, 0.55f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
@@ -12329,6 +12333,61 @@ namespace
             std::cerr << "Aurum bipolar voice stress failed energy=" << energy
                       << " fmDifference=" << fmDifference
                       << " inversionResidual=" << inversionResidual << "\n";
+        return ok;
+    }
+
+    bool stressInstrumentVoiceAurumOperatorRelease()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.drive01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 0.0f;
+        params.releaseMs = 1.0f;
+        params.aurumOperators[0] = { true, 0, 1.0f, 0, 0.0f, 0.8f, 0.0f, 0.0f, 0.0f, 1.0f, 20.0f };
+        params.aurumOperators[1] = { true, 0, 2.0f, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 200.0f };
+        params.aurumMatrix[0][6] = 1.0f;
+
+        auto renderTail = [](const beat::InstrumentVoice::Params& renderParams)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 12000);
+            voice.setParams(renderParams);
+            voice.startNote(57, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> held(2, 4800);
+            held.clear();
+            voice.renderNextBlock(held, 0, held.getNumSamples());
+            voice.stopNote(0.0f, true);
+            juce::AudioBuffer<float> tail(2, 12000);
+            tail.clear();
+            voice.renderNextBlock(tail, 0, tail.getNumSamples());
+            return tail;
+        };
+
+        const auto shortRelease = renderTail(params);
+        params.aurumOperators[0].releaseMs = 200.0f;
+        const auto longRelease = renderTail(params);
+        double shortTailEnergy = 0.0;
+        double longTailEnergy = 0.0;
+        for (int channel = 0; channel < shortRelease.getNumChannels(); ++channel)
+            for (int sampleIndex = 4800; sampleIndex < 7200; ++sampleIndex)
+            {
+                const auto shortSample = (double) shortRelease.getSample(channel, sampleIndex);
+                const auto longSample = (double) longRelease.getSample(channel, sampleIndex);
+                if (!std::isfinite(shortSample) || !std::isfinite(longSample))
+                    return false;
+                shortTailEnergy += shortSample * shortSample;
+                longTailEnergy += longSample * longSample;
+            }
+
+        const bool ok = shortTailEnergy < 0.0001 && longTailEnergy > 0.01;
+        if (!ok)
+            std::cerr << "Aurum operator release stress failed shortTailEnergy=" << shortTailEnergy
+                      << " longTailEnergy=" << longTailEnergy << "\n";
         return ok;
     }
 
@@ -13652,6 +13711,20 @@ namespace
 
 int main(int argc, char** argv)
 {
+    if (argc == 2 && juce::String(argv[1]) == "--aurum")
+    {
+        const bool ok = stressInstrumentVoiceAurumBipolarMatrix()
+            && stressInstrumentVoiceAurumOperatorRelease()
+            && stressProjectRepositoryAurumInstrumentRoundtrip();
+        if (!ok)
+        {
+            std::cerr << "Aurum focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Aurum focused stress passed\n";
+        return 0;
+    }
+
     if (argc == 2 && juce::String(argv[1]) == "--audio-bus")
     {
         const bool ok = stressProjectIntegrityVerifier()
@@ -13794,6 +13867,11 @@ int main(int argc, char** argv)
     if (!stressInstrumentVoiceAurumBipolarMatrix())
     {
         std::cerr << "Instrument voice Aurum bipolar matrix stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumOperatorRelease())
+    {
+        std::cerr << "Instrument voice Aurum operator release stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceBandlimitedBasicOscillators())

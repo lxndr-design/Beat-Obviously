@@ -287,6 +287,7 @@ namespace beat
         float shapedEnvelope(float rawEnvelope) noexcept;
         float env1LoopValue() noexcept;
         float env2LoopValue() noexcept;
+        bool aurumReleaseTailActive() const noexcept;
 
         Params  baseParams;
         Params  params;
@@ -300,7 +301,9 @@ namespace beat
         double  aetherOscBPhaseOffset { 0.0 };
         std::array<double, 48> aurumPhases {};
         std::array<float, 48> aurumOutputs {};
+        std::array<float, 6> aurumReleaseLevels {};
         int64_t aurumAgeSamples { 0 };
+        int64_t aurumReleaseAgeSamples { -1 };
         float   level { 0.0f };
         float   noteKeytrack { 0.0f };
         float   modWheel { 0.0f };
