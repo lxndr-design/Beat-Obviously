@@ -1335,13 +1335,13 @@ try {
       && devHooksSource.includes('fixture === "aether-performance"'),
     "browser fixture coverage should exercise Aether Performance control editing",
   );
-  assert.ok(
-    synthEditorSource.includes("Sample Slot 1")
-      && synthEditorSource.includes('id="aether.sample.1.start"')
-      && synthEditorSource.includes('id="aether.sample.1.end"')
-      && synthEditorSource.includes('checked={draft().parameters["aether.sample.1.loop.enabled"] === true}')
-      && synthEditorSource.includes('id="aether.sample.1.loop.start"')
-      && synthEditorSource.includes('id="aether.sample.1.loop.end"')
+	  assert.ok(
+	    synthEditorSource.includes("Sample Slot 1")
+	      && synthEditorSource.includes('sampleParameterId("start")')
+	      && synthEditorSource.includes('sampleParameterId("end")')
+	      && synthEditorSource.includes('draft().parameters[sampleParameterId("loop.enabled")] === true')
+	      && synthEditorSource.includes('sampleParameterId("loop.start")')
+	      && synthEditorSource.includes('sampleParameterId("loop.end")')
       && synthEditorSource.includes('aria-label="Aether Sample Slot 1 mapped zones"')
       && synthEditorSource.includes("Create Key Map")
       && synthEditorSource.includes('label="Key Low"')
@@ -1354,8 +1354,8 @@ try {
       && synthEditorSource.includes('checked={props.zone.loopEnabled}')
       && synthEditorSource.includes('const loopStartRatio = Math.max(startRatio, props.zone.loopStartRatio)')
       && synthEditorSource.includes('const loopEndRatio = Math.min(endRatio, props.zone.loopEndRatio)')
-      && synthEditorSource.includes('id="aether.sample.1.fxSend1"')
-      && synthEditorSource.includes('id="aether.sample.1.fxSend2"')
+      && synthEditorSource.includes('sampleParameterId("fxSend1")')
+      && synthEditorSource.includes('sampleParameterId("fxSend2")')
       && synthEditorSource.includes("overlaps crossfade")
       && synthEditorSource.includes("zones.slice(0, 8)"),
     "Aether Sample Slot 1 should expose bounded mapped-zone selection and per-zone playback controls",
@@ -1363,11 +1363,11 @@ try {
   assert.ok(
     synthEditorSource.includes('aria-labelledby="aether-sample-slot-1-title"')
       && synthEditorSource.includes('id="aether-sample-slot-1-source-status"')
-      && synthEditorSource.includes('aria-label="Enable Aether sample slot 1"')
+      && synthEditorSource.includes('aria-label={`Enable ${sampleSlotLabel()}`}')
       && synthEditorSource.includes('aria-describedby="aether-sample-slot-1-source-status"')
       && synthEditorSource.includes('aria-labelledby="aether-granular-slot-2-title"')
       && synthEditorSource.includes('id="aether-granular-slot-2-source-status"')
-      && synthEditorSource.includes('aria-label="Enable Aether granular slot 2"')
+      && synthEditorSource.includes('isLumus() ? `Enable Source ${activeLumusSampleSlot().toUpperCase()} granular` : "Enable Aether granular slot 2"')
       && synthEditorSource.includes('aria-describedby="aether-granular-slot-2-source-status"')
       && synthEditorSource.includes('aria-busy={importingSfz()}')
       && synthEditorSource.includes('aria-busy={importingGranular()}')

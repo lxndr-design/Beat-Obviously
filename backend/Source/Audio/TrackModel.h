@@ -320,12 +320,22 @@ namespace beat
         // Lumus-owned source rack extension. Aether remains a fixed A/B engine.
         struct LumusConfig
         {
+            struct Arpeggiator
+            {
+                bool enabled { false };
+                int mode { 0 }; // 0 up, 1 down, 2 up-down, 3 deterministic random
+                int rateDivision { 16 };
+                float gate { 0.75f };
+                int octaves { 1 };
+            };
+
             int sourceRackSchemaVersion { 1 };
             AetherOscillator oscC;
             std::array<AetherSampleSlot, 3> sampleSlots;
             std::array<bool, 3> sampleModes {};
             std::array<AetherGranularSlot, 3> granularSlots;
             std::array<bool, 3> granularModes {};
+            Arpeggiator arpeggiator;
         };
 
         struct DynamicModTarget

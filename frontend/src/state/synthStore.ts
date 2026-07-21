@@ -24,8 +24,8 @@ import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 5;
-export const LUMUS_PATCH_SCHEMA_VERSION = 6;
-const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2, 3, 4, 5] as const;
+export const LUMUS_PATCH_SCHEMA_VERSION = 7;
+const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6] as const;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
 export const SYNTH_INSTRUMENT_TYPE = "wavetable-synth";
 export const LUMUS_PARAMETER_NAMESPACE = "lumus";
@@ -187,6 +187,11 @@ export type SynthParameterId =
   | "aether.mpe.masterChannel"
   | "aether.mpe.firstMemberChannel"
   | "aether.mpe.lastMemberChannel"
+  | "lumus.arp.enabled"
+  | "lumus.arp.mode"
+  | "lumus.arp.rate"
+  | "lumus.arp.gate"
+  | "lumus.arp.octaves"
   | "amp.level"
   | "amp.pan"
   | "maxVoices"
@@ -550,9 +555,10 @@ function normalizeLumusSourceRack(value: unknown, patchVersion: unknown, legacyS
     throw new SynthPatchIdentityError("lumus.source-rack.capacity", "Lumus requires exactly three source slots.");
   for (let index = 0; index < canonical.slots.length; index += 1) {
     const slot = value.slots[index];
-    const supportsSample = patchVersion === 3 || patchVersion === 4 || patchVersion === 5 || patchVersion === 6;
-    const supportsGranular = patchVersion === 5 || patchVersion === 6;
-    const supportsMultisample = patchVersion === 6;
+    const numericPatchVersion = typeof patchVersion === "number" ? patchVersion : 0;
+    const supportsSample = numericPatchVersion >= 3;
+    const supportsGranular = numericPatchVersion >= 5;
+    const supportsMultisample = numericPatchVersion >= 6;
     if (!isRecord(slot)
         || slot.id !== canonical.slots[index].id
         || (slot.mode !== "wavetable"
@@ -1433,6 +1439,11 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "aether.mpe.masterChannel": 1,
   "aether.mpe.firstMemberChannel": 2,
   "aether.mpe.lastMemberChannel": 16,
+  "lumus.arp.enabled": false,
+  "lumus.arp.mode": "up",
+  "lumus.arp.rate": "1/16",
+  "lumus.arp.gate": 0.75,
+  "lumus.arp.octaves": 1,
   "amp.level": 0.8,
   "amp.pan": 0,
   maxVoices: 16,
@@ -1608,6 +1619,11 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "aether.mpe.masterChannel": "MPE Master Channel",
   "aether.mpe.firstMemberChannel": "MPE First Member Channel",
   "aether.mpe.lastMemberChannel": "MPE Last Member Channel",
+  "lumus.arp.enabled": "Lumus Arpeggiator Enabled",
+  "lumus.arp.mode": "Lumus Arpeggiator Mode",
+  "lumus.arp.rate": "Lumus Arpeggiator Rate",
+  "lumus.arp.gate": "Lumus Arpeggiator Gate",
+  "lumus.arp.octaves": "Lumus Arpeggiator Octaves",
   "amp.level": "Amp Level",
   "amp.pan": "Amp Pan",
   maxVoices: "Max Voices",
@@ -1791,6 +1807,11 @@ export function createDefaultLumusDraft(): SynthDraftPatch {
   for (const slot of ["a", "b", "c"] as const)
     for (const [suffix, value] of Object.entries(DEFAULT_LUMUS_GRANULAR_PARAMETERS))
       parameters[lumusGranularParameterId(slot, suffix)] = value;
+  parameters["lumus.arp.enabled"] = false;
+  parameters["lumus.arp.mode"] = "up";
+  parameters["lumus.arp.rate"] = "1/16";
+  parameters["lumus.arp.gate"] = 0.75;
+  parameters["lumus.arp.octaves"] = 1;
   return {
     ...draft,
     schemaVersion: LUMUS_PATCH_SCHEMA_VERSION,
@@ -1962,7 +1983,7 @@ function validateSynthPatchIdentity(input: Partial<SynthDraftPatch> | SynthPatch
   if (type === LUMUS_INSTRUMENT_TYPE) {
     if (namespace !== LUMUS_PARAMETER_NAMESPACE)
       throw new SynthPatchIdentityError("lumus.identity.namespace-mismatch", "Lumus patches must use the lumus namespace.");
-    if (!LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3 | 4 | 5)
+    if (!LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3 | 4 | 5 | 6)
         && input.schemaVersion !== LUMUS_PATCH_SCHEMA_VERSION)
       throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema 1 through ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
     return true;
@@ -3056,6 +3077,8 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (id.endsWith(".unison.voices")) return clampAetherUnisonVoices(value);
   if (id === "maxVoices") return Math.max(1, Math.min(32, Math.round(value)));
   if (id === "glide.ms") return Math.max(0, Math.min(5000, Math.round(value)));
+  if (id === "lumus.arp.gate") return Math.max(0.05, Math.min(1, value));
+  if (id === "lumus.arp.octaves") return Math.max(1, Math.min(4, Math.round(value)));
   if (id.startsWith("aether.mpe.") && id.endsWith("Channel")) return clampMidiChannel(value);
   if (id === "aether.sample.1.rootNote") return Math.max(0, Math.min(127, Math.round(value)));
   if (id === "aether.granular.2.rootNote") return Math.max(0, Math.min(127, Math.round(value)));

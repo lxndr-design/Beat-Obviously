@@ -438,6 +438,7 @@ namespace beat
                     && (int) schemaVersion != params::lumusSampleModePatchSchemaVersion
                     && (int) schemaVersion != params::lumusSampleOwnershipPatchSchemaVersion
                     && (int) schemaVersion != params::lumusGranularPatchSchemaVersion
+                    && (int) schemaVersion != params::lumusMultisamplePatchSchemaVersion
                     && (int) schemaVersion != params::lumusPatchSchemaVersion)
                 || patchNamespace.toString() != "lumus")
                 return false;
@@ -474,7 +475,7 @@ namespace beat
                     || objectProperty(slot, "id", {}).toString() != requiredIds[(size_t) index]
                     || (mode != "wavetable" && mode != "sample"
                         && (patchSchemaVersion < params::lumusGranularPatchSchemaVersion || mode != "granular")
-                        && (patchSchemaVersion < params::lumusPatchSchemaVersion || mode != "multisample")))
+                        && (patchSchemaVersion < params::lumusMultisamplePatchSchemaVersion || mode != "multisample")))
                     return false;
                 lumusSampleModes[(size_t) index] = mode == "sample" || mode == "multisample";
                 lumusGranularModes[(size_t) index] = mode == "granular";
@@ -486,6 +487,18 @@ namespace beat
         instrument.synthEngine = isLumus
             ? InstrumentDefinition::SynthEngine::Lumus
             : InstrumentDefinition::SynthEngine::Aether;
+        if (isLumus && (int) objectProperty(patch, "schemaVersion", 0) >= params::lumusArpeggiatorPatchSchemaVersion)
+        {
+            const auto arpMode = synthStringParam(params, "lumus.arp.mode", "up");
+            const auto arpRate = synthStringParam(params, "lumus.arp.rate", "1/16");
+            instrument.lumus.arpeggiator.enabled = synthNumberParam(params, "lumus.arp.enabled", 0.0) >= 0.5;
+            instrument.lumus.arpeggiator.mode = arpMode == "down" ? 1 : arpMode == "upDown" ? 2 : arpMode == "random" ? 3 : 0;
+            instrument.lumus.arpeggiator.rateDivision = arpRate == "1/4" ? 4 : arpRate == "1/8" ? 8 : arpRate == "1/32" ? 32 : 16;
+            instrument.lumus.arpeggiator.gate = juce::jlimit(0.05f, 1.0f,
+                (float) synthNumberParam(params, "lumus.arp.gate", 0.75));
+            instrument.lumus.arpeggiator.octaves = juce::jlimit(1, 4,
+                (int) std::round(synthNumberParam(params, "lumus.arp.octaves", 1.0)));
+        }
         instrument.waveform = 5;
         instrument.maxVoices = juce::jlimit(1, 32, (int) std::round(synthNumberParam(params, "maxVoices", instrument.maxVoices)));
         instrument.mono = synthNumberParam(params, "mono.enabled", instrument.mono ? 1.0 : 0.0) >= 0.5;

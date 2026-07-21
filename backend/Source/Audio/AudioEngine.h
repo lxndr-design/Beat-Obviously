@@ -15,6 +15,7 @@
 #include "BeatSynthesiser.h"
 #include "AudioQuality.h"
 #include "Realtime/VoiceNoteAutomation.h"
+#include "Midi/LumusArpeggiator.h"
 #include <array>
 #include <atomic>
 #include <functional>
@@ -472,6 +473,9 @@ namespace beat
             std::array<std::unique_ptr<juce::Synthesiser>, maxRetiringSynths> retiringSynths;
             juce::MidiBuffer midi;
             juce::MidiBuffer retiringMidi;
+            LumusArpeggiator lumusArpeggiator;
+            LumusArpeggiator::Config lumusArpeggiatorConfig;
+            int lumusArpeggiatorRateDivision { 16 };
             float gainDb { 0.0f };
             float pan { 0.0f };
             std::vector<TrackEffect> effects;

@@ -590,6 +590,10 @@ export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "
 
         <LfoPanel focusedSourceTarget={focusedSourceTarget()} />
 
+        <Show when={draft().instrumentType === "lumus-hybrid-synth"}>
+          <LumusArpeggiatorPanel />
+        </Show>
+
         <InstrumentFxRack />
 
         <AmpFilterPanel focusedSourceTarget={focusedSourceTarget()} />
@@ -620,6 +624,79 @@ export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "
         </div>
       </footer>
     </div>
+  );
+}
+
+function LumusArpeggiatorPanel() {
+  const draft = createStoreSelector(useSynthStore, (state) => state.draft);
+  const setNumericParameter = useSynthStore.getState().setNumericParameter;
+  const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
+  const setParameter = useSynthStore.getState().setParameter;
+  const enabled = createMemo(() => draft().parameters["lumus.arp.enabled"] === true);
+
+  return (
+    <section class={`${styles.majorSection} ${enabled() ? "" : styles.disabledPanel}`} aria-label="Lumus arpeggiator">
+      <div class={styles.ampFilterRibbon}>
+        <Button
+          iconOnly
+          size="xs"
+          selected={enabled()}
+          className={styles.ampFilterPowerButton}
+          aria-label={`${enabled() ? "Disable" : "Enable"} Lumus arpeggiator`}
+          onClick={() => setBooleanParameter("lumus.arp.enabled", !enabled())}
+        >
+          <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={18} decorative />
+        </Button>
+        <div class={styles.ampFilterRibbonTitle}>Arpeggiator</div>
+      </div>
+      <div class={styles.ampFilterBody}>
+        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`}>
+          <div class={styles.ampFilterGroupTitle}>Pattern</div>
+          <div class={styles.ampFilterShapeRow}>
+            <ShapeButtonSet
+              label="Arpeggiator mode"
+              value={String(draft().parameters["lumus.arp.mode"] ?? "up")}
+              options={[
+                ["up", "Up", "Ascending", "ph:trend-up"],
+                ["down", "Down", "Descending", "ph:trend-down"],
+                ["upDown", "Up/Down", "Ascending and descending", "ph:wave-sine"],
+                ["random", "Random", "Deterministic random", "ph:wave-square"],
+              ]}
+              onChange={(value) => setParameter("lumus.arp.mode", value)}
+            />
+          </div>
+        </div>
+        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`}>
+          <div class={styles.ampFilterGroupTitle}>Timing</div>
+          <div class={styles.ampFilterShapeRow}>
+            <ShapeButtonSet
+              label="Arpeggiator rate"
+              value={String(draft().parameters["lumus.arp.rate"] ?? "1/16")}
+              options={[
+                ["1/4", "1/4", "Quarter notes", "ph:music-note"],
+                ["1/8", "1/8", "Eighth notes", "ph:music-note"],
+                ["1/16", "1/16", "Sixteenth notes", "ph:music-notes"],
+                ["1/32", "1/32", "Thirty-second notes", "ph:music-notes"],
+              ]}
+              onChange={(value) => setParameter("lumus.arp.rate", value)}
+            />
+          </div>
+          <div class={styles.knobCluster}>
+            <SynthParameterKnob id="lumus.arp.gate" label="Gate" defaultValue={0.75} onChange={setNumericParameter} />
+            <NumberInput
+              label="Octaves"
+              layout="inline"
+              value={getNumberParam(draft(), "lumus.arp.octaves")}
+              min={1}
+              max={4}
+              step={1}
+              ariaLabel="Arpeggiator octave range"
+              onChange={(value) => setNumericParameter("lumus.arp.octaves", value)}
+            />
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

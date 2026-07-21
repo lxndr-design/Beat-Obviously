@@ -1822,6 +1822,7 @@ namespace beat
 
         route.midi.clear();
         route.retiringMidi.clear();
+        route.lumusArpeggiator.reset();
         route.noteAutomationContextCount = 0;
         route.gainDb = route.baseGainDb;
         route.pan = route.basePan;
@@ -2743,6 +2744,19 @@ namespace beat
 
             if (routeInstrument != nullptr)
             {
+                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumus)
+                {
+                    const auto& arp = routeInstrument->lumus.arpeggiator;
+                    route.lumusArpeggiatorConfig.enabled = arp.enabled;
+                    route.lumusArpeggiatorConfig.mode = arp.mode == 1 ? LumusArpeggiator::Mode::down
+                        : arp.mode == 2 ? LumusArpeggiator::Mode::upDown
+                        : arp.mode == 3 ? LumusArpeggiator::Mode::random
+                        : LumusArpeggiator::Mode::up;
+                    route.lumusArpeggiatorConfig.gate = arp.gate;
+                    route.lumusArpeggiatorConfig.octaves = arp.octaves;
+                    route.lumusArpeggiatorRateDivision = arp.rateDivision;
+                    route.lumusArpeggiator.prepare(routeBuf.getNumSamples() > 0 ? routeBuf.getNumSamples() : 512);
+                }
                 std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1;
                 std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1;
                 std::array<std::shared_ptr<const ImmutableMappedSampleSource>, 3> lumusSampleSlots;
@@ -5437,7 +5451,17 @@ namespace beat
                         });
                         const auto realtimeRouteId = makeRealtimeParameterChangeFromJuce(
                             &route.instrumentId, nullptr, 0.0f);
-                        renderSynthWithRealtimeParametersLocked(*route.synth, routeBuf, route.midi,
+                        juce::MidiBuffer* routeMidi = &route.midi;
+                        if (route.lumusArpeggiatorConfig.enabled)
+                        {
+                            const auto tempo = juce::jmax(1.0, seq.getTempo());
+                            const auto speed = juce::jmax(0.1, seq.getSpeed());
+                            route.lumusArpeggiatorConfig.stepSamples = sampleRate * 60.0 / tempo / speed
+                                * (4.0 / (double) route.lumusArpeggiatorRateDivision);
+                            route.lumusArpeggiator.setConfig(route.lumusArpeggiatorConfig);
+                            routeMidi = &route.lumusArpeggiator.process(route.midi, numSamples);
+                        }
+                        renderSynthWithRealtimeParametersLocked(*route.synth, routeBuf, *routeMidi,
                             realtimeRouteId.instrumentIdView(), numSamples);
                         voiceTicks += ticksBetween(voiceStartTicks, markTicks());
                         activeSynthVoiceCount += countActiveSynthVoices(*route.synth);

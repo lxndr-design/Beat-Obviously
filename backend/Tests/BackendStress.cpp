@@ -12,6 +12,7 @@
 #include "../Source/Audio/InstrumentVoice.h"
 #include "../Source/Audio/Modulation/DynamicModulation.h"
 #include "../Source/Audio/Modulation/Lfo.h"
+#include "../Source/Audio/Midi/LumusArpeggiator.h"
 #include "../Source/Audio/Nodemap/NodemapGraph.h"
 #include "../Source/Audio/Oscillator/AetherInteractionStage.h"
 #include "../Source/Audio/Oscillator/AetherTableStackRenderer.h"
@@ -5331,6 +5332,64 @@ namespace
 
         engine.requestStop();
         return output;
+    }
+
+    beat::Project makeLumusArpeggiatorOfflineProject(bool enabled)
+    {
+        auto project = makeTinyOfflineProject();
+        project.lengthBeats = 1.25;
+        auto& instrument = project.instruments.front();
+        instrument.hasAether = true;
+        instrument.synthEngine = beat::InstrumentDefinition::SynthEngine::Lumus;
+        instrument.maxVoices = 8;
+        instrument.aether.oscA.enabled = true;
+        instrument.aether.oscA.level = 0.7f;
+        instrument.aether.oscA.waveform = 0;
+        instrument.aether.oscA.routing = 2;
+        instrument.lumus.arpeggiator.enabled = enabled;
+        instrument.lumus.arpeggiator.mode = 0;
+        instrument.lumus.arpeggiator.rateDivision = 16;
+        instrument.lumus.arpeggiator.gate = 0.5f;
+        instrument.lumus.arpeggiator.octaves = 1;
+        auto& segment = project.tracks.front().segments.front();
+        segment.lengthBeats = 1.0;
+        segment.notes.front().lengthBeats = 1.0;
+        return project;
+    }
+
+    bool stressAudioEngineLumusArpeggiator()
+    {
+        constexpr int samples = 30000;
+        const auto disabledSmall = renderOfflineChunks(makeLumusArpeggiatorOfflineProject(false), samples, 64);
+        const auto disabled = renderOfflineChunks(makeLumusArpeggiatorOfflineProject(false), samples, 257);
+        const auto enabledSmall = renderOfflineChunks(makeLumusArpeggiatorOfflineProject(true), samples, 64);
+        const auto enabledLarge = renderOfflineChunks(makeLumusArpeggiatorOfflineProject(true), samples, 257);
+        double differenceEnergy = 0.0;
+        float blockDifference = 0.0f;
+        float inheritedBlockDifference = 0.0f;
+        for (int channel = 0; channel < enabledSmall.getNumChannels(); ++channel)
+            for (int sample = 0; sample < samples; ++sample)
+            {
+                const auto arpDelta = enabledLarge.getSample(channel, sample) - disabled.getSample(channel, sample);
+                differenceEnergy += (double) arpDelta * (double) arpDelta;
+                blockDifference = juce::jmax(blockDifference,
+                    std::abs(enabledLarge.getSample(channel, sample) - enabledSmall.getSample(channel, sample)));
+                inheritedBlockDifference = juce::jmax(inheritedBlockDifference,
+                    std::abs(disabled.getSample(channel, sample) - disabledSmall.getSample(channel, sample)));
+            }
+        const auto disabledEnergy = bufferEnergy(disabled);
+        const auto enabledEnergy = bufferEnergy(enabledLarge);
+        const bool ok = disabledEnergy > 0.0001
+            && enabledEnergy > 0.0001
+            && differenceEnergy > 0.01
+            && blockDifference <= 0.005f;
+        if (!ok)
+            std::cerr << "Lumus arp render disabledEnergy=" << disabledEnergy
+                      << " enabledEnergy=" << enabledEnergy
+                      << " differenceEnergy=" << differenceEnergy
+                      << " blockDifference=" << blockDifference
+                      << " inheritedBlockDifference=" << inheritedBlockDifference << "\n";
+        return ok;
     }
 
     juce::AudioBuffer<float> renderOfflineRangeChunks(
@@ -16324,6 +16383,87 @@ namespace
             && std::abs(changedRate.getPhase() - phase) <= 1.0e-12;
     }
 
+    bool stressLumusArpeggiator()
+    {
+        const auto events = [](const juce::MidiBuffer& buffer)
+        {
+            std::vector<std::tuple<int, bool, int>> result;
+            for (const auto metadata : buffer)
+            {
+                const auto message = metadata.getMessage();
+                if (message.isNoteOnOrOff())
+                    result.emplace_back(metadata.samplePosition, message.isNoteOn(), message.getNoteNumber());
+            }
+            return result;
+        };
+
+        beat::LumusArpeggiator arp;
+        arp.prepare(512);
+        juce::MidiBuffer passthrough;
+        passthrough.addEvent(juce::MidiMessage::noteOn(2, 61, 0.7f), 3);
+        passthrough.addEvent(juce::MidiMessage::controllerEvent(2, 1, 96), 7);
+        passthrough.addEvent(juce::MidiMessage::noteOff(2, 61), 11);
+        if (events(arp.process(passthrough, 32)) != events(passthrough)) return false;
+
+        beat::LumusArpeggiator::Config config;
+        config.enabled = true;
+        config.mode = beat::LumusArpeggiator::Mode::up;
+        config.stepSamples = 100.0;
+        config.gate = 0.75f;
+        config.octaves = 2;
+        arp.setConfig(config);
+        juce::MidiBuffer chord;
+        chord.addEvent(juce::MidiMessage::noteOn(2, 60, 0.8f), 0);
+        chord.addEvent(juce::MidiMessage::noteOn(3, 64, 0.7f), 0);
+        chord.addEvent(juce::MidiMessage::noteOn(4, 67, 0.6f), 0);
+        chord.addEvent(juce::MidiMessage::noteOff(2, 60), 399);
+        chord.addEvent(juce::MidiMessage::noteOff(3, 64), 399);
+        chord.addEvent(juce::MidiMessage::noteOff(4, 67), 399);
+        beat::test::beginRealtimeSafetyProbe();
+        const auto& renderedChord = arp.process(chord, 400);
+        const auto realtimeViolations = beat::test::endRealtimeSafetyProbe();
+        if (realtimeViolations != 0) return false;
+        const auto singleBlock = events(renderedChord);
+        const std::vector<std::tuple<int, bool, int>> expected {
+            { 0, true, 60 }, { 75, false, 60 },
+            { 100, true, 64 }, { 175, false, 64 },
+            { 200, true, 67 }, { 275, false, 67 },
+            { 300, true, 72 }, { 375, false, 72 },
+        };
+        if (singleBlock != expected) return false;
+        std::vector<int> renderedChannels;
+        for (const auto metadata : renderedChord)
+            if (metadata.getMessage().isNoteOn()) renderedChannels.push_back(metadata.getMessage().getChannel());
+        if (renderedChannels != std::vector<int> { 2, 3, 4, 2 }) return false;
+
+        arp.reset();
+        arp.setConfig(config);
+        std::vector<std::tuple<int, bool, int>> splitBlocks;
+        for (int block = 0; block < 4; ++block)
+        {
+            juce::MidiBuffer blockInput;
+            if (block == 0)
+            {
+                blockInput.addEvent(juce::MidiMessage::noteOn(2, 60, 0.8f), 0);
+                blockInput.addEvent(juce::MidiMessage::noteOn(3, 64, 0.7f), 0);
+                blockInput.addEvent(juce::MidiMessage::noteOn(4, 67, 0.6f), 0);
+            }
+            if (block == 3)
+                for (const int note : { 60, 64, 67 }) blockInput.addEvent(juce::MidiMessage::noteOff(note == 60 ? 2 : note == 64 ? 3 : 4, note), 99);
+            for (const auto& [offset, noteOn, note] : events(arp.process(blockInput, 100)))
+                splitBlocks.emplace_back(block * 100 + offset, noteOn, note);
+        }
+        if (splitBlocks != expected) return false;
+
+        arp.reset();
+        arp.setConfig(config);
+        juce::MidiBuffer panic;
+        panic.addEvent(juce::MidiMessage::noteOn(1, 60, 0.8f), 0);
+        panic.addEvent(juce::MidiMessage::allNotesOff(1), 20);
+        const auto panicEvents = events(arp.process(panic, 200));
+        return panicEvents == std::vector<std::tuple<int, bool, int>> {{ 0, true, 60 }, { 20, false, 60 }};
+    }
+
     bool stressSynthPatchContract()
     {
         beat::InstrumentDefinition untouched;
@@ -16537,6 +16677,46 @@ namespace
             || !lumusGranular.lumus.granularSlots[1].enabled
             || !lumusGranular.lumus.granularSlots[2].enabled)
             return false;
+        const auto lumusArpeggiatorPatch = juce::JSON::parse(R"json(
+        {
+          "schemaVersion": 7,
+          "instrumentType": "lumus-hybrid-synth",
+          "namespace": "lumus",
+          "parameters": {
+            "lumus.arp.enabled": true,
+            "lumus.arp.mode": "upDown",
+            "lumus.arp.rate": "1/8",
+            "lumus.arp.gate": 0.63,
+            "lumus.arp.octaves": 3
+          },
+          "metadata": {
+            "lumusSourceRack": { "schemaVersion": 2, "slots": [
+              { "id": "a", "mode": "wavetable" },
+              { "id": "b", "mode": "wavetable" },
+              { "id": "c", "mode": "wavetable" }
+            ] },
+            "lumusSampleSlots": {
+              "a": { "schemaVersion": 1, "zones": [] },
+              "b": { "schemaVersion": 1, "zones": [] },
+              "c": { "schemaVersion": 1, "zones": [] }
+            },
+            "lumusGranularSlots": {
+              "a": { "schemaVersion": 1 },
+              "b": { "schemaVersion": 1 },
+              "c": { "schemaVersion": 1 }
+            }
+          },
+          "modulation": []
+        }
+        )json");
+        beat::InstrumentDefinition lumusArpeggiator;
+        if (!beat::applySynthPatchContract(lumusArpeggiatorPatch, lumusArpeggiator)
+            || !lumusArpeggiator.lumus.arpeggiator.enabled
+            || lumusArpeggiator.lumus.arpeggiator.mode != 2
+            || lumusArpeggiator.lumus.arpeggiator.rateDivision != 8
+            || std::abs(lumusArpeggiator.lumus.arpeggiator.gate - 0.63f) > 0.0001f
+            || lumusArpeggiator.lumus.arpeggiator.octaves != 3)
+            return false;
         const auto malformedLumusRack = juce::JSON::parse(R"json(
         {
           "schemaVersion": 2,
@@ -16555,7 +16735,7 @@ namespace
         if (beat::applySynthPatchContract(malformedLumusRack, rejectedMalformedRack))
             return false;
         const auto futureLumusPatch = juce::JSON::parse(R"json(
-        { "schemaVersion": 7, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
+        { "schemaVersion": 8, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
         )json");
         beat::InstrumentDefinition rejectedFutureLumus;
         if (beat::applySynthPatchContract(futureLumusPatch, rejectedFutureLumus))
@@ -18906,6 +19086,16 @@ int main(int argc, char** argv)
     if (!stressSynthPatchContract())
     {
         std::cerr << "Synth patch contract stress failed\n";
+        return 1;
+    }
+    if (!stressLumusArpeggiator())
+    {
+        std::cerr << "Lumus arpeggiator stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineLumusArpeggiator())
+    {
+        std::cerr << "Audio engine Lumus arpeggiator stress failed\n";
         return 1;
     }
     std::cerr << "synth contract: done\n";

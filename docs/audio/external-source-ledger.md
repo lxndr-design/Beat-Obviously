@@ -200,6 +200,8 @@ Lumus uses Xfer Records' public Serum 2 product page and web manual only to defi
 
 Local destinations are `docs/audio/lumus-serum2-benchmark.md`, `docs/audio/lumus-serum2-capability-matrix.json`, and `docs/audio/lumus-architecture.md`. The Lumus identity/schema implementation is independently implemented Beat-owned code. Its v1 renderer adapter deliberately reuses Beat's existing Aether implementation as an internal starting point while preserving distinct `lumus-hybrid-synth` / `lumus` persistence identity. This entry does not claim a direct Serum 2 audio or CPU comparison because no locally installed reference renderer was available.
 
+The Lumus v7 arpeggiator is independently implemented Beat-owned work using the existing JUCE MIDI container and Beat Sequencer timing boundary. No third-party source, preset, MIDI pattern, asset, executable, service, or new dependency was imported or executed. Local implementation boundaries are `backend/Source/Audio/Midi/LumusArpeggiator.h`, the Lumus-only route preparation/insertion in `backend/Source/Audio/AudioEngine.{h,cpp}`, the versioned fields in `TrackModel.h` and `SynthPatchContract.cpp`, and shared-component controls in `SynthEditor.solid.tsx`. It does not alter repository licensing or ownership and is not Vital-derived.
+
 ## Milestone B29 benchmark factory-preset provenance
 
 Two user-supplied local preset documents were structurally adapted into Beat's existing factory-guide representation:
