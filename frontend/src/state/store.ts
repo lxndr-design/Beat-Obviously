@@ -6,6 +6,7 @@ import { defaultTrackEffectParams } from "./effects";
 import { pruneDevFixtureInstruments } from "./instrumentLibraryGuards";
 import { normalizeInstrumentTaxonomy } from "./instrumentTaxonomy";
 import { normalizeSampleMap } from "./sampleZones";
+import { FACTORY_SYNTH_PRESETS, synthDraftToInstrumentPatch } from "./synthStore";
 import { audioBusExists, canSetAudioBusOutput, canSetAudioBusSend } from "./audioBusRouting";
 import { AUDIO_BUS_SCHEMA_VERSION } from "./types";
 import type { BeatProjectAsset, BeatProjectIntegrityReport, ProjectSidecarCleanupReport, RecentProjectEntry } from "../ipc/schema";
@@ -2015,6 +2016,7 @@ interface InstrumentLibrarySlice {
 
 export const FACTORY_DRUM_SET_ID = "factory-drums";
 export const FACTORY_SYNTH_SET_ID = "factory-synths";
+export const LUMUS_TEST_INSTRUMENT_SET_ID = "lumus-test";
 export const ROCK_DRUM_SET_ID = "rock-drums";
 export const ORCHESTRA_SET_ID = "orchestra-pit";
 export const TEMPORARY_DS_INSTRUMENT_SET_ID = "temporary-ds-instruments";
@@ -2026,6 +2028,7 @@ function defaultInstrumentSets(): InstrumentSet[] {
     { id: FACTORY_DRUM_SET_ID, name: "Classic Machines", factory: true },
     { id: ORCHESTRA_SET_ID, name: "Orchestra Pit", factory: true },
     { id: FACTORY_SYNTH_SET_ID, name: "Synths", factory: true },
+    { id: LUMUS_TEST_INSTRUMENT_SET_ID, name: "Lumus Test", factory: true },
     { id: TEMPORARY_DS_INSTRUMENT_SET_ID, name: "Instanced Instruments", factory: true },
     { id: USER_INSTRUMENT_SET_ID, name: "User", factory: true },
   ];
@@ -2593,6 +2596,25 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         kind: "created",
         label: "Made in Beat",
       };
+      const lumusTestSeeds: Instrument[] = FACTORY_SYNTH_PRESETS
+        .filter((preset) => preset.tags.includes("mvp-test") && preset.patch.instrumentType === "lumus-hybrid-synth")
+        .map((preset) => {
+          const patch = synthDraftToInstrumentPatch(preset.patch);
+          return withOriginal({
+            ...defaultInstrument(),
+            ...patch,
+            id: preset.id,
+            name: preset.name,
+            icon: "ph:sparkle",
+            kind: "wavetable",
+            waveform: "wavetable",
+            sampleIds: patch.sampleIds ?? [],
+            setId: LUMUS_TEST_INSTRUMENT_SET_ID,
+            source: { kind: "created", label: "Made in Beat / Lumus" },
+            descriptors: ["lumus", "mvp-test", preset.category.toLowerCase()],
+            userCreated: false,
+          });
+        });
 
       const seeds: Instrument[] = [
         withOriginal({
@@ -2743,6 +2765,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
           source: beatSource,
           userCreated: false,
         }),
+        ...lumusTestSeeds,
       ];
       const deprecatedBreakcoreAetherInstrumentNames = new Set([
         "Breakcore Kick (Aether)",

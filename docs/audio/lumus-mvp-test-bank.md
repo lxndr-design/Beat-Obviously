@@ -2,6 +2,8 @@
 
 The factory test bank contains seven Beat-authored Lumus instruments. They use built-in synthesis and the existing Beat-owned granular benchmark source; no external preset, sample, or wavetable content is included.
 
+In the app, open the **Instruments** panel and expand **Lumus Test**. The seven entries are protected factory instruments with stable IDs. Selecting an entry opens the Lumus editor with the authored patch; the same records remain searchable in the shared preset browser.
+
 | Instrument | Primary coverage | Hands-on test | Expected result |
 |---|---|---|---|
 | `Lumus_SubBass_01` | Three-source tuning, direct route, mono/legato, glide, compression | Play detached and overlapping C1-G1 notes, then release. | A centered fundamental, short controlled glide only on overlap, correct note lengths, and no stuck bass note. |

@@ -338,6 +338,46 @@ try {
   assert.equal(exportStore.exportValidationBlocksExport(failedExportValidation), true);
 
   store.useInstrumentStore.getState().seedSystemInstruments();
+  const lumusTestSet = store.useInstrumentStore.getState().instrumentSets.find(
+    (set) => set.id === store.LUMUS_TEST_INSTRUMENT_SET_ID,
+  );
+  assert.deepEqual(lumusTestSet, { id: "lumus-test", name: "Lumus Test", factory: true });
+  const expectedLumusTestNames = [
+    "Lumus_SubBass_01",
+    "Lumus_ArpPluck_01",
+    "Lumus_WidePad_01",
+    "Lumus_MonoLead_01",
+    "Lumus_DigitalKeys_01",
+    "Lumus_ClipSequence_01",
+    "Lumus_GranularTexture_01",
+  ];
+  const lumusTestInstruments = store.useInstrumentStore.getState().instruments
+    .filter((instrument) => instrument.setId === store.LUMUS_TEST_INSTRUMENT_SET_ID);
+  assert.deepEqual(
+    lumusTestInstruments.map((instrument) => instrument.name).sort(),
+    [...expectedLumusTestNames].sort(),
+    "the Instruments panel should materialize the complete Lumus Test group",
+  );
+  for (const instrument of lumusTestInstruments) {
+    assert.equal(instrument.id.startsWith("factory.lumus-"), true, `${instrument.name} should have a stable factory id`);
+    assert.equal(instrument.userCreated, false, `${instrument.name} should be a protected factory instrument`);
+    assert.equal(instrument.source?.label, "Made in Beat / Lumus");
+    assert.equal(instrument.synthPatch?.instrumentType, "lumus-hybrid-synth");
+    assert.equal(instrument.synthPatch?.namespace, "lumus");
+  }
+  store.useInstrumentStore.getState().removeInstrument(lumusTestInstruments[0].id);
+  assert.ok(
+    store.useInstrumentStore.getState().instruments.some((instrument) => instrument.id === lumusTestInstruments[0].id),
+    "Lumus Test factory instruments must not be deletable",
+  );
+  store.useInstrumentStore.getState().seedSystemInstruments();
+  assert.equal(
+    store.useInstrumentStore.getState().instruments.filter(
+      (instrument) => instrument.setId === store.LUMUS_TEST_INSTRUMENT_SET_ID,
+    ).length,
+    7,
+    "re-seeding must not duplicate Lumus Test instruments",
+  );
   const legacySynthProbeId = store.useInstrumentStore.getState().addInstrument({
     name: "Legacy Synth Creation Probe",
     kind: "synth",

@@ -124,6 +124,11 @@ try {
     componentLibrarySource.includes("<LibraryFolder") && instrumentLibrarySource.includes("<LibraryFolder"),
     "instrument and component libraries should share the LibraryFolder UI and interactions",
   );
+  assert.ok(
+    instrumentLibrarySource.includes("LUMUS_TEST_INSTRUMENT_SET_ID")
+      && instrumentLibrarySource.includes("set.id === LUMUS_TEST_INSTRUMENT_SET_ID"),
+    "the protected Lumus Test factory group should display with its exact product-testing name",
+  );
   assert.equal(runner.snapBeat(1.13, 0.25), 1.25, "snapBeat should round upward past the midpoint");
   assert.deepEqual(
     midiInteraction.midiNoteSelectionAfterPointerDown({ selectedIndices: [], noteIndex: 1, additive: false }),

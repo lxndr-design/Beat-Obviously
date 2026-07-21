@@ -1,7 +1,7 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { Button, Checkbox, HoverInfo, Icon, LibraryFolder, LibrarySearch, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { createInstrumentBufferSource, preloadInstrumentSample, previewFrequency } from "../../audio/synthPreview";
-import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useProjectStore, useUiStore } from "../../state/store";
+import { LUMUS_TEST_INSTRUMENT_SET_ID, TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useProjectStore, useUiStore } from "../../state/store";
 import { instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
 import {
   FACTORY_SYNTH_PRESETS,
@@ -563,7 +563,7 @@ function persistOpenInstrumentSets(openSets: Record<string, boolean>) {
 }
 
 function instrumentSetDisplayName(set: InstrumentSet): string {
-  if (!set.factory || set.id === "user-instruments" || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID) return set.name;
+  if (!set.factory || set.id === "user-instruments" || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID || set.id === LUMUS_TEST_INSTRUMENT_SET_ID) return set.name;
   return set.name.toLowerCase().startsWith("factory ") ? set.name : `Factory ${set.name}`;
 }
 
