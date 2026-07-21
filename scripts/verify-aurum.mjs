@@ -31,6 +31,8 @@ try {
   assert.deepEqual(instrument.aurum.matrix.map((row) => row.length), [7, 7, 7, 7, 7, 7], "Aurum matrix must expose six destinations plus output");
   assert.equal(instrument.aurum.matrix[1][0], 0.42, "Default patch must route OP 2 into OP 1");
   assert.equal(instrument.aurum.matrix[0][6], 0.86, "Default patch must route OP 1 to output");
+  assert.equal(instrument.aurum.version, 2, "Aurum RM patches must use schema version 2");
+  assert.deepEqual(instrument.aurum.rmMatrix.map((row) => row.length), [6, 6, 6, 6, 6, 6], "Aurum RM matrix must expose six operator destinations");
 
   const baseline = new Float32Array(4096);
   preview.renderInstrumentSamples(instrument, baseline, 48000, 220, "visual", true);
@@ -80,6 +82,23 @@ try {
   const inversionResidual = baseline.reduce((sum, sample, index) => sum + Math.abs(sample + invertedOutputSamples[index]), 0) / baseline.length;
   assert.ok(inversionResidual < 0.0001, `Negative output sends must phase-invert the rendered carrier, got residual ${inversionResidual}`);
 
+  const dryRm = structuredClone(instrument);
+  dryRm.aurum.matrix[1][0] = 0;
+  const dryRmSamples = new Float32Array(4096);
+  preview.renderInstrumentSamples(dryRm, dryRmSamples, 48000, 220, "visual", false);
+  const positiveRm = structuredClone(dryRm);
+  positiveRm.aurum.rmMatrix[1][0] = 1;
+  const positiveRmSamples = new Float32Array(4096);
+  preview.renderInstrumentSamples(positiveRm, positiveRmSamples, 48000, 220, "visual", false);
+  const rmDifference = dryRmSamples.reduce((sum, sample, index) => sum + Math.abs(sample - positiveRmSamples[index]), 0) / dryRmSamples.length;
+  assert.ok(rmDifference > 0.005, `Ring modulation routing must alter the carrier, got mean difference ${rmDifference}`);
+  const negativeRm = structuredClone(dryRm);
+  negativeRm.aurum.rmMatrix[1][0] = -1;
+  const negativeRmSamples = new Float32Array(4096);
+  preview.renderInstrumentSamples(negativeRm, negativeRmSamples, 48000, 220, "visual", false);
+  const rmInversionResidual = positiveRmSamples.reduce((sum, sample, index) => sum + Math.abs(sample + negativeRmSamples[index]), 0) / positiveRmSamples.length;
+  assert.ok(rmInversionResidual < 0.0001, `Negative full-depth RM must invert the ring-modulated carrier, got residual ${rmInversionResidual}`);
+
   const stereoPatch = structuredClone(instrument);
   stereoPatch.aurum.unison = 3;
   stereoPatch.aurum.detuneCents = 14;
@@ -90,11 +109,21 @@ try {
   const stereoDifference = left.reduce((sum, sample, index) => sum + Math.abs(sample - right[index]), 0) / left.length;
   assert.ok(stereoDifference > 0.005, `Aurum spread must create stereo separation, got mean difference ${stereoDifference}`);
 
-  const malformed = aurum.normalizedAurumConfig({ ...instrument.aurum, operators: instrument.aurum.operators.slice(0, 1), matrix: [[4, -4]] });
+  const malformed = aurum.normalizedAurumConfig({ ...instrument.aurum, operators: instrument.aurum.operators.slice(0, 1), matrix: [[4, -4]], rmMatrix: [[4, -4]] });
   assert.equal(malformed.operators.length, 6, "Normalization must restore missing operators");
   assert.equal(malformed.matrix[0][0], 1, "Normalization must clamp matrix values");
   assert.equal(malformed.matrix[0][1], -1, "Normalization must preserve and clamp negative matrix values");
   assert.equal(malformed.matrix[5].length, 7, "Normalization must restore matrix geometry");
+  assert.equal(malformed.rmMatrix[0][0], 1, "Normalization must clamp positive RM values");
+  assert.equal(malformed.rmMatrix[0][1], -1, "Normalization must preserve and clamp negative RM values");
+  assert.equal(malformed.rmMatrix[5].length, 6, "Normalization must restore RM matrix geometry");
+
+  const legacyConfig = structuredClone(instrument.aurum);
+  legacyConfig.version = 1;
+  delete legacyConfig.rmMatrix;
+  const migrated = aurum.normalizedAurumConfig(legacyConfig);
+  assert.equal(migrated.version, 2, "Version 1 Aurum patches must migrate to schema version 2");
+  assert.ok(migrated.rmMatrix.every((row) => row.length === 6 && row.every((value) => value === 0)), "Migrated patches must add an inactive RM matrix without changing sound");
 
   assert.equal(interaction.aurumTabIndexAfterKey(0, "ArrowRight"), 1, "Right arrow must advance from Main to OP 1");
   assert.equal(interaction.aurumTabIndexAfterKey(6, "ArrowRight"), 0, "Right arrow must wrap from OP 6 to Main");

@@ -1138,6 +1138,7 @@ export function installBeatDevHooks() {
       };
       fixture.aurum.matrix[1][0] = 0.48;
       fixture.aurum.matrix[2][1] = 0.26;
+      fixture.aurum.rmMatrix[2][0] = 0.35;
       fixture.aurum.unison = 3;
       fixture.aurum.detuneCents = 11;
       fixture.aurum.stereoSpread = 0.55;

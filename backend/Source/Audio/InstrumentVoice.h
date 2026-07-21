@@ -249,6 +249,7 @@ namespace beat
             bool hasAurum { false };
             std::array<AurumOperator, 6> aurumOperators {};
             std::array<std::array<float, 7>, 6> aurumMatrix {};
+            std::array<std::array<float, 6>, 6> aurumRmMatrix {};
             int aurumUnison { 1 };
             float aurumDetuneCents { 8.0f };
             float aurumStereoSpread { 0.35f };

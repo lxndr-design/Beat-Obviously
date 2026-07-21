@@ -25,12 +25,14 @@ function defaultOperator(index: number): AurumOperatorConfig {
 
 export function defaultAurumConfig(): AurumSynthConfig {
   const matrix = Array.from({ length: AURUM_OPERATOR_COUNT }, () => Array(AURUM_OPERATOR_COUNT + 1).fill(0));
+  const rmMatrix = Array.from({ length: AURUM_OPERATOR_COUNT }, () => Array(AURUM_OPERATOR_COUNT).fill(0));
   matrix[0][AURUM_OUTPUT_COLUMN] = 0.86;
   matrix[1][0] = 0.42;
   return {
-    version: 1,
+    version: 2,
     operators: Array.from({ length: AURUM_OPERATOR_COUNT }, (_, index) => defaultOperator(index)),
     matrix,
+    rmMatrix,
     unison: 1,
     detuneCents: 8,
     stereoSpread: 0.35,
@@ -70,9 +72,10 @@ export function normalizedAurumConfig(config: AurumSynthConfig | undefined): Aur
   return {
     ...fallback,
     ...config,
-    version: 1,
+    version: 2,
     operators: fallback.operators.map((operator, index) => ({ ...operator, ...config.operators[index] })),
     matrix: fallback.matrix.map((row, source) => row.map((value, target) => clampBipolar(config.matrix[source]?.[target] ?? value))),
+    rmMatrix: fallback.rmMatrix.map((row, source) => row.map((value, target) => clampBipolar(config.rmMatrix?.[source]?.[target] ?? value))),
   };
 }
 

@@ -9,7 +9,8 @@ The staged implementation and release gates are tracked in [`aurum-roadmap.md`](
 - Six independently enabled operators
 - Sine, saw, square, and triangle operator waveforms
 - Ratio, coarse, fine, level, phase, and ADSR controls per operator
-- A bipolar 6 x 7 routing matrix: six operator destinations plus the audible output
+- A bipolar 6 x 7 FM/output matrix: six operator destinations plus the audible output
+- A separate bipolar 6 x 6 ring/amplitude-modulation matrix
 - Self-routing for operator feedback
 - One-sample-delayed matrix feedback so cyclic routes remain bounded
 - Independent operator note-off releases with native voice lifetime governed by the longest enabled operator tail
@@ -22,11 +23,11 @@ The staged implementation and release gates are tracked in [`aurum-roadmap.md`](
 
 The frontend stores Aurum configuration under `instrument.aurum`. Native parsing maps the same object to `InstrumentDefinition::AurumConfig`; project persistence writes it back without flattening the matrix.
 
-Matrix rows are modulation sources. Columns `0..5` target operators 1 through 6, and column `6` routes that source to the audible output.
+FM matrix rows are modulation sources. Columns `0..5` target operators 1 through 6, and column `6` routes that source to the audible output. RM matrix rows are amplitude-modulation sources and its six columns target operators 1 through 6. At full positive or negative depth the target becomes a ring-modulated signal; intermediate values retain a proportional dry component.
 
 ## Editor structure
 
-The editor keeps the routing matrix visible while the left workspace switches between Main and OP 1 through OP 6. Main contains shared unison and output-filter controls. Operator pages combine a live waveform scope, tuning and level controls, and the operator amplitude envelope.
+The editor keeps the selected FM or RM routing matrix visible while the left workspace switches between Main and OP 1 through OP 6. Main contains shared unison and output-filter controls. Operator pages combine a live waveform scope, tuning and level controls, and the operator amplitude envelope.
 
 The module strip uses tab semantics with roving focus. Arrow keys cycle through Main and the six operators; Home selects Main and End selects OP 6.
 

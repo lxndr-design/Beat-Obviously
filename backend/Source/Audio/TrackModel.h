@@ -225,6 +225,7 @@ namespace beat
         {
             std::array<AurumOperator, 6> operators {};
             std::array<std::array<float, 7>, 6> matrix {};
+            std::array<std::array<float, 6>, 6> rmMatrix {};
             int unison { 1 };
             float detuneCents { 8.0f };
             float stereoSpread { 0.35f };

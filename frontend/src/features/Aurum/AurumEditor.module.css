@@ -67,6 +67,9 @@
 .matrixSection { padding: 6px; }
 .operatorHeading,
 .sectionTitle { min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.matrixMode { display: flex; align-self: stretch; }
+.matrixMode > button { border-top: 0; border-bottom: 0; }
+.matrixMode > button + button { border-left: 0; }
 .operatorHeading h3,
 .sectionTitle h3,
 .panelTitle h3 { font-size: var(--font-size-field-label); }
@@ -126,6 +129,7 @@
   border-top: var(--border-soft);
   border-left: var(--border-soft);
 }
+.rmMatrix { grid-template-columns: 48px repeat(6, minmax(57px, 1fr)); }
 
 .matrixHeader,
 .matrixRowLabel,

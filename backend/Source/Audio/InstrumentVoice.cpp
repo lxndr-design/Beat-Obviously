@@ -565,8 +565,15 @@ namespace beat
                         const double ratio = juce::jlimit(0.125, 32.0, (double) op.ratio);
                         const double tuning = std::exp2((double) op.coarse / 12.0 + (double) op.fineCents / 1200.0);
                         const double delta = currentFrequency * voiceRate * ratio * tuning / sampleRate;
+                        float rmGain = 1.0f;
+                        for (size_t source = 0; source < 6; ++source)
+                        {
+                            const float amount = juce::jlimit(-1.0f, 1.0f, params.aurumRmMatrix[source][target]);
+                            if (std::abs(amount) <= 0.0001f) continue;
+                            rmGain *= 1.0f - std::abs(amount) + aurumOutputs[voiceOffset + source] * amount;
+                        }
                         nextOutputs[voiceOffset + target] = BasicOscillator::sample(op.waveform, aurumPhases[voiceOffset + target] + fm * 1.9, delta)
-                            * VoiceMath::clamp01(op.level) * opEnvelope;
+                            * VoiceMath::clamp01(op.level) * opEnvelope * rmGain;
                         aurumPhases[voiceOffset + target] = std::fmod(aurumPhases[voiceOffset + target] + delta, 1.0);
                         currentBlockWork.addOscillatorSamples(1);
                     }

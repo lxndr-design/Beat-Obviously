@@ -1010,7 +1010,14 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
       const tuning = Math.pow(2, operator.coarse / 12 + operator.fineCents / 1200);
       const phase = state.aurumPhases[stateIndex] + modulation * 1.9;
       const envelope = aurumOperatorEnvelope(operator.envelope, timeMs, state.aurumNoteOffMs);
-      nextOutputs[stateIndex] = oscillatorSample(operator.waveform, phase, 0.5) * clamp01(operator.level) * envelope;
+      let rmGain = 1;
+      for (let source = 0; source < operatorCount; source += 1) {
+        const amount = clampBipolar(config.rmMatrix?.[source]?.[target] ?? 0);
+        if (Math.abs(amount) <= 0.0001) continue;
+        const modulator = state.aurumOutputs[voiceOffset + source] ?? 0;
+        rmGain *= 1 - Math.abs(amount) + modulator * amount;
+      }
+      nextOutputs[stateIndex] = oscillatorSample(operator.waveform, phase, 0.5) * clamp01(operator.level) * envelope * rmGain;
       state.aurumPhases[stateIndex] = (state.aurumPhases[stateIndex] + (frequency * voiceRate * ratio * tuning) / sampleRate) % 1;
     }
 

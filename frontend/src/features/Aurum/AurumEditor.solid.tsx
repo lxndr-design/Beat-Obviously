@@ -21,6 +21,7 @@ export function AurumEditor(props: AurumEditorProps) {
   const [draft, setDraft] = createSignal(cloneInstrument(props.instrument), { equals: false });
   const [selectedOperator, setSelectedOperator] = createSignal(0);
   const [selectedPage, setSelectedPage] = createSignal<"main" | "operator">("operator");
+  const [matrixMode, setMatrixMode] = createSignal<"fm" | "rm">("fm");
   const [waveformOpen, setWaveformOpen] = createSignal(false);
   const [auditioning, setAuditioning] = createSignal(false);
   let audition: InstrumentPreviewAuditionHandle | null = null;
@@ -47,9 +48,14 @@ export function AurumEditor(props: AurumEditorProps) {
   }
 
   function updateMatrix(source: number, target: number, value: number) {
-    updateAurum((config) => ({
+    updateAurum((config) => matrixMode() === "fm" ? ({
       ...config,
       matrix: config.matrix.map((row, rowIndex) => rowIndex === source
+        ? row.map((cell, columnIndex) => columnIndex === target ? value : cell)
+        : row),
+    }) : ({
+      ...config,
+      rmMatrix: config.rmMatrix.map((row, rowIndex) => rowIndex === source
         ? row.map((cell, columnIndex) => columnIndex === target ? value : cell)
         : row),
     }));
@@ -102,7 +108,7 @@ export function AurumEditor(props: AurumEditorProps) {
           <span class={styles.mark}>AU</span>
           <div>
             <h2>Aurum</h2>
-            <p>Six-operator frequency modulation</p>
+            <p>Six-operator frequency and ring modulation</p>
           </div>
         </div>
         <TextInput
@@ -225,14 +231,24 @@ export function AurumEditor(props: AurumEditorProps) {
         <section class={styles.matrixSection}>
           <div class={styles.sectionTitle}>
             <div>
-              <h3>Operator Matrix</h3>
-              <p>Rows modulate columns. Diagonal cells are feedback.</p>
+              <h3>{matrixMode() === "fm" ? "Frequency Matrix" : "Ring / AM Matrix"}</h3>
+              <p>{matrixMode() === "fm"
+                ? "Rows modulate frequency. Diagonal cells are feedback."
+                : "Rows modulate amplitude. Full depth produces ring modulation."}</p>
+            </div>
+            <div class={styles.matrixMode} role="group" aria-label="Aurum matrix mode">
+              <Button size="xs" selected={matrixMode() === "fm"} onClick={() => setMatrixMode("fm")}>FM</Button>
+              <Button size="xs" selected={matrixMode() === "rm"} onClick={() => setMatrixMode("rm")}>RM</Button>
             </div>
           </div>
-          <div class={styles.matrix} role="group" aria-label="Aurum operator routing matrix">
+          <div
+            class={`${styles.matrix} ${matrixMode() === "rm" ? styles.rmMatrix : ""}`}
+            role="group"
+            aria-label={`Aurum ${matrixMode() === "fm" ? "frequency" : "ring modulation"} routing matrix`}
+          >
             <span />
             <For each={aurum().operators}>{(candidate) => <span class={styles.matrixHeader}>{candidate.name}</span>}</For>
-            <span class={`${styles.matrixHeader} ${styles.outputHeader}`}>OUT</span>
+            <Show when={matrixMode() === "fm"}><span class={`${styles.matrixHeader} ${styles.outputHeader}`}>OUT</span></Show>
             <For each={aurum().operators}>{(source, sourceIndex) => (
               <>
                 <Button
@@ -247,10 +263,12 @@ export function AurumEditor(props: AurumEditorProps) {
                 >
                   {source.name}
                 </Button>
-                <For each={Array.from({ length: AURUM_OPERATOR_COUNT + 1 })}>{(_, targetIndex) => {
-                  const value = () => aurum().matrix[sourceIndex()][targetIndex()] ?? 0;
+                <For each={Array.from({ length: matrixMode() === "fm" ? AURUM_OPERATOR_COUNT + 1 : AURUM_OPERATOR_COUNT })}>{(_, targetIndex) => {
+                  const value = () => matrixMode() === "fm"
+                    ? aurum().matrix[sourceIndex()][targetIndex()] ?? 0
+                    : aurum().rmMatrix[sourceIndex()][targetIndex()] ?? 0;
                   const feedback = () => sourceIndex() === targetIndex();
-                  const output = () => targetIndex() === AURUM_OUTPUT_COLUMN;
+                  const output = () => matrixMode() === "fm" && targetIndex() === AURUM_OUTPUT_COLUMN;
                   return (
                     <div class={`${styles.matrixCell} ${feedback() ? styles.feedbackCell : ""} ${output() ? styles.outputCell : ""}`} data-active={Math.abs(value()) > 0.001}>
                       <Knob
@@ -261,7 +279,9 @@ export function AurumEditor(props: AurumEditorProps) {
                         step={0.01}
                         bipolar
                         value={value()}
-                        label={`${source.name} ${feedback() ? "feedback" : output() ? "to output" : `to ${aurum().operators[targetIndex()].name}`}`}
+                        label={matrixMode() === "fm"
+                          ? `${source.name} ${feedback() ? "feedback" : output() ? "to output" : `to ${aurum().operators[targetIndex()].name}`}`
+                          : `${source.name} ${feedback() ? "self ring modulation" : `ring modulation to ${aurum().operators[targetIndex()].name}`}`}
                         formatValue={(next) => `${Math.round(next * 100)}`}
                         defaultValue={0}
                         onChange={(next) => updateMatrix(sourceIndex(), targetIndex(), next)}

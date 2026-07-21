@@ -2273,6 +2273,14 @@ namespace beat
                                     for (int target = 0; target < juce::jmin(7, cells->size()); ++target)
                                         instrument.aurum.matrix[(size_t) source][(size_t) target] = juce::jlimit(-1.0f, 1.0f, (float) (double) cells->getReference(target));
                         }
+                        if (auto* rows = aurum.getProperty("rmMatrix", {}).getArray())
+                        {
+                            const auto rowCount = juce::jmin(6, rows->size());
+                            for (int source = 0; source < rowCount; ++source)
+                                if (auto* cells = rows->getReference(source).getArray())
+                                    for (int target = 0; target < juce::jmin(6, cells->size()); ++target)
+                                        instrument.aurum.rmMatrix[(size_t) source][(size_t) target] = juce::jlimit(-1.0f, 1.0f, (float) (double) cells->getReference(target));
+                        }
                         instrument.aurum.unison = juce::jlimit(1, 8, (int) aurum.getProperty("unison", 1));
                         instrument.aurum.detuneCents = floatParam(aurum, "detuneCents", 8.0f, 0.0f, 100.0f);
                         instrument.aurum.stereoSpread = normalizedParam(aurum, "stereoSpread", 0.35f);

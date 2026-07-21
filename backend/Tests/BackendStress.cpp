@@ -7267,6 +7267,8 @@ namespace
         instrument.aurum.operators[1].releaseMs = 87.0f;
         instrument.aurum.matrix[1][0] = -0.42f;
         instrument.aurum.matrix[0][6] = -0.86f;
+        instrument.aurum.rmMatrix[1][0] = 0.73f;
+        instrument.aurum.rmMatrix[2][1] = -0.31f;
         instrument.aurum.unison = 3;
         instrument.aurum.detuneCents = 11.0f;
         instrument.aurum.stereoSpread = 0.57f;
@@ -7282,6 +7284,8 @@ namespace
             && !loaded->instruments.front().hasAether
             && near(loaded->instruments.front().aurum.matrix[1][0], -0.42f)
             && near(loaded->instruments.front().aurum.matrix[0][6], -0.86f)
+            && near(loaded->instruments.front().aurum.rmMatrix[1][0], 0.73f)
+            && near(loaded->instruments.front().aurum.rmMatrix[2][1], -0.31f)
             && near(loaded->instruments.front().aurum.operators[0].releaseMs, 1234.0f)
             && near(loaded->instruments.front().aurum.operators[1].releaseMs, 87.0f)
             && loaded->instruments.front().aurum.unison == 3
@@ -12391,6 +12395,64 @@ namespace
         return ok;
     }
 
+    bool stressInstrumentVoiceAurumRingMatrix()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.drive01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 1.0f;
+        params.sustain = 0.0f;
+        params.releaseMs = 1.0f;
+        params.aurumOperators[0] = { true, 0, 1.0f, 0, 0.0f, 0.8f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
+        params.aurumOperators[1] = { true, 0, 2.0f, 0, 0.0f, 0.65f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
+        params.aurumMatrix[0][6] = 1.0f;
+
+        auto render = [](const beat::InstrumentVoice::Params& renderParams)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 4096);
+            voice.setParams(renderParams);
+            voice.startNote(57, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        const auto dry = render(params);
+        params.aurumRmMatrix[1][0] = 1.0f;
+        const auto positive = render(params);
+        params.aurumRmMatrix[1][0] = -1.0f;
+        const auto negative = render(params);
+        double difference = 0.0;
+        double inversionResidual = 0.0;
+        double energy = 0.0;
+        for (int channel = 0; channel < dry.getNumChannels(); ++channel)
+            for (int sampleIndex = 0; sampleIndex < dry.getNumSamples(); ++sampleIndex)
+            {
+                const auto drySample = (double) dry.getSample(channel, sampleIndex);
+                const auto positiveSample = (double) positive.getSample(channel, sampleIndex);
+                const auto negativeSample = (double) negative.getSample(channel, sampleIndex);
+                if (!std::isfinite(drySample) || !std::isfinite(positiveSample) || !std::isfinite(negativeSample))
+                    return false;
+                difference += std::abs(drySample - positiveSample);
+                inversionResidual += std::abs(positiveSample + negativeSample);
+                energy += positiveSample * positiveSample;
+            }
+
+        const bool ok = energy > 0.001 && difference > 0.1 && inversionResidual < 0.001;
+        if (!ok)
+            std::cerr << "Aurum ring matrix stress failed energy=" << energy
+                      << " difference=" << difference
+                      << " inversionResidual=" << inversionResidual << "\n";
+        return ok;
+    }
+
     bool stressInstrumentVoiceWavetablePath()
     {
         beat::InstrumentVoice::Params params;
@@ -13715,6 +13777,7 @@ int main(int argc, char** argv)
     {
         const bool ok = stressInstrumentVoiceAurumBipolarMatrix()
             && stressInstrumentVoiceAurumOperatorRelease()
+            && stressInstrumentVoiceAurumRingMatrix()
             && stressProjectRepositoryAurumInstrumentRoundtrip();
         if (!ok)
         {
@@ -13872,6 +13935,11 @@ int main(int argc, char** argv)
     if (!stressInstrumentVoiceAurumOperatorRelease())
     {
         std::cerr << "Instrument voice Aurum operator release stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumRingMatrix())
+    {
+        std::cerr << "Instrument voice Aurum ring matrix stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceBandlimitedBasicOscillators())
