@@ -8931,6 +8931,190 @@ namespace
         return ok;
     }
 
+    bool stressProjectRepositoryLumusMvpRoundtrip()
+    {
+        const auto root = juce::File("/private/tmp")
+            .getChildFile("BeatBackendStress-lumus-mvp-repository-" + juce::Uuid().toString());
+        const auto dbFile = root.getChildFile("projects.sqlite");
+        if (!root.createDirectory()) return false;
+
+        auto project = makeLumusClipOfflineProject(true);
+        project.id = "lumus-mvp-roundtrip";
+        project.name = "Lumus MVP Roundtrip";
+        auto& instrument = project.instruments.front();
+        instrument.aether.oscA.enabled = false;
+        instrument.lumus.oscC.enabled = true;
+        instrument.lumus.oscC.level = 0.62f;
+        instrument.lumus.oscC.pan = 0.27f;
+        instrument.lumus.oscC.routing = 2;
+        instrument.lumus.oscC.tuningMode = 2;
+        instrument.lumus.oscC.ratioNumerator = 3.0f;
+        instrument.lumus.oscC.ratioDenominator = 2.0f;
+        instrument.lumus.oscC.phaseMode = 1;
+        instrument.lumus.oscC.fxSends = { 0.64f, 0.0f };
+        instrument.lumus.sampleModes = { false, true, false };
+        instrument.lumus.sampleSlots[1].rootNote = 55;
+        instrument.lumus.sampleSlots[1].level = 0.43f;
+        instrument.lumus.sampleSlots[1].routing = 3;
+        instrument.lumus.granularSlots[2].rootNote = 48;
+        instrument.lumus.granularSlots[2].position = 0.31f;
+        instrument.lumus.granularSlots[2].randomSeed = 98765u;
+        instrument.aether.fxBusIds = { "lumus-source-fx", "" };
+
+        beat::TrackEffect drive;
+        drive.id = "lumus-main-drive";
+        drive.kind = beat::TrackEffectKind::Saturator;
+        drive.params.push_back({ "drive", 58.0f });
+        drive.params.push_back({ "mix", 72.0f });
+        instrument.effects.push_back(drive);
+        beat::TrackEffect tone;
+        tone.id = "lumus-main-tone";
+        tone.kind = beat::TrackEffectKind::Lowpass;
+        tone.params.push_back({ "cutoffHz", 4200.0f });
+        tone.params.push_back({ "resonance", 18.0f });
+        instrument.effects.push_back(tone);
+
+        beat::ReturnBus sourceBus;
+        sourceBus.id = "lumus-source-fx";
+        sourceBus.name = "Lumus Source FX";
+        beat::TrackEffect returnDelay;
+        returnDelay.id = "lumus-return-delay";
+        returnDelay.kind = beat::TrackEffectKind::Delay;
+        returnDelay.params.push_back({ "timeMs", 90.0f });
+        returnDelay.params.push_back({ "feedback", 12.0f });
+        returnDelay.params.push_back({ "mix", 35.0f });
+        sourceBus.effects.push_back(returnDelay);
+        project.returnBuses.push_back(sourceBus);
+
+        constexpr int samples = 24000;
+        const auto before = renderOfflineChunks(project, samples, 257, 48000.0);
+        auto mutedProject = project;
+        mutedProject.returnBuses.front().mute = true;
+        const auto muted = renderOfflineChunks(mutedProject, samples, 257, 48000.0);
+
+        beat::Database db(dbFile);
+        beat::ProjectRepository repository(db);
+        repository.save(project);
+        const auto loaded = repository.load(project.id);
+
+        bool metadataOk = loaded.has_value() && loaded->instruments.size() == 1
+            && loaded->returnBuses.size() == 1;
+        if (metadataOk)
+        {
+            const auto& restored = loaded->instruments.front();
+            metadataOk = restored.synthEngine == beat::InstrumentDefinition::SynthEngine::Lumus
+                && restored.hasAether
+                && restored.lumus.oscC.enabled
+                && near(restored.lumus.oscC.level, 0.62f)
+                && near(restored.lumus.oscC.pan, 0.27f)
+                && restored.lumus.oscC.routing == 2
+                && restored.lumus.oscC.tuningMode == 2
+                && near(restored.lumus.oscC.ratioNumerator, 3.0f)
+                && near(restored.lumus.oscC.ratioDenominator, 2.0f)
+                && restored.lumus.oscC.phaseMode == 1
+                && near(restored.lumus.oscC.fxSends[0], 0.64f)
+                && restored.lumus.sampleModes[1]
+                && restored.lumus.sampleSlots[1].rootNote == 55
+                && near(restored.lumus.sampleSlots[1].level, 0.43f)
+                && restored.lumus.sampleSlots[1].routing == 3
+                && restored.lumus.granularSlots[2].rootNote == 48
+                && near(restored.lumus.granularSlots[2].position, 0.31f)
+                && restored.lumus.granularSlots[2].randomSeed == 98765u
+                && restored.lumus.clip.enabled
+                && restored.lumus.clip.lengthSteps == 4
+                && restored.lumus.clip.steps[1].pitchOffset == 7
+                && restored.aether.fxBusIds[0] == "lumus-source-fx"
+                && restored.effects.size() == 2
+                && restored.effects[0].id == "lumus-main-drive"
+                && restored.effects[1].id == "lumus-main-tone"
+                && loaded->returnBuses.front().effects.size() == 1
+                && loaded->returnBuses.front().effects.front().id == "lumus-return-delay";
+        }
+
+        double sendDifference = 0.0;
+        double roundtripDifference = 0.0;
+        double afterEnergy = 0.0;
+        if (loaded.has_value())
+        {
+            const auto after = renderOfflineChunks(*loaded, samples, 257, 48000.0);
+            for (int channel = 0; channel < before.getNumChannels(); ++channel)
+                for (int sample = 0; sample < samples; ++sample)
+                {
+                    const auto beforeSample = before.getSample(channel, sample);
+                    const auto afterSample = after.getSample(channel, sample);
+                    const auto mutedSample = muted.getSample(channel, sample);
+                    if (!std::isfinite(beforeSample) || !std::isfinite(afterSample) || !std::isfinite(mutedSample))
+                    {
+                        root.deleteRecursively();
+                        return false;
+                    }
+                    sendDifference += std::abs((double) beforeSample - mutedSample);
+                    roundtripDifference = juce::jmax(roundtripDifference,
+                        std::abs((double) beforeSample - afterSample));
+                    afterEnergy += (double) afterSample * afterSample;
+                }
+        }
+        bool malformedRejected = false;
+        bool futureRejected = false;
+        beat::Statement select(db, "SELECT json_blob FROM projects WHERE id = ?");
+        select.bind(1, project.id);
+        if (select.step())
+        {
+            auto persisted = juce::JSON::parse(select.columnText(0));
+            if (auto* instruments = persisted.getProperty("instruments", {}).getArray();
+                instruments != nullptr && !instruments->isEmpty())
+            {
+                auto lumus = instruments->getReference(0).getProperty("lumus", {});
+                if (auto* object = lumus.getDynamicObject())
+                {
+                    auto clip = object->getProperty("clip");
+                    if (auto* clipObject = clip.getDynamicObject())
+                    {
+                        clipObject->setProperty("rateDivision", 3);
+                        beat::Statement malformedUpdate(db, "UPDATE projects SET json_blob = ? WHERE id = ?");
+                        malformedUpdate.bind(1, juce::JSON::toString(persisted, false));
+                        malformedUpdate.bind(2, project.id);
+                        malformedUpdate.step();
+                        const auto rejected = repository.loadWithDiagnostics(project.id);
+                        malformedRejected = !rejected.project.has_value()
+                            && std::any_of(rejected.diagnostics.begin(), rejected.diagnostics.end(), [](const auto& diagnostic)
+                            {
+                                return diagnostic.code == "lumus.clip.rate"
+                                    && diagnostic.path.contains(".lumus.clip.rateDivision")
+                                    && diagnostic.message.isNotEmpty();
+                            });
+                        clipObject->setProperty("rateDivision", 16);
+                    }
+                    object->setProperty("schemaVersion", 2);
+                    beat::Statement update(db, "UPDATE projects SET json_blob = ? WHERE id = ?");
+                    update.bind(1, juce::JSON::toString(persisted, false));
+                    update.bind(2, project.id);
+                    update.step();
+                    const auto rejected = repository.loadWithDiagnostics(project.id);
+                    futureRejected = !rejected.project.has_value()
+                        && std::any_of(rejected.diagnostics.begin(), rejected.diagnostics.end(), [](const auto& diagnostic)
+                        {
+                            return diagnostic.code == "lumus.config.schema-future"
+                                && diagnostic.path.contains(".lumus.schemaVersion")
+                                && diagnostic.message.isNotEmpty();
+                        });
+                }
+            }
+        }
+        root.deleteRecursively();
+        const bool ok = metadataOk && bufferEnergy(before) > 0.0001 && afterEnergy > 0.0001
+            && sendDifference > 0.01 && roundtripDifference <= 0.000001
+            && malformedRejected && futureRejected;
+        if (!ok)
+            std::cerr << "Lumus MVP repository roundtrip failed metadata=" << metadataOk
+                      << " sendDifference=" << sendDifference
+                      << " roundtripDifference=" << roundtripDifference
+                      << " afterEnergy=" << afterEnergy
+                      << " malformedRejected=" << malformedRejected
+                      << " futureRejected=" << futureRejected << "\n";
+        return ok;
+    }
+
     bool stressHybridSourceMigrationAndCleanupSafety()
     {
         const auto root = juce::File("/private/tmp")
@@ -19317,7 +19501,8 @@ int main(int argc, char** argv)
     {
         beat::test::prepareRealtimeSafetyInterposers();
         const bool ok = stressLumusArpeggiator() && stressLumusClipSequencer()
-            && stressAudioEngineLumusArpeggiator() && stressAudioEngineLumusClipSequencer();
+            && stressAudioEngineLumusArpeggiator() && stressAudioEngineLumusClipSequencer()
+            && stressProjectRepositoryLumusMvpRoundtrip();
         if (!ok)
         {
             std::cerr << "Lumus arpeggiator focused stress failed\n";
@@ -19728,6 +19913,11 @@ int main(int argc, char** argv)
     if (!stressProjectRepositoryAetherInstrumentRoundtrip())
     {
         std::cerr << "Project repository Aether instrument roundtrip stress failed\n";
+        return 1;
+    }
+    if (!stressProjectRepositoryLumusMvpRoundtrip())
+    {
+        std::cerr << "Project repository Lumus MVP roundtrip stress failed\n";
         return 1;
     }
     if (!stressHybridSourceMigrationAndCleanupSafety())

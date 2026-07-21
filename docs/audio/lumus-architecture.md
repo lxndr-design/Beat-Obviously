@@ -43,6 +43,13 @@ The adapter is an intentional bootstrap boundary. It lets Lumus start audible an
 - `backend/Source/Audio/Midi/LumusClipSequencer.h`: fixed-capacity latest-held trigger state and a maximum 32-step monophonic sequence with bounded relative pitch, length, velocity, rests, and pair-preserving swing. It allocates only during preparation and owns no transport clock.
 - `backend/Source/Audio/AudioEngine.cpp`: prepares the mutually exclusive transforms off the callback, derives step length from the active sample rate plus Sequencer tempo/speed, and inserts transformed MIDI immediately before the Lumus route synth render.
 - `backend/Source/Audio/InstrumentVoice.{h,cpp}`: prepared fixed-capacity A/B/C sample and granular state plus Slot C wavetable state, routing, and bounded modulation evaluation; these branches are unreachable for Aether.
+- `backend/Source/Persistence/ProjectRepository.cpp`: persists and strictly reconstructs Lumus engine identity plus the bounded rack, Slot C, sample/granular modes, arpeggiator, clip, source-bus targets, and ordered instrument inserts. Older records without `synthEngine` retain their established Aether inference.
+
+## Effects and routing contract
+
+Each A/B/C source independently selects Shared Filter, Filter 1, Filter 2, Direct, or None. Its two send amounts branch to two explicitly selected Beat return buses before the serial instrument-insert chain. Missing return-bus identifiers are intentionally silent and never fall back to Master. Instrument inserts process the main Lumus route in stored order, before track inserts; bypass and reorder state are persisted. Return buses then process their own stored-order effects before their configured downstream output. Live callback and offline rendering use this same graph and timing order.
+
+The native renderer continues to store the two fixed source-bus identifiers in the shared internal Aether renderer adapter. This is an implementation boundary, not an Aether product identity: the Lumus editor labels the controls as Lumus, Lumus project identity is serialized separately, and no Aether patch or default changes when Lumus routing is edited.
 
 ## Non-negotiable compatibility rules
 

@@ -65,5 +65,7 @@ assert.ok(synthEditor.includes('<FloatingSelect'), "Lumus key/scale UI must reus
 assert.ok(synthEditor.includes('aria-label="Lumus clip sequencer"'));
 assert.ok(synthEditor.includes('aria-label="Clip steps"'));
 assert.ok(synthEditor.includes("<NumberInput"), "Lumus clip editing must reuse Beat number inputs");
+assert.ok(synthEditor.includes('"Lumus instrument effects" : "Aether instrument effects"'), "The shared insert rack must expose the active synth identity");
+assert.ok(synthEditor.includes('`${isLumus() ? "Lumus" : "Aether"} source FX buses`'), "The shared source-bus controls must expose Lumus rather than Aether branding");
 
 console.log(`Lumus foundation verification passed (${matrix.rows.length} benchmark rows).`);

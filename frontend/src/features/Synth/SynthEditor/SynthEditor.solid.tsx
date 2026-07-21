@@ -483,6 +483,7 @@ export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "
               samples={analyzerWaveform()}
               playing={auditioning()}
               onToggle={() => void onAudition()}
+              instrumentName={draft().instrumentType === "lumus-hybrid-synth" ? "Lumus" : "Aether"}
             />
             <div class={styles.identityFields}>
               <div class={styles.nameRow}>
@@ -948,10 +949,11 @@ function InstrumentOutputPreview(props: {
   samples: number[];
   playing: boolean;
   onToggle: () => void;
+  instrumentName: "Aether" | "Lumus";
 }) {
   return (
-    <div class={styles.identityPreview} aria-label="Aether output preview">
-      <SynthCurvePreview samples={props.samples} label="Aether output waveform" />
+    <div class={styles.identityPreview} aria-label={`${props.instrumentName} output preview`}>
+      <SynthCurvePreview samples={props.samples} label={`${props.instrumentName} output waveform`} />
       <div class={styles.identityPreviewActions}>
         <Button size="xs" variant="ghost" selected={props.playing} onClick={props.onToggle}>
           <Icon name={props.playing ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
@@ -969,6 +971,7 @@ function InstrumentFxRack() {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setDraft = useSynthStore.getState().setDraft;
   const effects = createMemo(() => draft().effects.filters);
+  const instrumentName = createMemo(() => draft().instrumentType === "lumus-hybrid-synth" ? "Lumus" : "Aether");
   const [draggedEffectId, setDraggedEffectId] = createSignal<string | null>(null);
   const [dragOverEffectId, setDragOverEffectId] = createSignal<string | null>(null);
 
@@ -1061,12 +1064,12 @@ function InstrumentFxRack() {
   }
 
   return (
-    <section class={`ds-panel ${styles.fxPanel}`} aria-label="Aether instrument effects">
+    <section class={`ds-panel ${styles.fxPanel}`} aria-label={instrumentName() === "Lumus" ? "Lumus instrument effects" : "Aether instrument effects"}>
       <header class="ds-panel-header">
         <div class="ds-panel-title">Instrument FX</div>
       </header>
       <div class={`ds-panel-body ${styles.fxBody}`}>
-        <div class={styles.fxChainSummary} aria-label="Current Aether FX chain">
+        <div class={styles.fxChainSummary} aria-label={instrumentName() === "Lumus" ? "Current Lumus FX chain" : "Current Aether FX chain"}>
           <span>Current chain: {describeEffectChain(effects())}</span>
           <FloatingSelect
             layout="bare"
@@ -2052,14 +2055,14 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             <NumberInput label="Seed" layout="inline" value={getNumberParam(draft(), granularParameterId("randomSeed"))} min={1} max={4294967295} step={1} ariaLabel="Granular deterministic seed" onChange={(value) => setNumericParameter(granularParameterId("randomSeed"), value)} />
           </div>
         </section>
-        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label="Aether shared FX buses">
+        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label={`${isLumus() ? "Lumus" : "Aether"} source FX buses`}>
           <div class={styles.ampFilterGroupTitle}>Source FX</div>
           <div class={styles.ampFilterShapeRow}>
             <FloatingSelect
               label="Bus 1"
               layout="inline"
               value={String(draft().parameters["aether.fxBus1Id"] ?? "")}
-              ariaLabel="Aether FX bus 1 target"
+              ariaLabel={`${isLumus() ? "Lumus" : "Aether"} FX bus 1 target`}
               options={fxBusOptions()}
               open={fxBus1Open()}
               onOpenChange={setFxBus1Open}
@@ -2069,7 +2072,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               label="Bus 2"
               layout="inline"
               value={String(draft().parameters["aether.fxBus2Id"] ?? "")}
-              ariaLabel="Aether FX bus 2 target"
+              ariaLabel={`${isLumus() ? "Lumus" : "Aether"} FX bus 2 target`}
               options={fxBusOptions()}
               open={fxBus2Open()}
               onOpenChange={setFxBus2Open}

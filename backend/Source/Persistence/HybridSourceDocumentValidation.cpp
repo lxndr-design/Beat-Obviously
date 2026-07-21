@@ -203,6 +203,107 @@ namespace beat
                         "Enabled granularSlot2 has no built-in or managed source.");
             }
         }
+
+        void validateLumusConfig(const juce::var& lumus,
+                                 const juce::String& path,
+                                 std::vector<HybridSourceDocumentDiagnostic>& diagnostics)
+        {
+            if (!lumus.isObject())
+            {
+                add(diagnostics, "lumus.config.shape", path,
+                    "A Lumus instrument requires an object-valued Lumus configuration.");
+                return;
+            }
+            if (!validateVersion(lumus, 1, "lumus.config", path, diagnostics))
+                return;
+
+            const auto requireThree = [&](const char* property, const char* code) -> const juce::Array<juce::var>*
+            {
+                const auto* array = lumus.getProperty(property, {}).getArray();
+                if (array == nullptr || array->size() != 3)
+                    add(diagnostics, code, path + "." + property,
+                        juce::String(property) + " must contain exactly three entries.");
+                return array != nullptr && array->size() == 3 ? array : nullptr;
+            };
+            const auto* sampleSlots = requireThree("sampleSlots", "lumus.sample-slots.capacity");
+            const auto* sampleModes = requireThree("sampleModes", "lumus.sample-modes.capacity");
+            const auto* granularSlots = requireThree("granularSlots", "lumus.granular-slots.capacity");
+            const auto* granularModes = requireThree("granularModes", "lumus.granular-modes.capacity");
+            const auto validateModes = [&](const juce::Array<juce::var>* modes,
+                                           const char* property,
+                                           const char* code)
+            {
+                if (modes == nullptr) return;
+                for (int index = 0; index < modes->size(); ++index)
+                    if (!modes->getReference(index).isBool())
+                        add(diagnostics, code,
+                            path + "." + property + "[" + juce::String(index) + "]",
+                            "Each source mode must be a boolean.");
+            };
+            validateModes(sampleModes, "sampleModes", "lumus.sample-modes.type");
+            validateModes(granularModes, "granularModes", "lumus.granular-modes.type");
+            for (int index = 0; index < 3; ++index)
+            {
+                if (sampleSlots != nullptr)
+                {
+                    juce::DynamicObject::Ptr holder = new juce::DynamicObject();
+                    holder->setProperty("sampleSlot1", sampleSlots->getReference(index));
+                    validateSampleSlot(juce::var(holder.get()),
+                        path + ".sampleSlots[" + juce::String(index) + "]", diagnostics);
+                }
+                if (granularSlots != nullptr)
+                {
+                    juce::DynamicObject::Ptr holder = new juce::DynamicObject();
+                    holder->setProperty("granularSlot2", granularSlots->getReference(index));
+                    validateGranularSlot(juce::var(holder.get()),
+                        path + ".granularSlots[" + juce::String(index) + "]", diagnostics);
+                }
+            }
+
+            const auto arpeggiator = lumus.getProperty("arpeggiator", {});
+            const auto clip = lumus.getProperty("clip", {});
+            if (!arpeggiator.isObject())
+                add(diagnostics, "lumus.arpeggiator.shape", path + ".arpeggiator",
+                    "arpeggiator must be an object.");
+            const auto validateRate = [&](const juce::var& owner,
+                                          const juce::String& ownerPath,
+                                          const char* code)
+            {
+                const auto rate = owner.getProperty("rateDivision", {});
+                if (!isIntegralNumber(rate)
+                    || ((int) rate != 4 && (int) rate != 8
+                        && (int) rate != 16 && (int) rate != 32))
+                    add(diagnostics, code, ownerPath + ".rateDivision",
+                        "rateDivision must be one of 4, 8, 16, or 32.");
+            };
+            if (arpeggiator.isObject())
+                validateRate(arpeggiator, path + ".arpeggiator", "lumus.arpeggiator.rate");
+            if (!clip.isObject())
+            {
+                add(diagnostics, "lumus.clip.shape", path + ".clip", "clip must be an object.");
+                return;
+            }
+            validateRate(clip, path + ".clip", "lumus.clip.rate");
+            const auto lengthValue = clip.getProperty("lengthSteps", {});
+            const auto* steps = clip.getProperty("steps", {}).getArray();
+            if (!isIntegralNumber(lengthValue) || (int) lengthValue < 1 || (int) lengthValue > 32)
+                add(diagnostics, "lumus.clip.length", path + ".clip.lengthSteps",
+                    "lengthSteps must be an integer from 1 through 32.");
+            else if (steps == nullptr || steps->size() != (int) lengthValue)
+                add(diagnostics, "lumus.clip.steps-capacity", path + ".clip.steps",
+                    "steps must contain exactly lengthSteps entries.");
+            else
+                for (int index = 0; index < steps->size(); ++index)
+                    if (!steps->getReference(index).isObject())
+                        add(diagnostics, "lumus.clip.step-shape",
+                            path + ".clip.steps[" + juce::String(index) + "]",
+                            "Each clip step must be an object.");
+            if (arpeggiator.isObject()
+                && (bool) arpeggiator.getProperty("enabled", false)
+                && (bool) clip.getProperty("enabled", false))
+                add(diagnostics, "lumus.performance-mode.conflict", path,
+                    "Arpeggiator and clip cannot both be enabled.");
+        }
     }
 
     std::vector<HybridSourceDocumentDiagnostic> validateHybridSourceDocument(const juce::var& document)
@@ -216,11 +317,15 @@ namespace beat
         {
             const auto& instrument = instruments->getReference(index);
             const auto aether = instrument.getProperty("aether", {});
-            if (!aether.isObject())
-                continue;
-            const auto path = "instruments[" + juce::String(index) + "].aether";
-            validateSampleSlot(aether, path, diagnostics);
-            validateGranularSlot(aether, path, diagnostics);
+            if (aether.isObject())
+            {
+                const auto path = "instruments[" + juce::String(index) + "].aether";
+                validateSampleSlot(aether, path, diagnostics);
+                validateGranularSlot(aether, path, diagnostics);
+            }
+            if (instrument.getProperty("synthEngine", {}).toString() == "lumus")
+                validateLumusConfig(instrument.getProperty("lumus", {}),
+                    "instruments[" + juce::String(index) + "].lumus", diagnostics);
         }
         return diagnostics;
     }

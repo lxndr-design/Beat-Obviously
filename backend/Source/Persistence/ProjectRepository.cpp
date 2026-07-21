@@ -287,6 +287,14 @@ namespace beat
             o->setProperty("octave", oscillator.octave);
             o->setProperty("semitone", oscillator.semitone);
             o->setProperty("fineCents", oscillator.fineCents);
+            o->setProperty("tuningMode", oscillator.tuningMode);
+            o->setProperty("harmonic", oscillator.harmonic);
+            o->setProperty("ratioNumerator", oscillator.ratioNumerator);
+            o->setProperty("ratioDenominator", oscillator.ratioDenominator);
+            o->setProperty("tuningStep", oscillator.tuningStep);
+            o->setProperty("tuningDivisions", oscillator.tuningDivisions);
+            o->setProperty("phaseMode", oscillator.phaseMode);
+            o->setProperty("routing", oscillator.routing);
             o->setProperty("phase", oscillator.phase);
             o->setProperty("randomPhase", oscillator.randomPhase);
             o->setProperty("fxSend1", oscillator.fxSends[0]);
@@ -309,6 +317,14 @@ namespace beat
             fallback.octave = juce::jlimit(-4, 4, (int) oscillatorVar.getProperty("octave", fallback.octave));
             fallback.semitone = juce::jlimit(-24, 24, (int) oscillatorVar.getProperty("semitone", fallback.semitone));
             fallback.fineCents = juce::jlimit(-100.0f, 100.0f, (float) (double) oscillatorVar.getProperty("fineCents", fallback.fineCents));
+            fallback.tuningMode = juce::jlimit(0, 3, (int) oscillatorVar.getProperty("tuningMode", fallback.tuningMode));
+            fallback.harmonic = juce::jlimit(1, 32, (int) oscillatorVar.getProperty("harmonic", fallback.harmonic));
+            fallback.ratioNumerator = juce::jlimit(1.0f, 32.0f, (float) (double) oscillatorVar.getProperty("ratioNumerator", fallback.ratioNumerator));
+            fallback.ratioDenominator = juce::jlimit(1.0f, 32.0f, (float) (double) oscillatorVar.getProperty("ratioDenominator", fallback.ratioDenominator));
+            fallback.tuningStep = juce::jlimit(-96, 96, (int) oscillatorVar.getProperty("tuningStep", fallback.tuningStep));
+            fallback.tuningDivisions = juce::jlimit(1, 96, (int) oscillatorVar.getProperty("tuningDivisions", fallback.tuningDivisions));
+            fallback.phaseMode = juce::jlimit(0, 2, (int) oscillatorVar.getProperty("phaseMode", fallback.phaseMode));
+            fallback.routing = juce::jlimit(0, 4, (int) oscillatorVar.getProperty("routing", fallback.routing));
             fallback.phase = juce::jlimit(0.0f, 1.0f, (float) (double) oscillatorVar.getProperty("phase", fallback.phase));
             fallback.randomPhase = juce::jlimit(0.0f, 1.0f, (float) (double) oscillatorVar.getProperty("randomPhase", fallback.randomPhase));
             fallback.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) (double) oscillatorVar.getProperty("fxSend1", fallback.fxSends[0]));
@@ -363,6 +379,7 @@ namespace beat
             sub->setProperty("level", aether.sub.level);
             sub->setProperty("octave", aether.sub.octave);
             sub->setProperty("waveform", aether.sub.waveform);
+            sub->setProperty("routing", aether.sub.routing);
             sub->setProperty("fxSend1", aether.sub.fxSends[0]);
             sub->setProperty("fxSend2", aether.sub.fxSends[1]);
             o->setProperty("sub", juce::var(sub.get()));
@@ -371,6 +388,7 @@ namespace beat
             noise->setProperty("enabled", aether.noise.enabled);
             noise->setProperty("level", aether.noise.level);
             noise->setProperty("color", aether.noise.color);
+            noise->setProperty("routing", aether.noise.routing);
             noise->setProperty("fxSend1", aether.noise.fxSends[0]);
             noise->setProperty("fxSend2", aether.noise.fxSends[1]);
             o->setProperty("noise", juce::var(noise.get()));
@@ -481,6 +499,7 @@ namespace beat
                 config.sub.level = juce::jlimit(0.0f, 1.0f, (float) (double) sub.getProperty("level", config.sub.level));
                 config.sub.octave = juce::jlimit(-4, 0, (int) sub.getProperty("octave", config.sub.octave));
                 config.sub.waveform = juce::jlimit(0, 8, (int) sub.getProperty("waveform", config.sub.waveform));
+                config.sub.routing = juce::jlimit(0, 4, (int) sub.getProperty("routing", config.sub.routing));
                 config.sub.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) (double) sub.getProperty("fxSend1", config.sub.fxSends[0]));
                 config.sub.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) (double) sub.getProperty("fxSend2", config.sub.fxSends[1]));
             }
@@ -491,6 +510,7 @@ namespace beat
                 config.noise.enabled = (bool) noise.getProperty("enabled", config.noise.enabled);
                 config.noise.level = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("level", config.noise.level));
                 config.noise.color = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("color", config.noise.color));
+                config.noise.routing = juce::jlimit(0, 4, (int) noise.getProperty("routing", config.noise.routing));
                 config.noise.fxSends[0] = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("fxSend1", config.noise.fxSends[0]));
                 config.noise.fxSends[1] = juce::jlimit(0.0f, 1.0f, (float) (double) noise.getProperty("fxSend2", config.noise.fxSends[1]));
             }
@@ -631,6 +651,136 @@ namespace beat
                     config.memberExpressionZone.enabled = false;
             }
             return config;
+        }
+
+        juce::var lumusConfigToVar(const InstrumentDefinition::LumusConfig& lumus)
+        {
+            juce::DynamicObject::Ptr object = new juce::DynamicObject();
+            object->setProperty("schemaVersion", 1);
+            object->setProperty("sourceRackSchemaVersion", lumus.sourceRackSchemaVersion);
+            object->setProperty("oscC", aetherOscillatorToVar(lumus.oscC));
+
+            juce::Array<juce::var> sampleSlots;
+            juce::Array<juce::var> sampleModes;
+            juce::Array<juce::var> granularSlots;
+            juce::Array<juce::var> granularModes;
+            for (size_t index = 0; index < lumus.sampleSlots.size(); ++index)
+            {
+                InstrumentDefinition::AetherConfig holder;
+                holder.sampleSlot1 = lumus.sampleSlots[index];
+                sampleSlots.add(aetherConfigToVar(holder).getProperty("sampleSlot1", {}));
+                sampleModes.add(lumus.sampleModes[index]);
+                holder.granularSlot2 = lumus.granularSlots[index];
+                granularSlots.add(aetherConfigToVar(holder).getProperty("granularSlot2", {}));
+                granularModes.add(lumus.granularModes[index]);
+            }
+            object->setProperty("sampleSlots", sampleSlots);
+            object->setProperty("sampleModes", sampleModes);
+            object->setProperty("granularSlots", granularSlots);
+            object->setProperty("granularModes", granularModes);
+
+            juce::DynamicObject::Ptr arpeggiator = new juce::DynamicObject();
+            arpeggiator->setProperty("enabled", lumus.arpeggiator.enabled);
+            arpeggiator->setProperty("mode", lumus.arpeggiator.mode);
+            arpeggiator->setProperty("rateDivision", lumus.arpeggiator.rateDivision);
+            arpeggiator->setProperty("gate", lumus.arpeggiator.gate);
+            arpeggiator->setProperty("swing", lumus.arpeggiator.swing);
+            arpeggiator->setProperty("octaves", lumus.arpeggiator.octaves);
+            arpeggiator->setProperty("rootPitchClass", lumus.arpeggiator.rootPitchClass);
+            arpeggiator->setProperty("scale", lumus.arpeggiator.scale);
+            object->setProperty("arpeggiator", juce::var(arpeggiator.get()));
+
+            juce::DynamicObject::Ptr clip = new juce::DynamicObject();
+            clip->setProperty("enabled", lumus.clip.enabled);
+            clip->setProperty("rateDivision", lumus.clip.rateDivision);
+            clip->setProperty("swing", lumus.clip.swing);
+            clip->setProperty("lengthSteps", lumus.clip.lengthSteps);
+            juce::Array<juce::var> steps;
+            for (int index = 0; index < juce::jlimit(1, (int) lumus.clip.steps.size(), lumus.clip.lengthSteps); ++index)
+            {
+                const auto& source = lumus.clip.steps[(size_t) index];
+                juce::DynamicObject::Ptr step = new juce::DynamicObject();
+                step->setProperty("enabled", source.enabled);
+                step->setProperty("pitchOffset", source.pitchOffset);
+                step->setProperty("lengthSteps", source.lengthSteps);
+                step->setProperty("velocity", source.velocity);
+                steps.add(juce::var(step.get()));
+            }
+            clip->setProperty("steps", steps);
+            object->setProperty("clip", juce::var(clip.get()));
+            return juce::var(object.get());
+        }
+
+        bool lumusConfigFromVar(const juce::var& value, InstrumentDefinition::LumusConfig& lumus)
+        {
+            if (!value.isObject() || (int) value.getProperty("schemaVersion", 0) != 1)
+                return false;
+            auto* sampleSlots = value.getProperty("sampleSlots", {}).getArray();
+            auto* sampleModes = value.getProperty("sampleModes", {}).getArray();
+            auto* granularSlots = value.getProperty("granularSlots", {}).getArray();
+            auto* granularModes = value.getProperty("granularModes", {}).getArray();
+            if (sampleSlots == nullptr || sampleModes == nullptr || granularSlots == nullptr || granularModes == nullptr
+                || sampleSlots->size() != 3 || sampleModes->size() != 3
+                || granularSlots->size() != 3 || granularModes->size() != 3)
+                return false;
+
+            lumus.sourceRackSchemaVersion = juce::jlimit(1, 2,
+                (int) value.getProperty("sourceRackSchemaVersion", lumus.sourceRackSchemaVersion));
+            lumus.oscC = aetherOscillatorFromVar(value.getProperty("oscC", {}), lumus.oscC);
+            for (int index = 0; index < 3; ++index)
+            {
+                juce::DynamicObject::Ptr sampleHolder = new juce::DynamicObject();
+                sampleHolder->setProperty("sampleSlot1", sampleSlots->getReference(index));
+                lumus.sampleSlots[(size_t) index] = aetherConfigFromVar(
+                    juce::var(sampleHolder.get()), {}).sampleSlot1;
+                lumus.sampleModes[(size_t) index] = (bool) sampleModes->getReference(index);
+
+                juce::DynamicObject::Ptr granularHolder = new juce::DynamicObject();
+                granularHolder->setProperty("granularSlot2", granularSlots->getReference(index));
+                lumus.granularSlots[(size_t) index] = aetherConfigFromVar(
+                    juce::var(granularHolder.get()), {}).granularSlot2;
+                lumus.granularModes[(size_t) index] = (bool) granularModes->getReference(index);
+            }
+
+            const auto arpeggiator = value.getProperty("arpeggiator", {});
+            const auto validRate = [] (int rate) { return rate == 4 || rate == 8 || rate == 16 || rate == 32; };
+            if (!arpeggiator.isObject()) return false;
+            lumus.arpeggiator.enabled = (bool) arpeggiator.getProperty("enabled", false);
+            lumus.arpeggiator.mode = juce::jlimit(0, 3, (int) arpeggiator.getProperty("mode", 0));
+            const int arpRate = (int) arpeggiator.getProperty("rateDivision", 16);
+            if (!validRate(arpRate)) return false;
+            lumus.arpeggiator.rateDivision = arpRate;
+            lumus.arpeggiator.gate = juce::jlimit(0.05f, 1.0f, (float) (double) arpeggiator.getProperty("gate", 0.75));
+            lumus.arpeggiator.swing = juce::jlimit(0.0f, 0.75f, (float) (double) arpeggiator.getProperty("swing", 0.0));
+            lumus.arpeggiator.octaves = juce::jlimit(1, 4, (int) arpeggiator.getProperty("octaves", 1));
+            lumus.arpeggiator.rootPitchClass = juce::jlimit(0, 11, (int) arpeggiator.getProperty("rootPitchClass", 0));
+            lumus.arpeggiator.scale = juce::jlimit(0, 4, (int) arpeggiator.getProperty("scale", 0));
+
+            const auto clip = value.getProperty("clip", {});
+            auto* steps = clip.getProperty("steps", {}).getArray();
+            const int clipLength = (int) clip.getProperty("lengthSteps", 0);
+            const int clipRate = (int) clip.getProperty("rateDivision", 16);
+            if (!clip.isObject() || steps == nullptr || clipLength < 1 || clipLength > 32
+                || steps->size() != clipLength || !validRate(clipRate))
+                return false;
+            lumus.clip.enabled = (bool) clip.getProperty("enabled", false);
+            lumus.clip.rateDivision = clipRate;
+            lumus.clip.swing = juce::jlimit(0.0f, 0.75f, (float) (double) clip.getProperty("swing", 0.0));
+            lumus.clip.lengthSteps = clipLength;
+            if (lumus.clip.enabled && lumus.arpeggiator.enabled) return false;
+            for (int index = 0; index < clipLength; ++index)
+            {
+                const auto& source = steps->getReference(index);
+                if (!source.isObject()) return false;
+                auto& destination = lumus.clip.steps[(size_t) index];
+                destination.enabled = (bool) source.getProperty("enabled", false);
+                destination.pitchOffset = juce::jlimit(-48, 48, (int) source.getProperty("pitchOffset", 0));
+                destination.lengthSteps = juce::jlimit(1, clipLength - index,
+                    (int) source.getProperty("lengthSteps", 1));
+                destination.velocity = juce::jlimit(0.001f, 1.0f,
+                    (float) (double) source.getProperty("velocity", 1.0));
+            }
+            return true;
         }
 
         juce::var dynamicModTargetToVar(const InstrumentDefinition::DynamicModTarget& target)
@@ -1299,8 +1449,12 @@ namespace beat
             o->setProperty("macroValues", macroValues);
             o->setProperty("dynamicModulation", dynamicModulationToVar(instrument.dynamicModulation));
             o->setProperty("hasAether", instrument.hasAether);
+            o->setProperty("synthEngine", instrument.synthEngine == InstrumentDefinition::SynthEngine::Lumus
+                ? "lumus" : instrument.synthEngine == InstrumentDefinition::SynthEngine::Aether ? "aether" : "none");
             if (instrument.hasAether)
                 o->setProperty("aether", aetherConfigToVar(instrument.aether));
+            if (instrument.synthEngine == InstrumentDefinition::SynthEngine::Lumus)
+                o->setProperty("lumus", lumusConfigToVar(instrument.lumus));
             if (instrument.nodeGraph)
                 o->setProperty("nodeGraph", nodemapGraphToVar(*instrument.nodeGraph));
             if (!instrument.taxonomy.isVoid())
@@ -1539,6 +1693,18 @@ namespace beat
                     {
                         instrument.hasAether = true;
                         instrument.aether = aetherConfigFromVar(aether, globalWavetable);
+                    }
+                    const auto synthEngine = iv.getProperty("synthEngine", {}).toString();
+                    if (synthEngine == "lumus")
+                    {
+                        if (!lumusConfigFromVar(iv.getProperty("lumus", {}), instrument.lumus))
+                            continue;
+                        instrument.synthEngine = InstrumentDefinition::SynthEngine::Lumus;
+                        instrument.hasAether = true;
+                    }
+                    else if (synthEngine == "aether" || (synthEngine.isEmpty() && instrument.hasAether))
+                    {
+                        instrument.synthEngine = InstrumentDefinition::SynthEngine::Aether;
                     }
                     instrument.nodeGraph = nodemapGraphFromVar(iv.getProperty("nodeGraph", {}));
 

@@ -183,6 +183,33 @@ try {
   const restoredLumus = synthStore.synthDraftFromInstrument({ id: "lumus-roundtrip", ...lumusInstrumentPatch });
   assert.equal(restoredLumus.instrumentType, "lumus-hybrid-synth", "instrument roundtrip must not migrate Lumus into Aether");
   assert.equal(restoredLumus.namespace, "lumus");
+  const routedLumus = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumusDraft),
+    parameters: {
+      ...lumusDraft.parameters,
+      "osc.c.enabled": true,
+      "osc.c.route": "filter2",
+      "osc.c.fxSend1": 0.64,
+      "aether.fxBus1Id": "lumus-return-a",
+      "aether.fxBus2Id": "lumus-return-b",
+    },
+    effects: { filters: [
+      { id: "lumus-drive", kind: "saturator", bypassed: false, params: { drive: 58, mix: 72 } },
+      { id: "lumus-tone", kind: "lowpass", bypassed: true, params: { cutoffHz: 4200, resonance: 18 } },
+    ] },
+  });
+  const routedInstrument = synthStore.synthDraftToInstrumentPatch(routedLumus);
+  assert.deepEqual(routedInstrument.aether.fxBusIds, ["lumus-return-a", "lumus-return-b"]);
+  assert.deepEqual(routedInstrument.aether.oscillators?.find(({ id }) => id === "c")?.fxSends, [0.64, 0]);
+  assert.deepEqual(routedInstrument.effects.filters.map(({ id }) => id), ["lumus-drive", "lumus-tone"]);
+  const restoredRoutedLumus = synthStore.synthDraftFromInstrument({ id: "lumus-routing-roundtrip", ...routedInstrument });
+  assert.equal(restoredRoutedLumus.parameters["osc.c.route"], "filter2");
+  assert.equal(restoredRoutedLumus.parameters["osc.c.fxSend1"], 0.64);
+  assert.equal(restoredRoutedLumus.parameters["aether.fxBus1Id"], "lumus-return-a");
+  assert.deepEqual(restoredRoutedLumus.effects.filters.map(({ id, bypassed }) => ({ id, bypassed })), [
+    { id: "lumus-drive", bypassed: false },
+    { id: "lumus-tone", bypassed: true },
+  ]);
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({ ...lumusDraft, namespace: "synth" }),
     /lumus\.identity\.namespace-mismatch/,

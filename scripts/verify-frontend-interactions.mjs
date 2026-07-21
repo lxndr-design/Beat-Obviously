@@ -1275,7 +1275,8 @@ try {
   );
   assert.ok(
     editorHostSource.includes("Instrument - Aether Engine")
-      && synthEditorSource.includes('aria-label="Aether output preview"')
+      && synthEditorSource.includes('`${props.instrumentName} output preview`')
+      && synthEditorSource.includes('instrumentName={draft().instrumentType === "lumus-hybrid-synth" ? "Lumus" : "Aether"}')
       && synthEditorSource.includes('label="Name"')
       && synthEditorSource.includes('label="Category"')
       && synthEditorSource.includes('label="Instrument"')
@@ -1319,9 +1320,9 @@ try {
     "browser fixture coverage should exercise Aether oscillator, disabled-row, and voice-stack editing",
   );
   assert.ok(
-    synthEditorSource.includes('aria-label="Aether instrument effects"')
+    synthEditorSource.includes('"Lumus instrument effects" : "Aether instrument effects"')
       && synthEditorSource.includes('aria-label="Add instrument effect"')
-      && synthEditorSource.includes('aria-label="Current Aether FX chain"')
+      && synthEditorSource.includes('"Current Lumus FX chain" : "Current Aether FX chain"')
       && synthEditorSource.includes("Drag ${EFFECT_LABELS[effect.kind]} to reorder")
       && synthEditorSource.includes("Bypass")
       && synthEditorSource.includes("Remove ${EFFECT_LABELS[effect.kind]}"),
