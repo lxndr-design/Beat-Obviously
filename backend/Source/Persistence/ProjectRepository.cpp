@@ -404,6 +404,7 @@ namespace beat
                 case 1: return "saw";
                 case 2: return "square";
                 case 3: return "triangle";
+                case 4: return "additive";
                 default: return "sine";
             }
         }
@@ -414,13 +415,14 @@ namespace beat
             if (name == "saw") return 1;
             if (name == "square") return 2;
             if (name == "triangle") return 3;
-            return value.isInt() ? juce::jlimit(0, 3, (int) value) : 0;
+            if (name == "additive") return 4;
+            return value.isInt() ? juce::jlimit(0, 4, (int) value) : 0;
         }
 
         juce::var aurumConfigToVar(const InstrumentDefinition::AurumConfig& aurum)
         {
             juce::DynamicObject::Ptr object = new juce::DynamicObject();
-            object->setProperty("version", 2);
+            object->setProperty("version", 3);
             object->setProperty("unison", aurum.unison);
             object->setProperty("detuneCents", aurum.detuneCents);
             object->setProperty("stereoSpread", aurum.stereoSpread);
@@ -444,6 +446,9 @@ namespace beat
                 envelope->setProperty("sustain", source.sustain);
                 envelope->setProperty("releaseMs", source.releaseMs);
                 op->setProperty("envelope", juce::var(envelope.get()));
+                juce::Array<juce::var> harmonics;
+                for (const auto amplitude : source.harmonics) harmonics.add(amplitude);
+                op->setProperty("harmonics", juce::var(harmonics));
                 operators.add(juce::var(op.get()));
             }
             object->setProperty("operators", operators);
@@ -488,6 +493,9 @@ namespace beat
                     op.decayMs = juce::jlimit(0.0f, 10000.0f, (float) (double) envelope.getProperty("decayMs", 500.0));
                     op.sustain = juce::jlimit(0.0f, 1.0f, (float) (double) envelope.getProperty("sustain", 0.7));
                     op.releaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) envelope.getProperty("releaseMs", 300.0));
+                    if (auto* harmonics = source.getProperty("harmonics", {}).getArray())
+                        for (int harmonic = 0; harmonic < juce::jmin(16, harmonics->size()); ++harmonic)
+                            op.harmonics[(size_t) harmonic] = juce::jlimit(0.0f, 1.0f, (float) (double) harmonics->getReference(harmonic));
                 }
             if (auto* rows = value.getProperty("matrix", {}).getArray())
                 for (int source = 0; source < juce::jmin(6, rows->size()); ++source)

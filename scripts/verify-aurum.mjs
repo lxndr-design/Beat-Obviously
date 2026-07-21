@@ -31,8 +31,9 @@ try {
   assert.deepEqual(instrument.aurum.matrix.map((row) => row.length), [7, 7, 7, 7, 7, 7], "Aurum matrix must expose six destinations plus output");
   assert.equal(instrument.aurum.matrix[1][0], 0.42, "Default patch must route OP 2 into OP 1");
   assert.equal(instrument.aurum.matrix[0][6], 0.86, "Default patch must route OP 1 to output");
-  assert.equal(instrument.aurum.version, 2, "Aurum RM patches must use schema version 2");
+  assert.equal(instrument.aurum.version, 3, "Aurum additive patches must use schema version 3");
   assert.deepEqual(instrument.aurum.rmMatrix.map((row) => row.length), [6, 6, 6, 6, 6, 6], "Aurum RM matrix must expose six operator destinations");
+  assert.ok(instrument.aurum.operators.every((operator) => operator.harmonics.length === 16), "Every Aurum operator must expose 16 additive harmonics");
 
   const baseline = new Float32Array(4096);
   preview.renderInstrumentSamples(instrument, baseline, 48000, 220, "visual", true);
@@ -99,6 +100,24 @@ try {
   const rmInversionResidual = positiveRmSamples.reduce((sum, sample, index) => sum + Math.abs(sample + negativeRmSamples[index]), 0) / positiveRmSamples.length;
   assert.ok(rmInversionResidual < 0.0001, `Negative full-depth RM must invert the ring-modulated carrier, got residual ${rmInversionResidual}`);
 
+  const additive = structuredClone(dryRm);
+  additive.aurum.operators[0].waveform = "additive";
+  additive.aurum.operators[0].harmonics = Array.from({ length: 16 }, (_, index) => index === 0 ? 1 : 0);
+  const additiveFundamental = new Float32Array(4096);
+  preview.renderInstrumentSamples(additive, additiveFundamental, 48000, 220, "visual", false);
+  additive.aurum.operators[0].harmonics = Array.from({ length: 16 }, (_, index) => index === 2 ? 1 : 0);
+  const additiveThird = new Float32Array(4096);
+  preview.renderInstrumentSamples(additive, additiveThird, 48000, 220, "visual", false);
+  const additiveDifference = additiveFundamental.reduce((sum, sample, index) => sum + Math.abs(sample - additiveThird[index]), 0) / additiveFundamental.length;
+  const additivePeak = additiveThird.reduce((peakValue, sample) => Math.max(peakValue, Math.abs(sample)), 0);
+  assert.ok(additiveDifference > 0.005, `Changing additive harmonics must alter the operator waveform, got mean difference ${additiveDifference}`);
+  assert.ok(additivePeak > 0.01 && additivePeak <= 1, `Additive rendering must remain audible and bounded, got peak ${additivePeak}`);
+  additive.aurum.operators[0].harmonics = Array.from({ length: 16 }, (_, index) => index === 15 ? 1 : 0);
+  const suppressedAboveNyquist = new Float32Array(1024);
+  preview.renderInstrumentSamples(additive, suppressedAboveNyquist, 48000, 4000, "visual", false);
+  const nyquistPeak = suppressedAboveNyquist.reduce((peakValue, sample) => Math.max(peakValue, Math.abs(sample)), 0);
+  assert.ok(nyquistPeak < 0.000001, `Additive harmonics above Nyquist must be suppressed, got peak ${nyquistPeak}`);
+
   const stereoPatch = structuredClone(instrument);
   stereoPatch.aurum.unison = 3;
   stereoPatch.aurum.detuneCents = 14;
@@ -109,7 +128,8 @@ try {
   const stereoDifference = left.reduce((sum, sample, index) => sum + Math.abs(sample - right[index]), 0) / left.length;
   assert.ok(stereoDifference > 0.005, `Aurum spread must create stereo separation, got mean difference ${stereoDifference}`);
 
-  const malformed = aurum.normalizedAurumConfig({ ...instrument.aurum, operators: instrument.aurum.operators.slice(0, 1), matrix: [[4, -4]], rmMatrix: [[4, -4]] });
+  const malformedOperator = { ...instrument.aurum.operators[0], harmonics: [4, -4] };
+  const malformed = aurum.normalizedAurumConfig({ ...instrument.aurum, operators: [malformedOperator], matrix: [[4, -4]], rmMatrix: [[4, -4]] });
   assert.equal(malformed.operators.length, 6, "Normalization must restore missing operators");
   assert.equal(malformed.matrix[0][0], 1, "Normalization must clamp matrix values");
   assert.equal(malformed.matrix[0][1], -1, "Normalization must preserve and clamp negative matrix values");
@@ -117,13 +137,22 @@ try {
   assert.equal(malformed.rmMatrix[0][0], 1, "Normalization must clamp positive RM values");
   assert.equal(malformed.rmMatrix[0][1], -1, "Normalization must preserve and clamp negative RM values");
   assert.equal(malformed.rmMatrix[5].length, 6, "Normalization must restore RM matrix geometry");
+  assert.equal(malformed.operators[0].harmonics[0], 1, "Normalization must clamp positive harmonic amplitudes");
+  assert.equal(malformed.operators[0].harmonics[1], 0, "Normalization must clamp negative harmonic amplitudes");
+  assert.equal(malformed.operators[0].harmonics.length, 16, "Normalization must restore harmonic geometry");
 
   const legacyConfig = structuredClone(instrument.aurum);
-  legacyConfig.version = 1;
-  delete legacyConfig.rmMatrix;
+  legacyConfig.version = 2;
+  legacyConfig.operators.forEach((operator) => delete operator.harmonics);
   const migrated = aurum.normalizedAurumConfig(legacyConfig);
-  assert.equal(migrated.version, 2, "Version 1 Aurum patches must migrate to schema version 2");
-  assert.ok(migrated.rmMatrix.every((row) => row.length === 6 && row.every((value) => value === 0)), "Migrated patches must add an inactive RM matrix without changing sound");
+  assert.equal(migrated.version, 3, "Version 2 Aurum patches must migrate to schema version 3");
+  assert.ok(migrated.operators.every((operator) => operator.harmonics[0] === 1 && operator.harmonics.slice(1).every((value) => value === 0)), "Migrated operators must add a fundamental-only spectrum without changing sound");
+  const versionOneConfig = structuredClone(legacyConfig);
+  versionOneConfig.version = 1;
+  delete versionOneConfig.rmMatrix;
+  const versionOneMigrated = aurum.normalizedAurumConfig(versionOneConfig);
+  assert.ok(versionOneMigrated.rmMatrix.every((row) => row.length === 6 && row.every((value) => value === 0)), "Version 1 patches must retain an inactive RM matrix during migration");
+  assert.deepEqual(aurum.drawAurumHarmonicLine(Array(16).fill(0), 0, 1, 3, 0.25).slice(0, 4), [1, 0.75, 0.5, 0.25], "Harmonic drawing must interpolate crossed bins");
 
   assert.equal(interaction.aurumTabIndexAfterKey(0, "ArrowRight"), 1, "Right arrow must advance from Main to OP 1");
   assert.equal(interaction.aurumTabIndexAfterKey(6, "ArrowRight"), 0, "Right arrow must wrap from OP 6 to Main");

@@ -485,7 +485,7 @@ export interface AetherSynthConfig {
   runtimeWarpMode?: WavetableWarpMode;
 }
 
-export type AurumOperatorWaveform = "sine" | "triangle" | "saw" | "square";
+export type AurumOperatorWaveform = "sine" | "triangle" | "saw" | "square" | "additive";
 
 export interface AurumOperatorConfig {
   id: string;
@@ -497,6 +497,7 @@ export interface AurumOperatorConfig {
   fineCents: number;
   level: number;
   phase: number;
+  harmonics: number[];
   envelope: AdsrEnvelope;
 }
 
@@ -504,7 +505,7 @@ export interface AurumOperatorConfig {
  * are FM destinations and column 6 is direct output. Diagonal values are
  * operator feedback. */
 export interface AurumSynthConfig {
-  version: 2;
+  version: 3;
   operators: AurumOperatorConfig[];
   matrix: number[][];
   rmMatrix: number[][];

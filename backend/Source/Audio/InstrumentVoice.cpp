@@ -28,6 +28,27 @@ namespace beat
             return VoiceMath::clamp01(op.sustain);
         }
 
+        float aurumOperatorSample(
+            const InstrumentVoice::Params::AurumOperator& op,
+            double phase,
+            double phaseDelta) noexcept
+        {
+            if (op.waveform != 4)
+                return BasicOscillator::sample(op.waveform, phase, phaseDelta);
+            float sample = 0.0f;
+            float weight = 0.0f;
+            for (size_t index = 0; index < op.harmonics.size(); ++index)
+            {
+                const auto harmonic = (double) index + 1.0;
+                if (harmonic * std::abs(phaseDelta) >= 0.5) break;
+                const float amplitude = VoiceMath::clamp01(op.harmonics[index]);
+                if (amplitude <= 0.0001f) continue;
+                sample += std::sin(juce::MathConstants<double>::twoPi * phase * harmonic) * amplitude;
+                weight += amplitude;
+            }
+            return weight > 0.0f ? sample / weight : 0.0f;
+        }
+
         float runtimeWarpShape(float input, float amount, int mode) noexcept
         {
             const float drive = VoiceMath::clamp01(amount);
@@ -572,7 +593,7 @@ namespace beat
                             if (std::abs(amount) <= 0.0001f) continue;
                             rmGain *= 1.0f - std::abs(amount) + aurumOutputs[voiceOffset + source] * amount;
                         }
-                        nextOutputs[voiceOffset + target] = BasicOscillator::sample(op.waveform, aurumPhases[voiceOffset + target] + fm * 1.9, delta)
+                        nextOutputs[voiceOffset + target] = aurumOperatorSample(op, aurumPhases[voiceOffset + target] + fm * 1.9, delta)
                             * VoiceMath::clamp01(op.level) * opEnvelope * rmGain;
                         aurumPhases[voiceOffset + target] = std::fmod(aurumPhases[voiceOffset + target] + delta, 1.0);
                         currentBlockWork.addOscillatorSamples(1);

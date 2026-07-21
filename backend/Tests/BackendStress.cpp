@@ -7259,8 +7259,11 @@ namespace
         instrument.hasAurum = true;
         instrument.hasAether = false;
         instrument.aurum.operators[0].enabled = true;
+        instrument.aurum.operators[0].waveform = 4;
         instrument.aurum.operators[0].level = 0.8f;
         instrument.aurum.operators[0].releaseMs = 1234.0f;
+        instrument.aurum.operators[0].harmonics[2] = 0.64f;
+        instrument.aurum.operators[0].harmonics[7] = 0.22f;
         instrument.aurum.operators[1].enabled = true;
         instrument.aurum.operators[1].ratio = 2.0f;
         instrument.aurum.operators[1].level = 0.55f;
@@ -7288,6 +7291,9 @@ namespace
             && near(loaded->instruments.front().aurum.rmMatrix[2][1], -0.31f)
             && near(loaded->instruments.front().aurum.operators[0].releaseMs, 1234.0f)
             && near(loaded->instruments.front().aurum.operators[1].releaseMs, 87.0f)
+            && loaded->instruments.front().aurum.operators[0].waveform == 4
+            && near(loaded->instruments.front().aurum.operators[0].harmonics[2], 0.64f)
+            && near(loaded->instruments.front().aurum.operators[0].harmonics[7], 0.22f)
             && loaded->instruments.front().aurum.unison == 3
             && near(loaded->instruments.front().aurum.detuneCents, 11.0f)
             && near(loaded->instruments.front().aurum.stereoSpread, 0.57f);
@@ -12453,6 +12459,71 @@ namespace
         return ok;
     }
 
+    bool stressInstrumentVoiceAurumAdditiveOperator()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.drive01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 1.0f;
+        params.sustain = 0.0f;
+        params.releaseMs = 1.0f;
+        params.aurumOperators[0] = { true, 4, 1.0f, 0, 0.0f, 0.8f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
+        params.aurumMatrix[0][6] = 1.0f;
+
+        auto render = [](const beat::InstrumentVoice::Params& renderParams, int midiNote)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 4096);
+            voice.setParams(renderParams);
+            voice.startNote(midiNote, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        params.aurumOperators[0].harmonics.fill(0.0f);
+        params.aurumOperators[0].harmonics[0] = 1.0f;
+        const auto fundamental = render(params, 57);
+        params.aurumOperators[0].harmonics.fill(0.0f);
+        params.aurumOperators[0].harmonics[2] = 1.0f;
+        const auto third = render(params, 57);
+        params.aurumOperators[0].harmonics.fill(0.0f);
+        params.aurumOperators[0].harmonics[15] = 1.0f;
+        const auto aboveNyquist = render(params, 107);
+
+        double difference = 0.0;
+        double thirdEnergy = 0.0;
+        double suppressedEnergy = 0.0;
+        float peak = 0.0f;
+        for (int channel = 0; channel < fundamental.getNumChannels(); ++channel)
+            for (int sampleIndex = 0; sampleIndex < fundamental.getNumSamples(); ++sampleIndex)
+            {
+                const auto fundamentalSample = (double) fundamental.getSample(channel, sampleIndex);
+                const auto thirdSample = (double) third.getSample(channel, sampleIndex);
+                const auto suppressedSample = (double) aboveNyquist.getSample(channel, sampleIndex);
+                if (!std::isfinite(fundamentalSample) || !std::isfinite(thirdSample) || !std::isfinite(suppressedSample))
+                    return false;
+                difference += std::abs(fundamentalSample - thirdSample);
+                thirdEnergy += thirdSample * thirdSample;
+                suppressedEnergy += suppressedSample * suppressedSample;
+                peak = juce::jmax(peak, (float) std::abs(thirdSample));
+            }
+
+        const bool ok = difference > 0.1 && thirdEnergy > 0.001 && peak <= 1.0f && suppressedEnergy < 0.000001;
+        if (!ok)
+            std::cerr << "Aurum additive operator stress failed difference=" << difference
+                      << " thirdEnergy=" << thirdEnergy
+                      << " peak=" << peak
+                      << " suppressedEnergy=" << suppressedEnergy << "\n";
+        return ok;
+    }
+
     bool stressInstrumentVoiceWavetablePath()
     {
         beat::InstrumentVoice::Params params;
@@ -13778,6 +13849,7 @@ int main(int argc, char** argv)
         const bool ok = stressInstrumentVoiceAurumBipolarMatrix()
             && stressInstrumentVoiceAurumOperatorRelease()
             && stressInstrumentVoiceAurumRingMatrix()
+            && stressInstrumentVoiceAurumAdditiveOperator()
             && stressProjectRepositoryAurumInstrumentRoundtrip();
         if (!ok)
         {
@@ -13940,6 +14012,11 @@ int main(int argc, char** argv)
     if (!stressInstrumentVoiceAurumRingMatrix())
     {
         std::cerr << "Instrument voice Aurum ring matrix stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumAdditiveOperator())
+    {
+        std::cerr << "Instrument voice Aurum additive operator stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceBandlimitedBasicOscillators())

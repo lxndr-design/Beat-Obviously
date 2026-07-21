@@ -26,7 +26,7 @@ Exit gate: identical patches survive save/load, produce finite audible browser/n
 ## M2: Operator depth
 
 - `[x]` Basic sine, triangle, saw, and square sources with ratio, coarse, fine, phase, level, and ADSR controls.
-- `[ ]` Editable additive harmonic spectrum per operator.
+- `[x]` Each operator has an editable 16-partial additive spectrum with bounded normalization, Nyquist suppression, browser/native rendering, and versioned persistence.
 - `[ ]` Operator waveshaping with a live waveform preview driven by engine data.
 - `[ ]` Independent pitch, phase, and amplitude articulation.
 - `[ ]` Velocity and keyboard tracking curves.
@@ -76,5 +76,5 @@ Exit gate: the release report distinguishes verified audio behavior, performance
 
 ## Immediate order
 
-1. Add the additive harmonic editor.
-2. Add native Aurum live/export and cross-rate gates before expanding filters or content.
+1. Add native Aurum live/export and cross-rate gates before expanding filters or content.
+2. Add explicit feedback stability limits and dense-matrix stress.

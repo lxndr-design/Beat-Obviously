@@ -1,12 +1,12 @@
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { Button, FloatingSelect, Icon, Knob, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
 import { startInstrumentPreviewAudition, type InstrumentPreviewAuditionHandle } from "../../audio/synthPreview";
-import { AURUM_OPERATOR_COUNT, AURUM_OUTPUT_COLUMN, normalizedAurumConfig } from "../../state/aurum";
+import { AURUM_HARMONIC_COUNT, AURUM_OPERATOR_COUNT, AURUM_OUTPUT_COLUMN, drawAurumHarmonicLine, normalizedAurumConfig } from "../../state/aurum";
 import type { AurumOperatorConfig, AurumOperatorWaveform, Instrument } from "../../state/types";
 import { aurumTabIndexAfterKey } from "./aurumEditorInteraction";
 import styles from "./AurumEditor.module.css";
 
-const WAVEFORM_OPTIONS = ["sine", "triangle", "saw", "square"].map((value) => ({
+const WAVEFORM_OPTIONS = ["sine", "triangle", "saw", "square", "additive"].map((value) => ({
   value,
   label: value[0].toUpperCase() + value.slice(1),
 }));
@@ -108,7 +108,7 @@ export function AurumEditor(props: AurumEditorProps) {
           <span class={styles.mark}>AU</span>
           <div>
             <h2>Aurum</h2>
-            <p>Six-operator frequency and ring modulation</p>
+            <p>Six-operator FM, RM, and additive synthesis</p>
           </div>
         </div>
         <TextInput
@@ -192,7 +192,7 @@ export function AurumEditor(props: AurumEditorProps) {
                 <Toggle label="Enabled" checked={operator().enabled} onChange={(enabled) => updateOperator({ enabled })} />
               </div>
               <div class={styles.waveRow}>
-                <WaveformScope waveform={operator().waveform} phase={operator().phase} />
+                <WaveformScope waveform={operator().waveform} phase={operator().phase} harmonics={operator().harmonics} />
                 <div class={styles.waveControls}>
                   <FloatingSelect
                     label="Wave"
@@ -206,6 +206,19 @@ export function AurumEditor(props: AurumEditorProps) {
                   <Slider label="Phase" layout="inline" min={0} max={1} step={0.01} value={operator().phase} readout={<span>{Math.round(operator().phase * 360)}°</span>} onChange={(phase) => updateOperator({ phase })} />
                 </div>
               </div>
+              <Show when={operator().waveform === "additive"}>
+                <div class={styles.controlBlock}>
+                  <div class={styles.harmonicHeader}>
+                    <h4>Harmonic spectrum</h4>
+                    <div class={styles.harmonicPresets} aria-label="Harmonic presets">
+                      <Button size="xs" variant="ghost" onClick={() => updateOperator({ harmonics: harmonicPreset("fundamental") })}>Fund.</Button>
+                      <Button size="xs" variant="ghost" onClick={() => updateOperator({ harmonics: harmonicPreset("odd") })}>Odd</Button>
+                      <Button size="xs" variant="ghost" onClick={() => updateOperator({ harmonics: harmonicPreset("saw") })}>Saw</Button>
+                    </div>
+                  </div>
+                  <HarmonicEditor values={operator().harmonics} onChange={(harmonics) => updateOperator({ harmonics })} />
+                </div>
+              </Show>
               <div class={styles.controlBlock}>
                 <h4>Tuning and level</h4>
                 <div class={styles.controlGrid}>
@@ -310,11 +323,11 @@ export function AurumEditor(props: AurumEditorProps) {
   );
 }
 
-function WaveformScope(props: { waveform: AurumOperatorWaveform; phase: number }) {
+function WaveformScope(props: { waveform: AurumOperatorWaveform; phase: number; harmonics: number[] }) {
   const points = createMemo(() => Array.from({ length: 73 }, (_, index) => {
     const x = index / 72;
     const phase = (x + props.phase) % 1;
-    const sample = waveformSample(props.waveform, phase);
+    const sample = waveformSample(props.waveform, phase, props.harmonics);
     return `${(x * 144).toFixed(1)},${(36 - sample * 27).toFixed(1)}`;
   }).join(" "));
 
@@ -328,11 +341,96 @@ function WaveformScope(props: { waveform: AurumOperatorWaveform; phase: number }
   );
 }
 
-function waveformSample(waveform: AurumOperatorWaveform, phase: number) {
+function waveformSample(waveform: AurumOperatorWaveform, phase: number, harmonics: number[]) {
+  if (waveform === "additive") {
+    let sample = 0;
+    let weight = 0;
+    for (let index = 0; index < AURUM_HARMONIC_COUNT; index += 1) {
+      const amplitude = Math.max(0, Math.min(1, harmonics[index] ?? 0));
+      sample += Math.sin(phase * Math.PI * 2 * (index + 1)) * amplitude;
+      weight += amplitude;
+    }
+    return weight > 0 ? sample / weight : 0;
+  }
   if (waveform === "triangle") return 1 - 4 * Math.abs(phase - 0.5);
   if (waveform === "saw") return phase * 2 - 1;
   if (waveform === "square") return phase < 0.5 ? 1 : -1;
   return Math.sin(phase * Math.PI * 2);
+}
+
+function HarmonicEditor(props: { values: number[]; onChange: (values: number[]) => void }) {
+  const [lastPoint, setLastPoint] = createSignal<{ index: number; value: number } | null>(null);
+  const values = createMemo(() => Array.from({ length: AURUM_HARMONIC_COUNT }, (_, index) => Math.max(0, Math.min(1, props.values[index] ?? 0))));
+
+  function pointerPoint(event: PointerEvent & { currentTarget: HTMLDivElement }) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width - 0.001, event.clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    return {
+      index: Math.max(0, Math.min(AURUM_HARMONIC_COUNT - 1, Math.floor((x / Math.max(1, rect.width)) * AURUM_HARMONIC_COUNT))),
+      value: Math.max(0, Math.min(1, 1 - y / Math.max(1, rect.height))),
+    };
+  }
+
+  function updateFromPointer(event: PointerEvent & { currentTarget: HTMLDivElement }) {
+    const point = pointerPoint(event);
+    const previous = lastPoint() ?? point;
+    props.onChange(drawAurumHarmonicLine(values(), previous.index, previous.value, point.index, point.value));
+    setLastPoint(point);
+  }
+
+  function updateBin(index: number, value: number) {
+    const next = [...values()];
+    next[index] = Math.max(0, Math.min(1, value));
+    props.onChange(next);
+  }
+
+  return (
+    <div
+      class={styles.harmonicEditor}
+      aria-label="Additive harmonic spectrum"
+      onPointerDown={(event) => {
+        event.currentTarget.setPointerCapture(event.pointerId);
+        setLastPoint(null);
+        updateFromPointer(event);
+      }}
+      onPointerMove={(event) => { if (event.buttons === 1) updateFromPointer(event); }}
+      onPointerUp={() => setLastPoint(null)}
+      onPointerCancel={() => setLastPoint(null)}
+    >
+      <For each={values()}>{(value, index) => (
+        <div
+          class={styles.harmonicBin}
+          role="slider"
+          tabIndex={0}
+          aria-label={`Harmonic ${index() + 1}`}
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow={Math.round(value * 100)}
+          title={`H${index() + 1} ${Math.round(value * 100)}%`}
+          onKeyDown={(event) => {
+            const steps: Record<string, number> = { ArrowUp: 0.05, ArrowRight: 0.05, ArrowDown: -0.05, ArrowLeft: -0.05, PageUp: 0.1, PageDown: -0.1 };
+            if (event.key === "Home" || event.key === "End" || event.key in steps) {
+              event.preventDefault();
+              updateBin(index(), event.key === "Home" ? 0 : event.key === "End" ? 1 : value + steps[event.key]);
+            }
+          }}
+        >
+          <span style={{ height: `${Math.max(1, value * 100)}%` }} />
+          <small>{index() + 1}</small>
+        </div>
+      )}</For>
+    </div>
+  );
+}
+
+function harmonicPreset(preset: "fundamental" | "odd" | "saw") {
+  return Array.from({ length: AURUM_HARMONIC_COUNT }, (_, index) => {
+    const harmonic = index + 1;
+    if (preset === "fundamental") return harmonic === 1 ? 1 : 0;
+    if (preset === "odd") return harmonic % 2 === 1 ? 1 / harmonic : 0;
+    return 1 / harmonic;
+  });
 }
 
 function cloneInstrument(instrument: Instrument): Instrument {

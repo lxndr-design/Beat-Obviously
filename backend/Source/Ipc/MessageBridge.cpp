@@ -2252,7 +2252,8 @@ namespace beat
                                 if (!value.isObject()) continue;
                                 auto& op = instrument.aurum.operators[(size_t) index];
                                 op.enabled = (bool) value.getProperty("enabled", index < 2);
-                                op.waveform = parseWaveform(value.getProperty("waveform", "sine"), juce::String());
+                                const auto waveform = value.getProperty("waveform", "sine");
+                                op.waveform = waveform.toString() == "additive" ? 4 : juce::jlimit(0, 3, parseWaveform(waveform, juce::String()));
                                 op.ratio = floatParam(value, "ratio", index == 1 ? 2.0f : 1.0f, 0.125f, 32.0f);
                                 op.coarse = juce::jlimit(-48, 48, (int) value.getProperty("coarse", 0));
                                 op.fineCents = floatParam(value, "fineCents", 0.0f, -100.0f, 100.0f);
@@ -2263,6 +2264,9 @@ namespace beat
                                 op.decayMs = floatParam(envelope, "decayMs", 500.0f, 0.0f, 10000.0f);
                                 op.sustain = normalizedParam(envelope, "sustain", 0.7f);
                                 op.releaseMs = floatParam(envelope, "releaseMs", 300.0f, 0.0f, 10000.0f);
+                                if (auto* harmonics = value.getProperty("harmonics", {}).getArray())
+                                    for (int harmonic = 0; harmonic < juce::jmin(16, harmonics->size()); ++harmonic)
+                                        op.harmonics[(size_t) harmonic] = juce::jlimit(0.0f, 1.0f, (float) (double) harmonics->getReference(harmonic));
                             }
                         }
                         if (auto* rows = aurum.getProperty("matrix", {}).getArray())

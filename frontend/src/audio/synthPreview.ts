@@ -1,5 +1,5 @@
 import { evaluateAutomationCurve } from "../automation/curves";
-import type { AutomationCurve, CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, WavetableConfig } from "../state/types";
+import type { AurumOperatorConfig, AutomationCurve, CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, WavetableConfig } from "../state/types";
 import { sampleZoneStableId } from "../state/sampleZones";
 
 export type SynthRenderMode = "visual" | "audio";
@@ -1017,8 +1017,9 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
         const modulator = state.aurumOutputs[voiceOffset + source] ?? 0;
         rmGain *= 1 - Math.abs(amount) + modulator * amount;
       }
-      nextOutputs[stateIndex] = oscillatorSample(operator.waveform, phase, 0.5) * clamp01(operator.level) * envelope * rmGain;
-      state.aurumPhases[stateIndex] = (state.aurumPhases[stateIndex] + (frequency * voiceRate * ratio * tuning) / sampleRate) % 1;
+      const phaseDelta = (frequency * voiceRate * ratio * tuning) / sampleRate;
+      nextOutputs[stateIndex] = aurumOscillatorSample(operator, phase, phaseDelta) * clamp01(operator.level) * envelope * rmGain;
+      state.aurumPhases[stateIndex] = (state.aurumPhases[stateIndex] + phaseDelta) % 1;
     }
 
     let voiceOutput = 0;
@@ -1081,6 +1082,21 @@ function aurumHeldEnvelope(envelope: Instrument["envelope"], timeMs: number): nu
   const decay = Math.max(0, envelope.decayMs);
   if (decay > 0 && decayTime < decay) return 1 + (clamp01(envelope.sustain) - 1) * (decayTime / decay);
   return clamp01(envelope.sustain);
+}
+
+function aurumOscillatorSample(operator: AurumOperatorConfig, phase: number, phaseDelta: number): number {
+  if (operator.waveform !== "additive") return oscillatorSample(operator.waveform, phase, 0.5);
+  let sample = 0;
+  let weight = 0;
+  for (let index = 0; index < operator.harmonics.length; index += 1) {
+    const harmonic = index + 1;
+    if (harmonic * Math.abs(phaseDelta) >= 0.5) break;
+    const amplitude = clamp01(operator.harmonics[index] ?? 0);
+    if (amplitude <= 0.0001) continue;
+    sample += Math.sin(Math.PI * 2 * phase * harmonic) * amplitude;
+    weight += amplitude;
+  }
+  return weight > 0 ? sample / weight : 0;
 }
 
 function aurumOperatorEnvelope(envelope: Instrument["envelope"], timeMs: number, noteOffMs: number): number {

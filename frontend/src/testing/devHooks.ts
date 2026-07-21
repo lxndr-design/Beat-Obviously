@@ -1132,9 +1132,10 @@ export function installBeatDevHooks() {
       fixture.aurum.operators[2] = {
         ...fixture.aurum.operators[2],
         enabled: true,
-        waveform: "saw",
+        waveform: "additive",
         ratio: 3,
         level: 0.38,
+        harmonics: Array.from({ length: 16 }, (_, index) => 1 / (index + 1)),
       };
       fixture.aurum.matrix[1][0] = 0.48;
       fixture.aurum.matrix[2][1] = 0.26;
