@@ -36,8 +36,8 @@ Exit gate: operator edits agree between waveform preview and rendered audio, and
 
 ## M3: Filter and signal routing
 
-- `[~]` Shared output filter, resonance, and drive exist.
-- `[ ]` At least two independently configurable filter modules.
+- `[x]` Two independently enabled multimode output filters expose cutoff, resonance, and drive in browser and native paths.
+- `[x]` Serial and Parallel filter routing persists in schema v8; legacy patches migrate their shared output filter into Filter A with Filter B bypassed.
 - `[ ]` Bipolar operator-to-filter sends and filter-to-filter routing.
 - `[ ]` Per-operator pan, direct output, and shared Beat FX sends.
 - `[ ]` Visible signal-flow diagnostics for silent or disconnected patches.
@@ -76,5 +76,5 @@ Exit gate: the release report distinguishes verified audio behavior, performance
 
 ## Immediate order
 
-1. Add the dual-filter and signal-routing foundation.
-2. Add bipolar operator-to-filter sends and filter-to-filter routing.
+1. Add bipolar operator-to-filter sends into the two-filter foundation.
+2. Add visible signal-flow diagnostics and explicit filter-to-filter routing controls.

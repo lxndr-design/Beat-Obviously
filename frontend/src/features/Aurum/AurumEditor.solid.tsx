@@ -1,14 +1,19 @@
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { Button, FloatingSelect, Icon, Knob, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
 import { sampleAurumOperatorWaveform, startInstrumentPreviewAudition, type InstrumentPreviewAuditionHandle } from "../../audio/synthPreview";
-import { AURUM_HARMONIC_COUNT, AURUM_OPERATOR_COUNT, AURUM_OUTPUT_COLUMN, AURUM_RESPONSE_CURVE_POINT_COUNT, drawAurumHarmonicLine, normalizedAurumConfig } from "../../state/aurum";
-import type { AurumOperatorConfig, AurumOperatorWaveform, Instrument } from "../../state/types";
+import { AURUM_HARMONIC_COUNT, AURUM_OPERATOR_COUNT, AURUM_OUTPUT_COLUMN, AURUM_RESPONSE_CURVE_POINT_COUNT, drawAurumHarmonicLine, normalizedAurumConfigForInstrument } from "../../state/aurum";
+import type { AurumFilterConfig, AurumOperatorConfig, AurumOperatorWaveform, Instrument } from "../../state/types";
 import { aurumTabIndexAfterKey } from "./aurumEditorInteraction";
 import styles from "./AurumEditor.module.css";
 
 const WAVEFORM_OPTIONS = ["sine", "triangle", "saw", "square", "additive"].map((value) => ({
   value,
   label: value[0].toUpperCase() + value.slice(1),
+}));
+
+const FILTER_OPTIONS = ["lowpass", "bandpass", "highpass"].map((value) => ({
+  value,
+  label: value === "lowpass" ? "Low-pass" : value === "bandpass" ? "Band-pass" : "High-pass",
 }));
 
 type EnvelopeMode = "amp" | "pitch" | "phase";
@@ -27,16 +32,17 @@ export function AurumEditor(props: AurumEditorProps) {
   const [envelopeMode, setEnvelopeMode] = createSignal<EnvelopeMode>("amp");
   const [responseMode, setResponseMode] = createSignal<"velocity" | "key">("velocity");
   const [waveformOpen, setWaveformOpen] = createSignal(false);
+  const [filterOpen, setFilterOpen] = createSignal<number | null>(null);
   const [auditioning, setAuditioning] = createSignal(false);
   let audition: InstrumentPreviewAuditionHandle | null = null;
 
-  const aurum = createMemo(() => normalizedAurumConfig(draft().aurum));
+  const aurum = createMemo(() => normalizedAurumConfigForInstrument(draft()));
   const operator = createMemo(() => aurum().operators[selectedOperator()]);
 
   onCleanup(stopAudition);
 
   function updateAurum(mutator: (config: ReturnType<typeof aurum>) => ReturnType<typeof aurum>) {
-    setDraft((current) => ({ ...current, aurum: mutator(normalizedAurumConfig(current.aurum)) }));
+    setDraft((current) => ({ ...current, aurum: mutator(normalizedAurumConfigForInstrument(current)) }));
   }
 
   function updateOperator(patch: Partial<AurumOperatorConfig>) {
@@ -44,6 +50,13 @@ export function AurumEditor(props: AurumEditorProps) {
     updateAurum((config) => ({
       ...config,
       operators: config.operators.map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, ...patch } : candidate),
+    }));
+  }
+
+  function updateFilter(index: number, patch: Partial<AurumFilterConfig>) {
+    updateAurum((config) => ({
+      ...config,
+      filters: config.filters.map((filter, filterIndex) => filterIndex === index ? { ...filter, ...patch } : filter) as typeof config.filters,
     }));
   }
 
@@ -121,7 +134,19 @@ export function AurumEditor(props: AurumEditorProps) {
 
   function save() {
     stopAudition();
-    props.onCommit({ ...draft(), aurum: aurum() });
+    const config = aurum();
+    const primaryFilter = config.filters[0];
+    props.onCommit({
+      ...draft(),
+      filterType: primaryFilter.type,
+      knobs: {
+        ...draft().knobs,
+        cutoff: primaryFilter.cutoff,
+        resonance: primaryFilter.resonance,
+        drive: primaryFilter.drive,
+      },
+      aurum: config,
+    });
   }
 
   return (
@@ -207,11 +232,34 @@ export function AurumEditor(props: AurumEditorProps) {
                 </div>
               </div>
               <div class={styles.controlBlock}>
-                <h4>Output filter</h4>
-                <div class={styles.controlGrid}>
-                  <Slider label="Cutoff" layout="inline" min={0} max={1} step={0.01} value={draft().knobs.cutoff} readout={<span>{Math.round(draft().knobs.cutoff * 100)}%</span>} onChange={(cutoff) => setDraft((current) => ({ ...current, knobs: { ...current.knobs, cutoff } }))} />
-                  <Slider label="Resonance" layout="inline" min={0} max={1} step={0.01} value={draft().knobs.resonance} readout={<span>{Math.round(draft().knobs.resonance * 100)}%</span>} onChange={(resonance) => setDraft((current) => ({ ...current, knobs: { ...current.knobs, resonance } }))} />
-                  <Slider label="Drive" layout="inline" min={0} max={1} step={0.01} value={draft().knobs.drive} readout={<span>{Math.round(draft().knobs.drive * 100)}%</span>} onChange={(drive) => setDraft((current) => ({ ...current, knobs: { ...current.knobs, drive } }))} />
+                <div class={styles.filterHeader}>
+                  <h4>Output filters</h4>
+                  <div class={styles.filterRouting} role="group" aria-label="Aurum filter routing">
+                    <Button size="xs" selected={aurum().filterRouting === "serial"} aria-pressed={aurum().filterRouting === "serial"} onClick={() => updateAurum((config) => ({ ...config, filterRouting: "serial" }))}>Serial</Button>
+                    <Button size="xs" selected={aurum().filterRouting === "parallel"} aria-pressed={aurum().filterRouting === "parallel"} onClick={() => updateAurum((config) => ({ ...config, filterRouting: "parallel" }))}>Parallel</Button>
+                  </div>
+                </div>
+                <div class={styles.filterGrid}>
+                  <For each={aurum().filters}>{(filter, index) => (
+                    <section class={styles.filterBlock} aria-label={`Filter ${index() === 0 ? "A" : "B"}`}>
+                      <div class={styles.filterTitle}>
+                        <strong>Filter {index() === 0 ? "A" : "B"}</strong>
+                        <Toggle label="Enabled" checked={filter.enabled} onChange={(enabled) => updateFilter(index(), { enabled })} />
+                      </div>
+                      <FloatingSelect
+                        label="Mode"
+                        layout="inline"
+                        value={filter.type}
+                        options={FILTER_OPTIONS}
+                        open={filterOpen() === index()}
+                        onOpenChange={(open) => setFilterOpen(open ? index() : null)}
+                        onChange={(type) => updateFilter(index(), { type: type as AurumFilterConfig["type"] })}
+                      />
+                      <Slider label="Cutoff" layout="inline" min={0} max={1} step={0.01} value={filter.cutoff} readout={<span>{Math.round(filter.cutoff * 100)}%</span>} onChange={(cutoff) => updateFilter(index(), { cutoff })} />
+                      <Slider label="Resonance" layout="inline" min={0} max={1} step={0.01} value={filter.resonance} readout={<span>{Math.round(filter.resonance * 100)}%</span>} onChange={(resonance) => updateFilter(index(), { resonance })} />
+                      <Slider label="Drive" layout="inline" min={0} max={1} step={0.01} value={filter.drive} readout={<span>{Math.round(filter.drive * 100)}%</span>} onChange={(drive) => updateFilter(index(), { drive })} />
+                    </section>
+                  )}</For>
                 </div>
               </div>
             </div>

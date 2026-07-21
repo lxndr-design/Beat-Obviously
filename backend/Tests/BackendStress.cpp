@@ -7382,6 +7382,9 @@ namespace
         instrument.aurum.detuneCents = 11.0f;
         instrument.aurum.stereoSpread = 0.57f;
         instrument.aurum.oversampling = 4;
+        instrument.aurum.filters[0] = { true, 1, 0.43f, 0.27f, 0.19f };
+        instrument.aurum.filters[1] = { true, 2, 0.16f, 0.34f, 0.11f };
+        instrument.aurum.filterRouting = 1;
         project.instruments.push_back(instrument);
 
         beat::Database db(dbFile);
@@ -7418,7 +7421,16 @@ namespace
             && loaded->instruments.front().aurum.unison == 3
             && near(loaded->instruments.front().aurum.detuneCents, 11.0f)
             && near(loaded->instruments.front().aurum.stereoSpread, 0.57f)
-            && loaded->instruments.front().aurum.oversampling == 4;
+            && loaded->instruments.front().aurum.oversampling == 4
+            && loaded->instruments.front().aurum.filters[0].enabled
+            && loaded->instruments.front().aurum.filters[0].type == 1
+            && near(loaded->instruments.front().aurum.filters[0].cutoff01, 0.43f)
+            && near(loaded->instruments.front().aurum.filters[0].resonance01, 0.27f)
+            && near(loaded->instruments.front().aurum.filters[0].drive01, 0.19f)
+            && loaded->instruments.front().aurum.filters[1].enabled
+            && loaded->instruments.front().aurum.filters[1].type == 2
+            && near(loaded->instruments.front().aurum.filters[1].cutoff01, 0.16f)
+            && loaded->instruments.front().aurum.filterRouting == 1;
 
         root.deleteRecursively();
         if (!ok)
@@ -12940,6 +12952,81 @@ namespace
         return ok;
     }
 
+    bool stressInstrumentVoiceAurumDualFilters()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        auto& op = params.aurumOperators[0];
+        op.enabled = true;
+        op.waveform = 1;
+        op.level = 0.8f;
+        op.attackMs = 0.0f;
+        op.decayMs = 0.0f;
+        op.sustain = 1.0f;
+        params.aurumMatrix[0][6] = 1.0f;
+        params.aurumFilters[0] = { true, 0, 0.32f, 0.18f, 0.12f };
+        params.aurumFilters[1] = { false, 2, 0.16f, 0.22f, 0.08f };
+
+        const auto render = [] (beat::InstrumentVoice::Params renderParams)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 4096);
+            voice.setParams(renderParams);
+            voice.startNote(57, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        const auto filterAOnly = render(params);
+        auto parallelSingleParams = params;
+        parallelSingleParams.aurumFilterRouting = 1;
+        const auto parallelSingle = render(parallelSingleParams);
+        auto serialParams = params;
+        serialParams.aurumFilters[1].enabled = true;
+        serialParams.aurumFilterRouting = 0;
+        const auto serial = render(serialParams);
+        auto parallelParams = serialParams;
+        parallelParams.aurumFilterRouting = 1;
+        const auto parallel = render(parallelParams);
+
+        double singleRoutingDifference = 0.0;
+        double serialDifference = 0.0;
+        double routingDifference = 0.0;
+        float peak = 0.0f;
+        for (int channel = 0; channel < 2; ++channel)
+            for (int sample = 0; sample < filterAOnly.getNumSamples(); ++sample)
+            {
+                const float a = filterAOnly.getSample(channel, sample);
+                const float singleParallel = parallelSingle.getSample(channel, sample);
+                const float serialSample = serial.getSample(channel, sample);
+                const float parallelSample = parallel.getSample(channel, sample);
+                if (!std::isfinite(a) || !std::isfinite(serialSample) || !std::isfinite(parallelSample))
+                    return false;
+                singleRoutingDifference += std::abs((double) a - singleParallel);
+                serialDifference += std::abs((double) a - serialSample);
+                routingDifference += std::abs((double) serialSample - parallelSample);
+                peak = std::max(peak, std::max(std::abs(serialSample), std::abs(parallelSample)));
+            }
+
+        const bool ok = singleRoutingDifference < 0.000001
+            && serialDifference > 0.1
+            && routingDifference > 0.1
+            && peak <= 1.0f;
+        if (!ok)
+            std::cerr << "Aurum dual-filter stress failed single=" << singleRoutingDifference
+                      << " serial=" << serialDifference
+                      << " routing=" << routingDifference
+                      << " peak=" << peak << "\n";
+        return ok;
+    }
+
     bool stressInstrumentVoiceAurumOversamplingQuality()
     {
         beat::InstrumentVoice::Params params;
@@ -14472,6 +14559,7 @@ int main(int argc, char** argv)
             && stressInstrumentVoiceAurumWavefold()
             && stressInstrumentVoiceAurumOperatorArticulation()
             && stressInstrumentVoiceAurumOperatorResponseCurves()
+            && stressInstrumentVoiceAurumDualFilters()
             && stressInstrumentVoiceAurumOversamplingQuality()
             && stressInstrumentVoiceAurumDenseFeedbackStability()
             && stressAudioEngineAurumCrossRateLiveExportParity()
@@ -14657,6 +14745,11 @@ int main(int argc, char** argv)
     if (!stressInstrumentVoiceAurumOperatorResponseCurves())
     {
         std::cerr << "Instrument voice Aurum operator response curve stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumDualFilters())
+    {
+        std::cerr << "Instrument voice Aurum dual-filter stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceAurumOversamplingQuality())

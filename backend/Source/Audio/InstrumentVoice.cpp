@@ -194,6 +194,7 @@ namespace beat
         adsr.setSampleRate(sr);
         env2Adsr.setSampleRate(sr);
         filterState.prepare(sr, blockSize, params.filterType);
+        aurumFilterBState.prepare(sr, blockSize, params.aurumFilters[1].type);
     }
 
     void InstrumentVoice::setParams(const Params& p)
@@ -256,7 +257,15 @@ namespace beat
         env2AdsrParams.release = juce::jmax(0.001f, p.env2ReleaseMs * 0.001f);
         env2Adsr.setParameters(env2AdsrParams);
 
-        filterState.configure(p.filterType, p.cutoff01, p.resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
+        if (p.hasAurum)
+        {
+            filterState.configure(p.aurumFilters[0].type, p.aurumFilters[0].cutoff01, p.aurumFilters[0].resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
+            aurumFilterBState.configure(p.aurumFilters[1].type, p.aurumFilters[1].cutoff01, p.aurumFilters[1].resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
+        }
+        else
+        {
+            filterState.configure(p.filterType, p.cutoff01, p.resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
+        }
         refreshCachedPanGains();
         refreshCachedPitchRates();
         refreshCachedDynamicModulationFlags();
@@ -774,46 +783,106 @@ namespace beat
                 aetherRuntimeWarpState.reset({ left, right });
             }
 
-            // Drive (soft clipping)
-            const float drive = VoiceMath::clamp01(params.drive01 + (useDynamicModulation && cachedDynamicTargets.filterDrive
+            const float filterDriveMod = useDynamicModulation && cachedDynamicTargets.filterDrive
                 ? DynamicModulation::targetOffset(params.dynamicModulation.filterDrive, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, params.macroValues, 1.0f)
-                : 0.0f));
-            if (drive > 0.0001f)
+                : 0.0f;
+            const float filterCutoffMod = hasFilterMod
+                ? (useDynamicModulation && cachedDynamicTargets.filterCutoff
+                    ? DynamicModulation::targetOffset(params.dynamicModulation.filterCutoff, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, params.macroValues, 0.35f)
+                    : filterLfo * params.lfoToFilter * 0.35f + env * params.envToFilter * 0.35f)
+                : 0.0f;
+            const float filterResonanceMod = useDynamicModulation && cachedDynamicTargets.filterResonance
+                ? DynamicModulation::targetOffset(params.dynamicModulation.filterResonance, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, params.macroValues, 1.0f)
+                : 0.0f;
+
+            const auto processFilter = [&] (
+                float inputLeft,
+                float inputRight,
+                float cutoff,
+                float resonance,
+                float drive,
+                FilterStage::State& filter,
+                DriveStage::State& driveStage)
             {
-                const float driveGain = 1.0f + drive * 6.0f;
-                const auto driven = DriveStage::processOversampled(driveState, { left, right }, driveGain);
-                left = driven.left;
-                right = driven.right;
-                currentBlockWork.addFilterDriveSamples(DriveStage::workSamplesForChannels(2));
+                const float drivenAmount = VoiceMath::clamp01(drive + filterDriveMod);
+                if (drivenAmount > 0.0001f)
+                {
+                    const auto driven = DriveStage::processOversampled(driveStage, { inputLeft, inputRight }, 1.0f + drivenAmount * 6.0f);
+                    inputLeft = driven.left;
+                    inputRight = driven.right;
+                    currentBlockWork.addFilterDriveSamples(DriveStage::workSamplesForChannels(2));
+                }
+                else
+                {
+                    driveStage.reset({ inputLeft, inputRight });
+                }
+                if (hasFilterMod)
+                {
+                    currentBlockWork.addFilterCutoffUpdates(filter.updateCutoffIfChanged(
+                        cutoff + filterCutoffMod,
+                        sampleRate,
+                        params.filterKeytrack,
+                        baseFrequencyHz,
+                        6.0f));
+                    if (useDynamicModulation && cachedDynamicTargets.filterResonance)
+                        currentBlockWork.addFilterResonanceUpdates(filter.updateResonanceIfChanged(
+                            VoiceMath::clamp01(resonance + filterResonanceMod),
+                            0.001f));
+                }
+                return filter.process(inputLeft, inputRight);
+            };
+
+            if (params.hasAurum)
+            {
+                const auto& filterA = params.aurumFilters[0];
+                const auto& filterB = params.aurumFilters[1];
+                if (params.aurumFilterRouting == 1)
+                {
+                    float mixedLeft = 0.0f;
+                    float mixedRight = 0.0f;
+                    int branchCount = 0;
+                    if (filterA.enabled)
+                    {
+                        const auto branch = processFilter(left, right, filterA.cutoff01, filterA.resonance01, filterA.drive01, filterState, driveState);
+                        mixedLeft += branch.left;
+                        mixedRight += branch.right;
+                        ++branchCount;
+                    }
+                    if (filterB.enabled)
+                    {
+                        const auto branch = processFilter(left, right, filterB.cutoff01, filterB.resonance01, filterB.drive01, aurumFilterBState, aurumFilterBDriveState);
+                        mixedLeft += branch.left;
+                        mixedRight += branch.right;
+                        ++branchCount;
+                    }
+                    if (branchCount > 0)
+                    {
+                        left = mixedLeft / (float) branchCount;
+                        right = mixedRight / (float) branchCount;
+                    }
+                }
+                else
+                {
+                    if (filterA.enabled)
+                    {
+                        const auto filtered = processFilter(left, right, filterA.cutoff01, filterA.resonance01, filterA.drive01, filterState, driveState);
+                        left = filtered.left;
+                        right = filtered.right;
+                    }
+                    if (filterB.enabled)
+                    {
+                        const auto filtered = processFilter(left, right, filterB.cutoff01, filterB.resonance01, filterB.drive01, aurumFilterBState, aurumFilterBDriveState);
+                        left = filtered.left;
+                        right = filtered.right;
+                    }
+                }
             }
             else
             {
-                driveState.reset({ left, right });
+                const auto filtered = processFilter(left, right, params.cutoff01, params.resonance01, params.drive01, filterState, driveState);
+                left = filtered.left;
+                right = filtered.right;
             }
-
-            if (hasFilterMod)
-            {
-                const float cutoffMod = useDynamicModulation && cachedDynamicTargets.filterCutoff
-                    ? DynamicModulation::targetOffset(params.dynamicModulation.filterCutoff, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, params.macroValues, 0.35f)
-                    : filterLfo * params.lfoToFilter * 0.35f + env * params.envToFilter * 0.35f;
-                const int cutoffUpdates = filterState.updateCutoffIfChanged(
-                    params.cutoff01 + cutoffMod,
-                    sampleRate,
-                    params.filterKeytrack,
-                    baseFrequencyHz,
-                    6.0f);
-                currentBlockWork.addFilterCutoffUpdates(cutoffUpdates);
-                if (useDynamicModulation && cachedDynamicTargets.filterResonance)
-                {
-                    const float resonance = VoiceMath::clamp01(params.resonance01
-                        + DynamicModulation::targetOffset(params.dynamicModulation.filterResonance, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, params.macroValues, 1.0f));
-                    const int resonanceUpdates = filterState.updateResonanceIfChanged(resonance, 0.001f);
-                    currentBlockWork.addFilterResonanceUpdates(resonanceUpdates);
-                }
-            }
-            const auto filtered = filterState.process(left, right);
-            left = filtered.left;
-            right = filtered.right;
 
             const float ampLevel = VoiceMath::clamp01(params.ampLevel + (useDynamicModulation && cachedDynamicTargets.ampLevel
                 ? DynamicModulation::targetOffset(params.dynamicModulation.ampLevel, rawLfo, rawLfo2, env, env2, level, noteKeytrack, modWheel, params.macroValues, 1.0f)

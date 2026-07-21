@@ -2094,6 +2094,18 @@ namespace beat
         params.aurumDetuneCents = juce::jlimit(0.0f, 100.0f, instrument.aurum.detuneCents);
         params.aurumStereoSpread = juce::jlimit(0.0f, 1.0f, instrument.aurum.stereoSpread);
         params.aurumOversampling = instrument.aurum.oversampling >= 4 ? 4 : instrument.aurum.oversampling >= 2 ? 2 : 1;
+        for (size_t index = 0; index < params.aurumFilters.size(); ++index)
+        {
+            const auto& source = instrument.aurum.filters[index];
+            params.aurumFilters[index] = {
+                source.enabled,
+                juce::jlimit(0, 2, source.type),
+                juce::jlimit(0.0f, 1.0f, source.cutoff01),
+                juce::jlimit(0.0f, 1.0f, source.resonance01),
+                juce::jlimit(0.0f, 1.0f, source.drive01),
+            };
+        }
+        params.aurumFilterRouting = instrument.aurum.filterRouting == 1 ? 1 : 0;
 
         instrumentSynth->setNoteStealingEnabled(allocation.noteStealing);
         for (int i = 0; i < allocation.voiceCount; ++i)

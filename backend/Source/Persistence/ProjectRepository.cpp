@@ -419,14 +419,42 @@ namespace beat
             return value.isInt() ? juce::jlimit(0, 4, (int) value) : 0;
         }
 
+        juce::String aurumFilterTypeName(int type)
+        {
+            if (type == 1) return "bandpass";
+            if (type == 2) return "highpass";
+            return "lowpass";
+        }
+
+        int aurumFilterTypeFromVar(const juce::var& value)
+        {
+            const auto name = value.toString().toLowerCase();
+            if (name == "bandpass") return 1;
+            if (name == "highpass") return 2;
+            return value.isInt() ? juce::jlimit(0, 2, (int) value) : 0;
+        }
+
         juce::var aurumConfigToVar(const InstrumentDefinition::AurumConfig& aurum)
         {
             juce::DynamicObject::Ptr object = new juce::DynamicObject();
-            object->setProperty("version", 7);
+            object->setProperty("version", 8);
             object->setProperty("unison", aurum.unison);
             object->setProperty("detuneCents", aurum.detuneCents);
             object->setProperty("stereoSpread", aurum.stereoSpread);
             object->setProperty("oversampling", aurum.oversampling);
+            object->setProperty("filterRouting", aurum.filterRouting == 1 ? "parallel" : "serial");
+            juce::Array<juce::var> filters;
+            for (const auto& source : aurum.filters)
+            {
+                juce::DynamicObject::Ptr filter = new juce::DynamicObject();
+                filter->setProperty("enabled", source.enabled);
+                filter->setProperty("type", aurumFilterTypeName(source.type));
+                filter->setProperty("cutoff", source.cutoff01);
+                filter->setProperty("resonance", source.resonance01);
+                filter->setProperty("drive", source.drive01);
+                filters.add(juce::var(filter.get()));
+            }
+            object->setProperty("filters", filters);
             juce::Array<juce::var> operators;
             for (size_t index = 0; index < aurum.operators.size(); ++index)
             {
@@ -493,10 +521,41 @@ namespace beat
             return juce::var(object.get());
         }
 
-        InstrumentDefinition::AurumConfig aurumConfigFromVar(const juce::var& value)
+        InstrumentDefinition::AurumConfig aurumConfigFromVar(
+            const juce::var& value,
+            int legacyFilterType,
+            float legacyCutoff,
+            float legacyResonance,
+            float legacyDrive)
         {
             InstrumentDefinition::AurumConfig config;
             if (!value.isObject()) return config;
+            const int version = (int) value.getProperty("version", 1);
+            if (version < 8)
+            {
+                config.filters[0] = {
+                    true,
+                    juce::jlimit(0, 2, legacyFilterType),
+                    juce::jlimit(0.0f, 1.0f, legacyCutoff),
+                    juce::jlimit(0.0f, 1.0f, legacyResonance),
+                    juce::jlimit(0.0f, 1.0f, legacyDrive),
+                };
+            }
+            else if (auto* filters = value.getProperty("filters", {}).getArray())
+            {
+                for (int index = 0; index < juce::jmin(2, filters->size()); ++index)
+                {
+                    const auto source = filters->getReference(index);
+                    if (!source.isObject()) continue;
+                    auto& filter = config.filters[(size_t) index];
+                    filter.enabled = (bool) source.getProperty("enabled", filter.enabled);
+                    filter.type = aurumFilterTypeFromVar(source.getProperty("type", aurumFilterTypeName(filter.type)));
+                    filter.cutoff01 = juce::jlimit(0.0f, 1.0f, (float) (double) source.getProperty("cutoff", filter.cutoff01));
+                    filter.resonance01 = juce::jlimit(0.0f, 1.0f, (float) (double) source.getProperty("resonance", filter.resonance01));
+                    filter.drive01 = juce::jlimit(0.0f, 1.0f, (float) (double) source.getProperty("drive", filter.drive01));
+                }
+            }
+            config.filterRouting = value.getProperty("filterRouting", "serial").toString().toLowerCase() == "parallel" ? 1 : 0;
             const int oversampling = (int) value.getProperty("oversampling", 1);
             config.oversampling = oversampling >= 4 ? 4 : oversampling >= 2 ? 2 : 1;
             if (auto* operators = value.getProperty("operators", {}).getArray())
@@ -1381,7 +1440,12 @@ namespace beat
                     {
                         instrument.hasAurum = true;
                         instrument.hasAether = false;
-                        instrument.aurum = aurumConfigFromVar(aurum);
+                        instrument.aurum = aurumConfigFromVar(
+                            aurum,
+                            instrument.filterType,
+                            instrument.cutoff01,
+                            instrument.resonance01,
+                            instrument.drive01);
                     }
                     instrument.nodeGraph = nodemapGraphFromVar(iv.getProperty("nodeGraph", {}));
 

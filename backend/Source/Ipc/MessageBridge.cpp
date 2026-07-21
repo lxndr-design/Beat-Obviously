@@ -2243,8 +2243,35 @@ namespace beat
                     {
                         instrument.hasAurum = true;
                         instrument.hasAether = false;
+                        const int aurumVersion = (int) aurum.getProperty("version", 1);
                         const int oversampling = (int) aurum.getProperty("oversampling", 2);
                         instrument.aurum.oversampling = oversampling >= 4 ? 4 : oversampling >= 2 ? 2 : 1;
+                        if (aurumVersion < 8)
+                        {
+                            instrument.aurum.filters[0] = {
+                                true,
+                                instrument.filterType,
+                                instrument.cutoff01,
+                                instrument.resonance01,
+                                instrument.drive01,
+                            };
+                        }
+                        else if (auto* filters = aurum.getProperty("filters", {}).getArray())
+                        {
+                            const auto count = juce::jmin(2, filters->size());
+                            for (int index = 0; index < count; ++index)
+                            {
+                                const auto value = filters->getReference(index);
+                                if (!value.isObject()) continue;
+                                auto& filter = instrument.aurum.filters[(size_t) index];
+                                filter.enabled = (bool) value.getProperty("enabled", filter.enabled);
+                                filter.type = parseSynthFilterType(value.getProperty("type", "lowpass"));
+                                filter.cutoff01 = normalizedParam(value, "cutoff", filter.cutoff01);
+                                filter.resonance01 = normalizedParam(value, "resonance", filter.resonance01);
+                                filter.drive01 = normalizedParam(value, "drive", filter.drive01);
+                            }
+                        }
+                        instrument.aurum.filterRouting = aurum.getProperty("filterRouting", "serial").toString().toLowerCase() == "parallel" ? 1 : 0;
                         if (auto* operators = aurum.getProperty("operators", {}).getArray())
                         {
                             const auto count = juce::jmin(6, operators->size());

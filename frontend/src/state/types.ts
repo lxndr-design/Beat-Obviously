@@ -486,6 +486,15 @@ export interface AetherSynthConfig {
 }
 
 export type AurumOperatorWaveform = "sine" | "triangle" | "saw" | "square" | "additive";
+export type AurumFilterRouting = "serial" | "parallel";
+
+export interface AurumFilterConfig {
+  enabled: boolean;
+  type: NonNullable<Instrument["filterType"]>;
+  cutoff: number;
+  resonance: number;
+  drive: number;
+}
 
 export interface AurumOperatorConfig {
   id: string;
@@ -512,7 +521,7 @@ export interface AurumOperatorConfig {
  * are FM destinations and column 6 is direct output. Diagonal values are
  * operator feedback. */
 export interface AurumSynthConfig {
-  version: 7;
+  version: 8;
   operators: AurumOperatorConfig[];
   matrix: number[][];
   rmMatrix: number[][];
@@ -520,6 +529,8 @@ export interface AurumSynthConfig {
   detuneCents: number;
   stereoSpread: number;
   oversampling: 1 | 2 | 4;
+  filters: [AurumFilterConfig, AurumFilterConfig];
+  filterRouting: AurumFilterRouting;
 }
 
 export type SynthPatchParameterValue = boolean | number | string;

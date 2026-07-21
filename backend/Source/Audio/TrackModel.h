@@ -237,6 +237,15 @@ namespace beat
 
         struct AurumConfig
         {
+            struct Filter
+            {
+                bool enabled { false };
+                int type { 0 };
+                float cutoff01 { 0.5f };
+                float resonance01 { 0.0f };
+                float drive01 { 0.0f };
+            };
+
             std::array<AurumOperator, 6> operators {};
             std::array<std::array<float, 7>, 6> matrix {};
             std::array<std::array<float, 6>, 6> rmMatrix {};
@@ -244,6 +253,11 @@ namespace beat
             float detuneCents { 8.0f };
             float stereoSpread { 0.35f };
             int oversampling { 2 };
+            std::array<Filter, 2> filters {{
+                { true, 0, 0.78f, 0.12f, 0.08f },
+                { false, 2, 0.18f, 0.08f, 0.0f },
+            }};
+            int filterRouting { 0 };
         };
 
         struct DynamicModTarget

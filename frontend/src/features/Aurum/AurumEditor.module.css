@@ -137,6 +137,25 @@
 .qualityMode { display: flex; }
 .qualityMode > button + button { border-left: 0; }
 
+.filterHeader,
+.filterTitle {
+  min-height: 30px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.filterHeader h4,
+.filterTitle strong { display: flex; align-items: center; }
+.filterTitle strong { padding-left: 6px; font-size: var(--font-size-ui); }
+.filterRouting { display: flex; }
+.filterRouting > button + button { border-left: 0; }
+.filterGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.filterBlock { min-width: 0; display: grid; align-content: start; gap: 6px; border: var(--border-soft); }
+.filterBlock > :not(.filterTitle) { margin-inline: 6px; }
+.filterBlock > :last-child { margin-bottom: 6px; }
+
 .responseHeader h4 { display: flex; align-items: center; }
 .responseMode,
 .responsePresets { display: flex; }

@@ -1,9 +1,27 @@
-import type { AurumOperatorConfig, AurumSynthConfig, Instrument } from "./types";
+import type { AurumFilterConfig, AurumOperatorConfig, AurumSynthConfig, Instrument } from "./types";
 
 export const AURUM_OPERATOR_COUNT = 6;
 export const AURUM_OUTPUT_COLUMN = AURUM_OPERATOR_COUNT;
 export const AURUM_HARMONIC_COUNT = 16;
 export const AURUM_RESPONSE_CURVE_POINT_COUNT = 5;
+
+type AurumLegacyFilter = Pick<AurumFilterConfig, "type" | "cutoff" | "resonance" | "drive">;
+
+const DEFAULT_FILTER_A: AurumFilterConfig = {
+  enabled: true,
+  type: "lowpass",
+  cutoff: 0.78,
+  resonance: 0.12,
+  drive: 0.08,
+};
+
+const DEFAULT_FILTER_B: AurumFilterConfig = {
+  enabled: false,
+  type: "highpass",
+  cutoff: 0.18,
+  resonance: 0.08,
+  drive: 0,
+};
 
 function defaultOperator(index: number): AurumOperatorConfig {
   return {
@@ -39,7 +57,7 @@ export function defaultAurumConfig(): AurumSynthConfig {
   matrix[0][AURUM_OUTPUT_COLUMN] = 0.86;
   matrix[1][0] = 0.42;
   return {
-    version: 7,
+    version: 8,
     operators: Array.from({ length: AURUM_OPERATOR_COUNT }, (_, index) => defaultOperator(index)),
     matrix,
     rmMatrix,
@@ -47,6 +65,8 @@ export function defaultAurumConfig(): AurumSynthConfig {
     detuneCents: 8,
     stereoSpread: 0.35,
     oversampling: 2,
+    filters: [{ ...DEFAULT_FILTER_A }, { ...DEFAULT_FILTER_B }],
+    filterRouting: "serial",
   };
 }
 
@@ -77,13 +97,16 @@ export function createAurumInstrument(id: string, name = "Aurum Patch"): Instrum
   };
 }
 
-export function normalizedAurumConfig(config: AurumSynthConfig | undefined): AurumSynthConfig {
+export function normalizedAurumConfig(config: AurumSynthConfig | undefined, legacyFilter?: AurumLegacyFilter): AurumSynthConfig {
   const fallback = defaultAurumConfig();
   if (!config) return fallback;
+  const incomingVersion = config.version as number;
+  const legacyFilterA = legacyFilter ? { enabled: true, ...legacyFilter } : fallback.filters[0];
+  const incomingFilters = incomingVersion >= 8 ? config.filters : undefined;
   return {
     ...fallback,
     ...config,
-    version: 7,
+    version: 8,
     operators: fallback.operators.map((operator, index) => {
       const incoming = config.operators?.[index];
       return {
@@ -103,6 +126,31 @@ export function normalizedAurumConfig(config: AurumSynthConfig | undefined): Aur
     matrix: fallback.matrix.map((row, source) => row.map((value, target) => clampBipolar(config.matrix[source]?.[target] ?? value))),
     rmMatrix: fallback.rmMatrix.map((row, source) => row.map((value, target) => clampBipolar(config.rmMatrix?.[source]?.[target] ?? value))),
     oversampling: normalizeOversampling(config.oversampling ?? ((config.version as number) >= 7 ? fallback.oversampling : 1)),
+    filters: [
+      normalizeFilter(incomingFilters?.[0], legacyFilterA),
+      normalizeFilter(incomingFilters?.[1], fallback.filters[1]),
+    ],
+    filterRouting: config.filterRouting === "parallel" ? "parallel" : "serial",
+  };
+}
+
+export function normalizedAurumConfigForInstrument(instrument: Instrument): AurumSynthConfig {
+  return normalizedAurumConfig(instrument.aurum, {
+    type: instrument.filterType ?? "lowpass",
+    cutoff: instrument.knobs.cutoff,
+    resonance: instrument.knobs.resonance,
+    drive: instrument.knobs.drive,
+  });
+}
+
+function normalizeFilter(filter: AurumFilterConfig | undefined, fallback: AurumFilterConfig): AurumFilterConfig {
+  const type = filter?.type ?? fallback.type;
+  return {
+    enabled: filter?.enabled ?? fallback.enabled,
+    type: type === "bandpass" || type === "highpass" ? type : "lowpass",
+    cutoff: clamp01(filter?.cutoff ?? fallback.cutoff),
+    resonance: clamp01(filter?.resonance ?? fallback.resonance),
+    drive: clamp01(filter?.drive ?? fallback.drive),
   };
 }
 

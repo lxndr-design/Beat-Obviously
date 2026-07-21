@@ -1,19 +1,23 @@
 import { evaluateAutomationCurve } from "../automation/curves";
-import { evaluateAurumResponseCurve } from "../state/aurum";
-import type { AurumOperatorConfig, AutomationCurve, CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, WavetableConfig } from "../state/types";
+import { evaluateAurumResponseCurve, normalizedAurumConfigForInstrument } from "../state/aurum";
+import type { AurumFilterConfig, AurumOperatorConfig, AutomationCurve, CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, WavetableConfig } from "../state/types";
 import { sampleZoneStableId } from "../state/sampleZones";
 
 export type SynthRenderMode = "visual" | "audio";
 
-export interface SynthRenderState {
-  phase: number;
-  index: number;
+interface FilterRenderState {
   low: number;
   band: number;
   filterCutoff: number;
   filterResonance: number;
   filterF: number;
   filterDamping: number;
+}
+
+export interface SynthRenderState extends FilterRenderState {
+  phase: number;
+  index: number;
+  aurumFilterB: FilterRenderState;
   aurumPhases: number[];
   aurumOutputs: number[];
   aurumNoteOffMs: number;
@@ -182,10 +186,15 @@ export function createSynthRenderState(): SynthRenderState {
     filterResonance: -1,
     filterF: 0,
     filterDamping: 1,
+    aurumFilterB: createFilterRenderState(),
     aurumPhases: Array(48).fill(0),
     aurumOutputs: Array(48).fill(0),
     aurumNoteOffMs: Number.POSITIVE_INFINITY,
   };
+}
+
+function createFilterRenderState(): FilterRenderState {
+  return { low: 0, band: 0, filterCutoff: -1, filterResonance: -1, filterF: 0, filterDamping: 1 };
 }
 
 export function noteFrequency(midiPitch: number, instrument?: Instrument): number {
@@ -277,8 +286,10 @@ export function renderInstrumentStereoSamples(
   const length = Math.min(left.length, right.length);
   if (instrument.aurum) {
     const phaseState = createSynthRenderState();
-    const leftFilterState = createSynthRenderState();
-    const rightFilterState = createSynthRenderState();
+    const leftFilterAState = createSynthRenderState();
+    const rightFilterAState = createSynthRenderState();
+    const leftFilterBState = createSynthRenderState();
+    const rightFilterBState = createSynthRenderState();
     const durationS = length / sampleRate;
     if (fade) phaseState.aurumNoteOffMs = aurumPreviewNoteOffMs(instrument, durationS);
     const velocity01 = clamp01(velocity / 127);
@@ -303,7 +314,7 @@ export function renderInstrumentStereoSamples(
       );
       applyAutomationOffsets(instrument, modulation, automation, timeS);
       const currentFrequency = baseFrequency * Math.pow(2, (pitchBendSemitones + modulation.pitchSemitones) / 12);
-      const stereo = renderAurumStereoSample(instrument, phaseState, leftFilterState, rightFilterState, sampleRate, currentFrequency, modulation);
+      const stereo = renderAurumStereoSample(instrument, phaseState, leftFilterAState, rightFilterAState, leftFilterBState, rightFilterBState, sampleRate, currentFrequency, modulation);
       left[i] = stereo.left * amp;
       right[i] = stereo.right * amp;
     }
@@ -966,6 +977,13 @@ export function renderInstrumentSample(
     const subWave = oscillatorSample("square", state.phase * 0.5, 0.5);
     v = v * (1 - sub * 0.45) + subWave * sub * 0.45;
   }
+  if (instrument.aurum) {
+    const filtered = processAurumMonoFilters(instrument, v, state, state.aurumFilterB, sampleRate, frequency, modulation);
+    const level = clamp01((instrument.ampLevel ?? 1) + modulationTargetOffset(modulation, "amp.level"));
+    state.phase += frequency / sampleRate;
+    state.index += 1;
+    return clamp(filtered * level * clamp01(modulation.ampEnvelope ?? 1), -1, 1);
+  }
 
   if (drive > 0) {
     const amount = 1 + drive * 10;
@@ -1061,35 +1079,114 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
 function renderAurumStereoSample(
   instrument: Instrument,
   phaseState: SynthRenderState,
-  leftFilterState: SynthRenderState,
-  rightFilterState: SynthRenderState,
+  leftFilterAState: FilterRenderState,
+  rightFilterAState: FilterRenderState,
+  leftFilterBState: FilterRenderState,
+  rightFilterBState: FilterRenderState,
   sampleRate: number,
   frequency: number,
   modulation: RenderModulation,
 ) {
-  const cutoff = clamp01(
-    instrument.knobs.cutoff
-      + filterKeytrackOffset(instrument, sampleRate, frequency)
-      + modulation.filterOffset
-      + modulationTargetOffset(modulation, "filter.cutoff"),
-  );
-  const resonance = clamp01(instrument.knobs.resonance + modulationTargetOffset(modulation, "filter.resonance"));
-  const drive = clamp01(instrument.knobs.drive + modulationTargetOffset(modulation, "filter.drive"));
   const raw = aurumMatrixStereoSample(instrument, phaseState, sampleRate, frequency, modulation);
-  let left = raw.left;
-  let right = raw.right;
-  if (drive > 0) {
-    const amount = 1 + drive * 10;
-    const normalizer = Math.tanh(amount);
-    left = Math.tanh(left * amount) / normalizer;
-    right = Math.tanh(right * amount) / normalizer;
-  }
-  left = resonantFilter(left, leftFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass");
-  right = resonantFilter(right, rightFilterState, sampleRate, cutoff, resonance, instrument.filterType ?? "lowpass");
+  const filtered = processAurumStereoFilters(
+    instrument,
+    raw,
+    leftFilterAState,
+    rightFilterAState,
+    leftFilterBState,
+    rightFilterBState,
+    sampleRate,
+    frequency,
+    modulation,
+  );
   const level = clamp01((instrument.ampLevel ?? 1) + modulationTargetOffset(modulation, "amp.level"));
   const gain = level * clamp01(modulation.ampEnvelope ?? 1);
   phaseState.index += 1;
-  return { left: clamp(left * gain, -1, 1), right: clamp(right * gain, -1, 1) };
+  return { left: clamp(filtered.left * gain, -1, 1), right: clamp(filtered.right * gain, -1, 1) };
+}
+
+function driveSample(sample: number, drive: number) {
+  if (drive <= 0) return sample;
+  const amount = 1 + drive * 10;
+  return Math.tanh(sample * amount) / Math.tanh(amount);
+}
+
+function processAurumMonoFilter(instrument: Instrument, input: number, filter: AurumFilterConfig, state: FilterRenderState, sampleRate: number, frequency: number, modulation: RenderModulation) {
+  const cutoff = clamp01(filter.cutoff + filterKeytrackOffset(instrument, sampleRate, frequency) + modulation.filterOffset + modulationTargetOffset(modulation, "filter.cutoff"));
+  const resonance = clamp01(filter.resonance + modulationTargetOffset(modulation, "filter.resonance"));
+  const drive = clamp01(filter.drive + modulationTargetOffset(modulation, "filter.drive"));
+  return resonantFilter(driveSample(input, drive), state, sampleRate, cutoff, resonance, filter.type);
+}
+
+function processAurumMonoFilters(instrument: Instrument, input: number, filterAState: FilterRenderState, filterBState: FilterRenderState, sampleRate: number, frequency: number, modulation: RenderModulation) {
+  const config = activeAurumFilterConfig(instrument);
+  const [filterA, filterB] = config.filters;
+  if (config.filterRouting === "serial") {
+    let output = input;
+    if (filterA.enabled) output = processAurumMonoFilter(instrument, output, filterA, filterAState, sampleRate, frequency, modulation);
+    if (filterB.enabled) output = processAurumMonoFilter(instrument, output, filterB, filterBState, sampleRate, frequency, modulation);
+    return output;
+  }
+  let output = 0;
+  let branchCount = 0;
+  if (filterA.enabled) {
+    output += processAurumMonoFilter(instrument, input, filterA, filterAState, sampleRate, frequency, modulation);
+    branchCount += 1;
+  }
+  if (filterB.enabled) {
+    output += processAurumMonoFilter(instrument, input, filterB, filterBState, sampleRate, frequency, modulation);
+    branchCount += 1;
+  }
+  return branchCount > 0 ? output / branchCount : input;
+}
+
+function processAurumStereoFilters(
+  instrument: Instrument,
+  input: { left: number; right: number },
+  leftFilterAState: FilterRenderState,
+  rightFilterAState: FilterRenderState,
+  leftFilterBState: FilterRenderState,
+  rightFilterBState: FilterRenderState,
+  sampleRate: number,
+  frequency: number,
+  modulation: RenderModulation,
+) {
+  const config = activeAurumFilterConfig(instrument);
+  const [filterA, filterB] = config.filters;
+  if (config.filterRouting === "serial") {
+    let left = input.left;
+    let right = input.right;
+    if (filterA.enabled) {
+      left = processAurumMonoFilter(instrument, left, filterA, leftFilterAState, sampleRate, frequency, modulation);
+      right = processAurumMonoFilter(instrument, right, filterA, rightFilterAState, sampleRate, frequency, modulation);
+    }
+    if (filterB.enabled) {
+      left = processAurumMonoFilter(instrument, left, filterB, leftFilterBState, sampleRate, frequency, modulation);
+      right = processAurumMonoFilter(instrument, right, filterB, rightFilterBState, sampleRate, frequency, modulation);
+    }
+    return { left, right };
+  }
+  let left = 0;
+  let right = 0;
+  let branchCount = 0;
+  if (filterA.enabled) {
+    left += processAurumMonoFilter(instrument, input.left, filterA, leftFilterAState, sampleRate, frequency, modulation);
+    right += processAurumMonoFilter(instrument, input.right, filterA, rightFilterAState, sampleRate, frequency, modulation);
+    branchCount += 1;
+  }
+  if (filterB.enabled) {
+    left += processAurumMonoFilter(instrument, input.left, filterB, leftFilterBState, sampleRate, frequency, modulation);
+    right += processAurumMonoFilter(instrument, input.right, filterB, rightFilterBState, sampleRate, frequency, modulation);
+    branchCount += 1;
+  }
+  return branchCount > 0 ? { left: left / branchCount, right: right / branchCount } : input;
+}
+
+function activeAurumFilterConfig(instrument: Instrument) {
+  const config = instrument.aurum!;
+  return (config.version as number) >= 8 && config.filters?.length === 2
+    ? config
+    : normalizedAurumConfigForInstrument(instrument);
 }
 
 function aurumHeldEnvelope(envelope: Instrument["envelope"], timeMs: number): number {
@@ -1185,7 +1282,7 @@ function renderInstrumentStereoSample(
 
 function resonantFilter(
   input: number,
-  state: SynthRenderState,
+  state: FilterRenderState,
   sampleRate: number,
   cutoff: number,
   resonance: number,

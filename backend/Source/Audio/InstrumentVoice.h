@@ -146,6 +146,15 @@ namespace beat
                 std::array<float, 5> keytrackCurve {{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }};
             };
 
+            struct AurumFilter
+            {
+                bool enabled { false };
+                int type { 0 };
+                float cutoff01 { 0.5f };
+                float resonance01 { 0.0f };
+                float drive01 { 0.0f };
+            };
+
             struct DynamicModTarget
             {
                 float lfo { 0.0f };
@@ -268,6 +277,11 @@ namespace beat
             float aurumDetuneCents { 8.0f };
             float aurumStereoSpread { 0.35f };
             int aurumOversampling { 1 };
+            std::array<AurumFilter, 2> aurumFilters {{
+                { true, 0, 0.78f, 0.12f, 0.08f },
+                { false, 2, 0.18f, 0.08f, 0.0f },
+            }};
+            int aurumFilterRouting { 0 };
         };
 
         void setParams(const Params& p);
@@ -346,6 +360,8 @@ namespace beat
         DriveStage::State aetherRuntimeWarpState;
         DriveStage::State driveState;
         FilterStage::State filterState;
+        DriveStage::State aurumFilterBDriveState;
+        FilterStage::State aurumFilterBState;
         float previousRawEnvelope { 0.0f };
         float previousRawEnv2Envelope { 0.0f };
         EnvelopeShaper::LoopState env1LoopState;
