@@ -201,6 +201,13 @@ namespace beat
     {
         baseParams = p;
         params = p;
+        aurumOutputBusMask = 0;
+        for (const auto& sends : params.aurumOutputSends)
+        {
+            if (std::abs(sends[0]) > 0.0001f) aurumOutputBusMask |= 1;
+            if (std::abs(sends[1]) > 0.0001f) aurumOutputBusMask |= 2;
+            if (std::abs(sends[2]) > 0.0001f) aurumOutputBusMask |= 4;
+        }
         modWheel = juce::jlimit(0.0f, 1.0f, p.modWheel);
         pitchWheelSemitones = 0.0f;
         params.wavetable.bank = params.wavetableBank;
@@ -631,18 +638,29 @@ namespace beat
 
             // Oscillator
             StereoSample raw;
+            StereoSample aurumFilterAInput;
+            StereoSample aurumFilterBInput;
+            StereoSample aurumDirectInput;
             if (params.hasAurum)
             {
                 const float timeMs = (float) ((double) aurumAgeSamples * 1000.0 / sampleRate);
                 const int voiceCount = juce::jlimit(1, 8, params.aurumUnison);
                 const int oversampling = params.aurumOversampling >= 4 ? 4 : params.aurumOversampling >= 2 ? 2 : 1;
-                float accumulatedLeft = 0.0f;
-                float accumulatedRight = 0.0f;
+                float accumulatedALeft = 0.0f;
+                float accumulatedARight = 0.0f;
+                float accumulatedBLeft = 0.0f;
+                float accumulatedBRight = 0.0f;
+                float accumulatedDirectLeft = 0.0f;
+                float accumulatedDirectRight = 0.0f;
                 for (int substep = 0; substep < oversampling; ++substep)
                 {
                     std::array<float, 48> nextOutputs {};
-                    float left = 0.0f;
-                    float right = 0.0f;
+                    float aLeft = 0.0f;
+                    float aRight = 0.0f;
+                    float bLeft = 0.0f;
+                    float bRight = 0.0f;
+                    float directLeft = 0.0f;
+                    float directRight = 0.0f;
                     for (int voice = 0; voice < voiceCount; ++voice)
                     {
                     const size_t voiceOffset = (size_t) voice * 6;
@@ -701,30 +719,55 @@ namespace beat
                         currentBlockWork.addOscillatorSamples(1);
                     }
 
-                        float voiceOutput = 0.0f;
-                        float outputWeight = 0.0f;
+                        float voiceA = 0.0f;
+                        float voiceB = 0.0f;
+                        float voiceDirect = 0.0f;
+                        float weightA = 0.0f;
+                        float weightB = 0.0f;
+                        float weightDirect = 0.0f;
                         for (size_t source = 0; source < 6; ++source)
                         {
-                            const float amount = aurumRouteAmount(params.aurumMatrix[source][6]);
-                            voiceOutput += nextOutputs[voiceOffset + source] * amount;
-                            outputWeight += std::abs(amount);
+                            const float output = nextOutputs[voiceOffset + source];
+                            const float amountA = aurumRouteAmount(params.aurumOutputSends[source][0]);
+                            const float amountB = aurumRouteAmount(params.aurumOutputSends[source][1]);
+                            const float amountDirect = aurumRouteAmount(params.aurumOutputSends[source][2]);
+                            voiceA += output * amountA;
+                            voiceB += output * amountB;
+                            voiceDirect += output * amountDirect;
+                            weightA += std::abs(amountA);
+                            weightB += std::abs(amountB);
+                            weightDirect += std::abs(amountDirect);
                         }
-                        if (outputWeight > 0.0f)
-                            voiceOutput /= juce::jmax(1.0f, std::sqrt(outputWeight));
+                        if (weightA > 0.0f) voiceA /= juce::jmax(1.0f, std::sqrt(weightA));
+                        if (weightB > 0.0f) voiceB /= juce::jmax(1.0f, std::sqrt(weightB));
+                        if (weightDirect > 0.0f) voiceDirect /= juce::jmax(1.0f, std::sqrt(weightDirect));
                         const float pan = centered * params.aurumStereoSpread;
                         const float angle = (pan + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
-                        left += voiceOutput * std::cos(angle);
-                        right += voiceOutput * std::sin(angle);
+                        const float leftGain = std::cos(angle);
+                        const float rightGain = std::sin(angle);
+                        aLeft += voiceA * leftGain;
+                        aRight += voiceA * rightGain;
+                        bLeft += voiceB * leftGain;
+                        bRight += voiceB * rightGain;
+                        directLeft += voiceDirect * leftGain;
+                        directRight += voiceDirect * rightGain;
                     }
                     aurumOutputs = nextOutputs;
-                    accumulatedLeft += left;
-                    accumulatedRight += right;
+                    accumulatedALeft += aLeft;
+                    accumulatedARight += aRight;
+                    accumulatedBLeft += bLeft;
+                    accumulatedBRight += bRight;
+                    accumulatedDirectLeft += directLeft;
+                    accumulatedDirectRight += directRight;
                 }
                 ++aurumAgeSamples;
                 if (aurumReleaseAgeSamples >= 0)
                     ++aurumReleaseAgeSamples;
                 const float normalization = 1.0f / (std::sqrt((float) voiceCount) * (float) oversampling);
-                raw = { accumulatedLeft * normalization, accumulatedRight * normalization };
+                aurumFilterAInput = { accumulatedALeft * normalization, accumulatedARight * normalization };
+                aurumFilterBInput = { accumulatedBLeft * normalization, accumulatedBRight * normalization };
+                aurumDirectInput = { accumulatedDirectLeft * normalization, accumulatedDirectRight * normalization };
+                raw = aurumFilterAInput;
             }
             else if (params.hasAether)
             {
@@ -836,45 +879,56 @@ namespace beat
             {
                 const auto& filterA = params.aurumFilters[0];
                 const auto& filterB = params.aurumFilters[1];
+                const bool filterAActive = (aurumOutputBusMask & 1) != 0;
+                const bool filterBActive = (aurumOutputBusMask & 2) != 0;
+                const bool directActive = (aurumOutputBusMask & 4) != 0;
                 if (params.aurumFilterRouting == 1)
                 {
                     float mixedLeft = 0.0f;
                     float mixedRight = 0.0f;
                     int branchCount = 0;
-                    if (filterA.enabled)
+                    if (filterAActive)
                     {
-                        const auto branch = processFilter(left, right, filterA.cutoff01, filterA.resonance01, filterA.drive01, filterState, driveState);
+                        const auto branch = filterA.enabled
+                            ? processFilter(aurumFilterAInput.left, aurumFilterAInput.right, filterA.cutoff01, filterA.resonance01, filterA.drive01, filterState, driveState)
+                            : FilterStage::StereoFrame { aurumFilterAInput.left, aurumFilterAInput.right };
                         mixedLeft += branch.left;
                         mixedRight += branch.right;
                         ++branchCount;
                     }
-                    if (filterB.enabled)
+                    if (filterBActive)
                     {
-                        const auto branch = processFilter(left, right, filterB.cutoff01, filterB.resonance01, filterB.drive01, aurumFilterBState, aurumFilterBDriveState);
+                        const auto branch = filterB.enabled
+                            ? processFilter(aurumFilterBInput.left, aurumFilterBInput.right, filterB.cutoff01, filterB.resonance01, filterB.drive01, aurumFilterBState, aurumFilterBDriveState)
+                            : FilterStage::StereoFrame { aurumFilterBInput.left, aurumFilterBInput.right };
                         mixedLeft += branch.left;
                         mixedRight += branch.right;
                         ++branchCount;
                     }
-                    if (branchCount > 0)
+                    if (directActive)
                     {
-                        left = mixedLeft / (float) branchCount;
-                        right = mixedRight / (float) branchCount;
+                        mixedLeft += aurumDirectInput.left;
+                        mixedRight += aurumDirectInput.right;
+                        ++branchCount;
                     }
+                    left = branchCount > 0 ? mixedLeft / (float) branchCount : 0.0f;
+                    right = branchCount > 0 ? mixedRight / (float) branchCount : 0.0f;
                 }
                 else
                 {
-                    if (filterA.enabled)
-                    {
-                        const auto filtered = processFilter(left, right, filterA.cutoff01, filterA.resonance01, filterA.drive01, filterState, driveState);
-                        left = filtered.left;
-                        right = filtered.right;
-                    }
-                    if (filterB.enabled)
-                    {
-                        const auto filtered = processFilter(left, right, filterB.cutoff01, filterB.resonance01, filterB.drive01, aurumFilterBState, aurumFilterBDriveState);
-                        left = filtered.left;
-                        right = filtered.right;
-                    }
+                    auto filterAOutput = FilterStage::StereoFrame { aurumFilterAInput.left, aurumFilterAInput.right };
+                    if (filterAActive && filterA.enabled)
+                        filterAOutput = processFilter(filterAOutput.left, filterAOutput.right, filterA.cutoff01, filterA.resonance01, filterA.drive01, filterState, driveState);
+                    const int filterBInputCount = (int) filterAActive + (int) filterBActive;
+                    auto filterBOutput = FilterStage::StereoFrame {
+                        filterBInputCount > 0 ? (filterAOutput.left + aurumFilterBInput.left) / (float) filterBInputCount : 0.0f,
+                        filterBInputCount > 0 ? (filterAOutput.right + aurumFilterBInput.right) / (float) filterBInputCount : 0.0f,
+                    };
+                    if (filterBInputCount > 0 && filterB.enabled)
+                        filterBOutput = processFilter(filterBOutput.left, filterBOutput.right, filterB.cutoff01, filterB.resonance01, filterB.drive01, aurumFilterBState, aurumFilterBDriveState);
+                    const int outputCount = (int) (filterAActive || filterBActive) + (int) directActive;
+                    left = outputCount > 0 ? (filterBOutput.left + aurumDirectInput.left) / (float) outputCount : 0.0f;
+                    right = outputCount > 0 ? (filterBOutput.right + aurumDirectInput.right) / (float) outputCount : 0.0f;
                 }
             }
             else

@@ -2089,6 +2089,7 @@ namespace beat
             };
             params.aurumMatrix[index] = instrument.aurum.matrix[index];
             params.aurumRmMatrix[index] = instrument.aurum.rmMatrix[index];
+            params.aurumOutputSends[index] = instrument.aurum.outputSends[index];
         }
         params.aurumUnison = juce::jlimit(1, 8, instrument.aurum.unison);
         params.aurumDetuneCents = juce::jlimit(0.0f, 100.0f, instrument.aurum.detuneCents);

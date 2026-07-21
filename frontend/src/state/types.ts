@@ -521,7 +521,7 @@ export interface AurumOperatorConfig {
  * are FM destinations and column 6 is direct output. Diagonal values are
  * operator feedback. */
 export interface AurumSynthConfig {
-  version: 8;
+  version: 9;
   operators: AurumOperatorConfig[];
   matrix: number[][];
   rmMatrix: number[][];
@@ -531,6 +531,8 @@ export interface AurumSynthConfig {
   oversampling: 1 | 2 | 4;
   filters: [AurumFilterConfig, AurumFilterConfig];
   filterRouting: AurumFilterRouting;
+  /** Rows are operators; columns are Filter A, Filter B, and Direct. */
+  outputSends: number[][];
 }
 
 export type SynthPatchParameterValue = boolean | number | string;

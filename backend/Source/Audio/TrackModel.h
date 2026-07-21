@@ -249,6 +249,9 @@ namespace beat
             std::array<AurumOperator, 6> operators {};
             std::array<std::array<float, 7>, 6> matrix {};
             std::array<std::array<float, 6>, 6> rmMatrix {};
+            std::array<std::array<float, 3>, 6> outputSends {{
+                {{ 0.86f, 0.0f, 0.0f }},
+            }};
             int unison { 1 };
             float detuneCents { 8.0f };
             float stereoSpread { 0.35f };

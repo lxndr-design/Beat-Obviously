@@ -80,6 +80,7 @@
 .envelopeGrid { display: grid; gap: 6px; }
 .controlGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .envelopeGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sendGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; }
 
 .mainPanel,
 .operatorPanel { padding: 6px; }
@@ -234,11 +235,11 @@
 .matrixSection { overflow: auto; }
 .matrix {
   display: grid;
-  grid-template-columns: 48px repeat(7, minmax(57px, 1fr));
   border-top: var(--border-soft);
   border-left: var(--border-soft);
 }
-.rmMatrix { grid-template-columns: 48px repeat(6, minmax(57px, 1fr)); }
+.fmMatrix { grid-template-columns: 48px repeat(6, minmax(57px, 1fr)); }
+.outputMatrix { grid-template-columns: 48px repeat(3, minmax(78px, 1fr)); }
 
 .matrixHeader,
 .matrixRowLabel,

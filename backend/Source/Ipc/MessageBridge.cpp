@@ -2333,6 +2333,25 @@ namespace beat
                                     for (int target = 0; target < juce::jmin(6, cells->size()); ++target)
                                         instrument.aurum.rmMatrix[(size_t) source][(size_t) target] = juce::jlimit(-1.0f, 1.0f, (float) (double) cells->getReference(target));
                         }
+                        if (aurumVersion >= 9)
+                        {
+                            if (auto* rows = aurum.getProperty("outputSends", {}).getArray())
+                            {
+                                const auto rowCount = juce::jmin(6, rows->size());
+                                for (int source = 0; source < rowCount; ++source)
+                                    if (auto* cells = rows->getReference(source).getArray())
+                                        for (int bus = 0; bus < juce::jmin(3, cells->size()); ++bus)
+                                            instrument.aurum.outputSends[(size_t) source][(size_t) bus] = juce::jlimit(-1.0f, 1.0f, (float) (double) cells->getReference(bus));
+                            }
+                        }
+                        else
+                        {
+                            for (size_t source = 0; source < instrument.aurum.outputSends.size(); ++source)
+                            {
+                                const float legacyOutput = instrument.aurum.matrix[source][6];
+                                instrument.aurum.outputSends[source] = {{ legacyOutput, instrument.aurum.filterRouting == 1 ? legacyOutput : 0.0f, 0.0f }};
+                            }
+                        }
                         instrument.aurum.unison = juce::jlimit(1, 8, (int) aurum.getProperty("unison", 1));
                         instrument.aurum.detuneCents = floatParam(aurum, "detuneCents", 8.0f, 0.0f, 100.0f);
                         instrument.aurum.stereoSpread = normalizedParam(aurum, "stereoSpread", 0.35f);

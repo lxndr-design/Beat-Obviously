@@ -437,7 +437,7 @@ namespace beat
         juce::var aurumConfigToVar(const InstrumentDefinition::AurumConfig& aurum)
         {
             juce::DynamicObject::Ptr object = new juce::DynamicObject();
-            object->setProperty("version", 8);
+            object->setProperty("version", 9);
             object->setProperty("unison", aurum.unison);
             object->setProperty("detuneCents", aurum.detuneCents);
             object->setProperty("stereoSpread", aurum.stereoSpread);
@@ -518,6 +518,14 @@ namespace beat
                 rmMatrix.add(juce::var(row));
             }
             object->setProperty("rmMatrix", rmMatrix);
+            juce::Array<juce::var> outputSends;
+            for (const auto& source : aurum.outputSends)
+            {
+                juce::Array<juce::var> row;
+                for (const auto amount : source) row.add(amount);
+                outputSends.add(juce::var(row));
+            }
+            object->setProperty("outputSends", outputSends);
             return juce::var(object.get());
         }
 
@@ -609,6 +617,22 @@ namespace beat
                     if (auto* cells = rows->getReference(source).getArray())
                         for (int target = 0; target < juce::jmin(6, cells->size()); ++target)
                             config.rmMatrix[(size_t) source][(size_t) target] = juce::jlimit(-1.0f, 1.0f, (float) (double) cells->getReference(target));
+            if (version >= 9)
+            {
+                if (auto* rows = value.getProperty("outputSends", {}).getArray())
+                    for (int source = 0; source < juce::jmin(6, rows->size()); ++source)
+                        if (auto* cells = rows->getReference(source).getArray())
+                            for (int bus = 0; bus < juce::jmin(3, cells->size()); ++bus)
+                                config.outputSends[(size_t) source][(size_t) bus] = juce::jlimit(-1.0f, 1.0f, (float) (double) cells->getReference(bus));
+            }
+            else
+            {
+                for (size_t source = 0; source < config.outputSends.size(); ++source)
+                {
+                    const float legacyOutput = config.matrix[source][6];
+                    config.outputSends[source] = {{ legacyOutput, config.filterRouting == 1 ? legacyOutput : 0.0f, 0.0f }};
+                }
+            }
             config.unison = juce::jlimit(1, 8, (int) value.getProperty("unison", 1));
             config.detuneCents = juce::jlimit(0.0f, 100.0f, (float) (double) value.getProperty("detuneCents", 8.0));
             config.stereoSpread = juce::jlimit(0.0f, 1.0f, (float) (double) value.getProperty("stereoSpread", 0.35));

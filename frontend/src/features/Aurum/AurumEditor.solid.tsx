@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { Button, FloatingSelect, Icon, Knob, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
 import { sampleAurumOperatorWaveform, startInstrumentPreviewAudition, type InstrumentPreviewAuditionHandle } from "../../audio/synthPreview";
-import { AURUM_HARMONIC_COUNT, AURUM_OPERATOR_COUNT, AURUM_OUTPUT_COLUMN, AURUM_RESPONSE_CURVE_POINT_COUNT, drawAurumHarmonicLine, normalizedAurumConfigForInstrument } from "../../state/aurum";
+import { AURUM_DIRECT_BUS, AURUM_FILTER_A_BUS, AURUM_FILTER_B_BUS, AURUM_HARMONIC_COUNT, AURUM_OPERATOR_COUNT, AURUM_OUTPUT_BUS_COUNT, AURUM_RESPONSE_CURVE_POINT_COUNT, drawAurumHarmonicLine, normalizedAurumConfigForInstrument } from "../../state/aurum";
 import type { AurumFilterConfig, AurumOperatorConfig, AurumOperatorWaveform, Instrument } from "../../state/types";
 import { aurumTabIndexAfterKey } from "./aurumEditorInteraction";
 import styles from "./AurumEditor.module.css";
@@ -28,7 +28,7 @@ export function AurumEditor(props: AurumEditorProps) {
   const [draft, setDraft] = createSignal(cloneInstrument(props.instrument), { equals: false });
   const [selectedOperator, setSelectedOperator] = createSignal(0);
   const [selectedPage, setSelectedPage] = createSignal<"main" | "operator">("operator");
-  const [matrixMode, setMatrixMode] = createSignal<"fm" | "rm">("fm");
+  const [matrixMode, setMatrixMode] = createSignal<"fm" | "rm" | "output">("fm");
   const [envelopeMode, setEnvelopeMode] = createSignal<EnvelopeMode>("amp");
   const [responseMode, setResponseMode] = createSignal<"velocity" | "key">("velocity");
   const [waveformOpen, setWaveformOpen] = createSignal(false);
@@ -89,10 +89,24 @@ export function AurumEditor(props: AurumEditorProps) {
       matrix: config.matrix.map((row, rowIndex) => rowIndex === source
         ? row.map((cell, columnIndex) => columnIndex === target ? value : cell)
         : row),
-    }) : ({
+    }) : matrixMode() === "rm" ? ({
       ...config,
       rmMatrix: config.rmMatrix.map((row, rowIndex) => rowIndex === source
         ? row.map((cell, columnIndex) => columnIndex === target ? value : cell)
+        : row),
+    }) : ({
+      ...config,
+      outputSends: config.outputSends.map((row, rowIndex) => rowIndex === source
+        ? row.map((cell, columnIndex) => columnIndex === target ? value : cell)
+        : row),
+    }));
+  }
+
+  function updateOutputSend(bus: number, value: number) {
+    updateAurum((config) => ({
+      ...config,
+      outputSends: config.outputSends.map((row, rowIndex) => rowIndex === selectedOperator()
+        ? row.map((cell, columnIndex) => columnIndex === bus ? value : cell)
         : row),
     }));
   }
@@ -311,6 +325,14 @@ export function AurumEditor(props: AurumEditorProps) {
                 </div>
               </div>
               <div class={styles.controlBlock}>
+                <h4>Output sends</h4>
+                <div class={styles.sendGrid}>
+                  <Knob size="sm" min={-1} max={1} step={0.01} bipolar label="Filter A" value={aurum().outputSends[selectedOperator()][AURUM_FILTER_A_BUS]} formatValue={(value) => `${Math.round(value * 100)}`} defaultValue={0} onChange={(value) => updateOutputSend(AURUM_FILTER_A_BUS, value)} />
+                  <Knob size="sm" min={-1} max={1} step={0.01} bipolar label="Filter B" value={aurum().outputSends[selectedOperator()][AURUM_FILTER_B_BUS]} formatValue={(value) => `${Math.round(value * 100)}`} defaultValue={0} onChange={(value) => updateOutputSend(AURUM_FILTER_B_BUS, value)} />
+                  <Knob size="sm" min={-1} max={1} step={0.01} bipolar label="Direct" value={aurum().outputSends[selectedOperator()][AURUM_DIRECT_BUS]} formatValue={(value) => `${Math.round(value * 100)}`} defaultValue={0} onChange={(value) => updateOutputSend(AURUM_DIRECT_BUS, value)} />
+                </div>
+              </div>
+              <div class={styles.controlBlock}>
                 <div class={styles.articulationHeader}>
                   <h4>{envelopeMode() === "amp" ? "Amplitude" : envelopeMode() === "pitch" ? "Pitch" : "Phase"} envelope</h4>
                   <div class={styles.envelopeMode} role="group" aria-label="Operator envelope mode">
@@ -358,24 +380,26 @@ export function AurumEditor(props: AurumEditorProps) {
         <section class={styles.matrixSection}>
           <div class={styles.sectionTitle}>
             <div>
-              <h3>{matrixMode() === "fm" ? "Frequency Matrix" : "Ring / AM Matrix"}</h3>
+              <h3>{matrixMode() === "fm" ? "Frequency Matrix" : matrixMode() === "rm" ? "Ring / AM Matrix" : "Output Routing"}</h3>
               <p>{matrixMode() === "fm"
                 ? "Rows modulate frequency. Diagonal cells are feedback."
-                : "Rows modulate amplitude. Full depth produces ring modulation."}</p>
+                : matrixMode() === "rm"
+                  ? "Rows modulate amplitude. Full depth produces ring modulation."
+                  : "Rows send bipolar signal to filters or direct output."}</p>
             </div>
             <div class={styles.matrixMode} role="group" aria-label="Aurum matrix mode">
               <Button size="xs" selected={matrixMode() === "fm"} onClick={() => setMatrixMode("fm")}>FM</Button>
               <Button size="xs" selected={matrixMode() === "rm"} onClick={() => setMatrixMode("rm")}>RM</Button>
+              <Button size="xs" selected={matrixMode() === "output"} onClick={() => setMatrixMode("output")}>OUT</Button>
             </div>
           </div>
           <div
-            class={`${styles.matrix} ${matrixMode() === "rm" ? styles.rmMatrix : ""}`}
+            class={`${styles.matrix} ${matrixMode() === "output" ? styles.outputMatrix : styles.fmMatrix}`}
             role="group"
-            aria-label={`Aurum ${matrixMode() === "fm" ? "frequency" : "ring modulation"} routing matrix`}
+            aria-label={`Aurum ${matrixMode() === "fm" ? "frequency" : matrixMode() === "rm" ? "ring modulation" : "output"} routing matrix`}
           >
             <span />
-            <For each={aurum().operators}>{(candidate) => <span class={styles.matrixHeader}>{candidate.name}</span>}</For>
-            <Show when={matrixMode() === "fm"}><span class={`${styles.matrixHeader} ${styles.outputHeader}`}>OUT</span></Show>
+            <For each={matrixMode() === "output" ? ["FILTER A", "FILTER B", "DIRECT"] : aurum().operators.map((candidate) => candidate.name)}>{(label) => <span class={`${styles.matrixHeader} ${matrixMode() === "output" ? styles.outputHeader : ""}`}>{label}</span>}</For>
             <For each={aurum().operators}>{(source, sourceIndex) => (
               <>
                 <Button
@@ -390,12 +414,14 @@ export function AurumEditor(props: AurumEditorProps) {
                 >
                   {source.name}
                 </Button>
-                <For each={Array.from({ length: matrixMode() === "fm" ? AURUM_OPERATOR_COUNT + 1 : AURUM_OPERATOR_COUNT })}>{(_, targetIndex) => {
+                <For each={Array.from({ length: matrixMode() === "output" ? AURUM_OUTPUT_BUS_COUNT : AURUM_OPERATOR_COUNT })}>{(_, targetIndex) => {
                   const value = () => matrixMode() === "fm"
                     ? aurum().matrix[sourceIndex()][targetIndex()] ?? 0
-                    : aurum().rmMatrix[sourceIndex()][targetIndex()] ?? 0;
-                  const feedback = () => sourceIndex() === targetIndex();
-                  const output = () => matrixMode() === "fm" && targetIndex() === AURUM_OUTPUT_COLUMN;
+                    : matrixMode() === "rm"
+                      ? aurum().rmMatrix[sourceIndex()][targetIndex()] ?? 0
+                      : aurum().outputSends[sourceIndex()][targetIndex()] ?? 0;
+                  const feedback = () => matrixMode() !== "output" && sourceIndex() === targetIndex();
+                  const output = () => matrixMode() === "output";
                   return (
                     <div class={`${styles.matrixCell} ${feedback() ? styles.feedbackCell : ""} ${output() ? styles.outputCell : ""}`} data-active={Math.abs(value()) > 0.001}>
                       <Knob
@@ -407,8 +433,10 @@ export function AurumEditor(props: AurumEditorProps) {
                         bipolar
                         value={value()}
                         label={matrixMode() === "fm"
-                          ? `${source.name} ${feedback() ? "feedback" : output() ? "to output" : `to ${aurum().operators[targetIndex()].name}`}`
-                          : `${source.name} ${feedback() ? "self ring modulation" : `ring modulation to ${aurum().operators[targetIndex()].name}`}`}
+                          ? `${source.name} ${feedback() ? "feedback" : `to ${aurum().operators[targetIndex()].name}`}`
+                          : matrixMode() === "rm"
+                            ? `${source.name} ${feedback() ? "self ring modulation" : `ring modulation to ${aurum().operators[targetIndex()].name}`}`
+                            : `${source.name} to ${targetIndex() === AURUM_FILTER_A_BUS ? "Filter A" : targetIndex() === AURUM_FILTER_B_BUS ? "Filter B" : "Direct"}`}
                         formatValue={(next) => `${Math.round(next * 100)}`}
                         defaultValue={0}
                         onChange={(next) => updateMatrix(sourceIndex(), targetIndex(), next)}

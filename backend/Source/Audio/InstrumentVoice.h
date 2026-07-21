@@ -273,6 +273,9 @@ namespace beat
             std::array<AurumOperator, 6> aurumOperators {};
             std::array<std::array<float, 7>, 6> aurumMatrix {};
             std::array<std::array<float, 6>, 6> aurumRmMatrix {};
+            std::array<std::array<float, 3>, 6> aurumOutputSends {{
+                {{ 0.86f, 0.0f, 0.0f }},
+            }};
             int aurumUnison { 1 };
             float aurumDetuneCents { 8.0f };
             float aurumStereoSpread { 0.35f };
@@ -356,6 +359,7 @@ namespace beat
         VoiceNoteAutomationState noteAutomationState;
         RealtimeRamp pitchFrequencyRamp;
         int activeWavetableUnison { 1 };
+        int aurumOutputBusMask { 0 };
         VoiceStats::RenderWorkBlock currentBlockWork;
         DriveStage::State aetherRuntimeWarpState;
         DriveStage::State driveState;

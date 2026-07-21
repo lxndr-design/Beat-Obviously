@@ -7385,6 +7385,8 @@ namespace
         instrument.aurum.filters[0] = { true, 1, 0.43f, 0.27f, 0.19f };
         instrument.aurum.filters[1] = { true, 2, 0.16f, 0.34f, 0.11f };
         instrument.aurum.filterRouting = 1;
+        instrument.aurum.outputSends[0] = {{ -0.72f, 0.31f, 0.18f }};
+        instrument.aurum.outputSends[2] = {{ 0.14f, -0.63f, 0.42f }};
         project.instruments.push_back(instrument);
 
         beat::Database db(dbFile);
@@ -7430,7 +7432,13 @@ namespace
             && loaded->instruments.front().aurum.filters[1].enabled
             && loaded->instruments.front().aurum.filters[1].type == 2
             && near(loaded->instruments.front().aurum.filters[1].cutoff01, 0.16f)
-            && loaded->instruments.front().aurum.filterRouting == 1;
+            && loaded->instruments.front().aurum.filterRouting == 1
+            && near(loaded->instruments.front().aurum.outputSends[0][0], -0.72f)
+            && near(loaded->instruments.front().aurum.outputSends[0][1], 0.31f)
+            && near(loaded->instruments.front().aurum.outputSends[0][2], 0.18f)
+            && near(loaded->instruments.front().aurum.outputSends[2][0], 0.14f)
+            && near(loaded->instruments.front().aurum.outputSends[2][1], -0.63f)
+            && near(loaded->instruments.front().aurum.outputSends[2][2], 0.42f);
 
         root.deleteRecursively();
         if (!ok)
@@ -12508,6 +12516,7 @@ namespace
         params.aurumOperators[1] = { true, 0, 2.0f, 0, 0.0f, 0.55f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
         params.aurumMatrix[1][0] = 0.42f;
         params.aurumMatrix[0][6] = 0.86f;
+        params.aurumOutputSends[0][0] = 0.86f;
 
         auto render = [](const beat::InstrumentVoice::Params& renderParams)
         {
@@ -12528,6 +12537,7 @@ namespace
         const auto negativeFm = render(negativeFmParams);
         auto negativeOutputParams = params;
         negativeOutputParams.aurumMatrix[0][6] = -params.aurumMatrix[0][6];
+        negativeOutputParams.aurumOutputSends[0][0] = -params.aurumOutputSends[0][0];
         const auto negativeOutput = render(negativeOutputParams);
 
         double energy = 0.0;
@@ -12571,6 +12581,7 @@ namespace
         params.aurumOperators[0] = { true, 0, 1.0f, 0, 0.0f, 0.8f, 0.0f, 0.0f, 0.0f, 1.0f, 20.0f };
         params.aurumOperators[1] = { true, 0, 2.0f, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 200.0f };
         params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
 
         auto renderTail = [](const beat::InstrumentVoice::Params& renderParams)
         {
@@ -12626,6 +12637,7 @@ namespace
         params.aurumOperators[0] = { true, 0, 1.0f, 0, 0.0f, 0.8f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
         params.aurumOperators[1] = { true, 0, 2.0f, 0, 0.0f, 0.65f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
         params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
 
         auto render = [](const beat::InstrumentVoice::Params& renderParams)
         {
@@ -12683,6 +12695,7 @@ namespace
         params.releaseMs = 1.0f;
         params.aurumOperators[0] = { true, 4, 1.0f, 0, 0.0f, 0.8f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
         params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
 
         auto render = [](const beat::InstrumentVoice::Params& renderParams, int midiNote)
         {
@@ -12748,6 +12761,7 @@ namespace
         params.releaseMs = 1.0f;
         params.aurumOperators[0] = { true, 0, 1.0f, 0, 0.0f, 0.8f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
         params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
 
         auto render = [](const beat::InstrumentVoice::Params& renderParams)
         {
@@ -12832,6 +12846,7 @@ namespace
         op.phaseSustain = 1.0f;
         op.phaseReleaseMs = 100.0f;
         params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
 
         auto render = [](const beat::InstrumentVoice::Params& renderParams)
         {
@@ -12900,6 +12915,7 @@ namespace
         op.decayMs = 0.0f;
         op.sustain = 1.0f;
         params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
 
         auto render = [](const beat::InstrumentVoice::Params& renderParams, int midiNote, float velocity)
         {
@@ -12968,6 +12984,7 @@ namespace
         op.decayMs = 0.0f;
         op.sustain = 1.0f;
         params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
         params.aurumFilters[0] = { true, 0, 0.32f, 0.18f, 0.12f };
         params.aurumFilters[1] = { false, 2, 0.16f, 0.22f, 0.08f };
 
@@ -12994,11 +13011,21 @@ namespace
         const auto serial = render(serialParams);
         auto parallelParams = serialParams;
         parallelParams.aurumFilterRouting = 1;
+        parallelParams.aurumOutputSends[0][1] = 0.65f;
         const auto parallel = render(parallelParams);
+        auto directParams = params;
+        directParams.aurumOutputSends[0] = {{ 0.0f, 0.0f, 1.0f }};
+        const auto directPositive = render(directParams);
+        directParams.aurumOutputSends[0][2] = -1.0f;
+        const auto directNegative = render(directParams);
+        directParams.aurumOutputSends[0][2] = 0.0f;
+        const auto disconnected = render(directParams);
 
         double singleRoutingDifference = 0.0;
         double serialDifference = 0.0;
         double routingDifference = 0.0;
+        double directInversionResidual = 0.0;
+        double disconnectedEnergy = 0.0;
         float peak = 0.0f;
         for (int channel = 0; channel < 2; ++channel)
             for (int sample = 0; sample < filterAOnly.getNumSamples(); ++sample)
@@ -13012,17 +13039,23 @@ namespace
                 singleRoutingDifference += std::abs((double) a - singleParallel);
                 serialDifference += std::abs((double) a - serialSample);
                 routingDifference += std::abs((double) serialSample - parallelSample);
+                directInversionResidual += std::abs((double) directPositive.getSample(channel, sample) + (double) directNegative.getSample(channel, sample));
+                disconnectedEnergy += std::abs((double) disconnected.getSample(channel, sample));
                 peak = std::max(peak, std::max(std::abs(serialSample), std::abs(parallelSample)));
             }
 
         const bool ok = singleRoutingDifference < 0.000001
             && serialDifference > 0.1
             && routingDifference > 0.1
+            && directInversionResidual < 0.000001
+            && disconnectedEnergy < 0.000001
             && peak <= 1.0f;
         if (!ok)
             std::cerr << "Aurum dual-filter stress failed single=" << singleRoutingDifference
                       << " serial=" << serialDifference
                       << " routing=" << routingDifference
+                      << " directInverse=" << directInversionResidual
+                      << " disconnected=" << disconnectedEnergy
                       << " peak=" << peak << "\n";
         return ok;
     }
@@ -13047,6 +13080,7 @@ namespace
         op.decayMs = 0.0f;
         op.sustain = 1.0f;
         params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
 
         auto render = [](beat::InstrumentVoice::Params renderParams, int oversampling)
         {
@@ -13133,6 +13167,7 @@ namespace
             }
 
             params.aurumMatrix[operatorIndex][6] = operatorIndex % 2 == 0 ? 1.0f : -1.0f;
+            params.aurumOutputSends[operatorIndex][0] = operatorIndex % 2 == 0 ? 1.0f : -1.0f;
             for (size_t target = 0; target < params.aurumOperators.size(); ++target)
             {
                 const float polarity = (operatorIndex + target) % 2 == 0 ? 1.0f : -1.0f;

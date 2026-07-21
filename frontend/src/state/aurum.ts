@@ -2,6 +2,10 @@ import type { AurumFilterConfig, AurumOperatorConfig, AurumSynthConfig, Instrume
 
 export const AURUM_OPERATOR_COUNT = 6;
 export const AURUM_OUTPUT_COLUMN = AURUM_OPERATOR_COUNT;
+export const AURUM_OUTPUT_BUS_COUNT = 3;
+export const AURUM_FILTER_A_BUS = 0;
+export const AURUM_FILTER_B_BUS = 1;
+export const AURUM_DIRECT_BUS = 2;
 export const AURUM_HARMONIC_COUNT = 16;
 export const AURUM_RESPONSE_CURVE_POINT_COUNT = 5;
 
@@ -57,7 +61,7 @@ export function defaultAurumConfig(): AurumSynthConfig {
   matrix[0][AURUM_OUTPUT_COLUMN] = 0.86;
   matrix[1][0] = 0.42;
   return {
-    version: 8,
+    version: 9,
     operators: Array.from({ length: AURUM_OPERATOR_COUNT }, (_, index) => defaultOperator(index)),
     matrix,
     rmMatrix,
@@ -67,6 +71,7 @@ export function defaultAurumConfig(): AurumSynthConfig {
     oversampling: 2,
     filters: [{ ...DEFAULT_FILTER_A }, { ...DEFAULT_FILTER_B }],
     filterRouting: "serial",
+    outputSends: matrix.map((row) => [row[AURUM_OUTPUT_COLUMN], 0, 0]),
   };
 }
 
@@ -106,7 +111,7 @@ export function normalizedAurumConfig(config: AurumSynthConfig | undefined, lega
   return {
     ...fallback,
     ...config,
-    version: 8,
+    version: 9,
     operators: fallback.operators.map((operator, index) => {
       const incoming = config.operators?.[index];
       return {
@@ -131,6 +136,13 @@ export function normalizedAurumConfig(config: AurumSynthConfig | undefined, lega
       normalizeFilter(incomingFilters?.[1], fallback.filters[1]),
     ],
     filterRouting: config.filterRouting === "parallel" ? "parallel" : "serial",
+    outputSends: fallback.outputSends.map((row, source) => row.map((value, bus) => clampBipolar(
+      incomingVersion >= 9
+        ? config.outputSends?.[source]?.[bus] ?? value
+        : bus === AURUM_FILTER_A_BUS || (bus === AURUM_FILTER_B_BUS && config.filterRouting === "parallel")
+          ? config.matrix?.[source]?.[AURUM_OUTPUT_COLUMN] ?? value
+          : 0,
+    ))),
   };
 }
 
