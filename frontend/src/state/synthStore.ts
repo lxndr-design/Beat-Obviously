@@ -24,8 +24,8 @@ import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 5;
-export const LUMUS_PATCH_SCHEMA_VERSION = 7;
-const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6] as const;
+export const LUMUS_PATCH_SCHEMA_VERSION = 8;
+const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7] as const;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
 export const SYNTH_INSTRUMENT_TYPE = "wavetable-synth";
 export const LUMUS_PARAMETER_NAMESPACE = "lumus";
@@ -191,6 +191,7 @@ export type SynthParameterId =
   | "lumus.arp.mode"
   | "lumus.arp.rate"
   | "lumus.arp.gate"
+  | "lumus.arp.swing"
   | "lumus.arp.octaves"
   | "amp.level"
   | "amp.pan"
@@ -1443,6 +1444,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "lumus.arp.mode": "up",
   "lumus.arp.rate": "1/16",
   "lumus.arp.gate": 0.75,
+  "lumus.arp.swing": 0,
   "lumus.arp.octaves": 1,
   "amp.level": 0.8,
   "amp.pan": 0,
@@ -1623,6 +1625,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "lumus.arp.mode": "Lumus Arpeggiator Mode",
   "lumus.arp.rate": "Lumus Arpeggiator Rate",
   "lumus.arp.gate": "Lumus Arpeggiator Gate",
+  "lumus.arp.swing": "Lumus Arpeggiator Swing",
   "lumus.arp.octaves": "Lumus Arpeggiator Octaves",
   "amp.level": "Amp Level",
   "amp.pan": "Amp Pan",
@@ -1811,6 +1814,7 @@ export function createDefaultLumusDraft(): SynthDraftPatch {
   parameters["lumus.arp.mode"] = "up";
   parameters["lumus.arp.rate"] = "1/16";
   parameters["lumus.arp.gate"] = 0.75;
+  parameters["lumus.arp.swing"] = 0;
   parameters["lumus.arp.octaves"] = 1;
   return {
     ...draft,
@@ -1896,6 +1900,8 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
       parameters[lumusSampleParameterId("c", suffix)] = parameters[`aether.sample.1.${suffix}`]
         ?? DEFAULT_LUMUS_SAMPLE_PARAMETERS[suffix];
   }
+  if (isLumus && Number(input.schemaVersion) < 8)
+    parameters["lumus.arp.swing"] = 0;
 
   const mpeMaster = clampMidiChannel(Number(parameters["aether.mpe.masterChannel"]));
   const mpeFirst = clampMidiChannel(Number(parameters["aether.mpe.firstMemberChannel"]));
@@ -1983,7 +1989,7 @@ function validateSynthPatchIdentity(input: Partial<SynthDraftPatch> | SynthPatch
   if (type === LUMUS_INSTRUMENT_TYPE) {
     if (namespace !== LUMUS_PARAMETER_NAMESPACE)
       throw new SynthPatchIdentityError("lumus.identity.namespace-mismatch", "Lumus patches must use the lumus namespace.");
-    if (!LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3 | 4 | 5 | 6)
+    if (!LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3 | 4 | 5 | 6 | 7)
         && input.schemaVersion !== LUMUS_PATCH_SCHEMA_VERSION)
       throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema 1 through ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
     return true;
@@ -3078,6 +3084,7 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (id === "maxVoices") return Math.max(1, Math.min(32, Math.round(value)));
   if (id === "glide.ms") return Math.max(0, Math.min(5000, Math.round(value)));
   if (id === "lumus.arp.gate") return Math.max(0.05, Math.min(1, value));
+  if (id === "lumus.arp.swing") return Math.max(0, Math.min(0.75, value));
   if (id === "lumus.arp.octaves") return Math.max(1, Math.min(4, Math.round(value)));
   if (id.startsWith("aether.mpe.") && id.endsWith("Channel")) return clampMidiChannel(value);
   if (id === "aether.sample.1.rootNote") return Math.max(0, Math.min(127, Math.round(value)));

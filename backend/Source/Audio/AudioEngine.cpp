@@ -2753,6 +2753,7 @@ namespace beat
                         : arp.mode == 3 ? LumusArpeggiator::Mode::random
                         : LumusArpeggiator::Mode::up;
                     route.lumusArpeggiatorConfig.gate = arp.gate;
+                    route.lumusArpeggiatorConfig.swing = arp.swing;
                     route.lumusArpeggiatorConfig.octaves = arp.octaves;
                     route.lumusArpeggiatorRateDivision = arp.rateDivision;
                     route.lumusArpeggiator.prepare(routeBuf.getNumSamples() > 0 ? routeBuf.getNumSamples() : 512);

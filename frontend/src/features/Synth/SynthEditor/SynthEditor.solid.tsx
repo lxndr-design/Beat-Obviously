@@ -683,6 +683,7 @@ function LumusArpeggiatorPanel() {
           </div>
           <div class={styles.knobCluster}>
             <SynthParameterKnob id="lumus.arp.gate" label="Gate" defaultValue={0.75} onChange={setNumericParameter} />
+            <SynthParameterKnob id="lumus.arp.swing" label="Swing" defaultValue={0} max={0.75} onChange={setNumericParameter} />
             <NumberInput
               label="Octaves"
               layout="inline"
@@ -1996,6 +1997,7 @@ function SynthParameterKnob(props: {
   id: SynthParameterId;
   label: string;
   defaultValue: number;
+  max?: number;
   bipolar?: boolean;
   onChange: (id: SynthParameterId, value: number) => void;
 }) {
@@ -2007,7 +2009,7 @@ function SynthParameterKnob(props: {
       label={props.label}
       value={getNumberParam(draft(), props.id)}
       min={props.bipolar ? -1 : 0}
-      max={isEnvelopeTime() ? 30 : 1}
+      max={props.max ?? (isEnvelopeTime() ? 30 : 1)}
       step={isEnvelopeTime() ? 0.001 : 0.01}
       defaultValue={props.defaultValue}
       bipolar={props.bipolar}

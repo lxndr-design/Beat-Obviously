@@ -202,6 +202,8 @@ Local destinations are `docs/audio/lumus-serum2-benchmark.md`, `docs/audio/lumus
 
 The Lumus v7 arpeggiator is independently implemented Beat-owned work using the existing JUCE MIDI container and Beat Sequencer timing boundary. No third-party source, preset, MIDI pattern, asset, executable, service, or new dependency was imported or executed. Local implementation boundaries are `backend/Source/Audio/Midi/LumusArpeggiator.h`, the Lumus-only route preparation/insertion in `backend/Source/Audio/AudioEngine.{h,cpp}`, the versioned fields in `TrackModel.h` and `SynthPatchContract.cpp`, and shared-component controls in `SynthEditor.solid.tsx`. It does not alter repository licensing or ownership and is not Vital-derived.
 
+The Lumus v8 swing extension is likewise independently implemented Beat-owned work. It adds only a bounded alternating interval calculation, versioned persistence, shared-knob UI, and focused timing/migration tests within the same local boundaries. No upstream code, musical pattern, asset, executable, service, binary, or dependency was imported or executed.
+
 ## Milestone B29 benchmark factory-preset provenance
 
 Two user-supplied local preset documents were structurally adapted into Beat's existing factory-guide representation:

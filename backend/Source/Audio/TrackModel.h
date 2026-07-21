@@ -326,6 +326,7 @@ namespace beat
                 int mode { 0 }; // 0 up, 1 down, 2 up-down, 3 deterministic random
                 int rateDivision { 16 };
                 float gate { 0.75f };
+                float swing { 0.0f };
                 int octaves { 1 };
             };
 

@@ -16,21 +16,21 @@ This equality is a starting-line invariant, not a permanent goal. Every future d
 
 ## Three-slot source rack
 
-Lumus schema v7 freezes three stable source identities: A, B, and C, and gives each slot independent sample and granular parameters, managed assets, and Wavetable/Sample/Multisample/Granular selection. Multisample is an explicit policy identity over the same bounded key-map/SFZ renderer rather than a duplicate DSP engine. The generalized oscillator editor presents exactly those rows and disables structural add/remove actions. Non-wavetable modes disable only the selected slot's wavetable renderer. V3 sample data migrates losslessly into C; v4 gains silent granular defaults while retaining its legacy auxiliary granular state, and v1/v2 remain wavetable-only and silent for C.
+Lumus schema v8 freezes three stable source identities: A, B, and C, and gives each slot independent sample and granular parameters, managed assets, and Wavetable/Sample/Multisample/Granular selection. Multisample is an explicit policy identity over the same bounded key-map/SFZ renderer rather than a duplicate DSP engine. The generalized oscillator editor presents exactly those rows and disables structural add/remove actions. Non-wavetable modes disable only the selected slot's wavetable renderer. V3 sample data migrates losslessly into C; v4 gains silent granular defaults while retaining its legacy auxiliary granular state, and v1/v2 remain wavetable-only and silent for C.
 
 Wavetable, sample, multisample, and bounded granular modes are implemented independently for A, B, and C. A shared A/B/C settings switch exposes each source asset and key map without creating a second component system. Sample and Multisample deliberately share the verified renderer while retaining distinct serialized mode identity. Spectral remains paused rather than exposed as a placeholder. Slot C wavetable mode participates in the existing modulation contract. All source-mode and routing UI uses Beat's shared `FloatingSelect`, button, toggle, input, and knob components with no Lumus-specific typography or layout system.
 
-Schema v7 also adds a Lumus-owned arpeggiator. It is disabled by default, so older patches and the Lumus Init/Aether Init equality invariant remain unchanged. When enabled, the route-level MIDI transform produces Up, Down, Up/Down, or deterministic Random patterns at 1/4, 1/8, 1/16, or 1/32 divisions, with bounded gate and octave controls. Step duration is recalculated from the active sample rate, sequencer tempo, and transport speed. Held-note state, order, channel, velocity, block continuity, gate note-offs, and controller panic behavior are deterministic; transport reset clears the transform. The callback uses fixed arrays and a pre-sized MIDI buffer, while configuration and storage preparation happen outside it. Swing, scale/key constraints, and clip sequencing are not implemented.
+Schema v7 added a Lumus-owned arpeggiator. Schema v8 adds zero-to-75% swing as alternating long/short step intervals; each pair remains exactly two straight steps, so tempo does not drift. Swing defaults to zero and v1-v7 migrate to straight timing, preserving older output. When enabled, the route-level MIDI transform produces Up, Down, Up/Down, or deterministic Random patterns at 1/4, 1/8, 1/16, or 1/32 divisions, with bounded gate, swing, and octave controls. Step duration is recalculated from the active sample rate, sequencer tempo, and transport speed. Held-note state, order, channel, velocity, block continuity, gate note-offs, and controller panic behavior are deterministic; transport reset clears the transform. The callback uses fixed arrays and a pre-sized MIDI buffer, while configuration and storage preparation happen outside it. Scale/key constraints and clip sequencing are not implemented.
 
 The focused MIDI transform is event-exact across 100-sample block splits and reports zero realtime-safety violations after preparation. The end-to-end offline engine test produces finite, audible, materially different enabled output (`differenceEnergy 647.748`) and a `0.003130` maximum sample delta between 64- and 257-sample render blocks, below the explicit `0.005` integration tolerance. The disabled comparison is block-identical. This tolerance records the renderer's retrigger/envelope numerical boundary rather than relaxing MIDI event timing.
 
-### Verified 2026-07-20
+### Verified 2026-07-21
 
 - Complete non-native verification and production frontend build: passed.
 - Release `Beat` and `BeatBackendStress` targets: built successfully.
 - Complete native stress suite: passed with only the existing `baseline.recent-project-exists` TCC waiver enabled.
-- Lumus v1-v6 migration, v7 roundtrip, independent sample-ownership preservation, malformed/future per-slot metadata rejection, ambiguous legacy-source rejection, malformed/future rack rejection, arpeggiator default-off migration, parser clamps, exact gate timing, channel/velocity preservation, block-size invariance, controller panic, fixed UI identities, browser/native wavetable audibility, native sample audibility, stereo pan, per-source route conversion, Slot C modulation, finite output, and deterministic rendering: passed.
-- Frozen Aether benchmark renders at 44.1, 48, and 96 kHz retained their recorded SHA-256 values; no baseline was updated.
+- Lumus v1-v7 migration, v8 roundtrip, independent sample-ownership preservation, malformed/future per-slot metadata rejection, ambiguous legacy-source rejection, malformed/future rack rejection, arpeggiator default-off/straight-timing migration, parser clamps, exact gate and swing timing, channel/velocity preservation, block-size invariance, controller panic, fixed UI identities, browser/native wavetable audibility, native sample audibility, stereo pan, per-source route conversion, Slot C modulation, finite output, and deterministic rendering: passed.
+- Frozen Aether benchmark renders at 44.1, 48, and 96 kHz retained their recorded SHA-256 values; no baseline was updated. The regenerated 150-WAV baseline retained normalized manifest `67c27249118f7ec4281659db7fdcfa3ce6638d6110885a572e5e71de6ad0cafa`, with zero deadline overruns and unchanged 64 accepted / 16 rejected / 16 overflow queue telemetry.
 
 ## Benchmark lanes
 
@@ -39,7 +39,7 @@ The focused MIDI transform is event-exact across 100-sample block splits and rep
 3. **Audio quality:** pitch, alias-risk, DC, discontinuity, cross-rate equivalence, stereo coherence, transition continuity, and deterministic live/offline parity.
 4. **Routing and modulation:** per-source dual-filter/main/direct/none routing, two sends, bounded effect graph, deterministic modulation, and unchanged event timing.
 5. **Performance:** equivalent-patch Lumus must begin no slower than the frozen Aether path; new modes receive independent realtime work budgets and offline-HQ measurements.
-6. **Workflow:** the first synth-owned arpeggiator slice is complete; swing, scale/key context, and clip sequencing remain independently gated work.
+6. **Workflow:** the synth-owned arpeggiator and pair-preserving swing slices are complete; scale/key context and clip sequencing remain independently gated work.
 
 ## Direct-reference gate
 
@@ -47,4 +47,4 @@ A direct Serum 2 comparison may be added later only from a locally licensed inst
 
 ## Current conclusion
 
-Lumus has a clean identity boundary, a bit-stable Aether-derived starting renderer, a fixed A/B/C rack with independently verified sample, multisample, and granular playback in every slot, and a bounded sample-accurate arpeggiator. Swing, key/scale context, clip sequencing, and spectral work remain incomplete and are not implied ready by this benchmark.
+Lumus has a clean identity boundary, a bit-stable Aether-derived starting renderer, a fixed A/B/C rack with independently verified sample, multisample, and granular playback in every slot, and a bounded sample-accurate arpeggiator with pair-preserving swing. Key/scale context, clip sequencing, and spectral work remain incomplete and are not implied ready by this benchmark.

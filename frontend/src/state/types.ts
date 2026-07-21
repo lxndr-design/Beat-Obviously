@@ -693,7 +693,7 @@ export interface SynthPatchMacroDefinition {
 
 export interface SynthPatchSnapshot {
   /** v2 adds Sample Slot 1; v3 slicing/looping; v4 bounded mapped zones; v5 sample-source FX sends. */
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   instrumentType: "wavetable-synth" | "lumus-hybrid-synth";
   namespace: "synth" | "lumus";
   name: string;

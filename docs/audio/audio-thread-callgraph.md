@@ -126,9 +126,10 @@ No table generation, mutation, allocation, or lock was added to oscillator playb
 
 ```text
 queue/sequencer note or arrangement event
-  -> Lumus route only, when schema v7 arpeggiator is enabled
+  -> Lumus route only, when the schema v7+ arpeggiator is enabled
      -> fixed held-note/channel/velocity arrays
      -> step samples from active sample rate + atomic sequencer tempo/speed
+     -> optional schema v8 alternating long/short swing intervals with pair duration preserved
      -> pre-sized route MIDI output with sample-offset gate events
      -> no separate clock, file access, lock, or lazy initialization
   stable parameter ID + value + caller rampSamples

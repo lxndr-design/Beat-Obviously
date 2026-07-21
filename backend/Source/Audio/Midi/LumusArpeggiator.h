@@ -19,6 +19,7 @@ namespace beat
             Mode mode { Mode::up };
             double stepSamples { 6000.0 };
             float gate { 0.75f };
+            float swing { 0.0f };
             int octaves { 1 };
         };
 
@@ -35,6 +36,7 @@ namespace beat
         {
             next.stepSamples = std::isfinite(next.stepSamples) ? juce::jmax(1.0, next.stepSamples) : 6000.0;
             next.gate = juce::jlimit(0.05f, 1.0f, next.gate);
+            next.swing = juce::jlimit(0.0f, 0.75f, next.swing);
             next.octaves = juce::jlimit(1, 4, next.octaves);
             if (config.enabled && !next.enabled) reset();
             config = next;
@@ -48,6 +50,7 @@ namespace beat
             heldCount = 0;
             sequenceIndex = 0;
             sequenceDirection = 1;
+            nextStepUsesLongSwingInterval = true;
             samplesUntilStep = 0.0;
             samplesUntilGateOff = -1.0;
             activeNote = -1;
@@ -87,6 +90,7 @@ namespace beat
                 {
                     if (activeNote >= 0) emitNoteOff(sample);
                     samplesUntilStep = 0.0;
+                    nextStepUsesLongSwingInterval = true;
                     continue;
                 }
                 if (samplesUntilGateOff == 0.0 && activeNote >= 0) emitNoteOff(sample);
@@ -97,8 +101,9 @@ namespace beat
                     activeNote = note;
                     activeChannel = channel;
                     output.addEvent(juce::MidiMessage::noteOn(channel, note, velocity), sample);
-                    samplesUntilStep += config.stepSamples;
-                    samplesUntilGateOff = std::floor(config.stepSamples * config.gate);
+                    const auto interval = nextStepDuration();
+                    samplesUntilStep += interval;
+                    samplesUntilGateOff = std::floor(interval * config.gate);
                 }
                 samplesUntilStep -= 1.0;
                 if (samplesUntilGateOff > 0.0) samplesUntilGateOff -= 1.0;
@@ -122,6 +127,7 @@ namespace beat
             velocities[(size_t) note] = 0.0f;
             --heldCount;
             sequenceIndex = 0;
+            if (heldCount == 0) nextStepUsesLongSwingInterval = true;
         }
 
         void clearHeldNotes(int sample) noexcept
@@ -132,6 +138,7 @@ namespace beat
             heldCount = 0;
             sequenceIndex = 0;
             sequenceDirection = 1;
+            nextStepUsesLongSwingInterval = true;
             samplesUntilStep = 0.0;
             if (activeNote >= 0) emitNoteOff(sample);
         }
@@ -170,6 +177,14 @@ namespace beat
             samplesUntilGateOff = -1.0;
         }
 
+        double nextStepDuration() noexcept
+        {
+            const auto amount = (double) config.swing;
+            const auto multiplier = nextStepUsesLongSwingInterval ? 1.0 + amount : 1.0 - amount;
+            nextStepUsesLongSwingInterval = !nextStepUsesLongSwingInterval;
+            return config.stepSamples * multiplier;
+        }
+
         Config config;
         std::array<bool, 128> held {};
         std::array<float, 128> velocities {};
@@ -177,6 +192,7 @@ namespace beat
         int heldCount { 0 };
         int sequenceIndex { 0 };
         int sequenceDirection { 1 };
+        bool nextStepUsesLongSwingInterval { true };
         double samplesUntilStep { 0.0 };
         double samplesUntilGateOff { -1.0 };
         int activeNote { -1 };

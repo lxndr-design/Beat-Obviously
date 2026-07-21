@@ -496,6 +496,9 @@ namespace beat
             instrument.lumus.arpeggiator.rateDivision = arpRate == "1/4" ? 4 : arpRate == "1/8" ? 8 : arpRate == "1/32" ? 32 : 16;
             instrument.lumus.arpeggiator.gate = juce::jlimit(0.05f, 1.0f,
                 (float) synthNumberParam(params, "lumus.arp.gate", 0.75));
+            if ((int) objectProperty(patch, "schemaVersion", 0) >= params::lumusArpeggiatorSwingPatchSchemaVersion)
+                instrument.lumus.arpeggiator.swing = juce::jlimit(0.0f, 0.75f,
+                    (float) synthNumberParam(params, "lumus.arp.swing", 0.0));
             instrument.lumus.arpeggiator.octaves = juce::jlimit(1, 4,
                 (int) std::round(synthNumberParam(params, "lumus.arp.octaves", 1.0)));
         }

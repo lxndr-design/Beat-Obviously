@@ -16456,6 +16456,48 @@ namespace
         if (splitBlocks != expected) return false;
 
         arp.reset();
+        config.gate = 0.5f;
+        config.swing = 0.25f;
+        config.octaves = 1;
+        arp.setConfig(config);
+        juce::MidiBuffer swungChord;
+        swungChord.addEvent(juce::MidiMessage::noteOn(1, 60, 0.8f), 0);
+        swungChord.addEvent(juce::MidiMessage::noteOn(1, 64, 0.8f), 0);
+        swungChord.addEvent(juce::MidiMessage::noteOff(1, 60), 399);
+        swungChord.addEvent(juce::MidiMessage::noteOff(1, 64), 399);
+        const auto swung = events(arp.process(swungChord, 400));
+        const std::vector<std::tuple<int, bool, int>> expectedSwung {
+            { 0, true, 60 }, { 62, false, 60 },
+            { 125, true, 64 }, { 162, false, 64 },
+            { 200, true, 60 }, { 262, false, 60 },
+            { 325, true, 64 }, { 362, false, 64 },
+        };
+        if (swung != expectedSwung) return false;
+        arp.reset();
+        arp.setConfig(config);
+        std::vector<std::tuple<int, bool, int>> splitSwung;
+        for (int block = 0; block < 4; ++block)
+        {
+            juce::MidiBuffer blockInput;
+            if (block == 0)
+            {
+                blockInput.addEvent(juce::MidiMessage::noteOn(1, 60, 0.8f), 0);
+                blockInput.addEvent(juce::MidiMessage::noteOn(1, 64, 0.8f), 0);
+            }
+            if (block == 3)
+            {
+                blockInput.addEvent(juce::MidiMessage::noteOff(1, 60), 99);
+                blockInput.addEvent(juce::MidiMessage::noteOff(1, 64), 99);
+            }
+            for (const auto& [offset, noteOn, note] : events(arp.process(blockInput, 100)))
+                splitSwung.emplace_back(block * 100 + offset, noteOn, note);
+        }
+        if (splitSwung != expectedSwung) return false;
+
+        arp.reset();
+        config.gate = 0.75f;
+        config.swing = 0.0f;
+        config.octaves = 2;
         arp.setConfig(config);
         juce::MidiBuffer panic;
         panic.addEvent(juce::MidiMessage::noteOn(1, 60, 0.8f), 0);
@@ -16679,7 +16721,7 @@ namespace
             return false;
         const auto lumusArpeggiatorPatch = juce::JSON::parse(R"json(
         {
-          "schemaVersion": 7,
+          "schemaVersion": 8,
           "instrumentType": "lumus-hybrid-synth",
           "namespace": "lumus",
           "parameters": {
@@ -16687,6 +16729,7 @@ namespace
             "lumus.arp.mode": "upDown",
             "lumus.arp.rate": "1/8",
             "lumus.arp.gate": 0.63,
+            "lumus.arp.swing": 0.82,
             "lumus.arp.octaves": 3
           },
           "metadata": {
@@ -16715,6 +16758,7 @@ namespace
             || lumusArpeggiator.lumus.arpeggiator.mode != 2
             || lumusArpeggiator.lumus.arpeggiator.rateDivision != 8
             || std::abs(lumusArpeggiator.lumus.arpeggiator.gate - 0.63f) > 0.0001f
+            || std::abs(lumusArpeggiator.lumus.arpeggiator.swing - 0.75f) > 0.0001f
             || lumusArpeggiator.lumus.arpeggiator.octaves != 3)
             return false;
         const auto malformedLumusRack = juce::JSON::parse(R"json(
@@ -16735,7 +16779,7 @@ namespace
         if (beat::applySynthPatchContract(malformedLumusRack, rejectedMalformedRack))
             return false;
         const auto futureLumusPatch = juce::JSON::parse(R"json(
-        { "schemaVersion": 8, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
+        { "schemaVersion": 9, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
         )json");
         beat::InstrumentDefinition rejectedFutureLumus;
         if (beat::applySynthPatchContract(futureLumusPatch, rejectedFutureLumus))
