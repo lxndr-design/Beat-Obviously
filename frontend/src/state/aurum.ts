@@ -27,7 +27,7 @@ const DEFAULT_FILTER_B: AurumFilterConfig = {
   drive: 0,
 };
 
-function defaultOperator(index: number): AurumOperatorConfig {
+export function defaultAurumOperator(index: number): AurumOperatorConfig {
   return {
     id: `op-${index + 1}`,
     name: `OP ${index + 1}`,
@@ -63,7 +63,7 @@ export function defaultAurumConfig(): AurumSynthConfig {
   matrix[1][0] = 0.42;
   return {
     version: 10,
-    operators: Array.from({ length: AURUM_OPERATOR_COUNT }, (_, index) => defaultOperator(index)),
+    operators: Array.from({ length: AURUM_OPERATOR_COUNT }, (_, index) => defaultAurumOperator(index)),
     matrix,
     rmMatrix,
     unison: 1,

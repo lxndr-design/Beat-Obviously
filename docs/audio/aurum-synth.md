@@ -34,6 +34,10 @@ The editor keeps the selected FM, RM, or OUT routing matrix visible while the le
 
 The module strip uses tab semantics with roving focus. Arrow keys cycle through Main and the six operators; Home selects Main and End selects OP 6.
 
+Each operator page exposes shared Beat controls for Init, Copy, Paste, Swap, and Reset. Init restores the selected slot's default parameters while preserving its routing. Copy creates an isolated parameter snapshot and Paste keeps the destination slot's fixed id and name. Swap exchanges both parameter sets and the corresponding FM/RM matrix rows and columns plus output-send rows, preserving the audible topology. Reset initializes the slot and clears all of its inbound FM/RM, outbound FM/RM, and output routes.
+
+The matrix header provides seven routing templates: Single carrier, 2-op stack, 3-op stack, Dual carriers, Dual branches, Feedback pair, and Six carriers. Applying a template replaces FM, RM, and output routing and enables only the operators required by that topology; oscillator, tuning, articulation, level, and pan parameters remain intact. Any manual matrix or output-send edit returns the selector to Custom algorithm.
+
 Existing Beat controls are used for commands, selection, numeric entry, sliders, toggles, and matrix knobs. The waveform scope and routing-cell composition are Aurum-specific because the shared UI kit has no equivalent synthesis visual.
 
 The editor analyzes the signal graph live. Operators with direct bus sends are marked as carriers, operators that reach those carriers through FM or RM are marked as modulators, and enabled operators without an audible path are marked as disconnected. Filter A, Filter B, and Direct show active or idle state; a patch with no active bus is explicitly reported as silent.

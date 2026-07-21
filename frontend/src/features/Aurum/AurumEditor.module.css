@@ -76,6 +76,31 @@
 .sectionTitle h3,
 .panelTitle h3 { font-size: var(--font-size-field-label); }
 
+.operatorCommands {
+  min-height: 30px;
+  display: flex;
+  align-items: stretch;
+  margin-bottom: 6px;
+}
+.operatorCommands > button + button { border-left: 0; }
+.swapSelect { width: 78px; height: 30px; margin-left: -1px; }
+.operatorCommands > .swapSelect + button { margin-left: -1px; }
+.commandStatus {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 6px;
+  overflow: hidden;
+  color: var(--color-fg);
+  font-size: var(--font-size-hint);
+  opacity: var(--structural-muted-opacity);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sectionActions { display: flex; align-self: stretch; align-items: stretch; }
+.algorithmSelect { width: 138px; height: 30px; align-self: center; margin-right: 6px; }
+
 .controlGrid,
 .envelopeGrid { display: grid; gap: 6px; }
 .controlGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -339,6 +364,11 @@
 }
 
 @media (max-width: 660px) {
+  .sectionTitle { align-items: flex-start; }
+  .sectionActions { flex-direction: column; gap: 3px; }
+  .algorithmSelect { margin-right: 0; }
+  .operatorCommands { flex-wrap: wrap; }
+  .commandStatus { flex-basis: 100%; min-height: 18px; padding-left: 0; }
   .signalFlow { display: grid; }
   .signalOperators { grid-template-columns: repeat(3, minmax(48px, 1fr)); }
   .signalBuses { width: 100%; max-width: none; }

@@ -4,6 +4,7 @@ import { sampleAurumOperatorWaveform, startInstrumentPreviewAudition, type Instr
 import { AURUM_DIRECT_BUS, AURUM_FILTER_A_BUS, AURUM_FILTER_B_BUS, AURUM_HARMONIC_COUNT, AURUM_OPERATOR_COUNT, AURUM_OUTPUT_BUS_COUNT, AURUM_RESPONSE_CURVE_POINT_COUNT, drawAurumHarmonicLine, normalizedAurumConfigForInstrument } from "../../state/aurum";
 import type { AurumFilterConfig, AurumOperatorConfig, AurumOperatorWaveform, Instrument } from "../../state/types";
 import { aurumTabIndexAfterKey } from "./aurumEditorInteraction";
+import { applyAurumAlgorithmTemplate, AURUM_ALGORITHM_TEMPLATES, copyAurumOperator, initializeAurumOperator, pasteAurumOperator, resetAurumOperator, swapAurumOperators, type AurumAlgorithmTemplateId } from "./aurumEditing";
 import { analyzeAurumSignalFlow, type AurumOperatorSignalState } from "./aurumSignalDiagnostics";
 import styles from "./AurumEditor.module.css";
 
@@ -34,6 +35,10 @@ export function AurumEditor(props: AurumEditorProps) {
   const [responseMode, setResponseMode] = createSignal<"velocity" | "key">("velocity");
   const [waveformOpen, setWaveformOpen] = createSignal(false);
   const [filterOpen, setFilterOpen] = createSignal<number | null>(null);
+  const [swapOpen, setSwapOpen] = createSignal(false);
+  const [algorithmOpen, setAlgorithmOpen] = createSignal(false);
+  const [algorithmTemplate, setAlgorithmTemplate] = createSignal<AurumAlgorithmTemplateId | "custom">("custom");
+  const [operatorClipboard, setOperatorClipboard] = createSignal<{ sourceName: string; operator: AurumOperatorConfig } | null>(null);
   const [auditioning, setAuditioning] = createSignal(false);
   let audition: InstrumentPreviewAuditionHandle | null = null;
 
@@ -86,6 +91,7 @@ export function AurumEditor(props: AurumEditorProps) {
   }
 
   function updateMatrix(source: number, target: number, value: number) {
+    setAlgorithmTemplate("custom");
     updateAurum((config) => matrixMode() === "fm" ? ({
       ...config,
       matrix: config.matrix.map((row, rowIndex) => rowIndex === source
@@ -105,12 +111,50 @@ export function AurumEditor(props: AurumEditorProps) {
   }
 
   function updateOutputSend(bus: number, value: number) {
+    setAlgorithmTemplate("custom");
     updateAurum((config) => ({
       ...config,
       outputSends: config.outputSends.map((row, rowIndex) => rowIndex === selectedOperator()
         ? row.map((cell, columnIndex) => columnIndex === bus ? value : cell)
         : row),
     }));
+  }
+
+  function copySelectedOperator() {
+    setOperatorClipboard({ sourceName: operator().name, operator: copyAurumOperator(operator()) });
+  }
+
+  function pasteSelectedOperator() {
+    const copied = operatorClipboard();
+    if (!copied) return;
+    setAlgorithmTemplate("custom");
+    updateAurum((config) => pasteAurumOperator(config, selectedOperator(), copied.operator));
+  }
+
+  function initializeSelectedOperator() {
+    setAlgorithmTemplate("custom");
+    updateAurum((config) => initializeAurumOperator(config, selectedOperator()));
+  }
+
+  function resetSelectedOperator() {
+    setAlgorithmTemplate("custom");
+    updateAurum((config) => resetAurumOperator(config, selectedOperator()));
+  }
+
+  function swapSelectedOperator(value: string) {
+    const target = Number(value);
+    if (!Number.isInteger(target)) return;
+    setAlgorithmTemplate("custom");
+    updateAurum((config) => swapAurumOperators(config, selectedOperator(), target));
+    setSelectedOperator(target);
+  }
+
+  function selectAlgorithmTemplate(value: string) {
+    if (value === "custom") return;
+    const id = value as AurumAlgorithmTemplateId;
+    updateAurum((config) => applyAurumAlgorithmTemplate(config, id));
+    setAlgorithmTemplate(id);
+    setMatrixMode("fm");
   }
 
   function selectTab(index: number) {
@@ -286,7 +330,30 @@ export function AurumEditor(props: AurumEditorProps) {
                   <h3>{operator().name}</h3>
                   <p>Oscillator and per-operator articulation</p>
                 </div>
-                <Toggle label="Enabled" checked={operator().enabled} onChange={(enabled) => updateOperator({ enabled })} />
+                <Toggle label="Enabled" checked={operator().enabled} onChange={(enabled) => {
+                  setAlgorithmTemplate("custom");
+                  updateOperator({ enabled });
+                }} />
+              </div>
+              <div class={styles.operatorCommands} aria-label={`${operator().name} editing commands`}>
+                <Button size="xs" variant="ghost" onClick={initializeSelectedOperator} title="Restore operator parameters without changing routing">Init</Button>
+                <Button size="xs" variant="ghost" onClick={copySelectedOperator}>Copy</Button>
+                <Button size="xs" variant="ghost" disabled={!operatorClipboard()} onClick={pasteSelectedOperator} title={operatorClipboard() ? `Paste parameters from ${operatorClipboard()!.sourceName}` : "Copy an operator first"}>Paste</Button>
+                <FloatingSelect
+                  className={styles.swapSelect}
+                  layout="bare"
+                  ariaLabel={`Swap ${operator().name} with another operator`}
+                  value=""
+                  options={[
+                    { value: "", label: "Swap", disabled: true },
+                    ...aurum().operators.map((candidate, index) => ({ value: `${index}`, label: candidate.name, disabled: index === selectedOperator() })),
+                  ]}
+                  open={swapOpen()}
+                  onOpenChange={setSwapOpen}
+                  onChange={swapSelectedOperator}
+                />
+                <Button size="xs" variant="danger" onClick={resetSelectedOperator} title="Initialize this operator and clear all of its routing">Reset</Button>
+                <span class={styles.commandStatus} aria-live="polite">{operatorClipboard() ? `${operatorClipboard()!.sourceName} copied` : ""}</span>
               </div>
               <div class={styles.waveRow}>
                 <WaveformScope operator={operator()} />
@@ -390,10 +457,25 @@ export function AurumEditor(props: AurumEditorProps) {
                   ? "Rows modulate amplitude. Full depth produces ring modulation."
                   : "Rows send bipolar signal to filters or direct output."}</p>
             </div>
-            <div class={styles.matrixMode} role="group" aria-label="Aurum matrix mode">
-              <Button size="xs" selected={matrixMode() === "fm"} onClick={() => setMatrixMode("fm")}>FM</Button>
-              <Button size="xs" selected={matrixMode() === "rm"} onClick={() => setMatrixMode("rm")}>RM</Button>
-              <Button size="xs" selected={matrixMode() === "output"} onClick={() => setMatrixMode("output")}>OUT</Button>
+            <div class={styles.sectionActions}>
+              <FloatingSelect
+                className={styles.algorithmSelect}
+                layout="bare"
+                ariaLabel="Aurum algorithm template"
+                value={algorithmTemplate()}
+                options={[
+                  { value: "custom", label: "Custom algorithm", disabled: true },
+                  ...AURUM_ALGORITHM_TEMPLATES.map((template) => ({ value: template.id, label: template.label })),
+                ]}
+                open={algorithmOpen()}
+                onOpenChange={setAlgorithmOpen}
+                onChange={selectAlgorithmTemplate}
+              />
+              <div class={styles.matrixMode} role="group" aria-label="Aurum matrix mode">
+                <Button size="xs" selected={matrixMode() === "fm"} onClick={() => setMatrixMode("fm")}>FM</Button>
+                <Button size="xs" selected={matrixMode() === "rm"} onClick={() => setMatrixMode("rm")}>RM</Button>
+                <Button size="xs" selected={matrixMode() === "output"} onClick={() => setMatrixMode("output")}>OUT</Button>
+              </div>
             </div>
           </div>
           <div class={styles.signalDiagnostics} data-silent={signalDiagnostics().silent} aria-live="polite">

@@ -57,8 +57,8 @@ Exit gate: modulation changes are audible in browser/native playback and do not 
 
 - `[ ]` Versioned Aurum preset records and migrations.
 - `[ ]` Factory preset browser with tags, favorites, and search.
-- `[ ]` Operator initialize, copy, paste, swap, and reset commands.
-- `[ ]` Algorithm templates for common FM topologies.
+- `[x]` Operator initialize, copy, paste, swap, and reset commands use isolated parameter snapshots, fixed slot identities, and routing-aware destructive behavior.
+- `[x]` Seven algorithm templates cover single, stacked, parallel, branched, feedback, and six-carrier FM topologies without replacing operator sound parameters.
 - `[ ]` Undo/redo transactions for matrix and operator edits.
 - `[ ]` Auditioned factory bank covering bass, bell, keys, pad, lead, percussion, and effects families.
 
@@ -76,5 +76,5 @@ Exit gate: the release report distinguishes verified audio behavior, performance
 
 ## Immediate order
 
-1. Add operator initialize, copy, paste, swap, and reset commands.
-2. Add algorithm templates for common FM topologies.
+1. Add versioned Aurum preset records and migrations.
+2. Add undo/redo transactions for matrix and operator edits.

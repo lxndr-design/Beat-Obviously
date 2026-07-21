@@ -16,6 +16,7 @@ try {
     join(repoRoot, "frontend/src/state/aurum.ts"),
     join(repoRoot, "frontend/src/audio/synthPreview.ts"),
     join(repoRoot, "frontend/src/features/Aurum/aurumEditorInteraction.ts"),
+    join(repoRoot, "frontend/src/features/Aurum/aurumEditing.ts"),
     join(repoRoot, "frontend/src/features/Aurum/aurumSignalDiagnostics.ts"),
     "--bundle",
     "--format=esm",
@@ -26,6 +27,7 @@ try {
   const aurum = await import(pathToFileURL(join(outDir, "state/aurum.js")));
   const preview = await import(pathToFileURL(join(outDir, "audio/synthPreview.js")));
   const interaction = await import(pathToFileURL(join(outDir, "features/Aurum/aurumEditorInteraction.js")));
+  const editing = await import(pathToFileURL(join(outDir, "features/Aurum/aurumEditing.js")));
   const diagnostics = await import(pathToFileURL(join(outDir, "features/Aurum/aurumSignalDiagnostics.js")));
   const instrument = aurum.createAurumInstrument("aurum-verifier", "Aurum Verifier");
 
@@ -50,6 +52,55 @@ try {
   assert.ok(instrument.aurum.operators.every((operator) => operator.keytrackCurve.every((value) => value === 1)), "Keyboard curves must default to neutral gain");
   assert.ok(instrument.aurum.operators.every((operator) => operator.pan === 0), "Aurum operators must default to centered pan");
   assert.equal(aurum.evaluateAurumResponseCurve([0, 0.25, 0.5, 0.75, 1], 0.375), 0.375, "Response curves must interpolate between fixed points");
+
+  const copiedOperator = editing.copyAurumOperator(instrument.aurum.operators[0]);
+  copiedOperator.harmonics[0] = 0.25;
+  copiedOperator.envelope.attackMs = 77;
+  assert.equal(instrument.aurum.operators[0].harmonics[0], 1, "Copied operator harmonics must not alias the source");
+  assert.equal(instrument.aurum.operators[0].envelope.attackMs, 5, "Copied operator envelopes must not alias the source");
+  const pastedConfig = editing.pasteAurumOperator(instrument.aurum, 2, copiedOperator);
+  assert.equal(pastedConfig.operators[2].id, "op-3", "Paste must preserve the destination operator id");
+  assert.equal(pastedConfig.operators[2].name, "OP 3", "Paste must preserve the destination operator name");
+  assert.equal(pastedConfig.operators[2].harmonics[0], 0.25, "Paste must copy operator parameters");
+
+  const editedForInit = structuredClone(instrument.aurum);
+  editedForInit.operators[2].waveform = "square";
+  editedForInit.matrix[2][1] = 0.37;
+  const initializedConfig = editing.initializeAurumOperator(editedForInit, 2);
+  assert.equal(initializedConfig.operators[2].waveform, "sine", "Initialize must restore default operator parameters");
+  assert.equal(initializedConfig.matrix[2][1], 0.37, "Initialize must preserve routing");
+  editedForInit.matrix[1][2] = -0.22;
+  editedForInit.rmMatrix[2][4] = 0.51;
+  editedForInit.outputSends[2][2] = 0.8;
+  const resetConfig = editing.resetAurumOperator(editedForInit, 2);
+  assert.ok(resetConfig.matrix[2].every((value) => value === 0), "Reset must clear the operator FM source row");
+  assert.ok(resetConfig.matrix.every((row) => row[2] === 0), "Reset must clear inbound FM routes");
+  assert.ok(resetConfig.rmMatrix[2].every((value) => value === 0) && resetConfig.rmMatrix.every((row) => row[2] === 0), "Reset must clear inbound and outbound RM routes");
+  assert.deepEqual(resetConfig.outputSends[2], [0, 0, 0], "Reset must clear output sends");
+
+  const swapSource = structuredClone(instrument.aurum);
+  swapSource.operators[0].waveform = "saw";
+  swapSource.operators[1].waveform = "square";
+  swapSource.matrix[1][0] = 0.63;
+  swapSource.rmMatrix[0][1] = -0.31;
+  swapSource.outputSends[0] = [0.73, 0.12, 0];
+  const swappedConfig = editing.swapAurumOperators(swapSource, 0, 1);
+  assert.equal(swappedConfig.operators[0].waveform, "square", "Swap must move operator parameters into the other slot");
+  assert.equal(swappedConfig.operators[0].id, "op-1", "Swap must preserve fixed slot identity");
+  assert.equal(swappedConfig.operators[1].waveform, "saw", "Swap must exchange both operator parameter sets");
+  assert.equal(swappedConfig.matrix[0][1], 0.63, "Swap must exchange FM source rows and target columns");
+  assert.equal(swappedConfig.rmMatrix[1][0], -0.31, "Swap must exchange RM source rows and target columns");
+  assert.deepEqual(swappedConfig.outputSends[1], [0.73, 0.12, 0], "Swap must move output routing with the operator sound");
+
+  const stackTemplate = editing.applyAurumAlgorithmTemplate(instrument.aurum, "stack-3");
+  assert.deepEqual(stackTemplate.operators.map((operator) => operator.enabled), [true, true, true, false, false, false], "3-op stack must activate only its required operators");
+  assert.equal(stackTemplate.matrix[2][1], 0.42, "3-op stack must route OP 3 into OP 2");
+  assert.equal(stackTemplate.matrix[1][0], 0.42, "3-op stack must route OP 2 into OP 1");
+  assert.deepEqual(stackTemplate.outputSends[0], [0.86, 0, 0], "3-op stack must route its carrier to Filter A");
+  assert.ok(stackTemplate.rmMatrix.flat().every((value) => value === 0), "FM templates must clear stale RM routing");
+  const feedbackTemplate = editing.applyAurumAlgorithmTemplate(instrument.aurum, "feedback-2");
+  assert.equal(feedbackTemplate.matrix[1][1], 0.18, "Feedback template must set bounded OP 2 feedback");
+  assert.equal(editing.AURUM_ALGORITHM_TEMPLATES.length, 7, "Aurum must expose the complete initial algorithm-template set");
 
   const defaultSignalFlow = diagnostics.analyzeAurumSignalFlow(instrument.aurum);
   assert.equal(defaultSignalFlow.silent, false, "The default Aurum patch must report a connected output");
