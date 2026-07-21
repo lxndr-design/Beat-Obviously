@@ -624,13 +624,18 @@ namespace beat
             StereoSample raw;
             if (params.hasAurum)
             {
-                std::array<float, 48> nextOutputs {};
                 const float timeMs = (float) ((double) aurumAgeSamples * 1000.0 / sampleRate);
                 const int voiceCount = juce::jlimit(1, 8, params.aurumUnison);
-                float left = 0.0f;
-                float right = 0.0f;
-                for (int voice = 0; voice < voiceCount; ++voice)
+                const int oversampling = params.aurumOversampling >= 4 ? 4 : params.aurumOversampling >= 2 ? 2 : 1;
+                float accumulatedLeft = 0.0f;
+                float accumulatedRight = 0.0f;
+                for (int substep = 0; substep < oversampling; ++substep)
                 {
+                    std::array<float, 48> nextOutputs {};
+                    float left = 0.0f;
+                    float right = 0.0f;
+                    for (int voice = 0; voice < voiceCount; ++voice)
+                    {
                     const size_t voiceOffset = (size_t) voice * 6;
                     const float centered = voiceCount == 1 ? 0.0f : ((float) voice / (float) (voiceCount - 1)) * 2.0f - 1.0f;
                     const double voiceRate = std::exp2((double) centered * params.aurumDetuneCents / 1200.0);
@@ -661,7 +666,7 @@ namespace beat
                         const double tuning = std::exp2((double) op.coarse / 12.0 + (double) op.fineCents / 1200.0);
                         const double pitchEnvelopeRate = std::exp2(
                             (double) pitchEnvelope * juce::jlimit(-48.0f, 48.0f, op.pitchEnvelopeSemitones) / 12.0);
-                        const double delta = currentFrequency * voiceRate * ratio * tuning * pitchEnvelopeRate / sampleRate;
+                        const double delta = currentFrequency * voiceRate * ratio * tuning * pitchEnvelopeRate / (sampleRate * (double) oversampling);
                         float rmGain = 1.0f;
                         for (size_t source = 0; source < 6; ++source)
                         {
@@ -687,27 +692,30 @@ namespace beat
                         currentBlockWork.addOscillatorSamples(1);
                     }
 
-                    float voiceOutput = 0.0f;
-                    float outputWeight = 0.0f;
-                    for (size_t source = 0; source < 6; ++source)
-                    {
-                        const float amount = aurumRouteAmount(params.aurumMatrix[source][6]);
-                        voiceOutput += nextOutputs[voiceOffset + source] * amount;
-                        outputWeight += std::abs(amount);
+                        float voiceOutput = 0.0f;
+                        float outputWeight = 0.0f;
+                        for (size_t source = 0; source < 6; ++source)
+                        {
+                            const float amount = aurumRouteAmount(params.aurumMatrix[source][6]);
+                            voiceOutput += nextOutputs[voiceOffset + source] * amount;
+                            outputWeight += std::abs(amount);
+                        }
+                        if (outputWeight > 0.0f)
+                            voiceOutput /= juce::jmax(1.0f, std::sqrt(outputWeight));
+                        const float pan = centered * params.aurumStereoSpread;
+                        const float angle = (pan + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
+                        left += voiceOutput * std::cos(angle);
+                        right += voiceOutput * std::sin(angle);
                     }
-                    if (outputWeight > 0.0f)
-                        voiceOutput /= juce::jmax(1.0f, std::sqrt(outputWeight));
-                    const float pan = centered * params.aurumStereoSpread;
-                    const float angle = (pan + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
-                    left += voiceOutput * std::cos(angle);
-                    right += voiceOutput * std::sin(angle);
+                    aurumOutputs = nextOutputs;
+                    accumulatedLeft += left;
+                    accumulatedRight += right;
                 }
-                aurumOutputs = nextOutputs;
                 ++aurumAgeSamples;
                 if (aurumReleaseAgeSamples >= 0)
                     ++aurumReleaseAgeSamples;
-                const float normalization = 1.0f / std::sqrt((float) voiceCount);
-                raw = { left * normalization, right * normalization };
+                const float normalization = 1.0f / (std::sqrt((float) voiceCount) * (float) oversampling);
+                raw = { accumulatedLeft * normalization, accumulatedRight * normalization };
             }
             else if (params.hasAether)
             {

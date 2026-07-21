@@ -512,13 +512,14 @@ export interface AurumOperatorConfig {
  * are FM destinations and column 6 is direct output. Diagonal values are
  * operator feedback. */
 export interface AurumSynthConfig {
-  version: 6;
+  version: 7;
   operators: AurumOperatorConfig[];
   matrix: number[][];
   rmMatrix: number[][];
   unison: number;
   detuneCents: number;
   stereoSpread: number;
+  oversampling: 1 | 2 | 4;
 }
 
 export type SynthPatchParameterValue = boolean | number | string;

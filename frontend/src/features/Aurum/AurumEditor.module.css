@@ -125,6 +125,18 @@
   gap: 6px;
 }
 
+.qualityHeader {
+  min-height: 30px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.qualityHeader h4 { display: flex; align-items: center; }
+.qualityMode { display: flex; }
+.qualityMode > button + button { border-left: 0; }
+
 .responseHeader h4 { display: flex; align-items: center; }
 .responseMode,
 .responsePresets { display: flex; }

@@ -243,6 +243,7 @@ namespace beat
             int unison { 1 };
             float detuneCents { 8.0f };
             float stereoSpread { 0.35f };
+            int oversampling { 2 };
         };
 
         struct DynamicModTarget

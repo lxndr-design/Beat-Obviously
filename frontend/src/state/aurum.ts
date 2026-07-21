@@ -39,13 +39,14 @@ export function defaultAurumConfig(): AurumSynthConfig {
   matrix[0][AURUM_OUTPUT_COLUMN] = 0.86;
   matrix[1][0] = 0.42;
   return {
-    version: 6,
+    version: 7,
     operators: Array.from({ length: AURUM_OPERATOR_COUNT }, (_, index) => defaultOperator(index)),
     matrix,
     rmMatrix,
     unison: 1,
     detuneCents: 8,
     stereoSpread: 0.35,
+    oversampling: 2,
   };
 }
 
@@ -82,7 +83,7 @@ export function normalizedAurumConfig(config: AurumSynthConfig | undefined): Aur
   return {
     ...fallback,
     ...config,
-    version: 6,
+    version: 7,
     operators: fallback.operators.map((operator, index) => {
       const incoming = config.operators?.[index];
       return {
@@ -101,7 +102,12 @@ export function normalizedAurumConfig(config: AurumSynthConfig | undefined): Aur
     }),
     matrix: fallback.matrix.map((row, source) => row.map((value, target) => clampBipolar(config.matrix[source]?.[target] ?? value))),
     rmMatrix: fallback.rmMatrix.map((row, source) => row.map((value, target) => clampBipolar(config.rmMatrix?.[source]?.[target] ?? value))),
+    oversampling: normalizeOversampling(config.oversampling ?? ((config.version as number) >= 7 ? fallback.oversampling : 1)),
   };
+}
+
+function normalizeOversampling(value: number): 1 | 2 | 4 {
+  return value >= 4 ? 4 : value >= 2 ? 2 : 1;
 }
 
 function normalizeResponseCurve(values: number[] | undefined, fallback: number[]) {

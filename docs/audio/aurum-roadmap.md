@@ -30,7 +30,7 @@ Exit gate: identical patches survive save/load, produce finite audible browser/n
 - `[x]` Every operator has bounded wavefold shaping, versioned persistence, matching browser/native rendering, and a live scope driven by the browser engine sampler.
 - `[x]` Each operator has independent amplitude, pitch, and phase ADSRs; pitch and phase use bipolar depths, persist in schema v5, and render consistently in browser and native paths.
 - `[x]` Each operator has editable five-point velocity and keyboard gain-response curves with neutral migration, browser/native rendering, and versioned persistence.
-- `[ ]` Oversampling/quality policy for nonlinear FM, feedback, and waveshaping.
+- `[x]` Selectable 1x, 2x, and 4x operator-network quality runs FM, feedback, RM, and wavefold at the internal rate with box-filter decimation, bounded convergence checks, and explicit work scaling.
 
 Exit gate: operator edits agree between waveform preview and rendered audio, and cross-rate reference tests meet a documented threshold.
 
@@ -76,5 +76,5 @@ Exit gate: the release report distinguishes verified audio behavior, performance
 
 ## Immediate order
 
-1. Define and verify the oversampling/quality policy for nonlinear FM, feedback, and waveshaping.
-2. Add the dual-filter and signal-routing foundation.
+1. Add the dual-filter and signal-routing foundation.
+2. Add bipolar operator-to-filter sends and filter-to-filter routing.

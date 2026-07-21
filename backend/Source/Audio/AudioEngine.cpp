@@ -2093,6 +2093,7 @@ namespace beat
         params.aurumUnison = juce::jlimit(1, 8, instrument.aurum.unison);
         params.aurumDetuneCents = juce::jlimit(0.0f, 100.0f, instrument.aurum.detuneCents);
         params.aurumStereoSpread = juce::jlimit(0.0f, 1.0f, instrument.aurum.stereoSpread);
+        params.aurumOversampling = instrument.aurum.oversampling >= 4 ? 4 : instrument.aurum.oversampling >= 2 ? 2 : 1;
 
         instrumentSynth->setNoteStealingEnabled(allocation.noteStealing);
         for (int i = 0; i < allocation.voiceCount; ++i)

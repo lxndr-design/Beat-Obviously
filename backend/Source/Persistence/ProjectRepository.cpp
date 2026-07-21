@@ -422,10 +422,11 @@ namespace beat
         juce::var aurumConfigToVar(const InstrumentDefinition::AurumConfig& aurum)
         {
             juce::DynamicObject::Ptr object = new juce::DynamicObject();
-            object->setProperty("version", 6);
+            object->setProperty("version", 7);
             object->setProperty("unison", aurum.unison);
             object->setProperty("detuneCents", aurum.detuneCents);
             object->setProperty("stereoSpread", aurum.stereoSpread);
+            object->setProperty("oversampling", aurum.oversampling);
             juce::Array<juce::var> operators;
             for (size_t index = 0; index < aurum.operators.size(); ++index)
             {
@@ -496,6 +497,8 @@ namespace beat
         {
             InstrumentDefinition::AurumConfig config;
             if (!value.isObject()) return config;
+            const int oversampling = (int) value.getProperty("oversampling", 1);
+            config.oversampling = oversampling >= 4 ? 4 : oversampling >= 2 ? 2 : 1;
             if (auto* operators = value.getProperty("operators", {}).getArray())
                 for (int index = 0; index < juce::jmin(6, operators->size()); ++index)
                 {

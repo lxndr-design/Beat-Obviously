@@ -991,12 +991,16 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
   const voiceCount = Math.max(1, Math.min(8, Math.round(config.unison)));
   const detune = clamp(config.detuneCents, 0, 100);
   const spread = clamp01(config.stereoSpread);
-  const nextOutputs = Array(48).fill(0);
+  const oversampling = config.oversampling >= 4 ? 4 : config.oversampling >= 2 ? 2 : 1;
   const timeMs = (state.index / sampleRate) * 1000;
-  let mixedLeft = 0;
-  let mixedRight = 0;
+  let accumulatedLeft = 0;
+  let accumulatedRight = 0;
 
-  for (let voice = 0; voice < voiceCount; voice += 1) {
+  for (let substep = 0; substep < oversampling; substep += 1) {
+    const nextOutputs = Array(48).fill(0);
+    let mixedLeft = 0;
+    let mixedRight = 0;
+    for (let voice = 0; voice < voiceCount; voice += 1) {
     const voiceOffset = voice * 6;
     const centered = voiceCount === 1 ? 0 : (voice / (voiceCount - 1)) * 2 - 1;
     const voiceRate = Math.pow(2, (centered * detune) / 1200);
@@ -1008,7 +1012,7 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
         modulation += (state.aurumOutputs[voiceOffset + source] ?? 0) * clampBipolar(config.matrix[source]?.[target] ?? 0);
       }
       const stateIndex = voiceOffset + target;
-      if (state.index === 0) state.aurumPhases[stateIndex] = (clamp01(operator.phase) + voice * 0.071) % 1;
+      if (state.index === 0 && substep === 0) state.aurumPhases[stateIndex] = (clamp01(operator.phase) + voice * 0.071) % 1;
       const ratio = Math.max(0.125, Math.min(32, operator.ratio));
       const tuning = Math.pow(2, operator.coarse / 12 + operator.fineCents / 1200);
       const envelope = aurumOperatorEnvelope(operator.envelope, timeMs, state.aurumNoteOffMs);
@@ -1025,30 +1029,33 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
         const modulator = state.aurumOutputs[voiceOffset + source] ?? 0;
         rmGain *= 1 - Math.abs(amount) + modulator * amount;
       }
-      const phaseDelta = (frequency * voiceRate * ratio * tuning * pitchEnvelopeRate) / sampleRate;
+      const phaseDelta = (frequency * voiceRate * ratio * tuning * pitchEnvelopeRate) / (sampleRate * oversampling);
       const responseGain = evaluateAurumResponseCurve(operator.velocityCurve, modulationState.velocity ?? 1)
         * evaluateAurumResponseCurve(operator.keytrackCurve, modulationState.keytrack ?? 0.5);
       nextOutputs[stateIndex] = sampleAurumOperatorWaveform(operator, phase, phaseDelta) * clamp01(operator.level) * envelope * responseGain * rmGain;
       state.aurumPhases[stateIndex] = (state.aurumPhases[stateIndex] + phaseDelta) % 1;
     }
 
-    let voiceOutput = 0;
-    let outputWeight = 0;
-    for (let source = 0; source < operatorCount; source += 1) {
-      const amount = clampBipolar(config.matrix[source]?.[6] ?? 0);
-      voiceOutput += nextOutputs[voiceOffset + source] * amount;
-      outputWeight += Math.abs(amount);
+      let voiceOutput = 0;
+      let outputWeight = 0;
+      for (let source = 0; source < operatorCount; source += 1) {
+        const amount = clampBipolar(config.matrix[source]?.[6] ?? 0);
+        voiceOutput += nextOutputs[voiceOffset + source] * amount;
+        outputWeight += Math.abs(amount);
+      }
+      if (outputWeight > 0) {
+        voiceOutput /= Math.max(1, Math.sqrt(outputWeight));
+        const [leftGain, rightGain] = panGains(centered * spread);
+        mixedLeft += voiceOutput * leftGain;
+        mixedRight += voiceOutput * rightGain;
+      }
     }
-    if (outputWeight > 0) {
-      voiceOutput /= Math.max(1, Math.sqrt(outputWeight));
-      const [leftGain, rightGain] = panGains(centered * spread);
-      mixedLeft += voiceOutput * leftGain;
-      mixedRight += voiceOutput * rightGain;
-    }
+    state.aurumOutputs = nextOutputs;
+    accumulatedLeft += mixedLeft;
+    accumulatedRight += mixedRight;
   }
-  state.aurumOutputs = nextOutputs;
-  const normalization = 1 / Math.sqrt(voiceCount);
-  return { left: mixedLeft * normalization, right: mixedRight * normalization };
+  const normalization = 1 / (Math.sqrt(voiceCount) * oversampling);
+  return { left: accumulatedLeft * normalization, right: accumulatedRight * normalization };
 }
 
 function renderAurumStereoSample(

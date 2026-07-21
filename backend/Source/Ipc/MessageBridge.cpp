@@ -2243,6 +2243,8 @@ namespace beat
                     {
                         instrument.hasAurum = true;
                         instrument.hasAether = false;
+                        const int oversampling = (int) aurum.getProperty("oversampling", 2);
+                        instrument.aurum.oversampling = oversampling >= 4 ? 4 : oversampling >= 2 ? 2 : 1;
                         if (auto* operators = aurum.getProperty("operators", {}).getArray())
                         {
                             const auto count = juce::jmin(6, operators->size());

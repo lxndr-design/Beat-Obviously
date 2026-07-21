@@ -15,13 +15,14 @@ The staged implementation and release gates are tracked in [`aurum-roadmap.md`](
 - One-sample-delayed matrix feedback so cyclic routes remain bounded
 - Independent operator note-off releases with native voice lifetime governed by the longest enabled operator tail
 - One to eight unison voices with detune and stereo spread
+- Selectable 1x, 2x, and 4x operator-network quality
 - Shared Beat filter, resonance, drive, amplitude, and voice behavior
 - Browser audition and native-engine rendering
 - Project save/load persistence
 
 ## Data model
 
-The frontend stores Aurum configuration under `instrument.aurum`. Native parsing maps the same object to `InstrumentDefinition::AurumConfig`; project persistence writes it back without flattening the matrices, operator harmonic spectra, or response curves. Schema version 3 adds 16 normalized harmonic amplitudes per operator; version 4 adds normalized per-operator wavefold; version 5 adds dedicated pitch and phase ADSRs with bipolar semitone and degree depths; version 6 adds five-point velocity and keyboard gain-response curves. Older patches migrate with a fundamental-only spectrum, zero wavefold, zero pitch/phase depth, and flat response curves so their sound does not change.
+The frontend stores Aurum configuration under `instrument.aurum`. Native parsing maps the same object to `InstrumentDefinition::AurumConfig`; project persistence writes it back without flattening the matrices, operator harmonic spectra, or response curves. Schema version 3 adds 16 normalized harmonic amplitudes per operator; version 4 adds normalized per-operator wavefold; version 5 adds dedicated pitch and phase ADSRs with bipolar semitone and degree depths; version 6 adds five-point velocity and keyboard gain-response curves; version 7 adds the operator-network quality mode. Older patches migrate with a fundamental-only spectrum, zero wavefold, zero pitch/phase depth, flat response curves, and 1x quality so their sound does not change. New patches default to 2x.
 
 FM matrix rows are modulation sources. Columns `0..5` target operators 1 through 6, and column `6` routes that source to the audible output. RM matrix rows are amplitude-modulation sources and its six columns target operators 1 through 6. At full positive or negative depth the target becomes a ring-modulated signal; intermediate values retain a proportional dry component.
 
@@ -37,7 +38,9 @@ For a deterministic browser review, open `?beatDevFixture=aurum-editor`. The fix
 
 ## Current boundary
 
-Aurum is an instrument foundation, not a clone of another synthesizer. It does not yet include per-operator filters, arbitrary modulation curves, or a preset browser. Each operator's amplitude release governs its audible note-off tail; pitch and phase releases continue their articulation during that tail without extending an otherwise silent native voice. Velocity and MIDI-note position are evaluated once per voice against each operator's linearly interpolated five-point gain curves; flat curves are neutral. The hidden shared amplitude envelope does not reshape Aurum's operator envelopes. Additive rendering normalizes active partials and suppresses harmonics at or above Nyquist for the current operator frequency. Wavefold is an identity transform at zero and uses a bounded symmetric fold at positive depth; dedicated oversampling remains part of the later quality-policy milestone.
+Aurum is an instrument foundation, not a clone of another synthesizer. It does not yet include per-operator filters, arbitrary modulation curves, or a preset browser. Each operator's amplitude release governs its audible note-off tail; pitch and phase releases continue their articulation during that tail without extending an otherwise silent native voice. Velocity and MIDI-note position are evaluated once per voice against each operator's linearly interpolated five-point gain curves; flat curves are neutral. The hidden shared amplitude envelope does not reshape Aurum's operator envelopes. Additive rendering normalizes active partials and suppresses harmonics at or above Nyquist for the current operator frequency. Wavefold is an identity transform at zero and uses a bounded symmetric fold at positive depth.
+
+The quality selector runs the complete operator network, including one-sample feedback, at 1x, 2x, or 4x the project sample rate and averages the internal substeps back to the output rate. Focused gates verify finite bounded output, 2x convergence toward a 4x nonlinear high-frequency reference, and exact 1:2:4 oscillator-work scaling. This is a deterministic quality-policy gate; the separate release-readiness spectral alias benchmark remains outstanding.
 
 The focused native stress gate renders one deterministic additive/FM/RM/unison patch through both the live callback path and 32-bit WAV export at 44.1, 48, and 96 kHz. It verifies repeatable live output, requested stereo WAV metadata, finite bounded samples, and a negligible live/export residual at each rate. This is a path-parity gate, not yet the separate aliasing and perceptual cross-rate benchmark tracked for release readiness.
 

@@ -197,6 +197,16 @@ export function AurumEditor(props: AurumEditorProps) {
                 </div>
               </div>
               <div class={styles.controlBlock}>
+                <div class={styles.qualityHeader}>
+                  <h4>Operator quality</h4>
+                  <div class={styles.qualityMode} role="group" aria-label="Aurum operator quality">
+                    <Button size="xs" selected={aurum().oversampling === 1} aria-pressed={aurum().oversampling === 1} onClick={() => updateAurum((config) => ({ ...config, oversampling: 1 }))}>1x</Button>
+                    <Button size="xs" selected={aurum().oversampling === 2} aria-pressed={aurum().oversampling === 2} onClick={() => updateAurum((config) => ({ ...config, oversampling: 2 }))}>2x</Button>
+                    <Button size="xs" selected={aurum().oversampling === 4} aria-pressed={aurum().oversampling === 4} onClick={() => updateAurum((config) => ({ ...config, oversampling: 4 }))}>4x</Button>
+                  </div>
+                </div>
+              </div>
+              <div class={styles.controlBlock}>
                 <h4>Output filter</h4>
                 <div class={styles.controlGrid}>
                   <Slider label="Cutoff" layout="inline" min={0} max={1} step={0.01} value={draft().knobs.cutoff} readout={<span>{Math.round(draft().knobs.cutoff * 100)}%</span>} onChange={(cutoff) => setDraft((current) => ({ ...current, knobs: { ...current.knobs, cutoff } }))} />

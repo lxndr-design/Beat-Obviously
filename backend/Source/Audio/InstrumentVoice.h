@@ -267,6 +267,7 @@ namespace beat
             int aurumUnison { 1 };
             float aurumDetuneCents { 8.0f };
             float aurumStereoSpread { 0.35f };
+            int aurumOversampling { 1 };
         };
 
         void setParams(const Params& p);

@@ -7381,6 +7381,7 @@ namespace
         instrument.aurum.unison = 3;
         instrument.aurum.detuneCents = 11.0f;
         instrument.aurum.stereoSpread = 0.57f;
+        instrument.aurum.oversampling = 4;
         project.instruments.push_back(instrument);
 
         beat::Database db(dbFile);
@@ -7416,7 +7417,8 @@ namespace
             && near(loaded->instruments.front().aurum.operators[0].harmonics[7], 0.22f)
             && loaded->instruments.front().aurum.unison == 3
             && near(loaded->instruments.front().aurum.detuneCents, 11.0f)
-            && near(loaded->instruments.front().aurum.stereoSpread, 0.57f);
+            && near(loaded->instruments.front().aurum.stereoSpread, 0.57f)
+            && loaded->instruments.front().aurum.oversampling == 4;
 
         root.deleteRecursively();
         if (!ok)
@@ -12938,6 +12940,75 @@ namespace
         return ok;
     }
 
+    bool stressInstrumentVoiceAurumOversamplingQuality()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        auto& op = params.aurumOperators[0];
+        op.enabled = true;
+        op.waveform = 1;
+        op.ratio = 7.0f;
+        op.level = 0.8f;
+        op.wavefold = 0.82f;
+        op.attackMs = 0.0f;
+        op.decayMs = 0.0f;
+        op.sustain = 1.0f;
+        params.aurumMatrix[0][6] = 1.0f;
+
+        auto render = [](beat::InstrumentVoice::Params renderParams, int oversampling)
+        {
+            renderParams.aurumOversampling = oversampling;
+            beat::InstrumentVoice::consumeRenderWorkStats();
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 4096);
+            voice.setParams(renderParams);
+            voice.startNote(69, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return std::pair { std::move(buffer), beat::InstrumentVoice::consumeRenderWorkStats() };
+        };
+
+        const auto [one, oneWork] = render(params, 1);
+        const auto [two, twoWork] = render(params, 2);
+        const auto [four, fourWork] = render(params, 4);
+        double oneToFour = 0.0;
+        double twoToFour = 0.0;
+        float peak = 0.0f;
+        for (int channel = 0; channel < one.getNumChannels(); ++channel)
+            for (int sampleIndex = 0; sampleIndex < one.getNumSamples(); ++sampleIndex)
+            {
+                const float oneSample = one.getSample(channel, sampleIndex);
+                const float twoSample = two.getSample(channel, sampleIndex);
+                const float fourSample = four.getSample(channel, sampleIndex);
+                if (!std::isfinite(oneSample) || !std::isfinite(twoSample) || !std::isfinite(fourSample))
+                    return false;
+                oneToFour += std::abs((double) oneSample - (double) fourSample);
+                twoToFour += std::abs((double) twoSample - (double) fourSample);
+                peak = std::max(peak, std::max(std::abs(oneSample), std::max(std::abs(twoSample), std::abs(fourSample))));
+            }
+
+        const bool ok = oneToFour > 0.1
+            && twoToFour < oneToFour
+            && peak <= 1.0f
+            && oneWork.oscillatorSamples == 4096
+            && twoWork.oscillatorSamples == 8192
+            && fourWork.oscillatorSamples == 16384;
+        if (!ok)
+            std::cerr << "Aurum oversampling quality stress failed oneToFour=" << oneToFour
+                      << " twoToFour=" << twoToFour
+                      << " peak=" << peak
+                      << " work=" << oneWork.oscillatorSamples << "/" << twoWork.oscillatorSamples << "/" << fourWork.oscillatorSamples << "\n";
+        return ok;
+    }
+
     bool stressInstrumentVoiceAurumDenseFeedbackStability()
     {
         beat::InstrumentVoice::Params params;
@@ -14401,6 +14472,7 @@ int main(int argc, char** argv)
             && stressInstrumentVoiceAurumWavefold()
             && stressInstrumentVoiceAurumOperatorArticulation()
             && stressInstrumentVoiceAurumOperatorResponseCurves()
+            && stressInstrumentVoiceAurumOversamplingQuality()
             && stressInstrumentVoiceAurumDenseFeedbackStability()
             && stressAudioEngineAurumCrossRateLiveExportParity()
             && stressProjectRepositoryAurumInstrumentRoundtrip();
@@ -14585,6 +14657,11 @@ int main(int argc, char** argv)
     if (!stressInstrumentVoiceAurumOperatorResponseCurves())
     {
         std::cerr << "Instrument voice Aurum operator response curve stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumOversamplingQuality())
+    {
+        std::cerr << "Instrument voice Aurum oversampling quality stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceAurumDenseFeedbackStability())
