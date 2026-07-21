@@ -1212,6 +1212,98 @@ namespace
         return project;
     }
 
+    beat::Project makeAurumParityProject()
+    {
+        beat::Project project;
+        project.id = "aurum-parity-project";
+        project.name = "Aurum Cross-rate Parity";
+        project.bpm = 120.0;
+        project.lengthBeats = 1.0;
+
+        beat::InstrumentDefinition instrument;
+        instrument.id = "aurum-parity";
+        instrument.kind = "synth";
+        instrument.hasAether = false;
+        instrument.hasAurum = true;
+        instrument.maxVoices = 8;
+        instrument.cutoff01 = 1.0f;
+        instrument.resonance01 = 0.0f;
+        instrument.drive01 = 0.0f;
+        instrument.attackMs = 0.0f;
+        instrument.decayMs = 0.0f;
+        instrument.sustain = 1.0f;
+        instrument.releaseMs = 180.0f;
+        instrument.ampLevel = 0.48f;
+
+        auto& carrier = instrument.aurum.operators[0];
+        carrier.enabled = true;
+        carrier.waveform = 4;
+        carrier.ratio = 1.0f;
+        carrier.level = 0.76f;
+        carrier.releaseMs = 180.0f;
+        carrier.harmonics.fill(0.0f);
+        carrier.harmonics[0] = 1.0f;
+        carrier.harmonics[1] = 0.36f;
+        carrier.harmonics[2] = 0.18f;
+        carrier.harmonics[4] = 0.08f;
+
+        auto& fmOperator = instrument.aurum.operators[1];
+        fmOperator.enabled = true;
+        fmOperator.waveform = 0;
+        fmOperator.ratio = 2.0f;
+        fmOperator.level = 0.52f;
+        fmOperator.releaseMs = 120.0f;
+
+        auto& ringOperator = instrument.aurum.operators[2];
+        ringOperator.enabled = true;
+        ringOperator.waveform = 2;
+        ringOperator.ratio = 0.5f;
+        ringOperator.level = 0.34f;
+        ringOperator.releaseMs = 260.0f;
+
+        instrument.aurum.matrix[1][0] = -0.38f;
+        instrument.aurum.matrix[0][6] = 0.82f;
+        instrument.aurum.rmMatrix[2][0] = 0.44f;
+        instrument.aurum.unison = 3;
+        instrument.aurum.detuneCents = 8.0f;
+        instrument.aurum.stereoSpread = 0.62f;
+        project.instruments.push_back(std::move(instrument));
+
+        beat::Track track;
+        track.id = "aurum-parity-track";
+        track.name = "Aurum Parity";
+        track.kind = beat::TrackKind::Midi;
+        track.instrumentId = "aurum-parity";
+        track.gainDb = -4.0f;
+
+        beat::Segment segment;
+        segment.id = "aurum-parity-segment";
+        segment.trackId = track.id;
+        segment.kind = beat::SegmentPayloadKind::Midi;
+        segment.instrumentId = "aurum-parity";
+        segment.startBeat = 0.0;
+        segment.lengthBeats = 1.0;
+
+        beat::MidiNote first;
+        first.instrumentId = "aurum-parity";
+        first.pitch = 48;
+        first.velocity = 104;
+        first.startBeat = 0.0;
+        first.lengthBeats = 0.5;
+        segment.notes.push_back(first);
+
+        beat::MidiNote second = first;
+        second.pitch = 55;
+        second.velocity = 92;
+        second.startBeat = 0.25;
+        second.lengthBeats = 0.5;
+        segment.notes.push_back(second);
+
+        track.segments.push_back(std::move(segment));
+        project.tracks.push_back(std::move(track));
+        return project;
+    }
+
     beat::TrackEffect makeSerumBenchmarkEffect(
         const juce::String& id,
         beat::TrackEffectKind kind,
@@ -11191,6 +11283,82 @@ namespace
         return ok;
     }
 
+    bool stressAudioEngineAurumCrossRateLiveExportParity()
+    {
+        constexpr std::array<double, 3> sampleRates { 44100.0, 48000.0, 96000.0 };
+        constexpr int blockSize = 257;
+
+        for (const double sampleRate : sampleRates)
+        {
+            const int samples = (int) std::llround(sampleRate * 0.375);
+            auto project = makeAurumParityProject();
+            auto liveA = renderOfflineChunks(project, samples, blockSize, sampleRate);
+            auto liveB = renderOfflineChunks(project, samples, blockSize, sampleRate);
+            const auto liveNull = bufferResidualStats(liveA, liveB, samples);
+            const float livePeak = bufferPeak(liveA);
+
+            const auto exportFile = juce::File("/private/tmp").getChildFile(
+                "BeatBackendStress-aurum-parity-" + juce::String((int) sampleRate) + ".wav");
+            if (exportFile.existsAsFile())
+                exportFile.deleteFile();
+
+            juce::String error;
+            if (!beat::AudioEngine::renderProjectToWav(
+                    project, exportFile, sampleRate, blockSize, 2, &error, {}, 32))
+            {
+                std::cerr << "Aurum " << sampleRate << " Hz parity export error: " << error << "\n";
+                return false;
+            }
+
+            juce::AudioFormatManager formatManager;
+            formatManager.registerBasicFormats();
+            std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(exportFile));
+            const bool metadataOk = reader != nullptr
+                && std::abs(reader->sampleRate - sampleRate) < 0.5
+                && reader->numChannels == 2
+                && reader->lengthInSamples >= samples;
+
+            auto exported = readWavPrefix(exportFile, samples);
+            exportFile.deleteFile();
+            const auto exportNull = bufferResidualStats(liveA, exported, samples);
+            const double exportResidualRatio = exportNull.sourceEnergy > 0.0
+                ? exportNull.residualEnergy / exportNull.sourceEnergy
+                : std::numeric_limits<double>::infinity();
+
+            const bool ok = metadataOk
+                && liveNull.ok
+                && exportNull.ok
+                && liveNull.sourceEnergy > 0.0001
+                && livePeak > 0.0001f
+                && livePeak <= 1.0f
+                && liveNull.residualEnergy <= 0.000000000001
+                && liveNull.maxAbsDiff <= 0.0000001f
+                && exportNull.maxAbsDiff <= 0.0000005f
+                && exportNull.meanAbsDiff <= 0.00000008
+                && exportResidualRatio <= 0.00000000001;
+
+            if (!ok)
+            {
+                std::cerr << "Aurum " << sampleRate << " Hz live/export parity failed"
+                          << " metadata=" << metadataOk
+                          << " liveOk=" << liveNull.ok
+                          << " liveEnergy=" << liveNull.sourceEnergy
+                          << " livePeak=" << livePeak
+                          << " liveResidual=" << liveNull.residualEnergy
+                          << " liveMaxDiff=" << liveNull.maxAbsDiff
+                          << " exportOk=" << exportNull.ok
+                          << " exportResidual=" << exportNull.residualEnergy
+                          << " exportResidualRatio=" << exportResidualRatio
+                          << " exportMaxDiff=" << exportNull.maxAbsDiff
+                          << " exportMeanDiff=" << exportNull.meanAbsDiff
+                          << "\n";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     bool stressAudioEngineAetherDeterministicNullExportFamily(beat::Project project,
                                                               const char* label,
                                                               const char* tempFileName,
@@ -13850,6 +14018,7 @@ int main(int argc, char** argv)
             && stressInstrumentVoiceAurumOperatorRelease()
             && stressInstrumentVoiceAurumRingMatrix()
             && stressInstrumentVoiceAurumAdditiveOperator()
+            && stressAudioEngineAurumCrossRateLiveExportParity()
             && stressProjectRepositoryAurumInstrumentRoundtrip();
         if (!ok)
         {
@@ -14017,6 +14186,11 @@ int main(int argc, char** argv)
     if (!stressInstrumentVoiceAurumAdditiveOperator())
     {
         std::cerr << "Instrument voice Aurum additive operator stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineAurumCrossRateLiveExportParity())
+    {
+        std::cerr << "Audio engine Aurum cross-rate live/export parity stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceBandlimitedBasicOscillators())

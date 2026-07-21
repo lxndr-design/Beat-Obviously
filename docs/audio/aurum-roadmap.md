@@ -19,7 +19,7 @@ Lumus/Aether owns wavetable and hybrid synthesis concerns such as sample, granul
 - `[x]` Separate bipolar FM and ring/amplitude-modulation matrices render, persist, and share a bounded one-sample-delayed routing model.
 - `[x]` Operator release values control note-off independently in browser and native rendering; native voice lifetime follows the longest enabled operator tail.
 - `[ ]` Feedback behavior has explicit stability limits and sample-rate/block-size stress.
-- `[ ]` Aurum has native live/export parity fixtures at 44.1, 48, and 96 kHz.
+- `[x]` Aurum has deterministic native live/export parity fixtures at 44.1, 48, and 96 kHz, including stereo WAV metadata and bounded residual checks.
 
 Exit gate: identical patches survive save/load, produce finite audible browser/native output, and remain bounded under dense bipolar feedback and high unison.
 
@@ -76,5 +76,5 @@ Exit gate: the release report distinguishes verified audio behavior, performance
 
 ## Immediate order
 
-1. Add native Aurum live/export and cross-rate gates before expanding filters or content.
-2. Add explicit feedback stability limits and dense-matrix stress.
+1. Add explicit feedback stability limits and dense-matrix stress.
+2. Add operator waveshaping and a waveform preview driven by the same engine data.

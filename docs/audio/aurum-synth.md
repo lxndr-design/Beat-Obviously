@@ -38,3 +38,5 @@ For a deterministic browser review, open `?beatDevFixture=aurum-editor`. The fix
 ## Current boundary
 
 Aurum is an instrument foundation, not a clone of another synthesizer. It does not yet include per-operator filters, waveshaping editors, keyboard-mapped modulation curves, or a preset browser. Operator releases govern their own note-off tails in browser and native rendering; the hidden shared amplitude envelope does not reshape Aurum's operator envelopes. Additive rendering normalizes active partials and suppresses harmonics at or above Nyquist for the current operator frequency.
+
+The focused native stress gate renders one deterministic additive/FM/RM/unison patch through both the live callback path and 32-bit WAV export at 44.1, 48, and 96 kHz. It verifies repeatable live output, requested stereo WAV metadata, finite bounded samples, and a negligible live/export residual at each rate. This is a path-parity gate, not yet the separate aliasing and perceptual cross-rate benchmark tracked for release readiness.
