@@ -692,8 +692,8 @@ export interface SynthPatchMacroDefinition {
 }
 
 export interface SynthPatchSnapshot {
-  /** v2 adds Sample Slot 1; v3 slicing/looping; v4 bounded mapped zones; v5 sample-source FX sends. */
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+  /** Aether remains v5; Lumus v10 adds the bounded synth-owned clip sequence. */
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
   instrumentType: "wavetable-synth" | "lumus-hybrid-synth";
   namespace: "synth" | "lumus";
   name: string;
@@ -722,6 +722,16 @@ export interface SynthPatchSnapshot {
       schemaVersion: 1;
       managedAsset?: ManagedGranularAssetConfig;
     }>>;
+    lumusClip?: {
+      schemaVersion: 1;
+      lengthSteps: number;
+      steps: Array<{
+        enabled: boolean;
+        pitchOffset: number;
+        lengthSteps: number;
+        velocity: number;
+      }>;
+    };
   };
 }
 

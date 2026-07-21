@@ -169,7 +169,7 @@ try {
   const lumusDraft = synthStore.createDefaultLumusDraft();
   assert.equal(lumusDraft.instrumentType, "lumus-hybrid-synth", "Lumus must have an independent instrument identity");
   assert.equal(lumusDraft.namespace, "lumus", "Lumus must not serialize into Aether's namespace");
-  assert.equal(lumusDraft.schemaVersion, 9, "Lumus must use the explicit arpeggiator key/scale schema");
+  assert.equal(lumusDraft.schemaVersion, 10, "Lumus must use the bounded clip-sequencer schema");
   assert.equal(lumusDraft.metadata.lumusSourceRack.schemaVersion, 2);
   assert.equal(lumusDraft.name, "Lumus Init");
   assert.deepEqual(lumusDraft.metadata.oscillators.map(({ id }) => id), ["a", "b", "c"], "Lumus must expose exactly three stable source identities");
@@ -189,7 +189,7 @@ try {
     "Lumus namespace mismatches must fail diagnostically",
   );
   assert.throws(
-    () => synthStore.normalizeSynthDraftPatch({ ...lumusDraft, schemaVersion: 10 }),
+    () => synthStore.normalizeSynthDraftPatch({ ...lumusDraft, schemaVersion: 11 }),
     /lumus\.schema\.unsupported/,
     "future or inconsistent Lumus schemas must not be silently normalized",
   );
@@ -210,13 +210,15 @@ try {
     metadata: { ...structuredClone(lumusDraft.metadata), lumusSourceRack: undefined, oscillators: [{ id: "a", name: "A" }, { id: "b", name: "B" }] },
     parameters: Object.fromEntries(Object.entries(lumusDraft.parameters).filter(([id]) => !id.startsWith("osc.c."))),
   });
-  assert.equal(migratedLumusV1.schemaVersion, 9, "Lumus v1 must deterministically migrate to v9");
+  assert.equal(migratedLumusV1.schemaVersion, 10, "Lumus v1 must deterministically migrate to v10");
   assert.deepEqual(migratedLumusV1.metadata.oscillators.map(({ id }) => id), ["a", "b", "c"]);
   assert.equal(migratedLumusV1.parameters["osc.c.enabled"], false);
   assert.equal(migratedLumusV1.parameters["lumus.arp.enabled"], false, "legacy Lumus patches must migrate with the arpeggiator off");
   assert.equal(migratedLumusV1.parameters["lumus.arp.swing"], 0, "legacy Lumus patches must migrate with straight timing");
   assert.equal(migratedLumusV1.parameters["lumus.arp.key"], "c");
   assert.equal(migratedLumusV1.parameters["lumus.arp.scale"], "chromatic");
+  assert.equal(migratedLumusV1.parameters["lumus.clip.enabled"], false);
+  assert.equal(migratedLumusV1.metadata.lumusClip?.steps.length, 16);
   const migratedLumusV3 = synthStore.normalizeSynthDraftPatch({
     ...structuredClone(lumusDraft),
     schemaVersion: 3,
@@ -246,7 +248,7 @@ try {
       }],
     },
   });
-  assert.equal(migratedLumusV3.schemaVersion, 9);
+  assert.equal(migratedLumusV3.schemaVersion, 10);
   assert.equal(migratedLumusV3.parameters["lumus.source.c.sample.enabled"], true);
   assert.equal(migratedLumusV3.parameters["lumus.source.c.sample.audioFileId"], "legacy-lumus-c");
   assert.equal(migratedLumusV3.parameters["lumus.source.c.sample.rootNote"], 65);
@@ -288,6 +290,61 @@ try {
   });
   assert.equal(migratedLumusV8.parameters["lumus.arp.key"], "c", "v8 must not activate a future key field");
   assert.equal(migratedLumusV8.parameters["lumus.arp.scale"], "chromatic", "v8 must not activate a future scale field");
+  const migratedLumusV9 = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumusDraft),
+    schemaVersion: 9,
+    parameters: { ...lumusDraft.parameters, "lumus.clip.enabled": true, "lumus.clip.rate": "1/4" },
+    metadata: { ...structuredClone(lumusDraft.metadata), lumusClip: undefined },
+  });
+  assert.equal(migratedLumusV9.parameters["lumus.clip.enabled"], false, "v9 must not activate future clip state");
+  assert.equal(migratedLumusV9.parameters["lumus.clip.rate"], "1/16");
+  assert.equal(migratedLumusV9.metadata.lumusClip?.steps.length, 16);
+  const clipRoundtrip = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumusDraft),
+    parameters: {
+      ...lumusDraft.parameters,
+      "lumus.clip.enabled": true,
+      "lumus.clip.rate": "1/8",
+      "lumus.clip.swing": 0.24,
+    },
+    metadata: {
+      ...structuredClone(lumusDraft.metadata),
+      lumusClip: {
+        schemaVersion: 1,
+        lengthSteps: 4,
+        steps: [
+          { enabled: true, pitchOffset: 0, lengthSteps: 1, velocity: 1 },
+          { enabled: true, pitchOffset: 4, lengthSteps: 1, velocity: 0.8 },
+          { enabled: false, pitchOffset: 0, lengthSteps: 1, velocity: 1 },
+          { enabled: true, pitchOffset: 7, lengthSteps: 1, velocity: 0.6 },
+        ],
+      },
+    },
+  });
+  assert.equal(clipRoundtrip.parameters["lumus.clip.enabled"], true);
+  assert.equal(clipRoundtrip.parameters["lumus.clip.rate"], "1/8");
+  assert.equal(clipRoundtrip.parameters["lumus.clip.swing"], 0.24);
+  assert.deepEqual(clipRoundtrip.metadata.lumusClip?.steps.map((step) => [step.enabled, step.pitchOffset, step.velocity]), [
+    [true, 0, 1], [true, 4, 0.8], [false, 0, 1], [true, 7, 0.6],
+  ]);
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch({
+      ...structuredClone(clipRoundtrip),
+      parameters: { ...clipRoundtrip.parameters, "lumus.arp.enabled": true },
+    }),
+    /lumus\.performance-mode\.conflict/,
+  );
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch({
+      ...structuredClone(clipRoundtrip),
+      metadata: { ...structuredClone(clipRoundtrip.metadata), lumusClip: {
+        schemaVersion: 1,
+        lengthSteps: 1,
+        steps: [{ enabled: true, pitchOffset: Number.NaN, lengthSteps: 1, velocity: 1 }],
+      } },
+    }),
+    /lumus\.clip\.step-malformed/,
+  );
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
       ...structuredClone(lumusDraft),

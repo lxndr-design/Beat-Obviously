@@ -133,6 +133,12 @@ queue/sequencer note or arrangement event
      -> optional schema v9 fixed-mask key/scale quantization before deterministic note ordering
      -> pre-sized route MIDI output with sample-offset gate events
      -> no separate clock, file access, lock, or lazy initialization
+  -> Lumus route only, when the mutually exclusive schema v10 clip is enabled
+     -> fixed held-note/order/channel/velocity arrays; latest-held note is the trigger
+     -> fixed 32-step storage prepared from validated patch metadata
+     -> step samples from active sample rate + atomic sequencer tempo/speed
+     -> bounded relative pitch, note length, velocity, rests, and pair-preserving swing
+     -> pre-sized route MIDI output; no allocation, lock, file access, or lazy initialization
   stable parameter ID + value + caller rampSamples
   AudioEngine block event ordering
   InstrumentVoice::setRealtimeParameterValue

@@ -24,8 +24,8 @@ import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 5;
-export const LUMUS_PATCH_SCHEMA_VERSION = 9;
-const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+export const LUMUS_PATCH_SCHEMA_VERSION = 10;
+const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 const LUMUS_ARPEGGIATOR_KEYS = ["c", "cSharp", "d", "dSharp", "e", "f", "fSharp", "g", "gSharp", "a", "aSharp", "b"] as const;
 const LUMUS_ARPEGGIATOR_SCALES = ["chromatic", "major", "naturalMinor", "majorPentatonic", "blues"] as const;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
@@ -88,6 +88,17 @@ export interface LumusSourceRackDescriptor {
     { id: "b"; mode: LumusSourceMode },
     { id: "c"; mode: LumusSourceMode },
   ];
+}
+export interface LumusClipStep {
+  enabled: boolean;
+  pitchOffset: number;
+  lengthSteps: number;
+  velocity: number;
+}
+export interface LumusClipMetadata {
+  schemaVersion: 1;
+  lengthSteps: number;
+  steps: LumusClipStep[];
 }
 export type OscillatorParamSuffix =
   | "enabled"
@@ -197,6 +208,9 @@ export type SynthParameterId =
   | "lumus.arp.octaves"
   | "lumus.arp.key"
   | "lumus.arp.scale"
+  | "lumus.clip.enabled"
+  | "lumus.clip.rate"
+  | "lumus.clip.swing"
   | "amp.level"
   | "amp.pan"
   | "maxVoices"
@@ -416,6 +430,7 @@ export interface SynthDraftPatch {
     lumusSourceRack?: LumusSourceRackDescriptor;
     lumusSampleSlots?: Partial<Record<LumusSourceSlotId, LumusSampleSlotMetadata>>;
     lumusGranularSlots?: Partial<Record<LumusSourceSlotId, LumusGranularSlotMetadata>>;
+    lumusClip?: LumusClipMetadata;
     sampleSlot1Zones: AetherSampleZoneConfig[];
     managedSfz?: ManagedSfzAssetConfig;
     managedGranular?: ManagedGranularAssetConfig;
@@ -622,6 +637,40 @@ function normalizeLumusGranularSlots(value: unknown, patchVersion: unknown): Rec
     result[slot] = { schemaVersion: 1, managedAsset: normalizeManagedGranular(entry.managedAsset) };
   }
   return result;
+}
+
+function emptyLumusClip(): LumusClipMetadata {
+  return {
+    schemaVersion: 1,
+    lengthSteps: 16,
+    steps: Array.from({ length: 16 }, () => ({ enabled: false, pitchOffset: 0, lengthSteps: 1, velocity: 1 })),
+  };
+}
+
+function normalizeLumusClip(value: unknown, patchVersion: unknown): LumusClipMetadata {
+  if (typeof patchVersion !== "number" || patchVersion < 10) return emptyLumusClip();
+  if (!isRecord(value) || value.schemaVersion !== 1 || !Number.isInteger(value.lengthSteps))
+    throw new SynthPatchIdentityError("lumus.clip.malformed", "Lumus v10 requires clip schema 1 with an integer length.");
+  const lengthSteps = Number(value.lengthSteps);
+  if (lengthSteps < 1 || lengthSteps > 32 || !Array.isArray(value.steps) || value.steps.length !== lengthSteps)
+    throw new SynthPatchIdentityError("lumus.clip.capacity", "Lumus clips require exactly 1 through 32 bounded steps.");
+  const steps = value.steps.map((step, index): LumusClipStep => {
+    if (!isRecord(step)
+        || typeof step.enabled !== "boolean"
+        || !Number.isInteger(step.pitchOffset)
+        || !Number.isInteger(step.lengthSteps)
+        || typeof step.velocity !== "number"
+        || !Number.isFinite(step.velocity))
+      throw new SynthPatchIdentityError("lumus.clip.step-malformed", `Invalid Lumus clip step ${index + 1}.`);
+    const pitchOffset = Number(step.pitchOffset);
+    const noteLength = Number(step.lengthSteps);
+    if (pitchOffset < -48 || pitchOffset > 48
+        || noteLength < 1 || noteLength > lengthSteps - index
+        || step.velocity <= 0 || step.velocity > 1)
+      throw new SynthPatchIdentityError("lumus.clip.step-range", `Out-of-range Lumus clip step ${index + 1}.`);
+    return { enabled: step.enabled, pitchOffset, lengthSteps: noteLength, velocity: step.velocity };
+  });
+  return { schemaVersion: 1, lengthSteps, steps };
 }
 
 export class HybridSourceMigrationError extends Error {
@@ -1452,6 +1501,9 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "lumus.arp.octaves": 1,
   "lumus.arp.key": "c",
   "lumus.arp.scale": "chromatic",
+  "lumus.clip.enabled": false,
+  "lumus.clip.rate": "1/16",
+  "lumus.clip.swing": 0,
   "amp.level": 0.8,
   "amp.pan": 0,
   maxVoices: 16,
@@ -1635,6 +1687,9 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "lumus.arp.octaves": "Lumus Arpeggiator Octaves",
   "lumus.arp.key": "Lumus Arpeggiator Key",
   "lumus.arp.scale": "Lumus Arpeggiator Scale",
+  "lumus.clip.enabled": "Lumus Clip Enabled",
+  "lumus.clip.rate": "Lumus Clip Rate",
+  "lumus.clip.swing": "Lumus Clip Swing",
   "amp.level": "Amp Level",
   "amp.pan": "Amp Pan",
   maxVoices: "Max Voices",
@@ -1826,6 +1881,9 @@ export function createDefaultLumusDraft(): SynthDraftPatch {
   parameters["lumus.arp.octaves"] = 1;
   parameters["lumus.arp.key"] = "c";
   parameters["lumus.arp.scale"] = "chromatic";
+  parameters["lumus.clip.enabled"] = false;
+  parameters["lumus.clip.rate"] = "1/16";
+  parameters["lumus.clip.swing"] = 0;
   return {
     ...draft,
     schemaVersion: LUMUS_PATCH_SCHEMA_VERSION,
@@ -1858,6 +1916,7 @@ export function createDefaultLumusDraft(): SynthDraftPatch {
       lumusGranularSlots: {
         a: { schemaVersion: 1 }, b: { schemaVersion: 1 }, c: { schemaVersion: 1 },
       },
+      lumusClip: emptyLumusClip(),
     },
   };
 }
@@ -1923,6 +1982,17 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
     if (!LUMUS_ARPEGGIATOR_SCALES.includes(scale as (typeof LUMUS_ARPEGGIATOR_SCALES)[number]))
       throw new SynthPatchIdentityError("lumus.arp.scale-invalid", `Unsupported Lumus arpeggiator scale: ${scale}.`);
   }
+  if (isLumus && Number(input.schemaVersion) < 10) {
+    parameters["lumus.clip.enabled"] = false;
+    parameters["lumus.clip.rate"] = "1/16";
+    parameters["lumus.clip.swing"] = 0;
+  } else if (isLumus) {
+    const clipRate = String(parameters["lumus.clip.rate"]);
+    if (!["1/4", "1/8", "1/16", "1/32"].includes(clipRate))
+      throw new SynthPatchIdentityError("lumus.clip.rate-invalid", `Unsupported Lumus clip rate: ${clipRate}.`);
+    if (parameters["lumus.clip.enabled"] === true && parameters["lumus.arp.enabled"] === true)
+      throw new SynthPatchIdentityError("lumus.performance-mode.conflict", "Lumus Clip and Arpeggiator cannot be enabled together.");
+  }
 
   const mpeMaster = clampMidiChannel(Number(parameters["aether.mpe.masterChannel"]));
   const mpeFirst = clampMidiChannel(Number(parameters["aether.mpe.firstMemberChannel"]));
@@ -1976,6 +2046,9 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
         inputMetadata,
       ), lumusGranularSlots: normalizeLumusGranularSlots(
         inputMetadata.lumusGranularSlots,
+        input.schemaVersion,
+      ), lumusClip: normalizeLumusClip(
+        inputMetadata.lumusClip,
         input.schemaVersion,
       ) } : {}),
       sampleSlot1Zones: normalizeAetherSampleZones(inputMetadata.sampleSlot1Zones),
@@ -3107,6 +3180,7 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (id === "lumus.arp.gate") return Math.max(0.05, Math.min(1, value));
   if (id === "lumus.arp.swing") return Math.max(0, Math.min(0.75, value));
   if (id === "lumus.arp.octaves") return Math.max(1, Math.min(4, Math.round(value)));
+  if (id === "lumus.clip.swing") return Math.max(0, Math.min(0.75, value));
   if (id.startsWith("aether.mpe.") && id.endsWith("Channel")) return clampMidiChannel(value);
   if (id === "aether.sample.1.rootNote") return Math.max(0, Math.min(127, Math.round(value)));
   if (id === "aether.granular.2.rootNote") return Math.max(0, Math.min(127, Math.round(value)));

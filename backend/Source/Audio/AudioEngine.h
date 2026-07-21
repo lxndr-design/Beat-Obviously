@@ -16,6 +16,7 @@
 #include "AudioQuality.h"
 #include "Realtime/VoiceNoteAutomation.h"
 #include "Midi/LumusArpeggiator.h"
+#include "Midi/LumusClipSequencer.h"
 #include <array>
 #include <atomic>
 #include <functional>
@@ -476,6 +477,9 @@ namespace beat
             LumusArpeggiator lumusArpeggiator;
             LumusArpeggiator::Config lumusArpeggiatorConfig;
             int lumusArpeggiatorRateDivision { 16 };
+            LumusClipSequencer lumusClipSequencer;
+            LumusClipSequencer::Config lumusClipConfig;
+            int lumusClipRateDivision { 16 };
             float gainDb { 0.0f };
             float pan { 0.0f };
             std::vector<TrackEffect> effects;

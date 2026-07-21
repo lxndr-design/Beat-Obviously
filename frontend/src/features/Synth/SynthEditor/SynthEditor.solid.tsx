@@ -36,6 +36,7 @@ import {
   useSynthStore,
   type MacroCurve,
   type MacroId,
+  type LumusClipStep,
   type ModulationSourceId,
   type ModulationTargetId,
   type SynthDraftPatch,
@@ -592,6 +593,7 @@ export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "
 
         <Show when={draft().instrumentType === "lumus-hybrid-synth"}>
           <LumusArpeggiatorPanel />
+          <LumusClipPanel />
         </Show>
 
         <InstrumentFxRack />
@@ -632,6 +634,7 @@ function LumusArpeggiatorPanel() {
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
   const setParameter = useSynthStore.getState().setParameter;
+  const setDraft = useSynthStore.getState().setDraft;
   const enabled = createMemo(() => draft().parameters["lumus.arp.enabled"] === true);
 
   return (
@@ -643,7 +646,15 @@ function LumusArpeggiatorPanel() {
           selected={enabled()}
           className={styles.ampFilterPowerButton}
           aria-label={`${enabled() ? "Disable" : "Enable"} Lumus arpeggiator`}
-          onClick={() => setBooleanParameter("lumus.arp.enabled", !enabled())}
+          onClick={() => {
+            if (!enabled()) {
+              const current = draft();
+              setDraft({
+                ...current,
+                parameters: { ...current.parameters, "lumus.arp.enabled": true, "lumus.clip.enabled": false },
+              });
+            } else setBooleanParameter("lumus.arp.enabled", false);
+          }}
         >
           <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={18} decorative />
         </Button>
@@ -729,6 +740,131 @@ function LumusArpeggiatorPanel() {
                 { value: "blues", label: "Blues" },
               ]}
               onChange={(value) => setParameter("lumus.arp.scale", value)}
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function LumusClipPanel() {
+  const draft = createStoreSelector(useSynthStore, (state) => state.draft);
+  const setDraft = useSynthStore.getState().setDraft;
+  const setNumericParameter = useSynthStore.getState().setNumericParameter;
+  const setParameter = useSynthStore.getState().setParameter;
+  const [selectedStep, setSelectedStep] = createSignal(0);
+  const clip = createMemo(() => draft().metadata.lumusClip!);
+  const enabled = createMemo(() => draft().parameters["lumus.clip.enabled"] === true);
+  const step = createMemo(() => clip().steps[Math.min(selectedStep(), clip().lengthSteps - 1)]);
+
+  function updateStep(index: number, patch: Partial<LumusClipStep>) {
+    const current = draft();
+    const nextClip = structuredClone(current.metadata.lumusClip!);
+    nextClip.steps[index] = { ...nextClip.steps[index], ...patch };
+    setDraft({ ...current, metadata: { ...current.metadata, lumusClip: nextClip } });
+  }
+
+  function toggleEnabled() {
+    const current = draft();
+    setDraft({
+      ...current,
+      parameters: {
+        ...current.parameters,
+        "lumus.clip.enabled": !enabled(),
+        ...(!enabled() ? { "lumus.arp.enabled": false } : {}),
+      },
+    });
+  }
+
+  return (
+    <section class={`${styles.majorSection} ${enabled() ? "" : styles.disabledPanel}`} aria-label="Lumus clip sequencer">
+      <div class={styles.ampFilterRibbon}>
+        <Button
+          iconOnly
+          size="xs"
+          selected={enabled()}
+          className={styles.ampFilterPowerButton}
+          aria-label={`${enabled() ? "Disable" : "Enable"} Lumus clip sequencer`}
+          onClick={toggleEnabled}
+        >
+          <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={18} decorative />
+        </Button>
+        <div class={styles.ampFilterRibbonTitle}>Clip</div>
+      </div>
+      <div class={styles.ampFilterBody}>
+        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`}>
+          <div class={styles.ampFilterGroupTitle}>Steps</div>
+          <div class={styles.clipStepGrid} aria-label="Clip steps">
+            <For each={clip().steps}>
+              {(candidate, index) => (
+                <Button
+                  size="xs"
+                  selected={candidate.enabled}
+                  className={styles.clipStepButton}
+                  aria-label={`Step ${index() + 1}${candidate.enabled ? ", enabled" : ", rest"}`}
+                  onClick={() => {
+                    setSelectedStep(index());
+                    updateStep(index(), { enabled: !candidate.enabled });
+                  }}
+                >
+                  {index() + 1}
+                </Button>
+              )}
+            </For>
+          </div>
+        </div>
+        <div class={styles.ampFilterGroup}>
+          <div class={styles.ampFilterGroupTitle}>Timing</div>
+          <div class={styles.ampFilterShapeRow}>
+            <FloatingSelect
+              label="Rate"
+              layout="inline"
+              value={String(draft().parameters["lumus.clip.rate"] ?? "1/16")}
+              ariaLabel="Clip step rate"
+              options={[
+                { value: "1/4", label: "1/4" },
+                { value: "1/8", label: "1/8" },
+                { value: "1/16", label: "1/16" },
+                { value: "1/32", label: "1/32" },
+              ]}
+              onChange={(value) => setParameter("lumus.clip.rate", value)}
+            />
+            <SynthParameterKnob id="lumus.clip.swing" label="Swing" defaultValue={0} max={0.75} onChange={setNumericParameter} />
+          </div>
+        </div>
+        <div class={styles.ampFilterGroup}>
+          <div class={styles.ampFilterGroupTitle}>Selected Step {selectedStep() + 1}</div>
+          <div class={styles.clipStepControls}>
+            <NumberInput
+              label="Pitch"
+              layout="inline"
+              value={step().pitchOffset}
+              min={-48}
+              max={48}
+              step={1}
+              ariaLabel="Selected clip step pitch offset"
+              onChange={(value) => updateStep(selectedStep(), { pitchOffset: Math.round(value) })}
+            />
+            <NumberInput
+              label="Length"
+              layout="inline"
+              value={step().lengthSteps}
+              min={1}
+              max={clip().lengthSteps - selectedStep()}
+              step={1}
+              ariaLabel="Selected clip note length in steps"
+              onChange={(value) => updateStep(selectedStep(), { lengthSteps: Math.round(value) })}
+            />
+            <NumberInput
+              label="Velocity"
+              layout="inline"
+              value={Math.round(step().velocity * 100)}
+              min={1}
+              max={100}
+              step={1}
+              ariaLabel="Selected clip step velocity percent"
+              onChange={(value) => updateStep(selectedStep(), { velocity: value / 100 })}
             />
           </div>
         </div>

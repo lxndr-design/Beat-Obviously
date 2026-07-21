@@ -439,6 +439,9 @@ namespace beat
                     && (int) schemaVersion != params::lumusSampleOwnershipPatchSchemaVersion
                     && (int) schemaVersion != params::lumusGranularPatchSchemaVersion
                     && (int) schemaVersion != params::lumusMultisamplePatchSchemaVersion
+                    && (int) schemaVersion != params::lumusArpeggiatorPatchSchemaVersion
+                    && (int) schemaVersion != params::lumusArpeggiatorSwingPatchSchemaVersion
+                    && (int) schemaVersion != params::lumusArpeggiatorScalePatchSchemaVersion
                     && (int) schemaVersion != params::lumusPatchSchemaVersion)
                 || patchNamespace.toString() != "lumus")
                 return false;
@@ -522,6 +525,49 @@ namespace beat
                     : scale == "majorPentatonic" ? 3
                     : scale == "blues" ? 4
                     : 0;
+            }
+        }
+        if (isLumus && (int) objectProperty(patch, "schemaVersion", 0) >= params::lumusClipPatchSchemaVersion)
+        {
+            const auto clipRate = synthStringParam(params, "lumus.clip.rate", "1/16");
+            if (clipRate != "1/4" && clipRate != "1/8" && clipRate != "1/16" && clipRate != "1/32")
+                return false;
+            instrument.lumus.clip.enabled = synthNumberParam(params, "lumus.clip.enabled", 0.0) >= 0.5;
+            if (instrument.lumus.clip.enabled && instrument.lumus.arpeggiator.enabled) return false;
+            instrument.lumus.clip.rateDivision = clipRate == "1/4" ? 4 : clipRate == "1/8" ? 8 : clipRate == "1/32" ? 32 : 16;
+            instrument.lumus.clip.swing = juce::jlimit(0.0f, 0.75f,
+                (float) synthNumberParam(params, "lumus.clip.swing", 0.0));
+
+            const auto clip = objectProperty(metadata, "lumusClip", {});
+            const auto clipLength = objectProperty(clip, "lengthSteps", {});
+            const auto clipSteps = objectProperty(clip, "steps", {});
+            const auto* stepArray = clipSteps.getArray();
+            if (!clip.isObject() || (int) objectProperty(clip, "schemaVersion", 0) != 1
+                || (!clipLength.isInt() && !clipLength.isInt64())
+                || (int) clipLength < 1 || (int) clipLength > 32
+                || stepArray == nullptr || stepArray->size() != (int) clipLength)
+                return false;
+            instrument.lumus.clip.lengthSteps = (int) clipLength;
+            for (int index = 0; index < stepArray->size(); ++index)
+            {
+                const auto& step = stepArray->getReference(index);
+                const auto enabled = objectProperty(step, "enabled", {});
+                const auto pitchOffset = objectProperty(step, "pitchOffset", {});
+                const auto lengthSteps = objectProperty(step, "lengthSteps", {});
+                const auto velocity = objectProperty(step, "velocity", {});
+                if (!step.isObject() || !enabled.isBool()
+                    || (!pitchOffset.isInt() && !pitchOffset.isInt64())
+                    || (!lengthSteps.isInt() && !lengthSteps.isInt64())
+                    || (!velocity.isInt() && !velocity.isInt64() && !velocity.isDouble())
+                    || (int) pitchOffset < -48 || (int) pitchOffset > 48
+                    || (int) lengthSteps < 1 || (int) lengthSteps > (int) clipLength - index
+                    || !std::isfinite((double) velocity) || (double) velocity <= 0.0 || (double) velocity > 1.0)
+                    return false;
+                auto& destination = instrument.lumus.clip.steps[(size_t) index];
+                destination.enabled = (bool) enabled;
+                destination.pitchOffset = (int) pitchOffset;
+                destination.lengthSteps = (int) lengthSteps;
+                destination.velocity = (float) velocity;
             }
         }
         instrument.waveform = 5;

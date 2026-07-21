@@ -332,6 +332,23 @@ namespace beat
                 int scale { 0 }; // 0 chromatic, 1 major, 2 natural minor, 3 major pentatonic, 4 blues
             };
 
+            struct Clip
+            {
+                struct Step
+                {
+                    bool enabled { false };
+                    int pitchOffset { 0 };
+                    int lengthSteps { 1 };
+                    float velocity { 1.0f };
+                };
+
+                bool enabled { false };
+                int rateDivision { 16 };
+                float swing { 0.0f };
+                int lengthSteps { 16 };
+                std::array<Step, 32> steps {};
+            };
+
             int sourceRackSchemaVersion { 1 };
             AetherOscillator oscC;
             std::array<AetherSampleSlot, 3> sampleSlots;
@@ -339,6 +356,7 @@ namespace beat
             std::array<AetherGranularSlot, 3> granularSlots;
             std::array<bool, 3> granularModes {};
             Arpeggiator arpeggiator;
+            Clip clip;
         };
 
         struct DynamicModTarget

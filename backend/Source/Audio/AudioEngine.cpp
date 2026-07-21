@@ -1823,6 +1823,7 @@ namespace beat
         route.midi.clear();
         route.retiringMidi.clear();
         route.lumusArpeggiator.reset();
+        route.lumusClipSequencer.reset();
         route.noteAutomationContextCount = 0;
         route.gainDb = route.baseGainDb;
         route.pan = route.basePan;
@@ -2763,6 +2764,19 @@ namespace beat
                         : LumusArpeggiator::Scale::chromatic;
                     route.lumusArpeggiatorRateDivision = arp.rateDivision;
                     route.lumusArpeggiator.prepare(routeBuf.getNumSamples() > 0 ? routeBuf.getNumSamples() : 512);
+                    const auto& clip = routeInstrument->lumus.clip;
+                    route.lumusClipConfig.enabled = clip.enabled;
+                    route.lumusClipConfig.swing = clip.swing;
+                    route.lumusClipConfig.lengthSteps = clip.lengthSteps;
+                    for (int index = 0; index < LumusClipSequencer::maxSteps; ++index)
+                    {
+                        route.lumusClipConfig.steps[(size_t) index].enabled = clip.steps[(size_t) index].enabled;
+                        route.lumusClipConfig.steps[(size_t) index].pitchOffset = clip.steps[(size_t) index].pitchOffset;
+                        route.lumusClipConfig.steps[(size_t) index].lengthSteps = clip.steps[(size_t) index].lengthSteps;
+                        route.lumusClipConfig.steps[(size_t) index].velocity = clip.steps[(size_t) index].velocity;
+                    }
+                    route.lumusClipRateDivision = clip.rateDivision;
+                    route.lumusClipSequencer.prepare(routeBuf.getNumSamples() > 0 ? routeBuf.getNumSamples() : 512);
                 }
                 std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1;
                 std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1;
@@ -5459,7 +5473,16 @@ namespace beat
                         const auto realtimeRouteId = makeRealtimeParameterChangeFromJuce(
                             &route.instrumentId, nullptr, 0.0f);
                         juce::MidiBuffer* routeMidi = &route.midi;
-                        if (route.lumusArpeggiatorConfig.enabled)
+                        if (route.lumusClipConfig.enabled)
+                        {
+                            const auto tempo = juce::jmax(1.0, seq.getTempo());
+                            const auto speed = juce::jmax(0.1, seq.getSpeed());
+                            route.lumusClipConfig.stepSamples = sampleRate * 60.0 / tempo / speed
+                                * (4.0 / (double) route.lumusClipRateDivision);
+                            route.lumusClipSequencer.setConfig(route.lumusClipConfig);
+                            routeMidi = &route.lumusClipSequencer.process(route.midi, numSamples);
+                        }
+                        else if (route.lumusArpeggiatorConfig.enabled)
                         {
                             const auto tempo = juce::jmax(1.0, seq.getTempo());
                             const auto speed = juce::jmax(0.1, seq.getSpeed());
