@@ -30,6 +30,8 @@ The MVP routing contract freezes two fixed pre-insert source sends plus a stored
 
 The focused MIDI transform is event-exact across 100-sample block splits and reports zero realtime-safety violations after preparation. The end-to-end offline engine test produces finite, audible, materially different enabled output (`differenceEnergy 647.748`) and a `0.003130` maximum sample delta between 64- and 257-sample render blocks, below the explicit `0.005` integration tolerance. The disabled comparison is block-identical. This tolerance records the renderer's retrigger/envelope numerical boundary rather than relaxing MIDI event timing.
 
+The MVP factory test bank adds seven Beat-authored archetypes: `Lumus_SubBass_01`, `Lumus_ArpPluck_01`, `Lumus_WidePad_01`, `Lumus_MonoLead_01`, `Lumus_DigitalKeys_01`, `Lumus_ClipSequence_01`, and `Lumus_GranularTexture_01`. Together they exercise three-source tuning/routing, mono and polyphonic lifecycle behavior, arpeggiator and clip transforms, dual filters, ordered inserts, ratio tuning, and Slot C granular mode. Automated auditions require finite output, useful level below full scale, stable Lumus identity/roundtrip, and material pairwise render differences. The hands-on cases are recorded in `docs/audio/lumus-mvp-test-bank.md`.
+
 ### Verified 2026-07-21
 
 - Complete non-native verification and production frontend build: passed.

@@ -1345,6 +1345,60 @@ try {
     false,
     "factory Aether preset bank should not include rough breakcore synth drums",
   );
+  const lumusMvpNames = [
+    "Lumus_SubBass_01",
+    "Lumus_ArpPluck_01",
+    "Lumus_WidePad_01",
+    "Lumus_MonoLead_01",
+    "Lumus_DigitalKeys_01",
+    "Lumus_ClipSequence_01",
+    "Lumus_GranularTexture_01",
+  ];
+  const lumusMvpPresets = lumusMvpNames.map((name) => {
+    const preset = synthStore.FACTORY_SYNTH_PRESETS.find((candidate) => candidate.name === name);
+    assert.ok(preset, `expected Lumus MVP test preset ${name}`);
+    assert.equal(preset.patch.instrumentType, "lumus-hybrid-synth");
+    assert.equal(preset.patch.namespace, "lumus");
+    assert.ok(preset.tags.includes("mvp-test"));
+    return preset;
+  });
+  assert.equal(lumusMvpPresets[1].patch.parameters["lumus.arp.enabled"], true);
+  assert.equal(lumusMvpPresets[5].patch.parameters["lumus.clip.enabled"], true);
+  assert.equal(lumusMvpPresets[5].patch.metadata.lumusClip?.lengthSteps, 8);
+  assert.equal(lumusMvpPresets[6].patch.metadata.lumusSourceRack?.slots[2].mode, "granular");
+  assert.equal(lumusMvpPresets[6].patch.parameters["lumus.source.c.granular.builtinSource"], "benchmark");
+  const lumusMvpRenders = lumusMvpPresets.map((preset) => {
+    const preview = synthStore.synthDraftToPreviewInstrument(preset.patch);
+    const samples = new Float32Array(48000);
+    synthPreview.renderInstrumentSamples(preview, samples, 48000, synthPreview.previewFrequency(preview), "audio", true);
+    let energy = 0;
+    let peak = 0;
+    for (const sample of samples) {
+      assert.equal(Number.isFinite(sample), true, `${preset.name} must render finite samples`);
+      energy += sample * sample;
+      peak = Math.max(peak, Math.abs(sample));
+    }
+    assert.ok(Math.sqrt(energy / samples.length) > 0.005, `${preset.name} must be objectively audible`);
+    assert.ok(peak < 1, `${preset.name} must remain below full scale in the factory audition`);
+    const repeated = new Float32Array(samples.length);
+    const repeatedPreview = synthStore.synthDraftToPreviewInstrument(preset.patch);
+    synthPreview.renderInstrumentSamples(repeatedPreview, repeated, 48000, synthPreview.previewFrequency(repeatedPreview), "audio", true);
+    assert.deepEqual(repeated, samples, `${preset.name} must render deterministically`);
+    return samples;
+  });
+  for (let left = 0; left < lumusMvpRenders.length; left += 1) {
+    for (let right = left + 1; right < lumusMvpRenders.length; right += 1) {
+      let differenceEnergy = 0;
+      for (let sample = 0; sample < lumusMvpRenders[left].length; sample += 1) {
+        const difference = lumusMvpRenders[left][sample] - lumusMvpRenders[right][sample];
+        differenceEnergy += difference * difference;
+      }
+      assert.ok(
+        Math.sqrt(differenceEnergy / lumusMvpRenders[left].length) > 0.002,
+        `${lumusMvpNames[left]} and ${lumusMvpNames[right]} must be materially distinct`,
+      );
+    }
+  }
   const futureBassBenchmark = synthStore.FACTORY_SYNTH_PRESETS.find(
     (preset) => preset.id === "factory.benchmark-future-bass-strings",
   );
@@ -1489,6 +1543,13 @@ try {
       .sort(),
     ["Benchmark - Future Bass Strings", "Benchmark - Progressive House Strings"],
     "benchmark factory instruments should be discoverable through the shared preset library",
+  );
+  assert.deepEqual(
+    aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { search: "lumus mvp-test" })
+      .map((entry) => entry.name)
+      .sort(),
+    [...lumusMvpNames].sort(),
+    "all Lumus MVP instruments should be discoverable through the shared factory library",
   );
   const macroUserPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, {
     search: "macro user preset",

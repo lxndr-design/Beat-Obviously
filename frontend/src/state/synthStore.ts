@@ -4153,9 +4153,207 @@ function slugFactoryGuideName(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+function createLumusMvpTestPresets(): SynthFactoryPresetRecord[] {
+  const effect = (id: string, kind: TrackEffect["kind"], params: Record<string, number>): TrackEffect => ({
+    id,
+    kind,
+    bypassed: false,
+    params,
+  });
+  const preset = (
+    slug: string,
+    instrument: string,
+    category: string,
+    description: string,
+    auditionNote: string,
+    parameters: Record<string, SynthParameterValue>,
+    options: {
+      modulation?: SynthModulationRoute[];
+      effects?: TrackEffect[];
+      clip?: LumusClipMetadata;
+      sourceModes?: [LumusSourceMode, LumusSourceMode, LumusSourceMode];
+      macroLabels?: [string, string, string, string];
+    } = {},
+  ): SynthFactoryPresetRecord => {
+    const base = createDefaultLumusDraft();
+    const name = `Lumus_${instrument}_01`;
+    const tags = ["factory", "lumus", "mvp-test", category.toLowerCase().replaceAll(" ", "-")];
+    const labels = options.macroLabels ?? ["Motion", "Tone", "Shape", "Space"];
+    const macros = cloneDefaultMacros();
+    for (let index = 0; index < 4; index += 1) {
+      const macroId = `macro.${index + 1}` as MacroId;
+      macros[macroId] = { ...macros[macroId], label: labels[index] };
+    }
+    const modes = options.sourceModes ?? ["wavetable", "wavetable", "wavetable"];
+    const patch = normalizeSynthDraftPatch({
+      ...base,
+      name,
+      parameters: { ...base.parameters, ...parameters },
+      modulation: [
+        ...(options.modulation ?? []),
+        { id: `factory.lumus-${slug}-01.macro.1`, source: "macro.1", target: "osc.a.position", amount: 0.12, bipolar: true, enabled: true },
+        { id: `factory.lumus-${slug}-01.macro.2`, source: "macro.2", target: "filter.cutoff", amount: 0.14, bipolar: false, enabled: true },
+        { id: `factory.lumus-${slug}-01.macro.3`, source: "macro.3", target: "amp.level", amount: 0.12, bipolar: false, enabled: true },
+        { id: `factory.lumus-${slug}-01.macro.4`, source: "macro.4", target: "unison.spread", amount: 0.14, bipolar: false, enabled: true },
+      ],
+      effects: { filters: options.effects ?? [] },
+      metadata: {
+        ...base.metadata,
+        tags,
+        macros,
+        lumusSourceRack: {
+          schemaVersion: 2,
+          slots: [
+            { id: "a", mode: modes[0] },
+            { id: "b", mode: modes[1] },
+            { id: "c", mode: modes[2] },
+          ],
+        },
+        lumusClip: options.clip ?? base.metadata.lumusClip,
+      },
+    });
+    return {
+      id: `factory.lumus-${slug}-01`,
+      name,
+      patch,
+      tags,
+      category,
+      description,
+      family: `Lumus ${category}`,
+      role: `${category.toLowerCase()} MVP test`,
+      auditionNote,
+    };
+  };
+  const clipStep = (pitchOffset: number, velocity = 0.82, lengthSteps = 1): LumusClipStep => ({
+    enabled: true,
+    pitchOffset,
+    lengthSteps,
+    velocity,
+  });
+  const rest = (): LumusClipStep => ({ enabled: false, pitchOffset: 0, lengthSteps: 1, velocity: 1 });
+
+  return [
+    preset("sub-bass", "SubBass", "Bass", "Focused three-source sub bass for low-register tuning, mono, and filter-envelope checks.",
+      "Play C1-G1 notes. The fundamental should stay centered and solid, with clean note lengths and no stuck release.", {
+        "osc.a.wavetable": "basic.sine", "osc.a.octave": -1, "osc.a.level": 0.76, "osc.a.route": "direct",
+        "osc.b.enabled": true, "osc.b.wavetable": "basic.triangle", "osc.b.octave": -1, "osc.b.level": 0.28,
+        "osc.c.enabled": true, "osc.c.wavetable": "basic.saw", "osc.c.octave": -2, "osc.c.level": 0.12,
+        "filter.cutoff": 620, "filter.resonance": 0.12, "filter.drive": 0.16,
+        "mono.enabled": true, "legato.enabled": true, "glide.ms": 42,
+        "env.1.attack": 0.004, "env.1.decay": 0.16, "env.1.sustain": 0.88, "env.1.release": 0.11,
+        "amp.level": 0.72,
+      }, {
+        modulation: [{ id: "lumus_sub_env_filter", source: "env.1", target: "filter.cutoff", amount: 0.16, bipolar: false, enabled: true }],
+        effects: [effect("factory.lumus-sub-bass-01.compress", "compressor", { threshold: -18, ratio: 3, attackMs: 18, releaseMs: 110, makeup: 1.5, mix: 100 })],
+        macroLabels: ["Weight", "Tone", "Drive", "Glide"],
+      }),
+    preset("arp-pluck", "ArpPluck", "Pluck", "Bright three-source pluck with the Lumus arpeggiator enabled.",
+      "Hold a C-minor triad around C4. Notes should step evenly, stop on release, and respond clearly to swing and rate changes.", {
+        "osc.a.wavetable": "basic.pulse", "osc.a.level": 0.72,
+        "osc.b.enabled": true, "osc.b.wavetable": "basic.triangle", "osc.b.octave": 1, "osc.b.level": 0.22,
+        "osc.c.enabled": true, "osc.c.wavetable": "basic.sine", "osc.c.octave": 2, "osc.c.level": 0.12, "osc.c.route": "filter2",
+        "filter.cutoff": 3400, "filter.resonance": 0.24,
+        "filter.2.enabled": true, "filter.2.type": "highpass", "filter.2.cutoff": 1800, "filter.2.resonance": 0.18,
+        "env.1.attack": 0.001, "env.1.decay": 0.18, "env.1.sustain": 0.04, "env.1.release": 0.09,
+        "lumus.arp.enabled": true, "lumus.arp.mode": "upDown", "lumus.arp.rate": "1/16", "lumus.arp.gate": 0.56,
+        "lumus.arp.swing": 0.12, "lumus.arp.octaves": 2, "lumus.arp.key": "c", "lumus.arp.scale": "naturalMinor",
+        "amp.level": 0.66,
+      }, {
+        effects: [effect("factory.lumus-arp-pluck-01.delay", "delay", { timeMs: 188, feedback: 22, mix: 16 })],
+        macroLabels: ["Pattern", "Brightness", "Snap", "Echo"],
+      }),
+    preset("wide-pad", "WidePad", "Pad", "Slow, wide three-source pad for unison, stereo, and release-tail checks.",
+      "Hold four-note chords from C3-C5, then release. The swell and tail should remain smooth with no clicks or collapsing stereo.", {
+        "osc.a.wavetable": "basic.saw", "osc.a.level": 0.48, "osc.a.unison.voices": 7, "osc.a.unison.detune": 0.14, "osc.a.unison.spread": 0.78,
+        "osc.b.enabled": true, "osc.b.wavetable": "basic.triangle", "osc.b.fine": -7, "osc.b.level": 0.34, "osc.b.pan": -0.22,
+        "osc.c.enabled": true, "osc.c.wavetable": "basic.square", "osc.c.octave": 1, "osc.c.fine": 7, "osc.c.level": 0.18, "osc.c.pan": 0.24,
+        "filter.cutoff": 5200, "filter.resonance": 0.1, "filter.drive": 0.06,
+        "env.1.attack": 0.72, "env.1.decay": 1.8, "env.1.sustain": 0.76, "env.1.release": 2.8,
+        "lfo.1.enabled": true, "lfo.1.shape": "triangle", "lfo.1.sync": false, "lfo.1.rate": 0.09, "lfo.1.smoothing": 0.62,
+        "amp.level": 0.54,
+      }, {
+        modulation: [{ id: "lumus_pad_scan", source: "lfo.1", target: "osc.a.position", amount: 0.16, bipolar: true, enabled: true }],
+        effects: [
+          effect("factory.lumus-wide-pad-01.chorus", "chorus", { rateHz: 0.18, depthMs: 8, delayMs: 16, feedback: 3, mix: 22 }),
+          effect("factory.lumus-wide-pad-01.reverb", "reverb", { roomSize: 62, damping: 46, mix: 20 }),
+        ],
+        macroLabels: ["Drift", "Warmth", "Width", "Space"],
+      }),
+    preset("mono-lead", "MonoLead", "Lead", "Expressive mono lead for legato, glide, filter-2 routing, and effect-order checks.",
+      "Play overlapping notes around C4 while changing velocity. Glide should occur only between connected phrases and note-offs must remain clean.", {
+        "osc.a.wavetable": "basic.saw", "osc.a.level": 0.64,
+        "osc.b.enabled": true, "osc.b.wavetable": "basic.square", "osc.b.fine": -5, "osc.b.level": 0.31,
+        "osc.c.enabled": true, "osc.c.wavetable": "basic.pulse", "osc.c.fine": 7, "osc.c.level": 0.24, "osc.c.route": "filter2",
+        "filter.cutoff": 2800, "filter.resonance": 0.24, "filter.drive": 0.18,
+        "filter.2.enabled": true, "filter.2.type": "highpass", "filter.2.cutoff": 420, "filter.2.resonance": 0.1,
+        "mono.enabled": true, "legato.enabled": true, "glide.ms": 86,
+        "env.1.attack": 0.008, "env.1.decay": 0.28, "env.1.sustain": 0.72, "env.1.release": 0.2,
+        "amp.level": 0.62,
+      }, {
+        modulation: [
+          { id: "lumus_lead_velocity", source: "velocity", target: "amp.level", amount: 0.16, bipolar: false, enabled: true },
+          { id: "lumus_lead_env_filter", source: "env.1", target: "filter.cutoff", amount: 0.22, bipolar: false, enabled: true },
+        ],
+        effects: [
+          effect("factory.lumus-mono-lead-01.saturator", "saturator", { drive: 34, mix: 54 }),
+          effect("factory.lumus-mono-lead-01.delay", "delay", { timeMs: 245, feedback: 20, mix: 13 }),
+        ],
+        macroLabels: ["Expression", "Bite", "Glide", "Echo"],
+      }),
+    preset("digital-keys", "DigitalKeys", "Keys", "Balanced digital keys patch for velocity, chord polyphony, tuning, and release behavior.",
+      "Play short chords and repeated notes from C3-C6. Attacks should remain even and every note should respect its recorded length.", {
+        "osc.a.wavetable": "basic.triangle", "osc.a.level": 0.58,
+        "osc.b.enabled": true, "osc.b.wavetable": "basic.sine", "osc.b.octave": 1, "osc.b.level": 0.27,
+        "osc.c.enabled": true, "osc.c.wavetable": "basic.saw", "osc.c.octave": 2, "osc.c.level": 0.09, "osc.c.tuning.mode": "ratio", "osc.c.tuning.numerator": 2, "osc.c.tuning.denominator": 1,
+        "filter.cutoff": 7600, "filter.resonance": 0.08,
+        "env.1.attack": 0.006, "env.1.decay": 0.72, "env.1.sustain": 0.48, "env.1.release": 0.58,
+        "amp.level": 0.66,
+      }, {
+        modulation: [{ id: "lumus_keys_velocity", source: "velocity", target: "amp.level", amount: 0.22, bipolar: false, enabled: true }],
+        effects: [effect("factory.lumus-digital-keys-01.chorus", "chorus", { rateHz: 0.32, depthMs: 4, delayMs: 10, feedback: 1, mix: 12 })],
+        macroLabels: ["Touch", "Tone", "Body", "Room"],
+      }),
+    preset("clip-sequence", "ClipSequence", "Sequence", "Bounded monophonic Lumus clip pattern for timing, rests, velocity, and trigger-note transposition.",
+      "Hold C3, then move the trigger to F3. The eight-step phrase should restart and transpose predictably; releasing the trigger should silence it.", {
+        "osc.a.wavetable": "basic.square", "osc.a.level": 0.58,
+        "osc.b.enabled": true, "osc.b.wavetable": "basic.saw", "osc.b.octave": 1, "osc.b.level": 0.2,
+        "osc.c.enabled": true, "osc.c.wavetable": "basic.triangle", "osc.c.level": 0.24, "osc.c.pan": 0.18,
+        "filter.cutoff": 4100, "filter.resonance": 0.2, "filter.drive": 0.1,
+        "env.1.attack": 0.002, "env.1.decay": 0.14, "env.1.sustain": 0.08, "env.1.release": 0.07,
+        "lumus.clip.enabled": true, "lumus.clip.rate": "1/16", "lumus.clip.swing": 0.16,
+        "amp.level": 0.62,
+      }, {
+        clip: {
+          schemaVersion: 1,
+          lengthSteps: 8,
+          steps: [clipStep(0, 1), clipStep(7, 0.76), rest(), clipStep(12, 0.9), clipStep(3, 0.7, 2), rest(), clipStep(10, 0.84), clipStep(7, 0.72)],
+        },
+        effects: [effect("factory.lumus-clip-sequence-01.delay", "delay", { timeMs: 160, feedback: 18, mix: 12 })],
+        macroLabels: ["Pattern", "Tone", "Accent", "Echo"],
+      }),
+    preset("granular-texture", "GranularTexture", "Texture", "Beat-owned granular source layered with a quiet oscillator pilot for hybrid-source verification.",
+      "Hold a low fifth for several seconds. The texture should remain finite, repeatable, stereo-spread, and clearly different from the pad.", {
+        "osc.a.wavetable": "basic.sine", "osc.a.level": 0.1,
+        "osc.b.enabled": false, "osc.c.enabled": false,
+        "lumus.source.c.granular.enabled": true, "lumus.source.c.granular.builtinSource": "benchmark",
+        "lumus.source.c.granular.rootNote": 45, "lumus.source.c.granular.level": 0.62,
+        "lumus.source.c.granular.position": 0.44, "lumus.source.c.granular.positionSpread": 0.3,
+        "lumus.source.c.granular.grainMilliseconds": 132, "lumus.source.c.granular.densityHz": 22,
+        "lumus.source.c.granular.stereoSpread": 0.84, "lumus.source.c.granular.randomSeed": 314159,
+        "filter.cutoff": 8400, "filter.resonance": 0.11,
+        "env.1.attack": 0.08, "env.1.decay": 0.9, "env.1.sustain": 0.82, "env.1.release": 1.8,
+        "amp.level": 0.6,
+      }, {
+        sourceModes: ["wavetable", "wavetable", "granular"],
+        effects: [effect("factory.lumus-granular-texture-01.reverb", "reverb", { roomSize: 52, damping: 48, mix: 16 })],
+        macroLabels: ["Position", "Density", "Width", "Space"],
+      }),
+  ];
+}
+
 function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
   const guidedPresets = createFactorySynthPresetsFromGuide();
-  if (guidedPresets.length > 0) return guidedPresets;
+  if (guidedPresets.length > 0) return [...guidedPresets, ...createLumusMvpTestPresets()];
 
   const custom = createDefaultCustomWavetable();
   const effect = (id: string, kind: TrackEffect["kind"], params: Record<string, number>): TrackEffect => ({
