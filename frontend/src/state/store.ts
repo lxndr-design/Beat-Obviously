@@ -6,6 +6,7 @@ import { defaultTrackEffectParams } from "./effects";
 import { pruneDevFixtureInstruments } from "./instrumentLibraryGuards";
 import { normalizeInstrumentTaxonomy } from "./instrumentTaxonomy";
 import { normalizeSampleMap } from "./sampleZones";
+import { createAurumTestInstruments } from "./aurumTestBank";
 import { audioBusExists, canSetAudioBusOutput, canSetAudioBusSend } from "./audioBusRouting";
 import { AUDIO_BUS_SCHEMA_VERSION } from "./types";
 import type { BeatProjectAsset, BeatProjectIntegrityReport, ProjectSidecarCleanupReport, RecentProjectEntry } from "../ipc/schema";
@@ -2753,6 +2754,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
           userCreated: false,
         }),
       ];
+      seeds.push(...createAurumTestInstruments(FACTORY_SYNTH_SET_ID).map(withOriginal));
       const deprecatedBreakcoreAetherInstrumentNames = new Set([
         "Breakcore Kick (Aether)",
         "Breakcore Snare (Aether)",

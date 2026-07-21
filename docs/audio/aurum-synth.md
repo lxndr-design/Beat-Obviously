@@ -3,6 +3,7 @@
 Aurum is Beat's six-operator FM and additive instrument. It takes inspiration from matrix-based FM synthesizers while keeping Beat's own compact editor and data model.
 
 The staged implementation and release gates are tracked in [`aurum-roadmap.md`](aurum-roadmap.md).
+The diagnostic patch bank and repeatable MVP checks are documented in [`aurum-mvp-test-cases.md`](aurum-mvp-test-cases.md).
 
 ## Version 1 scope
 

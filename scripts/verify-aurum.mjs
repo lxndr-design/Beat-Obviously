@@ -14,6 +14,7 @@ try {
   const esbuild = join(repoRoot, "frontend", "node_modules", ".bin", "esbuild");
   execFileSync(esbuild, [
     join(repoRoot, "frontend/src/state/aurum.ts"),
+    join(repoRoot, "frontend/src/state/aurumTestBank.ts"),
     join(repoRoot, "frontend/src/audio/synthPreview.ts"),
     join(repoRoot, "frontend/src/features/Aurum/aurumEditorInteraction.ts"),
     join(repoRoot, "frontend/src/features/Aurum/aurumEditing.ts"),
@@ -25,6 +26,7 @@ try {
   ], { stdio: "inherit" });
 
   const aurum = await import(pathToFileURL(join(outDir, "state/aurum.js")));
+  const testBank = await import(pathToFileURL(join(outDir, "state/aurumTestBank.js")));
   const preview = await import(pathToFileURL(join(outDir, "audio/synthPreview.js")));
   const interaction = await import(pathToFileURL(join(outDir, "features/Aurum/aurumEditorInteraction.js")));
   const editing = await import(pathToFileURL(join(outDir, "features/Aurum/aurumEditing.js")));
@@ -52,6 +54,48 @@ try {
   assert.ok(instrument.aurum.operators.every((operator) => operator.keytrackCurve.every((value) => value === 1)), "Keyboard curves must default to neutral gain");
   assert.ok(instrument.aurum.operators.every((operator) => operator.pan === 0), "Aurum operators must default to centered pan");
   assert.equal(aurum.evaluateAurumResponseCurve([0, 0.25, 0.5, 0.75, 1], 0.375), 0.375, "Response curves must interpolate between fixed points");
+
+  const testInstruments = testBank.createAurumTestInstruments("factory-synths");
+  assert.deepEqual(testInstruments.map((candidate) => candidate.name), [...testBank.AURUM_TEST_INSTRUMENT_NAMES], "The Aurum MVP test bank must expose its canonical archetype names in order");
+  assert.equal(new Set(testInstruments.map((candidate) => candidate.id)).size, testInstruments.length, "Aurum test instruments must have unique stable ids");
+  assert.ok(testInstruments.every((candidate) => candidate.userCreated === false && candidate.setId === "factory-synths"), "Aurum test instruments must seed into the factory Synths set");
+
+  const byName = Object.fromEntries(testInstruments.map((candidate) => [candidate.name, candidate]));
+  assert.equal(byName.Aurum_Bass_01.aurum.operators[0].ratio, 0.5, "Bass archetype must include a sub-ratio carrier");
+  assert.ok(byName.Aurum_Bell_01.aurum.operators.some((operator) => !Number.isInteger(operator.ratio)), "Bell archetype must include inharmonic ratios");
+  assert.ok(byName.Aurum_Keys_01.aurum.operators.some((operator) => operator.pan < 0) && byName.Aurum_Keys_01.aurum.operators.some((operator) => operator.pan > 0), "Keys archetype must exercise opposing operator pan");
+  assert.ok(byName.Aurum_Pad_01.aurum.operators.some((operator) => operator.waveform === "additive") && byName.Aurum_Pad_01.aurum.unison >= 5, "Pad archetype must exercise additive high-unison rendering");
+  assert.ok(byName.Aurum_Lead_01.aurum.operators.some((operator) => operator.wavefold > 0) && byName.Aurum_Lead_01.aurum.matrix.some((row, index) => row[index] > 0), "Lead archetype must exercise wavefold and feedback");
+  assert.ok(byName.Aurum_Percussion_01.aurum.operators.some((operator) => operator.pitchEnvelopeSemitones !== 0), "Percussion archetype must exercise pitch-envelope transients");
+  assert.ok(byName.Aurum_Organ_01.aurum.operators.every((operator) => operator.enabled) && byName.Aurum_Organ_01.aurum.outputSends.every((row) => row.some((value) => value !== 0)), "Organ archetype must exercise six parallel carriers");
+  assert.ok(byName.Aurum_FX_01.aurum.rmMatrix.flat().some((value) => value !== 0) && byName.Aurum_FX_01.aurum.outputSends.flat().some((value) => value < 0), "FX archetype must exercise RM and bipolar output routing");
+
+  const renderedArchetypes = new Map();
+  for (const candidate of testInstruments) {
+    for (const sampleRate of [44100, 48000, 96000]) {
+      const left = new Float32Array(16384);
+      const right = new Float32Array(16384);
+      preview.renderInstrumentStereoSamples(candidate, left, right, sampleRate, 110, "visual", true);
+      const peak = Math.max(
+        left.reduce((value, sample) => Math.max(value, Math.abs(sample)), 0),
+        right.reduce((value, sample) => Math.max(value, Math.abs(sample)), 0),
+      );
+      assert.ok([...left, ...right].every(Number.isFinite), `${candidate.name} must remain finite at ${sampleRate} Hz`);
+      assert.ok(peak > 0.001 && peak <= 1, `${candidate.name} must remain audible and bounded at ${sampleRate} Hz, got peak ${peak}`);
+      if (sampleRate === 48000) renderedArchetypes.set(candidate.name, { left, right });
+    }
+  }
+  const bassReference = renderedArchetypes.get("Aurum_Bass_01").left;
+  for (const candidate of testInstruments.slice(1)) {
+    const rendered = renderedArchetypes.get(candidate.name).left;
+    const meanDifference = rendered.reduce((sum, sample, index) => sum + Math.abs(sample - bassReference[index]), 0) / rendered.length;
+    assert.ok(meanDifference > 0.001, `${candidate.name} must render a distinct archetype fingerprint, got ${meanDifference}`);
+  }
+  for (const name of ["Aurum_Keys_01", "Aurum_Pad_01", "Aurum_Organ_01", "Aurum_FX_01"]) {
+    const rendered = renderedArchetypes.get(name);
+    const stereoDifference = rendered.left.reduce((sum, sample, index) => sum + Math.abs(sample - rendered.right[index]), 0) / rendered.left.length;
+    assert.ok(stereoDifference > 0.0005, `${name} must exercise audible stereo separation, got ${stereoDifference}`);
+  }
 
   const copiedOperator = editing.copyAurumOperator(instrument.aurum.operators[0]);
   copiedOperator.harmonics[0] = 0.25;
