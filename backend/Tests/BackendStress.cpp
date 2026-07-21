@@ -7355,6 +7355,16 @@ namespace
         instrument.aurum.operators[0].level = 0.8f;
         instrument.aurum.operators[0].releaseMs = 1234.0f;
         instrument.aurum.operators[0].wavefold = 0.68f;
+        instrument.aurum.operators[0].pitchAttackMs = 31.0f;
+        instrument.aurum.operators[0].pitchDecayMs = 417.0f;
+        instrument.aurum.operators[0].pitchSustain = 0.36f;
+        instrument.aurum.operators[0].pitchReleaseMs = 289.0f;
+        instrument.aurum.operators[0].pitchEnvelopeSemitones = -17.0f;
+        instrument.aurum.operators[0].phaseAttackMs = 23.0f;
+        instrument.aurum.operators[0].phaseDecayMs = 311.0f;
+        instrument.aurum.operators[0].phaseSustain = 0.58f;
+        instrument.aurum.operators[0].phaseReleaseMs = 197.0f;
+        instrument.aurum.operators[0].phaseEnvelopeDegrees = 94.0f;
         instrument.aurum.operators[0].harmonics[2] = 0.64f;
         instrument.aurum.operators[0].harmonics[7] = 0.22f;
         instrument.aurum.operators[1].enabled = true;
@@ -7387,6 +7397,16 @@ namespace
             && near(loaded->instruments.front().aurum.operators[1].releaseMs, 87.0f)
             && near(loaded->instruments.front().aurum.operators[0].wavefold, 0.68f)
             && near(loaded->instruments.front().aurum.operators[1].wavefold, 0.21f)
+            && near(loaded->instruments.front().aurum.operators[0].pitchAttackMs, 31.0f)
+            && near(loaded->instruments.front().aurum.operators[0].pitchDecayMs, 417.0f)
+            && near(loaded->instruments.front().aurum.operators[0].pitchSustain, 0.36f)
+            && near(loaded->instruments.front().aurum.operators[0].pitchReleaseMs, 289.0f)
+            && near(loaded->instruments.front().aurum.operators[0].pitchEnvelopeSemitones, -17.0f)
+            && near(loaded->instruments.front().aurum.operators[0].phaseAttackMs, 23.0f)
+            && near(loaded->instruments.front().aurum.operators[0].phaseDecayMs, 311.0f)
+            && near(loaded->instruments.front().aurum.operators[0].phaseSustain, 0.58f)
+            && near(loaded->instruments.front().aurum.operators[0].phaseReleaseMs, 197.0f)
+            && near(loaded->instruments.front().aurum.operators[0].phaseEnvelopeDegrees, 94.0f)
             && loaded->instruments.front().aurum.operators[0].waveform == 4
             && near(loaded->instruments.front().aurum.operators[0].harmonics[2], 0.64f)
             && near(loaded->instruments.front().aurum.operators[0].harmonics[7], 0.22f)
@@ -12764,6 +12784,84 @@ namespace
         return ok;
     }
 
+    bool stressInstrumentVoiceAurumOperatorArticulation()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.drive01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        params.releaseMs = 1.0f;
+        auto& op = params.aurumOperators[0];
+        op.enabled = true;
+        op.waveform = 0;
+        op.ratio = 1.0f;
+        op.level = 0.8f;
+        op.attackMs = 0.0f;
+        op.decayMs = 0.0f;
+        op.sustain = 1.0f;
+        op.releaseMs = 100.0f;
+        op.pitchAttackMs = 0.0f;
+        op.pitchDecayMs = 0.0f;
+        op.pitchSustain = 1.0f;
+        op.pitchReleaseMs = 100.0f;
+        op.phaseAttackMs = 0.0f;
+        op.phaseDecayMs = 0.0f;
+        op.phaseSustain = 1.0f;
+        op.phaseReleaseMs = 100.0f;
+        params.aurumMatrix[0][6] = 1.0f;
+
+        auto render = [](const beat::InstrumentVoice::Params& renderParams)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 4096);
+            voice.setParams(renderParams);
+            voice.startNote(57, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        const auto dry = render(params);
+        params.aurumOperators[0].pitchEnvelopeSemitones = 12.0f;
+        const auto pitched = render(params);
+        params.aurumOperators[0].pitchEnvelopeSemitones = 0.0f;
+        params.aurumOperators[0].phaseEnvelopeDegrees = 90.0f;
+        const auto phased = render(params);
+
+        double pitchDifference = 0.0;
+        double phaseDifference = 0.0;
+        double energy = 0.0;
+        float peak = 0.0f;
+        for (int channel = 0; channel < dry.getNumChannels(); ++channel)
+            for (int sampleIndex = 0; sampleIndex < dry.getNumSamples(); ++sampleIndex)
+            {
+                const float drySample = dry.getSample(channel, sampleIndex);
+                const float pitchedSample = pitched.getSample(channel, sampleIndex);
+                const float phasedSample = phased.getSample(channel, sampleIndex);
+                if (!std::isfinite(drySample) || !std::isfinite(pitchedSample) || !std::isfinite(phasedSample))
+                    return false;
+                pitchDifference += std::abs((double) drySample - (double) pitchedSample);
+                phaseDifference += std::abs((double) drySample - (double) phasedSample);
+                energy += (double) pitchedSample * (double) pitchedSample + (double) phasedSample * (double) phasedSample;
+                peak = std::max(peak, std::max(std::abs(pitchedSample), std::abs(phasedSample)));
+            }
+
+        const bool ok = pitchDifference > 0.1 && phaseDifference > 0.1 && energy > 0.001 && peak <= 1.0f;
+        if (!ok)
+            std::cerr << "Aurum operator articulation stress failed pitchDifference=" << pitchDifference
+                      << " phaseDifference=" << phaseDifference
+                      << " energy=" << energy
+                      << " peak=" << peak << "\n";
+        return ok;
+    }
+
     bool stressInstrumentVoiceAurumDenseFeedbackStability()
     {
         beat::InstrumentVoice::Params params;
@@ -14225,6 +14323,7 @@ int main(int argc, char** argv)
             && stressInstrumentVoiceAurumRingMatrix()
             && stressInstrumentVoiceAurumAdditiveOperator()
             && stressInstrumentVoiceAurumWavefold()
+            && stressInstrumentVoiceAurumOperatorArticulation()
             && stressInstrumentVoiceAurumDenseFeedbackStability()
             && stressAudioEngineAurumCrossRateLiveExportParity()
             && stressProjectRepositoryAurumInstrumentRoundtrip();
@@ -14399,6 +14498,11 @@ int main(int argc, char** argv)
     if (!stressInstrumentVoiceAurumWavefold())
     {
         std::cerr << "Instrument voice Aurum wavefold stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumOperatorArticulation())
+    {
+        std::cerr << "Instrument voice Aurum operator articulation stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceAurumDenseFeedbackStability())

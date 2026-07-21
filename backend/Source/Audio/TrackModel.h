@@ -221,6 +221,16 @@ namespace beat
             float releaseMs { 300.0f };
             std::array<float, 16> harmonics {{ 1.0f }};
             float wavefold { 0.0f };
+            float pitchAttackMs { 0.0f };
+            float pitchDecayMs { 250.0f };
+            float pitchSustain { 0.0f };
+            float pitchReleaseMs { 120.0f };
+            float pitchEnvelopeSemitones { 0.0f };
+            float phaseAttackMs { 0.0f };
+            float phaseDecayMs { 180.0f };
+            float phaseSustain { 0.0f };
+            float phaseReleaseMs { 100.0f };
+            float phaseEnvelopeDegrees { 0.0f };
         };
 
         struct AurumConfig

@@ -28,7 +28,7 @@ Exit gate: identical patches survive save/load, produce finite audible browser/n
 - `[x]` Basic sine, triangle, saw, and square sources with ratio, coarse, fine, phase, level, and ADSR controls.
 - `[x]` Each operator has an editable 16-partial additive spectrum with bounded normalization, Nyquist suppression, browser/native rendering, and versioned persistence.
 - `[x]` Every operator has bounded wavefold shaping, versioned persistence, matching browser/native rendering, and a live scope driven by the browser engine sampler.
-- `[ ]` Independent pitch, phase, and amplitude articulation.
+- `[x]` Each operator has independent amplitude, pitch, and phase ADSRs; pitch and phase use bipolar depths, persist in schema v5, and render consistently in browser and native paths.
 - `[ ]` Velocity and keyboard tracking curves.
 - `[ ]` Oversampling/quality policy for nonlinear FM, feedback, and waveshaping.
 
@@ -76,5 +76,5 @@ Exit gate: the release report distinguishes verified audio behavior, performance
 
 ## Immediate order
 
-1. Add independent operator pitch, phase, and amplitude articulation.
-2. Add velocity and keyboard tracking curves.
+1. Add velocity and keyboard tracking curves.
+2. Define and verify the oversampling/quality policy for nonlinear FM, feedback, and waveshaping.

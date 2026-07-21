@@ -422,7 +422,7 @@ namespace beat
         juce::var aurumConfigToVar(const InstrumentDefinition::AurumConfig& aurum)
         {
             juce::DynamicObject::Ptr object = new juce::DynamicObject();
-            object->setProperty("version", 4);
+            object->setProperty("version", 5);
             object->setProperty("unison", aurum.unison);
             object->setProperty("detuneCents", aurum.detuneCents);
             object->setProperty("stereoSpread", aurum.stereoSpread);
@@ -447,6 +447,20 @@ namespace beat
                 envelope->setProperty("sustain", source.sustain);
                 envelope->setProperty("releaseMs", source.releaseMs);
                 op->setProperty("envelope", juce::var(envelope.get()));
+                juce::DynamicObject::Ptr pitchEnvelope = new juce::DynamicObject();
+                pitchEnvelope->setProperty("attackMs", source.pitchAttackMs);
+                pitchEnvelope->setProperty("decayMs", source.pitchDecayMs);
+                pitchEnvelope->setProperty("sustain", source.pitchSustain);
+                pitchEnvelope->setProperty("releaseMs", source.pitchReleaseMs);
+                op->setProperty("pitchEnvelope", juce::var(pitchEnvelope.get()));
+                op->setProperty("pitchEnvelopeSemitones", source.pitchEnvelopeSemitones);
+                juce::DynamicObject::Ptr phaseEnvelope = new juce::DynamicObject();
+                phaseEnvelope->setProperty("attackMs", source.phaseAttackMs);
+                phaseEnvelope->setProperty("decayMs", source.phaseDecayMs);
+                phaseEnvelope->setProperty("sustain", source.phaseSustain);
+                phaseEnvelope->setProperty("releaseMs", source.phaseReleaseMs);
+                op->setProperty("phaseEnvelope", juce::var(phaseEnvelope.get()));
+                op->setProperty("phaseEnvelopeDegrees", source.phaseEnvelopeDegrees);
                 juce::Array<juce::var> harmonics;
                 for (const auto amplitude : source.harmonics) harmonics.add(amplitude);
                 op->setProperty("harmonics", juce::var(harmonics));
@@ -495,6 +509,18 @@ namespace beat
                     op.decayMs = juce::jlimit(0.0f, 10000.0f, (float) (double) envelope.getProperty("decayMs", 500.0));
                     op.sustain = juce::jlimit(0.0f, 1.0f, (float) (double) envelope.getProperty("sustain", 0.7));
                     op.releaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) envelope.getProperty("releaseMs", 300.0));
+                    const auto pitchEnvelope = source.getProperty("pitchEnvelope", {});
+                    op.pitchAttackMs = juce::jlimit(0.0f, 10000.0f, (float) (double) pitchEnvelope.getProperty("attackMs", 0.0));
+                    op.pitchDecayMs = juce::jlimit(0.0f, 10000.0f, (float) (double) pitchEnvelope.getProperty("decayMs", 250.0));
+                    op.pitchSustain = juce::jlimit(0.0f, 1.0f, (float) (double) pitchEnvelope.getProperty("sustain", 0.0));
+                    op.pitchReleaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) pitchEnvelope.getProperty("releaseMs", 120.0));
+                    op.pitchEnvelopeSemitones = juce::jlimit(-48.0f, 48.0f, (float) (double) source.getProperty("pitchEnvelopeSemitones", 0.0));
+                    const auto phaseEnvelope = source.getProperty("phaseEnvelope", {});
+                    op.phaseAttackMs = juce::jlimit(0.0f, 10000.0f, (float) (double) phaseEnvelope.getProperty("attackMs", 0.0));
+                    op.phaseDecayMs = juce::jlimit(0.0f, 10000.0f, (float) (double) phaseEnvelope.getProperty("decayMs", 180.0));
+                    op.phaseSustain = juce::jlimit(0.0f, 1.0f, (float) (double) phaseEnvelope.getProperty("sustain", 0.0));
+                    op.phaseReleaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) phaseEnvelope.getProperty("releaseMs", 100.0));
+                    op.phaseEnvelopeDegrees = juce::jlimit(-180.0f, 180.0f, (float) (double) source.getProperty("phaseEnvelopeDegrees", 0.0));
                     if (auto* harmonics = source.getProperty("harmonics", {}).getArray())
                         for (int harmonic = 0; harmonic < juce::jmin(16, harmonics->size()); ++harmonic)
                             op.harmonics[(size_t) harmonic] = juce::jlimit(0.0f, 1.0f, (float) (double) harmonics->getReference(harmonic));

@@ -8,7 +8,7 @@ The staged implementation and release gates are tracked in [`aurum-roadmap.md`](
 
 - Six independently enabled operators
 - Sine, saw, square, triangle, and editable 16-partial additive operator waveforms
-- Ratio, coarse, fine, level, phase, wavefold, and ADSR controls per operator
+- Ratio, coarse, fine, level, phase, wavefold, and independent amplitude, pitch, and phase ADSR controls per operator
 - A bipolar 6 x 7 FM/output matrix: six operator destinations plus the audible output
 - A separate bipolar 6 x 6 ring/amplitude-modulation matrix
 - Self-routing for operator feedback
@@ -21,13 +21,13 @@ The staged implementation and release gates are tracked in [`aurum-roadmap.md`](
 
 ## Data model
 
-The frontend stores Aurum configuration under `instrument.aurum`. Native parsing maps the same object to `InstrumentDefinition::AurumConfig`; project persistence writes it back without flattening the matrices or operator harmonic spectra. Schema version 3 adds 16 normalized harmonic amplitudes per operator; version 4 adds normalized per-operator wavefold. Older patches migrate with a fundamental-only spectrum and zero wavefold so their sound does not change.
+The frontend stores Aurum configuration under `instrument.aurum`. Native parsing maps the same object to `InstrumentDefinition::AurumConfig`; project persistence writes it back without flattening the matrices or operator harmonic spectra. Schema version 3 adds 16 normalized harmonic amplitudes per operator; version 4 adds normalized per-operator wavefold; version 5 adds dedicated pitch and phase ADSRs with bipolar semitone and degree depths. Older patches migrate with a fundamental-only spectrum, zero wavefold, and zero pitch/phase depth so their sound does not change.
 
 FM matrix rows are modulation sources. Columns `0..5` target operators 1 through 6, and column `6` routes that source to the audible output. RM matrix rows are amplitude-modulation sources and its six columns target operators 1 through 6. At full positive or negative depth the target becomes a ring-modulated signal; intermediate values retain a proportional dry component.
 
 ## Editor structure
 
-The editor keeps the selected FM or RM routing matrix visible while the left workspace switches between Main and OP 1 through OP 6. Main contains shared unison and output-filter controls. Operator pages combine an engine-sampled live waveform scope, phase and wavefold shaping, tuning and level controls, and the operator amplitude envelope. Additive operators expose a drawable 16-bin spectrum with keyboard-adjustable bins and fundamental, odd, and saw presets.
+The editor keeps the selected FM or RM routing matrix visible while the left workspace switches between Main and OP 1 through OP 6. Main contains shared unison and output-filter controls. Operator pages combine an engine-sampled live waveform scope, phase and wavefold shaping, tuning and level controls, and a compact Amp/Pitch/Phase articulation selector over the operator's three ADSRs. Pitch and phase modes expose their bipolar depth beside the shared envelope controls. Additive operators expose a drawable 16-bin spectrum with keyboard-adjustable bins and fundamental, odd, and saw presets.
 
 The module strip uses tab semantics with roving focus. Arrow keys cycle through Main and the six operators; Home selects Main and End selects OP 6.
 
@@ -37,7 +37,7 @@ For a deterministic browser review, open `?beatDevFixture=aurum-editor`. The fix
 
 ## Current boundary
 
-Aurum is an instrument foundation, not a clone of another synthesizer. It does not yet include per-operator filters, keyboard-mapped modulation curves, or a preset browser. Operator releases govern their own note-off tails in browser and native rendering; the hidden shared amplitude envelope does not reshape Aurum's operator envelopes. Additive rendering normalizes active partials and suppresses harmonics at or above Nyquist for the current operator frequency. Wavefold is an identity transform at zero and uses a bounded symmetric fold at positive depth; dedicated oversampling remains part of the later quality-policy milestone.
+Aurum is an instrument foundation, not a clone of another synthesizer. It does not yet include per-operator filters, keyboard-mapped modulation curves, or a preset browser. Each operator's amplitude release governs its audible note-off tail; pitch and phase releases continue their articulation during that tail without extending an otherwise silent native voice. The hidden shared amplitude envelope does not reshape Aurum's operator envelopes. Additive rendering normalizes active partials and suppresses harmonics at or above Nyquist for the current operator frequency. Wavefold is an identity transform at zero and uses a bounded symmetric fold at positive depth; dedicated oversampling remains part of the later quality-policy milestone.
 
 The focused native stress gate renders one deterministic additive/FM/RM/unison patch through both the live callback path and 32-bit WAV export at 44.1, 48, and 96 kHz. It verifies repeatable live output, requested stereo WAV metadata, finite bounded samples, and a negligible live/export residual at each rate. This is a path-parity gate, not yet the separate aliasing and perceptual cross-rate benchmark tracked for release readiness.
 

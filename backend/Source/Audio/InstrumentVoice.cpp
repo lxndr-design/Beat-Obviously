@@ -46,16 +46,33 @@ namespace beat
                 / juce::MathConstants<float>::halfPi;
         }
 
-        float aurumHeldEnvelope(const InstrumentVoice::Params::AurumOperator& op, float timeMs) noexcept
+        float aurumHeldEnvelope(float attackMs, float decayMs, float sustain, float timeMs) noexcept
         {
-            const float attack = juce::jmax(0.0f, op.attackMs);
+            const float attack = juce::jmax(0.0f, attackMs);
             if (attack > 0.0f && timeMs < attack)
                 return timeMs / attack;
-            const float decay = juce::jmax(0.0f, op.decayMs);
+            const float decay = juce::jmax(0.0f, decayMs);
             const float decayTime = timeMs - attack;
             if (decay > 0.0f && decayTime < decay)
-                return 1.0f + (VoiceMath::clamp01(op.sustain) - 1.0f) * (decayTime / decay);
-            return VoiceMath::clamp01(op.sustain);
+                return 1.0f + (VoiceMath::clamp01(sustain) - 1.0f) * (decayTime / decay);
+            return VoiceMath::clamp01(sustain);
+        }
+
+        float aurumEnvelope(float attackMs,
+                            float decayMs,
+                            float sustain,
+                            float releaseMs,
+                            float timeMs,
+                            float releaseTimeMs,
+                            float releaseLevel,
+                            bool releasing) noexcept
+        {
+            if (!releasing)
+                return aurumHeldEnvelope(attackMs, decayMs, sustain, timeMs);
+            const float release = juce::jmax(0.0f, releaseMs);
+            return release > 0.0f
+                ? releaseLevel * juce::jmax(0.0f, 1.0f - releaseTimeMs / release)
+                : 0.0f;
         }
 
         float aurumOperatorSample(
@@ -396,6 +413,8 @@ namespace beat
         aurumAgeSamples = 0;
         aurumReleaseAgeSamples = -1;
         aurumReleaseLevels.fill(0.0f);
+        aurumPitchReleaseLevels.fill(0.0f);
+        aurumPhaseReleaseLevels.fill(0.0f);
         aurumOutputs.fill(0.0f);
         for (size_t index = 0; index < aurumPhases.size(); ++index)
             aurumPhases[index] = std::fmod(
@@ -453,7 +472,12 @@ namespace beat
             {
                 const float timeMs = (float) ((double) aurumAgeSamples * 1000.0 / sampleRate);
                 for (size_t index = 0; index < aurumReleaseLevels.size(); ++index)
-                    aurumReleaseLevels[index] = aurumHeldEnvelope(params.aurumOperators[index], timeMs);
+                {
+                    const auto& op = params.aurumOperators[index];
+                    aurumReleaseLevels[index] = aurumHeldEnvelope(op.attackMs, op.decayMs, op.sustain, timeMs);
+                    aurumPitchReleaseLevels[index] = aurumHeldEnvelope(op.pitchAttackMs, op.pitchDecayMs, op.pitchSustain, timeMs);
+                    aurumPhaseReleaseLevels[index] = aurumHeldEnvelope(op.phaseAttackMs, op.phaseDecayMs, op.phaseSustain, timeMs);
+                }
                 aurumReleaseAgeSamples = 0;
             }
             if (params.env1Loop)
@@ -485,6 +509,8 @@ namespace beat
             env2LoopState.reset();
             aurumReleaseAgeSamples = -1;
             aurumReleaseLevels.fill(0.0f);
+            aurumPitchReleaseLevels.fill(0.0f);
+            aurumPhaseReleaseLevels.fill(0.0f);
             clearCurrentNote();
         }
     }
@@ -606,18 +632,24 @@ namespace beat
                                 * aurumRouteAmount(params.aurumMatrix[source][target]);
                         fm = juce::jlimit(-aurumMaximumFmSum, aurumMaximumFmSum, fm);
 
-                        float opEnvelope = aurumHeldEnvelope(op, timeMs);
-                        if (aurumReleaseAgeSamples >= 0)
-                        {
-                            const float releaseMs = juce::jmax(0.0f, op.releaseMs);
-                            const float releaseTimeMs = (float) ((double) aurumReleaseAgeSamples * 1000.0 / sampleRate);
-                            opEnvelope = releaseMs > 0.0f
-                                ? aurumReleaseLevels[target] * juce::jmax(0.0f, 1.0f - releaseTimeMs / releaseMs)
-                                : 0.0f;
-                        }
+                        const bool releasing = aurumReleaseAgeSamples >= 0;
+                        const float releaseTimeMs = releasing
+                            ? (float) ((double) aurumReleaseAgeSamples * 1000.0 / sampleRate)
+                            : 0.0f;
+                        const float opEnvelope = aurumEnvelope(
+                            op.attackMs, op.decayMs, op.sustain, op.releaseMs,
+                            timeMs, releaseTimeMs, aurumReleaseLevels[target], releasing);
+                        const float pitchEnvelope = aurumEnvelope(
+                            op.pitchAttackMs, op.pitchDecayMs, op.pitchSustain, op.pitchReleaseMs,
+                            timeMs, releaseTimeMs, aurumPitchReleaseLevels[target], releasing);
+                        const float phaseEnvelope = aurumEnvelope(
+                            op.phaseAttackMs, op.phaseDecayMs, op.phaseSustain, op.phaseReleaseMs,
+                            timeMs, releaseTimeMs, aurumPhaseReleaseLevels[target], releasing);
                         const double ratio = juce::jlimit(0.125, 32.0, (double) op.ratio);
                         const double tuning = std::exp2((double) op.coarse / 12.0 + (double) op.fineCents / 1200.0);
-                        const double delta = currentFrequency * voiceRate * ratio * tuning / sampleRate;
+                        const double pitchEnvelopeRate = std::exp2(
+                            (double) pitchEnvelope * juce::jlimit(-48.0f, 48.0f, op.pitchEnvelopeSemitones) / 12.0);
+                        const double delta = currentFrequency * voiceRate * ratio * tuning * pitchEnvelopeRate / sampleRate;
                         float rmGain = 1.0f;
                         for (size_t source = 0; source < 6; ++source)
                         {
@@ -628,7 +660,12 @@ namespace beat
                             rmGain = juce::jlimit(-aurumMaximumRingGain, aurumMaximumRingGain, rmGain);
                         }
                         nextOutputs[voiceOffset + target] = aurumFeedbackSample(
-                            aurumOperatorSample(op, aurumPhases[voiceOffset + target] + fm * aurumFmPhaseScale, delta)
+                            aurumOperatorSample(
+                                op,
+                                aurumPhases[voiceOffset + target]
+                                    + phaseEnvelope * juce::jlimit(-180.0f, 180.0f, op.phaseEnvelopeDegrees) / 360.0f
+                                    + fm * aurumFmPhaseScale,
+                                delta)
                                 * VoiceMath::clamp01(op.level) * opEnvelope * rmGain);
                         aurumPhases[voiceOffset + target] = std::fmod(aurumPhases[voiceOffset + target] + delta, 1.0);
                         currentBlockWork.addOscillatorSamples(1);

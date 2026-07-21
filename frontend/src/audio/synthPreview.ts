@@ -1008,8 +1008,13 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
       if (state.index === 0) state.aurumPhases[stateIndex] = (clamp01(operator.phase) + voice * 0.071) % 1;
       const ratio = Math.max(0.125, Math.min(32, operator.ratio));
       const tuning = Math.pow(2, operator.coarse / 12 + operator.fineCents / 1200);
-      const phase = state.aurumPhases[stateIndex] + modulation * 1.9;
       const envelope = aurumOperatorEnvelope(operator.envelope, timeMs, state.aurumNoteOffMs);
+      const pitchEnvelope = aurumOperatorEnvelope(operator.pitchEnvelope, timeMs, state.aurumNoteOffMs);
+      const phaseEnvelope = aurumOperatorEnvelope(operator.phaseEnvelope, timeMs, state.aurumNoteOffMs);
+      const pitchEnvelopeRate = Math.pow(2, (pitchEnvelope * clamp(operator.pitchEnvelopeSemitones, -48, 48)) / 12);
+      const phase = state.aurumPhases[stateIndex]
+        + (phaseEnvelope * clamp(operator.phaseEnvelopeDegrees, -180, 180)) / 360
+        + modulation * 1.9;
       let rmGain = 1;
       for (let source = 0; source < operatorCount; source += 1) {
         const amount = clampBipolar(config.rmMatrix?.[source]?.[target] ?? 0);
@@ -1017,7 +1022,7 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
         const modulator = state.aurumOutputs[voiceOffset + source] ?? 0;
         rmGain *= 1 - Math.abs(amount) + modulator * amount;
       }
-      const phaseDelta = (frequency * voiceRate * ratio * tuning) / sampleRate;
+      const phaseDelta = (frequency * voiceRate * ratio * tuning * pitchEnvelopeRate) / sampleRate;
       nextOutputs[stateIndex] = sampleAurumOperatorWaveform(operator, phase, phaseDelta) * clamp01(operator.level) * envelope * rmGain;
       state.aurumPhases[stateIndex] = (state.aurumPhases[stateIndex] + phaseDelta) % 1;
     }

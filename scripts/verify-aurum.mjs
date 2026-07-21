@@ -31,10 +31,12 @@ try {
   assert.deepEqual(instrument.aurum.matrix.map((row) => row.length), [7, 7, 7, 7, 7, 7], "Aurum matrix must expose six destinations plus output");
   assert.equal(instrument.aurum.matrix[1][0], 0.42, "Default patch must route OP 2 into OP 1");
   assert.equal(instrument.aurum.matrix[0][6], 0.86, "Default patch must route OP 1 to output");
-  assert.equal(instrument.aurum.version, 4, "Aurum waveshaping patches must use schema version 4");
+  assert.equal(instrument.aurum.version, 5, "Aurum articulation patches must use schema version 5");
   assert.deepEqual(instrument.aurum.rmMatrix.map((row) => row.length), [6, 6, 6, 6, 6, 6], "Aurum RM matrix must expose six operator destinations");
   assert.ok(instrument.aurum.operators.every((operator) => operator.harmonics.length === 16), "Every Aurum operator must expose 16 additive harmonics");
   assert.ok(instrument.aurum.operators.every((operator) => operator.wavefold === 0), "Wavefold must default to exact identity");
+  assert.ok(instrument.aurum.operators.every((operator) => operator.pitchEnvelopeSemitones === 0), "Pitch envelopes must migrate and default to neutral depth");
+  assert.ok(instrument.aurum.operators.every((operator) => operator.phaseEnvelopeDegrees === 0), "Phase envelopes must migrate and default to neutral depth");
 
   const baseline = new Float32Array(4096);
   preview.renderInstrumentSamples(instrument, baseline, 48000, 220, "visual", true);
@@ -131,6 +133,31 @@ try {
   const sampledFolded = preview.sampleAurumOperatorWaveform(folded.aurum.operators[0], 0.125, 1 / 144);
   assert.ok(Math.abs(sampledDry - sampledFolded) > 0.05, "The exported engine sampler must expose the folded waveform used by the editor scope");
 
+  const articulated = structuredClone(instrument);
+  articulated.aurum.matrix = Array.from({ length: 6 }, () => Array(7).fill(0));
+  articulated.aurum.operators.forEach((operator) => { operator.enabled = false; });
+  articulated.aurum.operators[0].enabled = true;
+  articulated.aurum.operators[0].level = 0.8;
+  articulated.aurum.operators[0].envelope = { attackMs: 0, decayMs: 0, sustain: 1, releaseMs: 100 };
+  articulated.aurum.operators[0].pitchEnvelope = { attackMs: 0, decayMs: 0, sustain: 1, releaseMs: 100 };
+  articulated.aurum.operators[0].phaseEnvelope = { attackMs: 0, decayMs: 0, sustain: 1, releaseMs: 100 };
+  articulated.aurum.matrix[0][6] = 1;
+  const articulationDry = new Float32Array(4096);
+  preview.renderInstrumentSamples(articulated, articulationDry, 48000, 220, "visual", false);
+  const pitched = structuredClone(articulated);
+  pitched.aurum.operators[0].pitchEnvelopeSemitones = 12;
+  const pitchedSamples = new Float32Array(4096);
+  preview.renderInstrumentSamples(pitched, pitchedSamples, 48000, 220, "visual", false);
+  const pitchDifference = articulationDry.reduce((sum, sample, index) => sum + Math.abs(sample - pitchedSamples[index]), 0) / articulationDry.length;
+  assert.ok(pitchDifference > 0.05, `Pitch articulation must alter operator frequency, got mean difference ${pitchDifference}`);
+  const phased = structuredClone(articulated);
+  phased.aurum.operators[0].phaseEnvelopeDegrees = 90;
+  const phasedSamples = new Float32Array(4096);
+  preview.renderInstrumentSamples(phased, phasedSamples, 48000, 220, "visual", false);
+  const phaseDifference = articulationDry.reduce((sum, sample, index) => sum + Math.abs(sample - phasedSamples[index]), 0) / articulationDry.length;
+  assert.ok(phaseDifference > 0.05, `Phase articulation must offset operator phase, got mean difference ${phaseDifference}`);
+  assert.ok([...pitchedSamples, ...phasedSamples].every(Number.isFinite), "Pitch and phase articulation must remain finite");
+
   const stereoPatch = structuredClone(instrument);
   stereoPatch.aurum.unison = 3;
   stereoPatch.aurum.detuneCents = 14;
@@ -141,7 +168,7 @@ try {
   const stereoDifference = left.reduce((sum, sample, index) => sum + Math.abs(sample - right[index]), 0) / left.length;
   assert.ok(stereoDifference > 0.005, `Aurum spread must create stereo separation, got mean difference ${stereoDifference}`);
 
-  const malformedOperator = { ...instrument.aurum.operators[0], wavefold: 4, harmonics: [4, -4] };
+  const malformedOperator = { ...instrument.aurum.operators[0], wavefold: 4, harmonics: [4, -4], pitchEnvelopeSemitones: 400, phaseEnvelopeDegrees: -400 };
   const malformed = aurum.normalizedAurumConfig({ ...instrument.aurum, operators: [malformedOperator], matrix: [[4, -4]], rmMatrix: [[4, -4]] });
   assert.equal(malformed.operators.length, 6, "Normalization must restore missing operators");
   assert.equal(malformed.matrix[0][0], 1, "Normalization must clamp matrix values");
@@ -154,18 +181,32 @@ try {
   assert.equal(malformed.operators[0].harmonics[1], 0, "Normalization must clamp negative harmonic amplitudes");
   assert.equal(malformed.operators[0].harmonics.length, 16, "Normalization must restore harmonic geometry");
   assert.equal(malformed.operators[0].wavefold, 1, "Normalization must clamp operator wavefold");
+  assert.equal(malformed.operators[0].pitchEnvelopeSemitones, 48, "Normalization must clamp positive pitch envelope depth");
+  assert.equal(malformed.operators[0].phaseEnvelopeDegrees, -180, "Normalization must clamp negative phase envelope depth");
 
-  const versionThreeConfig = structuredClone(instrument.aurum);
+  const versionFourConfig = structuredClone(instrument.aurum);
+  versionFourConfig.version = 4;
+  versionFourConfig.operators.forEach((operator) => {
+    delete operator.pitchEnvelope;
+    delete operator.pitchEnvelopeSemitones;
+    delete operator.phaseEnvelope;
+    delete operator.phaseEnvelopeDegrees;
+  });
+  const versionFourMigrated = aurum.normalizedAurumConfig(versionFourConfig);
+  assert.equal(versionFourMigrated.version, 5, "Version 4 Aurum patches must migrate to schema version 5");
+  assert.ok(versionFourMigrated.operators.every((operator) => operator.pitchEnvelopeSemitones === 0 && operator.phaseEnvelopeDegrees === 0), "Version 4 articulation must migrate at neutral depth");
+
+  const versionThreeConfig = structuredClone(versionFourConfig);
   versionThreeConfig.version = 3;
   versionThreeConfig.operators.forEach((operator) => delete operator.wavefold);
   const versionThreeMigrated = aurum.normalizedAurumConfig(versionThreeConfig);
-  assert.equal(versionThreeMigrated.version, 4, "Version 3 Aurum patches must migrate to schema version 4");
+  assert.equal(versionThreeMigrated.version, 5, "Version 3 Aurum patches must migrate to schema version 5");
   assert.ok(versionThreeMigrated.operators.every((operator) => operator.wavefold === 0), "Version 3 operators must migrate with identity waveshaping");
   const legacyConfig = structuredClone(versionThreeConfig);
   legacyConfig.version = 2;
   legacyConfig.operators.forEach((operator) => delete operator.harmonics);
   const migrated = aurum.normalizedAurumConfig(legacyConfig);
-  assert.equal(migrated.version, 4, "Version 2 Aurum patches must migrate through additive support to schema version 4");
+  assert.equal(migrated.version, 5, "Version 2 Aurum patches must migrate through additive support to schema version 5");
   assert.ok(migrated.operators.every((operator) => operator.harmonics[0] === 1 && operator.harmonics.slice(1).every((value) => value === 0)), "Migrated operators must add a fundamental-only spectrum without changing sound");
   const versionOneConfig = structuredClone(legacyConfig);
   versionOneConfig.version = 1;

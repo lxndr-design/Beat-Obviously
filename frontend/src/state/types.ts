@@ -500,13 +500,17 @@ export interface AurumOperatorConfig {
   wavefold: number;
   harmonics: number[];
   envelope: AdsrEnvelope;
+  pitchEnvelope: AdsrEnvelope;
+  pitchEnvelopeSemitones: number;
+  phaseEnvelope: AdsrEnvelope;
+  phaseEnvelopeDegrees: number;
 }
 
 /** Six-operator FM/additive instrument. Matrix rows are sources; columns 0..5
  * are FM destinations and column 6 is direct output. Diagonal values are
  * operator feedback. */
 export interface AurumSynthConfig {
-  version: 4;
+  version: 5;
   operators: AurumOperatorConfig[];
   matrix: number[][];
   rmMatrix: number[][];

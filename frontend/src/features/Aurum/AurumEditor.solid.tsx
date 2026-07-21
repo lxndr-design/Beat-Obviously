@@ -11,6 +11,8 @@ const WAVEFORM_OPTIONS = ["sine", "triangle", "saw", "square", "additive"].map((
   label: value[0].toUpperCase() + value.slice(1),
 }));
 
+type EnvelopeMode = "amp" | "pitch" | "phase";
+
 export interface AurumEditorProps {
   instrument: Instrument;
   onCommit: (instrument: Instrument) => void;
@@ -22,6 +24,7 @@ export function AurumEditor(props: AurumEditorProps) {
   const [selectedOperator, setSelectedOperator] = createSignal(0);
   const [selectedPage, setSelectedPage] = createSignal<"main" | "operator">("operator");
   const [matrixMode, setMatrixMode] = createSignal<"fm" | "rm">("fm");
+  const [envelopeMode, setEnvelopeMode] = createSignal<EnvelopeMode>("amp");
   const [waveformOpen, setWaveformOpen] = createSignal(false);
   const [auditioning, setAuditioning] = createSignal(false);
   let audition: InstrumentPreviewAuditionHandle | null = null;
@@ -43,7 +46,21 @@ export function AurumEditor(props: AurumEditorProps) {
     }));
   }
 
+  function selectedEnvelope() {
+    if (envelopeMode() === "pitch") return operator().pitchEnvelope;
+    if (envelopeMode() === "phase") return operator().phaseEnvelope;
+    return operator().envelope;
+  }
+
   function updateEnvelope(patch: Partial<AurumOperatorConfig["envelope"]>) {
+    if (envelopeMode() === "pitch") {
+      updateOperator({ pitchEnvelope: { ...operator().pitchEnvelope, ...patch } });
+      return;
+    }
+    if (envelopeMode() === "phase") {
+      updateOperator({ phaseEnvelope: { ...operator().phaseEnvelope, ...patch } });
+      return;
+    }
     updateOperator({ envelope: { ...operator().envelope, ...patch } });
   }
 
@@ -187,7 +204,7 @@ export function AurumEditor(props: AurumEditorProps) {
               <div class={styles.operatorHeading}>
                 <div>
                   <h3>{operator().name}</h3>
-                  <p>Oscillator and amplitude articulation</p>
+                  <p>Oscillator and per-operator articulation</p>
                 </div>
                 <Toggle label="Enabled" checked={operator().enabled} onChange={(enabled) => updateOperator({ enabled })} />
               </div>
@@ -230,12 +247,25 @@ export function AurumEditor(props: AurumEditorProps) {
                 </div>
               </div>
               <div class={styles.controlBlock}>
-                <h4>Amplitude envelope</h4>
+                <div class={styles.articulationHeader}>
+                  <h4>{envelopeMode() === "amp" ? "Amplitude" : envelopeMode() === "pitch" ? "Pitch" : "Phase"} envelope</h4>
+                  <div class={styles.envelopeMode} role="group" aria-label="Operator envelope mode">
+                    <Button size="xs" selected={envelopeMode() === "amp"} onClick={() => setEnvelopeMode("amp")}>Amp</Button>
+                    <Button size="xs" selected={envelopeMode() === "pitch"} onClick={() => setEnvelopeMode("pitch")}>Pitch</Button>
+                    <Button size="xs" selected={envelopeMode() === "phase"} onClick={() => setEnvelopeMode("phase")}>Phase</Button>
+                  </div>
+                </div>
                 <div class={styles.envelopeGrid}>
-                  <NumberInput label="Attack" layout="inline" min={0} max={10000} step={1} unit="ms" value={operator().envelope.attackMs} onChange={(attackMs) => updateEnvelope({ attackMs })} />
-                  <NumberInput label="Decay" layout="inline" min={0} max={10000} step={1} unit="ms" value={operator().envelope.decayMs} onChange={(decayMs) => updateEnvelope({ decayMs })} />
-                  <Slider label="Sustain" layout="inline" min={0} max={1} step={0.01} value={operator().envelope.sustain} readout={<span>{Math.round(operator().envelope.sustain * 100)}%</span>} onChange={(sustain) => updateEnvelope({ sustain })} />
-                  <NumberInput label="Release" layout="inline" min={0} max={10000} step={1} unit="ms" value={operator().envelope.releaseMs} onChange={(releaseMs) => updateEnvelope({ releaseMs })} />
+                  <Show when={envelopeMode() === "pitch"}>
+                    <NumberInput label="Depth" layout="inline" min={-48} max={48} step={1} unit="st" value={operator().pitchEnvelopeSemitones} onChange={(pitchEnvelopeSemitones) => updateOperator({ pitchEnvelopeSemitones })} />
+                  </Show>
+                  <Show when={envelopeMode() === "phase"}>
+                    <NumberInput label="Depth" layout="inline" min={-180} max={180} step={1} unit="deg" value={operator().phaseEnvelopeDegrees} onChange={(phaseEnvelopeDegrees) => updateOperator({ phaseEnvelopeDegrees })} />
+                  </Show>
+                  <NumberInput label="Attack" layout="inline" min={0} max={10000} step={1} unit="ms" value={selectedEnvelope().attackMs} onChange={(attackMs) => updateEnvelope({ attackMs })} />
+                  <NumberInput label="Decay" layout="inline" min={0} max={10000} step={1} unit="ms" value={selectedEnvelope().decayMs} onChange={(decayMs) => updateEnvelope({ decayMs })} />
+                  <Slider label="Sustain" layout="inline" min={0} max={1} step={0.01} value={selectedEnvelope().sustain} readout={<span>{Math.round(selectedEnvelope().sustain * 100)}%</span>} onChange={(sustain) => updateEnvelope({ sustain })} />
+                  <NumberInput label="Release" layout="inline" min={0} max={10000} step={1} unit="ms" value={selectedEnvelope().releaseMs} onChange={(releaseMs) => updateEnvelope({ releaseMs })} />
                 </div>
               </div>
             </div>

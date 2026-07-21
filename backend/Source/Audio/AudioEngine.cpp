@@ -2074,6 +2074,16 @@ namespace beat
                 source.releaseMs,
                 source.harmonics,
                 source.wavefold,
+                source.pitchAttackMs,
+                source.pitchDecayMs,
+                source.pitchSustain,
+                source.pitchReleaseMs,
+                source.pitchEnvelopeSemitones,
+                source.phaseAttackMs,
+                source.phaseDecayMs,
+                source.phaseSustain,
+                source.phaseReleaseMs,
+                source.phaseEnvelopeDegrees,
             };
             params.aurumMatrix[index] = instrument.aurum.matrix[index];
             params.aurumRmMatrix[index] = instrument.aurum.rmMatrix[index];

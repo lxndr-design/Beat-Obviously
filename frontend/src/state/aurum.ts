@@ -23,6 +23,10 @@ function defaultOperator(index: number): AurumOperatorConfig {
       sustain: index === 1 ? 0 : 0.72,
       releaseMs: index === 1 ? 180 : 360,
     },
+    pitchEnvelope: { attackMs: 0, decayMs: 250, sustain: 0, releaseMs: 120 },
+    pitchEnvelopeSemitones: 0,
+    phaseEnvelope: { attackMs: 0, decayMs: 180, sustain: 0, releaseMs: 100 },
+    phaseEnvelopeDegrees: 0,
   };
 }
 
@@ -32,7 +36,7 @@ export function defaultAurumConfig(): AurumSynthConfig {
   matrix[0][AURUM_OUTPUT_COLUMN] = 0.86;
   matrix[1][0] = 0.42;
   return {
-    version: 4,
+    version: 5,
     operators: Array.from({ length: AURUM_OPERATOR_COUNT }, (_, index) => defaultOperator(index)),
     matrix,
     rmMatrix,
@@ -75,7 +79,7 @@ export function normalizedAurumConfig(config: AurumSynthConfig | undefined): Aur
   return {
     ...fallback,
     ...config,
-    version: 4,
+    version: 5,
     operators: fallback.operators.map((operator, index) => {
       const incoming = config.operators?.[index];
       return {
@@ -83,6 +87,10 @@ export function normalizedAurumConfig(config: AurumSynthConfig | undefined): Aur
         ...incoming,
         wavefold: clamp01(incoming?.wavefold ?? operator.wavefold),
         envelope: { ...operator.envelope, ...incoming?.envelope },
+        pitchEnvelope: { ...operator.pitchEnvelope, ...incoming?.pitchEnvelope },
+        pitchEnvelopeSemitones: clampRange(incoming?.pitchEnvelopeSemitones ?? operator.pitchEnvelopeSemitones, -48, 48),
+        phaseEnvelope: { ...operator.phaseEnvelope, ...incoming?.phaseEnvelope },
+        phaseEnvelopeDegrees: clampRange(incoming?.phaseEnvelopeDegrees ?? operator.phaseEnvelopeDegrees, -180, 180),
         harmonics: operator.harmonics.map((value, harmonic) => clamp01(incoming?.harmonics?.[harmonic] ?? value)),
       };
     }),
@@ -97,6 +105,10 @@ function clampBipolar(value: number) {
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+}
+
+function clampRange(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, Number.isFinite(value) ? value : 0));
 }
 
 export function drawAurumHarmonicLine(
