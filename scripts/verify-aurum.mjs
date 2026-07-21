@@ -55,10 +55,10 @@ try {
   assert.ok(instrument.aurum.operators.every((operator) => operator.pan === 0), "Aurum operators must default to centered pan");
   assert.equal(aurum.evaluateAurumResponseCurve([0, 0.25, 0.5, 0.75, 1], 0.375), 0.375, "Response curves must interpolate between fixed points");
 
-  const testInstruments = testBank.createAurumTestInstruments("factory-synths");
+  const testInstruments = testBank.createAurumTestInstruments("aurum-test");
   assert.deepEqual(testInstruments.map((candidate) => candidate.name), [...testBank.AURUM_TEST_INSTRUMENT_NAMES], "The Aurum MVP test bank must expose its canonical archetype names in order");
   assert.equal(new Set(testInstruments.map((candidate) => candidate.id)).size, testInstruments.length, "Aurum test instruments must have unique stable ids");
-  assert.ok(testInstruments.every((candidate) => candidate.userCreated === false && candidate.setId === "factory-synths"), "Aurum test instruments must seed into the factory Synths set");
+  assert.ok(testInstruments.every((candidate) => candidate.userCreated === false && candidate.setId === "aurum-test"), "Aurum test instruments must seed into the Aurum Test set");
 
   const byName = Object.fromEntries(testInstruments.map((candidate) => [candidate.name, candidate]));
   assert.equal(byName.Aurum_Bass_01.aurum.operators[0].ratio, 0.5, "Bass archetype must include a sub-ratio carrier");

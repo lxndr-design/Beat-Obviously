@@ -2037,6 +2037,7 @@ interface InstrumentLibrarySlice {
 
 export const FACTORY_DRUM_SET_ID = "factory-drums";
 export const FACTORY_SYNTH_SET_ID = "factory-synths";
+export const AURUM_TEST_SET_ID = "aurum-test";
 export const ROCK_DRUM_SET_ID = "rock-drums";
 export const ORCHESTRA_SET_ID = "orchestra-pit";
 export const TEMPORARY_DS_INSTRUMENT_SET_ID = "temporary-ds-instruments";
@@ -2048,6 +2049,7 @@ function defaultInstrumentSets(): InstrumentSet[] {
     { id: FACTORY_DRUM_SET_ID, name: "Classic Machines", factory: true },
     { id: ORCHESTRA_SET_ID, name: "Orchestra Pit", factory: true },
     { id: FACTORY_SYNTH_SET_ID, name: "Synths", factory: true },
+    { id: AURUM_TEST_SET_ID, name: "Aurum Test", factory: true },
     { id: TEMPORARY_DS_INSTRUMENT_SET_ID, name: "Instanced Instruments", factory: true },
     { id: USER_INSTRUMENT_SET_ID, name: "User", factory: true },
   ];
@@ -2754,7 +2756,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
           userCreated: false,
         }),
       ];
-      seeds.push(...createAurumTestInstruments(FACTORY_SYNTH_SET_ID).map(withOriginal));
+      seeds.push(...createAurumTestInstruments(AURUM_TEST_SET_ID).map(withOriginal));
       const deprecatedBreakcoreAetherInstrumentNames = new Set([
         "Breakcore Kick (Aether)",
         "Breakcore Snare (Aether)",
@@ -2802,7 +2804,10 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         for (const instrument of s.instruments) {
           if (instrument.userCreated) continue;
           const replacement = seedByName.get(instrument.name);
-          if (replacement && instrument.descriptors?.includes("breakcore")) {
+          if (replacement && (
+            instrument.descriptors?.includes("breakcore")
+            || replacement.descriptors?.includes("aurum-test-bank")
+          )) {
             const existingId = instrument.id;
             Object.assign(instrument, structuredClone(replacement), { id: existingId });
           }

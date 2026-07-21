@@ -2,7 +2,7 @@
 
 ## Test bank
 
-The factory Synths set contains eight diagnostic patches. They are intentionally named as test assets rather than release presets.
+The system-owned Aurum Test group contains eight diagnostic patches. They are intentionally named as test assets rather than release presets.
 
 | Patch | Primary coverage |
 | --- | --- |
@@ -19,7 +19,7 @@ The factory Synths set contains eight diagnostic patches. They are intentionally
 
 `npm run verify:aurum` performs these checks:
 
-1. The bank exposes all eight canonical names with unique stable ids in the factory Synths set.
+1. The bank exposes all eight canonical names with unique stable ids in the Aurum Test group.
 2. Each patch retains the structural trait that defines its archetype.
 3. Every patch renders stereo at 44.1, 48, and 96 kHz.
 4. Every rendered sample is finite and every render is audible with peak amplitude no greater than 1.
@@ -31,7 +31,7 @@ The factory Synths set contains eight diagnostic patches. They are intentionally
 ### ATM-001: Factory-bank discovery
 
 1. Start Beat with an existing instrument library.
-2. Open Instruments > Factory Synths and search for `Aurum_`.
+2. Open Instruments > Aurum Test and search for `Aurum_`.
 3. Restart Beat and repeat the search.
 
 Expected: all eight patches appear exactly once after both starts. They use the Aurum editor and cannot be deleted as user instruments.

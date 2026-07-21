@@ -585,7 +585,7 @@ export function InstrumentsPage() {
 }
 
 function instrumentSetDisplayName(set: InstrumentSet): string {
-  if (!set.factory || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID) return set.name;
+  if (!set.factory || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID || set.name === "Aurum Test") return set.name;
   return `Factory ${set.name}`;
 }
 

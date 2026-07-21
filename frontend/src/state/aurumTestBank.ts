@@ -30,7 +30,7 @@ function makeBase(name: typeof AURUM_TEST_INSTRUMENT_NAMES[number], setId: strin
   instrument.setId = setId;
   instrument.source = { kind: "factory", label: "Beat / Aurum MVP test bank" };
   instrument.userCreated = false;
-  instrument.descriptors = ["aurum", "test", ...descriptors];
+  instrument.descriptors = ["aurum", "test", "aurum-test-bank", ...descriptors];
   instrument.ampLevel = 0.76;
   instrument.maxVoices = 16;
   instrument.aurum = blankAurum(instrument.aurum!);
