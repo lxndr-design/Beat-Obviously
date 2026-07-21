@@ -16424,6 +16424,65 @@ namespace
             || !lumusSampleMode.aether.sampleSlot1.enabled
             || lumusSampleMode.aether.sampleSlot1.audioFileId != "lumus-sample-fixture")
             return false;
+        const auto lumusIndependentSamplePatch = juce::JSON::parse(R"json(
+        {
+          "schemaVersion": 4,
+          "instrumentType": "lumus-hybrid-synth",
+          "namespace": "lumus",
+          "parameters": {
+            "osc.c.enabled": true,
+            "lumus.source.c.sample.enabled": true,
+            "lumus.source.c.sample.audioFileId": "lumus-canonical-sample",
+            "lumus.source.c.sample.rootNote": 67,
+            "lumus.source.c.sample.level": 0.61
+          },
+          "metadata": {
+            "lumusSourceRack": { "schemaVersion": 2, "slots": [
+              { "id": "a", "mode": "wavetable" },
+              { "id": "b", "mode": "wavetable" },
+              { "id": "c", "mode": "sample" }
+            ] },
+            "lumusSampleSlots": {
+              "a": { "schemaVersion": 1, "zones": [] },
+              "b": { "schemaVersion": 1, "zones": [] },
+              "c": { "schemaVersion": 1, "zones": [] }
+            }
+          },
+          "modulation": []
+        }
+        )json");
+        beat::InstrumentDefinition lumusIndependentSample;
+        if (!beat::applySynthPatchContract(lumusIndependentSamplePatch, lumusIndependentSample)
+            || lumusIndependentSample.lumus.oscC.enabled
+            || !lumusIndependentSample.aether.sampleSlot1.enabled
+            || lumusIndependentSample.aether.sampleSlot1.audioFileId != "lumus-canonical-sample"
+            || lumusIndependentSample.aether.sampleSlot1.rootNote != 67
+            || std::abs(lumusIndependentSample.aether.sampleSlot1.level - 0.61f) > 0.0001f)
+            return false;
+        const auto malformedLumusSamples = juce::JSON::parse(R"json(
+        {
+          "schemaVersion": 4,
+          "instrumentType": "lumus-hybrid-synth",
+          "namespace": "lumus",
+          "parameters": {},
+          "metadata": {
+            "lumusSourceRack": { "schemaVersion": 2, "slots": [
+              { "id": "a", "mode": "wavetable" },
+              { "id": "b", "mode": "wavetable" },
+              { "id": "c", "mode": "wavetable" }
+            ] },
+            "lumusSampleSlots": {
+              "a": { "schemaVersion": 2, "zones": [] },
+              "b": { "schemaVersion": 1, "zones": [] },
+              "c": { "schemaVersion": 1, "zones": [] }
+            }
+          },
+          "modulation": []
+        }
+        )json");
+        beat::InstrumentDefinition rejectedMalformedSamples;
+        if (beat::applySynthPatchContract(malformedLumusSamples, rejectedMalformedSamples))
+            return false;
         const auto malformedLumusRack = juce::JSON::parse(R"json(
         {
           "schemaVersion": 2,
@@ -16442,7 +16501,7 @@ namespace
         if (beat::applySynthPatchContract(malformedLumusRack, rejectedMalformedRack))
             return false;
         const auto futureLumusPatch = juce::JSON::parse(R"json(
-        { "schemaVersion": 4, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
+        { "schemaVersion": 5, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
         )json");
         beat::InstrumentDefinition rejectedFutureLumus;
         if (beat::applySynthPatchContract(futureLumusPatch, rejectedFutureLumus))

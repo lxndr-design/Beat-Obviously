@@ -713,6 +713,11 @@ export interface SynthPatchSnapshot {
     sampleSlot1Zones?: AetherSampleZoneConfig[];
     managedSfz?: ManagedSfzAssetConfig;
     managedGranular?: ManagedGranularAssetConfig;
+    lumusSampleSlots?: Partial<Record<"a" | "b" | "c", {
+      schemaVersion: 1;
+      zones: AetherSampleZoneConfig[];
+      managedSfz?: ManagedSfzAssetConfig;
+    }>>;
   };
 }
 

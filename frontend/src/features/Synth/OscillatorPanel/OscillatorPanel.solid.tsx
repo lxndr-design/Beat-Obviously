@@ -244,8 +244,13 @@ function OscillatorRow(props: {
   const lumusSlotC = createMemo(() => draft().instrumentType === "lumus-hybrid-synth" && props.oscillator === "c");
   const sourceMode = createMemo(() => lumusSlotC() ? draft().metadata.lumusSourceRack?.slots[2]?.mode ?? "wavetable" : "wavetable");
   const sampleMode = createMemo(() => sourceMode() === "sample");
-  const sampleAvailable = createMemo(() => Boolean(getStringParam(draft(), "aether.sample.1.audioFileId") || draft().metadata.managedSfz));
-  const enabledId = createMemo(() => sampleMode() ? "aether.sample.1.enabled" as SynthParameterId : oscParam(props.oscillator, "enabled"));
+  const sampleAvailable = createMemo(() => Boolean(
+    getStringParam(draft(), "lumus.source.c.sample.audioFileId" as SynthParameterId)
+      || draft().metadata.lumusSampleSlots?.c?.managedSfz,
+  ));
+  const enabledId = createMemo(() => sampleMode()
+    ? "lumus.source.c.sample.enabled" as SynthParameterId
+    : oscParam(props.oscillator, "enabled"));
   const enabled = createMemo(() => getBooleanParam(draft(), enabledId()));
   const wavetableId = createMemo(() => oscParam(props.oscillator, "wavetable"));
   const warpModeId = createMemo(() => oscParam(props.oscillator, "warpMode"));
@@ -272,8 +277,8 @@ function OscillatorRow(props: {
       parameters: {
         ...current.parameters,
         ...(mode === "sample"
-          ? { "aether.sample.1.enabled": sampleAvailable() }
-          : { "aether.sample.1.enabled": false }),
+          ? { "lumus.source.c.sample.enabled": sampleAvailable() }
+          : { "lumus.source.c.sample.enabled": false }),
       },
       metadata: {
         ...current.metadata,
@@ -336,7 +341,7 @@ function OscillatorRow(props: {
           </Button>
         </Show>
       </div>
-      <Show when={!sampleMode()} fallback={<div class={styles.rowMain}><span class={styles.tuningModeHint}>Sample controls are available in Sample Slot 1 below.</span></div>}>
+      <Show when={!sampleMode()} fallback={<div class={styles.rowMain}><span class={styles.tuningModeHint}>Sample controls are available in Source C Sample below.</span></div>}>
       <div class={styles.rowMain}>
           <WaveformPreview label={`${label()} local oscillator preview`} samples={waveform()} disabled={!enabled()} />
           <div class={styles.settingsPane}>

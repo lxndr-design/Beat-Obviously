@@ -24,8 +24,8 @@ import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 5;
-export const LUMUS_PATCH_SCHEMA_VERSION = 3;
-const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2] as const;
+export const LUMUS_PATCH_SCHEMA_VERSION = 4;
+const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2, 3] as const;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
 export const SYNTH_INSTRUMENT_TYPE = "wavetable-synth";
 export const LUMUS_PARAMETER_NAMESPACE = "lumus";
@@ -69,6 +69,12 @@ export interface WavemapManualRange {
 export type OscillatorKey = string;
 export interface SynthOscillatorDefinition { id: OscillatorKey; name: string }
 export type LumusSourceMode = "wavetable" | "sample";
+export type LumusSourceSlotId = "a" | "b" | "c";
+export interface LumusSampleSlotMetadata {
+  schemaVersion: 1;
+  zones: AetherSampleZoneConfig[];
+  managedSfz?: ManagedSfzAssetConfig;
+}
 export interface LumusSourceRackDescriptor {
   schemaVersion: 2;
   slots: [
@@ -394,6 +400,7 @@ export interface SynthDraftPatch {
     customWavetables?: Record<string, CustomWavetableDefinition>;
     oscillators: SynthOscillatorDefinition[];
     lumusSourceRack?: LumusSourceRackDescriptor;
+    lumusSampleSlots?: Partial<Record<LumusSourceSlotId, LumusSampleSlotMetadata>>;
     sampleSlot1Zones: AetherSampleZoneConfig[];
     managedSfz?: ManagedSfzAssetConfig;
     managedGranular?: ManagedGranularAssetConfig;
@@ -460,6 +467,26 @@ const DEFAULT_ADDED_OSCILLATOR_PARAMETERS: Record<OscillatorParamSuffix, SynthPa
   fxSend1: 0, fxSend2: 0,
 };
 
+const DEFAULT_LUMUS_SAMPLE_PARAMETERS: Record<string, SynthParameterValue> = {
+  enabled: false,
+  audioFileId: "",
+  rootNote: 60,
+  level: 0.8,
+  pan: 0,
+  route: "filter",
+  start: 0,
+  end: 1,
+  "loop.enabled": false,
+  "loop.start": 0,
+  "loop.end": 1,
+  fxSend1: 0,
+  fxSend2: 0,
+};
+
+function lumusSampleParameterId(slot: LumusSourceSlotId, suffix: string): SynthParameterId {
+  return `lumus.source.${slot}.sample.${suffix}` as SynthParameterId;
+}
+
 function oscillatorIdForIndex(index: number): string {
   return index < 26 ? String.fromCharCode(97 + index) : `osc-${index + 1}`;
 }
@@ -502,7 +529,7 @@ function normalizeLumusSourceRack(value: unknown, patchVersion: unknown, legacyS
     if (!isRecord(value) || value.schemaVersion !== 1 || !Array.isArray(value.slots))
       throw new SynthPatchIdentityError("lumus.source-rack.malformed", "Legacy Lumus source-rack data is malformed.");
   } else if (!isRecord(value) || value.schemaVersion !== 2 || !Array.isArray(value.slots)) {
-    throw new SynthPatchIdentityError("lumus.source-rack.malformed", "Lumus v3 requires source-rack schema 2.");
+    throw new SynthPatchIdentityError("lumus.source-rack.malformed", "Lumus v3+ requires source-rack schema 2.");
   }
   if (value.slots.length !== canonical.slots.length)
     throw new SynthPatchIdentityError("lumus.source-rack.capacity", "Lumus requires exactly three source slots.");
@@ -515,6 +542,38 @@ function normalizeLumusSourceRack(value: unknown, patchVersion: unknown, legacyS
     if (index === 2) canonical.slots[2].mode = slot.mode as LumusSourceMode;
   }
   return canonical;
+}
+
+function normalizeLumusSampleSlots(
+  value: unknown,
+  patchVersion: unknown,
+  legacyMetadata: Record<string, unknown>,
+): Record<LumusSourceSlotId, LumusSampleSlotMetadata> {
+  const empty = (): LumusSampleSlotMetadata => ({ schemaVersion: 1, zones: [] });
+  if (patchVersion === 1 || patchVersion === 2) return { a: empty(), b: empty(), c: empty() };
+  if (patchVersion === 3) return {
+    a: empty(),
+    b: empty(),
+    c: {
+      schemaVersion: 1 as const,
+      zones: normalizeAetherSampleZones(legacyMetadata.sampleSlot1Zones),
+      managedSfz: normalizeManagedSfz(legacyMetadata.managedSfz),
+    },
+  };
+  if (!isRecord(value))
+    throw new SynthPatchIdentityError("lumus.sample-slots.malformed", "Lumus v4 requires independent sample metadata for A, B, and C.");
+  const result: Record<LumusSourceSlotId, LumusSampleSlotMetadata> = { a: empty(), b: empty(), c: empty() };
+  for (const slot of ["a", "b", "c"] as const) {
+    const entry = value[slot];
+    if (!isRecord(entry) || entry.schemaVersion !== 1)
+      throw new SynthPatchIdentityError("lumus.sample-slot.invalid", `Invalid Lumus sample metadata for Slot ${slot.toUpperCase()}.`);
+    result[slot] = {
+      schemaVersion: 1,
+      zones: normalizeAetherSampleZones(entry.zones),
+      managedSfz: normalizeManagedSfz(entry.managedSfz),
+    };
+  }
+  return result;
 }
 
 export class HybridSourceMigrationError extends Error {
@@ -1689,6 +1748,9 @@ export function createDefaultLumusDraft(): SynthDraftPatch {
   parameters["osc.c.unison.voices"] = 1;
   parameters["osc.c.unison.detune"] = 0.12;
   parameters["osc.c.unison.spread"] = 0.5;
+  for (const slot of ["a", "b", "c"] as const)
+    for (const [suffix, value] of Object.entries(DEFAULT_LUMUS_SAMPLE_PARAMETERS))
+      parameters[lumusSampleParameterId(slot, suffix)] = value;
   return {
     ...draft,
     schemaVersion: LUMUS_PATCH_SCHEMA_VERSION,
@@ -1712,6 +1774,11 @@ export function createDefaultLumusDraft(): SynthDraftPatch {
           { id: "b", mode: "wavetable" },
           { id: "c", mode: "wavetable" },
         ],
+      },
+      lumusSampleSlots: {
+        a: { schemaVersion: 1, zones: [] },
+        b: { schemaVersion: 1, zones: [] },
+        c: { schemaVersion: 1, zones: [] },
       },
     },
   };
@@ -1760,6 +1827,11 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
     inheritUnison("detune", parameters["unison.detune"]);
     inheritUnison("spread", parameters["unison.spread"]);
   }
+  if (isLumus && input.schemaVersion === 3) {
+    for (const suffix of Object.keys(DEFAULT_LUMUS_SAMPLE_PARAMETERS))
+      parameters[lumusSampleParameterId("c", suffix)] = parameters[`aether.sample.1.${suffix}`]
+        ?? DEFAULT_LUMUS_SAMPLE_PARAMETERS[suffix];
+  }
 
   const mpeMaster = clampMidiChannel(Number(parameters["aether.mpe.masterChannel"]));
   const mpeFirst = clampMidiChannel(Number(parameters["aether.mpe.firstMemberChannel"]));
@@ -1807,6 +1879,10 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
         inputMetadata.lumusSourceRack,
         input.schemaVersion,
         input.parameters?.["aether.sample.1.enabled"] === true,
+      ), lumusSampleSlots: normalizeLumusSampleSlots(
+        inputMetadata.lumusSampleSlots,
+        input.schemaVersion,
+        inputMetadata,
       ) } : {}),
       sampleSlot1Zones: normalizeAetherSampleZones(inputMetadata.sampleSlot1Zones),
       managedSfz: normalizeManagedSfz(inputMetadata.managedSfz),
@@ -1840,9 +1916,9 @@ function validateSynthPatchIdentity(input: Partial<SynthDraftPatch> | SynthPatch
   if (type === LUMUS_INSTRUMENT_TYPE) {
     if (namespace !== LUMUS_PARAMETER_NAMESPACE)
       throw new SynthPatchIdentityError("lumus.identity.namespace-mismatch", "Lumus patches must use the lumus namespace.");
-    if (!LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2)
+    if (!LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3)
         && input.schemaVersion !== LUMUS_PATCH_SCHEMA_VERSION)
-      throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema 1, 2, or ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
+      throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema 1, 2, 3, or ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
     return true;
   }
   throw new SynthPatchIdentityError("synth.identity.type-unknown", `Unsupported synth instrument type: ${String(type)}`);
@@ -2245,6 +2321,11 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
   const lumusCMode = draft.instrumentType === LUMUS_INSTRUMENT_TYPE
     ? draft.metadata.lumusSourceRack?.slots[2]?.mode ?? "wavetable"
     : null;
+  const samplePrefix = lumusCMode === null ? "aether.sample.1" : "lumus.source.c.sample";
+  const sampleParam = (suffix: string) => `${samplePrefix}.${suffix}` as SynthParameterId;
+  const sampleMetadata = lumusCMode === null
+    ? { zones: draft.metadata.sampleSlot1Zones, managedSfz: draft.metadata.managedSfz }
+    : draft.metadata.lumusSampleSlots?.c ?? { zones: [] };
   const wavetable = wavetableFromDraft(draft, "a");
   const oscA = oscillatorFromDraft(draft, "a", wavetable);
   const oscB = oscillatorFromDraft(draft, "b", wavetableFromDraft(draft, "b"));
@@ -2312,23 +2393,23 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
       sampleSlot1: {
         schemaVersion: 5,
         enabled: (lumusCMode === null || lumusCMode === "sample")
-          && getBooleanParam(draft, "aether.sample.1.enabled")
-          && (Boolean(getStringParam(draft, "aether.sample.1.audioFileId"))
-            || draft.metadata.sampleSlot1Zones.length > 0
-            || Boolean(draft.metadata.managedSfz?.manifestPath)),
-        audioFileId: getStringParam(draft, "aether.sample.1.audioFileId"),
-        rootNote: Math.max(0, Math.min(127, Math.round(getNumberParam(draft, "aether.sample.1.rootNote")))),
-        level: clamp01(getNumberParam(draft, "aether.sample.1.level")),
-        pan: clampBipolar(getNumberParam(draft, "aether.sample.1.pan")),
-        route: sourceRouteFromId(getStringParam(draft, "aether.sample.1.route")),
-        startRatio: clamp01(getNumberParam(draft, "aether.sample.1.start")),
-        endRatio: clamp01(getNumberParam(draft, "aether.sample.1.end")),
-        loopEnabled: getBooleanParam(draft, "aether.sample.1.loop.enabled"),
-        loopStartRatio: clamp01(getNumberParam(draft, "aether.sample.1.loop.start")),
-        loopEndRatio: clamp01(getNumberParam(draft, "aether.sample.1.loop.end")),
-        fxSends: [clamp01(getNumberParam(draft, "aether.sample.1.fxSend1")), clamp01(getNumberParam(draft, "aether.sample.1.fxSend2"))],
-        zones: draft.metadata.sampleSlot1Zones,
-        ...(draft.metadata.managedSfz ? { managedSfz: draft.metadata.managedSfz } : {}),
+          && getBooleanParam(draft, sampleParam("enabled"))
+          && (Boolean(getStringParam(draft, sampleParam("audioFileId")))
+            || sampleMetadata.zones.length > 0
+            || Boolean(sampleMetadata.managedSfz?.manifestPath)),
+        audioFileId: getStringParam(draft, sampleParam("audioFileId")),
+        rootNote: Math.max(0, Math.min(127, Math.round(getNumberParam(draft, sampleParam("rootNote"))))),
+        level: clamp01(getNumberParam(draft, sampleParam("level"))),
+        pan: clampBipolar(getNumberParam(draft, sampleParam("pan"))),
+        route: sourceRouteFromId(getStringParam(draft, sampleParam("route"))),
+        startRatio: clamp01(getNumberParam(draft, sampleParam("start"))),
+        endRatio: clamp01(getNumberParam(draft, sampleParam("end"))),
+        loopEnabled: getBooleanParam(draft, sampleParam("loop.enabled")),
+        loopStartRatio: clamp01(getNumberParam(draft, sampleParam("loop.start"))),
+        loopEndRatio: clamp01(getNumberParam(draft, sampleParam("loop.end"))),
+        fxSends: [clamp01(getNumberParam(draft, sampleParam("fxSend1"))), clamp01(getNumberParam(draft, sampleParam("fxSend2")))],
+        zones: sampleMetadata.zones,
+        ...(sampleMetadata.managedSfz ? { managedSfz: sampleMetadata.managedSfz } : {}),
       },
       granularSlot2: {
         schemaVersion: 1,

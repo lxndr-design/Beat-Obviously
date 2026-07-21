@@ -435,6 +435,7 @@ namespace beat
             if ((!schemaVersion.isInt() && !schemaVersion.isInt64())
                 || ((int) schemaVersion != params::lumusLegacyPatchSchemaVersion
                     && (int) schemaVersion != params::lumusPreviousPatchSchemaVersion
+                    && (int) schemaVersion != params::lumusSampleModePatchSchemaVersion
                     && (int) schemaVersion != params::lumusPatchSchemaVersion)
                 || patchNamespace.toString() != "lumus")
                 return false;
@@ -459,7 +460,7 @@ namespace beat
             const int rackSchemaVersion = (int) objectProperty(rack, "schemaVersion", 0);
             const int patchSchemaVersion = (int) objectProperty(patch, "schemaVersion", 0);
             if (!rack.isObject()
-                || rackSchemaVersion != (patchSchemaVersion >= params::lumusPatchSchemaVersion ? 2 : 1)
+                || rackSchemaVersion != (patchSchemaVersion >= params::lumusSampleModePatchSchemaVersion ? 2 : 1)
                 || slotArray == nullptr || slotArray->size() != (int) requiredIds.size())
                 return false;
             for (int index = 0; index < slotArray->size(); ++index)
@@ -555,32 +556,37 @@ namespace beat
         const auto sourceRoute = [](const juce::String& route) { return route == "direct" ? 1 : route == "filter1" ? 2 : route == "filter2" ? 3 : route == "none" ? 4 : 0; };
         instrument.aether.sub.routing = sourceRoute(synthStringParam(params, "aether.sub.route", "filter"));
         instrument.aether.noise.routing = sourceRoute(synthStringParam(params, "aether.noise.route", "filter"));
+        const int activeLumusSchema = isLumus ? (int) objectProperty(patch, "schemaVersion", 0) : 0;
+        const juce::String samplePrefix = isLumus && activeLumusSchema >= params::lumusPatchSchemaVersion
+            ? "lumus.source.c.sample."
+            : "aether.sample.1.";
+        const auto sampleParameter = [&samplePrefix](const char* suffix) { return samplePrefix + suffix; };
         instrument.aether.sampleSlot1.schemaVersion = 4;
-        instrument.aether.sampleSlot1.audioFileId = synthStringParam(params, "aether.sample.1.audioFileId", "");
-        const bool requestedSampleSlotEnabled = synthNumberParam(params, "aether.sample.1.enabled", 0.0) >= 0.5;
+        instrument.aether.sampleSlot1.audioFileId = synthStringParam(params, sampleParameter("audioFileId"), "");
+        const bool requestedSampleSlotEnabled = synthNumberParam(params, sampleParameter("enabled"), 0.0) >= 0.5;
         instrument.aether.sampleSlot1.enabled = requestedSampleSlotEnabled
             && instrument.aether.sampleSlot1.audioFileId.isNotEmpty();
         instrument.aether.sampleSlot1.rootNote = juce::jlimit(0, 127,
-            (int) std::round(synthNumberParam(params, "aether.sample.1.rootNote", 60.0)));
+            (int) std::round(synthNumberParam(params, sampleParameter("rootNote"), 60.0)));
         instrument.aether.sampleSlot1.level = juce::jlimit(0.0f, 1.0f,
-            (float) synthNumberParam(params, "aether.sample.1.level", 0.8));
+            (float) synthNumberParam(params, sampleParameter("level"), 0.8));
         instrument.aether.sampleSlot1.pan = juce::jlimit(-1.0f, 1.0f,
-            (float) synthNumberParam(params, "aether.sample.1.pan", 0.0));
+            (float) synthNumberParam(params, sampleParameter("pan"), 0.0));
         instrument.aether.sampleSlot1.routing = sourceRoute(
-            synthStringParam(params, "aether.sample.1.route", "filter"));
+            synthStringParam(params, sampleParameter("route"), "filter"));
         instrument.aether.sampleSlot1.startRatio = juce::jlimit(0.0f, 1.0f,
-            (float) synthNumberParam(params, "aether.sample.1.start", 0.0));
+            (float) synthNumberParam(params, sampleParameter("start"), 0.0));
         instrument.aether.sampleSlot1.endRatio = juce::jlimit(0.0f, 1.0f,
-            (float) synthNumberParam(params, "aether.sample.1.end", 1.0));
-        instrument.aether.sampleSlot1.loopEnabled = synthNumberParam(params, "aether.sample.1.loop.enabled", 0.0) >= 0.5;
+            (float) synthNumberParam(params, sampleParameter("end"), 1.0));
+        instrument.aether.sampleSlot1.loopEnabled = synthNumberParam(params, sampleParameter("loop.enabled"), 0.0) >= 0.5;
         instrument.aether.sampleSlot1.loopStartRatio = juce::jlimit(0.0f, 1.0f,
-            (float) synthNumberParam(params, "aether.sample.1.loop.start", 0.0));
+            (float) synthNumberParam(params, sampleParameter("loop.start"), 0.0));
         instrument.aether.sampleSlot1.loopEndRatio = juce::jlimit(0.0f, 1.0f,
-            (float) synthNumberParam(params, "aether.sample.1.loop.end", 1.0));
+            (float) synthNumberParam(params, sampleParameter("loop.end"), 1.0));
         instrument.aether.sampleSlot1.fxSends[0] = juce::jlimit(0.0f, 1.0f,
-            (float) synthNumberParam(params, "aether.sample.1.fxSend1", 0.0));
+            (float) synthNumberParam(params, sampleParameter("fxSend1"), 0.0));
         instrument.aether.sampleSlot1.fxSends[1] = juce::jlimit(0.0f, 1.0f,
-            (float) synthNumberParam(params, "aether.sample.1.fxSend2", 0.0));
+            (float) synthNumberParam(params, sampleParameter("fxSend2"), 0.0));
         if (instrument.aether.sampleSlot1.endRatio <= instrument.aether.sampleSlot1.startRatio)
         {
             instrument.aether.sampleSlot1.startRatio = 0.0f;
@@ -590,7 +596,23 @@ namespace beat
             || instrument.aether.sampleSlot1.loopEndRatio > instrument.aether.sampleSlot1.endRatio
             || instrument.aether.sampleSlot1.loopEndRatio <= instrument.aether.sampleSlot1.loopStartRatio)
             instrument.aether.sampleSlot1.loopEnabled = false;
-        if (const auto* mappedZones = objectProperty(metadata, "sampleSlot1Zones", {}).getArray())
+        juce::var mappedZoneData = objectProperty(metadata, "sampleSlot1Zones", {});
+        if (isLumus && activeLumusSchema >= params::lumusPatchSchemaVersion)
+        {
+            const auto sampleSlots = objectProperty(metadata, "lumusSampleSlots", {});
+            if (!sampleSlots.isObject()) return false;
+            static constexpr std::array<const char*, 3> requiredSampleSlots {{ "a", "b", "c" }};
+            for (const auto* slotId : requiredSampleSlots)
+            {
+                const auto slot = objectProperty(sampleSlots, slotId, {});
+                const auto zones = objectProperty(slot, "zones", {});
+                if (!slot.isObject() || (int) objectProperty(slot, "schemaVersion", 0) != 1
+                    || zones.getArray() == nullptr || zones.getArray()->size() > 8)
+                    return false;
+            }
+            mappedZoneData = objectProperty(objectProperty(sampleSlots, "c", {}), "zones", {});
+        }
+        if (const auto* mappedZones = mappedZoneData.getArray())
         {
             for (int index = 0; index < juce::jmin(8, mappedZones->size()); ++index)
             {
@@ -616,7 +638,7 @@ namespace beat
         instrument.aether.sampleSlot1.enabled = requestedSampleSlotEnabled
             && (instrument.aether.sampleSlot1.audioFileId.isNotEmpty()
                 || !instrument.aether.sampleSlot1.zones.empty());
-        if (isLumus && (int) objectProperty(patch, "schemaVersion", 0) >= params::lumusPatchSchemaVersion
+        if (isLumus && activeLumusSchema >= params::lumusSampleModePatchSchemaVersion
             && !lumusCSampleMode)
             instrument.aether.sampleSlot1.enabled = false;
         auto& granular = instrument.aether.granularSlot2;

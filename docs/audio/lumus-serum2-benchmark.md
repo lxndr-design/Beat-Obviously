@@ -16,7 +16,7 @@ This equality is a starting-line invariant, not a permanent goal. Every future d
 
 ## Three-slot source rack
 
-Lumus schema v3 freezes three stable source identities: A, B, and C. The existing generalized oscillator editor presents exactly those rows and disables structural add/remove actions. A and B remain wavetable sources. Slot C now has an explicit Wavetable/Sample selector: wavetable mode owns the existing tuning, phase, unison, level, pan, routing, and sends; sample mode disables the C wavetable renderer and publishes Beat's existing fixed-capacity Sample Slot renderer as Source C. The default and unambiguous v1/v2 migrations remain wavetable-only and silent for C.
+Lumus schema v4 freezes three stable source identities: A, B, and C, and gives each slot independent sample parameters, mapped zones, and managed-asset metadata. The existing generalized oscillator editor presents exactly those rows and disables structural add/remove actions. A and B remain wavetable sources in the current renderer. Slot C has an explicit Wavetable/Sample selector: wavetable mode owns the existing tuning, phase, unison, level, pan, routing, and sends; sample mode disables the C wavetable renderer and publishes Beat's existing fixed-capacity Sample Slot renderer as Source C. V3 sample data migrates losslessly into C; the default and unambiguous v1/v2 migrations remain wavetable-only and silent for C.
 
 Wavetable and sample modes are implemented for Slot C. Multisample mapping remains available through the existing Sample controls, but is not yet claimed as a distinct rack mode; granular and spectral choices are not exposed as placeholders. Slot C wavetable mode participates in the existing modulation contract. All source-mode and routing UI uses Beat's shared `FloatingSelect`, button, toggle, input, and knob components with no Lumus-specific typography or layout system.
 
@@ -25,7 +25,7 @@ Wavetable and sample modes are implemented for Slot C. Multisample mapping remai
 - Complete non-native verification and production frontend build: passed.
 - Release `Beat` and `BeatBackendStress` targets: built successfully.
 - Complete native stress suite: passed with only the existing `baseline.recent-project-exists` TCC waiver enabled.
-- Lumus v1/v2 migration, v3 roundtrip, ambiguous legacy-source rejection, malformed/future rack rejection, fixed UI identities, browser/native wavetable audibility, native sample audibility, stereo pan, per-source route conversion, Slot C modulation, finite output, and deterministic rendering: passed.
+- Lumus v1/v2/v3 migration, v4 roundtrip, independent sample-ownership preservation, malformed/future per-slot metadata rejection, ambiguous legacy-source rejection, malformed/future rack rejection, fixed UI identities, browser/native wavetable audibility, native sample audibility, stereo pan, per-source route conversion, Slot C modulation, finite output, and deterministic rendering: passed.
 - Frozen Aether benchmark renders at 44.1, 48, and 96 kHz retained their recorded SHA-256 values; no baseline was updated.
 
 ## Benchmark lanes
@@ -43,4 +43,4 @@ A direct Serum 2 comparison may be added later only from a locally licensed inst
 
 ## Current conclusion
 
-Lumus has a clean identity boundary, a bit-stable Aether-derived starting renderer, and a fixed A/B/C rack whose first non-wavetable mode is verified sample playback in Slot C. The largest remaining source gap is extending the same bounded mode contract to A/B and granular/multisample choices without duplicating asset ownership. Synth-owned arp/clip sequencing remains absent. Spectral work remains incomplete and is not implied ready by this benchmark.
+Lumus has a clean identity boundary, a bit-stable Aether-derived starting renderer, and a fixed A/B/C rack whose first non-wavetable mode is verified sample playback in Slot C. Sample ownership no longer needs to be duplicated when the bounded mode contract is extended to A/B; those runtime modes and voices are still pending. Granular and multisample mode choices also remain pending. Synth-owned arp/clip sequencing remains absent. Spectral work remains incomplete and is not implied ready by this benchmark.

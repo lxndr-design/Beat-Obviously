@@ -52,7 +52,7 @@ import {
   instrumentTaxonomyOptionsForCategory,
   taxonomyAssignmentForInstrumentId,
 } from "../../../state/instrumentTaxonomy";
-import type { AetherSampleZoneConfig, AudioFile, EnvelopeCurve, Instrument, TrackEffect } from "../../../state/types";
+import type { AetherSampleZoneConfig, AudioFile, EnvelopeCurve, Instrument, ManagedSfzAssetConfig, TrackEffect } from "../../../state/types";
 import { ModulationMatrix } from "../ModulationMatrix/ModulationMatrix.solid";
 import { OscillatorPanel } from "../OscillatorPanel/OscillatorPanel.solid";
 import { SynthCurvePreview } from "../CurvePreview/SynthCurvePreview.solid";
@@ -1338,15 +1338,21 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
     { value: "", label: "Off" },
     ...returnBuses().filter((bus) => !bus.mute).map((bus) => ({ value: bus.id, label: bus.name || bus.id })),
   ]);
-  const mappedZones = createMemo(() => draft().metadata.sampleSlot1Zones ?? []);
-  const managedSfz = createMemo(() => draft().metadata.managedSfz);
+  const isLumus = createMemo(() => draft().instrumentType === "lumus-hybrid-synth");
+  const sampleParameterId = (suffix: string) => `${isLumus() ? "lumus.source.c.sample" : "aether.sample.1"}.${suffix}` as SynthParameterId;
+  const mappedZones = createMemo(() => isLumus()
+    ? draft().metadata.lumusSampleSlots?.c?.zones ?? []
+    : draft().metadata.sampleSlot1Zones ?? []);
+  const managedSfz = createMemo(() => isLumus()
+    ? draft().metadata.lumusSampleSlots?.c?.managedSfz
+    : draft().metadata.managedSfz);
   const managedGranular = createMemo(() => draft().metadata.managedGranular);
-  const sampleSourceAvailable = createMemo(() => Boolean(String(draft().parameters["aether.sample.1.audioFileId"] ?? "") || managedSfz()));
+  const sampleSourceAvailable = createMemo(() => Boolean(String(draft().parameters[sampleParameterId("audioFileId")] ?? "") || managedSfz()));
   const sampleSlotLabel = createMemo(() => draft().instrumentType === "lumus-hybrid-synth" ? "Source C Sample" : "Sample Slot 1");
   const granularSourceAvailable = createMemo(() => Boolean(managedGranular() || draft().parameters["aether.granular.2.builtinSource"] === "benchmark"));
   const sampleSourceDescription = createMemo(() => managedSfz()
     ? `Managed SFZ source: ${managedSfz()!.displayName}.`
-    : String(draft().parameters["aether.sample.1.audioFileId"] ?? "")
+    : String(draft().parameters[sampleParameterId("audioFileId")] ?? "")
       ? "Project audio source selected."
       : "No source selected. Choose a project audio asset or import an SFZ before enabling this slot.");
   const granularSourceDescription = createMemo(() => managedGranular()
@@ -1354,9 +1360,17 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
     : draft().parameters["aether.granular.2.builtinSource"] === "benchmark"
       ? "Built-in benchmark source selected."
       : "No source selected. Import audio or choose the benchmark source before enabling this slot.");
+  const sampleMetadataPatch = (
+    zones: AetherSampleZoneConfig[],
+    nextManagedSfz: ManagedSfzAssetConfig | null | undefined = managedSfz(),
+  ) => isLumus()
+    ? { ...draft().metadata, lumusSampleSlots: {
+        ...draft().metadata.lumusSampleSlots,
+        c: { schemaVersion: 1 as const, zones: zones.slice(0, 8), ...(nextManagedSfz ? { managedSfz: nextManagedSfz } : {}) },
+      } }
+    : { ...draft().metadata, sampleSlot1Zones: zones.slice(0, 8), managedSfz: nextManagedSfz ?? undefined };
   const commitMappedZones = (zones: AetherSampleZoneConfig[]) => setDraft({
-    ...draft(),
-    metadata: { ...draft().metadata, sampleSlot1Zones: zones.slice(0, 8) },
+    ...draft(), metadata: sampleMetadataPatch(zones),
   });
   const importSfz = async () => {
     const projectPath = useDocumentStore.getState().currentFilePath;
@@ -1373,14 +1387,10 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
         ...draft(),
         parameters: {
           ...draft().parameters,
-          "aether.sample.1.enabled": true,
-          "aether.sample.1.audioFileId": "",
+          [sampleParameterId("enabled")]: true,
+          [sampleParameterId("audioFileId")]: "",
         },
-        metadata: {
-          ...draft().metadata,
-          sampleSlot1Zones: [],
-          managedSfz: result.managedSfz,
-        },
+        metadata: sampleMetadataPatch([], result.managedSfz),
       });
       queueMicrotask(() => sampleSourceStatus?.focus());
     } catch (error) {
@@ -1417,19 +1427,19 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
     }
   };
   const baseZone = (): AetherSampleZoneConfig => ({
-    audioFileId: String(draft().parameters["aether.sample.1.audioFileId"] ?? ""),
-    rootNote: getNumberParam(draft(), "aether.sample.1.rootNote"),
+    audioFileId: String(draft().parameters[sampleParameterId("audioFileId")] ?? ""),
+    rootNote: getNumberParam(draft(), sampleParameterId("rootNote")),
     loNote: 0,
     hiNote: 127,
     loVelocity: 0,
     hiVelocity: 127,
-    level: getNumberParam(draft(), "aether.sample.1.level"),
-    pan: getNumberParam(draft(), "aether.sample.1.pan"),
-    startRatio: getNumberParam(draft(), "aether.sample.1.start"),
-    endRatio: getNumberParam(draft(), "aether.sample.1.end"),
-    loopEnabled: draft().parameters["aether.sample.1.loop.enabled"] === true,
-    loopStartRatio: getNumberParam(draft(), "aether.sample.1.loop.start"),
-    loopEndRatio: getNumberParam(draft(), "aether.sample.1.loop.end"),
+    level: getNumberParam(draft(), sampleParameterId("level")),
+    pan: getNumberParam(draft(), sampleParameterId("pan")),
+    startRatio: getNumberParam(draft(), sampleParameterId("start")),
+    endRatio: getNumberParam(draft(), sampleParameterId("end")),
+    loopEnabled: draft().parameters[sampleParameterId("loop.enabled")] === true,
+    loopStartRatio: getNumberParam(draft(), sampleParameterId("loop.start")),
+    loopEndRatio: getNumberParam(draft(), sampleParameterId("loop.end")),
   });
   const addMappedZone = () => {
     const current = mappedZones();
@@ -1568,14 +1578,14 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               label="Enabled"
               aria-label={`Enable ${sampleSlotLabel()}`}
               aria-describedby="aether-sample-slot-1-source-status"
-              checked={draft().parameters["aether.sample.1.enabled"] === true}
+              checked={draft().parameters[sampleParameterId("enabled")] === true}
               disabled={!sampleSourceAvailable()}
-              onChange={(value) => setBooleanParameter("aether.sample.1.enabled", value)}
+              onChange={(value) => setBooleanParameter(sampleParameterId("enabled"), value)}
             />
             <FloatingSelect
               label="Asset"
               layout="inline"
-              value={String(draft().parameters["aether.sample.1.audioFileId"] ?? "")}
+              value={String(draft().parameters[sampleParameterId("audioFileId")] ?? "")}
               ariaLabel={`${sampleSlotLabel()} audio asset`}
               ariaDescribedBy="aether-sample-slot-1-source-status"
               options={[
@@ -1585,18 +1595,18 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               open={sampleAssetOpen()}
               onOpenChange={setSampleAssetOpen}
               onChange={(value) => {
-                setParameter("aether.sample.1.audioFileId", value);
-                setBooleanParameter("aether.sample.1.enabled", Boolean(value));
+                setParameter(sampleParameterId("audioFileId"), value);
+                setBooleanParameter(sampleParameterId("enabled"), Boolean(value));
                 if (value && managedSfz()) setDraft({
                   ...useSynthStore.getState().draft,
-                  metadata: { ...useSynthStore.getState().draft.metadata, managedSfz: undefined },
+                  metadata: sampleMetadataPatch(mappedZones(), null),
                 });
               }}
             />
             <FloatingSelect
               label="Route"
               layout="inline"
-              value={String(draft().parameters["aether.sample.1.route"] ?? "filter")}
+              value={String(draft().parameters[sampleParameterId("route")] ?? "filter")}
               ariaLabel={`${sampleSlotLabel()} route`}
               options={[
                 { value: "filter", label: "Filter" },
@@ -1607,7 +1617,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               ]}
               open={sampleRouteOpen()}
               onOpenChange={setSampleRouteOpen}
-              onChange={(value) => setParameter("aether.sample.1.route", value)}
+              onChange={(value) => setParameter(sampleParameterId("route"), value)}
             />
             <Button
               ref={sampleImportButton}
@@ -1623,8 +1633,8 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               <Button size="xs" variant="ghost" aria-label={`Remove managed SFZ ${managedSfz()!.displayName}`} onClick={() => {
                 setDraft({
                   ...draft(),
-                  parameters: { ...draft().parameters, "aether.sample.1.enabled": false },
-                  metadata: { ...draft().metadata, managedSfz: undefined },
+                  parameters: { ...draft().parameters, [sampleParameterId("enabled")]: false },
+                  metadata: sampleMetadataPatch(mappedZones(), null),
                 });
                 queueMicrotask(() => sampleImportButton?.focus());
               }}>Remove SFZ</Button>
@@ -1634,26 +1644,26 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             <NumberInput
               label="Root"
               layout="inline"
-              value={getNumberParam(draft(), "aether.sample.1.rootNote")}
+              value={getNumberParam(draft(), sampleParameterId("rootNote"))}
               min={0}
               max={127}
               step={1}
               ariaLabel="Aether sample slot 1 root MIDI note"
-              onChange={(value) => setNumericParameter("aether.sample.1.rootNote", value)}
+              onChange={(value) => setNumericParameter(sampleParameterId("rootNote"), value)}
             />
-            <SynthParameterKnob id="aether.sample.1.level" label="Level" defaultValue={0.8} onChange={setNumericParameter} />
-            <SynthParameterKnob id="aether.sample.1.pan" label="Pan" defaultValue={0} bipolar onChange={setNumericParameter} />
+            <SynthParameterKnob id={sampleParameterId("level")} label="Level" defaultValue={0.8} onChange={setNumericParameter} />
+            <SynthParameterKnob id={sampleParameterId("pan")} label="Pan" defaultValue={0} bipolar onChange={setNumericParameter} />
           </div>
           <div class={styles.knobCluster}>
-            <SynthParameterKnob id="aether.sample.1.start" label="Start" defaultValue={0} onChange={setNumericParameter} />
-            <SynthParameterKnob id="aether.sample.1.end" label="End" defaultValue={1} onChange={setNumericParameter} />
+            <SynthParameterKnob id={sampleParameterId("start")} label="Start" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id={sampleParameterId("end")} label="End" defaultValue={1} onChange={setNumericParameter} />
             <Toggle
               label="Loop"
-              checked={draft().parameters["aether.sample.1.loop.enabled"] === true}
-              onChange={(value) => setBooleanParameter("aether.sample.1.loop.enabled", value)}
+              checked={draft().parameters[sampleParameterId("loop.enabled")] === true}
+              onChange={(value) => setBooleanParameter(sampleParameterId("loop.enabled"), value)}
             />
-            <SynthParameterKnob id="aether.sample.1.loop.start" label="Loop Start" defaultValue={0} onChange={setNumericParameter} />
-            <SynthParameterKnob id="aether.sample.1.loop.end" label="Loop End" defaultValue={1} onChange={setNumericParameter} />
+            <SynthParameterKnob id={sampleParameterId("loop.start")} label="Loop Start" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id={sampleParameterId("loop.end")} label="Loop End" defaultValue={1} onChange={setNumericParameter} />
           </div>
           <div class={styles.ampFilterShapeRow} aria-label="Aether Sample Slot 1 mapped zones">
             <Button size="xs" onClick={addMappedZone} disabled={mappedZones().length >= 8 || (!mappedZones().length && !baseZone().audioFileId)}>
@@ -1786,8 +1796,8 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             <SynthParameterKnob id="aether.sub.fxSend2" label="Sub 2" defaultValue={0} onChange={setNumericParameter} />
             <SynthParameterKnob id="aether.noise.fxSend1" label="Noise 1" defaultValue={0} onChange={setNumericParameter} />
             <SynthParameterKnob id="aether.noise.fxSend2" label="Noise 2" defaultValue={0} onChange={setNumericParameter} />
-            <SynthParameterKnob id="aether.sample.1.fxSend1" label="Sample 1" defaultValue={0} onChange={setNumericParameter} />
-            <SynthParameterKnob id="aether.sample.1.fxSend2" label="Sample 2" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id={sampleParameterId("fxSend1")} label="Sample 1" defaultValue={0} onChange={setNumericParameter} />
+            <SynthParameterKnob id={sampleParameterId("fxSend2")} label="Sample 2" defaultValue={0} onChange={setNumericParameter} />
           </div>
         </div>
       </div>
