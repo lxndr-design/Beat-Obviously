@@ -40,7 +40,7 @@ Exit gate: operator edits agree between waveform preview and rendered audio, and
 - `[x]` Serial and Parallel filter routing persists in schema v8; legacy patches migrate their shared output filter into Filter A with Filter B bypassed.
 - `[x]` A dedicated 6 x 3 bipolar output matrix routes every operator to Filter A, Filter B, or Direct; Serial routing feeds Filter A into Filter B while Parallel keeps both filter buses independent.
 - `[ ]` Per-operator pan and shared Beat FX sends.
-- `[ ]` Visible signal-flow diagnostics for silent or disconnected patches.
+- `[x]` Live signal-flow diagnostics classify carriers, modulators, disconnected or zero-level operators, active output buses, and fully silent patches.
 
 Exit gate: every audible route is visible in the editor and covered by persistence plus live/export tests.
 
@@ -76,5 +76,4 @@ Exit gate: the release report distinguishes verified audio behavior, performance
 
 ## Immediate order
 
-1. Add visible signal-flow diagnostics for disconnected operators and silent output buses.
-2. Add per-operator pan and shared Beat FX sends.
+1. Add per-operator pan and shared Beat FX sends.

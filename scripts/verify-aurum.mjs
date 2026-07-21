@@ -16,6 +16,7 @@ try {
     join(repoRoot, "frontend/src/state/aurum.ts"),
     join(repoRoot, "frontend/src/audio/synthPreview.ts"),
     join(repoRoot, "frontend/src/features/Aurum/aurumEditorInteraction.ts"),
+    join(repoRoot, "frontend/src/features/Aurum/aurumSignalDiagnostics.ts"),
     "--bundle",
     "--format=esm",
     "--platform=node",
@@ -25,6 +26,7 @@ try {
   const aurum = await import(pathToFileURL(join(outDir, "state/aurum.js")));
   const preview = await import(pathToFileURL(join(outDir, "audio/synthPreview.js")));
   const interaction = await import(pathToFileURL(join(outDir, "features/Aurum/aurumEditorInteraction.js")));
+  const diagnostics = await import(pathToFileURL(join(outDir, "features/Aurum/aurumSignalDiagnostics.js")));
   const instrument = aurum.createAurumInstrument("aurum-verifier", "Aurum Verifier");
 
   assert.equal(instrument.aurum.operators.length, 6, "Aurum must expose six operators");
@@ -47,6 +49,25 @@ try {
   assert.ok(instrument.aurum.operators.every((operator) => operator.velocityCurve.every((value) => value === 1)), "Velocity curves must default to neutral gain");
   assert.ok(instrument.aurum.operators.every((operator) => operator.keytrackCurve.every((value) => value === 1)), "Keyboard curves must default to neutral gain");
   assert.equal(aurum.evaluateAurumResponseCurve([0, 0.25, 0.5, 0.75, 1], 0.375), 0.375, "Response curves must interpolate between fixed points");
+
+  const defaultSignalFlow = diagnostics.analyzeAurumSignalFlow(instrument.aurum);
+  assert.equal(defaultSignalFlow.silent, false, "The default Aurum patch must report a connected output");
+  assert.equal(defaultSignalFlow.operators[0].state, "carrier", "The default output operator must be identified as a carrier");
+  assert.equal(defaultSignalFlow.operators[1].state, "modulator", "An operator feeding a connected carrier must be identified as a modulator");
+  assert.deepEqual(defaultSignalFlow.activeBuses, [true, false, false], "Default signal diagnostics must identify Filter A as the active output bus");
+
+  const silentDiagnosticsPatch = structuredClone(instrument.aurum);
+  silentDiagnosticsPatch.outputSends = Array.from({ length: 6 }, () => [0, 0, 0]);
+  const silentSignalFlow = diagnostics.analyzeAurumSignalFlow(silentDiagnosticsPatch);
+  assert.equal(silentSignalFlow.silent, true, "Aurum diagnostics must identify a patch with no output sends as silent");
+  assert.equal(silentSignalFlow.operators[0].state, "disconnected", "An enabled carrier without an output path must be identified as disconnected");
+  assert.equal(silentSignalFlow.operators[1].state, "disconnected", "A modulator in a disconnected graph must also be identified as disconnected");
+
+  const zeroLevelDiagnosticsPatch = structuredClone(instrument.aurum);
+  zeroLevelDiagnosticsPatch.operators[0].level = 0;
+  const zeroLevelSignalFlow = diagnostics.analyzeAurumSignalFlow(zeroLevelDiagnosticsPatch);
+  assert.equal(zeroLevelSignalFlow.silent, true, "A zero-level carrier must not activate its assigned output bus");
+  assert.equal(zeroLevelSignalFlow.operators[0].state, "silent", "A zero-level enabled operator must expose its silent state");
 
   const baseline = new Float32Array(4096);
   preview.renderInstrumentSamples(instrument, baseline, 48000, 220, "visual", true);

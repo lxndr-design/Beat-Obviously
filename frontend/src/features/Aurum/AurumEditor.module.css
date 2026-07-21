@@ -233,6 +233,55 @@
 .waveformScope polyline { fill: none; stroke: var(--color-fg); stroke-width: 2; vector-effect: non-scaling-stroke; }
 
 .matrixSection { overflow: auto; }
+.signalDiagnostics {
+  margin-bottom: 6px;
+  border: var(--border-soft);
+  background: var(--surface-subtle);
+}
+
+.signalDiagnostics[data-silent="true"] { border-color: var(--color-fg); }
+.signalSummary {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-bottom: var(--border-soft);
+  font-size: var(--font-size-ui);
+}
+.signalSummary > span { opacity: var(--structural-muted-opacity); }
+.signalFlow { display: flex; align-items: stretch; gap: 6px; padding: 6px; }
+.signalOperators { min-width: 0; flex: 1 1 auto; display: grid; grid-template-columns: repeat(6, minmax(48px, 1fr)); gap: 3px; }
+.signalBuses { flex: 0 0 min(210px, 36%); display: grid; grid-template-columns: repeat(3, minmax(54px, 1fr)); gap: 3px; }
+.signalNode,
+.signalBus {
+  min-width: 0;
+  min-height: 42px;
+  display: grid;
+  place-content: center;
+  gap: 3px;
+  padding: 3px;
+  border: var(--border-soft);
+  border-radius: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  text-align: center;
+  font: inherit;
+}
+.signalNode { cursor: pointer; }
+.signalNode strong,
+.signalBus strong { overflow: hidden; text-overflow: ellipsis; font-size: var(--font-size-ui); white-space: nowrap; }
+.signalNode span,
+.signalBus span { font-size: var(--font-size-hint); opacity: var(--structural-muted-opacity); }
+.signalNode[data-state="carrier"],
+.signalNode[data-state="modulator"],
+.signalBus[data-active="true"] { box-shadow: inset 0 -3px 0 var(--aurum-accent); }
+.signalNode[data-state="disconnected"],
+.signalNode[data-state="silent"] { border-color: var(--color-fg); }
+.signalNode[data-state="disabled"],
+.signalBus[data-active="false"] { opacity: 0.48; }
+.signalNode:focus-visible { outline: 2px solid var(--aurum-accent); outline-offset: 1px; }
+.signalArrow { display: grid; place-items: center; font-size: var(--font-size-field-label); opacity: var(--structural-muted-opacity); }
 .matrix {
   display: grid;
   border-top: var(--border-soft);
@@ -255,6 +304,10 @@
 
 .matrixHeader { display: grid; place-items: center; font-size: var(--font-size-ui); font-weight: 700; }
 .matrixRowLabel { font: inherit; font-size: var(--font-size-ui); cursor: pointer; }
+.matrixHeader[data-active="true"] { box-shadow: inset 0 -3px 0 var(--aurum-accent); }
+.matrixRowLabel[data-signal-state="disconnected"],
+.matrixRowLabel[data-signal-state="silent"] { box-shadow: inset 3px 0 0 var(--color-fg); }
+.matrixRowLabel[data-signal-state="disabled"] { opacity: 0.48; }
 .outputHeader,
 .outputCell { background: color-mix(in srgb, var(--aurum-accent) 10%, var(--color-bg)); }
 .feedbackCell { background: var(--surface-subtle); }
@@ -283,4 +336,11 @@
 @media (max-width: 960px) {
   .body { grid-template-columns: 1fr; overflow: auto; }
   .operatorSection { border-right: 0; border-bottom: var(--border-soft); overflow: visible; }
+}
+
+@media (max-width: 660px) {
+  .signalFlow { display: grid; }
+  .signalOperators { grid-template-columns: repeat(3, minmax(48px, 1fr)); }
+  .signalBuses { width: 100%; max-width: none; }
+  .signalArrow { display: none; }
 }

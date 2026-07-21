@@ -4,6 +4,7 @@ import { sampleAurumOperatorWaveform, startInstrumentPreviewAudition, type Instr
 import { AURUM_DIRECT_BUS, AURUM_FILTER_A_BUS, AURUM_FILTER_B_BUS, AURUM_HARMONIC_COUNT, AURUM_OPERATOR_COUNT, AURUM_OUTPUT_BUS_COUNT, AURUM_RESPONSE_CURVE_POINT_COUNT, drawAurumHarmonicLine, normalizedAurumConfigForInstrument } from "../../state/aurum";
 import type { AurumFilterConfig, AurumOperatorConfig, AurumOperatorWaveform, Instrument } from "../../state/types";
 import { aurumTabIndexAfterKey } from "./aurumEditorInteraction";
+import { analyzeAurumSignalFlow, type AurumOperatorSignalState } from "./aurumSignalDiagnostics";
 import styles from "./AurumEditor.module.css";
 
 const WAVEFORM_OPTIONS = ["sine", "triangle", "saw", "square", "additive"].map((value) => ({
@@ -38,6 +39,7 @@ export function AurumEditor(props: AurumEditorProps) {
 
   const aurum = createMemo(() => normalizedAurumConfigForInstrument(draft()));
   const operator = createMemo(() => aurum().operators[selectedOperator()]);
+  const signalDiagnostics = createMemo(() => analyzeAurumSignalFlow(aurum()));
 
   onCleanup(stopAudition);
 
@@ -393,13 +395,53 @@ export function AurumEditor(props: AurumEditorProps) {
               <Button size="xs" selected={matrixMode() === "output"} onClick={() => setMatrixMode("output")}>OUT</Button>
             </div>
           </div>
+          <div class={styles.signalDiagnostics} data-silent={signalDiagnostics().silent} aria-live="polite">
+            <div class={styles.signalSummary}>
+              <Icon name={signalDiagnostics().silent ? "ph:warning" : "ph:activity"} size={18} decorative />
+              <strong>{signalDiagnostics().silent ? "Silent patch" : "Output connected"}</strong>
+              <span>{signalDiagnostics().silent
+                ? "No enabled operator reaches an output bus."
+                : `${signalDiagnostics().activeOperatorCount} active ${signalDiagnostics().activeOperatorCount === 1 ? "operator" : "operators"}${signalDiagnostics().disconnectedOperatorCount > 0 ? ` · ${signalDiagnostics().disconnectedOperatorCount} disconnected` : ""}`}</span>
+            </div>
+            <div class={styles.signalFlow} aria-label="Aurum signal-flow status">
+              <div class={styles.signalOperators}>
+                <For each={aurum().operators}>{(candidate, index) => {
+                  const diagnostic = () => signalDiagnostics().operators[index()];
+                  return (
+                    <button
+                      type="button"
+                      class={styles.signalNode}
+                      data-state={diagnostic().state}
+                      aria-label={`${candidate.name}: ${operatorSignalLabel(diagnostic().state)}`}
+                      onClick={() => {
+                        setSelectedOperator(index());
+                        setSelectedPage("operator");
+                      }}
+                    >
+                      <strong>{candidate.name}</strong>
+                      <span>{operatorSignalLabel(diagnostic().state)}</span>
+                    </button>
+                  );
+                }}</For>
+              </div>
+              <span class={styles.signalArrow} aria-hidden="true">→</span>
+              <div class={styles.signalBuses}>
+                <For each={["FILTER A", "FILTER B", "DIRECT"]}>{(label, index) => (
+                  <div class={styles.signalBus} data-active={signalDiagnostics().activeBuses[index()]}>
+                    <strong>{label}</strong>
+                    <span>{signalDiagnostics().activeBuses[index()] ? "ACTIVE" : "IDLE"}</span>
+                  </div>
+                )}</For>
+              </div>
+            </div>
+          </div>
           <div
             class={`${styles.matrix} ${matrixMode() === "output" ? styles.outputMatrix : styles.fmMatrix}`}
             role="group"
             aria-label={`Aurum ${matrixMode() === "fm" ? "frequency" : matrixMode() === "rm" ? "ring modulation" : "output"} routing matrix`}
           >
             <span />
-            <For each={matrixMode() === "output" ? ["FILTER A", "FILTER B", "DIRECT"] : aurum().operators.map((candidate) => candidate.name)}>{(label) => <span class={`${styles.matrixHeader} ${matrixMode() === "output" ? styles.outputHeader : ""}`}>{label}</span>}</For>
+            <For each={matrixMode() === "output" ? ["FILTER A", "FILTER B", "DIRECT"] : aurum().operators.map((candidate) => candidate.name)}>{(label, index) => <span class={`${styles.matrixHeader} ${matrixMode() === "output" ? styles.outputHeader : ""}`} data-active={matrixMode() === "output" ? signalDiagnostics().activeBuses[index()] : undefined}>{label}</span>}</For>
             <For each={aurum().operators}>{(source, sourceIndex) => (
               <>
                 <Button
@@ -407,6 +449,7 @@ export function AurumEditor(props: AurumEditorProps) {
                   variant="ghost"
                   selected={selectedOperator() === sourceIndex()}
                   className={styles.matrixRowLabel}
+                  data-signal-state={signalDiagnostics().operators[sourceIndex()].state}
                   onClick={() => {
                     setSelectedOperator(sourceIndex());
                     setSelectedPage("operator");
@@ -463,6 +506,14 @@ export function AurumEditor(props: AurumEditorProps) {
       </footer>
     </div>
   );
+}
+
+function operatorSignalLabel(state: AurumOperatorSignalState) {
+  if (state === "carrier") return "OUTPUT";
+  if (state === "modulator") return "MOD";
+  if (state === "disconnected") return "NO PATH";
+  if (state === "silent") return "0 LEVEL";
+  return "OFF";
 }
 
 function WaveformScope(props: { operator: AurumOperatorConfig }) {

@@ -36,6 +36,8 @@ The module strip uses tab semantics with roving focus. Arrow keys cycle through 
 
 Existing Beat controls are used for commands, selection, numeric entry, sliders, toggles, and matrix knobs. The waveform scope and routing-cell composition are Aurum-specific because the shared UI kit has no equivalent synthesis visual.
 
+The editor analyzes the signal graph live. Operators with direct bus sends are marked as carriers, operators that reach those carriers through FM or RM are marked as modulators, and enabled operators without an audible path are marked as disconnected. Filter A, Filter B, and Direct show active or idle state; a patch with no active bus is explicitly reported as silent.
+
 For a deterministic browser review, open `?beatDevFixture=aurum-editor`. The fixture loads a three-operator routing example and opens the Aurum editor directly.
 
 ## Current boundary
