@@ -504,13 +504,15 @@ export interface AurumOperatorConfig {
   pitchEnvelopeSemitones: number;
   phaseEnvelope: AdsrEnvelope;
   phaseEnvelopeDegrees: number;
+  velocityCurve: number[];
+  keytrackCurve: number[];
 }
 
 /** Six-operator FM/additive instrument. Matrix rows are sources; columns 0..5
  * are FM destinations and column 6 is direct output. Diagonal values are
  * operator feedback. */
 export interface AurumSynthConfig {
-  version: 5;
+  version: 6;
   operators: AurumOperatorConfig[];
   matrix: number[][];
   rmMatrix: number[][];

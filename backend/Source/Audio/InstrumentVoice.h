@@ -142,6 +142,8 @@ namespace beat
                 float phaseSustain { 0.0f };
                 float phaseReleaseMs { 100.0f };
                 float phaseEnvelopeDegrees { 0.0f };
+                std::array<float, 5> velocityCurve {{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }};
+                std::array<float, 5> keytrackCurve {{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }};
             };
 
             struct DynamicModTarget

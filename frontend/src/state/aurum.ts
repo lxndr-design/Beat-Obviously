@@ -3,6 +3,7 @@ import type { AurumOperatorConfig, AurumSynthConfig, Instrument } from "./types"
 export const AURUM_OPERATOR_COUNT = 6;
 export const AURUM_OUTPUT_COLUMN = AURUM_OPERATOR_COUNT;
 export const AURUM_HARMONIC_COUNT = 16;
+export const AURUM_RESPONSE_CURVE_POINT_COUNT = 5;
 
 function defaultOperator(index: number): AurumOperatorConfig {
   return {
@@ -27,6 +28,8 @@ function defaultOperator(index: number): AurumOperatorConfig {
     pitchEnvelopeSemitones: 0,
     phaseEnvelope: { attackMs: 0, decayMs: 180, sustain: 0, releaseMs: 100 },
     phaseEnvelopeDegrees: 0,
+    velocityCurve: Array(AURUM_RESPONSE_CURVE_POINT_COUNT).fill(1),
+    keytrackCurve: Array(AURUM_RESPONSE_CURVE_POINT_COUNT).fill(1),
   };
 }
 
@@ -36,7 +39,7 @@ export function defaultAurumConfig(): AurumSynthConfig {
   matrix[0][AURUM_OUTPUT_COLUMN] = 0.86;
   matrix[1][0] = 0.42;
   return {
-    version: 5,
+    version: 6,
     operators: Array.from({ length: AURUM_OPERATOR_COUNT }, (_, index) => defaultOperator(index)),
     matrix,
     rmMatrix,
@@ -79,7 +82,7 @@ export function normalizedAurumConfig(config: AurumSynthConfig | undefined): Aur
   return {
     ...fallback,
     ...config,
-    version: 5,
+    version: 6,
     operators: fallback.operators.map((operator, index) => {
       const incoming = config.operators?.[index];
       return {
@@ -91,12 +94,27 @@ export function normalizedAurumConfig(config: AurumSynthConfig | undefined): Aur
         pitchEnvelopeSemitones: clampRange(incoming?.pitchEnvelopeSemitones ?? operator.pitchEnvelopeSemitones, -48, 48),
         phaseEnvelope: { ...operator.phaseEnvelope, ...incoming?.phaseEnvelope },
         phaseEnvelopeDegrees: clampRange(incoming?.phaseEnvelopeDegrees ?? operator.phaseEnvelopeDegrees, -180, 180),
+        velocityCurve: normalizeResponseCurve(incoming?.velocityCurve, operator.velocityCurve),
+        keytrackCurve: normalizeResponseCurve(incoming?.keytrackCurve, operator.keytrackCurve),
         harmonics: operator.harmonics.map((value, harmonic) => clamp01(incoming?.harmonics?.[harmonic] ?? value)),
       };
     }),
     matrix: fallback.matrix.map((row, source) => row.map((value, target) => clampBipolar(config.matrix[source]?.[target] ?? value))),
     rmMatrix: fallback.rmMatrix.map((row, source) => row.map((value, target) => clampBipolar(config.rmMatrix?.[source]?.[target] ?? value))),
   };
+}
+
+function normalizeResponseCurve(values: number[] | undefined, fallback: number[]) {
+  return Array.from({ length: AURUM_RESPONSE_CURVE_POINT_COUNT }, (_, index) => clamp01(values?.[index] ?? fallback[index] ?? 1));
+}
+
+export function evaluateAurumResponseCurve(values: number[], input: number) {
+  const curve = normalizeResponseCurve(values, Array(AURUM_RESPONSE_CURVE_POINT_COUNT).fill(1));
+  const position = clamp01(input) * (AURUM_RESPONSE_CURVE_POINT_COUNT - 1);
+  const lower = Math.floor(position);
+  const upper = Math.min(AURUM_RESPONSE_CURVE_POINT_COUNT - 1, lower + 1);
+  const mix = position - lower;
+  return curve[lower] + (curve[upper] - curve[lower]) * mix;
 }
 
 function clampBipolar(value: number) {

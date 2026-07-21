@@ -2084,6 +2084,8 @@ namespace beat
                 source.phaseSustain,
                 source.phaseReleaseMs,
                 source.phaseEnvelopeDegrees,
+                source.velocityCurve,
+                source.keytrackCurve,
             };
             params.aurumMatrix[index] = instrument.aurum.matrix[index];
             params.aurumRmMatrix[index] = instrument.aurum.rmMatrix[index];

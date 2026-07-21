@@ -2277,6 +2277,12 @@ namespace beat
                                 op.phaseSustain = normalizedParam(phaseEnvelope, "sustain", 0.0f);
                                 op.phaseReleaseMs = floatParam(phaseEnvelope, "releaseMs", 100.0f, 0.0f, 10000.0f);
                                 op.phaseEnvelopeDegrees = floatParam(value, "phaseEnvelopeDegrees", 0.0f, -180.0f, 180.0f);
+                                if (auto* points = value.getProperty("velocityCurve", {}).getArray())
+                                    for (int point = 0; point < juce::jmin(5, points->size()); ++point)
+                                        op.velocityCurve[(size_t) point] = juce::jlimit(0.0f, 1.0f, (float) (double) points->getReference(point));
+                                if (auto* points = value.getProperty("keytrackCurve", {}).getArray())
+                                    for (int point = 0; point < juce::jmin(5, points->size()); ++point)
+                                        op.keytrackCurve[(size_t) point] = juce::jlimit(0.0f, 1.0f, (float) (double) points->getReference(point));
                                 if (auto* harmonics = value.getProperty("harmonics", {}).getArray())
                                     for (int harmonic = 0; harmonic < juce::jmin(16, harmonics->size()); ++harmonic)
                                         op.harmonics[(size_t) harmonic] = juce::jlimit(0.0f, 1.0f, (float) (double) harmonics->getReference(harmonic));

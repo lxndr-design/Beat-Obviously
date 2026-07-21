@@ -50,7 +50,7 @@
 
 .body {
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   display: grid;
   grid-template-columns: minmax(330px, 0.78fr) minmax(540px, 1.22fr);
   align-content: start;
@@ -59,7 +59,7 @@
 .operatorSection,
 .matrixSection { min-width: 0; }
 
-.operatorSection { border-right: var(--border-soft); }
+.operatorSection { border-right: var(--border-soft); overflow: auto; }
 .operatorTabs { display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: var(--border-soft); }
 .operatorTabs > button { border-top: 0; border-bottom: 0; border-left: 0; }
 .operatorTabs > button:last-child { border-right: 0; }
@@ -116,6 +116,52 @@
 .articulationHeader h4 { display: flex; align-items: center; }
 .envelopeMode { display: flex; }
 .envelopeMode > button + button { border-left: 0; }
+
+.responseHeader {
+  min-height: 30px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.responseHeader h4 { display: flex; align-items: center; }
+.responseMode,
+.responsePresets { display: flex; }
+.responseMode > button + button,
+.responsePresets > button + button { border-left: 0; }
+.responsePresets { justify-content: flex-end; margin-top: 3px; }
+
+.responseEditor {
+  padding: 6px 9px 3px;
+  border: var(--border-soft);
+  background: var(--surface-subtle);
+}
+
+.responseCanvas {
+  position: relative;
+  height: 84px;
+  margin: 6px;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.responseCanvas svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.responseCanvas line { stroke: color-mix(in srgb, var(--color-fg) 18%, transparent); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.responseCanvas polyline { fill: none; stroke: var(--aurum-accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+
+.responsePoint {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  border: var(--border-fg);
+  background: var(--color-bg);
+  cursor: ns-resize;
+}
+
+.responsePoint:focus-visible { outline: 2px solid var(--aurum-accent); outline-offset: 2px; }
+.responseLabels { display: flex; justify-content: space-between; font-size: var(--font-size-hint); opacity: var(--structural-muted-opacity); }
 
 .waveRow {
   display: grid;
@@ -203,6 +249,6 @@
 .footerActions > button { border-top: 0; border-bottom: 0; border-right: 0; }
 
 @media (max-width: 960px) {
-  .body { grid-template-columns: 1fr; }
-  .operatorSection { border-right: 0; border-bottom: var(--border-soft); }
+  .body { grid-template-columns: 1fr; overflow: auto; }
+  .operatorSection { border-right: 0; border-bottom: var(--border-soft); overflow: visible; }
 }

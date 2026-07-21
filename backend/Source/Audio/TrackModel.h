@@ -229,8 +229,10 @@ namespace beat
             float phaseAttackMs { 0.0f };
             float phaseDecayMs { 180.0f };
             float phaseSustain { 0.0f };
-            float phaseReleaseMs { 100.0f };
-            float phaseEnvelopeDegrees { 0.0f };
+                float phaseReleaseMs { 100.0f };
+                float phaseEnvelopeDegrees { 0.0f };
+                std::array<float, 5> velocityCurve {{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }};
+                std::array<float, 5> keytrackCurve {{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }};
         };
 
         struct AurumConfig

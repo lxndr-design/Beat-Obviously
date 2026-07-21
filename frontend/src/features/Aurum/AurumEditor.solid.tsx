@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { Button, FloatingSelect, Icon, Knob, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
 import { sampleAurumOperatorWaveform, startInstrumentPreviewAudition, type InstrumentPreviewAuditionHandle } from "../../audio/synthPreview";
-import { AURUM_HARMONIC_COUNT, AURUM_OPERATOR_COUNT, AURUM_OUTPUT_COLUMN, drawAurumHarmonicLine, normalizedAurumConfig } from "../../state/aurum";
+import { AURUM_HARMONIC_COUNT, AURUM_OPERATOR_COUNT, AURUM_OUTPUT_COLUMN, AURUM_RESPONSE_CURVE_POINT_COUNT, drawAurumHarmonicLine, normalizedAurumConfig } from "../../state/aurum";
 import type { AurumOperatorConfig, AurumOperatorWaveform, Instrument } from "../../state/types";
 import { aurumTabIndexAfterKey } from "./aurumEditorInteraction";
 import styles from "./AurumEditor.module.css";
@@ -25,6 +25,7 @@ export function AurumEditor(props: AurumEditorProps) {
   const [selectedPage, setSelectedPage] = createSignal<"main" | "operator">("operator");
   const [matrixMode, setMatrixMode] = createSignal<"fm" | "rm">("fm");
   const [envelopeMode, setEnvelopeMode] = createSignal<EnvelopeMode>("amp");
+  const [responseMode, setResponseMode] = createSignal<"velocity" | "key">("velocity");
   const [waveformOpen, setWaveformOpen] = createSignal(false);
   const [auditioning, setAuditioning] = createSignal(false);
   let audition: InstrumentPreviewAuditionHandle | null = null;
@@ -62,6 +63,11 @@ export function AurumEditor(props: AurumEditorProps) {
       return;
     }
     updateOperator({ envelope: { ...operator().envelope, ...patch } });
+  }
+
+  function updateResponseCurve(values: number[]) {
+    if (responseMode() === "velocity") updateOperator({ velocityCurve: values });
+    else updateOperator({ keytrackCurve: values });
   }
 
   function updateMatrix(source: number, target: number, value: number) {
@@ -268,6 +274,25 @@ export function AurumEditor(props: AurumEditorProps) {
                   <NumberInput label="Release" layout="inline" min={0} max={10000} step={1} unit="ms" value={selectedEnvelope().releaseMs} onChange={(releaseMs) => updateEnvelope({ releaseMs })} />
                 </div>
               </div>
+              <div class={styles.controlBlock}>
+                <div class={styles.responseHeader}>
+                  <h4>{responseMode() === "velocity" ? "Velocity" : "Keyboard"} response</h4>
+                  <div class={styles.responseMode} role="group" aria-label="Operator response curve mode">
+                    <Button size="xs" selected={responseMode() === "velocity"} onClick={() => setResponseMode("velocity")}>Vel</Button>
+                    <Button size="xs" selected={responseMode() === "key"} onClick={() => setResponseMode("key")}>Key</Button>
+                  </div>
+                </div>
+                <ResponseCurveEditor
+                  mode={responseMode()}
+                  values={responseMode() === "velocity" ? operator().velocityCurve : operator().keytrackCurve}
+                  onChange={updateResponseCurve}
+                />
+                <div class={styles.responsePresets} aria-label="Response curve presets">
+                  <Button size="xs" variant="ghost" onClick={() => updateResponseCurve(Array(AURUM_RESPONSE_CURVE_POINT_COUNT).fill(1))}>Flat</Button>
+                  <Button size="xs" variant="ghost" onClick={() => updateResponseCurve([0, 0.25, 0.5, 0.75, 1])}>Rise</Button>
+                  <Button size="xs" variant="ghost" onClick={() => updateResponseCurve([1, 0.75, 0.5, 0.25, 0])}>Fall</Button>
+                </div>
+              </div>
             </div>
           </Show>
         </section>
@@ -434,6 +459,74 @@ function HarmonicEditor(props: { values: number[]; onChange: (values: number[]) 
           <small>{index() + 1}</small>
         </div>
       )}</For>
+    </div>
+  );
+}
+
+function ResponseCurveEditor(props: { mode: "velocity" | "key"; values: number[]; onChange: (values: number[]) => void }) {
+  const values = createMemo(() => Array.from(
+    { length: AURUM_RESPONSE_CURVE_POINT_COUNT },
+    (_, index) => Math.max(0, Math.min(1, props.values[index] ?? 1)),
+  ));
+  const points = createMemo(() => values().map((value, index) => `${(index / (AURUM_RESPONSE_CURVE_POINT_COUNT - 1)) * 100},${(1 - value) * 100}`).join(" "));
+
+  function updatePoint(index: number, value: number) {
+    const next = [...values()];
+    next[index] = Math.max(0, Math.min(1, value));
+    props.onChange(next);
+  }
+
+  function updateFromPointer(event: PointerEvent & { currentTarget: HTMLDivElement }) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / Math.max(1, rect.width)));
+    const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / Math.max(1, rect.height)));
+    updatePoint(Math.round(x * (AURUM_RESPONSE_CURVE_POINT_COUNT - 1)), 1 - y);
+  }
+
+  const inputLabel = (index: number) => props.mode === "velocity"
+    ? Math.round((index / (AURUM_RESPONSE_CURVE_POINT_COUNT - 1)) * 127)
+    : Math.round((index / (AURUM_RESPONSE_CURVE_POINT_COUNT - 1)) * 127);
+
+  return (
+    <div class={styles.responseEditor} aria-label={`${props.mode === "velocity" ? "Velocity" : "Keyboard"} response curve`}>
+      <div
+        class={styles.responseCanvas}
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          updateFromPointer(event);
+        }}
+        onPointerMove={(event) => { if (event.buttons === 1) updateFromPointer(event); }}
+      >
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <line x1="0" y1="50" x2="100" y2="50" />
+          <line x1="50" y1="0" x2="50" y2="100" />
+          <polyline points={points()} />
+        </svg>
+        <For each={values()}>{(value, index) => (
+          <div
+            class={styles.responsePoint}
+            style={{ left: `${(index() / (AURUM_RESPONSE_CURVE_POINT_COUNT - 1)) * 100}%`, top: `${(1 - value) * 100}%` }}
+            role="slider"
+            tabIndex={0}
+            aria-label={`${props.mode === "velocity" ? "Velocity" : "Key"} ${inputLabel(index())}`}
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow={Math.round(value * 100)}
+            aria-valuetext={`${Math.round(value * 100)} percent gain`}
+            title={`${inputLabel(index())}: ${Math.round(value * 100)}%`}
+            onKeyDown={(event) => {
+              const steps: Record<string, number> = { ArrowUp: 0.05, ArrowRight: 0.05, ArrowDown: -0.05, ArrowLeft: -0.05, PageUp: 0.1, PageDown: -0.1 };
+              if (event.key === "Home" || event.key === "End" || event.key in steps) {
+                event.preventDefault();
+                updatePoint(index(), event.key === "Home" ? 0 : event.key === "End" ? 1 : value + steps[event.key]);
+              }
+            }}
+          />
+        )}</For>
+      </div>
+      <div class={styles.responseLabels} aria-hidden="true">
+        <For each={values()}>{(_, index) => <span>{inputLabel(index())}</span>}</For>
+      </div>
     </div>
   );
 }

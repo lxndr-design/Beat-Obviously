@@ -7365,6 +7365,8 @@ namespace
         instrument.aurum.operators[0].phaseSustain = 0.58f;
         instrument.aurum.operators[0].phaseReleaseMs = 197.0f;
         instrument.aurum.operators[0].phaseEnvelopeDegrees = 94.0f;
+        instrument.aurum.operators[0].velocityCurve = {{ 0.12f, 0.31f, 0.53f, 0.77f, 0.96f }};
+        instrument.aurum.operators[0].keytrackCurve = {{ 0.91f, 0.73f, 0.58f, 0.34f, 0.16f }};
         instrument.aurum.operators[0].harmonics[2] = 0.64f;
         instrument.aurum.operators[0].harmonics[7] = 0.22f;
         instrument.aurum.operators[1].enabled = true;
@@ -7407,6 +7409,8 @@ namespace
             && near(loaded->instruments.front().aurum.operators[0].phaseSustain, 0.58f)
             && near(loaded->instruments.front().aurum.operators[0].phaseReleaseMs, 197.0f)
             && near(loaded->instruments.front().aurum.operators[0].phaseEnvelopeDegrees, 94.0f)
+            && near(loaded->instruments.front().aurum.operators[0].velocityCurve[2], 0.53f)
+            && near(loaded->instruments.front().aurum.operators[0].keytrackCurve[3], 0.34f)
             && loaded->instruments.front().aurum.operators[0].waveform == 4
             && near(loaded->instruments.front().aurum.operators[0].harmonics[2], 0.64f)
             && near(loaded->instruments.front().aurum.operators[0].harmonics[7], 0.22f)
@@ -12862,6 +12866,78 @@ namespace
         return ok;
     }
 
+    bool stressInstrumentVoiceAurumOperatorResponseCurves()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        params.releaseMs = 1.0f;
+        auto& op = params.aurumOperators[0];
+        op.enabled = true;
+        op.waveform = 0;
+        op.ratio = 1.0f;
+        op.level = 0.8f;
+        op.attackMs = 0.0f;
+        op.decayMs = 0.0f;
+        op.sustain = 1.0f;
+        params.aurumMatrix[0][6] = 1.0f;
+
+        auto render = [](const beat::InstrumentVoice::Params& renderParams, int midiNote, float velocity)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 4096);
+            voice.setParams(renderParams);
+            voice.startNote(midiNote, velocity, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        auto energy = [](const juce::AudioBuffer<float>& buffer)
+        {
+            double sum = 0.0;
+            for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+                for (int sampleIndex = 0; sampleIndex < buffer.getNumSamples(); ++sampleIndex)
+                {
+                    const auto sample = (double) buffer.getSample(channel, sampleIndex);
+                    if (!std::isfinite(sample)) return -1.0;
+                    sum += sample * sample;
+                }
+            return sum;
+        };
+
+        const auto flat = render(params, 64, 0.5f);
+        params.aurumOperators[0].velocityCurve = {{ 0.0f, 0.25f, 0.5f, 0.75f, 1.0f }};
+        const auto velocityShaped = render(params, 64, 0.5f);
+        params.aurumOperators[0].velocityCurve = {{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }};
+        params.aurumOperators[0].keytrackCurve = {{ 0.0f, 0.25f, 0.5f, 0.75f, 1.0f }};
+        const auto keyShaped = render(params, 64, 0.5f);
+        params.aurumOperators[0].keytrackCurve = {{ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }};
+        const auto muted = render(params, 64, 0.5f);
+
+        const double flatEnergy = energy(flat);
+        const double velocityEnergy = energy(velocityShaped);
+        const double keyEnergy = energy(keyShaped);
+        const double mutedEnergy = energy(muted);
+        const bool ok = flatEnergy > 0.001
+            && velocityEnergy > 0.001 && velocityEnergy < flatEnergy * 0.4
+            && keyEnergy > 0.001 && keyEnergy < flatEnergy * 0.4
+            && mutedEnergy >= 0.0 && mutedEnergy < 0.000001;
+        if (!ok)
+            std::cerr << "Aurum operator response curve stress failed flat=" << flatEnergy
+                      << " velocity=" << velocityEnergy
+                      << " key=" << keyEnergy
+                      << " muted=" << mutedEnergy << "\n";
+        return ok;
+    }
+
     bool stressInstrumentVoiceAurumDenseFeedbackStability()
     {
         beat::InstrumentVoice::Params params;
@@ -14324,6 +14400,7 @@ int main(int argc, char** argv)
             && stressInstrumentVoiceAurumAdditiveOperator()
             && stressInstrumentVoiceAurumWavefold()
             && stressInstrumentVoiceAurumOperatorArticulation()
+            && stressInstrumentVoiceAurumOperatorResponseCurves()
             && stressInstrumentVoiceAurumDenseFeedbackStability()
             && stressAudioEngineAurumCrossRateLiveExportParity()
             && stressProjectRepositoryAurumInstrumentRoundtrip();
@@ -14503,6 +14580,11 @@ int main(int argc, char** argv)
     if (!stressInstrumentVoiceAurumOperatorArticulation())
     {
         std::cerr << "Instrument voice Aurum operator articulation stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumOperatorResponseCurves())
+    {
+        std::cerr << "Instrument voice Aurum operator response curve stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceAurumDenseFeedbackStability())

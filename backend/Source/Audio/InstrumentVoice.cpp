@@ -75,6 +75,18 @@ namespace beat
                 : 0.0f;
         }
 
+        float aurumResponseCurve(const std::array<float, 5>& curve, float input) noexcept
+        {
+            const float position = VoiceMath::clamp01(input) * 4.0f;
+            const auto lower = (size_t) juce::jlimit(0, 4, (int) std::floor(position));
+            const auto upper = juce::jmin((size_t) 4, lower + 1);
+            const float mix = position - (float) lower;
+            return juce::jmap(
+                mix,
+                VoiceMath::clamp01(curve[lower]),
+                VoiceMath::clamp01(curve[upper]));
+        }
+
         float aurumOperatorSample(
             const InstrumentVoice::Params::AurumOperator& op,
             double phase,
@@ -666,7 +678,11 @@ namespace beat
                                     + phaseEnvelope * juce::jlimit(-180.0f, 180.0f, op.phaseEnvelopeDegrees) / 360.0f
                                     + fm * aurumFmPhaseScale,
                                 delta)
-                                * VoiceMath::clamp01(op.level) * opEnvelope * rmGain);
+                                * VoiceMath::clamp01(op.level)
+                                * opEnvelope
+                                * aurumResponseCurve(op.velocityCurve, level)
+                                * aurumResponseCurve(op.keytrackCurve, noteKeytrack)
+                                * rmGain);
                         aurumPhases[voiceOffset + target] = std::fmod(aurumPhases[voiceOffset + target] + delta, 1.0);
                         currentBlockWork.addOscillatorSamples(1);
                     }

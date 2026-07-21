@@ -422,7 +422,7 @@ namespace beat
         juce::var aurumConfigToVar(const InstrumentDefinition::AurumConfig& aurum)
         {
             juce::DynamicObject::Ptr object = new juce::DynamicObject();
-            object->setProperty("version", 5);
+            object->setProperty("version", 6);
             object->setProperty("unison", aurum.unison);
             object->setProperty("detuneCents", aurum.detuneCents);
             object->setProperty("stereoSpread", aurum.stereoSpread);
@@ -461,6 +461,12 @@ namespace beat
                 phaseEnvelope->setProperty("releaseMs", source.phaseReleaseMs);
                 op->setProperty("phaseEnvelope", juce::var(phaseEnvelope.get()));
                 op->setProperty("phaseEnvelopeDegrees", source.phaseEnvelopeDegrees);
+                juce::Array<juce::var> velocityCurve;
+                for (const auto point : source.velocityCurve) velocityCurve.add(point);
+                op->setProperty("velocityCurve", juce::var(velocityCurve));
+                juce::Array<juce::var> keytrackCurve;
+                for (const auto point : source.keytrackCurve) keytrackCurve.add(point);
+                op->setProperty("keytrackCurve", juce::var(keytrackCurve));
                 juce::Array<juce::var> harmonics;
                 for (const auto amplitude : source.harmonics) harmonics.add(amplitude);
                 op->setProperty("harmonics", juce::var(harmonics));
@@ -521,6 +527,12 @@ namespace beat
                     op.phaseSustain = juce::jlimit(0.0f, 1.0f, (float) (double) phaseEnvelope.getProperty("sustain", 0.0));
                     op.phaseReleaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) phaseEnvelope.getProperty("releaseMs", 100.0));
                     op.phaseEnvelopeDegrees = juce::jlimit(-180.0f, 180.0f, (float) (double) source.getProperty("phaseEnvelopeDegrees", 0.0));
+                    if (auto* points = source.getProperty("velocityCurve", {}).getArray())
+                        for (int point = 0; point < juce::jmin(5, points->size()); ++point)
+                            op.velocityCurve[(size_t) point] = juce::jlimit(0.0f, 1.0f, (float) (double) points->getReference(point));
+                    if (auto* points = source.getProperty("keytrackCurve", {}).getArray())
+                        for (int point = 0; point < juce::jmin(5, points->size()); ++point)
+                            op.keytrackCurve[(size_t) point] = juce::jlimit(0.0f, 1.0f, (float) (double) points->getReference(point));
                     if (auto* harmonics = source.getProperty("harmonics", {}).getArray())
                         for (int harmonic = 0; harmonic < juce::jmin(16, harmonics->size()); ++harmonic)
                             op.harmonics[(size_t) harmonic] = juce::jlimit(0.0f, 1.0f, (float) (double) harmonics->getReference(harmonic));

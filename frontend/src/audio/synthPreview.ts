@@ -1,4 +1,5 @@
 import { evaluateAutomationCurve } from "../automation/curves";
+import { evaluateAurumResponseCurve } from "../state/aurum";
 import type { AurumOperatorConfig, AutomationCurve, CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, WavetableConfig } from "../state/types";
 import { sampleZoneStableId } from "../state/sampleZones";
 
@@ -24,6 +25,8 @@ interface RenderModulation {
   positionOffset: number;
   ampEnvelope: number;
   targetOffsets: Partial<Record<RuntimeModulationTarget, number>>;
+  velocity?: number;
+  keytrack?: number;
 }
 
 type DirectRuntimeModulationTarget =
@@ -942,7 +945,7 @@ export function renderInstrumentSample(
   const sub = instrument.aether || instrument.aurum ? 0 : clamp01(instrument.subOscLevel ?? 0);
 
   let v = instrument.aurum
-    ? aurumMatrixSample(instrument, state, sampleRate, frequency)
+    ? aurumMatrixSample(instrument, state, sampleRate, frequency, modulation)
     : instrument.kind === "wavetable" && instrument.aether
     ? aetherStackSample(instrument, state, sampleRate, frequency, mode, modulation)
     : instrument.kind === "wavetable" || instrument.waveform === "wavetable"
@@ -976,12 +979,12 @@ export function renderInstrumentSample(
   return clamp(filtered * level * clamp01(modulation.ampEnvelope ?? 1), -1, 1);
 }
 
-function aurumMatrixSample(instrument: Instrument, state: SynthRenderState, sampleRate: number, frequency: number): number {
-  const stereo = aurumMatrixStereoSample(instrument, state, sampleRate, frequency);
+function aurumMatrixSample(instrument: Instrument, state: SynthRenderState, sampleRate: number, frequency: number, modulation: RenderModulation): number {
+  const stereo = aurumMatrixStereoSample(instrument, state, sampleRate, frequency, modulation);
   return (stereo.left + stereo.right) * Math.SQRT1_2;
 }
 
-function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState, sampleRate: number, frequency: number) {
+function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState, sampleRate: number, frequency: number, modulationState: RenderModulation) {
   const config = instrument.aurum;
   if (!config) return { left: 0, right: 0 };
   const operatorCount = Math.min(6, config.operators.length);
@@ -1023,7 +1026,9 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
         rmGain *= 1 - Math.abs(amount) + modulator * amount;
       }
       const phaseDelta = (frequency * voiceRate * ratio * tuning * pitchEnvelopeRate) / sampleRate;
-      nextOutputs[stateIndex] = sampleAurumOperatorWaveform(operator, phase, phaseDelta) * clamp01(operator.level) * envelope * rmGain;
+      const responseGain = evaluateAurumResponseCurve(operator.velocityCurve, modulationState.velocity ?? 1)
+        * evaluateAurumResponseCurve(operator.keytrackCurve, modulationState.keytrack ?? 0.5);
+      nextOutputs[stateIndex] = sampleAurumOperatorWaveform(operator, phase, phaseDelta) * clamp01(operator.level) * envelope * responseGain * rmGain;
       state.aurumPhases[stateIndex] = (state.aurumPhases[stateIndex] + phaseDelta) % 1;
     }
 
@@ -1063,7 +1068,7 @@ function renderAurumStereoSample(
   );
   const resonance = clamp01(instrument.knobs.resonance + modulationTargetOffset(modulation, "filter.resonance"));
   const drive = clamp01(instrument.knobs.drive + modulationTargetOffset(modulation, "filter.drive"));
-  const raw = aurumMatrixStereoSample(instrument, phaseState, sampleRate, frequency);
+  const raw = aurumMatrixStereoSample(instrument, phaseState, sampleRate, frequency, modulation);
   let left = raw.left;
   let right = raw.right;
   if (drive > 0) {
@@ -2097,7 +2102,7 @@ export function modulationAtTime(
   const env2 = modEnvelopePreviewValue(timeS, durationS, instrument);
   const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, env, env2, velocity, keytrack, modWheel, macroOverrides);
   if (targetOffsets) {
-    return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, ampEnvelope: env, targetOffsets };
+    return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, ampEnvelope: env, targetOffsets, velocity, keytrack };
   }
 
   const positionLfo = lfoRouteValue(rawLfo, instrument.lfoPositionBipolar ?? true);
@@ -2107,7 +2112,7 @@ export function modulationAtTime(
   const pitchSemitones = pitchLfo * Math.max(0, instrument.lfoToPitch ?? 0);
   const lfoFilter = filterLfo * clamp(instrument.lfoToFilter ?? 0, -1, 1) * 0.35;
   const envFilter = env * clamp(instrument.envToFilter ?? 0, -1, 1) * 0.35;
-  return { pitchSemitones, filterOffset: lfoFilter + envFilter, positionOffset, ampEnvelope: env, targetOffsets: {} };
+  return { pitchSemitones, filterOffset: lfoFilter + envFilter, positionOffset, ampEnvelope: env, targetOffsets: {}, velocity, keytrack };
 }
 
 function routeTargetOffsets(

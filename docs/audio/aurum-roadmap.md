@@ -29,7 +29,7 @@ Exit gate: identical patches survive save/load, produce finite audible browser/n
 - `[x]` Each operator has an editable 16-partial additive spectrum with bounded normalization, Nyquist suppression, browser/native rendering, and versioned persistence.
 - `[x]` Every operator has bounded wavefold shaping, versioned persistence, matching browser/native rendering, and a live scope driven by the browser engine sampler.
 - `[x]` Each operator has independent amplitude, pitch, and phase ADSRs; pitch and phase use bipolar depths, persist in schema v5, and render consistently in browser and native paths.
-- `[ ]` Velocity and keyboard tracking curves.
+- `[x]` Each operator has editable five-point velocity and keyboard gain-response curves with neutral migration, browser/native rendering, and versioned persistence.
 - `[ ]` Oversampling/quality policy for nonlinear FM, feedback, and waveshaping.
 
 Exit gate: operator edits agree between waveform preview and rendered audio, and cross-rate reference tests meet a documented threshold.
@@ -76,5 +76,5 @@ Exit gate: the release report distinguishes verified audio behavior, performance
 
 ## Immediate order
 
-1. Add velocity and keyboard tracking curves.
-2. Define and verify the oversampling/quality policy for nonlinear FM, feedback, and waveshaping.
+1. Define and verify the oversampling/quality policy for nonlinear FM, feedback, and waveshaping.
+2. Add the dual-filter and signal-routing foundation.
