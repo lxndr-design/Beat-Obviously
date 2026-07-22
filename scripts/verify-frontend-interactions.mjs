@@ -58,6 +58,7 @@ try {
   const audioFilesSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx"), "utf8");
   const assetReferenceGraphSource = readFileSync(join(repoRoot, "frontend/src/persistence/assetReferenceGraph.ts"), "utf8");
   const documentActionsSource = readFileSync(join(repoRoot, "frontend/src/persistence/documentActions.ts"), "utf8");
+  const appSource = readFileSync(join(repoRoot, "frontend/src/App.solid.tsx"), "utf8");
   const appMenuSource = readFileSync(join(repoRoot, "frontend/src/features/TopBar/AppMenuButton.solid.tsx"), "utf8");
   const sidebarSource = readFileSync(join(repoRoot, "frontend/src/features/Sidebar/Sidebar.solid.tsx"), "utf8");
   const editorHostSource = readFileSync(join(repoRoot, "frontend/src/features/EditorHost/EditorHost.solid.tsx"), "utf8");
@@ -617,6 +618,12 @@ try {
       && documentActionsSource.includes("unresolved.push(asset)")
       && documentActionsSource.includes("replaceBeatDocumentAssetPath(nextDocument, asset.path, result.path)"),
     "document open/recent/restore flows should offer sequential missing-asset relink and preserve unresolved missing assets",
+  );
+  assert.ok(
+    appSource.includes('case "native.openProjectFile":')
+      && appSource.includes("void openRecentFromHome(event.path)")
+      && !appSource.includes("void openRecentDocument(event.path)"),
+    "Finder-open events should use the successful Home-open path so a loaded project reveals the arrangement",
   );
   assert.ok(
     audioFilesSource.includes("removeSelectedEntries")

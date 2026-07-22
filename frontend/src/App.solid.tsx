@@ -469,7 +469,7 @@ export function App() {
           });
           break;
         case "native.openProjectFile":
-          void openRecentDocument(event.path).catch((error) => {
+          void openRecentFromHome(event.path).catch((error) => {
             void appAlert(error instanceof Error ? error.message : "Open project failed.");
           });
           break;
