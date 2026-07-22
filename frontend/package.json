@@ -21,6 +21,7 @@
     "verify:synth": "node ../scripts/verify-synth-roundtrip.mjs",
     "verify:aurum": "node ../scripts/verify-aurum.mjs",
     "verify:lumus": "node ../scripts/verify-lumus-foundation.mjs",
+    "verify:feature-demo": "node ../scripts/create-lumus-aurum-demo.mjs /private/tmp/Lumus_Aurum_30s_Feature_Demo",
     "verify:benchmark-instruments": "node ../scripts/verify-aether-benchmark-renders.mjs",
     "verify:node-instrument": "node ../scripts/verify-node-instrument-editor.mjs",
     "verify:track-interactions": "node ../scripts/verify-track-interactions.mjs",
