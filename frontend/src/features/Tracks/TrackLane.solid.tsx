@@ -4,6 +4,8 @@ import { createStoreSelector } from "../../solid-utils/store";
 import { appAlert, Button } from "../../solid-ui";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
+import { createAurumInstrument } from "../../state/aurum";
+import { createDefaultLumusDraft, createDefaultSynthDraft, synthDraftToInstrumentPatch } from "../../state/synthStore";
 import {
   useAudioFileStore,
   useInstrumentStore,
@@ -84,6 +86,24 @@ export function TrackLane(props: Props) {
       useUiStore.getState().setSelectedSegments([segmentId]);
       openSegmentEditor(segmentId, { discardIfUntouched: true });
     };
+    const addEngineSegment = (engine: "aether" | "aurum" | "lumus") => {
+      const label = engine === "aether" ? "Aether" : engine === "aurum" ? "Aurum" : "Lumus";
+      const instrumentStore = useInstrumentStore.getState();
+      const instrumentId = engine === "aurum"
+        ? instrumentStore.addInstrument(createAurumInstrument(nano(), `${label} Segment Instrument`))
+        : instrumentStore.addInstrument({
+            ...synthDraftToInstrumentPatch(engine === "lumus" ? createDefaultLumusDraft() : createDefaultSynthDraft()),
+            name: `${label} Segment Instrument`,
+            userCreated: true,
+          });
+      addEditableSegment({
+        name: nextEngineSegmentName(tracks(), label),
+        startBeat: lastClickBeat,
+        lengthBeats: lastLen(),
+        instrumentId,
+        payload: { kind: "midi", notes: [] },
+      });
+    };
     return [
       ...(canPaste
         ? [{
@@ -105,6 +125,22 @@ export function TrackLane(props: Props) {
             payload: { kind: "midi", notes: [] },
           });
         },
+      },
+      {
+        label: "Create Aether Segment",
+        icon: "ph:cube",
+        separatorBefore: true,
+        onSelect: () => addEngineSegment("aether"),
+      },
+      {
+        label: "Create Aurum Segment",
+        icon: "ph:circles-three-plus",
+        onSelect: () => addEngineSegment("aurum"),
+      },
+      {
+        label: "Create Lumus Segment",
+        icon: "ph:sparkle",
+        onSelect: () => addEngineSegment("lumus"),
       },
       {
         label: "Drum Sequencer",
@@ -554,6 +590,18 @@ function nextSegmentName(tracks: Track[], kind: "midi" | "audio" | "drum" | "dru
   }
   let next = 1;
   while (used.has(next)) next++;
+  return `${stem} ${next}`;
+}
+
+function nextEngineSegmentName(tracks: Track[], engine: "Aether" | "Aurum" | "Lumus"): string {
+  const stem = `${engine} Segment`;
+  const used = new Set<number>();
+  for (const segment of tracks.flatMap((track) => track.segments)) {
+    const match = (segment.name ?? "").match(new RegExp(`^${stem}\\s+(\\d+)$`));
+    if (match) used.add(Number(match[1]));
+  }
+  let next = 1;
+  while (used.has(next)) next += 1;
   return `${stem} ${next}`;
 }
 

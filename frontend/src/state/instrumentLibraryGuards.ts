@@ -12,6 +12,7 @@ const DEV_FIXTURE_INSTRUMENT_IDS = new Set([
   "dev-aether-amp-filter-host",
   "dev-aether-lfo-host",
   "dev-aether-performance-host",
+  "dev-aurum-editor-host",
 ]);
 
 const DEV_FIXTURE_SOURCE_LABELS = new Set([
@@ -24,6 +25,7 @@ const DEV_FIXTURE_SOURCE_LABELS = new Set([
   "Aether LFO editor dev fixture",
   "Aether performance editor dev fixture",
   "Aether automation dev fixture",
+  "Aurum editor dev fixture",
 ]);
 
 const DEV_FIXTURE_NAMES = new Set([

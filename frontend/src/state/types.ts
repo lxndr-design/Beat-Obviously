@@ -350,6 +350,8 @@ export interface Instrument {
   wavetable?: WavetableConfig;
   /** Serum-style multi-oscillator stack for Aether WT instruments. */
   aether?: AetherSynthConfig;
+  /** Six-operator FM/additive engine used by Aurum instruments. */
+  aurum?: AurumSynthConfig;
   /** Exact synth-editor patch contract. Preserves modulation/macro state. */
   synthPatch?: SynthPatchSnapshot;
   /** Visual node-editor graph for synth-style instruments. */
@@ -596,6 +598,57 @@ export interface AetherSynthConfig {
     firstMemberChannel: number;
     lastMemberChannel: number;
   };
+}
+
+export type AurumOperatorWaveform = "sine" | "triangle" | "saw" | "square" | "additive";
+export type AurumFilterRouting = "serial" | "parallel";
+
+export interface AurumFilterConfig {
+  enabled: boolean;
+  type: NonNullable<Instrument["filterType"]>;
+  cutoff: number;
+  resonance: number;
+  drive: number;
+}
+
+export interface AurumOperatorConfig {
+  id: string;
+  name: string;
+  enabled: boolean;
+  waveform: AurumOperatorWaveform;
+  ratio: number;
+  coarse: number;
+  fineCents: number;
+  level: number;
+  pan: number;
+  phase: number;
+  wavefold: number;
+  harmonics: number[];
+  envelope: AdsrEnvelope;
+  pitchEnvelope: AdsrEnvelope;
+  pitchEnvelopeSemitones: number;
+  phaseEnvelope: AdsrEnvelope;
+  phaseEnvelopeDegrees: number;
+  velocityCurve: number[];
+  keytrackCurve: number[];
+}
+
+/** Six-operator FM/additive instrument. Matrix rows are sources; columns 0..5
+ * are FM destinations and column 6 is direct output. Diagonal values are
+ * operator feedback. */
+export interface AurumSynthConfig {
+  version: 10;
+  operators: AurumOperatorConfig[];
+  matrix: number[][];
+  rmMatrix: number[][];
+  unison: number;
+  detuneCents: number;
+  stereoSpread: number;
+  oversampling: 1 | 2 | 4;
+  filters: [AurumFilterConfig, AurumFilterConfig];
+  filterRouting: AurumFilterRouting;
+  /** Rows are operators; columns are Filter A, Filter B, and Direct. */
+  outputSends: number[][];
 }
 
 export type SynthPatchParameterValue = boolean | number | string;
@@ -910,6 +963,7 @@ export interface InstrumentSnapshot {
   ampPan?: number;
   wavetable?: WavetableConfig;
   aether?: AetherSynthConfig;
+  aurum?: AurumSynthConfig;
   synthPatch?: SynthPatchSnapshot;
   nodeGraph?: InstrumentNodeGraph;
   lfoWaveform?: Instrument["lfoWaveform"];

@@ -84,6 +84,7 @@ try {
   const instrumentEditorSource = readFileSync(join(repoRoot, "frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx"), "utf8");
   const componentLibrarySource = readFileSync(join(repoRoot, "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx"), "utf8");
   const instrumentLibrarySource = readFileSync(join(repoRoot, "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx"), "utf8");
+  const trackLaneSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackLane.solid.tsx"), "utf8");
   const drumSequencerSource = readFileSync(join(repoRoot, "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx"), "utf8");
   const devHooksSource = readFileSync(join(repoRoot, "frontend/src/testing/devHooks.ts"), "utf8");
 
@@ -128,6 +129,20 @@ try {
     instrumentLibrarySource.includes("LUMUS_TEST_INSTRUMENT_SET_ID")
       && instrumentLibrarySource.includes("set.id === LUMUS_TEST_INSTRUMENT_SET_ID"),
     "the protected Lumus Test factory group should display with its exact product-testing name",
+  );
+  assert.ok(
+    ["Aether", "Aurum", "Lumus"].every((engine) =>
+      trackLaneSource.includes(`Create ${engine} Segment`)),
+    "track creation UI should expose dedicated Aether, Aurum, and Lumus segment actions",
+  );
+  assert.ok(
+    trackLaneSource.includes('addEngineSegment("aether")')
+      && trackLaneSource.includes('addEngineSegment("aurum")')
+      && trackLaneSource.includes('addEngineSegment("lumus")')
+      && trackLaneSource.includes("createAurumInstrument")
+      && trackLaneSource.includes("createDefaultLumusDraft")
+      && trackLaneSource.includes("createDefaultSynthDraft"),
+    "each engine segment action should construct and bind its own engine instrument",
   );
   assert.equal(runner.snapBeat(1.13, 0.25), 1.25, "snapBeat should round upward past the midpoint");
   assert.deepEqual(

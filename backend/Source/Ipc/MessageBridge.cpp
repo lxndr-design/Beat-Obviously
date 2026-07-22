@@ -2397,6 +2397,127 @@ namespace beat
                         instrument.aether.runtimeWarp2Mode = parseWavetableWarpMode(aether.getProperty("runtimeWarp2Mode", 0));
                     }
 
+                    const auto aurum = instrumentVar.getProperty("aurum", {});
+                    if (aurum.isObject())
+                    {
+                        instrument.hasAurum = true;
+                        instrument.hasAether = false;
+                        instrument.synthEngine = InstrumentDefinition::SynthEngine::Aurum;
+                        const int aurumVersion = (int) aurum.getProperty("version", 1);
+                        const int oversampling = (int) aurum.getProperty("oversampling", 2);
+                        instrument.aurum.oversampling = oversampling >= 4 ? 4 : oversampling >= 2 ? 2 : 1;
+                        if (aurumVersion < 8)
+                        {
+                            instrument.aurum.filters[0] = {
+                                true,
+                                instrument.filterType,
+                                instrument.cutoff01,
+                                instrument.resonance01,
+                                instrument.drive01,
+                            };
+                        }
+                        else if (auto* filters = aurum.getProperty("filters", {}).getArray())
+                        {
+                            const auto count = juce::jmin(2, filters->size());
+                            for (int index = 0; index < count; ++index)
+                            {
+                                const auto value = filters->getReference(index);
+                                if (!value.isObject()) continue;
+                                auto& filter = instrument.aurum.filters[(size_t) index];
+                                filter.enabled = (bool) value.getProperty("enabled", filter.enabled);
+                                filter.type = parseSynthFilterType(value.getProperty("type", "lowpass"));
+                                filter.cutoff01 = normalizedParam(value, "cutoff", filter.cutoff01);
+                                filter.resonance01 = normalizedParam(value, "resonance", filter.resonance01);
+                                filter.drive01 = normalizedParam(value, "drive", filter.drive01);
+                            }
+                        }
+                        instrument.aurum.filterRouting = aurum.getProperty("filterRouting", "serial").toString().toLowerCase() == "parallel" ? 1 : 0;
+                        if (auto* operators = aurum.getProperty("operators", {}).getArray())
+                        {
+                            const auto count = juce::jmin(6, operators->size());
+                            for (int index = 0; index < count; ++index)
+                            {
+                                const auto value = operators->getReference(index);
+                                if (!value.isObject()) continue;
+                                auto& op = instrument.aurum.operators[(size_t) index];
+                                op.enabled = (bool) value.getProperty("enabled", index < 2);
+                                const auto waveform = value.getProperty("waveform", "sine");
+                                op.waveform = waveform.toString() == "additive" ? 4 : juce::jlimit(0, 3, parseWaveform(waveform, juce::String()));
+                                op.ratio = floatParam(value, "ratio", index == 1 ? 2.0f : 1.0f, 0.125f, 32.0f);
+                                op.coarse = juce::jlimit(-48, 48, (int) value.getProperty("coarse", 0));
+                                op.fineCents = floatParam(value, "fineCents", 0.0f, -100.0f, 100.0f);
+                                op.level = normalizedParam(value, "level", index == 0 ? 0.78f : 0.55f);
+                                op.pan = floatParam(value, "pan", 0.0f, -1.0f, 1.0f);
+                                op.phase = normalizedParam(value, "phase", 0.0f);
+                                op.wavefold = normalizedParam(value, "wavefold", 0.0f);
+                                const auto envelope = value.getProperty("envelope", {});
+                                op.attackMs = floatParam(envelope, "attackMs", 5.0f, 0.0f, 10000.0f);
+                                op.decayMs = floatParam(envelope, "decayMs", 500.0f, 0.0f, 10000.0f);
+                                op.sustain = normalizedParam(envelope, "sustain", 0.7f);
+                                op.releaseMs = floatParam(envelope, "releaseMs", 300.0f, 0.0f, 10000.0f);
+                                const auto pitchEnvelope = value.getProperty("pitchEnvelope", {});
+                                op.pitchAttackMs = floatParam(pitchEnvelope, "attackMs", 0.0f, 0.0f, 10000.0f);
+                                op.pitchDecayMs = floatParam(pitchEnvelope, "decayMs", 250.0f, 0.0f, 10000.0f);
+                                op.pitchSustain = normalizedParam(pitchEnvelope, "sustain", 0.0f);
+                                op.pitchReleaseMs = floatParam(pitchEnvelope, "releaseMs", 120.0f, 0.0f, 10000.0f);
+                                op.pitchEnvelopeSemitones = floatParam(value, "pitchEnvelopeSemitones", 0.0f, -48.0f, 48.0f);
+                                const auto phaseEnvelope = value.getProperty("phaseEnvelope", {});
+                                op.phaseAttackMs = floatParam(phaseEnvelope, "attackMs", 0.0f, 0.0f, 10000.0f);
+                                op.phaseDecayMs = floatParam(phaseEnvelope, "decayMs", 180.0f, 0.0f, 10000.0f);
+                                op.phaseSustain = normalizedParam(phaseEnvelope, "sustain", 0.0f);
+                                op.phaseReleaseMs = floatParam(phaseEnvelope, "releaseMs", 100.0f, 0.0f, 10000.0f);
+                                op.phaseEnvelopeDegrees = floatParam(value, "phaseEnvelopeDegrees", 0.0f, -180.0f, 180.0f);
+                                if (auto* points = value.getProperty("velocityCurve", {}).getArray())
+                                    for (int point = 0; point < juce::jmin(5, points->size()); ++point)
+                                        op.velocityCurve[(size_t) point] = juce::jlimit(0.0f, 1.0f, (float) (double) points->getReference(point));
+                                if (auto* points = value.getProperty("keytrackCurve", {}).getArray())
+                                    for (int point = 0; point < juce::jmin(5, points->size()); ++point)
+                                        op.keytrackCurve[(size_t) point] = juce::jlimit(0.0f, 1.0f, (float) (double) points->getReference(point));
+                                if (auto* harmonics = value.getProperty("harmonics", {}).getArray())
+                                    for (int harmonic = 0; harmonic < juce::jmin(16, harmonics->size()); ++harmonic)
+                                        op.harmonics[(size_t) harmonic] = juce::jlimit(0.0f, 1.0f, (float) (double) harmonics->getReference(harmonic));
+                            }
+                        }
+                        if (auto* rows = aurum.getProperty("matrix", {}).getArray())
+                        {
+                            const auto rowCount = juce::jmin(6, rows->size());
+                            for (int source = 0; source < rowCount; ++source)
+                                if (auto* cells = rows->getReference(source).getArray())
+                                    for (int target = 0; target < juce::jmin(7, cells->size()); ++target)
+                                        instrument.aurum.matrix[(size_t) source][(size_t) target] = juce::jlimit(-1.0f, 1.0f, (float) (double) cells->getReference(target));
+                        }
+                        if (auto* rows = aurum.getProperty("rmMatrix", {}).getArray())
+                        {
+                            const auto rowCount = juce::jmin(6, rows->size());
+                            for (int source = 0; source < rowCount; ++source)
+                                if (auto* cells = rows->getReference(source).getArray())
+                                    for (int target = 0; target < juce::jmin(6, cells->size()); ++target)
+                                        instrument.aurum.rmMatrix[(size_t) source][(size_t) target] = juce::jlimit(-1.0f, 1.0f, (float) (double) cells->getReference(target));
+                        }
+                        if (aurumVersion >= 9)
+                        {
+                            if (auto* rows = aurum.getProperty("outputSends", {}).getArray())
+                            {
+                                const auto rowCount = juce::jmin(6, rows->size());
+                                for (int source = 0; source < rowCount; ++source)
+                                    if (auto* cells = rows->getReference(source).getArray())
+                                        for (int bus = 0; bus < juce::jmin(3, cells->size()); ++bus)
+                                            instrument.aurum.outputSends[(size_t) source][(size_t) bus] = juce::jlimit(-1.0f, 1.0f, (float) (double) cells->getReference(bus));
+                            }
+                        }
+                        else
+                        {
+                            for (size_t source = 0; source < instrument.aurum.outputSends.size(); ++source)
+                            {
+                                const float legacyOutput = instrument.aurum.matrix[source][6];
+                                instrument.aurum.outputSends[source] = {{ legacyOutput, instrument.aurum.filterRouting == 1 ? legacyOutput : 0.0f, 0.0f }};
+                            }
+                        }
+                        instrument.aurum.unison = juce::jlimit(1, 8, (int) aurum.getProperty("unison", 1));
+                        instrument.aurum.detuneCents = floatParam(aurum, "detuneCents", 8.0f, 0.0f, 100.0f);
+                        instrument.aurum.stereoSpread = normalizedParam(aurum, "stereoSpread", 0.35f);
+                    }
+
                     if (auto* sampleUrls = instrumentVar.getProperty("sampleUrls", {}).getArray())
                     {
                         for (const auto& sampleUrl : *sampleUrls)

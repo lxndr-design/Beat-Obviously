@@ -1,13 +1,12 @@
 import { evaluateAutomationCurve } from "../automation/curves";
 import { clampAetherUnisonVoices } from "./aetherLimits";
-import type { AutomationCurve, CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, WavetableConfig } from "../state/types";
+import { evaluateAurumResponseCurve, normalizedAurumConfigForInstrument } from "../state/aurum";
+import type { AurumFilterConfig, AurumOperatorConfig, AutomationCurve, CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, WavetableConfig } from "../state/types";
 import { sampleZoneStableId } from "../state/sampleZones";
 
 export type SynthRenderMode = "visual" | "audio";
 
-export interface SynthRenderState {
-  phase: number;
-  index: number;
+interface FilterRenderState {
   low: number;
   band: number;
   filterCutoff: number;
@@ -24,12 +23,33 @@ export interface SynthRenderState {
   low4: number; band4: number; filterCutoff4: number; filterResonance4: number; filterF4: number; filterDamping4: number;
 }
 
+interface AurumStereoBuses {
+  filterALeft: number;
+  filterARight: number;
+  filterBLeft: number;
+  filterBRight: number;
+  directLeft: number;
+  directRight: number;
+  activeMask: number;
+}
+
+export interface SynthRenderState extends FilterRenderState {
+  phase: number;
+  index: number;
+  aurumFilterB: FilterRenderState;
+  aurumPhases: number[];
+  aurumOutputs: number[];
+  aurumNoteOffMs: number;
+}
+
 interface RenderModulation {
   pitchSemitones: number;
   filterOffset: number;
   positionOffset: number;
   ampEnvelope: number;
   targetOffsets: Partial<Record<RuntimeModulationTarget, number>>;
+  velocity?: number;
+  keytrack?: number;
 }
 
 type DirectRuntimeModulationTarget =
@@ -185,6 +205,19 @@ export function createSynthRenderState(): SynthRenderState {
     low2: 0, band2: 0, filterCutoff2: -1, filterResonance2: -1, filterF2: 0, filterDamping2: 1,
     low3: 0, band3: 0, filterCutoff3: -1, filterResonance3: -1, filterF3: 0, filterDamping3: 1,
     low4: 0, band4: 0, filterCutoff4: -1, filterResonance4: -1, filterF4: 0, filterDamping4: 1,
+    aurumFilterB: createFilterRenderState(),
+    aurumPhases: Array(48).fill(0),
+    aurumOutputs: Array(48).fill(0),
+    aurumNoteOffMs: Number.POSITIVE_INFINITY,
+  };
+}
+
+function createFilterRenderState(): FilterRenderState {
+  return {
+    low: 0, band: 0, filterCutoff: -1, filterResonance: -1, filterF: 0, filterDamping: 1,
+    low2: 0, band2: 0, filterCutoff2: -1, filterResonance2: -1, filterF2: 0, filterDamping2: 1,
+    low3: 0, band3: 0, filterCutoff3: -1, filterResonance3: -1, filterF3: 0, filterDamping3: 1,
+    low4: 0, band4: 0, filterCutoff4: -1, filterResonance4: -1, filterF4: 0, filterDamping4: 1,
   };
 }
 
@@ -231,13 +264,14 @@ export function renderInstrumentSamples(
 ) {
   const state = createSynthRenderState();
   const durationS = out.length / sampleRate;
+  if (instrument.aurum && fade) state.aurumNoteOffMs = aurumPreviewNoteOffMs(instrument, durationS);
   const velocity01 = clamp01(velocity / 127);
   const sortedCurve = curve?.filter((point) => Number.isFinite(point.timeS) && Number.isFinite(point.frequency))
     .sort((a, b) => a.timeS - b.timeS);
 
   for (let i = 0; i < out.length; i++) {
     const t = i / sampleRate;
-    const amp = fade ? Math.min(1, t / 0.025, (durationS - t) / 0.08) : 1;
+    const amp = instrument.aurum ? 1 : fade ? Math.min(1, t / 0.025, (durationS - t) / 0.08) : 1;
     const baseFrequency = sortedCurve && sortedCurve.length > 1
       ? frequencyAtCurveTime(sortedCurve, t)
       : glideBaseFrequency(instrument, frequency, targetFrequency, t, durationS);
@@ -274,6 +308,42 @@ export function renderInstrumentStereoSamples(
   pitchBendSemitones = 0,
 ) {
   const length = Math.min(left.length, right.length);
+  if (instrument.aurum) {
+    const phaseState = createSynthRenderState();
+    const leftFilterAState = createSynthRenderState();
+    const rightFilterAState = createSynthRenderState();
+    const leftFilterBState = createSynthRenderState();
+    const rightFilterBState = createSynthRenderState();
+    const durationS = length / sampleRate;
+    if (fade) phaseState.aurumNoteOffMs = aurumPreviewNoteOffMs(instrument, durationS);
+    const velocity01 = clamp01(velocity / 127);
+    const sortedCurve = curve?.filter((point) => Number.isFinite(point.timeS) && Number.isFinite(point.frequency))
+      .sort((a, b) => a.timeS - b.timeS);
+
+    for (let i = 0; i < length; i++) {
+      const timeS = i / sampleRate;
+      const amp = 1;
+      const baseFrequency = sortedCurve && sortedCurve.length > 1
+        ? frequencyAtCurveTime(sortedCurve, timeS)
+        : glideBaseFrequency(instrument, frequency, targetFrequency, timeS, durationS);
+      const modulation = modulationAtTime(
+        instrument,
+        timeS,
+        durationS,
+        bpm,
+        velocity01,
+        keytrackSourceValue(baseFrequency),
+        modWheel,
+        automationMacroValues(instrument, automation, timeS),
+      );
+      applyAutomationOffsets(instrument, modulation, automation, timeS);
+      const currentFrequency = baseFrequency * Math.pow(2, (pitchBendSemitones + modulation.pitchSemitones) / 12);
+      const stereo = renderAurumStereoSample(instrument, phaseState, leftFilterAState, rightFilterAState, leftFilterBState, rightFilterBState, sampleRate, currentFrequency, modulation);
+      left[i] = stereo.left * amp;
+      right[i] = stereo.right * amp;
+    }
+    return;
+  }
   if (!instrument.aether) {
     const mono = new Float32Array(length);
     renderInstrumentSamples(instrument, mono, sampleRate, frequency, mode, fade, targetFrequency, curve, automation, bpm, velocity, modWheel, pitchBendSemitones);
@@ -857,6 +927,7 @@ function renderRelevantInstrumentState(instrument: Instrument) {
     ampPan: instrument.ampPan,
     wavetable: instrument.wavetable,
     aether: instrument.aether,
+    aurum: instrument.aurum,
     lfoWaveform: instrument.lfoWaveform,
     lfoRateHz: instrument.lfoRateHz,
     lfoSyncedRate: instrument.lfoSyncedRate,
@@ -962,7 +1033,27 @@ export function renderInstrumentSample(
     ? clamp01(instrument.knobs.drive + modulationTargetOffset(modulation, "filter.drive"))
     : 0;
   const color = clamp01(instrument.knobs.color);
-  const sub = instrument.aether ? 0 : clamp01(instrument.subOscLevel ?? 0);
+  const sub = instrument.aether || instrument.aurum ? 0 : clamp01(instrument.subOscLevel ?? 0);
+
+  if (instrument.aurum) {
+    const buses = aurumMatrixStereoSample(instrument, state, sampleRate, frequency, modulation);
+    const filtered = processAurumMonoBuses(
+      instrument,
+      (buses.filterALeft + buses.filterARight) * Math.SQRT1_2,
+      (buses.filterBLeft + buses.filterBRight) * Math.SQRT1_2,
+      (buses.directLeft + buses.directRight) * Math.SQRT1_2,
+      buses.activeMask,
+      state,
+      state.aurumFilterB,
+      sampleRate,
+      frequency,
+      modulation,
+    );
+    const level = clamp01((instrument.ampLevel ?? 1) + modulationTargetOffset(modulation, "amp.level"));
+    state.phase += frequency / sampleRate;
+    state.index += 1;
+    return clamp(filtered * level * clamp01(modulation.ampEnvelope ?? 1), -1, 1);
+  }
 
   const aetherBuses = instrument.kind === "wavetable" && instrument.aether
     ? aetherStackBuses(instrument, state, sampleRate, frequency, mode, modulation)
@@ -1026,6 +1117,321 @@ export function renderInstrumentSample(
   state.phase += frequency / sampleRate;
   state.index += 1;
   return clamp(filtered * level * clamp01(modulation.ampEnvelope ?? 1), -1, 1);
+}
+
+function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState, sampleRate: number, frequency: number, modulationState: RenderModulation): AurumStereoBuses {
+  const config = activeAurumFilterConfig(instrument);
+  const operatorCount = Math.min(6, config.operators.length);
+  const voiceCount = Math.max(1, Math.min(8, Math.round(config.unison)));
+  const detune = clamp(config.detuneCents, 0, 100);
+  const spread = clamp01(config.stereoSpread);
+  const oversampling = config.oversampling >= 4 ? 4 : config.oversampling >= 2 ? 2 : 1;
+  const timeMs = (state.index / sampleRate) * 1000;
+  let activeMask = 0;
+  for (let source = 0; source < operatorCount; source += 1) {
+    if (Math.abs(config.outputSends[source]?.[0] ?? 0) > 0.0001) activeMask |= 1;
+    if (Math.abs(config.outputSends[source]?.[1] ?? 0) > 0.0001) activeMask |= 2;
+    if (Math.abs(config.outputSends[source]?.[2] ?? 0) > 0.0001) activeMask |= 4;
+  }
+  let accumulatedALeft = 0;
+  let accumulatedARight = 0;
+  let accumulatedBLeft = 0;
+  let accumulatedBRight = 0;
+  let accumulatedDirectLeft = 0;
+  let accumulatedDirectRight = 0;
+
+  for (let substep = 0; substep < oversampling; substep += 1) {
+    const nextOutputs = Array(48).fill(0);
+    let mixedALeft = 0;
+    let mixedARight = 0;
+    let mixedBLeft = 0;
+    let mixedBRight = 0;
+    let mixedDirectLeft = 0;
+    let mixedDirectRight = 0;
+    for (let voice = 0; voice < voiceCount; voice += 1) {
+    const voiceOffset = voice * 6;
+    const centered = voiceCount === 1 ? 0 : (voice / (voiceCount - 1)) * 2 - 1;
+    const voiceRate = Math.pow(2, (centered * detune) / 1200);
+    for (let target = 0; target < operatorCount; target += 1) {
+      const operator = config.operators[target];
+      if (!operator.enabled) continue;
+      let modulation = 0;
+      for (let source = 0; source < operatorCount; source += 1) {
+        modulation += (state.aurumOutputs[voiceOffset + source] ?? 0) * clampBipolar(config.matrix[source]?.[target] ?? 0);
+      }
+      const stateIndex = voiceOffset + target;
+      if (state.index === 0 && substep === 0) state.aurumPhases[stateIndex] = (clamp01(operator.phase) + voice * 0.071) % 1;
+      const ratio = Math.max(0.125, Math.min(32, operator.ratio));
+      const tuning = Math.pow(2, operator.coarse / 12 + operator.fineCents / 1200);
+      const envelope = aurumOperatorEnvelope(operator.envelope, timeMs, state.aurumNoteOffMs);
+      const pitchEnvelope = aurumOperatorEnvelope(operator.pitchEnvelope, timeMs, state.aurumNoteOffMs);
+      const phaseEnvelope = aurumOperatorEnvelope(operator.phaseEnvelope, timeMs, state.aurumNoteOffMs);
+      const pitchEnvelopeRate = Math.pow(2, (pitchEnvelope * clamp(operator.pitchEnvelopeSemitones, -48, 48)) / 12);
+      const phase = state.aurumPhases[stateIndex]
+        + (phaseEnvelope * clamp(operator.phaseEnvelopeDegrees, -180, 180)) / 360
+        + modulation * 1.9;
+      let rmGain = 1;
+      for (let source = 0; source < operatorCount; source += 1) {
+        const amount = clampBipolar(config.rmMatrix?.[source]?.[target] ?? 0);
+        if (Math.abs(amount) <= 0.0001) continue;
+        const modulator = state.aurumOutputs[voiceOffset + source] ?? 0;
+        rmGain *= 1 - Math.abs(amount) + modulator * amount;
+      }
+      const phaseDelta = (frequency * voiceRate * ratio * tuning * pitchEnvelopeRate) / (sampleRate * oversampling);
+      const responseGain = evaluateAurumResponseCurve(operator.velocityCurve, modulationState.velocity ?? 1)
+        * evaluateAurumResponseCurve(operator.keytrackCurve, modulationState.keytrack ?? 0.5);
+      nextOutputs[stateIndex] = sampleAurumOperatorWaveform(operator, phase, phaseDelta) * clamp01(operator.level) * envelope * responseGain * rmGain;
+      state.aurumPhases[stateIndex] = (state.aurumPhases[stateIndex] + phaseDelta) % 1;
+    }
+
+      let voiceALeft = 0;
+      let voiceARight = 0;
+      let voiceBLeft = 0;
+      let voiceBRight = 0;
+      let voiceDirectLeft = 0;
+      let voiceDirectRight = 0;
+      let weightA = 0;
+      let weightB = 0;
+      let weightDirect = 0;
+      for (let source = 0; source < operatorCount; source += 1) {
+        const output = nextOutputs[voiceOffset + source];
+        const amountA = clampBipolar(config.outputSends[source]?.[0] ?? 0);
+        const amountB = clampBipolar(config.outputSends[source]?.[1] ?? 0);
+        const amountDirect = clampBipolar(config.outputSends[source]?.[2] ?? 0);
+        const [leftGain, rightGain] = panGains(clampBipolar((config.operators[source]?.pan ?? 0) + centered * spread));
+        voiceALeft += output * amountA * leftGain;
+        voiceARight += output * amountA * rightGain;
+        voiceBLeft += output * amountB * leftGain;
+        voiceBRight += output * amountB * rightGain;
+        voiceDirectLeft += output * amountDirect * leftGain;
+        voiceDirectRight += output * amountDirect * rightGain;
+        weightA += Math.abs(amountA);
+        weightB += Math.abs(amountB);
+        weightDirect += Math.abs(amountDirect);
+      }
+      const normalizationA = Math.max(1, Math.sqrt(weightA));
+      const normalizationB = Math.max(1, Math.sqrt(weightB));
+      const normalizationDirect = Math.max(1, Math.sqrt(weightDirect));
+      mixedALeft += voiceALeft / normalizationA;
+      mixedARight += voiceARight / normalizationA;
+      mixedBLeft += voiceBLeft / normalizationB;
+      mixedBRight += voiceBRight / normalizationB;
+      mixedDirectLeft += voiceDirectLeft / normalizationDirect;
+      mixedDirectRight += voiceDirectRight / normalizationDirect;
+    }
+    state.aurumOutputs = nextOutputs;
+    accumulatedALeft += mixedALeft;
+    accumulatedARight += mixedARight;
+    accumulatedBLeft += mixedBLeft;
+    accumulatedBRight += mixedBRight;
+    accumulatedDirectLeft += mixedDirectLeft;
+    accumulatedDirectRight += mixedDirectRight;
+  }
+  const normalization = 1 / (Math.sqrt(voiceCount) * oversampling);
+  return {
+    filterALeft: accumulatedALeft * normalization,
+    filterARight: accumulatedARight * normalization,
+    filterBLeft: accumulatedBLeft * normalization,
+    filterBRight: accumulatedBRight * normalization,
+    directLeft: accumulatedDirectLeft * normalization,
+    directRight: accumulatedDirectRight * normalization,
+    activeMask,
+  };
+}
+
+function renderAurumStereoSample(
+  instrument: Instrument,
+  phaseState: SynthRenderState,
+  leftFilterAState: FilterRenderState,
+  rightFilterAState: FilterRenderState,
+  leftFilterBState: FilterRenderState,
+  rightFilterBState: FilterRenderState,
+  sampleRate: number,
+  frequency: number,
+  modulation: RenderModulation,
+) {
+  const buses = aurumMatrixStereoSample(instrument, phaseState, sampleRate, frequency, modulation);
+  const filtered = processAurumStereoBuses(
+    instrument,
+    buses,
+    leftFilterAState,
+    rightFilterAState,
+    leftFilterBState,
+    rightFilterBState,
+    sampleRate,
+    frequency,
+    modulation,
+  );
+  const level = clamp01((instrument.ampLevel ?? 1) + modulationTargetOffset(modulation, "amp.level"));
+  const gain = level * clamp01(modulation.ampEnvelope ?? 1);
+  phaseState.index += 1;
+  return { left: clamp(filtered.left * gain, -1, 1), right: clamp(filtered.right * gain, -1, 1) };
+}
+
+function driveSample(sample: number, drive: number) {
+  if (drive <= 0) return sample;
+  const amount = 1 + drive * 10;
+  return Math.tanh(sample * amount) / Math.tanh(amount);
+}
+
+function processAurumMonoFilter(instrument: Instrument, input: number, filter: AurumFilterConfig, state: FilterRenderState, sampleRate: number, frequency: number, modulation: RenderModulation) {
+  const cutoff = clamp01(filter.cutoff + filterKeytrackOffset(instrument, sampleRate, frequency) + modulation.filterOffset + modulationTargetOffset(modulation, "filter.cutoff"));
+  const resonance = clamp01(filter.resonance + modulationTargetOffset(modulation, "filter.resonance"));
+  const drive = clamp01(filter.drive + modulationTargetOffset(modulation, "filter.drive"));
+  return resonantFilter(driveSample(input, drive), state, sampleRate, cutoff, resonance, filter.type);
+}
+
+function processAurumMonoBuses(
+  instrument: Instrument,
+  filterAInput: number,
+  filterBInput: number,
+  directInput: number,
+  activeMask: number,
+  filterAState: FilterRenderState,
+  filterBState: FilterRenderState,
+  sampleRate: number,
+  frequency: number,
+  modulation: RenderModulation,
+) {
+  const config = activeAurumFilterConfig(instrument);
+  const [filterA, filterB] = config.filters;
+  const filterAActive = (activeMask & 1) !== 0;
+  const filterBActive = (activeMask & 2) !== 0;
+  const directActive = (activeMask & 4) !== 0;
+  if (config.filterRouting === "serial") {
+    let filterAOutput = filterAInput;
+    if (filterA.enabled) filterAOutput = processAurumMonoFilter(instrument, filterAOutput, filterA, filterAState, sampleRate, frequency, modulation);
+    const filterBInputCount = Number(filterAActive) + Number(filterBActive);
+    let filterBOutput = filterBInputCount > 0 ? (filterAOutput + filterBInput) / filterBInputCount : 0;
+    if (filterB.enabled) filterBOutput = processAurumMonoFilter(instrument, filterBOutput, filterB, filterBState, sampleRate, frequency, modulation);
+    const outputCount = Number(filterAActive || filterBActive) + Number(directActive);
+    return outputCount > 0 ? (filterBOutput + directInput) / outputCount : 0;
+  }
+  let output = 0;
+  let branchCount = 0;
+  if (filterAActive) {
+    output += filterA.enabled ? processAurumMonoFilter(instrument, filterAInput, filterA, filterAState, sampleRate, frequency, modulation) : filterAInput;
+    branchCount += 1;
+  }
+  if (filterBActive) {
+    output += filterB.enabled ? processAurumMonoFilter(instrument, filterBInput, filterB, filterBState, sampleRate, frequency, modulation) : filterBInput;
+    branchCount += 1;
+  }
+  if (directActive) {
+    output += directInput;
+    branchCount += 1;
+  }
+  return branchCount > 0 ? output / branchCount : 0;
+}
+
+function processAurumStereoBuses(
+  instrument: Instrument,
+  buses: AurumStereoBuses,
+  leftFilterAState: FilterRenderState,
+  rightFilterAState: FilterRenderState,
+  leftFilterBState: FilterRenderState,
+  rightFilterBState: FilterRenderState,
+  sampleRate: number,
+  frequency: number,
+  modulation: RenderModulation,
+) {
+  const config = activeAurumFilterConfig(instrument);
+  const [filterA, filterB] = config.filters;
+  const filterAActive = (buses.activeMask & 1) !== 0;
+  const filterBActive = (buses.activeMask & 2) !== 0;
+  const directActive = (buses.activeMask & 4) !== 0;
+  if (config.filterRouting === "serial") {
+    let filterALeft = buses.filterALeft;
+    let filterARight = buses.filterARight;
+    if (filterA.enabled) {
+      filterALeft = processAurumMonoFilter(instrument, filterALeft, filterA, leftFilterAState, sampleRate, frequency, modulation);
+      filterARight = processAurumMonoFilter(instrument, filterARight, filterA, rightFilterAState, sampleRate, frequency, modulation);
+    }
+    const filterBInputCount = Number(filterAActive) + Number(filterBActive);
+    let left = filterBInputCount > 0 ? (filterALeft + buses.filterBLeft) / filterBInputCount : 0;
+    let right = filterBInputCount > 0 ? (filterARight + buses.filterBRight) / filterBInputCount : 0;
+    if (filterB.enabled) {
+      left = processAurumMonoFilter(instrument, left, filterB, leftFilterBState, sampleRate, frequency, modulation);
+      right = processAurumMonoFilter(instrument, right, filterB, rightFilterBState, sampleRate, frequency, modulation);
+    }
+    const outputCount = Number(filterAActive || filterBActive) + Number(directActive);
+    return outputCount > 0
+      ? { left: (left + buses.directLeft) / outputCount, right: (right + buses.directRight) / outputCount }
+      : { left: 0, right: 0 };
+  }
+  let left = 0;
+  let right = 0;
+  let branchCount = 0;
+  if (filterAActive) {
+    left += filterA.enabled ? processAurumMonoFilter(instrument, buses.filterALeft, filterA, leftFilterAState, sampleRate, frequency, modulation) : buses.filterALeft;
+    right += filterA.enabled ? processAurumMonoFilter(instrument, buses.filterARight, filterA, rightFilterAState, sampleRate, frequency, modulation) : buses.filterARight;
+    branchCount += 1;
+  }
+  if (filterBActive) {
+    left += filterB.enabled ? processAurumMonoFilter(instrument, buses.filterBLeft, filterB, leftFilterBState, sampleRate, frequency, modulation) : buses.filterBLeft;
+    right += filterB.enabled ? processAurumMonoFilter(instrument, buses.filterBRight, filterB, rightFilterBState, sampleRate, frequency, modulation) : buses.filterBRight;
+    branchCount += 1;
+  }
+  if (directActive) {
+    left += buses.directLeft;
+    right += buses.directRight;
+    branchCount += 1;
+  }
+  return branchCount > 0 ? { left: left / branchCount, right: right / branchCount } : { left: 0, right: 0 };
+}
+
+function activeAurumFilterConfig(instrument: Instrument) {
+  const config = instrument.aurum!;
+  return (config.version as number) >= 10 && config.filters?.length === 2 && config.outputSends?.length === 6
+    ? config
+    : normalizedAurumConfigForInstrument(instrument);
+}
+
+function aurumHeldEnvelope(envelope: Instrument["envelope"], timeMs: number): number {
+  const attack = Math.max(0, envelope.attackMs);
+  if (attack > 0 && timeMs < attack) return timeMs / attack;
+  const decayTime = timeMs - attack;
+  const decay = Math.max(0, envelope.decayMs);
+  if (decay > 0 && decayTime < decay) return 1 + (clamp01(envelope.sustain) - 1) * (decayTime / decay);
+  return clamp01(envelope.sustain);
+}
+
+export function sampleAurumOperatorWaveform(operator: AurumOperatorConfig, phase: number, phaseDelta: number): number {
+  if (operator.waveform !== "additive") return applyAurumWavefold(oscillatorSample(operator.waveform, phase, 0.5), operator.wavefold);
+  let sample = 0;
+  let weight = 0;
+  for (let index = 0; index < operator.harmonics.length; index += 1) {
+    const harmonic = index + 1;
+    if (harmonic * Math.abs(phaseDelta) >= 0.5) break;
+    const amplitude = clamp01(operator.harmonics[index] ?? 0);
+    if (amplitude <= 0.0001) continue;
+    sample += Math.sin(Math.PI * 2 * phase * harmonic) * amplitude;
+    weight += amplitude;
+  }
+  return applyAurumWavefold(weight > 0 ? sample / weight : 0, operator.wavefold);
+}
+
+function applyAurumWavefold(sample: number, amount: number): number {
+  const depth = clamp01(amount);
+  if (depth <= 0.0001) return sample;
+  const driven = clamp(sample, -1, 1) * (1 + depth * 3);
+  return Math.asin(Math.sin(driven * Math.PI * 0.5)) / (Math.PI * 0.5);
+}
+
+function aurumOperatorEnvelope(envelope: Instrument["envelope"], timeMs: number, noteOffMs: number): number {
+  if (timeMs < noteOffMs) return aurumHeldEnvelope(envelope, timeMs);
+  const releaseMs = Math.max(0, envelope.releaseMs);
+  if (releaseMs <= 0) return 0;
+  const releaseStart = aurumHeldEnvelope(envelope, noteOffMs);
+  return releaseStart * Math.max(0, 1 - (timeMs - noteOffMs) / releaseMs);
+}
+
+function aurumPreviewNoteOffMs(instrument: Instrument, durationS: number): number {
+  const durationMs = Math.max(0, durationS * 1000);
+  const longestReleaseMs = Math.max(0, ...instrument.aurum!.operators
+    .filter((operator) => operator.enabled)
+    .map((operator) => Math.max(0, operator.envelope.releaseMs)));
+  return Math.max(durationMs * 0.5, durationMs - longestReleaseMs);
 }
 
 function renderInstrumentStereoSample(
@@ -1121,7 +1527,7 @@ function renderInstrumentStereoSample(
 
 function resonantFilter(
   input: number,
-  state: SynthRenderState,
+  state: FilterRenderState,
   sampleRate: number,
   cutoff: number,
   resonance: number,
@@ -1349,7 +1755,6 @@ function aetherStackStereoSample(
     }
     levelSum += level;
   };
-
   const addOsc = (
     osc: NonNullable<Instrument["aether"]>["oscA"],
     key: string,
@@ -2226,7 +2631,7 @@ export function modulationAtTime(
   const env4 = modEnvelopePreviewValue(timeS, durationS, instrument, 4);
   const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, keytrack, modWheel, macroOverrides, pressure, timbre);
   if (targetOffsets) {
-    return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, ampEnvelope: env, targetOffsets };
+    return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, ampEnvelope: env, targetOffsets, velocity, keytrack };
   }
 
   const positionLfo = lfoRouteValue(rawLfo, instrument.lfoPositionBipolar ?? true);
@@ -2236,7 +2641,7 @@ export function modulationAtTime(
   const pitchSemitones = pitchLfo * Math.max(0, instrument.lfoToPitch ?? 0);
   const lfoFilter = filterLfo * clamp(instrument.lfoToFilter ?? 0, -1, 1) * 0.35;
   const envFilter = env * clamp(instrument.envToFilter ?? 0, -1, 1) * 0.35;
-  return { pitchSemitones, filterOffset: lfoFilter + envFilter, positionOffset, ampEnvelope: env, targetOffsets: {} };
+  return { pitchSemitones, filterOffset: lfoFilter + envFilter, positionOffset, ampEnvelope: env, targetOffsets: {}, velocity, keytrack };
 }
 
 function routeTargetOffsets(

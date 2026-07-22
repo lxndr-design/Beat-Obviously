@@ -18,6 +18,7 @@ import { SegmentEditorModal } from "../SegmentEditor/SegmentEditorModal.solid";
 import { SynthEditor } from "../Synth/SynthEditor/SynthEditor.solid";
 import { TrackDetailsModal } from "../TrackDetails/TrackDetailsModal.solid";
 import { TrackEffectsPanel } from "../TrackEffects/TrackEffectsPanel.solid";
+import { AurumEditor } from "../Aurum/AurumEditor.solid";
 
 export function EditorHost() {
   const openEditors = createStoreSelector(useUiStore, (state) => state.openEditors);
@@ -49,7 +50,9 @@ export function EditorHost() {
                   open
                   title={instrument()?.nodeGraph
                     ? instrument()?.name ?? "Nodemap"
-                    : instrument()?.synthPatch?.instrumentType === "lumus-hybrid-synth"
+                    : instrument()?.aurum
+                      ? "Instrument - Aurum Engine"
+                      : instrument()?.synthPatch?.instrumentType === "lumus-hybrid-synth"
                       ? "Instrument - Lumus Engine"
                       : "Instrument - Aether Engine"}
                   width="editor"
@@ -65,6 +68,16 @@ export function EditorHost() {
                         else addInstrument(saved);
                         closeEditor({ kind: "synthInstrument", instrumentId: editor.instrumentId });
                       }}
+                    />
+                  ) : instrument()?.aurum ? (
+                    <AurumEditor
+                      instrument={instrument()!}
+                      onCommit={(saved) => {
+                        if (instruments().some((candidate) => candidate.id === saved.id)) updateInstrument(saved.id, saved);
+                        else addInstrument(saved);
+                        closeEditor({ kind: "synthInstrument", instrumentId: editor.instrumentId });
+                      }}
+                      onClose={() => closeEditor({ kind: "synthInstrument", instrumentId: editor.instrumentId })}
                     />
                   ) : (
                     <SynthEditor instrumentId={editor.instrumentId} hotkeyScopeId={scopeId} />

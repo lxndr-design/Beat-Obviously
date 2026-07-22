@@ -16,6 +16,98 @@ namespace beat
 {
     namespace
     {
+        constexpr float aurumMaximumRouteAmount = 1.0f;
+        constexpr float aurumMaximumFmSum = 6.0f;
+        constexpr float aurumMaximumRingGain = 1.0f;
+        constexpr float aurumMaximumFeedbackSample = 1.0f;
+        constexpr float aurumFmPhaseScale = 1.9f;
+
+        float aurumRouteAmount(float amount) noexcept
+        {
+            return std::isfinite(amount)
+                ? juce::jlimit(-aurumMaximumRouteAmount, aurumMaximumRouteAmount, amount)
+                : 0.0f;
+        }
+
+        float aurumFeedbackSample(float sample) noexcept
+        {
+            return std::isfinite(sample)
+                ? juce::jlimit(-aurumMaximumFeedbackSample, aurumMaximumFeedbackSample, sample)
+                : 0.0f;
+        }
+
+        float aurumWavefold(float sample, float amount) noexcept
+        {
+            const float depth = VoiceMath::clamp01(amount);
+            if (depth <= 0.0001f)
+                return sample;
+            const float driven = juce::jlimit(-1.0f, 1.0f, sample) * (1.0f + depth * 3.0f);
+            return std::asin(std::sin(driven * juce::MathConstants<float>::halfPi))
+                / juce::MathConstants<float>::halfPi;
+        }
+
+        float aurumHeldEnvelope(float attackMs, float decayMs, float sustain, float timeMs) noexcept
+        {
+            const float attack = juce::jmax(0.0f, attackMs);
+            if (attack > 0.0f && timeMs < attack)
+                return timeMs / attack;
+            const float decay = juce::jmax(0.0f, decayMs);
+            const float decayTime = timeMs - attack;
+            if (decay > 0.0f && decayTime < decay)
+                return 1.0f + (VoiceMath::clamp01(sustain) - 1.0f) * (decayTime / decay);
+            return VoiceMath::clamp01(sustain);
+        }
+
+        float aurumEnvelope(float attackMs,
+                            float decayMs,
+                            float sustain,
+                            float releaseMs,
+                            float timeMs,
+                            float releaseTimeMs,
+                            float releaseLevel,
+                            bool releasing) noexcept
+        {
+            if (!releasing)
+                return aurumHeldEnvelope(attackMs, decayMs, sustain, timeMs);
+            const float release = juce::jmax(0.0f, releaseMs);
+            return release > 0.0f
+                ? releaseLevel * juce::jmax(0.0f, 1.0f - releaseTimeMs / release)
+                : 0.0f;
+        }
+
+        float aurumResponseCurve(const std::array<float, 5>& curve, float input) noexcept
+        {
+            const float position = VoiceMath::clamp01(input) * 4.0f;
+            const auto lower = (size_t) juce::jlimit(0, 4, (int) std::floor(position));
+            const auto upper = juce::jmin((size_t) 4, lower + 1);
+            const float mix = position - (float) lower;
+            return juce::jmap(
+                mix,
+                VoiceMath::clamp01(curve[lower]),
+                VoiceMath::clamp01(curve[upper]));
+        }
+
+        float aurumOperatorSample(
+            const InstrumentVoice::Params::AurumOperator& op,
+            double phase,
+            double phaseDelta) noexcept
+        {
+            if (op.waveform != 4)
+                return aurumWavefold(BasicOscillator::sample(op.waveform, phase, phaseDelta), op.wavefold);
+            float sample = 0.0f;
+            float weight = 0.0f;
+            for (size_t index = 0; index < op.harmonics.size(); ++index)
+            {
+                const auto harmonic = (double) index + 1.0;
+                if (harmonic * std::abs(phaseDelta) >= 0.5) break;
+                const float amplitude = VoiceMath::clamp01(op.harmonics[index]);
+                if (amplitude <= 0.0001f) continue;
+                sample += std::sin(juce::MathConstants<double>::twoPi * phase * harmonic) * amplitude;
+                weight += amplitude;
+            }
+            return aurumWavefold(weight > 0.0f ? sample / weight : 0.0f, op.wavefold);
+        }
+
         float runtimeWarpShape(float input, float amount, int mode) noexcept
         {
             const float drive = VoiceMath::clamp01(amount);
@@ -111,6 +203,7 @@ namespace beat
         filter2State.prepare(sr, blockSize, params.filter2Type);
         filter1RouteState.prepare(sr, blockSize, params.filterType);
         filter2RouteState.prepare(sr, blockSize, params.filter2Type);
+        aurumFilterBState.prepare(sr, blockSize, params.aurumFilters[1].type);
         stealTransition.prepare(sampleRate);
         for (auto& transition : sourceSendTransitions)
             transition.prepare(sampleRate);
@@ -136,6 +229,30 @@ namespace beat
     {
         baseParams = p;
         params = p;
+        aurumOutputBusMask = 0;
+        for (const auto& sends : params.aurumOutputSends)
+        {
+            if (std::abs(sends[0]) > 0.0001f) aurumOutputBusMask |= 1;
+            if (std::abs(sends[1]) > 0.0001f) aurumOutputBusMask |= 2;
+            if (std::abs(sends[2]) > 0.0001f) aurumOutputBusMask |= 4;
+        }
+        if (params.hasAurum)
+        {
+            params.hasAether = false;
+            params.hasLumus = false;
+            const auto& filterA = params.aurumFilters[0];
+            const auto& filterB = params.aurumFilters[1];
+            params.filterType = filterA.type;
+            params.cutoff01 = filterA.cutoff01;
+            params.resonance01 = filterA.resonance01;
+            params.drive01 = filterA.drive01;
+            params.filter2Enabled = filterB.enabled;
+            params.filter2Type = filterB.type;
+            params.filter2Cutoff01 = filterB.cutoff01;
+            params.filter2Resonance01 = filterB.resonance01;
+            params.filter2Drive01 = filterB.drive01;
+            params.filterRouting = params.aurumFilterRouting;
+        }
         modWheel = juce::jlimit(0.0f, 1.0f, p.modWheel);
         pitchWheelSemitones = 0.0f;
         masterPitchWheelSemitones = 0.0f;
@@ -252,10 +369,12 @@ namespace beat
         env3Adsr.setParameters(env3AdsrParams);
         env4Adsr.setParameters(env4AdsrParams);
 
-        filterState.configure(p.filterType, p.cutoff01, p.resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
-        filter2State.configure(p.filter2Type, p.filter2Cutoff01, p.filter2Resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
-        filter1RouteState.configure(p.filterType, p.cutoff01, p.resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
-        filter2RouteState.configure(p.filter2Type, p.filter2Cutoff01, p.filter2Resonance01, sampleRate, p.filterKeytrack, baseFrequencyHz);
+        filterState.configure(params.filterType, params.cutoff01, params.resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
+        filter2State.configure(params.filter2Type, params.filter2Cutoff01, params.filter2Resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
+        filter1RouteState.configure(params.filterType, params.cutoff01, params.resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
+        filter2RouteState.configure(params.filter2Type, params.filter2Cutoff01, params.filter2Resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
+        aurumFilterBState.configure(params.aurumFilters[1].type, params.aurumFilters[1].cutoff01,
+            params.aurumFilters[1].resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
         refreshCachedPanGains();
         refreshCachedPitchRates();
         refreshCachedDynamicModulationFlags();
@@ -531,6 +650,17 @@ namespace beat
                 + VoiceMath::deterministicPhaseJitter(noiseState ^ 0xd4e12b87u)
                     * juce::jlimit(0.0, 1.0, (double) params.lumusOscC.randomPhase);
         }
+        aurumAgeSamples = 0;
+        aurumReleaseAgeSamples = -1;
+        aurumReleaseLevels.fill(0.0f);
+        aurumPitchReleaseLevels.fill(0.0f);
+        aurumPhaseReleaseLevels.fill(0.0f);
+        aurumOutputs.fill(0.0f);
+        for (size_t index = 0; index < aurumPhases.size(); ++index)
+            aurumPhases[index] = std::fmod(
+                juce::jlimit(0.0, 1.0, (double) params.aurumOperators[index % 6].phase)
+                    + (double) (index / 6) * 0.071,
+                1.0);
         if (params.lfoRetrigger)
             lfoPhase = std::fmod(juce::jlimit(0.0, 1.0, (double) params.lfoPhaseOffset)
                 + VoiceMath::deterministicPhaseJitter(noiseState ^ 0x35a1d7bdu) * juce::jlimit(0.0, 1.0, (double) params.lfoRandomPhase),
@@ -644,6 +774,18 @@ namespace beat
         }
         if (allowTailOff)
         {
+            if (params.hasAurum && aurumReleaseAgeSamples < 0)
+            {
+                const float timeMs = (float) ((double) aurumAgeSamples * 1000.0 / sampleRate);
+                for (size_t index = 0; index < aurumReleaseLevels.size(); ++index)
+                {
+                    const auto& op = params.aurumOperators[index];
+                    aurumReleaseLevels[index] = aurumHeldEnvelope(op.attackMs, op.decayMs, op.sustain, timeMs);
+                    aurumPitchReleaseLevels[index] = aurumHeldEnvelope(op.pitchAttackMs, op.pitchDecayMs, op.pitchSustain, timeMs);
+                    aurumPhaseReleaseLevels[index] = aurumHeldEnvelope(op.phaseAttackMs, op.phaseDecayMs, op.phaseSustain, timeMs);
+                }
+                aurumReleaseAgeSamples = 0;
+            }
             if (params.env1Loop)
             {
                 const float value = env1LoopValue();
@@ -679,6 +821,10 @@ namespace beat
             env2LoopState.reset();
             env3LoopState.reset();
             env4LoopState.reset();
+            aurumReleaseAgeSamples = -1;
+            aurumReleaseLevels.fill(0.0f);
+            aurumPitchReleaseLevels.fill(0.0f);
+            aurumPhaseReleaseLevels.fill(0.0f);
             clearCurrentNote();
             if (!stealPrepared)
             {
@@ -697,7 +843,18 @@ namespace beat
                                           int startSample, int numSamples)
     {
         juce::ScopedNoDenormals noDenormals;
-        if (!adsr.isActive()) return;
+        if (params.hasAurum)
+        {
+            if (aurumReleaseAgeSamples >= 0 && !aurumReleaseTailActive())
+            {
+                clearCurrentNote();
+                return;
+            }
+        }
+        else if (!adsr.isActive())
+        {
+            return;
+        }
 
         const auto modulationPlan = DynamicModulation::makeRenderPlan(
             cachedDynamicTargets,
@@ -784,7 +941,7 @@ namespace beat
             double currentPhaseDelta = currentPitchFrequency / sampleRate;
             if (hasPitchMod)
                 currentPhaseDelta *= std::exp2((pitchLfo * pitchMod) / 12.0);
-            if (useDynamicModulation && !params.hasAether)
+            if (useDynamicModulation && !params.hasAether && !params.hasAurum)
             {
                 const float oscAFineCents = DynamicModulation::targetOffset(params.dynamicModulation.oscAFine, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, level, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 100.0f);
                 currentPhaseDelta *= std::exp2(oscAFineCents / 1200.0f);
@@ -811,7 +968,165 @@ namespace beat
             std::array<AetherTableStackRenderer::StereoFrame, 3> lumusGranularFrames {};
             AetherTableStackRenderer::StereoFrame lumusSourceFrameC {};
             std::array<AetherTableStackRenderer::StereoFrame, 4> sourceFrames {};
-            if (params.hasAether)
+            if (params.hasAurum)
+            {
+                const float timeMs = (float) ((double) aurumAgeSamples * 1000.0 / sampleRate);
+                const int voiceCount = juce::jlimit(1, 8, params.aurumUnison);
+                const int oversampling = params.aurumOversampling >= 4 ? 4 : params.aurumOversampling >= 2 ? 2 : 1;
+                StereoSample busA {};
+                StereoSample busB {};
+                StereoSample direct {};
+                for (int substep = 0; substep < oversampling; ++substep)
+                {
+                    std::array<float, 48> nextOutputs {};
+                    StereoSample stepA {};
+                    StereoSample stepB {};
+                    StereoSample stepDirect {};
+                    for (int voice = 0; voice < voiceCount; ++voice)
+                    {
+                        const size_t voiceOffset = (size_t) voice * 6;
+                        const float centered = voiceCount == 1 ? 0.0f
+                            : ((float) voice / (float) (voiceCount - 1)) * 2.0f - 1.0f;
+                        const double voiceRate = std::exp2((double) centered * params.aurumDetuneCents / 1200.0);
+                        for (size_t target = 0; target < 6; ++target)
+                        {
+                            const auto& op = params.aurumOperators[target];
+                            if (!op.enabled) continue;
+                            float fm = 0.0f;
+                            for (size_t source = 0; source < 6; ++source)
+                                fm += aurumFeedbackSample(aurumOutputs[voiceOffset + source])
+                                    * aurumRouteAmount(params.aurumMatrix[source][target]);
+                            fm = juce::jlimit(-aurumMaximumFmSum, aurumMaximumFmSum, fm);
+
+                            const bool releasing = aurumReleaseAgeSamples >= 0;
+                            const float releaseTimeMs = releasing
+                                ? (float) ((double) aurumReleaseAgeSamples * 1000.0 / sampleRate) : 0.0f;
+                            const float opEnvelope = aurumEnvelope(op.attackMs, op.decayMs, op.sustain,
+                                op.releaseMs, timeMs, releaseTimeMs, aurumReleaseLevels[target], releasing);
+                            const float pitchEnvelope = aurumEnvelope(op.pitchAttackMs, op.pitchDecayMs,
+                                op.pitchSustain, op.pitchReleaseMs, timeMs, releaseTimeMs,
+                                aurumPitchReleaseLevels[target], releasing);
+                            const float phaseEnvelope = aurumEnvelope(op.phaseAttackMs, op.phaseDecayMs,
+                                op.phaseSustain, op.phaseReleaseMs, timeMs, releaseTimeMs,
+                                aurumPhaseReleaseLevels[target], releasing);
+                            const double ratio = juce::jlimit(0.125, 32.0, (double) op.ratio);
+                            const double tuning = std::exp2((double) op.coarse / 12.0 + (double) op.fineCents / 1200.0);
+                            const double pitchEnvelopeRate = std::exp2(
+                                (double) pitchEnvelope * juce::jlimit(-48.0f, 48.0f, op.pitchEnvelopeSemitones) / 12.0);
+                            const double delta = currentFrequency * voiceRate * ratio * tuning * pitchEnvelopeRate
+                                / (sampleRate * (double) oversampling);
+                            float rmGain = 1.0f;
+                            for (size_t source = 0; source < 6; ++source)
+                            {
+                                const float amount = aurumRouteAmount(params.aurumRmMatrix[source][target]);
+                                if (std::abs(amount) <= 0.0001f) continue;
+                                rmGain *= 1.0f - std::abs(amount)
+                                    + aurumFeedbackSample(aurumOutputs[voiceOffset + source]) * amount;
+                                rmGain = juce::jlimit(-aurumMaximumRingGain, aurumMaximumRingGain, rmGain);
+                            }
+                            nextOutputs[voiceOffset + target] = aurumFeedbackSample(
+                                aurumOperatorSample(op,
+                                    aurumPhases[voiceOffset + target]
+                                        + phaseEnvelope * juce::jlimit(-180.0f, 180.0f, op.phaseEnvelopeDegrees) / 360.0f
+                                        + fm * aurumFmPhaseScale,
+                                    delta)
+                                * VoiceMath::clamp01(op.level)
+                                * opEnvelope
+                                * aurumResponseCurve(op.velocityCurve, level)
+                                * aurumResponseCurve(op.keytrackCurve, noteKeytrack)
+                                * rmGain);
+                            aurumPhases[voiceOffset + target] = std::fmod(
+                                aurumPhases[voiceOffset + target] + delta, 1.0);
+                            currentBlockWork.addOscillatorSamples(1);
+                        }
+
+                        for (size_t source = 0; source < 6; ++source)
+                        {
+                            const float output = nextOutputs[voiceOffset + source];
+                            const float pan = juce::jlimit(-1.0f, 1.0f,
+                                params.aurumOperators[source].pan + centered * params.aurumStereoSpread);
+                            const float angle = (pan + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
+                            const float leftGain = std::cos(angle);
+                            const float rightGain = std::sin(angle);
+                            const auto addToBus = [&](StereoSample& bus, float amount)
+                            {
+                                const float routed = output * aurumRouteAmount(amount);
+                                bus.left += routed * leftGain;
+                                bus.right += routed * rightGain;
+                            };
+                            addToBus(stepA, params.aurumOutputSends[source][0]);
+                            addToBus(stepB, params.aurumOutputSends[source][1]);
+                            addToBus(stepDirect, params.aurumOutputSends[source][2]);
+                        }
+                    }
+                    aurumOutputs = nextOutputs;
+                    busA.left += stepA.left; busA.right += stepA.right;
+                    busB.left += stepB.left; busB.right += stepB.right;
+                    direct.left += stepDirect.left; direct.right += stepDirect.right;
+                }
+                ++aurumAgeSamples;
+                if (aurumReleaseAgeSamples >= 0) ++aurumReleaseAgeSamples;
+                const float normalization = 1.0f / (std::sqrt((float) voiceCount) * (float) oversampling);
+                for (auto* frame : { &busA, &busB, &direct })
+                {
+                    frame->left *= normalization;
+                    frame->right *= normalization;
+                }
+
+                const auto processAurumFilter = [&](StereoSample input,
+                                                    const Params::AurumFilter& config,
+                                                    FilterStage::State& state,
+                                                    DriveStage::State& driveState)
+                {
+                    if (!config.enabled) return input;
+                    if (config.drive01 > 0.0001f)
+                    {
+                        const auto driven = DriveStage::processOversampled(
+                            driveState, input, 1.0f + config.drive01 * 6.0f);
+                        input = { driven.left, driven.right };
+                        currentBlockWork.addFilterDriveSamples(DriveStage::workSamplesForChannels(2));
+                    }
+                    else driveState.reset(input);
+                    state.updateCutoffIfChanged(config.cutoff01, sampleRate,
+                        params.filterKeytrack, baseFrequencyHz, 6.0f);
+                    state.updateResonanceIfChanged(config.resonance01, 0.001f);
+                    const auto filtered = state.process(input.left, input.right);
+                    return StereoSample { filtered.left, filtered.right };
+                };
+
+                const bool hasA = (aurumOutputBusMask & 1) != 0;
+                const bool hasB = (aurumOutputBusMask & 2) != 0;
+                const bool hasDirect = (aurumOutputBusMask & 4) != 0;
+                if (params.aurumFilterRouting == 1)
+                {
+                    const auto filteredA = hasA
+                        ? processAurumFilter(busA, params.aurumFilters[0], filterState, driveState)
+                        : StereoSample {};
+                    const auto filteredB = hasB
+                        ? processAurumFilter(busB, params.aurumFilters[1], aurumFilterBState, aurumFilterBDriveState)
+                        : StereoSample {};
+                    const int count = (int) hasA + (int) hasB + (int) hasDirect;
+                    raw = count > 0 ? StereoSample {
+                        (filteredA.left + filteredB.left + direct.left) / (float) count,
+                        (filteredA.right + filteredB.right + direct.right) / (float) count,
+                    } : StereoSample {};
+                }
+                else
+                {
+                    auto serial = hasA
+                        ? processAurumFilter(busA, params.aurumFilters[0], filterState, driveState)
+                        : StereoSample {};
+                    if (hasB) { serial.left += busB.left; serial.right += busB.right; }
+                    if (hasA || hasB)
+                        serial = processAurumFilter(serial, params.aurumFilters[1], aurumFilterBState, aurumFilterBDriveState);
+                    const int count = (int) (hasA || hasB) + (int) hasDirect;
+                    raw = count > 0 ? StereoSample {
+                        (serial.left + direct.left) / (float) count,
+                        (serial.right + direct.right) / (float) count,
+                    } : StereoSample {};
+                }
+            }
+            else if (params.hasAether)
             {
                 const auto aetherResult = AetherTableStackRenderer::render(
                     params,
@@ -1082,6 +1397,8 @@ namespace beat
             processSecondWarp(aetherFilter1RuntimeWarp2State, filter1RouteLeft, filter1RouteRight);
             processSecondWarp(aetherFilter2RuntimeWarp2State, filter2RouteLeft, filter2RouteRight);
 
+            if (!params.hasAurum)
+            {
             const float filterInputLeft = left;
             const float filterInputRight = right;
 
@@ -1203,6 +1520,7 @@ namespace beat
                 left += directLeft;
                 right += directRight;
             }
+            }
 
             const float ampLevel = VoiceMath::clamp01(params.ampLevel + (useDynamicModulation && cachedDynamicTargets.ampLevel
                 ? DynamicModulation::targetOffset(params.dynamicModulation.ampLevel, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, level, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f)
@@ -1211,7 +1529,7 @@ namespace beat
                 ? juce::jlimit(-1.0f, 1.0f, params.ampPan + DynamicModulation::targetOffset(params.dynamicModulation.ampPan, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, level, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f))
                 : params.ampPan;
             const auto panGains = hasAmpPanMod ? VoiceMath::equalPowerPanGains(ampPan) : cachedPanGains.amp;
-            const float voiceGain = env * level * 0.4f * ampLevel;
+            const float voiceGain = (params.hasAurum ? 1.0f : env) * level * 0.4f * ampLevel;
             const auto [leftGain, rightGain] = panGains;
 
             const auto transitioned = stealTransition.process({
@@ -1311,8 +1629,15 @@ namespace beat
             }
         }
 
-        if (!adsr.isActive())
+        if (params.hasAurum)
+        {
+            if (aurumReleaseAgeSamples >= 0 && !aurumReleaseTailActive())
+                clearCurrentNote();
+        }
+        else if (!adsr.isActive())
+        {
             clearCurrentNote();
+        }
 
         VoiceRenderStats::recordBlock(currentBlockWork.snapshot());
     }
@@ -1325,6 +1650,18 @@ namespace beat
             juce::jmax(std::abs(lastOutput.left), std::abs(lastOutput.right)),
             stableVoiceId
         };
+    }
+
+    bool InstrumentVoice::aurumReleaseTailActive() const noexcept
+    {
+        if (!params.hasAurum || aurumReleaseAgeSamples < 0 || sampleRate <= 0.0)
+            return false;
+        float longestReleaseMs = 0.0f;
+        for (const auto& op : params.aurumOperators)
+            if (op.enabled)
+                longestReleaseMs = juce::jmax(longestReleaseMs, juce::jmax(0.0f, op.releaseMs));
+        const auto releaseSamples = (int64_t) std::ceil((double) longestReleaseMs * sampleRate / 1000.0);
+        return aurumReleaseAgeSamples < releaseSamples;
     }
 
     float InstrumentVoice::shapedEnvelope(float rawEnvelope) noexcept
@@ -1377,6 +1714,7 @@ namespace beat
     bool InstrumentVoice::legacyWavetableNeedsSetup() const noexcept
     {
         return !params.hasAether
+            && !params.hasAurum
             && params.waveform == 5;
     }
 

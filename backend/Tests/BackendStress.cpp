@@ -2210,6 +2210,108 @@ namespace
         return project;
     }
 
+    beat::Project makeAurumParityProject()
+    {
+        beat::Project project;
+        project.id = "aurum-parity-project";
+        project.name = "Aurum Cross-rate Parity";
+        project.bpm = 120.0;
+        project.lengthBeats = 1.0;
+
+        beat::InstrumentDefinition instrument;
+        instrument.id = "aurum-parity";
+        instrument.kind = "synth";
+        instrument.hasAether = false;
+        instrument.hasAurum = true;
+        instrument.maxVoices = 8;
+        instrument.cutoff01 = 1.0f;
+        instrument.resonance01 = 0.0f;
+        instrument.drive01 = 0.0f;
+        instrument.attackMs = 0.0f;
+        instrument.decayMs = 0.0f;
+        instrument.sustain = 1.0f;
+        instrument.releaseMs = 180.0f;
+        instrument.ampLevel = 0.48f;
+
+        auto& carrier = instrument.aurum.operators[0];
+        carrier.enabled = true;
+        carrier.waveform = 4;
+        carrier.ratio = 1.0f;
+        carrier.level = 0.76f;
+        carrier.pan = -0.22f;
+        carrier.releaseMs = 180.0f;
+        carrier.harmonics.fill(0.0f);
+        carrier.harmonics[0] = 1.0f;
+        carrier.harmonics[1] = 0.36f;
+        carrier.harmonics[2] = 0.18f;
+        carrier.harmonics[4] = 0.08f;
+
+        auto& fmOperator = instrument.aurum.operators[1];
+        fmOperator.enabled = true;
+        fmOperator.waveform = 0;
+        fmOperator.ratio = 2.0f;
+        fmOperator.level = 0.52f;
+        fmOperator.releaseMs = 120.0f;
+
+        auto& ringOperator = instrument.aurum.operators[2];
+        ringOperator.enabled = true;
+        ringOperator.waveform = 2;
+        ringOperator.ratio = 0.5f;
+        ringOperator.level = 0.34f;
+        ringOperator.releaseMs = 260.0f;
+
+        instrument.aurum.matrix[1][0] = -0.38f;
+        instrument.aurum.matrix[0][6] = 0.82f;
+        instrument.aurum.rmMatrix[2][0] = 0.44f;
+        instrument.aurum.unison = 3;
+        instrument.aurum.detuneCents = 8.0f;
+        instrument.aurum.stereoSpread = 0.62f;
+        beat::TrackEffect chorus;
+        chorus.id = "aurum-shared-chorus";
+        chorus.kind = beat::TrackEffectKind::Chorus;
+        chorus.params.push_back({ "rateHz", 0.8f });
+        chorus.params.push_back({ "depthMs", 8.0f });
+        chorus.params.push_back({ "delayMs", 12.0f });
+        chorus.params.push_back({ "feedback", 8.0f });
+        chorus.params.push_back({ "mix", 35.0f });
+        instrument.effects.push_back(std::move(chorus));
+        project.instruments.push_back(std::move(instrument));
+
+        beat::Track track;
+        track.id = "aurum-parity-track";
+        track.name = "Aurum Parity";
+        track.kind = beat::TrackKind::Midi;
+        track.instrumentId = "aurum-parity";
+        track.gainDb = -4.0f;
+
+        beat::Segment segment;
+        segment.id = "aurum-parity-segment";
+        segment.trackId = track.id;
+        segment.kind = beat::SegmentPayloadKind::Midi;
+        segment.instrumentId = "aurum-parity";
+        segment.startBeat = 0.0;
+        segment.lengthBeats = 1.0;
+
+        beat::MidiNote first;
+        first.instrumentId = "aurum-parity";
+        first.pitch = 48;
+        first.velocity = 104;
+        first.startBeat = 0.0;
+        first.lengthBeats = 0.5;
+        segment.notes.push_back(first);
+
+        beat::MidiNote second = first;
+        second.pitch = 55;
+        second.velocity = 92;
+        second.startBeat = 0.25;
+        second.lengthBeats = 0.5;
+        segment.notes.push_back(second);
+
+        track.segments.push_back(std::move(segment));
+        project.tracks.push_back(std::move(track));
+        return project;
+    }
+
     beat::Project makeMaxUnisonAetherProject()
     {
         auto project = makeDenseAetherProject();
@@ -9258,6 +9360,127 @@ namespace
         return ok;
     }
 
+    bool stressProjectRepositoryAurumInstrumentRoundtrip()
+    {
+        const auto root = juce::File("/private/tmp")
+            .getChildFile("BeatBackendStress-aurum-instrument-repository-" + juce::Uuid().toString());
+        const auto dbFile = root.getChildFile("projects.sqlite");
+        if (!root.createDirectory())
+            return false;
+
+        beat::Project project;
+        project.id = "aurum-instrument-repository-project";
+        project.name = "Aurum Instrument Repository Project";
+
+        beat::InstrumentDefinition instrument;
+        instrument.id = "aurum-bipolar-roundtrip";
+        instrument.hasAurum = true;
+        instrument.hasAether = false;
+        instrument.aurum.operators[0].enabled = true;
+        instrument.aurum.operators[0].waveform = 4;
+        instrument.aurum.operators[0].level = 0.8f;
+        instrument.aurum.operators[0].pan = -0.37f;
+        instrument.aurum.operators[0].releaseMs = 1234.0f;
+        instrument.aurum.operators[0].wavefold = 0.68f;
+        instrument.aurum.operators[0].pitchAttackMs = 31.0f;
+        instrument.aurum.operators[0].pitchDecayMs = 417.0f;
+        instrument.aurum.operators[0].pitchSustain = 0.36f;
+        instrument.aurum.operators[0].pitchReleaseMs = 289.0f;
+        instrument.aurum.operators[0].pitchEnvelopeSemitones = -17.0f;
+        instrument.aurum.operators[0].phaseAttackMs = 23.0f;
+        instrument.aurum.operators[0].phaseDecayMs = 311.0f;
+        instrument.aurum.operators[0].phaseSustain = 0.58f;
+        instrument.aurum.operators[0].phaseReleaseMs = 197.0f;
+        instrument.aurum.operators[0].phaseEnvelopeDegrees = 94.0f;
+        instrument.aurum.operators[0].velocityCurve = {{ 0.12f, 0.31f, 0.53f, 0.77f, 0.96f }};
+        instrument.aurum.operators[0].keytrackCurve = {{ 0.91f, 0.73f, 0.58f, 0.34f, 0.16f }};
+        instrument.aurum.operators[0].harmonics[2] = 0.64f;
+        instrument.aurum.operators[0].harmonics[7] = 0.22f;
+        instrument.aurum.operators[1].enabled = true;
+        instrument.aurum.operators[1].ratio = 2.0f;
+        instrument.aurum.operators[1].level = 0.55f;
+        instrument.aurum.operators[1].releaseMs = 87.0f;
+        instrument.aurum.operators[1].wavefold = 0.21f;
+        instrument.aurum.matrix[1][0] = -0.42f;
+        instrument.aurum.matrix[0][6] = -0.86f;
+        instrument.aurum.rmMatrix[1][0] = 0.73f;
+        instrument.aurum.rmMatrix[2][1] = -0.31f;
+        instrument.aurum.unison = 3;
+        instrument.aurum.detuneCents = 11.0f;
+        instrument.aurum.stereoSpread = 0.57f;
+        instrument.aurum.oversampling = 4;
+        instrument.aurum.filters[0] = { true, 1, 0.43f, 0.27f, 0.19f };
+        instrument.aurum.filters[1] = { true, 2, 0.16f, 0.34f, 0.11f };
+        instrument.aurum.filterRouting = 1;
+        instrument.aurum.outputSends[0] = {{ -0.72f, 0.31f, 0.18f }};
+        instrument.aurum.outputSends[2] = {{ 0.14f, -0.63f, 0.42f }};
+        beat::TrackEffect sharedEffect;
+        sharedEffect.id = "aurum-shared-effect";
+        sharedEffect.kind = beat::TrackEffectKind::Chorus;
+        sharedEffect.params.push_back({ "mix", 31.0f });
+        instrument.effects.push_back(std::move(sharedEffect));
+        project.instruments.push_back(instrument);
+
+        beat::Database db(dbFile);
+        beat::ProjectRepository repo(db);
+        repo.save(project);
+        const auto loaded = repo.load(project.id);
+        const bool ok = loaded.has_value()
+            && loaded->instruments.size() == 1
+            && loaded->instruments.front().hasAurum
+            && !loaded->instruments.front().hasAether
+            && near(loaded->instruments.front().aurum.matrix[1][0], -0.42f)
+            && near(loaded->instruments.front().aurum.matrix[0][6], -0.86f)
+            && near(loaded->instruments.front().aurum.rmMatrix[1][0], 0.73f)
+            && near(loaded->instruments.front().aurum.rmMatrix[2][1], -0.31f)
+            && near(loaded->instruments.front().aurum.operators[0].releaseMs, 1234.0f)
+            && near(loaded->instruments.front().aurum.operators[0].pan, -0.37f)
+            && near(loaded->instruments.front().aurum.operators[1].releaseMs, 87.0f)
+            && near(loaded->instruments.front().aurum.operators[0].wavefold, 0.68f)
+            && near(loaded->instruments.front().aurum.operators[1].wavefold, 0.21f)
+            && near(loaded->instruments.front().aurum.operators[0].pitchAttackMs, 31.0f)
+            && near(loaded->instruments.front().aurum.operators[0].pitchDecayMs, 417.0f)
+            && near(loaded->instruments.front().aurum.operators[0].pitchSustain, 0.36f)
+            && near(loaded->instruments.front().aurum.operators[0].pitchReleaseMs, 289.0f)
+            && near(loaded->instruments.front().aurum.operators[0].pitchEnvelopeSemitones, -17.0f)
+            && near(loaded->instruments.front().aurum.operators[0].phaseAttackMs, 23.0f)
+            && near(loaded->instruments.front().aurum.operators[0].phaseDecayMs, 311.0f)
+            && near(loaded->instruments.front().aurum.operators[0].phaseSustain, 0.58f)
+            && near(loaded->instruments.front().aurum.operators[0].phaseReleaseMs, 197.0f)
+            && near(loaded->instruments.front().aurum.operators[0].phaseEnvelopeDegrees, 94.0f)
+            && near(loaded->instruments.front().aurum.operators[0].velocityCurve[2], 0.53f)
+            && near(loaded->instruments.front().aurum.operators[0].keytrackCurve[3], 0.34f)
+            && loaded->instruments.front().aurum.operators[0].waveform == 4
+            && near(loaded->instruments.front().aurum.operators[0].harmonics[2], 0.64f)
+            && near(loaded->instruments.front().aurum.operators[0].harmonics[7], 0.22f)
+            && loaded->instruments.front().aurum.unison == 3
+            && near(loaded->instruments.front().aurum.detuneCents, 11.0f)
+            && near(loaded->instruments.front().aurum.stereoSpread, 0.57f)
+            && loaded->instruments.front().aurum.oversampling == 4
+            && loaded->instruments.front().aurum.filters[0].enabled
+            && loaded->instruments.front().aurum.filters[0].type == 1
+            && near(loaded->instruments.front().aurum.filters[0].cutoff01, 0.43f)
+            && near(loaded->instruments.front().aurum.filters[0].resonance01, 0.27f)
+            && near(loaded->instruments.front().aurum.filters[0].drive01, 0.19f)
+            && loaded->instruments.front().aurum.filters[1].enabled
+            && loaded->instruments.front().aurum.filters[1].type == 2
+            && near(loaded->instruments.front().aurum.filters[1].cutoff01, 0.16f)
+            && loaded->instruments.front().aurum.filterRouting == 1
+            && near(loaded->instruments.front().aurum.outputSends[0][0], -0.72f)
+            && near(loaded->instruments.front().aurum.outputSends[0][1], 0.31f)
+            && near(loaded->instruments.front().aurum.outputSends[0][2], 0.18f)
+            && near(loaded->instruments.front().aurum.outputSends[2][0], 0.14f)
+            && near(loaded->instruments.front().aurum.outputSends[2][1], -0.63f)
+            && near(loaded->instruments.front().aurum.outputSends[2][2], 0.42f)
+            && loaded->instruments.front().effects.size() == 1
+            && loaded->instruments.front().effects.front().id == "aurum-shared-effect";
+
+        root.deleteRecursively();
+        if (!ok)
+            std::cerr << "Project repository Aurum bipolar roundtrip failed loaded=" << loaded.has_value() << "\n";
+        return ok;
+    }
+
     bool stressProjectRepositoryAudioFileRoundtrip()
     {
         const auto root = juce::File("/private/tmp")
@@ -15690,6 +15913,88 @@ namespace
         return ok;
     }
 
+    bool stressAudioEngineAurumCrossRateLiveExportParity()
+    {
+        constexpr std::array<double, 3> sampleRates { 44100.0, 48000.0, 96000.0 };
+        constexpr int blockSize = 257;
+
+        for (const double sampleRate : sampleRates)
+        {
+            const int samples = (int) std::llround(sampleRate * 0.375);
+            auto project = makeAurumParityProject();
+            auto liveA = renderOfflineChunks(project, samples, blockSize, sampleRate);
+            auto liveB = renderOfflineChunks(project, samples, blockSize, sampleRate);
+            auto dryProject = project;
+            dryProject.instruments.front().effects.clear();
+            auto dry = renderOfflineChunks(dryProject, samples, blockSize, sampleRate);
+            const auto liveNull = bufferResidualStats(liveA, liveB, samples);
+            const float livePeak = bufferPeak(liveA);
+            const auto fxDifference = bufferResidualStats(liveA, dry, samples);
+
+            const auto exportFile = juce::File("/private/tmp").getChildFile(
+                "BeatBackendStress-aurum-parity-" + juce::String((int) sampleRate) + ".wav");
+            if (exportFile.existsAsFile())
+                exportFile.deleteFile();
+
+            juce::String error;
+            if (!beat::AudioEngine::renderProjectToWav(
+                    project, exportFile, sampleRate, blockSize, 2, &error, {}, 32))
+            {
+                std::cerr << "Aurum " << sampleRate << " Hz parity export error: " << error << "\n";
+                return false;
+            }
+
+            juce::AudioFormatManager formatManager;
+            formatManager.registerBasicFormats();
+            std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(exportFile));
+            const bool metadataOk = reader != nullptr
+                && std::abs(reader->sampleRate - sampleRate) < 0.5
+                && reader->numChannels == 2
+                && reader->lengthInSamples >= samples;
+
+            auto exported = readWavPrefix(exportFile, samples);
+            exportFile.deleteFile();
+            const auto exportNull = bufferResidualStats(liveA, exported, samples);
+            const double exportResidualRatio = exportNull.sourceEnergy > 0.0
+                ? exportNull.residualEnergy / exportNull.sourceEnergy
+                : std::numeric_limits<double>::infinity();
+
+            const bool ok = metadataOk
+                && liveNull.ok
+                && exportNull.ok
+                && liveNull.sourceEnergy > 0.0001
+                && fxDifference.residualEnergy > 0.000001
+                && livePeak > 0.0001f
+                && livePeak <= 1.0f
+                && liveNull.residualEnergy <= 0.000000000001
+                && liveNull.maxAbsDiff <= 0.0000001f
+                && exportNull.maxAbsDiff <= 0.0000005f
+                && exportNull.meanAbsDiff <= 0.00000008
+                && exportResidualRatio <= 0.00000000001;
+
+            if (!ok)
+            {
+                std::cerr << "Aurum " << sampleRate << " Hz live/export parity failed"
+                          << " metadata=" << metadataOk
+                          << " liveOk=" << liveNull.ok
+                          << " liveEnergy=" << liveNull.sourceEnergy
+                          << " livePeak=" << livePeak
+                          << " fxDifference=" << fxDifference.residualEnergy
+                          << " liveResidual=" << liveNull.residualEnergy
+                          << " liveMaxDiff=" << liveNull.maxAbsDiff
+                          << " exportOk=" << exportNull.ok
+                          << " exportResidual=" << exportNull.residualEnergy
+                          << " exportResidualRatio=" << exportResidualRatio
+                          << " exportMaxDiff=" << exportNull.maxAbsDiff
+                          << " exportMeanDiff=" << exportNull.meanAbsDiff
+                          << "\n";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     bool stressAudioEngineAetherDeterministicNullExportFamily(beat::Project project,
                                                               const char* label,
                                                               const char* tempFileName,
@@ -17797,6 +18102,799 @@ namespace
         return true;
     }
 
+    bool stressInstrumentVoiceAurumBipolarMatrix()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.drive01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 1.0f;
+        params.sustain = 0.0f;
+        params.releaseMs = 1.0f;
+        params.aurumOperators[0] = { true, 0, 1.0f, 0, 0.0f, 0.8f, 0.13f, 0.0f, 0.0f, 1.0f, 100.0f };
+        params.aurumOperators[1] = { true, 0, 2.0f, 0, 0.0f, 0.55f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
+        params.aurumMatrix[1][0] = 0.42f;
+        params.aurumMatrix[0][6] = 0.86f;
+        params.aurumOutputSends[0][0] = 0.86f;
+
+        auto render = [](const beat::InstrumentVoice::Params& renderParams)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 256);
+            voice.setParams(renderParams);
+            voice.startNote(57, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        const auto positive = render(params);
+        auto negativeFmParams = params;
+        negativeFmParams.aurumMatrix[1][0] = -params.aurumMatrix[1][0];
+        const auto negativeFm = render(negativeFmParams);
+        auto negativeOutputParams = params;
+        negativeOutputParams.aurumMatrix[0][6] = -params.aurumMatrix[0][6];
+        negativeOutputParams.aurumOutputSends[0][0] = -params.aurumOutputSends[0][0];
+        const auto negativeOutput = render(negativeOutputParams);
+
+        double energy = 0.0;
+        double fmDifference = 0.0;
+        double inversionResidual = 0.0;
+        for (int channel = 0; channel < positive.getNumChannels(); ++channel)
+        {
+            for (int sampleIndex = 0; sampleIndex < positive.getNumSamples(); ++sampleIndex)
+            {
+                const auto positiveSample = (double) positive.getSample(channel, sampleIndex);
+                const auto negativeFmSample = (double) negativeFm.getSample(channel, sampleIndex);
+                const auto negativeOutputSample = (double) negativeOutput.getSample(channel, sampleIndex);
+                if (!std::isfinite(positiveSample) || !std::isfinite(negativeFmSample) || !std::isfinite(negativeOutputSample))
+                    return false;
+                energy += positiveSample * positiveSample;
+                fmDifference += std::abs(positiveSample - negativeFmSample);
+                inversionResidual += std::abs(positiveSample + negativeOutputSample);
+            }
+        }
+
+        const bool ok = energy > 0.001 && fmDifference > 0.1 && inversionResidual < 0.001;
+        if (!ok)
+            std::cerr << "Aurum bipolar voice stress failed energy=" << energy
+                      << " fmDifference=" << fmDifference
+                      << " inversionResidual=" << inversionResidual << "\n";
+        return ok;
+    }
+
+    bool stressInstrumentVoiceAurumOperatorRelease()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.drive01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 0.0f;
+        params.releaseMs = 1.0f;
+        params.aurumOperators[0] = { true, 0, 1.0f, 0, 0.0f, 0.8f, 0.0f, 0.0f, 0.0f, 1.0f, 20.0f };
+        params.aurumOperators[1] = { true, 0, 2.0f, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 200.0f };
+        params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
+
+        auto renderTail = [](const beat::InstrumentVoice::Params& renderParams)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 12000);
+            voice.setParams(renderParams);
+            voice.startNote(57, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> held(2, 4800);
+            held.clear();
+            voice.renderNextBlock(held, 0, held.getNumSamples());
+            voice.stopNote(0.0f, true);
+            juce::AudioBuffer<float> tail(2, 12000);
+            tail.clear();
+            voice.renderNextBlock(tail, 0, tail.getNumSamples());
+            return tail;
+        };
+
+        const auto shortRelease = renderTail(params);
+        params.aurumOperators[0].releaseMs = 200.0f;
+        const auto longRelease = renderTail(params);
+        double shortTailEnergy = 0.0;
+        double longTailEnergy = 0.0;
+        for (int channel = 0; channel < shortRelease.getNumChannels(); ++channel)
+            for (int sampleIndex = 4800; sampleIndex < 7200; ++sampleIndex)
+            {
+                const auto shortSample = (double) shortRelease.getSample(channel, sampleIndex);
+                const auto longSample = (double) longRelease.getSample(channel, sampleIndex);
+                if (!std::isfinite(shortSample) || !std::isfinite(longSample))
+                    return false;
+                shortTailEnergy += shortSample * shortSample;
+                longTailEnergy += longSample * longSample;
+            }
+
+        const bool ok = shortTailEnergy < 0.0001 && longTailEnergy > 0.01;
+        if (!ok)
+            std::cerr << "Aurum operator release stress failed shortTailEnergy=" << shortTailEnergy
+                      << " longTailEnergy=" << longTailEnergy << "\n";
+        return ok;
+    }
+
+    bool stressInstrumentVoiceAurumRingMatrix()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.drive01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 1.0f;
+        params.sustain = 0.0f;
+        params.releaseMs = 1.0f;
+        params.aurumOperators[0] = { true, 0, 1.0f, 0, 0.0f, 0.8f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
+        params.aurumOperators[1] = { true, 0, 2.0f, 0, 0.0f, 0.65f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
+        params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
+
+        auto render = [](const beat::InstrumentVoice::Params& renderParams)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 4096);
+            voice.setParams(renderParams);
+            voice.startNote(57, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        const auto dry = render(params);
+        params.aurumRmMatrix[1][0] = 1.0f;
+        const auto positive = render(params);
+        params.aurumRmMatrix[1][0] = -1.0f;
+        const auto negative = render(params);
+        double difference = 0.0;
+        double inversionResidual = 0.0;
+        double energy = 0.0;
+        for (int channel = 0; channel < dry.getNumChannels(); ++channel)
+            for (int sampleIndex = 0; sampleIndex < dry.getNumSamples(); ++sampleIndex)
+            {
+                const auto drySample = (double) dry.getSample(channel, sampleIndex);
+                const auto positiveSample = (double) positive.getSample(channel, sampleIndex);
+                const auto negativeSample = (double) negative.getSample(channel, sampleIndex);
+                if (!std::isfinite(drySample) || !std::isfinite(positiveSample) || !std::isfinite(negativeSample))
+                    return false;
+                difference += std::abs(drySample - positiveSample);
+                inversionResidual += std::abs(positiveSample + negativeSample);
+                energy += positiveSample * positiveSample;
+            }
+
+        const bool ok = energy > 0.001 && difference > 0.1 && inversionResidual < 0.001;
+        if (!ok)
+            std::cerr << "Aurum ring matrix stress failed energy=" << energy
+                      << " difference=" << difference
+                      << " inversionResidual=" << inversionResidual << "\n";
+        return ok;
+    }
+
+    bool stressInstrumentVoiceAurumAdditiveOperator()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.drive01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 1.0f;
+        params.sustain = 0.0f;
+        params.releaseMs = 1.0f;
+        params.aurumOperators[0] = { true, 4, 1.0f, 0, 0.0f, 0.8f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
+        params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
+
+        auto render = [](const beat::InstrumentVoice::Params& renderParams, int midiNote)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 4096);
+            voice.setParams(renderParams);
+            voice.startNote(midiNote, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        params.aurumOperators[0].harmonics.fill(0.0f);
+        params.aurumOperators[0].harmonics[0] = 1.0f;
+        const auto fundamental = render(params, 57);
+        params.aurumOperators[0].harmonics.fill(0.0f);
+        params.aurumOperators[0].harmonics[2] = 1.0f;
+        const auto third = render(params, 57);
+        params.aurumOperators[0].harmonics.fill(0.0f);
+        params.aurumOperators[0].harmonics[15] = 1.0f;
+        const auto aboveNyquist = render(params, 107);
+
+        double difference = 0.0;
+        double thirdEnergy = 0.0;
+        double suppressedEnergy = 0.0;
+        float peak = 0.0f;
+        for (int channel = 0; channel < fundamental.getNumChannels(); ++channel)
+            for (int sampleIndex = 0; sampleIndex < fundamental.getNumSamples(); ++sampleIndex)
+            {
+                const auto fundamentalSample = (double) fundamental.getSample(channel, sampleIndex);
+                const auto thirdSample = (double) third.getSample(channel, sampleIndex);
+                const auto suppressedSample = (double) aboveNyquist.getSample(channel, sampleIndex);
+                if (!std::isfinite(fundamentalSample) || !std::isfinite(thirdSample) || !std::isfinite(suppressedSample))
+                    return false;
+                difference += std::abs(fundamentalSample - thirdSample);
+                thirdEnergy += thirdSample * thirdSample;
+                suppressedEnergy += suppressedSample * suppressedSample;
+                peak = juce::jmax(peak, (float) std::abs(thirdSample));
+            }
+
+        const bool ok = difference > 0.1 && thirdEnergy > 0.001 && peak <= 1.0f && suppressedEnergy < 0.000001;
+        if (!ok)
+            std::cerr << "Aurum additive operator stress failed difference=" << difference
+                      << " thirdEnergy=" << thirdEnergy
+                      << " peak=" << peak
+                      << " suppressedEnergy=" << suppressedEnergy << "\n";
+        return ok;
+    }
+
+    bool stressInstrumentVoiceAurumWavefold()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.drive01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        params.releaseMs = 1.0f;
+        params.aurumOperators[0] = { true, 0, 1.0f, 0, 0.0f, 0.8f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
+        params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
+
+        auto render = [](const beat::InstrumentVoice::Params& renderParams)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 4096);
+            voice.setParams(renderParams);
+            voice.startNote(57, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        const auto dry = render(params);
+        params.aurumOperators[0].wavefold = 0.72f;
+        const auto folded = render(params);
+        params.aurumOperators[0].wavefold = 1.0f;
+        const auto fullFold = render(params);
+        params.aurumOperators[0].wavefold = 4.0f;
+        const auto clampedFold = render(params);
+
+        double foldDifference = 0.0;
+        double clampResidual = 0.0;
+        double foldedEnergy = 0.0;
+        float peak = 0.0f;
+        for (int channel = 0; channel < dry.getNumChannels(); ++channel)
+            for (int sampleIndex = 0; sampleIndex < dry.getNumSamples(); ++sampleIndex)
+            {
+                const float drySample = dry.getSample(channel, sampleIndex);
+                const float foldedSample = folded.getSample(channel, sampleIndex);
+                const float fullFoldSample = fullFold.getSample(channel, sampleIndex);
+                const float clampedFoldSample = clampedFold.getSample(channel, sampleIndex);
+                if (!std::isfinite(drySample) || !std::isfinite(foldedSample)
+                    || !std::isfinite(fullFoldSample) || !std::isfinite(clampedFoldSample))
+                    return false;
+                foldDifference += std::abs((double) drySample - (double) foldedSample);
+                clampResidual += std::abs((double) fullFoldSample - (double) clampedFoldSample);
+                foldedEnergy += (double) foldedSample * (double) foldedSample;
+                peak = std::max(peak, std::abs(foldedSample));
+            }
+
+        const bool ok = foldDifference > 0.1
+            && clampResidual < 0.000001
+            && foldedEnergy > 0.001
+            && peak <= 1.0f;
+        if (!ok)
+            std::cerr << "Aurum wavefold stress failed difference=" << foldDifference
+                      << " clampResidual=" << clampResidual
+                      << " energy=" << foldedEnergy
+                      << " peak=" << peak << "\n";
+        return ok;
+    }
+
+    bool stressInstrumentVoiceAurumOperatorArticulation()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.drive01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        params.releaseMs = 1.0f;
+        auto& op = params.aurumOperators[0];
+        op.enabled = true;
+        op.waveform = 0;
+        op.ratio = 1.0f;
+        op.level = 0.8f;
+        op.attackMs = 0.0f;
+        op.decayMs = 0.0f;
+        op.sustain = 1.0f;
+        op.releaseMs = 100.0f;
+        op.pitchAttackMs = 0.0f;
+        op.pitchDecayMs = 0.0f;
+        op.pitchSustain = 1.0f;
+        op.pitchReleaseMs = 100.0f;
+        op.phaseAttackMs = 0.0f;
+        op.phaseDecayMs = 0.0f;
+        op.phaseSustain = 1.0f;
+        op.phaseReleaseMs = 100.0f;
+        params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
+
+        auto render = [](const beat::InstrumentVoice::Params& renderParams)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 4096);
+            voice.setParams(renderParams);
+            voice.startNote(57, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        const auto dry = render(params);
+        params.aurumOperators[0].pitchEnvelopeSemitones = 12.0f;
+        const auto pitched = render(params);
+        params.aurumOperators[0].pitchEnvelopeSemitones = 0.0f;
+        params.aurumOperators[0].phaseEnvelopeDegrees = 90.0f;
+        const auto phased = render(params);
+
+        double pitchDifference = 0.0;
+        double phaseDifference = 0.0;
+        double energy = 0.0;
+        float peak = 0.0f;
+        for (int channel = 0; channel < dry.getNumChannels(); ++channel)
+            for (int sampleIndex = 0; sampleIndex < dry.getNumSamples(); ++sampleIndex)
+            {
+                const float drySample = dry.getSample(channel, sampleIndex);
+                const float pitchedSample = pitched.getSample(channel, sampleIndex);
+                const float phasedSample = phased.getSample(channel, sampleIndex);
+                if (!std::isfinite(drySample) || !std::isfinite(pitchedSample) || !std::isfinite(phasedSample))
+                    return false;
+                pitchDifference += std::abs((double) drySample - (double) pitchedSample);
+                phaseDifference += std::abs((double) drySample - (double) phasedSample);
+                energy += (double) pitchedSample * (double) pitchedSample + (double) phasedSample * (double) phasedSample;
+                peak = std::max(peak, std::max(std::abs(pitchedSample), std::abs(phasedSample)));
+            }
+
+        const bool ok = pitchDifference > 0.1 && phaseDifference > 0.1 && energy > 0.001 && peak <= 1.0f;
+        if (!ok)
+            std::cerr << "Aurum operator articulation stress failed pitchDifference=" << pitchDifference
+                      << " phaseDifference=" << phaseDifference
+                      << " energy=" << energy
+                      << " peak=" << peak << "\n";
+        return ok;
+    }
+
+    bool stressInstrumentVoiceAurumOperatorResponseCurves()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        params.releaseMs = 1.0f;
+        auto& op = params.aurumOperators[0];
+        op.enabled = true;
+        op.waveform = 0;
+        op.ratio = 1.0f;
+        op.level = 0.8f;
+        op.attackMs = 0.0f;
+        op.decayMs = 0.0f;
+        op.sustain = 1.0f;
+        params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
+
+        auto render = [](const beat::InstrumentVoice::Params& renderParams, int midiNote, float velocity)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 4096);
+            voice.setParams(renderParams);
+            voice.startNote(midiNote, velocity, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        auto energy = [](const juce::AudioBuffer<float>& buffer)
+        {
+            double sum = 0.0;
+            for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+                for (int sampleIndex = 0; sampleIndex < buffer.getNumSamples(); ++sampleIndex)
+                {
+                    const auto sample = (double) buffer.getSample(channel, sampleIndex);
+                    if (!std::isfinite(sample)) return -1.0;
+                    sum += sample * sample;
+                }
+            return sum;
+        };
+
+        const auto flat = render(params, 64, 0.5f);
+        params.aurumOperators[0].velocityCurve = {{ 0.0f, 0.25f, 0.5f, 0.75f, 1.0f }};
+        const auto velocityShaped = render(params, 64, 0.5f);
+        params.aurumOperators[0].velocityCurve = {{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }};
+        params.aurumOperators[0].keytrackCurve = {{ 0.0f, 0.25f, 0.5f, 0.75f, 1.0f }};
+        const auto keyShaped = render(params, 64, 0.5f);
+        params.aurumOperators[0].keytrackCurve = {{ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }};
+        const auto muted = render(params, 64, 0.5f);
+
+        const double flatEnergy = energy(flat);
+        const double velocityEnergy = energy(velocityShaped);
+        const double keyEnergy = energy(keyShaped);
+        const double mutedEnergy = energy(muted);
+        const bool ok = flatEnergy > 0.001
+            && velocityEnergy > 0.001 && velocityEnergy < flatEnergy * 0.4
+            && keyEnergy > 0.001 && keyEnergy < flatEnergy * 0.4
+            && mutedEnergy >= 0.0 && mutedEnergy < 0.000001;
+        if (!ok)
+            std::cerr << "Aurum operator response curve stress failed flat=" << flatEnergy
+                      << " velocity=" << velocityEnergy
+                      << " key=" << keyEnergy
+                      << " muted=" << mutedEnergy << "\n";
+        return ok;
+    }
+
+    bool stressInstrumentVoiceAurumDualFilters()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        auto& op = params.aurumOperators[0];
+        op.enabled = true;
+        op.waveform = 1;
+        op.level = 0.8f;
+        op.attackMs = 0.0f;
+        op.decayMs = 0.0f;
+        op.sustain = 1.0f;
+        params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
+        params.aurumFilters[0] = { true, 0, 0.32f, 0.18f, 0.12f };
+        params.aurumFilters[1] = { false, 2, 0.16f, 0.22f, 0.08f };
+
+        const auto render = [] (beat::InstrumentVoice::Params renderParams)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 4096);
+            voice.setParams(renderParams);
+            voice.startNote(57, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return buffer;
+        };
+
+        const auto filterAOnly = render(params);
+        auto parallelSingleParams = params;
+        parallelSingleParams.aurumFilterRouting = 1;
+        const auto parallelSingle = render(parallelSingleParams);
+        auto serialParams = params;
+        serialParams.aurumFilters[1].enabled = true;
+        serialParams.aurumFilterRouting = 0;
+        const auto serial = render(serialParams);
+        auto parallelParams = serialParams;
+        parallelParams.aurumFilterRouting = 1;
+        parallelParams.aurumOutputSends[0][1] = 0.65f;
+        const auto parallel = render(parallelParams);
+        auto directParams = params;
+        directParams.aurumOutputSends[0] = {{ 0.0f, 0.0f, 1.0f }};
+        const auto directPositive = render(directParams);
+        directParams.aurumOutputSends[0][2] = -1.0f;
+        const auto directNegative = render(directParams);
+        directParams.aurumOutputSends[0][2] = 0.0f;
+        const auto disconnected = render(directParams);
+        auto hardLeftParams = directParams;
+        hardLeftParams.aurumOutputSends[0][2] = 1.0f;
+        hardLeftParams.aurumStereoSpread = 0.0f;
+        hardLeftParams.aurumOperators[0].pan = -1.0f;
+        const auto hardLeft = render(hardLeftParams);
+        auto hardRightParams = hardLeftParams;
+        hardRightParams.aurumOperators[0].pan = 1.0f;
+        const auto hardRight = render(hardRightParams);
+
+        double singleRoutingDifference = 0.0;
+        double serialDifference = 0.0;
+        double routingDifference = 0.0;
+        double directInversionResidual = 0.0;
+        double disconnectedEnergy = 0.0;
+        double hardLeftEnergy = 0.0;
+        double hardLeftOppositeEnergy = 0.0;
+        double hardRightEnergy = 0.0;
+        double hardRightOppositeEnergy = 0.0;
+        float peak = 0.0f;
+        for (int channel = 0; channel < 2; ++channel)
+            for (int sample = 0; sample < filterAOnly.getNumSamples(); ++sample)
+            {
+                const float a = filterAOnly.getSample(channel, sample);
+                const float singleParallel = parallelSingle.getSample(channel, sample);
+                const float serialSample = serial.getSample(channel, sample);
+                const float parallelSample = parallel.getSample(channel, sample);
+                if (!std::isfinite(a) || !std::isfinite(serialSample) || !std::isfinite(parallelSample))
+                    return false;
+                singleRoutingDifference += std::abs((double) a - singleParallel);
+                serialDifference += std::abs((double) a - serialSample);
+                routingDifference += std::abs((double) serialSample - parallelSample);
+                directInversionResidual += std::abs((double) directPositive.getSample(channel, sample) + (double) directNegative.getSample(channel, sample));
+                disconnectedEnergy += std::abs((double) disconnected.getSample(channel, sample));
+                if (channel == 0)
+                {
+                    hardLeftEnergy += std::abs((double) hardLeft.getSample(channel, sample));
+                    hardRightOppositeEnergy += std::abs((double) hardRight.getSample(channel, sample));
+                }
+                else
+                {
+                    hardLeftOppositeEnergy += std::abs((double) hardLeft.getSample(channel, sample));
+                    hardRightEnergy += std::abs((double) hardRight.getSample(channel, sample));
+                }
+                peak = std::max(peak, std::max(std::abs(serialSample), std::abs(parallelSample)));
+            }
+
+        const bool ok = singleRoutingDifference < 0.000001
+            && serialDifference > 0.1
+            && routingDifference > 0.1
+            && directInversionResidual < 0.000001
+            && disconnectedEnergy < 0.000001
+            && hardLeftEnergy > 0.1
+            && hardLeftOppositeEnergy < 0.0001
+            && hardRightEnergy > 0.1
+            && hardRightOppositeEnergy < 0.0001
+            && peak <= 1.0f;
+        if (!ok)
+            std::cerr << "Aurum dual-filter stress failed single=" << singleRoutingDifference
+                      << " serial=" << serialDifference
+                      << " routing=" << routingDifference
+                      << " directInverse=" << directInversionResidual
+                      << " disconnected=" << disconnectedEnergy
+                      << " panLeft=" << hardLeftEnergy << "/" << hardLeftOppositeEnergy
+                      << " panRight=" << hardRightEnergy << "/" << hardRightOppositeEnergy
+                      << " peak=" << peak << "\n";
+        return ok;
+    }
+
+    bool stressInstrumentVoiceAurumOversamplingQuality()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        auto& op = params.aurumOperators[0];
+        op.enabled = true;
+        op.waveform = 1;
+        op.ratio = 7.0f;
+        op.level = 0.8f;
+        op.wavefold = 0.82f;
+        op.attackMs = 0.0f;
+        op.decayMs = 0.0f;
+        op.sustain = 1.0f;
+        params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
+
+        auto render = [](beat::InstrumentVoice::Params renderParams, int oversampling)
+        {
+            renderParams.aurumOversampling = oversampling;
+            beat::InstrumentVoice::consumeRenderWorkStats();
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 4096);
+            voice.setParams(renderParams);
+            voice.startNote(69, 1.0f, nullptr, 0);
+            juce::AudioBuffer<float> buffer(2, 4096);
+            buffer.clear();
+            voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+            voice.stopNote(0.0f, false);
+            return std::pair { std::move(buffer), beat::InstrumentVoice::consumeRenderWorkStats() };
+        };
+
+        const auto [one, oneWork] = render(params, 1);
+        const auto [two, twoWork] = render(params, 2);
+        const auto [four, fourWork] = render(params, 4);
+        double oneToFour = 0.0;
+        double twoToFour = 0.0;
+        float peak = 0.0f;
+        for (int channel = 0; channel < one.getNumChannels(); ++channel)
+            for (int sampleIndex = 0; sampleIndex < one.getNumSamples(); ++sampleIndex)
+            {
+                const float oneSample = one.getSample(channel, sampleIndex);
+                const float twoSample = two.getSample(channel, sampleIndex);
+                const float fourSample = four.getSample(channel, sampleIndex);
+                if (!std::isfinite(oneSample) || !std::isfinite(twoSample) || !std::isfinite(fourSample))
+                    return false;
+                oneToFour += std::abs((double) oneSample - (double) fourSample);
+                twoToFour += std::abs((double) twoSample - (double) fourSample);
+                peak = std::max(peak, std::max(std::abs(oneSample), std::max(std::abs(twoSample), std::abs(fourSample))));
+            }
+
+        const bool ok = oneToFour > 0.1
+            && twoToFour < oneToFour
+            && peak <= 1.0f
+            && oneWork.oscillatorSamples == 4096
+            && twoWork.oscillatorSamples == 8192
+            && fourWork.oscillatorSamples == 16384;
+        if (!ok)
+            std::cerr << "Aurum oversampling quality stress failed oneToFour=" << oneToFour
+                      << " twoToFour=" << twoToFour
+                      << " peak=" << peak
+                      << " work=" << oneWork.oscillatorSamples << "/" << twoWork.oscillatorSamples << "/" << fourWork.oscillatorSamples << "\n";
+        return ok;
+    }
+
+    bool stressInstrumentVoiceAurumDenseFeedbackStability()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.ampLevel = 0.8f;
+        params.cutoff01 = 1.0f;
+        params.resonance01 = 0.0f;
+        params.drive01 = 0.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        params.releaseMs = 100.0f;
+        params.aurumUnison = 8;
+        params.aurumDetuneCents = 100.0f;
+        params.aurumStereoSpread = 1.0f;
+
+        for (size_t operatorIndex = 0; operatorIndex < params.aurumOperators.size(); ++operatorIndex)
+        {
+            auto& op = params.aurumOperators[operatorIndex];
+            op.enabled = true;
+            op.waveform = operatorIndex == 5 ? 4 : (int) (operatorIndex % 4);
+            op.ratio = 0.5f + (float) operatorIndex * 0.75f;
+            op.coarse = (int) operatorIndex - 2;
+            op.fineCents = (float) operatorIndex * 2.5f - 6.25f;
+            op.level = 1.0f;
+            op.attackMs = 0.0f;
+            op.decayMs = 0.0f;
+            op.sustain = 1.0f;
+            op.releaseMs = 100.0f + (float) operatorIndex * 20.0f;
+            if (op.waveform == 4)
+            {
+                op.harmonics.fill(1.0f);
+                op.harmonics[1] = 0.7f;
+                op.harmonics[3] = 0.4f;
+            }
+
+            params.aurumMatrix[operatorIndex][6] = operatorIndex % 2 == 0 ? 1.0f : -1.0f;
+            params.aurumOutputSends[operatorIndex][0] = operatorIndex % 2 == 0 ? 1.0f : -1.0f;
+            for (size_t target = 0; target < params.aurumOperators.size(); ++target)
+            {
+                const float polarity = (operatorIndex + target) % 2 == 0 ? 1.0f : -1.0f;
+                params.aurumMatrix[operatorIndex][target] = polarity;
+                params.aurumRmMatrix[operatorIndex][target] = polarity * 0.62f;
+            }
+        }
+
+        constexpr int totalSamples = 8192;
+        constexpr std::array<double, 3> sampleRates { 44100.0, 48000.0, 96000.0 };
+        constexpr std::array<int, 4> blockSizes { 1, 17, 257, 4096 };
+        constexpr int64_t expectedOscillatorSamples = (int64_t) totalSamples * 6 * 8;
+
+        auto render = [&](double sampleRate, int blockSize, const beat::InstrumentVoice::Params& renderParams)
+        {
+            beat::InstrumentVoice::consumeRenderWorkStats();
+            beat::InstrumentVoice voice;
+            voice.prepare(sampleRate, blockSize);
+            voice.setParams(renderParams);
+            voice.startNote(45, 1.0f, nullptr, 0);
+
+            juce::AudioBuffer<float> output(2, totalSamples);
+            output.clear();
+            int rendered = 0;
+            while (rendered < totalSamples)
+            {
+                const int samplesThisBlock = juce::jmin(blockSize, totalSamples - rendered);
+                voice.renderNextBlock(output, rendered, samplesThisBlock);
+                rendered += samplesThisBlock;
+            }
+            voice.stopNote(0.0f, false);
+            return std::pair { std::move(output), beat::InstrumentVoice::consumeRenderWorkStats() };
+        };
+
+        for (const double sampleRate : sampleRates)
+        {
+            juce::AudioBuffer<float> reference(2, totalSamples);
+            reference.clear();
+            bool hasReference = false;
+
+            for (const int blockSize : blockSizes)
+            {
+                auto [buffer, work] = render(sampleRate, blockSize, params);
+                const double energy = bufferEnergy(buffer);
+                const float peak = bufferPeak(buffer);
+                const int64_t expectedBlocks = (totalSamples + blockSize - 1) / blockSize;
+                bool blockInvariant = true;
+                float maxBlockDiff = 0.0f;
+                if (hasReference)
+                {
+                    const auto residual = bufferResidualStats(reference, buffer, totalSamples);
+                    blockInvariant = residual.ok && residual.maxAbsDiff <= 0.000001f;
+                    maxBlockDiff = residual.maxAbsDiff;
+                }
+                else
+                {
+                    reference.makeCopyOf(buffer);
+                    hasReference = true;
+                }
+
+                const bool ok = std::isfinite(energy)
+                    && energy > 0.000001
+                    && std::isfinite(peak)
+                    && peak > 0.000001f
+                    && peak <= 1.0f
+                    && !bufferHasSubnormalSamples(buffer)
+                    && blockInvariant
+                    && work.voiceBlocks == expectedBlocks
+                    && work.voiceSamples == totalSamples
+                    && work.oscillatorSamples == expectedOscillatorSamples
+                    && work.wavetableVoiceSamples == 0;
+                if (!ok)
+                {
+                    std::cerr << "Aurum dense feedback stability failed"
+                              << " sampleRate=" << sampleRate
+                              << " blockSize=" << blockSize
+                              << " energy=" << energy
+                              << " peak=" << peak
+                              << " maxBlockDiff=" << maxBlockDiff
+                              << " voiceBlocks=" << work.voiceBlocks
+                              << " voiceSamples=" << work.voiceSamples
+                              << " oscillatorSamples=" << work.oscillatorSamples
+                              << "\n";
+                    return false;
+                }
+            }
+        }
+
+        auto malformedParams = params;
+        malformedParams.aurumMatrix[0][0] = std::numeric_limits<float>::quiet_NaN();
+        malformedParams.aurumRmMatrix[1][2] = std::numeric_limits<float>::infinity();
+        auto [malformed, malformedWork] = render(48000.0, 257, malformedParams);
+        return std::isfinite(bufferEnergy(malformed))
+            && bufferPeak(malformed) <= 1.0f
+            && malformedWork.oscillatorSamples == expectedOscillatorSamples;
+    }
+
     bool stressInstrumentVoiceWavetablePath()
     {
         beat::InstrumentVoice::Params params;
@@ -19469,6 +20567,29 @@ namespace
 
 int main(int argc, char** argv)
 {
+    if (argc == 2 && juce::String(argv[1]) == "--aurum")
+    {
+        const bool ok = stressInstrumentVoiceAurumBipolarMatrix()
+            && stressInstrumentVoiceAurumOperatorRelease()
+            && stressInstrumentVoiceAurumRingMatrix()
+            && stressInstrumentVoiceAurumAdditiveOperator()
+            && stressInstrumentVoiceAurumWavefold()
+            && stressInstrumentVoiceAurumOperatorArticulation()
+            && stressInstrumentVoiceAurumOperatorResponseCurves()
+            && stressInstrumentVoiceAurumDualFilters()
+            && stressInstrumentVoiceAurumOversamplingQuality()
+            && stressInstrumentVoiceAurumDenseFeedbackStability()
+            && stressAudioEngineAurumCrossRateLiveExportParity()
+            && stressProjectRepositoryAurumInstrumentRoundtrip();
+        if (!ok)
+        {
+            std::cerr << "Aurum focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Aurum focused stress passed\n";
+        return 0;
+    }
+
     if (argc == 2 && juce::String(argv[1]) == "--aether-sample-streaming")
     {
         beat::test::prepareRealtimeSafetyInterposers();
@@ -19726,6 +20847,61 @@ int main(int argc, char** argv)
         std::cerr << "Instrument voice dual-filter stress failed\n";
         return 1;
     }
+    if (!stressInstrumentVoiceAurumBipolarMatrix())
+    {
+        std::cerr << "Instrument voice Aurum bipolar matrix stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumOperatorRelease())
+    {
+        std::cerr << "Instrument voice Aurum operator release stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumRingMatrix())
+    {
+        std::cerr << "Instrument voice Aurum ring matrix stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumAdditiveOperator())
+    {
+        std::cerr << "Instrument voice Aurum additive operator stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumWavefold())
+    {
+        std::cerr << "Instrument voice Aurum wavefold stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumOperatorArticulation())
+    {
+        std::cerr << "Instrument voice Aurum operator articulation stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumOperatorResponseCurves())
+    {
+        std::cerr << "Instrument voice Aurum operator response curve stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumDualFilters())
+    {
+        std::cerr << "Instrument voice Aurum dual-filter stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumOversamplingQuality())
+    {
+        std::cerr << "Instrument voice Aurum oversampling quality stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoiceAurumDenseFeedbackStability())
+    {
+        std::cerr << "Instrument voice Aurum dense feedback stability stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineAurumCrossRateLiveExportParity())
+    {
+        std::cerr << "Audio engine Aurum cross-rate live/export parity stress failed\n";
+        return 1;
+    }
     if (!stressInstrumentVoiceBandlimitedBasicOscillators())
     {
         std::cerr << "Instrument voice bandlimited basic oscillator stress failed\n";
@@ -19923,6 +21099,11 @@ int main(int argc, char** argv)
     if (!stressHybridSourceMigrationAndCleanupSafety())
     {
         std::cerr << "Hybrid source migration/cleanup safety stress failed\n";
+        return 1;
+    }
+    if (!stressProjectRepositoryAurumInstrumentRoundtrip())
+    {
+        std::cerr << "Project repository Aurum instrument roundtrip stress failed\n";
         return 1;
     }
     if (!stressProjectRepositoryAudioFileRoundtrip())
@@ -20486,6 +21667,11 @@ int main(int argc, char** argv)
     if (!stressAudioEngineFxHeavyAetherDeterministicNullExport())
     {
         std::cerr << "Audio engine FX-heavy Aether deterministic null export stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineSerum1Benchmarks())
+    {
+        std::cerr << "Audio engine Serum 1 benchmark stress failed\n";
         return 1;
     }
     if (!stressAudioEngineSerum1Benchmarks())

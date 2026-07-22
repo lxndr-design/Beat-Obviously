@@ -783,6 +783,250 @@ namespace beat
             return true;
         }
 
+        juce::String aurumWaveformName(int waveform)
+        {
+            switch (waveform)
+            {
+                case 1: return "saw";
+                case 2: return "square";
+                case 3: return "triangle";
+                case 4: return "additive";
+                default: return "sine";
+            }
+        }
+
+        int aurumWaveformFromVar(const juce::var& value)
+        {
+            const auto name = value.toString().toLowerCase();
+            if (name == "saw") return 1;
+            if (name == "square") return 2;
+            if (name == "triangle") return 3;
+            if (name == "additive") return 4;
+            return value.isInt() ? juce::jlimit(0, 4, (int) value) : 0;
+        }
+
+        juce::String aurumFilterTypeName(int type)
+        {
+            if (type == 1) return "bandpass";
+            if (type == 2) return "highpass";
+            return "lowpass";
+        }
+
+        int aurumFilterTypeFromVar(const juce::var& value)
+        {
+            const auto name = value.toString().toLowerCase();
+            if (name == "bandpass") return 1;
+            if (name == "highpass") return 2;
+            return value.isInt() ? juce::jlimit(0, 2, (int) value) : 0;
+        }
+
+        juce::var aurumConfigToVar(const InstrumentDefinition::AurumConfig& aurum)
+        {
+            juce::DynamicObject::Ptr object = new juce::DynamicObject();
+            object->setProperty("version", 10);
+            object->setProperty("unison", aurum.unison);
+            object->setProperty("detuneCents", aurum.detuneCents);
+            object->setProperty("stereoSpread", aurum.stereoSpread);
+            object->setProperty("oversampling", aurum.oversampling);
+            object->setProperty("filterRouting", aurum.filterRouting == 1 ? "parallel" : "serial");
+            juce::Array<juce::var> filters;
+            for (const auto& source : aurum.filters)
+            {
+                juce::DynamicObject::Ptr filter = new juce::DynamicObject();
+                filter->setProperty("enabled", source.enabled);
+                filter->setProperty("type", aurumFilterTypeName(source.type));
+                filter->setProperty("cutoff", source.cutoff01);
+                filter->setProperty("resonance", source.resonance01);
+                filter->setProperty("drive", source.drive01);
+                filters.add(juce::var(filter.get()));
+            }
+            object->setProperty("filters", filters);
+            juce::Array<juce::var> operators;
+            for (size_t index = 0; index < aurum.operators.size(); ++index)
+            {
+                const auto& source = aurum.operators[index];
+                juce::DynamicObject::Ptr op = new juce::DynamicObject();
+                op->setProperty("id", "op-" + juce::String((int) index + 1));
+                op->setProperty("name", "OP " + juce::String((int) index + 1));
+                op->setProperty("enabled", source.enabled);
+                op->setProperty("waveform", aurumWaveformName(source.waveform));
+                op->setProperty("ratio", source.ratio);
+                op->setProperty("coarse", source.coarse);
+                op->setProperty("fineCents", source.fineCents);
+                op->setProperty("level", source.level);
+                op->setProperty("pan", source.pan);
+                op->setProperty("phase", source.phase);
+                op->setProperty("wavefold", source.wavefold);
+                juce::DynamicObject::Ptr envelope = new juce::DynamicObject();
+                envelope->setProperty("attackMs", source.attackMs);
+                envelope->setProperty("decayMs", source.decayMs);
+                envelope->setProperty("sustain", source.sustain);
+                envelope->setProperty("releaseMs", source.releaseMs);
+                op->setProperty("envelope", juce::var(envelope.get()));
+                juce::DynamicObject::Ptr pitchEnvelope = new juce::DynamicObject();
+                pitchEnvelope->setProperty("attackMs", source.pitchAttackMs);
+                pitchEnvelope->setProperty("decayMs", source.pitchDecayMs);
+                pitchEnvelope->setProperty("sustain", source.pitchSustain);
+                pitchEnvelope->setProperty("releaseMs", source.pitchReleaseMs);
+                op->setProperty("pitchEnvelope", juce::var(pitchEnvelope.get()));
+                op->setProperty("pitchEnvelopeSemitones", source.pitchEnvelopeSemitones);
+                juce::DynamicObject::Ptr phaseEnvelope = new juce::DynamicObject();
+                phaseEnvelope->setProperty("attackMs", source.phaseAttackMs);
+                phaseEnvelope->setProperty("decayMs", source.phaseDecayMs);
+                phaseEnvelope->setProperty("sustain", source.phaseSustain);
+                phaseEnvelope->setProperty("releaseMs", source.phaseReleaseMs);
+                op->setProperty("phaseEnvelope", juce::var(phaseEnvelope.get()));
+                op->setProperty("phaseEnvelopeDegrees", source.phaseEnvelopeDegrees);
+                juce::Array<juce::var> velocityCurve;
+                for (const auto point : source.velocityCurve) velocityCurve.add(point);
+                op->setProperty("velocityCurve", juce::var(velocityCurve));
+                juce::Array<juce::var> keytrackCurve;
+                for (const auto point : source.keytrackCurve) keytrackCurve.add(point);
+                op->setProperty("keytrackCurve", juce::var(keytrackCurve));
+                juce::Array<juce::var> harmonics;
+                for (const auto amplitude : source.harmonics) harmonics.add(amplitude);
+                op->setProperty("harmonics", juce::var(harmonics));
+                operators.add(juce::var(op.get()));
+            }
+            object->setProperty("operators", operators);
+            juce::Array<juce::var> matrix;
+            for (const auto& source : aurum.matrix)
+            {
+                juce::Array<juce::var> row;
+                for (const auto amount : source) row.add(amount);
+                matrix.add(juce::var(row));
+            }
+            object->setProperty("matrix", matrix);
+            juce::Array<juce::var> rmMatrix;
+            for (const auto& source : aurum.rmMatrix)
+            {
+                juce::Array<juce::var> row;
+                for (const auto amount : source) row.add(amount);
+                rmMatrix.add(juce::var(row));
+            }
+            object->setProperty("rmMatrix", rmMatrix);
+            juce::Array<juce::var> outputSends;
+            for (const auto& source : aurum.outputSends)
+            {
+                juce::Array<juce::var> row;
+                for (const auto amount : source) row.add(amount);
+                outputSends.add(juce::var(row));
+            }
+            object->setProperty("outputSends", outputSends);
+            return juce::var(object.get());
+        }
+
+        InstrumentDefinition::AurumConfig aurumConfigFromVar(
+            const juce::var& value,
+            int legacyFilterType,
+            float legacyCutoff,
+            float legacyResonance,
+            float legacyDrive)
+        {
+            InstrumentDefinition::AurumConfig config;
+            if (!value.isObject()) return config;
+            const int version = (int) value.getProperty("version", 1);
+            if (version < 8)
+            {
+                config.filters[0] = {
+                    true,
+                    juce::jlimit(0, 2, legacyFilterType),
+                    juce::jlimit(0.0f, 1.0f, legacyCutoff),
+                    juce::jlimit(0.0f, 1.0f, legacyResonance),
+                    juce::jlimit(0.0f, 1.0f, legacyDrive),
+                };
+            }
+            else if (auto* filters = value.getProperty("filters", {}).getArray())
+            {
+                for (int index = 0; index < juce::jmin(2, filters->size()); ++index)
+                {
+                    const auto source = filters->getReference(index);
+                    if (!source.isObject()) continue;
+                    auto& filter = config.filters[(size_t) index];
+                    filter.enabled = (bool) source.getProperty("enabled", filter.enabled);
+                    filter.type = aurumFilterTypeFromVar(source.getProperty("type", aurumFilterTypeName(filter.type)));
+                    filter.cutoff01 = juce::jlimit(0.0f, 1.0f, (float) (double) source.getProperty("cutoff", filter.cutoff01));
+                    filter.resonance01 = juce::jlimit(0.0f, 1.0f, (float) (double) source.getProperty("resonance", filter.resonance01));
+                    filter.drive01 = juce::jlimit(0.0f, 1.0f, (float) (double) source.getProperty("drive", filter.drive01));
+                }
+            }
+            config.filterRouting = value.getProperty("filterRouting", "serial").toString().toLowerCase() == "parallel" ? 1 : 0;
+            const int oversampling = (int) value.getProperty("oversampling", 1);
+            config.oversampling = oversampling >= 4 ? 4 : oversampling >= 2 ? 2 : 1;
+            if (auto* operators = value.getProperty("operators", {}).getArray())
+                for (int index = 0; index < juce::jmin(6, operators->size()); ++index)
+                {
+                    const auto source = operators->getReference(index);
+                    if (!source.isObject()) continue;
+                    auto& op = config.operators[(size_t) index];
+                    op.enabled = (bool) source.getProperty("enabled", index < 2);
+                    op.waveform = aurumWaveformFromVar(source.getProperty("waveform", "sine"));
+                    op.ratio = juce::jlimit(0.125f, 32.0f, (float) (double) source.getProperty("ratio", index == 1 ? 2.0 : 1.0));
+                    op.coarse = juce::jlimit(-48, 48, (int) source.getProperty("coarse", 0));
+                    op.fineCents = juce::jlimit(-100.0f, 100.0f, (float) (double) source.getProperty("fineCents", 0.0));
+                    op.level = juce::jlimit(0.0f, 1.0f, (float) (double) source.getProperty("level", index == 0 ? 0.78 : 0.55));
+                    op.pan = juce::jlimit(-1.0f, 1.0f, (float) (double) source.getProperty("pan", 0.0));
+                    op.phase = juce::jlimit(0.0f, 1.0f, (float) (double) source.getProperty("phase", 0.0));
+                    op.wavefold = juce::jlimit(0.0f, 1.0f, (float) (double) source.getProperty("wavefold", 0.0));
+                    const auto envelope = source.getProperty("envelope", {});
+                    op.attackMs = juce::jlimit(0.0f, 10000.0f, (float) (double) envelope.getProperty("attackMs", 5.0));
+                    op.decayMs = juce::jlimit(0.0f, 10000.0f, (float) (double) envelope.getProperty("decayMs", 500.0));
+                    op.sustain = juce::jlimit(0.0f, 1.0f, (float) (double) envelope.getProperty("sustain", 0.7));
+                    op.releaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) envelope.getProperty("releaseMs", 300.0));
+                    const auto pitchEnvelope = source.getProperty("pitchEnvelope", {});
+                    op.pitchAttackMs = juce::jlimit(0.0f, 10000.0f, (float) (double) pitchEnvelope.getProperty("attackMs", 0.0));
+                    op.pitchDecayMs = juce::jlimit(0.0f, 10000.0f, (float) (double) pitchEnvelope.getProperty("decayMs", 250.0));
+                    op.pitchSustain = juce::jlimit(0.0f, 1.0f, (float) (double) pitchEnvelope.getProperty("sustain", 0.0));
+                    op.pitchReleaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) pitchEnvelope.getProperty("releaseMs", 120.0));
+                    op.pitchEnvelopeSemitones = juce::jlimit(-48.0f, 48.0f, (float) (double) source.getProperty("pitchEnvelopeSemitones", 0.0));
+                    const auto phaseEnvelope = source.getProperty("phaseEnvelope", {});
+                    op.phaseAttackMs = juce::jlimit(0.0f, 10000.0f, (float) (double) phaseEnvelope.getProperty("attackMs", 0.0));
+                    op.phaseDecayMs = juce::jlimit(0.0f, 10000.0f, (float) (double) phaseEnvelope.getProperty("decayMs", 180.0));
+                    op.phaseSustain = juce::jlimit(0.0f, 1.0f, (float) (double) phaseEnvelope.getProperty("sustain", 0.0));
+                    op.phaseReleaseMs = juce::jlimit(0.0f, 10000.0f, (float) (double) phaseEnvelope.getProperty("releaseMs", 100.0));
+                    op.phaseEnvelopeDegrees = juce::jlimit(-180.0f, 180.0f, (float) (double) source.getProperty("phaseEnvelopeDegrees", 0.0));
+                    if (auto* points = source.getProperty("velocityCurve", {}).getArray())
+                        for (int point = 0; point < juce::jmin(5, points->size()); ++point)
+                            op.velocityCurve[(size_t) point] = juce::jlimit(0.0f, 1.0f, (float) (double) points->getReference(point));
+                    if (auto* points = source.getProperty("keytrackCurve", {}).getArray())
+                        for (int point = 0; point < juce::jmin(5, points->size()); ++point)
+                            op.keytrackCurve[(size_t) point] = juce::jlimit(0.0f, 1.0f, (float) (double) points->getReference(point));
+                    if (auto* harmonics = source.getProperty("harmonics", {}).getArray())
+                        for (int harmonic = 0; harmonic < juce::jmin(16, harmonics->size()); ++harmonic)
+                            op.harmonics[(size_t) harmonic] = juce::jlimit(0.0f, 1.0f, (float) (double) harmonics->getReference(harmonic));
+                }
+            if (auto* rows = value.getProperty("matrix", {}).getArray())
+                for (int source = 0; source < juce::jmin(6, rows->size()); ++source)
+                    if (auto* cells = rows->getReference(source).getArray())
+                        for (int target = 0; target < juce::jmin(7, cells->size()); ++target)
+                            config.matrix[(size_t) source][(size_t) target] = juce::jlimit(-1.0f, 1.0f, (float) (double) cells->getReference(target));
+            if (auto* rows = value.getProperty("rmMatrix", {}).getArray())
+                for (int source = 0; source < juce::jmin(6, rows->size()); ++source)
+                    if (auto* cells = rows->getReference(source).getArray())
+                        for (int target = 0; target < juce::jmin(6, cells->size()); ++target)
+                            config.rmMatrix[(size_t) source][(size_t) target] = juce::jlimit(-1.0f, 1.0f, (float) (double) cells->getReference(target));
+            if (version >= 9)
+            {
+                if (auto* rows = value.getProperty("outputSends", {}).getArray())
+                    for (int source = 0; source < juce::jmin(6, rows->size()); ++source)
+                        if (auto* cells = rows->getReference(source).getArray())
+                            for (int bus = 0; bus < juce::jmin(3, cells->size()); ++bus)
+                                config.outputSends[(size_t) source][(size_t) bus] = juce::jlimit(-1.0f, 1.0f, (float) (double) cells->getReference(bus));
+            }
+            else
+            {
+                for (size_t source = 0; source < config.outputSends.size(); ++source)
+                {
+                    const float legacyOutput = config.matrix[source][6];
+                    config.outputSends[source] = {{ legacyOutput, config.filterRouting == 1 ? legacyOutput : 0.0f, 0.0f }};
+                }
+            }
+            config.unison = juce::jlimit(1, 8, (int) value.getProperty("unison", 1));
+            config.detuneCents = juce::jlimit(0.0f, 100.0f, (float) (double) value.getProperty("detuneCents", 8.0));
+            config.stereoSpread = juce::jlimit(0.0f, 1.0f, (float) (double) value.getProperty("stereoSpread", 0.35));
+            return config;
+        }
+
         juce::var dynamicModTargetToVar(const InstrumentDefinition::DynamicModTarget& target)
         {
             juce::DynamicObject::Ptr o = new juce::DynamicObject();
@@ -1450,9 +1694,13 @@ namespace beat
             o->setProperty("dynamicModulation", dynamicModulationToVar(instrument.dynamicModulation));
             o->setProperty("hasAether", instrument.hasAether);
             o->setProperty("synthEngine", instrument.synthEngine == InstrumentDefinition::SynthEngine::Lumus
-                ? "lumus" : instrument.synthEngine == InstrumentDefinition::SynthEngine::Aether ? "aether" : "none");
+                ? "lumus" : instrument.synthEngine == InstrumentDefinition::SynthEngine::Aurum
+                    ? "aurum" : instrument.synthEngine == InstrumentDefinition::SynthEngine::Aether ? "aether" : "none");
             if (instrument.hasAether)
                 o->setProperty("aether", aetherConfigToVar(instrument.aether));
+            o->setProperty("hasAurum", instrument.hasAurum);
+            if (instrument.hasAurum)
+                o->setProperty("aurum", aurumConfigToVar(instrument.aurum));
             if (instrument.synthEngine == InstrumentDefinition::SynthEngine::Lumus)
                 o->setProperty("lumus", lumusConfigToVar(instrument.lumus));
             if (instrument.nodeGraph)
@@ -1705,6 +1953,20 @@ namespace beat
                     else if (synthEngine == "aether" || (synthEngine.isEmpty() && instrument.hasAether))
                     {
                         instrument.synthEngine = InstrumentDefinition::SynthEngine::Aether;
+                    }
+                    instrument.hasAurum = (bool) iv.getProperty("hasAurum", false);
+                    const auto aurum = iv.getProperty("aurum", {});
+                    if (aurum.isObject() || instrument.hasAurum)
+                    {
+                        instrument.hasAurum = true;
+                        instrument.hasAether = false;
+                        instrument.synthEngine = InstrumentDefinition::SynthEngine::Aurum;
+                        instrument.aurum = aurumConfigFromVar(
+                            aurum,
+                            instrument.filterType,
+                            instrument.cutoff01,
+                            instrument.resonance01,
+                            instrument.drive01);
                     }
                     instrument.nodeGraph = nodemapGraphFromVar(iv.getProperty("nodeGraph", {}));
 

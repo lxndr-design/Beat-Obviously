@@ -137,6 +137,7 @@ namespace beat
         {
             None,
             Aether,
+            Aurum,
             Lumus,
         };
 
@@ -359,6 +360,64 @@ namespace beat
             Clip clip;
         };
 
+        struct AurumOperator
+        {
+            bool enabled { false };
+            int waveform { 0 };
+            float ratio { 1.0f };
+            int coarse { 0 };
+            float fineCents { 0.0f };
+            float level { 0.0f };
+            float phase { 0.0f };
+            float attackMs { 5.0f };
+            float decayMs { 500.0f };
+            float sustain { 0.7f };
+            float releaseMs { 300.0f };
+            std::array<float, 16> harmonics {{ 1.0f }};
+            float wavefold { 0.0f };
+            float pitchAttackMs { 0.0f };
+            float pitchDecayMs { 250.0f };
+            float pitchSustain { 0.0f };
+            float pitchReleaseMs { 120.0f };
+            float pitchEnvelopeSemitones { 0.0f };
+            float phaseAttackMs { 0.0f };
+            float phaseDecayMs { 180.0f };
+            float phaseSustain { 0.0f };
+                float phaseReleaseMs { 100.0f };
+                float phaseEnvelopeDegrees { 0.0f };
+                std::array<float, 5> velocityCurve {{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }};
+                std::array<float, 5> keytrackCurve {{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }};
+                float pan { 0.0f };
+        };
+
+        struct AurumConfig
+        {
+            struct Filter
+            {
+                bool enabled { false };
+                int type { 0 };
+                float cutoff01 { 0.5f };
+                float resonance01 { 0.0f };
+                float drive01 { 0.0f };
+            };
+
+            std::array<AurumOperator, 6> operators {};
+            std::array<std::array<float, 7>, 6> matrix {};
+            std::array<std::array<float, 6>, 6> rmMatrix {};
+            std::array<std::array<float, 3>, 6> outputSends {{
+                {{ 0.86f, 0.0f, 0.0f }},
+            }};
+            int unison { 1 };
+            float detuneCents { 8.0f };
+            float stereoSpread { 0.35f };
+            int oversampling { 2 };
+            std::array<Filter, 2> filters {{
+                { true, 0, 0.78f, 0.12f, 0.08f },
+                { false, 2, 0.18f, 0.08f, 0.0f },
+            }};
+            int filterRouting { 0 };
+        };
+
         struct DynamicModTarget
         {
             float lfo { 0.0f };
@@ -554,6 +613,8 @@ namespace beat
         bool hasAether { false };
         SynthEngine synthEngine { SynthEngine::None };
         AetherConfig aether;
+        bool hasAurum { false };
+        AurumConfig aurum;
         LumusConfig lumus;
         std::optional<Nodemap::Graph> nodeGraph;
         juce::var taxonomy;

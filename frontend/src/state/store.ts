@@ -6,6 +6,7 @@ import { defaultTrackEffectParams } from "./effects";
 import { pruneDevFixtureInstruments } from "./instrumentLibraryGuards";
 import { normalizeInstrumentTaxonomy } from "./instrumentTaxonomy";
 import { normalizeSampleMap } from "./sampleZones";
+import { createAurumTestInstruments } from "./aurumTestBank";
 import { FACTORY_SYNTH_PRESETS, synthDraftToInstrumentPatch } from "./synthStore";
 import { audioBusExists, canSetAudioBusOutput, canSetAudioBusSend } from "./audioBusRouting";
 import { AUDIO_BUS_SCHEMA_VERSION } from "./types";
@@ -2016,6 +2017,7 @@ interface InstrumentLibrarySlice {
 
 export const FACTORY_DRUM_SET_ID = "factory-drums";
 export const FACTORY_SYNTH_SET_ID = "factory-synths";
+export const AURUM_TEST_SET_ID = "aurum-test";
 export const LUMUS_TEST_INSTRUMENT_SET_ID = "lumus-test";
 export const ROCK_DRUM_SET_ID = "rock-drums";
 export const ORCHESTRA_SET_ID = "orchestra-pit";
@@ -2028,6 +2030,7 @@ function defaultInstrumentSets(): InstrumentSet[] {
     { id: FACTORY_DRUM_SET_ID, name: "Classic Machines", factory: true },
     { id: ORCHESTRA_SET_ID, name: "Orchestra Pit", factory: true },
     { id: FACTORY_SYNTH_SET_ID, name: "Synths", factory: true },
+    { id: AURUM_TEST_SET_ID, name: "Aurum Test", factory: true },
     { id: LUMUS_TEST_INSTRUMENT_SET_ID, name: "Lumus Test", factory: true },
     { id: TEMPORARY_DS_INSTRUMENT_SET_ID, name: "Instanced Instruments", factory: true },
     { id: USER_INSTRUMENT_SET_ID, name: "User", factory: true },
@@ -2180,6 +2183,7 @@ export function snapshotInstrument(instrument: Instrument): InstrumentSnapshot {
     ampPan: instrument.ampPan,
     wavetable: instrument.wavetable ? structuredClone(instrument.wavetable) : undefined,
     aether: instrument.aether ? structuredClone(instrument.aether) : undefined,
+    aurum: instrument.aurum ? structuredClone(instrument.aurum) : undefined,
     synthPatch: instrument.synthPatch ? structuredClone(instrument.synthPatch) : undefined,
     nodeGraph: instrument.nodeGraph ? structuredClone(instrument.nodeGraph) : undefined,
     lfoWaveform: instrument.lfoWaveform,
@@ -2273,6 +2277,9 @@ function defaultInstrumentForPatch(patch?: Partial<Instrument>): Instrument {
 }
 
 function aetherizeCreatedInstrumentPatch(patch: Partial<Instrument> = {}): Partial<Instrument> {
+  if (patch.aurum) {
+    return { ...patch, kind: "synth", waveform: "sine", wavetable: undefined, aether: undefined };
+  }
   if (!shouldUseAetherForCreatedInstrument(patch)) return patch;
   return {
     ...patch,
@@ -2767,6 +2774,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         }),
         ...lumusTestSeeds,
       ];
+      seeds.push(...createAurumTestInstruments(AURUM_TEST_SET_ID).map(withOriginal));
       const deprecatedBreakcoreAetherInstrumentNames = new Set([
         "Breakcore Kick (Aether)",
         "Breakcore Snare (Aether)",
@@ -2814,7 +2822,10 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         for (const instrument of s.instruments) {
           if (instrument.userCreated) continue;
           const replacement = seedByName.get(instrument.name);
-          if (replacement && instrument.descriptors?.includes("breakcore")) {
+          if (replacement && (
+            instrument.descriptors?.includes("breakcore")
+            || replacement.descriptors?.includes("aurum-test-bank")
+          )) {
             const existingId = instrument.id;
             Object.assign(instrument, structuredClone(replacement), { id: existingId });
           }

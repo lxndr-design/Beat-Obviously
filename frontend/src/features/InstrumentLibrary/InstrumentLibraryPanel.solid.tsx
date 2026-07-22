@@ -2,6 +2,7 @@ import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { Button, Checkbox, HoverInfo, Icon, LibraryFolder, LibrarySearch, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { createInstrumentBufferSource, preloadInstrumentSample, previewFrequency } from "../../audio/synthPreview";
 import { LUMUS_TEST_INSTRUMENT_SET_ID, TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useProjectStore, useUiStore } from "../../state/store";
+import { createAurumInstrument } from "../../state/aurum";
 import { instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
 import {
   FACTORY_SYNTH_PRESETS,
@@ -100,6 +101,11 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
       onSelect: createNodemap,
     },
     {
+      label: "Create Aurum",
+      icon: "ph:circles-three-plus",
+      onSelect: createAurum,
+    },
+    {
       label: "Create Aether",
       icon: "ph:cube",
       onSelect: () => createWavetable(WAVETABLE_STARTERS[0]),
@@ -196,6 +202,16 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
     });
     useUiStore.getState().openEditor({
       kind: "samplerInstrument",
+      instrumentId: draftInstrument.id,
+      draftInstrument,
+    });
+  }
+
+  function createAurum() {
+    const instrumentName = nextInstrumentName(instruments(), "Aurum Patch");
+    const draftInstrument = createAurumInstrument(createDraftId(), instrumentName);
+    useUiStore.getState().openEditor({
+      kind: "synthInstrument",
       instrumentId: draftInstrument.id,
       draftInstrument,
     });
@@ -563,7 +579,7 @@ function persistOpenInstrumentSets(openSets: Record<string, boolean>) {
 }
 
 function instrumentSetDisplayName(set: InstrumentSet): string {
-  if (!set.factory || set.id === "user-instruments" || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID || set.id === LUMUS_TEST_INSTRUMENT_SET_ID) return set.name;
+  if (!set.factory || set.id === "user-instruments" || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID || set.id === LUMUS_TEST_INSTRUMENT_SET_ID || set.name === "Aurum Test") return set.name;
   return set.name.toLowerCase().startsWith("factory ") ? set.name : `Factory ${set.name}`;
 }
 

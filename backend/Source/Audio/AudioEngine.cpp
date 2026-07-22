@@ -2436,6 +2436,44 @@ namespace beat
         params.aetherRuntimeWarp2Mode = juce::jlimit(0, 3, instrument.aether.runtimeWarp2Mode);
         params.aetherInteractionMode = juce::jlimit(0, 2, instrument.aether.interactionMode);
         params.aetherInteractionAmount = juce::jlimit(0.0f, 1.0f, instrument.aether.interactionAmount);
+        params.hasAurum = instrument.hasAurum
+            || instrument.synthEngine == InstrumentDefinition::SynthEngine::Aurum;
+        for (size_t index = 0; index < params.aurumOperators.size(); ++index)
+        {
+            const auto& source = instrument.aurum.operators[index];
+            params.aurumOperators[index] = {
+                source.enabled, source.waveform, source.ratio, source.coarse,
+                source.fineCents, source.level, source.phase,
+                source.attackMs, source.decayMs, source.sustain, source.releaseMs,
+                source.harmonics, source.wavefold,
+                source.pitchAttackMs, source.pitchDecayMs, source.pitchSustain,
+                source.pitchReleaseMs, source.pitchEnvelopeSemitones,
+                source.phaseAttackMs, source.phaseDecayMs, source.phaseSustain,
+                source.phaseReleaseMs, source.phaseEnvelopeDegrees,
+                source.velocityCurve, source.keytrackCurve,
+                juce::jlimit(-1.0f, 1.0f, source.pan),
+            };
+            params.aurumMatrix[index] = instrument.aurum.matrix[index];
+            params.aurumRmMatrix[index] = instrument.aurum.rmMatrix[index];
+            params.aurumOutputSends[index] = instrument.aurum.outputSends[index];
+        }
+        params.aurumUnison = juce::jlimit(1, 8, instrument.aurum.unison);
+        params.aurumDetuneCents = juce::jlimit(0.0f, 100.0f, instrument.aurum.detuneCents);
+        params.aurumStereoSpread = juce::jlimit(0.0f, 1.0f, instrument.aurum.stereoSpread);
+        params.aurumOversampling = instrument.aurum.oversampling >= 4 ? 4
+            : instrument.aurum.oversampling >= 2 ? 2 : 1;
+        for (size_t index = 0; index < params.aurumFilters.size(); ++index)
+        {
+            const auto& source = instrument.aurum.filters[index];
+            params.aurumFilters[index] = {
+                source.enabled,
+                juce::jlimit(0, 2, source.type),
+                juce::jlimit(0.0f, 1.0f, source.cutoff01),
+                juce::jlimit(0.0f, 1.0f, source.resonance01),
+                juce::jlimit(0.0f, 1.0f, source.drive01),
+            };
+        }
+        params.aurumFilterRouting = instrument.aurum.filterRouting == 1 ? 1 : 0;
 
         instrumentSynth->setNoteStealingEnabled(allocation.noteStealing);
         for (int i = 0; i < allocation.voiceCount; ++i)

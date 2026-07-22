@@ -585,7 +585,7 @@ export function InstrumentsPage() {
 }
 
 function instrumentSetDisplayName(set: InstrumentSet): string {
-  if (!set.factory || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID) return set.name;
+  if (!set.factory || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID || set.name === "Aurum Test") return set.name;
   return `Factory ${set.name}`;
 }
 
@@ -1515,11 +1515,12 @@ function sampleName(sampleUrl: string, index = 0) {
 }
 
 function isSustainedPreview(instrument: Instrument) {
-  return instrument.kind === "synth" || instrument.kind === "wavetable" || Boolean(instrument.aether || instrument.synthPatch);
+  return instrument.kind === "synth" || instrument.kind === "wavetable" || Boolean(instrument.aether || instrument.aurum || instrument.synthPatch);
 }
 
 function formatEngine(instrument: Instrument) {
   if (instrument.nodeGraph) return "Nodemap";
+  if (instrument.aurum) return "Aurum";
   if (instrument.aether || instrument.kind === "wavetable") return "Aether";
   if (instrument.kind === "sampler") return "Sampler";
   if (instrument.kind === "synth") return "Basic";
@@ -1528,6 +1529,7 @@ function formatEngine(instrument: Instrument) {
 
 function formatInstrumentType(instrument: Instrument) {
   if (instrument.nodeGraph) return "Nodemap";
+  if (instrument.aurum) return "Aurum";
   if (instrument.kind === "sampler" || instrument.waveform === "sample") return "Sampler";
   if (instrument.aether || instrument.kind === "wavetable") return "Aether";
   if (instrument.kind === "synth") return "Basic";

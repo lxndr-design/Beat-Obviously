@@ -27,6 +27,7 @@
 #include <juce_dsp/juce_dsp.h>
 
 #include <array>
+#include <cstdint>
 #include <memory>
 #include <string_view>
 
@@ -145,6 +146,45 @@ namespace beat
                 std::shared_ptr<const SfzDecodedInstrument> sfzSource;
                 int routing { 0 };
                 std::array<float, 2> fxSends {};
+            };
+
+            struct AurumOperator
+            {
+                bool enabled { false };
+                int waveform { 0 };
+                float ratio { 1.0f };
+                int coarse { 0 };
+                float fineCents { 0.0f };
+                float level { 0.0f };
+                float phase { 0.0f };
+                float attackMs { 5.0f };
+                float decayMs { 500.0f };
+                float sustain { 0.7f };
+                float releaseMs { 300.0f };
+                std::array<float, 16> harmonics {{ 1.0f }};
+                float wavefold { 0.0f };
+                float pitchAttackMs { 0.0f };
+                float pitchDecayMs { 250.0f };
+                float pitchSustain { 0.0f };
+                float pitchReleaseMs { 120.0f };
+                float pitchEnvelopeSemitones { 0.0f };
+                float phaseAttackMs { 0.0f };
+                float phaseDecayMs { 180.0f };
+                float phaseSustain { 0.0f };
+                float phaseReleaseMs { 100.0f };
+                float phaseEnvelopeDegrees { 0.0f };
+                std::array<float, 5> velocityCurve {{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }};
+                std::array<float, 5> keytrackCurve {{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }};
+                float pan { 0.0f };
+            };
+
+            struct AurumFilter
+            {
+                bool enabled { false };
+                int type { 0 };
+                float cutoff01 { 0.5f };
+                float resonance01 { 0.0f };
+                float drive01 { 0.0f };
             };
 
             struct DynamicModTarget
@@ -319,6 +359,22 @@ namespace beat
             int aetherRuntimeWarp2Mode { 0 };
             int aetherInteractionMode { 0 };
             float aetherInteractionAmount { 0.0f };
+            bool hasAurum { false };
+            std::array<AurumOperator, 6> aurumOperators {};
+            std::array<std::array<float, 7>, 6> aurumMatrix {};
+            std::array<std::array<float, 6>, 6> aurumRmMatrix {};
+            std::array<std::array<float, 3>, 6> aurumOutputSends {{
+                {{ 0.86f, 0.0f, 0.0f }},
+            }};
+            int aurumUnison { 1 };
+            float aurumDetuneCents { 8.0f };
+            float aurumStereoSpread { 0.35f };
+            int aurumOversampling { 1 };
+            std::array<AurumFilter, 2> aurumFilters {{
+                { true, 0, 0.78f, 0.12f, 0.08f },
+                { false, 2, 0.18f, 0.08f, 0.0f },
+            }};
+            int aurumFilterRouting { 0 };
         };
 
         void setParams(const Params& p);
@@ -390,6 +446,7 @@ namespace beat
         float env2LoopValue() noexcept;
         float env3LoopValue() noexcept;
         float env4LoopValue() noexcept;
+        bool aurumReleaseTailActive() const noexcept;
 
         Params  baseParams;
         Params  params;
@@ -405,6 +462,13 @@ namespace beat
         double  aetherOscAPhaseOffset { 0.0 };
         double  aetherOscBPhaseOffset { 0.0 };
         double  lumusOscCPhaseOffset { 0.0 };
+        std::array<double, 48> aurumPhases {};
+        std::array<float, 48> aurumOutputs {};
+        std::array<float, 6> aurumReleaseLevels {};
+        std::array<float, 6> aurumPitchReleaseLevels {};
+        std::array<float, 6> aurumPhaseReleaseLevels {};
+        int64_t aurumAgeSamples { 0 };
+        int64_t aurumReleaseAgeSamples { -1 };
         float   level { 0.0f };
         float   noteKeytrack { 0.0f };
         float   modWheel { 0.0f };
@@ -444,6 +508,7 @@ namespace beat
         VoiceNoteAutomationState noteAutomationState;
         RealtimeRamp pitchFrequencyRamp;
         int activeWavetableUnison { 1 };
+        int aurumOutputBusMask { 0 };
         VoiceStats::RenderWorkBlock currentBlockWork;
         DriveStage::State aetherRuntimeWarpState;
         DriveStage::State aetherDirectRuntimeWarpState;
@@ -457,8 +522,10 @@ namespace beat
         DriveStage::State filter2DriveState;
         DriveStage::State filter1RouteDriveState;
         DriveStage::State filter2RouteDriveState;
+        DriveStage::State aurumFilterBDriveState;
         FilterStage::State filterState;
         FilterStage::State filter2State;
+        FilterStage::State aurumFilterBState;
         FilterStage::State filter1RouteState;
         FilterStage::State filter2RouteState;
         float previousRawEnvelope { 0.0f };
