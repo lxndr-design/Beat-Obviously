@@ -97,6 +97,48 @@ export interface AudioWaveformChannel {
   lower: number[];
 }
 
+export type StemSeparationKind = "drums" | "bass" | "vocals" | "other";
+
+export interface StemSeparationResult {
+  stem: StemSeparationKind;
+  file: AudioFile;
+}
+
+export interface StemSeparationJobStatus {
+  jobId?: string;
+  active: boolean;
+  finished: boolean;
+  ok: boolean;
+  cancelled: boolean;
+  progress: number;
+  stage: string;
+  error: string;
+  stems: StemSeparationResult[];
+}
+
+export type AudioTranscriptionProfile = "bass" | "vocals" | "other";
+
+export interface AudioTranscriptionNote {
+  startSeconds: number;
+  endSeconds: number;
+  pitch: number;
+  velocity: number;
+  /** Basic Pitch contour offsets in thirds of a semitone. */
+  pitchBends: number[];
+}
+
+export interface AudioTranscriptionJobStatus {
+  jobId?: string;
+  active: boolean;
+  finished: boolean;
+  ok: boolean;
+  cancelled: boolean;
+  progress: number;
+  stage: string;
+  error: string;
+  notes: AudioTranscriptionNote[];
+}
+
 export interface AudioWaveformSummary {
   left: AudioWaveformChannel;
   right: AudioWaveformChannel;
@@ -314,6 +356,12 @@ export type OutboundRequest =
   | { kind: "audio.delete"; ids: Id[]; deleteFiles?: boolean }
   | { kind: "audio.reveal"; path: string }
   | { kind: "audio.waveform"; path: string; bucketCount?: number }
+  | { kind: "audio.stemsStart"; path: string }
+  | { kind: "audio.stemsStatus" }
+  | { kind: "audio.stemsCancel" }
+  | { kind: "audio.transcriptionStart"; path: string; profile: AudioTranscriptionProfile }
+  | { kind: "audio.transcriptionStatus" }
+  | { kind: "audio.transcriptionCancel" }
   | { kind: "audio.listDevices" }
   | { kind: "audio.selectInputDevice"; typeName?: string; deviceName: string; inputChannelCount?: number }
   | { kind: "audio.selectOutputDevice"; typeName?: string; deviceName: string }
@@ -370,6 +418,12 @@ export type ResponseFor<R extends OutboundRequest> =
   R extends { kind: "audio.delete" }   ? { deletedIds: Id[]; failedIds: Id[]; failedPaths: string[]; error?: string } :
   R extends { kind: "audio.reveal" }   ? { ok: boolean; error?: string } :
   R extends { kind: "audio.waveform" } ? { waveform: AudioWaveformSummary | null; cached?: boolean; error?: string } :
+  R extends { kind: "audio.stemsStart" } ? StemSeparationJobStatus :
+  R extends { kind: "audio.stemsStatus" } ? StemSeparationJobStatus :
+  R extends { kind: "audio.stemsCancel" } ? StemSeparationJobStatus :
+  R extends { kind: "audio.transcriptionStart" } ? AudioTranscriptionJobStatus :
+  R extends { kind: "audio.transcriptionStatus" } ? AudioTranscriptionJobStatus :
+  R extends { kind: "audio.transcriptionCancel" } ? AudioTranscriptionJobStatus :
   R extends { kind: "audio.listDevices" } ? { snapshot: AudioDeviceSnapshot } :
   R extends { kind: "audio.selectInputDevice" } ? { ok: boolean; snapshot: AudioDeviceSnapshot; error?: string } :
   R extends { kind: "audio.selectOutputDevice" } ? { ok: boolean; snapshot: AudioDeviceSnapshot; error?: string } :

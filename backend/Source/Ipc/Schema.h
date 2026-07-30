@@ -68,6 +68,12 @@ namespace beat::ipc
         constexpr const char* AUDIO_DELETE        = "audio.delete";
         constexpr const char* AUDIO_REVEAL        = "audio.reveal";
         constexpr const char* AUDIO_WAVEFORM      = "audio.waveform";
+        constexpr const char* AUDIO_STEMS_START   = "audio.stemsStart";
+        constexpr const char* AUDIO_STEMS_STATUS  = "audio.stemsStatus";
+        constexpr const char* AUDIO_STEMS_CANCEL  = "audio.stemsCancel";
+        constexpr const char* AUDIO_TRANSCRIPTION_START  = "audio.transcriptionStart";
+        constexpr const char* AUDIO_TRANSCRIPTION_STATUS = "audio.transcriptionStatus";
+        constexpr const char* AUDIO_TRANSCRIPTION_CANCEL = "audio.transcriptionCancel";
         constexpr const char* AUDIO_LIST_DEVICES  = "audio.listDevices";
         constexpr const char* AUDIO_SELECT_INPUT_DEVICE = "audio.selectInputDevice";
         constexpr const char* AUDIO_SELECT_OUTPUT_DEVICE = "audio.selectOutputDevice";

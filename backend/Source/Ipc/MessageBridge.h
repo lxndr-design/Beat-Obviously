@@ -2,6 +2,8 @@
 
 #include <juce_gui_extra/juce_gui_extra.h>
 #include "../Audio/AudioEngine.h"
+#include "../Audio/Analysis/AudioToMidiService.h"
+#include "../Audio/Analysis/StemSeparationService.h"
 #include "../Persistence/Database.h"
 #include "../Persistence/ProjectRepository.h"
 #include "../Persistence/InstrumentRepository.h"
@@ -68,6 +70,8 @@ namespace beat
 
         void joinFinishedExportThreadIfNeeded();
         juce::var exportJobStatusVar(const std::shared_ptr<ExportJob>& job) const;
+        juce::var audioToMidiStatusVar(const AudioToMidiService::Status& status) const;
+        juce::var stemSeparationStatusVar(const StemSeparationService::Status& status);
 
         struct WaveformCacheEntry
         {
@@ -91,6 +95,11 @@ namespace beat
         mutable std::mutex exportJobLock;
         std::shared_ptr<ExportJob> activeExportJob;
         std::thread exportThread;
+        AudioToMidiService audioToMidi;
+        StemSeparationService stemSeparation;
+        juce::String finalizedStemJobId;
+        juce::String finalizedStemError;
+        juce::var finalizedStemResults;
         std::vector<WaveformCacheEntry> waveformCache;
         uint64_t lastAnalyzerSequence { 0 };
         uint64_t lastRenderTimingSequence { 0 };

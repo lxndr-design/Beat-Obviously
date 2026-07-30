@@ -2726,6 +2726,96 @@ namespace beat
         return juce::var(object.get());
     }
 
+    juce::var MessageBridge::stemSeparationStatusVar(const StemSeparationService::Status& status)
+    {
+        juce::DynamicObject::Ptr object = new juce::DynamicObject();
+        object->setProperty("active", status.active);
+        object->setProperty("finished", status.finished);
+        object->setProperty("ok", status.ok);
+        object->setProperty("cancelled", status.cancelled);
+        object->setProperty("jobId", status.jobId);
+        object->setProperty("progress", status.progress);
+        object->setProperty("stage", status.stage);
+        object->setProperty("error", status.error);
+
+        if (status.finished && status.ok && status.jobId.isNotEmpty())
+        {
+            if (finalizedStemJobId != status.jobId)
+            {
+                juce::Array<juce::var> importedStems;
+                juce::String importError;
+                for (const auto& stem : status.stems)
+                {
+                    const auto importedPath = importAudioFileIntoLibrary(juce::File(stem.path));
+                    auto audioFile = makeAudioFile(importedPath);
+                    if (audioFile.isVoid())
+                    {
+                        importError = "Beat could not import the generated " + stem.stem + " stem.";
+                        break;
+                    }
+
+                    saveAudioFile(database, audioFile);
+                    juce::DynamicObject::Ptr item = new juce::DynamicObject();
+                    item->setProperty("stem", stem.stem);
+                    item->setProperty("file", audioFile);
+                    importedStems.add(juce::var(item.get()));
+                }
+
+                finalizedStemJobId = status.jobId;
+                finalizedStemError = importError;
+                finalizedStemResults = juce::var(importedStems);
+                stemSeparation.discardOutputs(status.jobId);
+            }
+            if (finalizedStemError.isNotEmpty())
+            {
+                object->setProperty("ok", false);
+                object->setProperty("error", finalizedStemError);
+            }
+            object->setProperty("stems", finalizedStemResults);
+        }
+        else
+        {
+            object->setProperty("stems", juce::Array<juce::var>());
+        }
+
+        return juce::var(object.get());
+    }
+
+    juce::var MessageBridge::audioToMidiStatusVar(const AudioToMidiService::Status& status) const
+    {
+        juce::DynamicObject::Ptr object = new juce::DynamicObject();
+        object->setProperty("active", status.active);
+        object->setProperty("finished", status.finished);
+        object->setProperty("ok", status.ok);
+        object->setProperty("cancelled", status.cancelled);
+        object->setProperty("jobId", status.jobId);
+        object->setProperty("progress", status.progress);
+        object->setProperty("stage", status.stage);
+        object->setProperty("error", status.error);
+
+        juce::Array<juce::var> notes;
+        if (status.finished && status.ok)
+        {
+            notes.ensureStorageAllocated(static_cast<int>(status.notes.size()));
+            for (const auto& note : status.notes)
+            {
+                juce::DynamicObject::Ptr item = new juce::DynamicObject();
+                item->setProperty("startSeconds", note.startSeconds);
+                item->setProperty("endSeconds", note.endSeconds);
+                item->setProperty("pitch", note.pitch);
+                item->setProperty("velocity", note.velocity);
+                juce::Array<juce::var> pitchBends;
+                pitchBends.ensureStorageAllocated(static_cast<int>(note.pitchBends.size()));
+                for (const auto bend : note.pitchBends)
+                    pitchBends.add(bend);
+                item->setProperty("pitchBends", pitchBends);
+                notes.add(juce::var(item.get()));
+            }
+        }
+        object->setProperty("notes", notes);
+        return juce::var(object.get());
+    }
+
     void MessageBridge::timerCallback()
     {
         const auto nowMs = juce::Time::getMillisecondCounterHiRes();
@@ -4383,6 +4473,35 @@ namespace beat
             response->setProperty("files", files);
             return juce::var(response.get());
         }
+
+        if (kind == AUDIO_STEMS_START)
+        {
+            const auto status = stemSeparation.start(juce::File(payload.getProperty("path", {}).toString()));
+            if (status.jobId.isNotEmpty() && status.jobId != finalizedStemJobId)
+            {
+                finalizedStemJobId.clear();
+                finalizedStemError.clear();
+                finalizedStemResults = juce::var();
+            }
+            return stemSeparationStatusVar(status);
+        }
+
+        if (kind == AUDIO_STEMS_STATUS)
+            return stemSeparationStatusVar(stemSeparation.status());
+
+        if (kind == AUDIO_STEMS_CANCEL)
+            return stemSeparationStatusVar(stemSeparation.cancel());
+
+        if (kind == AUDIO_TRANSCRIPTION_START)
+            return audioToMidiStatusVar(audioToMidi.start(
+                juce::File(payload.getProperty("path", {}).toString()),
+                payload.getProperty("profile", {}).toString()));
+
+        if (kind == AUDIO_TRANSCRIPTION_STATUS)
+            return audioToMidiStatusVar(audioToMidi.status());
+
+        if (kind == AUDIO_TRANSCRIPTION_CANCEL)
+            return audioToMidiStatusVar(audioToMidi.cancel());
 
         if (kind == AUDIO_LIST)
         {

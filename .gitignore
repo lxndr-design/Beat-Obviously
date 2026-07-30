@@ -23,6 +23,8 @@ frontend/.vite/
 frontend/src/**/*.js
 .npm/
 .pnpm-store/
+.venv-stems/
+.venv-transcription/
 
 # Generated
 *.log

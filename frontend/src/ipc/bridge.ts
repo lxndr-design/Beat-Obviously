@@ -212,6 +212,32 @@ async function mockResponse<R extends OutboundRequest>(
           bucketCount: req.bucketCount ?? 256,
         },
       } as unknown as ResponseFor<R>;
+    case "audio.stemsStart":
+    case "audio.stemsStatus":
+    case "audio.stemsCancel":
+      return {
+        active: false,
+        finished: true,
+        ok: false,
+        cancelled: false,
+        progress: 0,
+        stage: "Unavailable",
+        error: "Stem separation is only available in the native app.",
+        stems: [],
+      } as unknown as ResponseFor<R>;
+    case "audio.transcriptionStart":
+    case "audio.transcriptionStatus":
+    case "audio.transcriptionCancel":
+      return {
+        active: false,
+        finished: true,
+        ok: false,
+        cancelled: false,
+        progress: 0,
+        stage: "Unavailable",
+        error: "Audio-to-MIDI is only available in the native app.",
+        notes: [],
+      } as unknown as ResponseFor<R>;
     case "audio.listDevices":
       return {
         snapshot: {

@@ -65,6 +65,18 @@ In dev mode, set `BEAT_DEV_FRONTEND_URL=http://localhost:6174` before launching 
 
 In production builds, `frontend/dist/` is copied into `Beat.app/Contents/Resources/frontend` and served by JUCE's `WebBrowserComponent::Options::withResourceProvider()`. The native menu sends commands into the Solid UI through the JUCE native bridge exposed as `window.__BEAT_NATIVE__`.
 
+Optional local ML tools are installed separately from the app build:
+
+```bash
+# Four-part vocals/drums/bass/other separation
+./scripts/setup-stem-separation.sh
+
+# Spotify Basic Pitch for Bass, Vocals, and Other stem-to-MIDI conversion
+./scripts/setup-audio-to-midi.sh
+```
+
+Once setup has completed, both tools run locally without network access. Drum-to-MIDI uses a different transcription problem and is intentionally not part of the Basic Pitch integration.
+
 ## Design system
 
 See [frontend/src/design/README.md](frontend/src/design/README.md). Short version: only `#000` and `#fff`, Helvetica Neue, 8px grid, no button outlines, transitions are slides or color inversions, all images dithered B&W.

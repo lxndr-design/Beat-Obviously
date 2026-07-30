@@ -26,6 +26,7 @@
     "verify:node-instrument": "node ../scripts/verify-node-instrument-editor.mjs",
     "verify:track-interactions": "node ../scripts/verify-track-interactions.mjs",
     "verify:drums": "node ../scripts/verify-drum-generation.mjs",
+    "verify:audio-to-midi": "node ../scripts/verify-audio-to-midi.mjs",
     "verify:interactions": "node ../scripts/verify-frontend-interactions.mjs",
     "verify:non-native": "npm run verify:version && npm run verify:design-system && npm run verify:audio-boundary && npm run verify:sampler-zones && npm run typecheck && npm run verify:synth && npm run verify:aurum && npm run verify:lumus && npm run verify:benchmark-instruments && npm run audit:generation && npm run verify:daw && npm run verify:documents && npm run verify:track-interactions && npm run verify:interactions && npm run verify:node-instrument && npm run verify:drums && npm run build",
     "visualize:codebase": "node ../scripts/generate-codebase-visualizer.mjs",

@@ -11,6 +11,7 @@ export type Beats = number; // floating-point position/length in beats
 export type DrumSpeed = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type TrackKind = "audio" | "midi" | "mixed" | "group";
+export type AudioStemKind = "drums" | "bass" | "vocals" | "other";
 
 export type WavetableWarpMode = "shape" | "fold" | "pinch" | "mirror";
 export type SamplerComplexity = "single" | "layered" | "mapped" | "performance";
@@ -137,6 +138,8 @@ export interface Segment {
   icon?: string;
   /** Optional edit group id for linked arrangement operations. */
   groupId?: Id;
+  /** Source-separation role used to select safe downstream transcription tools. */
+  stemKind?: AudioStemKind;
   /** Bound instrument from the library (renders this segment). */
   instrumentId?: Id;
   /** MIDI playback transpose in semitones. */

@@ -8,6 +8,7 @@ import {
   useTransportStore,
   useUiStore,
   useViewStore,
+  runProjectHistoryGroup,
 } from "../../state/store";
 import { clipboardStore } from "../../state/clipboard";
 import { useComponentStore } from "../../state/components";
@@ -32,6 +33,18 @@ import { SegmentMidiPreview } from "./SegmentMidiPreview.solid";
 import { SegmentDrumPreview } from "./SegmentDrumPreview.solid";
 import { SegmentDrumpadPreview } from "./SegmentDrumpadPreview.solid";
 import { SegmentWaveform } from "./SegmentWaveform.solid";
+import {
+  cancelStemSeparation,
+  separateSegmentIntoStems,
+  stemSeparationState,
+  unlinkStemGroup,
+} from "../../audio/stemSeparation";
+import {
+  audioToMidiState,
+  cancelAudioToMidi,
+  convertStemToMidi,
+} from "../../audio/audioToMidi";
+import { linkedResizeTargets, linkedSegmentsFor } from "../../audio/stemGrouping";
 import styles from "./Segment.module.css";
 import type { Id, Segment as SegmentType } from "../../state/types";
 
@@ -101,6 +114,8 @@ export function Segment(props: Props) {
   const selected = createMemo(() => selectedSegmentIds().includes(props.segmentId));
   const playing = createMemo(() => Boolean(activeSegmentPlayback()[props.segmentId]));
   const editing = createMemo(() => openEditors().some((editor) => editor.kind === "segment" && editor.segmentId === props.segmentId));
+  const stemJob = createMemo(() => stemSeparationState());
+  const transcriptionJob = createMemo(() => audioToMidiState());
   const liveInstrument = createMemo(() => {
     const segment = liveSeg();
     return segment?.instrumentId ? instruments().find((instrument) => instrument.id === segment.instrumentId) : undefined;
@@ -134,11 +149,20 @@ export function Segment(props: Props) {
 
     if (mode === "move") {
       const ids = uiStore.selectedSegmentIds;
-      const nextSelected = ids.includes(props.segmentId)
+      const explicitlySelected = ids.includes(props.segmentId)
         ? ids
         : event.shiftKey
           ? [...ids, props.segmentId]
           : [props.segmentId];
+      const allSegments = projectState.tracks.flatMap((track) => track.segments);
+      const nextSelectedSet = new Set(explicitlySelected);
+      for (const selectedId of explicitlySelected) {
+        const selectedSegment = allSegments.find((candidate) => candidate.id === selectedId);
+        if (!selectedSegment) continue;
+        for (const linked of linkedSegmentsFor(selectedSegment, allSegments))
+          nextSelectedSet.add(linked.id);
+      }
+      const nextSelected = Array.from(nextSelectedSet);
       uiStore.setSelectedSegments(nextSelected);
       uiStore.setSelectedTracks([]);
       const selectedIdSet = new Set(nextSelected);
@@ -166,7 +190,8 @@ export function Segment(props: Props) {
         pendingMoves: [],
       };
     } else if (mode === "resize-left" || mode === "resize-right") {
-      uiStore.setSelectedSegments([props.segmentId]);
+      const allSegments = projectState.tracks.flatMap((track) => track.segments);
+      uiStore.setSelectedSegments(segment ? linkedSegmentsFor(segment, allSegments).map((candidate) => candidate.id) : [props.segmentId]);
       uiStore.setSelectedTracks([]);
       drag = {
         mode,
@@ -262,15 +287,24 @@ export function Segment(props: Props) {
     } else if (currentDrag?.mode === "move" && currentDrag.pendingMoves.length > 0) {
       projectStore.applySegmentEditCommand({ kind: "move", moves: currentDrag.pendingMoves });
     } else if ((currentDrag?.mode === "resize-right" || currentDrag?.mode === "resize-left") && currentDrag.pendingResize) {
-      projectStore.applySegmentEditCommand({
-        kind: "resize",
-        segmentId: props.segmentId,
-        startBeat: currentDrag.pendingResize.startBeat,
-        lengthBeats: currentDrag.pendingResize.lengthBeats,
-        originStartBeat: currentDrag.startBeat,
-        originLengthBeats: currentDrag.startLen,
-        originSourceStartBeat: currentDrag.sourceStartBeat,
-        originPayload: currentDrag.payload ?? undefined,
+      const anchor = liveSeg();
+      const allSegments = projectStore.project.tracks.flatMap((track) => track.segments);
+      const linked = anchor ? linkedSegmentsFor(anchor, allSegments) : [];
+      runProjectHistoryGroup(() => {
+        if (!anchor) return;
+        for (const target of linkedResizeTargets(currentDrag.mode, anchor, currentDrag.pendingResize!, linked)) {
+          const segment = target.segment;
+          projectStore.applySegmentEditCommand({
+            kind: "resize",
+            segmentId: segment.id,
+            startBeat: target.startBeat,
+            lengthBeats: target.lengthBeats,
+            originStartBeat: segment.startBeat,
+            originLengthBeats: segment.lengthBeats,
+            originSourceStartBeat: segment.sourceStartBeat,
+            originPayload: structuredClone(segment.payload),
+          });
+        }
       });
       useViewStore.getState().setLastSegmentLength(currentDrag.pendingResize.lengthBeats);
     } else if (currentDrag?.mode === "fade-in" && currentDrag.pendingFade) {
@@ -351,9 +385,12 @@ export function Segment(props: Props) {
         },
         ...(groupedIds.length > 0
           ? [{
-              label: "Ungroup",
+              label: groupedIds.some((groupId) => groupId.startsWith("stems_")) ? "Unlink Stems" : "Ungroup",
               icon: "ph:brackets-curly",
-              onSelect: () => projectStore.applySegmentEditCommand({ kind: "ungroup", groupIds: groupedIds }),
+              onSelect: () => {
+                projectStore.applySegmentEditCommand({ kind: "ungroup", groupIds: groupedIds });
+                uiStore.setSelectedSegments([props.segmentId]);
+              },
             } as ContextMenuItem]
           : []),
         {
@@ -375,6 +412,9 @@ export function Segment(props: Props) {
     }
     const isMidi = segment.payload.kind === "midi" || segment.payload.kind === "mixed";
     const canLoop = isMidi || segment.payload.kind === "drum" || segment.payload.kind === "drumpad";
+    const isAudio = segment.payload.kind === "audio";
+    const activeStemJob = stemJob();
+    const activeTranscriptionJob = transcriptionJob();
     const playheadBeat = useTransportStore.getState().positionBeat;
     const canSplitAtPlayhead = playheadBeat > segment.startBeat + GRID_TICK_BEATS / 4
       && playheadBeat < segment.startBeat + segment.lengthBeats - GRID_TICK_BEATS / 4;
@@ -420,6 +460,46 @@ export function Segment(props: Props) {
               const [createdId] = projectStore.applySegmentEditCommand({ kind: "split", segmentId: props.segmentId, splitBeat: playheadBeat });
               if (createdId) uiStore.setSelectedSegments([createdId]);
             },
+          } as ContextMenuItem]
+        : []),
+      ...(isAudio
+        ? activeStemJob?.segmentId === segment.id
+          ? [{
+              label: "Cancel Stem Separation",
+              icon: "ph:x-circle",
+              separatorBefore: true,
+              onSelect: () => void cancelStemSeparation(),
+            } as ContextMenuItem]
+          : [{
+              label: "Separate into Stems…",
+              icon: "ph:waveform",
+              separatorBefore: true,
+              disabled: Boolean(activeStemJob),
+              onSelect: () => void separateSegmentIntoStems(segment.id),
+            } as ContextMenuItem]
+        : []),
+      ...(isAudio && segment.stemKind !== "drums" && segment.stemKind != null
+        ? activeTranscriptionJob?.segmentId === segment.id
+          ? [{
+              label: "Cancel Audio-to-MIDI",
+              icon: "ph:x-circle",
+              separatorBefore: true,
+              onSelect: () => void cancelAudioToMidi(),
+            } as ContextMenuItem]
+          : [{
+              label: "Convert Stem to MIDI…",
+              icon: "ph:music-notes",
+              separatorBefore: true,
+              disabled: Boolean(activeTranscriptionJob || activeStemJob),
+              onSelect: () => void convertStemToMidi(segment.id),
+            } as ContextMenuItem]
+        : []),
+      ...(segment.groupId
+        ? [{
+            label: segment.groupId.startsWith("stems_") ? "Unlink Stems" : "Ungroup",
+            icon: "ph:brackets-curly",
+            separatorBefore: !isAudio,
+            onSelect: () => unlinkStemGroup(segment),
           } as ContextMenuItem]
         : []),
       {
@@ -648,6 +728,21 @@ export function Segment(props: Props) {
             <Show when={props.repetition > 0}>
               <span class={styles.repBadge} aria-label="Loop repeat">
                 <Icon name="ph:repeat" size={18} decorative />
+              </span>
+            </Show>
+            <Show when={liveSeg()?.groupId}>
+              <span class={styles.repBadge} aria-label="Linked clip group">
+                <Icon name="ph:link" size={18} decorative />
+              </span>
+            </Show>
+            <Show when={stemJob()?.segmentId === props.segmentId}>
+              <span class={styles.repBadge} aria-label={stemJob()?.stage || "Separating stems"}>
+                {Math.round((stemJob()?.progress ?? 0) * 100)}%
+              </span>
+            </Show>
+            <Show when={transcriptionJob()?.segmentId === props.segmentId}>
+              <span class={styles.repBadge} aria-label={transcriptionJob()?.stage || "Converting stem to MIDI"}>
+                MIDI {Math.round((transcriptionJob()?.progress ?? 0) * 100)}%
               </span>
             </Show>
             <Show when={decentSamplerPlugin()}>
