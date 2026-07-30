@@ -2,6 +2,7 @@ import { createMemo, createSignal, Show } from "solid-js";
 import { nanoid as newNanoid } from "nanoid";
 import { createStoreSelector } from "../../solid-utils/store";
 import {
+  appAlert,
   appConfirm,
   createContextMenu,
   HoverInfo,
@@ -12,6 +13,7 @@ import {
 } from "../../solid-ui";
 import { useAnalyzerStore } from "../../state/analyzerStore";
 import { useProjectStore, useUiStore } from "../../state/store";
+import { exportTrackAsWav } from "../ExportReview/exportActions";
 import styles from "./TrackHeader.module.css";
 import type { Id, Track } from "../../state/types";
 
@@ -77,6 +79,13 @@ export function TrackHeader(props: Props) {
         label: "Duplicate track",
         icon: "ph:copy",
         onSelect: () => duplicateTrack(props.trackId),
+      },
+      {
+        label: "Export as .wav",
+        icon: "ph:export",
+        disabled: current.kind === "group",
+        onSelect: () => void exportTrackWithErrorHandling(props.trackId),
+        separatorBefore: true,
       },
       {
         label: "Delete track",
@@ -353,6 +362,14 @@ async function removeTrackWithConfirmation(trackId: Id) {
     if (!confirmed) return;
   }
   projectStore.removeTrack(trackId);
+}
+
+async function exportTrackWithErrorHandling(trackId: Id) {
+  try {
+    await exportTrackAsWav(trackId);
+  } catch (error) {
+    await appAlert(error instanceof Error ? error.message : "Track export failed.");
+  }
 }
 
 function trackHasDestructiveContent(track: Track): boolean {

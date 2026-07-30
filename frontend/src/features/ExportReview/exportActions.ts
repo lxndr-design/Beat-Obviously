@@ -8,6 +8,7 @@ import {
   exportValidationStatusFromReport,
   failedExportValidationStatus,
   normalizeExportOptions,
+  projectFolderFromFilePath,
   useExportStore,
   type ExportPresetTarget,
   type ExportValidationStatus,
@@ -17,7 +18,10 @@ export async function runProjectExport(mode: ExportPresetTarget = "project") {
   const exportState = useExportStore.getState();
   const exportPreset = exportPresetById(exportState.selectedPresetId, mode);
   const options = normalizeExportOptions(exportPreset.options);
-  const pathHint = exportPathHint(exportState.exportDestinationFolder, mode);
+  const destinationFolder = exportState.exportDestinationFolder
+    || projectFolderFromFilePath(useDocumentStore.getState().currentFilePath)
+    || "";
+  const pathHint = exportPathHint(destinationFolder, mode);
   const validation = await validateCurrentProjectBeforeExport();
   if (exportValidationBlocksExport(validation)) throw new Error(validation.message);
   const request = {
@@ -25,6 +29,7 @@ export async function runProjectExport(mode: ExportPresetTarget = "project") {
     instruments: useInstrumentStore.getState().instruments,
     audioFiles: useAudioFileStore.getState().files,
     pathHint,
+    includeTail: true,
     options,
   };
   const renderableTracks = request.project.tracks.filter(isRenderableStemTrack);
@@ -39,7 +44,6 @@ export async function runProjectExport(mode: ExportPresetTarget = "project") {
         ...request,
         startBeat: range.startBeat,
         endBeat: range.endBeat,
-        includeTail: exportPreset.includeTail,
       });
       useExportStore.getState().setJob(result.job);
       if (result.error) throw new Error(result.error);
@@ -47,6 +51,8 @@ export async function runProjectExport(mode: ExportPresetTarget = "project") {
     }
     if (mode === "track") {
       if (selectedTrackIds.length !== 1) throw new Error("Select exactly one track before exporting a stem.");
+      const selectedTrack = request.project.tracks.find((track) => track.id === selectedTrackIds[0]);
+      if (!selectedTrack || !isRenderableStemTrack(selectedTrack)) throw new Error("Group tracks cannot be exported as individual stems yet.");
       const result = await send({
         kind: "project.exportTrackWavAsync",
         ...request,
@@ -82,7 +88,6 @@ export async function runProjectExport(mode: ExportPresetTarget = "project") {
       ...request,
       startBeat: range.startBeat,
       endBeat: range.endBeat,
-      includeTail: exportPreset.includeTail,
     });
     if (result.error) throw new Error(result.error);
     recordCompletedExport(result.path, "range");
@@ -90,6 +95,8 @@ export async function runProjectExport(mode: ExportPresetTarget = "project") {
   }
   if (mode === "track") {
     if (selectedTrackIds.length !== 1) throw new Error("Select exactly one track before exporting a stem.");
+    const selectedTrack = request.project.tracks.find((track) => track.id === selectedTrackIds[0]);
+    if (!selectedTrack || !isRenderableStemTrack(selectedTrack)) throw new Error("Group tracks cannot be exported as individual stems yet.");
     const result = await send({
       kind: "project.exportTrackWav",
       ...request,
@@ -106,7 +113,7 @@ export async function runProjectExport(mode: ExportPresetTarget = "project") {
         kind: "project.exportTrackWav",
         ...request,
         trackId: track.id,
-        pathHint: stemExportPathHint(exportState.exportDestinationFolder, track.name),
+        pathHint: stemExportPathHint(destinationFolder, track.name),
       });
       if (result.error) throw new Error(result.error);
       recordCompletedExport(result.path, "track");
@@ -120,6 +127,42 @@ export async function runProjectExport(mode: ExportPresetTarget = "project") {
   });
   if (result.error) throw new Error(result.error);
   recordCompletedExport(result.path, mode);
+}
+
+export async function exportTrackAsWav(trackId: Id) {
+  const exportState = useExportStore.getState();
+  const project = useProjectStore.getState().project;
+  const track = project.tracks.find((candidate) => candidate.id === trackId);
+  if (!track) throw new Error("Track was not found.");
+  if (!isRenderableStemTrack(track)) throw new Error("Group tracks cannot be exported as individual WAV files yet.");
+
+  const validation = await validateCurrentProjectBeforeExport();
+  if (exportValidationBlocksExport(validation)) throw new Error(validation.message);
+
+  const destinationFolder = exportState.exportDestinationFolder
+    || projectFolderFromFilePath(useDocumentStore.getState().currentFilePath)
+    || "";
+  const preset = exportPresetById("selected-stem", "track");
+  const request = {
+    project,
+    instruments: useInstrumentStore.getState().instruments,
+    audioFiles: useAudioFileStore.getState().files,
+    trackId,
+    pathHint: stemExportPathHint(destinationFolder, track.name),
+    includeTail: true,
+    options: normalizeExportOptions(preset.options),
+  };
+
+  if (isNative()) {
+    const result = await send({ kind: "project.exportTrackWavAsync", ...request });
+    useExportStore.getState().setJob(result.job);
+    if (result.error) throw new Error(result.error);
+    return;
+  }
+
+  const result = await send({ kind: "project.exportTrackWav", ...request });
+  if (result.error) throw new Error(result.error);
+  recordCompletedExport(result.path, "track");
 }
 
 export async function bounceTrackInPlace(trackId?: Id) {
@@ -144,6 +187,7 @@ export async function bounceTrackInPlace(trackId?: Id) {
     instruments: useInstrumentStore.getState().instruments,
     audioFiles: useAudioFileStore.getState().files,
     trackId: sourceTrack.id,
+    includeTail: true,
     options: normalizeExportOptions(preset.options),
   });
   if (result.error) throw new Error(result.error);
@@ -199,19 +243,6 @@ export function unfreezeBouncedTrack(trackId: Id) {
 
 export async function validateCurrentProjectBeforeExport(): Promise<ExportValidationStatus> {
   const exportStore = useExportStore.getState();
-  if (!exportStore.validateBeforeExport) {
-    const status: ExportValidationStatus = {
-      state: "idle",
-      message: "Project Health validation is disabled for this export.",
-      errorCount: 0,
-      warningCount: 0,
-      missingAssetCount: 0,
-      checkedAt: Date.now(),
-    };
-    exportStore.setValidation(status);
-    return status;
-  }
-
   const checking: ExportValidationStatus = {
     state: "checking",
     message: "Checking Project Health before export.",

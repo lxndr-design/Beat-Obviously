@@ -1,61 +1,52 @@
-import { createMemo, For, Show } from "solid-js";
-import { appAlert, appPrompt, Button, FloatingSelect, Icon, Modal, Toggle } from "../../solid-ui";
+import { createMemo, createSignal, onMount, Show } from "solid-js";
+import { appAlert, Button, FloatingSelect, Icon, Modal, Toggle } from "../../solid-ui";
 import { isNative, send } from "../../ipc/bridge";
 import { createStoreSelector } from "../../solid-utils/store";
-import { useDocumentStore, useProjectStore, useTransportStore, useUiStore } from "../../state/store";
+import { useDocumentStore, useTransportStore, useUiStore } from "../../state/store";
 import {
-  FACTORY_EXPORT_PRESETS,
-  applyExportPresetOverride,
-  allExportPresets,
+  exportPresetById,
   exportValidationBlocksExport,
   normalizeExportOptions,
-  recentExportFolder,
+  projectFolderFromFilePath,
   useExportStore,
-  type ExportPreset,
   type ExportValidationStatus,
 } from "../../state/exportStore";
-import { revealExportDestination, runProjectExport } from "./exportActions";
+import { runProjectExport } from "./exportActions";
 import styles from "./ExportReviewModal.module.css";
 
 export function ExportReviewModal() {
-  const selectedPresetId = createStoreSelector(useExportStore, (state) => state.selectedPresetId);
-  const userPresets = createStoreSelector(useExportStore, (state) => state.userPresets);
-  const presetOverrides = createStoreSelector(useExportStore, (state) => state.presetOverrides);
-  const recentDestinations = createStoreSelector(useExportStore, (state) => state.recentDestinations);
+  const [useLoopRangeOnly, setUseLoopRangeOnly] = createSignal(useExportStore.getState().selectedPresetId === "review-range");
   const exportDestinationFolder = createStoreSelector(useExportStore, (state) => state.exportDestinationFolder);
   const job = createStoreSelector(useExportStore, (state) => state.job);
+  const lastCompletedJob = createStoreSelector(useExportStore, (state) => state.lastCompletedJob);
   const validation = createStoreSelector(useExportStore, (state) => state.validation);
-  const validateBeforeExport = createStoreSelector(useExportStore, (state) => state.validateBeforeExport);
   const currentFilePath = createStoreSelector(useDocumentStore, (state) => state.currentFilePath);
-  const tracks = createStoreSelector(useProjectStore, (state) => state.project.tracks);
-  const selectedTrackIds = createStoreSelector(useUiStore, (state) => state.selectedTrackIds);
   const loopRange = createStoreSelector(useTransportStore, (state) => state.loopRange);
 
-  const presets = createMemo(() => allExportPresets(userPresets()));
-  const preset = createMemo(() => applyExportPresetOverride(
-    presets().find((candidate) => candidate.id === selectedPresetId()) ?? FACTORY_EXPORT_PRESETS[0],
-    presetOverrides(),
-  ));
-  const editablePreset = createMemo(() => Boolean(preset().userCreated));
+  const preset = createMemo(() => useLoopRangeOnly()
+    ? exportPresetById("review-range", "range")
+    : exportPresetById("full-mix-review", "project"));
   const options = createMemo(() => normalizeExportOptions(preset().options));
   const rangeReady = createMemo(() => loopRange().endBeat > loopRange().startBeat);
-  const trackReady = createMemo(() => selectedTrackIds().length === 1);
-  const renderableStemCount = createMemo(() => tracks().filter((track) => track.kind !== "group").length);
-  const defaultExportFolder = createMemo(() => recentExportFolder(recentDestinations()));
+  const projectExportFolder = createMemo(() => projectFolderFromFilePath(currentFilePath()));
+  const showProjectHealth = createMemo(() => ["checking", "warning", "blocked", "failed"].includes(validation().state));
+  const analysisJob = createMemo(() => {
+    const current = job();
+    if (current?.analysis) return current;
+    return current?.active ? null : lastCompletedJob();
+  });
   const canExport = createMemo(() => {
-    const target = preset().target;
-    if (validation().state === "checking" || exportValidationBlocksExport(validation())) return false;
-    if (target === "range") return rangeReady();
-    if (target === "track") return trackReady();
-    if (target === "stems") return renderableStemCount() > 0;
-    return true;
+    if (job()?.active || validation().state === "checking") return false;
+    return !useLoopRangeOnly() || rangeReady();
   });
   const readinessLabel = createMemo(() => {
-    const target = preset().target;
-    if (target === "range" && !rangeReady()) return "Set a review loop range before exporting.";
-    if (target === "track" && !trackReady()) return "Select exactly one track before exporting a stem.";
-    if (target === "stems" && renderableStemCount() === 0) return "Add at least one renderable track before exporting all stems.";
+    if (useLoopRangeOnly() && !rangeReady()) return "Set a loop range before exporting.";
     return "Ready to export.";
+  });
+
+  onMount(() => {
+    const projectFolder = projectExportFolder();
+    if (projectFolder) useExportStore.getState().setExportDestinationFolder(projectFolder);
   });
 
   function close() {
@@ -64,29 +55,10 @@ export function ExportReviewModal() {
 
   async function exportSelected() {
     try {
-      await runProjectExport(preset().target);
+      await runProjectExport(useLoopRangeOnly() ? "range" : "project");
     } catch (error) {
       await appAlert(error instanceof Error ? error.message : "Export failed.");
     }
-  }
-
-  async function revealDestination(path: string) {
-    try {
-      await revealExportDestination(path);
-    } catch (error) {
-      await appAlert(error instanceof Error ? error.message : "View in Folder failed.");
-    }
-  }
-
-  async function savePresetAs() {
-    const name = await appPrompt("Export preset name", preset().userCreated ? preset().name : `${preset().name} Custom`, "Save Export Preset");
-    if (!name?.trim()) return;
-    useExportStore.getState().saveUserPreset(name, preset());
-  }
-
-  function deletePreset() {
-    if (!preset().userCreated) return;
-    useExportStore.getState().deleteUserPreset(preset().id);
   }
 
   function updatePresetOptions(patch: Partial<ReturnType<typeof normalizeExportOptions>>) {
@@ -103,7 +75,7 @@ export function ExportReviewModal() {
     try {
       const result = await send({
         kind: "project.chooseExportFolder",
-        pathHint: exportDestinationFolder() || defaultExportFolder() || undefined,
+        pathHint: exportDestinationFolder() || projectExportFolder() || undefined,
       });
       if (result.error) throw new Error(result.error);
       if (result.path?.trim()) useExportStore.getState().setExportDestinationFolder(result.path);
@@ -122,36 +94,26 @@ export function ExportReviewModal() {
       footer={(
         <>
           <Button onClick={close}>Close</Button>
-          <Button variant="primary" disabled={!canExport()} onClick={() => void exportSelected()}>Export</Button>
+          <Button variant="primary" disabled={!canExport()} onClick={() => void exportSelected()}>
+            {job()?.active ? "Exporting..." : exportValidationBlocksExport(validation()) ? "Retry Export" : "Export"}
+          </Button>
         </>
       )}
     >
       <div class={styles.panel}>
         <section class={styles.section}>
           <div class={styles.sectionHeader}>
-            <h3>Export Mode</h3>
-            <div class={styles.headerActions}>
-              <Button size="sm" onClick={() => void savePresetAs()}>Save As</Button>
-              <Show when={editablePreset()}>
-                <Button size="sm" onClick={deletePreset}>Delete</Button>
-              </Show>
-            </div>
+            <h3>Export Contents</h3>
           </div>
-          <div class={styles.presetGrid}>
-            <For each={presets()}>
-              {(candidate) => (
-                <Button
-                  variant="ghost"
-                  selected={candidate.id === selectedPresetId()}
-                  class={styles.presetButton}
-                  onClick={() => useExportStore.getState().setSelectedPresetId(candidate.id)}
-                >
-                  <Icon name={iconForTarget(candidate.target)} size={18} decorative />
-                  <strong>{candidate.name}</strong>
-                  <span>{candidate.description}</span>
-                </Button>
-              )}
-            </For>
+          <div class={styles.scopeToggle}>
+            <Toggle
+              checked={useLoopRangeOnly()}
+              onChange={(enabled) => {
+                setUseLoopRangeOnly(enabled);
+                useExportStore.getState().setSelectedPresetId(enabled ? "review-range" : "full-mix-review");
+              }}
+              label="Use loop range only"
+            />
           </div>
         </section>
 
@@ -199,13 +161,6 @@ export function ExportReviewModal() {
               onChange={(value) => updatePresetOptions({ quality: value === "high" ? "high" : "standard" })}
             />
           </div>
-          <div class={styles.tailControl}>
-            <Toggle
-              checked={preset().includeTail}
-              onChange={(includeTail) => useExportStore.getState().updatePresetRenderSettings(preset().id, { includeTail })}
-              label="Include effect tail"
-            />
-          </div>
         </section>
 
         <section class={styles.section}>
@@ -219,36 +174,29 @@ export function ExportReviewModal() {
           <StateBanner
             icon="ph:folder-open"
             title={exportDestinationFolder() ? "Selected folder" : "No export folder selected"}
-            body={exportDestinationFolder() || "Export will ask for a destination."}
+            body={exportDestinationFolder() || projectExportFolder() || "Save the project first, or choose an export folder."}
           />
         </section>
 
-        <StateBanner
-          icon={canExport() ? "ph:check-circle" : "ph:warning-circle"}
-          title={readinessLabel()}
-          body={exportContextLabel(preset(), currentFilePath(), loopRange(), selectedTrackIds(), renderableStemCount())}
-        />
+        <Show when={showProjectHealth()}>
+          <section class={styles.section}>
+            <div class={styles.sectionHeader}>
+              <h3>Project Health</h3>
+            </div>
+            <StateBanner
+              icon={validationIcon(validation())}
+              title={validationTitle(validation())}
+              body={validationBody(validation())}
+            />
+          </section>
+        </Show>
 
-        <section class={styles.section}>
-          <div class={styles.sectionHeader}>
-            <h3>Project Health</h3>
-            <Button className={styles.outlineButton} size="sm" onClick={() => useExportStore.getState().setValidateBeforeExport(!validateBeforeExport())}>
-              {validateBeforeExport() ? "Validate on" : "Validate off"}
-            </Button>
-          </div>
-          <StateBanner
-            icon={validationIcon(validation())}
-            title={validationTitle(validation(), validateBeforeExport())}
-            body={validationBody(validation(), validateBeforeExport())}
-          />
-        </section>
-
-        <Show when={job()?.analysis}>
+        <Show when={analysisJob()?.analysis}>
           {(analysis) => (
             <section class={styles.section}>
               <div class={styles.sectionHeader}>
-                <h3>Post-Export Analysis</h3>
-                <span>{job()?.ok ? "Passed" : "Review"}</span>
+                <h3>{analysisJob() === job() ? "Post-Export Analysis" : "Last Successful Export Analysis"}</h3>
+                <span>{analysisJob()?.ok ? "Passed" : "Review"}</span>
               </div>
               <div class={styles.analysisGrid}>
                 <Metric label="Duration" value={formatDuration(analysis().durationSeconds)} />
@@ -261,8 +209,8 @@ export function ExportReviewModal() {
                 <Metric label="DC Offset" value={formatRatio(analysis().dcOffset)} />
                 <Metric label="Correlation" value={formatRatio(analysis().stereoCorrelation)} />
               </div>
-              <Show when={job()?.path}>
-                <StateBanner icon="ph:waveform" title="Rendered file" body={job()?.path ?? ""} />
+              <Show when={analysisJob()?.path}>
+                <StateBanner icon="ph:waveform" title="Rendered file" body={analysisJob()?.path ?? ""} />
               </Show>
             </section>
           )}
@@ -270,35 +218,13 @@ export function ExportReviewModal() {
 
         <section class={styles.section}>
           <div class={styles.sectionHeader}>
-            <h3>Recent Destinations</h3>
-            <Show
-              when={recentDestinations().length > 0}
-              fallback={<span>None yet</span>}
-            >
-              <Button size="sm" onClick={() => useExportStore.getState().clearRecentDestinations()}>Clear</Button>
-            </Show>
+            <h3>Export Status</h3>
           </div>
-          <Show
-            when={recentDestinations().length > 0}
-            fallback={<StateBanner icon="ph:folder-open" title="No export destination history yet." body="Completed exports will appear here for review." />}
-          >
-            <div class={styles.pathList}>
-              <For each={recentDestinations().slice(0, 4)}>
-                {(path) => (
-                  <div class={styles.pathRow}>
-                    <div class={styles.pathText}>
-                      <span class={styles.label}>Destination</span>
-                      <strong title={path}>{path}</strong>
-                    </div>
-                    <div class={styles.pathActions}>
-                      <Button size="sm" onClick={() => void revealDestination(path)}>Reveal</Button>
-                      <Button size="sm" onClick={() => useExportStore.getState().removeRecentDestination(path)}>Remove</Button>
-                    </div>
-                  </div>
-                )}
-              </For>
-            </div>
-          </Show>
+          <StateBanner
+            icon={exportStatusIcon(canExport(), validation())}
+            title={exportStatusTitle(readinessLabel(), canExport(), validation())}
+            body={exportStatusBody(useLoopRangeOnly(), currentFilePath(), loopRange(), validation())}
+          />
         </section>
       </div>
     </Modal>
@@ -334,15 +260,13 @@ function validationIcon(status: ExportValidationStatus): string {
   return "ph:shield-check";
 }
 
-function validationTitle(status: ExportValidationStatus, enabled: boolean): string {
-  if (!enabled) return "Pre-export validation disabled.";
-  if (status.state === "idle") return "Project Health will run before export.";
+function validationTitle(status: ExportValidationStatus): string {
+  if (status.state === "idle") return "Project Health runs automatically before export.";
   return status.message;
 }
 
-function validationBody(status: ExportValidationStatus, enabled: boolean): string | undefined {
-  if (!enabled) return "Export will skip the Project Health preflight for this session.";
-  if (status.state === "idle") return "Errors and missing media will block export. Warnings will be shown but will not block.";
+function validationBody(status: ExportValidationStatus): string | undefined {
+  if (status.state === "idle") return "Document errors and missing media block export; warnings are reported but do not block it.";
   if (status.state === "checking") return "Inspecting document integrity, media references, and export blockers.";
   if (status.checkedAt) {
     const details = `${status.errorCount} errors / ${status.warningCount} warnings / ${status.missingAssetCount} missing assets`;
@@ -351,23 +275,28 @@ function validationBody(status: ExportValidationStatus, enabled: boolean): strin
   return undefined;
 }
 
-function iconForTarget(target: ExportPreset["target"]): string {
-  if (target === "range") return "ph:arrows-in-line-horizontal";
-  if (target === "track") return "ph:git-branch";
-  if (target === "stems") return "ph:stack";
-  return "ph:waveform";
+function exportStatusIcon(canExport: boolean, status: ExportValidationStatus): string {
+  if (!canExport || exportValidationBlocksExport(status)) return "ph:warning-circle";
+  if (status.state === "checking") return "ph:arrows-clockwise";
+  return "ph:check-circle";
 }
 
-function exportContextLabel(
-  preset: ExportPreset,
+function exportStatusTitle(readiness: string, canExport: boolean, status: ExportValidationStatus): string {
+  if (status.state === "checking") return "Checking project before export...";
+  if (exportValidationBlocksExport(status)) return "Export blocked by Project Health.";
+  if (!canExport) return readiness;
+  if (status.state === "warning") return "Ready to export with warnings.";
+  return "Ready to export.";
+}
+
+function exportStatusBody(
+  useLoopRangeOnly: boolean,
   currentFilePath: string | null,
   range: { startBeat: number; endBeat: number },
-  selectedTrackIds: string[],
-  renderableStemCount: number,
+  status: ExportValidationStatus,
 ): string {
-  if (preset.target === "range") return `Range ${range.startBeat.toFixed(2)}-${range.endBeat.toFixed(2)} beats.`;
-  if (preset.target === "track") return selectedTrackIds.length === 1 ? `Track ${selectedTrackIds[0]} selected.` : `${selectedTrackIds.length} tracks selected.`;
-  if (preset.target === "stems") return `${renderableStemCount} renderable ${renderableStemCount === 1 ? "track" : "tracks"} will be exported as stems.`;
+  if (exportValidationBlocksExport(status)) return status.message;
+  if (useLoopRangeOnly) return `Range ${range.startBeat.toFixed(2)}-${range.endBeat.toFixed(2)} beats.`;
   return currentFilePath ? `Project file: ${currentFilePath}` : "Unsaved project; choose a destination during export.";
 }
 

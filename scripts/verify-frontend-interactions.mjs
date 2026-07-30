@@ -651,20 +651,26 @@ try {
     "Project Health should classify backend return-bus/send/freeze routing integrity checks into the routing/stale-id category",
   );
   assert.ok(
-    exportReviewSource.includes("FACTORY_EXPORT_PRESETS") && exportReviewSource.includes("runProjectExport"),
-    "export review modal should expose factory presets and launch the shared export runner",
+    exportReviewSource.includes("exportPresetById")
+      && exportReviewSource.includes("runProjectExport")
+      && exportReviewSource.includes('label="Use loop range only"')
+      && !exportReviewSource.includes("presetGrid"),
+    "export review modal should expose one loop-range toggle and launch the shared export runner without scope cards",
   );
   assert.ok(
     exportReviewSource.includes("Project Health")
-      && exportReviewSource.includes("validateBeforeExport")
+      && exportReviewSource.includes("showProjectHealth")
+      && exportReviewSource.includes('["checking", "warning", "blocked", "failed"]')
+      && !exportReviewSource.includes("<span>Required</span>")
       && exportReviewSource.includes("exportValidationBlocksExport"),
-    "export review modal should expose pre-export Project Health validation state",
+    "export review modal should surface Project Health only while checking or when it has an actionable status",
   );
   assert.ok(
     exportActionsSource.includes("validateCurrentProjectBeforeExport")
       && exportActionsSource.includes("project.inspectDocument")
-      && exportActionsSource.includes("exportValidationBlocksExport"),
-    "shared export runner should run Project Health validation before export IPC",
+      && exportActionsSource.includes("exportValidationBlocksExport")
+      && exportActionsSource.includes("includeTail: true"),
+    "shared export runner should validate before export IPC and always include effect tails",
   );
   assert.ok(
     exportActionsSource.includes("bounceTrackInPlace")
@@ -685,14 +691,13 @@ try {
     "shared export actions should expose reversible unfreeze that restores source mute/solo and removes the generated bounce asset",
   );
   assert.ok(
-    exportReviewSource.includes("clearRecentDestinations")
-      && exportReviewSource.includes("removeRecentDestination")
-      && exportReviewSource.includes("revealExportDestination")
-      && exportReviewSource.includes("recentExportFolder")
+    !exportReviewSource.includes("Recent Destinations")
+      && !exportReviewSource.includes("clearRecentDestinations")
+      && !exportReviewSource.includes("recentExportFolder")
       && exportReviewSource.includes("chooseDestinationFolder")
       && exportReviewSource.includes("Selected folder")
       && exportReviewSource.includes("Choose Folder"),
-    "export review modal should expose recent destination reveal/remove/clear actions and a folder chooser derived from destination history",
+    "export review modal should omit recent-destination management and retain the direct folder chooser",
   );
   assert.ok(
     exportStoreSource.includes("EXPORT_PREFERENCES_KEY")
@@ -703,22 +708,29 @@ try {
     "export store should persist recent destinations and validate-before-export preference",
   );
   assert.ok(
-    exportReviewSource.includes("renderableStemCount")
-      && exportStoreSource.includes("All Stems")
+    !exportReviewSource.includes("renderableStemCount")
+      && !exportReviewSource.includes("Track Stems")
+      && exportStoreSource.includes("Track Stems")
       && exportStoreSource.includes('target: "stems"')
       && exportActionsSource.includes('mode === "stems"')
       && exportActionsSource.includes("project.exportAllTrackWavsAsync"),
-    "export review should expose all-stems readiness and launch the native batch-stem IPC",
+    "export review should omit batch-stem UI while preserving the underlying batch-stem export capability",
   );
   assert.ok(
-    exportReviewSource.includes("savePresetAs")
-      && exportStoreSource.includes("updateUserPreset")
-      && exportReviewSource.includes("deletePreset")
-      && exportStoreSource.includes("deleteUserPreset")
-      && exportReviewSource.includes("Include effect tail")
+    !exportReviewSource.includes("savePresetAs")
+      && !exportReviewSource.includes("deletePreset")
+      && !exportReviewSource.includes("Include reverb and delay decay")
       && exportReviewSource.includes('label="Quality"')
       && exportReviewSource.includes("Offline HQ"),
-    "export review should expose custom export preset save, edit, tail, quality, and delete controls",
+    "export review should keep render quality controls while omitting preset management and the redundant effect-tail toggle",
+  );
+  assert.ok(
+    exportReviewSource.includes("useLoopRangeOnly")
+      && exportReviewSource.includes("Export Status")
+      && exportReviewSource.lastIndexOf("Export Status") > exportReviewSource.lastIndexOf("Export Destination")
+      && exportStoreSource.includes("projectFolderFromFilePath")
+      && exportActionsSource.includes("projectFolderFromFilePath(useDocumentStore.getState().currentFilePath)"),
+    "export loop scope should be visible, final status should be last, and exports should default to the project folder",
   );
   assert.ok(
     exportReviewSource.includes("Post-Export Analysis")
@@ -734,8 +746,13 @@ try {
     "export destination reveal should reuse the native project reveal IPC",
   );
   assert.ok(
-    appMenuSource.includes("onExportReview") && appMenuSource.includes("setSelectedPresetId"),
-    "app menu export entries should select an export preset and open export review",
+    appMenuSource.includes("onExportReview")
+      && appMenuSource.includes("setSelectedPresetId")
+      && appMenuSource.includes("callbacks.onExportTrack?.()")
+      && trackHeaderSource.includes('label: "Export as .wav"')
+      && trackHeaderSource.includes("exportTrackAsWav")
+      && exportActionsSource.includes("exportTrackAsWav"),
+    "app and track-header menus should route isolated track WAV export directly to the shared track exporter",
   );
   assert.ok(
     sidebarSource.includes('openEditor({ kind: "exportReview" })') && !sidebarSource.includes("project.exportWav"),

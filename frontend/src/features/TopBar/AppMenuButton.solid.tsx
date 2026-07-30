@@ -86,7 +86,7 @@ export function AppMenuButton(props: { props: Accessor<AppMenuButtonProps> }) {
             hint: selectedTrackCount() === 1 ? undefined : "Select 1",
             onSelect: () => {
               useExportStore.getState().setSelectedPresetId("selected-stem");
-              (callbacks.onExportReview ?? callbacks.onExportTrack)?.();
+              callbacks.onExportTrack?.();
             },
           },
         ],

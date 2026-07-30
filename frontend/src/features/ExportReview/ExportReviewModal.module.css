@@ -12,15 +12,6 @@
   line-height: 1;
 }
 
-.pathRow strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-size-ui);
-  line-height: 1.15;
-}
-
 .section {
   display: grid;
   gap: 6px;
@@ -48,67 +39,8 @@
   font-size: var(--font-size-ui);
 }
 
-.headerActions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  min-width: 0;
-}
-
-.presetGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.presetButton {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 6px;
-  align-items: start;
-  min-height: 69px;
-  padding: 6px;
-  color: var(--color-fg);
-  background: var(--color-bg);
-  border: var(--border-fg);
-  text-align: left;
-  cursor: pointer;
-  transition: var(--interaction-transition);
-}
-
-.presetButton:hover {
-  background: var(--interaction-hover-bg);
-}
-
-.presetButtonActive {
-  background: var(--interaction-selected-bg);
-}
-
-.presetButton:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.presetButton strong,
-.presetButton > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.presetButton strong {
-  font-size: var(--font-size-ui);
-  font-weight: var(--font-weight-medium);
-  line-height: 1.1;
-}
-
-.presetButton > span {
-  grid-column: 1 / -1;
-  color: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
-  font-size: var(--font-size-ui);
-  line-height: 1.25;
+.scopeToggle {
+  min-height: 24px;
 }
 
 .controls {
@@ -122,16 +54,6 @@
   font-size: var(--font-size-ui);
   opacity: 0.66;
   text-transform: none;
-}
-
-.tailControl {
-  display: flex;
-  align-items: center;
-  min-height: 24px;
-}
-
-.outlineButton {
-  border: var(--border-fg);
 }
 
 .analysisGrid {
@@ -166,37 +88,6 @@
   line-height: 1.15;
 }
 
-.pathList {
-  display: grid;
-  border: var(--border-fg);
-}
-
-.pathRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 9px;
-  align-items: center;
-  min-width: 0;
-  padding: 6px;
-  border-bottom: var(--border-fg);
-}
-
-.pathRow:last-child {
-  border-bottom: 0;
-}
-
-.pathText {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.pathActions {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
 .stateBanner {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -221,7 +112,6 @@
 
 @media (max-width: 760px) {
   .controls,
-  .presetGrid,
   .analysisGrid {
     grid-template-columns: 1fr;
   }
@@ -237,16 +127,4 @@
     border-bottom: 0;
   }
 
-  .pathRow {
-    grid-template-columns: 1fr;
-  }
-
-  .pathActions {
-    justify-content: flex-start;
-  }
-
-  .headerActions {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
 }

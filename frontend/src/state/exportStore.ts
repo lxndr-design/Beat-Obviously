@@ -35,56 +35,41 @@ const EXPORT_PREFERENCES_KEY = "beat:export-preferences:v1";
 export const FACTORY_EXPORT_PRESETS: ExportPreset[] = [
   {
     id: "full-mix-review",
-    name: "Full Mix Review",
-    description: "Stereo WAV for normal mix review.",
+    name: "Full Song",
+    description: "One WAV containing the complete project mix.",
     target: "project",
     options: { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512, quality: "standard" },
     includeTail: true,
   },
   {
     id: "review-range",
-    name: "Review Range",
-    description: "Loop/range export with effect tails.",
+    name: "Loop Range",
+    description: "One WAV containing only the active loop range.",
     target: "range",
     options: { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512, quality: "standard" },
     includeTail: true,
   },
   {
     id: "selected-stem",
-    name: "Selected Stem",
-    description: "Selected track stem at mix-session quality.",
+    name: "Selected Track",
+    description: "One isolated WAV of the currently selected track.",
     target: "track",
     options: { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512, quality: "standard" },
     includeTail: true,
   },
   {
     id: "all-stems",
-    name: "All Stems",
-    description: "One stem per renderable track.",
+    name: "Track Stems",
+    description: "A folder with one isolated WAV per renderable track.",
     target: "stems",
     options: { sampleRate: 48000, bitDepth: 24, channels: 2, blockSize: 512, quality: "standard" },
-    includeTail: true,
-  },
-  {
-    id: "web-draft",
-    name: "Web Draft",
-    description: "Compact PCM16 draft for quick sharing.",
-    target: "project",
-    options: { sampleRate: 44100, bitDepth: 16, channels: 2, blockSize: 512, quality: "standard" },
-    includeTail: true,
-  },
-  {
-    id: "mono-reference",
-    name: "Mono Reference",
-    description: "Mono compatibility reference render.",
-    target: "project",
-    options: { sampleRate: 48000, bitDepth: 24, channels: 1, blockSize: 512, quality: "standard" },
     includeTail: true,
   },
 ];
 
 interface ExportState {
   job: ProjectExportJobStatus | null;
+  lastCompletedJob: ProjectExportJobStatus | null;
   selectedPresetId: string;
   userPresets: ExportPreset[];
   presetOverrides: Record<string, ExportPresetOverride>;
@@ -129,17 +114,18 @@ let cachedExportPreferences: ExportPreferencesRecord | null = null;
 
 export const useExportStore = create<ExportState>((set) => ({
   job: null,
+  lastCompletedJob: null,
   selectedPresetId: "full-mix-review",
   userPresets: loadUserExportPresets(),
   presetOverrides: loadExportPreferences().presetOverrides,
   recentDestinations: loadExportPreferences().recentDestinations,
   exportDestinationFolder: loadExportPreferences().exportDestinationFolder,
-  validateBeforeExport: loadExportPreferences().validateBeforeExport,
+  validateBeforeExport: true,
   validation: IDLE_EXPORT_VALIDATION,
   updatedAt: 0,
   setJob: (job) =>
     set((state) => {
-      const recentDestinations = job.path
+      const recentDestinations = job.finished && job.ok && job.path
         ? normalizeRecentDestinations([job.path, ...state.recentDestinations])
         : state.recentDestinations;
       persistExportPreferences({
@@ -150,6 +136,7 @@ export const useExportStore = create<ExportState>((set) => ({
       });
       return {
         job,
+        lastCompletedJob: job.finished && job.ok && job.analysis ? job : state.lastCompletedJob,
         recentDestinations,
         updatedAt: Date.now(),
       };
@@ -244,15 +231,15 @@ export const useExportStore = create<ExportState>((set) => ({
         updatedAt: Date.now(),
       };
     }),
-  setValidateBeforeExport: (enabled) =>
+  setValidateBeforeExport: () =>
     set((state) => {
       persistExportPreferences({
         presetOverrides: state.presetOverrides,
         recentDestinations: state.recentDestinations,
         exportDestinationFolder: state.exportDestinationFolder,
-        validateBeforeExport: enabled,
+        validateBeforeExport: true,
       });
-      return { validateBeforeExport: enabled, updatedAt: Date.now() };
+      return { validateBeforeExport: true, updatedAt: Date.now() };
     }),
   setExportDestinationFolder: (path) =>
     set((state) => {
@@ -361,6 +348,14 @@ export function recentExportFolder(paths: string[]): string | null {
   return normalized.slice(0, lastSlash);
 }
 
+export function projectFolderFromFilePath(path: string | null | undefined): string | null {
+  const normalized = path?.trim().replace(/\\/g, "/").replace(/\/+$/g, "") ?? "";
+  const lastSlash = normalized.lastIndexOf("/");
+  if (lastSlash < 0) return null;
+  if (lastSlash === 0) return "/";
+  return normalized.slice(0, lastSlash);
+}
+
 function clampToSet<T extends number>(value: number | undefined, allowed: readonly T[], fallback: T): T {
   return allowed.includes(value as T) ? value as T : fallback;
 }
@@ -422,8 +417,11 @@ function loadExportPreferences(): ExportPreferencesRecord {
     cachedExportPreferences = {
       presetOverrides: normalizePresetOverrides(parsed.presetOverrides),
       recentDestinations: normalizeRecentDestinations(Array.isArray(parsed.recentDestinations) ? parsed.recentDestinations : []),
-      exportDestinationFolder: typeof parsed.exportDestinationFolder === "string" ? parsed.exportDestinationFolder.trim() : "",
-      validateBeforeExport: parsed.validateBeforeExport !== false,
+      // A destination choice is session-scoped. New export sessions start in
+      // the current project's folder instead of restoring an unrelated path.
+      exportDestinationFolder: "",
+      // Migrate the retired preference without restoring its validation bypass.
+      validateBeforeExport: true,
     };
     return cachedExportPreferences;
   } catch {
@@ -437,7 +435,7 @@ function persistExportPreferences(preferences: ExportPreferencesRecord) {
     presetOverrides: normalizePresetOverrides(preferences.presetOverrides),
     recentDestinations: normalizeRecentDestinations(preferences.recentDestinations),
     exportDestinationFolder: preferences.exportDestinationFolder.trim(),
-    validateBeforeExport: preferences.validateBeforeExport,
+    validateBeforeExport: true,
   };
   cachedExportPreferences = normalized;
   if (typeof window === "undefined") return;
