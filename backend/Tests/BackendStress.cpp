@@ -14039,6 +14039,70 @@ namespace
         return ok;
     }
 
+    bool stressAudioEngineAudioBusExportTail()
+    {
+        auto project = makeTinyOfflineProject();
+        project.lengthBeats = 0.5;
+
+        beat::ReturnBus delayBus;
+        delayBus.id = "export-tail-delay-bus";
+        delayBus.name = "Export Tail Delay Bus";
+        beat::TrackEffect delay;
+        delay.id = "export-tail-delay";
+        delay.kind = beat::TrackEffectKind::Delay;
+        delay.params.push_back({ "timeMs", 250.0f });
+        delay.params.push_back({ "feedback", 70.0f });
+        delay.params.push_back({ "mix", 65.0f });
+        delayBus.effects.push_back(std::move(delay));
+
+        beat::ReturnBus reverbBus;
+        reverbBus.id = "export-tail-reverb-bus";
+        reverbBus.name = "Export Tail Reverb Bus";
+        beat::TrackEffect reverb;
+        reverb.id = "export-tail-reverb";
+        reverb.kind = beat::TrackEffectKind::Reverb;
+        reverb.params.push_back({ "roomSize", 50.0f });
+        reverb.params.push_back({ "damping", 35.0f });
+        reverb.params.push_back({ "mix", 40.0f });
+        reverbBus.effects.push_back(std::move(reverb));
+
+        delayBus.outputBusId = reverbBus.id;
+        project.tracks.front().outputBusId = delayBus.id;
+        project.returnBuses = { delayBus, reverbBus };
+
+        auto exportFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-audio-bus-tail.wav");
+        if (exportFile.existsAsFile())
+            exportFile.deleteFile();
+
+        juce::String error;
+        if (!beat::AudioEngine::renderProjectToWav(project, exportFile, 44100.0, 256, 2, &error))
+        {
+            std::cerr << "Audio bus tail export error: " << error << "\n";
+            return false;
+        }
+
+        juce::AudioFormatManager formatManager;
+        formatManager.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(exportFile));
+        const auto drySamples = (juce::int64) std::ceil((project.lengthBeats * 60.0 / project.bpm) * 44100.0);
+        const auto renderedSamples = reader != nullptr ? reader->lengthInSamples : 0;
+        const double energy = wavEnergy(exportFile);
+        exportFile.deleteFile();
+
+        // The two serial Bus effects need substantially more room than either
+        // the dry project or a Track-only tail estimate would provide.
+        const bool ok = renderedSamples > drySamples + (juce::int64) (3.0 * 44100.0)
+            && std::isfinite(energy)
+            && energy > 0.0001;
+        if (!ok)
+        {
+            std::cerr << "Audio bus tail export failed length=" << renderedSamples
+                      << " dry=" << drySamples
+                      << " energy=" << energy << "\n";
+        }
+        return ok;
+    }
+
     bool stressAudioEngineGroupRouting()
     {
         auto dryProject = makeTinyOfflineProject();
@@ -20672,7 +20736,8 @@ int main(int argc, char** argv)
             && stressProjectRepositoryEffectDefaultsMigration()
             && stressAudioEngineSendReturnBus()
             && stressAudioEngineNestedAudioBusRouting()
-            && stressAudioEngineAudioBusLatencyCompensation();
+            && stressAudioEngineAudioBusLatencyCompensation()
+            && stressAudioEngineAudioBusExportTail();
         if (!ok)
         {
             std::cerr << "Audio bus focused stress failed\n";
@@ -21640,6 +21705,11 @@ int main(int argc, char** argv)
     if (!stressAudioEngineAudioBusLatencyCompensation())
     {
         std::cerr << "Audio engine audio bus latency compensation stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineAudioBusExportTail())
+    {
+        std::cerr << "Audio engine audio bus export tail stress failed\n";
         return 1;
     }
     if (!stressAudioEngineGroupRouting())

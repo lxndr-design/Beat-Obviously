@@ -13,7 +13,7 @@ The Audio Bus backend extends the existing Return Bus model without breaking old
 
 ## Signal and state
 
-Bus processing is input summing, input trim, inserts, meter, pre/post-fader sends, balance/fader, then primary output. Track and Bus routes share the existing bounded realtime buffers and effect framework. Offline rendering uses the same engine path.
+Bus processing is input summing, input trim, inserts, meter, pre/post-fader sends, balance/fader, then primary output. Track and Bus routes share the existing bounded realtime buffers and effect framework. Offline rendering uses the same engine path. Tail-enabled exports include delay and reverb decay across serial Track/Bus effect chains and nested Bus routes, capped by the existing eight-second export-tail policy.
 
 Each Bus persists its stable ID, schema version, name, color, icon, channel layout, primary output, trim, gain, pan, mute, solo, solo-safe state, mixer order, sends, insert chain, and automation. Bus automation targets are:
 
@@ -45,6 +45,6 @@ The integrity verifier diagnoses unsupported Bus schema versions, empty names, u
 
 - `npm run verify:audio-bus` checks atomic selected-track creation, stable-ID protection, value normalization, destination validation, nested routing, cycle rejection, sends, insert-chain operations, channel mode, safe deletion, routed-input presentation, shared synth controls/graphs, and editable insert parameters.
 - `npm run verify:design-system` checks that the shared Slider delegates continuous pointer dragging to the native range control and keeps its label on the compact field-label scale.
-- `build-native/bin/BeatBackendStress --audio-bus` checks persistence, malformed/future Bus diagnostics, summing, nested routing, missing/cyclic fail-closed behavior, trim automation, solo isolation, offline rendering, and latency-compensated parallel paths.
+- `build-native/bin/BeatBackendStress --audio-bus` checks persistence, malformed/future Bus diagnostics, summing, nested routing, missing/cyclic fail-closed behavior, trim automation, solo isolation, offline rendering, serial Bus-effect export tails, and latency-compensated parallel paths.
 
 The full-screen Mixer remains available for detailed Track channel strips. Further visual refinement can build on the main-editor tabs without changing the routing contract.

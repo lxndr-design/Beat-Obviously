@@ -696,7 +696,9 @@ namespace beat
             }
         }
 
-        double estimateTrackEffectTailSeconds(const std::vector<TrackEffect>& effects) noexcept
+        constexpr double maximumExportTailSeconds = 8.0;
+
+        double estimateEffectChainTailSeconds(const std::vector<TrackEffect>& effects) noexcept
         {
             double tailSeconds = 0.0;
             for (const auto& effect : effects)
@@ -707,15 +709,47 @@ namespace beat
                     const double timeMs = juce::jlimit(1.0, 2000.0, (double) trackEffectParam(effect, "timeMs", 250.0f));
                     const double feedback = juce::jlimit(0.0, 0.95, (double) trackEffectParam(effect, "feedback", 25.0f) / 100.0);
                     const double repeats = feedback > 0.001 ? juce::jlimit(1.0, 10.0, std::log(0.001) / std::log(feedback)) : 1.0;
-                    tailSeconds = juce::jmax(tailSeconds, timeMs / 1000.0 * repeats);
+                    tailSeconds += timeMs / 1000.0 * repeats;
                 }
                 else if (effect.kind == TrackEffectKind::Reverb)
                 {
                     const double room = juce::jlimit(0.0, 1.0, (double) trackEffectParam(effect, "roomSize", 40.0f) / 100.0);
-                    tailSeconds = juce::jmax(tailSeconds, 0.75 + room * 3.0);
+                    tailSeconds += 0.75 + room * 3.0;
                 }
             }
-            return juce::jlimit(0.0, 8.0, tailSeconds);
+            return juce::jlimit(0.0, maximumExportTailSeconds, tailSeconds);
+        }
+
+        double estimateAudioBusPathTailSeconds(const Project& project,
+                                               const Id& busId,
+                                               juce::StringArray& visited) noexcept
+        {
+            if (busId.isEmpty() || visited.contains(busId))
+                return 0.0;
+
+            const auto* bus = findProjectBus(project, busId);
+            if (bus == nullptr)
+                return 0.0;
+
+            visited.add(busId);
+            double downstreamTailSeconds = 0.0;
+            if (bus->outputEnabled && bus->outputBusId.isNotEmpty())
+                downstreamTailSeconds = estimateAudioBusPathTailSeconds(project, bus->outputBusId, visited);
+
+            for (const auto& send : bus->sends)
+            {
+                if (!send.enabled)
+                    continue;
+                juce::StringArray sendVisited(visited);
+                downstreamTailSeconds = juce::jmax(
+                    downstreamTailSeconds,
+                    estimateAudioBusPathTailSeconds(project, send.busId, sendVisited));
+            }
+
+            return juce::jlimit(
+                0.0,
+                maximumExportTailSeconds,
+                estimateEffectChainTailSeconds(bus->effects) + downstreamTailSeconds);
         }
 
         double estimateProjectTailSeconds(const Project& project) noexcept
@@ -724,11 +758,30 @@ namespace beat
             for (const auto& track : project.tracks)
             {
                 const auto* instrument = findInstrumentDefinition(project, track.instrumentId);
+                const double routeTailSeconds = estimateEffectChainTailSeconds(composeRouteEffects(instrument, track.effects));
+                double downstreamTailSeconds = 0.0;
+
+                if (track.outputEnabled && track.outputBusId.isNotEmpty())
+                {
+                    juce::StringArray visited;
+                    downstreamTailSeconds = estimateAudioBusPathTailSeconds(project, track.outputBusId, visited);
+                }
+
+                for (const auto& send : track.sends)
+                {
+                    if (!send.enabled)
+                        continue;
+                    juce::StringArray visited;
+                    downstreamTailSeconds = juce::jmax(
+                        downstreamTailSeconds,
+                        estimateAudioBusPathTailSeconds(project, send.busId, visited));
+                }
+
                 tailSeconds = juce::jmax(
                     tailSeconds,
-                    estimateTrackEffectTailSeconds(composeRouteEffects(instrument, track.effects)));
+                    juce::jlimit(0.0, maximumExportTailSeconds, routeTailSeconds + downstreamTailSeconds));
             }
-            return tailSeconds;
+            return juce::jlimit(0.0, maximumExportTailSeconds, tailSeconds);
         }
 
         bool canLoadReaderIntoAudioBuffer(const juce::AudioFormatReader& reader) noexcept
