@@ -95,5 +95,14 @@ namespace beat
         uint64_t lastAnalyzerSequence { 0 };
         uint64_t lastRenderTimingSequence { 0 };
         uint64_t lastTrackMeterSequence { 0 };
+        double bridgeStartedMs { 0.0 };
+        double lastTimerCallbackMs { 0.0 };
+        double lastLoadLogMs { 0.0 };
+        int64_t lastLoggedDeadlineOverruns { 0 };
+        int64_t lastLoggedNoteOffOverflows { 0 };
+        int64_t lastLoggedOverloadSafetyMutes { 0 };
+        int64_t lastLoggedLockMisses { 0 };
+        bool overloadWasActive { false };
+        juce::String activeProjectId;
     };
 }

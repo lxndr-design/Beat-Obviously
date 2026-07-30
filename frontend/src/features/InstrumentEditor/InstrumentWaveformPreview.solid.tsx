@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, type Accessor } from "solid-js";
 import { FieldActionButton, HoverInfo, Icon } from "../../solid-ui";
+import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import {
   cachedInstrumentSampleBuffer,
   createInstrumentBufferSource,
@@ -34,6 +35,10 @@ export function InstrumentWaveformPreview(props: InstrumentWaveformPreviewProps)
 }
 
 function InstrumentWaveformPreviewRuntime(props: { state: Accessor<InstrumentWaveformPreviewProps> }) {
+  onCleanup(registerGlobalAudioStop(() => {
+    stopPreview();
+    stopLoop();
+  }));
   let canvasRef: HTMLCanvasElement | undefined;
   let audioCtx: AudioContext | null = null;
   let source: AudioBufferSourceNode | null = null;

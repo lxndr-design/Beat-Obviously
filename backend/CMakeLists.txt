@@ -318,6 +318,7 @@ target_compile_features(BeatBackendStress PRIVATE cxx_std_20)
 target_compile_definitions(BeatBackendStress PRIVATE
     BEAT_REALTIME_SAFETY_TESTING=1
     BEAT_SFZ_DECODE_TESTING=1
+    BEAT_BACKEND_STRESS_TEST=1
 )
 
 add_executable(BeatAetherBaseline

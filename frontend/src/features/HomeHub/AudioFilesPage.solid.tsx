@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "so
 import { appAlert, appConfirm, appPrompt } from "../../solid-ui";
 import { ActionFooter, Button, HoverInfo, Icon, MarqueeText, TextInput } from "../../solid-ui";
 import { importAudioFiles } from "../../audio/audioImport";
+import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import { isNative, send } from "../../ipc/bridge";
 import type { AudioWaveformSummary } from "../../ipc/schema";
 import { buildCurrentBeatDocumentFingerprint } from "../../persistence/beatDocument";
@@ -31,6 +32,7 @@ type WaveformAnalysis = {
 };
 
 export function AudioFilesPage() {
+  onCleanup(registerGlobalAudioStop(stopPreview));
   const files = createStoreSelector(useAudioFileStore, (s) => s.files);
   const addFile = useAudioFileStore.getState().addFile;
   const removeFile = useAudioFileStore.getState().removeFile;

@@ -149,6 +149,9 @@ namespace beat
         void applyProject(Project p);
         void setEqAutomation(std::vector<EqAutomationPoint> pts);
         void stopAllNotes(bool allowTailOff);
+#if defined(BEAT_BACKEND_STRESS_TEST)
+        void holdRuntimeLockForTest(std::atomic<bool>& acquired, const std::atomic<bool>& release);
+#endif
         void requestPlay();
         void requestPause();
         void requestStop();
@@ -252,6 +255,9 @@ namespace beat
             int64_t callbackSafetyViolations { 0 };
             int64_t modulationWorkBudgetOverruns { 0 };
             int64_t nonlinearWorkBudgetOverruns { 0 };
+            int64_t pendingNoteOffOverflows { 0 };
+            int64_t overloadSafetyMutes { 0 };
+            int64_t callbackLockMisses { 0 };
         };
 
         bool pullRenderTimingSnapshot(RenderTimingSnapshot& out) const noexcept;
@@ -644,6 +650,9 @@ namespace beat
         RecordingCapture inputRecording;
         std::atomic<bool> inputMonitoringEnabled { false };
         std::atomic<float> inputMonitoringGain { 1.0f };
+        std::atomic<bool> transportSafetySilence { false };
+        std::atomic<bool> runtimeResetPending { false };
+        int consecutiveRealtimeDeadlineOverruns { 0 };
         int projectLatencySamples { 0 };
         Id activeProjectId;
         juce::CriticalSection sampleLock;
@@ -676,6 +685,7 @@ namespace beat
                                                  int numSamples);
         void resetRouteRuntimeLocked(InstrumentRenderState& route, bool allowTailOff) noexcept;
         void resetRuntimeStateLocked(bool allowTailOff) noexcept;
+        void applyPendingRuntimeResetLocked() noexcept;
         bool queueTransportCommand(TransportCommand command) noexcept;
         bool tryApplyUrgentTransportCommand(TransportCommand command) noexcept;
         void applyTransportCommandLocked(const TransportCommand& command) noexcept;
@@ -833,5 +843,8 @@ namespace beat
         std::atomic<int64_t> callbackSafetyViolations { 0 };
         std::atomic<int64_t> modulationWorkBudgetOverruns { 0 };
         std::atomic<int64_t> nonlinearWorkBudgetOverruns { 0 };
+        std::atomic<int64_t> pendingNoteOffOverflows { 0 };
+        std::atomic<int64_t> overloadSafetyMutes { 0 };
+        std::atomic<int64_t> callbackLockMisses { 0 };
     };
 }

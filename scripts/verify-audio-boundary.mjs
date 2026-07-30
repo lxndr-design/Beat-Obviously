@@ -41,6 +41,7 @@ const timelinePath = join(frontendSrc, "audio", "TimelineMidiPlayback.solid.tsx"
 const liveMidiExpressionInputPath = join(frontendSrc, "audio", "LiveMidiExpressionInput.solid.tsx");
 const liveMidiExpressionPath = join(frontendSrc, "audio", "liveMidiExpression.ts");
 const transportActionsPath = join(frontendSrc, "audio", "transportActions.ts");
+const globalAudioSafetyPath = join(frontendSrc, "audio", "globalAudioSafety.ts");
 const wavemapResynthesisPath = join(frontendSrc, "audio", "wavemapResynthesis.ts");
 const audioRecordingModalPath = join(frontendSrc, "features", "Tracks", "AudioRecordingModal.solid.tsx");
 const schemaPath = join(frontendSrc, "ipc", "schema.ts");
@@ -56,6 +57,7 @@ for (const requiredPath of [
   liveMidiExpressionInputPath,
   liveMidiExpressionPath,
   transportActionsPath,
+  globalAudioSafetyPath,
   wavemapResynthesisPath,
   audioRecordingModalPath,
   schemaPath,
@@ -66,6 +68,18 @@ for (const requiredPath of [
   audioEnginePath,
 ]) {
   if (!existsSync(requiredPath)) fail(`Missing audio boundary file: ${rel(requiredPath)}`);
+}
+
+if (existsSync(globalAudioSafetyPath) && existsSync(transportActionsPath)) {
+  const safetySource = read(globalAudioSafetyPath);
+  const transportSource = read(transportActionsPath);
+  if (!safetySource.includes("registerGlobalAudioStop") || !safetySource.includes("stopAllBrowserAudio")) {
+    fail("Browser preview owners must have a shared global audio-stop registry.");
+  }
+  const stopCallCount = (transportSource.match(/stopAllBrowserAudio\(\)/g) ?? []).length;
+  if (stopCallCount < 2) {
+    fail("Pause and Stop must both cancel every registered browser playback owner.");
+  }
 }
 
 if (existsSync(audioEngineHeaderPath)) {

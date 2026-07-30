@@ -94,6 +94,7 @@ namespace beat::ipc
         // Inbound events (C++ → JS)
         constexpr const char* EV_POSITION_CHANGED = "transport.positionChanged";
         constexpr const char* EV_PLAYBACK_ENDED   = "transport.playbackEnded";
+        constexpr const char* EV_SAFETY_MUTED     = "transport.safetyMuted";
         constexpr const char* EV_SEGMENT_TRIGGER  = "engine.segmentTrigger";
         constexpr const char* EV_LEVEL_METERS     = "engine.levelMeters";
         constexpr const char* EV_ANALYZER_SPECTRUM = "analyzer.spectrum";

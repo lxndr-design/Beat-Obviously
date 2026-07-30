@@ -1466,7 +1466,7 @@ try {
   );
   assert.ok(
     synthEditorSource.includes("Import Preset")
-      && editorHostSource.includes("Instrument - Aether Engine")
+      && editorHostSource.includes("Instrument Details - Aether Engine")
       && synthEditorSource.includes("onAudition")
       && synthEditorSource.includes("onSaveInstrument"),
     "browser fixture coverage should track current Aether import, audition, and save controls",

@@ -1368,14 +1368,17 @@ namespace beat
 
     void AudioEngine::requestPlay()
     {
-        seq.play();
-        queueTransportCommand({ TransportCommand::Type::Play, 0.0, 0.0 });
+        const TransportCommand command { TransportCommand::Type::Play, 0.0, 0.0 };
+        if (!tryApplyUrgentTransportCommand(command))
+            queueTransportCommand(command);
     }
 
     void AudioEngine::requestPause()
     {
         TransportCommand command { TransportCommand::Type::Pause, 0.0, 0.0 };
         seq.pause();
+        transportSafetySilence.store(true, std::memory_order_release);
+        runtimeResetPending.store(true, std::memory_order_release);
         if (!tryApplyUrgentTransportCommand(command))
             queueTransportCommand(command);
     }
@@ -1384,6 +1387,8 @@ namespace beat
     {
         TransportCommand command { TransportCommand::Type::Stop, 0.0, 0.0 };
         seq.stop();
+        transportSafetySilence.store(true, std::memory_order_release);
+        runtimeResetPending.store(true, std::memory_order_release);
         if (!tryApplyUrgentTransportCommand(command))
             queueTransportCommand(command);
     }
@@ -1391,8 +1396,6 @@ namespace beat
     void AudioEngine::requestRestart()
     {
         TransportCommand command { TransportCommand::Type::Restart, 0.0, 0.0 };
-        seq.seek(0.0);
-        seq.play();
         if (!tryApplyUrgentTransportCommand(command))
             queueTransportCommand(command);
     }
@@ -1541,6 +1544,9 @@ namespace beat
         out.callbackSafetyViolations = callbackSafetyViolations.load(std::memory_order_relaxed);
         out.modulationWorkBudgetOverruns = modulationWorkBudgetOverruns.load(std::memory_order_relaxed);
         out.nonlinearWorkBudgetOverruns = nonlinearWorkBudgetOverruns.load(std::memory_order_relaxed);
+        out.pendingNoteOffOverflows = pendingNoteOffOverflows.load(std::memory_order_relaxed);
+        out.overloadSafetyMutes = overloadSafetyMutes.load(std::memory_order_relaxed);
+        out.callbackLockMisses = callbackLockMisses.load(std::memory_order_relaxed);
         return true;
     }
 
@@ -1812,6 +1818,16 @@ namespace beat
         resetRuntimeStateLocked(allowTailOff);
     }
 
+#if defined(BEAT_BACKEND_STRESS_TEST)
+    void AudioEngine::holdRuntimeLockForTest(std::atomic<bool>& acquired, const std::atomic<bool>& release)
+    {
+        const juce::ScopedLock lock(sampleLock);
+        acquired.store(true, std::memory_order_release);
+        while (!release.load(std::memory_order_acquire))
+            juce::Thread::yield();
+    }
+#endif
+
     void AudioEngine::resetRouteRuntimeLocked(InstrumentRenderState& route, bool allowTailOff) noexcept
     {
         if (route.synth != nullptr)
@@ -1937,6 +1953,12 @@ namespace beat
         resetMasterLoudnessMeter();
     }
 
+    void AudioEngine::applyPendingRuntimeResetLocked() noexcept
+    {
+        if (runtimeResetPending.exchange(false, std::memory_order_acq_rel))
+            resetRuntimeStateLocked(false);
+    }
+
     bool AudioEngine::queueTransportCommand(TransportCommand command) noexcept
     {
         if (transportCommands.push(command))
@@ -1957,6 +1979,7 @@ namespace beat
         if (!lock.isLocked())
             return false;
 
+        applyPendingRuntimeResetLocked();
         transportCommands.clear();
         applyTransportCommandLocked(command);
         return true;
@@ -1968,22 +1991,29 @@ namespace beat
         {
             case TransportCommand::Type::Play:
                 seq.play();
+                transportSafetySilence.store(false, std::memory_order_release);
                 break;
 
             case TransportCommand::Type::Pause:
                 seq.pause();
                 resetRuntimeStateLocked(false);
+                runtimeResetPending.store(false, std::memory_order_release);
+                transportSafetySilence.store(true, std::memory_order_release);
                 break;
 
             case TransportCommand::Type::Stop:
                 seq.stop();
                 resetRuntimeStateLocked(false);
+                runtimeResetPending.store(false, std::memory_order_release);
+                transportSafetySilence.store(true, std::memory_order_release);
                 break;
 
             case TransportCommand::Type::Restart:
                 resetRuntimeStateLocked(false);
                 seq.seek(0.0);
                 seq.play();
+                runtimeResetPending.store(false, std::memory_order_release);
+                transportSafetySilence.store(false, std::memory_order_release);
                 break;
 
             case TransportCommand::Type::Seek:
@@ -5281,8 +5311,22 @@ namespace beat
         const auto deadlineTicks = sampleRate > 0.0
             ? (int64_t) std::ceil((double) numSamples * ticksPerSecond / sampleRate)
             : std::numeric_limits<int64_t>::max();
-        if (totalTicks > deadlineTicks)
+        const bool missedDeadline = totalTicks > deadlineTicks;
+        if (missedDeadline)
             deadlineOverruns.fetch_add(1, std::memory_order_relaxed);
+        if (realtimeDeviceMode.load(std::memory_order_relaxed))
+        {
+            consecutiveRealtimeDeadlineOverruns = missedDeadline
+                ? consecutiveRealtimeDeadlineOverruns + 1
+                : 0;
+            if (consecutiveRealtimeDeadlineOverruns >= 8
+                && !transportSafetySilence.exchange(true, std::memory_order_acq_rel))
+            {
+                seq.pause();
+                runtimeResetPending.store(true, std::memory_order_release);
+                overloadSafetyMutes.fetch_add(1, std::memory_order_relaxed);
+            }
+        }
         renderTimingSequence.fetch_add(1, std::memory_order_release);
     }
 
@@ -5293,7 +5337,11 @@ namespace beat
         prepareForRealtime(dev->getCurrentSampleRate(), block, channels);
     }
 
-    void AudioEngine::audioDeviceStopped() { realtimeDeviceMode = false; }
+    void AudioEngine::audioDeviceStopped()
+    {
+        realtimeDeviceMode.store(false, std::memory_order_release);
+        consecutiveRealtimeDeadlineOverruns = 0;
+    }
 
     void AudioEngine::handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage& message)
     {
@@ -5307,6 +5355,29 @@ namespace beat
     {
         juce::ScopedNoDenormals noDenormals;
         inputRecording.captureBlock(inputChannels, numInputChannels, numSamples);
+
+        const auto clearDeviceOutput = [&]() noexcept {
+            for (int ch = 0; ch < numOutChannels; ++ch)
+                if (outputChannels != nullptr && outputChannels[ch] != nullptr)
+                    std::fill_n(outputChannels[ch], numSamples, 0.0f);
+        };
+
+        // Pause and Stop must be a lock-independent safety boundary. A project
+        // rebuild may own sampleLock while the realtime callback is already
+        // overloaded; never wait for that lock before replacing device output
+        // with silence.
+        if (transportSafetySilence.load(std::memory_order_acquire))
+        {
+            clearDeviceOutput();
+            const juce::ScopedTryLock lock(sampleLock);
+            if (lock.isLocked())
+            {
+                applyPendingRuntimeResetLocked();
+                drainTransportCommandsLocked();
+            }
+            if (transportSafetySilence.load(std::memory_order_acquire))
+                return;
+        }
 
         const auto blockStartTicks = juce::Time::getHighResolutionTicks();
         auto markTicks = [] { return juce::Time::getHighResolutionTicks(); };
@@ -5332,6 +5403,7 @@ namespace beat
             const juce::ScopedTryLock lock(sampleLock);
             if (lock.isLocked())
             {
+                applyPendingRuntimeResetLocked();
                 drainTransportCommandsLocked();
                 blockRealtimeParameterEvents.clear();
                 blockRouteParameterEvents.clear();
@@ -5361,9 +5433,9 @@ namespace beat
                         continue;
                     }
 
-                    noteOff.samplesUntilOff -= numSamples;
+                    pendingNoteOffs[noteOffRead].samplesUntilOff -= numSamples;
                     if (noteOffWrite != noteOffRead)
-                        pendingNoteOffs[noteOffWrite] = std::move(noteOff);
+                        pendingNoteOffs[noteOffWrite] = std::move(pendingNoteOffs[noteOffRead]);
                     ++noteOffWrite;
                 }
                 pendingNoteOffs.resize(noteOffWrite);
@@ -5425,6 +5497,7 @@ namespace beat
                                    else
                                    {
                                        blockEventOverflows.fetch_add(1, std::memory_order_relaxed);
+                                       pendingNoteOffOverflows.fetch_add(1, std::memory_order_relaxed);
                                        targetMidi->addEvent(juce::MidiMessage::noteOff(1, ev.pitch), numSamples - 1);
                                    }
                                }
@@ -5576,10 +5649,9 @@ namespace beat
             else
             {
                 VoiceAutomationInbox::clearPending();
-                const auto voiceStartTicks = markTicks();
-                synth.renderNextBlock(mixBuf, midi, 0, numSamples);
-                voiceTicks += ticksBetween(voiceStartTicks, markTicks());
-                activeSynthVoiceCount = countActiveSynthVoices(synth);
+                // Never render stale/default state while a project mutation
+                // owns sampleLock. Silence is bounded and deterministic.
+                callbackLockMisses.fetch_add(1, std::memory_order_relaxed);
             }
         }
         const auto synthTicks = juce::jmax<int64_t>(0, ticksBetween(phaseStartTicks, markTicks()) - samplesTicks);

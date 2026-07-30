@@ -2,6 +2,7 @@ import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-j
 import { Button, Checkbox, Icon, Modal, TextInput, createContextMenu } from "../../solid-ui";
 import { appAlert } from "../../solid-ui";
 import { browserFileToAudioFile, importAudioFiles } from "../../audio/audioImport";
+import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_EXTENSIONS, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { isNative, send } from "../../ipc/bridge";
 import type { DecentSamplerImport } from "../../ipc/schema";
@@ -53,6 +54,7 @@ const INSTRUMENT_TYPES = [
 ];
 
 export function ImportInstrumentModal(props: Props) {
+  onCleanup(registerGlobalAudioStop(stopImportSamplePreview));
   const [files, setFiles] = createSignal<AudioFile[]>(props.initialFiles ?? [], { equals: false });
   const [selectedIds, setSelectedIds] = createSignal<Set<string>>(new Set((props.initialFiles ?? []).map((file) => file.id)), { equals: false });
   const [groups, setGroups] = createSignal<ImportGroup[]>([], { equals: false });

@@ -3,6 +3,7 @@ import { clampAetherUnisonVoices } from "./aetherLimits";
 import { evaluateAurumResponseCurve, normalizedAurumConfigForInstrument } from "../state/aurum";
 import type { AurumFilterConfig, AurumOperatorConfig, AutomationCurve, CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, WavetableConfig } from "../state/types";
 import { sampleZoneStableId } from "../state/sampleZones";
+import { registerGlobalAudioStop } from "./globalAudioSafety";
 
 export type SynthRenderMode = "visual" | "audio";
 
@@ -91,6 +92,7 @@ const renderedInstrumentBufferCache = new Map<string, AudioBuffer>();
 const unisonVoicePlanCache = new Map<number, UnisonVoicePlan>();
 const oscillatorRateCache = new Map<string, number>();
 let browserPreviewAudioContext: AudioContext | null = null;
+const activeInstrumentAuditions = new Set<InstrumentPreviewAuditionHandle>();
 
 const MAX_RENDERED_INSTRUMENT_BUFFERS = 32;
 const MAX_UNISON_VOICE_PLANS = 96;
@@ -127,13 +129,15 @@ export function startInstrumentPreviewAudition(
   };
 
   source.connect(gain).connect(ctx.destination);
+  let handle: InstrumentPreviewAuditionHandle;
   source.onended = () => {
     cleanup();
+    activeInstrumentAuditions.delete(handle);
     onEnded?.();
   };
   source.start();
 
-  return {
+  handle = {
     stop: () => {
       if (stopped) return;
       stopped = true;
@@ -143,9 +147,16 @@ export function startInstrumentPreviewAudition(
         // Source can already be stopped.
       }
       cleanup();
+      activeInstrumentAuditions.delete(handle);
     },
   };
+  activeInstrumentAuditions.add(handle);
+  return handle;
 }
+
+registerGlobalAudioStop(() => {
+  for (const audition of Array.from(activeInstrumentAuditions)) audition.stop();
+});
 
 export async function startInstrumentSampleZoneAudition(
   instrument: Instrument,

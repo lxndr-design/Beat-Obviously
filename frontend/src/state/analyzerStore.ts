@@ -60,8 +60,16 @@ export interface RenderTimingSnapshot {
   routeFilterEffectSamples: number;
   routeNonlinearEffectSamples: number;
   routeDelayEffectSamples: number;
+  realtimeQueueAccepted: number;
+  realtimeQueueRejected: number;
+  blockEventOverflows: number;
+  deadlineOverruns: number;
+  callbackSafetyViolations: number;
   modulationWorkBudgetOverruns: number;
   nonlinearWorkBudgetOverruns: number;
+  pendingNoteOffOverflows: number;
+  overloadSafetyMutes: number;
+  callbackLockMisses: number;
   updatedAt: number;
 }
 
@@ -149,8 +157,16 @@ function createEmptyRenderTiming(): RenderTimingSnapshot {
     routeFilterEffectSamples: 0,
     routeNonlinearEffectSamples: 0,
     routeDelayEffectSamples: 0,
+    realtimeQueueAccepted: 0,
+    realtimeQueueRejected: 0,
+    blockEventOverflows: 0,
+    deadlineOverruns: 0,
+    callbackSafetyViolations: 0,
     modulationWorkBudgetOverruns: 0,
     nonlinearWorkBudgetOverruns: 0,
+    pendingNoteOffOverflows: 0,
+    overloadSafetyMutes: 0,
+    callbackLockMisses: 0,
     updatedAt: 0,
   };
 }

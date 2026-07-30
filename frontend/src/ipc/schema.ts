@@ -391,6 +391,7 @@ export type ResponseFor<R extends OutboundRequest> =
 export type InboundEvent =
   | { kind: "transport.positionChanged"; positionBeat: Beats }
   | { kind: "transport.playbackEnded" }
+  | { kind: "transport.safetyMuted"; reason: "realtime-deadline-overload"; deadlineOverruns: number }
   | { kind: "engine.segmentTrigger"; segmentId: Id; repetition: number }
   | { kind: "engine.levelMeters"; tracks: Array<{ id: Id; rms: number; peak: number; leftRms?: number; rightRms?: number; leftPeak?: number; rightPeak?: number; rmsDbFS?: number; peakDbFS?: number; truePeakDbTP?: number; momentaryLufs?: number }> }
   | { kind: "analyzer.spectrum"; sequence: number; rms: number; peak: number; bands: number[] }
@@ -441,8 +442,16 @@ export type InboundEvent =
       routeFilterEffectSamples: number;
       routeNonlinearEffectSamples: number;
       routeDelayEffectSamples: number;
+      realtimeQueueAccepted: number;
+      realtimeQueueRejected: number;
+      blockEventOverflows: number;
+      deadlineOverruns: number;
+      callbackSafetyViolations: number;
       modulationWorkBudgetOverruns: number;
       nonlinearWorkBudgetOverruns: number;
+      pendingNoteOffOverflows: number;
+      overloadSafetyMutes: number;
+      callbackLockMisses: number;
     }
   | { kind: "audio.deviceChanged"; deviceName: string; sampleRate: number }
   | {

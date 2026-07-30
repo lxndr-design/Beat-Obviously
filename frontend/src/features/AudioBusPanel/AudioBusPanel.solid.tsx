@@ -1,8 +1,8 @@
 import { createEffect, createMemo, createSignal, For, Show, type JSX } from "solid-js";
-import { appConfirm, Button, FloatingSelect, HoverInfo, Icon, Knob, MicroButton, Slider, TextInput } from "../../solid-ui";
+import { appConfirm, Button, FloatingSelect, HoverInfo, Icon, Knob, MicroButton, RowItem, SectionRibbon, Slider, TextInput } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { useAnalyzerStore } from "../../state/analyzerStore";
-import { canSetAudioBusOutput, canSetAudioBusSend } from "../../state/audioBusRouting";
+import { canSetAudioBusOutput, canSetAudioBusSend, getMasterInputBuses } from "../../state/audioBusRouting";
 import { EFFECT_DEFAULT_PARAMS, EFFECT_LABELS, EFFECT_OPTIONS, EFFECT_PARAM_SPECS, type EffectKind, type EffectParamSpec } from "../../state/effects";
 import { useProjectStore, useUiStore } from "../../state/store";
 import type { Id, ReturnBus, Track, TrackEffect, TrackSend } from "../../state/types";
@@ -41,7 +41,7 @@ export function AudioBusPanel() {
   return (
     <Show
       when={activeBus()}
-      fallback={<MasterEditorPanel buses={buses()} tracks={project().tracks} header={tabs()} />}
+      fallback={<MasterEditorPanel buses={buses()} header={tabs()} />}
     >
       {(bus) => (
         <BusEditorPanel
@@ -135,17 +135,17 @@ function AddBusTabButton(props: { onAdd: () => void }) {
   );
 }
 
-function MasterEditorPanel(props: { buses: ReturnBus[]; tracks: Track[]; header: JSX.Element }) {
+function MasterEditorPanel(props: { buses: ReturnBus[]; header: JSX.Element }) {
   const master = createStoreSelector(useProjectStore, (state) => state.project.masterChain);
   const updateMaster = (patch: Partial<ReturnType<typeof master>>) => useProjectStore.getState().updateMasterChain(patch);
-  const inputSources = createMemo<BusInputSource[]>(() => [
-    ...props.tracks
-      .filter((track) => track.outputEnabled !== false && !track.outputBusId)
-      .map((track) => ({ id: `track:${track.id}`, meterId: track.id, name: track.name, detail: "Track" })),
-    ...props.buses
-      .filter((bus) => bus.outputEnabled !== false && !bus.outputBusId)
-      .map((bus) => ({ id: `bus:${bus.id}`, meterId: bus.id, name: bus.name, detail: "Bus" })),
-  ]);
+  const inputSources = createMemo<BusInputSource[]>(() => getMasterInputBuses(props.buses)
+    .map((bus) => ({
+      id: `bus:${bus.id}`,
+      name: bus.name,
+      detail: "Bus",
+      levelDb: bus.gainDb,
+      onLevelChange: (gainDb: number) => useProjectStore.getState().updateReturnBus(bus.id, { gainDb }),
+    })));
   const compressorEffect = createMemo<TrackEffect>(() => ({
     id: "master-compressor",
     kind: "compressor",
@@ -174,12 +174,12 @@ function MasterEditorPanel(props: { buses: ReturnBus[]; tracks: Track[]; header:
       <header class={styles.ribbon}>{props.header}</header>
       <div class={`${styles.busBody} ${styles.masterBody}`}>
         <section class={styles.inputSection} aria-label="Master inputs">
-          <SectionTitle title="Inputs" meta={`${inputSources().length} direct`} />
-          <div class={styles.inputRows}>
-            <Show when={inputSources().length > 0} fallback={<span class={styles.emptyState}>No direct inputs</span>}>
+          <SectionTitle title="Inputs" meta={`${inputSources().length} ${inputSources().length === 1 ? "bus" : "buses"}`} />
+          <ul class={styles.inputRows}>
+            <Show when={inputSources().length > 0} fallback={<li class={styles.emptyState}>No buses routed to Master</li>}>
               <For each={inputSources()}>{(source) => <BusInputRow source={source} />}</For>
             </Show>
-          </div>
+          </ul>
         </section>
 
         <section class={styles.parametersSection} aria-label="Master parameters">
@@ -191,7 +191,7 @@ function MasterEditorPanel(props: { buses: ReturnBus[]; tracks: Track[]; header:
         </section>
 
         <section class={`${styles.insertSection} ${styles.masterInserts}`} aria-label="Master inserts">
-          <div class={styles.rackHeader}><span class={styles.rackTitle}>Inserts</span></div>
+          <SectionRibbon className={styles.rackHeader} title="Inserts" expanded showToggle={false} onToggle={() => undefined} />
           <div class={styles.insertCards}>
             <article class={`${styles.insertCard} ${styles.masterEqCard}`}>
               <header class={styles.insertCardHeader}>
@@ -235,39 +235,50 @@ interface BusEditorPanelProps {
 
 interface BusInputSource {
   id: string;
-  meterId: Id;
   name: string;
   detail: string;
+  levelDb: number;
+  onLevelChange: (gainDb: number) => void;
 }
 
 function SectionTitle(props: { title: string; meta?: string }) {
   return (
-    <header class={styles.sectionTitle}>
-      <strong>{props.title}</strong>
-      <Show when={props.meta}><span>{props.meta}</span></Show>
-    </header>
+    <SectionRibbon
+      className={styles.sectionTitle}
+      title={props.title}
+      expanded
+      showToggle={false}
+      onToggle={() => undefined}
+      actions={<Show when={props.meta}><span class={styles.sectionMeta}>{props.meta}</span></Show>}
+    />
   );
 }
 
 function BusInputRow(props: { source: BusInputSource }) {
-  const meter = createStoreSelector(useAnalyzerStore, (state) => state.trackMeters[props.source.meterId]);
-  const peak = () => clamp01(Math.max(meter()?.leftPeak ?? meter()?.peak ?? 0, meter()?.rightPeak ?? meter()?.peak ?? 0));
   return (
-    <div class={styles.inputRow} title={`${props.source.name} · ${props.source.detail}`}>
-      <span class={styles.inputIdentity}>
-        <strong>{props.source.name}</strong>
-        <small>{props.source.detail}</small>
-      </span>
-      <span
-        class={styles.inputMeter}
-        role="meter"
-        aria-label={`${props.source.name} level`}
-        aria-valuemin="0"
-        aria-valuemax="1"
-        aria-valuenow={peak()}
-        style={{ background: `conic-gradient(var(--color-fg) ${Math.round(peak() * 360)}deg, var(--surface-subtle) 0deg)` }}
-      ><span /></span>
-    </div>
+    <RowItem
+      className={styles.inputRow}
+      density="media"
+      cursor="default"
+      name={props.source.name}
+      meta={props.source.detail}
+      title={`${props.source.name} · ${props.source.detail}`}
+      action={(
+        <Knob
+          className={styles.inputLevelKnob}
+          size="sm"
+          label={`${props.source.name} input volume`}
+          min={-96}
+          max={24}
+          step={0.1}
+          value={props.source.levelDb}
+          defaultValue={0}
+          unit="dB"
+          formatValue={formatCompact}
+          onChange={props.source.onLevelChange}
+        />
+      )}
+    />
   );
 }
 
@@ -285,16 +296,46 @@ function BusEditorPanel(props: BusEditorPanelProps) {
   const inputSources = createMemo<BusInputSource[]>(() => [
     ...props.tracks
       .filter((track) => track.outputEnabled !== false && track.outputBusId === props.bus.id)
-      .map((track) => ({ id: `track:${track.id}`, meterId: track.id, name: track.name, detail: "Track" })),
+      .map((track) => ({
+        id: `track:${track.id}`,
+        name: track.name,
+        detail: "Track",
+        levelDb: track.gainDb,
+        onLevelChange: (gainDb: number) => useProjectStore.getState().updateTrack(track.id, { gainDb }),
+      })),
     ...props.buses
       .filter((bus) => bus.id !== props.bus.id && bus.outputEnabled !== false && bus.outputBusId === props.bus.id)
-      .map((bus) => ({ id: `bus:${bus.id}`, meterId: bus.id, name: bus.name, detail: "Bus" })),
+      .map((bus) => ({
+        id: `bus:${bus.id}`,
+        name: bus.name,
+        detail: "Bus",
+        levelDb: bus.gainDb,
+        onLevelChange: (gainDb: number) => useProjectStore.getState().updateReturnBus(bus.id, { gainDb }),
+      })),
     ...props.tracks
       .filter((track) => (track.sends ?? []).some((send) => send.enabled && send.busId === props.bus.id))
-      .map((track) => ({ id: `track-send:${track.id}`, meterId: track.id, name: track.name, detail: "Track send" })),
+      .map((track) => {
+        const send = track.sends?.find((candidate) => candidate.enabled && candidate.busId === props.bus.id);
+        return {
+          id: `track-send:${track.id}`,
+          name: track.name,
+          detail: "Track send",
+          levelDb: send?.gainDb ?? 0,
+          onLevelChange: (gainDb: number) => useProjectStore.getState().upsertTrackSend(track.id, props.bus.id, { gainDb }),
+        };
+      }),
     ...props.buses
       .filter((bus) => bus.id !== props.bus.id && (bus.sends ?? []).some((send) => send.enabled && send.busId === props.bus.id))
-      .map((bus) => ({ id: `bus-send:${bus.id}`, meterId: bus.id, name: bus.name, detail: "Bus send" })),
+      .map((bus) => {
+        const send = bus.sends?.find((candidate) => candidate.enabled && candidate.busId === props.bus.id);
+        return {
+          id: `bus-send:${bus.id}`,
+          name: bus.name,
+          detail: "Bus send",
+          levelDb: send?.gainDb ?? 0,
+          onLevelChange: (gainDb: number) => useProjectStore.getState().upsertAudioBusSend(bus.id, props.bus.id, { gainDb }),
+        };
+      }),
   ]);
   const outputValue = () => props.bus.outputEnabled === false
     ? NO_OUTPUT_VALUE
@@ -382,11 +423,11 @@ function BusEditorPanel(props: BusEditorPanelProps) {
       <div class={styles.busBody}>
         <section class={styles.inputSection} aria-label={`${props.bus.name} inputs`}>
           <SectionTitle title="Inputs" meta={`${primaryTrackInputs()} tracks · ${primaryBusInputs()} buses · ${sendInputs()} sends`} />
-          <div class={styles.inputRows}>
-            <Show when={inputSources().length > 0} fallback={<span class={styles.emptyState}>No routed inputs</span>}>
+          <ul class={styles.inputRows}>
+            <Show when={inputSources().length > 0} fallback={<li class={styles.emptyState}>No routed inputs</li>}>
               <For each={inputSources()}>{(source) => <BusInputRow source={source} />}</For>
             </Show>
-          </div>
+          </ul>
         </section>
 
         <section class={styles.parametersSection} aria-label={`${props.bus.name} parameters`}>
@@ -404,17 +445,25 @@ function BusEditorPanel(props: BusEditorPanelProps) {
         </section>
 
         <section class={styles.insertSection} aria-label={`${props.bus.name} inserts`}>
-          <div class={styles.rackHeader}>
-            <span class={styles.rackTitle}>Inserts</span>
-            <FloatingSelect
-              layout="bare"
-              value={newEffectKind()}
-              options={EFFECT_OPTIONS}
-              onChange={(value) => setNewEffectKind(value as EffectKind)}
-              ariaLabel="New insert type"
-            />
-            <Button size="xs" class={styles.rackAdd} onClick={addInsert}>Add</Button>
-          </div>
+          <SectionRibbon
+            className={styles.rackHeader}
+            title="Inserts"
+            expanded
+            showToggle={false}
+            onToggle={() => undefined}
+            actions={(
+              <div class={styles.rackHeaderActions}>
+                <FloatingSelect
+                  layout="bare"
+                  value={newEffectKind()}
+                  options={EFFECT_OPTIONS}
+                  onChange={(value) => setNewEffectKind(value as EffectKind)}
+                  ariaLabel="New insert type"
+                />
+                <Button size="xs" class={styles.rackAdd} onClick={addInsert}>Add</Button>
+              </div>
+            )}
+          />
           <div class={styles.insertCards}>
             <Show when={props.bus.effects.filters.length > 0} fallback={<span class={styles.emptyState}>No inserts</span>}>
               <For each={props.bus.effects.filters}>
@@ -440,18 +489,26 @@ function BusEditorPanel(props: BusEditorPanelProps) {
             <span class={styles.meterLane}><span class={styles.meterFill} style={{ transform: `scaleX(${clamp01(meter()?.leftPeak ?? meter()?.peak ?? 0)})` }} /></span>
             <span class={styles.meterLane}><span class={styles.meterFill} style={{ transform: `scaleX(${clamp01(meter()?.rightPeak ?? meter()?.peak ?? 0)})` }} /></span>
           </div>
-          <div class={styles.sendHeader}>
-            <span class={styles.rackTitle}>Sends</span>
-            <FloatingSelect
-              layout="bare"
-              value={newSendDestinationId()}
-              options={sendDestinationOptions()}
-              onChange={setNewSendDestinationId}
-              ariaLabel="New send destination"
-              disabled={sendDestinations().length === 0}
-            />
-            <Button size="xs" class={styles.rackAdd} onClick={addSend} disabled={!newSendDestinationId()}>Add</Button>
-          </div>
+          <SectionRibbon
+            className={styles.sendHeader}
+            title="Sends"
+            expanded
+            showToggle={false}
+            onToggle={() => undefined}
+            actions={(
+              <div class={styles.rackHeaderActions}>
+                <FloatingSelect
+                  layout="bare"
+                  value={newSendDestinationId()}
+                  options={sendDestinationOptions()}
+                  onChange={setNewSendDestinationId}
+                  ariaLabel="New send destination"
+                  disabled={sendDestinations().length === 0}
+                />
+                <Button size="xs" class={styles.rackAdd} onClick={addSend} disabled={!newSendDestinationId()}>Add</Button>
+              </div>
+            )}
+          />
           <div class={styles.sendRows}>
             <Show when={(props.bus.sends?.length ?? 0) > 0} fallback={<span class={styles.emptyState}>No sends</span>}>
               <For each={props.bus.sends ?? []}>

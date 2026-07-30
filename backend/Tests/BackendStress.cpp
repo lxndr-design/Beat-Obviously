@@ -6575,6 +6575,70 @@ namespace
         return std::isfinite(afterSeekEnergy);
     }
 
+    bool stressAudioEngineTransportPanicDuringRuntimeContention()
+    {
+        beat::AudioEngine engine;
+        engine.prepareForOffline(48000.0, 256, 2);
+        engine.applyProject(makeTinyOfflineProject());
+        engine.requestPlay();
+
+        const auto playing = renderEngineBlock(engine, 256);
+        if (!(bufferEnergy(playing) > 0.000001))
+            return false;
+
+        std::atomic<bool> acquired { false };
+        std::atomic<bool> release { false };
+        std::thread lockOwner([&] { engine.holdRuntimeLockForTest(acquired, release); });
+        while (!acquired.load(std::memory_order_acquire))
+            std::this_thread::yield();
+
+        engine.requestStop();
+        const auto stoppedWhileContended = renderEngineBlock(engine, 256);
+        const double stoppedEnergy = bufferEnergy(stoppedWhileContended);
+
+        release.store(true, std::memory_order_release);
+        lockOwner.join();
+
+        if (!std::isfinite(stoppedEnergy) || stoppedEnergy > 0.000000001)
+            return false;
+
+        const auto stoppedAfterRelease = renderEngineBlock(engine, 256);
+        return std::isfinite(bufferEnergy(stoppedAfterRelease))
+            && bufferEnergy(stoppedAfterRelease) <= 0.000000001
+            && !engine.sequencer().isPlaying();
+    }
+
+    bool stressAudioEngineScheduledNoteOffCountdown()
+    {
+        auto project = makeTinyOfflineProject();
+        project.lengthBeats = 2.0;
+        project.instruments.front().releaseMs = 5.0f;
+
+        beat::AudioEngine engine;
+        engine.prepareForOffline(48000.0, 128, 2);
+        engine.applyProject(std::move(project));
+        engine.requestPlay();
+
+        bool beganActive = false;
+        beat::AudioEngine::RenderTimingSnapshot timing;
+        for (int block = 0; block < 72; ++block)
+        {
+            const auto output = renderEngineBlock(engine, 128);
+            if (!std::isfinite(bufferEnergy(output)) || !engine.pullRenderTimingSnapshot(timing))
+                return false;
+            beganActive = beganActive || timing.activeSynthVoices > 0;
+        }
+
+        const bool ok = beganActive
+            && timing.activeSynthVoices == 0
+            && timing.pendingNoteOffOverflows == 0;
+        if (!ok)
+            std::cerr << "Scheduled note-off countdown failed beganActive=" << beganActive
+                      << " finalVoices=" << timing.activeSynthVoices
+                      << " overflows=" << timing.pendingNoteOffOverflows << "\n";
+        return ok;
+    }
+
     bool stressAudioEngineApplyProjectRuntimeBoundary()
     {
         beat::AudioEngine engine;
@@ -21261,6 +21325,18 @@ int main(int argc, char** argv)
     if (!stressAudioEngineTransportPanicReset())
     {
         std::cerr << "Audio engine transport panic reset stress failed\n";
+        return 1;
+    }
+    std::cerr << "  transport panic during runtime contention\n";
+    if (!stressAudioEngineTransportPanicDuringRuntimeContention())
+    {
+        std::cerr << "Audio engine contended transport panic stress failed\n";
+        return 1;
+    }
+    std::cerr << "  scheduled note-off countdown\n";
+    if (!stressAudioEngineScheduledNoteOffCountdown())
+    {
+        std::cerr << "Audio engine scheduled note-off countdown stress failed\n";
         return 1;
     }
     std::cerr << "  apply project runtime boundary\n";

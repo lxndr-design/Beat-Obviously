@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 import { nanoid as nano } from "nanoid";
 import { createInstrumentBufferSource, noteFrequency } from "../../audio/synthPreview";
 import { getTimelineAudioContext } from "../../audio/timelineAudio";
+import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import { Button, FloatingSelect, Icon, MicroButton, Modal, TextInput } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { selectSegment } from "../../state/selectors";
@@ -75,6 +76,7 @@ const DRUMPAD_WHEEL_ZOOM_FACTOR = 0.002;
 const DRUMPAD_FINE_TICKS_PER_BEAT = 8;
 
 export function DrumpadEditorModal(props: Props) {
+  onCleanup(registerGlobalAudioStop(stopPreviewAudio));
   let bodyRef: HTMLDivElement | undefined;
   let trackTimelineRef: HTMLDivElement | undefined;
   let countdownTimer: number | undefined;

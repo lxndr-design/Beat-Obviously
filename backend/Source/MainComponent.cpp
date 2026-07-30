@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "DiagnosticLog.h"
 
 #include <cstring>
 #include <optional>
@@ -174,16 +175,21 @@ namespace
 
 MainComponent::MainComponent()
 {
+    beat::diagnostics::ScopedDuration componentStartup("lifecycle", "main component");
     // Persistence: SQLite under ~/Library/Application Support/Beat/beat.db
     auto dbPath = juce::File::getSpecialLocation(
                       juce::File::userApplicationDataDirectory)
                       .getChildFile("Beat")
                       .getChildFile("beat.db");
     database = std::make_unique<beat::Database>(dbPath);
+    beat::diagnostics::log("startup", "database ready path=" + dbPath.getFullPathName());
 
     // Audio engine starts on its own thread.
     engine = std::make_unique<beat::AudioEngine>();
+    const auto engineStartedMs = juce::Time::getMillisecondCounterHiRes();
     engine->prepare();
+    beat::diagnostics::log("startup", "audio engine ready durationMs="
+        + juce::String(juce::Time::getMillisecondCounterHiRes() - engineStartedMs, 2));
 
     browser = std::make_unique<juce::WebBrowserComponent>(createBrowserOptions());
     addAndMakeVisible(*browser);
@@ -193,12 +199,15 @@ MainComponent::MainComponent()
     bridge = std::make_unique<beat::MessageBridge>(*engine, *database, *browser);
     bridge->onAppReady = [this]
     {
+        beat::diagnostics::log("startup", "frontend reported ready");
         if (onFrontendReady)
             onFrontendReady();
     };
     bridge->install();
 
     const auto launchTarget = resolveFrontendLaunchTarget(getBundledFrontendRoot());
+    beat::diagnostics::log("startup", "frontend navigation started target="
+        + launchTarget.url.toString(true) + " devServer=" + juce::String(launchTarget.isDevServer ? 1 : 0));
     browser->goToURL(launchTarget.url.toString(true));
     if (launchTarget.isDevServer)
     {
@@ -215,11 +224,13 @@ MainComponent::MainComponent()
 
 MainComponent::~MainComponent()
 {
+    beat::diagnostics::log("lifecycle", "main component shutdown started");
     // Tear down in reverse: stop bridge → stop engine → close db.
     bridge.reset();
     if (engine) engine->shutdown();
     engine.reset();
     database.reset();
+    beat::diagnostics::log("lifecycle", "main component shutdown complete");
 }
 
 void MainComponent::paint(juce::Graphics& g)

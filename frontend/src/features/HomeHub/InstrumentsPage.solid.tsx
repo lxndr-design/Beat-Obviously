@@ -11,6 +11,7 @@ import {
   renderedInstrumentBuffer,
 } from "../../audio/synthPreview";
 import { isNative, send } from "../../ipc/bridge";
+import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import type { AudioRenderAnalysis, AudioWaveformSummary } from "../../ipc/schema";
 import { listProjects } from "../../persistence/dexie";
 import {
@@ -58,6 +59,7 @@ type InstrumentRenderState = {
 };
 
 export function InstrumentsPage() {
+  onCleanup(registerGlobalAudioStop(stopPreview));
   const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
   const sets = createStoreSelector(useInstrumentStore, (state) => state.instrumentSets);
   const loading = createStoreSelector(useInstrumentStore, (state) => state.loading);

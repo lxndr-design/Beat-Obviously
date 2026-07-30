@@ -5,6 +5,7 @@ import { ai } from "../../ai/aiService";
 import { DRUM_COMPLEXITY_DEFAULT, DRUM_GENRES, DRUM_MAX_STEPS, type DrumGenre, type GeneratedDrumBeat } from "../../ai/drumBeatGenerator";
 import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import { createInstrumentBufferSource, noteFrequency, preloadInstrumentSample } from "../../audio/synthPreview";
+import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import { useContextualHotkey } from "../../solid-utils/contextualHotkeys.solid";
 import { listDrumBeatFeedback, saveDrumBeatFeedback } from "../../persistence/dexie";
 import { TimeSignatureControl } from "../Transport/TimeSignatureControl.solid";
@@ -109,6 +110,10 @@ function px(value: number): string {
 }
 
 export function DrumSequencer(props: Props) {
+  onCleanup(registerGlobalAudioStop(() => {
+    stop();
+    stopDrumPreviewAudio();
+  }));
   const [playing, setPlaying] = createSignal(false);
   const [playStep, setPlayStep] = createSignal<number | null>(null);
   const [selectedCells, setSelectedCells] = createSignal<Set<string>>(new Set(), { equals: false });

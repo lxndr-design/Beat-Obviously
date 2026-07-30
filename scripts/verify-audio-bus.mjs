@@ -26,11 +26,22 @@ try {
   assert.ok(panelSource.includes("moveReturnBusEffect") && panelSource.includes("removeReturnBusEffect"), "Bus insert rack should support reorder and removal");
   assert.ok(panelSource.includes('label="Mode"') && panelSource.includes("channelLayout"), "Bus panel should expose mono/stereo channel mode");
   assert.ok(panelSource.includes("BusInputRow") && panelSource.includes('title="Inputs"'), "Bus panel should identify routed track, bus, and send inputs");
+  assert.ok(panelSource.includes("<SectionRibbon") && panelSource.includes("<RowItem"), "Bus panel should reuse shared section-header and row primitives");
+  assert.ok(!panelSource.includes("<button"), "Bus panel should not introduce raw feature-local buttons");
+  const inputRowSource = panelSource.slice(panelSource.indexOf("function BusInputRow"), panelSource.indexOf("function BusEditorPanel"));
+  assert.ok(inputRowSource.includes("<Knob") && inputRowSource.includes("props.source.onLevelChange"), "input rows should use the shared Knob as a functional per-input volume control");
+  assert.ok(!inputRowSource.includes('role="meter"'), "input-row volume controls should not remain read-only meter rings");
+  assert.ok(panelSource.includes("updateTrack(track.id, { gainDb })"), "primary Track input knobs should update Track gain");
+  assert.ok(panelSource.includes("updateReturnBus(bus.id, { gainDb })"), "primary Bus input knobs should update Bus gain");
+  assert.ok(panelSource.includes("upsertTrackSend(track.id, props.bus.id, { gainDb })"), "Track-send input knobs should update the routed send gain");
+  assert.ok(panelSource.includes("upsertAudioBusSend(bus.id, props.bus.id, { gainDb })"), "Bus-send input knobs should update the routed send gain");
   assert.ok(panelSource.includes("<Knob") && panelSource.includes('label="Input Trim"') && panelSource.includes('label="Fader"'), "Bus parameters should reuse the synth knob controls");
   assert.ok(panelSource.includes("SynthCurvePreview") && panelSource.includes("effectResponseSamples"), "Bus insert cards should reuse the Aether synth curve preview language");
   assert.ok(panelSource.includes("EFFECT_PARAM_SPECS") && panelSource.includes("patchParam"), "Bus insert cards should expose editable effect parameters");
   const masterPanelSource = panelSource.slice(panelSource.indexOf("function MasterEditorPanel"), panelSource.indexOf("interface BusEditorPanelProps"));
   assert.ok(masterPanelSource.includes('title="Inputs"') && masterPanelSource.includes('title="Parameters"') && masterPanelSource.includes("masterInserts"), "Master should use the same Inputs, Parameters, and Inserts workspace as Buses");
+  assert.ok(masterPanelSource.includes("getMasterInputBuses(props.buses)") && !masterPanelSource.includes("props.tracks"), "Master inputs should be derived only from Buses whose primary output feeds Master");
+  assert.ok(masterPanelSource.includes("No buses routed to Master"), "Master should explain an empty bus-input list without showing direct Tracks");
   assert.ok(!masterPanelSource.includes("styles.outputSection"), "Master workspace should not expose a redundant Output section");
   assert.ok(!masterEqSource.includes("Presets") && !masterEqSource.includes("FACTORY_PRESETS"), "Master EQ presets should not remain in the interface");
   assert.ok(panelSource.includes("index() === props.buses.length - 1") && panelSource.indexOf("<AddBusTabButton") < panelSource.indexOf('role="tab"', panelSource.indexOf("<For each={props.buses}")), "Create Bus should sit immediately before the final Bus tab");
@@ -38,6 +49,7 @@ try {
   assert.ok(panelSource.includes("styles.insertPower") && panelSource.includes('"ph:power-fill"') && panelSource.includes('"ph:power"'), "Insert bypass controls should reuse the existing selected power button");
   assert.ok(panelCss.includes("flex-direction: column") && panelCss.includes("overflow-y: auto") && panelCss.includes("overscroll-behavior: contain"), "Insert cards should form an independently scrollable vertical stack");
   assert.ok(panelCss.includes("width: 100%") && panelCss.includes("max-width: none"), "Insert cards should fill the insert-column width");
+  assert.deepEqual(panelCss.match(/\b\d+px\b/g), null, "Bus panel geometry should use existing design tokens instead of hard-coded pixel values");
 
   execFileSync(join(repoRoot, "frontend/node_modules/.bin/esbuild"), [
     join(repoRoot, "frontend/src/state/store.ts"),
@@ -47,12 +59,27 @@ try {
     `--outfile=${join(outDir, "store.js")}`,
   ], { stdio: "inherit" });
 
+  execFileSync(join(repoRoot, "frontend/node_modules/.bin/esbuild"), [
+    join(repoRoot, "frontend/src/state/audioBusRouting.ts"),
+    "--bundle",
+    "--format=esm",
+    "--platform=node",
+    `--outfile=${join(outDir, "audioBusRouting.js")}`,
+  ], { stdio: "inherit" });
+
   const store = await import(pathToFileURL(join(outDir, "store.js")));
+  const routing = await import(pathToFileURL(join(outDir, "audioBusRouting.js")));
   const state = () => store.useProjectStore.getState();
   const trackId = state().project.tracks[0].id;
   const drumBus = state().addAudioBus({ name: " Drum Bus ", trackIds: [trackId, "missing-track"] });
   const rhythmBus = state().addReturnBus("Rhythm Bus");
   const reverbBus = state().addReturnBus("Reverb Bus");
+
+  assert.deepEqual(
+    routing.getMasterInputBuses(state().project.returnBuses).map((bus) => bus.id),
+    [drumBus, rhythmBus, reverbBus],
+    "new Buses should appear as Master inputs because they output to Master by default",
+  );
 
   assert.equal(state().project.tracks[0].outputBusId, drumBus, "bus creation should atomically route selected tracks");
   assert.equal(state().project.returnBuses.find((bus) => bus.id === drumBus)?.name, "Drum Bus");
@@ -66,6 +93,18 @@ try {
     "track send values should be normalized at the store boundary",
   );
   assert.equal(state().setAudioBusOutput(drumBus, rhythmBus), true);
+  assert.deepEqual(
+    routing.getMasterInputBuses(state().project.returnBuses).map((bus) => bus.id),
+    [rhythmBus, reverbBus],
+    "a Bus routed into another Bus should leave the Master input list",
+  );
+  assert.equal(state().setAudioBusOutput(reverbBus, undefined, false), true);
+  assert.deepEqual(
+    routing.getMasterInputBuses(state().project.returnBuses).map((bus) => bus.id),
+    [rhythmBus],
+    "an explicitly disconnected Bus should not appear as a Master input",
+  );
+  assert.equal(state().setAudioBusOutput(reverbBus, undefined, true), true);
   assert.equal(state().setAudioBusOutput(drumBus, "missing-bus"), false, "new bus outputs must target an existing bus");
   assert.equal(state().upsertAudioBusSend(drumBus, "missing-bus", { enabled: true }), false, "new bus sends must target an existing bus");
   assert.equal(state().setAudioBusOutput(rhythmBus, drumBus), false, "primary cycles must be rejected");

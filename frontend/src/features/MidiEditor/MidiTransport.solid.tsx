@@ -8,6 +8,7 @@ import {
   type SynthAutomationTarget,
 } from "../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../audio/synthWorkletPreview";
+import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import { useContextualHotkeyStore } from "../../hotkeys/contextualHotkeys";
 import type { Instrument, MidiAutomationLane, MidiAutomationTarget, MidiNote } from "../../state/types";
 import styles from "./MidiTransport.module.css";
@@ -28,6 +29,7 @@ export function MidiTransport(props: MidiTransportProps) {
 }
 
 function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
+  onCleanup(registerGlobalAudioStop(stopPreviewAudio));
   const [playing, setPlaying] = createSignal(false);
   let ctx: AudioContext | null = null;
   let startMs: number | null = null;

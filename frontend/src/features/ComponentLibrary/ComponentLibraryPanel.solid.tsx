@@ -2,6 +2,7 @@ import { createSignal, For, onCleanup, Show } from "solid-js";
 import { Icon, LibraryFolder, LibrarySearch, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { appPrompt } from "../../solid-ui";
 import { createInstrumentBufferSource, noteFrequency, preloadInstrumentSample } from "../../audio/synthPreview";
+import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import {
   DEFAULT_DRUM_MIDI_PITCH,
   DEFAULT_DRUM_VELOCITY,
@@ -41,6 +42,11 @@ export function ComponentLibraryPanel(props: ComponentLibraryPanelProps) {
   const [searchQuery, setSearchQuery] = createSignal("");
   const normalizedSearch = () => searchQuery().trim().toLowerCase();
   let playback: ComponentPlayback | null = null;
+  onCleanup(registerGlobalAudioStop(() => {
+    stopComponentPlayback(playback);
+    playback = null;
+    setPlayingId(null);
+  }));
   const addMenu = createContextMenu((): ContextMenuItem[] => [{
     label: "New folder",
     icon: "ph:folder-plus",

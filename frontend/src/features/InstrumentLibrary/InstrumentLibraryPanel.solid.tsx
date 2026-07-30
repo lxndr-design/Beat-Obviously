@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { Button, Checkbox, HoverInfo, Icon, LibraryFolder, LibrarySearch, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { createInstrumentBufferSource, preloadInstrumentSample, previewFrequency } from "../../audio/synthPreview";
+import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import { LUMUS_TEST_INSTRUMENT_SET_ID, TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useProjectStore, useUiStore } from "../../state/store";
 import { createAurumInstrument } from "../../state/aurum";
 import { instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
@@ -641,6 +642,8 @@ function stopInstrumentPreview() {
     if (activePreview?.source === source) activePreview = null;
   }, 80);
 }
+
+registerGlobalAudioStop(stopInstrumentPreview);
 
 async function playInstrumentPreview(instrument: Instrument, onDone: () => void, shouldContinue: () => boolean) {
   const ctx = getPreviewCtx();

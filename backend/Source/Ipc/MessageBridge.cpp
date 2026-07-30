@@ -1,4 +1,5 @@
 #include "MessageBridge.h"
+#include "../DiagnosticLog.h"
 #include "Schema.h"
 #include "../Audio/Analysis/AudioFileAnalyzer.h"
 #include "../Audio/Effects/TrackEffectDefaults.h"
@@ -2634,6 +2635,9 @@ namespace beat
     MessageBridge::MessageBridge(AudioEngine& e, Database& d, juce::WebBrowserComponent& b)
         : engine(e), database(d), browser(b)
     {
+        bridgeStartedMs = juce::Time::getMillisecondCounterHiRes();
+        lastTimerCallbackMs = bridgeStartedMs;
+        diagnostics::log("startup", "native bridge ready");
         // Hook engine events → emit() so the UI sees them.
         engine.onPositionChanged = [this](Beats b) {
             juce::DynamicObject::Ptr o = new juce::DynamicObject();
@@ -2724,6 +2728,12 @@ namespace beat
 
     void MessageBridge::timerCallback()
     {
+        const auto nowMs = juce::Time::getMillisecondCounterHiRes();
+        const auto timerGapMs = nowMs - lastTimerCallbackMs;
+        lastTimerCallbackMs = nowMs;
+        if (timerGapMs > 500.0)
+            diagnostics::log("responsiveness", "message timer stallMs=" + juce::String(timerGapMs, 2));
+
         AudioEngine::RenderTimingSnapshot timing;
         if (engine.pullRenderTimingSnapshot(timing) && timing.sequence != 0 && timing.sequence != lastRenderTimingSequence)
         {
@@ -2775,9 +2785,53 @@ namespace beat
             timingObject->setProperty("routeFilterEffectSamples", (double) timing.routeFilterEffectSamples);
             timingObject->setProperty("routeNonlinearEffectSamples", (double) timing.routeNonlinearEffectSamples);
             timingObject->setProperty("routeDelayEffectSamples", (double) timing.routeDelayEffectSamples);
+            timingObject->setProperty("realtimeQueueAccepted", (double) timing.realtimeQueueAccepted);
+            timingObject->setProperty("realtimeQueueRejected", (double) timing.realtimeQueueRejected);
+            timingObject->setProperty("blockEventOverflows", (double) timing.blockEventOverflows);
+            timingObject->setProperty("deadlineOverruns", (double) timing.deadlineOverruns);
+            timingObject->setProperty("callbackSafetyViolations", (double) timing.callbackSafetyViolations);
             timingObject->setProperty("modulationWorkBudgetOverruns", (double) timing.modulationWorkBudgetOverruns);
             timingObject->setProperty("nonlinearWorkBudgetOverruns", (double) timing.nonlinearWorkBudgetOverruns);
+            timingObject->setProperty("pendingNoteOffOverflows", (double) timing.pendingNoteOffOverflows);
+            timingObject->setProperty("overloadSafetyMutes", (double) timing.overloadSafetyMutes);
+            timingObject->setProperty("callbackLockMisses", (double) timing.callbackLockMisses);
             emit(ipc::kind::EV_RENDER_TIMING, juce::var(timingObject.get()));
+
+            const bool overloadActive = timing.loadPercent >= 100.0;
+            const bool countersChanged = timing.deadlineOverruns != lastLoggedDeadlineOverruns
+                || timing.pendingNoteOffOverflows != lastLoggedNoteOffOverflows
+                || timing.overloadSafetyMutes != lastLoggedOverloadSafetyMutes
+                || timing.callbackLockMisses != lastLoggedLockMisses;
+            if (timing.overloadSafetyMutes > lastLoggedOverloadSafetyMutes)
+            {
+                juce::DynamicObject::Ptr safetyEvent = new juce::DynamicObject();
+                safetyEvent->setProperty("reason", "realtime-deadline-overload");
+                safetyEvent->setProperty("deadlineOverruns", (double) timing.deadlineOverruns);
+                emit(ipc::kind::EV_SAFETY_MUTED, juce::var(safetyEvent.get()));
+            }
+            const bool periodicActiveLog = engine.sequencer().isPlaying() && nowMs - lastLoadLogMs >= 5000.0;
+            const bool throttledOverloadLog = overloadActive && nowMs - lastLoadLogMs >= 1000.0;
+            const bool throttledCounterLog = countersChanged && nowMs - lastLoadLogMs >= 250.0;
+            if (throttledCounterLog || periodicActiveLog || throttledOverloadLog || overloadActive != overloadWasActive)
+            {
+                diagnostics::log("audio", "render project=" + activeProjectId
+                    + " playing=" + juce::String(engine.sequencer().isPlaying() ? 1 : 0)
+                    + " positionBeat=" + juce::String(engine.sequencer().getPosition(), 3)
+                    + " loadPercent=" + juce::String(timing.loadPercent, 2)
+                    + " totalMs=" + juce::String(timing.totalMs, 3)
+                    + " voices=" + juce::String(timing.activeSynthVoices)
+                    + " routes=" + juce::String(timing.routeCount)
+                    + " deadlineOverruns=" + juce::String(timing.deadlineOverruns)
+                    + " safetyMutes=" + juce::String(timing.overloadSafetyMutes)
+                    + " noteOffOverflows=" + juce::String(timing.pendingNoteOffOverflows)
+                    + " lockMisses=" + juce::String(timing.callbackLockMisses));
+                lastLoadLogMs = nowMs;
+                lastLoggedDeadlineOverruns = timing.deadlineOverruns;
+                lastLoggedNoteOffOverflows = timing.pendingNoteOffOverflows;
+                lastLoggedOverloadSafetyMutes = timing.overloadSafetyMutes;
+                lastLoggedLockMisses = timing.callbackLockMisses;
+                overloadWasActive = overloadActive;
+            }
         }
 
         std::vector<AudioEngine::TrackMeterSnapshot> meterSnapshots;
@@ -2854,15 +2908,27 @@ namespace beat
 
         if (kind == APP_READY)
         {
+            diagnostics::log("startup", "frontend ready durationMs="
+                + juce::String(juce::Time::getMillisecondCounterHiRes() - bridgeStartedMs, 2));
             if (onAppReady)
                 onAppReady();
             return juce::var(true);
         }
 
-        if (kind == TRANSPORT_PLAY)       { engine.requestPlay();  return juce::var(true); }
-        if (kind == TRANSPORT_PAUSE)      { engine.requestPause(); return juce::var(true); }
-        if (kind == TRANSPORT_STOP)       { engine.requestStop();  return juce::var(true); }
-        if (kind == TRANSPORT_RESTART)    { engine.requestRestart(); return juce::var(true); }
+        if (kind == TRANSPORT_PLAY || kind == TRANSPORT_PAUSE || kind == TRANSPORT_STOP || kind == TRANSPORT_RESTART)
+        {
+            const auto startedMs = juce::Time::getMillisecondCounterHiRes();
+            diagnostics::log("transport", kind + " requested project=" + activeProjectId
+                + " positionBeat=" + juce::String(engine.sequencer().getPosition(), 3));
+            if (kind == TRANSPORT_PLAY) engine.requestPlay();
+            else if (kind == TRANSPORT_PAUSE) engine.requestPause();
+            else if (kind == TRANSPORT_STOP) engine.requestStop();
+            else engine.requestRestart();
+            diagnostics::log("transport", kind + " acknowledged durationMs="
+                + juce::String(juce::Time::getMillisecondCounterHiRes() - startedMs, 2)
+                + " playing=" + juce::String(engine.sequencer().isPlaying() ? 1 : 0));
+            return juce::var(true);
+        }
         if (kind == TRANSPORT_SEEK)
         {
             engine.requestSeek((double) payload.getProperty("positionBeat", 0.0));
@@ -2891,10 +2957,20 @@ namespace beat
 
         if (kind == ENGINE_APPLY_PROJECT)
         {
-            engine.applyProject(parseProjectFromFrontend(
+            const auto startedMs = juce::Time::getMillisecondCounterHiRes();
+            diagnostics::log("project", "engine apply started");
+            auto parsedProject = parseProjectFromFrontend(
                 payload.getProperty("project", {}),
                 payload.getProperty("instruments", {}),
-                payload.getProperty("audioFiles", {})));
+                payload.getProperty("audioFiles", {}));
+            activeProjectId = parsedProject.id;
+            const auto trackCount = parsedProject.tracks.size();
+            const auto instrumentCount = parsedProject.instruments.size();
+            engine.applyProject(std::move(parsedProject));
+            diagnostics::log("project", "engine apply ready project=" + activeProjectId
+                + " tracks=" + juce::String((int) trackCount)
+                + " instruments=" + juce::String((int) instrumentCount)
+                + " durationMs=" + juce::String(juce::Time::getMillisecondCounterHiRes() - startedMs, 2));
             return juce::var(true);
         }
 
@@ -3086,6 +3162,7 @@ namespace beat
 
         if (kind == PROJECT_OPEN_FILE)
         {
+            const auto openStartedMs = juce::Time::getMillisecondCounterHiRes();
             juce::DynamicObject::Ptr response = new juce::DynamicObject();
             const auto directPath = payload.getProperty("directPath", {}).toString();
             const auto pathHint = payload.getProperty("pathHint", {}).toString();
@@ -3137,6 +3214,8 @@ namespace beat
             response->setProperty("missingAssets", collectMissingDocumentAssets(parsed));
             response->setProperty("integrityReport", integrityReport.toVar());
             projectRepo.recordRecentProject(file, parsed);
+            diagnostics::log("project", "file load ready path=" + file.getFullPathName()
+                + " durationMs=" + juce::String(juce::Time::getMillisecondCounterHiRes() - openStartedMs, 2));
             return juce::var(response.get());
         }
 

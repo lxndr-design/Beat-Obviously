@@ -89,7 +89,7 @@ export function EditorHost() {
               return (
                 <Modal
                   open
-                  title="Instrument - Aether Engine"
+                  title="Instrument Details - Aether Engine"
                   width="editor"
                   scopeId="synth-editor"
                   flushBody

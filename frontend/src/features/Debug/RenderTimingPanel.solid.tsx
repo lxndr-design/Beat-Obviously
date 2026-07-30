@@ -122,6 +122,11 @@ export function RenderTimingPanel() {
             staticValue={stale() ? "--" : `Mod ${formatCount(timing().modulationWorkBudgetOverruns)}`}
             value={stale() ? "--" : `Nonlinear ${formatCount(timing().nonlinearWorkBudgetOverruns)}`}
           />
+          <StaticRow
+            label="Safety"
+            staticValue={stale() ? "--" : `Deadlines ${formatCount(timing().deadlineOverruns)} / Note queue ${formatCount(timing().pendingNoteOffOverflows)}`}
+            value={stale() ? "--" : `Mute ${formatCount(timing().overloadSafetyMutes)} / Lock ${formatCount(timing().callbackLockMisses)}`}
+          />
           <div class={styles.countGrid}>
             <For each={countRows}>
               {([label, key]) => (

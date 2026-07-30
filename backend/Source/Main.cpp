@@ -1,5 +1,6 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MainComponent.h"
+#include "DiagnosticLog.h"
 
 namespace
 {
@@ -269,6 +270,19 @@ public:
 
     void initialise(const juce::String& commandLine) override
     {
+        const auto logDirectory = juce::File::getSpecialLocation(juce::File::userHomeDirectory)
+            .getChildFile("Library").getChildFile("Logs").getChildFile("Beat");
+        logDirectory.createDirectory();
+        const auto logFile = logDirectory.getChildFile("Beat-debug.log");
+        diagnosticLogger = std::make_unique<juce::FileLogger>(
+            logFile,
+            "Beat diagnostic log",
+            4 * 1024 * 1024);
+        juce::Logger::setCurrentLogger(diagnosticLogger.get());
+        beat::diagnostics::log("lifecycle", "application initialise version=" + getApplicationVersion()
+            + " executable=" + juce::File::getSpecialLocation(juce::File::currentExecutableFile).getFullPathName()
+            + " commandLine=" + commandLine);
+        beat::diagnostics::ScopedDuration startup("lifecycle", "main window");
         juce::LookAndFeel::setDefaultLookAndFeel(&lookAndFeel);
        #if JUCE_MAC
         macApplicationMenu.clear();
@@ -284,11 +298,15 @@ public:
 
     void shutdown() override
     {
+        beat::diagnostics::log("lifecycle", "application shutdown started");
         mainWindow = nullptr;
        #if JUCE_MAC
         juce::MenuBarModel::setMacMainMenu(nullptr);
        #endif
         juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
+        beat::diagnostics::log("lifecycle", "application shutdown complete");
+        juce::Logger::setCurrentLogger(nullptr);
+        diagnosticLogger.reset();
     }
 
     void systemRequestedQuit() override
@@ -450,6 +468,7 @@ private:
     BeatLookAndFeel lookAndFeel;
     juce::PopupMenu macApplicationMenu;
     std::unique_ptr<MainWindow> mainWindow;
+    std::unique_ptr<juce::FileLogger> diagnosticLogger;
 };
 
 START_JUCE_APPLICATION(BeatApp)

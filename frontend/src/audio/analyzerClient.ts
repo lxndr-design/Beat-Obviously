@@ -63,8 +63,16 @@ export function startAnalyzerClient(): () => void {
         routeFilterEffectSamples: positiveNumber(event.routeFilterEffectSamples),
         routeNonlinearEffectSamples: positiveNumber(event.routeNonlinearEffectSamples),
         routeDelayEffectSamples: positiveNumber(event.routeDelayEffectSamples),
+        realtimeQueueAccepted: positiveNumber(event.realtimeQueueAccepted),
+        realtimeQueueRejected: positiveNumber(event.realtimeQueueRejected),
+        blockEventOverflows: positiveNumber(event.blockEventOverflows),
+        deadlineOverruns: positiveNumber(event.deadlineOverruns),
+        callbackSafetyViolations: positiveNumber(event.callbackSafetyViolations),
         modulationWorkBudgetOverruns: positiveNumber(event.modulationWorkBudgetOverruns),
         nonlinearWorkBudgetOverruns: positiveNumber(event.nonlinearWorkBudgetOverruns),
+        pendingNoteOffOverflows: positiveNumber(event.pendingNoteOffOverflows),
+        overloadSafetyMutes: positiveNumber(event.overloadSafetyMutes),
+        callbackLockMisses: positiveNumber(event.callbackLockMisses),
       });
       return;
     }

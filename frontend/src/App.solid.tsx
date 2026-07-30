@@ -9,6 +9,7 @@ import { TrainingAutoRunner } from "./features/Training/TrainingAutoRunner.solid
 import { StartupSplash, STARTUP_MINIMUM_VISIBLE_MS, type StartupStage } from "./features/Startup/StartupSplash.solid";
 import { runProjectExport } from "./features/ExportReview/exportActions";
 import { getTimelineAudioContext, stopTimelineAudio } from "./audio/timelineAudio";
+import { stopAllBrowserAudio } from "./audio/globalAudioSafety";
 import { importAudioFiles } from "./audio/audioImport";
 import { preloadInstrumentSample } from "./audio/synthPreview";
 import { installGlobalHotkeys } from "./hotkeys/hotkeys";
@@ -436,6 +437,12 @@ export function App() {
             useTransportStore.getState().pause();
             stopTimelineAudio();
           }
+          break;
+        case "transport.safetyMuted":
+          useTransportStore.getState().pause();
+          stopTimelineAudio();
+          stopAllBrowserAudio();
+          console.error(`[Beat audio safety] Playback muted after repeated realtime deadline overruns (${event.deadlineOverruns}).`);
           break;
         case "engine.segmentTrigger":
           useUiStore.getState().triggerSegmentPlayback(event.segmentId);

@@ -6,6 +6,11 @@ export interface AudioBusRoutingIssue {
   destinationBusId: Id;
 }
 
+/** Buses whose enabled primary output feeds the Master summing boundary. */
+export function getMasterInputBuses(buses: ReturnBus[]): ReturnBus[] {
+  return buses.filter((bus) => bus.outputEnabled !== false && !bus.outputBusId);
+}
+
 export function audioBusExists(buses: ReturnBus[], busId: Id | undefined): boolean {
   return !busId || buses.some((bus) => bus.id === busId);
 }

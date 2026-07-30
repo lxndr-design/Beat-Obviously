@@ -258,7 +258,7 @@ export function UiElementsSpecimen() {
             <div class={styles.modalShell}>
               <div class={styles.modalHeader}>
                 <Icon name="ph:waveform" size={18} decorative />
-                <strong>Instrument - Aether Engine</strong>
+                <strong>Instrument Details - Aether Engine</strong>
                 <Button iconOnly aria-label="Close mock modal"><Icon name="ph:x" size={18} decorative /></Button>
               </div>
               <div class={styles.modalBody}>

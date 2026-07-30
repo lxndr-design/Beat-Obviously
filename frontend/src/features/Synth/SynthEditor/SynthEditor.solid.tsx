@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { previewFrequency, renderAetherOutputPreviewSamples, renderedInstrumentBuffer } from "../../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../../audio/synthWorkletPreview";
+import { registerGlobalAudioStop } from "../../../audio/globalAudioSafety";
 import { appAlert, Button, FieldActionButton, FloatingSelect, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, Slider, TextInput, Toggle } from "../../../solid-ui";
 import { send } from "../../../ipc/bridge";
 import { useContextualHotkey } from "../../../solid-utils/contextualHotkeys.solid";
@@ -121,6 +122,7 @@ export interface SynthEditorProps {
 }
 
 export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "lumus" }) {
+  onCleanup(registerGlobalAudioStop(stopAudition));
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const boundInstrumentId = createStoreSelector(useSynthStore, (state) => state.boundInstrumentId);
   const liveExpressionActivities = createStoreSelector(useSynthStore, (state) => state.expressionActivityByInstrument);
